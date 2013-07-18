@@ -28,6 +28,7 @@
  */
 #include <inttypes.h>
 #include <stdbool.h>
+#include "trigger.h"
 
 /**
  * Abstraction of a single user session:
@@ -82,22 +83,10 @@ session_exists(uint32_t sid)
 	return session_fd(sid) >= 0;
 }
 
-/**
- * Type of the callback which may be invoked
- * on connect or disconnect event.
- */
-typedef void (*session_trigger_f)(void *);
-
-struct session_trigger
-{
-	session_trigger_f trigger;
-	void *param;
-};
-
 /* The global on-connect trigger. */
-extern struct session_trigger session_on_connect;
+extern struct trigger session_on_connect;
 /* The global on-disconnect trigger. */
-extern struct session_trigger session_on_disconnect;
+extern struct trigger session_on_disconnect;
 
 void
 session_init();

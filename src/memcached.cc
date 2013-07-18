@@ -506,17 +506,13 @@ memcached_space_init()
 
 	/* Configure memcached index key. */
 	struct key_def key_def;
-	key_def.id = 0;
-	key_def.part_count = 1;
-	key_def.is_unique = true;
-	key_def.type = HASH;
+	key_def_create(&key_def, 0, HASH, true, 1, 0, STRING);
 
-	key_def.parts = (struct key_part *) malloc(sizeof(struct key_part));
+	struct space_def space_def;
+	space_def.id = cfg.memcached_space;
+	space_def.arity = 4;
 
-	key_def.parts[0].fieldno = 0;
-	key_def.parts[0].type = STRING;
-
-	(void) space_new(cfg.memcached_space, &key_def, 1, 4);
+	(void) space_new(&space_def, &key_def, 1);
 }
 
 /** Delete a bunch of expired keys. */

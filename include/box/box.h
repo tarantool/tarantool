@@ -78,7 +78,6 @@ box_check_config(struct tarantool_cfg *conf);
  */
 int
 box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
-void box_lua_load_cfg(struct lua_State *L);
 /**
  * Iterate over all spaces and save them to the
  * snapshot file.

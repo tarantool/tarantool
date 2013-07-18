@@ -41,6 +41,8 @@ extern "C" {
 #include <assoc.h>
 
 #include <box/box.h>
+#include "lua/init.h"
+#include "box_lua_space.h"
 
 static struct mh_i32ptr_t *spaces;
 
@@ -57,13 +59,11 @@ static bool primary_indexes_enabled = false;
 
 
 static void
-space_create(struct space *space, uint32_t id,
-	     struct key_def *key_defs, uint32_t key_count,
-	     uint32_t arity)
+space_create(struct space *space, struct space_def *def,
+	     struct key_def *key_defs, uint32_t key_count)
 {
 	memset(space, 0, sizeof(struct space));
-	space->id = id;
-	space->arity = arity;
+	space->def = *def;
 	space->key_count = key_count;
 	space->format = tuple_format_new(key_defs, key_count);
 	/* fill space indexes */
@@ -88,26 +88,33 @@ space_destroy(struct space *space)
 }
 
 struct space *
-space_new(uint32_t id, struct key_def *key_defs,
-	  uint32_t key_count, uint32_t arity)
+space_new(struct space_def *space_def, struct key_def *key_defs,
+	  uint32_t key_count)
 {
-	struct space *space = space_by_id(id);
+	struct space *space = space_by_id(space_def->id);
 	if (space)
-		tnt_raise(LoggedError, ER_SPACE_EXISTS, id);
+		tnt_raise(LoggedError, ER_SPACE_EXISTS, space_def->id);
 
 	space = (struct space *) malloc(sizeof(struct space));
 
-	space_create(space, id, key_defs, key_count, arity);
+	space_create(space, space_def, key_defs, key_count);
 
 	const struct mh_i32ptr_node_t node = { space_id(space), space };
 	mh_i32ptr_put(spaces, &node, NULL, NULL);
-
+	/*
+	 * Must be after the space is put into the hash, since
+	 * box.bless_space() uses hash look up to find the space
+	 * and create userdata objects for space objects.
+	 */
+	box_lua_space_new(tarantool_L, space);
 	return space;
 }
 
 static void
 space_delete(struct space *space)
 {
+	if (tarantool_L)
+		box_lua_space_delete(tarantool_L, space);
 	const struct mh_i32ptr_node_t node = { space_id(space), NULL };
 	mh_int_t k = mh_i32ptr_get(spaces, &node, NULL);
 	assert(k != mh_end(spaces));
@@ -197,7 +204,7 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
-	if (sp->arity > 0 && sp->arity != new_tuple->field_count)
+	if (sp->def.arity > 0 && sp->def.arity != new_tuple->field_count)
 		tnt_raise(IllegalParams,
 			  "tuple field count must match space arity");
 
@@ -227,6 +234,8 @@ space_config()
 
 	/* fill box spaces */
 	for (uint32_t i = 0; cfg.space[i] != NULL; ++i) {
+		struct space_def space_def;
+		space_def.id = i;
 		tarantool_cfg_space *cfg_space = cfg.space[i];
 
 		if (!CNF_STRUCT_DEFINED(cfg_space) || !cfg_space->enabled)
@@ -234,8 +243,8 @@ space_config()
 
 		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
 
-		uint32_t arity = (cfg_space->arity != -1 ?
-				  cfg_space->arity : 0);
+		space_def.arity = (cfg_space->arity != -1 ?
+				   cfg_space->arity : 0);
 		/*
 		 * Collect key/field info. We need aggregate
 		 * information on all keys before we can create
@@ -250,9 +259,9 @@ space_config()
 
 		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
 			auto cfg_index = cfg_space->index[j];
-			key_def_create(&key_defs[j], j, cfg_index);
+			key_def_create_from_cfg(&key_defs[j], j, cfg_index);
 		}
-		(void) space_new(i, key_defs, key_count, arity);
+		(void) space_new(&space_def, key_defs, key_count);
 		free(key_defs);
 
 		say_info("space %i successfully configured", i);

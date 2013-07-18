@@ -38,13 +38,6 @@ struct tarantool_cfg;
 
 struct space {
 	Index *index[BOX_INDEX_MAX];
-	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields.
-	 * If set, each tuple
-	 * must have exactly this many fields.
-	 */
-	uint32_t arity;
-
 	/**
 	 * The number of indexes in the space.
 	 *
@@ -52,9 +45,8 @@ struct space {
 	 * array and defines the key_defs array size as well.
 	 */
 	uint32_t key_count;
-
-	/** Space numeric id. */
-	uint32_t id;
+	/** Space meta. */
+	struct space_def def;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
@@ -62,7 +54,7 @@ struct space {
 
 
 /** Get space ordinal number. */
-static inline uint32_t space_id(struct space *space) { return space->id; }
+static inline uint32_t space_id(struct space *space) { return space->def.id; }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -196,8 +188,8 @@ space_find(uint32_t id)
 }
 
 struct space *
-space_new(uint32_t id, struct key_def *key_defs,
-	  uint32_t key_count, uint32_t arity);
+space_new(struct space_def *space_def,
+	  struct key_def *key_defs, uint32_t key_count);
 
 
 void space_init(void);

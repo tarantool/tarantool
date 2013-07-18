@@ -804,6 +804,7 @@ main(int argc, char **argv)
 
 	if (gopt(opt, 'I')) {
 		initialize_minimal();
+		tarantool_L = tarantool_lua_init(); /* box.space[] */
 		box_init(true);
 		set_lsn(recovery_state, 1);
 		snapshot_save(recovery_state, init_storage);

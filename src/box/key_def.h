@@ -37,7 +37,6 @@
 enum field_type { UNKNOWN = 0, NUM, NUM64, STRING, field_type_MAX };
 extern const char *field_type_strs[];
 
-
 static inline uint32_t
 field_type_maxlen(enum field_type type)
 {
@@ -76,11 +75,31 @@ struct key_def {
 
 struct tarantool_cfg_space_index;
 
+/** Initialize a pre-allocated key_def from cfg_index. */
 void
-key_def_create(struct key_def *def, uint32_t id,
-	       struct tarantool_cfg_space_index *cfg_index);
+key_def_create_from_cfg(struct key_def *def, uint32_t id,
+			struct tarantool_cfg_space_index *cfg_index);
+
+/** Allocate and initialize a key_def */
+struct key_def *
+key_def_create(struct key_def *def,
+	       uint32_t i, enum index_type type, bool is_unique,
+	       uint32_t part_count, ...);
 
 void
 key_def_destroy(struct key_def *def);
+
+/** Space metadata. */
+struct space_def {
+	/** Space id. */
+	uint32_t id;
+	/**
+	 * If not set (is 0), any tuple in the
+	 * space can have any number of fields.
+	 * If set, each tuple
+	 * must have exactly this many fields.
+	 */
+	uint32_t arity;
+};
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

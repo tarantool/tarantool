@@ -92,7 +92,7 @@ lbox_session_peer(struct lua_State *L)
 
 struct lbox_session_trigger
 {
-	struct session_trigger *trigger;
+	struct trigger *trigger;
 	int ref;
 };
 
@@ -149,15 +149,13 @@ lbox_session_set_trigger(struct lua_State *L,
 	 */
 	if (lua_type(L, -2) == LUA_TNIL) {
 		trigger->ref = LUA_NOREF;
-		trigger->trigger->trigger = NULL;
-		trigger->trigger->param = NULL;
+		trigger_set(trigger->trigger, NULL, NULL);
 	} else {
 		/* Move the trigger to the top of the stack. */
 		lua_insert(L, -2);
 		/* Reference the new trigger. Pops it. */
 		trigger->ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		trigger->trigger->trigger = lbox_session_run_trigger;
-		trigger->trigger->param = trigger;
+		trigger_set(trigger->trigger, lbox_session_run_trigger, trigger);
 	}
 	/* Return the old trigger. */
 	return 1;

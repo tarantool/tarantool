@@ -1472,8 +1472,6 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		panic("%s", lua_tostring(L, -1));
 	}
 	lua_pop(L, 1);	/* cleanup stack */
-
-	box_lua_load_cfg(L);
 	/*
 	 * Invoke a user-defined on_reload_configuration hook,
 	 * if it exists. Do it after everything else is done.

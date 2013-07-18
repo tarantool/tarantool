@@ -85,7 +85,7 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
 		txn_replace(txn, space, NULL, new_tuple, mode);
 
-	} catch (const Exception& e) {
+	} catch (const Exception &e) {
 		tuple_free(new_tuple);
 		throw;
 	}
@@ -123,7 +123,7 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 	try {
 		space_validate_tuple(space, new_tuple);
 		txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
-	} catch (const Exception& e) {
+	} catch (const Exception &e) {
 		tuple_free(new_tuple);
 		throw;
 	}

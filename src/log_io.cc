@@ -72,7 +72,8 @@ struct log_dir snap_dir = {
 	/* .open_wflags = */ 0,
 	/* .filetype = */ "SNAP\n",
 	/* .filename_ext = */ ".snap",
-	/* .dirname = */ NULL
+	/* .dirname = */ NULL,
+	/* .mode = */ 0660
 };
 
 struct log_dir wal_dir = {
@@ -81,7 +82,8 @@ struct log_dir wal_dir = {
 	/* .open_wflags = */ 0,
 	/* .filetype = */ "XLOG\n",
 	/* .filename_ext = */ ".xlog",
-	/* .dirname = */ NULL
+	/* .dirname = */ NULL,
+	/* .mode = */ 0660
 };
 
 static int
@@ -647,8 +649,8 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * open will fail.
 	 */
 
-	fd = open(filename,
-		      O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, 0664);
+	fd = open(filename, O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags,
+		  dir->mode);
 	if (fd < 0)
 		goto error;
 	say_info("creating `%s'", filename);

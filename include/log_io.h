@@ -58,6 +58,8 @@ struct log_dir {
 	const char *filetype;
 	const char *filename_ext;
 	char *dirname;
+	/** File create mode in this directory. */
+	mode_t mode;
 };
 
 extern struct log_dir snap_dir;
