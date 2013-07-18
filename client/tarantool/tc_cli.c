@@ -138,7 +138,7 @@ tc_cmd_usage(void)
 		" - notee\n"
 		" - loadfile 'path'\n"
 		" - setopt key=val\n"
-		" - (possible pairs: delim=\'str\')\n"
+		" - (possible pairs: delim[iter]=\'string\')\n"
 		"...\n";
 	tc_printf("%s", usage);
 }
