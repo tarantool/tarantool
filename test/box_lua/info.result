@@ -70,8 +70,8 @@ string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
  - true
 ...
-for k, _ in pairs(box.info()) do 
-    print(' - ', k) 
+for k, _ in pairs(box.info()) do
+    print(' - ', k)
 end
 ---
  - version

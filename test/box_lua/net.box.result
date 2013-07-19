@@ -123,9 +123,9 @@ pstart = box.time()
 parallel = {}
 ---
 ...
-function parallel_foo(id) 
-    box.fiber.sleep(math.random() * .05) 
-    return id 
+function parallel_foo(id)
+    box.fiber.sleep(math.random() * .05)
+    return id
 end
 ---
 ...
@@ -133,25 +133,25 @@ parallel_foo('abc')
 ---
  - abc
 ...
-for i = 1, 20 do 
+for i = 1, 20 do
     box.fiber.resume(
         box.fiber.create(
-            function() 
-                box.fiber.detach() 
-                local s = string.format('%07d', i) 
-                local so = remote:call('parallel_foo', s) 
-                table.insert(parallel, tostring(s == so[0])) 
+            function()
+                box.fiber.detach()
+                local s = string.format('%07d', i)
+                local so = remote:call('parallel_foo', s)
+                table.insert(parallel, tostring(s == so[0]))
             end
         )
-    ) 
+    )
 end
 ---
 ...
-for i = 1, 20 do 
-    if #parallel == 20 then 
-        break 
-    end 
-    box.fiber.sleep(0.1) 
+for i = 1, 20 do
+    if #parallel == 20 then
+        break
+    end
+    box.fiber.sleep(0.1)
 end
 ---
 ...

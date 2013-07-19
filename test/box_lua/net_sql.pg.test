@@ -2,8 +2,8 @@ c = box.net.sql.connect('abcd');
 dump = function(v) return box.cjson.encode(v) end;
 
 connect = {};
-for tk in string.gmatch(os.getenv('PG'), '[^:]+') do 
-    table.insert(connect, tk) 
+for tk in string.gmatch(os.getenv('PG'), '[^:]+') do
+    table.insert(connect, tk)
 end;
 
 -- postgresql;
@@ -36,8 +36,8 @@ c:begin_work();
 c:commit();
 
 c:txn(
-    function(dbi) 
-        dbi:single('SELECT 1') 
+    function(dbi)
+        dbi:single('SELECT 1')
     end
 );
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

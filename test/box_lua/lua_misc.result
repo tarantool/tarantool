@@ -24,8 +24,8 @@ error: '345'
 ----------------
 ---
 ...
-for k, v in pairs(box.stat()) do 
-    print(' - ', k) 
+for k, v in pairs(box.stat()) do
+    print(' - ', k)
 end
 ---
  - DELETE
@@ -35,15 +35,15 @@ end
  - UPDATE
  - DELETE_1_3
 ...
-for k, v in pairs(box.stat().DELETE) do 
-    print(' - ', k) 
+for k, v in pairs(box.stat().DELETE) do
+    print(' - ', k)
 end
 ---
  - total
  - rps
 ...
-for k, v in pairs(box.stat.DELETE) do 
-    print(' - ', k) 
+for k, v in pairs(box.stat.DELETE) do
+    print(' - ', k)
 end
 ---
  - total
@@ -66,8 +66,8 @@ box.cfg.memcached_space
 ---
  - 23
 ...
-for i, v in pairs(box.space[0].index[0].key_field[0]) do 
-    print(i, ' : ', v) 
+for i, v in pairs(box.space[0].index[0].key_field[0]) do
+    print(i, ' : ', v)
 end
 ---
 type : NUM
@@ -94,8 +94,8 @@ string.match(tostring(box.slab.slabs), '^table:') ~= nil
 ---
  - true
 ...
-for k, v in pairs(box.slab()) do 
-    print(' - ', k) 
+for k, v in pairs(box.slab()) do
+    print(' - ', k)
 end
 ---
  - slabs
@@ -107,8 +107,8 @@ end
 ----------------
 ---
 ...
-for k,v in pairs(box.error) do 
-    print('box.error.', k, ' : ', v) 
+for k,v in pairs(box.error) do
+    print('box.error.', k, ' : ', v)
 end
 ---
 box.error.ER_ILLEGAL_PARAMS : 514

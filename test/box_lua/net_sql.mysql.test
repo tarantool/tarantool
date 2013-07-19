@@ -1,17 +1,17 @@
 c = box.net.sql.connect('abcd');
-function dump(v) return 
-    box.cjson.encode(v) 
+function dump(v) return
+    box.cjson.encode(v)
 end;
 
 connect = {};
-for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do 
-    table.insert(connect, tk) 
+for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do
+    table.insert(connect, tk)
 end;
 
 -- mysql;
 c = box.net.sql.connect('mysql', unpack(connect));
-for k, v in pairs(c) do 
-    print(k, ': ', type(v)) 
+for k, v in pairs(c) do
+    print(k, ': ', type(v))
 end;
 c:execute('SEL ECT 1');
 dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')});

@@ -51,8 +51,8 @@ function box.crossjoin(space0, space1, limit)
                 return unpack(result)
             end
             newtuple = {v0:unpack()}
-            for _, v in v1:pairs() do 
-                table.insert(newtuple, v) 
+            for _, v in v1:pairs() do
+                table.insert(newtuple, v)
             end
             table.insert(result, box.tuple.new(newtuple))
             limit = limit - 1
@@ -64,7 +64,7 @@ end;
 box.space[2]:insert(1, 'tuple');
 box.space[3]:insert(1, 'tuple');
 box.space[3]:insert(2, 'tuple');
- 
+
 box.crossjoin('3', '3', '0');
 box.crossjoin('3', '3', '5');
 box.crossjoin('3', '3', '10000');

@@ -53,11 +53,11 @@ buffer = {}
 ---
 ...
 tfbr = box.fiber.create(
-    function() 
-        box.fiber.detach() 
-        while true do 
-            table.insert(buffer, ch:get()) 
-        end 
+    function()
+        box.fiber.detach()
+        while true do
+            table.insert(buffer, ch:get())
+        end
     end
 )
 ---
@@ -65,8 +65,8 @@ tfbr = box.fiber.create(
 box.fiber.resume(tfbr)
 ---
 ...
-for i = 1, 10 do 
-    print(i, ' : ', ch:put(i, 0.1)) 
+for i = 1, 10 do
+    print(i, ' : ', ch:put(i, 0.1))
 end
 ---
 1 : true
@@ -115,8 +115,8 @@ ch:get(box.info.pid) == box.info.pid
 ---
  - true
 ...
-for i, v in pairs(buffer) do 
-    print(v) 
+for i, v in pairs(buffer) do
+    print(v)
 end
 ---
 234
@@ -156,12 +156,12 @@ ch:is_empty()
  - true
 ...
 tfbr = box.fiber.create(
-    function() 
-        box.fiber.detach() 
-        while true do 
-            local v = ch:get() 
-            table.insert(buffer, 'tfbr  - ' .. tostring(v)) 
-        end 
+    function()
+        box.fiber.detach()
+        while true do
+            local v = ch:get()
+            table.insert(buffer, 'tfbr  - ' .. tostring(v))
+        end
     end
 )
 ---
@@ -170,12 +170,12 @@ box.fiber.resume(tfbr)
 ---
 ...
 tfbr2 = box.fiber.create(
-    function() 
-        box.fiber.detach() 
-        while true do 
+    function()
+        box.fiber.detach()
+        while true do
             local v = ch:get()
-            table.insert(buffer, 'tfbr2 - ' .. tostring(v)) 
-        end 
+            table.insert(buffer, 'tfbr2 - ' .. tostring(v))
+        end
     end
 )
 ---
@@ -186,8 +186,8 @@ box.fiber.resume(tfbr2)
 buffer = {}
 ---
 ...
-for i, v in pairs(buffer) do 
-    print(' - ', v) 
+for i, v in pairs(buffer) do
+    print(' - ', v)
 end
 ---
 ...
@@ -223,8 +223,8 @@ ch:broadcast('broadcast message!')
 ---
  - 2
 ...
-for i = 35, 45 do 
-    print(' - ', ch:put(i)) 
+for i = 35, 45 do
+    print(' - ', ch:put(i))
 end
 ---
  - true
@@ -239,8 +239,8 @@ end
  - true
  - true
 ...
-for i, v in pairs(buffer) do 
-    print(' - "', v, '"') 
+for i, v in pairs(buffer) do
+    print(' - "', v, '"')
 end
 ---
  - "tfbr  - 1"

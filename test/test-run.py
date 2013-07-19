@@ -91,7 +91,7 @@ class Options:
                 action = "store_true",
                 default = False,
                 help = """Start the server under 'gdb' debugger in detached
-                Screen. See also --start-and-exit. This option is mutually 
+                Screen. See also --start-and-exit. This option is mutually
                 exclusive with --valgrind. Default: false.""")
 
         parser.add_argument(
@@ -177,7 +177,7 @@ def main():
                     suite_names.append(os.path.basename(root))
 
         suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
-        
+
         for suite in suites:
             failed_tests += suite.run_all()
     except RuntimeError as e:

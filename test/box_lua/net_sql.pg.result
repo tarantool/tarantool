@@ -8,8 +8,8 @@ dump = function(v) return box.cjson.encode(v) end
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('PG'), '[^:]+') do 
-    table.insert(connect, tk) 
+for tk in string.gmatch(os.getenv('PG'), '[^:]+') do
+    table.insert(connect, tk)
 end
 ---
 ...
@@ -115,8 +115,8 @@ c:commit()
  - 0
 ...
 c:txn(
-    function(dbi) 
-        dbi:single('SELECT 1') 
+    function(dbi)
+        dbi:single('SELECT 1')
     end
 )
 ---

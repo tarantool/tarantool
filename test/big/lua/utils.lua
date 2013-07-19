@@ -83,10 +83,10 @@ end
 
 -- sort all rows as strings(not for tables);
 function box.sort(tuples)
-    function compare_tables(t1, t2) 
+    function compare_tables(t1, t2)
         return (tostring(t1) < tostring(t2))
-    end 
-    table.sort(tuples, compare_tables) 
+    end
+    table.sort(tuples, compare_tables)
     return tuples
 end;
 

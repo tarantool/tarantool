@@ -1,6 +1,6 @@
 -- A test case for a race condition between ev_schedule
--- and wal_schedule fiber schedulers. 
--- The same fiber should not be scheduled by ev_schedule (e.g. 
+-- and wal_schedule fiber schedulers.
+-- The same fiber should not be scheduled by ev_schedule (e.g.
 -- due to cancellation) if it is within th wal_schedule queue.
 -- The test case is dependent on rows_per_wal, since this is when
 -- we reopen the .xlog file and thus wal_scheduler takes a long
@@ -228,13 +228,13 @@ box.space[0]:truncate()
 -- test passing arguments in and out created fiber
 ---
 ...
-function y() 
-    print('started') 
-    box.fiber.detach() 
-    while true do 
-        box.replace(0, 'test', os.time()) 
-        box.fiber.sleep(0.001) 
-    end 
+function y()
+    print('started')
+    box.fiber.detach()
+    while true do
+        box.replace(0, 'test', os.time())
+        box.fiber.sleep(0.001)
+    end
 end
 ---
 ...
@@ -255,12 +255,12 @@ box.fiber.resume(f)
 ---
 error: 'fiber.resume(): the fiber is dead'
 ...
-for k = 1, 1000, 1 do 
+for k = 1, 1000, 1 do
     box.fiber.create(
-        function() 
-            box.fiber.detach() 
+        function()
+            box.fiber.detach()
         end
-    ) 
+    )
 end
 ---
 ...
