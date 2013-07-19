@@ -3,10 +3,10 @@
 # A wrapper script to run a single tarantool instance
 # and restart it when it crashes
 
-export PATH=$PATH:/usr/local/bin
+export PATH=$PATH:/usr/bin
 
 NAME="tarantool_box"
-BINARY="/usr/local/bin/${NAME}"
+BINARY="/usr/bin/${NAME}"
 INST=$(basename $0 .sh)
 CONF="/usr/local/etc/${INST}.cfg"
 LOGDIR="/var/${INST}/logs"
