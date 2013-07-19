@@ -140,8 +140,8 @@ def setenv():
     os.putenv("TARANTOOL_PLUGIN_DIR",
         string.join(
             (
-                os.path.join(os.getcwd(), '../src/plugins/mysql'),
-                os.path.join(os.getcwd(), '../src/plugins/pg')
+                os.path.join(os.getcwd(), '../src/plugin/mysql'),
+                os.path.join(os.getcwd(), '../src/plugin/pg')
             ),
             ':'
         )

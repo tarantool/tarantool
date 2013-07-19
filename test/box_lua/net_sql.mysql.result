@@ -2,19 +2,28 @@ c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
-dump = function(v) return box.cjson.encode(v) end
+function dump(v) return 
+    box.cjson.encode(v) 
+end
 ---
 ...
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do 
+    table.insert(connect, tk) 
+end
+---
+...
+-- mysql
 ---
 ...
 c = box.net.sql.connect('mysql', unpack(connect))
 ---
 ...
-for k, v in pairs(c) do print(k, ': ', type(v)) end
+for k, v in pairs(c) do 
+    print(k, ': ', type(v)) 
+end
 ---
 raise: boolean
 processing: boolean
@@ -59,7 +68,7 @@ dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
 ---
  - [[{"one":1},{"one":2},{"two":"abc"}],3]
 ...
-c:quote('test "abc" test')
+c:quote('test \"abc\" test')
 ---
  - test \"abc\" test
 ...
@@ -78,4 +87,8 @@ c:begin_work()
 c:commit()
 ---
  - 0
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
 ...

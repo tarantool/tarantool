@@ -8,7 +8,12 @@ dump = function(v) return box.cjson.encode(v) end
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('PG'), '[^:]+') do 
+    table.insert(connect, tk) 
+end
+---
+...
+-- postgresql
 ---
 ...
 c = box.net.sql.connect('pg', unpack(connect))
@@ -89,7 +94,7 @@ c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
-c:quote('abc"cde"def')
+c:quote('abc\"cde\"def')
 ---
  - 'abc"cde"def'
 ...
@@ -109,7 +114,15 @@ c:commit()
 ---
  - 0
 ...
-c:txn(function(dbi) dbi:single('SELECT 1') end)
+c:txn(
+    function(dbi) 
+        dbi:single('SELECT 1') 
+    end
+)
 ---
  - true
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
 ...

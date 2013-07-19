@@ -1,9 +1,6 @@
-# encoding: utf-8
-
 import os
 
 try:
 	(host, port, user, password, db) = os.getenv('PG').split(':')
-
 except (RuntimeError, TypeError, NameError, AttributeError, ValueError):
 	self.skip = 1
