@@ -126,6 +126,24 @@ Index::Index(struct key_def *key_def)
 	m_position = NULL;
 }
 
+void
+Index::beginBuild()
+{}
+
+void
+Index::reserve(uint32_t /* size_hint */)
+{}
+
+void
+Index::buildNext(struct tuple *tuple)
+{
+	replace(NULL, tuple, DUP_INSERT);
+}
+
+void
+Index::endBuild()
+{}
+
 Index::~Index()
 {
 	if (m_position != NULL)
@@ -134,10 +152,64 @@ Index::~Index()
 }
 
 struct tuple *
+Index::min() const
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def.type],
+		  "min()");
+	return NULL;
+}
+
+struct tuple *
+Index::max() const
+{
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def.type],
+		  "max()");
+	return NULL;
+}
+
+struct tuple *
+Index::random(uint32_t rnd) const
+{
+	(void) rnd;
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def.type],
+		  "random()");
+	return NULL;
+}
+
+struct tuple *
 Index::findByTuple(struct tuple *tuple) const
 {
 	(void) tuple;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "Index", "findByTuple()");
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+		  index_type_strs[key_def.type],
+		  "findByTuple()");
 	return NULL;
 }
+
+void
+index_build(Index *index, Index *pk)
+{
+	uint32_t n_tuples = pk->size();
+	uint32_t estimated_tuples = n_tuples * 1.2;
+
+	index->beginBuild();
+	index->reserve(estimated_tuples);
+
+	say_info("Adding %" PRIu32 " keys to %s index %"
+		 PRIu32 "...", n_tuples,
+		 index_type_strs[index->key_def.type], index_id(index));
+
+	struct iterator *it = pk->position();
+	pk->initIterator(it, ITER_ALL, NULL, 0);
+
+	struct tuple *tuple;
+	while ((tuple = it->next(it)))
+		index->buildNext(tuple);
+
+	index->endBuild();
+}
+
 /* }}} */

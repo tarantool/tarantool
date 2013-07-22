@@ -170,7 +170,7 @@ hash_iterator_eq(struct iterator *it)
 
 /* }}} */
 
-/* {{{ HashIndex -- base class for all hashes. ********************/
+/* {{{ HashIndex -- implementation of all hashes. **********************/
 
 HashIndex::HashIndex(struct key_def *key_def)
 	: Index(key_def)
@@ -188,67 +188,15 @@ HashIndex::~HashIndex()
 }
 
 void
-HashIndex::beginBuild()
+HashIndex::reserve(uint32_t size_hint)
 {
-}
-
-void
-HashIndex::buildNext(struct tuple *tuple)
-{
-	replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-HashIndex::endBuild()
-{
-}
-
-void
-HashIndex::build(Index *pk)
-{
-	uint32_t n_tuples = pk->size();
-
-	if (n_tuples == 0)
-		return;
-
-	reserve(n_tuples);
-
-	say_info("Adding %" PRIu32 " keys to HASH index %"
-		 PRIu32 "...", n_tuples, index_id(this));
-
-	struct iterator *it = pk->position();
-	struct tuple *tuple;
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	while ((tuple = it->next(it)))
-	      replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-HashIndex::reserve(uint32_t n_tuples)
-{
-	mh_index_reserve(hash, n_tuples, &key_def);
+	mh_index_reserve(hash, size_hint, &key_def);
 }
 
 size_t
 HashIndex::size() const
 {
 	return mh_size(hash);
-}
-
-
-struct tuple *
-HashIndex::min() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "Hash index", "min()");
-	return NULL;
-}
-
-struct tuple *
-HashIndex::max() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "Hash index", "max()");
-	return NULL;
 }
 
 struct tuple *

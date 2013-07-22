@@ -44,9 +44,9 @@ public:
 	virtual ~TreeIndex();
 
 	virtual void beginBuild();
+	virtual void reserve(uint32_t size_hint);
 	virtual void buildNext(struct tuple *tuple);
 	virtual void endBuild();
-	virtual void build(Index *pk);
 	virtual size_t size() const;
 	virtual struct tuple *min() const;
 	virtual struct tuple *max() const;

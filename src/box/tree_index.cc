@@ -361,30 +361,29 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 void
 TreeIndex::beginBuild()
 {
-	assert(index_is_primary(this));
-
 	tree.size = 0;
-	tree.max_size = 64;
+	tree.max_size = 0;
+	tree.members = NULL;
+}
 
-	size_t sz = tree.max_size * sizeof(struct sptree_index_node);
-	tree.members = malloc(sz);
+void
+TreeIndex::reserve(uint32_t size_hint)
+{
+	assert(size_hint >= tree.size);
+	size_t sz = size_hint * sizeof(struct sptree_index_node);
+	tree.members = realloc(tree.members, sz);
 	if (tree.members == NULL) {
-		panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sz,
+			  "TreeIndex::reserve()", "malloc");
 	}
+	tree.max_size = size_hint;
 }
 
 void
 TreeIndex::buildNext(struct tuple *tuple)
 {
-	if (tree.size == tree.max_size) {
-		tree.max_size *= 2;
-
-		size_t sz = tree.max_size * sizeof(struct sptree_index_node);
-		tree.members = realloc(tree.members, sz);
-		if (tree.members == NULL) {
-			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
-		}
-	}
+	if (tree.size == tree.max_size)
+		reserve(tree.max_size * 2);
 
 	struct sptree_index_node *node = (struct sptree_index_node *)
 			tree.members + tree.size;
@@ -395,54 +394,14 @@ TreeIndex::buildNext(struct tuple *tuple)
 void
 TreeIndex::endBuild()
 {
-	assert(index_is_primary(this));
-
 	uint32_t n_tuples = tree.size;
-	uint32_t estimated_tuples = tree.max_size;
-	void *nodes = tree.members;
-
-	sptree_index_init(&tree, sizeof(struct tuple *),
-			  nodes, n_tuples, estimated_tuples,
-			  sptree_index_node_compare_with_key,
-			  sptree_index_node_compare,
-			  this);
-}
-
-void
-TreeIndex::build(Index *pk)
-{
-	uint32_t n_tuples = pk->size();
-	uint32_t estimated_tuples = n_tuples * 1.2;
-
-	void *nodes = NULL;
-	if (n_tuples) {
-		/*
-		 * Allocate a little extra to avoid
-		 * unnecessary realloc() when more data is
-		 * inserted.
-		*/
-		size_t sz = estimated_tuples * sizeof(struct sptree_index_node);
-		nodes = malloc(sz);
-		if (nodes == NULL) {
-			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
-		}
-	}
-
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	struct tuple *tuple;
-
-	for (uint32_t i = 0; (tuple = it->next(it)) != NULL; ++i) {
-		struct sptree_index_node *node = (struct sptree_index_node *)
-				nodes + i;
-		sptree_index_fold(node, tuple);
-	}
 
 	if (n_tuples) {
 		say_info("Sorting %" PRIu32 " keys in index %" PRIu32 "...",
 			 n_tuples, index_id(this));
 	}
+	uint32_t estimated_tuples = tree.max_size;
+	void *nodes = tree.members;
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
 	sptree_index_init(&tree, sizeof(struct sptree_index_node),
@@ -452,3 +411,4 @@ TreeIndex::build(Index *pk)
 					    : sptree_index_node_compare_dup,
 			  this);
 }
+

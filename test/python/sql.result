@@ -340,11 +340,11 @@ for k, v in box.space[4]:pairs() do print(v) end
 ...
 box.space[4].index[0].idx:min()
 ---
-error: 'Hash index does not support min()'
+error: 'HASH does not support min()'
 ...
 box.space[4].index[0].idx:max()
 ---
-error: 'Hash index does not support max()'
+error: 'HASH does not support max()'
 ...
 box.space[4].index[1].idx:min()
 ---

@@ -355,10 +355,9 @@ build_secondary_indexes(void)
 			 space_id(space));
 
 		Index *pk = space->index[0];
-		for (uint32_t j = 1; j < space->key_count; j++) {
-			Index *index = space->index[j];
-			index->build(pk);
-		}
+
+		for (uint32_t j = 1; j < space->key_count; j++)
+			index_build(space->index[j], pk);
 
 		say_info("Space %d: done", space_id(space));
 	}

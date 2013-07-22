@@ -155,15 +155,19 @@ public:
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
-	virtual void beginBuild() = 0;
-	virtual void buildNext(struct tuple *tuple) = 0;
-	virtual void endBuild() = 0;
-	/** Build this index based on the contents of another index. */
-	virtual void build(Index *pk) = 0;
+	virtual void beginBuild();
+	/**
+	 * Optional hint, given to the index, about
+	 * the total size of the index. If given,
+	 * is given after beginBuild().
+	 */
+	virtual void reserve(uint32_t /* size_hint */);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
 	virtual size_t size() const = 0;
-	virtual struct tuple *min() const = 0;
-	virtual struct tuple *max() const = 0;
-	virtual struct tuple *random(uint32_t rnd) const = 0;
+	virtual struct tuple *min() const;
+	virtual struct tuple *max() const;
+	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
@@ -237,5 +241,9 @@ index_is_primary(const Index *index)
 {
 	return index_id(index) == 0;
 }
+
+/** Build this index based on the contents of another index. */
+void
+index_build(Index *index, Index *pk);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */
