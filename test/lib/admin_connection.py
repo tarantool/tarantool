@@ -97,3 +97,10 @@ class AdminConnection(TarantoolConnection):
         if (not rg1 or len(rg1.group()) != len(command)) and not rg2:
             add_lua=True
         return self.execute_simple(command, silent, lua=add_lua)
+    
+    def __call__(self, command, silent=False, simple=False):
+        if not simple:
+            return self.execute(command, silent)
+        else:
+            self.opt_reconnect()
+            return self.execute_simple(command, silent)

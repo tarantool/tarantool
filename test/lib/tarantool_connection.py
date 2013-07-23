@@ -76,8 +76,4 @@ class TarantoolConnection(object):
         self.disconnect()
  
     def __call__(self, command, silent=False, simple=False):
-        if not simple:
-            return self.execute(command, silent)
-        else:
-            self.opt_reconnect()
-            return self.execute_simple(command, silent)
+        return self.execute(command, silent)
