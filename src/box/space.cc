@@ -46,47 +46,6 @@ extern "C" {
 
 static struct mh_i32ptr_t *spaces;
 
-/**
- * Secondary indexes are built in bulk after all data is
- * recovered. This flag indicates that the indexes are
- * already built and ready for use.
- */
-static bool secondary_indexes_enabled = false;
-/**
- * Primary indexes are enabled only after reading the snapshot.
- */
-static bool primary_indexes_enabled = false;
-
-
-static void
-space_create(struct space *space, struct space_def *def,
-	     struct key_def *key_defs, uint32_t key_count)
-{
-	memset(space, 0, sizeof(struct space));
-	space->def = *def;
-	space->key_count = key_count;
-	space->format = tuple_format_new(key_defs, key_count);
-	/* fill space indexes */
-	for (uint32_t j = 0; j < key_count; ++j) {
-		struct key_def *key_def = &key_defs[j];
-		Index *index = Index::factory(key_def);
-		if (index == NULL) {
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  "class Index", "malloc");
-		}
-		space->index[j] = index;
-	}
-}
-
-static void
-space_destroy(struct space *space)
-{
-	for (uint32_t j = 0 ; j < space->key_count; j++) {
-		Index *index = space->index[j];
-		delete index;
-	}
-}
-
 struct space *
 space_new(struct space_def *space_def, struct key_def *key_defs,
 	  uint32_t key_count)
@@ -95,9 +54,34 @@ space_new(struct space_def *space_def, struct key_def *key_defs,
 	if (space)
 		tnt_raise(LoggedError, ER_SPACE_EXISTS, space_def->id);
 
-	space = (struct space *) malloc(sizeof(struct space));
+	uint32_t index_id_max = 0;
+	for (uint32_t j = 0; j < key_count; ++j)
+		index_id_max = MAX(index_id_max, key_defs[j].id);
 
-	space_create(space, space_def, key_defs, key_count);
+	size_t sz = sizeof(struct space) +
+		(key_count + index_id_max + 1) * sizeof(Index *);
+	space = (struct space *) calloc(1, sz);
+
+	space->index_map = (Index **)((char *) space + sizeof(*space) +
+				      key_count * sizeof(Index *));
+	space->def = *space_def;
+	space->format = tuple_format_new(key_defs, key_count);
+	space->index_id_max = index_id_max;
+	/* fill space indexes */
+	for (uint32_t j = 0; j < key_count; ++j) {
+		struct key_def *key_def = &key_defs[j];
+		Index *index = Index::factory(key_def);
+		if (index == NULL) {
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  "class Index", "malloc");
+		}
+		space->index_map[key_def->id] = index;
+	}
+	/*
+	 * Initialize the primary key, but do not the secondary
+	 * keys - they are built by space_build_secondary_keys().
+	 */
+	space->index[space->index_count++] = space->index_map[0];
 
 	const struct mh_i32ptr_node_t node = { space_id(space), space };
 	mh_i32ptr_put(spaces, &node, NULL, NULL);
@@ -110,6 +94,28 @@ space_new(struct space_def *space_def, struct key_def *key_defs,
 	return space;
 }
 
+void
+space_build_secondary_keys(struct space *space)
+{
+	if (space->index_id_max == 0)
+		return; /* no secondary keys */
+
+	say_info("Building secondary keys in space %d...",
+		 space_id(space));
+
+	Index *pk = space->index_map[0];
+
+	for (uint32_t j = 1; j <= space->index_id_max; j++) {
+		Index *index = space->index_map[j];
+		if (index) {
+			index_build(index, pk);
+			space->index[space->index_count++] = index;
+		}
+	}
+
+	say_info("Space %d: done", space_id(space));
+}
+
 static void
 space_delete(struct space *space)
 {
@@ -119,7 +125,8 @@ space_delete(struct space *space)
 	mh_int_t k = mh_i32ptr_get(spaces, &node, NULL);
 	assert(k != mh_end(spaces));
 	mh_i32ptr_del(spaces, k, NULL);
-	space_destroy(space);
+	for (uint32_t j = 0 ; j <= space->index_id_max; j++)
+		delete space->index_map[j];
 	free(space);
 }
 
@@ -132,22 +139,6 @@ space_by_id(uint32_t id)
 	if (space == mh_end(spaces))
 		return NULL;
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;
-}
-
-/** Return the number of active indexes in a space. */
-static inline int
-index_count(struct space *sp)
-{
-	if (!secondary_indexes_enabled) {
-		/* If secondary indexes are not enabled yet,
-		   we can use only the primary index. So return
-		   1 if there is at least one index (which
-		   must be primary) and return 0 otherwise. */
-		return sp->key_count > 0;
-	} else {
-		/* Return the actual number of indexes. */
-		return sp->key_count;
-	}
 }
 
 /**
@@ -165,13 +156,13 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata) {
 }
 
 struct tuple *
-space_replace(struct space *sp, struct tuple *old_tuple,
+space_replace(struct space *space, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
 	uint32_t i = 0;
 	try {
 		/* Update the primary key */
-		Index *pk = sp->index[0];
+		Index *pk = space->index[0];
 		assert(pk->key_def.is_unique);
 		/*
 		 * If old_tuple is not NULL, the index
@@ -181,17 +172,20 @@ space_replace(struct space *sp, struct tuple *old_tuple,
 		old_tuple = pk->replace(old_tuple, new_tuple, mode);
 
 		assert(old_tuple || new_tuple);
-		uint32_t n = index_count(sp);
-		/* Update secondary keys */
-		for (i = i + 1; i < n; i++) {
-			Index *index = sp->index[i];
+		/*
+		 * Update secondary keys. When loading data from
+		 * the WAL secondary keys are not enabled
+		 * (index_count is 1).
+		 */
+		for (i++; i < space->index_count; i++) {
+			Index *index = space->index[i];
 			index->replace(old_tuple, new_tuple, DUP_INSERT);
 		}
 		return old_tuple;
-	} catch (const Exception& e) {
+	} catch (const Exception &e) {
 		/* Rollback all changes */
 		for (; i > 0; i--) {
-			Index *index = sp->index[i-1];
+			Index *index = space->index[i-1];
 			index->replace(new_tuple, old_tuple, DUP_INSERT);
 		}
 		throw;
@@ -312,8 +306,6 @@ space_init(void)
 void
 begin_build_primary_indexes(void)
 {
-	assert(primary_indexes_enabled == false);
-
 	mh_int_t i;
 
 	mh_foreach(spaces, i) {
@@ -334,36 +326,18 @@ end_build_primary_indexes(void)
 		Index *index = space->index[0];
 		index->endBuild();
 	}
-	primary_indexes_enabled = true;
 }
 
 void
 build_secondary_indexes(void)
 {
-	assert(primary_indexes_enabled == true);
-	assert(secondary_indexes_enabled == false);
-
 	mh_int_t i;
 	mh_foreach(spaces, i) {
 		struct space *space = (struct space *)
 				mh_i32ptr_node(spaces, i)->val;
 
-		if (space->key_count <= 1)
-			continue; /* no secondary keys */
-
-		say_info("Building secondary keys in space %d...",
-			 space_id(space));
-
-		Index *pk = space->index[0];
-
-		for (uint32_t j = 1; j < space->key_count; j++)
-			index_build(space->index[j], pk);
-
-		say_info("Space %d: done", space_id(space));
+		space_build_secondary_keys(space);
 	}
-
-	/* enable secondary indexes now */
-	secondary_indexes_enabled = true;
 }
 
 int

@@ -76,11 +76,14 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	 * Fill space.index table with
 	 * all defined indexes.
 	 */
-	for (int i = 0; i < space->key_count; i++) {
-		lua_pushnumber(L, i);
+	for (int i = 0; i <= space->index_id_max; i++) {
+		Index *index = space_index(space, i);
+		if (index == NULL)
+			continue;
+		struct key_def *key_def = &index->key_def;
+		lua_pushnumber(L, key_def->id);
 		lua_newtable(L);		/* space.index[i] */
 
-		struct key_def *key_def = &space->index[i]->key_def;
 		lua_pushstring(L, "unique");
 		lua_pushboolean(L, key_def->is_unique);
 		lua_settable(L, -3);

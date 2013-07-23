@@ -37,24 +37,42 @@
 struct tarantool_cfg;
 
 struct space {
-	Index *index[BOX_INDEX_MAX];
 	/**
-	 * The number of indexes in the space.
+	 * The number of *enabled* indexes in the space.
 	 *
-	 * It is equal to the number of non-nil members of the index
-	 * array and defines the key_defs array size as well.
+	 * After all indexes are built, it is equal to the number
+	 * of non-nil members of the index[] array.
 	 */
-	uint32_t key_count;
+	uint32_t index_count;
+	/**
+	 * There may be gaps index ids, i.e. index 0 and 2 may exist,
+	 * while index 1 is not defined. This member stores the
+	 * max id of a defined index in the space. It defines the
+	 * size of index_map array.
+	 */
+	uint32_t index_id_max;
 	/** Space meta. */
 	struct space_def def;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
+	/**
+	 * Sparse array of indexes defined on the space, indexed
+	 * by id. Used to quickly find index by id (for SELECTs).
+	 */
+	Index **index_map;
+	/**
+	 * Dense array of indexes defined on the space, in order
+	 * of index id. Initially stores only the primary key at
+	 * position 0, and is fully built by
+	 * space_build_secondary_keys().
+	 */
+	Index *index[];
 };
 
-
 /** Get space ordinal number. */
-static inline uint32_t space_id(struct space *space) { return space->def.id; }
+static inline uint32_t
+space_id(struct space *space) { return space->def.id; }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -153,14 +171,14 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 /**
- * Get index by index number.
+ * Get index by index id.
  * @return NULL if index not found.
  */
 static inline Index *
-space_index(struct space *sp, uint32_t index_no)
+space_index(struct space *space, uint32_t id)
 {
-	if (index_no < BOX_INDEX_MAX)
-		return sp->index[index_no];
+	if (id <= space->index_id_max)
+		return space->index_map[id];
 	return NULL;
 }
 
@@ -191,6 +209,13 @@ struct space *
 space_new(struct space_def *space_def,
 	  struct key_def *key_defs, uint32_t key_count);
 
+/**
+ * Secondary indexes are built in bulk after all data is
+ * recovered. This flag indicates that the indexes are
+ * already built and ready for use.
+ */
+void
+space_build_secondary_keys(struct space *space);
 
 void space_init(void);
 void space_free(void);
