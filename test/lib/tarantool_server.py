@@ -51,6 +51,15 @@ class FuncTest(Test):
     def execute(self, server):
         execfile(self.name, dict(locals(), **server.__dict__))
 
+class LuaTest(FuncTest):
+    def execute(self, server):
+        for i in open(self.name, 'r').read().replace('\n\n', '\n').split(';\n'):
+             server.admin(i)
+
+class PythonTest(FuncTest):
+    def execute(self, server):
+        execfile(self.name, dict(locals(), **server.__dict__))
+
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""
     def __init__(self, fp, section_name):
@@ -417,3 +426,12 @@ class TarantoolServer(Server):
             except socket.error as e:
                 break
 
+    def find_tests(self, test_suite, suite_path):
+        def patterned(test, patterns):
+            for i in patterns
+                if test.name.find(i):
+                    return True
+            return False
+        tests  = [PythonTest(k, test_suite.args, test_sutie.args.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))
+        tests += [PythonTest(k, test_suite.args, test_sutie.args.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))
+        test_suite.tests = filter((lambda x: patterned(x)), test_suite.tests)
