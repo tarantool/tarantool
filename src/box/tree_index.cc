@@ -401,7 +401,7 @@ TreeIndex::endBuild()
 	uint32_t estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
 
-	sptree_index_init(&tree, sizeof(struct tuple *),
+	sptree_index_init(&tree, sizeof(struct sptree_index_node),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
 			  sptree_index_node_compare,
