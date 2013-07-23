@@ -79,4 +79,5 @@ class TarantoolConnection(object):
         if not simple:
             return self.execute(command, silent)
         else:
+            self.opt_reconnect()
             return self.execute_simple(command, silent)

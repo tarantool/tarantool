@@ -82,7 +82,7 @@ print """# recv reply 'cas foo1' from memcached1 """
 result = memcached1.recv(silent=True)
 mem1_cas_result = result.split()[0]
 print """# recv reply 'cas foo1' from memcached2 """
-result = memcached.recv(silent=True)
+result = memcached2.recv(silent=True)
 mem2_cas_result = result.split()[0]
 
 if mem1_cas_result == "STORED" and mem2_cas_result == "EXISTS":
