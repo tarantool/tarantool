@@ -51,13 +51,6 @@ read_key(const char **reqpos, const char *reqend, uint32_t *key_part_count)
 	return key;
 }
 
-static struct space *
-read_space(const char **reqpos, const char *reqend)
-{
-	uint32_t space_no = pick_u32(reqpos, reqend);
-	return space_find(space_no);
-}
-
 enum dup_replace_mode
 dup_replace_mode(uint32_t flags)
 {
@@ -71,15 +64,13 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
-	struct space *space = read_space(reqpos, reqend);
-	request->flags |= (pick_u32(reqpos, reqend) &
-			   BOX_ALLOWED_REQUEST_FLAGS);
-	uint32_t field_count = pick_u32(reqpos, reqend);
+
+	struct space *space = space_find(request->r.space_no);
+	const char **tuplepos = &request->r.tuple;
+	uint32_t field_count = pick_u32(tuplepos, request->r.tuple_end);
 
 	struct tuple *new_tuple = tuple_new(space->format, field_count,
-					    reqpos, reqend);
+					    tuplepos, request->r.tuple_end);
 	try {
 		space_validate_tuple(space, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
@@ -91,26 +82,21 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 	}
 }
 
-
 static void
 execute_update(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
-	struct space *space = read_space(reqpos, reqend);
-	request->flags |= (pick_u32(reqpos, reqend) &
-			   BOX_ALLOWED_REQUEST_FLAGS);
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
-	uint32_t key_part_count;
-	const char *key = read_key(reqpos, reqend, &key_part_count);
 
+	struct space *space = space_find(request->u.space_no);
 	Index *pk = space_index(space, 0);
 	/* Try to find the tuple by primary key. */
-	primary_key_validate(&pk->key_def, key, key_part_count);
-	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
+	primary_key_validate(&pk->key_def, request->u.key,
+			     request->u.key_part_count);
+	struct tuple *old_tuple = pk->findByKey(request->u.key,
+						request->u.key_part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -119,7 +105,8 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 	struct tuple *new_tuple = tuple_update(space->format,
 					       palloc_region_alloc,
 					       fiber->gc_pool,
-					       old_tuple, *reqpos, reqend);
+					       old_tuple, request->u.expr,
+					       request->u.expr_end);
 	try {
 		space_validate_tuple(space, new_tuple);
 		txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
@@ -135,30 +122,26 @@ static void
 execute_select(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) txn;
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
-	struct space *space = read_space(reqpos, reqend);
-	uint32_t index_no = pick_u32(reqpos, reqend);
-	Index *index = index_find(space, index_no);
-	uint32_t offset = pick_u32(reqpos, reqend);
-	uint32_t limit = pick_u32(reqpos, reqend);
-	uint32_t count = pick_u32(reqpos, reqend);
-	if (count == 0)
+	struct space *space = space_find(request->s.space_no);
+	Index *index = index_find(space, request->s.index_no);
+
+	if (request->s.key_count == 0)
 		tnt_raise(IllegalParams, "tuple count must be positive");
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
 	uint32_t found = 0;
-
-	for (uint32_t i = 0; i < count; i++) {
+	const char *keys = request->s.keys;
+	for (uint32_t i = 0; i < request->s.key_count; i++) {
 
 		/* End the loop if reached the limit. */
-		if (limit == found)
+		if (request->s.limit == found)
 			return;
 
 		/* read key */
 		uint32_t key_part_count;
-		const char *key = read_key(reqpos, reqend, &key_part_count);
+		const char *key = read_key(&keys, request->s.keys_end,
+					   &key_part_count);
 
 		struct iterator *it = index->position();
 		key_validate(&index->key_def, ITER_EQ, key, key_part_count);
@@ -166,18 +149,19 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it)) != NULL) {
-			if (offset > 0) {
-				offset--;
+			if (request->s.offset > 0) {
+				request->s.offset--;
 				continue;
 			}
 
 			port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 
-			if (limit == ++found)
+			if (request->s.limit == ++found)
 				break;
 		}
 	}
-	if (*reqpos != reqend)
+
+	if (keys != request->s.keys_end)
 		tnt_raise(IllegalParams, "can't unpack request");
 }
 
@@ -185,22 +169,15 @@ static void
 execute_delete(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
-	uint32_t type = request->type;
-	txn_add_redo(txn, type, request->data, request->len);
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
-	struct space *space = read_space(reqpos, reqend);
-	if (type == DELETE) {
-		request->flags |= pick_u32(reqpos, reqend) &
-			BOX_ALLOWED_REQUEST_FLAGS;
-	}
-	/* read key */
-	uint32_t key_part_count;
-	const char *key = read_key(reqpos, reqend, &key_part_count);
+	txn_add_redo(txn, request->type, request->data, request->len);
+	struct space *space = space_find(request->d.space_no);
+
 	/* Try to find tuple by primary key */
 	Index *pk = space_index(space, 0);
-	primary_key_validate(&pk->key_def, key, key_part_count);
-	struct tuple *old_tuple = pk->findByKey(key, key_part_count);
+	primary_key_validate(&pk->key_def, request->d.key,
+			     request->d.key_part_count);
+	struct tuple *old_tuple = pk->findByKey(request->d.key,
+						request->d.key_part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -243,22 +220,67 @@ request_create(struct request *request, uint32_t type, const char *data,
 	request->len = len;
 	request->flags = 0;
 
+	const char **reqpos = &data;
+	const char *reqend = data + len;
+
 	switch (request->type) {
 	case REPLACE:
 		request->execute = execute_replace;
+		request->r.space_no = pick_u32(reqpos, reqend);
+		request->flags |= (pick_u32(reqpos, reqend) &
+				   BOX_ALLOWED_REQUEST_FLAGS);
+		request->r.tuple = *reqpos;
+		/* Do not parse the tail, execute_replace will do it */
+		request->r.tuple_end = reqend;
 		break;
 	case SELECT:
 		request->execute = execute_select;
+		request->s.space_no = pick_u32(reqpos, reqend);
+		request->s.index_no = pick_u32(reqpos, reqend);
+		request->s.offset = pick_u32(reqpos, reqend);
+		request->s.limit = pick_u32(reqpos, reqend);
+		request->s.key_count = pick_u32(reqpos, reqend);
+		request->s.keys = *reqpos;
+		/* Do not parse the tail, execute_select will do it */
+		request->s.keys_end = reqend;
 		break;
 	case UPDATE:
 		request->execute = execute_update;
+		request->u.space_no = pick_u32(reqpos, reqend);
+		request->flags |= (pick_u32(reqpos, reqend) &
+				   BOX_ALLOWED_REQUEST_FLAGS);
+		request->u.key = read_key(reqpos, reqend,
+					       &request->u.key_part_count);
+		request->u.key_end = *reqpos;
+		request->u.expr = *reqpos;
+		/* Do not parse the tail, tuple_update will do it */
+		request->u.expr_end = reqend;
 		break;
 	case DELETE_1_3:
 	case DELETE:
 		request->execute = execute_delete;
+		request->d.space_no = pick_u32(reqpos, reqend);
+		if (type == DELETE) {
+			request->flags |= pick_u32(reqpos, reqend) &
+				BOX_ALLOWED_REQUEST_FLAGS;
+		}
+		request->d.key = read_key(reqpos, reqend,
+					    &request->d.key_part_count);
+		request->d.key_end = *reqpos;
+		if (*reqpos != reqend)
+			tnt_raise(IllegalParams, "can't unpack request");
 		break;
 	case CALL:
 		request->execute = box_lua_execute;
+		request->flags |= (pick_u32(reqpos, reqend) &
+				   BOX_ALLOWED_REQUEST_FLAGS);
+		request->c.procname = pick_field_str(reqpos, reqend,
+						     &request->c.procname_len);
+		request->c.args = read_key(reqpos, reqend,
+					   &request->c.arg_count);;
+		request->c.args_end = *reqpos;
+		if (*reqpos != reqend)
+			tnt_raise(IllegalParams, "can't unpack request");
 		break;
 	default:
 		assert(false);

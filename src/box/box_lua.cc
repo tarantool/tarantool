@@ -1272,12 +1272,8 @@ void
 box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) txn;
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
-	/* Request flags: not used. */
-	(void) (pick_u32(reqpos, reqend));
 
 	try {
 		auto scoped_guard = make_scoped_guard([=] {
@@ -1288,18 +1284,20 @@ box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 			luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 		});
 
-		uint32_t field_len;
 		/* proc name */
-		const char *field = pick_field_str(reqpos, reqend, &field_len);
-		box_lua_find(L, field, field + field_len);
+		box_lua_find(L, request->c.procname, request->c.procname +
+			     request->c.procname_len);
 		/* Push the rest of args (a tuple). */
-		uint32_t nargs = pick_u32(reqpos, reqend);
-		luaL_checkstack(L, nargs, "call: out of stack");
-		for (int i = 0; i < nargs; i++) {
-			field = pick_field_str(reqpos, reqend, &field_len);
+		const char **argspos = &request->c.args;
+		luaL_checkstack(L, request->c.arg_count, "call: out of stack");
+
+		for (uint32_t i = 0; i < request->c.arg_count; i++) {
+			uint32_t field_len = load_varint32(argspos);
+			const char *field = *argspos;
+			*argspos += field_len;
 			lua_pushlstring(L, field, field_len);
 		}
-		lua_call(L, nargs, LUA_MULTRET);
+		lua_call(L, request->c.arg_count, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
 		port_add_lua_multret(port, L);
 	} catch (const Exception& e) {
