@@ -321,8 +321,7 @@ fiber_ready_async(ev_async *watcher, int revents)
 struct fiber *
 fiber_find(uint32_t fid)
 {
-	struct mh_i32ptr_node_t node = { fid, NULL };
-	mh_int_t k = mh_i32ptr_get(fiber_registry, &node, NULL);
+	mh_int_t k = mh_i32ptr_find(fiber_registry, fid, NULL);
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
