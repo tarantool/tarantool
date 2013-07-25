@@ -49,7 +49,7 @@ usage() {
 	echo "Tarantool deployment script: add more Tarantool instances."
 	echo "usage: tarantool_deploy.sh [options] <instance>"
 	echo
-	echo "  --prefix <path>       installation path (/usr/local)"
+	echo "  --prefix <path>       installation path (/usr)"
 	echo "  --prefix_etc <path>   installation etc path (/etc)"
 	echo "  --prefix_var <path>   installation var path (/var)"
 	echo
@@ -66,7 +66,7 @@ usage() {
 rollback_instance() {
 	id=$1
 	workdir="${prefix_var}/tarantool_box$id"
-	config="${prefix}/etc/tarantool_box$id.cfg"
+	config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
 	rm -rf $workdir
 	rm -f $config
 	rm -f "${prefix}/bin/tarantool_box$id.sh"
@@ -93,7 +93,7 @@ try() {
 deploy() {
 	id=$1
 	workdir="${prefix_var}/tarantool_box$id"
-	config="${prefix}/etc/tarantool_box$id.cfg"
+	config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
 
 	log ">>> deploy instance $id"
 
@@ -105,7 +105,7 @@ deploy() {
 	try "chown tarantool:tarantool -R $workdir"
 
 	# setup configuration file
-	try "cp \"${prefix}/etc/tarantool.cfg\" $config"
+	try "cp \"${prefix_etc}/tarantool/tarantool.cfg\" $config"
 	try 'echo work_dir = \"$workdir\" >> $config'
 	try 'echo username = \"tarantool\" >> $config'
 	try 'echo logger = \"cat - \>\> logs/tarantool.log\" >> $config'
@@ -130,7 +130,7 @@ deploy_check() {
 	# check, if there are any instance-related files exists that could be
 	# accidently removed or overwritten by setup.
 	instance_workdir="${prefix_var}/tarantool_box$id"
-	instance_config="${prefix}/etc/tarantool_box$id.cfg"
+	instance_config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
 	instance_wrapper="${prefix}/bin/tarantool_box$id.sh"
 	instance_startup="${prefix_etc}/init.d/tarantool_box$id"
 	[ -d $instance_workdir ] && error "Instance workdir exists: '$instance_workdir'"
@@ -163,11 +163,11 @@ while [ $# -ge 1 ]; do
 	esac
 done
 
-set ${prefix:="/usr/local"}
+set ${prefix:="/usr"}
 set ${prefix_var:="/var"}
 set ${prefix_etc:="/etc"}
 
-deploy_cfg="${prefix}/etc/tarantool_deploy.cfg"
+deploy_cfg="${prefix_etc}/tarantool/tarantool_deploy.cfg"
 deploy_exists=0
 
 # check deployment configuration file
