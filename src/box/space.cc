@@ -121,8 +121,7 @@ space_delete(struct space *space)
 {
 	if (tarantool_L)
 		box_lua_space_delete(tarantool_L, space);
-	const struct mh_i32ptr_node_t node = { space_id(space), NULL };
-	mh_int_t k = mh_i32ptr_get(spaces, &node, NULL);
+	mh_int_t k = mh_i32ptr_find(spaces, space_id(space), NULL);
 	assert(k != mh_end(spaces));
 	mh_i32ptr_del(spaces, k, NULL);
 	for (uint32_t j = 0 ; j <= space->index_id_max; j++)
@@ -134,8 +133,7 @@ space_delete(struct space *space)
 struct space *
 space_by_id(uint32_t id)
 {
-	const struct mh_i32ptr_node_t node = { id, NULL };
-	mh_int_t space = mh_i32ptr_get(spaces, &node, NULL);
+	mh_int_t space = mh_i32ptr_find(spaces, id, NULL);
 	if (space == mh_end(spaces))
 		return NULL;
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;

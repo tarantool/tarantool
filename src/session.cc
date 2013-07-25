@@ -93,8 +93,7 @@ session_destroy(uint32_t sid)
 int
 session_fd(uint32_t sid)
 {
-	struct mh_i32ptr_node_t node = { sid, NULL };
-	mh_int_t k = mh_i32ptr_get(session_registry, &node, NULL);
+	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
 	return k == mh_end(session_registry) ?
 		-1 : (intptr_t) mh_i32ptr_node(session_registry, k)->val;
 }

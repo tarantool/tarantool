@@ -43,7 +43,9 @@ a stack trace after a crash.
 Please follow these steps to compile Tarantool:
 
 tarantool $ git submodule init; git submodule update # if compiling from git
+
 tarantool $ cmake .
+
 tarantool $ make
 
 To use a different release type, say, RelWithDebugInfo, use:
