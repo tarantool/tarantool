@@ -8,7 +8,7 @@ export PATH=$PATH:/usr/bin
 NAME="tarantool_box"
 BINARY="/usr/bin/${NAME}"
 INST=$(basename $0 .sh)
-CONF="/usr/local/etc/${INST}.cfg"
+CONF="/etc/tarantool/${INST}.cfg"
 LOGDIR="/var/${INST}/logs"
 WRAP_PIDFILE="/var/${INST}/wrapper.pid"
 # set to get restart emails
