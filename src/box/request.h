@@ -129,7 +129,7 @@ struct request
 	const char *data;
 	uint32_t len;
 
-	void (*execute)(struct request *, struct txn *, struct port *);
+	void (*execute)(const struct request *, struct txn *, struct port *);
 };
 
 void

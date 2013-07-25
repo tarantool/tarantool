@@ -36,7 +36,8 @@ struct txn;
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct txn *txn, struct port *port);
+box_lua_execute(const struct request *request, struct txn *txn,
+		struct port *port);
 
 /**
  * Create an instance of Lua interpreter in box.

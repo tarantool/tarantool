@@ -60,17 +60,18 @@ dup_replace_mode(uint32_t flags)
 }
 
 static void
-execute_replace(struct request *request, struct txn *txn, struct port *port)
+execute_replace(const struct request *request, struct txn *txn,
+		struct port *port)
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
 
 	struct space *space = space_find(request->r.space_no);
-	const char **tuplepos = &request->r.tuple;
-	uint32_t field_count = pick_u32(tuplepos, request->r.tuple_end);
+	const char *tuple = request->r.tuple;
+	uint32_t field_count = pick_u32(&tuple, request->r.tuple_end);
 
 	struct tuple *new_tuple = tuple_new(space->format, field_count,
-					    tuplepos, request->r.tuple_end);
+					    &tuple, request->r.tuple_end);
 	try {
 		space_validate_tuple(space, new_tuple);
 		enum dup_replace_mode mode = dup_replace_mode(request->flags);
@@ -83,7 +84,8 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 }
 
 static void
-execute_update(struct request *request, struct txn *txn, struct port *port)
+execute_update(const struct request *request, struct txn *txn,
+	       struct port *port)
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
@@ -119,7 +121,8 @@ execute_update(struct request *request, struct txn *txn, struct port *port)
 /** }}} */
 
 static void
-execute_select(struct request *request, struct txn *txn, struct port *port)
+execute_select(const struct request *request, struct txn *txn,
+	       struct port *port)
 {
 	(void) txn;
 	struct space *space = space_find(request->s.space_no);
@@ -132,10 +135,12 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 
 	uint32_t found = 0;
 	const char *keys = request->s.keys;
+	uint32_t offset = request->s.offset;
+	uint32_t limit = request->s.limit;
 	for (uint32_t i = 0; i < request->s.key_count; i++) {
 
 		/* End the loop if reached the limit. */
-		if (request->s.limit == found)
+		if (limit == found)
 			return;
 
 		/* read key */
@@ -149,14 +154,14 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it)) != NULL) {
-			if (request->s.offset > 0) {
-				request->s.offset--;
+			if (offset > 0) {
+				offset--;
 				continue;
 			}
 
 			port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 
-			if (request->s.limit == ++found)
+			if (limit == ++found)
 				break;
 		}
 	}
@@ -166,7 +171,8 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 }
 
 static void
-execute_delete(struct request *request, struct txn *txn, struct port *port)
+execute_delete(const struct request *request, struct txn *txn,
+	       struct port *port)
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);

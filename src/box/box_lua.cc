@@ -1269,7 +1269,8 @@ lbox_call_loadproc(struct lua_State *L)
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct txn *txn, struct port *port)
+box_lua_execute(const struct request *request, struct txn *txn,
+		struct port *port)
 {
 	(void) txn;
 	lua_State *L = lua_newthread(root_L);
@@ -1288,13 +1289,13 @@ box_lua_execute(struct request *request, struct txn *txn, struct port *port)
 		box_lua_find(L, request->c.procname, request->c.procname +
 			     request->c.procname_len);
 		/* Push the rest of args (a tuple). */
-		const char **argspos = &request->c.args;
+		const char *args = request->c.args;
 		luaL_checkstack(L, request->c.arg_count, "call: out of stack");
 
 		for (uint32_t i = 0; i < request->c.arg_count; i++) {
-			uint32_t field_len = load_varint32(argspos);
-			const char *field = *argspos;
-			*argspos += field_len;
+			uint32_t field_len = load_varint32(&args);
+			const char *field = args;
+			args += field_len;
 			lua_pushlstring(L, field, field_len);
 		}
 		lua_call(L, request->c.arg_count, LUA_MULTRET);
