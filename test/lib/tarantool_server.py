@@ -188,11 +188,13 @@ class TarantoolServer(Server):
 
     def init(self):
         # init storage
-        subprocess.check_call([self.binary, "--init-storage"],
-                              cwd = self.vardir,
-                              # catch stdout/stderr to not clutter output
-                              stdout = subprocess.PIPE,
-                              stderr = subprocess.PIPE)
+        cmd = [self.binary, "--init-storage"]
+        _init = subprocess.Popen(cmd, cwd=self.vardir,
+                stderr = subprocess.STDOUT, stdout = subprocess.PIPE)
+        retcode = _init.wait()
+        if retcode:
+            sys.stderr.write("tarantool_box --init-storage error: \n%s\n" %  _init.stdout.read())
+            raise subprocess.CalledProcessError(retcode, cmd)
 
     def get_param(self, param):
         if param:
