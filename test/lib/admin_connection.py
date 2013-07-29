@@ -21,7 +21,9 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+
 import socket
+import pprint
 import yaml
 import sys
 import re
@@ -66,7 +68,8 @@ class AdminConnection(TarantoolConnection):
     def execute_simple(self, command, silent, lua=False):
         if not command:
             return
-        self.socket.sendall(('lua ' if lua else '') + command.replace('\n', ' ') + ADMIN_SEPARATOR)
+        cmd = ('lua ' if lua else '') + command.replace('\n', ' ') + ADMIN_SEPARATOR
+        self.socket.sendall(cmd)
 
         bufsiz = 4096
         res = ""
@@ -94,3 +97,10 @@ class AdminConnection(TarantoolConnection):
         if (not rg1 or len(rg1.group()) != len(command)) and not rg2:
             add_lua=True
         return self.execute_simple(command, silent, lua=add_lua)
+    
+    def __call__(self, command, silent=False, simple=False):
+        if not simple:
+            return self.execute(command, silent)
+        else:
+            self.opt_reconnect()
+            return self.execute_simple(command, silent)

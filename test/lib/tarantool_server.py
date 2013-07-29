@@ -6,6 +6,7 @@ import time
 import yaml
 import socket
 import signal
+import shlex
 import shutil
 import pexpect
 import traceback
@@ -48,6 +49,15 @@ def create_tmpfs_vardir(vardir):
     os.symlink(os.path.join("/dev/shm", vardir), vardir)
 
 class FuncTest(Test):
+    def execute(self, server):
+        execfile(self.name, dict(locals(), **server.__dict__))
+
+class LuaTest(FuncTest):
+    def execute(self, server):
+        for i in open(self.name, 'r').read().replace('\n\n', '\n').split(';\n'):
+             server.admin(i)
+
+class PythonTest(FuncTest):
     def execute(self, server):
         execfile(self.name, dict(locals(), **server.__dict__))
 
@@ -419,3 +429,12 @@ class TarantoolServer(Server):
             except socket.error as e:
                 break
 
+    def find_tests(self, test_suite, suite_path):
+        def patterned(test, patterns):
+            for i in patterns:
+                if test.name.find(i) != -1:
+                    return True
+            return False
+        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
+        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
+        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
