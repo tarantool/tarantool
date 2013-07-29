@@ -1,7 +1,0 @@
-# encoding: utf-8
-# 
-import sys
-# moved to separete test becouse this test fail in the valgrind mode (coredump
-# process terminated via abort procedure).
-admin("save coredump")
-# vim: syntax=python

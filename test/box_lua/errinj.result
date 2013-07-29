@@ -1,0 +1,146 @@
+show injections
+---
+error injections:
+  - name: ERRINJ_TESTING
+    state: off
+  - name: ERRINJ_WAL_IO
+    state: off
+  - name: ERRINJ_WAL_ROTATE
+    state: off
+  - name: ERRINJ_INDEX_ALLOC
+    state: off
+...
+set injection some-injection on
+---
+fail:can't find error injection 'some-injection'
+...
+box.space[0]:select(0,222444)
+---
+...
+set injection ERRINJ_TESTING on
+---
+ok
+...
+box.space[0]:select(0,222444)
+---
+error: 'Error injection ''ERRINJ_TESTING'''
+...
+set injection ERRINJ_TESTING off
+---
+ok
+...
+-- Check how well we handle a failed log write
+---
+...
+set injection ERRINJ_WAL_IO on
+---
+ok
+...
+box.space[0]:insert(1)
+---
+error: 'Failed to write to disk'
+...
+box.space[0]:select(0,1)
+---
+...
+set injection ERRINJ_WAL_IO off
+---
+ok
+...
+box.space[0]:insert(1)
+---
+ - 1: {}
+...
+set injection ERRINJ_WAL_IO on
+---
+ok
+...
+box.space[0]:update(1, '=p', 0, 2)
+---
+error: 'Failed to write to disk'
+...
+box.space[0]:select(0,1)
+---
+ - 1: {}
+...
+box.space[0]:select(0,2)
+---
+...
+set injection ERRINJ_WAL_IO off
+---
+ok
+...
+box.space[0]:truncate()
+---
+...
+-- Check a failed log rotation
+---
+...
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+box.space[0]:insert(1)
+---
+error: 'Failed to write to disk'
+...
+box.space[0]:select(0,1)
+---
+...
+set injection ERRINJ_WAL_ROTATE off
+---
+ok
+...
+box.space[0]:insert(1)
+---
+ - 1: {}
+...
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+box.space[0]:update(1, '=p', 0, 2)
+---
+error: 'Failed to write to disk'
+...
+box.space[0]:select(0,1)
+---
+ - 1: {}
+...
+box.space[0]:select(0,2)
+---
+...
+set injection ERRINJ_WAL_ROTATE off
+---
+ok
+...
+box.space[0]:update(1, '=p', 0, 2)
+---
+ - 2: {}
+...
+box.space[0]:select(0,1)
+---
+...
+box.space[0]:select(0,2)
+---
+ - 2: {}
+...
+set injection ERRINJ_WAL_ROTATE on
+---
+ok
+...
+box.space[0]:truncate()
+---
+error: 'Failed to write to disk'
+...
+set injection ERRINJ_WAL_ROTATE off
+---
+ok
+...
+box.space[0]:truncate()
+---
+...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+
+---
+...

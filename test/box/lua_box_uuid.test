@@ -1,8 +1,0 @@
-# encoding: utf-8
-import os
-import sys
-
-print """# box.uuid()"""
-admin("string.len(box.uuid())")
-admin("string.len(box.uuid_hex())")
-admin("string.match(box.uuid_hex(), '^[a-f0-9]+$') ~= nil")
