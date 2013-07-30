@@ -42,19 +42,20 @@ a stack trace after a crash.
 
 Please follow these steps to compile Tarantool:
 
-tarantool $ git submodule init; git submodule update # if compiling from git
+    # If compiling from git
+    tarantool $ git submodule init
+    tarantool $ git submodule update
 
-tarantool $ cmake .
-
-tarantool $ make
+    tarantool $ cmake .
+    tarantool $ make
 
 To use a different release type, say, RelWithDebugInfo, use:
 
-tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
 Additional build options can be set similarly:
 
-tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
 
 -- builds the command line client.
 
@@ -71,29 +72,27 @@ additional Python modules:
 
 Once all pre-requisites are installed, try:
 
-tarantool $ cd test && ./test-run.py --suite box --start-and-exit
+    tarantool $ cd test
+    tarantool $ ./test-run.py --suite box --start-and-exit
 
 This will create a 'var' subdirectory in directory 'test',
 populate it with necessary files, and
 start the server. To connect, you could use
 a simple command-line client:
 
-'''
-tarantool $ ./test/tarantool
-'''
+    tarantool $ ./test/tarantool
 
 Alternatively, if a customized server configuration is required,
 you could follow these steps:
 
-```
-tarantool $ emacs cfg/tarantool.cfg # edit the configuration
-# Initialize the storage directory, path to this directory
-# is specified in the configuration file:
-tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg --init-storage
-#
-# run
-tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
-```
+
+    tarantool $ emacs cfg/tarantool.cfg # edit the configuration
+    # Initialize the storage directory, path to this directory
+    # is specified in the configuration file:
+    tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg --init-storage
+    #
+    # run
+    tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
 
 Please report bugs at http://bugs.launchpad.net/tarantool or
 http://github.com/tarantool/tarantool/issues
