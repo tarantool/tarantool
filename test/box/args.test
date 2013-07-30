@@ -59,6 +59,7 @@ os.mkdir(os.path.join(vardir, "bug726778/xlogs"))
 os.symlink(os.path.abspath("box/bug726778.cfg"), cfg)
 
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+sys.stdout.push_filter(".*(P|p)lugin.*", "")
 server.test_option("--config=bug726778.cfg --init-storage")
 sys.stdout.pop_filter()
 
