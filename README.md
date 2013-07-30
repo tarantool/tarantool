@@ -55,9 +55,7 @@ To use a different release type, say, RelWithDebugInfo, use:
 
 Additional build options can be set similarly:
 
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
-
--- builds the command line client.
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true # builds the command line client.
 
 'make' creates tarantool_box executable in directory
 src/box and tarantool executable in client/tarantool.
@@ -90,8 +88,7 @@ you could follow these steps:
     # Initialize the storage directory, path to this directory
     # is specified in the configuration file:
     tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg --init-storage
-    #
-    # run
+    # Run tarantool
     tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
 
 Please report bugs at http://bugs.launchpad.net/tarantool or
