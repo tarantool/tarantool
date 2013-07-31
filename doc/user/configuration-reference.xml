@@ -206,7 +206,7 @@ Tarantool 1.4.0-69-g45551dd
     parameters in two template files, which are easy to maintain
     and extend:
     <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/mod/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
+    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
     These files can always be used as a reference for any
     parameter in this manual.
   </para>
