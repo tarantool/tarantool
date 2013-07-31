@@ -1235,7 +1235,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
     functions. For example, instead of <code>box.insert(0, ...)</code>
     one can write <code>box.space[0]:insert(...)</code>.
     Package source code is available in file <filename
-    xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/box.lua">src/box/box.lua</filename></para>
+    xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/box.lua">src/box/lua/box.lua</filename></para>
     <para>A list of all <code>space</code> members follows.</para>
     <varlistentry>
         <term><emphasis role="lua">space.n</emphasis></term>
@@ -1472,7 +1472,7 @@ localhost> lua for k,v in box.space[0]:pairs() do print(v) end
                 access to all tuples and spaces until it
                 encounters a "context switch": caused a write to
                 disk, network, or by an explicit call to <emphasis
-                role="lua" xlink:href="box.fiber.yield">box.fiber.yield()</emphasis>.
+                role="lua" xlink:href="#box.fiber.yield">box.fiber.yield()</emphasis>.
                 When the execution flow returns to the yielded
                 procedure, the data set could have changed significantly.
                 Iteration, resumed after a yield point, does not
