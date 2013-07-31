@@ -31,7 +31,7 @@ Tarantool - расширяемая, транзакционная СУБД для
 
 # Features
 
-- [lowest CPU and RAM overhead](benchmark.html) to store or serve a
+- [lowest CPU overhead](benchmark.html) to store or serve a
 piece of content,
 - optional Write Ahead Logging for persistency and reliability,
 - universal data access with [rich Lua stored
