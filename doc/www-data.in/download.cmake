@@ -131,7 +131,7 @@ The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
 
 - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
 - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
-- Ruby driver, [http://github.com/mailru/tarantool-ruby](https://github.com/tarantool/tarantool-ruby)
+- Ruby driver, [http://github.com/mailru/tarantool-ruby](https://github.com/mailru/tarantool-ruby)
 - Python driver, [http://pypi.python.org/pypi/tarantool](http://pypi.python.org/pypi/tarantool)
 - PHP driver, [https://github.com/tarantool/tarantool-php](https://github.com/tarantool/tarantool-php)
 - node.js driver,
