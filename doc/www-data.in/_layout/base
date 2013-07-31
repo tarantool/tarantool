@@ -13,7 +13,7 @@
   <div id="header">
     {% block header %}
     <p class='lwrap'><a id="home_link" href="index{{ languages[pagelang].suffix | e }}">{{ home_tag | langselect | e }}</a></p>
-    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p>
+<!--    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p> -->
     {% endblock header %}
   </div>
 

@@ -2,7 +2,7 @@
 {% set title = "Tarantool -- a transactional NoSQL database" %}
 
 {% block header %}
-    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p>
+<!--    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p> -->
 {% endblock header %}
 
 {% block content %}
