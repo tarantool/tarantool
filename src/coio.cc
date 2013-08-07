@@ -507,7 +507,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 				return nrd;
 
 			if (! ev_is_active(coio)) {
-				ev_io_set(coio, coio->fd, EV_WRITE);
+				ev_io_set(coio, coio->fd, EV_READ);
 				ev_io_start(coio);
 			}
 			/*
