@@ -42,6 +42,7 @@ extern "C" {
 #include <lj_ctype.h>
 #include <lj_cdata.h>
 #include <lj_cconv.h>
+#include <endian.h>
 } /* extern "C" */
 
 #include "pickle.h"
@@ -1477,6 +1478,11 @@ lbox_pack(struct lua_State *L)
 	luaL_buffinit(L, &b);
 
 	struct lua_field field;
+	double dbl;
+	float flt;
+	uint16_t u16;
+	uint32_t u32;
+	uint64_t u64;
 	while (*format) {
 		if (i > nargs)
 			luaL_error(L, "box.pack: argument count does not match "
@@ -1497,12 +1503,26 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "box.pack: expected 16-bit int");
 			luaL_addlstring(&b, field.data, sizeof(uint16_t));
 			break;
+		case 'n':
+			/* signed and unsigned 16-bit big endian integers */
+			if (field.type != NUM || field.u32 > UINT16_MAX)
+				luaL_error(L, "box.pack: expected 16-bit int");
+			u16 = htobe16( (uint16_t) field.u32 );
+			luaL_addlstring(&b, (char *)&u16, sizeof(u16));
+			break;
 		case 'I':
 		case 'i':
 			/* signed and unsigned 32-bit integers */
 			if (field.type != NUM)
 				luaL_error(L, "box.pack: expected 32-bit int");
 			luaL_addlstring(&b, field.data, sizeof(uint32_t));
+			break;
+		case 'N':
+			/* signed and unsigned 32-bit big endian integers */
+			if (field.type != NUM)
+				luaL_error(L, "box.pack: expected 32-bit int");
+			u32 = htobe32( field.u32 );
+			luaL_addlstring(&b, (char *)&u32, sizeof(uint32_t));
 			break;
 		case 'L':
 		case 'l':
@@ -1511,11 +1531,33 @@ lbox_pack(struct lua_State *L)
 				luaL_addlstring(&b, field.data, field.len);
 			} else if (field.type == NUM) {
 				/* extend 32-bit value to 64-bit */
-				uint64_t val = field.u32;
-				luaL_addlstring(&b, (char *)&val, sizeof(val));
+				u64 = field.u32;
+				luaL_addlstring(&b, (char *)&u64, sizeof(u64));
 			} else {
 				luaL_error(L, "box.pack: expected 64-bit int");
 			}
+			break;
+		case 'Q':
+		case 'q':
+			/* signed and unsigned 64-bit integers */
+			if (field.type == NUM64) {
+				u64 = *(uint64_t*) field.data;
+			} else if (field.type == NUM) {
+				/* extend 32-bit value to 64-bit */
+				u64 = field.u32;
+			} else {
+				luaL_error(L, "box.pack: expected 64-bit int");
+			}
+			u64 = htobe64(u64);
+			luaL_addlstring(&b, (char *)&u64, sizeof(u64));
+			break;
+		case 'd':
+			dbl = (double) lua_tonumber(L, i);
+			luaL_addlstring(&b, (char *) &dbl, sizeof(dbl));
+			break;
+		case 'f':
+			flt = (float) lua_tonumber(L, i);
+			luaL_addlstring(&b, (char *) &flt, sizeof(flt));
 			break;
 		case 'w':
 			/* Perl 'pack' BER-encoded integer */
@@ -1618,6 +1660,8 @@ lbox_unpack(struct lua_State *L)
 	uint8_t  u8buf;
 	uint16_t u16buf;
 	uint32_t u32buf;
+	double dbl;
+	float flt;
 
 #define CHECK_SIZE(cur) if (unlikely((cur) >= end)) {	                \
 	luaL_error(L, "box.unpack('%c'): got %d bytes (expected: %d+)",	\
@@ -1637,9 +1681,21 @@ lbox_unpack(struct lua_State *L)
 			lua_pushnumber(L, u16buf);
 			s += 2;
 			break;
+		case 'n':
+			CHECK_SIZE(s + 1);
+			u16buf = be16toh(*(uint16_t *) s);
+			lua_pushnumber(L, u16buf);
+			s += 2;
+			break;
 		case 'i':
 			CHECK_SIZE(s + 3);
 			u32buf = *(uint32_t *) s;
+			lua_pushnumber(L, u32buf);
+			s += 4;
+			break;
+		case 'N':
+			CHECK_SIZE(s + 3);
+			u32buf = be32toh(*(uint32_t *) s);
 			lua_pushnumber(L, u32buf);
 			s += 4;
 			break;
@@ -1647,6 +1703,23 @@ lbox_unpack(struct lua_State *L)
 			CHECK_SIZE(s + 7);
 			luaL_pushnumber64(L, *(uint64_t*) s);
 			s += 8;
+			break;
+		case 'q':
+			CHECK_SIZE(s + 7);
+			luaL_pushnumber64(L, be64toh(*(uint64_t*) s));
+			s += 8;
+			break;
+		case 'd':
+			CHECK_SIZE(s + 7);
+			dbl = *(double *) s;
+			lua_pushnumber(L, dbl);
+			s += 8;
+			break;
+		case 'f':
+			CHECK_SIZE(s + 3);
+			flt = *(float *) s;
+			lua_pushnumber(L, flt);
+			s += 4;
 			break;
 		case 'w':
 			/* pick_varint32 throws exception on error. */

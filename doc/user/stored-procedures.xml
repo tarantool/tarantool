@@ -726,6 +726,31 @@ localhost> lua box.select_reverse_range(4, 1, 2, '1')
                 integer, and stores the integer in the resulting
                 string, low byte first,
                 </member>
+                <member><code>n</code> &mdash; converts Lua
+                variable to a 2-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>N</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>Q</code> &mdash; converts Lua
+                variable to a 8-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>f</code> &mdash; converts Lua
+                variable to a 4-byte
+                float, and stores the float in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a 8-byte
+                double, and stores the double in the resulting
+                string,
+                </member>
                 <member><code>w</code> &mdash; converts Lua
                 integer to a BER-encoded integer,
                 </member>
