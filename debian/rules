@@ -32,6 +32,7 @@ include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
 
 DEB_BUILDDIR := build-area
+DEB_INSTALL_DOCS := -XTODO -XAUTHORS
 
 tarball: clean
 	git describe > VERSION
