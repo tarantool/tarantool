@@ -39,6 +39,7 @@ struct ts_spaces {
 
 int ts_space_init(struct ts_spaces *s);
 void ts_space_free(struct ts_spaces *s);
+void ts_space_recycle(struct ts_spaces *s);
 
 struct ts_space *ts_space_create(struct ts_spaces *s, uint32_t id);
 struct ts_space *ts_space_match(struct ts_spaces *s, uint32_t id);

@@ -52,9 +52,27 @@ int ts_space_init(struct ts_spaces *s) {
 	return 0;
 }
 
+void ts_space_recycle(struct ts_spaces *s)
+{
+	mh_int_t i;
+	mh_foreach(s->t, i) {
+		struct ts_space *space = mh_u32ptr_node(s->t, i)->val;
+		mh_int_t pos = 0;
+		while (pos != mh_end(space->index)) {
+			if (mh_exist((space->index), pos)) {
+				struct ts_key *k =
+					*mh_pk_node(space->index, pos);
+				free(k);
+			}
+			pos++;
+		}
+		mh_pk_delete(space->index);
+		space->index = mh_pk_new();
+	}
+}
+
 void ts_space_free(struct ts_spaces *s)
 {
-	return;
 	mh_int_t i;
 	mh_foreach(s->t, i) {
 		struct ts_space *space = mh_u32ptr_node(s->t, i)->val;
