@@ -1,2 +1,2 @@
-usr/lib/tarantool/plugin/libmysql.so
+usr/lib/tarantool/plugins/libmysql.so
 
