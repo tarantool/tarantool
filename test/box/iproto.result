@@ -6,9 +6,9 @@
 
 # Test bug #899343 (server assertion failure on incorrect packet)
 
-# sending the package with invalid length
+# send the package with invalid length
 12
-# checking what is server alive
+# check that is server alive
 ping
 ok
 ---
