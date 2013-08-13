@@ -19,6 +19,11 @@ from test_suite import FilteredStream, Test
 from admin_connection import AdminConnection
 from memcached_connection import MemcachedConnection
 
+try:
+    import cStringIO as StringIO
+except ImportError:
+    import StringIO
+
 def check_port(port):
     """Check if the port we're connecting to is available"""
     try:
@@ -54,8 +59,29 @@ class FuncTest(Test):
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        for i in open(self.name, 'r').read().replace('\n\n', '\n').split(';\n'):
-             server.admin(i)
+        delim = ''
+        cmd = None
+        for line in open(self.name, 'r'):
+            if not line.strip():
+                continue
+            if not cmd:
+                cmd = StringIO.StringIO()
+            if line.find('--') == 0 and not cmd.getvalue():
+                matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line)
+                if matched:
+                    if re.match('delim(i(t(e(r)?)?)?)?', matched.group(1)):
+                        delim = matched.group(2)[1:-1]
+                else:
+                    sys.stdout.write(line)
+            else:
+                cmd.write(line)
+                if line.endswith(delim+'\n'):
+                    server.admin(cmd.getvalue()[:(len(delim)+1)*(-1)].replace('\n\n', '\n'))
+                    cmd.close()
+                    cmd = None
+        if cmd and cmd.getvalue():
+            server.admin(cmd.getvalue()[:-len(delim)].replace('\n\n', '\n'))
+            cmd.close
 
 class PythonTest(FuncTest):
     def execute(self, server):

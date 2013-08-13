@@ -15,9 +15,7 @@ for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do
 end
 ---
 ...
--- mysql
----
-...
+-- mysql;
 c = box.net.sql.connect('mysql', unpack(connect))
 ---
 ...
@@ -89,6 +87,3 @@ c:commit()
  - 0
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

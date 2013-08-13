@@ -1,3 +1,4 @@
+-- setopt delim ';'
 show injections;
 set injection some-injection on;
 box.space[0]:select(0,222444);

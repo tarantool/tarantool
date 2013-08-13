@@ -1,3 +1,4 @@
+-- setopt delim ';'
 -- box.uuid();
 string.len(box.uuid());
 string.len(box.uuid_hex());

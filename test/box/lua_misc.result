@@ -1,8 +1,6 @@
 ----------------
 -- # box.raise
-----------------
----
-...
+----------------;
 1 + 1
 ---
  - 2
@@ -21,9 +19,7 @@ error: '345'
 ...
 ----------------
 -- # box.stat
-----------------
----
-...
+----------------;
 for k, v in pairs(box.stat()) do
     print(' - ', k)
 end
@@ -51,9 +47,7 @@ end
 ...
 ----------------
 -- # box.space
-----------------
----
-...
+----------------;
 type(box)
 ---
  - table
@@ -75,9 +69,7 @@ fieldno : 0
 ...
 ----------------
 -- # box.space
-----------------
----
-...
+----------------;
 string.match(tostring(box.slab), '^table:') ~= nil
 ---
  - true
@@ -104,9 +96,7 @@ end
 ...
 ----------------
 -- # box.error
-----------------
----
-...
+----------------;
 for k,v in pairs(box.error) do
     print('box.error.', k, ' : ', v)
 end
@@ -142,6 +132,3 @@ box.error.ER_SECONDARY : 770
 box.error.ER_MEMORY_ISSUE : 1793
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

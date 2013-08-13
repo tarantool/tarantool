@@ -1,3 +1,4 @@
+-- setopt delim ';'
 dofile('utils.lua');
 
 box.space[20]:insert('pid_001', 'sid_001', 'tid_998', 'a');

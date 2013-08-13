@@ -1,3 +1,4 @@
+-- setopt delim ';'
 --
 -- Insert test
 --;

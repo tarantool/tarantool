@@ -4,9 +4,7 @@
 -- due to cancellation) if it is within th wal_schedule queue.
 -- The test case is dependent on rows_per_wal, since this is when
 -- we reopen the .xlog file and thus wal_scheduler takes a long
--- pause
----
-...
+-- pause;
 box.cfg.rows_per_wal
 ---
  - 50
@@ -27,9 +25,7 @@ box.space[0]:delete(1)
 ---
  - 1: {'testing', 'lua rocks'}
 ...
--- check delete
----
-...
+-- check delete;
 box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))
 ---
 ...
@@ -141,9 +137,7 @@ box.insert('0', 'test', 'old', 'abcd')
 ---
  - 1953719668: {'old', 1684234849}
 ...
--- test that insert produces a duplicate key error
----
-...
+-- test that insert produces a duplicate key error;
 box.insert('0', 'test', 'old', 'abcd')
 ---
 error: 'Duplicate key exists in unique index 0'
@@ -179,9 +173,7 @@ reload configuration
 ---
 ok
 ...
--- must be read-only
----
-...
+-- must be read-only;
 box.insert(0, 'test')
 ---
  - 1953719668: {}
@@ -210,9 +202,7 @@ box.space[0]:delete('test')
 ---
  - 1953719668: {'bye, world'}
 ...
--- test tuple iterators
----
-...
+-- test tuple iterators;
 t = box.space[0]:insert('test')
 ---
 ...
@@ -225,9 +215,7 @@ t = box.space[0]:replace('test', 'another field', 'one more')
 box.space[0]:truncate()
 ---
 ...
--- test passing arguments in and out created fiber
----
-...
+-- test passing arguments in and out created fiber;
 function y()
     print('started')
     box.fiber.detach()
@@ -268,9 +256,7 @@ collectgarbage('collect')
 ---
  - 0
 ...
--- check that these newly created fibers are garbage collected
----
-...
+-- check that these newly created fibers are garbage collected;
 box.fiber.find(900)
 ---
  - nil
@@ -287,6 +273,3 @@ box.space[0]:truncate()
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

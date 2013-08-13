@@ -13,9 +13,7 @@ for tk in string.gmatch(os.getenv('PG'), '[^:]+') do
 end
 ---
 ...
--- postgresql
----
-...
+-- postgresql;
 c = box.net.sql.connect('pg', unpack(connect))
 ---
 ...
@@ -123,6 +121,3 @@ c:txn(
  - true
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

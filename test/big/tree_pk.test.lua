@@ -1,3 +1,4 @@
+-- setopt delim ';'
 dofile('utils.lua');
 
 -- integer keys;

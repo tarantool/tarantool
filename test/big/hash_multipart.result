@@ -34,16 +34,12 @@ box.space[27]:insert(1, 'bar', 1, '', 4)
 ---
  - 1: {'bar', 1, '', 4}
 ...
--- try to insert a row with a duplicate key
----
-...
+-- try to insert a row with a duplicate key;
 box.space[27]:insert(1, 'bar', 1, '', 5)
 ---
 error: 'Duplicate key exists in unique index 0'
 ...
--- output all rows
----
-...
+-- output all rows;
 function box.select_all(space)
     local result = {}
     for k, v in box.space[space]:pairs() do
@@ -73,57 +69,41 @@ box.space[27]:select(0, 1, 'bar', 0)
 ---
  - 1: {'bar', 0, '', 4}
 ...
--- primary index select with missing part
----
-...
+-- primary index select with missing part;
 box.space[27]:select(0, 1, 'foo')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
--- primary index select with extra part
----
-...
+-- primary index select with extra part;
 box.space[27]:select(0, 1, 'foo', 0, 0)
 ---
 error: 'Invalid key part count (expected [0..3], got 4)'
 ...
--- primary index select with wrong type
----
-...
+-- primary index select with wrong type;
 box.space[27]:select(0, 1, 'foo', 'baz')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
--- secondary index select
----
-...
+-- secondary index select;
 box.space[27]:select(1, 1, 4)
 ---
  - 1: {'bar', 1, '', 4}
 ...
--- secondary index select with no such key
----
-...
+-- secondary index select with no such key;
 box.space[27]:select(1, 1, 5)
 ---
 ...
--- secondary index select with missing part
----
-...
+-- secondary index select with missing part;
 box.space[27]:select(1, 1)
 ---
 error: 'Invalid key part count in an exact match (expected 2, got 1)'
 ...
--- secondary index select with wrong type
----
-...
+-- secondary index select with wrong type;
 box.space[27]:select(1, 1, 'baz')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
 ...
--- cleanup
----
-...
+-- cleanup;
 box.space[27]:truncate()
 ---
 ...
@@ -132,6 +112,3 @@ box.space[27]:len()
  - 0
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

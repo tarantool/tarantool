@@ -1,3 +1,4 @@
+-- setopt delim ';'
 dofile('utils.lua')
 
 --=============================================================================
@@ -7,7 +8,7 @@ dofile('utils.lua')
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------;
 
--- Insert valid fieds;
+-- Insert valid fields;
 box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0');
 box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0');
 box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0');
@@ -20,7 +21,7 @@ box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0');
 -- 32-bit hash replace fields tests
 -------------------------------------------------------------------------------;
 
--- Replace valid fieds;
+-- Replace valid fields;
 box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12');
 box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72');
 box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92');
@@ -67,7 +68,7 @@ box.space[10]:delete(1, 2);
 -- 64-bit hash inset fields tests
 -------------------------------------------------------------------------------;
 
--- Insert valid fieds;
+-- Insert valid fields;
 box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0');
 box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0');
 box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0');
@@ -84,7 +85,7 @@ box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0');
 -- 64-bit hash replace fields tests
 -------------------------------------------------------------------------------;
 
--- Replace valid fieds;
+-- Replace valid fields;
 box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12');
 box.space[11]:replace(1ULL, 'value1 v1.32', 'value2 1.72');
 box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92');
@@ -155,7 +156,7 @@ box.space[11]:delete('00000001', '00000002');
 -- String hash inset fields tests
 -------------------------------------------------------------------------------;
 
--- Insert valid fieds;
+-- Insert valid fields;
 box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0');
 box.space[12]:insert('key 1', 'value1 v1.0', 'value2 v1.0');
 box.space[12]:insert('key 2', 'value1 v1.0', 'value2 v1.0');
@@ -165,7 +166,7 @@ box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0');
 -- String hash replace fields tests
 -------------------------------------------------------------------------------;
 
--- Replace valid fieds;
+-- Replace valid fields;
 box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12');
 box.space[12]:replace('key 1', 'value1 v1.32', 'value2 1.72');
 box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92');

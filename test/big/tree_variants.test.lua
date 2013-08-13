@@ -1,3 +1,4 @@
+-- setopt delim ';'
 box.space[6]:insert(0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000);
 box.space[6]:insert(1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001);
 box.space[6]:insert(2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002);

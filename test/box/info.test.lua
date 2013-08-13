@@ -1,3 +1,4 @@
+-- setopt delim ';'
 -- Test Lua from admin console. Whenever producing output,
 -- make sure it's a valid YAML;
 box.info.unknown_variable;

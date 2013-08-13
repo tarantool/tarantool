@@ -1,3 +1,4 @@
+-- setopt delim ';'
 c = box.net.sql.connect('abcd');
 dump = function(v) return box.cjson.encode(v) end;
 

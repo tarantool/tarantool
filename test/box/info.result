@@ -1,7 +1,5 @@
 -- Test Lua from admin console. Whenever producing output,
--- make sure it's a valid YAML
----
-...
+-- make sure it's a valid YAML;
 box.info.unknown_variable
 ---
  - nil
@@ -91,6 +89,3 @@ box.info.snapshot_pid
  - 0
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

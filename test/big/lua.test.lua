@@ -1,3 +1,4 @@
+-- setopt delim ';'
 dofile('index_random_test.lua');
 
 box.space[1]:insert('brave', 'new', 'world');

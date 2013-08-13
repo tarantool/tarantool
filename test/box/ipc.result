@@ -263,6 +263,3 @@ end
  - "tfbr2 - 45"
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

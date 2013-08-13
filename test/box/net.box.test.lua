@@ -1,3 +1,4 @@
+-- setopt delim ';'
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5');
 type(remote);
 remote:ping();

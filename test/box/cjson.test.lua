@@ -1,3 +1,4 @@
+-- setopt delim ';'
 -- cjson tests;
 type(box.cjson);
 box.cjson.encode(123);

@@ -154,9 +154,7 @@ end
  - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
 -- Test incorrect keys - supplied key field type does not match index type
--- https://bugs.launchpad.net/tarantool/+bug/1072624
----
-...
+-- https://bugs.launchpad.net/tarantool/+bug/1072624;
 box.space[6]:insert('', '00000001', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Supplied key field type does not match index type: expected NUM'
@@ -174,6 +172,3 @@ box.space[6]:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
 error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
-
----
-...

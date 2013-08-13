@@ -1,3 +1,4 @@
+-- setopt delim ';'
 ch = box.ipc.channel();
 ch:is_full();
 ch:is_empty();
