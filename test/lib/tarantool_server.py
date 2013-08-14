@@ -59,29 +59,36 @@ class FuncTest(Test):
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        delim = ''
+        delimiter = ''
         cmd = None
         for line in open(self.name, 'r'):
-            if not line.strip():
-                continue
             if not cmd:
                 cmd = StringIO.StringIO()
-            if line.find('--') == 0 and not cmd.getvalue():
-                matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line)
+            if line.find('--') == 0:
+                matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line, re.DOTALL)
                 if matched:
+                    matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line.strip(), re.DOTALL)
                     if re.match('delim(i(t(e(r)?)?)?)?', matched.group(1)):
-                        delim = matched.group(2)[1:-1]
-                else:
-                    sys.stdout.write(line)
+                        delimiter = matched.group(2)[1:-1]
+                sys.stdout.write(line)
             else:
+                if not delimiter:
+                    if line.strip():
+                        server.admin(line[:-1])
+                    continue
                 cmd.write(line)
-                if line.endswith(delim+'\n'):
-                    server.admin(cmd.getvalue()[:(len(delim)+1)*(-1)].replace('\n\n', '\n'))
+                if cmd.getvalue().endswith(delimiter + '\n') and cmd.getvalue():
+                    res = server.admin(cmd.getvalue()[:-(1 + len(delimiter))].replace('\n\n', '\n'), silent=True)
+                    sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
+                    sys.stdout.write(res.replace("\r\n", "\n"))
                     cmd.close()
                     cmd = None
         if cmd and cmd.getvalue():
-            server.admin(cmd.getvalue()[:-len(delim)].replace('\n\n', '\n'))
+            res = server.admin(cmd.getvalue()[:-(1 + len(delimiter))].replace('\n\n', '\n'), silent=True)
+            sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
+            sys.stdout.write(res.replace("\r\n", "\n"))
             cmd.close
+            cmd = None
 
 class PythonTest(FuncTest):
     def execute(self, server):

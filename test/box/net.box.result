@@ -117,19 +117,20 @@ remote:timeout(0.01):call('box.fiber.sleep', '10')
 ---
  - nil
 ...
-pstart = box.time()
+-- setopt delimiter ';'
+pstart = box.time();
 ---
 ...
-parallel = {}
+parallel = {};
 ---
 ...
 function parallel_foo(id)
     box.fiber.sleep(math.random() * .05)
     return id
-end
+end;
 ---
 ...
-parallel_foo('abc')
+parallel_foo('abc');
 ---
  - abc
 ...
@@ -144,7 +145,7 @@ for i = 1, 20 do
             end
         )
     )
-end
+end;
 ---
 ...
 for i = 1, 20 do
@@ -152,9 +153,10 @@ for i = 1, 20 do
         break
     end
     box.fiber.sleep(0.1)
-end
+end;
 ---
 ...
+-- setopt delimiter ''
 unpack(parallel)
 ---
  - true

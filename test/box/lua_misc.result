@@ -1,28 +1,29 @@
+-- setopt delim ';'
 ----------------
 -- # box.raise
-----------------;
-1 + 1
+----------------
+1 + 1;
 ---
  - 2
 ...
-box.raise(123, 'test')
+box.raise(123, 'test');
 ---
 error: 'test'
 ...
-box.raise(0, 'the other test')
+box.raise(0, 'the other test');
 ---
 error: 'box.raise(): unknown error code'
 ...
-box.raise(12, 345)
+box.raise(12, 345);
 ---
 error: '345'
 ...
 ----------------
 -- # box.stat
-----------------;
+----------------
 for k, v in pairs(box.stat()) do
     print(' - ', k)
-end
+end;
 ---
  - DELETE
  - SELECT
@@ -33,62 +34,62 @@ end
 ...
 for k, v in pairs(box.stat().DELETE) do
     print(' - ', k)
-end
+end;
 ---
  - total
  - rps
 ...
 for k, v in pairs(box.stat.DELETE) do
     print(' - ', k)
-end
+end;
 ---
  - total
  - rps
 ...
 ----------------
 -- # box.space
-----------------;
-type(box)
+----------------
+type(box);
 ---
  - table
 ...
-type(box.space)
+type(box.space);
 ---
  - table
 ...
-box.cfg.memcached_space
+box.cfg.memcached_space;
 ---
  - 23
 ...
 for i, v in pairs(box.space[0].index[0].key_field[0]) do
     print(i, ' : ', v)
-end
+end;
 ---
 type : NUM
 fieldno : 0
 ...
 ----------------
 -- # box.space
-----------------;
-string.match(tostring(box.slab), '^table:') ~= nil
+----------------
+string.match(tostring(box.slab), '^table:') ~= nil;
 ---
  - true
 ...
-box.slab.arena_used >= 0
+box.slab.arena_used >= 0;
 ---
  - true
 ...
-box.slab.arena_size > 0
+box.slab.arena_size > 0;
 ---
  - true
 ...
-string.match(tostring(box.slab.slabs), '^table:') ~= nil
+string.match(tostring(box.slab.slabs), '^table:') ~= nil;
 ---
  - true
 ...
 for k, v in pairs(box.slab()) do
     print(' - ', k)
-end
+end;
 ---
  - slabs
  - arena_size
@@ -96,10 +97,10 @@ end
 ...
 ----------------
 -- # box.error
-----------------;
+----------------
 for k,v in pairs(box.error) do
     print('box.error.', k, ' : ', v)
-end
+end;
 ---
 box.error.ER_ILLEGAL_PARAMS : 514
 box.error.ER_KEY_FIELD_TYPE : 9730

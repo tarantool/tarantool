@@ -1,13 +1,13 @@
 dofile('utils.lua')
---=============================================================================
-== 32-bit hash tests
---=============================================================================
 ---
 ...
+--=============================================================================
+-- 32-bit hash tests
+--=============================================================================
 -------------------------------------------------------------------------------
 -- 32-bit hash insert fields tests
--------------------------------------------------------------------------------;
--- Insert valid fields;
+-------------------------------------------------------------------------------
+-- Insert valid fields
 box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -24,15 +24,15 @@ box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')
 ---
  - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
--- Insert invalid fields;
+-- Insert invalid fields
 box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Supplied key field type does not match index type: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash replace fields tests
--------------------------------------------------------------------------------;
--- Replace valid fields;
+-------------------------------------------------------------------------------
+-- Replace valid fields
 box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
  - 3: {'value1 v1.31', 'value2 1.12'}
@@ -45,15 +45,15 @@ box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
  - 2: {'value1 v1.43', 'value2 1.92'}
 ...
--- Replace invalid fields;
+-- Replace invalid fields
 box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Supplied key field type does not match index type: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash select fields test
--------------------------------------------------------------------------------;
--- select by valid keys;
+-------------------------------------------------------------------------------
+-- select by valid keys
 box.space[10]:select(0, 0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -76,7 +76,7 @@ box.space[10]:select(0, 4)
 box.space[10]:select(0, 5)
 ---
 ...
--- select by invalid keys;
+-- select by invalid keys
 box.space[10]:select(0, 'invalid key')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
@@ -87,8 +87,8 @@ error: 'Invalid key part count (expected [0..1], got 2)'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash delete fields test
--------------------------------------------------------------------------------;
--- delete by valid keys;
+-------------------------------------------------------------------------------
+-- delete by valid keys
 box.space[10]:delete(0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -111,7 +111,7 @@ box.space[10]:delete(4)
 box.space[10]:delete(5)
 ---
 ...
--- delete by invalid keys;
+-- delete by invalid keys
 box.space[10]:delete('invalid key')
 ---
 error: 'Supplied key field type does not match index type: expected u32'
@@ -122,11 +122,11 @@ error: 'Invalid key part count in an exact match (expected 1, got 2)'
 ...
 --=============================================================================
 -- 64-bit hash tests
---=============================================================================;
+--=============================================================================
 -------------------------------------------------------------------------------
 -- 64-bit hash inset fields tests
--------------------------------------------------------------------------------;
--- Insert valid fields;
+-------------------------------------------------------------------------------
+-- Insert valid fields
 box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -143,7 +143,7 @@ box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
  - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
--- Insert invalid fields;
+-- Insert invalid fields
 box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Supplied key field type does not match index type: expected NUM64'
@@ -166,8 +166,8 @@ error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash replace fields tests
--------------------------------------------------------------------------------;
--- Replace valid fields;
+-------------------------------------------------------------------------------
+-- Replace valid fields
 box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12')
 ---
  - 3: {'value1 v1.31', 'value2 1.12'}
@@ -180,7 +180,7 @@ box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 ---
  - 2: {'value1 v1.43', 'value2 1.92'}
 ...
--- Replace invalid fields;
+-- Replace invalid fields
 box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
 error: 'Supplied key field type does not match index type: expected NUM64'
@@ -199,8 +199,8 @@ error: 'Supplied key field type does not match index type: expected NUM64'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash select fields test
--------------------------------------------------------------------------------;
--- select by valid keys;
+-------------------------------------------------------------------------------
+-- select by valid keys
 box.space[11]:select(0, 0ULL)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -223,7 +223,7 @@ box.space[11]:select(0, 4ULL)
 box.space[11]:select(0, 5ULL)
 ---
 ...
--- select by valid NUM keys;
+-- select by valid NUM keys
 box.space[11]:select(0, 0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -246,7 +246,7 @@ box.space[11]:select(0, 4)
 box.space[11]:select(0, 5)
 ---
 ...
--- select by invalid keys;
+-- select by invalid keys
 box.space[11]:select(0, 'invalid key')
 ---
 error: 'Supplied key field type does not match index type: expected u64'
@@ -257,8 +257,8 @@ error: 'Invalid key part count (expected [0..1], got 2)'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash delete fields test
--------------------------------------------------------------------------------;
--- delete by valid keys;
+-------------------------------------------------------------------------------
+-- delete by valid keys
 box.space[11]:delete(0ULL)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -297,7 +297,7 @@ box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
  - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
--- delete by valid NUM keys;
+-- delete by valid NUM keys
 box.space[11]:delete(0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
@@ -320,7 +320,7 @@ box.space[11]:delete(4)
 box.space[11]:delete(5)
 ---
 ...
--- delete by invalid keys;
+-- delete by invalid keys
 box.space[11]:delete('invalid key')
 ---
 error: 'Supplied key field type does not match index type: expected u64'
@@ -331,11 +331,11 @@ error: 'Invalid key part count in an exact match (expected 1, got 2)'
 ...
 --=============================================================================
 -- String hash tests
---=============================================================================;
+--=============================================================================
 -------------------------------------------------------------------------------
 -- String hash inset fields tests
--------------------------------------------------------------------------------;
--- Insert valid fields;
+-------------------------------------------------------------------------------
+-- Insert valid fields
 box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0')
 ---
  - 'key 0': {'value1 v1.0', 'value2 v1.0'}
@@ -354,8 +354,8 @@ box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0')
 ...
 -------------------------------------------------------------------------------
 -- String hash replace fields tests
--------------------------------------------------------------------------------;
--- Replace valid fields;
+-------------------------------------------------------------------------------
+-- Replace valid fields
 box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12')
 ---
  - 'key 3': {'value1 v1.31', 'value2 1.12'}
@@ -370,8 +370,8 @@ box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92')
 ...
 -------------------------------------------------------------------------------
 -- String hash select fields test
--------------------------------------------------------------------------------;
--- select by valid keys;
+-------------------------------------------------------------------------------
+-- select by valid keys
 box.space[12]:select(0, 'key 0')
 ---
  - 'key 0': {'value1 v1.0', 'value2 v1.0'}
@@ -394,15 +394,15 @@ box.space[12]:select(0, 'key 4')
 box.space[12]:select(0, 'key 5')
 ---
 ...
--- select by invalid keys;
+-- select by invalid keys
 box.space[12]:select(0, 'key 1', 'key 2')
 ---
 error: 'Invalid key part count (expected [0..1], got 2)'
 ...
 -------------------------------------------------------------------------------
 -- String hash delete fields test
--------------------------------------------------------------------------------;
--- delete by valid keys;
+-------------------------------------------------------------------------------
+-- delete by valid keys
 box.space[12]:delete('key 0')
 ---
  - 'key 0': {'value1 v1.0', 'value2 v1.0'}
@@ -425,12 +425,12 @@ box.space[12]:delete('key 4')
 box.space[12]:delete('key 5')
 ---
 ...
--- delete by invalid keys;
+-- delete by invalid keys
 box.space[12]:delete('key 1', 'key 2')
 ---
 error: 'Invalid key part count in an exact match (expected 1, got 2)'
 ...
--- clean-up;
+-- clean-up
 box.space[10]:truncate()
 ---
 ...
@@ -442,7 +442,7 @@ box.space[12]:truncate()
 ...
 ------------------------
 -- hash::replace tests
-------------------------;
+------------------------
 box.space[21]:truncate()
 ---
 ...
@@ -458,7 +458,7 @@ box.space[21]:insert(2, 2, 2, 2)
 ---
  - 2: {2, 2, 2}
 ...
--- OK;
+-- OK
 box.replace_if_exists(21, 1, 1, 1, 1)
 ---
  - 1: {1, 1, 1}
@@ -499,7 +499,7 @@ box.space[21]:select(3, 1)
 ---
  - 1: {1, 1, 1}
 ...
--- OK;
+-- OK
 box.space[21]:insert(10, 10, 10, 10)
 ---
  - 10: {10, 10, 10}
@@ -520,7 +520,7 @@ box.space[21]:select(2, 10)
 box.space[21]:select(3, 10)
 ---
 ...
--- TupleFound (primary key);
+-- TupleFound (primary key)
 box.space[21]:insert(1, 10, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 0'
@@ -541,7 +541,7 @@ box.space[21]:select(0, 1)
 ---
  - 1: {1, 1, 1}
 ...
--- TupleNotFound (primary key);
+-- TupleNotFound (primary key)
 box.replace_if_exists(21, 10, 10, 10, 10)
 ---
 error: 'Tuple doesn''t exist in index 0'
@@ -558,7 +558,7 @@ box.space[21]:select(2, 10)
 box.space[21]:select(3, 10)
 ---
 ...
--- TupleFound (key --1);
+-- TupleFound (key --1)
 box.space[21]:insert(10, 0, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 1'
@@ -579,7 +579,7 @@ box.space[21]:select(1, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key --1);
+-- TupleFound (key --1)
 box.replace_if_exists(21, 2, 0, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 1'
@@ -600,7 +600,7 @@ box.space[21]:select(1, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key --3);
+-- TupleFound (key --3)
 box.space[21]:insert(10, 10, 10, 0)
 ---
 error: 'Duplicate key exists in unique index 3'
@@ -621,7 +621,7 @@ box.space[21]:select(3, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key --3);
+-- TupleFound (key --3)
 box.replace_if_exists(21, 2, 10, 10, 0)
 ---
 error: 'Duplicate key exists in unique index 3'

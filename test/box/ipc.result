@@ -52,6 +52,7 @@ ch:is_empty()
 buffer = {}
 ---
 ...
+-- setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -59,15 +60,15 @@ tfbr = box.fiber.create(
             table.insert(buffer, ch:get())
         end
     end
-)
+);
 ---
 ...
-box.fiber.resume(tfbr)
+box.fiber.resume(tfbr);
 ---
 ...
 for i = 1, 10 do
     print(i, ' : ', ch:put(i, 0.1))
-end
+end;
 ---
 1 : true
 2 : true
@@ -80,44 +81,44 @@ end
 9 : true
 10 : true
 ...
-ch:has_readers()
+ch:has_readers();
 ---
  - true
 ...
-ch:has_writers()
+ch:has_writers();
 ---
  - false
 ...
-box.fiber.cancel(tfbr)
+box.fiber.cancel(tfbr);
 ---
 ...
-ch:has_readers()
----
- - false
-...
-ch:has_writers()
+ch:has_readers();
 ---
  - false
 ...
-ch:put(box.info.pid)
+ch:has_writers();
+---
+ - false
+...
+ch:put(box.info.pid);
 ---
  - true
 ...
-ch:is_full()
+ch:is_full();
 ---
  - true
 ...
-ch:is_empty()
+ch:is_empty();
 ---
  - false
 ...
-ch:get(box.info.pid) == box.info.pid
+ch:get(box.info.pid) == box.info.pid;
 ---
  - true
 ...
 for i, v in pairs(buffer) do
     print(v)
-end
+end;
 ---
 234
 1
@@ -131,27 +132,27 @@ end
 9
 10
 ...
-ch:is_empty()
+ch:is_empty();
 ---
  - true
 ...
-ch:broadcast()
+ch:broadcast();
 ---
 error: 'usage: channel:broadcast(variable)'
 ...
-ch:broadcast(123)
+ch:broadcast(123);
 ---
  - true
 ...
-ch:get()
+ch:get();
 ---
  - 123
 ...
-ch:is_full()
+ch:is_full();
 ---
  - false
 ...
-ch:is_empty()
+ch:is_empty();
 ---
  - true
 ...
@@ -163,10 +164,10 @@ tfbr = box.fiber.create(
             table.insert(buffer, 'tfbr  - ' .. tostring(v))
         end
     end
-)
+);
 ---
 ...
-box.fiber.resume(tfbr)
+box.fiber.resume(tfbr);
 ---
 ...
 tfbr2 = box.fiber.create(
@@ -177,18 +178,17 @@ tfbr2 = box.fiber.create(
             table.insert(buffer, 'tfbr2 - ' .. tostring(v))
         end
     end
-)
+);
 ---
 ...
-box.fiber.resume(tfbr2)
+box.fiber.resume(tfbr2);
 ---
 ...
+-- setopt delimiter ''
 buffer = {}
 ---
 ...
-for i, v in pairs(buffer) do
-    print(' - ', v)
-end
+for i, v in pairs(buffer) do print(' - ', v) end
 ---
 ...
 ch:is_full()
@@ -223,9 +223,7 @@ ch:broadcast('broadcast message!')
 ---
  - 2
 ...
-for i = 35, 45 do
-    print(' - ', ch:put(i))
-end
+for i = 35, 45 do print(' - ', ch:put(i)) end
 ---
  - true
  - true
@@ -239,9 +237,7 @@ end
  - true
  - true
 ...
-for i, v in pairs(buffer) do
-    print(' - "', v, '"')
-end
+for i, v in pairs(buffer) do print(' - "', v, '"') end
 ---
  - "tfbr  - 1"
  - "tfbr2 - 2"

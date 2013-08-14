@@ -1,4 +1,4 @@
--- cjson tests;
+-- cjson tests
 type(box.cjson)
 ---
  - table

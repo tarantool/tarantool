@@ -98,7 +98,7 @@ class AdminConnection(TarantoolConnection):
             add_lua=True
         return self.execute_simple(command, silent, lua=add_lua)
     
-    def __call__(self, command, silent=False, simple=False):
+    def __call__(self, command, silent=False, simple=False, cut = 0):
         if not simple:
             return self.execute(command, silent)
         else:

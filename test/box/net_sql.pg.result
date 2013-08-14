@@ -8,12 +8,10 @@ dump = function(v) return box.cjson.encode(v) end
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('PG'), '[^:]+') do
-    table.insert(connect, tk)
-end
+for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end
 ---
 ...
--- postgresql;
+-- postgresql
 c = box.net.sql.connect('pg', unpack(connect))
 ---
 ...
@@ -112,11 +110,7 @@ c:commit()
 ---
  - 0
 ...
-c:txn(
-    function(dbi)
-        dbi:single('SELECT 1')
-    end
-)
+c:txn(function(dbi) dbi:single('SELECT 1') end)
 ---
  - true
 ...

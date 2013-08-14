@@ -1,6 +1,6 @@
 --
 -- Insert test
---;
+--
 box.space[9]:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -83,8 +83,8 @@ box.space[9]:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s becaus
 ...
 --
 -- Select test
---;
--- Select by one entry;
+--
+-- Select by one entry
 box.select(9, 0, 'Vincent', 'Jules', 0)
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -165,7 +165,7 @@ box.select(9, 0, 'Vincent', 'The Wolf!', 2)
 ---
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
--- Select all messages from Vincent to Jules;
+-- Select all messages from Vincent to Jules
 box.select(9, 0, 'Vincent', 'Jules')
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -176,7 +176,7 @@ box.select(9, 0, 'Vincent', 'Jules')
  - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
  - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
 ...
--- Select all messages from Jules to Vincent;
+-- Select all messages from Jules to Vincent
 box.select(9, 0, 'Jules', 'Vincent')
 ---
  - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
@@ -186,14 +186,14 @@ box.select(9, 0, 'Jules', 'Vincent')
  - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
  - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
 ...
--- Select all messages from Vincent to The Wolf;
+-- Select all messages from Vincent to The Wolf
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
--- Select all messages from The Wolf to Vincent;
+-- Select all messages from The Wolf to Vincent
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
  - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
@@ -201,7 +201,7 @@ box.select(9, 0, 'The Wolf!', 'Vincent')
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
  - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
 ...
--- Select all Vincent messages;
+-- Select all Vincent messages
 box.select(9, 0, 'Vincent')
 ---
  - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
@@ -217,8 +217,8 @@ box.select(9, 0, 'Vincent')
 ...
 --
 -- Delete test
---;
--- Delete some messages from the The Wolf and Vincent dialog;
+--
+-- Delete some messages from the The Wolf and Vincent dialog
 box.delete(9, 'The Wolf!', 'Vincent', 0)
 ---
  - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
@@ -239,35 +239,35 @@ box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 ---
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
 ...
--- Checking Vincent's last messages;
+-- Checking Vincent's last messages
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
--- Checking The Wolf's last messages;
+-- Checking The Wolf's last messages
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
  - 'The Wolf!': {'Vincent', 1, 'Come again?'}
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
--- try to delete nonexistent message;
+-- try to delete nonexistent message
 box.delete(9, 'Vincent', 'The Wolf!', 3)
 ---
 ...
--- try to delete patrial defined key;
+-- try to delete patrial defined key
 box.delete(9, 'Vincent', 'The Wolf!')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
--- try to delete by invalid key;
+-- try to delete by invalid key
 box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 4)'
 ...
 --
 -- Update test
---;
+--
 box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 ---
  - 'The Wolf!': {'Vincent', 1, '<ooops>'}
@@ -276,28 +276,28 @@ box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 ---
  - 'Vincent': {'The Wolf!', 1, '<ooops>'}
 ...
--- Checking Vincent's last messages;
+-- Checking Vincent's last messages
 box.select(9, 0, 'Vincent', 'The Wolf!')
 ---
  - 'Vincent': {'The Wolf!', 1, '<ooops>'}
  - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
--- Checking The Wolf's last messages;
+-- Checking The Wolf's last messages
 box.select(9, 0, 'The Wolf!', 'Vincent')
 ---
  - 'The Wolf!': {'Vincent', 1, '<ooops>'}
  - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
--- try to update a nonexistent message;
+-- try to update a nonexistent message
 box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
 ---
 ...
--- try to update patrial defined key;
+-- try to update patrial defined key
 box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 2)'
 ...
--- try to update by invalid key;
+-- try to update by invalid key
 box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
 ---
 error: 'Invalid key part count in an exact match (expected 3, got 4)'
@@ -314,7 +314,7 @@ box.space[9]:len()
  - 0
 ...
 -- A test case for Bug#1051006 Tree iterators return garbage
---if an index is modified between calls;
+--if an index is modified between calls
 box.space[16]:insert('a', 'a', 'a')
 ---
  - 'a': {'a', 'a'}
@@ -335,54 +335,56 @@ box.space[16]:insert('c', 'c', 'c')
 ---
  - 'c': {'c', 'c'}
 ...
+-- setopt delimiter ';'
 for i = 1, 2 do
     k,v = box.space[16].index[1]:next(k)
     print(' - ', v)
-end
+end;
 ---
  - 'a': {'a', 'a'}
  - 'b': {'b', 'b'}
 ...
-box.space[16]:truncate()
+box.space[16]:truncate();
 ---
 ...
-v
+v;
 ---
  - 'b': {'b', 'b'}
 ...
-collectgarbage('collect')
+collectgarbage('collect');
 ---
  - 0
 ...
-v
+v;
 ---
  - 'b': {'b', 'b'}
 ...
-k,v = box.space[16].index[1]:next(k)
+k,v = box.space[16].index[1]:next(k);
 ---
 ...
-v
+v;
 ---
  - nil
 ...
-collectgarbage('collect')
+collectgarbage('collect');
 ---
  - 0
 ...
-v
+v;
 ---
  - nil
 ...
 for i = 1, 3 do
     k,v = box.space[16].index[1]:next(k)
     print(' - ', v)
-end
+end;
 ---
  - nil
  - nil
  - nil
 ...
--- Bug #1082356;
+-- setopt delimiter ''
+-- Bug #1082356
 box.space[19]:insert(1, 1)
 ---
 error: 'Illegal parameters, tuple must have all indexed fields'

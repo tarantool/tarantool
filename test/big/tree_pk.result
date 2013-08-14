@@ -1,7 +1,7 @@
 dofile('utils.lua')
 ---
 ...
--- integer keys;
+-- integer keys
 box.space[2]:insert(1, 'tuple')
 ---
  - 1: {'tuple'}
@@ -34,7 +34,7 @@ box.space[2]:select(0, 3)
 ---
  - 3: {'tuple 3'}
 ...
--- Cleanup;
+-- Cleanup
 box.space[2]:delete(1)
 ---
  - 1: {'tuple'}
@@ -48,7 +48,7 @@ box.space[2]:delete(3)
  - 3: {'tuple 3'}
 ...
 -- Test incorrect keys - supplied key field type does not match index type
--- https://bugs.launchpad.net/tarantool/+bug/1072624;
+-- https://bugs.launchpad.net/tarantool/+bug/1072624
 box.space[2]:insert('xxxxxxx')
 ---
 error: 'Supplied key field type does not match index type: expected NUM'
@@ -61,7 +61,7 @@ box.space[2]:insert('12')
 ---
 error: 'Supplied key field type does not match index type: expected NUM'
 ...
--- string keys;
+-- string keys
 box.space[3]:insert('identifier', 'tuple')
 ---
  - 'identifier': {'tuple'}
@@ -103,7 +103,7 @@ box.space[3]:select(0, 'third')
 ---
  - 'third': {'tuple 3'}
 ...
--- Cleanup;
+-- Cleanup
 box.space[3]:delete('identifier')
 ---
  - 'identifier': {'tuple'}
@@ -116,6 +116,7 @@ box.space[3]:delete('third')
 ---
  - 'third': {'tuple 3'}
 ...
+-- setopt delimiter ';'
 function box.crossjoin(space0, space1, limit)
     space0 = tonumber(space0)
     space1 = tonumber(space1)
@@ -135,9 +136,10 @@ function box.crossjoin(space0, space1, limit)
         end
     end
     return unpack(result)
-end
+end;
 ---
 ...
+-- setopt delimiter ''
 box.space[2]:insert(1, 'tuple')
 ---
  - 1: {'tuple'}
@@ -175,7 +177,7 @@ box.crossjoin('3', '2', '10000')
 box.space[3]:truncate()
 ---
 ...
--- Bug #922520 - select missing keys;
+-- Bug #922520 - select missing keys
 box.space[2]:insert(200, 'select me!')
 ---
  - 200: {'select me!'}
@@ -190,7 +192,7 @@ box.space[2]:select(0, 199)
 box.space[2]:select(0, 201)
 ---
 ...
--- Test partially specified keys in TREE indexes;
+-- Test partially specified keys in TREE indexes
 box.space[15]:insert('abcd')
 ---
  - 1684234849: {}
@@ -238,7 +240,7 @@ box.space[15]:truncate()
 ...
 --
 -- tree::replace tests
---;
+--
 box.space[22]:truncate()
 ---
 ...
@@ -254,7 +256,7 @@ box.space[22]:insert(2, 2, 2, 2)
 ---
  - 2: {2, 2, 2}
 ...
--- OK;
+-- OK
 box.replace_if_exists(22, 1, 1, 1, 1)
 ---
  - 1: {1, 1, 1}
@@ -295,7 +297,7 @@ box.space[22]:select(3, 1)
 ---
  - 1: {1, 1, 1}
 ...
--- OK;
+-- OK
 box.space[22]:insert(10, 10, 10, 10)
 ---
  - 10: {10, 10, 10}
@@ -316,7 +318,7 @@ box.space[22]:select(2, 10)
 box.space[22]:select(3, 10)
 ---
 ...
--- TupleFound (primary key);
+-- TupleFound (primary key)
 box.space[22]:insert(1, 10, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 0'
@@ -337,7 +339,7 @@ box.space[22]:select(0, 1)
 ---
  - 1: {1, 1, 1}
 ...
--- TupleNotFound (primary key);
+-- TupleNotFound (primary key)
 box.replace_if_exists(22, 10, 10, 10, 10)
 ---
 error: 'Tuple doesn''t exist in index 0'
@@ -354,7 +356,7 @@ box.space[22]:select(2, 10)
 box.space[22]:select(3, 10)
 ---
 ...
--- TupleFound (key #1);
+-- TupleFound (key #1)
 box.space[22]:insert(10, 0, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 1'
@@ -375,7 +377,7 @@ box.space[22]:select(1, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key #1);
+-- TupleFound (key #1)
 box.replace_if_exists(22, 2, 0, 10, 10)
 ---
 error: 'Duplicate key exists in unique index 1'
@@ -396,7 +398,7 @@ box.space[22]:select(1, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key #3);
+-- TupleFound (key #3)
 box.space[22]:insert(10, 10, 10, 0)
 ---
 error: 'Duplicate key exists in unique index 3'
@@ -417,7 +419,7 @@ box.space[22]:select(3, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- TupleFound (key #3);
+-- TupleFound (key #3)
 box.replace_if_exists(22, 2, 10, 10, 0)
 ---
 error: 'Duplicate key exists in unique index 3'
@@ -438,7 +440,7 @@ box.space[22]:select(3, 0)
 ---
  - 0: {0, 0, 0}
 ...
--- Non-Uniq test (key #2);
+-- Non-Uniq test (key #2)
 box.space[22]:insert(4, 4, 0, 4)
 ---
  - 4: {4, 0, 4}

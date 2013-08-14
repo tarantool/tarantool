@@ -1,18 +1,18 @@
--- setopt delim ';'
-ch = box.ipc.channel();
-ch:is_full();
-ch:is_empty();
-ch:get(.1);
-ch:put();
-ch:put('test');
-ch:get();
-ch:get('wrong timeout');
-ch:get(-10);
-ch:put(234);
-ch:put(345, .5);
-ch:is_full();
-ch:is_empty();
-buffer = {};
+ch = box.ipc.channel()
+ch:is_full()
+ch:is_empty()
+ch:get(.1)
+ch:put()
+ch:put('test')
+ch:get()
+ch:get('wrong timeout')
+ch:get(-10)
+ch:put(234)
+ch:put(345, .5)
+ch:is_full()
+ch:is_empty()
+buffer = {}
+-- setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -66,25 +66,20 @@ tfbr2 = box.fiber.create(
     end
 );
 box.fiber.resume(tfbr2);
+-- setopt delimiter ''
 
-buffer = {};
+buffer = {}
 
-for i, v in pairs(buffer) do
-    print(' - ', v)
-end;
-ch:is_full();
-ch:is_empty();
-ch:put(1);
-ch:put(2);
-ch:put(3);
-ch:put(4);
-ch:put(5);
-ch:broadcast('broadcast message!');
-for i = 35, 45 do
-    print(' - ', ch:put(i))
-end;
+for i, v in pairs(buffer) do print(' - ', v) end
+ch:is_full()
+ch:is_empty()
+ch:put(1)
+ch:put(2)
+ch:put(3)
+ch:put(4)
+ch:put(5)
+ch:broadcast('broadcast message!')
+for i = 35, 45 do print(' - ', ch:put(i)) end
 
-for i, v in pairs(buffer) do
-    print(' - "', v, '"')
-end;
+for i, v in pairs(buffer) do print(' - "', v, '"') end
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

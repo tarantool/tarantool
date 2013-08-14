@@ -138,9 +138,7 @@ box.space[6]:select(2, 400)
  - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
  - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
-for k,v in box.space[6]:pairs() do
-    print(' - ', v)
-end
+for k,v in box.space[6]:pairs() do print(' - ', v) end
 ---
  - 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
  - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
@@ -154,7 +152,7 @@ end
  - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
 -- Test incorrect keys - supplied key field type does not match index type
--- https://bugs.launchpad.net/tarantool/+bug/1072624;
+-- https://bugs.launchpad.net/tarantool/+bug/1072624
 box.space[6]:insert('', '00000001', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Supplied key field type does not match index type: expected NUM'

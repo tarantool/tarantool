@@ -1,4 +1,4 @@
--- box.uuid();
+-- box.uuid()
 string.len(box.uuid())
 ---
  - 16

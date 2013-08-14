@@ -29,7 +29,7 @@ set injection ERRINJ_TESTING off
 ---
 ok
 ...
--- Check how well we handle a failed log write;
+-- Check how well we handle a failed log write
 set injection ERRINJ_WAL_IO on
 ---
 ok
@@ -71,7 +71,7 @@ ok
 box.space[0]:truncate()
 ---
 ...
--- Check a failed log rotation;
+-- Check a failed log rotation
 set injection ERRINJ_WAL_ROTATE on
 ---
 ok

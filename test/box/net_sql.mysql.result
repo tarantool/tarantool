@@ -2,26 +2,20 @@ c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
-function dump(v) return
-    box.cjson.encode(v)
-end
+function dump(v) return box.cjson.encode(v) end
 ---
 ...
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do
-    table.insert(connect, tk)
-end
+for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
 ---
 ...
--- mysql;
+-- mysql
 c = box.net.sql.connect('mysql', unpack(connect))
 ---
 ...
-for k, v in pairs(c) do
-    print(k, ': ', type(v))
-end
+for k, v in pairs(c) do print(k, ': ', type(v)) end
 ---
 raise: boolean
 processing: boolean
