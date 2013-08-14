@@ -1547,6 +1547,7 @@ tarantool_lua_sandbox(struct lua_State *L)
 					    "os.rename = nil\n"
 					    "os.tmpname = nil\n"
 					    "os.remove = nil\n"
+					    "io = nil\n"
 					    "require = nil\n");
 	if (result)
 		panic("%s", lua_tostring(L, -1));
