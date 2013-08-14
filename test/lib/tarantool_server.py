@@ -140,6 +140,9 @@ class TarantoolServer(Server):
         self.gdb = False
         self.valgrind = False
 
+    def __del__(self):
+        self.stop()
+
     def find_exe(self, builddir, silent=True):
         "Locate server executable in the build dir or in the PATH."
         self.builddir = builddir
