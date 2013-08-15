@@ -37,6 +37,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <cxxabi.h>
 
 #ifdef HAVE_BFD
 #include <bfd.h>
@@ -228,33 +229,29 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 	void *stack_bottom = stack;
 
 	char *p = backtrace_buf;
-	size_t r, len = sizeof(backtrace_buf);
+	char *end = p + sizeof(backtrace_buf) - 1;
+	int frameno = 0;
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
-		r = snprintf(p, len, "        - { frame: %p, caller: %p",
-			     (char *)frame + 2 * sizeof(void *), frame->ret);
+		p += snprintf(p, end - p, "#%-2d %p in ", frameno++, frame->ret);
 
-		if (r >= len)
+		if (p >= end)
 			goto out;
-		p += r;
-		len -= r;
-
 #ifdef HAVE_BFD
 		struct symbol *s = addr2symbol(frame->ret);
 		if (s != NULL) {
-			r = snprintf(p, len, " <%s+%" PRI_SZ "> ", s->name, (const char *) frame->ret - (const char *) s->addr);
-			if (r >= len)
-				goto out;
-			p += r;
-			len -= r;
-
-		}
+			size_t offset = (const char *) frame->ret - (const char *) s->addr;
+			p += snprintf(p, end - p, "%s+%" PRI_SZ "",
+				      s->name, offset);
+		} else
 #endif /* HAVE_BFD */
-		r = snprintf(p, len, " }" CRLF);
-		if (r >= len)
+		{
+			p += snprintf(p, end - p, "?");
+		}
+		if (p >= end)
 			goto out;
-		p += r;
-		len -= r;
-
+		p += snprintf(p, end - p, CRLF);
+		if (p >= end)
+			goto out;
 #ifdef HAVE_BFD
 		if (s != NULL && strcmp(s->name, "main") == 0)
 			break;
@@ -262,10 +259,8 @@ backtrace(void *frame_, void *stack, size_t stack_size)
 #endif
 		frame = frame->rbp;
 	}
-	r = 0;
 out:
-	p += MIN(len - 1, r);
-	*p = 0;
+	*p = '\0';
 	return backtrace_buf;
 }
 
@@ -389,7 +384,10 @@ symbols_load(const char *name)
 		if (is_func && (vma + symbol_table[i]->value) > 0 &&
 		    symbol_table[i]->value < size)
 		{
-			symbols[j].name = strdup(symbol_table[i]->name);
+			int status;
+			symbols[j].name = abi::__cxa_demangle(symbol_table[i]->name, 0, 0, &status);
+			if (symbols[j].name == NULL)
+				symbols[j].name = strdup(symbol_table[i]->name);
 			symbols[j].addr = (void *)(uintptr_t)(vma + symbol_table[i]->value);
 			symbols[j].end = (void *)(uintptr_t)(vma + size);
 			j++;
@@ -428,7 +426,10 @@ addr2symbol(void *addr)
 	if (symbols == NULL)
 		return NULL;
 
-	struct symbol key = {.addr = addr, .name = NULL, .end = NULL};
+	struct symbol key;
+	key.addr = addr;
+	key.name = NULL;
+	key.end = NULL;
 	struct symbol *low = symbols;
 	struct symbol *high = symbols + symbol_count;
 
