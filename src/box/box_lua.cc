@@ -42,7 +42,8 @@ extern "C" {
 #include <lj_ctype.h>
 #include <lj_cdata.h>
 #include <lj_cconv.h>
-#include <endian.h>
+#include <arpa/inet.h>
+#include <lib/bit/bit.h>
 } /* extern "C" */
 
 #include "pickle.h"
@@ -1507,7 +1508,7 @@ lbox_pack(struct lua_State *L)
 			/* signed and unsigned 16-bit big endian integers */
 			if (field.type != NUM || field.u32 > UINT16_MAX)
 				luaL_error(L, "box.pack: expected 16-bit int");
-			u16 = htobe16( (uint16_t) field.u32 );
+			u16 = htons( (uint16_t) field.u32 );
 			luaL_addlstring(&b, (char *)&u16, sizeof(u16));
 			break;
 		case 'I':
@@ -1521,7 +1522,7 @@ lbox_pack(struct lua_State *L)
 			/* signed and unsigned 32-bit big endian integers */
 			if (field.type != NUM)
 				luaL_error(L, "box.pack: expected 32-bit int");
-			u32 = htobe32( field.u32 );
+			u32 = htonl( field.u32 );
 			luaL_addlstring(&b, (char *)&u32, sizeof(uint32_t));
 			break;
 		case 'L':
@@ -1548,7 +1549,7 @@ lbox_pack(struct lua_State *L)
 			} else {
 				luaL_error(L, "box.pack: expected 64-bit int");
 			}
-			u64 = htobe64(u64);
+			u64 = bswap_u64(u64);
 			luaL_addlstring(&b, (char *)&u64, sizeof(u64));
 			break;
 		case 'd':
@@ -1683,7 +1684,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'n':
 			CHECK_SIZE(s + 1);
-			u16buf = be16toh(*(uint16_t *) s);
+			u16buf = ntohs(*(uint16_t *) s);
 			lua_pushnumber(L, u16buf);
 			s += 2;
 			break;
@@ -1695,7 +1696,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'N':
 			CHECK_SIZE(s + 3);
-			u32buf = be32toh(*(uint32_t *) s);
+			u32buf = ntohl(*(uint32_t *) s);
 			lua_pushnumber(L, u32buf);
 			s += 4;
 			break;
@@ -1706,7 +1707,7 @@ lbox_unpack(struct lua_State *L)
 			break;
 		case 'q':
 			CHECK_SIZE(s + 7);
-			luaL_pushnumber64(L, be64toh(*(uint64_t*) s));
+			luaL_pushnumber64(L, bswap_u64(*(uint64_t*) s));
 			s += 8;
 			break;
 		case 'd':
