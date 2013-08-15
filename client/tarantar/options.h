@@ -9,6 +9,7 @@ enum ts_options_mode {
 
 struct ts_options {
 	enum ts_options_mode mode;
+	int interval;
 	const char *file_config;
 	struct tarantool_cfg cfg;
 };
