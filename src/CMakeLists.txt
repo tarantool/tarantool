@@ -84,7 +84,7 @@ set (recompiled_sources
 set (common_sources
      tbuf.c
      palloc.cc
-     util.c
+     util.cc
      sio.cc
      evio.cc
      coio.cc
