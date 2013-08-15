@@ -33,10 +33,6 @@
 
 /* {{{ Utilities. *************************************************/
 
-struct sptree_index_node {
-	struct tuple *tuple;
-};
-
 struct sptree_index_key_data
 {
 	const char *key;
@@ -46,62 +42,50 @@ struct sptree_index_key_data
 static inline struct tuple *
 sptree_index_unfold(const void *node)
 {
-	if (node == NULL)
-		return NULL;
-
-	struct sptree_index_node *node_x = (struct sptree_index_node *) node;
-	assert (node_x->tuple != NULL);
-	return node_x->tuple;
-}
-
-static inline void
-sptree_index_fold(void *node, struct tuple *tuple)
-{
-	assert (node != NULL);
-	assert (tuple != NULL);
-
-	struct sptree_index_node *node_x = (struct sptree_index_node *) node;
-	node_x->tuple = tuple;
+	return node ? *(struct tuple **) node : NULL;
 }
 
 static int
 sptree_index_node_compare(const void *node_a, const void *node_b, void *arg)
 {
-	TreeIndex *self = (TreeIndex *) arg;
-	struct tuple *tuple_a = sptree_index_unfold(node_a);
-	struct tuple *tuple_b = sptree_index_unfold(node_b);
+	struct key_def *key_def = (struct key_def *) arg;
+	const struct tuple *tuple_a = *(const struct tuple **) node_a;
+	const struct tuple *tuple_b = *(const struct tuple **) node_b;
 
-	return tuple_compare(tuple_a, tuple_b, &self->key_def);
+	return tuple_compare(tuple_a, tuple_b, key_def);
 }
 
 static int
-sptree_index_node_compare_dup(const void *node_a, const void *node_b, void *arg)
+sptree_index_node_compare_dup(const void *node_a, const void *node_b,
+			      void *arg)
 {
-	TreeIndex *self = (TreeIndex *) arg;
-	struct tuple *tuple_a = sptree_index_unfold(node_a);
-	struct tuple *tuple_b = sptree_index_unfold(node_b);
+	struct key_def *key_def = (struct key_def *) arg;
+	const struct tuple *tuple_a = *(const struct tuple **) node_a;
+	const struct tuple *tuple_b = *(const struct tuple **) node_b;
 
-	return tuple_compare_dup(tuple_a, tuple_b, &self->key_def);
+	return tuple_compare_dup(tuple_a, tuple_b, key_def);
 }
 
 static int
-sptree_index_node_compare_with_key(const void *key, const void *node, void *arg)
+sptree_index_node_compare_with_key(const void *key, const void *node,
+				   void *arg)
 {
-	TreeIndex *self = (TreeIndex *) arg;
-	struct sptree_index_key_data *key_data =
-			(struct sptree_index_key_data *) key;
-	struct tuple *tuple = sptree_index_unfold(node);
+	struct key_def *key_def = (struct key_def *) arg;
+	const struct sptree_index_key_data *key_data =
+			(const struct sptree_index_key_data *) key;
+	const struct tuple *tuple = *(const struct tuple **) node;
 
 	/* the result is inverted because arguments are swapped */
 	return -tuple_compare_with_key(tuple, key_data->key,
-				       key_data->part_count, &self->key_def);
+				       key_data->part_count, key_def);
 }
 
 /* {{{ TreeIndex Iterators ****************************************/
 
 struct tree_iterator {
 	struct iterator base;
-	const TreeIndex *index;
+	struct key_def *key_def;
+	sptree_index_compare compare;
 	struct sptree_index_iterator *iter;
 	struct sptree_index_key_data key_data;
 };
@@ -147,9 +131,8 @@ tree_iterator_eq(struct iterator *iterator)
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	void *node = sptree_index_iterator_next(it->iter);
-	if (node && it->index->tree.compare(&it->key_data, node,
-					    (void *) it->index) == 0)
-		return sptree_index_unfold(node);
+	if (node && it->compare(&it->key_data, node, it->key_def) == 0)
+		return *(struct tuple **) node;
 
 	return NULL;
 }
@@ -160,11 +143,8 @@ tree_iterator_req(struct iterator *iterator)
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	void *node = sptree_index_iterator_reverse_next(it->iter);
-	if (node != NULL
-	    && it->index->tree.compare(&it->key_data, node,
-				       (void *) it->index) == 0) {
-		return sptree_index_unfold(node);
-	}
+	if (node && it->compare(&it->key_data, node, it->key_def) == 0)
+		return *(struct tuple **) node;
 
 	return NULL;
 }
@@ -176,10 +156,9 @@ tree_iterator_lt(struct iterator *iterator)
 
 	void *node ;
 	while ((node = sptree_index_iterator_reverse_next(it->iter)) != NULL) {
-		if (it->index->tree.compare(&it->key_data, node,
-					    (void *) it->index) != 0) {
+		if (it->compare(&it->key_data, node, it->key_def) != 0) {
 			it->base.next = tree_iterator_le;
-			return sptree_index_unfold(node);
+			return *(struct tuple **) node;
 		}
 	}
 
@@ -193,10 +172,9 @@ tree_iterator_gt(struct iterator *iterator)
 
 	void *node;
 	while ((node = sptree_index_iterator_next(it->iter)) != NULL) {
-		if (it->index->tree.compare(&it->key_data, node,
-					    (void *) it->index) != 0) {
+		if (it->compare(&it->key_data, node, it->key_def) != 0) {
 			it->base.next = tree_iterator_ge;
-			return sptree_index_unfold(node);
+			return *(struct tuple **) node;
 		}
 	}
 
@@ -261,32 +239,28 @@ struct tuple *
 TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
-	struct sptree_index_node new_node;
-	struct sptree_index_node old_node;
 	uint32_t errcode;
 
 	if (new_tuple) {
-		struct sptree_index_node *p_dup_node = &old_node;
-		sptree_index_fold(&new_node, new_tuple);
+		struct tuple *dup_tuple = NULL;
+		void *p_dup_node = &dup_tuple;
 
 		/* Try to optimistically replace the new_tuple. */
-		sptree_index_replace(&tree, &new_node, (void **) &p_dup_node);
+		sptree_index_replace(&tree, &new_tuple, &p_dup_node);
 
-		struct tuple *dup_tuple = sptree_index_unfold(p_dup_node);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			sptree_index_delete(&tree, &new_node);
-			if (p_dup_node != NULL)
-				sptree_index_replace(&tree, p_dup_node, NULL);
+			sptree_index_delete(&tree, &new_tuple);
+			if (dup_tuple)
+				sptree_index_replace(&tree, &dup_tuple, NULL);
 			tnt_raise(ClientError, errcode, index_id(this));
 		}
 		if (dup_tuple)
 			return dup_tuple;
 	}
 	if (old_tuple) {
-		sptree_index_fold(&old_node, old_tuple);
-		sptree_index_delete(&tree, &old_node);
+		sptree_index_delete(&tree, &old_tuple);
 	}
 	return old_tuple;
 }
@@ -302,7 +276,8 @@ TreeIndex::allocIterator() const
 			  "TreeIndex", "iterator");
 	}
 
-	it->index = this;
+	it->key_def = (struct key_def *) &key_def;
+	it->compare = tree.compare;
 	it->base.free = tree_iterator_free;
 	return (struct iterator *) it;
 }
@@ -370,24 +345,24 @@ void
 TreeIndex::reserve(uint32_t size_hint)
 {
 	assert(size_hint >= tree.size);
-	size_t sz = size_hint * sizeof(struct sptree_index_node);
-	tree.members = realloc(tree.members, sz);
-	if (tree.members == NULL) {
+	size_t sz = size_hint * sizeof(struct tuple *);
+	void *members = realloc(tree.members, sz);
+	if (members == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sz,
 			  "TreeIndex::reserve()", "malloc");
 	}
+	tree.members = members;
 	tree.max_size = size_hint;
 }
 
 void
 TreeIndex::buildNext(struct tuple *tuple)
 {
-	if (tree.size == tree.max_size)
-		reserve(tree.max_size * 2);
+	if (tree.size >= tree.max_size)
+		reserve(MAX(tree.max_size * 2, SPTREE_MIN_SIZE));
 
-	struct sptree_index_node *node = (struct sptree_index_node *)
-			tree.members + tree.size;
-	sptree_index_fold(node, tuple);
+	struct tuple **node = (struct tuple **) tree.members + tree.size;
+	*node = tuple;
 	tree.size++;
 }
 
@@ -404,11 +379,11 @@ TreeIndex::endBuild()
 	void *nodes = tree.members;
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
-	sptree_index_init(&tree, sizeof(struct sptree_index_node),
+	sptree_index_init(&tree, sizeof(struct tuple *),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
 			  key_def.is_unique ? sptree_index_node_compare
 					    : sptree_index_node_compare_dup,
-			  this);
+			  &key_def);
 }
 
