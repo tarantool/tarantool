@@ -34,7 +34,7 @@ fi
 
 start() {
         echo -n $"Starting ${INST}: "
-        /usr/local/bin/${INST}.sh ${OPTIONS} >> /var/${INST}/logs/init.log 2>&1
+        /usr/bin/${INST}.sh ${OPTIONS} >> /var/${INST}/logs/init.log 2>&1
         RETVAL=${?}
         if [ ${RETVAL} -eq 0 ]
         then
