@@ -290,9 +290,9 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 }
 
 
-/*-----------------------------------------------------------------------------*/
-/* spawner process                                                             */
-/*-----------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*
+ * spawner process                                                          *
+ * -------------------------------------------------------------------------*/
 
 /** Initialize the spawner. */
 
@@ -334,6 +334,21 @@ spawner_init(int sock)
 	sa.sa_handler = spawner_sigchld_handler;
 
 	if (sigaction(SIGCHLD, &sa, NULL) == -1)
+		say_syserror("sigaction");
+
+	sa.sa_handler = SIG_IGN;
+	/*
+	 * Ignore SIGUSR1, SIGUSR1 is used to make snapshots,
+	 * and if someone wrote a faulty regexp for `ps' and
+	 * fed it to `kill' the replication shouldn't die.
+	 */
+	if (sigaction(SIGUSR1, &sa, NULL) == -1)
+		say_syserror("sigaction");
+	/*
+	 * Ignore SIGUSR2 as well, since one can be pretty
+	 * inventive in ways of shooting oneself in the foot.
+	 */
+	if (sigaction(SIGUSR2, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
 	say_crit("initialized");
@@ -397,6 +412,15 @@ spawner_main_loop()
 static void
 spawner_shutdown()
 {
+	/*
+	 * There is no need to ever use signals with the spawner
+	 * process. If someone did send spawner a signal by
+	 * mistake, at least make a squeak in the error log before
+	 * dying.
+	 */
+	if (spawner.killed)
+		say_info("Terminated by signal %d", (int) spawner.killed);
+
 	/* close socket */
 	close(spawner.sock);
 
@@ -612,9 +636,22 @@ replication_relay_loop(int client_sock)
 	    sigaction(SIGTERM, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
-	/* Block SIGPIPE, we already handle EPIPE. */
+	/* Ignore SIGPIPE, we already handle EPIPE. */
 	sa.sa_handler = SIG_IGN;
 	if (sigaction(SIGPIPE, &sa, NULL) == -1)
+		say_syserror("sigaction");
+	/*
+	 * Ignore SIGUSR1, SIGUSR1 is used to make snapshots,
+	 * and if someone wrote a faulty regexp for `ps' and
+	 * fed it to `kill' the replication shouldn't die.
+	 */
+	if (sigaction(SIGUSR1, &sa, NULL) == -1)
+		say_syserror("sigaction");
+	/*
+	 * Ignore SIGUSR2 as well, since one can be pretty
+	 * inventive in ways of shooting oneself in the foot.
+	 */
+	if (sigaction(SIGUSR2, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
 	r = read(client_sock, &lsn, sizeof(lsn));
