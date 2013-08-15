@@ -377,7 +377,7 @@ void
 TreeIndex::buildNext(struct tuple *tuple)
 {
 	if (tree.size == tree.max_size) {
-		tree.max_size *= 2;
+		tree.max_size = MAX(tree.max_size * 2, 64);
 
 		size_t sz = tree.max_size * sizeof(struct sptree_index_node);
 		tree.members = realloc(tree.members, sz);
