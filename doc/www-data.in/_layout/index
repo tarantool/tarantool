@@ -1,5 +1,5 @@
 {% extends "base" %}
-{% set title = "Tarantool -- a transactional NoSQL database" %}
+{% set title = "Tarantool -- an in-memory NoSQL database" %}
 
 {% block header %}
 <!--    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p> -->
