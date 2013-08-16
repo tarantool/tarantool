@@ -135,6 +135,10 @@ static int tc_snapshot_printer(struct tnt_iter *i) {
 	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
 	struct tnt_stream_snapshot *ss =
 		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
+	if (tc.opt.space_set) {
+		if (ss->log.current.row_snap.space != tc.opt.space)
+			return 0;
+	}
 	((tc_printerf_snap_t)tc.opt.snap_printer)(&ss->log.current.row_snap, tu);
 	return 0;
 }
