@@ -121,7 +121,7 @@ static int tc_store_check_skip(struct tnt_iter *i, struct tnt_request *r) {
 	return 0;
 }
 
-static int tc_store_printer(struct tnt_iter *i) {
+static int tc_store_xlog_printer(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	if (tc_store_check_skip(i, r))
 		return 0;
@@ -131,7 +131,7 @@ static int tc_store_printer(struct tnt_iter *i) {
 	return 0;
 }
 
-static int tc_snapshot_printer(struct tnt_iter *i) {
+static int tc_store_snap_printer(struct tnt_iter *i) {
 	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
 	struct tnt_stream_snapshot *ss =
 		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
@@ -163,7 +163,7 @@ static int tc_store_foreach_xlog(tc_iter_t cb) {
 	return rc;
 }
 
-static int tc_store_foreach_snapshot(tc_iter_t cb) {
+static int tc_store_foreach_snap(tc_iter_t cb) {
 	struct tnt_stream s;
 	tnt_snapshot(&s);
 	if (tnt_snapshot_open(&s, (char*)tc.opt.file) == -1) {
@@ -195,10 +195,10 @@ int tc_store_cat(void)
 
 	switch (type) {
 	case TNT_LOG_SNAPSHOT:
-		rc = tc_store_foreach_snapshot(tc_snapshot_printer);
+		rc = tc_store_foreach_snap(tc_store_snap_printer);
 		break;
 	case TNT_LOG_XLOG:
-		rc = tc_store_foreach_xlog(tc_store_printer);
+		rc = tc_store_foreach_xlog(tc_store_xlog_printer);
 		break;
 	case TNT_LOG_NONE:
 		rc = 1;
@@ -212,8 +212,29 @@ int tc_store_cat(void)
 	}
 	return rc;
 }
+static int
+tc_store_snap_resender(struct tnt_iter *i) {
+	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
+	struct tnt_stream_snapshot *ss =
+		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
+	if (tc.opt.space_set) {
+		if (ss->log.current.row_snap.space != tc.opt.space)
+			return 0;
+	}
+	if (tnt_insert(tc.net, ss->log.current.row_snap.space,
+		       TNT_FLAG_ADD, tu) == -1)
+		return tc_store_error("failed to write request");
+	char *e = NULL;
+	if (tc_query_foreach(NULL, NULL, &e) == -1) {
+		tc_store_error("%s", e);
+		free(e);
+		return -1;
+	}
+	return 0;
+}
 
-static int tc_store_resender(struct tnt_iter *i) {
+static int
+tc_store_xlog_resender(struct tnt_iter *i) {
 	struct tnt_request *r = TNT_IREQUEST_PTR(i);
 	if (tc_store_check_skip(i, r))
 		return 0;
@@ -230,7 +251,24 @@ static int tc_store_resender(struct tnt_iter *i) {
 
 int tc_store_play(void)
 {
-	return tc_store_foreach_xlog(tc_store_resender);
+	enum tnt_log_type type = tnt_log_guess((char *)tc.opt.file);
+	if (type == TNT_LOG_NONE)
+		return 1;
+	int rc;
+	switch (type) {
+	case TNT_LOG_SNAPSHOT:
+		rc = tc_store_foreach_snap(tc_store_snap_resender);
+		break;
+	case TNT_LOG_XLOG:
+		rc = tc_store_foreach_xlog(tc_store_xlog_resender);
+		break;
+	case TNT_LOG_NONE:
+		rc = 1;
+		break;
+	default:
+		return -1;
+	}
+	return rc;
 }
 
 static int tc_store_printer_from_rpl(struct tnt_iter *i) {
