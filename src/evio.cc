@@ -173,6 +173,12 @@ evio_service_port(struct evio_service *service)
 	return ntohs(service->addr.sin_port);
 }
 
+static inline const char *
+evio_service_name(struct evio_service *service)
+{
+	return service->name;
+}
+
 /**
  * A callback invoked by libev when acceptor socket is ready.
  * Accept the socket, initialize it and pass to the on_accept
@@ -228,7 +234,8 @@ evio_service_bind_and_listen(struct evio_service *service)
 			close(fd);
 			return -1;
 		}
-		say_info("bound to port %i", evio_service_port(service));
+		say_info("bound to %s port %i", evio_service_name(service),
+			 evio_service_port(service));
 
 		/* Invoke on_bind callback if it is set. */
 		if (service->on_bind)
@@ -300,8 +307,9 @@ evio_service_start(struct evio_service *service)
 
 	if (evio_service_bind_and_listen(service)) {
 		/* Try again after a delay. */
-		say_warn("port %i is already in use, will "
+		say_warn("%s port %i is already in use, will "
 			 "retry binding after %lf seconds.",
+			 evio_service_name(service),
 			 evio_service_port(service), BIND_RETRY_DELAY);
 
 		ev_timer_set(&service->timer,
