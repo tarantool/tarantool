@@ -243,7 +243,7 @@ void tc_print_lua_field(char *data, uint32_t size, char string)
 		tc_printf("%"PRIu32, *((uint32_t*)data));
 		break;
 	case 8:
-		tc_printf("%"PRIu64, *((uint64_t*)data));
+		tc_printf("%"PRIu64"LL", *((uint64_t*)data));
 		break;
 	default:
 _string:
