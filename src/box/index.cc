@@ -198,9 +198,11 @@ index_build(Index *index, Index *pk)
 	index->beginBuild();
 	index->reserve(estimated_tuples);
 
-	say_info("Adding %" PRIu32 " keys to %s index %"
-		 PRIu32 "...", n_tuples,
-		 index_type_strs[index->key_def.type], index_id(index));
+	if (n_tuples > 0) {
+		say_info("Adding %" PRIu32 " keys to %s index %"
+			 PRIu32 "...", n_tuples,
+			 index_type_strs[index->key_def.type], index_id(index));
+	}
 
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);

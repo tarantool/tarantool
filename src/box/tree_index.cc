@@ -345,6 +345,7 @@ void
 TreeIndex::reserve(uint32_t size_hint)
 {
 	assert(size_hint >= tree.size);
+	size_hint = MAX(size_hint, SPTREE_MIN_SIZE);
 	size_t sz = size_hint * sizeof(struct tuple *);
 	void *members = realloc(tree.members, sz);
 	if (members == NULL) {
@@ -359,7 +360,7 @@ void
 TreeIndex::buildNext(struct tuple *tuple)
 {
 	if (tree.size >= tree.max_size)
-		reserve(MAX(tree.max_size * 2, SPTREE_MIN_SIZE));
+		reserve(tree.max_size * 2);
 
 	struct tuple **node = (struct tuple **) tree.members + tree.size;
 	*node = tuple;
@@ -372,8 +373,8 @@ TreeIndex::endBuild()
 	uint32_t n_tuples = tree.size;
 
 	if (n_tuples) {
-		say_info("Sorting %" PRIu32 " keys in index %" PRIu32 "...",
-			 n_tuples, index_id(this));
+		say_info("Sorting %" PRIu32 " keys in %s index %" PRIu32 "...",
+			 n_tuples, index_type_strs[key_def.type], index_id(this));
 	}
 	uint32_t estimated_tuples = tree.max_size;
 	void *nodes = tree.members;

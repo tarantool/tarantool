@@ -100,10 +100,13 @@ space_build_secondary_keys(struct space *space)
 	if (space->index_id_max == 0)
 		return; /* no secondary keys */
 
-	say_info("Building secondary keys in space %d...",
-		 space_id(space));
-
 	Index *pk = space->index_map[0];
+	uint32_t n_tuples = pk->size();
+
+	if (n_tuples > 0) {
+		say_info("Building secondary indexes in space %d...",
+			 space_id(space));
+	}
 
 	for (uint32_t j = 1; j <= space->index_id_max; j++) {
 		Index *index = space->index_map[j];
@@ -113,7 +116,9 @@ space_build_secondary_keys(struct space *space)
 		}
 	}
 
-	say_info("Space %d: done", space_id(space));
+	if (n_tuples > 0) {
+		say_info("Space %d: done", space_id(space));
+	}
 }
 
 static void

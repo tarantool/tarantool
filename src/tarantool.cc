@@ -878,7 +878,7 @@ main(int argc, char **argv)
 		tarantool_lua_load_init_script(tarantool_L);
 		prelease(fiber->gc_pool);
 		say_crit("log level %i", cfg.log_level);
-		say_crit("entering event loop");
+		say_crit("entering the event loop");
 		if (cfg.io_collect_interval > 0)
 			ev_set_io_collect_interval(cfg.io_collect_interval);
 		ev_now_update();
@@ -886,10 +886,10 @@ main(int argc, char **argv)
 		ev_loop(0);
 	} catch (const Exception& e) {
 		e.log();
-		panic("%s", "Fatal error, exiting loop");
+		panic("%s", "fatal error, exiting the event loop");
 	}
 
-	say_crit("exiting loop");
+	say_crit("exiting the event loop");
 	/* freeing resources */
 	return 0;
 }
