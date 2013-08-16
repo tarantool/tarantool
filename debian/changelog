@@ -1,3 +1,10 @@
+tarantool (1.5.3.157.g1c06d59-1) unstable; urgency=low
+
+  * New snapshot.
+   - Fix crashes with broken snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 16 Aug 2013 15:09:06 +0400
+
 tarantool (1.5.3.120.g68b26b6-1) unstable; urgency=low
 
   * New snapshot.
