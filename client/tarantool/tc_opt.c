@@ -53,7 +53,7 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file>", "replay xlog file to the specified server"),
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
-		    gopt_longs("space"), " <space>", "xlog file space number"),
+		    gopt_longs("space"), " <space>", "filter by space number"),
 	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
 		    gopt_longs("from"), " <lsn>", "start xlog file from the specified lsn"),
 	gopt_option('T', GOPT_ARG, gopt_shorts('T'),
