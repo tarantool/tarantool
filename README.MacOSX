@@ -36,10 +36,11 @@ the directory the module's archive deflates into.
 4. Download & build tarantool source code:
 -------------
 
-git clone git://github.com/tarantool/tarantool.git
+git clone --recursive git://github.com/tarantool/tarantool.git
 
 cd tarantool
 CC=clang CXX=clang++ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
+make
 
 5. Run tarantool test suite
 -------------
