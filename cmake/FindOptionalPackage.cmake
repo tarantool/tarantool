@@ -5,6 +5,7 @@ if (NOT _OptionalPackagesFile)
         file(REMOVE ${_OptionalPackagesFile})
     endif()
 endif()
+file(APPEND "${_OptionalPackagesFile}" "")
 
 macro (find_optional_package _package)
     string(TOUPPER ${_package} _packageUpper)
