@@ -29,6 +29,14 @@
  * SUCH DAMAGE.
  */
 #include "tarantool/util.h"
+#include "rlist.h"
+
+enum {
+	BOX_SPACE_MAX = INT32_MAX,
+	BOX_INDEX_MAX = 10,
+	BOX_FIELD_MAX = UINT32_MAX
+};
+
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
  * since there is a mismatch between enum name (STRING) and type

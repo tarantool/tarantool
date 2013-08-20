@@ -41,8 +41,6 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-#define RECOVER_READONLY 1
-
 typedef int (row_handler)(void *, const char *, uint32_t);
 
 /** A "condition variable" that allows fibers to wait when a given
@@ -100,7 +98,6 @@ struct recovery_state {
 	void *row_handler_param;
 	int snap_io_rate_limit;
 	int rows_per_wal;
-	int flags;
 	double wal_fsync_delay;
 	struct wait_lsn wait_lsn;
 	enum wal_mode wal_mode;
@@ -112,7 +109,7 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   int rows_per_wal, int flags);
+		   int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,

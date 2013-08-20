@@ -683,7 +683,7 @@ replication_relay_loop(int client_sock)
 	/* Initialize the recovery process */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
 		      replication_relay_send_row, (void *)(intptr_t) client_sock,
-		      INT32_MAX, RECOVER_READONLY);
+		      INT32_MAX);
 	/*
 	 * Note that recovery starts with lsn _NEXT_ to
 	 * the confirmed one.

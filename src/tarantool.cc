@@ -52,6 +52,7 @@
 #include <iproto.h>
 #include "mutex.h"
 #include <recovery.h>
+#include "log_io.h"
 #include <crc32.h>
 #include <palloc.h>
 #include <salloc.h>
@@ -69,6 +70,7 @@ extern "C" {
 #include "memcached.h"
 #include "session.h"
 #include "box/box.h"
+#include "bootstrap.h"
 #include "scoped_guard.h"
 
 
@@ -619,20 +621,26 @@ tarantool_free(void)
 #endif
 }
 
-static void
-initialize_minimal()
-{
-	if (!salloc_init(64 * 1000 * 1000, 4, 2))
-		panic_syserror("can't initialize slab allocator");
-	fiber_init();
-	coeio_init();
-}
-
-/** Callback of snapshot_save() when doing --init-storage */
+/** Create the initial snapshot file in the storage. */
 void
-init_storage(struct log_io * /* l */, struct fio_batch * /* batch */)
+init_storage()
 {
-	/* Nothing. */
+	struct log_dir dir = snap_dir;
+	dir.dirname = cfg.snap_dir;
+	const char *filename = format_filename(&dir, 1 /* lsn */, NONE);
+	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir.mode);
+	say_info("saving snapshot `%s'", filename);
+	if (fd == -1) {
+		panic_syserror("failed to open snapshot file `%s' for "
+			       "writing", filename);
+	}
+	if (write(fd, bootstrap_bin, sizeof(bootstrap_bin)) !=
+						sizeof(bootstrap_bin)) {
+		panic_syserror("failed to write to snapshot file `%s'",
+			       filename);
+	}
+	close(fd);
+	say_info("done");
 }
 
 int
@@ -803,11 +811,7 @@ main(int argc, char **argv)
 	}
 
 	if (gopt(opt, 'I')) {
-		initialize_minimal();
-		tarantool_L = tarantool_lua_init(); /* box.space[] */
-		box_init(true);
-		set_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, init_storage);
+		init_storage();
 		exit(EXIT_SUCCESS);
 	}
 
@@ -851,7 +855,7 @@ main(int argc, char **argv)
 
 	try {
 		tarantool_L = tarantool_lua_init();
-		box_init(false);
+		box_init();
 		atexit(tarantool_lua_free);
 		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		tarantool_lua_load_cfg(tarantool_L, &cfg);

@@ -202,7 +202,7 @@ recovery_stop_local(struct recovery_state *r);
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, void *row_handler_param,
-	      int rows_per_wal, int flags)
+	      int rows_per_wal)
 {
 	assert(recovery_state == NULL);
 	recovery_state = (struct recovery_state *) p0alloc(eter_pool, sizeof(struct recovery_state));
@@ -222,7 +222,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->wal_dir->open_wflags = r->wal_mode == WAL_FSYNC ? WAL_SYNC_FLAG : 0;
 	r->rows_per_wal = rows_per_wal;
 	wait_lsn_clear(&r->wait_lsn);
-	r->flags = flags;
 }
 
 void
@@ -564,8 +563,7 @@ recovery_finalize(struct recovery_state *r)
 		log_io_close(&r->current_wal);
 	}
 
-	if ((r->flags & RECOVER_READONLY) == 0)
-		wal_writer_start(r);
+	wal_writer_start(r);
 }
 
 

@@ -49,7 +49,7 @@ struct tarantool_cfg;
 struct lua_State;
 
 /** To be called at program start. */
-void box_init(bool init_storage);
+void box_init();
 /** To be called at program end. */
 void box_free(void);
 
@@ -95,12 +95,6 @@ const char *box_status(void);
  */
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
-
-enum {
-	BOX_SPACE_MAX = UINT32_MAX,
-	BOX_INDEX_MAX = 10,
-	BOX_FIELD_MAX = UINT32_MAX
-};
 
 #if defined(__cplusplus)
 }

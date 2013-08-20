@@ -62,6 +62,8 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
+set(bin_sources)
+bin_source(bin_sources bootstrap.snap bootstrap.h)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -120,6 +122,7 @@ set (common_sources
      lua/session.cc
      lua/cjson.cc
      ${lua_sources}
+     ${bin_sources}
 )
 
 if (ENABLE_TRACE)
