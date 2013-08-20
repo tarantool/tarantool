@@ -4,7 +4,7 @@ box.space[box.cfg.memcached_space].arity
 ...
 box.space[box.cfg.memcached_space].estimated_rows
 ---
- - 0
+ - nil
 ...
 box.space[box.cfg.memcached_space].n
 ---

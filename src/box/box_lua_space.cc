@@ -64,11 +64,6 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	lua_pushboolean(L, 1);
 	lua_settable(L, -3);
 
-	/* legacy field */
-	lua_pushstring(L, "estimated_rows");
-	lua_pushnumber(L, 0);
-	lua_settable(L, -3);
-
 	/* space.index */
 	lua_pushstring(L, "index");
 	lua_newtable(L);
