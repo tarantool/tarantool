@@ -57,12 +57,14 @@ function(lua_source varname filename)
 endfunction()
 
 function(bin_source varname srcfile dstfile)
+    set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
     set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${dstfile}.tmp")
+    set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${dstfile}")
     get_filename_component(module ${dstfile} NAME_WE)
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
         COMMAND ${ECHO} 'const unsigned char ${module}_bin[] = {' > ${tmpfile}
-        COMMAND ${CMAKE_BINARY_DIR}/extra/bin2c ${srcfile} >> ${tmpfile}
+        COMMAND ${CMAKE_BINARY_DIR}/extra/bin2c "${srcfile}" >> ${tmpfile}
         COMMAND ${ECHO} '}\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
