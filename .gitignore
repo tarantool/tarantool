@@ -17,8 +17,9 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
 RPM
-TAGS
+tags
 extra/txt2c
+extra/bin2c
 client/tarantool/tarantool
 client/tarancheck/tarancheck
 client/tarantar/tarantar
@@ -46,6 +47,7 @@ extra/rpm.spec
 include/tarantool/config.h
 install_manifest.txt
 lcov
+src/bootstrap.h
 src/lua/*.lua.c
 src/box/lua/*.lua.c
 src/box/tarantool_box
