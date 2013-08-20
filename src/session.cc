@@ -37,8 +37,8 @@ uint32_t sid_max;
 
 static struct mh_i32ptr_t *session_registry;
 
-struct trigger session_on_connect;
-struct trigger session_on_disconnect;
+RLIST_HEAD(session_on_connect);
+RLIST_HEAD(session_on_disconnect);
 
 uint32_t
 session_create(int fd)
@@ -64,7 +64,7 @@ session_create(int fd)
 	 */
 	fiber_set_sid(fiber, sid);
 	try {
-		trigger_run(&session_on_connect);
+		trigger_run(&session_on_connect, NULL);
 	} catch (const Exception& e) {
 		fiber_set_sid(fiber, 0);
 		mh_i32ptr_remove(session_registry, &node, NULL);
@@ -80,7 +80,7 @@ session_destroy(uint32_t sid)
 		return;
 
 	try {
-		trigger_run(&session_on_disconnect);
+		trigger_run(&session_on_disconnect, NULL);
 	} catch (const Exception& e) {
 		e.log();
 	} catch (...) {

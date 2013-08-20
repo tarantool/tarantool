@@ -84,9 +84,9 @@ session_exists(uint32_t sid)
 }
 
 /* The global on-connect trigger. */
-extern struct trigger session_on_connect;
+extern struct rlist session_on_connect;
 /* The global on-disconnect trigger. */
-extern struct trigger session_on_disconnect;
+extern struct rlist session_on_disconnect;
 
 void
 session_init();
