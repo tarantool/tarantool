@@ -76,7 +76,7 @@ snapshot_process_row(struct ts_spaces *s, int fileid, int offset,
 
 	mh_int_t pos = mh_pk_put(space->index, &node, NULL, space);
 	if (pos == mh_end(space->index)) {
-		free(k);
+		ts_space_keyfree(space, k);
 		return -1;
 	}
 	return 0;
@@ -209,17 +209,18 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 	case TNT_OP_INSERT:
 		pos = mh_pk_put(space->index, &node, NULL, space);
 		if (pos == mh_end(space->index)) {
-			free(k);
+			ts_space_keyfree(space, k);
 			return -1;
 		}
+		ts_oomcheck();
 		break;
 	case TNT_OP_DELETE: {
 		pos = mh_pk_get(space->index, &node, space);
 		assert(pos != mh_end(space->index));
 		struct ts_key *key = *mh_pk_node(space->index, pos);
 		mh_pk_del(space->index, pos, space);
-		free(key);
-		free(k);
+		ts_space_keyfree(space, key);
+		ts_space_keyfree(space, k);
 		break;
 	}
 	case TNT_OP_UPDATE: {
@@ -237,13 +238,13 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 
 			old = tnt_tuple_set(NULL, key->key + space->key_size + sizeof(uint32_t), size);
 			if (old == NULL) {
-				free(k);
+				ts_space_keyfree(space, k);
 				return -1;
 			}
 		} else {
 			/* load from file */
 			if (ts_cursor_open(&cursor, key)) {
-				free(k);
+				ts_space_keyfree(space, k);
 				return -1;
 			}
 			old = ts_cursor_tuple(&cursor);
@@ -252,8 +253,8 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 		/* remove key tuple from index, due to possibility of the key
 		 * being changed by update */
 		mh_pk_del(space->index, pos, space);
-		free(k);
-		free(key);
+		ts_space_keyfree(space, k);
+		ts_space_keyfree(space, key);
 
 		/* free old key */
 		struct tnt_tuple *n = ts_update(r, old);
@@ -278,7 +279,7 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 		node = k;
 		pos = mh_pk_put(space->index, &node, NULL, space);
 		if (pos == mh_end(space->index)) {
-			free(k);
+			ts_space_keyfree(space, k);
 			return -1;
 		}
 		break;

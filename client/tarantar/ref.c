@@ -20,7 +20,10 @@ int ts_reftable_init(struct ts_reftable *t)
 
 void ts_reftable_free(struct ts_reftable *t)
 {
-	free(t->r);
+	if (t->r) {
+		free(t->r);
+		t->r = NULL;
+	}
 }
 
 int ts_reftable_add(struct ts_reftable *t, char *file, int is_snap)
