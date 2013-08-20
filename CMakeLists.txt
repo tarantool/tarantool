@@ -93,8 +93,8 @@ add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
-set (CPACK_PACKAGE_VERSION_MINOR "5")
-set (CPACK_PACKAGE_VERSION_PATCH "3")
+set (CPACK_PACKAGE_VERSION_MINOR "6")
+set (CPACK_PACKAGE_VERSION_PATCH "0")
 
 set (PACKAGE_VERSION "")
 
