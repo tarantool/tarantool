@@ -9,6 +9,8 @@ enum ts_options_mode {
 
 struct ts_options {
 	enum ts_options_mode mode;
+	int to_lsn_set;
+	uint64_t to_lsn;
 	const char *file_config;
 	struct tarantool_cfg cfg;
 };

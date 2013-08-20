@@ -44,6 +44,8 @@
 static const void *opts_def = gopt_start(
 	gopt_option('c', 0, gopt_shorts('c'),
 		    gopt_longs("create"), NULL, "create snapshot file"),
+	gopt_option('l', GOPT_ARG, gopt_shorts('l'),
+		    gopt_longs("lsn"), " <u64>", "snapshot lsn (latest by default)"),
 	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
@@ -80,6 +82,13 @@ ts_options_process(struct ts_options *opts, int argc, char **argv)
 	if (gopt(opt, 'v')) {
 		opts->mode = TS_MODE_VERSION;
 		goto done;
+	}
+
+	/* lsn */
+	const char *arg = NULL;
+	if (gopt_arg(opt, 'l', &arg)) {
+		opts->to_lsn = atoll(arg);
+		opts->to_lsn_set = 1;
 	}
 	/* generate or verify */
 	if (gopt(opt, 'c')) {

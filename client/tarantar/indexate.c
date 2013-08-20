@@ -322,6 +322,10 @@ xlog_process(struct ts_spaces *s, char *wal_dir, uint64_t file_lsn,
 			*last = xs->log.current.hdr.lsn;
 		if (xs->log.current.hdr.lsn <= start)
 			continue;
+		if (tss.opts.to_lsn_set && xs->log.current.hdr.lsn > tss.opts.to_lsn) {
+			rc = 1;
+			goto done;
+		}
 		rc = xlog_process_row(s, fileid, xs->log.current_offset, r);
 		if (rc == -1)
 			goto done;
@@ -352,8 +356,8 @@ waldir_processof(struct ts_spaces *s, struct tnt_dir *wal_dir, int i)
 	if (i < wal_dir->count) {
 		rc = xlog_process(s, wal_dir->path, wal_dir->files[i].lsn,
 		                  tss.last_snap_lsn, &tss.last_xlog_lsn);
-		if (rc == -1)
-			return -1;
+		if (rc == -1 || rc == -1)
+			return rc;
 	}
 	for (i++; i < wal_dir->count; i++) {
 		rc = xlog_process(s, wal_dir->path, wal_dir->files[i].lsn,
@@ -361,7 +365,7 @@ waldir_processof(struct ts_spaces *s, struct tnt_dir *wal_dir, int i)
 		if (rc == -1)
 			return -1;
 	}
-	return 0;
+	return rc;
 }
 
 static int
