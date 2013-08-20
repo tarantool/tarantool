@@ -57,9 +57,11 @@ function(lua_source varname filename)
 endfunction()
 
 function(bin_source varname srcfile dstfile)
-    set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
-    set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${dstfile}.tmp")
-    set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${dstfile}")
+    set(var ${${varname}})
+    set(${varname} ${var} ${dstfile} PARENT_SCOPE)
+    set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${srcfile}")
+    set (dstfile "${CMAKE_CURRENT_SOURCE_DIR}/${dstfile}")
+    set (tmpfile "${dstfile}.tmp")
     get_filename_component(module ${dstfile} NAME_WE)
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
@@ -70,6 +72,4 @@ function(bin_source varname srcfile dstfile)
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
         DEPENDS ${srcfile} bin2c)
 
-    set(var ${${varname}})
-    set(${varname} ${var} ${dstfile} PARENT_SCOPE)
 endfunction()
