@@ -39,10 +39,5 @@ void
 box_lua_execute(const struct request *request, struct txn *txn,
 		struct port *port);
 
-/**
- * Create an instance of Lua interpreter in box.
- */
-void box_lua_init();
-
 struct tuple *lua_istuple(struct lua_State *L, int narg);
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */
