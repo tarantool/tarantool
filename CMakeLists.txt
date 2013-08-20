@@ -84,9 +84,9 @@ check_function_exists(memrchr HAVE_MEMRCHR)
 check_library_exists("" __libc_stack_end "" HAVE_LIBC_STACK_END)
 
 #
-# Enable 'make TAGS' target.
+# Enable 'make tags' target.
 #
-add_custom_target(TAGS COMMAND ctags -R --langmap=ObjectiveC:.m -e -f TAGS
+add_custom_target(tags COMMAND ctags -R -f tags
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #
