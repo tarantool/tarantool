@@ -116,8 +116,7 @@ int tnt_dir_scan(struct tnt_dir *d, char *path) {
 
 		switch (d->type) {
 		case TNT_DIR_XLOG:
-			if (strcmp(ext, ".xlog") != 0 && 
-			    strcmp(ext, ".xlog.inprogress") != 0)
+			if (strcmp(ext, ".xlog") != 0)
 				continue;
 			break;
 		case TNT_DIR_SNAPSHOT:

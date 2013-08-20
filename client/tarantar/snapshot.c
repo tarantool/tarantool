@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <third_party/crc32.h>
 
@@ -138,13 +139,13 @@ int ts_snapshot_create(void)
 
 	unsigned long long snap_lsn = tss.last_xlog_lsn;
 
-	if (tss.last_snap_lsn == snap_lsn) {
-		printf("snapshot already exists.\n");
+	if (snap_lsn == 0 || tss.last_snap_lsn == snap_lsn) {
+		printf("snapshot exists, skip.\n");
 		return 0;
 	}
 
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020llu.snap", tss.opts.cfg.snap_dir,
+	snprintf(path, sizeof(path), "%s/%020llu.snap.inprocess", tss.opts.cfg.snap_dir,
 	         (unsigned long long) snap_lsn);
 
 	FILE *snapshot = fopen(path, "a");
@@ -227,9 +228,23 @@ int ts_snapshot_create(void)
 		printf("failed to write row\n");
 		goto error;
 	}
+	if (fflush(snapshot) != 0) {
+		printf("flush failed\n");
+		goto error;
+	}
+	if (fsync(fileno(snapshot)) != 0) {
+		printf("sync failed\n");
+		goto error;
+	}
 	if (fclose(snapshot) != 0) {
 		printf("failed to write row\n");
 	}
+
+	char newpath[1024];
+	strncpy(newpath, path, sizeof(newpath));
+	char *ext = strrchr(newpath, '.');
+	*ext = 0;
+	rename(path, newpath);
 
 	tnt_log_close(&current);
 	printf("\n");

@@ -8,9 +8,12 @@ struct ts {
 	uint64_t last_snap_lsn;
 	uint64_t last_xlog_lsn;
 	int to_lsn_set;
+	uint64_t alloc;
 	uint64_t to_lsn;
 	struct slab_cache sc;
 	struct region ra;
 };
+
+void ts_oomcheck(void);
 
 #endif
