@@ -32,6 +32,22 @@ remote:call('box.select', '0', '0', 123)
 ---
  - 123: {'test1', 'test2'}
 ...
+slf, foo = box.call_loadproc('box.select')
+---
+...
+print(type(slf)) print(type(foo))
+---
+function
+nil
+...
+slf, foo = box.call_loadproc('box.net.self:select')
+---
+...
+print(type(slf)) print(type(foo))
+---
+function
+table
+...
 tuple
 ---
  - 123: {'test1', 'test2'}
@@ -194,11 +210,11 @@ remote:close()
 ...
 remote:close()
 ---
-error: '[string "-- box_net.lua (internal file)..."]:404: box.net.box: already closed'
+error: '[string "-- box_net.lua (internal file)..."]:408: box.net.box: already closed'
 ...
 remote:ping()
 ---
-error: '[string "-- box_net.lua (internal file)..."]:409: box.net.box: connection was closed'
+error: '[string "-- box_net.lua (internal file)..."]:413: box.net.box: connection was closed'
 ...
 box.space[0]:truncate()
 ---

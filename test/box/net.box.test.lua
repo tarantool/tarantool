@@ -7,6 +7,12 @@ box.insert(0, 123, 'test1', 'test2')
 box.select(0, 0, 123)
 tuple = remote:select(0, 0, 123)
 remote:call('box.select', '0', '0', 123)
+
+slf, foo = box.call_loadproc('box.select')
+print(type(slf)) print(type(foo))
+slf, foo = box.call_loadproc('box.net.self:select')
+print(type(slf)) print(type(foo))
+
 tuple
 type(tuple)
 #tuple
