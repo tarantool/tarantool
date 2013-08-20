@@ -1219,8 +1219,9 @@ tarantool_load_plugin(struct lua_State *L, const char *plugin)
 	say_info("Plugin '%s' was loaded, version: %d", p->name, p->version);
 }
 
+/** Load all plugins in a plugin dir. */
 static void
-tarantool_plugins_dir(struct lua_State *L, const char *dir)
+tarantool_plugin_dir(struct lua_State *L, const char *dir)
 {
 	if (!dir)
 		return;
@@ -1231,7 +1232,7 @@ tarantool_plugins_dir(struct lua_State *L, const char *dir)
 	if (!dh)
 		return;
 
-	struct dirent * dent;
+	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
 		if (dent->d_type != DT_REG)
 			continue;
@@ -1252,7 +1253,7 @@ tarantool_plugins_dir(struct lua_State *L, const char *dir)
 }
 
 static void
-tarantool_plugins_init(struct lua_State *L)
+tarantool_plugin_init(struct lua_State *L)
 {
 	int top = lua_gettop(L);
 
@@ -1264,17 +1265,17 @@ tarantool_plugins_init(struct lua_State *L)
 		for (;;) {
 			char *divider = strchr(ptr, ':');
 			if (divider == NULL) {
-				tarantool_plugins_dir(L, ptr);
+				tarantool_plugin_dir(L, ptr);
 				break;
 			}
 			*divider = 0;
-			tarantool_plugins_dir(L, ptr);
+			tarantool_plugin_dir(L, ptr);
 			ptr = divider + 1;
 		}
 		free(plugins);
 	}
 
-	tarantool_plugins_dir(L, PLUGIN_DIR);
+	tarantool_plugin_dir(L, PLUGIN_DIR);
 
 	lua_settop(L, top);
 }
@@ -1340,7 +1341,7 @@ tarantool_lua_init()
 	mod_lua_init(L);
 
 	/* init after internal luas are processed */
-	tarantool_plugins_init(L);
+	tarantool_plugin_init(L);
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
@@ -1557,7 +1558,7 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
 	 * box.insert, box.update, etc...), but box.fiber.yield() today,
-	 * which, when called from 'sched' fiber crashes the server.
+	 * when called from 'sched' fiber crashes the server.
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
