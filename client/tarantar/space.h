@@ -39,6 +39,7 @@ struct ts_spaces {
 
 int ts_space_init(struct ts_spaces *s);
 void ts_space_free(struct ts_spaces *s);
+void ts_space_recycle(struct ts_spaces *s);
 
 struct ts_space *ts_space_create(struct ts_spaces *s, uint32_t id);
 struct ts_space *ts_space_match(struct ts_spaces *s, uint32_t id);
@@ -48,5 +49,16 @@ int ts_space_fill(struct ts_spaces *s, struct ts_options *opts);
 struct ts_key*
 ts_space_keyalloc(struct ts_space *s, struct tnt_tuple *t, int fileid,
                   int offset, int attach);
+
+void
+ts_space_keyfree(struct ts_space *s, struct ts_key *k);
+
+static inline size_t
+ts_space_keysize(struct ts_space *s, struct ts_key *k) {
+	size_t size = sizeof(struct ts_key) + s->key_size;
+	if (k->flags == TS_KEY_WITH_DATA)
+		size += sizeof(uint32_t) + *(uint32_t*)(k->key + s->key_size);
+	return size;
+}
 
 #endif

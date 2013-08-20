@@ -44,8 +44,12 @@
 static const void *opts_def = gopt_start(
 	gopt_option('c', 0, gopt_shorts('c'),
 		    gopt_longs("create"), NULL, "create snapshot file"),
-	gopt_option('l', GOPT_ARG, gopt_shorts('l'),
+	gopt_option('i', GOPT_ARG, gopt_shorts('i'),
+		    gopt_longs("interval"), " <sec>", "periodically create snapshot"),
+	gopt_option('n', GOPT_ARG, gopt_shorts('n'),
 		    gopt_longs("lsn"), " <u64>", "snapshot lsn (latest by default)"),
+	gopt_option('l', GOPT_ARG, gopt_shorts('l'),
+		    gopt_longs("limit"), " <limit>", "memory limit (bytes)"),
 	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
@@ -63,8 +67,9 @@ void ts_options_free(struct ts_options *opts) {
 
 int ts_options_usage(void)
 {
-	printf("Tarantool XLOG compression utility.\n");
-	printf("Usage: tarantar <options> <tarantool_config>\n\n");
+	printf("Tarantool xlog compression utility.\n\n");
+
+	printf("Usage: tarantar <options> <tarantool_config>\n");
 	gopt_help(opts_def);
 	return 1;
 }
@@ -74,7 +79,7 @@ ts_options_process(struct ts_options *opts, int argc, char **argv)
 {
 	void *opt = gopt_sort(&argc, (const char**)argv, opts_def);
 	/* usage */
-	if (gopt(opt, '?') || argc != 2) {
+	if (gopt(opt, '?')) {
 		opts->mode = TS_MODE_USAGE;
 		goto done;
 	}
@@ -86,10 +91,19 @@ ts_options_process(struct ts_options *opts, int argc, char **argv)
 
 	/* lsn */
 	const char *arg = NULL;
-	if (gopt_arg(opt, 'l', &arg)) {
+	if (gopt_arg(opt, 'n', &arg)) {
 		opts->to_lsn = atoll(arg);
 		opts->to_lsn_set = 1;
 	}
+
+	/* limit */
+	if (gopt_arg(opt, 'l', &arg))
+		opts->limit = strtoll(arg, NULL, 10);
+
+	/* sleep */
+	if (gopt_arg(opt, 'i', &arg))
+		opts->interval = atoi(arg);
+
 	/* generate or verify */
 	if (gopt(opt, 'c')) {
 		opts->mode = TS_MODE_CREATE;

@@ -39,11 +39,20 @@
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
 
+#include <lib/small/region.h>
+
 #include "key.h"
 #include "hash.h"
 #include "options.h"
+#include "config.h"
 #include "space.h"
+#include "ref.h"
+#include "ts.h"
 #include "sha1.h"
+#include "indexate.h"
+#include "snapshot.h"
+
+extern struct ts tss;
 
 int ts_space_init(struct ts_spaces *s) {
 	s->t = mh_u32ptr_new();
@@ -52,9 +61,27 @@ int ts_space_init(struct ts_spaces *s) {
 	return 0;
 }
 
+void ts_space_recycle(struct ts_spaces *s)
+{
+	mh_int_t i;
+	mh_foreach(s->t, i) {
+		struct ts_space *space = mh_u32ptr_node(s->t, i)->val;
+		mh_int_t pos = 0;
+		while (pos != mh_end(space->index)) {
+			if (mh_exist((space->index), pos)) {
+				struct ts_key *k =
+					*mh_pk_node(space->index, pos);
+				free(k);
+			}
+			pos++;
+		}
+		mh_pk_delete(space->index);
+		space->index = mh_pk_new();
+	}
+}
+
 void ts_space_free(struct ts_spaces *s)
 {
-	return;
 	mh_int_t i;
 	mh_foreach(s->t, i) {
 		struct ts_space *space = mh_u32ptr_node(s->t, i)->val;
@@ -316,11 +343,24 @@ struct ts_key*
 ts_space_keyalloc(struct ts_space *s, struct tnt_tuple *t, int fileid,
                   int offset, int attach)
 {
+	struct ts_key *k = NULL;
 	switch (s->c) {
 	case TS_SPACE_COMPACT_CHECKSUM:
-		return ts_space_keyalloc_sha(s, t, fileid, offset, attach);
+		k = ts_space_keyalloc_sha(s, t, fileid, offset, attach);
+		break;
 	case TS_SPACE_COMPACT_SPARSE:
-		return ts_space_keyalloc_sparse(s, t, fileid, offset, attach);
+		k = ts_space_keyalloc_sparse(s, t, fileid, offset, attach);
+		break;
 	}
-	return NULL;
+	if (k == NULL)
+		return NULL;
+	tss.alloc += ts_space_keysize(s, k);
+	ts_oomcheck();
+	return k;
+}
+
+void
+ts_space_keyfree(struct ts_space *s, struct ts_key *k) {
+	tss.alloc -= ts_space_keysize(s, k);
+	free(k);
 }
