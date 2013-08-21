@@ -33,12 +33,15 @@
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
+#include <new>
 
 STRS(iterator_type, ITERATOR_TYPE);
 
 /* {{{ Utilities. **********************************************/
 
-static inline void
+
+
+void
 key_validate_parts(struct key_def *key_def,
 		   const char *key, uint32_t part_count)
 {
@@ -48,11 +51,13 @@ key_validate_parts(struct key_def *key_def,
 		enum field_type part_type = key_def->parts[part].type;
 
 		if (part_type == NUM && part_size != sizeof(uint32_t))
-			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u32");
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
+				  part, field_type_strs[part_type]);
 
 		if (part_type == NUM64 && part_size != sizeof(uint64_t) &&
 		    part_size != sizeof(uint32_t))
-			tnt_raise(ClientError, ER_KEY_FIELD_TYPE, "u64");
+			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
+				  part, field_type_strs[part_type]);
 
 		key += part_size;
 	}
@@ -108,23 +113,21 @@ Index::factory(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
-		return new HashIndex(key_def);
+		return new (std::nothrow) HashIndex(key_def);
 	case TREE:
-		return new TreeIndex(key_def);
+		return new (std::nothrow) TreeIndex(key_def);
 	case BITSET:
-		return new BitsetIndex(key_def);
+		return new (std::nothrow) BitsetIndex(key_def);
 	default:
 		assert(false);
 	}
-
 	return NULL;
 }
 
-Index::Index(struct key_def *key_def)
-{
-	this->key_def = *key_def;
-	m_position = NULL;
-}
+Index::Index(struct key_def *key_def_arg)
+	:key_def(key_def_arg),
+	m_position(NULL)
+{}
 
 void
 Index::beginBuild()
@@ -148,14 +151,14 @@ Index::~Index()
 {
 	if (m_position != NULL)
 		m_position->free(m_position);
-	key_def_destroy(&key_def);
+	key_def_delete(key_def);
 }
 
 struct tuple *
 Index::min() const
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def.type],
+		  index_type_strs[key_def->type],
 		  "min()");
 	return NULL;
 }
@@ -164,7 +167,7 @@ struct tuple *
 Index::max() const
 {
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def.type],
+		  index_type_strs[key_def->type],
 		  "max()");
 	return NULL;
 }
@@ -174,7 +177,7 @@ Index::random(uint32_t rnd) const
 {
 	(void) rnd;
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def.type],
+		  index_type_strs[key_def->type],
 		  "random()");
 	return NULL;
 }
@@ -184,7 +187,7 @@ Index::findByTuple(struct tuple *tuple) const
 {
 	(void) tuple;
 	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def.type],
+		  index_type_strs[key_def->type],
 		  "findByTuple()");
 	return NULL;
 }
@@ -201,7 +204,7 @@ index_build(Index *index, Index *pk)
 	if (n_tuples > 0) {
 		say_info("Adding %" PRIu32 " keys to %s index %"
 			 PRIu32 "...", n_tuples,
-			 index_type_strs[index->key_def.type], index_id(index));
+			 index_type_strs[index->key_def->type], index_id(index));
 	}
 
 	struct iterator *it = pk->position();

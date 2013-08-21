@@ -36,6 +36,7 @@
 #include "box/space.h"
 #include "box/port.h"
 #include "box/tuple.h"
+#include "box/schema.h"
 #include "fiber.h"
 extern "C" {
 #include <cfg/warning.h>
@@ -505,15 +506,20 @@ memcached_space_init()
                 return;
 
 	/* Configure memcached index key. */
-	struct key_def key_def;
-	key_def_create(&key_def, 0, HASH, true, 1);
-	key_def_set_part(&key_def, 0, 0, STRING);
+	struct key_def *key_def = key_def_new(0, HASH, true, 1);
+	key_def_set_part(key_def, 0, 0, STRING);
+	struct rlist keys;
+	rlist_create(&keys);
+	key_list_add_key(&keys, key_def);
 
 	struct space_def space_def;
 	space_def.id = cfg.memcached_space;
 	space_def.arity = 4;
 
-	(void) space_new(&space_def, &key_def, 1);
+	struct space *space = space_new(&space_def, &keys);
+	space->engine.recover(space);
+	space_cache_replace(space);
+	key_def_delete(key_def);
 }
 
 /** Delete a bunch of expired keys. */

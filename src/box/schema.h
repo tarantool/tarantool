@@ -1,3 +1,5 @@
+#ifndef INCLUDES_TARANTOOL_BOX_DATADICT_H
+#define INCLUDES_TARANTOOL_BOX_DATADICT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,31 +28,67 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "key_def.h"
-#include <stdlib.h>
+#include "exception.h"
 
-const char *field_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
-STRS(index_type, ENUM_INDEX_TYPE);
+struct space;
 
-struct key_def *
-key_def_new(uint32_t id, enum index_type type, bool is_unique,
-	    uint32_t part_count)
-{
-	uint32_t parts_size = sizeof(struct key_part) * part_count;
-	struct key_def *def = (struct key_def *)
-		malloc(parts_size + sizeof(*def));
-	def->type = type;
-	def->id = id;
-	def->is_unique = is_unique;
-	def->part_count = part_count;
-
-	memset(def->parts, 0, parts_size);
-	return def;
-}
-
-/** Free a key definition. */
+/** Call a visitor function on every space in the space cache. */
 void
-key_def_delete(struct key_def *key_def)
+space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
+
+/**
+ * Try to look up a space by space number in the space cache.
+ *
+ * @return NULL if space not found, otherwise space object.
+ */
+struct space *
+space_by_id(uint32_t id);
+
+static inline struct space *
+space_find(uint32_t id)
 {
-	free(key_def);
+	struct space *space = space_by_id(id);
+	if (space)
+		return space;
+
+	tnt_raise(ClientError, ER_NO_SUCH_SPACE, id);
 }
+
+/**
+ * Update contents of the space cache.  Typically the new space is
+ * an altered version of the original space.
+ * Returns the old space, if any.
+ */
+struct space *
+space_cache_replace(struct space *space);
+
+/** Delete a space from the space cache. */
+struct space *
+space_cache_delete(uint32_t id);
+
+void
+schema_init();
+
+void
+schema_free();
+
+/**
+ * Called at the end of recovery from snapshot.
+ * Build primary keys in all spaces.
+ * */
+void
+space_end_recover_snapshot();
+
+/**
+ * Called at the end of recovery.
+ * Build secondary keys in all spaces.
+ */
+void
+space_end_recover();
+
+struct tarantool_cfg;
+
+int
+check_spaces(struct tarantool_cfg *conf);
+
+#endif /* INCLUDES_TARANTOOL_BOX_DATADICT_H */

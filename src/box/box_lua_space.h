@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
+
 struct lua_State;
 struct space;
 
@@ -35,6 +37,6 @@ void
 box_lua_space_new(struct lua_State *L, struct space *space);
 
 void
-box_lua_space_delete(struct lua_State *L, struct space *space);
+box_lua_space_delete(struct lua_State *L, uint32_t id);
 
 #endif /* INCLUDES_TARANTOOL_LUA_SPACE_H */

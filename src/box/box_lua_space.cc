@@ -75,7 +75,7 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 		Index *index = space_index(space, i);
 		if (index == NULL)
 			continue;
-		struct key_def *key_def = &index->key_def;
+		struct key_def *key_def = index->key_def;
 		lua_pushnumber(L, key_def->id);
 		lua_newtable(L);		/* space.index[i] */
 
@@ -148,13 +148,13 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 
 /** Delete a given space in Lua */
 void
-box_lua_space_delete(struct lua_State *L, struct space *space)
+box_lua_space_delete(struct lua_State *L, uint32_t id)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_getfield(L, -1, "space");
 
 	lua_pushnil(L);
-	lua_rawseti(L, -2, space_id(space));
+	lua_rawseti(L, -2, id);
 	lua_pop(L, 2); /* box, space */
 
 	assert(lua_gettop(L) == 0);

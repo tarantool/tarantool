@@ -132,7 +132,7 @@ enum dup_replace_mode {
 class Index: public Object {
 public:
 	/* Description of a possibly multipart key. */
-	struct key_def key_def;
+	struct key_def *key_def;
 
 	/**
 	 * Allocate index instance.
@@ -232,7 +232,7 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 static inline uint32_t
 index_id(const Index *index)
 {
-	return index->key_def.id;
+	return index->key_def->id;
 }
 
 /** True if this index is a primary key. */

@@ -53,12 +53,12 @@ field_type_maxlen(enum field_type type)
 	return maxlen[type];
 }
 
-#define INDEX_TYPE(_)                                               \
+#define ENUM_INDEX_TYPE(_)                                          \
 	_(HASH,    0)       /* HASH Index  */                       \
 	_(TREE,    1)       /* TREE Index  */                       \
 	_(BITSET,  2)       /* BITSET Index  */                     \
 
-ENUM(index_type, INDEX_TYPE);
+ENUM(index_type, ENUM_INDEX_TYPE);
 extern const char *index_type_strs[];
 
 /** Descriptor of a single part in a multipart key. */
@@ -69,23 +69,36 @@ struct key_part {
 
 /* Descriptor of a multipart key. */
 struct key_def {
+	/* A link in key list. */
+	struct rlist link;
 	/** Ordinal index number in the index array. */
 	uint32_t id;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
-	/** Description of parts of a multipart index. */
-	struct key_part *parts;
 	/** Index type. */
 	enum index_type type;
 	/** Is this key unique. */
 	bool is_unique;
+	/** Description of parts of a multipart index. */
+	struct key_part parts[];
 };
 
 /** Initialize a pre-allocated key_def. */
-void
-key_def_create(struct key_def *def, uint32_t id,
-	       enum index_type type, bool is_unique,
-	       uint32_t part_count);
+struct key_def *
+key_def_new(uint32_t id, enum index_type type,
+	    bool is_unique, uint32_t part_count);
+
+static inline struct key_def *
+key_def_dup(struct key_def *def)
+{
+	struct key_def *dup = key_def_new(def->id, def->type, def->is_unique,
+					  def->part_count);
+	if (dup) {
+		memcpy(dup->parts, def->parts,
+		       def->part_count * sizeof(*def->parts));
+	}
+	return dup;
+}
 
 /**
  * Set a single key part in a key def.
@@ -100,8 +113,17 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	def->parts[part_no].type = type;
 }
 
+/* Destroy and free a key_def. */
 void
-key_def_destroy(struct key_def *def);
+key_def_delete(struct key_def *def);
+
+/** Add a key to the list of keys. */
+static inline  void
+key_list_add_key(struct rlist *key_list, struct key_def *key)
+{
+	rlist_add_entry(key_list, key, link);
+}
+
 
 /** Space metadata. */
 struct space_def {

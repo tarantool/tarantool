@@ -80,7 +80,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 25 */_(ER_UNUSED25,			2, "Unused25") \
 	/* 26 */_(ER_FIBER_STACK,		2, "Can not create a new fiber: recursion limit reached") \
 	/* 27 */_(ER_UNUSED27,			2, "Unused27") \
-	/* 28 */_(ER_UNUSED28,			2, "Unused28") \
+	/* 28 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
 	/* 29 */_(ER_UNUSED29,			2, "Unused29") \
 	/* 30 */_(ER_UNUSED30,			2, "Unused30") \
 	/* 31 */_(ER_UNUSED31,			2, "Unused31") \
@@ -90,15 +90,15 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 35 */_(ER_UNUSED35,			2, "Unused35") \
 	/* 36 */_(ER_UNUSED36,			2, "Unused36") \
 	/* 37 */_(ER_UNUSED37,			2, "Unused37") \
-	/* 38 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key field type does not match index type: expected %s") \
+	/* 38 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
-	/* 40 */_(ER_FIELD_TYPE,		2, "Field type does not match one required by operation: expected a %s") \
-	/* 41 */_(ER_ARG_TYPE,			2, "Argument type in operation does not match field type: expected a %s") \
+	/* 40 */_(ER_FIELD_TYPE,		2, "Tuple field %u type does not match one required by operation: expected %s") \
+	/* 41 */_(ER_ARG_TYPE,			2, "Argument type in operation on field %u does not match field type: expected a %s") \
 	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 45 */_(ER_EXACT_MATCH,		2, "Invalid key part count in an exact match (expected %u, got %u)") \
-	/* 46 */_(ER_UNUSED46,			2, "Unused46") \
+	/* 46 */_(ER_FIELD_TYPE_MISMATCH,	2, "Ambiguous field type in index %u, key part %u. Requested type is %s but the field has previously been defined as %s") \
 	/* 47 */_(ER_KEY_PART_COUNT,		2, "Invalid key part count (expected [0..%u], got %u)") \
 	/* 48 */_(ER_PROC_RET,			2, "Return type '%s' is not supported in the binary protocol") \
 	/* 49 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index %u") \

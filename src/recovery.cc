@@ -352,7 +352,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 	const char *row;
 	uint32_t rowlen;
 	while ((row = log_io_cursor_next(&i, &rowlen))) {
-		int64_t lsn = header_v11(row)->lsn;
+		int64_t lsn = row_header(row)->lsn;
 		if (lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
@@ -689,7 +689,7 @@ struct wal_write_request {
 	/* Auxiliary. */
 	int res;
 	struct fiber *fiber;
-	struct row_v11 row;
+	struct wal_row row;
 };
 
 /* Context of the WAL writer thread. */
@@ -1013,9 +1013,9 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
 	while (req != NULL && ! fio_batch_is_full(batch)) {
-		struct row_v11 *row = &req->row;
-		header_v11_sign(&row->header);
-		fio_batch_add(batch, row, row_v11_size(row));
+		struct wal_row *row = &req->row;
+		row_header_sign(&row->header);
+		fio_batch_add(batch, row, wal_row_size(row));
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -1104,7 +1104,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
+wal_write(struct recovery_state *r, int64_t lsn,
 	  uint16_t op, const char *row, uint32_t row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
@@ -1121,7 +1121,7 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 
 	req->fiber = fiber;
 	req->res = -1;
-	row_v11_fill(&req->row, lsn, XLOG, cookie, (const char *) &op,
+	wal_row_fill(&req->row, lsn, (const char *) &op,
 		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
@@ -1164,17 +1164,16 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct row_v11 *row = (struct row_v11 *) palloc(fiber->gc_pool,
-				     sizeof(struct row_v11) +
+	struct wal_row *row = (struct wal_row *) palloc(fiber->gc_pool,
+				     sizeof(struct wal_row) +
 				     data_len + metadata_len);
 
-	row_v11_fill(row, 0, SNAP, snapshot_cookie,
-		     metadata, metadata_len, data, data_len);
-	header_v11_sign(&row->header);
+	wal_row_fill(row, ++rows, metadata, metadata_len, data, data_len);
+	row_header_sign(&row->header);
 
-	fio_batch_add(batch, row, row_v11_size(row));
+	fio_batch_add(batch, row, wal_row_size(row));
 
-	if (++rows % 100000 == 0)
+	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
 	if (fio_batch_is_full(batch)) {
@@ -1188,7 +1187,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			ev_now_update();
 			last = ev_now();
 		}
-		bytes += row_v11_size(row);
+		bytes += wal_row_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
 
 			ev_now_update();

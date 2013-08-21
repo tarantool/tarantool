@@ -226,7 +226,7 @@ TreeIndex::random(uint32_t rnd) const
 struct tuple *
 TreeIndex::findByKey(const char *key, uint32_t part_count) const
 {
-	assert(key_def.is_unique && part_count == key_def.part_count);
+	assert(key_def->is_unique && part_count == key_def->part_count);
 
 	struct sptree_index_key_data key_data;
 	key_data.key = key;
@@ -276,7 +276,7 @@ TreeIndex::allocIterator() const
 			  "TreeIndex", "iterator");
 	}
 
-	it->key_def = (struct key_def *) &key_def;
+	it->key_def = key_def;
 	it->compare = tree.compare;
 	it->base.free = tree_iterator_free;
 	return (struct iterator *) it;
@@ -374,7 +374,7 @@ TreeIndex::endBuild()
 
 	if (n_tuples) {
 		say_info("Sorting %" PRIu32 " keys in %s index %" PRIu32 "...",
-			 n_tuples, index_type_strs[key_def.type], index_id(this));
+			 n_tuples, index_type_strs[key_def->type], index_id(this));
 	}
 	uint32_t estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
@@ -383,8 +383,8 @@ TreeIndex::endBuild()
 	sptree_index_init(&tree, sizeof(struct tuple *),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
-			  key_def.is_unique ? sptree_index_node_compare
-					    : sptree_index_node_compare_dup,
-			  &key_def);
+			  key_def->is_unique ? sptree_index_node_compare
+					     : sptree_index_node_compare_dup,
+			  key_def);
 }
 

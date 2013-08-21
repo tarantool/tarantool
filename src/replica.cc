@@ -44,15 +44,15 @@ const char *
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
 {
 	struct ibuf *in = &iobuf->in;
-	ssize_t to_read = sizeof(struct header_v11) - ibuf_size(in);
+	ssize_t to_read = sizeof(struct row_header) - ibuf_size(in);
 
 	if (to_read > 0) {
 		ibuf_reserve(in, cfg_readahead);
 		coio_breadn(coio, in, to_read);
 	}
 
-	ssize_t request_len = header_v11(in->pos)->len
-		+ sizeof(struct header_v11);
+	ssize_t request_len = row_header(in->pos)->len
+		+ sizeof(struct row_header);
 	to_read = request_len - ibuf_size(in);
 
 	if (to_read > 0)
@@ -115,7 +115,7 @@ pull_from_remote(va_list ap)
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now() - header_v11(row)->tm;
+			r->remote->recovery_lag = ev_now() - row_header(row)->tm;
 			r->remote->recovery_last_update_tstamp = ev_now();
 
 			remote_apply_row(r, row, rowlen);
@@ -143,9 +143,9 @@ pull_from_remote(va_list ap)
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlen)
 {
-	int64_t lsn = header_v11(row)->lsn;
+	int64_t lsn = row_header(row)->lsn;
 
-	assert(*(uint16_t*)(row + sizeof(struct header_v11)) == XLOG);
+	assert(*(uint16_t*)(row + sizeof(struct row_header)) == WAL);
 
 	if (r->row_handler(r->row_handler_param, row, rowlen) < 0)
 		panic("replication failure: can't apply row");

@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "tarantool/util.h"
-#include "key_def.h"
+#include "key_def.h" /* for enum field_type */
 #include <pickle.h>
 
 struct tbuf;
@@ -39,6 +39,8 @@ struct tbuf;
  */
 struct tuple_format {
 	uint16_t id;
+	/* Format objects are reference counted. */
+	int refs;
 	/**
 	 * Max field no which participates in any of the space
 	 * indexes. Each tuple of this format must have,
@@ -107,7 +109,21 @@ tuple_format_id(struct tuple_format *format)
  * @return tuple format
  */
 struct tuple_format *
-tuple_format_new(struct key_def *key_def, uint32_t key_count);
+tuple_format_new(struct rlist *key_list);
+
+/** Delete a format with zero ref count. */
+void
+tuple_format_delete(struct tuple_format *format);
+
+static inline void
+tuple_format_ref(struct tuple_format *format, int count)
+{
+	assert(format->refs + count >= 0);
+	format->refs += count;
+	if (format->refs == 0)
+		tuple_format_delete(format);
+
+};
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -197,6 +213,7 @@ tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
 		*len = load_varint32(&field);
 		return field;
 	}
+	*len = 0;
 	return NULL;
 }
 
@@ -287,7 +304,7 @@ tuple_range_size(const char **begin, const char *end, uint32_t count)
 	return *begin - start;
 }
 
-void tuple_free(struct tuple *tuple);
+void tuple_delete(struct tuple *tuple);
 
 /**
  * @brief Compare two tuples using field by field using key definition

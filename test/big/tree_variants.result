@@ -155,18 +155,18 @@ for k,v in box.space[6]:pairs() do print(' - ', v) end
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
 box.space[6]:insert('', '00000001', '00000002', '', '', '', '', '', 0)
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 box.space[6]:insert('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 box.space[6]:insert(1, '', '00000002', '', '', '', '', '', 0)
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
 ...
 box.space[6]:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

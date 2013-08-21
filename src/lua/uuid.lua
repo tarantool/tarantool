@@ -1,3 +1,4 @@
+-- uuid.lua (internal file)
 (function(box)
     local ffi = require("ffi")
     ffi.cdef[[

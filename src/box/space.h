@@ -32,11 +32,57 @@
 #include "key_def.h"
 #include <exception.h>
 
-#include <box/box.h>
+typedef void (*space_f)(struct space *space);
+typedef struct tuple *(*space_replace_f)
+	(struct space *space, struct tuple *old_tuple,
+	 struct tuple *new_tuple, enum dup_replace_mode mode);
 
-struct tarantool_cfg;
+/** Reflects what space_replace() is supposed to do. */
+enum space_state {
+	/**
+	 * The space is created, but has no data
+	 * and no primary key, or, if there is a primary
+	 * key, it's not ready for use (being built with
+	 * buildNext()).
+	 * Replace is always an error, since there are no
+	 * indexes to add data to.
+	 */
+	READY_NO_KEYS,
+	/**
+	 * The space has a functional primary key.
+	 * Replace adds the tuple to this key.
+	 */
+	READY_PRIMARY_KEY,
+	/**
+	 * The space is fully functional, all keys
+	 * are fully built, replace adds its tuple
+	 * to all keys.
+	 */
+	READY_ALL_KEYS
+};
+
+struct engine {
+	enum space_state state;
+	/* Recover is called after each recover step to enable
+	 * keys. When recovery is complete, it enables all keys
+	 * at once and resets itself to a no-op.
+	 */
+	space_f recover;
+	space_replace_f replace;
+};
+
+extern struct engine engine_no_keys;
+void space_build_primary_key(struct space *space);
+void space_build_all_keys(struct space *space);
 
 struct space {
+	/**
+	 * Reflects the current space state and is also a vtab
+	 * with methods. Unlike a C++ vtab, changes during space
+	 * life cycle, throughout phases of recovery or with
+	 * deletion and addition of indexes.
+	 */
+	struct engine engine;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *
@@ -159,9 +205,13 @@ space_id(struct space *space) { return space->def.id; }
  *         Otherwise, it's taken into account only for the
  *         primary key.
  */
-struct tuple *
+static inline struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
-	      struct tuple *new_tuple, enum dup_replace_mode mode);
+	      struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	return space->engine.replace(space, old_tuple, new_tuple,
+				     mode);
+}
 
 /**
  * Check that the tuple has correct arity and correct field
@@ -171,8 +221,20 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 /**
+ * Allocate and initialize a space. The space
+ * needs to be loaded before it can be used
+ * (see space->engine.recover()).
+ */
+struct space *
+space_new(struct space_def *space_def, struct rlist *key_list);
+
+/** Destroy and free a space. */
+void
+space_delete(struct space *space);
+
+/**
  * Get index by index id.
- * @return NULL if index not found.
+ * @return NULL if the index is not found.
  */
 static inline Index *
 space_index(struct space *space, uint32_t id)
@@ -183,49 +245,9 @@ space_index(struct space *space, uint32_t id)
 }
 
 /**
- * Call a visitor function on every enabled space.
+ * Look up index by id.
+ * Raise an error if the index is not found.
  */
-void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
-
-/**
- * Try to look up a space by space number.
- *
- * @return NULL if space not found, otherwise space object.
- */
-struct space *space_by_id(uint32_t id);
-
-static inline struct space *
-space_find(uint32_t id)
-{
-	struct space *space = space_by_id(id);
-	if (space)
-		return space;
-
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, id);
-}
-
-struct space *
-space_new(struct space_def *space_def,
-	  struct key_def *key_defs, uint32_t key_count);
-
-/**
- * Secondary indexes are built in bulk after all data is
- * recovered. This flag indicates that the indexes are
- * already built and ready for use.
- */
-void
-space_build_secondary_keys(struct space *space);
-
-void space_init(void);
-void space_free(void);
-int
-check_spaces(struct tarantool_cfg *conf);
-/* Build secondary keys. */
-void begin_build_primary_indexes(void);
-void end_build_primary_indexes(void);
-void build_secondary_indexes(void);
-
 static inline Index *
 index_find(struct space *space, uint32_t index_id)
 {

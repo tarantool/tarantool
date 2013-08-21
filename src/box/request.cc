@@ -31,6 +31,7 @@
 #include "tuple.h"
 #include "index.h"
 #include "space.h"
+#include "schema.h"
 #include "port.h"
 #include "box_lua.h"
 #include <errinj.h>
@@ -78,7 +79,7 @@ execute_replace(const struct request *request, struct txn *txn,
 		txn_replace(txn, space, NULL, new_tuple, mode);
 
 	} catch (const Exception &e) {
-		tuple_free(new_tuple);
+		tuple_delete(new_tuple);
 		throw;
 	}
 }
@@ -93,9 +94,9 @@ execute_update(const struct request *request, struct txn *txn,
 	/** Search key  and key part count. */
 
 	struct space *space = space_find(request->u.space_no);
-	Index *pk = space_index(space, 0);
+	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
-	primary_key_validate(&pk->key_def, request->u.key,
+	primary_key_validate(pk->key_def, request->u.key,
 			     request->u.key_part_count);
 	struct tuple *old_tuple = pk->findByKey(request->u.key,
 						request->u.key_part_count);
@@ -113,7 +114,7 @@ execute_update(const struct request *request, struct txn *txn,
 		space_validate_tuple(space, new_tuple);
 		txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
 	} catch (const Exception &e) {
-		tuple_free(new_tuple);
+		tuple_delete(new_tuple);
 		throw;
 	}
 }
@@ -149,7 +150,7 @@ execute_select(const struct request *request, struct txn *txn,
 					   &key_part_count);
 
 		struct iterator *it = index->position();
-		key_validate(&index->key_def, ITER_EQ, key, key_part_count);
+		key_validate(index->key_def, ITER_EQ, key, key_part_count);
 		index->initIterator(it, ITER_EQ, key, key_part_count);
 
 		struct tuple *tuple;
@@ -179,8 +180,8 @@ execute_delete(const struct request *request, struct txn *txn,
 	struct space *space = space_find(request->d.space_no);
 
 	/* Try to find tuple by primary key */
-	Index *pk = space_index(space, 0);
-	primary_key_validate(&pk->key_def, request->d.key,
+	Index *pk = index_find(space, 0);
+	primary_key_validate(pk->key_def, request->d.key,
 			     request->d.key_part_count);
 	struct tuple *old_tuple = pk->findByKey(request->d.key,
 						request->d.key_part_count);

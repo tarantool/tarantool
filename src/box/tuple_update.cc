@@ -342,7 +342,7 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(int32_t))
 			tnt_raise(ClientError, ER_ARG_TYPE,
-				  "32-bit int");
+				  op->field_no, "NUM");
 
 		arg->i32_val = *(int32_t *)op->arg.set.value;
 		break;
@@ -360,12 +360,12 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 			break;
 		default:
 			tnt_raise(ClientError, ER_ARG_TYPE,
-				  "32-bit or 64-bit int");
+				  op->field_no, "NUM or NUM64");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  "32-bit or 64-bit int");
+			  op->field_no, "NUM or NUM64");
 	}
 	STAILQ_INSERT_TAIL(&field->ops, op, next);
 	arg->val_size = op->new_field_len = field_len;

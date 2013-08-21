@@ -84,7 +84,7 @@ error: 'Invalid key part count (expected [0..3], got 4)'
 -- primary index select with wrong type
 box.space[27]:select(0, 1, 'foo', 'baz')
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key type of part 2 does not match index part type: expected NUM'
 ...
 -- secondary index select
 box.space[27]:select(1, 1, 4)
@@ -103,7 +103,7 @@ error: 'Invalid key part count in an exact match (expected 2, got 1)'
 -- secondary index select with wrong type
 box.space[27]:select(1, 1, 'baz')
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key type of part 1 does not match index part type: expected NUM'
 ...
 -- cleanup
 box.space[27]:truncate()

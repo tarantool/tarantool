@@ -34,102 +34,147 @@
 #include "key_def.h"
 #include "tuple_update.h"
 #include <exception.h>
-#include <palloc.h>
-#include <fiber.h>
-#include "scoped_guard.h"
 #include <stdio.h>
+#include <third_party/base64.h>
+
+enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
 struct tuple_format *tuple_format_ber;
+static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size, formats_capacity;
 
 /** Extract all available type info from keys. */
 void
 field_type_create(enum field_type *types, uint32_t field_count,
-		  struct key_def *key_def, uint32_t key_count)
+		  struct rlist *key_list)
 {
 	/* There may be fields between indexed fields (gaps). */
 	memset(types, 0, sizeof(*types) * field_count);
 
-	struct key_def *end = key_def + key_count;
+	struct key_def *key_def;
 	/* extract field type info */
-	for (; key_def < end; key_def++) {
+	rlist_foreach_entry(key_def, key_list, link) {
 		struct key_part *part = key_def->parts;
 		struct key_part *pend = part + key_def->part_count;
 		for (; part < pend; part++) {
-			assert(part->fieldno < field_count);
-			types[part->fieldno] = part->type;
+			enum field_type *ptype = &types[part->fieldno];
+			if (*ptype != UNKNOWN && *ptype != part->type) {
+				tnt_raise(ClientError,
+					  ER_FIELD_TYPE_MISMATCH,
+					  key_def->id, part - key_def->parts,
+					  field_type_strs[part->type],
+					  field_type_strs[*ptype]);
+			}
+			*ptype = part->type;
 		}
 	}
 }
 
-static struct tuple_format *
-tuple_format_alloc_and_register(struct key_def *key_def,
-				uint32_t key_count)
+void
+tuple_format_register(struct tuple_format *format)
 {
-	uint32_t total;
-	struct tuple_format *format;
-	struct key_def *end = key_def + key_count;
-	uint32_t max_fieldno = 0;
-	uint32_t field_count;
+	if (recycled_format_ids != FORMAT_ID_NIL) {
 
-	/* find max max field no */
-	for (; key_def < end; key_def++) {
-		struct key_part *part = key_def->parts;
-		struct key_part *pend = part + key_def->part_count;
-		for (; part < pend; part++)
-			max_fieldno= MAX(max_fieldno, part->fieldno);
-	}
-
-	if (formats_size == formats_capacity) {
+		format->id = (uint16_t) recycled_format_ids;
+		recycled_format_ids = (intptr_t) tuple_formats[recycled_format_ids];
+	} else if (formats_size == formats_capacity) {
 		uint32_t new_capacity = formats_capacity ?
 			formats_capacity * 2 : 16;
 		struct tuple_format **formats;
-		if (new_capacity >= UINT16_MAX)
-			goto error;
-		 formats = (struct tuple_format **) realloc(tuple_formats,
-				new_capacity * sizeof(tuple_formats[0]));
+		if (new_capacity >= FORMAT_ID_MAX) {
+			tnt_raise(LoggedError, ER_TUPLE_FORMAT_LIMIT,
+				  (unsigned) new_capacity);
+		}
+		formats = (struct tuple_format **)
+			realloc(tuple_formats, new_capacity *
+				sizeof(tuple_formats[0]));
 		if (formats == NULL)
-			goto error;
+			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+				  sizeof(struct tuple_format),
+				  "tuple_formats", "malloc");
 
 		formats_capacity = new_capacity;
 		tuple_formats = formats;
-	}
-	field_count = key_count > 0 ? max_fieldno + 1 : 0;
 
-	total = sizeof(struct tuple_format) +
+		format->id = formats_size++;
+	} else {
+		format->id = formats_size++;
+	}
+	tuple_formats[format->id] = format;
+}
+
+void
+tuple_format_deregister(struct tuple_format *format)
+{
+	if (format->id == FORMAT_ID_NIL)
+		return;
+	tuple_formats[format->id] = (struct tuple_format *) recycled_format_ids;
+	recycled_format_ids = format->id;
+	format->id = FORMAT_ID_NIL;
+}
+
+static struct tuple_format *
+tuple_format_alloc(struct rlist *key_list)
+{
+	struct key_def *key_def;
+	uint32_t max_fieldno = 0;
+	uint32_t key_count = 0;
+
+	/* find max max field no */
+	rlist_foreach_entry(key_def, key_list, link) {
+		struct key_part *part = key_def->parts;
+		struct key_part *pend = part + key_def->part_count;
+		key_count++;
+		for (; part < pend; part++)
+			max_fieldno = MAX(max_fieldno, part->fieldno);
+	}
+	uint32_t field_count = key_count > 0 ? max_fieldno + 1 : 0;
+
+	uint32_t total = sizeof(struct tuple_format) +
 		field_count * sizeof(int32_t) +
 		field_count * sizeof(enum field_type);
 
-	format = (struct tuple_format *) malloc(total);
+	struct tuple_format *format = (struct tuple_format *) malloc(total);
 
-	if (format == NULL)
-		goto error;
+	if (format == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  sizeof(struct tuple_format),
+			  "tuple format", "malloc");
+	}
 
-	format->id = formats_size++;
+	format->refs = 0;
+	format->id = FORMAT_ID_NIL;
 	format->max_fieldno = max_fieldno;
 	format->field_count = field_count;
 	format->types = (enum field_type *)
 		((char *) format + sizeof(*format) +
 		field_count * sizeof(int32_t));
-	tuple_formats[format->id] = format;
 	return format;
-error:
-	tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-		  sizeof(struct tuple_format), "tuple format", "malloc");
-	return NULL;
+}
+
+void
+tuple_format_delete(struct tuple_format *format)
+{
+	tuple_format_deregister(format);
+	free(format);
 }
 
 struct tuple_format *
-tuple_format_new(struct key_def *key_def, uint32_t key_count)
+tuple_format_new(struct rlist *key_list)
 {
-	struct tuple_format *format =
-		tuple_format_alloc_and_register(key_def, key_count);
+	struct tuple_format *format = tuple_format_alloc(key_list);
 
-	field_type_create(format->types, format->field_count,
-			  key_def, key_count);
+	try {
+		tuple_format_register(format);
+		field_type_create(format->types, format->field_count,
+				  key_list);
+	} catch (...) {
+		tuple_format_delete(format);
+		throw;
+	}
 
 	int32_t i = 0;
 	uint32_t prev_offset = 0;
@@ -186,8 +231,9 @@ tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
 	enum field_type *end = format->types + format->field_count;
 	const char *pos = tuple->data;
 	uint32_t *field_map = (uint32_t *) tuple;
+	uint32_t i = 0;
 
-	for (; type < end; offset++, type++) {
+	for (; type < end; offset++, type++, i++) {
 		if (pos >= tuple->data + tuple->bsize)
 			tnt_raise(IllegalParams,
 				  "incorrect tuple format");
@@ -198,7 +244,7 @@ tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
 		 * correct lengths.
 		 */
 		if (type_maxlen != UINT32_MAX && len != type_maxlen) {
-			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
+			tnt_raise(ClientError, ER_FIELD_TYPE, i,
 				  field_type_strs[*type]);
 		}
 		pos += len;
@@ -218,6 +264,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	tuple->refs = 0;
 	tuple->bsize = size;
 	tuple->format_id = tuple_format_id(format);
+	tuple_format_ref(format, 1);
 
 	say_debug("tuple_alloc(%zu) = %p", size, tuple);
 	return tuple;
@@ -228,11 +275,13 @@ tuple_alloc(struct tuple_format *format, size_t size)
  * @pre tuple->refs  == 0
  */
 void
-tuple_free(struct tuple *tuple)
+tuple_delete(struct tuple *tuple)
 {
-	say_debug("tuple_free(%p)", tuple);
+	say_debug("tuple_delete(%p)", tuple);
 	assert(tuple->refs == 0);
-	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
+	struct tuple_format *format = tuple_format(tuple);
+	char *ptr = (char *) tuple - format->field_map_size;
+	tuple_format_ref(format, -1);
 	sfree(ptr);
 }
 
@@ -249,7 +298,7 @@ tuple_ref(struct tuple *tuple, int count)
 	tuple->refs += count;
 
 	if (tuple->refs == 0)
-		tuple_free(tuple);
+		tuple_delete(tuple);
 }
 
 /**
@@ -393,7 +442,7 @@ tuple_update(struct tuple_format *format,
 		tuple_update_execute(update, new_tuple->data);
 		tuple_init_field_map(new_tuple, format);
 	} catch (const Exception&) {
-		tuple_free(new_tuple);
+		tuple_delete(new_tuple);
 		throw;
 	}
 	return new_tuple;
@@ -405,8 +454,24 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 {
 	size_t tuple_len = end - *data;
 
-	if (tuple_len != tuple_range_size(data, end, field_count))
+	if (tuple_len != tuple_range_size(data, end, field_count)) {
+		say_error("\n"
+			  "********************************************\n"
+		          "* Found a corrupted tuple in the snapshot! *\n"
+		          "* This can be either due to a memory       *\n"
+		          "* corruption or a bug in the server.       *\n"
+		          "* The tuple can not be loaded.             *\n"
+		          "********************************************\n"
+		          "Tuple data, BASE64 encoded:                 \n");
+
+		int base64_buflen = base64_bufsize(tuple_len);
+		char *base64_buf = (char *) malloc(base64_buflen);
+		int len = base64_encode(end - tuple_len, tuple_len,
+					base64_buf, base64_buflen);
+		write(STDERR_FILENO, base64_buf, len);
+		free(base64_buf);
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
+	}
 
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	new_tuple->field_count = field_count;
@@ -414,7 +479,7 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 	try {
 		tuple_init_field_map(new_tuple, format);
 	} catch (...) {
-		tuple_free(new_tuple);
+		tuple_delete(new_tuple);
 		throw;
 	}
 	return new_tuple;
@@ -470,8 +535,8 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		return tuple_compare_field(tuple_a->data, tuple_b->data,
 					   key_def->parts[0].type);
 
-	struct key_part *part = key_def->parts;
-	struct key_part *end = part + key_def->part_count;
+	const struct key_part *part = key_def->parts;
+	const struct key_part *end = part + key_def->part_count;
 	struct tuple_format *format_a = tuple_format(tuple_a);
 	struct tuple_format *format_b = tuple_format(tuple_b);
 	const char *field_a;
@@ -502,8 +567,8 @@ int
 tuple_compare_with_key(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, const struct key_def *key_def)
 {
-	struct key_part *part = key_def->parts;
-	struct key_part *end = part + MIN(part_count, key_def->part_count);
+	const struct key_part *part = key_def->parts;
+	const struct key_part *end = part + MIN(part_count, key_def->part_count);
 	struct tuple_format *format = tuple_format(tuple);
 	const char *field;
 	uint32_t field_size;
@@ -552,15 +617,24 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 void
 tuple_init()
 {
-	tuple_format_ber = tuple_format_new(NULL, 0);
+	tuple_format_ber = tuple_format_new(&rlist_nil);
+	/* Make sure this one stays around. */
+	tuple_format_ref(tuple_format_ber, 1);
 }
 
 void
 tuple_free()
 {
+	/* Clear recycled ids. */
+	while (recycled_format_ids != FORMAT_ID_NIL) {
+
+		uint16_t id = (uint16_t) recycled_format_ids;
+		recycled_format_ids = (intptr_t) tuple_formats[id];
+		tuple_formats[id] = NULL;
+	}
 	for (struct tuple_format **format = tuple_formats;
 	     format < tuple_formats + formats_size;
 	     format++)
-		free(*format);
+		free(*format); /* ignore the reference count. */
 	free(tuple_formats);
 }

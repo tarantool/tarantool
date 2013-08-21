@@ -51,15 +51,15 @@ box.space[2]:delete(3)
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
 box.space[2]:insert('xxxxxxx')
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 box.space[2]:insert('')
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 box.space[2]:insert('12')
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 -- string keys
 box.space[3]:insert('identifier', 'tuple')

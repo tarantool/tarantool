@@ -32,7 +32,7 @@
 
 #define TNT_LOG_MAGIC_XLOG "XLOG\n"
 #define TNT_LOG_MAGIC_SNAP "SNAP\n"
-#define TNT_LOG_VERSION "0.11\n"
+#define TNT_LOG_VERSION "0.12\n"
 
 enum tnt_log_error {
 	TNT_LOG_EOK,

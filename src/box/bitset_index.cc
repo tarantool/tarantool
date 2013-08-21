@@ -88,7 +88,7 @@ bitset_index_iterator_next(struct iterator *iterator)
 BitsetIndex::BitsetIndex(struct key_def *key_def)
 	: Index(key_def)
 {
-	assert(!this->key_def.is_unique);
+	assert(!this->key_def->is_unique);
 
 	if (bitset_index_create(&index, realloc) != 0)
 		panic_syserror("bitset_index_create");
@@ -135,7 +135,7 @@ struct tuple *
 BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
 {
-	assert(!key_def.is_unique);
+	assert(!key_def->is_unique);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 
@@ -154,7 +154,7 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	if (new_tuple != NULL) {
 		uint32_t len = 0;
 		const char *field;
-		field = tuple_field(new_tuple, key_def.parts[0].fieldno,
+		field = tuple_field(new_tuple, key_def->parts[0].fieldno,
 				    &len);
 
 		size_t value = tuple_to_value(new_tuple);

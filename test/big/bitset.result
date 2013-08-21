@@ -374,7 +374,7 @@ sorted output
 ...
 dump(box.index.BITS_ALL_SET, 4294967296)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (multiple bit)
@@ -812,7 +812,7 @@ $     128$
 ...
 dump(box.index.BITS_ALL_NOT_SET, 4294967296)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_NOT_SET (multiple bit)
@@ -1019,7 +1019,7 @@ $     128$
 ...
 dump(box.index.BITS_ANY_SET, 4294967296)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (multiple bit)

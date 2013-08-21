@@ -43,7 +43,7 @@
 #include <connector/c/include/tarantool/tnt_log.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
 
-static const uint32_t tnt_rpl_version = 11;
+static const uint32_t tnt_rpl_version = 12;
 
 static void tnt_rpl_free(struct tnt_stream *s) {
 	struct tnt_stream_rpl *sr = TNT_RPL_CAST(s);
