@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_DATADICT_H
-#define INCLUDES_TARANTOOL_BOX_DATADICT_H
+#ifndef INCLUDES_TARANTOOL_BOX_SCHEMA_H
+#define INCLUDES_TARANTOOL_BOX_SCHEMA_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -91,4 +91,4 @@ struct tarantool_cfg;
 int
 check_spaces(struct tarantool_cfg *conf);
 
-#endif /* INCLUDES_TARANTOOL_BOX_DATADICT_H */
+#endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */
