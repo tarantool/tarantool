@@ -1,3 +1,23 @@
+tarantool (1.5.3.157.g1c06d59-1) unstable; urgency=low
+
+  * New snapshot.
+   - Fix crashes with broken snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 16 Aug 2013 15:09:06 +0400
+
+tarantool (1.5.3.120.g68b26b6-1) unstable; urgency=low
+
+  * New snapshot.
+   - Cleanup debian/copyright (drop php-connector section).
+   - Drop empty TODO files from binary packages.
+   - debian/* relicensed as tarantool.
+   - tarantool-plugins has 'any' architecture: it depends on plugins
+     that contain ELF-files.
+   - Fix FTBFS with Debian/kFreeBSD, closes: #715358.
+   - Drop irrelevant debian/README.source.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 12 Aug 2013 14:06:16 +0400
+
 tarantool (1.4.9+20130620.1443-1) experimental; urgency=low
 
   * New snapshot.

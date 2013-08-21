@@ -55,7 +55,7 @@ Description: high performance key/value storage server
  This package provides tarantool server.
 
 Package: tarantool-plugins
-Architecture: all
+Architecture: any
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version}),
