@@ -117,6 +117,9 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "s", 1, TC_SETOPT},
 	{ "setopt", 6, TC_SETOPT},
 	{ "delim", 5, TC_SETOPT_DELIM},
+	{ "delimi", 6, TC_SETOPT_DELIM},
+	{ "delimit", 7, TC_SETOPT_DELIM},
+	{ "delimite", 8, TC_SETOPT_DELIM},
 	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };
@@ -137,8 +140,8 @@ tc_cmd_usage(void)
 		" - tee 'path'\n"
 		" - notee\n"
 		" - loadfile 'path'\n"
-		" - setopt key=val\n"
-		" - (possible pairs: delim=\'str\')\n"
+		" - setopt key val\n"
+		" - (possible pairs: delimiter 'string')\n"
 		"...\n";
 	tc_printf("%s", usage);
 }
@@ -232,6 +235,17 @@ tc_cmd_loadfile(char *path, int *reconnect)
 	return rc;
 }
 
+static void replace_newline(char *cmd) {
+	int len = strlen(cmd);
+	int offset = 0;
+	for (int i = 0; i < len - 1; ++i)
+		if (cmd[i] == '\\' && cmd[i + 1] == 'n')
+			cmd[i - offset++] = '\n';
+		else if (offset != 0)
+			cmd[i - offset] = cmd[i];
+	cmd[len - offset] = '\0';
+}
+
 static enum tc_cli_cmd_ret
 tc_cmd_try(char *cmd, size_t size, int *reconnect)
 {
@@ -269,8 +283,9 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 	case TC_SETOPT:
 		switch (tnt_lex(&lex, &tk)) {
 		case TC_SETOPT_DELIM:
-			if (tnt_lex(&lex, &tk) == '=' &&
-			    tnt_lex(&lex, &tk) == TNT_TK_STRING) {
+			if (tnt_lex(&lex, &tk) != '=')
+				tnt_lex_push(&lex, tk);
+			if (tnt_lex(&lex, &tk) == TNT_TK_STRING) {
 				if (!TNT_TK_S(tk)->size) {
 					tc.opt.delim = "";
 					tc.opt.delim_len = 0;
@@ -283,11 +298,12 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 				strncpy(temp,
 					(const char *)TNT_TK_S(tk)->data,
 					TNT_TK_S(tk)->size + 1);
+				replace_newline(temp);
 				tc.opt.delim = temp;
 				tc.opt.delim_len = strlen(tc.opt.delim);
 			} else {
 				tc_printf("---\n");
-				tc_printf(" - Expected delim='string'\n");
+				tc_printf(" - Expected `setopt delimiter 'string'`\n");
 				tc_printf("---\n");
 			}
 			break;
@@ -402,7 +418,6 @@ static char* tc_cli_readline_pipe() {
 
 static int check_delim(char* str, size_t len, size_t sep_len) {
 	const char *sep = tc.opt.delim;
-	len = strip_end_ws(str);
 	if (sep_len == 0)
 		return 1;
 	if (len < sep_len)
@@ -411,8 +426,6 @@ static int check_delim(char* str, size_t len, size_t sep_len) {
 	for (i = len; sep_len > 0; --sep_len, --i)
 		if (str[i - 1] != sep[sep_len - 1])
 			return 0;
-	str[i] = '\0';
-	len = strip_end_ws(str);
 	return 1;
 }
 
@@ -442,37 +455,37 @@ int tc_cli(void)
 		if (isatty(STDIN_FILENO)) {
 			snprintf(prompt_delim, sizeof(prompt_delim),
 				 "%*s> ", prompt_len, "-");
-			part_cmd = readline(!tc_buf_str_isempty(&cmd) ? prompt_delim
-							   : prompt);
+			part_cmd = readline(! tc_buf_str_isempty(&cmd)
+					    ? prompt_delim
+					    : prompt);
 		} else {
 			clearerr(stdin);
 			part_cmd = tc_cli_readline_pipe();
 		}
 		if (!part_cmd)
 			break;
-		size_t part_cmd_len = strlen(part_cmd);
-		int delim_exists = check_delim(part_cmd,
-					       part_cmd_len,
-					       tc.opt.delim_len);
 		if (tc_buf_str_append(&cmd, part_cmd, strlen(part_cmd)))
 			tc_error(TC_REALLOCATION_ERROR,
 				 cmd.size);
+		int delim_exists = check_delim( cmd.data,
+						cmd.used - 1,
+						tc.opt.delim_len);
+		if (tc_buf_str_append(&cmd, "\n", 1)) /* Append '\n' to the STR */
+			tc_error(TC_REALLOCATION_ERROR,
+				 cmd.size);
 		free(part_cmd);
-		if (!delim_exists && !feof(stdin)) {
-			if (tc_buf_str_append(&cmd, " ", 1))
-				tc_error(TC_REALLOCATION_ERROR,
-					 cmd.size);
+		if (!delim_exists && !feof(stdin)) /* If still without delimiter and not EOF */
 			continue;
-		}
-		tc_buf_str_stripws(&cmd);
+		tc_buf_str_delete(&cmd, 1); /* Delete last appended '\n' */
+		if (isatty(STDIN_FILENO)) /* Enable history on readline use only */
+			add_history(cmd.data);
+		tc_buf_cmdfy(&cmd, tc.opt.delim_len); /* Create admin cmd from STR */
 		if (delim_exists && tc_buf_str_isempty(&cmd))
-			goto next;
+			goto next; /* If empty - don't send to server, it crashes */
 		tc_print_cmd2tee(cmd.used != 1 ? prompt_delim : prompt,
 				 cmd.data, cmd.used - 1);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
 						     cmd.used - 1);
-		if (isatty(STDIN_FILENO))
-			add_history(cmd.data);
 next:
 		tc_buf_clear(&cmd);
 		if (ret == TC_CLI_EXIT || feof(stdin)) {

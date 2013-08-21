@@ -112,6 +112,26 @@ int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len) {
 	return 0;
 }
 
+/* Remove last num symbols from STR */
+size_t tc_buf_str_delete(struct tc_buf *buf, size_t len) {
+	size_t ret = tc_buf_delete(buf, len + 1); /* Remove '\0' + len */
+	if (tc_buf_append(buf, (void *)"\0", 1))
+		return 0;
+	return ret;
+}
+
+/*
+ * Make admin command from multiline command
+ * and delete delimiter (last num bytes)
+ */
+void tc_buf_cmdfy(struct tc_buf *buf, size_t num) {
+	tc_buf_delete(buf, num);
+	buf->data[buf->size] = '\0';
+	for (int i = 0; i < buf->used; ++i)
+		if (buf->data[i] == '\n')
+			buf->data[i] = ' ';
+}
+
 /* Remove trailing ws from STR */
 int tc_buf_str_stripws(struct tc_buf *buf) {
 	if (buf->data) {
