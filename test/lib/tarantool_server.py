@@ -65,11 +65,11 @@ class LuaTest(FuncTest):
             if not cmd:
                 cmd = StringIO.StringIO()
             if line.find('--') == 0:
-                matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line, re.DOTALL)
+                matched = re.match("--\s*setopt\s+(.*)", line, re.DOTALL)
                 if matched:
-                    matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line.strip(), re.DOTALL)
-                    if re.match('delim(i(t(e(r)?)?)?)?', matched.group(1)):
-                        delimiter = matched.group(2)[1:-1]
+                    command = re.split('\s*=\s*|\s+', matched.group(1), maxsplit=1)
+                    if re.match('delim(i(t(e(r)?)?)?)?', command[0]):
+                        delimiter = command[1].strip()[1:-1]
                 sys.stdout.write(line)
             else:
                 if not delimiter:
