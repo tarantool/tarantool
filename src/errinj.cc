@@ -112,8 +112,7 @@ errinj_info(struct tbuf *out)
 	int i;
 	for (i = 0 ; i < errinj_enum_MAX ; i++) {
 		struct errinj *inj = &errinjs[i];
-		tbuf_printf(out, "  - name: %s" CRLF, inj->name);
-		tbuf_printf(out, "    state: %s" CRLF,
-			    (inj->state) ? "on" : "off");
+		tbuf_printf(out, " - name: %s" CRLF, inj->name);
+		tbuf_printf(out, " - state: %d" CRLF, inj->state);
 	}
 }

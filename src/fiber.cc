@@ -494,13 +494,12 @@ static void
 fiber_info_print(struct tbuf *out, struct fiber *fiber)
 {
 	void *stack_top = (char *) fiber->coro.stack + fiber->coro.stack_size;
-
-	tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
-	tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
-	tbuf_printf(out, "    name: %s" CRLF, fiber_name(fiber));
-	tbuf_printf(out, "    stack: %p" CRLF, stack_top);
+	tbuf_printf(out, " - fid: %i" CRLF, fiber->fid);
+	tbuf_printf(out, " - csw: %i" CRLF, fiber->csw);
+	tbuf_printf(out, " - name: %s" CRLF, fiber_name(fiber));
+	tbuf_printf(out, " - stack: %p" CRLF, stack_top);
 #ifdef ENABLE_BACKTRACE
-	tbuf_printf(out, "    backtrace:" CRLF "%s",
+	tbuf_printf(out, " - backtrace:" CRLF "%s",
 		    backtrace(fiber->last_stack_frame,
 			      fiber->coro.stack, fiber->coro.stack_size));
 #endif /* ENABLE_BACKTRACE */
@@ -512,7 +511,6 @@ fiber_info(struct tbuf *out)
 	struct fiber *fiber;
 
 	tbuf_printf(out, "fibers:" CRLF);
-
 	rlist_foreach_entry(fiber, &fibers, link)
 		fiber_info_print(out, fiber);
 	rlist_foreach_entry(fiber, &zombie_fibers, link)
@@ -551,4 +549,21 @@ fiber_free(void)
 		fiber_destroy_all();
 		mh_i32ptr_delete(fiber_registry);
 	}
+}
+
+int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
+{
+	struct fiber *fiber;
+	int res;
+	rlist_foreach_entry(fiber, &fibers, link) {
+		res = cb(fiber, cb_ctx);
+		if (res != 0)
+			return res;
+	}
+	rlist_foreach_entry(fiber, &zombie_fibers, link) {
+		res = cb(fiber, cb_ctx);
+		if (res != 0)
+			return res;
+	}
+	return 0;
 }

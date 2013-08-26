@@ -1,5 +1,6 @@
-#ifndef TC_CLI_H_INCLUDED
-#define TC_CLI_H_INCLUDED
+#ifndef TARANTOOL_LUA_FIBER_H_INCLUDED
+#define TARANTOOL_LUA_FIBER_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,10 +29,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-int tc_cli_cmdv(void);
-int tc_cli(void);
-int tc_cli_motd(void);
 
-int tc_cmd_tee_close(void);
+struct lua_State;
 
-#endif /* TC_CLI_H_INCLUDED */
+/**
+* Initialize box.fiber system
+*/
+void
+tarantool_lua_fiber_init(struct lua_State *L);
+
+#endif /* TARANTOOL_LUA_FIBER_H_INCLUDED */

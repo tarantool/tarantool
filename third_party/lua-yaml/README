@@ -1,0 +1,39 @@
+NAME
+    yaml - Lua YAML serialization using LibYAML
+
+SYNOPSIS
+    require 'yaml'
+
+    serialized = yaml.dump({ 1, 2, 3, 4 })
+    content = yaml.load(serialized)
+
+DESCRIPTION
+    This module is a Lua binding for Kirill Siminov's excellent LibYAML.
+    LibYAML is generally considered to be the best C YAML 1.1 implementation.
+    LibYAML 0.1.3 is included as part of this release.
+
+    This module defines the functions dump, load, and configure within the
+    global yaml table.
+
+    Portions of this software were inspired by Perl's YAML::LibYAML module by
+    Ingy döt Net.
+
+SEE ALSO
+    * LibYAML (http://pyyaml.org/wiki/LibYAML)
+    * luayaml: libsyck YAML binding (http://luaforge.net/projects/luayaml)
+    * YAML::LibYAML (http://search.cpan.org/~nuffin/YAML-LibYAML)
+
+AUTHOR
+    Andrew Danforth <acd@weirdness.net>
+
+    If you are using this module successfully I would love to hear from you.
+
+COPYRIGHT
+    Copyright (c) 2009, Andrew Danforth
+
+THANKS
+    Thanks to the following people for suggestions and patches:
+
+    Peter Mawhorter
+    Cyril Romain
+    Adrian Sampson

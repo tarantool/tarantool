@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+#include "lua/plugin.h"
 #include "lua/info.h"
 #include "lua/init.h"
 

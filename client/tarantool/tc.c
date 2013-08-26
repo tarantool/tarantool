@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
 	case TC_OPT_INTERACTIVE:
 		tc_connect();
 		tc_connect_admin();
+		tc_cli_motd();
 		rc = tc_cli();
 		break;
 	}

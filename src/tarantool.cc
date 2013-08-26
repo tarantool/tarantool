@@ -297,10 +297,10 @@ show_cfg(struct tbuf *out)
 	i = tarantool_cfg_iterator_init();
 	while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
 		if (value) {
-			tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
+			tbuf_printf(out, " - %s: \"%s\"" CRLF, key, value);
 			free(value);
 		} else {
-			tbuf_printf(out, "  %s: (null)" CRLF, key);
+			tbuf_printf(out, " - %s: (null)" CRLF, key);
 		}
 	}
 }

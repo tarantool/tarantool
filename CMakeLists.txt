@@ -304,6 +304,14 @@ libcjson_build()
 add_dependencies(build_bundled_libs cjson)
 
 #
+# LibYAML
+#
+
+include(BuildLibYAML)
+libyaml_build()
+add_dependencies(build_bundled_libs yaml)
+
+#
 # Third-Party misc
 #
 

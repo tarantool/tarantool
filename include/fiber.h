@@ -173,4 +173,8 @@ fiber_set_sid(struct fiber *f, uint32_t sid)
 	f->sid = sid;
 }
 
+typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
+
+int fiber_stat(fiber_stat_cb cb, void *cb_ctx);
+
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

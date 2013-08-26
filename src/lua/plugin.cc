@@ -32,90 +32,47 @@ extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include "tarantool/plugin.h"
 } /* extern "C" */
 
 #include "lua/init.h"
 #include <salloc.h>
 
-/** A callback passed into salloc_stat() and invoked for every slab class. */
 static int
-salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
+plugin_cb(struct tarantool_plugin *p, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
-
-	/*
-	 * Create a Lua table for every slab class. A class is
-	 * defined by its item size.
-	 */
-	lua_pushnumber(L, cstat->item_size);
+	lua_pushstring(L, p->name);
 	lua_newtable(L);
-
-	lua_pushstring(L, "slabs");
-	luaL_pushnumber64(L, cstat->slabs);
+	lua_pushstring(L, "version");
+	luaL_pushnumber64(L, p->version);
 	lua_settable(L, -3);
-
-	lua_pushstring(L, "items");
-	luaL_pushnumber64(L, cstat->items);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "bytes_used");
-	luaL_pushnumber64(L, cstat->bytes_used);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "bytes_free");
-	luaL_pushnumber64(L, cstat->bytes_free);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "item_size");
-	luaL_pushnumber64(L, cstat->item_size);
-	lua_settable(L, -3);
-
 	lua_settable(L, -3);
 	return 0;
 }
 
 static int
-lbox_slab_info(struct lua_State *L)
+lbox_plugin_info(struct lua_State *L)
 {
-	struct slab_arena_stats astat;
-
 	lua_newtable(L);
-	lua_pushstring(L, "slabs");
+	lua_pushstring(L, "plugins");
 	lua_newtable(L);
-	salloc_stat(salloc_stat_lua_cb, &astat, L);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "arena_used");
-	luaL_pushnumber64(L, astat.used);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "arena_size");
-	luaL_pushnumber64(L, astat.size);
+	plugins_stat(plugin_cb, L);
 	lua_settable(L, -3);
 	return 1;
 }
 
-static int
-lbox_slab_check(struct lua_State *L __attribute__((unused)))
-{
-	slab_validate();
-	return 0;
-}
+/** Initialize box.plugin package. */
 
-/** Initialize box.slab package. */
 void
-tarantool_lua_slab_init(struct lua_State *L)
+tarantool_lua_plugin_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "slab");
+	lua_pushstring(L, "plugin");
 	lua_newtable(L);
 
 	lua_pushstring(L, "info");
-	lua_pushcfunction(L, lbox_slab_info);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "check");
-	lua_pushcfunction(L, lbox_slab_check);
+	lua_pushcfunction(L, lbox_plugin_info);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);

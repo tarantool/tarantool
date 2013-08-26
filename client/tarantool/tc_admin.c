@@ -38,6 +38,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
+#include <sys/uio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -85,24 +86,37 @@ void tc_admin_close(struct tc_admin *a)
 	a->fd = 0;
 }
 
-static int
-tc_admin_send(struct tc_admin *a, char *buf, size_t size) {
-	ssize_t rc, off = 0;
-	do {
-		rc = send(a->fd, buf + off, size - off, 0);
-		if (rc <= 0)
-			return -1;
-		off += rc;
-	} while (off != size);
-	return 0;
-}
-
 int tc_admin_query(struct tc_admin *a, char *q)
 {
-	if (tc_admin_send(a, q, strlen(q)) == -1)
-		return -1;
-	if (tc_admin_send(a, "\n", 1) == -1)
-		return -1;
+	size_t total = 0;
+	int count = 2;
+	struct iovec v[2];
+	struct iovec *vp = v;
+	v[0].iov_base = q;
+	v[0].iov_len = strlen(q);
+	v[1].iov_base = "\n";
+	v[1].iov_len = 1;
+	while (count > 0)
+	{
+		ssize_t r;
+		do {
+			r = writev(a->fd, vp, count);
+		} while (r == -1 && (errno == EINTR));
+		if (r <= 0)
+			return -1;
+		total += r;
+		while (count > 0) {
+			if (vp->iov_len > (size_t)r) {
+				vp->iov_base += r;
+				vp->iov_len -= r;
+				break;
+			} else {
+				r -= vp->iov_len;
+				vp++;
+				count--;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -125,19 +139,18 @@ int tc_admin_reply(struct tc_admin *a, char **r, size_t *size)
 		off += rxi;
 		buf[off] = 0;
 
-		if (off >= 8) {
-			int done_cr =
-			    !memcmp(buf, "---\n", 4) &&
-			    !memcmp(buf + off - 4, "...\n", 4);
-			int done_crlf = !done_cr &&
-			    off >= 10 &&
-			    !memcmp(buf, "---\r\n", 5) &&
-			    !memcmp(buf + off - 5, "...\r\n", 5);
-			if (done_crlf || done_cr) {
-				*r = buf;
-				*size = off;
-				return 0;
-			}
+		int is_complete =
+		 (off >= 6 && !memcmp(buf, "---", 3)) &&
+		 ((!memcmp(buf + off - 3, "...", 3)) ||
+		  (off >= 7 && !memcmp(buf + off - 4, "...\n", 4))   ||
+		  (off >= 7 && !memcmp(buf + off - 4, "...\r", 4))   ||
+		  (off >= 8 && !memcmp(buf + off - 5, "...\r\n", 5)) ||
+		  (off >= 8 && !memcmp(buf + off - 5, "...\n\n", 5)));
+
+		if (is_complete) {
+			*r = buf;
+			*size = off;
+			return 0;
 		}
 	}
 	if (buf)
