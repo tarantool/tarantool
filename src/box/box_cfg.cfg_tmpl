@@ -31,23 +31,3 @@ memcached_expire_full_sweep=3600.0
 # fetching records from it.. In replication mode the server
 # only accepts reads.
 replication_source=NULL
-
-space = [
-  {
-    enabled = false, required
-    arity = -1
-    estimated_rows = 0
-    index = [
-      {
-        type = "", required
-        unique = false, required
-        key_field = [
-          {
-            fieldno = -1, required
-            type = "", required
-          }, ro,  required
-        ], required
-      }, ro, required
-    ], required
-  }, ro
-], ro

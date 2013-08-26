@@ -59,9 +59,8 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	lua_pushnumber(L, space_id(space));
 	lua_settable(L, -3);
 
-	/* all exists spaces are enabled */
 	lua_pushstring(L, "enabled");
-	lua_pushboolean(L, 1);
+	lua_pushboolean(L, space->engine.state != READY_NO_KEYS);
 	lua_settable(L, -3);
 
 	/* space.index */
@@ -115,12 +114,16 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	lua_settable(L, -3);	/* push space.index */
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "bless_space");
+	lua_pushstring(L, "schema");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "space");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "bless");
 	lua_gettable(L, -2);
 
-	lua_pushvalue(L, -3);			/* box, bless, space */
+	lua_pushvalue(L, -5);	/* box, schema, space, bless, space */
 	lua_call(L, 1, 0);
-	lua_pop(L, 1);	/* cleanup stack */
+	lua_pop(L, 3);	/* cleanup stack - box, schema, space */
 
 	return 1;
 }

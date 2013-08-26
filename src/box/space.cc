@@ -80,6 +80,8 @@ space_new(struct space_def *space_def, struct rlist *key_list)
 	}
 	space_fill_index_map(space);
 	space->engine = engine_no_keys;
+	rlist_create(&space->on_replace);
+	space->run_triggers = true;
 	return space;
 error:
 	space_delete(space);
@@ -186,6 +188,12 @@ space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	return NULL;
 }
 
+uint32_t
+space_size(struct space *space)
+{
+	return space_index(space, 0)->size();
+}
+
 /**
  * Secondary indexes are built in bulk after all data is
  * recovered. This function enables secondary keys on a space.
@@ -287,6 +295,31 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 		tnt_raise(IllegalParams,
 			  "tuple field count must match space arity");
 
+}
+
+void
+space_dump_def(const struct space *space, struct rlist *key_list)
+{
+	rlist_create(key_list);
+
+	for (int j = 0; j < space->index_count; j++)
+		rlist_add_tail_entry(key_list, space->index[j]->key_def,
+				     link);
+}
+
+void
+space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
+		 uint32_t rhs_id)
+{
+	Index *tmp = lhs->index_map[lhs_id];
+	lhs->index_map[lhs_id] = rhs->index_map[rhs_id];
+	rhs->index_map[rhs_id] = tmp;
+}
+
+extern "C" void
+space_run_triggers(struct space *space, bool yesno)
+{
+	space->run_triggers = yesno;
 }
 
 /* vim: set fm=marker */

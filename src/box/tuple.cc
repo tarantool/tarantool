@@ -341,6 +341,8 @@ const char *
 tuple_seek(struct tuple_iterator *it, uint32_t i, uint32_t *len)
 {
 	it->pos = tuple_field_old(tuple_format(it->tuple), it->tuple, i);
+	it->fieldno = it->pos == it->tuple->data + it->tuple->bsize ?
+		it->tuple->field_count : i;
 	return tuple_next(it, len);
 }
 
@@ -353,9 +355,67 @@ tuple_next(struct tuple_iterator *it, uint32_t *len)
 		const char *field = it->pos;
 		it->pos += *len;
 		assert(it->pos <= tuple_end);
+		it->fieldno++;
 		return field;
 	}
 	return NULL;
+}
+
+static const char *
+tuple_field_to_cstr(const char *field, uint32_t len, uint32_t field_index)
+{
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_index);
+	static __thread char buf[256];
+	len = MIN(len, sizeof(buf) - 1);
+	memcpy(buf, field, len);
+	buf[len] = '\0';
+	return buf;
+}
+
+static uint32_t
+tuple_field_to_u32(const char *field, uint32_t len, uint32_t field_index)
+{
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_index);
+	if (len != sizeof(uint32_t))
+		tnt_raise(ClientError, ER_FIELD_TYPE, field_index,
+			  field_type_strs[NUM]);
+	return pick_u32(&field, field + len);
+}
+
+const char *
+tuple_next_cstr(struct tuple_iterator *it)
+{
+	uint32_t len;
+	int fieldno = it->fieldno;
+	const char *field = tuple_next(it, &len);
+	return tuple_field_to_cstr(field, len, fieldno);
+}
+
+uint32_t
+tuple_next_u32(struct tuple_iterator *it)
+{
+	uint32_t len;
+	int fieldno = it->fieldno;
+	const char *field = tuple_next(it, &len);
+	return tuple_field_to_u32(field, len, fieldno);
+}
+
+uint32_t
+tuple_field_u32(struct tuple *tuple, uint32_t i)
+{
+	uint32_t len;
+	const char *field = tuple_field(tuple, i, &len);
+	return tuple_field_to_u32(field, len, i);
+}
+
+const char *
+tuple_field_cstr(struct tuple *tuple, uint32_t i)
+{
+	uint32_t len;
+	const char *field = tuple_field(tuple, i, &len);
+	return tuple_field_to_cstr(field, len, i);
 }
 
 /** print field to tbuf */

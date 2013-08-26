@@ -73,15 +73,10 @@ execute_replace(const struct request *request, struct txn *txn,
 
 	struct tuple *new_tuple = tuple_new(space->format, field_count,
 					    &tuple, request->r.tuple_end);
-	try {
-		space_validate_tuple(space, new_tuple);
-		enum dup_replace_mode mode = dup_replace_mode(request->flags);
-		txn_replace(txn, space, NULL, new_tuple, mode);
-
-	} catch (const Exception &e) {
-		tuple_delete(new_tuple);
-		throw;
-	}
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	enum dup_replace_mode mode = dup_replace_mode(request->flags);
+	txn_replace(txn, space, NULL, new_tuple, mode);
 }
 
 static void
@@ -110,13 +105,9 @@ execute_update(const struct request *request, struct txn *txn,
 					       fiber->gc_pool,
 					       old_tuple, request->u.expr,
 					       request->u.expr_end);
-	try {
-		space_validate_tuple(space, new_tuple);
-		txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
-	} catch (const Exception &e) {
-		tuple_delete(new_tuple);
-		throw;
-	}
+	TupleGuard guard(new_tuple);
+	space_validate_tuple(space, new_tuple);
+	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
 }
 
 /** }}} */

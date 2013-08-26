@@ -147,12 +147,14 @@ int main(int argc, char *argv[])
 		ts_options_free(&tss.opts);
 		return 1;
 	}
+#if 0
 	rc = ts_space_fill(&tss.s, &tss.opts);
 	if (rc == -1) {
 		ts_space_free(&tss.s);
 		ts_options_free(&tss.opts);
 		return 1;
 	}
+#endif
 
 	printf("snap_dir: %s\n", tss.opts.cfg.snap_dir);
 	printf("wal_dir:  %s\n", tss.opts.cfg.wal_dir);

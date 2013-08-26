@@ -55,10 +55,10 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  2 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  3 */_(ER_SECONDARY,			2, "Can't modify data upon a request on the secondary port.") \
 	/*  4 */_(ER_TUPLE_IS_RO,		1, "Tuple is marked as read-only") \
-	/*  5 */_(ER_INDEX_TYPE,		2, "Unsupported index type: %s") \
+	/*  5 */_(ER_INDEX_TYPE,		2, "Unsupported index type supplied for index %u in space %u") \
 	/*  6 */_(ER_SPACE_EXISTS,		2, "Space %u already exists") \
 	/*  7 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
-	/*  8 */_(ER_UNUSED8,			2, "Unused8") \
+	/*  8 */_(ER_CREATE_SPACE,		2, "Failed to create space %u: %s") \
 	/*  9 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/* 10 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 		/* silverproxy error codes */ \
@@ -76,13 +76,13 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 22 */_(ER_RESERVED22,		0, "Reserved22") \
 	/* 23 */_(ER_RESERVED23,		0, "Reserved23") \
 		/* end of silverproxy error codes */ \
-	/* 24 */_(ER_UNUSED24,			2, "Unused24") \
-	/* 25 */_(ER_UNUSED25,			2, "Unused25") \
+	/* 24 */_(ER_DROP_SPACE,		2, "Can't drop space %u: %s") \
+	/* 25 */_(ER_ALTER_SPACE,		2, "Can't modify space %u: %s") \
 	/* 26 */_(ER_FIBER_STACK,		2, "Can not create a new fiber: recursion limit reached") \
-	/* 27 */_(ER_UNUSED27,			2, "Unused27") \
+	/* 27 */_(ER_MODIFY_INDEX,		2, "Can't modify index %u in space %u: %s") \
 	/* 28 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
-	/* 29 */_(ER_UNUSED29,			2, "Unused29") \
-	/* 30 */_(ER_UNUSED30,			2, "Unused30") \
+	/* 29 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
+	/* 30 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
 	/* 31 */_(ER_UNUSED31,			2, "Unused31") \
 	/* 32 */_(ER_UNUSED32,			2, "Unused32") \
 	/* 33 */_(ER_UNUSED33,			2, "Unused33") \

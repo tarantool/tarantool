@@ -43,7 +43,6 @@ extern "C" {
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"
-#include "memcached.h"
 #include "box_lua.h"
 #include "schema.h"
 #include "space.h"
@@ -157,8 +156,6 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 	} else {
 		box_process = process_rw;
 
-		memcached_start_expire();
-
 		snprintf(status, sizeof(status), "primary%s",
 			 custom_proc_title);
 		title("primary%s", custom_proc_title);
@@ -219,22 +216,6 @@ box_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 
-	/* check if at least one space is defined */
-	if (conf->space == NULL && conf->memcached_port == 0) {
-		out_warning(CNF_OK, "at least one space or memcached port must be defined");
-		return -1;
-	}
-
-	/* check configured spaces */
-	if (check_spaces(conf) != 0) {
-		return -1;
-	}
-
-	/* check memcached configuration */
-	if (memcached_check_config(conf) != 0) {
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -255,10 +236,6 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 			return -1;
 		}
-
-		if (!old_is_replica && new_is_replica)
-			memcached_stop_expire();
-
 		if (recovery_state->remote)
 			recovery_stop_remote(recovery_state);
 
@@ -283,8 +260,6 @@ box_init()
 
 	tuple_init();
 	schema_init();
-	/* configure memcached space */
-	memcached_space_init();
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
@@ -337,6 +312,8 @@ snapshot_space(struct space *sp, void *udata)
 	struct tuple *tuple;
 	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
 	Index *pk = space_index(sp, 0);
+	if (pk == NULL)
+		return;
 	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 

@@ -169,6 +169,10 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	if (replication_check_config(conf) != 0)
 		return -1;
 
+	/* check memcached configuration */
+	if (memcached_check_config(conf) != 0)
+		return -1;
+
 	return box_check_config(conf);
 }
 
@@ -278,6 +282,9 @@ reload_cfg(struct tbuf *out)
 
 	/* Now pass the config to the module, to take action. */
 	if (box_reload_config(&cfg, &new_cfg) != 0)
+		return -1;
+
+	if (memcached_reload_config(&cfg, &new_cfg) != 0)
 		return -1;
 	/* All OK, activate the config. */
 	swap_tarantool_cfg(&cfg, &new_cfg);
@@ -857,16 +864,12 @@ main(int argc, char **argv)
 		tarantool_L = tarantool_lua_init();
 		box_init();
 		atexit(tarantool_lua_free);
-		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*
-		 * init iproto before admin and after memcached:
+		 * init iproto before admin:
 		 * recovery is finished on bind to the primary port,
 		 * and it has to happen before requests on the
 		 * administrative port start to arrive.
-		 * And when recovery is finalized, memcached
-		 * expire loop is started, so binding can happen
-		 * only after memcached is initialized.
 		 */
 		iproto_init(cfg.bind_ipaddr, cfg.primary_port,
 			    cfg.secondary_port);
@@ -880,6 +883,12 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(tarantool_L);
+		/*
+		 * And when recovery is finalized, memcached
+		 * expire loop is started, so binding can happen
+		 * only after memcached is initialized.
+		 */
+		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		prelease(fiber->gc_pool);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering the event loop");

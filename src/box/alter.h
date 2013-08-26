@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TXN_H_INCLUDED
-#define TARANTOOL_BOX_TXN_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
+#define INCLUDES_TARANTOOL_BOX_ALTER_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,33 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
 #include "trigger.h"
 
-struct tuple;
-struct space;
+extern struct trigger alter_space_on_replace_space;
+extern struct trigger alter_space_on_replace_index;
 
-struct txn {
-	/* Undo info. */
-	struct space *space;
-	struct tuple *old_tuple;
-	struct tuple *new_tuple;
-
-	struct rlist on_commit;
-	struct rlist on_rollback;
-
-	/* Redo info: binary packet */
-	const char *data;
-	uint32_t len;
-	uint16_t op;
-};
-
-struct txn *txn_begin();
-void txn_commit(struct txn *txn);
-void txn_finish(struct txn *txn);
-void txn_rollback(struct txn *txn);
-void txn_add_redo(struct txn *txn, uint16_t op, const char *data, uint32_t len);
-void txn_replace(struct txn *txn, struct space *space,
-		 struct tuple *old_tuple, struct tuple *new_tuple,
-		 enum dup_replace_mode mode);
-#endif /* TARANTOOL_BOX_TXN_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */

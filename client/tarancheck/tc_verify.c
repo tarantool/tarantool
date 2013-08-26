@@ -186,10 +186,12 @@ int tc_verify(struct tc_options *opts)
 	int rc = tc_space_init(&ss);
 	if (rc == -1)
 		return -1;
+#if 0
 	rc = tc_space_fill(&ss, opts);
 	if (rc == -1)
 		goto error;
 
+#endif
 	/* 2. load signature file */
 	uint64_t last_xlog_lsn = 0;
 	uint64_t last_snap_lsn = 0;

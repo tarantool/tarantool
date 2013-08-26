@@ -439,11 +439,13 @@ int tc_generate(struct tc_options *opts)
 	int rc = tc_space_init(&s);
 	if (rc == -1)
 		return -1;
+#if 0
 	rc = tc_space_fill(&s, opts);
 	if (rc == -1) {
 		tc_space_free(&s);
 		return -1;
 	}
+#endif
 	printf("configured spaces: %d\n", mh_size(s.t));
 	printf("snap_dir: %s\n", opts->cfg.snap_dir);
 	printf("wal_dir: %s\n", opts->cfg.wal_dir);

@@ -30,6 +30,22 @@
  */
 #include "exception.h"
 
+enum schema_id {
+	/** Start of the reserved range of system spaces. */
+	SC_SYSTEM_ID_MIN = 256,
+	/** Space id of _schema. */
+	SC_SCHEMA_ID = 272,
+	/** Space id of _space. */
+	SC_SPACE_ID = 280,
+	/** Space id of _index. */
+	SC_INDEX_ID = 288,
+	/** End of the reserved range of system spaces. */
+	SC_SYSTEM_ID_MAX = 511
+};
+
+enum schema_field_id {
+};
+
 struct space;
 
 /** Call a visitor function on every space in the space cache. */
@@ -38,10 +54,11 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 
 /**
  * Try to look up a space by space number in the space cache.
+ * FFI-friendly no-exception-thrown space lookup function.
  *
  * @return NULL if space not found, otherwise space object.
  */
-struct space *
+extern "C" struct space *
 space_by_id(uint32_t id);
 
 static inline struct space *
@@ -66,6 +83,9 @@ space_cache_replace(struct space *space);
 struct space *
 space_cache_delete(uint32_t id);
 
+bool
+space_is_system(struct space *space);
+
 void
 schema_init();
 
@@ -86,9 +106,7 @@ space_end_recover_snapshot();
 void
 space_end_recover();
 
-struct tarantool_cfg;
+struct space *schema_space(uint32_t id);
 
-int
-check_spaces(struct tarantool_cfg *conf);
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

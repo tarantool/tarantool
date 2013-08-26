@@ -28,20 +28,22 @@
  */
 #include "schema.h"
 #include "space.h"
+#include "tuple.h"
 #include "assoc.h"
 #include "lua/init.h"
 #include "box_lua_space.h"
 #include "key_def.h"
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
+#include "alter.h"
+#include "scoped_guard.h"
 /**
  * @module Data Dictionary
  *
  * The data dictionary is responsible for storage and caching
  * of system metadata, such as information about existing
- * spaces, indexes, tuple formats.
+ * spaces, indexes, tuple formats. Space and index metadata
+ * is called in dedicated spaces, _space and _index respectively.
+ * The contents of these spaces is fully cached in a cache of
+ * struct space objects.
  *
  * struct space is an in-memory instance representing a single
  * space with its metadata, space data, and methods to manage
@@ -51,11 +53,15 @@ extern "C" {
 /** All existing spaces. */
 static struct mh_i32ptr_t *spaces;
 
-static void
-space_config();
+bool
+space_is_system(struct space *space)
+{
+	return space->def.id > SC_SYSTEM_ID_MIN &&
+		space->def.id < SC_SYSTEM_ID_MAX;
+}
 
 /** Return space by its number */
-struct space *
+extern "C" struct space *
 space_by_id(uint32_t id)
 {
 	mh_int_t space = mh_i32ptr_find(spaces, id, NULL);
@@ -71,9 +77,36 @@ void
 space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 {
 	mh_int_t i;
+	struct space *space;
+	struct { char len; uint32_t id; } __attribute__((packed))
+		key = { sizeof(uint32_t), SC_SYSTEM_ID_MIN };
+	/*
+	 * Make sure we always visit system spaces first,
+	 * in order from lowest space id to the highest..
+	 * This is essential for correctly recovery from the
+	 * snapshot, and harmless otherwise.
+	 */
+	space = space_by_id(SC_SPACE_ID);
+	Index *pk = space ? space_index(space, 0) : NULL;
+	if (pk) {
+		struct iterator *it = pk->allocIterator();
+		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
+		pk->initIterator(it, ITER_GE, (char *) &key, 1);
+		struct tuple *tuple;
+		while ((tuple = it->next(it))) {
+			/* Get space id, primary key, field 0. */
+			uint32_t id = tuple_field_u32(tuple, 0);
+			space = space_find(id);
+			if (! space_is_system(space))
+				break;
+			func(space, udata);
+		}
+	}
+
 	mh_foreach(spaces, i) {
-		struct space *space = (struct space *)
-				mh_i32ptr_node(spaces, i)->val;
+		space = (struct space *) mh_i32ptr_node(spaces, i)->val;
+		if (space_is_system(space))
+			continue;
 		func(space, udata);
 	}
 }
@@ -123,6 +156,35 @@ do_one_recover_step(struct space *space, void * /* param */)
 		space->engine = engine_no_keys;
 }
 
+/** A wrapper around space_new() for data dictionary spaces. */
+struct space *
+sc_space_new(struct space_def *space_def,
+	     struct key_def *key_def,
+	     struct trigger *trigger)
+{
+	struct rlist key_list;
+	rlist_create(&key_list);
+	rlist_add_entry(&key_list, key_def, link);
+	struct space *space = space_new(space_def, &key_list);
+	(void) space_cache_replace(space);
+	if (trigger)
+		trigger_set(&space->on_replace, trigger);
+	/*
+	 * Data dictionary spaces are fully built since:
+	 * - they contain data right from the start
+	 * - they are fully operable already during recovery
+	 * - if there is a record in the snapshot which mandates
+	 *   addition of a new index to a system space, this
+	 *   index is built tuple-by-tuple, not in bulk, which
+	 *   ensures validation of tuples when starting from
+	 *   a snapshot of older version.
+	 */
+	space->engine.recover(space); /* load snapshot - begin */
+	space->engine.recover(space); /* load snapshot - end */
+	space->engine.recover(space); /* build secondary keys */
+	return space;
+}
+
 /**
  * Initialize a prototype for the two mandatory data
  * dictionary spaces and create a cache entry for them.
@@ -134,8 +196,46 @@ schema_init()
 {
 	/* Initialize the space cache. */
 	spaces = mh_i32ptr_new();
-	space_config();
-	space_foreach(do_one_recover_step, NULL);
+	/*
+	 * Create surrogate space objects for the mandatory system
+	 * spaces (the primal eggs from which we get all the
+	 * chicken). Their definitions will be overwritten by the
+	 * data in the snapshot, and they will thus be
+	 * *re-created* during recovery.  Note, the index type
+	 * must be TREE and space identifiers must be the smallest
+	 * one to ensure that these spaces are always recovered
+	 * (and re-created) first.
+	 */
+	/* _schema - key/value space with schema description */
+	struct space_def space_def = { SC_SCHEMA_ID, 0 };
+	struct key_def *key_def = key_def_new(0 /* id */,
+					      TREE /* index type */,
+					      true /* unique */,
+					      1 /* part count */);
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
+	(void) sc_space_new(&space_def, key_def, NULL);
+
+	/* _space - home for all spaces. */
+	space_def.id = SC_SPACE_ID;
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
+
+	(void) sc_space_new(&space_def, key_def,
+			    &alter_space_on_replace_space);
+	key_def_delete(key_def);
+
+	/* _index - definition of indexes in all spaces */
+	key_def = key_def_new(0 /* id */,
+			      TREE /* index type */,
+			      true /* unique */,
+			      2 /* part count */);
+	/* space no */
+	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
+	/* index no */
+	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */, NUM);
+	space_def.id = SC_INDEX_ID;
+	(void) sc_space_new(&space_def, key_def,
+			    &alter_space_on_replace_index);
+	key_def_delete(key_def);
 }
 
 void
@@ -173,263 +273,3 @@ schema_free(void)
 	}
 	mh_i32ptr_delete(spaces);
 }
-
-struct key_def *
-key_def_new_from_cfg(uint32_t id,
-		     struct tarantool_cfg_space_index *cfg_index)
-{
-	uint32_t part_count = 0;
-	enum index_type type = STR2ENUM(index_type, cfg_index->type);
-
-	if (type == index_type_MAX)
-		tnt_raise(LoggedError, ER_INDEX_TYPE, cfg_index->type);
-
-	/* Find out key part count. */
-	for (uint32_t k = 0; cfg_index->key_field[k] != NULL; ++k) {
-		auto cfg_key = cfg_index->key_field[k];
-
-		if (cfg_key->fieldno == -1) {
-			/* last filled key reached */
-			break;
-		}
-		part_count++;
-	}
-
-	struct key_def *key= key_def_new(id, type, cfg_index->unique,
-					 part_count);
-
-	for (uint32_t k = 0; k < part_count; k++) {
-		auto cfg_key = cfg_index->key_field[k];
-
-		key_def_set_part(key, k, cfg_key->fieldno,
-				 STR2ENUM(field_type, cfg_key->type));
-	}
-	return key;
-}
-
-static void
-space_config()
-{
-	extern tarantool_cfg cfg;
-	/* exit if no spaces are configured */
-	if (cfg.space == NULL) {
-		return;
-	}
-
-	/* fill box spaces */
-	for (uint32_t i = 0; cfg.space[i] != NULL; ++i) {
-		struct space_def space_def;
-		space_def.id = i;
-		tarantool_cfg_space *cfg_space = cfg.space[i];
-
-		if (!CNF_STRUCT_DEFINED(cfg_space) || !cfg_space->enabled)
-			continue;
-
-		assert(cfg.memcached_port == 0 || i != cfg.memcached_space);
-
-		space_def.arity = (cfg_space->arity != -1 ?
-				   cfg_space->arity : 0);
-
-		struct rlist key_defs;
-		rlist_create(&key_defs);
-		struct key_def *key;
-
-		for (uint32_t j = 0; cfg_space->index[j] != NULL; ++j) {
-			auto cfg_index = cfg_space->index[j];
-			key = key_def_new_from_cfg(j, cfg_index);
-			key_list_add_key(&key_defs, key);
-		}
-		space_cache_replace(space_new(&space_def, &key_defs));
-
-		say_info("space %i successfully configured", i);
-	}
-}
-
-int
-check_spaces(struct tarantool_cfg *conf)
-{
-	/* exit if no spaces are configured */
-	if (conf->space == NULL) {
-		return 0;
-	}
-
-	for (size_t i = 0; conf->space[i] != NULL; ++i) {
-		auto space = conf->space[i];
-
-		if (i >= BOX_SPACE_MAX) {
-			out_warning(CNF_OK, "(space = %zu) invalid id, (maximum=%u)",
-				    i, BOX_SPACE_MAX);
-			return -1;
-		}
-
-		if (!CNF_STRUCT_DEFINED(space)) {
-			/* space undefined, skip it */
-			continue;
-		}
-
-		if (!space->enabled) {
-			/* space disabled, skip it */
-			continue;
-		}
-
-		if (conf->memcached_port && i == conf->memcached_space) {
-			out_warning(CNF_OK, "Space %zu is already used as "
-				    "memcached_space.", i);
-			return -1;
-		}
-
-		/* at least one index in space must be defined
-		 * */
-		if (space->index == NULL) {
-			out_warning(CNF_OK, "(space = %zu) "
-				    "at least one index must be defined", i);
-			return -1;
-		}
-
-		uint32_t max_key_fieldno = 0;
-
-		/* check spaces indexes */
-		for (size_t j = 0; space->index[j] != NULL; ++j) {
-			auto index = space->index[j];
-			uint32_t key_part_count = 0;
-			enum index_type index_type;
-
-			/* check index bound */
-			if (j >= BOX_INDEX_MAX) {
-				/* maximum index in space reached */
-				out_warning(CNF_OK, "(space = %zu index = %zu) "
-					    "too many indexed (%u maximum)", i, j, BOX_INDEX_MAX);
-				return -1;
-			}
-
-			/* at least one key in index must be defined */
-			if (index->key_field == NULL) {
-				out_warning(CNF_OK, "(space = %zu index = %zu) "
-					    "at least one field must be defined", i, j);
-				return -1;
-			}
-
-			/* check unique property */
-			if (index->unique == -1) {
-				/* unique property undefined */
-				out_warning(CNF_OK, "(space = %zu index = %zu) "
-					    "unique property is undefined", i, j);
-			}
-
-			for (size_t k = 0; index->key_field[k] != NULL; ++k) {
-				auto key = index->key_field[k];
-
-				if (key->fieldno == -1) {
-					/* last key reached */
-					break;
-				}
-
-				if (key->fieldno >= BOX_FIELD_MAX) {
-					/* maximum index in space reached */
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "invalid field number (%u maximum)",
-						    i, j, BOX_FIELD_MAX);
-					return -1;
-				}
-
-				/* key must has valid type */
-				if (STR2ENUM(field_type, key->type) == field_type_MAX) {
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "unknown field data type: `%s'", i, j, key->type);
-					return -1;
-				}
-
-				if (max_key_fieldno < key->fieldno + 1) {
-					max_key_fieldno = key->fieldno + 1;
-				}
-
-				++key_part_count;
-			}
-
-			/* Check key part count. */
-			if (key_part_count == 0) {
-				out_warning(CNF_OK, "(space = %zu index = %zu) "
-					    "at least one field must be defined", i, j);
-				return -1;
-			}
-
-			index_type = STR2ENUM(index_type, index->type);
-
-			/* check index type */
-			if (index_type == index_type_MAX) {
-				out_warning(CNF_OK, "(space = %zu index = %zu) "
-					    "unknown index type '%s'", i, j, index->type);
-				return -1;
-			}
-
-			/* First index must be unique. */
-			if (j == 0 && index->unique == false) {
-				out_warning(CNF_OK, "(space = %zu) space first index must be unique", i);
-				return -1;
-			}
-
-			switch (index_type) {
-			case HASH:
-				/* check hash index */
-				/* hash index must be unique */
-				if (!index->unique) {
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "hash index must be unique", i, j);
-					return -1;
-				}
-				break;
-			case TREE:
-				/* extra check for tree index not needed */
-				break;
-			case BITSET:
-				/* check bitset index */
-				/* bitset index must has single-field key */
-				if (key_part_count != 1) {
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "bitset index must has a single-field key", i, j);
-					return -1;
-				}
-				/* bitset index must not be unique */
-				if (index->unique) {
-					out_warning(CNF_OK, "(space = %zu index = %zu) "
-						    "bitset index must be non-unique", i, j);
-					return -1;
-				}
-				break;
-			default:
-				assert(false);
-			}
-		}
-
-		/* Check for index field type conflicts */
-		if (max_key_fieldno > 0) {
-			char *types = (char *) alloca(max_key_fieldno);
-			memset(types, 0, max_key_fieldno);
-			for (size_t j = 0; space->index[j] != NULL; ++j) {
-				auto index = space->index[j];
-				for (size_t k = 0; index->key_field[k] != NULL; ++k) {
-					auto key = index->key_field[k];
-					if (key->fieldno == -1)
-						break;
-
-					uint32_t f = key->fieldno;
-					enum field_type t = STR2ENUM(field_type, key->type);
-					assert(t != field_type_MAX);
-					if (types[f] != t) {
-						if (types[f] == UNKNOWN) {
-							types[f] = t;
-						} else {
-							out_warning(CNF_OK, "(space = %zu fieldno = %zu) "
-								    "index field type mismatch", i, f);
-							return -1;
-						}
-					}
-				}
-
-			}
-		}
-	}
-
-	return 0;
-}
-

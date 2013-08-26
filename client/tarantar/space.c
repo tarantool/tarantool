@@ -140,6 +140,7 @@ ts_space_key_typeof(char *name)
 	return TS_SPACE_KEY_UNKNOWN;
 }
 
+#if 0
 static int
 ts_space_key_init(struct ts_space *s, tarantool_cfg_space *cs)
 {
@@ -249,6 +250,7 @@ int ts_space_fill(struct ts_spaces *s, struct ts_options *opts)
 	}
 	return 0;
 }
+#endif
 
 static inline struct ts_key*
 ts_space_keyalloc_sha(struct ts_space *s, struct tnt_tuple *t, int fileid,

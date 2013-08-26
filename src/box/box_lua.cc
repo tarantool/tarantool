@@ -55,8 +55,8 @@ extern "C" {
 #include "scoped_guard.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char box_lua[], box_net_lua[], misc_lua[], sql_lua[];
-static const char *lua_sources[] = { box_lua, box_net_lua, misc_lua, sql_lua, NULL };
+extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[], sql_lua[];
+static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, sql_lua, NULL };
 
 /**
  * All box connections share the same Lua state. We use
@@ -1094,10 +1094,7 @@ static void
 port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 {
 	struct tuple *tuple = lua_totuple(L, index);
-	auto scoped_guard = make_scoped_guard([=] {
-		if (tuple->refs == 0)
-			tuple_delete(tuple);
-	});
+	TupleGuard guard(tuple);
 	port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 }
 
@@ -1816,12 +1813,39 @@ static const struct luaL_reg boxlib[] = {
 };
 
 void
+schema_lua_init(struct lua_State *L)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_newtable(L);
+	lua_setfield(L, -2, "schema");
+	lua_getfield(L, -1, "schema");
+	lua_pushnumber(L, SC_SCHEMA_ID);
+	lua_setfield(L, -2, "SCHEMA_ID");
+	lua_pushnumber(L, SC_SPACE_ID);
+	lua_setfield(L, -2, "SPACE_ID");
+	lua_pushnumber(L, SC_INDEX_ID);
+	lua_setfield(L, -2, "INDEX_ID");
+	lua_pushnumber(L, SC_SYSTEM_ID_MIN);
+	lua_setfield(L, -2, "SYSTEM_ID_MIN");
+	lua_pushnumber(L, SC_SYSTEM_ID_MAX);
+	lua_setfield(L, -2, "SYSTEM_ID_MAX");
+	lua_pushnumber(L, BOX_INDEX_MAX);
+	lua_setfield(L, -2, "INDEX_MAX");
+	lua_pushnumber(L, BOX_SPACE_MAX);
+	lua_setfield(L, -2, "SPACE_MAX");
+	lua_pushnumber(L, BOX_FIELD_MAX);
+	lua_setfield(L, -2, "FIELD_MAX");
+	lua_pop(L, 2); /* box, schema */
+}
+
+void
 mod_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
 	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
+	schema_lua_init(L);
 	tarantool_lua_register_type(L, tuple_iteratorlib_name,
 				    lbox_tuple_iterator_meta);
 	luaL_register(L, "box", boxlib);

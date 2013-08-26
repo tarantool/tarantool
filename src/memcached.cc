@@ -33,10 +33,10 @@
 
 #include "box/box.h"
 #include "box/request.h"
+#include "box/schema.h"
 #include "box/space.h"
 #include "box/port.h"
 #include "box/tuple.h"
-#include "box/schema.h"
 #include "fiber.h"
 extern "C" {
 #include <cfg/warning.h>
@@ -59,7 +59,6 @@ ENUM(memcached_stat, STAT);
 STRS(memcached_stat, STAT);
 
 static int stat_base;
-static struct fiber *memcached_expire = NULL;
 
 static Index *memcached_index;
 static struct iterator *memcached_it;
@@ -477,6 +476,8 @@ memcached_free(void)
 		memcached_it->free(memcached_it);
 }
 
+void
+memcached_start_expire();
 
 void
 memcached_init(const char *bind_ipaddr, int memcached_port)
@@ -488,15 +489,13 @@ memcached_init(const char *bind_ipaddr, int memcached_port)
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 
-	struct space *sp = space_by_id(cfg.memcached_space);
-	memcached_index = space_index(sp, 0);
-
 	/* run memcached server */
 	static struct coio_service memcached;
 	coio_service_init(&memcached, "memcached",
 			  bind_ipaddr, memcached_port,
 			  memcached_handler, NULL);
 	evio_service_start(&memcached.evio_service);
+	memcached_start_expire();
 }
 
 void
@@ -555,6 +554,7 @@ memcached_delete_expired_keys(struct tbuf *keys_to_delete)
 void
 memcached_expire_loop(va_list ap __attribute__((unused)))
 {
+	memcached_space_init();
 	struct tuple *tuple = NULL;
 
 	say_info("memcached expire fiber started");
@@ -593,10 +593,10 @@ restart:
 
 void memcached_start_expire()
 {
+	struct fiber *memcached_expire;
 	if (cfg.memcached_port == 0 || cfg.memcached_expire == 0)
 		return;
 
-	assert(memcached_expire == NULL);
 	try {
 		memcached_expire = fiber_new("memcached_expire",
 						memcached_expire_loop);
@@ -607,11 +607,13 @@ void memcached_start_expire()
 	fiber_call(memcached_expire);
 }
 
-void memcached_stop_expire()
+int
+memcached_reload_config(struct tarantool_cfg *oldcfg,
+			struct tarantool_cfg *newcfg)
 {
-	if (cfg.memcached_port == 0 || cfg.memcached_expire == 0)
-		return;
-	assert(memcached_expire != NULL);
-	fiber_cancel(memcached_expire);
-	memcached_expire = NULL;
+	(void) oldcfg;
+	(void) newcfg;
+	if (newcfg->memcached_port == 0)
+		return 0;
+	return -1;
 }

@@ -528,7 +528,7 @@ tarantool_lua_init()
 	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH,
 	                      LUA_SYSCPATH, NULL);
 
-	/* Loadi 'ffi' extension and make it inaccessible */
+	/* Load 'ffi' extension and make it inaccessible */
 	lua_getglobal(L, "require");
 	lua_pushstring(L, "ffi");
 	if (lua_pcall(L, 1, 0, 0) != 0)

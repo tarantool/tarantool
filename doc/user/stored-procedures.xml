@@ -1331,7 +1331,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
             <emphasis role="lua"
             xml:id="box.space.select_reverse_range"
             xreflabel="box.space.select_reverse_range">
-            space:select_reverse_range(limit, key)</emphasis>
+            space:select_reverse_range(index_no, limit, key)</emphasis>
         </term>
         <listitem>
             <simpara>

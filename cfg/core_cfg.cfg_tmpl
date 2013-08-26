@@ -71,10 +71,6 @@ snap_io_rate_limit=0.0
 # Write no more rows in WAL
 rows_per_wal=500000, ro
 
-# OBSOLETE
-# Starting from 1.4.5, this variable has no effect.
-wal_writer_inbox_size=16384, ro
-
 # Defines fiber/data synchronization fsync(2) policy:
 #   "none":           does not write to WAL
 #   "write":          fibers wait for their data to be written to the log.

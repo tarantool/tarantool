@@ -28,6 +28,7 @@
  */
 #include "key_def.h"
 #include <stdlib.h>
+#include "exception.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
 STRS(index_type, ENUM_INDEX_TYPE);
@@ -53,4 +54,103 @@ void
 key_def_delete(struct key_def *key_def)
 {
 	free(key_def);
+}
+
+int
+key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
+	     const struct key_part *parts2, uint32_t part_count2)
+{
+	const struct key_part *part1 = parts1;
+	const struct key_part *part2 = parts2;
+	uint32_t part_count = MIN(part_count1, part_count2);
+	const struct key_part *end = parts1 + part_count;
+	for (; part1 != end; part1++, part2++) {
+		if (part1->fieldno != part2->fieldno)
+			return part1->fieldno < part2->fieldno ? -1 : 1;
+		if ((int) part1->type != (int) part2->type)
+			return (int) part1->type < (int) part2->type ? -1 : 1;
+	}
+	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
+}
+
+int
+key_def_cmp(const struct key_def *key1, const struct key_def *key2)
+{
+	if (key1->id != key2->id)
+		return key1->id < key2->id ? -1 : 1;
+	if (key1->type != key2->type)
+		return (int) key1->type < (int) key2->type ? -1 : 1;
+	if (key1->is_unique != key2->is_unique)
+		return (int) key1->is_unique < (int) key2->is_unique ? -1 : 1;
+
+	return key_part_cmp(key1->parts, key1->part_count,
+			    key2->parts, key2->part_count);
+}
+
+void
+key_list_del_key(struct rlist *key_list, uint32_t id)
+{
+	struct key_def *key;
+	rlist_foreach_entry(key, key_list, link) {
+		if (key->id == id) {
+			rlist_del_entry(key, link);
+			return;
+		}
+	}
+	assert(false);
+}
+
+void
+key_def_check(uint32_t id, struct key_def *key_def)
+{
+	if (key_def->id > BOX_INDEX_MAX) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) id, (unsigned) key_def->id,
+			  "index id too big");
+	}
+	if (key_def->part_count == 0) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) id, (unsigned) key_def->id,
+			  "part count must be positive");
+	}
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		if (key_def->parts[i].type == field_type_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) id, (unsigned) key_def->id,
+				  "unknown field type");
+		}
+		if (key_def->parts[i].fieldno > BOX_FIELD_MAX) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) id, (unsigned) key_def->id,
+				  "field no is too big");
+		}
+	}
+	switch (key_def->type) {
+	case HASH:
+		if (! key_def->is_unique) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) id, (unsigned) key_def->id,
+				  "HASH index must be unique");
+		}
+		break;
+	case TREE:
+		/* TREE index has no limitations. */
+		break;
+	case BITSET:
+		if (key_def->part_count != 1) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) id, (unsigned) key_def->id,
+				    "BITSET index key can not be multipart");
+		}
+		if (key_def->is_unique) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) id, (unsigned) key_def->id,
+				  "BITSET can not be unique");
+		}
+		break;
+	default:
+		tnt_raise(ClientError, ER_INDEX_TYPE,
+			  (unsigned) id, (unsigned) key_def->id);
+		break;
+	}
 }

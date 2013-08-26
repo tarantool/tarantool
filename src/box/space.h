@@ -30,6 +30,7 @@
  */
 #include "index.h"
 #include "key_def.h"
+#include "rlist.h"
 #include <exception.h>
 
 typedef void (*space_f)(struct space *space);
@@ -83,6 +84,9 @@ struct space {
 	 * deletion and addition of indexes.
 	 */
 	struct engine engine;
+
+	/** Triggers fired after space_replace() -- see txn_replace(). */
+	struct rlist on_replace;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *
@@ -99,6 +103,8 @@ struct space {
 	uint32_t index_id_max;
 	/** Space meta. */
 	struct space_def def;
+	/** Enable/disable triggers. */
+	bool run_triggers;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
@@ -213,6 +219,9 @@ space_replace(struct space *space, struct tuple *old_tuple,
 				     mode);
 }
 
+uint32_t
+space_size(struct space *space);
+
 /**
  * Check that the tuple has correct arity and correct field
  * types (a pre-requisite for an INSERT).
@@ -231,6 +240,26 @@ space_new(struct space_def *space_def, struct rlist *key_list);
 /** Destroy and free a space. */
 void
 space_delete(struct space *space);
+
+/**
+ * Dump space definition (key definitions, key count)
+ * for ALTER.
+ */
+void
+space_dump_def(const struct space *space, struct rlist *key_list);
+
+/**
+ * Exchange two index objects in two spaces. Used
+ * to update a space with a newly built index, while
+ * making sure the old index doesn't leak.
+ */
+void
+space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
+		 uint32_t rhs_id);
+
+/** Rebuild index map in a space after a series of swap index. */
+void
+space_fill_index_map(struct space *space);
 
 /**
  * Get index by index id.
@@ -257,5 +286,8 @@ index_find(struct space *space, uint32_t index_id)
 			  space_id(space));
 	return index;
 }
+
+extern "C" void
+space_run_triggers(struct space *space, bool yesno);
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

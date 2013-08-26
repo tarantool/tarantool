@@ -175,6 +175,16 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 void
 tuple_ref(struct tuple *tuple, int count);
 
+void
+tuple_delete(struct tuple *tuple);
+
+/** Make tuple references exception-friendly in absence of @finally. */
+struct TupleGuard {
+	struct tuple *tuple;
+	TupleGuard(struct tuple *arg) :tuple(arg) {}
+	~TupleGuard() { if (tuple->refs == 0) tuple_delete(tuple); }
+};
+
 /**
 * @brief Return a tuple format instance
 * @param tuple tuple
@@ -218,6 +228,20 @@ tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
 }
 
 /**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as uint32_t.
+ */
+uint32_t
+tuple_field_u32(struct tuple *tuple, uint32_t i);
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as a NUL-terminated string - returns a string of up to 256 bytes.
+ */
+const char *
+tuple_field_cstr(struct tuple *tuple, uint32_t i);
+
+/**
  * @brief Tuple Interator
  */
 struct tuple_iterator {
@@ -227,6 +251,8 @@ struct tuple_iterator {
 	/** Always points to the beginning of the next field. */
 	const char *pos;
 	/** @endcond **/
+	/** field no of the next field. */
+	int fieldno;
 };
 
 /**
@@ -251,6 +277,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
 {
 	it->tuple = tuple;
 	it->pos = tuple->data;
+	it->fieldno = 0;
 }
 
 /**
@@ -269,6 +296,22 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no, uint32_t *len);
  */
 const char *
 tuple_next(struct tuple_iterator *it, uint32_t *len);
+
+/**
+ * A convenience shortcut for the data dictionary - get next field
+ * from iterator as uint32_t or raise an error if there is
+ * no next field.
+ */
+uint32_t
+tuple_next_u32(struct tuple_iterator *it);
+
+/**
+ * A convenience shortcut for the data dictionary - get next field
+ * from iterator as a C string or raise an error if there is no
+ * next field.
+ */
+const char *
+tuple_next_cstr(struct tuple_iterator *it);
 
 /**
  * @brief Print a tuple in yaml-compatible mode to tbuf:
@@ -304,7 +347,6 @@ tuple_range_size(const char **begin, const char *end, uint32_t count)
 	return *begin - start;
 }
 
-void tuple_delete(struct tuple *tuple);
 
 /**
  * @brief Compare two tuples using field by field using key definition

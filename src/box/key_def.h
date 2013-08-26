@@ -113,6 +113,35 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
 	def->parts[part_no].type = type;
 }
 
+/** Compare two key part arrays.
+ *
+ * This function is used to find out whether alteration
+ * of an index has changed it substantially enough to warrant
+ * a rebuild or not. For example, change of index id is
+ * not a substantial change, whereas change of index type
+ * or key parts requires a rebuild.
+ *
+ * One key part is considered to be greater than the other if:
+ * - its fieldno is greater
+ * - given the same fieldno, NUM < NUM64 < STRING
+ *   (coarsely speaking, based on field_type_maxlen()).
+ *
+ * A key part array is considered greater than the other if all
+ * its key parts are greater, or, all common key parts are equal
+ * but there are additional parts in the bigger array.
+ */
+int
+key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
+	     const struct key_part *parts2, uint32_t part_count2);
+
+/**
+ * One key definition is greater than the other if it's id is
+ * greater, it's index type is greater (HASH < TREE < BITSET)
+ * or its key part array is greater.
+ */
+int
+key_def_cmp(const struct key_def *key1, const struct key_def *key2);
+
 /* Destroy and free a key_def. */
 void
 key_def_delete(struct key_def *def);
@@ -124,6 +153,19 @@ key_list_add_key(struct rlist *key_list, struct key_def *key)
 	rlist_add_entry(key_list, key, link);
 }
 
+/** Remove a key from the list of keys. */
+void
+key_list_del_key(struct rlist *key_list, uint32_t id);
+
+/**
+ * Check a key definition for violation of various limits.
+ *
+ * @param id        space id
+ * @param key_def   key_def
+ * @param type_str  type name (to produce a nice error)
+ */
+void
+key_def_check(uint32_t id, struct key_def *key_def);
 
 /** Space metadata. */
 struct space_def {
