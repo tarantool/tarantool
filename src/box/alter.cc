@@ -604,6 +604,7 @@ AddIndex::prepare(struct alter_space *alter)
 
 	if (drop == NULL ||
 	    drop->old_key_def->type != new_key_def->type ||
+	    drop->old_key_def->is_unique != new_key_def->is_unique ||
 	    key_part_cmp(drop->old_key_def->parts,
 			 drop->old_key_def->part_count,
 			 new_key_def->parts,
