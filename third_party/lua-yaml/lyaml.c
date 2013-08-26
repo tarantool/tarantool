@@ -98,8 +98,8 @@ static void generate_error_message(struct lua_yaml_loader *loader) {
 
    if (loader->parser.problem_mark.line || loader->parser.problem_mark.column) {
       snprintf(buf, sizeof(buf), ", line: %d, column: %d\n",
-         loader->parser.problem_mark.line + 1,
-         loader->parser.problem_mark.column + 1);
+         (int) loader->parser.problem_mark.line + 1,
+         (int) loader->parser.problem_mark.column + 1);
       luaL_addstring(&b, buf);
    } else {
       luaL_addstring(&b, "\n");
@@ -108,8 +108,8 @@ static void generate_error_message(struct lua_yaml_loader *loader) {
    if (loader->parser.context) {
       snprintf(buf, sizeof(buf), "%s at line: %d, column: %d\n",
          loader->parser.context,
-         loader->parser.context_mark.line + 1,
-         loader->parser.context_mark.column + 1);
+         (int) loader->parser.context_mark.line + 1,
+         (int) loader->parser.context_mark.column + 1);
       luaL_addstring(&b, buf);
    }
 
@@ -610,7 +610,7 @@ static void dump_document(struct lua_yaml_dumper *dumper) {
    yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
-static int append_output(void *arg, unsigned char *buf, unsigned int len) {
+static int append_output(void *arg, unsigned char *buf, size_t len) {
    struct lua_yaml_dumper *dumper = (struct lua_yaml_dumper *)arg;
    luaL_addlstring(&dumper->yamlbuf, (char *)buf, len);
    return 1;
