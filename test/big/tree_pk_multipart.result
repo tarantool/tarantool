@@ -1,396 +1,451 @@
 --
 -- Insert test
 --
-box.space[9]:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+0: {0, 'tweedledum'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
+-- Multipart primary key (sender nickname, receiver nickname, message id)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 3, 0, 'str', 1, 'str', 2, 'num')
 ---
- - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+0: {0, 'primary', 1701147252, 1, 3, 0, 'str', 1, 'str', 2, 'num'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
+space = box.space[0]
 ---
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 1, 'Then what do they call it?')
+space:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
 ---
- - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
+space:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
 ---
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
+space:insert('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
 ---
- - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 3, 'That`s right.')
+space:insert('Jules', 'Vincent', 1, 'Then what do they call it?')
 ---
- - 'Vincent': {'Jules', 3, 'That`s right.'}
+'Jules': {'Vincent', 1, 'Then what do they call it?'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
+space:insert('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
 ---
- - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
+space:insert('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
 ---
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 4, '`Le Big Mac!`')
+space:insert('Vincent', 'Jules', 3, 'That`s right.')
 ---
- - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+'Vincent': {'Jules', 3, 'That`s right.'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 5, 'Ha, ha, ha.')
+space:insert('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
 ---
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
 ...
-box.space[9]:insert('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
+space:insert('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
 ---
- - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
 ...
-box.space[9]:insert('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
+space:insert('Jules', 'Vincent', 4, '`Le Big Mac!`')
 ---
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+'Jules': {'Vincent', 4, '`Le Big Mac!`'}
 ...
-box.space[9]:insert('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
+space:insert('Vincent', 'Jules', 5, 'Ha, ha, ha.')
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
 ...
-box.space[9]:insert('Vincent', 'The Wolf!', 0, 'A please would be nice.')
+space:insert('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
 ...
-box.space[9]:insert('The Wolf!', 'Vincent', 1, 'Come again?')
+space:insert('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
 ---
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
 ...
-box.space[9]:insert('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
+space:insert('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
 ...
-box.space[9]:insert('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
+space:insert('Vincent', 'The Wolf!', 0, 'A please would be nice.')
 ---
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
 ...
-box.space[9]:insert('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
+space:insert('The Wolf!', 'Vincent', 1, 'Come again?')
 ---
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+'The Wolf!': {'Vincent', 1, 'Come again?'}
 ...
-box.space[9]:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
+space:insert('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
 ---
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+...
+space:insert('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
+---
+'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+...
+space:insert('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
+---
+'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+...
+space:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
+---
+'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 --
 -- Select test
 --
 -- Select by one entry
-box.select(9, 0, 'Vincent', 'Jules', 0)
+space:select(0, 'Vincent', 'Jules', 0)
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 0)
+space:select(0, 'Jules', 'Vincent', 0)
 ---
- - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 1)
+space:select(0, 'Vincent', 'Jules', 1)
 ---
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 1)
+space:select(0, 'Jules', 'Vincent', 1)
 ---
- - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+'Jules': {'Vincent', 1, 'Then what do they call it?'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 2)
+space:select(0, 'Vincent', 'Jules', 2)
 ---
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 2)
+space:select(0, 'Jules', 'Vincent', 2)
 ---
- - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 3)
+space:select(0, 'Vincent', 'Jules', 3)
 ---
- - 'Vincent': {'Jules', 3, 'That`s right.'}
+'Vincent': {'Jules', 3, 'That`s right.'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 3)
+space:select(0, 'Jules', 'Vincent', 3)
 ---
- - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 4)
+space:select(0, 'Vincent', 'Jules', 4)
 ---
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 4)
+space:select(0, 'Jules', 'Vincent', 4)
 ---
- - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+'Jules': {'Vincent', 4, '`Le Big Mac!`'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 5)
+space:select(0, 'Vincent', 'Jules', 5)
 ---
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
 ...
-box.select(9, 0, 'Jules', 'Vincent', 5)
+space:select(0, 'Jules', 'Vincent', 5)
 ---
- - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
 ...
-box.select(9, 0, 'Vincent', 'Jules', 6)
+space:select(0, 'Vincent', 'Jules', 6)
 ---
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
 ...
-box.select(9, 0, 'The Wolf!', 'Vincent', 0)
+space:select(0, 'The Wolf!', 'Vincent', 0)
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
 ...
-box.select(9, 0, 'Vincent', 'The Wolf!', 0)
+space:select(0, 'Vincent', 'The Wolf!', 0)
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
 ...
-box.select(9, 0, 'The Wolf!', 'Vincent', 1)
+space:select(0, 'The Wolf!', 'Vincent', 1)
 ---
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+'The Wolf!': {'Vincent', 1, 'Come again?'}
 ...
-box.select(9, 0, 'Vincent', 'The Wolf!', 1)
+space:select(0, 'Vincent', 'The Wolf!', 1)
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
 ...
-box.select(9, 0, 'The Wolf!', 'Vincent', 2)
+space:select(0, 'The Wolf!', 'Vincent', 2)
 ---
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
-box.select(9, 0, 'The Wolf!', 'Vincent', 3)
+space:select(0, 'The Wolf!', 'Vincent', 3)
 ---
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
 ...
-box.select(9, 0, 'Vincent', 'The Wolf!', 2)
+space:select(0, 'Vincent', 'The Wolf!', 2)
 ---
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 -- Select all messages from Vincent to Jules
-box.select(9, 0, 'Vincent', 'Jules')
+{space:select(0, 'Vincent', 'Jules')}
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
- - 'Vincent': {'Jules', 3, 'That`s right.'}
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+-'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+-'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+-'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+-'Vincent': {'Jules', 3, 'That`s right.'}
+-'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+-'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+-'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
 ...
 -- Select all messages from Jules to Vincent
-box.select(9, 0, 'Jules', 'Vincent')
+{space:select(0, 'Jules', 'Vincent')}
 ---
- - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
- - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
- - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
- - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
- - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
- - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+-'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+-'Jules': {'Vincent', 1, 'Then what do they call it?'}
+-'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+-'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+-'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+-'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
 ...
 -- Select all messages from Vincent to The Wolf
-box.select(9, 0, 'Vincent', 'The Wolf!')
+{space:select(0, 'Vincent', 'The Wolf!')}
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+-'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+-'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+-'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 -- Select all messages from The Wolf to Vincent
-box.select(9, 0, 'The Wolf!', 'Vincent')
+{space:select(0, 'The Wolf!', 'Vincent')}
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+-'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+-'The Wolf!': {'Vincent', 1, 'Come again?'}
+-'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+-'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
 ...
 -- Select all Vincent messages
-box.select(9, 0, 'Vincent')
+{space:select(0, 'Vincent')}
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
- - 'Vincent': {'Jules', 3, 'That`s right.'}
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+-'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+-'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
+-'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+-'Vincent': {'Jules', 3, 'That`s right.'}
+-'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+-'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+-'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+-'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+-'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+-'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 --
 -- Delete test
 --
 -- Delete some messages from the The Wolf and Vincent dialog
-box.delete(9, 'The Wolf!', 'Vincent', 0)
+space:delete('The Wolf!', 'Vincent', 0)
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
 ...
-box.delete(9, 'The Wolf!', 'Vincent', 3)
+space:delete('The Wolf!', 'Vincent', 3)
 ---
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
 ...
-box.delete(9, 'Vincent', 'The Wolf!', 0)
+space:delete('Vincent', 'The Wolf!', 0)
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
 ...
-box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
+space:update({'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
 ---
- - 'Updated': {'The Wolf!', 1, 'I said a please would be nice.', 'New'}
+'Updated': {'The Wolf!', 1, 'I said a please would be nice.', 'New'}
 ...
-box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
+space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
 ...
 -- Checking Vincent's last messages
-box.select(9, 0, 'Vincent', 'The Wolf!')
+{space:select(0, 'Vincent', 'The Wolf!')}
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+-'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+-'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 -- Checking The Wolf's last messages
-box.select(9, 0, 'The Wolf!', 'Vincent')
+{space:select(0, 'The Wolf!', 'Vincent')}
 ---
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+-'The Wolf!': {'Vincent', 1, 'Come again?'}
+-'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
 -- try to delete nonexistent message
-box.delete(9, 'Vincent', 'The Wolf!', 3)
+space:delete('Vincent', 'The Wolf!', 3)
 ---
 ...
 -- try to delete patrial defined key
-box.delete(9, 'Vincent', 'The Wolf!')
+space:delete('Vincent', 'The Wolf!')
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 2)'
+error: Invalid key part count in an exact match (expected 3, got 2)
 ...
 -- try to delete by invalid key
-box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
+space:delete('The Wolf!', 'Vincent', 1, 'Come again?')
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 4)'
+error: Invalid key part count in an exact match (expected 3, got 4)
 ...
 --
 -- Update test
 --
-box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
+space:update({'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 ---
- - 'The Wolf!': {'Vincent', 1, '<ooops>'}
+'The Wolf!': {'Vincent', 1, '<ooops>'}
 ...
-box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
+space:update({'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 ---
- - 'Vincent': {'The Wolf!', 1, '<ooops>'}
+'Vincent': {'The Wolf!', 1, '<ooops>'}
 ...
 -- Checking Vincent's last messages
-box.select(9, 0, 'Vincent', 'The Wolf!')
+{space:select(0, 'Vincent', 'The Wolf!')}
 ---
- - 'Vincent': {'The Wolf!', 1, '<ooops>'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+-'Vincent': {'The Wolf!', 1, '<ooops>'}
+-'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ...
 -- Checking The Wolf's last messages
-box.select(9, 0, 'The Wolf!', 'Vincent')
+{space:select(0, 'The Wolf!', 'Vincent')}
 ---
- - 'The Wolf!': {'Vincent', 1, '<ooops>'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+-'The Wolf!': {'Vincent', 1, '<ooops>'}
+-'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ...
 -- try to update a nonexistent message
-box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
+space:update({'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
 ---
 ...
 -- try to update patrial defined key
-box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
+space:update({'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 2)'
+error: Invalid key part count in an exact match (expected 3, got 2)
 ...
 -- try to update by invalid key
-box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
+space:update({'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 4)'
+error: Invalid key part count in an exact match (expected 3, got 4)
 ...
-box.space[9]:len()
+space:len()
 ---
- - 17
+17
 ...
-box.space[9]:truncate()
+space:truncate()
 ---
 ...
-box.space[9]:len()
+space:len()
 ---
- - 0
+0
 ...
 -- A test case for Bug#1051006 Tree iterators return garbage
 --if an index is modified between calls
-box.space[16]:insert('a', 'a', 'a')
+--
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
- - 'a': {'a', 'a'}
+0: {0, 'primary', 1701147252, 1, 1, 0, 'str'}
 ...
-box.space[16]:insert('d', 'd', 'd')
+box.replace(box.schema.INDEX_ID, 0, 1, 'second', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
- - 'd': {'d', 'd'}
+0: {1, 'second', 1701147252, 1, 2, 1, 'str', 2, 'str'}
 ...
-box.space[16]:insert('e', 'e', 'e')
+space = box.space[0]
 ---
- - 'e': {'e', 'e'}
 ...
-box.space[16]:insert('b', 'b', 'b')
+space:insert('a', 'a', 'a')
 ---
- - 'b': {'b', 'b'}
+'a': {'a', 'a'}
 ...
-box.space[16]:insert('c', 'c', 'c')
+space:insert('d', 'd', 'd')
 ---
- - 'c': {'c', 'c'}
+'d': {'d', 'd'}
+...
+space:insert('e', 'e', 'e')
+---
+'e': {'e', 'e'}
+...
+space:insert('b', 'b', 'b')
+---
+'b': {'b', 'b'}
+...
+space:insert('c', 'c', 'c')
+---
+'c': {'c', 'c'}
+...
+t = {}
+---
 ...
 -- setopt delimiter ';'
 for i = 1, 2 do
-    k,v = box.space[16].index[1]:next(k)
-    print(' - ', v)
+    k,v = space.index[1]:next(k)
+    table.insert(t, v)
 end;
 ---
- - 'a': {'a', 'a'}
- - 'b': {'b', 'b'}
-...
-box.space[16]:truncate();
----
-...
-v;
----
- - 'b': {'b', 'b'}
-...
-collectgarbage('collect');
----
- - 0
-...
-v;
----
- - 'b': {'b', 'b'}
-...
-k,v = box.space[16].index[1]:next(k);
----
-...
-v;
----
- - nil
-...
-collectgarbage('collect');
----
- - 0
-...
-v;
----
- - nil
-...
-for i = 1, 3 do
-    k,v = box.space[16].index[1]:next(k)
-    print(' - ', v)
-end;
----
- - nil
- - nil
- - nil
 ...
 -- setopt delimiter ''
--- Bug #1082356
-box.space[19]:insert(1, 1)
+t
 ---
-error: 'Illegal parameters, tuple must have all indexed fields'
+-'a': {'a', 'a'}
+-'b': {'b', 'b'}
 ...
-box.replace_if_exists(19, 1, 1)
+space:truncate()
 ---
-error: 'Illegal parameters, tuple must have all indexed fields'
+...
+v
+---
+'b': {'b', 'b'}
+...
+collectgarbage('collect')
+---
+0
+...
+v
+---
+'b': {'b', 'b'}
+...
+k,v = space.index[1]:next(k)
+---
+...
+v
+---
+null
+...
+collectgarbage('collect')
+---
+0
+...
+v
+---
+null
+...
+t = {}
+---
+...
+-- setopt delimiter ';'
+for i = 1, 3 do
+    k,v = space.index[1]:next(k)
+    table.insert(t, v)
+end;
+---
+...
+-- setopt delimiter ''
+t
+---
+{}
+...
+space:drop()
+---
+...
+-- Bug #1082356
+-- Space #19, https://bugs.launchpad.net/tarantool/+bug/1082356
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+0: {0, 'tweedledum'}
+...
+-- Multipart primary key (sender nickname, receiver nickname, message id)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 0, 'num', 2, 'num')
+---
+0: {0, 'primary', 1701147252, 1, 2, 0, 'num', 2, 'num'}
+...
+space = box.space[0]
+---
+...
+space:insert(1, 1)
+---
+error: Illegal parameters, tuple must have all indexed fields
+...
+space:replace_if_exists(1, 1)
+---
+error: Illegal parameters, tuple must have all indexed fields
+...
+space:drop()
+---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
