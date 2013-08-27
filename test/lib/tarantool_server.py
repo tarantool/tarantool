@@ -471,6 +471,17 @@ class TarantoolServer(Server):
                 if test.name.find(i) != -1:
                     return True
             return False
-        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
-        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
-        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
+
+        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.py"))):
+            for test_pattern in test_suite.args.tests:
+                if test_name.find(test_pattern) != -1:
+                    test_suite.tests.append(PythonTest(test_name, test_suite.args, test_suite.ini))
+
+        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.lua"))):
+            for test_pattern in test_suite.args.tests:
+                if test_name.find(test_pattern) != -1:
+                    test_suite.tests.append(LuaTest(test_name, test_suite.args, test_suite.ini))
+
+#        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
+#        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
+#        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
