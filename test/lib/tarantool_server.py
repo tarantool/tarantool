@@ -65,11 +65,11 @@ class LuaTest(FuncTest):
             if not cmd:
                 cmd = StringIO.StringIO()
             if line.find('--') == 0:
-                matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line, re.DOTALL)
+                matched = re.match("--\s*setopt\s+(.*)", line, re.DOTALL)
                 if matched:
-                    matched = re.match("--\s*setopt\s+(\S+)\s+(.*)\s*", line.strip(), re.DOTALL)
-                    if re.match('delim(i(t(e(r)?)?)?)?', matched.group(1)):
-                        delimiter = matched.group(2)[1:-1]
+                    command = re.split('\s*=\s*|\s+', matched.group(1), maxsplit=1)
+                    if re.match('delim(i(t(e(r)?)?)?)?', command[0]):
+                        delimiter = command[1].strip()[1:-1]
                 sys.stdout.write(line)
             else:
                 if not delimiter:
@@ -471,6 +471,17 @@ class TarantoolServer(Server):
                 if test.name.find(i) != -1:
                     return True
             return False
-        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
-        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
-        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
+
+        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.py"))):
+            for test_pattern in test_suite.args.tests:
+                if test_name.find(test_pattern) != -1:
+                    test_suite.tests.append(PythonTest(test_name, test_suite.args, test_suite.ini))
+
+        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.lua"))):
+            for test_pattern in test_suite.args.tests:
+                if test_name.find(test_pattern) != -1:
+                    test_suite.tests.append(LuaTest(test_name, test_suite.args, test_suite.ini))
+
+#        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
+#        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
+#        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
