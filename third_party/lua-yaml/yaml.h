@@ -165,6 +165,9 @@ typedef enum yaml_scalar_style_e {
     /** Let the emitter choose the style. */
     YAML_ANY_SCALAR_STYLE,
 
+    /** The verbatim scalar style. */
+    YAML_VERBATIM_SCALAR_STYLE,
+
     /** The plain scalar style. */
     YAML_PLAIN_SCALAR_STYLE,
 

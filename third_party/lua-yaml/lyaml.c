@@ -439,7 +439,7 @@ static int dump_scalar(struct lua_yaml_dumper *dumper) {
    } else if (type == LUA_TUSERDATA) {
 		str = dump_tostring(dumper->L, -1);
 		len = strlen(str);
-		style = YAML_DOUBLE_QUOTED_SCALAR_STYLE;
+		style = YAML_VERBATIM_SCALAR_STYLE;
    } else if (type == LUA_TFUNCTION) {
 		str = dump_tostring(dumper->L, -1);
 		len = strlen(str);
