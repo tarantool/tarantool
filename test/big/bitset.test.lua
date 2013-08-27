@@ -1,6 +1,8 @@
 dofile('utils.lua')
 dofile('bitset.lua')
 
+create_space()
+
 ------------------------------------------------------------------------------
 -- BitsetIndex: insert/delete
 ------------------------------------------------------------------------------
@@ -64,4 +66,5 @@ dump(box.index.BITS_ANY_SET, 7)
 dump(box.index.BITS_ANY_SET, 84)
 dump(box.index.BITS_ANY_SET, 113)
 
+drop_space()
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

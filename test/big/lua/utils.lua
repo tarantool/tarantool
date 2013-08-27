@@ -30,10 +30,10 @@ function iterate(space_no, index_no, f1, f2, ...)
 		for f = f1, f2-1, 1 do tk = (tk..(get_field(v, f))..'$'); end;
 		table.insert(values, tk);
 		if pkeys[pk] ~= nil then
-			print('Duplicate tuple (primary key): ', pk);
+			error('Duplicate tuple (primary key): '..pk);
 		end
 		if box.space[space_no].index[index_no].unique and tkeys[tk] ~= nil then
-			print('Duplicate tuple (test key): ', tk);
+			error('Duplicate tuple (test key): '..tk);
 		end;
 		tkeys[pk] = true;
 		tkeys[tk] = true;
@@ -41,10 +41,9 @@ function iterate(space_no, index_no, f1, f2, ...)
 
 	if not sorted then
 		table.sort(values);
-		print('sorted output');
 	end;
 
-	for i,v in ipairs(values) do print(v) end;
+	return values
 end
 
 function arithmetic(d, count)

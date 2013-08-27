@@ -1,5 +1,11 @@
-local SPACE_NO = 24
+local SPACE_NO = 0 
 local INDEX_NO = 1
+
+function create_space()
+    box.insert(box.schema.SPACE_ID, SPACE_NO, 0, 'tweedledum')
+    box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+    box.insert(box.schema.INDEX_ID, 0, INDEX_NO, 'bitset', 'bitset', 0, 1, 1, 'num')
+end
 
 function fill(...)
 	local nums = table.generate(arithmetic(...));
@@ -21,8 +27,12 @@ function clear()
 	box.space[SPACE_NO]:truncate()
 end
 
+function drop_space()
+	box.space[SPACE_NO]:drop()
+end
+
 function dump(...)
-	iterate(SPACE_NO, INDEX_NO, 1, 2, ...);
+	return iterate(SPACE_NO, INDEX_NO, 1, 2, ...);
 end
 
 function test_insert_delete(n)
@@ -35,5 +45,5 @@ function test_insert_delete(n)
 	fill(1, n);
 
 	for _, v in ipairs(t) do delete(v, n / v) end
-	dump(box.index.BITS_ALL)
+	return dump(box.index.BITS_ALL)
 end
