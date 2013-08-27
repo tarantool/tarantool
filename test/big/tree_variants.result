@@ -1,172 +1,210 @@
-box.space[6]:insert(0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000)
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
+0: {0, 'tweedledum'}
 ...
-box.space[6]:insert(1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
- - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
+0: {0, 'primary', 1701147252, 1, 1, 0, 'num'}
 ...
-box.space[6]:insert(2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002)
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 1, 1, 'num64')
 ---
- - 2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+0: {1, 12649, 1701147252, 1, 1, 1, 'num64'}
 ...
-box.space[6]:insert(3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003)
+box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 0, 1, 2, 'num64')
 ---
- - 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+0: {2, 12905, 1701147252, 0, 1, 2, 'num64'}
 ...
-box.space[6]:insert(4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004)
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 3, 'str', 4, 'str')
 ---
- - 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+0: {3, 13161, 1701147252, 0, 2, 3, 'str', 4, 'str'}
 ...
-box.space[6]:insert(5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005)
+box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'tree', 0, 2, 6, 'str', 5, 'str')
 ---
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+0: {4, 13417, 1701147252, 0, 2, 6, 'str', 5, 'str'}
 ...
-box.space[6]:insert(6, '00000006', '00000400', 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
+box.insert(box.schema.INDEX_ID, 0, 5, 'i5', 'tree', 0, 1, 8, 'num')
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+0: {5, 13673, 1701147252, 0, 1, 8, 'num'}
 ...
-box.space[6]:insert(7, '00000007', '00000400', 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
+box.insert(box.schema.INDEX_ID, 0, 6, 'i6', 'tree', 1, 5, 6, 'str', 5, 'str', 3, 'str', 4, 'str', 8, 'num')
 ---
- - 7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+0: {6, 13929, 1701147252, 1, 5, 6, 'str', 5, 'str', 3, 'str', 4, 'str', 8, 'num'}
 ...
-box.space[6]:insert(8, '00000008', '00000400', 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
+space = box.space[0]
 ---
- - 8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 ...
-box.space[6]:insert(9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
+space:insert(0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000)
 ---
- - 9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
 ...
-box.space[6]:select(0, 1)
+space:insert(1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001)
 ---
- - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
+1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
 ...
-box.space[6]:select(1,'00000002')
+space:insert(2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002)
 ---
- - 2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
 ...
-box.space[6]:select(2,'00000300')
+space:insert(3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003)
 ---
- - 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
- - 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
 ...
-box.space[6]:select(3, 'Joe', 'Sixpack')
+space:insert(4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004)
 ---
- - 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
- - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
- - 2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
- - 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
- - 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
 ...
-box.space[6]:select(3, 'John')
+space:insert(5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005)
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
 ...
-box.space[6]:select(4, 'A Pipe')
+space:insert(6, '00000006', '00000400', 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
 ...
-box.space[6]:select(4, 'Miller Genuine Draft', 'Drinks')
+space:insert(7, '00000007', '00000400', 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
 ---
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
 ...
-box.space[6]:select(5, 2007)
+space:insert(8, '00000008', '00000400', 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
 ---
- - 7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 ...
-box.space[6]:select(6, 'Miller Genuine Draft', 'Drinks')
+space:insert(9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
 ---
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
-box.space[6]:delete(6)
+space:select(0, 1)
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
 ...
-box.space[6]:delete(7)
+space:select(1,'00000002')
 ---
- - 7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
 ...
-box.space[6]:delete(8)
+{space:select(2,'00000300')}
 ---
- - 8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+-4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+-5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
 ...
-box.space[6]:delete(9)
+{space:select(3, 'Joe', 'Sixpack')}
 ---
- - 9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+-0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
+-1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
+-2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+-3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+-4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+-5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
 ...
-box.space[6]:insert(6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
+{space:select(3, 'John')}
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+-6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+-7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+-8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
-box.space[6]:insert(7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
+{space:select(4, 'A Pipe')}
 ---
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+-6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
 ...
-box.space[6]:insert(8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
+{space:select(4, 'Miller Genuine Draft', 'Drinks')}
 ---
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
 ...
-box.space[6]:insert(9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
+space:select(5, 2007)
 ---
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
 ...
-box.space[6]:select(1, 6ULL)
+space:select(6, 'Miller Genuine Draft', 'Drinks')
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
 ...
-box.space[6]:select(1, 6)
+space:delete(6)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
 ...
-box.space[6]:select(2, 400ULL)
+space:delete(7)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
 ...
-box.space[6]:select(2, 400)
+space:delete(8)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
 ...
-for k,v in box.space[6]:pairs() do print(' - ', v) end
+space:delete(9)
 ---
- - 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
- - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
- - 2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
- - 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
- - 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+space:insert(6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
+---
+6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+space:insert(7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
+---
+7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+...
+space:insert(8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
+---
+8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+...
+space:insert(9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
+---
+9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+space:select(1, 6ULL)
+---
+6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+space:select(1, 6)
+---
+6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+...
+{space:select(2, 400ULL)}
+---
+-6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+-7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+-8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+{space:select(2, 400)}
+---
+-6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+-7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+-8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+...
+{space:select(0)}
+---
+-0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
+-1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
+-2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
+-3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
+-4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
+-5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+-6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+-7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+-8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+-9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
 -- Test incorrect keys - supplied key field type does not match index type
 -- https://bugs.launchpad.net/tarantool/+bug/1072624
-box.space[6]:insert('', '00000001', '00000002', '', '', '', '', '', 0)
+space:insert('', '00000001', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
-box.space[6]:insert('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
+space:insert('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
-box.space[6]:insert(1, '', '00000002', '', '', '', '', '', 0)
+space:insert(1, '', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
 ...
-box.space[6]:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
+space:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
 ---
 error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
+...
+space:drop()
+---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
