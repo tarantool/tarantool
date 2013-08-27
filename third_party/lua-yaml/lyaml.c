@@ -436,15 +436,18 @@ static int dump_scalar(struct lua_yaml_dumper *dumper) {
 			len -= 2;
 			break;
 		}
-   } else if (type == LUA_TUSERDATA || type == LUA_TFUNCTION) {
+   } else if (type == LUA_TUSERDATA) {
+		str = dump_tostring(dumper->L, -1);
+		len = strlen(str);
+		style = YAML_DOUBLE_QUOTED_SCALAR_STYLE;
+   } else if (type == LUA_TFUNCTION) {
 		str = dump_tostring(dumper->L, -1);
 		len = strlen(str);
    }
-
-   yaml_scalar_event_initialize(
-      &ev, NULL, tag, (unsigned char *)str, len,
+   yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
       !is_binary, !is_binary, style);
-   if (is_binary) lua_pop(dumper->L, 1);
+   if (is_binary)
+      lua_pop(dumper->L, 1);
    return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
