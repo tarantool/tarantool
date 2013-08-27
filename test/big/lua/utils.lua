@@ -112,13 +112,3 @@ function box.tuple.to_string(tuple, yaml)
     return ans
 end;
 
---replace if tuple already presented func
-function box.replace_if_exists(space, ...)
-    local field_count = select('#', ...)
-        return box.process(13,
-            box.pack('iiV',
-                tonumber(space),
-                bit.bor(box.flags.BOX_RETURN_TUPLE,
-                    box.flags.BOX_REPLACE),
-                field_count, ...))
-end;

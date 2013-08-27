@@ -1,11 +1,14 @@
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
---- '0: {0, ''tweedledum''}'
+---
+'0: {0, ''tweedledum''}'
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
---- '0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
+---
+'0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
---- '0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
+---
+'0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
 ...
 #
 # A test case for Bug#729758
@@ -80,7 +83,8 @@ box.space[0]:truncate()
 # Test composite keys with trees
 #
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 1, 2, 1, 'str', 2, 'str')
---- '0: {1, ''secondary'', 1701147252, 1, 2, 1, ''str'', 2, ''str''}'
+---
+'0: {1, ''secondary'', 1701147252, 1, 2, 1, ''str'', 2, ''str''}'
 ...
 insert into t0 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
@@ -148,10 +152,12 @@ box.space[0]:truncate()
 ---
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
---- '0: {0, ''primary'', 1701147252, 1, 1, 0, ''num64''}'
+---
+'0: {0, ''primary'', 1701147252, 1, 1, 0, ''num64''}'
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 2, 1, 'str', 2, 'str')
---- '0: {1, ''secondary'', 1701147252, 0, 2, 1, ''str'', 2, ''str''}'
+---
+'0: {1, ''secondary'', 1701147252, 0, 2, 1, ''str'', 2, ''str''}'
 ...
 insert into t0 values ('01234567', 'part1', 'part2')
 Insert OK, 1 row affected
@@ -219,16 +225,19 @@ Delete OK, 1 row affected
 delete from t0 where k0='41234567'
 Delete OK, 1 row affected
 { box.space[0]:select(0) }
---- {}
+---
+{}
 ...
 box.space[0]:truncate()
 ---
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
---- '0: {0, ''primary'', 1752392040, 1, 1, 0, ''num''}'
+---
+'0: {0, ''primary'', 1752392040, 1, 1, 0, ''num''}'
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 1, 'str')
---- '0: {1, ''secondary'', 1752392040, 1, 1, 1, ''str''}'
+---
+'0: {1, ''secondary'', 1752392040, 1, 1, 1, ''str''}'
 ...
 insert into t0 values (1, 'hello')
 Insert OK, 1 row affected
@@ -263,10 +272,12 @@ box.space[0]:truncate()
 #
 
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
---- '0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
+---
+'0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
---- '0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
+---
+'0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
 ...
 insert into t0 values ('Spears', 'Britney')
 Insert OK, 1 row affected
@@ -385,10 +396,12 @@ box.space[0].index[0].idx:max()
 error: HASH does not support max()
 ...
 box.space[0].index[1].idx:min()
---- '1: {''Aardvark ''}'
+---
+'1: {''Aardvark ''}'
 ...
 box.space[0].index[1].idx:max()
---- '3: {''Creature ''}'
+---
+'3: {''Creature ''}'
 ...
 delete from t0 where k0=1
 Delete OK, 1 row affected

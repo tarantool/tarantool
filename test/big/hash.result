@@ -7,25 +7,36 @@ dofile('utils.lua')
 -------------------------------------------------------------------------------
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+'0: {0, ''tweedledum''}'
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+'0: {0, ''primary'', 1752392040, 1, 1, 0, ''num''}'
+...
+hash = box.space[0]
+---
+...
 -- Insert valid fields
-box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')
+hash:insert(0, 'value1 v1.0', 'value2 v1.0')
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0')
+hash:insert(1, 'value1 v1.0', 'value2 v1.0')
 ---
  - 1: {'value1 v1.0', 'value2 v1.0'}
 ...
-box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0')
+hash:insert(2, 'value1 v1.0', 'value2 v1.0')
 ---
  - 2: {'value1 v1.0', 'value2 v1.0'}
 ...
-box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')
+hash:insert(3, 'value1 v1.0', 'value2 v1.0')
 ---
  - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
 -- Insert invalid fields
-box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
+hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
@@ -33,20 +44,20 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- 32-bit hash replace fields tests
 -------------------------------------------------------------------------------
 -- Replace valid fields
-box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')
+hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
  - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72')
+hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
  - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')
+hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
  - 2: {'value1 v1.43', 'value2 1.92'}
 ...
 -- Replace invalid fields
-box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
 error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
@@ -54,34 +65,34 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- 32-bit hash select fields test
 -------------------------------------------------------------------------------
 -- select by valid keys
-box.space[10]:select(0, 0)
+hash:select(0, 0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-box.space[10]:select(0, 1)
+hash:select(0, 1)
 ---
  - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-box.space[10]:select(0, 2)
+hash:select(0, 2)
 ---
  - 2: {'value1 v1.43', 'value2 1.92'}
 ...
-box.space[10]:select(0, 3)
+hash:select(0, 3)
 ---
  - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-box.space[10]:select(0, 4)
+hash:select(0, 4)
 ---
 ...
-box.space[10]:select(0, 5)
+hash:select(0, 5)
 ---
 ...
 -- select by invalid keys
-box.space[10]:select(0, 'invalid key')
+hash:select(0, 'invalid key')
 ---
 error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-box.space[10]:select(0, 1, 2)
+hash:select(0, 1, 2)
 ---
 error: 'Invalid key part count (expected [0..1], got 2)'
 ...
@@ -89,34 +100,34 @@ error: 'Invalid key part count (expected [0..1], got 2)'
 -- 32-bit hash delete fields test
 -------------------------------------------------------------------------------
 -- delete by valid keys
-box.space[10]:delete(0)
+hash:delete(0)
 ---
  - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-box.space[10]:delete(1)
+hash:delete(1)
 ---
  - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-box.space[10]:delete(2)
+hash:delete(2)
 ---
  - 2: {'value1 v1.43', 'value2 1.92'}
 ...
-box.space[10]:delete(3)
+hash:delete(3)
 ---
  - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-box.space[10]:delete(4)
+hash:delete(4)
 ---
 ...
-box.space[10]:delete(5)
+hash:delete(5)
 ---
 ...
 -- delete by invalid keys
-box.space[10]:delete('invalid key')
+hash:delete('invalid key')
 ---
 error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-box.space[10]:delete(1, 2)
+hash:delete(1, 2)
 ---
 error: 'Invalid key part count in an exact match (expected 1, got 2)'
 ...
@@ -431,7 +442,7 @@ box.space[12]:delete('key 1', 'key 2')
 error: 'Invalid key part count in an exact match (expected 1, got 2)'
 ...
 -- clean-up
-box.space[10]:truncate()
+hash:truncate()
 ---
 ...
 box.space[11]:truncate()
