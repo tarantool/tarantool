@@ -656,12 +656,26 @@ tarantool_lua(struct lua_State *L,
 		lua_replace(L, 1);
 		assert(lua_gettop(L) == 1);
 	}
-	/* Convert Lua stack to YAML and append to the given tbuf. */
+	/* Convert Lua stack to YAML and append to the given tbuf */
 	int top = lua_gettop(L);
 	if (top == 0) {
-		tbuf_printf(out, "---\n");
+		tbuf_printf(out, "---\n...\n");
 		lua_settop(L, 0);
 		return;
+	}
+	/* convert all tuples to tables */
+	for (int i = 1; i <= top; i++) {
+		if (lua_getmetatable(L, i) == 0)
+			continue;
+		luaL_getmetatable(L, "box.tuple");
+		int is_tuple = 0;
+		if (lua_equal(L, -1, -2))
+			is_tuple = 1;
+		lua_pop(L, 2);
+		if (is_tuple) {
+			luaL_callmeta(L, i, "totable");
+			lua_replace(L, i);
+		}
 	}
 	yamlL_encode(L);
 	lua_replace(L, 1);

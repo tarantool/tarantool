@@ -68,17 +68,7 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 			return -1;
 	}
 	eol[0] = '\0';
-
 	tarantool_lua(L, out, in->pos);
-
-	/* put end-of-document if the output doesn't has one */
-	int eof =
-	((out->size >= 4 && !memcmp(out->data + out->size - 4, "...\n", 4)) ||
-	 (out->size >= 5 && !memcmp(out->data + out->size - 5, "...\n\n", 5)));
-
-	if (! eof)
-		tbuf_printf(out, "...\n");
-
 	in->pos = (eol + 1);
 	coio_write(coio, out->data, out->size);
 	return 0;

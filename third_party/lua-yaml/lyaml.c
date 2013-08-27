@@ -549,10 +549,6 @@ static int figure_table_type(lua_State *L) {
 
 static int dump_null(struct lua_yaml_dumper *dumper) {
    yaml_event_t ev;
-   /*
-   yaml_scalar_event_initialize(&ev, NULL, NULL,
-      (unsigned char *)"~", 1, 1, 1, YAML_PLAIN_SCALAR_STYLE);
-	  */
    yaml_scalar_event_initialize(&ev, NULL, NULL,
       (unsigned char *)"null", 4, 1, 1, YAML_PLAIN_SCALAR_STYLE);
    return yaml_emitter_emit(&dumper->emitter, &ev);
@@ -606,7 +602,7 @@ static void dump_document(struct lua_yaml_dumper *dumper) {
    if (!dump_node(dumper) || dumper->error)
       return;
 
-   yaml_document_end_event_initialize(&ev, 1);
+   yaml_document_end_event_initialize(&ev, 0);
    yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
