@@ -1,14 +1,14 @@
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
-'0: {0, ''tweedledum''}'
+0: {0, 'tweedledum'}
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-'0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
+0: {0, 'primary', 1752392040, 1, 1, 0, 'str'}
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 ---
-'0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
+0: {1, 'secondary', 1701147252, 0, 1, 1, 'str'}
 ...
 #
 # A test case for Bug#729758
@@ -84,7 +84,7 @@ box.space[0]:truncate()
 #
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
-'0: {1, ''secondary'', 1701147252, 1, 2, 1, ''str'', 2, ''str''}'
+0: {1, 'secondary', 1701147252, 1, 2, 1, 'str', 2, 'str'}
 ...
 insert into t0 values ('key1', 'part1', 'part2')
 Insert OK, 1 row affected
@@ -96,9 +96,9 @@ insert into t0 values ('key3', 'part1', 'part2_b')
 Insert OK, 1 row affected
 return { box.space[0]:select(1) }
 ---
-- '830039403: {''part1'', ''part2''}'
-- '846816619: {''part1'', ''part2_a''}'
-- '863593835: {''part1'', ''part2_b''}'
+-830039403: {'part1', 'part2'}
+-846816619: {'part1', 'part2_a'}
+-863593835: {'part1', 'part2_b'}
 ...
 select * from t0 where k0='key1'
 Found 1 tuple:
@@ -153,11 +153,11 @@ box.space[0]:truncate()
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
 ---
-'0: {0, ''primary'', 1701147252, 1, 1, 0, ''num64''}'
+0: {0, 'primary', 1701147252, 1, 1, 0, 'num64'}
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 2, 1, 'str', 2, 'str')
 ---
-'0: {1, ''secondary'', 1701147252, 0, 2, 1, ''str'', 2, ''str''}'
+0: {1, 'secondary', 1701147252, 0, 2, 1, 'str', 2, 'str'}
 ...
 insert into t0 values ('01234567', 'part1', 'part2')
 Insert OK, 1 row affected
@@ -177,11 +177,11 @@ for k, v in box.space[0]:pairs() do table.insert(l, v) end
 ...
 return l
 ---
-- '3978425819141910832: {''part1'', ''part2''}'
-- '3978425819141910833: {''part1'', ''part2''}'
-- '3978425819141910834: {''part1'', ''part2_a''}'
-- '3978425819141910835: {''part1_a'', ''part2''}'
-- '3978425819141910836: {''part1_a'', ''part2_a''}'
+-3978425819141910832: {'part1', 'part2'}
+-3978425819141910833: {'part1', 'part2'}
+-3978425819141910834: {'part1', 'part2_a'}
+-3978425819141910835: {'part1_a', 'part2'}
+-3978425819141910836: {'part1_a', 'part2_a'}
 ...
 select * from t0 where k0='01234567'
 Found 1 tuple:
@@ -233,11 +233,11 @@ box.space[0]:truncate()
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-'0: {0, ''primary'', 1752392040, 1, 1, 0, ''num''}'
+0: {0, 'primary', 1752392040, 1, 1, 0, 'num'}
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 1, 'str')
 ---
-'0: {1, ''secondary'', 1752392040, 1, 1, 1, ''str''}'
+0: {1, 'secondary', 1752392040, 1, 1, 1, 'str'}
 ...
 insert into t0 values (1, 'hello')
 Insert OK, 1 row affected
@@ -273,11 +273,11 @@ box.space[0]:truncate()
 
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-'0: {0, ''primary'', 1752392040, 1, 1, 0, ''str''}'
+0: {0, 'primary', 1752392040, 1, 1, 0, 'str'}
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 ---
-'0: {1, ''secondary'', 1701147252, 0, 1, 1, ''str''}'
+0: {1, 'secondary', 1701147252, 0, 1, 1, 'str'}
 ...
 insert into t0 values ('Spears', 'Britney')
 Insert OK, 1 row affected
@@ -383,9 +383,9 @@ insert into t0 values(3, 'Creature ')
 Insert OK, 1 row affected
 { box.space[0]:select(1) }
 ---
-- '1: {''Aardvark ''}'
-- '2: {''Bilimbi''}'
-- '3: {''Creature ''}'
+-1: {'Aardvark '}
+-2: {'Bilimbi'}
+-3: {'Creature '}
 ...
 box.space[0].index[0].idx:min()
 ---
@@ -397,11 +397,11 @@ error: HASH does not support max()
 ...
 box.space[0].index[1].idx:min()
 ---
-'1: {''Aardvark ''}'
+1: {'Aardvark '}
 ...
 box.space[0].index[1].idx:max()
 ---
-'3: {''Creature ''}'
+3: {'Creature '}
 ...
 delete from t0 where k0=1
 Delete OK, 1 row affected
