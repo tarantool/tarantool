@@ -9,11 +9,11 @@ dofile('utils.lua')
 -------------------------------------------------------------------------------
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
-0: {0, 'tweedledum'}
+- [0, 0, 'tweedledum']
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-0: {0, 'primary', 1752392040, 1, 1, 0, 'num'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
 hash = box.space[0]
 ---
@@ -21,24 +21,24 @@ hash = box.space[0]
 -- Insert valid fields
 hash:insert(0, 'value1 v1.0', 'value2 v1.0')
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(1, 'value1 v1.0', 'value2 v1.0')
 ---
-1: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(2, 'value1 v1.0', 'value2 v1.0')
 ---
-2: {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(3, 'value1 v1.0', 'value2 v1.0')
 ---
-3: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
 -- Insert invalid fields
 hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash replace fields tests
@@ -46,20 +46,20 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- Replace valid fields
 hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 -- Replace invalid fields
 hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash select fields test
@@ -67,19 +67,19 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- select by valid keys
 hash:select(0, 0)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:select(0, 1)
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:select(0, 2)
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:select(0, 3)
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:select(0, 4)
 ---
@@ -90,11 +90,11 @@ hash:select(0, 5)
 -- select by invalid keys
 hash:select(0, 'invalid key')
 ---
-error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 hash:select(0, 1, 2)
 ---
-error: Invalid key part count (expected [0..1], got 2)
+- error: Invalid key part count (expected [0..1], got 2)
 ...
 -------------------------------------------------------------------------------
 -- 32-bit hash delete fields test
@@ -102,19 +102,19 @@ error: Invalid key part count (expected [0..1], got 2)
 -- delete by valid keys
 hash:delete(0)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(1)
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:delete(2)
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:delete(3)
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:delete(4)
 ---
@@ -125,11 +125,11 @@ hash:delete(5)
 -- delete by invalid keys
 hash:delete('invalid key')
 ---
-error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 hash:delete(1, 2)
 ---
-error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
 hash:truncate()
 ---
@@ -142,7 +142,7 @@ hash:truncate()
 -------------------------------------------------------------------------------
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num64')
 ---
-0: {0, 'primary', 1752392040, 1, 1, 0, 'num64'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num64']
 ...
 hash = box.space[0]
 ---
@@ -150,40 +150,40 @@ hash = box.space[0]
 -- Insert valid fields
 hash:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-1: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-2: {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-3: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
 -- Insert invalid fields
 hash:insert(100, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:insert(101, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:insert(102, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:insert(103, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash replace fields tests
@@ -191,32 +191,32 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- Replace valid fields
 hash:replace(3ULL, 'value1 v1.31', 'value2 1.12')
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:replace(1ULL, 'value1 v1.32', 'value2 1.72')
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 -- Replace invalid fields
 hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash select fields test
@@ -224,19 +224,19 @@ error: 'Tuple field 0 type does not match one required by operation: expected NU
 -- select by valid keys
 hash:select(0, 0ULL)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:select(0, 1ULL)
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:select(0, 2ULL)
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:select(0, 3ULL)
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:select(0, 4ULL)
 ---
@@ -247,19 +247,19 @@ hash:select(0, 5ULL)
 -- select by valid NUM keys
 hash:select(0, 0)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:select(0, 1)
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:select(0, 2)
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:select(0, 3)
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:select(0, 4)
 ---
@@ -270,11 +270,11 @@ hash:select(0, 5)
 -- select by invalid keys
 hash:select(0, 'invalid key')
 ---
-error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
 ...
 hash:select(0, '00000001', '00000002')
 ---
-error: Invalid key part count (expected [0..1], got 2)
+- error: Invalid key part count (expected [0..1], got 2)
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash delete fields test
@@ -282,19 +282,19 @@ error: Invalid key part count (expected [0..1], got 2)
 -- delete by valid keys
 hash:delete(0ULL)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(1ULL)
 ---
-1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:delete(2ULL)
 ---
-2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:delete(3ULL)
 ---
-3: {'value1 v1.31', 'value2 1.12'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:delete(4ULL)
 ---
@@ -304,36 +304,36 @@ hash:delete(5ULL)
 ...
 hash:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-1: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-2: {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-3: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
 -- delete by valid NUM keys
 hash:delete(0)
 ---
-0: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(1)
 ---
-1: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(2)
 ---
-2: {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(3)
 ---
-3: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete(4)
 ---
@@ -344,11 +344,11 @@ hash:delete(5)
 -- delete by invalid keys
 hash:delete('invalid key')
 ---
-error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
 ...
 hash:delete('00000001', '00000002')
 ---
-error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
 hash:truncate()
 ---
@@ -361,7 +361,7 @@ hash:truncate()
 -------------------------------------------------------------------------------
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-0: {0, 'primary', 1752392040, 1, 1, 0, 'str'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
 ...
 hash = box.space[0]
 ---
@@ -369,19 +369,19 @@ hash = box.space[0]
 -- Insert valid fields
 hash:insert('key 0', 'value1 v1.0', 'value2 v1.0')
 ---
-'key 0': {'value1 v1.0', 'value2 v1.0'}
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert('key 1', 'value1 v1.0', 'value2 v1.0')
 ---
-'key 1': {'value1 v1.0', 'value2 v1.0'}
+- ['key 1', 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert('key 2', 'value1 v1.0', 'value2 v1.0')
 ---
-'key 2': {'value1 v1.0', 'value2 v1.0'}
+- ['key 2', 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert('key 3', 'value1 v1.0', 'value2 v1.0')
 ---
-'key 3': {'value1 v1.0', 'value2 v1.0'}
+- ['key 3', 'value1 v1.0', 'value2 v1.0']
 ...
 -------------------------------------------------------------------------------
 -- String hash replace fields tests
@@ -389,15 +389,15 @@ hash:insert('key 3', 'value1 v1.0', 'value2 v1.0')
 -- Replace valid fields
 hash:replace('key 3', 'value1 v1.31', 'value2 1.12')
 ---
-'key 3': {'value1 v1.31', 'value2 1.12'}
+- ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
 hash:replace('key 1', 'value1 v1.32', 'value2 1.72')
 ---
-'key 1': {'value1 v1.32', 'value2 1.72'}
+- ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
 hash:replace('key 2', 'value1 v1.43', 'value2 1.92')
 ---
-'key 2': {'value1 v1.43', 'value2 1.92'}
+- ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
 -------------------------------------------------------------------------------
 -- String hash select fields test
@@ -405,19 +405,19 @@ hash:replace('key 2', 'value1 v1.43', 'value2 1.92')
 -- select by valid keys
 hash:select(0, 'key 0')
 ---
-'key 0': {'value1 v1.0', 'value2 v1.0'}
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
 hash:select(0, 'key 1')
 ---
-'key 1': {'value1 v1.32', 'value2 1.72'}
+- ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
 hash:select(0, 'key 2')
 ---
-'key 2': {'value1 v1.43', 'value2 1.92'}
+- ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
 hash:select(0, 'key 3')
 ---
-'key 3': {'value1 v1.31', 'value2 1.12'}
+- ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
 hash:select(0, 'key 4')
 ---
@@ -428,7 +428,7 @@ hash:select(0, 'key 5')
 -- select by invalid keys
 hash:select(0, 'key 1', 'key 2')
 ---
-error: Invalid key part count (expected [0..1], got 2)
+- error: Invalid key part count (expected [0..1], got 2)
 ...
 -------------------------------------------------------------------------------
 -- String hash delete fields test
@@ -436,19 +436,19 @@ error: Invalid key part count (expected [0..1], got 2)
 -- delete by valid keys
 hash:delete('key 0')
 ---
-'key 0': {'value1 v1.0', 'value2 v1.0'}
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
 hash:delete('key 1')
 ---
-'key 1': {'value1 v1.32', 'value2 1.72'}
+- ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
 hash:delete('key 2')
 ---
-'key 2': {'value1 v1.43', 'value2 1.92'}
+- ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
 hash:delete('key 3')
 ---
-'key 3': {'value1 v1.31', 'value2 1.12'}
+- ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
 hash:delete('key 4')
 ---
@@ -459,7 +459,7 @@ hash:delete('key 5')
 -- delete by invalid keys
 hash:delete('key 1', 'key 2')
 ---
-error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
 hash:truncate()
 ---
@@ -469,47 +469,47 @@ hash:truncate()
 ------------------------
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-0: {0, 'primary', 1752392040, 1, 1, 0, 'num'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'field1', 'hash', 1, 1, 1, 'num')
 ---
-0: {1, 'field1', 1752392040, 1, 1, 1, 'num'}
+- [0, 1, 'field1', 1752392040, 1, 1, 1, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 2, 'field2', 'hash', 1, 1, 2, 'num')
 ---
-0: {2, 'field2', 1752392040, 1, 1, 2, 'num'}
+- [0, 2, 'field2', 1752392040, 1, 1, 2, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 3, 'field3', 'hash', 1, 1, 3, 'num')
 ---
-0: {3, 'field3', 1752392040, 1, 1, 3, 'num'}
+- [0, 3, 'field3', 1752392040, 1, 1, 3, 'num']
 ...
 hash = box.space[0]
 ---
 ...
 hash:insert(0, 0, 0, 0)
 ---
-0: {0, 0, 0}
+- [0, 0, 0, 0]
 ...
 hash:insert(1, 1, 1, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:insert(2, 2, 2, 2)
 ---
-2: {2, 2, 2}
+- [2, 2, 2, 2]
 ...
 -- OK
 hash:replace_if_exists(1, 1, 1, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:replace_if_exists(1, 10, 10, 10)
 ---
-1: {10, 10, 10}
+- [1, 10, 10, 10]
 ...
 hash:replace_if_exists(1, 1, 1, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:select(0, 10)
 ---
@@ -525,28 +525,28 @@ hash:select(3, 10)
 ...
 hash:select(0, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:select(1, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:select(2, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 hash:select(3, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 -- OK
 hash:insert(10, 10, 10, 10)
 ---
-10: {10, 10, 10}
+- [10, 10, 10, 10]
 ...
 hash:delete(10)
 ---
-10: {10, 10, 10}
+- [10, 10, 10, 10]
 ...
 hash:select(0, 10)
 ---
@@ -563,7 +563,7 @@ hash:select(3, 10)
 -- TupleFound (primary key)
 hash:insert(1, 10, 10, 10)
 ---
-error: Duplicate key exists in unique index 0
+- error: Duplicate key exists in unique index 0
 ...
 hash:select(0, 10)
 ---
@@ -579,12 +579,12 @@ hash:select(3, 10)
 ...
 hash:select(0, 1)
 ---
-1: {1, 1, 1}
+- [1, 1, 1, 1]
 ...
 -- TupleNotFound (primary key)
 hash:replace_if_exists(10, 10, 10, 10)
 ---
-error: Tuple doesn't exist in index 0
+- error: Tuple doesn't exist in index 0
 ...
 hash:select(0, 10)
 ---
@@ -601,7 +601,7 @@ hash:select(3, 10)
 -- TupleFound (key --1)
 hash:insert(10, 0, 10, 10)
 ---
-error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 1
 ...
 hash:select(0, 10)
 ---
@@ -617,12 +617,12 @@ hash:select(3, 10)
 ...
 hash:select(1, 0)
 ---
-0: {0, 0, 0}
+- [0, 0, 0, 0]
 ...
 -- TupleFound (key --1)
 hash:replace_if_exists(2, 0, 10, 10)
 ---
-error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 1
 ...
 hash:select(0, 10)
 ---
@@ -638,12 +638,12 @@ hash:select(3, 10)
 ...
 hash:select(1, 0)
 ---
-0: {0, 0, 0}
+- [0, 0, 0, 0]
 ...
 -- TupleFound (key --3)
 hash:insert(10, 10, 10, 0)
 ---
-error: Duplicate key exists in unique index 3
+- error: Duplicate key exists in unique index 3
 ...
 hash:select(0, 10)
 ---
@@ -659,12 +659,12 @@ hash:select(3, 10)
 ...
 hash:select(3, 0)
 ---
-0: {0, 0, 0}
+- [0, 0, 0, 0]
 ...
 -- TupleFound (key --3)
 hash:replace_if_exists(2, 10, 10, 0)
 ---
-error: Duplicate key exists in unique index 3
+- error: Duplicate key exists in unique index 3
 ...
 hash:select(0, 10)
 ---
@@ -680,7 +680,7 @@ hash:select(3, 10)
 ...
 hash:select(3, 0)
 ---
-0: {0, 0, 0}
+- [0, 0, 0, 0]
 ...
 hash:drop()
 ---
