@@ -100,14 +100,14 @@ box.snapshot()
 ---
 - ok
 ...
-{s1:select_range(0, '100', 'second')}
+s1:select_range(0, '100', 'second')
 ---
-- - ['second', 'tuple 2']
+- ['second', 'tuple 2']
 ...
-{s1:select_range(0, '100', 'identifier')}
+s1:select_range(0, '100', 'identifier')
 ---
-- - ['identifier', 'tuple']
-  - ['second', 'tuple 2']
+- ['identifier', 'tuple']
+- ['second', 'tuple 2']
 ...
 s1:insert('third', 'tuple 3')
 ---
@@ -256,6 +256,9 @@ box.sort({s1.index[0]:select_range(3, 'abcdb')})
   - ['abcdb__']
 ...
 s1:drop()
+---
+...
+s1 = nil
 ---
 ...
 --
@@ -507,6 +510,9 @@ box.sort({s0:select(2, 0)})
   - [6, 6, 0, 6]
 ...
 s0:drop()
+---
+...
+s0 = nil
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

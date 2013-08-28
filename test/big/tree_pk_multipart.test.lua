@@ -57,19 +57,19 @@ space:select(0, 'The Wolf!', 'Vincent', 3)
 space:select(0, 'Vincent', 'The Wolf!', 2)
 
 -- Select all messages from Vincent to Jules
-{space:select(0, 'Vincent', 'Jules')}
+space:select(0, 'Vincent', 'Jules')
 
 -- Select all messages from Jules to Vincent
-{space:select(0, 'Jules', 'Vincent')}
+space:select(0, 'Jules', 'Vincent')
 
 -- Select all messages from Vincent to The Wolf
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 
 -- Select all messages from The Wolf to Vincent
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 
 -- Select all Vincent messages
-{space:select(0, 'Vincent')}
+space:select(0, 'Vincent')
 
 --
 -- Delete test
@@ -83,9 +83,9 @@ space:delete('Vincent', 'The Wolf!', 0)
 space:update({'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
 space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 -- Checking Vincent's last messages
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 -- Checking The Wolf's last messages
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 
 -- try to delete nonexistent message
 space:delete('Vincent', 'The Wolf!', 3)
@@ -101,9 +101,9 @@ space:update({'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 space:update({'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 
 -- Checking Vincent's last messages
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 -- Checking The Wolf's last messages
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
@@ -171,5 +171,7 @@ space:insert(1, 1)
 space:replace_if_exists(1, 1)
 
 space:drop()
+
+space = nil
 
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

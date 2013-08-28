@@ -312,7 +312,7 @@ lbox_fiber_gc(struct lua_State *L)
 }
 
 static int
-fiber_backtrace_cb(int frameno, void *frameret, char *func, size_t offset, void *cb_ctx)
+fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
 {
 	char buf[512];
 	int l = snprintf(buf, sizeof(buf), "#%-2d %p in ", frameno, frameret);

@@ -36,8 +36,8 @@ s1:insert('identifier', 'tuple')
 box.snapshot()
 s1:insert('second', 'tuple 2')
 box.snapshot()
-{s1:select_range(0, '100', 'second')}
-{s1:select_range(0, '100', 'identifier')}
+s1:select_range(0, '100', 'second')
+s1:select_range(0, '100', 'identifier')
 
 s1:insert('third', 'tuple 3')
 s1:select(0, 'identifier')
@@ -97,6 +97,7 @@ s1:insert('abcdc')
 s1:insert('abcdc_')
 box.sort({s1.index[0]:select_range(3, 'abcdb')})
 s1:drop()
+s1 = nil
 
 --
 -- tree::replace tests
@@ -189,5 +190,6 @@ s0:delete(5)
 box.sort({s0:select(2, 0)})
 
 s0:drop()
+s0 = nil
 
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

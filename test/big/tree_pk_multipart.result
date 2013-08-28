@@ -178,54 +178,54 @@ space:select(0, 'Vincent', 'The Wolf!', 2)
 - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Select all messages from Vincent to Jules
-{space:select(0, 'Vincent', 'Jules')}
+space:select(0, 'Vincent', 'Jules')
 ---
-- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
-  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
-  - ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
-  - ['Vincent', 'Jules', 3, 'That`s right.']
-  - ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
-  - ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
-  - ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
+- ['Vincent', 'Jules', 3, 'That`s right.']
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
 ...
 -- Select all messages from Jules to Vincent
-{space:select(0, 'Jules', 'Vincent')}
+space:select(0, 'Jules', 'Vincent')
 ---
-- - ['Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?']
-  - ['Jules', 'Vincent', 1, 'Then what do they call it?']
-  - ['Jules', 'Vincent', 2, 'A `Royale` with cheese!']
-  - ['Jules', 'Vincent', 3, 'What do they call a Big Mac?']
-  - ['Jules', 'Vincent', 4, '`Le Big Mac!`']
-  - ['Jules', 'Vincent', 5, 'What do they call a `Whopper`?']
+- ['Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?']
+- ['Jules', 'Vincent', 1, 'Then what do they call it?']
+- ['Jules', 'Vincent', 2, 'A `Royale` with cheese!']
+- ['Jules', 'Vincent', 3, 'What do they call a Big Mac?']
+- ['Jules', 'Vincent', 4, '`Le Big Mac!`']
+- ['Jules', 'Vincent', 5, 'What do they call a `Whopper`?']
 ...
 -- Select all messages from Vincent to The Wolf
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 ---
-- - ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
-  - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Select all messages from The Wolf to Vincent
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 ---
-- - ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
-  - ['The Wolf!', 'Vincent', 1, 'Come again?']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
-  - ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
+- ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
 -- Select all Vincent messages
-{space:select(0, 'Vincent')}
+space:select(0, 'Vincent')
 ---
-- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
-  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
-  - ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
-  - ['Vincent', 'Jules', 3, 'That`s right.']
-  - ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
-  - ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
-  - ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
-  - ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
-  - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
+- ['Vincent', 'Jules', 3, 'That`s right.']
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 --
 -- Delete test
@@ -252,16 +252,16 @@ space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
 ...
 -- Checking Vincent's last messages
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 ---
-- - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Checking The Wolf's last messages
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 ---
-- - ['The Wolf!', 'Vincent', 1, 'Come again?']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 -- try to delete nonexistent message
 space:delete('Vincent', 'The Wolf!', 3)
@@ -289,16 +289,16 @@ space:update({'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 - ['Vincent', 'The Wolf!', 1, '<ooops>']
 ...
 -- Checking Vincent's last messages
-{space:select(0, 'Vincent', 'The Wolf!')}
+space:select(0, 'Vincent', 'The Wolf!')
 ---
-- - ['Vincent', 'The Wolf!', 1, '<ooops>']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'The Wolf!', 1, '<ooops>']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Checking The Wolf's last messages
-{space:select(0, 'The Wolf!', 'Vincent')}
+space:select(0, 'The Wolf!', 'Vincent')
 ---
-- - ['The Wolf!', 'Vincent', 1, '<ooops>']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 1, '<ooops>']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
@@ -446,6 +446,9 @@ space:replace_if_exists(1, 1)
 - error: Illegal parameters, tuple must have all indexed fields
 ...
 space:drop()
+---
+...
+space = nil
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

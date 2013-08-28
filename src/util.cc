@@ -272,7 +272,7 @@ backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
 	void *stack_top = (char *) stack + stack_size;
 	void *stack_bottom = stack;
 	int frameno = 0;
-	char *sym = NULL;
+	const char *sym = NULL;
 	size_t offset = 0;
 	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
 #ifdef HAVE_BFD
