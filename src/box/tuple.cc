@@ -456,27 +456,22 @@ void
 tuple_print(struct tbuf *buf, const struct tuple *tuple)
 {
 	if (tuple->field_count == 0) {
-		tbuf_printf(buf, "'': {}");
+		tbuf_printf(buf, " []");
 		return;
 	}
-
 	struct tuple_iterator it;
 	const char *field;
 	uint32_t len = 0;
 	tuple_rewind(&it, tuple);
-	field = tuple_next(&it, &len);
-	print_field(buf, field, len);
-	tbuf_printf(buf, ": {");
-
-	uint32_t field_no = 1;
+	tbuf_printf(buf, " [");
+	uint32_t field_no = 0;
 	while ((field = tuple_next(&it, &len))) {
 		print_field(buf, field, len);
 		if (likely(++field_no < tuple->field_count))
 			tbuf_printf(buf, ", ");
 	}
 	assert(field_no == tuple->field_count);
-
-	tbuf_printf(buf, "}");
+	tbuf_printf(buf, "]");
 }
 
 struct tuple *

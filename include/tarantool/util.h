@@ -149,6 +149,11 @@ extern void *__libc_stack_end;
 #ifdef ENABLE_BACKTRACE
 void print_backtrace();
 char *backtrace(void *frame, void *stack, size_t stack_size);
+
+typedef int (backtrace_cb)(int frameno, void *frameret,
+                           char *func, size_t offset, void *cb_ctx);
+void backtrace_foreach(backtrace_cb cb, void *frame, void *stack, size_t stack_size,
+                       void *cb_ctx);
 #endif /* ENABLE_BACKTRACE */
 
 #ifdef HAVE_BFD

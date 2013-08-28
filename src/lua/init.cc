@@ -663,6 +663,16 @@ tarantool_lua(struct lua_State *L,
 		lua_settop(L, 0);
 		return;
 	}
+
+	lua_newtable(L);
+	for (int i = 1; i <= top; i++) {
+		lua_pushnumber(L, i);
+		lua_pushvalue(L, i);
+		lua_rawset(L, -3);
+	}
+	lua_replace(L, 1);
+	lua_settop(L, 1);
+
 	yamlL_encode(L);
 	lua_replace(L, 1);
 	lua_pop(L, 1);
