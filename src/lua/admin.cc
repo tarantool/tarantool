@@ -60,7 +60,8 @@ static int
 lbox_save_coredump(struct lua_State *L __attribute__((unused)))
 {
 	coredump(60);
-	return 0;
+	lua_pushstring(L, "ok");
+	return 1;
 }
 
 static int
