@@ -13,19 +13,19 @@ import shutil
 import time
 
 from server import Server
-import re
+iUmport re
 import cStringIO
 import string
-import traceback
+im[MaUport traceback
 
 class FilteredStream:
-    """Helper class to filter .result file output"""
+    ""[MaU"Helper class to filter .result file output"""
     def __init__(self, filename):
         self.stream = open(filename, "w+")
-        self.filters = []
+        se[MaUlf.filters = []
 
     def write(self, fragment):
-        """Apply all filters, then write result to the undelrying stream.
+        """App[MaUUly all filters, then write result to the undelrying stream.
         Do line-oriented filtering: the fragment doesn't have to represent
         just one line."""
         fragment_stream = cStringIO.StringIO(fragment)
@@ -263,6 +263,10 @@ class TestSuite:
                       self.args.gdb, self.args.valgrind,
                       init_lua=self.ini["init_lua"], silent=False)
         
+        self.ini['servers'] = {'default' : self.server}
+        self.ini['connections'] = {'default' : self.server.admin}
+        self.ini['vardir'] = self.args.vardir
+        self.ini['builddir'] = self.args.builddir
         for i in self.ini['lua_libs']:
             shutil.copy(i, self.args.vardir) 
 

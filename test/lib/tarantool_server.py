@@ -59,15 +59,78 @@ class FuncTest(Test):
 
 class LuaTest(FuncTest):
     def execute(self, server):
+        options = {
+                'delimiter' = (lambda x: delimiter = x.strip()[1:-1])
+                }
         delimiter = ''
         cmd = None
         for line in open(self.name, 'r'):
             if not cmd:
                 cmd = StringIO.StringIO()
-            if line.find('--') == 0:
-                matched = re.match("--\s*setopt\s+(.*)", line, re.DOTALL)
-                if matched:
-                    command = re.split('\s*=\s*|\s+', matched.group(1), maxsplit=1)
+            if line.find('--#') == 0:
+                line = line[3:].strip()
+                matched1 = re.match("setopt\s+(.*)", line)
+                matched2 = re.match("(.*)\s+server\s+(.*)", line)
+                matched3 = re.match("(.*)\s+connection\s+(.*)", line)
+                if matched1:
+                    command = re.split('\s*=\s*|\s+|\s*,\s*', matched1.group(1))
+                    command = { command[i] : command[i + 1] for i in xrange(0, len(a) - 1, 2) }
+                    for key, val in command.iteritems()
+                        check = False
+                        for k in options:
+                            if k.startswith(key):
+                                options[k](val)
+                                check = True
+                                break
+                        if not check:
+                            raise Exception()
+                elif matched2:
+                    try:
+                        if matched2.groups(1) == 'create':
+                                name, params = re.match("(.*)\s+with\s+(.*)", matched2.groups(2)).groups()
+                                params = re.split('\s*=\s*|\s+|\s*,\s*', params)
+                                params = { params[i] : params[i + 1] for i in xrange(0, len(a) - 1, 2) }
+                                temp_server = TarantoolServer()
+                                if 'configuration' in params:
+                                    temp_server.config = params['configuration'][1:-1]
+                                if 'init' in params:
+                                    temp_server.init_lua = params['init'][1:-1]
+                                temp_server.vardir = os.path.join(self.suite_ini['vardir'], name)
+                                temp_server.binary = temp_server.find_exe(self.suite_ini['builddir'])
+                                self.suite_ini[name] = temp_server
+                        elif matched2.groups(1) == 'start':
+                            if matched2.groups(2) in self.suite_ini['servers'] and
+                            self.suite_ini['servers'][matched2.groups(2)].installed:
+                                self.suite_ini['servers'][matched2.groups(2)].start(silent=True)
+                        elif matched2.groups(1) == 'stop':
+                            if matched2.groups(2) in self.suite_ini['servers']:
+                                self.suite_ini['servers'][matched2.groups(2)].stop(silent=True)
+                        elif matched2.groups(1) == 'deploy':
+                            if matched2.groups(2) in self.suite_ini['servers']:
+                                self.suite_ini['servers'][matched2.groups(2)].deploy()
+                        elif matched2.groups(1) == 'cleanup':
+                            if matched2.groups(2) in self.suite_ini['servers']:
+                                self.suite_ini['servers'][matched2.groups(2)].cleanup()
+                        else:
+                            raise Exception()
+                    except AttributeError:
+                        pass
+                elif matched3:
+                    if matched3.groups(1) == 'create':
+                        pass
+                    elif matched3.groups(1) == 'drop':
+                        pass
+                    elif matched3.groups(1) == 'set':
+                        pass
+                    else:
+                        raise Exception()
+                else:
+                    raise Exception()
+                sys.stdout.write(line)
+            elif line.find('--') == 0:
+                matched = re.match("--#\s*setopt\s+(.*)", line, re.DOTALL)
+                if matched:d
+                    for 
                     if re.match('delim(i(t(e(r)?)?)?)?', command[0]):
                         delimiter = command[1].strip()[1:-1]
                 sys.stdout.write(line)
@@ -139,6 +202,7 @@ class TarantoolServer(Server):
         self.start_and_exit = False
         self.gdb = False
         self.valgrind = False
+        self.installed = False
 
     def __del__(self):
         self.stop()
@@ -191,10 +255,13 @@ class TarantoolServer(Server):
                     os.path.join(self.vardir, self.default_suppression_name))
 
         var_init_lua = os.path.join(self.vardir, self.default_init_lua_name)
+
         if self.init_lua != None:
             if os.path.exists(var_init_lua):
                 os.remove(var_init_lua)
             shutil.copy(self.init_lua, var_init_lua)
+
+        self.installed = True
 
 
     def configure(self, config):
