@@ -436,7 +436,7 @@ class TarantoolServer(Server):
             time.sleep(0.001)
 
         is_connected = False
-        while not is_connected:
+        while not is_connected and not self.gdb:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))
@@ -447,16 +447,10 @@ class TarantoolServer(Server):
 
     def wait_until_stopped(self):
         """Wait until the server is stoped and has closed sockets"""
-
-        while self.read_pidfile() != -1:
-            time.sleep(0.001)
-
-        is_connected = False
-        while not is_connected:
+        while True:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))
-                is_connected = True
                 sock.close()
                 time.sleep(0.001)
                 continue
@@ -465,21 +459,12 @@ class TarantoolServer(Server):
 
     def find_tests(self, test_suite, suite_path):
         def patterned(test, patterns):
+            answer = []
             for i in patterns:
                 if test.name.find(i) != -1:
-                    return True
-            return False
+                    answer.append(test)
+            return answer
 
-        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.py"))):
-            for test_pattern in test_suite.args.tests:
-                if test_name.find(test_pattern) != -1:
-                    test_suite.tests.append(PythonTest(test_name, test_suite.args, test_suite.ini))
-
-        for test_name in sorted(glob.glob(os.path.join(suite_path, "*.test.lua"))):
-            for test_pattern in test_suite.args.tests:
-                if test_name.find(test_pattern) != -1:
-                    test_suite.tests.append(LuaTest(test_name, test_suite.args, test_suite.ini))
-
-#        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
-#        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
-#        test_suite.tests = filter((lambda x: patterned(x, test_suite.args.tests)), tests)
+        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
+        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
+        test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), tests), [])
