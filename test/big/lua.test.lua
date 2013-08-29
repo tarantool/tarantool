@@ -313,7 +313,7 @@ space:drop()
 dofile('index_random_test.lua')
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-box.insert(box.schema.INDEX_ID, 0, 1, 'primary', 'hash', 1, 1, 0, 'num')
+box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 0, 'num')
 space = box.space[0]
 -------------------------------------------------------------------------------
 -- TreeIndex::random()

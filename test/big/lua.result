@@ -881,9 +881,9 @@ box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
 - [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
 ...
-box.insert(box.schema.INDEX_ID, 0, 1, 'primary', 'hash', 1, 1, 0, 'num')
+box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 1, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 1, 'secondary', 1752392040, 1, 1, 0, 'num']
 ...
 space = box.space[0]
 ---

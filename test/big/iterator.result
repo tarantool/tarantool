@@ -23,9 +23,9 @@ box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 1, 2, 1, 'str', 2, 'str')
 - [0, 2, 12905, 1701147252, 1, 2, 1, 'str', 2, 'str']
 ...
 -- Tree multi-part non-unique
-box.insert(box.schema.INDEX_ID, 0, 3, 'i2', 'tree', 0, 2, 2, 'str', 3, 'str')
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 2, 'str', 3, 'str')
 ---
-- [0, 3, 12905, 1701147252, 0, 2, 2, 'str', 3, 'str']
+- [0, 3, 13161, 1701147252, 0, 2, 2, 'str', 3, 'str']
 ...
 -- Hash single-part unique
 box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'hash', 1, 1, 0, 'str')
