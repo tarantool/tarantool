@@ -151,7 +151,6 @@ function box.bless_space(space)
                 break
             end
             table.insert(range, v)
-            iterator_state, v = index:next(iterator_state)
         end
         return unpack(range)
     end
@@ -162,7 +161,6 @@ function box.bless_space(space)
                 break
             end
             table.insert(range, v)
-            iterator_state, v = index:prev(iterator_state)
         end
         return unpack(range)
     end
