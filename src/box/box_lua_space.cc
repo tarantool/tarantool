@@ -146,7 +146,6 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 	lua_rawseti(L, -2, space_id(space));
 
 	lua_pop(L, 2); /* box, space */
-	assert(lua_gettop(L) == 0);
 }
 
 /** Delete a given space in Lua */
@@ -159,6 +158,4 @@ box_lua_space_delete(struct lua_State *L, uint32_t id)
 	lua_pushnil(L);
 	lua_rawseti(L, -2, id);
 	lua_pop(L, 2); /* box, space */
-
-	assert(lua_gettop(L) == 0);
 }
