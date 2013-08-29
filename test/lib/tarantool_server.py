@@ -449,16 +449,10 @@ class TarantoolServer(Server):
 
     def wait_until_stopped(self):
         """Wait until the server is stoped and has closed sockets"""
-
-        while self.read_pidfile() != -1:
-            time.sleep(0.001)
-
-        is_connected = False
-        while not is_connected:
+        while True:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))
-                is_connected = True
                 sock.close()
                 time.sleep(0.001)
                 continue
