@@ -17,7 +17,9 @@ string.len(box.info.build.flags) > 0
 string.len(box.info.build.options) > 0
 string.len(box.info.uptime) > 0
 string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
-
-for k, _ in pairs(box.info()) do print(' - ', k) end
+t = {}
+for k, _ in pairs(box.info()) do table.insert(t, k) end
+table.sort(t)
+t
 box.info.snapshot_pid
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
