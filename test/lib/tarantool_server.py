@@ -4,6 +4,7 @@ import sys
 import glob
 import time
 import yaml
+import daemon
 import socket
 import signal
 import shlex
@@ -13,11 +14,11 @@ import traceback
 import subprocess
 import ConfigParser
 
-from server import Server
-from box_connection import BoxConnection
-from test_suite import FilteredStream, Test
-from admin_connection import AdminConnection
-from memcached_connection import MemcachedConnection
+from lib.server import Server
+from lib.box_connection import BoxConnection
+from lib.test_suite import FilteredStream, Test
+from lib.admin_connection import AdminConnection
+from lib.memcached_connection import MemcachedConnection
 
 try:
     import cStringIO as StringIO
@@ -35,7 +36,7 @@ def check_port(port):
 
 def prepare_gdb(binary, args):
     """Prepare server startup arguments to run under gdb."""
-    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args 
+    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args
     return args
 
 def prepare_valgrind(args, valgrind_log, valgrind_sup):
@@ -59,20 +60,13 @@ class FuncTest(Test):
 
 class LuaPreprocessorException(Exception):
     def __init__(self, val):
+        super(LuaPreprocessorException, self).__init__()
         self.value = val
     def __str__(self):
         return "lua preprocessor error: " + repr(self.value)
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        def set_delimiter(line):
-            global delimiter
-            delimiter = line.strip()[1:-1]
-            print delimiter
-
-        options = {
-        'delimiter' : set_delimiter
-        }
         delimiter = ''
         cmd = None
         curcon = server.admin
@@ -81,22 +75,22 @@ class LuaTest(FuncTest):
                 cmd = StringIO.StringIO()
             if line.find('--#') == 0:
                 line = line[3:].strip()
-                matched1 = re.match("setopt\s+(.*)", line)
-                matched2 = re.match("(.*)\s+server\s+(.*)", line)
-                matched3 = re.match("(.*)\s+connection\s+(.*)", line)
+                matched1 = re.match(r"setopt\s+(.*)", line)
+                matched2 = re.match(r"(.*)\s+server\s+(.*)", line)
+                matched3 = re.match(r"(.*)\s+connection\s+(.*)", line)
                 if matched1:
-                    command = re.split('\s*=\s*|\s+|\s*,\s*', matched1.group(1))
+                    command = re.split(r'\s*=\s*|\s+|\s*,\s*', matched1.group(1))
                     command = { command[i] : command[i + 1] for i in xrange(0, len(command) - 1, 2) }
                     if 'delimiter' in command:
                         delimiter = command['delimiter'].strip()[1:-1]
                         command.pop('delimiter')
                     if command:
-                        raise LuaPreprocessorException("Wrong setopt option") 
+                        raise LuaPreprocessorException("Wrong setopt option")
                 elif matched2:
                     try:
                         if matched2.group(1) == 'create':
-                            name, params = re.match("(.*)\s+with\s+(.*)", matched2.group(2)).groups()
-                            params = re.split('\s*=\s*|\s+|\s*,\s*', params)
+                            name, params = re.match(r"(.*)\s+with\s+(.*)", matched2.group(2)).groups()
+                            params = re.split(r'\s*=\s*|\s+|\s*,\s*', params)
                             params = { params[i] : params[i + 1] for i in xrange(0, len(params) - 1, 2) }
                             temp_server = TarantoolServer()
                             if 'configuration' in params:
@@ -107,7 +101,7 @@ class LuaTest(FuncTest):
                             temp_server.binary = temp_server.find_exe(self.suite_ini['builddir'])
                             self.suite_ini['servers'][name] = temp_server
                             temp_server.configure(temp_server.config)
-                            temp_server.install(temp_server.binary, 
+                            temp_server.install(temp_server.binary,
                                     temp_server.vardir, temp_server.mem, True)
                             temp_server.init()
                         elif matched2.group(1) == 'start':
@@ -129,11 +123,9 @@ class LuaTest(FuncTest):
                             if name in self.suite_ini['servers']:
                                 self.suite_ini['servers'][name].cleanup()
                         else:
-                            raise
-                            #raise LuaPreprocessorException("Wrong command for server")
+                            raise LuaPreprocessorException("Wrong command for server")
                     except (AttributeError, ValueError) as e:
-                        raise
-                        #raise LuaPreprocessorException("Wrong command for server") 
+                        raise LuaPreprocessorException("Wrong command for server")
                 elif matched3:
                     try:
                         if matched3.group(1) == 'create':
@@ -199,7 +191,7 @@ class TarantoolConfigFile:
 
 class TarantoolServer(Server):
     def __new__(cls, core="tarantool"):
-        return super(Server, cls).__new__(cls)
+        return super(TarantoolServer, cls).__new__(cls)
 
     def __init__(self, core="tarantool"):
         Server.__init__(self, core)
@@ -240,8 +232,8 @@ class TarantoolServer(Server):
         path = builddir + os.pathsep + os.environ["PATH"]
         if not silent:
             print "Looking for server binary in {0} ...".format(path)
-        for dir in path.split(os.pathsep):
-            exe = os.path.join(dir, self.default_bin_name)
+        for _dir in path.split(os.pathsep):
+            exe = os.path.join(_dir, self.default_bin_name)
             if os.access(exe, os.X_OK):
                 return exe
         raise RuntimeError("Can't find server executable in " + path)
@@ -275,7 +267,7 @@ class TarantoolServer(Server):
             else:
                 os.makedirs(self.vardir)
 
-        shutil.copy(self.config, 
+        shutil.copy(self.config,
                     os.path.join(self.vardir, self.default_config_name))
         shutil.copy(self.valgrind_sup,
                     os.path.join(self.vardir, self.default_suppression_name))
@@ -304,7 +296,7 @@ class TarantoolServer(Server):
             dummy_section_name = "tarantool"
             config = ConfigParser.ConfigParser()
             config.readfp(TarantoolConfigFile(fp, dummy_section_name))
-        
+
             self.pidfile = get_option(config, dummy_section_name, "pid_file")
             self.primary_port = get_option(config, dummy_section_name, "primary_port")
             self.admin_port = get_option(config, dummy_section_name, "admin_port")
@@ -339,7 +331,7 @@ class TarantoolServer(Server):
         if param:
             data = yaml.load(self.admin("box.info." + param, silent=True))[0]
         else:
-            data = yaml.load(self.admin("show info", silent=True))[info]
+            data = yaml.load(self.admin("box.info", silent=True))
         return data
 
     def wait_lsn(self, lsn):
@@ -371,7 +363,7 @@ class TarantoolServer(Server):
                 raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
             self.server = subprocess.Popen(args, cwd = self.vardir)
             self.server.wait()
-    
+
     def start(self, start_and_exit=None, gdb=None, valgrind=None, silent=True):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
@@ -431,17 +423,18 @@ class TarantoolServer(Server):
             return
 
         # kill process
-        pid = self.read_pidfile();
+        pid = self.read_pidfile()
         if pid != -1:
             os.kill(pid, signal.SIGTERM)
+
         #self.process.kill(signal.SIGTERM)
         if self.gdb or self.valgrind:
-            time = 0
-            while time < (1<<30) :
+            _time = 0
+            while _time < (1<<30) :
                 if self.process.poll() != None:
                     break
-                time += 1
-                sleep(1)
+                _time += 1
+                time.sleep(1)
         else:
             self.process.wait()
 
@@ -464,7 +457,7 @@ class TarantoolServer(Server):
         if init_lua != None:
             self.init_lua = os.path.abspath(init_lua)
         else:
-            self.init_lua = None;
+            self.init_lua = None
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
@@ -479,7 +472,7 @@ class TarantoolServer(Server):
     def test_option_get(self, show, option_list_str):
         args = [self.binary] + option_list_str.split()
         if show:
-           print " ".join([os.path.basename(self.binary)] + args[1:])
+            print " ".join([os.path.basename(self.binary)] + args[1:])
         output = subprocess.Popen(args,
                                   cwd = self.vardir,
                                   stdout = subprocess.PIPE,
@@ -492,7 +485,7 @@ class TarantoolServer(Server):
     def test_debug(self):
         output = self.test_option_get(False, "-V")
         if re.search("-Debug", output):
-           return True
+            return True
         return False
 
     def kill_old_server(self, silent=True):

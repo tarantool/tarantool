@@ -1,22 +1,19 @@
 import os
 import re
 import sys
-import stat
-import glob
 import ConfigParser
-import subprocess
 import collections
 import difflib
 import filecmp
-import shlex
 import shutil
 import time
-
-from server import Server
-import re
-import cStringIO
-import string
 import traceback
+
+from lib.server import Server
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 class FilteredStream:
     """Helper class to filter .result file output"""
@@ -28,7 +25,7 @@ class FilteredStream:
         """Apply all filters, then write result to the undelrying stream.
         Do line-oriented filtering: the fragment doesn't have to represent
         just one line."""
-        fragment_stream = cStringIO.StringIO(fragment)
+        fragment_stream = StringIO(fragment)
         skipped = False
         for line in fragment_stream:
             original_len = len(line.strip())
@@ -48,7 +45,7 @@ class FilteredStream:
         self.filters.pop()
 
     def clear_all_filters(self):
-        filters = []
+        self.filters = []
 
     def close(self):
         self.clear_all_filters()
@@ -78,13 +75,13 @@ class Test:
 
     def __init__(self, name, args, suite_ini):
         """Initialize test properties: path to test file, path to
-        temporary result file, path to the client program, test status."""  
+        temporary result file, path to the client program, test status.""" 
         rg = re.compile('.test.*')
         self.name = name
         self.args = args
         self.suite_ini = suite_ini
         self.result = rg.sub('.result', name)
-        self.skip_cond = rg.sub('.skipcond', name) 
+        self.skip_cond = rg.sub('.skipcond', name)
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
         self.reject = "{0}/test/{1}".format(self.args.builddir,
@@ -98,6 +95,9 @@ class Test:
         """Return true if this test was run successfully."""
         return self.is_executed and self.is_executed_ok and self.is_equal_result
 
+    def execute(self):
+        pass
+
     def run(self, server):
         """Execute the test assuming it's a python program.
         If the test aborts, print its output to stdout, and raise
@@ -108,7 +108,7 @@ class Test:
         diagnostics = "unknown"
         save_stdout = sys.stdout
         try:
-            self.skip = 0
+            self.skip = False
             if os.path.exists(self.skip_cond):
                 sys.stdout = FilteredStream(self.tmp_result)
                 stdout_fileno = sys.stdout.stream.fileno()
@@ -126,7 +126,7 @@ class Test:
         finally:
             if sys.stdout and sys.stdout != save_stdout:
                 sys.stdout.close()
-            sys.stdout = save_stdout;
+            sys.stdout = save_stdout
         self.is_executed = True
 
         if not self.skip:
@@ -246,7 +246,7 @@ class TestSuite:
 
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
-        self.server.find_tests(self, suite_path);
+        self.server.find_tests(self, suite_path)
         print "Found " + str(len(self.tests)) + " tests."
 
     def run_all(self):
@@ -262,13 +262,13 @@ class TestSuite:
                       self.args.vardir, self.args.mem, self.args.start_and_exit,
                       self.args.gdb, self.args.valgrind,
                       init_lua=self.ini["init_lua"], silent=False)
-        
+
         self.ini['servers'] = {'default' : self.server}
         self.ini['connections'] = {'default' : self.server.admin}
         self.ini['vardir'] = self.args.vardir
         self.ini['builddir'] = self.args.builddir
         for i in self.ini['lua_libs']:
-            shutil.copy(i, self.args.vardir) 
+            shutil.copy(i, self.args.vardir)
 
         if self.args.start_and_exit:
             print "  Start and exit requested, exiting..."
@@ -277,12 +277,12 @@ class TestSuite:
         longsep = '='*70
         shortsep = '-'*60
         print longsep
-        print string.ljust("TEST", 48), "RESULT"
+        print "TEST".ljust(48), "RESULT"
         print shortsep
         failed_tests = []
 
         for test in self.tests:
-            sys.stdout.write(string.ljust(test.name, 48))
+            sys.stdout.write(test.name.ljust(48))
             # for better diagnostics in case of a long-running test
             sys.stdout.flush()
 
