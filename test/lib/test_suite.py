@@ -13,19 +13,19 @@ import shutil
 import time
 
 from server import Server
-iUmport re
+import re
 import cStringIO
 import string
-im[MaUport traceback
+import traceback
 
 class FilteredStream:
-    ""[MaU"Helper class to filter .result file output"""
+    """Helper class to filter .result file output"""
     def __init__(self, filename):
         self.stream = open(filename, "w+")
-        se[MaUlf.filters = []
+        self.filters = []
 
     def write(self, fragment):
-        """App[MaUUly all filters, then write result to the undelrying stream.
+        """Apply all filters, then write result to the undelrying stream.
         Do line-oriented filtering: the fragment doesn't have to represent
         just one line."""
         fragment_stream = cStringIO.StringIO(fragment)
