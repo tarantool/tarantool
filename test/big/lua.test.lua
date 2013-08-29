@@ -86,7 +86,7 @@ tuple = space:select(0, 125)
 tuple2 = space:select(0, 125LL)
 num = box.unpack('l', tuple[0])
 num2 = box.unpack('l', tuple2[0])
-{num, num2}
+num, num2
 type(num) == 'cdata'
 type(num2) == 'cdata'
 num == tonumber64('125')

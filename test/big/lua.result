@@ -230,10 +230,10 @@ num = box.unpack('l', tuple[0])
 num2 = box.unpack('l', tuple2[0])
 ---
 ...
-{num, num2}
+num, num2
 ---
-- - 125
-  - 125
+- 125
+- 125
 ...
 type(num) == 'cdata'
 ---

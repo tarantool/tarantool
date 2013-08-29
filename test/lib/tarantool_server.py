@@ -343,12 +343,10 @@ class TarantoolServer(Server):
             os.kill(pid, signal.SIGTERM)
         #self.process.kill(signal.SIGTERM)
         if self.gdb or self.valgrind:
-            time = 0
-            while time < (1<<30) :
+            while True:
                 if self.process.poll() != None:
                     break
-                time += 1
-                sleep(1)
+                time.sleep(1)
         else:
             self.process.wait()
 
