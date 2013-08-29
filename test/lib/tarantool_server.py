@@ -438,7 +438,7 @@ class TarantoolServer(Server):
             time.sleep(0.001)
 
         is_connected = False
-        while not is_connected:
+        while not is_connected and not self.gdb:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))
