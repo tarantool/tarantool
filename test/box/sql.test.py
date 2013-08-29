@@ -1,4 +1,6 @@
 # encoding: utf-8
+admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
+admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 sql("ping")
 # xxx: bug -- currently selects no rows
 sql("select * from t0")
@@ -10,7 +12,7 @@ sql("select * from t0 where k0 = 0")
 sql("select * from t0 where k0 = 2")
 server.restart()
 sql("select * from t0 where k0 = 1")
-admin("save snapshot")
+admin("box.snapshot()")
 sql("select * from t0 where k0 = 1")
 server.restart()
 sql("select * from t0 where k0 = 1")
@@ -57,7 +59,7 @@ print """#
 sql("select * from t1 where k0 = 0")
 sql("select * from t65537 where k0 = 0")
 sql("select * from t4294967295 where k0 = 0")
-admin("box.space[0]:truncate()")
+admin("box.space[0]:drop()")
 
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/716683
