@@ -81,7 +81,7 @@ function help()
 		"box.fiber.info()",
 		"box.plugin.info()",
 		"box.cfg()",
-		"box.cfg_reload()",
+		"box.cfg.reload()",
 		"box.coredump()"
 	}
 end

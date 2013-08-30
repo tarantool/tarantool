@@ -5,6 +5,7 @@ import sys
 admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
 admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 
+
 # Test Lua from admin console. Whenever producing output,
 # make sure it's a valid YAML.
 admin("'  lua says: hello'")
@@ -130,12 +131,16 @@ admin("box.delete(0, 'test')")
 admin("fifo_top('test')")
 admin("box.delete(0, 'test')")
 admin("t = {} for k,v in pairs(box.cfg) do table.insert(t, k..': '..tostring(v)) end")
+sys.stdout.push_filter("'reload: .*", "'reload: function_ptr'")
 admin("t")
+sys.stdout.pop_filter()
 admin("t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' then table.insert(t, k..': '..tostring(v)) end end")
 admin("t")
 admin("box.cfg_reload()")
 admin("t = {} for k,v in pairs(box.cfg) do table.insert(t, k..': '..tostring(v)) end")
+sys.stdout.push_filter("'reload: .*", "'reload: function_ptr'")
 admin("t")
+sys.stdout.pop_filter()
 admin("t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' then table.insert(t, k..': '..tostring(v)) end end")
 admin("t")
 # must be read-only
@@ -472,7 +477,9 @@ server.deploy(init_lua="box/test_init.lua")
 print """
 # Test asscess to box configuration
 """
+sys.stdout.push_filter("'reload = .*", "'reload = function_ptr'")
 admin("print_config()")
+sys.stdout.pop_filter()
 
 print """
 # Test bug #977898
@@ -700,3 +707,5 @@ admin("t:bsize()")
 admin("box.delete(0, 8989)", silent=True)
 
 admin("box.space[0]:drop()")
+
+sys.stdout.clear_all_filters()

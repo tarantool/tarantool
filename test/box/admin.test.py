@@ -11,7 +11,9 @@ admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')"
 
 admin("box.stat()")
 admin("help()")
+sys.stdout.push_filter("'function: .*", "function_ptr")
 admin("box.cfg()")
+sys.stdout.clear_all_filters()
 admin("box.stat()")
 sql("insert into t0 values (1, 'tuple')")
 admin("box.snapshot()")

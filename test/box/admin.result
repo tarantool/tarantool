@@ -61,6 +61,7 @@ box.cfg()
   admin_port: 33015
   logger: cat - >> tarantool.log
   snap_io_rate_limit: 0
+  reload: function_ptr
   wal_dir_rescan_delay: 0.1
   backlog: 1024
   secondary_port: 33014

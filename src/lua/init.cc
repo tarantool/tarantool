@@ -700,6 +700,17 @@ is_string(const char *str)
 	return *endptr != '\0';
 }
 
+static int
+lbox_cfg_reload(struct lua_State *L)
+{
+	struct tbuf *err = tbuf_new(fiber->gc_pool);
+	if (reload_cfg(err)) {
+		lua_pushfstring(L, "error: %s", err->data);
+		return 1;
+	}
+	return 0;
+}
+
 /**
  * Make a new configuration available in Lua.
  * We could perhaps make Lua bindings to access the C
@@ -739,7 +750,24 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		}
 		free(value);
 	}
+	luaL_pushresult(&b);
+	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
+	    lua_pcall(L, 0, 0, 0) != 0) {
+		panic("%s", lua_tostring(L, -1));
+	}
+	lua_pop(L, 1);
 
+	/* add box.cfg.reload() function */
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_pushstring(L, "cfg");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "reload");
+	lua_pushcfunction(L, lbox_cfg_reload);
+	lua_settable(L, -3);
+	lua_pop(L, 2);
+
+	/* make box.cfg read-only */
+	luaL_buffinit(L, &b);
 	luaL_addstring(&b,
 		       "getmetatable(box.cfg).__newindex = "
 		       "function(table, index)\n"
@@ -751,7 +779,8 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	    lua_pcall(L, 0, 0, 0) != 0) {
 		panic("%s", lua_tostring(L, -1));
 	}
-	lua_pop(L, 1);	/* cleanup stack */
+	lua_pop(L, 1);
+
 	/*
 	 * Invoke a user-defined on_reload_configuration hook,
 	 * if it exists. Do it after everything else is done.
