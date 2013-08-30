@@ -1,137 +1,176 @@
 -- setopt delim ';'
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum');
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num');
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 ----------------
 -- # box.raise
 ----------------
 1 + 1;
 ---
- - 2
+- 2
 ...
 box.raise(123, 'test');
 ---
-error: 'test'
+- error: test
 ...
 box.raise(0, 'the other test');
 ---
-error: 'box.raise(): unknown error code'
+- error: 'box.raise(): unknown error code'
 ...
 box.raise(12, 345);
 ---
-error: '345'
+- error: '345'
 ...
 ----------------
 -- # box.stat
 ----------------
+t = {};
+---
+...
 for k, v in pairs(box.stat()) do
-    print(' - ', k)
+    table.insert(t, k)
 end;
 ---
- - DELETE
- - SELECT
- - REPLACE
- - CALL
- - UPDATE
- - DELETE_1_3
 ...
 for k, v in pairs(box.stat().DELETE) do
-    print(' - ', k)
+    table.insert(t, k)
 end;
 ---
- - total
- - rps
 ...
 for k, v in pairs(box.stat.DELETE) do
-    print(' - ', k)
+    table.insert(t, k)
 end;
 ---
- - total
- - rps
+...
+t;
+---
+- - DELETE
+  - SELECT
+  - REPLACE
+  - CALL
+  - UPDATE
+  - DELETE_1_3
+  - total
+  - rps
+  - total
+  - rps
 ...
 ----------------
 -- # box.space
 ----------------
 type(box);
 ---
- - table
+- table
 ...
 type(box.space);
 ---
- - table
+- table
 ...
 box.cfg.memcached_space;
 ---
- - 23
+- 23
+...
+t = {};
+---
 ...
 for i, v in pairs(box.space[0].index[0].key_field[0]) do
-    print(i, ' : ', v)
+    table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 ---
-type : NUM
-fieldno : 0
+...
+t;
+---
+- - 'type : NUM'
+  - 'fieldno : 0'
 ...
 ----------------
 -- # box.space
 ----------------
-string.match(tostring(box.slab), '^table:') ~= nil;
+string.match(tostring(box.slab.info()), '^table:') ~= nil;
 ---
- - true
+- true
 ...
-box.slab.arena_used >= 0;
+box.slab.info().arena_used >= 0;
 ---
- - true
+- true
 ...
-box.slab.arena_size > 0;
+box.slab.info().arena_size > 0;
 ---
- - true
+- true
 ...
-string.match(tostring(box.slab.slabs), '^table:') ~= nil;
+string.match(tostring(box.slab.info().slabs), '^table:') ~= nil;
 ---
- - true
+- true
 ...
-for k, v in pairs(box.slab()) do
-    print(' - ', k)
+t = {};
+---
+...
+for k, v in pairs(box.slab.info()) do
+    table.insert(t, k)
 end;
 ---
- - slabs
- - arena_size
- - arena_used
+...
+t;
+---
+- - slabs
+  - arena_size
+  - arena_used
 ...
 ----------------
 -- # box.error
 ----------------
+t = {}
 for k,v in pairs(box.error) do
-    print('box.error.', k, ' : ', v)
+   table.insert(t, 'box.error.'..tostring(k)..' : '..tostring(v))
 end;
 ---
-box.error.ER_ILLEGAL_PARAMS : 514
-box.error.ER_KEY_FIELD_TYPE : 9730
-box.error.ER_NONMASTER : 258
-box.error.ER_PROC_RET : 12290
-box.error.ER_TUPLE_IS_TOO_LONG : 11010
-box.error.ER_UNKNOWN_UPDATE_OP : 11266
-box.error.ER_EXACT_MATCH : 11522
-box.error.ER_TUPLE_FORMAT_LIMIT : 7170
-box.error.ER_FIELD_TYPE : 10242
-box.error.ER_TUPLE_FOUND : 14082
-box.error.ER_NO_SUCH_FIELD : 13826
-box.error.ER_OK : 0
-box.error.ER_NO_SUCH_INDEX : 13570
-box.error.ER_TUPLE_NOT_FOUND : 12546
-box.error.ER_FIBER_STACK : 6658
-box.error.ER_WAL_IO : 9986
-box.error.ER_SPACE_DISABLED : 13314
-box.error.ER_UNSUPPORTED : 2562
-box.error.ER_INJECTION : 2306
-box.error.ER_PROC_LUA : 13058
-box.error.ER_INDEX_TYPE : 1282
-box.error.ER_ARG_TYPE : 10498
-box.error.ER_NO_SUCH_SPACE : 14594
-box.error.ER_SECONDARY : 770
-box.error.ER_FIELD_TYPE_MISMATCH : 11778
-box.error.ER_NO_SUCH_PROC : 12802
-box.error.ER_SPLICE : 10754
-box.error.ER_KEY_PART_COUNT : 12034
-box.error.ER_SPACE_EXISTS : 1538
-box.error.ER_TUPLE_IS_RO : 1025
-box.error.ER_MEMORY_ISSUE : 1793
+...
+t;
+---
+- - 'box.error.ER_NO_SUCH_INDEX : 13570'
+  - 'box.error.ER_PROC_RET : 12290'
+  - 'box.error.ER_CREATE_SPACE : 2050'
+  - 'box.error.ER_TUPLE_FORMAT_LIMIT : 7170'
+  - 'box.error.ER_FIELD_TYPE : 10242'
+  - 'box.error.ER_OK : 0'
+  - 'box.error.ER_TUPLE_NOT_FOUND : 12546'
+  - 'box.error.ER_WAL_IO : 9986'
+  - 'box.error.ER_INJECTION : 2306'
+  - 'box.error.ER_DROP_PRIMARY_KEY : 7682'
+  - 'box.error.ER_INDEX_TYPE : 1282'
+  - 'box.error.ER_ARG_TYPE : 10498'
+  - 'box.error.ER_KEY_PART_COUNT : 12034'
+  - 'box.error.ER_MEMORY_ISSUE : 1793'
+  - 'box.error.ER_ILLEGAL_PARAMS : 514'
+  - 'box.error.ER_KEY_FIELD_TYPE : 9730'
+  - 'box.error.ER_NONMASTER : 258'
+  - 'box.error.ER_TUPLE_IS_TOO_LONG : 11010'
+  - 'box.error.ER_MODIFY_INDEX : 6914'
+  - 'box.error.ER_EXACT_MATCH : 11522'
+  - 'box.error.ER_SECONDARY : 770'
+  - 'box.error.ER_DROP_SPACE : 6146'
+  - 'box.error.ER_UNKNOWN_UPDATE_OP : 11266'
+  - 'box.error.ER_UNSUPPORTED : 2562'
+  - 'box.error.ER_NO_SUCH_SPACE : 14594'
+  - 'box.error.ER_TUPLE_FOUND : 14082'
+  - 'box.error.ER_NO_SUCH_FIELD : 13826'
+  - 'box.error.ER_SPACE_DISABLED : 13314'
+  - 'box.error.ER_ALTER_SPACE : 6402'
+  - 'box.error.ER_TUPLE_IS_RO : 1025'
+  - 'box.error.ER_FIBER_STACK : 6658'
+  - 'box.error.ER_PROC_LUA : 13058'
+  - 'box.error.ER_NO_SUCH_PROC : 12802'
+  - 'box.error.ER_SPLICE : 10754'
+  - 'box.error.ER_LAST_DROP : 7426'
+  - 'box.error.ER_SPACE_EXISTS : 1538'
+  - 'box.error.ER_FIELD_TYPE_MISMATCH : 11778'
+...
+box.space[0]:drop();
+---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
