@@ -79,7 +79,6 @@ class LuaTest(FuncTest):
                 matched2 = re.match(r"(.*)\s+server\s+(.*)", line)
                 matched3 = re.match(r"(.*)\s+connection\s+(.*)", line)
                 matched4 = re.match(r"(.*)\s+filter[s]?(\s+.*)?", line)
-
                 if matched1:
                     command = re.split(r'\s*=\s*|\s+|\s*,\s*', matched1.group(1))
                     command = { command[i] : command[i + 1] for i in xrange(0, len(command) - 1, 2) }
@@ -99,6 +98,8 @@ class LuaTest(FuncTest):
                                 temp_server.config = params['configuration'][1:-1]
                             else:
                                 temp_server.config = self.suite_ini['config']
+                            if 'need_init' in params:
+                                temp_server.need_init = False
                             if 'init' in params:
                                 temp_server.init_lua = params['init'][1:-1]
                                         
@@ -108,9 +109,11 @@ class LuaTest(FuncTest):
                             temp_server.configure(temp_server.config)
                             temp_server.install(temp_server.binary,
                                     temp_server.vardir, temp_server.mem, True)
-                            temp_server.init()
+                            if temp_server.need_init:
+                                temp_server.init()
                         elif matched2.group(1) == 'start':
                             name = matched2.group(2)
+                            print self.suite_ini['servers']
                             if name in self.suite_ini['servers']:
                                 self.suite_ini['servers'][name].start(silent=True)
                                 self.suite_ini['connections'][name] = self.suite_ini['servers'][name].admin
@@ -277,6 +280,7 @@ class TarantoolServer(Server):
         self.gdb = False
         self.valgrind = False
         self.installed = False
+        self.need_init = True
 
     def __del__(self):
         self.stop()
@@ -501,7 +505,7 @@ class TarantoolServer(Server):
 
     def deploy(self, config=None, binary=None, vardir=None,
                mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               valgrind_sup=None, init_lua=None, silent=True, need_init=True):
+               valgrind_sup=None, init_lua=None, silent=True, need_init=None):
         if config != None: self.config = config
         if binary != None: self.binary = binary
         if vardir != None: self.vardir = vardir
@@ -509,6 +513,7 @@ class TarantoolServer(Server):
         if start_and_exit != None: self.start_and_exit = start_and_exit
         if gdb != None: self.gdb = gdb
         if valgrind != None: self.valgrind = valgrind
+        if need_init != None: self.need_init = need_init
 
         if init_lua != None:
             self.init_lua = os.path.abspath(init_lua)
@@ -517,7 +522,7 @@ class TarantoolServer(Server):
 
         self.configure(self.config)
         self.install(self.binary, self.vardir, self.mem, silent)
-        if need_init:
+        if self.need_init:
             self.init()
         self.start(self.start_and_exit, self.gdb, self.valgrind, silent)
 
