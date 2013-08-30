@@ -26,72 +26,66 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/admin.h"
+
+#include "lua/errinj.h"
 
 extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+} /* extern "C" */
 
-#include <string.h>
 #include <say.h>
+#include <string.h>
 #include <errinj.h>
-#include "palloc.h"
-#include "salloc.h"
-#include "tbuf.h"
-#include "fiber.h"
+#include <recovery.h>
 #include "tarantool.h"
 #include "box/box.h"
-#include "lua/init.h"
 
 static int
-lbox_reload_configuration(struct lua_State *L)
+lbox_errinj_set(struct lua_State *L)
 {
-	struct tbuf *err = tbuf_new(fiber->gc_pool);
-	if (reload_cfg(err)) {
-		lua_pushfstring(L, "error: %s", err->data);
+	char *name = (char*)luaL_checkstring(L, 1);
+	bool state = lua_toboolean(L, 2);
+	if (errinj_set_byname(name, state)) {
+		lua_pushfstring(L, "error: can't find error injection '%s'", name);
 		return 1;
 	}
-	return 0;
-}
-
-static int
-lbox_save_coredump(struct lua_State *L __attribute__((unused)))
-{
-	coredump(60);
 	lua_pushstring(L, "ok");
 	return 1;
 }
 
-static int
-lbox_save_snapshot(struct lua_State *L)
+static inline int
+lbox_errinj_cb(struct errinj *e, void *cb_ctx)
 {
-	int ret = snapshot();
-	if (ret == 0) {
-		lua_pushstring(L, "ok");
-		return 1;
-	}
-	lua_pushfstring(L, "error: can't save snapshot, errno %d (%s)",
-	                ret, strerror(ret));
+	struct lua_State *L = (struct lua_State*)cb_ctx;
+	lua_pushstring(L, e->name);
+	lua_newtable(L);
+	lua_pushstring(L, "state");
+	lua_pushboolean(L, e->state);
+	lua_settable(L, -3);
+	lua_settable(L, -3);
+	return 0;
+}
+
+static int
+lbox_errinj_info(struct lua_State *L)
+{
+	lua_newtable(L);
+	errinj_foreach(lbox_errinj_cb, L);
 	return 1;
 }
 
-int tarantool_lua_admin_init(struct lua_State *L)
+static const struct luaL_reg errinjlib[] = {
+	{"info", lbox_errinj_info},
+	{"set", lbox_errinj_set},
+	{NULL, NULL}
+};
+
+/** Initialize box.errinj package. */
+void
+tarantool_lua_errinj_init(struct lua_State *L)
 {
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "snapshot");
-	lua_pushcfunction(L, lbox_save_snapshot);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "coredump");
-	lua_pushcfunction(L, lbox_save_coredump);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "cfg_reload");
-	lua_pushcfunction(L, lbox_reload_configuration);
-	lua_settable(L, -3);
-
+	luaL_register(L, "box.errinj", errinjlib);
 	lua_pop(L, 1);
-	return 0;
 }

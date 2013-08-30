@@ -1,14 +1,14 @@
 -- box.uuid()
 string.len(box.uuid())
 ---
- - 16
+- 16
 ...
 string.len(box.uuid_hex())
 ---
- - 32
+- 32
 ...
 string.match(box.uuid_hex(), '^[a-f0-9]+$') ~= nil
 ---
- - true
+- true
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

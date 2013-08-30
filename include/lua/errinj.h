@@ -1,3 +1,6 @@
+#ifndef INCLUDES_TARANTOOL_LUA_ERRINJ_H
+#define INCLUDES_TARANTOOL_LUA_ERRINJ_H
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,72 +29,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/admin.h"
 
-extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
+struct lua_State;
+void tarantool_lua_errinj_init(struct lua_State *L);
 
-#include <string.h>
-#include <say.h>
-#include <errinj.h>
-#include "palloc.h"
-#include "salloc.h"
-#include "tbuf.h"
-#include "fiber.h"
-#include "tarantool.h"
-#include "box/box.h"
-#include "lua/init.h"
-
-static int
-lbox_reload_configuration(struct lua_State *L)
-{
-	struct tbuf *err = tbuf_new(fiber->gc_pool);
-	if (reload_cfg(err)) {
-		lua_pushfstring(L, "error: %s", err->data);
-		return 1;
-	}
-	return 0;
-}
-
-static int
-lbox_save_coredump(struct lua_State *L __attribute__((unused)))
-{
-	coredump(60);
-	lua_pushstring(L, "ok");
-	return 1;
-}
-
-static int
-lbox_save_snapshot(struct lua_State *L)
-{
-	int ret = snapshot();
-	if (ret == 0) {
-		lua_pushstring(L, "ok");
-		return 1;
-	}
-	lua_pushfstring(L, "error: can't save snapshot, errno %d (%s)",
-	                ret, strerror(ret));
-	return 1;
-}
-
-int tarantool_lua_admin_init(struct lua_State *L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "snapshot");
-	lua_pushcfunction(L, lbox_save_snapshot);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "coredump");
-	lua_pushcfunction(L, lbox_save_coredump);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "cfg_reload");
-	lua_pushcfunction(L, lbox_reload_configuration);
-	lua_settable(L, -3);
-
-	lua_pop(L, 1);
-	return 0;
-}
+#endif /* INCLUDES_TARANTOOL_LUA_ERRINJ_H */

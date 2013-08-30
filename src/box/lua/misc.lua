@@ -80,6 +80,8 @@ function help()
 		"box.slab.check()",
 		"box.fiber.info()",
 		"box.plugin.info()",
+		"box.errinj.info()",
+		"box.errinj.set()",
 		"box.cfg()",
 		"box.cfg_reload()",
 		"box.coredump()"
