@@ -3,22 +3,25 @@ import yaml
 import time
 from signal import SIGUSR1
 
+admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
+admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
+
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/686411
-# Check that 'save snapshot' does not overwrite a snapshot
+# Check that 'box.snapshot()' does not overwrite a snapshot
 # file that already exists. Verify also that any other
 # error that happens when saving snapshot is propagated
 # to the caller.
 """
 sql("insert into t0 values (1, 'first tuple')")
-admin("save snapshot")
+admin("box.snapshot()")
 
 # In absence of data modifications, two consecutive
-# 'save snapshot' statements will try to write
+# 'box.snapshot()' statements will try to write
 # into the same file, since file name is based
 # on LSN.
 #  Don't allow to overwrite snapshots.
-admin("save snapshot")
+admin("box.snapshot()")
 #
 # Increment LSN
 sql("insert into t0 values (2, 'second tuple')")
@@ -26,7 +29,7 @@ sql("insert into t0 values (2, 'second tuple')")
 # Check for other errors, e.g. "Permission denied".
 print "# Make 'var' directory read-only."
 os.chmod(vardir, 0555)
-admin("save snapshot")
+admin("box.snapshot()")
 
 # cleanup
 os.chmod(vardir, 0755)
@@ -44,11 +47,10 @@ print """
 
 sql("insert into t0 values (1, 'Test tuple')")
 
-result = admin("show info", silent=True)
-info = yaml.load(result)["info"]
+pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
+lsn = yaml.load(admin("box.info.lsn", silent=True))[0]
 
-pid = info["pid"]
-snapshot = str(info["lsn"]).zfill(20) + ".snap"
+snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(vardir, snapshot)
 
 iteration = 0
@@ -66,6 +68,6 @@ if iteration == 0 or iteration >= MAX_ITERATIONS:
 else:
   print "Snapshot exists."
 
-sql("delete from t0 where k0=1")
+admin("box.space[0]:drop()")
 
 # vim: syntax=python spell

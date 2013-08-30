@@ -1,26 +1,34 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 #
 # A test case for: http://bugs.launchpad.net/bugs/686411
-# Check that 'save snapshot' does not overwrite a snapshot
+# Check that 'box.snapshot()' does not overwrite a snapshot
 # file that already exists. Verify also that any other
 # error that happens when saving snapshot is propagated
 # to the caller.
 
 insert into t0 values (1, 'first tuple')
 Insert OK, 1 row affected
-save snapshot
+box.snapshot()
 ---
-ok
+- ok
 ...
-save snapshot
+box.snapshot()
 ---
-fail: can't save snapshot, errno 17 (File exists)
+- error: can't save snapshot, errno 17 (File exists)
 ...
 insert into t0 values (2, 'second tuple')
 Insert OK, 1 row affected
 # Make 'var' directory read-only.
-save snapshot
+box.snapshot()
 ---
-fail: can't save snapshot, errno 13 (Permission denied)
+- error: can't save snapshot, errno 13 (Permission denied)
 ...
 delete from t0 where k0 = 1
 Delete OK, 1 row affected
@@ -36,5 +44,6 @@ Delete OK, 1 row affected
 insert into t0 values (1, 'Test tuple')
 Insert OK, 1 row affected
 Snapshot exists.
-delete from t0 where k0=1
-Delete OK, 1 row affected
+box.space[0]:drop()
+---
+...
