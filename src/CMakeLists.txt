@@ -112,6 +112,7 @@ set (common_sources
      lua/admin.cc
      lua/info.cc
      lua/stat.cc
+     lua/errinj.cc
      lua/slab.cc
      lua/plugin.cc
      lua/lua_ipc.cc

@@ -77,27 +77,6 @@ lbox_save_snapshot(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_show_injections(struct lua_State *L)
-{
-	struct tbuf *out = tbuf_new(fiber->gc_pool);
-	errinj_info(out);
-	lua_pushstring(L, out->data);
-	return 1;
-}
-
-static int
-lbox_set_injection(struct lua_State *L)
-{
-	char *name = (char*)luaL_checkstring(L, 1);
-	int state = luaL_checkint(L, 2);
-	if (errinj_set_byname(name, state)) {
-		lua_pushfstring(L, "error: can't find error injection '%s'", name);
-		return 1;
-	}
-	return 0;
-}
-
 int tarantool_lua_admin_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
@@ -111,14 +90,6 @@ int tarantool_lua_admin_init(struct lua_State *L)
 
 	lua_pushstring(L, "cfg_reload");
 	lua_pushcfunction(L, lbox_reload_configuration);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "show_injections");
-	lua_pushcfunction(L, lbox_show_injections);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "set_injection");
-	lua_pushcfunction(L, lbox_set_injection);
 	lua_settable(L, -3);
 
 	lua_pop(L, 1);

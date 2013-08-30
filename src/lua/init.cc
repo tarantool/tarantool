@@ -49,6 +49,7 @@ extern "C" {
 #include "fiber.h"
 #include "lua/fiber.h"
 #include "lua/admin.h"
+#include "lua/errinj.h"
 #include "lua_ipc.h"
 #include "lua_socket.h"
 #include "lua/info.h"
@@ -554,6 +555,7 @@ tarantool_lua_init()
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_errinj_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_admin_init(L);
 	tarantool_lua_plugin_init(L);
