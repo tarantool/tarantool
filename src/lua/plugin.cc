@@ -57,7 +57,7 @@ lbox_plugin_info(struct lua_State *L)
 	lua_newtable(L);
 	lua_pushstring(L, "plugins");
 	lua_newtable(L);
-	plugins_stat(plugin_cb, L);
+	plugin_stat(plugin_cb, L);
 	lua_settable(L, -3);
 	return 1;
 }

@@ -1,124 +1,114 @@
 box.cfg.too_long_threshold
 ---
- - 0.5
+- 0.5
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - Could not accept read only 'slab_alloc_arena' option
- - Could not accept read only 'pid_file' option
- - Could not accept read only 'logger' option
- - Could not accept read only 'primary_port' option
- - Could not accept read only 'secondary_port' option
- - Could not accept read only 'admin_port' option
- - Could not accept read only 'rows_per_wal' option
- - Could not accept read only 'space[0].enabled' option
- - Could not accept read only 'space[0].index[0].type' option
- - Could not accept read only 'space[0].index[0].unique' option
- - Could not accept read only 'space[0].index[0].key_field[0].fieldno' option
- - Could not accept read only 'space[0].index[0].key_field[0].type' option
-...
-box.cfg.too_long_threshold
----
- - 0.5
-...
-reload configuration
----
-fail:
- - Option 'primary_port' is not set (or has a default value)
- - Option 'space[0].enabled' is not set (or has a default value)
- - Option 'space[0].index[0].type' is not set (or has a default value)
- - Option 'space[0].index[0].key_field[0].fieldno' is not set (or has a default value)
-...
-reload configuration
----
-fail:
- - at least one space or memcached port must be defined
-...
-reload configuration
----
-fail:
- - Could not accept read only 'space[1].enabled' option
-...
-reload configuration
----
-fail:
- - Could not accept read only 'space[0].index[0].key_field[1].fieldno' option
-...
-reload configuration
----
-ok
+- error: 'Could not accept read only ''slab_alloc_arena'' option.
+
+    Could not accept read only ''pid_file'' option.
+
+    Could not accept read only ''logger'' option.
+
+    Could not accept read only ''primary_port'' option.
+
+    Could not accept read only ''secondary_port'' option.
+
+    Could not accept read only ''admin_port'' option.
+
+    Could not accept read only ''rows_per_wal'' option.
+
+'
 ...
 box.cfg.too_long_threshold
 ---
- - 2
+- 0.5
+...
+box.cfg.reload()
+---
+- ok
+...
+box.cfg.too_long_threshold
+---
+- 2
 ...
 box.cfg.snap_io_rate_limit
 ---
- - 10
+- 10
 ...
 box.cfg.io_collect_interval
 ---
- - 0.01
+- 0.01
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - empty configuration file 'tarantool.cfg'
-...
-box.cfg.too_long_threshold
----
- - 2
-...
-reload configuration
----
-fail:
- - can't open config `tarantool.cfg'
-...
-reload configuration
----
-ok
+- error: 'empty configuration file ''tarantool.cfg''.
+
+'
 ...
 box.cfg.too_long_threshold
 ---
- - 0.5
+- 2
+...
+box.cfg.reload()
+---
+- error: 'can''t open config `tarantool.cfg''.
+
+'
+...
+box.cfg.reload()
+---
+- ok
+...
+box.cfg.too_long_threshold
+---
+- 0.5
 ...
 #
 # A test case for http://bugs.launchpad.net/bugs/712447:
 # Valgrind reports use of not initialized memory after 'reload
 # configuration'
 #
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 insert into t0 values (1, 'tuple')
 Insert OK, 1 row affected
-save snapshot
+box.snapshot()
 ---
-ok
+- ok
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - can't open config `tarantool.cfg'
+- error: 'can''t open config `tarantool.cfg''.
+
+'
 ...
 insert into t0 values (2, 'tuple 2')
 Insert OK, 1 row affected
-save snapshot
+box.snapshot()
 ---
-ok
+- ok
 ...
-reload configuration
+box.cfg.reload()
 ---
-ok
+- ok
 ...
 insert into t0 values (3, 'tuple 3')
 Insert OK, 1 row affected
-save snapshot
+box.snapshot()
 ---
-ok
+- ok
 ...
-reload configuration
+box.cfg.reload()
 ---
-ok
+- ok
 ...
-box.space[0]:truncate()
+box.space[0]:drop()
 ---
 ...

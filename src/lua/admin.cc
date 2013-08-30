@@ -46,17 +46,6 @@ extern "C" {
 #include "lua/init.h"
 
 static int
-lbox_reload_configuration(struct lua_State *L)
-{
-	struct tbuf *err = tbuf_new(fiber->gc_pool);
-	if (reload_cfg(err)) {
-		lua_pushfstring(L, "error: %s", err->data);
-		return 1;
-	}
-	return 0;
-}
-
-static int
 lbox_save_coredump(struct lua_State *L __attribute__((unused)))
 {
 	coredump(60);
@@ -72,8 +61,8 @@ lbox_save_snapshot(struct lua_State *L)
 		lua_pushstring(L, "ok");
 		return 1;
 	}
-	lua_pushfstring(L, "error: can't save snapshot, errno %d (%s)",
-	                ret, strerror(ret));
+	luaL_error(L, "can't save snapshot, errno %d (%s)",
+		   ret, strerror(ret));
 	return 1;
 }
 
@@ -86,10 +75,6 @@ int tarantool_lua_admin_init(struct lua_State *L)
 
 	lua_pushstring(L, "coredump");
 	lua_pushcfunction(L, lbox_save_coredump);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "cfg_reload");
-	lua_pushcfunction(L, lbox_reload_configuration);
 	lua_settable(L, -3);
 
 	lua_pop(L, 1);

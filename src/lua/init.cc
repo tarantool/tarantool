@@ -398,7 +398,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
  * show statistics for all loaded plugins
  */
 int
-plugins_stat(tarantool_plugin_stat_cb cb, void *cb_ctx)
+plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx)
 {
 	int res;
 	struct tarantool_plugin *p;
@@ -704,11 +704,10 @@ static int
 lbox_cfg_reload(struct lua_State *L)
 {
 	struct tbuf *err = tbuf_new(fiber->gc_pool);
-	if (reload_cfg(err)) {
-		lua_pushfstring(L, "error: %s", err->data);
-		return 1;
-	}
-	return 0;
+	if (reload_cfg(err))
+		luaL_error(L, err->data);
+	lua_pushstring(L, "ok");
+	return 1;
 }
 
 /**

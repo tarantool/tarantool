@@ -117,7 +117,7 @@ int luaL_pushnumber64(struct lua_State *L, uint64_t val);
  */
 typedef int (*tarantool_plugin_stat_cb)(struct tarantool_plugin *p, void *cb_ctx);
 
-int plugins_stat(tarantool_plugin_stat_cb cb, void *cb_ctx);
+int plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx);
 
 /**
  * @brief A palloc-like wrapper to allocate memory using lua_newuserdata

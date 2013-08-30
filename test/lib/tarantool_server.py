@@ -230,7 +230,7 @@ class TarantoolServer(Server):
         else:
             self.config = os.path.abspath(config)
             shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
-        self.admin.execute("reload configuration", silent=silent)
+        self.admin.execute("box.cfg.reload()", silent=silent)
 
     def init(self):
         # init storage
