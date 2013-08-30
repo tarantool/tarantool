@@ -115,8 +115,8 @@ set (common_sources
      lua/errinj.cc
      lua/slab.cc
      lua/plugin.cc
-     lua/lua_ipc.cc
-     lua/lua_socket.cc
+     lua/ipc.cc
+     lua/socket.cc
      lua/session.cc
      lua/cjson.cc
      lua/yaml.cc
