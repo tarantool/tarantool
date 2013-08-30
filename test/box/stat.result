@@ -1,3 +1,11 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 #
 # check stat_cleanup
 #  add several tuples
@@ -23,15 +31,26 @@ insert into t0 values (8, 'tuple')
 Insert OK, 1 row affected
 insert into t0 values (9, 'tuple')
 Insert OK, 1 row affected
-show stat
+box.stat()
 ---
-statistics:
-  REPLACE:    { rps:  2    , total:  10          }
-  SELECT:     { rps:  0    , total:  0           }
-  UPDATE:     { rps:  0    , total:  0           }
-  DELETE_1_3: { rps:  0    , total:  0           }
-  DELETE:     { rps:  0    , total:  0           }
-  CALL:       { rps:  0    , total:  0           }
+- DELETE:
+    total: 0
+    rps: 0
+  SELECT:
+    total: 0
+    rps: 0
+  REPLACE:
+    total: 12
+    rps: 2
+  CALL:
+    total: 0
+    rps: 0
+  UPDATE:
+    total: 0
+    rps: 0
+  DELETE_1_3:
+    total: 0
+    rps: 0
 ...
 #
 # restart server
@@ -41,33 +60,27 @@ statistics:
 # statistics must be zero
 #
 
-show stat
+box.stat()
 ---
-statistics:
-  REPLACE:    { rps:  0    , total:  0           }
-  SELECT:     { rps:  0    , total:  0           }
-  UPDATE:     { rps:  0    , total:  0           }
-  DELETE_1_3: { rps:  0    , total:  0           }
-  DELETE:     { rps:  0    , total:  0           }
-  CALL:       { rps:  0    , total:  0           }
+- DELETE:
+    total: 0
+    rps: 0
+  SELECT:
+    total: 0
+    rps: 0
+  REPLACE:
+    total: 0
+    rps: 0
+  CALL:
+    total: 0
+    rps: 0
+  UPDATE:
+    total: 0
+    rps: 0
+  DELETE_1_3:
+    total: 0
+    rps: 0
 ...
-delete from t0 where k0 = 0
-Delete OK, 1 row affected
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
-delete from t0 where k0 = 2
-Delete OK, 1 row affected
-delete from t0 where k0 = 3
-Delete OK, 1 row affected
-delete from t0 where k0 = 4
-Delete OK, 1 row affected
-delete from t0 where k0 = 5
-Delete OK, 1 row affected
-delete from t0 where k0 = 6
-Delete OK, 1 row affected
-delete from t0 where k0 = 7
-Delete OK, 1 row affected
-delete from t0 where k0 = 8
-Delete OK, 1 row affected
-delete from t0 where k0 = 9
-Delete OK, 1 row affected
+box.space[0]:drop()
+---
+...
