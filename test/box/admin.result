@@ -117,12 +117,10 @@ box.info()
   recovery_lag: 0
   uptime: <uptime>
   build:
-    flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables
-      -std=c11 -Wall -Wextra -Wno-sign-compare -Wno-strict-aliasing -Werror -pthread'
-    target: Linux-i686-Debug
-    compiler: /usr/bin/gcc /usr/bin/c++
-    options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_TRACE=ON
-      -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=ON
+    flags: <flags>
+    target: <target>
+    compiler: <compiler>
+    options: <options>
   logger_pid: <pid>
   config: tarantool.cfg
 ...
