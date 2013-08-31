@@ -322,7 +322,27 @@ static void
 init_update_op_delete(struct tuple_update *update, struct update_op *op)
 {
 	op_adjust_field_no(op, rope_size(update->rope) - 1);
-	rope_erase(update->rope, op->field_no);
+
+	uint32_t delete_count = 1;
+	if (op->arg.set.length > 0) {
+		/* Check the operand type, if present. */
+		if (op->arg.set.length != sizeof(int32_t))
+			tnt_raise(ClientError, ER_ARG_TYPE,
+				  op->field_no, "NUM");
+
+		delete_count = *(int32_t *)op->arg.set.value;
+		if (delete_count == UINT32_MAX)
+			delete_count = rope_size(update->rope) - op->field_no;
+		else if (op->field_no + delete_count > rope_size(update->rope))
+			delete_count = rope_size(update->rope) - op->field_no;
+
+		if (delete_count == 0)
+			tnt_raise(ClientError, ER_UPDATE_FIELD,
+				  op->field_no, "cannot delete 0 fields");
+	}
+
+	for (uint32_t u = 0; u < delete_count; u++)
+		rope_erase(update->rope, op->field_no);
 }
 
 static void
@@ -524,10 +544,6 @@ update_calc_new_tuple_length(struct tuple_update *update)
 	}
 
 	update->new_tuple_fcount = rope_size(update->rope);
-
-	if (update->new_tuple_size > UINT32_MAX)
-		tnt_raise(ClientError, ER_TUPLE_IS_TOO_LONG,
-			  update->new_tuple_size);
 }
 
 static void

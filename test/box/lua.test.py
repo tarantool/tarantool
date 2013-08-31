@@ -398,6 +398,17 @@ sql("call box.update('0', 'tes4', '#p', 0, '')")
 admin("box.update(0, 'tes5', '#p', 0, '')")
 admin("box.space[0]:truncate()")
 
+# test delete multiple fields
+admin("box.insert(0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)")
+admin("box.update(0, 0, '#p', 42, 1)")
+admin("box.update(0, 0, '#p', 3, 'abirvalg')")
+admin("box.update(0, 0, '#p#p#p', 1, 1, 3, 2, 5, 1)")
+admin("box.update(0, 0, '#p', 3, 3)")
+admin("box.update(0, 0, '#p', 4, 123456)")
+admin("box.update(0, 0, '#p', 2, 4294967295)")
+admin("box.update(0, 0, '#p', 1, 0)")
+admin("box.space[0]:truncate()")
+
 print """
 # test box.update: INSERT field
 """

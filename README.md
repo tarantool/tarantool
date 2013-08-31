@@ -11,8 +11,8 @@ Key features of the system:
  * Lua functions, procedures, triggers, with
    rich access to database API, JSON support,
    inter-procedure and network communication libraries
- * a command line client supporting simple SQL,
-   a native Lua console and Memcached text protocol.
+ * a command line client supporting simple SQL and
+   a native Lua console
 
 Tarantool is ideal for data-enriched components of 
 scalable Web architecture: traditional database caches, queue

@@ -493,8 +493,8 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                     <member><code>:p</code> &mdash; splice a
                     field: start at offset, cut length bytes, and add a
                     string.</member>
-                    <member><code>#p</code> &mdash; delete a
-                    field.</member>
+                    <member><code>#p</code> &mdash; delete specified
+                    number of fields.</member>
                     <member><code>!p</code> &mdash; insert a field
                     (before the one specified).</member>
                 </simplelist>
@@ -528,6 +528,14 @@ localhost> lua box.update(0, 2, '!p', 1, 'Bienvenue tout le monde!')
 localhost> lua box.update(0, 2, '#p', 2, 1)
 ---
  - 2: {'Bienvenue tout le monde!'}
+...
+localhost> lua box.insert(0, 3, 'crocodile', 'giraffe', 'baobab', 'bamblebee', 'hippopotamus', 'rhino')
+---
+ - 3: {'crocodile', 'giraffe', 'baobab', 'bamblebee', 'hippopotamus', 'rhino'}
+...
+localhost> lua box.update(0, 3, '#p', 3, 2)
+---
+ - 3: {'crocodile', 'giraffe', 'hippopotamus', 'rhino'}
 ...
 </programlisting>
             </para>
