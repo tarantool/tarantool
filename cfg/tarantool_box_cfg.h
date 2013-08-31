@@ -151,21 +151,6 @@ typedef struct tarantool_cfg {
 	 */
 	char*	custom_proc_title;
 
-	/* Memcached protocol support is enabled if memcached_port is set */
-	int32_t	memcached_port;
-
-	/* space used for memcached emulation */
-	int32_t	memcached_space;
-
-	/* Memcached expiration is on if memcached_expire is set. */
-	confetti_bool_t	memcached_expire;
-
-	/* maximum rows to consider per expire loop iteration */
-	int32_t	memcached_expire_per_loop;
-
-	/* tarantool will try to iterate over all rows within this time */
-	double	memcached_expire_full_sweep;
-
 	/*
 	 * Replication mode (if enabled, the server, once
 	 * bound to the primary port, will connect to

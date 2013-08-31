@@ -1,4 +1,3 @@
-
 ## BOX
 
 # Primary port (where updates are accepted)
@@ -13,17 +12,6 @@ too_long_threshold=0.5
 # A custom process list (ps) title string, appended after the standard
 # program title.
 custom_proc_title=NULL, ro
-
-# Memcached protocol support is enabled if memcached_port is set
-memcached_port=0, ro
-# space used for memcached emulation
-memcached_space=23, ro
-# Memcached expiration is on if memcached_expire is set.
-memcached_expire=false, ro
-# maximum rows to consider per expire loop iteration
-memcached_expire_per_loop=1024
-# tarantool will try to iterate over all rows within this time
-memcached_expire_full_sweep=3600.0
 
 # Replication mode (if enabled, the server, once
 # bound to the primary port, will connect to

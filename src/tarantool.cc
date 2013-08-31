@@ -67,7 +67,6 @@ extern "C" {
 } /* extern "C" */
 #include "tt_pthread.h"
 #include "lua/init.h"
-#include "memcached.h"
 #include "session.h"
 #include "box/box.h"
 #include "bootstrap.h"
@@ -111,10 +110,9 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port,
-			cfg.replication_port };
+			cfg.admin_port, cfg.replication_port };
 	int *pptr = ports;
-	const char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
+	const char *names[] = { "pri", "sec", "adm", "rpl", NULL };
 	const char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -167,10 +165,6 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 		return -1;
 
 	if (replication_check_config(conf) != 0)
-		return -1;
-
-	/* check memcached configuration */
-	if (memcached_check_config(conf) != 0)
 		return -1;
 
 	return box_check_config(conf);
@@ -284,8 +278,6 @@ reload_cfg(struct tbuf *out)
 	if (box_reload_config(&cfg, &new_cfg) != 0)
 		return -1;
 
-	if (memcached_reload_config(&cfg, &new_cfg) != 0)
-		return -1;
 	/* All OK, activate the config. */
 	swap_tarantool_cfg(&cfg, &new_cfg);
 	tarantool_lua_load_cfg(tarantool_L, &cfg);
@@ -883,12 +875,6 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(tarantool_L);
-		/*
-		 * And when recovery is finalized, memcached
-		 * expire loop is started, so binding can happen
-		 * only after memcached is initialized.
-		 */
-		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
 		prelease(fiber->gc_pool);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering the event loop");

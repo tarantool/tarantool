@@ -73,7 +73,7 @@ type(box.space);
 ...
 box.cfg.memcached_space;
 ---
-- 23
+{}
 ...
 t = {};
 ---

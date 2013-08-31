@@ -17,41 +17,6 @@ if (CMAKE_COMPILER_IS_GNUCC)
     add_compile_flags("C;CXX" "-pthread")
 endif()
 
-#
-# Build memcached.cc from memcached.rl, but only if memcached.rl was changed.
-# We track memcached.cc in revision control, and thus do not
-# require engineers who do not modify .rl files to have Ragel
-# installed.
-#
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMAND ${RAGEL} -G2 src/memcached-grammar.rl
-                     -o src/memcached-grammar.cc
-    DEPENDS ${CMAKE_SOURCE_DIR}/src/memcached-grammar.rl)
-
-add_custom_target(generate_admin_cc DEPENDS ${CMAKE_SOURCE_DIR}/src/admin.cc)
-add_custom_target(generate_memcached_grammar_cc DEPENDS
-    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc)
-
-# do not randomly try to re-generate admin.cc or memcached-grammar.cc
-# after a fresh checkout/branch switch.
-execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/admin.cc
-    ${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc)
-
-set_source_files_properties(${CMAKE_SOURCE_DIR}/src/memcached-grammar.cc
-    PROPERTIES HEADER_FILE_ONLY true)
-
-set_source_files_properties(memcached.cc
-    PROPERTIES COMPILE_FLAGS "-Wno-uninitialized")
-
-#
-# # Do not clean admin.cc, memcached.cc or other
-# generated files in 'make clean' -- they are under
-# revision control.
-#
-set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
-
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
@@ -74,7 +39,6 @@ set (recompiled_sources
      ${CMAKE_SOURCE_DIR}/src/say.cc
      ${CMAKE_SOURCE_DIR}/src/assoc.cc
      ${CMAKE_SOURCE_DIR}/src/replication.cc
-     ${CMAKE_SOURCE_DIR}/src/memcached.cc
      ${CMAKE_SOURCE_DIR}/src/fiber.cc)
 
 set (common_sources
@@ -206,7 +170,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
         "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
-    add_dependencies(lt${mod} generate_headers generate_admin_cc generate_memcached_grammar_cc build_bundled_libs)
+    add_dependencies(lt${mod} generate_headers generate_admin_cc build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
 
