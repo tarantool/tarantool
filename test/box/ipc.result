@@ -3,51 +3,51 @@ ch = box.ipc.channel()
 ...
 ch:is_full()
 ---
- - false
+- false
 ...
 ch:is_empty()
 ---
- - true
+- true
 ...
 ch:get(.1)
 ---
- - nil
+{}
 ...
 ch:put()
 ---
-error: 'usage: channel:put(var [, timeout])'
+- error: 'usage: channel:put(var [, timeout])'
 ...
 ch:put('test')
 ---
- - true
+- true
 ...
 ch:get()
 ---
- - test
+- test
 ...
 ch:get('wrong timeout')
 ---
-error: 'timeout must be a number'
+- error: timeout must be a number
 ...
 ch:get(-10)
 ---
-error: 'wrong timeout'
+- error: wrong timeout
 ...
 ch:put(234)
 ---
- - true
+- true
 ...
 ch:put(345, .5)
 ---
- - false
+- false
 ...
 ch:is_full()
 ---
- - true
+- true
 ...
 ch:is_empty()
 ---
- - false
+- false
 ...
 buffer = {}
 ---
@@ -66,102 +66,116 @@ tfbr = box.fiber.create(
 box.fiber.resume(tfbr);
 ---
 ...
+t = {};
+---
+...
 for i = 1, 10 do
-    print(i, ' : ', ch:put(i, 0.1))
+    table.insert(t, {i, ch:put(i, 0.1)})
 end;
 ---
-1 : true
-2 : true
-3 : true
-4 : true
-5 : true
-6 : true
-7 : true
-8 : true
-9 : true
-10 : true
+...
+t;
+---
+- - - 1
+    - true
+  - - 2
+    - true
+  - - 3
+    - true
+  - - 4
+    - true
+  - - 5
+    - true
+  - - 6
+    - true
+  - - 7
+    - true
+  - - 8
+    - true
+  - - 9
+    - true
+  - - 10
+    - true
 ...
 ch:has_readers();
 ---
- - true
+- true
 ...
 ch:has_writers();
 ---
- - false
+- false
 ...
 box.fiber.cancel(tfbr);
 ---
 ...
 ch:has_readers();
 ---
- - false
+- false
 ...
 ch:has_writers();
 ---
- - false
+- false
 ...
 ch:put(box.info.pid);
 ---
- - true
+- true
 ...
 ch:is_full();
 ---
- - true
+- true
 ...
 ch:is_empty();
 ---
- - false
+- false
 ...
 ch:get(box.info.pid) == box.info.pid;
 ---
- - true
+- true
 ...
-for i, v in pairs(buffer) do
-    print(v)
-end;
+buffer;
 ---
-234
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
+- - 234
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
 ...
 ch:is_empty();
 ---
- - true
+- true
 ...
 ch:broadcast();
 ---
-error: 'usage: channel:broadcast(variable)'
+- error: 'usage: channel:broadcast(variable)'
 ...
 ch:broadcast(123);
 ---
- - true
+- true
 ...
 ch:get();
 ---
- - 123
+- 123
 ...
 ch:is_full();
 ---
- - false
+- false
 ...
 ch:is_empty();
 ---
- - true
+- true
 ...
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
         while true do
             local v = ch:get()
-            table.insert(buffer, 'tfbr  - ' .. tostring(v))
+            table.insert(buffer, {'tfbr', tostring(v)})
         end
     end
 );
@@ -175,7 +189,7 @@ tfbr2 = box.fiber.create(
         box.fiber.detach()
         while true do
             local v = ch:get()
-            table.insert(buffer, 'tfbr2 - ' .. tostring(v))
+            table.insert(buffer, {'tfbr2', tostring(v)})
         end
     end
 );
@@ -188,74 +202,99 @@ box.fiber.resume(tfbr2);
 buffer = {}
 ---
 ...
-for i, v in pairs(buffer) do print(' - ', v) end
+buffer
 ---
+- {}
 ...
 ch:is_full()
 ---
- - false
+- false
 ...
 ch:is_empty()
 ---
- - true
+- true
 ...
 ch:put(1)
 ---
- - true
+- true
 ...
 ch:put(2)
 ---
- - true
+- true
 ...
 ch:put(3)
 ---
- - true
+- true
 ...
 ch:put(4)
 ---
- - true
+- true
 ...
 ch:put(5)
 ---
- - true
+- true
 ...
 ch:broadcast('broadcast message!')
 ---
- - 2
+- 2
 ...
-for i = 35, 45 do print(' - ', ch:put(i)) end
+t = {}
 ---
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
 ...
-for i, v in pairs(buffer) do print(' - "', v, '"') end
+for i = 35, 45 do table.insert(t, ch:put(i)) end
 ---
- - "tfbr  - 1"
- - "tfbr2 - 2"
- - "tfbr  - 3"
- - "tfbr2 - 4"
- - "tfbr  - 5"
- - "tfbr2 - broadcast message!"
- - "tfbr  - broadcast message!"
- - "tfbr2 - 35"
- - "tfbr  - 36"
- - "tfbr2 - 37"
- - "tfbr  - 38"
- - "tfbr2 - 39"
- - "tfbr  - 40"
- - "tfbr2 - 41"
- - "tfbr  - 42"
- - "tfbr2 - 43"
- - "tfbr  - 44"
- - "tfbr2 - 45"
+...
+t
+---
+- - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+...
+buffer
+---
+- - - tfbr
+    - '1'
+  - - tfbr2
+    - '2'
+  - - tfbr
+    - '3'
+  - - tfbr2
+    - '4'
+  - - tfbr
+    - '5'
+  - - tfbr2
+    - broadcast message!
+  - - tfbr
+    - broadcast message!
+  - - tfbr2
+    - '35'
+  - - tfbr
+    - '36'
+  - - tfbr2
+    - '37'
+  - - tfbr
+    - '38'
+  - - tfbr2
+    - '39'
+  - - tfbr
+    - '40'
+  - - tfbr2
+    - '41'
+  - - tfbr
+    - '42'
+  - - tfbr2
+    - '43'
+  - - tfbr
+    - '44'
+  - - tfbr2
+    - '45'
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -22,9 +22,11 @@ tfbr = box.fiber.create(
     end
 );
 box.fiber.resume(tfbr);
+t = {};
 for i = 1, 10 do
-    print(i, ' : ', ch:put(i, 0.1))
+    table.insert(t, {i, ch:put(i, 0.1)})
 end;
+t;
 ch:has_readers();
 ch:has_writers();
 box.fiber.cancel(tfbr);
@@ -35,9 +37,7 @@ ch:put(box.info.pid);
 ch:is_full();
 ch:is_empty();
 ch:get(box.info.pid) == box.info.pid;
-for i, v in pairs(buffer) do
-    print(v)
-end;
+buffer;
 
 ch:is_empty();
 ch:broadcast();
@@ -51,7 +51,7 @@ tfbr = box.fiber.create(
         box.fiber.detach()
         while true do
             local v = ch:get()
-            table.insert(buffer, 'tfbr  - ' .. tostring(v))
+            table.insert(buffer, {'tfbr', tostring(v)})
         end
     end
 );
@@ -61,7 +61,7 @@ tfbr2 = box.fiber.create(
         box.fiber.detach()
         while true do
             local v = ch:get()
-            table.insert(buffer, 'tfbr2 - ' .. tostring(v))
+            table.insert(buffer, {'tfbr2', tostring(v)})
         end
     end
 );
@@ -70,7 +70,7 @@ box.fiber.resume(tfbr2);
 
 buffer = {}
 
-for i, v in pairs(buffer) do print(' - ', v) end
+buffer
 ch:is_full()
 ch:is_empty()
 ch:put(1)
@@ -79,7 +79,9 @@ ch:put(3)
 ch:put(4)
 ch:put(5)
 ch:broadcast('broadcast message!')
-for i = 35, 45 do print(' - ', ch:put(i)) end
+t = {}
+for i = 35, 45 do table.insert(t, ch:put(i)) end
+t
+buffer
 
-for i, v in pairs(buffer) do print(' - "', v, '"') end
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
