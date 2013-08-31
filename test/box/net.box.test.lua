@@ -1,36 +1,40 @@
+
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space = box.space[0]
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 type(remote)
 remote:ping()
 remote:ping()
 box.net.box.ping(remote)
-box.insert(0, 123, 'test1', 'test2')
-box.select(0, 0, 123)
-tuple = remote:select(0, 0, 123)
+space:insert(123, 'test1', 'test2')
+space:select(0, 123)
+tuple = remote:select(space.n, 0, 123)
 remote:call('box.select', '0', '0', 123)
 tuple
 type(tuple)
 #tuple
 
-box.update(0, 123, '=p', 1, 'test1-updated')
-remote:update(0, 123, '=p', 2, 'test2-updated')
+space:update(123, '=p', 1, 'test1-updated')
+remote:update(space.n, 123, '=p', 2, 'test2-updated')
 
-box.insert(0, 123, 'test1', 'test2')
-remote:insert(0, 123, 'test1', 'test2')
+space:insert(123, 'test1', 'test2')
+remote:insert(space.n, 123, 'test1', 'test2')
 
-remote:insert(0, 345, 'test1', 'test2')
-remote:select(0, 0, 345)
+remote:insert(space.n, 345, 'test1', 'test2')
+remote:select(space.n, 0, 345)
 remote:call('box.select', '0', '0', 345)
-box.select(0, 0, 345)
+space:select(0, 345)
 
-remote:replace(0, 345, 'test1-replaced', 'test2-replaced')
-box.select(0, 0, 345)
-remote:select_limit(0, 0, 0, 1000, 345)
+remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
+space:select(0, 345)
+remote:select_limit(space.n, 0, 0, 1000, 345)
 
-box.select_range(0, 0, 1000)
-remote:select_range(0, 0, 1000)
-box.select(0, 0, 345)
-remote:select(0, 0, 345)
-remote:timeout(0.5):select(0, 0, 345)
+space:select_range(0, 1000)
+remote:select_range(space.n, 0, 1000)
+space:select(0, 345)
+remote:select(space.n, 0, 345)
+remote:timeout(0.5):select(space.n, 0, 345)
 
 remote:call('box.fiber.sleep', '.01')
 remote:timeout(0.01):call('box.fiber.sleep', '10')
@@ -50,7 +54,7 @@ for i = 1, 20 do
                 box.fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
-                table.insert(parallel, tostring(s == so[0]))
+                table.insert(parallel, s == so[0])
             end
         )
     )
@@ -70,5 +74,5 @@ remote:close()
 remote:close()
 remote:ping()
 
-box.space[0]:truncate()
+space:drop()
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
