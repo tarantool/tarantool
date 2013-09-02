@@ -435,20 +435,28 @@ class TarantoolServer(Server):
         while self.read_pidfile() == -1:
             time.sleep(0.001)
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        while not sock.connect_ex(('localhost', self.port)):
-            time.sleep(0.0001)
-        sock.close()
+        is_connected = False
+        while not is_connected and not self.gdb:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect(("localhost", self.port))
+                is_connected = True
+                sock.close()
+            except socket.error as e:
+                time.sleep(0.001)
 
     def wait_until_stopped(self):
         """Wait until the server is stoped and has closed sockets"""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        while sock.connect_ex(('localhost', self.port)):
-            sock.close()
-            time.sleep(0.0001)
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.close()
-    
+        while True:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect(("localhost", self.port))
+                sock.close()
+                time.sleep(0.001)
+                continue
+            except socket.error as e:
+                break
+
     def find_tests(self, test_suite, suite_path):
         def patterned(test, patterns):
             answer = []
