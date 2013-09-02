@@ -94,7 +94,7 @@ space.arity
 ...
 space.index[0]
 ---
-{}
+- null
 ...
 --
 -- check dml - the space has no indexes yet, but must not crash on DML
@@ -127,7 +127,7 @@ space_deleted = box.space[box.unpack('i', t[0])]
 ...
 space_deleted
 ---
-{}
+- null
 ...
 space:replace(0)
 ---
@@ -179,5 +179,5 @@ box.space[1000]:drop()
 ...
 box.space[1000]
 ---
-{}
+- null
 ...

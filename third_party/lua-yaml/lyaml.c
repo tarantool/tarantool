@@ -369,12 +369,73 @@ static int l_load(lua_State *L) {
 
 static int dump_node(struct lua_yaml_dumper *dumper);
 
-static int is_binary_string(const unsigned char *str, size_t len) {
-   // this could be optimized to examine an entire word in each loop iteration
-   while (len-- > 0) {
-     if (*str++ & 0x80) return 1;
-   }
-   return 0;
+/*
+  Copyright (c) 2013 Palard Julien. All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+  Check if the given unsigned char * is a valid utf-8 sequence.
+
+  Return value :
+  If the string is valid utf-8, 1 is returned.
+  Else, 0 is returned.
+
+  Valid utf-8 sequences look like this :
+  0xxxxxxx
+  110xxxxx 10xxxxxx
+  1110xxxx 10xxxxxx 10xxxxxx
+  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+*/
+static int is_utf8(const unsigned char *str, size_t len)
+{
+    size_t i = 0;
+    size_t continuation_bytes = 0;
+
+    while (i < len)
+    {
+        if (str[i] <= 0x7F)
+            continuation_bytes = 0;
+        else if (str[i] >= 0xC0 /*11000000*/ && str[i] <= 0xDF /*11011111*/)
+            continuation_bytes = 1;
+        else if (str[i] >= 0xE0 /*11100000*/ && str[i] <= 0xEF /*11101111*/)
+            continuation_bytes = 2;
+        else if (str[i] >= 0xF0 /*11110000*/ && str[i] <= 0xF4 /* Cause of RFC 3629 */)
+            continuation_bytes = 3;
+        else
+            return 0;
+        i += 1;
+        while (i < len && continuation_bytes > 0
+               && str[i] >= 0x80
+               && str[i] <= 0xBF)
+        {
+            i += 1;
+            continuation_bytes -= 1;
+        }
+        if (continuation_bytes != 0)
+            return 0;
+    }
+    return 1;
 }
 
 static inline const char *
@@ -408,7 +469,7 @@ static int dump_scalar(struct lua_yaml_dumper *dumper) {
       } else if (lua_isnumber(dumper->L, -1)) {
          /* string is convertible to number, quote it to preserve type */
          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-      } else if ((is_binary = is_binary_string((const unsigned char *)str, len))) {
+      } else if ((is_binary = !is_utf8(str, len))) {
          tobase64(dumper->L, -1);
          str = lua_tolstring(dumper->L, -1, &len);
          tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
@@ -440,6 +501,17 @@ static int dump_scalar(struct lua_yaml_dumper *dumper) {
 		str = dump_tostring(dumper->L, -1);
 		len = strlen(str);
 		style = YAML_VERBATIM_SCALAR_STYLE;
+   } else if (type == LUA_TLIGHTUSERDATA) {
+		void *ptr = luaL_checkudata(dumper->L, -1, NULL);
+		if (ptr == NULL) {
+			str = "null";
+			len = 4;
+			style = YAML_PLAIN_SCALAR_STYLE;
+		} else {
+			str = dump_tostring(dumper->L, -1);
+			len = strlen(str);
+			style = YAML_VERBATIM_SCALAR_STYLE;
+		}
    } else if (type == LUA_TFUNCTION) {
 		str = dump_tostring(dumper->L, -1);
 		len = strlen(str);

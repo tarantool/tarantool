@@ -35,12 +35,12 @@ class UnittestServer(Server):
         self.builddir = builddir
 
     def find_tests(self, test_suite, suite_path):
-        def patterned(name):
-            for i in test_suite.args.tests:
-                if name.find(i) != -1:
-                    return True
-            return False
-        for f in sorted(glob.glob(os.path.join(suite_path, '*.test'))):
-            if os.access(f, os.X_OK) and os.path.isfile(f) and patterned(f):
-                test_suite.tests.append(UnitTest(f, test_suite.args,
-                            test_suite.ini));
+        def patterned(test, patterns):
+            answer = []
+            for i in patterns:
+                if test.name.find(i) != -1:
+                    answer.append(test)
+            return answer
+
+        test_suite.tests = [UnitTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test" )))]
+        test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), test_suite.tests), [])

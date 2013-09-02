@@ -545,12 +545,6 @@ tarantool_lua_init()
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
 
-	/*
-	luaL_register(L, fiberlib_name, fiberlib);
-	lua_pop(L, 1);
-	tarantool_lua_register_type(L, fiberlib_name, lbox_fiber_meta);
-	*/
-
 	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
@@ -669,7 +663,18 @@ tarantool_lua(struct lua_State *L,
 	lua_newtable(L);
 	for (int i = 1; i <= top; i++) {
 		lua_pushnumber(L, i);
-		lua_pushvalue(L, i);
+		if (lua_isnil(L, i)) {
+			/**
+			 * When storing a nil in a Lua table,
+			 * there is no way to distinguish nil
+			 * value from no value. This is a trick
+			 * to make sure yaml converter correctly
+			 * outputs nil values on the return stack.
+			 */
+			lua_pushlightuserdata(L, NULL);
+		} else {
+			lua_pushvalue(L, i);
+		}
 		lua_rawset(L, -3);
 	}
 	lua_replace(L, 1);

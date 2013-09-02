@@ -126,7 +126,7 @@ remote:call('box.fiber.sleep', '.01')
 ...
 remote:timeout(0.01):call('box.fiber.sleep', '10')
 ---
-{}
+- null
 ...
 --# setopt delimiter ';'
 pstart = box.time();
