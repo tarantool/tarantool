@@ -395,7 +395,7 @@ k,v = space.index[1]:next(k)
 ...
 v
 ---
-{}
+- null
 ...
 collectgarbage('collect')
 ---
@@ -403,7 +403,7 @@ collectgarbage('collect')
 ...
 v
 ---
-{}
+- null
 ...
 t = {}
 ---

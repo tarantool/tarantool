@@ -2,15 +2,15 @@
 -- make sure it's a valid YAML
 box.info.unknown_variable
 ---
-{}
+- null
 ...
 box.info[23]
 ---
-{}
+- null
 ...
 box.info['unknown_variable']
 ---
-{}
+- null
 ...
 string.match(box.info.version, '^[1-9]') ~= nil
 ---

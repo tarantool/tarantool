@@ -271,15 +271,15 @@ collectgarbage('collect')
 -- check that these newly created fibers are garbage collected
 box.fiber.find(900)
 ---
-{}
+- null
 ...
 box.fiber.find(910)
 ---
-{}
+- null
 ...
 box.fiber.find(920)
 ---
-{}
+- null
 ...
 space:drop()
 ---
