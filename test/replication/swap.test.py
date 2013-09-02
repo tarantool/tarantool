@@ -1,23 +1,19 @@
-# encoding: utf-8
 import os
-import time
 from lib.tarantool_server import TarantoolServer
 
 REPEAT = 20
 ID_BEGIN = 0
 ID_STEP = 5
 
-def insert_tuples(server, begin, end, msg = "tuple"):
-    server_sql = server.sql
+def insert_tuples(_server, begin, end, msg = "tuple"):
     for i in range(begin, end):
-        server_sql("insert into t0 values (%d, '%s %d')" % (i, msg, i))
+        _server.sql("insert into t0 values (%d, '%s %d')" % (i, msg, i))
 
-def select_tuples(server, begin, end):
-    server_sql = server.sql
+def select_tuples(_server, begin, end):
     # the last lsn is end id + 1
-    server.wait_lsn(end + 1)
+    _server.wait_lsn(end + 1)
     for i in range(begin, end):
-        server_sql("select * from t0 where k0 = %d" % i)
+        _server.sql("select * from t0 where k0 = %d" % i)
 
 # master server
 master = server
@@ -28,6 +24,8 @@ replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
+master.admin("box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
+master.admin("box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 id = ID_BEGIN
 for i in range(REPEAT):
     print "test %d iteration" % i
@@ -74,5 +72,3 @@ replica.stop()
 replica.cleanup(True)
 server.stop()
 server.deploy(self.suite_ini["config"])
-
-# vim: syntax=python

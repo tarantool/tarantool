@@ -1,687 +1,473 @@
-insert to master [0, 10) entries
-insert into t0 values (0, 'mater 0')
-Insert OK, 1 row affected
-insert into t0 values (1, 'mater 1')
-Insert OK, 1 row affected
-insert into t0 values (2, 'mater 2')
-Insert OK, 1 row affected
-insert into t0 values (3, 'mater 3')
-Insert OK, 1 row affected
-insert into t0 values (4, 'mater 4')
-Insert OK, 1 row affected
-insert into t0 values (5, 'mater 5')
-Insert OK, 1 row affected
-insert into t0 values (6, 'mater 6')
-Insert OK, 1 row affected
-insert into t0 values (7, 'mater 7')
-Insert OK, 1 row affected
-insert into t0 values (8, 'mater 8')
-Insert OK, 1 row affected
-insert into t0 values (9, 'mater 9')
-Insert OK, 1 row affected
-select from replica [0, 10) entries
-select * from t0 where k0 = 0
-Found 1 tuple:
-[0, 'mater 0']
-select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'mater 1']
-select * from t0 where k0 = 2
-Found 1 tuple:
-[2, 'mater 2']
-select * from t0 where k0 = 3
-Found 1 tuple:
-[3, 'mater 3']
-select * from t0 where k0 = 4
-Found 1 tuple:
-[4, 'mater 4']
-select * from t0 where k0 = 5
-Found 1 tuple:
-[5, 'mater 5']
-select * from t0 where k0 = 6
-Found 1 tuple:
-[6, 'mater 6']
-select * from t0 where k0 = 7
-Found 1 tuple:
-[7, 'mater 7']
-select * from t0 where k0 = 8
-Found 1 tuple:
-[8, 'mater 8']
-select * from t0 where k0 = 9
-Found 1 tuple:
-[9, 'mater 9']
-master lsn = 11
-replica lsn = 11
-
-#
-# mater lsn > replica lsn
-#
-
-
-# reconfigure replica to master
-
-reload configuration
+--# create server replica with configuration='replication/cfg/replica.cfg'
+--# start server replica
+--# setopt delimiter ';'
+--# set connection default
+box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum');
 ---
-ok
+- [0, 0, 'tweedledum']
 ...
-insert to master [10, 20) entries
-insert into t0 values (10, 'mater 10')
-Insert OK, 1 row affected
-insert into t0 values (11, 'mater 11')
-Insert OK, 1 row affected
-insert into t0 values (12, 'mater 12')
-Insert OK, 1 row affected
-insert into t0 values (13, 'mater 13')
-Insert OK, 1 row affected
-insert into t0 values (14, 'mater 14')
-Insert OK, 1 row affected
-insert into t0 values (15, 'mater 15')
-Insert OK, 1 row affected
-insert into t0 values (16, 'mater 16')
-Insert OK, 1 row affected
-insert into t0 values (17, 'mater 17')
-Insert OK, 1 row affected
-insert into t0 values (18, 'mater 18')
-Insert OK, 1 row affected
-insert into t0 values (19, 'mater 19')
-Insert OK, 1 row affected
-select from master [10, 20) entries
-select * from t0 where k0 = 10
-Found 1 tuple:
-[10, 'mater 10']
-select * from t0 where k0 = 11
-Found 1 tuple:
-[11, 'mater 11']
-select * from t0 where k0 = 12
-Found 1 tuple:
-[12, 'mater 12']
-select * from t0 where k0 = 13
-Found 1 tuple:
-[13, 'mater 13']
-select * from t0 where k0 = 14
-Found 1 tuple:
-[14, 'mater 14']
-select * from t0 where k0 = 15
-Found 1 tuple:
-[15, 'mater 15']
-select * from t0 where k0 = 16
-Found 1 tuple:
-[16, 'mater 16']
-select * from t0 where k0 = 17
-Found 1 tuple:
-[17, 'mater 17']
-select * from t0 where k0 = 18
-Found 1 tuple:
-[18, 'mater 18']
-select * from t0 where k0 = 19
-Found 1 tuple:
-[19, 'mater 19']
-insert to replica [10, 15) entries
-insert into t0 values (10, 'replica 10')
-Insert OK, 1 row affected
-insert into t0 values (11, 'replica 11')
-Insert OK, 1 row affected
-insert into t0 values (12, 'replica 12')
-Insert OK, 1 row affected
-insert into t0 values (13, 'replica 13')
-Insert OK, 1 row affected
-insert into t0 values (14, 'replica 14')
-Insert OK, 1 row affected
-select from replica [10, 15) entries
-select * from t0 where k0 = 10
-Found 1 tuple:
-[10, 'replica 10']
-select * from t0 where k0 = 11
-Found 1 tuple:
-[11, 'replica 11']
-select * from t0 where k0 = 12
-Found 1 tuple:
-[12, 'replica 12']
-select * from t0 where k0 = 13
-Found 1 tuple:
-[13, 'replica 13']
-select * from t0 where k0 = 14
-Found 1 tuple:
-[14, 'replica 14']
-master lsn = 21
-replica lsn = 16
-
-# rollback replica
-
-reload configuration
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num');
 ---
-ok
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
-select from replica [10, 20) entries
-select * from t0 where k0 = 10
-Found 1 tuple:
-[10, 'replica 10']
-select * from t0 where k0 = 11
-Found 1 tuple:
-[11, 'replica 11']
-select * from t0 where k0 = 12
-Found 1 tuple:
-[12, 'replica 12']
-select * from t0 where k0 = 13
-Found 1 tuple:
-[13, 'replica 13']
-select * from t0 where k0 = 14
-Found 1 tuple:
-[14, 'replica 14']
-select * from t0 where k0 = 15
-Found 1 tuple:
-[15, 'mater 15']
-select * from t0 where k0 = 16
-Found 1 tuple:
-[16, 'mater 16']
-select * from t0 where k0 = 17
-Found 1 tuple:
-[17, 'mater 17']
-select * from t0 where k0 = 18
-Found 1 tuple:
-[18, 'mater 18']
-select * from t0 where k0 = 19
-Found 1 tuple:
-[19, 'mater 19']
-master lsn = 21
-replica lsn = 21
-
-#
-# master lsn == replica lsn
-#
-
-
-# reconfigure replica to master
-
-reload configuration
+--# set connection default, replica
+function _insert(_begin, _end, msg) 
+    a = {}
+    for i = _begin, _end do
+        table.insert(a, box.insert(0, i, msg..' - '..i))
+    end
+    return unpack(a)
+end;
 ---
-ok
 ...
-insert to master [20, 30) entries
-insert into t0 values (20, 'mater 20')
-Insert OK, 1 row affected
-insert into t0 values (21, 'mater 21')
-Insert OK, 1 row affected
-insert into t0 values (22, 'mater 22')
-Insert OK, 1 row affected
-insert into t0 values (23, 'mater 23')
-Insert OK, 1 row affected
-insert into t0 values (24, 'mater 24')
-Insert OK, 1 row affected
-insert into t0 values (25, 'mater 25')
-Insert OK, 1 row affected
-insert into t0 values (26, 'mater 26')
-Insert OK, 1 row affected
-insert into t0 values (27, 'mater 27')
-Insert OK, 1 row affected
-insert into t0 values (28, 'mater 28')
-Insert OK, 1 row affected
-insert into t0 values (29, 'mater 29')
-Insert OK, 1 row affected
-select from master [20, 30) entries
-select * from t0 where k0 = 20
-Found 1 tuple:
-[20, 'mater 20']
-select * from t0 where k0 = 21
-Found 1 tuple:
-[21, 'mater 21']
-select * from t0 where k0 = 22
-Found 1 tuple:
-[22, 'mater 22']
-select * from t0 where k0 = 23
-Found 1 tuple:
-[23, 'mater 23']
-select * from t0 where k0 = 24
-Found 1 tuple:
-[24, 'mater 24']
-select * from t0 where k0 = 25
-Found 1 tuple:
-[25, 'mater 25']
-select * from t0 where k0 = 26
-Found 1 tuple:
-[26, 'mater 26']
-select * from t0 where k0 = 27
-Found 1 tuple:
-[27, 'mater 27']
-select * from t0 where k0 = 28
-Found 1 tuple:
-[28, 'mater 28']
-select * from t0 where k0 = 29
-Found 1 tuple:
-[29, 'mater 29']
-insert to replica [20, 30) entries
-insert into t0 values (20, 'replica 20')
-Insert OK, 1 row affected
-insert into t0 values (21, 'replica 21')
-Insert OK, 1 row affected
-insert into t0 values (22, 'replica 22')
-Insert OK, 1 row affected
-insert into t0 values (23, 'replica 23')
-Insert OK, 1 row affected
-insert into t0 values (24, 'replica 24')
-Insert OK, 1 row affected
-insert into t0 values (25, 'replica 25')
-Insert OK, 1 row affected
-insert into t0 values (26, 'replica 26')
-Insert OK, 1 row affected
-insert into t0 values (27, 'replica 27')
-Insert OK, 1 row affected
-insert into t0 values (28, 'replica 28')
-Insert OK, 1 row affected
-insert into t0 values (29, 'replica 29')
-Insert OK, 1 row affected
-select from replica [20, 30) entries
-select * from t0 where k0 = 20
-Found 1 tuple:
-[20, 'replica 20']
-select * from t0 where k0 = 21
-Found 1 tuple:
-[21, 'replica 21']
-select * from t0 where k0 = 22
-Found 1 tuple:
-[22, 'replica 22']
-select * from t0 where k0 = 23
-Found 1 tuple:
-[23, 'replica 23']
-select * from t0 where k0 = 24
-Found 1 tuple:
-[24, 'replica 24']
-select * from t0 where k0 = 25
-Found 1 tuple:
-[25, 'replica 25']
-select * from t0 where k0 = 26
-Found 1 tuple:
-[26, 'replica 26']
-select * from t0 where k0 = 27
-Found 1 tuple:
-[27, 'replica 27']
-select * from t0 where k0 = 28
-Found 1 tuple:
-[28, 'replica 28']
-select * from t0 where k0 = 29
-Found 1 tuple:
-[29, 'replica 29']
-master lsn = 31
-replica lsn = 31
-
-# rollback replica
-
-reload configuration
+function _select(_begin, _end)
+    a = {}
+    while box.info.lsn < _end + 3 do
+        box.fiber.sleep(0.001)
+    end
+    for i = _begin, _end do
+        table.insert(a, box.select(0, 0, i))
+    end
+    return unpack(a)
+end;
 ---
-ok
 ...
-select from replica [20, 30) entries
-select * from t0 where k0 = 20
-Found 1 tuple:
-[20, 'replica 20']
-select * from t0 where k0 = 21
-Found 1 tuple:
-[21, 'replica 21']
-select * from t0 where k0 = 22
-Found 1 tuple:
-[22, 'replica 22']
-select * from t0 where k0 = 23
-Found 1 tuple:
-[23, 'replica 23']
-select * from t0 where k0 = 24
-Found 1 tuple:
-[24, 'replica 24']
-select * from t0 where k0 = 25
-Found 1 tuple:
-[25, 'replica 25']
-select * from t0 where k0 = 26
-Found 1 tuple:
-[26, 'replica 26']
-select * from t0 where k0 = 27
-Found 1 tuple:
-[27, 'replica 27']
-select * from t0 where k0 = 28
-Found 1 tuple:
-[28, 'replica 28']
-select * from t0 where k0 = 29
-Found 1 tuple:
-[29, 'replica 29']
-master lsn = 31
-replica lsn = 31
-
-#
-# mater lsn < replica lsn
-#
-
-
-#reconfigure replica to master
-
-reload configuration
+--# setopt delimiter ''
+--# set connection default
+_insert(1, 10, 'master')
 ---
-ok
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
 ...
-insert to master [30, 40) entries
-insert into t0 values (30, 'mater 30')
-Insert OK, 1 row affected
-insert into t0 values (31, 'mater 31')
-Insert OK, 1 row affected
-insert into t0 values (32, 'mater 32')
-Insert OK, 1 row affected
-insert into t0 values (33, 'mater 33')
-Insert OK, 1 row affected
-insert into t0 values (34, 'mater 34')
-Insert OK, 1 row affected
-insert into t0 values (35, 'mater 35')
-Insert OK, 1 row affected
-insert into t0 values (36, 'mater 36')
-Insert OK, 1 row affected
-insert into t0 values (37, 'mater 37')
-Insert OK, 1 row affected
-insert into t0 values (38, 'mater 38')
-Insert OK, 1 row affected
-insert into t0 values (39, 'mater 39')
-Insert OK, 1 row affected
-select from master [30, 40) entries
-select * from t0 where k0 = 30
-Found 1 tuple:
-[30, 'mater 30']
-select * from t0 where k0 = 31
-Found 1 tuple:
-[31, 'mater 31']
-select * from t0 where k0 = 32
-Found 1 tuple:
-[32, 'mater 32']
-select * from t0 where k0 = 33
-Found 1 tuple:
-[33, 'mater 33']
-select * from t0 where k0 = 34
-Found 1 tuple:
-[34, 'mater 34']
-select * from t0 where k0 = 35
-Found 1 tuple:
-[35, 'mater 35']
-select * from t0 where k0 = 36
-Found 1 tuple:
-[36, 'mater 36']
-select * from t0 where k0 = 37
-Found 1 tuple:
-[37, 'mater 37']
-select * from t0 where k0 = 38
-Found 1 tuple:
-[38, 'mater 38']
-select * from t0 where k0 = 39
-Found 1 tuple:
-[39, 'mater 39']
-insert to replica [30, 50) entries
-insert into t0 values (30, 'replica 30')
-Insert OK, 1 row affected
-insert into t0 values (31, 'replica 31')
-Insert OK, 1 row affected
-insert into t0 values (32, 'replica 32')
-Insert OK, 1 row affected
-insert into t0 values (33, 'replica 33')
-Insert OK, 1 row affected
-insert into t0 values (34, 'replica 34')
-Insert OK, 1 row affected
-insert into t0 values (35, 'replica 35')
-Insert OK, 1 row affected
-insert into t0 values (36, 'replica 36')
-Insert OK, 1 row affected
-insert into t0 values (37, 'replica 37')
-Insert OK, 1 row affected
-insert into t0 values (38, 'replica 38')
-Insert OK, 1 row affected
-insert into t0 values (39, 'replica 39')
-Insert OK, 1 row affected
-insert into t0 values (40, 'replica 40')
-Insert OK, 1 row affected
-insert into t0 values (41, 'replica 41')
-Insert OK, 1 row affected
-insert into t0 values (42, 'replica 42')
-Insert OK, 1 row affected
-insert into t0 values (43, 'replica 43')
-Insert OK, 1 row affected
-insert into t0 values (44, 'replica 44')
-Insert OK, 1 row affected
-insert into t0 values (45, 'replica 45')
-Insert OK, 1 row affected
-insert into t0 values (46, 'replica 46')
-Insert OK, 1 row affected
-insert into t0 values (47, 'replica 47')
-Insert OK, 1 row affected
-insert into t0 values (48, 'replica 48')
-Insert OK, 1 row affected
-insert into t0 values (49, 'replica 49')
-Insert OK, 1 row affected
-select from replica [30, 50) entries
-select * from t0 where k0 = 30
-Found 1 tuple:
-[30, 'replica 30']
-select * from t0 where k0 = 31
-Found 1 tuple:
-[31, 'replica 31']
-select * from t0 where k0 = 32
-Found 1 tuple:
-[32, 'replica 32']
-select * from t0 where k0 = 33
-Found 1 tuple:
-[33, 'replica 33']
-select * from t0 where k0 = 34
-Found 1 tuple:
-[34, 'replica 34']
-select * from t0 where k0 = 35
-Found 1 tuple:
-[35, 'replica 35']
-select * from t0 where k0 = 36
-Found 1 tuple:
-[36, 'replica 36']
-select * from t0 where k0 = 37
-Found 1 tuple:
-[37, 'replica 37']
-select * from t0 where k0 = 38
-Found 1 tuple:
-[38, 'replica 38']
-select * from t0 where k0 = 39
-Found 1 tuple:
-[39, 'replica 39']
-select * from t0 where k0 = 40
-Found 1 tuple:
-[40, 'replica 40']
-select * from t0 where k0 = 41
-Found 1 tuple:
-[41, 'replica 41']
-select * from t0 where k0 = 42
-Found 1 tuple:
-[42, 'replica 42']
-select * from t0 where k0 = 43
-Found 1 tuple:
-[43, 'replica 43']
-select * from t0 where k0 = 44
-Found 1 tuple:
-[44, 'replica 44']
-select * from t0 where k0 = 45
-Found 1 tuple:
-[45, 'replica 45']
-select * from t0 where k0 = 46
-Found 1 tuple:
-[46, 'replica 46']
-select * from t0 where k0 = 47
-Found 1 tuple:
-[47, 'replica 47']
-select * from t0 where k0 = 48
-Found 1 tuple:
-[48, 'replica 48']
-select * from t0 where k0 = 49
-Found 1 tuple:
-[49, 'replica 49']
-master lsn = 41
-replica lsn = 51
-
-# rollback replica
-
-reload configuration
+_select(1, 10)
 ---
-ok
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
 ...
-select from replica [30, 50) entries
-select * from t0 where k0 = 30
-Found 1 tuple:
-[30, 'replica 30']
-select * from t0 where k0 = 31
-Found 1 tuple:
-[31, 'replica 31']
-select * from t0 where k0 = 32
-Found 1 tuple:
-[32, 'replica 32']
-select * from t0 where k0 = 33
-Found 1 tuple:
-[33, 'replica 33']
-select * from t0 where k0 = 34
-Found 1 tuple:
-[34, 'replica 34']
-select * from t0 where k0 = 35
-Found 1 tuple:
-[35, 'replica 35']
-select * from t0 where k0 = 36
-Found 1 tuple:
-[36, 'replica 36']
-select * from t0 where k0 = 37
-Found 1 tuple:
-[37, 'replica 37']
-select * from t0 where k0 = 38
-Found 1 tuple:
-[38, 'replica 38']
-select * from t0 where k0 = 39
-Found 1 tuple:
-[39, 'replica 39']
-select * from t0 where k0 = 40
-Found 1 tuple:
-[40, 'replica 40']
-select * from t0 where k0 = 41
-Found 1 tuple:
-[41, 'replica 41']
-select * from t0 where k0 = 42
-Found 1 tuple:
-[42, 'replica 42']
-select * from t0 where k0 = 43
-Found 1 tuple:
-[43, 'replica 43']
-select * from t0 where k0 = 44
-Found 1 tuple:
-[44, 'replica 44']
-select * from t0 where k0 = 45
-Found 1 tuple:
-[45, 'replica 45']
-select * from t0 where k0 = 46
-Found 1 tuple:
-[46, 'replica 46']
-select * from t0 where k0 = 47
-Found 1 tuple:
-[47, 'replica 47']
-select * from t0 where k0 = 48
-Found 1 tuple:
-[48, 'replica 48']
-select * from t0 where k0 = 49
-Found 1 tuple:
-[49, 'replica 49']
-insert to master [40, 60) entries
-insert into t0 values (40, 'master 40')
-Insert OK, 1 row affected
-insert into t0 values (41, 'master 41')
-Insert OK, 1 row affected
-insert into t0 values (42, 'master 42')
-Insert OK, 1 row affected
-insert into t0 values (43, 'master 43')
-Insert OK, 1 row affected
-insert into t0 values (44, 'master 44')
-Insert OK, 1 row affected
-insert into t0 values (45, 'master 45')
-Insert OK, 1 row affected
-insert into t0 values (46, 'master 46')
-Insert OK, 1 row affected
-insert into t0 values (47, 'master 47')
-Insert OK, 1 row affected
-insert into t0 values (48, 'master 48')
-Insert OK, 1 row affected
-insert into t0 values (49, 'master 49')
-Insert OK, 1 row affected
-insert into t0 values (50, 'master 50')
-Insert OK, 1 row affected
-insert into t0 values (51, 'master 51')
-Insert OK, 1 row affected
-insert into t0 values (52, 'master 52')
-Insert OK, 1 row affected
-insert into t0 values (53, 'master 53')
-Insert OK, 1 row affected
-insert into t0 values (54, 'master 54')
-Insert OK, 1 row affected
-insert into t0 values (55, 'master 55')
-Insert OK, 1 row affected
-insert into t0 values (56, 'master 56')
-Insert OK, 1 row affected
-insert into t0 values (57, 'master 57')
-Insert OK, 1 row affected
-insert into t0 values (58, 'master 58')
-Insert OK, 1 row affected
-insert into t0 values (59, 'master 59')
-Insert OK, 1 row affected
-select from replica [40, 60) entries
-select * from t0 where k0 = 40
-Found 1 tuple:
-[40, 'replica 40']
-select * from t0 where k0 = 41
-Found 1 tuple:
-[41, 'replica 41']
-select * from t0 where k0 = 42
-Found 1 tuple:
-[42, 'replica 42']
-select * from t0 where k0 = 43
-Found 1 tuple:
-[43, 'replica 43']
-select * from t0 where k0 = 44
-Found 1 tuple:
-[44, 'replica 44']
-select * from t0 where k0 = 45
-Found 1 tuple:
-[45, 'replica 45']
-select * from t0 where k0 = 46
-Found 1 tuple:
-[46, 'replica 46']
-select * from t0 where k0 = 47
-Found 1 tuple:
-[47, 'replica 47']
-select * from t0 where k0 = 48
-Found 1 tuple:
-[48, 'replica 48']
-select * from t0 where k0 = 49
-Found 1 tuple:
-[49, 'replica 49']
-select * from t0 where k0 = 50
-Found 1 tuple:
-[50, 'master 50']
-select * from t0 where k0 = 51
-Found 1 tuple:
-[51, 'master 51']
-select * from t0 where k0 = 52
-Found 1 tuple:
-[52, 'master 52']
-select * from t0 where k0 = 53
-Found 1 tuple:
-[53, 'master 53']
-select * from t0 where k0 = 54
-Found 1 tuple:
-[54, 'master 54']
-select * from t0 where k0 = 55
-Found 1 tuple:
-[55, 'master 55']
-select * from t0 where k0 = 56
-Found 1 tuple:
-[56, 'master 56']
-select * from t0 where k0 = 57
-Found 1 tuple:
-[57, 'master 57']
-select * from t0 where k0 = 58
-Found 1 tuple:
-[58, 'master 58']
-select * from t0 where k0 = 59
-Found 1 tuple:
-[59, 'master 59']
-master lsn = 61
-replica lsn = 61
-insert into t0 values (0, 'replica is read only')
-An error occurred: ER_NONMASTER, 'Can't modify data on a replication slave. My master is: 127.0.0.1:33017'
+--# set connection replica
+_select(1, 10)
+---
+- [1, 'master - 1']
+- [2, 'master - 2']
+- [3, 'master - 3']
+- [4, 'master - 4']
+- [5, 'master - 5']
+- [6, 'master - 6']
+- [7, 'master - 7']
+- [8, 'master - 8']
+- [9, 'master - 9']
+- [10, 'master - 10']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 13
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 13
+...
+-----------------------------
+--  Master LSN > Replica LSN
+-----------------------------
+--------------------
+-- Replica to Master
+--------------------
+--# reconfigure server replica with configuration 'replication/cfg/replica_to_master.cfg'
+--# set connection default
+_insert(11, 20, 'master')
+---
+- [11, 'master - 11']
+- [12, 'master - 12']
+- [13, 'master - 13']
+- [14, 'master - 14']
+- [15, 'master - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+_select(11, 20)
+---
+- [11, 'master - 11']
+- [12, 'master - 12']
+- [13, 'master - 13']
+- [14, 'master - 14']
+- [15, 'master - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+--# set connection replica
+_insert (11, 15, 'replica')
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+...
+_select (11, 15)
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 23
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 18
+...
+-------------------
+-- rollback Replica
+-------------------
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+_select(11, 20)
+---
+- [11, 'replica - 11']
+- [12, 'replica - 12']
+- [13, 'replica - 13']
+- [14, 'replica - 14']
+- [15, 'replica - 15']
+- [16, 'master - 16']
+- [17, 'master - 17']
+- [18, 'master - 18']
+- [19, 'master - 19']
+- [20, 'master - 20']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 23
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 23
+...
+------------------------------
+--  Master LSN == Replica LSN
+------------------------------
+--------------------
+-- Replica to Master
+--------------------
+--# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg'
+--# set connection default
+_insert(21, 30, 'master')
+---
+- [21, 'master - 21']
+- [22, 'master - 22']
+- [23, 'master - 23']
+- [24, 'master - 24']
+- [25, 'master - 25']
+- [26, 'master - 26']
+- [27, 'master - 27']
+- [28, 'master - 28']
+- [29, 'master - 29']
+- [30, 'master - 30']
+...
+_select(21, 30)
+---
+- [21, 'master - 21']
+- [22, 'master - 22']
+- [23, 'master - 23']
+- [24, 'master - 24']
+- [25, 'master - 25']
+- [26, 'master - 26']
+- [27, 'master - 27']
+- [28, 'master - 28']
+- [29, 'master - 29']
+- [30, 'master - 30']
+...
+--# set connection replica
+_insert(21, 30, 'replica')
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+_select(21, 30)
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 33
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 33
+...
+-------------------
+-- rollback Replica
+-------------------
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+_select(21, 30)
+---
+- [21, 'replica - 21']
+- [22, 'replica - 22']
+- [23, 'replica - 23']
+- [24, 'replica - 24']
+- [25, 'replica - 25']
+- [26, 'replica - 26']
+- [27, 'replica - 27']
+- [28, 'replica - 28']
+- [29, 'replica - 29']
+- [30, 'replica - 30']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 33
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 33
+...
+-----------------------------
+--  Master LSN < Replica LSN
+-----------------------------
+--------------------
+-- Replica to Master
+--------------------
+--# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg'
+--# set connection default
+_insert(31, 40, 'master')
+---
+- [31, 'master - 31']
+- [32, 'master - 32']
+- [33, 'master - 33']
+- [34, 'master - 34']
+- [35, 'master - 35']
+- [36, 'master - 36']
+- [37, 'master - 37']
+- [38, 'master - 38']
+- [39, 'master - 39']
+- [40, 'master - 40']
+...
+_select(31, 40)
+---
+- [31, 'master - 31']
+- [32, 'master - 32']
+- [33, 'master - 33']
+- [34, 'master - 34']
+- [35, 'master - 35']
+- [36, 'master - 36']
+- [37, 'master - 37']
+- [38, 'master - 38']
+- [39, 'master - 39']
+- [40, 'master - 40']
+...
+--# set connection replica
+_insert(31, 50, 'replica')
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+_select(31, 50)
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 43
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 53
+...
+-------------------
+-- rollback Replica
+-------------------
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+_select(31, 50)
+---
+- [31, 'replica - 31']
+- [32, 'replica - 32']
+- [33, 'replica - 33']
+- [34, 'replica - 34']
+- [35, 'replica - 35']
+- [36, 'replica - 36']
+- [37, 'replica - 37']
+- [38, 'replica - 38']
+- [39, 'replica - 39']
+- [40, 'replica - 40']
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+...
+--# set connection default
+_insert(41, 60, 'master')
+---
+- [41, 'master - 41']
+- [42, 'master - 42']
+- [43, 'master - 43']
+- [44, 'master - 44']
+- [45, 'master - 45']
+- [46, 'master - 46']
+- [47, 'master - 47']
+- [48, 'master - 48']
+- [49, 'master - 49']
+- [50, 'master - 50']
+- [51, 'master - 51']
+- [52, 'master - 52']
+- [53, 'master - 53']
+- [54, 'master - 54']
+- [55, 'master - 55']
+- [56, 'master - 56']
+- [57, 'master - 57']
+- [58, 'master - 58']
+- [59, 'master - 59']
+- [60, 'master - 60']
+...
+--# set connection replica
+_select(41, 60)
+---
+- [41, 'replica - 41']
+- [42, 'replica - 42']
+- [43, 'replica - 43']
+- [44, 'replica - 44']
+- [45, 'replica - 45']
+- [46, 'replica - 46']
+- [47, 'replica - 47']
+- [48, 'replica - 48']
+- [49, 'replica - 49']
+- [50, 'replica - 50']
+- [51, 'master - 51']
+- [52, 'master - 52']
+- [53, 'master - 53']
+- [54, 'master - 54']
+- [55, 'master - 55']
+- [56, 'master - 56']
+- [57, 'master - 57']
+- [58, 'master - 58']
+- [59, 'master - 59']
+- [60, 'master - 60']
+...
+--# set connection default
+-- Master LSN:
+box.info.lsn
+---
+- 63
+...
+--# set connection replica
+-- Replica LSN:
+box.info.lsn
+---
+- 63
+...
+-- Test that a replica replies with master connection URL on update request
+box.insert(0, 0, 'replica is RO')
+---
+- error: 'Can''t modify data on a replication slave. My master is: 127.0.0.1:33017'
+...
+--# stop server replica
+--# cleanup server replica
+--# set connection default
+box.space[0]:drop();
+---
+...

@@ -144,7 +144,7 @@ class LuaTest(FuncTest):
                             tmp_srv = self.suite_ini['servers'][name]
 
                             if 'configuration' in params:
-                                tmp_srv.reconfigure(params['configuration'][1:-1])
+                                tmp_srv.reconfigure(params['configuration'][1:-1], silent=True)
                             else:
                                 tmp_srv.config = self.suite_ini['config']
 
@@ -381,7 +381,6 @@ class TarantoolServer(Server):
             os.unlink(os.path.join(self.vardir, self.default_config_name))
         else:
             self.config = os.path.abspath(config)
-            print self.config
             shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
         self.admin.execute("box.cfg.reload()", silent=silent)
 

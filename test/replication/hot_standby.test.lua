@@ -14,7 +14,7 @@ function _insert(_begin, _end)
     end
     return unpack(a)
 end;
-function _insert(_begin, _end)
+function _select(_begin, _end)
     a = {}
     for i = _begin, _end do
         table.insert(a, box.select(0, 0, i))
