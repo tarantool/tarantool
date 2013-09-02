@@ -35,4 +35,9 @@ box.cjson.decode('{\"test\": \"Результат\"}').test
 ---
 - Результат
 ...
+-- parser test to recognize binary stream
+'\83\149\1\11'
+---
+- !!binary U5UBCw==
+...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

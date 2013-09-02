@@ -9,4 +9,8 @@ box.cjson.encode({Метапеременная = { 'Метазначение' } 
 box.cjson.decode('123')
 box.cjson.decode('[123, \"Кудыкины горы\"]')[2]
 box.cjson.decode('{\"test\": \"Результат\"}').test
+
+-- parser test to recognize binary stream
+'\83\149\1\11'
+
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
