@@ -9,31 +9,6 @@ import shutil
 sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
 
 print """
-# Bug #708685:
-#  Addition of required configuration file options broke backward
-#  compatibility
-#  (https://bugs.launchpad.net/bugs/708685)
-"""
-# stop current server
-server.stop()
-# start server from config with holes in spaces
-server.deploy("box/tarantool_bug708685.cfg")
-# check connection
-admin("show configuration")
-
-print """
-# Bug #884768:
-#  Test representation of boolean values
-#  (https://bugs.launchpad.net/bugs/884768)
-"""
-# stop current server
-server.stop()
-# start server from config with different boolean represenation
-server.deploy("box/tarantool_bug884768.cfg")
-# check values
-admin("show configuration")
-
-print """
 # Bug #876541:
 #  Test floating point values (wal_fsync_delay) with fractional part
 #  (https://bugs.launchpad.net/bugs/876541)
@@ -43,29 +18,6 @@ server.stop()
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
 admin("box.cfg.wal_fsync_delay")
-
-print """
-# Bug#928413 Lua malfunction on certain configuration
-#  (https://bugs.launchpad.net/bugs/928413)
-"""
-# stop current server
-server.stop()
-server.deploy("box/tarantool_bug928413.cfg")
-# check values
-admin("box.cfg.wal_fsync_delay")
-admin("box.space[0].enabled")
-admin("reload configuration")
-
-print """
-#  Test field type conflict in keys
-"""
-# stop current server
-server.stop()
-# start server with memcached space conflict
-sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
-server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bad_type.cfg"))
-sys.stdout.pop_filter()
-
 
 script_dir_path = os.path.join(vardir, "script_dir")
 os.mkdir(script_dir_path)

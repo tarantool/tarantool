@@ -741,7 +741,13 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		       "end\n"
 		       "getmetatable(box.cfg).__call = "
 		       "function(table, index)\n"
-		       "  return table\n"
+		       "  local t = {}\n"
+		       "  for i, v in pairs(table) do\n"
+		       "    if type(v) ~= 'function' then\n"
+		       "      t[i] = v\n"
+		       "    end\n"
+		       "  end\n"
+		       "  return t\n"
 		       "end\n");
 	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
 		if (value == NULL)
