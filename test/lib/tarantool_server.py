@@ -113,7 +113,6 @@ class LuaTest(FuncTest):
                                 temp_server.init()
                         elif matched2.group(1) == 'start':
                             name = matched2.group(2)
-                            print self.suite_ini['servers']
                             if name in self.suite_ini['servers']:
                                 self.suite_ini['servers'][name].start(silent=True)
                                 self.suite_ini['connections'][name] = self.suite_ini['servers'][name].admin
