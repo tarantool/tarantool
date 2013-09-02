@@ -11,7 +11,7 @@ ch:is_empty()
 ...
 ch:get(.1)
 ---
-{}
+- null
 ...
 ch:put()
 ---

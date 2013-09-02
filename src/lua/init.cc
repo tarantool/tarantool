@@ -663,10 +663,18 @@ tarantool_lua(struct lua_State *L,
 	lua_newtable(L);
 	for (int i = 1; i <= top; i++) {
 		lua_pushnumber(L, i);
-		if (lua_isnil(L, i))
+		if (lua_isnil(L, i)) {
+			/**
+			 * When storing a nil in a Lua table,
+			 * there is no way to distinguish nil
+			 * value from no value. This is a trick
+			 * to make sure yaml converter correctly
+			 * outputs nil values on the return stack.
+			 */
 			lua_pushlightuserdata(L, NULL);
-		else
+		} else {
 			lua_pushvalue(L, i);
+		}
 		lua_rawset(L, -3);
 	}
 	lua_replace(L, 1);
