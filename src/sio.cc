@@ -231,9 +231,27 @@ ssize_t
 sio_read(int fd, void *buf, size_t count)
 {
 	ssize_t n = read(fd, buf, count);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
+	if (n < 0) {
+		if (errno == EWOULDBLOCK)
+			errno = EINTR;
+		switch (errno) {
+		case EAGAIN:
+		case EINTR:
+			break;
+		/*
+		 * Happens typically when the client closes
+		 * socket on timeout without reading the previous
+		 * query's response completely. Treat the same as
+		 * EOF.
+		 */
+		case ECONNRESET:
+			errno = 0;
+			n = 0;
+			break;
+		default:
 			tnt_raise(SocketError, fd, "read(%zd)", count);
+		}
+	}
 	return n;
 }
 

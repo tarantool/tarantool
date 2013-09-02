@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua_ipc.h"
 
 #include <stdlib.h>
 
@@ -37,6 +36,7 @@ extern "C" {
 } /* extern "C" */
 
 #include "ipc.h"
+#include "lua/ipc.h"
 #include "lua/init.h"
 
 static const char channel_lib[]   = "box.ipc.channel";

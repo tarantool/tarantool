@@ -59,11 +59,6 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->secondary_port = 0;
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
-	c->memcached_port = 0;
-	c->memcached_space = 0;
-	c->memcached_expire = false;
-	c->memcached_expire_per_loop = 0;
-	c->memcached_expire_full_sweep = 0;
 	c->replication_source = NULL;
 }
 
@@ -108,11 +103,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->secondary_port = 0;
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
-	c->memcached_port = 0;
-	c->memcached_space = 23;
-	c->memcached_expire = false;
-	c->memcached_expire_per_loop = 1024;
-	c->memcached_expire_full_sweep = 3600;
 	c->replication_source = NULL;
 	return 0;
 }
@@ -216,21 +206,6 @@ static NameAtom _name__too_long_threshold[] = {
 };
 static NameAtom _name__custom_proc_title[] = {
 	{ "custom_proc_title", -1, NULL }
-};
-static NameAtom _name__memcached_port[] = {
-	{ "memcached_port", -1, NULL }
-};
-static NameAtom _name__memcached_space[] = {
-	{ "memcached_space", -1, NULL }
-};
-static NameAtom _name__memcached_expire[] = {
-	{ "memcached_expire", -1, NULL }
-};
-static NameAtom _name__memcached_expire_per_loop[] = {
-	{ "memcached_expire_per_loop", -1, NULL }
-};
-static NameAtom _name__memcached_expire_full_sweep[] = {
-	{ "memcached_expire_full_sweep", -1, NULL }
 };
 static NameAtom _name__replication_source[] = {
 	{ "replication_source", -1, NULL }
@@ -708,81 +683,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramValue.scalarval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_port) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached_port != i32)
-			return CNF_RDONLY;
-		c->memcached_port = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_space) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached_space != i32)
-			return CNF_RDONLY;
-		c->memcached_space = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_expire) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		bool bln;
-
-		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
-			bln = true;
-		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
-				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
-			bln = false;
-		else
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->memcached_expire != bln)
-			return CNF_RDONLY;
-		c->memcached_expire = bln;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_per_loop) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		c->memcached_expire_per_loop = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__memcached_expire_full_sweep) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		double dbl = strtod(opt->paramValue.scalarval, NULL);
-		if ( (dbl == 0 || dbl == -HUGE_VAL || dbl == HUGE_VAL) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		c->memcached_expire_full_sweep = dbl;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__replication_source) ) {
 		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
@@ -798,8 +698,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 	}
 	return CNF_OK;
 }
-
-static void cleanFlags(tarantool_cfg* c, OptDef* opt);
 
 #define PRINTBUFLEN	8192
 static char*
@@ -822,7 +720,6 @@ dumpOptDef(NameAtom *atom) {
 static void
 acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, int *n_skipped, int *n_optional) {
 	ConfettyError	r;
-	OptDef		*orig_opt = opt;
 
 	while(opt) {
 		r = acceptValue(c, opt, check_rdonly);
@@ -874,8 +771,6 @@ acceptCfgDef(tarantool_cfg *c, OptDef *opt, int check_rdonly, int *n_accepted, i
 
 		opt = opt->next;
 	}
-
-	cleanFlags(c, orig_opt);
 }
 
 int
@@ -940,11 +835,6 @@ typedef enum IteratorState {
 	S_name__secondary_port,
 	S_name__too_long_threshold,
 	S_name__custom_proc_title,
-	S_name__memcached_port,
-	S_name__memcached_space,
-	S_name__memcached_expire,
-	S_name__memcached_expire_per_loop,
-	S_name__memcached_expire_full_sweep,
 	S_name__replication_source,
 	_S_Finished
 } IteratorState;
@@ -1299,61 +1189,6 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "custom_proc_title");
-			i->state = S_name__memcached_port;
-			return buf;
-		case S_name__memcached_port:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->memcached_port);
-			snprintf(buf, PRINTBUFLEN-1, "memcached_port");
-			i->state = S_name__memcached_space;
-			return buf;
-		case S_name__memcached_space:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->memcached_space);
-			snprintf(buf, PRINTBUFLEN-1, "memcached_space");
-			i->state = S_name__memcached_expire;
-			return buf;
-		case S_name__memcached_expire:
-			*v = malloc(8);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%s", c->memcached_expire ? "true" : "false");
-			snprintf(buf, PRINTBUFLEN-1, "memcached_expire");
-			i->state = S_name__memcached_expire_per_loop;
-			return buf;
-		case S_name__memcached_expire_per_loop:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->memcached_expire_per_loop);
-			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_per_loop");
-			i->state = S_name__memcached_expire_full_sweep;
-			return buf;
-		case S_name__memcached_expire_full_sweep:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%g", c->memcached_expire_full_sweep);
-			snprintf(buf, PRINTBUFLEN-1, "memcached_expire_full_sweep");
 			i->state = S_name__replication_source;
 			return buf;
 		case S_name__replication_source:
@@ -1386,11 +1221,6 @@ check_cfg_tarantool_cfg(tarantool_cfg *c) {
 		out_warning(CNF_NOTSET, "Option '%s' is not set (or has a default value)", dumpOptDef(_name__primary_port));
 	}
 	return res;
-}
-
-static void
-cleanFlags(tarantool_cfg* c __attribute__((unused)), OptDef* opt __attribute__((unused))) {
-
 }
 
 /************** Duplicate config  **************/
@@ -1449,11 +1279,6 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	if (dst->custom_proc_title) free(dst->custom_proc_title);dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
 	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
 		return CNF_NOMEMORY;
-	dst->memcached_port = src->memcached_port;
-	dst->memcached_space = src->memcached_space;
-	dst->memcached_expire = src->memcached_expire;
-	dst->memcached_expire_per_loop = src->memcached_expire_per_loop;
-	dst->memcached_expire_full_sweep = src->memcached_expire_full_sweep;
 	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
 	if (src->replication_source != NULL && dst->replication_source == NULL)
 		return CNF_NOMEMORY;
@@ -1677,35 +1502,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
-	if (c1->memcached_port != c2->memcached_port) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_port");
-
-		return diff;
-	}
-	if (c1->memcached_space != c2->memcached_space) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_space");
-
-		return diff;
-	}
-	if (c1->memcached_expire != c2->memcached_expire) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_expire");
-
-		return diff;
-	}
-	if (!only_check_rdonly) {
-		if (c1->memcached_expire_per_loop != c2->memcached_expire_per_loop) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_expire_per_loop");
-
-			return diff;
-		}
-	}
-	if (!only_check_rdonly) {
-		if (c1->memcached_expire_full_sweep != c2->memcached_expire_full_sweep) {
-			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->memcached_expire_full_sweep");
-
-			return diff;
-		}
-	}
 	if (!only_check_rdonly) {
 		if (confetti_strcmp(c1->replication_source, c2->replication_source) != 0) {
 			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_source");

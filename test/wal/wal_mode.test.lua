@@ -1,60 +1,16 @@
 box.cfg.wal_mode
----
-- none
-...
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
----
-- [0, 0, 'tweedledum']
-...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
----
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
-...
 space = box.space[0]
----
-...
 space:insert(1)
----
-- [1]
-...
 space:insert(2)
----
-- [2]
-...
 space:insert(3)
----
-- [3]
-...
 space:select(0, 1)
----
-- [1]
-...
 space:select(0, 2)
----
-- [2]
-...
 space:select(0, 3)
----
-- [3]
-...
 space:select(0, 4)
----
-...
 box.snapshot()
----
-- ok
-...
 box.snapshot()
----
-- 'error: can''t save snapshot, errno 17 (File exists)'
-...
 space:truncate()
----
-...
 box.snapshot()
----
-- ok
-...
 space:drop()
----
-...

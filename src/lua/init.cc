@@ -49,8 +49,9 @@ extern "C" {
 #include "fiber.h"
 #include "lua/fiber.h"
 #include "lua/admin.h"
-#include "lua_ipc.h"
-#include "lua_socket.h"
+#include "lua/errinj.h"
+#include "lua/ipc.h"
+#include "lua/socket.h"
 #include "lua/info.h"
 #include "lua/slab.h"
 #include "lua/stat.h"
@@ -397,7 +398,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
  * show statistics for all loaded plugins
  */
 int
-plugins_stat(tarantool_plugin_stat_cb cb, void *cb_ctx)
+plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx)
 {
 	int res;
 	struct tarantool_plugin *p;
@@ -554,6 +555,7 @@ tarantool_lua_init()
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_errinj_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_admin_init(L);
 	tarantool_lua_plugin_init(L);
@@ -663,6 +665,16 @@ tarantool_lua(struct lua_State *L,
 		lua_settop(L, 0);
 		return;
 	}
+
+	lua_newtable(L);
+	for (int i = 1; i <= top; i++) {
+		lua_pushnumber(L, i);
+		lua_pushvalue(L, i);
+		lua_rawset(L, -3);
+	}
+	lua_replace(L, 1);
+	lua_settop(L, 1);
+
 	yamlL_encode(L);
 	lua_replace(L, 1);
 	lua_pop(L, 1);
@@ -686,6 +698,16 @@ is_string(const char *str)
 	/* -Wunused-result warning suppression */
 	(void) r;
 	return *endptr != '\0';
+}
+
+static int
+lbox_cfg_reload(struct lua_State *L)
+{
+	struct tbuf *err = tbuf_new(fiber->gc_pool);
+	if (reload_cfg(err))
+		luaL_error(L, err->data);
+	lua_pushstring(L, "ok");
+	return 1;
 }
 
 /**
@@ -727,7 +749,24 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 		}
 		free(value);
 	}
+	luaL_pushresult(&b);
+	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
+	    lua_pcall(L, 0, 0, 0) != 0) {
+		panic("%s", lua_tostring(L, -1));
+	}
+	lua_pop(L, 1);
 
+	/* add box.cfg.reload() function */
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_pushstring(L, "cfg");
+	lua_gettable(L, -2);
+	lua_pushstring(L, "reload");
+	lua_pushcfunction(L, lbox_cfg_reload);
+	lua_settable(L, -3);
+	lua_pop(L, 2);
+
+	/* make box.cfg read-only */
+	luaL_buffinit(L, &b);
 	luaL_addstring(&b,
 		       "getmetatable(box.cfg).__newindex = "
 		       "function(table, index)\n"
@@ -739,7 +778,8 @@ tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
 	    lua_pcall(L, 0, 0, 0) != 0) {
 		panic("%s", lua_tostring(L, -1));
 	}
-	lua_pop(L, 1);	/* cleanup stack */
+	lua_pop(L, 1);
+
 	/*
 	 * Invoke a user-defined on_reload_configuration hook,
 	 * if it exists. Do it after everything else is done.

@@ -9,7 +9,7 @@ box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 1, 1, 'str')
 -- Tree multi-part unique
 box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 1, 2, 1, 'str', 2, 'str')
 -- Tree multi-part non-unique
-box.insert(box.schema.INDEX_ID, 0, 3, 'i2', 'tree', 0, 2, 2, 'str', 3, 'str')
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 2, 'str', 3, 'str')
 -- Hash single-part unique
 box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'hash', 1, 1, 0, 'str')
 -- Hash multi-part unique

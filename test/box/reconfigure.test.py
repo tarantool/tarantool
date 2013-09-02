@@ -4,14 +4,6 @@ admin("box.cfg.too_long_threshold")
 # bad1
 server.reconfigure("box/tarantool_bad1.cfg")
 admin("box.cfg.too_long_threshold")
-# bad2
-server.reconfigure("box/tarantool_bad2.cfg")
-# bad3
-server.reconfigure("box/tarantool_bad3.cfg")
-# bad4
-server.reconfigure("box/tarantool_bad4.cfg")
-# bad5
-server.reconfigure("box/tarantool_bad5.cfg")
 # good
 server.reconfigure("box/tarantool_good.cfg")
 admin("box.cfg.too_long_threshold")
@@ -34,16 +26,18 @@ print """#
 # Valgrind reports use of not initialized memory after 'reload
 # configuration'
 #"""
+admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
+admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 sql("insert into t0 values (1, 'tuple')")
-admin("save snapshot")
+admin("box.snapshot()")
 server.reconfigure(None)
 sql("insert into t0 values (2, 'tuple 2')")
-admin("save snapshot")
+admin("box.snapshot()")
 server.reconfigure("box/tarantool_good.cfg")
 sql("insert into t0 values (3, 'tuple 3')")
-admin("save snapshot")
+admin("box.snapshot()")
 # Cleanup
 server.reconfigure(self.suite_ini["config"])
-admin("box.space[0]:truncate()")
+admin("box.space[0]:drop()")
 
 # vim: syntax=python

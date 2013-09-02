@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua_socket.h"
+#include "lua/socket.h"
 
 extern "C" {
 #include <lua.h>

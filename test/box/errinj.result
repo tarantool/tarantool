@@ -1,139 +1,153 @@
-show injections
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
-error injections:
-  - name: ERRINJ_TESTING
-    state: off
-  - name: ERRINJ_WAL_IO
-    state: off
-  - name: ERRINJ_WAL_ROTATE
-    state: off
-  - name: ERRINJ_INDEX_ALLOC
-    state: off
+- [0, 0, 'tweedledum']
 ...
-set injection some-injection on
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-fail:can't find error injection 'some-injection'
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
+box.errinj.info()
+---
+- ERRINJ_INDEX_ALLOC:
+    state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_WAL_ROTATE:
+    state: false
+  ERRINJ_TESTING:
+    state: false
+...
+box.errinj.set("some-injection", true)
+---
+- 'error: can''t find error injection ''some-injection'''
+...
+box.errinj.set("some-injection") -- check error
+---
+- 'error: can''t find error injection ''some-injection'''
 ...
 box.space[0]:select(0,222444)
 ---
 ...
-set injection ERRINJ_TESTING on
+box.errinj.set("ERRINJ_TESTING", true)
 ---
-ok
+- ok
 ...
 box.space[0]:select(0,222444)
 ---
-error: 'Error injection ''ERRINJ_TESTING'''
+- error: Error injection 'ERRINJ_TESTING'
 ...
-set injection ERRINJ_TESTING off
+box.errinj.set("ERRINJ_TESTING", false)
 ---
-ok
+- ok
 ...
 -- Check how well we handle a failed log write
-set injection ERRINJ_WAL_IO on
+box.errinj.set("ERRINJ_WAL_IO", true)
 ---
-ok
+- ok
 ...
 box.space[0]:insert(1)
 ---
-error: 'Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.space[0]:select(0,1)
 ---
 ...
-set injection ERRINJ_WAL_IO off
+box.errinj.set("ERRINJ_WAL_IO", false)
 ---
-ok
+- ok
 ...
 box.space[0]:insert(1)
 ---
- - 1: {}
+- [1]
 ...
-set injection ERRINJ_WAL_IO on
+box.errinj.set("ERRINJ_WAL_IO", true)
 ---
-ok
+- ok
 ...
 box.space[0]:update(1, '=p', 0, 2)
 ---
-error: 'Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.space[0]:select(0,1)
 ---
- - 1: {}
+- [1]
 ...
 box.space[0]:select(0,2)
 ---
 ...
-set injection ERRINJ_WAL_IO off
+box.errinj.set("ERRINJ_WAL_IO", false)
 ---
-ok
+- ok
 ...
 box.space[0]:truncate()
 ---
 ...
 -- Check a failed log rotation
-set injection ERRINJ_WAL_ROTATE on
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
-ok
+- ok
 ...
 box.space[0]:insert(1)
 ---
-error: 'Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.space[0]:select(0,1)
 ---
 ...
-set injection ERRINJ_WAL_ROTATE off
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
-ok
+- ok
 ...
 box.space[0]:insert(1)
 ---
- - 1: {}
+- [1]
 ...
-set injection ERRINJ_WAL_ROTATE on
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
-ok
+- ok
 ...
 box.space[0]:update(1, '=p', 0, 2)
 ---
-error: 'Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.space[0]:select(0,1)
 ---
- - 1: {}
+- [1]
 ...
 box.space[0]:select(0,2)
 ---
 ...
-set injection ERRINJ_WAL_ROTATE off
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
-ok
+- ok
 ...
 box.space[0]:update(1, '=p', 0, 2)
 ---
- - 2: {}
+- [2]
 ...
 box.space[0]:select(0,1)
 ---
 ...
 box.space[0]:select(0,2)
 ---
- - 2: {}
+- [2]
 ...
-set injection ERRINJ_WAL_ROTATE on
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
-ok
+- ok
 ...
 box.space[0]:truncate()
 ---
-error: 'Failed to write to disk'
+- error: Failed to write to disk
 ...
-set injection ERRINJ_WAL_ROTATE off
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
-ok
+- ok
 ...
 box.space[0]:truncate()
+---
+...
+box.space[0]:drop()
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

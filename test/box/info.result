@@ -2,88 +2,97 @@
 -- make sure it's a valid YAML
 box.info.unknown_variable
 ---
- - nil
+{}
 ...
 box.info[23]
 ---
- - nil
+{}
 ...
 box.info['unknown_variable']
 ---
- - nil
+{}
 ...
 string.match(box.info.version, '^[1-9]') ~= nil
 ---
- - true
+- true
 ...
 string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
- - true
+- true
 ...
 string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil
 ---
- - true
+- true
 ...
 box.info.lsn > 0
 ---
- - true
+- true
 ...
 box.info.recovery_lag
 ---
- - 0
+- 0
 ...
 box.info.recovery_last_update
 ---
- - 0
+- 0
 ...
 box.info.status
 ---
- - primary
+- primary
 ...
 string.len(box.info.config) > 0
 ---
- - true
+- true
 ...
 string.len(box.info.build.target) > 0
 ---
- - true
+- true
 ...
 string.len(box.info.build.compiler) > 0
 ---
- - true
+- true
 ...
 string.len(box.info.build.flags) > 0
 ---
- - true
+- true
 ...
 string.len(box.info.build.options) > 0
 ---
- - true
+- true
 ...
 string.len(box.info.uptime) > 0
 ---
- - true
+- true
 ...
 string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
- - true
+- true
 ...
-for k, _ in pairs(box.info()) do print(' - ', k) end
+t = {}
 ---
- - version
- - status
- - pid
- - lsn
- - snapshot_pid
- - recovery_last_update
- - recovery_lag
- - uptime
- - build
- - logger_pid
- - config
+...
+for k, _ in pairs(box.info()) do table.insert(t, k) end
+---
+...
+table.sort(t)
+---
+...
+t
+---
+- - build
+  - config
+  - logger_pid
+  - lsn
+  - pid
+  - recovery_lag
+  - recovery_last_update
+  - snapshot_pid
+  - status
+  - uptime
+  - version
 ...
 box.info.snapshot_pid
 ---
- - 0
+- 0
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -312,6 +312,22 @@ lbox_fiber_gc(struct lua_State *L)
 }
 
 static int
+fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
+{
+	char buf[512];
+	int l = snprintf(buf, sizeof(buf), "#%-2d %p in ", frameno, frameret);
+	if (func)
+		snprintf(buf + l, sizeof(buf) - l, "%s+%" PRI_SZ "", func, offset);
+	else
+		snprintf(buf + l, sizeof(buf) - l, "?");
+	struct lua_State *L = (struct lua_State*)cb_ctx;
+	lua_pushnumber(L, frameno + 1);
+	lua_pushstring(L, buf);
+	lua_settable(L, -3);
+	return 0;
+}
+
+static int
 lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
@@ -327,7 +343,14 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 	lua_pushnumber(L, f->csw);
 	lua_settable(L, -3);
 
-	/* stack, backtrace */
+#ifdef ENABLE_BACKTRACE
+	lua_pushstring(L, "backtrace");
+	lua_newtable(L);
+	backtrace_foreach(fiber_backtrace_cb,
+	                  f->last_stack_frame,
+	                  f->coro.stack, f->coro.stack_size, L);
+	lua_settable(L, -3);
+#endif /* ENABLE_BACKTRACE */
 
 	lua_settable(L, -3);
 	return 0;

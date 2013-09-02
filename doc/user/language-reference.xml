@@ -17,7 +17,7 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  During start up, the server can connect to up to five TCP ports:
+  During start up, the server can connect to up to four TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
@@ -46,9 +46,6 @@
         set in the option file, the corresponding server process
         is not started.
       </para></listitem>
-    <listitem><para>Memcached port. Optional, read-write data port
-      that speaks Memcached text protocol. This port is off by default.
-    </para></listitem>
   </itemizedlist>
   In absence of authentication, this approach allows system
   administrators to restrict access to read/write or
@@ -121,35 +118,6 @@
     and
     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
   </para>
-  <section xml:id="memcached-protocol">
-    <title>Memcached protocol</title>
-      <para>If full access to Tarantool functionality is not needed,
-      or there is no readily available connector for the
-      programming language in use, any existing client driver for
-      Memcached will make do as a Tarantool connector.
-      To enable text Memcached protocol, turn on
-      <olink targetptr="memcached_port"/> in the option file.
-      Since Memcached has no notion of spaces or secondary
-      indexes, this port only makes it possible to access one
-      dedicated space (see <olink
-      targetptr="memcached_space"/>) via its primary key.
-      Unless tuple expiration is enabled with <olink
-      targetptr="memcached_expire"/>, TTL part of the message is
-      stored but ignored.
-     </para>
-     <para>
-       Notice, that <olink targetptr="memcached_space"/> is also
-       accessible using the primary port or Lua. A common use
-       of the Memcached port in Tarantool is when a Memcached default
-       expiration algorithm is insufficient, and a custom Lua
-       expiration procedure is used.
-     </para>
-     <para>
-      Tarantool does not support the binary protocol of Memcached.
-      If top performance is a must, Tarantool's own binary
-      protocol should be used.
-     </para>
-  </section>
 </section>
 
 <section xml:id="administrative-console">

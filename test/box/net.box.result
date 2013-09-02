@@ -1,121 +1,132 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
+space = box.space[0]
+---
+...
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 ---
 ...
 type(remote)
 ---
- - table
+- table
 ...
 remote:ping()
 ---
- - true
+- true
 ...
 remote:ping()
 ---
- - true
+- true
 ...
 box.net.box.ping(remote)
 ---
- - true
+- true
 ...
-box.insert(0, 123, 'test1', 'test2')
+space:insert(123, 'test1', 'test2')
 ---
- - 123: {'test1', 'test2'}
+- [123, 'test1', 'test2']
 ...
-box.select(0, 0, 123)
+space:select(0, 123)
 ---
- - 123: {'test1', 'test2'}
+- [123, 'test1', 'test2']
 ...
-tuple = remote:select(0, 0, 123)
+tuple = remote:select(space.n, 0, 123)
 ---
 ...
 remote:call('box.select', '0', '0', 123)
 ---
- - 123: {'test1', 'test2'}
+- [123, 'test1', 'test2']
 ...
 tuple
 ---
- - 123: {'test1', 'test2'}
+- [123, 'test1', 'test2']
 ...
 type(tuple)
 ---
- - userdata
+- userdata
 ...
 #tuple
 ---
- - 3
+- 3
 ...
-box.update(0, 123, '=p', 1, 'test1-updated')
+space:update(123, '=p', 1, 'test1-updated')
 ---
- - 123: {'test1-updated', 'test2'}
+- [123, 'test1-updated', 'test2']
 ...
-remote:update(0, 123, '=p', 2, 'test2-updated')
+remote:update(space.n, 123, '=p', 2, 'test2-updated')
 ---
- - 123: {'test1-updated', 'test2-updated'}
+- [123, 'test1-updated', 'test2-updated']
 ...
-box.insert(0, 123, 'test1', 'test2')
+space:insert(123, 'test1', 'test2')
 ---
-error: 'Duplicate key exists in unique index 0'
+- error: Duplicate key exists in unique index 0
 ...
-remote:insert(0, 123, 'test1', 'test2')
+remote:insert(space.n, 123, 'test1', 'test2')
 ---
-error: 'Duplicate key exists in unique index 0'
+- error: Duplicate key exists in unique index 0
 ...
-remote:insert(0, 345, 'test1', 'test2')
+remote:insert(space.n, 345, 'test1', 'test2')
 ---
- - 345: {'test1', 'test2'}
+- [345, 'test1', 'test2']
 ...
-remote:select(0, 0, 345)
+remote:select(space.n, 0, 345)
 ---
- - 345: {'test1', 'test2'}
+- [345, 'test1', 'test2']
 ...
 remote:call('box.select', '0', '0', 345)
 ---
- - 345: {'test1', 'test2'}
+- [345, 'test1', 'test2']
 ...
-box.select(0, 0, 345)
+space:select(0, 345)
 ---
- - 345: {'test1', 'test2'}
+- [345, 'test1', 'test2']
 ...
-remote:replace(0, 345, 'test1-replaced', 'test2-replaced')
+remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-box.select(0, 0, 345)
+space:select(0, 345)
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select_limit(0, 0, 0, 1000, 345)
+remote:select_limit(space.n, 0, 0, 1000, 345)
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-box.select_range(0, 0, 1000)
+space:select_range(0, 1000)
 ---
- - 123: {'test1-updated', 'test2-updated'}
- - 345: {'test1-replaced', 'test2-replaced'}
+- [123, 'test1-updated', 'test2-updated']
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select_range(0, 0, 1000)
+remote:select_range(space.n, 0, 1000)
 ---
- - 123: {'test1-updated', 'test2-updated'}
- - 345: {'test1-replaced', 'test2-replaced'}
+- [123, 'test1-updated', 'test2-updated']
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-box.select(0, 0, 345)
+space:select(0, 345)
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select(0, 0, 345)
+remote:select(space.n, 0, 345)
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:timeout(0.5):select(0, 0, 345)
+remote:timeout(0.5):select(space.n, 0, 345)
 ---
- - 345: {'test1-replaced', 'test2-replaced'}
+- [345, 'test1-replaced', 'test2-replaced']
 ...
 remote:call('box.fiber.sleep', '.01')
 ---
 ...
 remote:timeout(0.01):call('box.fiber.sleep', '10')
 ---
- - nil
+{}
 ...
 -- setopt delimiter ';'
 pstart = box.time();
@@ -132,7 +143,7 @@ end;
 ...
 parallel_foo('abc');
 ---
- - abc
+- abc
 ...
 for i = 1, 20 do
     box.fiber.resume(
@@ -141,7 +152,7 @@ for i = 1, 20 do
                 box.fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
-                table.insert(parallel, tostring(s == so[0]))
+                table.insert(parallel, s == so[0])
             end
         )
     )
@@ -159,48 +170,49 @@ end;
 -- setopt delimiter ''
 unpack(parallel)
 ---
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
 ...
 #parallel
 ---
- - 20
+- 20
 ...
 box.time() - pstart < 0.5
 ---
- - true
+- true
 ...
 remote:close()
 ---
- - true
+- true
 ...
 remote:close()
 ---
-error: '[string "-- box_net.lua (internal file)..."]:404: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:404: box.net.box: already closed'
 ...
 remote:ping()
 ---
-error: '[string "-- box_net.lua (internal file)..."]:409: box.net.box: connection was closed'
+- error: '[string "-- box_net.lua (internal file)..."]:409: box.net.box: connection
+    was closed'
 ...
-box.space[0]:truncate()
+space:drop()
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -1,3 +1,14 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
+space = box.space[0]
+---
+...
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.
@@ -7,23 +18,23 @@
 -- pause
 box.cfg.rows_per_wal
 ---
- - 50
+- 50
 ...
-box.space[0]:insert(1, 'testing', 'lua rocks')
+space:insert(1, 'testing', 'lua rocks')
 ---
- - 1: {'testing', 'lua rocks'}
+- [1, 'testing', 'lua rocks']
 ...
-box.space[0]:delete(1)
+space:delete(1)
 ---
- - 1: {'testing', 'lua rocks'}
+- [1, 'testing', 'lua rocks']
 ...
-box.space[0]:insert(1, 'testing', 'lua rocks')
+space:insert(1, 'testing', 'lua rocks')
 ---
- - 1: {'testing', 'lua rocks'}
+- [1, 'testing', 'lua rocks']
 ...
-box.space[0]:delete(1)
+space:delete(1)
 ---
- - 1: {'testing', 'lua rocks'}
+- [1, 'testing', 'lua rocks']
 ...
 -- check delete
 box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))
@@ -31,195 +42,194 @@ box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))
 ...
 box.process(22, box.pack('iii', 0, 0, 0))
 ---
-error: 'box.process(CALL, ...) is not allowed'
+- error: box.process(CALL, ...) is not allowed
 ...
-box.space[0]:insert(1, 'test box delete')
+space:insert(1, 'test box delete')
 ---
- - 1: {'test box delete'}
+- [1, 'test box delete']
 ...
 box.delete('0', '\1\0\0\0')
 ---
- - 1: {'test box delete'}
+- [1, 'test box delete']
 ...
-box.space[0]:insert(1, 'test box delete')
+space:insert(1, 'test box delete')
 ---
- - 1: {'test box delete'}
+- [1, 'test box delete']
 ...
 box.delete(0, 1)
 ---
- - 1: {'test box delete'}
+- [1, 'test box delete']
 ...
-box.space[0]:insert('abcd', 'test box delete')
+space:insert('abcd', 'test box delete')
 ---
- - 1684234849: {'test box delete'}
+- [1684234849, 'test box delete']
 ...
 box.delete('0', 'abcd')
 ---
- - 1684234849: {'test box delete'}
+- [1684234849, 'test box delete']
 ...
-box.space[0]:insert('abcd', 'test box delete')
+space:insert('abcd', 'test box delete')
 ---
- - 1684234849: {'test box delete'}
+- [1684234849, 'test box delete']
 ...
 box.delete(0, 'abcd')
 ---
- - 1684234849: {'test box delete'}
+- [1684234849, 'test box delete']
 ...
-box.space[0]:insert('abcd', 'test box.select()')
+space:insert('abcd', 'test box.select()')
 ---
- - 1684234849: {'test box.select()'}
+- [1684234849, 'test box.select()']
 ...
 box.replace('0', 'abcd', 'hello', 'world')
 ---
- - 1684234849: {'hello', 'world'}
+- [1684234849, 'hello', 'world']
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'defc', 'goodbye', 'universe')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.replace('0', 'abcd')
 ---
- - 1684234849: {}
+- [1684234849]
 ...
 box.delete('0', 'abcd')
 ---
- - 1684234849: {}
+- [1684234849]
 ...
 box.delete('0', 'defc')
 ---
- - 1667655012: {'goodbye', 7310312400256331381}
+- [1667655012, 'goodbye', 7310312400256331381]
 ...
 box.insert('0', 'test', 'old', 'abcd')
 ---
- - 1953719668: {'old', 1684234849}
+- [1953719668, 'old', 1684234849]
 ...
 -- test that insert produces a duplicate key error
 box.insert('0', 'test', 'old', 'abcd')
 ---
-error: 'Duplicate key exists in unique index 0'
+- error: Duplicate key exists in unique index 0
 ...
 box.update('0', 'test', '=p=p', 0, 'pass', 1, 'new')
 ---
- - 1936941424: {'new', 1684234849}
+- [1936941424, 'new', 1684234849]
 ...
 box.update('0', 'miss', '+p', 2, '\1\0\0\0')
 ---
 ...
 box.update('0', 'pass', '+p', 2, '\1\0\0\0')
 ---
- - 1936941424: {'new', 1684234850}
+- [1936941424, 'new', 1684234850]
 ...
 box.update('0', 'pass', '-p', 2, '\1\0\0\0')
 ---
- - 1936941424: {'new', 1684234849}
+- [1936941424, 'new', 1684234849]
 ...
 box.update('0', 'pass', '-p', 2, '\1\0\0\0')
 ---
- - 1936941424: {'new', 1684234848}
+- [1936941424, 'new', 1684234848]
 ...
 box.update(0, 'pass', '+p', 2, 1)
 ---
- - 1936941424: {'new', 1684234849}
+- [1936941424, 'new', 1684234849]
 ...
 box.delete('0', 'pass')
 ---
- - 1936941424: {'new', 1684234849}
+- [1936941424, 'new', 1684234849]
 ...
 reload configuration
 ---
-ok
+- error: '[string "reload configuration"]:1: ''='' expected near ''configuration'''
 ...
 -- must be read-only
 box.insert(0, 'test')
 ---
- - 1953719668: {}
+- [1953719668]
 ...
 box.insert(0, 'abcd')
 ---
- - 1684234849: {}
+- [1684234849]
 ...
 box.delete(0, 'test')
 ---
- - 1953719668: {}
+- [1953719668]
 ...
 box.delete(0, 'abcd')
 ---
- - 1684234849: {}
+- [1684234849]
 ...
-box.space[0]:insert('test', 'hello world')
+space:insert('test', 'hello world')
 ---
- - 1953719668: {'hello world'}
+- [1953719668, 'hello world']
 ...
-box.space[0]:update('test', '=p', 1, 'bye, world')
+space:update('test', '=p', 1, 'bye, world')
 ---
- - 1953719668: {'bye, world'}
+- [1953719668, 'bye, world']
 ...
-box.space[0]:delete('test')
+space:delete('test')
 ---
- - 1953719668: {'bye, world'}
+- [1953719668, 'bye, world']
 ...
 -- test tuple iterators
-t = box.space[0]:insert('test')
+t = space:insert('test')
 ---
 ...
-t = box.space[0]:replace('test', 'another field')
+t = space:replace('test', 'another field')
 ---
 ...
-t = box.space[0]:replace('test', 'another field', 'one more')
+t = space:replace('test', 'another field', 'one more')
 ---
 ...
-box.space[0]:truncate()
+space:truncate()
 ---
 ...
 -- test passing arguments in and out created fiber
 -- setopt delimiter ';'
 function y()
-    print('started')
-    box.fiber.detach()
+    box.fiber.detach('started')
     while true do
         box.replace(0, 'test', os.time())
         box.fiber.sleep(0.001)
@@ -232,7 +242,7 @@ f = box.fiber.create(y);
 ...
 box.fiber.resume(f);
 ---
-started
+- started
 ...
 box.fiber.sleep(0.002);
 ---
@@ -242,7 +252,7 @@ box.fiber.cancel(f);
 ...
 box.fiber.resume(f);
 ---
-error: 'fiber.resume(): the fiber is dead'
+- error: 'fiber.resume(): the fiber is dead'
 ...
 for k = 1, 1000, 1 do
     box.fiber.create(
@@ -256,22 +266,22 @@ end;
 -- setopt delimiter ''
 collectgarbage('collect')
 ---
- - 0
+- 0
 ...
 -- check that these newly created fibers are garbage collected
 box.fiber.find(900)
 ---
- - nil
+{}
 ...
 box.fiber.find(910)
 ---
- - nil
+{}
 ...
 box.fiber.find(920)
 ---
- - nil
+{}
 ...
-box.space[0]:truncate()
+space:drop()
 ---
 ...
 -- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

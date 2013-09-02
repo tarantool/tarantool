@@ -1,3 +1,11 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 ping
 ok
 ---
@@ -15,9 +23,9 @@ No match
 select * from t0 where k0 = 1
 Found 1 tuple:
 [1, 'I am a tuple']
-save snapshot
+box.snapshot()
 ---
-ok
+- ok
 ...
 select * from t0 where k0 = 1
 Found 1 tuple:
@@ -96,7 +104,7 @@ select * from t65537 where k0 = 0
 An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exist'
 select * from t4294967295 where k0 = 0
 An error occurred: ER_NO_SUCH_SPACE, 'Space 4294967295 does not exist'
-box.space[0]:truncate()
+box.space[0]:drop()
 ---
 ...
 #
@@ -105,5 +113,5 @@ box.space[0]:truncate()
 
 show status
 ---
-unknown command. try typing help.
+- error: '[string "show status"]:1: ''='' expected near ''status'''
 ...
