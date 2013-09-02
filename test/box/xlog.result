@@ -1,17 +1,23 @@
 
 # Inprogress xlog must be renamed before second insert.
 
-insert into t0 values (1, 'first tuple')
-Insert OK, 1 row affected
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
 00000000000000000002.xlog.inprogress exists
-insert into t0 values (2, 'second tuple')
-Insert OK, 1 row affected
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
 00000000000000000002.xlog.inprogress has been successfully renamed
 
 # Inprogress xlog must be renamed during regular termination.
 
-insert into t0 values (3, 'third tuple')
-Insert OK, 1 row affected
+box.space[0]:insert(3, 'third tuple')
+---
+- [3, 'third tuple']
+...
 00000000000000000004.xlog.inprogress exists
 Stopping the server...
 00000000000000000004.xlog.inprogress has been successfully renamed
@@ -38,13 +44,12 @@ panic_on_wal_error doens't work for duplicate key errors
 
 box.space[0]:select(0, 1)
 ---
- - 1: {}
+- [1, 2]
 ...
 box.space[0]:select(0, 2)
 ---
- - 2: {}
 ...
 #box.space[0]
 ---
- - 0
+- 0
 ...

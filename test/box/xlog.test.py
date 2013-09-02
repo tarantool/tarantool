@@ -16,11 +16,12 @@ wal_inprogress = os.path.join(vardir, "00000000000000000002.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000002.xlog")
 
 server.start()
-sql("insert into t0 values (1, 'first tuple')")
+
+admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
 
-sql("insert into t0 values (2, 'second tuple')")
+admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"
@@ -34,7 +35,7 @@ server.start()
 wal_inprogress = os.path.join(vardir, "00000000000000000004.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000004.xlog")
 
-sql("insert into t0 values (3, 'third tuple')")
+admin("box.space[0]:insert(3, 'third tuple')")
 
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"
