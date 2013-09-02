@@ -170,23 +170,23 @@ class LuaTest(FuncTest):
                     try:
                         if matched3.group(1) == 'create':
                             name, namecon = re.match("(.*)\s+to\s+(.*)", matched3.group(2)).groups()
-                            self.suite_ini['connection'][namecon] = AdminConnection('localhost', self.suite_ini['server'][name].port)
+                            self.suite_ini['connections'][namecon] = AdminConnection('localhost', self.suite_ini['server'][name].port)
                         elif matched3.group(1) == 'drop':
                             name = matched3.group(2)
-                            if name in self.suite_ini['connections']:
-                                if self.suite_ini['connections'][name].is_connected:
-                                    self.suite_ini['connection'][name].disconnect()
-                                self.suite_ini['connection'].pop(name)
+                            if name in self.suite_ini['connections'] and not self.suite_ini['connections'] is curcon:
+                                self.suite_ini['connections'][name].disconnect()
+                                self.suite_ini['connections'].pop(name)
                             else:
                                 raise LuaPreprocessorException("Wrong connection name: " + name)
                         elif matched3.group(1) == 'set':
-                            name = matched3.group(2)
-                            if name in self.suite_ini['connections']:
-                                if not self.suite_ini['connections'][name].is_connected:
-                                    self.suite_ini['connections'][name].connect()
-                                curcon = self.suite_ini['connections'][name]
+                            name = re.split(",\s*", matched3.group(2))
+                            for _name in name:
+                                if not _name in self.suite_ini['connections']:
+                                    raise LuaPreprocessorException("Wrong connection name: " + _name)
+                            if len(name) == 1:
+                                curcon = self.suite_ini['connections'][name[0]]
                             else:
-                                raise LuaPreprocessorException("Wrong connection name: " + name)
+                                curcon = [self.suite_ini['connections'][_name] for _name in name]
                         else:
                             raise LuaPreprocessorException("Wrong command for connection - " + repr(matched3.group(1)))
                     except (AttributeError, ValueError) as e:
@@ -212,17 +212,25 @@ class LuaTest(FuncTest):
             else:
                 if not delimiter:
                     if line.strip():
-                        server.admin(line.strip())
+                        curcon(line.strip())
                     continue
                 cmd.write(line)
                 if cmd.getvalue().endswith(delimiter + '\n') and cmd.getvalue():
-                    res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
+                    if isinstance(curcon, list):
+                        for con in curcon:
+                            res = con(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
+                    else:
+                        res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
                     sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
                     sys.stdout.write(res.replace("\r\n", "\n"))
                     cmd.close()
                     cmd = None
-        if cmd and cmd.getvalue():
-            res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
+        if cmd and cmd.getvalue().strip():
+            if isinstance(curcon, list):
+                for con in curcon:
+                    res = con(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
+            else:
+                res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
             sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
             sys.stdout.write(res.replace("\r\n", "\n"))
             cmd.close
@@ -373,6 +381,7 @@ class TarantoolServer(Server):
             os.unlink(os.path.join(self.vardir, self.default_config_name))
         else:
             self.config = os.path.abspath(config)
+            print self.config
             shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
         self.admin.execute("box.cfg.reload()", silent=silent)
 
