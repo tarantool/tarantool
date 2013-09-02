@@ -170,5 +170,3 @@ iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
 space.index[0]:iterator(-666)
 
 space:drop()
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -24,4 +24,3 @@ c:begin_work()
 c:rollback()
 c:begin_work()
 c:commit()
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

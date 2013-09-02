@@ -1,6 +1,6 @@
 c = box.net.sql.connect('abcd')
 ---
-error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+- error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
 dump = function(v) return box.cjson.encode(v) end
 ---
@@ -17,101 +17,99 @@ c = box.net.sql.connect('pg', unpack(connect))
 ...
 dump({c:execute('SELECT 123::text AS bla, 345')})
 ---
- - [[{"?column?":345,"bla":"123"}],1,"SELECT 1"]
+- '[[{"?column?":345,"bla":"123"}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT -1 AS neg, NULL AS abc')})
 ---
- - [[{"neg":-1}],1,"SELECT 1"]
+- '[[{"neg":-1}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT -1.1 AS neg, 1.2 AS pos')})
 ---
- - [[{"neg":-1.1,"pos":1.2}],1,"SELECT 1"]
+- '[[{"neg":-1.1,"pos":1.2}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ARRAY[1,2] AS neg, 1.2 AS pos')})
 ---
- - [[{"neg":"{1,2}","pos":1.2}],1,"SELECT 1"]
+- '[[{"neg":"{1,2}","pos":1.2}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ? AS val', 'abc')})
 ---
- - [[{"val":"abc"}],1,"SELECT 1"]
+- '[[{"val":"abc"}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ? AS val', 123)})
 ---
- - [[{"val":123}],1,"SELECT 1"]
+- '[[{"val":123}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ? AS val', true)})
 ---
- - [[{"val":true}],1,"SELECT 1"]
+- '[[{"val":true}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ? AS val', false)})
 ---
- - [[{"val":false}],1,"SELECT 1"]
+- '[[{"val":false}],1,"SELECT 1"]'
 ...
 dump({c:execute('SELECT ? AS val, ? AS num, ? AS str', false, 123, 'abc')})
 ---
- - [[{"str":"abc","num":123,"val":false}],1,"SELECT 1"]
+- '[[{"str":"abc","num":123,"val":false}],1,"SELECT 1"]'
 ...
 dump({c:execute('DROP TABLE IF EXISTS unknown_table')})
 ---
- - [{},0,"DROP TABLE"]
+- '[{},0,"DROP TABLE"]'
 ...
 dump({c:execute('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
- - [[{"column1":1,"column2":2},{"column1":2,"column2":3}],2,"SELECT 2"]
+- '[[{"column1":1,"column2":2},{"column1":2,"column2":3}],2,"SELECT 2"]'
 ...
 c:ping()
 ---
- - true
+- true
 ...
 dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
- - [[{"column1":1,"column2":2},{"column1":2,"column2":3}]]
+- '[[{"column1":1,"column2":2},{"column1":2,"column2":3}]]'
 ...
 dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
-error: '[string "-- sql.lua (internal file)..."]:156: SQL request returned multiply rows'
+- error: '[string "-- sql.lua (internal file)..."]:156: SQL request returned multiply
+    rows'
 ...
 dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 ---
- - [{"column1":1,"column2":2}]
+- '[{"column1":1,"column2":2}]'
 ...
 dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
- - [2]
+- '[2]'
 ...
 c:execute('SELEC T')
 ---
-error: '[string "-- sql.lua (internal file)..."]:105: ERROR:  syntax error at or near "SELEC"
-LINE 1: SELEC T
-        ^
-'
+- error: "[string \"-- sql.lua (internal file)...\"]:105: ERROR:  syntax error at
+    or near \"SELEC\"\nLINE 1: SELEC T\n        ^\n"
 ...
 c = box.net.sql.connect('abcd')
 ---
-error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+- error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
 c:quote('abc\"cde\"def')
 ---
- - 'abc"cde"def'
+- '''abc"cde"def'''
 ...
 c:begin_work()
 ---
- - 0
+- 0
 ...
 c:rollback()
 ---
- - 0
+- 0
 ...
 c:begin_work()
 ---
- - 0
+- 0
 ...
 c:commit()
 ---
- - 0
+- 0
 ...
 c:txn(function(dbi) dbi:single('SELECT 1') end)
 ---
- - true
+- true
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -53,7 +53,7 @@ _space:replace(_space.n, 0, '_space')
 - [280, 0, '_space']
 ...
 --
--- # Can't drop a system space
+-- Can't drop a system space
 --
 _space:delete(_space.n)
 ---
@@ -80,7 +80,7 @@ _space:update(_space.n, '+p', 0, 2)
 t = box.auto_increment(_space.n, 0, 'hello')
 ---
 ...
--- # Check that a space exists
+-- Check that a space exists
 space = box.space[box.unpack('i', t[0])]
 ---
 ...
@@ -157,7 +157,7 @@ _index:select(0)
 - [288, 0, 'primary', 1701147252, 1, 2, 0, 'num', 1, 'num']
 - [288, 1, 1701667182, 1701147252, 1, 2, 0, 'num', 2, 'str']
 ...
--- # modify indexes of a system space
+-- modify indexes of a system space
 _index:delete(_index.n, 0)
 ---
 - error: Can't drop the primary key in a system space, space id 288

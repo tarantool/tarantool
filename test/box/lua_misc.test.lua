@@ -1,20 +1,19 @@
--- setopt delim ';'
-
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum');
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num');
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 
 ----------------
 -- # box.raise
 ----------------
-1 + 1;
-box.raise(123, 'test');
-box.raise(0, 'the other test');
-box.raise(12, 345);
+1 + 1
+box.raise(123, 'test')
+box.raise(0, 'the other test')
+box.raise(12, 345)
 
 ----------------
 -- # box.stat
 ----------------
-t = {};
+t = {}
+--# setopt delimiter ';'
 for k, v in pairs(box.stat()) do
     table.insert(t, k)
 end;
@@ -61,4 +60,3 @@ end;
 t;
 
 box.space[0]:drop();
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

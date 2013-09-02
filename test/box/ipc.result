@@ -52,7 +52,7 @@ ch:is_empty()
 buffer = {}
 ---
 ...
--- setopt delimiter ';'
+--# setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -74,7 +74,8 @@ for i = 1, 10 do
 end;
 ---
 ...
-t;
+--# setopt delimiter ''
+t
 ---
 - - - 1
     - true
@@ -97,42 +98,42 @@ t;
   - - 10
     - true
 ...
-ch:has_readers();
+ch:has_readers()
 ---
 - true
 ...
-ch:has_writers();
+ch:has_writers()
 ---
 - false
 ...
-box.fiber.cancel(tfbr);
+box.fiber.cancel(tfbr)
 ---
 ...
-ch:has_readers();
----
-- false
-...
-ch:has_writers();
+ch:has_readers()
 ---
 - false
 ...
-ch:put(box.info.pid);
+ch:has_writers()
+---
+- false
+...
+ch:put(box.info.pid)
 ---
 - true
 ...
-ch:is_full();
+ch:is_full()
 ---
 - true
 ...
-ch:is_empty();
+ch:is_empty()
 ---
 - false
 ...
-ch:get(box.info.pid) == box.info.pid;
+ch:get(box.info.pid) == box.info.pid
 ---
 - true
 ...
-buffer;
+buffer
 ---
 - - 234
   - 1
@@ -146,30 +147,31 @@ buffer;
   - 9
   - 10
 ...
-ch:is_empty();
+ch:is_empty()
 ---
 - true
 ...
-ch:broadcast();
+ch:broadcast()
 ---
 - error: 'usage: channel:broadcast(variable)'
 ...
-ch:broadcast(123);
+ch:broadcast(123)
 ---
 - true
 ...
-ch:get();
+ch:get()
 ---
 - 123
 ...
-ch:is_full();
+ch:is_full()
 ---
 - false
 ...
-ch:is_empty();
+ch:is_empty()
 ---
 - true
 ...
+--# setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -179,9 +181,6 @@ tfbr = box.fiber.create(
         end
     end
 );
----
-...
-box.fiber.resume(tfbr);
 ---
 ...
 tfbr2 = box.fiber.create(
@@ -195,10 +194,13 @@ tfbr2 = box.fiber.create(
 );
 ---
 ...
-box.fiber.resume(tfbr2);
+--# setopt delimiter ''
+box.fiber.resume(tfbr)
 ---
 ...
--- setopt delimiter ''
+box.fiber.resume(tfbr2)
+---
+...
 buffer = {}
 ---
 ...
@@ -297,4 +299,3 @@ buffer
   - - tfbr2
     - '45'
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

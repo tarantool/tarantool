@@ -6,7 +6,7 @@ space = box.space[0]
 -- https://bugs.launchpad.net/tarantool/+bug/1042738
 -- Iteration over a non-unique TREE index
 
--- setopt delimiter ';'
+--# setopt delimiter ';'
 for i = 1, 1000 do
     space:truncate()
     for j = 1, 30 do
@@ -20,7 +20,7 @@ for i = 1, 1000 do
         error('bug at iteration '..i..', count is '..count)
     end
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 space:truncate()
 
 --

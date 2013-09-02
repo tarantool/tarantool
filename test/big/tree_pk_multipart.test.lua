@@ -129,15 +129,14 @@ space:insert('b', 'b', 'b')
 space:insert('c', 'c', 'c')
 
 t = {}
--- setopt delimiter ';'
+--# setopt delimiter ';'
 for i = 1, 2 do
     k,v = space.index[1]:next(k)
     table.insert(t, v)
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 
 t
-
 space:truncate()
 v
 collectgarbage('collect')
@@ -149,12 +148,12 @@ collectgarbage('collect')
 v
 
 t = {}
--- setopt delimiter ';'
+--# setopt delimiter ';'
 for i = 1, 3 do
     k,v = space.index[1]:next(k)
     table.insert(t, v)
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 t
 space:drop()
 
@@ -173,5 +172,3 @@ space:replace_if_exists(1, 1)
 space:drop()
 
 space = nil
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

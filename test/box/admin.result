@@ -120,3 +120,6 @@ box.info()
   logger_pid: <pid>
   config: tarantool.cfg
 ...
+box.space[0]:drop()
+---
+...

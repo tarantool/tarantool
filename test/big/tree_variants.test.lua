@@ -1,4 +1,3 @@
-
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 1, 1, 'num64')
@@ -56,5 +55,3 @@ space:insert(1, '', '00000002', '', '', '', '', '', 0)
 space:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
 
 space:drop()
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

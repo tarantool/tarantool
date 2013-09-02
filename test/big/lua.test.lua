@@ -139,7 +139,7 @@ space = box.space[0]
 
 pid = 1
 tid = 999
--- setopt delimiter ';'
+--# setopt delimiter ';'
 for sid = 1, 2 do
     for i = 1, 3 do
         space:insert('pid_'..pid, 'sid_'..sid, 'tid_'..tid)
@@ -147,7 +147,7 @@ for sid = 1, 2 do
         tid = tid - 1
     end
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 
 index = space.index[1]
 

@@ -128,7 +128,7 @@ remote:timeout(0.01):call('box.fiber.sleep', '10')
 ---
 {}
 ...
--- setopt delimiter ';'
+--# setopt delimiter ';'
 pstart = box.time();
 ---
 ...
@@ -167,7 +167,7 @@ for i = 1, 20 do
 end;
 ---
 ...
--- setopt delimiter ''
+--# setopt delimiter ''
 unpack(parallel)
 ---
 - true
@@ -215,4 +215,3 @@ remote:ping()
 space:drop()
 ---
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

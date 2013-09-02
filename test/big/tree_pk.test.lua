@@ -49,7 +49,7 @@ s1:delete('identifier')
 s1:delete('second')
 s1:delete('third')
 
--- setopt delimiter ';'
+--# setopt delimiter ';'
 function crossjoin(space0, space1, limit)
     local result = {}
     for k0, v0 in space0:pairs() do
@@ -67,7 +67,7 @@ function crossjoin(space0, space1, limit)
     end
     return result
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 
 s0:insert(1, 'tuple')
 s1:insert(1, 'tuple')
@@ -191,5 +191,3 @@ box.sort({s0:select(2, 0)})
 
 s0:drop()
 s0 = nil
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

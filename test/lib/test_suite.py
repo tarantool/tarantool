@@ -262,11 +262,11 @@ class TestSuite:
                       self.args.vardir, self.args.mem, self.args.start_and_exit,
                       self.args.gdb, self.args.valgrind,
                       init_lua=self.ini["init_lua"], silent=False)
-
-        self.ini['servers'] = {'default' : self.server}
-        self.ini['connections'] = {'default' : self.server.admin}
-        self.ini['vardir'] = self.args.vardir
-        self.ini['builddir'] = self.args.builddir
+        if self.ini['core'] != 'unittest':
+            self.ini['servers'] = {'default' : self.server}
+            self.ini['connections'] = {'default' : self.server.admin}
+            self.ini['vardir'] = self.args.vardir
+            self.ini['builddir'] = self.args.builddir
         for i in self.ini['lua_libs']:
             shutil.copy(i, self.args.vardir)
 

@@ -1,4 +1,3 @@
-
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 space = box.space[0]
@@ -39,7 +38,7 @@ remote:timeout(0.5):select(space.n, 0, 345)
 remote:call('box.fiber.sleep', '.01')
 remote:timeout(0.01):call('box.fiber.sleep', '10')
 
--- setopt delimiter ';'
+--# setopt delimiter ';'
 pstart = box.time();
 parallel = {};
 function parallel_foo(id)
@@ -65,7 +64,7 @@ for i = 1, 20 do
     end
     box.fiber.sleep(0.1)
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 unpack(parallel)
 #parallel
 box.time() - pstart < 0.5
@@ -75,4 +74,3 @@ remote:close()
 remote:ping()
 
 space:drop()
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -150,4 +150,3 @@ box.space[0]:truncate()
 box.space[0]:drop()
 ---
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

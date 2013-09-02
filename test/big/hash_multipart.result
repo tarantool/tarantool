@@ -55,7 +55,7 @@ hash:insert(1, 'bar', 1, '', 5)
 - error: Duplicate key exists in unique index 0
 ...
 -- output all rows
--- setopt delimiter ';'
+--# setopt delimiter ';'
 function box.select_all(space)
     local result = {}
     for k, v in box.space[space]:pairs() do
@@ -65,7 +65,7 @@ function box.select_all(space)
 end;
 ---
 ...
--- setopt delimiter ''
+--# setopt delimiter ''
 box.sort(box.select_all(0))
 ---
 - - [0, 'bar', 0, '', 3]
@@ -131,4 +131,3 @@ hash:len()
 hash:drop()
 ---
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

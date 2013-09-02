@@ -294,5 +294,3 @@ hash:select(2, 10)
 hash:select(3, 10)
 hash:select(3, 0)
 hash:drop()
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -20,7 +20,7 @@ hash:insert(1, 'bar', 1, '', 5)
 
 -- output all rows
 
--- setopt delimiter ';'
+--# setopt delimiter ';'
 function box.select_all(space)
     local result = {}
     for k, v in box.space[space]:pairs() do
@@ -28,7 +28,7 @@ function box.select_all(space)
     end
     return result
 end;
--- setopt delimiter ''
+--# setopt delimiter ''
 box.sort(box.select_all(0))
 
 -- primary index select
@@ -54,5 +54,3 @@ hash:select(1, 1, 'baz')
 hash:truncate()
 hash:len()
 hash:drop()
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -12,7 +12,7 @@ ch:put(345, .5)
 ch:is_full()
 ch:is_empty()
 buffer = {}
--- setopt delimiter ';'
+--# setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -26,26 +26,28 @@ t = {};
 for i = 1, 10 do
     table.insert(t, {i, ch:put(i, 0.1)})
 end;
-t;
-ch:has_readers();
-ch:has_writers();
-box.fiber.cancel(tfbr);
+--# setopt delimiter ''
+t
+ch:has_readers()
+ch:has_writers()
+box.fiber.cancel(tfbr)
 
-ch:has_readers();
-ch:has_writers();
-ch:put(box.info.pid);
-ch:is_full();
-ch:is_empty();
-ch:get(box.info.pid) == box.info.pid;
-buffer;
+ch:has_readers()
+ch:has_writers()
+ch:put(box.info.pid)
+ch:is_full()
+ch:is_empty()
+ch:get(box.info.pid) == box.info.pid
+buffer
 
-ch:is_empty();
-ch:broadcast();
-ch:broadcast(123);
-ch:get();
+ch:is_empty()
+ch:broadcast()
+ch:broadcast(123)
+ch:get()
 
-ch:is_full();
-ch:is_empty();
+ch:is_full()
+ch:is_empty()
+--# setopt delimiter ';'
 tfbr = box.fiber.create(
     function()
         box.fiber.detach()
@@ -55,7 +57,6 @@ tfbr = box.fiber.create(
         end
     end
 );
-box.fiber.resume(tfbr);
 tfbr2 = box.fiber.create(
     function()
         box.fiber.detach()
@@ -65,8 +66,9 @@ tfbr2 = box.fiber.create(
         end
     end
 );
-box.fiber.resume(tfbr2);
--- setopt delimiter ''
+--# setopt delimiter ''
+box.fiber.resume(tfbr)
+box.fiber.resume(tfbr2)
 
 buffer = {}
 
@@ -83,5 +85,3 @@ t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
 buffer
-
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

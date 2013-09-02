@@ -9,7 +9,7 @@ box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 space = box.space[0]
 ---
 ...
--- setopt delimiter ';'
+--# setopt delimiter ';'
 i = 1;
 ---
 ...
@@ -48,7 +48,7 @@ end;
 ---
 - error: Failed to allocate 2051 bytes in slab allocator for tuple
 ...
--- setopt delimiter ''
+--# setopt delimiter ''
 space:len()
 ---
 - 6378
@@ -80,7 +80,7 @@ i = 0
 t = {}
 ---
 ...
--- setopt delimiter ';'
+--# setopt delimiter ';'
 for k,v in space:pairs() do
     table.insert(t, v)
     i = i + 1
@@ -90,7 +90,7 @@ for k,v in space:pairs() do
 end;
 ---
 ...
--- setopt delimiter ''
+--# setopt delimiter ''
 t
 ---
 - - [0, 1953719668]

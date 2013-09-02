@@ -25,7 +25,7 @@ _space:replace(_index.n, 0, '_index')
 --
 _space:replace(_space.n, 0, '_space')
 --
--- # Can't drop a system space
+-- Can't drop a system space
 --
 _space:delete(_space.n)
 _space:delete(_index.n)
@@ -38,7 +38,7 @@ _space:update(_space.n, '+p', 0, 2)
 -- Create a space
 --
 t = box.auto_increment(_space.n, 0, 'hello')
--- # Check that a space exists
+-- Check that a space exists
 space = box.space[box.unpack('i', t[0])]
 space.n
 space.arity
@@ -60,7 +60,7 @@ _index:replace(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')
 _index:insert(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
 _index:replace(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
 _index:select(0)
--- # modify indexes of a system space
+-- modify indexes of a system space
 _index:delete(_index.n, 0)
 _space:insert(1000, 0, 'hello')
 _index:insert(1000, 0, 'primary', 'tree', 1, 1, 0, 'num')

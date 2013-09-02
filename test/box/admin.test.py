@@ -1,5 +1,3 @@
-# encoding: utf-8
-# 
 import sys
 
 # clear statistics:
@@ -38,5 +36,3 @@ admin("box.slab.info()")
 sys.stdout.clear_all_filters()
 
 admin("box.space[0]:drop()")
-
-# vim: syntax=python

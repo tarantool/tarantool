@@ -34,4 +34,3 @@ c:begin_work()
 c:commit()
 
 c:txn(function(dbi) dbi:single('SELECT 1') end)
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

@@ -46,7 +46,7 @@ box.snapshot()
 ...
 box.snapshot()
 ---
-- 'error: can''t save snapshot, errno 17 (File exists)'
+- error: can't save snapshot, errno 17 (File exists)
 ...
 space:truncate()
 ---

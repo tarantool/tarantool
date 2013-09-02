@@ -227,7 +227,7 @@ space:truncate()
 ---
 ...
 -- test passing arguments in and out created fiber
--- setopt delimiter ';'
+--# setopt delimiter ';'
 function y()
     box.fiber.detach('started')
     while true do
@@ -263,7 +263,7 @@ for k = 1, 1000, 1 do
 end;
 ---
 ...
--- setopt delimiter ''
+--# setopt delimiter ''
 collectgarbage('collect')
 ---
 - 0
@@ -284,4 +284,3 @@ box.fiber.find(920)
 space:drop()
 ---
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

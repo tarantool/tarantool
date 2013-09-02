@@ -207,4 +207,3 @@ space:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
 space:drop()
 ---
 ...
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

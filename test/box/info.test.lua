@@ -22,4 +22,3 @@ for k, _ in pairs(box.info()) do table.insert(t, k) end
 table.sort(t)
 t
 box.info.snapshot_pid
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
