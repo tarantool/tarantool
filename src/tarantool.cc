@@ -84,7 +84,6 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
-bool booting = true;
 extern const void *opt_def;
 
 static int
@@ -821,9 +820,7 @@ main(int argc, char **argv)
 		create_pid();
 	}
 
-	say_logger_init(cfg.logger_nonblock);
-
-	/* init process title */
+	/* init process title - used for logging */
 	if (cfg.custom_proc_title == NULL) {
 		custom_proc_title = (char *) palloc(eter_pool, 1);
 		custom_proc_title[0] = '\0';
@@ -833,7 +830,7 @@ main(int argc, char **argv)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	booting = false;
+	say_logger_init(cfg.logger_nonblock);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);
