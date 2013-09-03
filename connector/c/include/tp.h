@@ -479,9 +479,9 @@ tp_tuple(struct tp *p) {
 	return tp_used(p);
 }
 
-/* Leb128 calculation functions, internally used by the library */
+/* Ber128 calculation functions, internally used by the library */
 static inline size_t
-tp_leb128sizeof(uint32_t value) {
+tp_ber128sizeof(uint32_t value) {
 	return (  tp_likely(value < (1 <<  7))) ? 1 :
 	       (  tp_likely(value < (1 << 14))) ? 2 :
 	       (tp_unlikely(value < (1 << 21))) ? 3 :
@@ -489,7 +489,7 @@ tp_leb128sizeof(uint32_t value) {
 }
 
 static tp_noinline void tp_hot
-tp_leb128save_slowpath(struct tp *p, uint32_t value) {
+tp_ber128save_slowpath(struct tp *p, uint32_t value) {
 	if (tp_unlikely(value >= (1 << 21))) {
 		if (tp_unlikely(value >= (1 << 28)))
 			*(p->p++) = (value >> 28) | 0x80;
@@ -502,9 +502,9 @@ tp_leb128save_slowpath(struct tp *p, uint32_t value) {
 }
 
 static inline void tp_hot
-tp_leb128save(struct tp *p, uint32_t value) {
+tp_ber128save(struct tp *p, uint32_t value) {
 	if (tp_unlikely(value >= (1 << 14))) {
-		tp_leb128save_slowpath(p, value);
+		tp_ber128save_slowpath(p, value);
 		return;
 	}
 	if (tp_likely(value >= (1 << 7)))
@@ -513,7 +513,7 @@ tp_leb128save(struct tp *p, uint32_t value) {
 }
 
 static tp_noinline int tp_hot
-tp_leb128load_slowpath(struct tp *p, uint32_t *value) {
+tp_ber128load_slowpath(struct tp *p, uint32_t *value) {
 	if (tp_likely(! (p->f[2] & 0x80))) {
 		*value = (p->f[0] & 0x7f) << 14 |
 		         (p->f[1] & 0x7f) << 7  |
@@ -540,7 +540,7 @@ tp_leb128load_slowpath(struct tp *p, uint32_t *value) {
 }
 
 static inline int tp_hot
-tp_leb128load(struct tp *p, uint32_t *value) {
+tp_ber128load(struct tp *p, uint32_t *value) {
 	if (tp_likely(! (p->f[0] & 0x80))) {
 		*value = *(p->f++) & 0x7f;
 	} else
@@ -548,7 +548,7 @@ tp_leb128load(struct tp *p, uint32_t *value) {
 		*value = (p->f[0] & 0x7f) << 7 | (p->f[1] & 0x7f);
 		p->f += 2;
 	} else
-		return tp_leb128load_slowpath(p, value);
+		return tp_ber128load_slowpath(p, value);
 	return 0;
 }
 
@@ -560,10 +560,10 @@ static inline ssize_t
 tp_field(struct tp *p, const char *data, size_t size) {
 	assert(p->h != NULL);
 	assert(p->t != NULL);
-	register int esz = tp_leb128sizeof(size);
+	register int esz = tp_ber128sizeof(size);
 	if (tp_unlikely(tp_ensure(p, esz + size) == -1))
 		return -1;
-	tp_leb128save(p, size);
+	tp_ber128save(p, size);
 	memcpy(p->p, data, size);
 	p->p += size;
 	(*(uint32_t*)p->t)++;
@@ -678,7 +678,7 @@ tp_call(struct tp *p, uint32_t flags, const char *name, size_t name_len) {
 		struct tp_h h;
 		struct tp_hcall c;
 	} h;
-	size_t sz = tp_leb128sizeof(name_len);
+	size_t sz = tp_ber128sizeof(name_len);
 	h.h.type = TP_CALL;
 	h.h.len = sizeof(struct tp_hcall) + sz + name_len;
 	h.h.reqid = 0;
@@ -688,7 +688,7 @@ tp_call(struct tp *p, uint32_t flags, const char *name, size_t name_len) {
 	tp_setreq(p);
 	memcpy(p->p, &h, sizeof(h));
 	p->p += sizeof(h);
-	tp_leb128save(p, name_len);
+	tp_ber128save(p, name_len);
 	memcpy(p->p, name, name_len);
 	p->p += name_len;
 	return tp_used(p);
@@ -788,7 +788,7 @@ tp_op(struct tp *p, uint32_t field, uint8_t op, const char *data,
 	assert(p->h != NULL);
 	assert(p->u != NULL);
 	assert(p->h->type == TP_UPDATE);
-	size_t sz = 4 + 1 + tp_leb128sizeof(size) + size;
+	size_t sz = 4 + 1 + tp_ber128sizeof(size) + size;
 	if (tp_unlikely(tp_ensure(p, sz)) == -1)
 		return -1;
 	/* field */
@@ -798,7 +798,7 @@ tp_op(struct tp *p, uint32_t field, uint8_t op, const char *data,
 	*(uint8_t*)(p->p) = op;
 	p->p += sizeof(uint8_t);
 	/* data */
-	tp_leb128save(p, size);
+	tp_ber128save(p, size);
 	if (tp_likely(data))
 		memcpy(p->p, data, size);
 	p->p += size;
@@ -814,22 +814,22 @@ tp_op(struct tp *p, uint32_t field, uint8_t op, const char *data,
 static inline ssize_t
 tp_opsplice(struct tp *p, uint32_t field, uint32_t offset,
 	    uint32_t cut, const char *paste, size_t paste_len) {
-	uint32_t olen = tp_leb128sizeof(sizeof(offset)),
-	         clen = tp_leb128sizeof(sizeof(cut)),
-	         plen = tp_leb128sizeof(paste_len);
+	uint32_t olen = tp_ber128sizeof(sizeof(offset)),
+	         clen = tp_ber128sizeof(sizeof(cut)),
+	         plen = tp_ber128sizeof(paste_len);
 	uint32_t sz = olen + sizeof(offset) + clen + sizeof(cut) +
 	              plen + paste_len;
 	ssize_t rc = tp_op(p, field, TP_OPSPLICE, NULL, sz);
 	if (tp_unlikely(rc == -1))
 		return -1;
 	p->p -= sz;
-	tp_leb128save(p, sizeof(offset));
+	tp_ber128save(p, sizeof(offset));
 	memcpy(p->p, &offset, sizeof(offset));
 	p->p += sizeof(offset);
-	tp_leb128save(p, sizeof(cut));
+	tp_ber128save(p, sizeof(cut));
 	memcpy(p->p, &cut, sizeof(cut));
 	p->p += sizeof(cut);
-	tp_leb128save(p, paste_len);
+	tp_ber128save(p, paste_len);
 	memcpy(p->p, paste, paste_len);
 	p->p += paste_len;
 	return rc;
@@ -1092,7 +1092,7 @@ tp_nextfield(struct tp *p) {
 		return 0;
 	p->f += p->fsz;
 fetch:;
-	register int rc = tp_leb128load(p, &p->fsz);
+	register int rc = tp_ber128load(p, &p->fsz);
 	if (tp_unlikely(rc == -1))
 		return -1;
 	if (tp_unlikely((p->f + p->fsz) > p->e))
