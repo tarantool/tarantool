@@ -169,8 +169,9 @@ class LuaTest(FuncTest):
                 elif matched3:
                     try:
                         if matched3.group(1) == 'create':
-                            name, namecon = re.match("(.*)\s+to\s+(.*)", matched3.group(2)).groups()
-                            self.suite_ini['connections'][namecon] = AdminConnection('localhost', self.suite_ini['server'][name].port)
+                            namecon, name = re.match("(.*)\s+to\s+(.*)", matched3.group(2)).groups()
+                            self.suite_ini['connections'][namecon] = AdminConnection('localhost', self.suite_ini['servers'][name].port)
+                            print name, namecon
                         elif matched3.group(1) == 'drop':
                             name = matched3.group(2)
                             if name in self.suite_ini['connections'] and not self.suite_ini['connections'] is curcon:
