@@ -176,10 +176,38 @@ tuple_format(const struct tuple *tuple)
  * Get a field from tuple by index.
  * Returns a pointer to BER-length prefixed field.
  *
+ * @pre field < tuple->field_count.
+ * @returns field data if field exists or NULL
  */
-const char *
+static inline const char *
 tuple_field_old(const struct tuple_format *format,
-		const struct tuple *tuple, uint32_t i);
+		const struct tuple *tuple, uint32_t i)
+{
+	const char *field = tuple->data;
+
+	if (i == 0)
+		return field;
+	i--;
+	if (i < format->max_fieldno) {
+		if (format->offset[i] > 0)
+			return field + format->offset[i];
+		if (format->offset[i] != INT32_MIN) {
+			uint32_t *field_map = (uint32_t *) tuple;
+			int32_t idx = format->offset[i];
+			return field + field_map[idx];
+		}
+	}
+	const char *tuple_end = field + tuple->bsize;
+
+	while (field < tuple_end) {
+		uint32_t len = load_varint32(&field);
+		field += len;
+		if (i == 0)
+			return field;
+		i--;
+	}
+	return tuple_end;
+}
 
 /**
  * @brief Return field data of the field
