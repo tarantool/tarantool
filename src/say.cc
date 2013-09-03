@@ -48,6 +48,7 @@ extern "C" {
 
 int sayfd = STDERR_FILENO;
 pid_t logger_pid;
+bool booting = true;
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -85,20 +86,30 @@ say_logger_init(int nonblock)
 	char args[] = { "-c" };
 	char *argv[] = { cmd, args, cfg.logger, NULL };
 	char *envp[] = { NULL };
+	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (cfg.logger != NULL) {
+		sigset_t mask;
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGCHLD);
+
+		if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+			say_syserror("sigprocmask");
+
 		if (pipe(pipefd) == -1) {
 			say_syserror("pipe");
-			goto out;
+			goto error;
 		}
 
 		pid = fork();
 		if (pid == -1) {
 			say_syserror("pipe");
-			goto out;
+			goto error;
 		}
 
 		if (pid == 0) {
+			sigprocmask(SIG_UNBLOCK, &mask, NULL);
+
 			close(pipefd[1]);
 			dup2(pipefd[0], STDIN_FILENO);
 			/*
@@ -110,9 +121,23 @@ say_logger_init(int nonblock)
 			 */
 			setpgid(0, 0);
 			execve(argv[0], argv, envp);
-			say_syserror("Can't start logger: %s", cfg.logger);
-			_exit(EXIT_FAILURE);
+			goto error;
 		}
+		/*
+		 * A courtesy to a DBA who might have
+		 * misconfigured the logger option: check whether
+		 * or not the logger process has started, and if
+		 * it didn't, abort. Notice, that if the logger
+		 * makes a slow start this is futile.
+		 */
+		struct timespec timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_nsec = 1; /* Mostly to trigger preemption. */
+		if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD)
+			goto error;
+
+		/* OK, let's hope for the best. */
+		sigprocmask(SIG_UNBLOCK, &mask, NULL);
 		close(pipefd[0]);
 		dup2(pipefd[1], STDERR_FILENO);
 		dup2(pipefd[1], STDOUT_FILENO);
@@ -122,11 +147,13 @@ say_logger_init(int nonblock)
 	} else {
 		sayfd = STDERR_FILENO;
 	}
-      out:
+	booting = false;
 	if (nonblock)
 		sio_setfl(sayfd, O_NONBLOCK, 1);
-
-	setvbuf(stderr, NULL, _IONBF, 0);
+	return;
+error:
+	say_syserror("Can't start logger: %s", cfg.logger);
+	_exit(EXIT_FAILURE);
 }
 
 void
