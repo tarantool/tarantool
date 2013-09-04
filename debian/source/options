@@ -1,0 +1,3 @@
+# don't pack some non-free and generated files for Debian
+--extend-diff-ignore=rfc4627\.txt|www-data/ycsb
+
