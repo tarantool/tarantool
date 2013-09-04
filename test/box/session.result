@@ -61,7 +61,7 @@ box.session.on_disconnect(function() end)
 ---
 - null
 ...
--- check it''s possible to reset these triggers
+-- check it's possible to reset these triggers
 type(box.session.on_connect(function() error('hear') end))
 ---
 - function
@@ -138,23 +138,22 @@ box.session.on_disconnect(dec)
 active_connections = 0
 ---
 ...
-default con1
---# create connection con1 to default
---# set connection con1
+--# create connection con_one to default
 active_connections
 ---
 - 1
 ...
-default con2
---# create connection con2 to default
---# set connection con2
+--# create connection con_two to default
 active_connections
 ---
 - 2
 ...
---# drop connection con1
---# drop connection con2
---# set connection default
+--# drop connection con_one
+--# drop connection con_two
+active_connections
+---
+- 0
+...
 type(box.session.on_connect(nil))
 ---
 - function
@@ -172,14 +171,14 @@ box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
 ---
 - null
 ...
-default con3
---# create connection con3 to default
---# set connection con3
+--# create connection con_three to default
+--# set connection con_three
 box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
 ---
 - true
 ...
---# drop connection con3
+--# set connection default
+--# drop connection con_three
 -- cleanup
 type(box.session.on_connect(nil))
 ---

@@ -132,7 +132,7 @@ class LuaTest(FuncTest):
                         elif matched2.group(1) == 'deploy':
                             name = matched2.group(2)
                             if name in self.suite_ini['servers']:
-                                self.suite_ini['servers'][name].deploy()
+                                self.suite_ini['servers'][name].deploy(silent=True)
                             else:
                                 raise LuaPreprocessorException("Wrong server name: " + name)
                         elif matched2.group(1) == 'reconfigure':
@@ -171,10 +171,10 @@ class LuaTest(FuncTest):
                         if matched3.group(1) == 'create':
                             namecon, name = re.match("(.*)\s+to\s+(.*)", matched3.group(2)).groups()
                             self.suite_ini['connections'][namecon] = AdminConnection('localhost', self.suite_ini['servers'][name].port)
-                            print name, namecon
+                            self.suite_ini['connections'][namecon].connect()
                         elif matched3.group(1) == 'drop':
                             name = matched3.group(2)
-                            if name in self.suite_ini['connections'] and not self.suite_ini['connections'] is curcon:
+                            if name in self.suite_ini['connections']:
                                 self.suite_ini['connections'][name].disconnect()
                                 self.suite_ini['connections'].pop(name)
                             else:
@@ -271,7 +271,8 @@ class TarantoolServer(Server):
                                    '*.inprogress',
                                    '*.cfg',
                                    '*.sup',
-                                   '*.lua']
+                                   '*.lua',
+                                   '*.pid']
         self.process = None
         self.config = None
         self.vardir = None

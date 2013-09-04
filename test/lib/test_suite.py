@@ -215,7 +215,7 @@ class TestSuite:
         self.args = args
         self.tests = []
         self.ini = {}
-
+        self.suite_path = suite_path
         self.ini["core"] = "tarantool"
 
         if os.access(suite_path, os.F_OK) == False:
@@ -280,33 +280,34 @@ class TestSuite:
         print "TEST".ljust(48), "RESULT"
         print shortsep
         failed_tests = []
+        try:
+            for test in self.tests:
+                sys.stdout.write(test.name.ljust(48))
+                # for better diagnostics in case of a long-running test
+                sys.stdout.flush()
 
-        for test in self.tests:
-            sys.stdout.write(test.name.ljust(48))
-            # for better diagnostics in case of a long-running test
-            sys.stdout.flush()
+                test_name = os.path.basename(test.name)
 
-            test_name = os.path.basename(test.name)
+                if (test_name in self.ini["disabled"]
+                    or not self.server.debug and test_name in self.ini["release_disabled"]
+                    or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
+                    print "[ disabled ]"
+                else:
+                    test.run(self.server)
+                    if not test.passed():
+                        failed_tests.append(test.name)
+        finally:
+            print '\n', shortsep
+            self.server.stop(silent=False)
+            self.server.cleanup()
 
-            if (test_name in self.ini["disabled"]
-                or not self.server.debug and test_name in self.ini["release_disabled"]
-                or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                print "[ disabled ]"
-            else:
-                test.run(self.server)
-                if not test.passed():
-                    failed_tests.append(test.name)
-
-        print shortsep
         if failed_tests:
             print "Failed {0} tests: {1}.".format(len(failed_tests),
                                                 ", ".join(failed_tests))
-        self.server.stop(silent=False)
-        self.server.cleanup()
 
         if self.args.valgrind and check_valgrind_log(self.server.valgrind_log):
             print "  Error! There were warnings/errors in valgrind log file:"
             print_tail_n(self.server.valgrind_log, 20)
-            return 1
-        return len(failed_tests)
+            return ['valgrind error in ' + self.suite_path]
+        return failed_tests
 

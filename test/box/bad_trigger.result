@@ -1,11 +1,14 @@
+ 
  #
  # if on_connect() trigger raises an exception, the connection is dropped
  # 
+ 
 type(box.session.on_connect(function() nosuchfunction() end))
 ---
 - nil
 ...
-disconnected
+Exception raised
+
 type(box.session.on_connect(nil))
 ---
 - function

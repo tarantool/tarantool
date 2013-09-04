@@ -20,7 +20,7 @@ box.session.peer() == box.session.peer(box.session.id())
 box.session.on_connect(function() end)
 box.session.on_disconnect(function() end)
 
--- check it''s possible to reset these triggers
+-- check it's possible to reset these triggers
 type(box.session.on_connect(function() error('hear') end))
 type(box.session.on_disconnect(function() error('hear') end))
 
@@ -49,16 +49,14 @@ function dec() active_connections = active_connections - 1 end
 box.session.on_connect(inc)
 box.session.on_disconnect(dec)
 active_connections = 0
---# create connection con1 to default
---# set connection con1
+--# create connection con_one to default
 active_connections
---# create connection con2 to default
---# set connection con2
+--# create connection con_two to default
 active_connections
---# drop connection con1
---# drop connection con2
+--# drop connection con_one
+--# drop connection con_two
+active_connections
 
---# set connection default
 type(box.session.on_connect(nil))
 type(box.session.on_disconnect(nil))
 
@@ -66,10 +64,11 @@ type(box.session.on_disconnect(nil))
 box.session.on_connect(function() box.insert(0, box.session.id()) end)
 box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
 
---# create connection con3 to default 
---# set connection con3
+--# create connection con_three to default 
+--# set connection con_three
 box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
---# drop connection con3
+--# set connection default
+--# drop connection con_three
 
 -- cleanup
 type(box.session.on_connect(nil))
