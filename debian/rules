@@ -36,7 +36,9 @@ DEB_BUILDDIR := build-area
 
 tarball: clean
 	git describe > VERSION
-	cd .. && tar --exclude=.git --exclude=debian \
+	cd .. && tar --exclude=.git --exclude=debian 		\
+		--exclude=rfc4627.txt				\
+		--exclude=doc/www-data/ycsb			\
 		-czf tarantool_$(UVERSION).orig.tar.gz tarantool-$(UVERSION)
 
 clean::
