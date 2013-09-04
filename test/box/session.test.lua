@@ -1,3 +1,6 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+
 box.session.exists(box.session.id())
 box.session.exists()
 box.session.exists(1, 2, 3)
@@ -72,3 +75,5 @@ box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
 type(box.session.on_connect(nil))
 type(box.session.on_disconnect(nil))
 active_connections
+
+box.space[0]:drop()
