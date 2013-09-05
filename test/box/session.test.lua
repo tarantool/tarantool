@@ -55,6 +55,7 @@ active_connections
 active_connections
 --# drop connection con_one
 --# drop connection con_two
+box.fiber.sleep(0) -- yield
 active_connections
 
 type(box.session.on_connect(nil))

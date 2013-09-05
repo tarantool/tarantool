@@ -1235,10 +1235,11 @@ lbox_raise(lua_State *L)
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
-static void
+static int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
+	int objstack = 0;
 	const char *start = name, *end;
 
 	while ((end = (const char *) memchr(start, '.', name_end - start))) {
@@ -1251,6 +1252,22 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
 	}
+
+	/* box.something:method */
+	if ((end = (const char *) memchr(start, ':', name_end - start))) {
+		lua_checkstack(L, 3);
+		lua_pushlstring(L, start, end - start);
+		lua_gettable(L, index);
+		if (! (lua_istable(L, -1) ||
+			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) ))
+				tnt_raise(ClientError, ER_NO_SUCH_PROC,
+					  name_end - name, name);
+		start = end + 1; /* next piece of a.b.c */
+		index = lua_gettop(L); /* top of the stack */
+		objstack = 1;
+	}
+
+
 	lua_pushlstring(L, start, name_end - start);
 	lua_gettable(L, index);
 	if (! lua_isfunction(L, -1)) {
@@ -1263,8 +1280,11 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
 		lua_replace(L, 1);
-		lua_settop(L, 1);
+		if (objstack)
+			lua_replace(L, 2);
+		lua_settop(L, 1 + objstack);
 	}
+	return 1 + objstack;
 }
 
 
@@ -1281,8 +1301,7 @@ lbox_call_loadproc(struct lua_State *L)
 	const char *name;
 	size_t name_len;
 	name = lua_tolstring(L, 1, &name_len);
-	box_lua_find(L, name, name + name_len);
-	return 1;
+	return box_lua_find(L, name, name + name_len);
 }
 
 /**
@@ -1307,8 +1326,8 @@ box_lua_execute(const struct request *request, struct txn *txn,
 		});
 
 		/* proc name */
-		box_lua_find(L, request->c.procname, request->c.procname +
-			     request->c.procname_len);
+		int oc = box_lua_find(L, request->c.procname,
+				 request->c.procname + request->c.procname_len);
 		/* Push the rest of args (a tuple). */
 		const char *args = request->c.args;
 		luaL_checkstack(L, request->c.arg_count, "call: out of stack");
@@ -1319,7 +1338,7 @@ box_lua_execute(const struct request *request, struct txn *txn,
 			args += field_len;
 			lua_pushlstring(L, field, field_len);
 		}
-		lua_call(L, request->c.arg_count, LUA_MULTRET);
+		lua_call(L, request->c.arg_count + oc - 1, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
 		port_add_lua_multret(port, L);
 	} catch (const Exception& e) {

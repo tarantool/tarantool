@@ -10,6 +10,14 @@ space:insert(123, 'test1', 'test2')
 space:select(0, 123)
 tuple = remote:select(space.n, 0, 123)
 remote:call('box.select', '0', '0', 123)
+
+slf, foo = box.call_loadproc('box.select')
+type(slf)
+type(foo)
+slf, foo = box.call_loadproc('box.net.self:select')
+type(slf)
+type(foo)
+
 tuple
 type(tuple)
 #tuple
