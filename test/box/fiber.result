@@ -1,12 +1,7 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
----
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
-...
-space = box.space[0]
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
 ...
 -- A test case for a race condition between ev_schedule
@@ -37,10 +32,10 @@ space:delete(1)
 - [1, 'testing', 'lua rocks']
 ...
 -- check delete
-box.process(17, box.pack('iiiiiip', 0, 0, 0, 2^31, 1, 1, 1))
+box.process(17, box.pack('iiiiiip', space.n, 0, 0, 2^31, 1, 1, 1))
 ---
 ...
-box.process(22, box.pack('iii', 0, 0, 0))
+box.process(22, box.pack('iii', space.n, 0, 0))
 ---
 - error: box.process(CALL, ...) is not allowed
 ...
@@ -48,7 +43,7 @@ space:insert(1, 'test box delete')
 ---
 - [1, 'test box delete']
 ...
-box.delete('0', '\1\0\0\0')
+space:delete('\1\0\0\0')
 ---
 - [1, 'test box delete']
 ...
@@ -56,7 +51,7 @@ space:insert(1, 'test box delete')
 ---
 - [1, 'test box delete']
 ...
-box.delete(0, 1)
+space:delete(1)
 ---
 - [1, 'test box delete']
 ...
@@ -64,7 +59,7 @@ space:insert('abcd', 'test box delete')
 ---
 - [1684234849, 'test box delete']
 ...
-box.delete('0', 'abcd')
+space:delete('abcd')
 ---
 - [1684234849, 'test box delete']
 ...
@@ -72,7 +67,7 @@ space:insert('abcd', 'test box delete')
 ---
 - [1684234849, 'test box delete']
 ...
-box.delete(0, 'abcd')
+space:delete('abcd')
 ---
 - [1684234849, 'test box delete']
 ...
@@ -80,124 +75,124 @@ space:insert('abcd', 'test box.select()')
 ---
 - [1684234849, 'test box.select()']
 ...
-box.replace('0', 'abcd', 'hello', 'world')
+space:replace('abcd', 'hello', 'world')
 ---
 - [1684234849, 'hello', 'world']
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'defc', 'goodbye', 'universe')
+space:replace('defc', 'goodbye', 'universe')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.replace('0', 'abcd')
+space:replace('abcd')
 ---
 - [1684234849]
 ...
-box.delete('0', 'abcd')
+space:delete('abcd')
 ---
 - [1684234849]
 ...
-box.delete('0', 'defc')
+space:delete('defc')
 ---
 - [1667655012, 'goodbye', 7310312400256331381]
 ...
-box.insert('0', 'test', 'old', 'abcd')
+space:insert('test', 'old', 'abcd')
 ---
 - [1953719668, 'old', 1684234849]
 ...
 -- test that insert produces a duplicate key error
-box.insert('0', 'test', 'old', 'abcd')
+space:insert('test', 'old', 'abcd')
 ---
 - error: Duplicate key exists in unique index 0
 ...
-box.update('0', 'test', '=p=p', 0, 'pass', 1, 'new')
+space:update('test', '=p=p', 0, 'pass', 1, 'new')
 ---
 - [1936941424, 'new', 1684234849]
 ...
-box.update('0', 'miss', '+p', 2, '\1\0\0\0')
+space:update('miss', '+p', 2, '\1\0\0\0')
 ---
 ...
-box.update('0', 'pass', '+p', 2, '\1\0\0\0')
+space:update('pass', '+p', 2, '\1\0\0\0')
 ---
 - [1936941424, 'new', 1684234850]
 ...
-box.update('0', 'pass', '-p', 2, '\1\0\0\0')
+space:update('pass', '-p', 2, '\1\0\0\0')
 ---
 - [1936941424, 'new', 1684234849]
 ...
-box.update('0', 'pass', '-p', 2, '\1\0\0\0')
+space:update('pass', '-p', 2, '\1\0\0\0')
 ---
 - [1936941424, 'new', 1684234848]
 ...
-box.update(0, 'pass', '+p', 2, 1)
+space:update('pass', '+p', 2, 1)
 ---
 - [1936941424, 'new', 1684234849]
 ...
-box.delete('0', 'pass')
+space:delete('pass')
 ---
 - [1936941424, 'new', 1684234849]
 ...
-reload configuration
+box.cfg.reload()
 ---
-- error: '[string "reload configuration"]:1: ''='' expected near ''configuration'''
+- ok
 ...
 -- must be read-only
-box.insert(0, 'test')
+space:insert('test')
 ---
 - [1953719668]
 ...
-box.insert(0, 'abcd')
+space:insert('abcd')
 ---
 - [1684234849]
 ...
-box.delete(0, 'test')
+space:delete('test')
 ---
 - [1953719668]
 ...
-box.delete(0, 'abcd')
+space:delete('abcd')
 ---
 - [1684234849]
 ...
@@ -230,8 +225,9 @@ space:truncate()
 --# setopt delimiter ';'
 function y()
     box.fiber.detach('started')
+    space = box.space['tweedledum']
     while true do
-        box.replace(0, 'test', os.time())
+        space:replace('test', os.time())
         box.fiber.sleep(0.001)
     end
 end;
