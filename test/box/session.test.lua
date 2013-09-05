@@ -1,5 +1,5 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 
 box.session.exists(box.session.id())
 box.session.exists()
@@ -62,12 +62,12 @@ type(box.session.on_connect(nil))
 type(box.session.on_disconnect(nil))
 
 -- write audit trail of connect/disconnect into a space
-box.session.on_connect(function() box.insert(0, box.session.id()) end)
-box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
+box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end)
+box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end)
 
 --# create connection con_three to default 
 --# set connection con_three
-box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
+box.unpack('i', space:select(0, box.session.id())[0]) == box.session.id()
 --# set connection default
 --# drop connection con_three
 
@@ -76,4 +76,4 @@ type(box.session.on_connect(nil))
 type(box.session.on_disconnect(nil))
 active_connections
 
-box.space[0]:drop()
+space:drop()

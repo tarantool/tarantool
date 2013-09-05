@@ -26,8 +26,8 @@ print """#
 # Valgrind reports use of not initialized memory after 'reload
 # configuration'
 #"""
-admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
-admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
+admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
 sql("insert into t0 values (1, 'tuple')")
 admin("box.snapshot()")
 server.reconfigure(None)

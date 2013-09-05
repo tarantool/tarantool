@@ -1,14 +1,12 @@
 
 # Inprogress xlog must be renamed before second insert.
 
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum', { id = 0 })
 ---
-- [0, 0, 'tweedledum']
 ...
 00000000000000000002.xlog.inprogress exists
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
 00000000000000000002.xlog.inprogress has been successfully renamed
 

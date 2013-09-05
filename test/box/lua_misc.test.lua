@@ -1,5 +1,5 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 
 ----------------
 -- # box.raise
@@ -32,7 +32,7 @@ type(box);
 type(box.space);
 box.cfg.memcached_space;
 t = {};
-for i, v in pairs(box.space[0].index[0].key_field[0]) do
+for i, v in pairs(space.index[0].key_field[0]) do
     table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 t;
@@ -59,4 +59,4 @@ for k,v in pairs(box.error) do
 end;
 t;
 
-box.space[0]:drop();
+space:drop();

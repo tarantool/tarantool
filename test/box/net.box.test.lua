@@ -1,6 +1,5 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 type(remote)
 remote:ping()
@@ -9,7 +8,7 @@ box.net.box.ping(remote)
 space:insert(123, 'test1', 'test2')
 space:select(0, 123)
 tuple = remote:select(space.n, 0, 123)
-remote:call('box.select', '0', '0', 123)
+remote:call('box.select', tostring(space.n), '0', 123)
 
 slf, foo = box.call_loadproc('box.select')
 type(slf)
@@ -30,7 +29,7 @@ remote:insert(space.n, 123, 'test1', 'test2')
 
 remote:insert(space.n, 345, 'test1', 'test2')
 remote:select(space.n, 0, 345)
-remote:call('box.select', '0', '0', 345)
+remote:call('box.select', tostring(space.n), '0', 345)
 space:select(0, 345)
 
 remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')

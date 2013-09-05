@@ -17,11 +17,11 @@ wal = os.path.join(vardir, "00000000000000000002.xlog")
 
 server.start()
 
-admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
+admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
 
-admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
+admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"
