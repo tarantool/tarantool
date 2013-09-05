@@ -1,3 +1,10 @@
+tarantool (1.5.1.76.g5ed3fbe-1) unstable; urgency=low
+
+  * New snapshot.
+   - Fix memory leak in box.ipc.channel:put(v, 0)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 05 Sep 2013 14:36:52 +0400
+
 tarantool (1.5.1.73.gd1b3db6-1) unstable; urgency=low
 
   * New snapshot
