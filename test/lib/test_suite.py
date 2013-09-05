@@ -255,7 +255,7 @@ class TestSuite:
 
         if not self.tests:
             # noting to test, exit
-            return 0
+            return []
 
         self.server.deploy(self.ini["config"],
                       self.server.find_exe(self.args.builddir, silent=False),
