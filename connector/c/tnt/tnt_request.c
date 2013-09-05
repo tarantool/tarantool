@@ -66,6 +66,9 @@ tnt_request_free(struct tnt_request *r)
 	case TNT_OP_INSERT:
 		tnt_tuple_free(&r->r.insert.t);
 		break;
+	case TNT_OP_DELETE_1_3:
+		tnt_tuple_free(&r->r.del_1_3.t);
+		break;
 	case TNT_OP_DELETE:
 		tnt_tuple_free(&r->r.del.t);
 		break;
@@ -149,6 +152,41 @@ tnt_request_insert(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	r->v[1].iov_len  = sizeof(struct tnt_header_insert);
 	r->v[2].iov_base = r->r.insert.t.data;
 	r->v[2].iov_len  = r->r.insert.t.size;
+	tnt_mem_free(buf);
+	return 0;
+}
+
+static int
+tnt_request_delete_1_3(struct tnt_request *r, tnt_request_t rcv, void *ptr)
+{
+	if (rcv(ptr, (char*)&r->r.del_1_3, sizeof(struct tnt_header_delete_1_3)) == -1)
+		return -1;
+	uint32_t size = r->h.len - sizeof(struct tnt_header_delete_1_3);
+	char *buf = tnt_mem_alloc(size);
+	if (buf == NULL)
+		return -1;
+	if (rcv(ptr, buf, size) == -1) {
+		tnt_mem_free(buf);
+		return -1;
+	}
+	if (tnt_tuple_set(&r->r.del_1_3.t, buf, size) == NULL) {
+		tnt_mem_free(buf);
+		return -1;
+	}
+	/* creating resend io vector */
+	r->vc = 3;
+	r->v = tnt_mem_alloc(r->vc * sizeof(struct iovec));
+	if (r->v == NULL) {
+		tnt_tuple_free(&r->r.del_1_3.t);
+		tnt_mem_free(buf);
+		return -1;
+	}
+	r->v[0].iov_base = &r->h;
+	r->v[0].iov_len  = sizeof(struct tnt_header);
+	r->v[1].iov_base = &r->r.del_1_3.h;
+	r->v[1].iov_len  = sizeof(struct tnt_header_delete_1_3);
+	r->v[2].iov_base = r->r.del_1_3.t.data;
+	r->v[2].iov_len  = r->r.del_1_3.t.size;
 	tnt_mem_free(buf);
 	return 0;
 }
@@ -404,6 +442,7 @@ tnt_request_from(struct tnt_request *r, tnt_request_t rcv, void *ptr,
 	}
 	switch (r->h.type) {
 	case TNT_OP_INSERT: return tnt_request_insert(r, rcv, ptr);
+	case TNT_OP_DELETE_1_3: return tnt_request_delete_1_3(r, rcv, ptr);
 	case TNT_OP_DELETE: return tnt_request_delete(r, rcv, ptr);
 	case TNT_OP_CALL:   return tnt_request_call(r, rcv, ptr);
 	case TNT_OP_SELECT: return tnt_request_select(r, rcv, ptr);

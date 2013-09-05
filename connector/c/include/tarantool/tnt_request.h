@@ -40,6 +40,11 @@ struct tnt_request_insert {
 	struct tnt_tuple t;
 };
 
+struct tnt_request_delete_1_3 {
+	struct tnt_header_delete_1_3 h;
+	struct tnt_tuple t;
+};
+
 struct tnt_request_delete {
 	struct tnt_header_delete h;
 	struct tnt_tuple t;
@@ -83,6 +88,7 @@ struct tnt_request {
 	struct tnt_header h;
 	union {
 		struct tnt_request_insert insert;
+		struct tnt_request_delete_1_3 del_1_3;
 		struct tnt_request_delete del;
 		struct tnt_request_call call;
 		struct tnt_request_select select;

@@ -91,6 +91,9 @@ static void tc_store_print(struct tnt_log_header_v11 *hdr,
 	case TNT_OP_DELETE:
 		tc_print_tuple(&r->r.del.t);
 		break;
+	case TNT_OP_DELETE_1_3:
+		tc_print_tuple(&r->r.del_1_3.t);
+		break;
 	case TNT_OP_UPDATE:
 		tc_print_tuple(&r->r.update.t);
 		break;
