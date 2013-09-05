@@ -1,6 +1,3 @@
-# encoding: utf-8
-#
-
 import os
 import sys
 import shutil
@@ -27,12 +24,9 @@ server.stop()
 server.deploy("box/tarantool_scriptdir.cfg")
 admin("print_config()")
 
-
 # restore default server
 server.stop()
 shutil.rmtree(script_dir_path, True)
 server.deploy(self.suite_ini["config"])
 
 sys.stdout.pop_filter()
-
-# vim: syntax=python

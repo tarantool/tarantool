@@ -1,197 +1,78 @@
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
----
-- [0, 0, 'tweedledum']
-...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
----
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
-...
+
 box.session.exists(box.session.id())
----
-- 1
-...
 box.session.exists()
----
-- error: 'session.exists(sid): bad arguments'
-...
 box.session.exists(1, 2, 3)
----
-- error: 'session.exists(sid): bad arguments'
-...
 box.session.exists(1234567890)
----
-- 0
-...
+
 -- check session.id()
 box.session.id() > 0
----
-- true
-...
 f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)
----
-...
 box.fiber.resume(f)
----
-...
 failed
----
-- false
-...
 f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)
----
-...
 box.fiber.resume(f1)
----
-- true
-...
 failed
----
-- false
-...
 box.session.peer() == box.session.peer(box.session.id())
----
-- true
-...
+
 -- check on_connect/on_disconnect triggers
 box.session.on_connect(function() end)
----
-- null
-...
 box.session.on_disconnect(function() end)
----
-- null
-...
+
 -- check it's possible to reset these triggers
 type(box.session.on_connect(function() error('hear') end))
----
-- function
-...
 type(box.session.on_disconnect(function() error('hear') end))
----
-- function
-...
+
 -- check on_connect/on_disconnect argument count and type
 box.session.on_connect()
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
 box.session.on_disconnect()
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
+
 box.session.on_connect(function() end, function() end)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
 box.session.on_disconnect(function() end, function() end)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
+
 box.session.on_connect(1, 2)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
 box.session.on_disconnect(1, 2)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
+
 box.session.on_connect(1)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
 box.session.on_disconnect(1)
----
-- error: 'session.on_connect(chunk): bad arguments'
-...
+
 -- use of nil to clear the trigger
 type(box.session.on_connect(nil))
----
-- function
-...
 type(box.session.on_disconnect(nil))
----
-- function
-...
 type(box.session.on_connect(nil))
----
-- nil
-...
 type(box.session.on_disconnect(nil))
----
-- nil
-...
+
 -- check how connect/disconnect triggers work
 function inc() active_connections = active_connections + 1 end
----
-...
 function dec() active_connections = active_connections - 1 end
----
-...
 box.session.on_connect(inc)
----
-- null
-...
 box.session.on_disconnect(dec)
----
-- null
-...
 active_connections = 0
----
-...
 --# create connection con_one to default
 active_connections
----
-- 1
-...
 --# create connection con_two to default
 active_connections
----
-- 2
-...
 --# drop connection con_one
 --# drop connection con_two
 active_connections
----
-- 0
-...
+
 type(box.session.on_connect(nil))
----
-- function
-...
 type(box.session.on_disconnect(nil))
----
-- function
-...
+
 -- write audit trail of connect/disconnect into a space
 box.session.on_connect(function() box.insert(0, box.session.id()) end)
----
-- null
-...
 box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
----
-- null
-...
---# create connection con_three to default
+
+--# create connection con_three to default 
 --# set connection con_three
 box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
----
-- true
-...
 --# set connection default
 --# drop connection con_three
+
 -- cleanup
 type(box.session.on_connect(nil))
----
-- function
-...
 type(box.session.on_disconnect(nil))
----
-- function
-...
 active_connections
----
-- 0
-...
+
 box.space[0]:drop()
----
-...

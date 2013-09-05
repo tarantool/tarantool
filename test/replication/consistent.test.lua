@@ -14,9 +14,11 @@ function _insert(_begin, _end, msg)
     return unpack(a)
 end;
 
+begin_lsn = box.info.lsn;
+
 function _select(_begin, _end)
     a = {}
-    while box.info.lsn < _end + 3 do
+    while box.info.lsn < begin_lsn + _end do
         box.fiber.sleep(0.001)
     end
     for i = _begin, _end do
