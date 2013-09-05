@@ -126,6 +126,10 @@ struct space {
 static inline uint32_t
 space_id(struct space *space) { return space->def.id; }
 
+/** Get space name. */
+static inline const char *
+space_name(struct space *space) { return space->def.name; }
+
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *

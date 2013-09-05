@@ -43,8 +43,7 @@ enum schema_id {
 	SC_SYSTEM_ID_MAX = 511
 };
 
-enum schema_field_id {
-};
+extern int sc_version;
 
 struct space;
 
@@ -107,6 +106,5 @@ void
 space_end_recover();
 
 struct space *schema_space(uint32_t id);
-
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

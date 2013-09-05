@@ -105,23 +105,23 @@ key_def_check(uint32_t id, struct key_def *key_def)
 {
 	if (key_def->id > BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) id, (unsigned) key_def->id,
+			  (unsigned) key_def->id, (unsigned) id,
 			  "index id too big");
 	}
 	if (key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) id, (unsigned) key_def->id,
+			  (unsigned) key_def->id, (unsigned) id,
 			  "part count must be positive");
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (key_def->parts[i].type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) id, (unsigned) key_def->id,
+				  (unsigned) key_def->id, (unsigned) id,
 				  "unknown field type");
 		}
 		if (key_def->parts[i].fieldno > BOX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) id, (unsigned) key_def->id,
+				  (unsigned) key_def->id, (unsigned) id,
 				  "field no is too big");
 		}
 	}
@@ -129,7 +129,7 @@ key_def_check(uint32_t id, struct key_def *key_def)
 	case HASH:
 		if (! key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) id, (unsigned) key_def->id,
+				  (unsigned) key_def->id, (unsigned) id,
 				  "HASH index must be unique");
 		}
 		break;
@@ -139,18 +139,18 @@ key_def_check(uint32_t id, struct key_def *key_def)
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) id, (unsigned) key_def->id,
+				  (unsigned) key_def->id, (unsigned) id,
 				    "BITSET index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) id, (unsigned) key_def->id,
+				  (unsigned) key_def->id, (unsigned) id,
 				  "BITSET can not be unique");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) id, (unsigned) key_def->id);
+			  (unsigned) key_def->id, (unsigned) id);
 		break;
 	}
 }

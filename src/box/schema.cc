@@ -35,6 +35,7 @@
 #include "key_def.h"
 #include "alter.h"
 #include "scoped_guard.h"
+#include <stdio.h>
 /**
  * @module Data Dictionary
  *
@@ -52,6 +53,7 @@
 
 /** All existing spaces. */
 static struct mh_i32ptr_t *spaces;
+int sc_version;
 
 bool
 space_is_system(struct space *space)
@@ -121,6 +123,7 @@ space_cache_delete(uint32_t id)
 	assert(k != mh_end(spaces));
 	struct space *space = (struct space *)mh_i32ptr_node(spaces, k)->val;
 	mh_i32ptr_del(spaces, k, NULL);
+	sc_version++;
 	return space;
 }
 
@@ -207,7 +210,7 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct space_def space_def = { SC_SCHEMA_ID, 0 };
+	struct space_def space_def = { SC_SCHEMA_ID, 0, "_schema" };
 	struct key_def *key_def = key_def_new(0 /* id */,
 					      TREE /* index type */,
 					      true /* unique */,
@@ -217,6 +220,7 @@ schema_init()
 
 	/* _space - home for all spaces. */
 	space_def.id = SC_SPACE_ID;
+	snprintf(space_def.name, sizeof(space_def.name), "_space");
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 
 	(void) sc_space_new(&space_def, key_def,
@@ -233,6 +237,7 @@ schema_init()
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */, NUM);
 	space_def.id = SC_INDEX_ID;
+	snprintf(space_def.name, sizeof(space_def.name), "_index");
 	(void) sc_space_new(&space_def, key_def,
 			    &alter_space_on_replace_index);
 	key_def_delete(key_def);

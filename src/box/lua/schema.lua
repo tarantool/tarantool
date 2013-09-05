@@ -16,17 +16,21 @@ box.schema.space.create = function(name, options)
     if if_not_exists and box.space[name] then
         return box.space[name], "not created"
     end
-    local id = box.unpack('i', _space.index[0]:max()[0])
-    if id < box.schema.SYSTEM_ID_MAX then
-        id = box.schema.SYSTEM_ID_MAX + 1
+    local id
+    if options.id then
+        id = options.id
     else
-        id = id + 1
+        id = box.unpack('i', _space.index[0]:max()[0])
+        if id < box.schema.SYSTEM_ID_MAX then
+            id = box.schema.SYSTEM_ID_MAX + 1
+        else
+            id = id + 1
+        end
     end
     if options.arity == nil then
         options.arity = 0
     end
     _space:insert(id, options.arity, name)
-    box.space[name] = box.space[id]
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create
@@ -43,9 +47,29 @@ end
 
 box.schema.index = {}
 
-box.schema.index.create = function(space_id, index_id, index_type, ...)
+box.schema.index.create = function(space_id, name, index_type, options)
     local _index = box.space[box.schema.INDEX_ID]
-    _index:insert(space_id, index_id, index_type, ...)
+    if options == nil then
+        options = { parts = { 0, 'num' } }
+    end
+    local unique = tonumber(options.unique)
+    if unique == nil then
+        unique = 1
+    end
+    local part_count = #options.parts/2
+    local parts = options.parts
+    local iid
+    -- max
+    local tuple = _index.index[0]:select_reverse_range(1, space_id)
+    if tuple then
+        iid = box.unpack('i', tuple[1]) + 1
+    else
+        iid = 0
+    end
+    if options.id then
+        iid = options.id
+    end
+    _index:insert(space_id, iid, name, index_type, unique, part_count, unpack(parts))
 end
 box.schema.index.drop = function(space_id, index_id)
     local _index = box.space[box.schema.INDEX_ID]

@@ -871,7 +871,7 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 * a separate fiber.
 	 */
 	struct fiber *loader = fiber_new(TARANTOOL_LUA_INIT_SCRIPT,
-					    load_init_script);
+					 load_init_script);
 	fiber_call(loader, L);
 	/* Outside the startup file require() or ffi are not
 	 * allowed.

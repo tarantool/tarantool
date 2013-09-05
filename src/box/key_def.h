@@ -34,6 +34,7 @@
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_INDEX_MAX = 10,
+	BOX_NAME_MAX = 32,
 	BOX_FIELD_MAX = UINT32_MAX
 };
 
@@ -178,6 +179,7 @@ struct space_def {
 	 * must have exactly this many fields.
 	 */
 	uint32_t arity;
+	char name[BOX_NAME_MAX];
 };
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

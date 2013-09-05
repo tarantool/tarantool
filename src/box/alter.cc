@@ -33,6 +33,7 @@
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
 #include <new> /* for placement new */
+#include <stdio.h> /* snprintf() */
 
 /** _space columns */
 #define ID 0
@@ -882,6 +883,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct space_def def;
 		def.id = old_id;
 		def.arity = tuple_field_u32(new_tuple, ARITY);
+		int n = snprintf(def.name, sizeof(def.name),
+				 "%s", tuple_field_cstr(new_tuple, NAME));
 		if (def.id > BOX_SPACE_MAX) {
 			tnt_raise(ClientError, ER_CREATE_SPACE,
 				  (unsigned) def.id,
@@ -897,6 +900,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 (unsigned) def.id,
 				 (unsigned) SC_SYSTEM_ID_MIN,
 				 (unsigned) SC_SYSTEM_ID_MAX);
+		}
+		if (n > sizeof(def.name)) {
+			tnt_raise(ClientError, ER_CREATE_SPACE,
+				  (unsigned) def.id,
+				  "space name is too long");
 		}
 		struct space *space = space_new(&def, &rlist_nil);
 		(void) space_cache_replace(space);

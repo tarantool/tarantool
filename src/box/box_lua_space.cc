@@ -59,6 +59,11 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	lua_pushnumber(L, space_id(space));
 	lua_settable(L, -3);
 
+	/* space.name */
+	lua_pushstring(L, "name");
+	lua_pushstring(L, space_name(space));
+	lua_settable(L, -3);
+
 	lua_pushstring(L, "enabled");
 	lua_pushboolean(L, space->engine.state != READY_NO_KEYS);
 	lua_settable(L, -3);
@@ -144,6 +149,9 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 
 	lbox_pushspace(L, space);
 	lua_rawseti(L, -2, space_id(space));
+	lua_pushstring(L, space_name(space));
+	lua_rawgeti(L, -2, space_id(space));
+	lua_rawset(L, -3);
 
 	lua_pop(L, 2); /* box, space */
 }

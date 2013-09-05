@@ -621,6 +621,18 @@ static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 static const char *indexlib_name = "box.index";
 static const char *iteratorlib_name = "box.index.iterator";
 
+/* Index userdata. */
+struct lbox_index
+{
+	Index *index;
+	/* space id. */
+	uint32_t id;
+	/* index id. */
+	uint32_t iid;
+	/* space cache version at the time of push. */
+	int sc_version;
+};
+
 static struct iterator *
 lbox_checkiterator(struct lua_State *L, int i)
 {
@@ -665,23 +677,32 @@ lbox_iterator_gc(struct lua_State *L)
 static Index *
 lua_checkindex(struct lua_State *L, int i)
 {
-	Index **index = (Index **) luaL_checkudata(L, i, indexlib_name);
+	struct lbox_index *index =
+		(struct lbox_index *) luaL_checkudata(L, i, indexlib_name);
 	assert(index != NULL);
-	return *index;
+	if (index->sc_version != sc_version) {
+		index->index = index_find(space_find(index->id), index->iid);
+		index->sc_version = sc_version;
+	}
+	return index->index;
 }
 
 static int
 lbox_index_new(struct lua_State *L)
 {
-	int n = luaL_checkint(L, 1); /* get space id */
-	int idx = luaL_checkint(L, 2); /* get index id in */
+	uint32_t id = (uint32_t) luaL_checkint(L, 1); /* get space id */
+	uint32_t iid = (uint32_t) luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	struct space *sp = space_find(n);
-	Index *index = index_find(sp, idx);
+	struct space *space = space_find(id);
+	Index *i = index_find(space, iid);
 
 	/* create a userdata object */
-	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
-	*ptr = index;
+	struct lbox_index *index = (struct lbox_index *)
+		lua_newuserdata(L, sizeof(struct lbox_index));
+	index->id = id;
+	index->iid = iid;
+	index->sc_version = sc_version;
+	index->index = i;
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);

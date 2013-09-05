@@ -4,8 +4,8 @@ import sys
 server.stop()
 server.deploy()
 
-admin("box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
-admin("box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
+admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
 
 admin("box.stat()")
 admin("help()")
@@ -35,4 +35,4 @@ admin("box.slab.info()")
 
 sys.stdout.clear_all_filters()
 
-admin("box.space[0]:drop()")
+admin("space:drop()")
