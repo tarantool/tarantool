@@ -22,9 +22,8 @@ local function do_insert()
     box.insert(0, 1, 2, 4, 8)
 end
 
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-
+space = box.schema.create_space('tweedledum', { id = 0 })
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 
 fiber = box.fiber.create(do_insert)
 box.fiber.resume(fiber)
@@ -33,4 +32,4 @@ box.fiber.resume(fiber)
 -- Test insert from start-up script
 --
 
-box.insert(0, 2, 4, 8, 16)
+space:insert(2, 4, 8, 16)

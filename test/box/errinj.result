@@ -1,10 +1,8 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
 box.errinj.info()
 ---
@@ -25,14 +23,14 @@ box.errinj.set("some-injection") -- check error
 ---
 - 'error: can''t find error injection ''some-injection'''
 ...
-box.space[0]:select(0,222444)
+space:select(0,222444)
 ---
 ...
 box.errinj.set("ERRINJ_TESTING", true)
 ---
 - ok
 ...
-box.space[0]:select(0,222444)
+space:select(0,222444)
 ---
 - error: Error injection 'ERRINJ_TESTING'
 ...
@@ -45,18 +43,18 @@ box.errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-box.space[0]:insert(1)
+space:insert(1)
 ---
 - error: Failed to write to disk
 ...
-box.space[0]:select(0,1)
+space:select(0,1)
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-box.space[0]:insert(1)
+space:insert(1)
 ---
 - [1]
 ...
@@ -64,22 +62,22 @@ box.errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-box.space[0]:update(1, '=p', 0, 2)
+space:update(1, '=p', 0, 2)
 ---
 - error: Failed to write to disk
 ...
-box.space[0]:select(0,1)
+space:select(0,1)
 ---
 - [1]
 ...
-box.space[0]:select(0,2)
+space:select(0,2)
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-box.space[0]:truncate()
+space:truncate()
 ---
 ...
 -- Check a failed log rotation
@@ -87,18 +85,18 @@ box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-box.space[0]:insert(1)
+space:insert(1)
 ---
 - error: Failed to write to disk
 ...
-box.space[0]:select(0,1)
+space:select(0,1)
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-box.space[0]:insert(1)
+space:insert(1)
 ---
 - [1]
 ...
@@ -106,29 +104,29 @@ box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-box.space[0]:update(1, '=p', 0, 2)
+space:update(1, '=p', 0, 2)
 ---
 - error: Failed to write to disk
 ...
-box.space[0]:select(0,1)
+space:select(0,1)
 ---
 - [1]
 ...
-box.space[0]:select(0,2)
+space:select(0,2)
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-box.space[0]:update(1, '=p', 0, 2)
+space:update(1, '=p', 0, 2)
 ---
 - [2]
 ...
-box.space[0]:select(0,1)
+space:select(0,1)
 ---
 ...
-box.space[0]:select(0,2)
+space:select(0,2)
 ---
 - [2]
 ...
@@ -136,7 +134,7 @@ box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-box.space[0]:truncate()
+space:truncate()
 ---
 - error: Failed to write to disk
 ...
@@ -144,9 +142,9 @@ box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-box.space[0]:truncate()
+space:truncate()
 ---
 ...
-box.space[0]:drop()
+space:drop()
 ---
 ...

@@ -44,33 +44,46 @@ extern "C" {
  * @return A new table representing a space on top of the Lua
  * stack.
  */
-static int
-lbox_pushspace(struct lua_State *L, struct space *space)
+static void
+lbox_fillspace(struct lua_State *L, struct space *space, int i)
 {
-	lua_newtable(L);
-
 	/* space.arity */
 	lua_pushstring(L, "arity");
 	lua_pushnumber(L, space->def.arity);
-	lua_settable(L, -3);
+	lua_settable(L, i);
 
 	/* space.n */
 	lua_pushstring(L, "n");
 	lua_pushnumber(L, space_id(space));
-	lua_settable(L, -3);
+	lua_settable(L, i);
 
 	/* space.name */
 	lua_pushstring(L, "name");
 	lua_pushstring(L, space_name(space));
-	lua_settable(L, -3);
+	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
 	lua_pushboolean(L, space->engine.state != READY_NO_KEYS);
-	lua_settable(L, -3);
+	lua_settable(L, i);
 
-	/* space.index */
-	lua_pushstring(L, "index");
-	lua_newtable(L);
+	lua_getfield(L, i, "index");
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		/* space.index */
+		lua_pushstring(L, "index");
+		lua_newtable(L);
+		lua_settable(L, i);	/* push space.index */
+		lua_getfield(L, i, "index");
+	} else {
+		/* Empty the table. */
+		lua_pushnil(L);  /* first key */
+		while (lua_next(L, -2) != 0) {
+			lua_pop(L, 1); /* remove the value. */
+			lua_pushnil(L); /* set the key to nil. */
+			lua_settable(L, -3);
+			lua_pushnil(L); /* start over. */
+		}
+	}
 	/*
 	 * Fill space.index table with
 	 * all defined indexes.
@@ -88,7 +101,6 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "type");
-
 		lua_pushstring(L, index_type_strs[key_def->type]);
 		lua_settable(L, -3);
 
@@ -111,12 +123,12 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 			lua_settable(L, -3);
 		}
 
-		lua_settable(L, -3);	/* space[i].key_field */
+		lua_settable(L, -3);	/* index[i].key_field */
 
-		lua_settable(L, -3);	/* space[i] */
+		lua_settable(L, -3);	/* space.index[i] */
 	}
 
-	lua_settable(L, -3);	/* push space.index */
+	lua_pop(L, 1); /* pop the index field */
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "schema");
@@ -126,11 +138,9 @@ lbox_pushspace(struct lua_State *L, struct space *space)
 	lua_pushstring(L, "bless");
 	lua_gettable(L, -2);
 
-	lua_pushvalue(L, -5);	/* box, schema, space, bless, space */
+	lua_pushvalue(L, i);	/* space */
 	lua_call(L, 1, 0);
 	lua_pop(L, 3);	/* cleanup stack - box, schema, space */
-
-	return 1;
 }
 
 /** Export a space to Lua */
@@ -147,10 +157,20 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 		lua_getfield(L, -1, "space");
 	}
 
-	lbox_pushspace(L, space);
-	lua_rawseti(L, -2, space_id(space));
+	lua_rawgeti(L, -1, space_id(space));
+	if (lua_isnil(L, -1)) {
+		/*
+		 * Important: if the space already exists,
+		 * modify it, rather than create a new one.
+		 */
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_rawseti(L, -2, space_id(space));
+		lua_rawgeti(L, -1, space_id(space));
+	}
+	lbox_fillspace(L, space, lua_gettop(L));
 	lua_pushstring(L, space_name(space));
-	lua_rawgeti(L, -2, space_id(space));
+	lua_insert(L, -2);
 	lua_rawset(L, -3);
 
 	lua_pop(L, 2); /* box, space */

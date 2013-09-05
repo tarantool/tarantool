@@ -58,13 +58,14 @@ box.schema.index.create = function(space_id, name, index_type, options)
     end
     local part_count = #options.parts/2
     local parts = options.parts
-    local iid
+    local iid = 0
     -- max
     local tuple = _index.index[0]:select_reverse_range(1, space_id)
     if tuple then
-        iid = box.unpack('i', tuple[1]) + 1
-    else
-        iid = 0
+        local id = box.unpack('i', tuple[0])
+        if id == space_id then
+            iid = box.unpack('i', tuple[1]) + 1
+        end
     end
     if options.id then
         iid = options.id
