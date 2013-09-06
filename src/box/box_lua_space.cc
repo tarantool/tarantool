@@ -182,6 +182,11 @@ box_lua_space_delete(struct lua_State *L, uint32_t id)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_getfield(L, -1, "space");
+	lua_rawgeti(L, -1, id);
+	lua_getfield(L, -1, "name");
+	lua_pushnil(L);
+	lua_rawset(L, -4);
+	lua_pop(L, 1); /* pop space */
 
 	lua_pushnil(L);
 	lua_rawseti(L, -2, id);

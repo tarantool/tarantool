@@ -901,7 +901,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				 (unsigned) SC_SYSTEM_ID_MIN,
 				 (unsigned) SC_SYSTEM_ID_MAX);
 		}
-		if (n > sizeof(def.name)) {
+		if (n >= sizeof(def.name)) {
 			tnt_raise(ClientError, ER_CREATE_SPACE,
 				  (unsigned) def.id,
 				  "space name is too long");

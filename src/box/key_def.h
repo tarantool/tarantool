@@ -179,7 +179,7 @@ struct space_def {
 	 * must have exactly this many fields.
 	 */
 	uint32_t arity;
-	char name[BOX_NAME_MAX];
+	char name[BOX_NAME_MAX + 1];
 };
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

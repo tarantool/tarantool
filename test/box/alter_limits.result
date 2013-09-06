@@ -1,0 +1,277 @@
+-- ----------------------------------------------------------------
+-- LIMITS
+-- ----------------------------------------------------------------
+box.schema.SYSTEM_ID_MIN
+---
+- 256
+...
+box.schema.FIELD_MAX
+---
+- 4294967295
+...
+box.schema.NAME_MAX
+---
+- 32
+...
+box.schema.INDEX_ID
+---
+- 288
+...
+box.schema.SPACE_ID
+---
+- 280
+...
+box.schema.INDEX_MAX
+---
+- 10
+...
+box.schema.SPACE_MAX
+---
+- 2147483647
+...
+box.schema.SYSTEM_ID_MAX
+---
+- 511
+...
+box.schema.SCHEMA_ID
+---
+- 272
+...
+-- ----------------------------------------------------------------
+-- CREATE SPACE
+-- ---------------------------------------------------------------- 
+s = box.schema.create_space('tweedledum')
+---
+...
+-- space already exists
+box.schema.create_space('tweedledum')
+---
+- error: Space 'tweedledum' already exists
+...
+-- create if not exists
+s = box.schema.create_space('tweedledum', { if_not_exists = true })
+---
+...
+s:drop()
+---
+...
+-- no such space
+s:drop()
+---
+- error: Space 512 does not exist
+...
+-- explicit space id
+s = box.schema.create_space('tweedledum', { id = 3000 })
+---
+...
+s.n
+---
+- 3000
+...
+-- duplicate id
+box.schema.create_space('tweedledee', { id = 3000 })
+---
+- error: Duplicate key exists in unique index 0
+...
+-- stupid space id
+box.schema.create_space('tweedledee', { id = 'tweedledee' })
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+s:drop()
+---
+...
+-- too long space name
+box.schema.create_space(string.rep('tweedledee', 100))
+---
+- error: 'Failed to create space 512: space name is too long'
+...
+-- space name limit
+box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
+---
+- error: 'Failed to create space 512: space name is too long'
+...
+s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+---
+...
+s.name
+---
+- ttttttttttttttttttttttttttttttt_
+...
+s:drop()
+---
+...
+s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+---
+...
+s.name
+---
+- tttttttttttttttttttttttttttttt_
+...
+s:drop()
+---
+...
+-- space with no indexes - test update, delete, select, truncate
+s = box.schema.create_space('tweedledum')
+---
+...
+s:insert(0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s:select(0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s:select_range(0, 0, 0)
+---
+- error: '[string "-- schema.lua (internal file)..."]:167: attempt to index a nil
+    value'
+...
+s:delete(0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s:update(0, "=p", 0, 0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s:replace(0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s.index[0]
+---
+- null
+...
+s:truncate()
+---
+- error: '[string "-- schema.lua (internal file)..."]:182: attempt to index local
+    ''pk'' (a nil value)'
+...
+s.enabled
+---
+- false
+...
+-- enabled/disabled transition
+s:create_index('primary', 'hash', { parts = { 0, 'num' } })
+---
+...
+s.enabled
+---
+- true
+...
+-- rename space - same name
+--  s:rename('tweedledum')
+--  s.name
+--  -- rename space - different name
+--  s:rename('tweedledee')
+--  s.name
+--  -- rename space - bad name
+--  s:rename(string.rep('t', box.schema.NAME_MAX * 2))
+--  s.name
+-- access to a renamed space
+s:insert(0)
+---
+- [0]
+...
+s:delete(0)
+---
+- [0]
+...
+-- cleanup
+s:drop()
+---
+...
+-- Test plan
+-- --------
+-- add space:
+-- ---------
+-- - rename space -> duplicate key 
+-- - arity change - empty, non-empty space
+-- - (wal/ test suite) longevity test for create/drop
+-- - test that during commit phase 
+--   -> inject error at commit, inject error at rollback
+-- - create space with reserved id
+-- - export space works correctly (space id, arity, etc)
+-- wal:
+-- - too many spaces
+-- - find out why we run short of 32k formats
+-- 
+-- alter space:
+-- -----------
+-- - check transition of a space to "disabled" on 
+-- deletion of primary key
+-- 
+-- add index:
+-- ---------
+--     - a test case for every constrain in key_def_check
+--     - test that during the rebuild there is a duplicate
+--     according to the new index
+--     - index rebuild -> no field in the index (validate tuple
+--     during build)
+--     - alter unique -> non unique
+--     - alter index type
+--     - index access by name
+--     - alter add key part
+--     - arbitrary index
+--     - index count exhaustion
+--     - test that during commit phase 
+--       -> inject error at commit, inject error at rollback
+--     - add check that doesn't allow drop of a primary
+--       key in presence of other keys, or moves the space
+--       to disabled state otherwise.
+-- 
+--     - add identical index - verify there is no rebuild
+--     - rename index (all non-essential propeties)
+--       -> duplicate key
+--     - inject fiber sleep during commit, so that some stuff is added
+--     (test crap which happens while there is a record to the wal
+--     - test ambiguous field type when adding an index (ER_FIELD_TYPE_MISMATCH)
+--     - test addition of a new index on data which it can't handle
+-- 
+-- space cache
+-- -----------
+-- - all the various kinds of reference to a dropped space
+--   - iterator to index
+--   index to space
+--   space ot index
+--   variable
+--   key def
+--   all userdata given away to lua - think how
+-- 
+-- 
+-- usability
+-- ---------
+-- - space name in all spaces!
+--   error: Duplicate key exists in unique index 1 (ugly)
+-- 
+-- other
+-- -----
+-- - space functions should not accept index no - they
+-- - experiment with more readable eof marker
+-- and row marker
+-- ork on the primary key
+-- 
+-- triggers
+-- --------
+-- - test that after disabling triggers we can 
+-- create an empty snapshot
+-- - test for run_triggers
+-- 
+-- recovery
+-- --------
+--  - add primary key in snapshot
+--  - add secondary key in snapshot
+--  - add primary key in xlog
+--  - add secondary key in xlog
+--  - the same for an empty space and a space with data
+--  - test start from a space entry added in xlog
+--  - test start from a space entry dropped in xlog
+--  - test enabled/disabled property for these
+--  spaces and space from a snapshot
+-- 
+-- 
+-- features
+--------
+-- - ffi function to enable/disable space

@@ -13,8 +13,13 @@ box.schema.space.create = function(name, options)
         options = {}
     end
     local if_not_exists = options.if_not_exists
-    if if_not_exists and box.space[name] then
-        return box.space[name], "not created"
+    if box.space[name] then
+        if options.if_not_exists then
+            return box.space[name], "not created"
+        else
+            box.raise(box.error.ER_SPACE_EXISTS,
+                     "Space '"..name.."' already exists")
+        end
     end
     local id
     if options.id then
@@ -42,7 +47,14 @@ box.schema.space.drop = function(space_id)
         local v = keys[i]
         _index:delete(v[0], v[1])
     end
-    _space:delete(space_id)
+    if _space:delete(space_id) == nil then
+        box.raise(box.error.ER_NO_SUCH_SPACE,
+                  "Space "..space_id.." does not exist")
+    end
+end
+box.schema.space.rename = function(space_id, space_name)
+    local _space = box.space[box.schema.SPACE_ID]
+    _space:update(space_id, "=p", 2, space_name)
 end
 
 box.schema.index = {}
@@ -181,6 +193,9 @@ function box.schema.space.bless(space)
     space_mt.pairs = function(space) return space.index[0]:pairs() end
     space_mt.drop = function(space)
         return box.schema.space.drop(space.n)
+    end
+    space_mt.rename = function(space, name)
+        return box.schema.space.rename(space.n, name)
     end
     space_mt.create_index = function(space, ...)
         return box.schema.index.create(space.n, ...)
