@@ -37,9 +37,10 @@
 /* Strip trailing ws from (char*) */
 size_t strip_end_ws(char *str) {
 	size_t last = 0;
-	for (size_t i = 0; str[i] != 0; ++i)
+	for (size_t i = 0; str[i] != 0; ++i) {
 		if (!isspace(str[i]))
 			last = i + 1;
+	}
 	str[last] = '\0';
 	return last;
 }
@@ -49,16 +50,18 @@ int tc_buf(struct tc_buf *buf) {
 	buf->size = TC_BUF_INIT_SIZE;
 	buf->used = 0;
 	buf->data = (char *)malloc(buf->size);
-	if (buf->data == NULL)
+	if (buf->data == NULL) {
 		return -1;
+	}
 	return 0;
 }
 
 /* Append len bytes of memory from str pointed memory */
 int tc_buf_append(struct tc_buf *buf, void *str, size_t len) {
 	if (buf->size - buf->used < len) {
-		if (buf->size < len)
+		if (buf->size < len) {
 			buf->size = len;
+		}
 		buf->size *= TC_BUF_MULTIPLIER;
 		char *nd = (char *)realloc(buf->data, buf->size);
 		if (nd == NULL)
@@ -125,11 +128,11 @@ size_t tc_buf_str_delete(struct tc_buf *buf, size_t len) {
  * and delete delimiter (last num bytes)
  */
 void tc_buf_cmdfy(struct tc_buf *buf, size_t num) {
-	tc_buf_delete(buf, num);
-	buf->data[buf->size] = '\0';
-	for (int i = 0; i < buf->used; ++i)
+	tc_buf_str_delete(buf, num);
+	for (int i = 0; i < buf->used; ++i) {
 		if (buf->data[i] == '\n')
 			buf->data[i] = ' ';
+	}
 }
 
 /* Remove trailing ws from STR */

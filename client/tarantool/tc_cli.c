@@ -116,10 +116,6 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "loadfile", 8, TC_LOADFILE },
 	{ "s", 1, TC_SETOPT},
 	{ "setopt", 6, TC_SETOPT},
-	{ "delim", 5, TC_SETOPT_DELIM},
-	{ "delimi", 6, TC_SETOPT_DELIM},
-	{ "delimit", 7, TC_SETOPT_DELIM},
-	{ "delimite", 8, TC_SETOPT_DELIM},
 	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };
@@ -240,7 +236,7 @@ static void replace_newline(char *cmd) {
 	int offset = 0;
 	for (int i = 0; i < len - 1; ++i)
 		if (cmd[i] == '\\' && cmd[i + 1] == 'n')
-			cmd[i - offset++] = '\n';
+			cmd[i++ - offset++] = '\n';
 		else if (offset != 0)
 			cmd[i - offset] = cmd[i];
 	cmd[len - offset] = '\0';
@@ -283,8 +279,9 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 	case TC_SETOPT:
 		switch (tnt_lex(&lex, &tk)) {
 		case TC_SETOPT_DELIM:
-			if (tnt_lex(&lex, &tk) != '=')
+			if (tnt_lex(&lex, &tk) != '=') {
 				tnt_lex_push(&lex, tk);
+			}
 			if (tnt_lex(&lex, &tk) == TNT_TK_STRING) {
 				if (!TNT_TK_S(tk)->size) {
 					tc.opt.delim = "";
@@ -403,9 +400,9 @@ static char* tc_cli_readline_pipe() {
 				ungetc(c_t, stdin);
 			wctomb(str + pos++, 0);
 			break;
-		}
-		else
+		} else {
 			pos += wctomb(str + pos, c);
+		}
 	}
 	if (pos == 1 && c == WEOF) {
 		free(str);
@@ -492,7 +489,7 @@ next:
 			tc_buf_free(&cmd);
 			break;
 		}
-}
+	}
 
 	/* updating history file */
 	write_history(history);
