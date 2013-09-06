@@ -296,8 +296,11 @@ class TestSuite:
                     test.run(self.server)
                     if not test.passed():
                         failed_tests.append(test.name)
+        except (KeyboardInterrupt) as e:
+            print '\n',
+            raise
         finally:
-            print '\n', shortsep
+            print shortsep
             self.server.stop(silent=False)
             self.server.cleanup()
 
