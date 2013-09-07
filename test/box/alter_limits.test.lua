@@ -12,7 +12,7 @@ box.schema.SYSTEM_ID_MAX
 box.schema.SCHEMA_ID
 -- ----------------------------------------------------------------
 -- CREATE SPACE
--- ---------------------------------------------------------------- 
+-- ----------------------------------------------------------------
 
 s = box.schema.create_space('tweedledum')
 -- space already exists
@@ -71,28 +71,59 @@ s:insert(0)
 s:delete(0)
 -- cleanup
 s:drop()
+-- create a space with reserved id (ok, but warns in the log)
+s = box.schema.create_space('test', { id = 256 })
+s.n
+s:drop()
+s = box.schema.create_space('test', { arity = 2 })
+s.arity
+s:create_index('primary', 'tree', { parts = { 0, 'num' } })
+-- arity actually works
+s:insert(1)
+s:insert(1, 2)
+s:insert(1, 2, 3)
+s:select(0)
+-- increase arity -- error
+box.space['_space']:update(s.n, "=p", 1, 3)
+s:select(0)
+-- decrease arity - error
+box.space['_space']:update(s.n, "=p", 1, 1)
+-- remove arity - ok
+box.space['_space']:update(s.n, "=p", 1, 0)
+s:select(0)
+-- increase arity - error
+box.space['_space']:update(s.n, "=p", 1, 3)
+s:truncate()
+s:select(0)
+-- set arity of an empty space
+box.space['_space']:update(s.n, "=p", 1, 3)
+s:select(0)
+-- arity actually works
+s:insert(3, 4)
+s:insert(3, 4, 5)
+s:insert(3, 4, 5, 6)
+s:insert(7, 8, 9)
+s:select(0)
+s:drop()
+
 -- Test plan
 -- --------
 -- add space:
 -- ---------
 -- - arity change - empty, non-empty space
--- - (wal/ test suite) longevity test for create/drop
--- - test that during commit phase 
+-- - test that during commit phase
 --   -> inject error at commit, inject error at rollback
--- - create space with reserved id
--- - export space works correctly (space id, arity, etc)
+-- - check transition of a space to "disabled" on
+-- deletion of primary key
 -- wal:
 -- - too many spaces
 -- - find out why we run short of 32k formats
--- 
--- alter space:
--- -----------
--- - check transition of a space to "disabled" on 
--- deletion of primary key
--- 
+-- - longevity test for create/drop
+--
+--
 -- add index:
 -- ---------
---     - a test case for every constrain in key_def_check
+--     - a test case for every constraint in key_def_check
 --     - test that during the rebuild there is a duplicate
 --     according to the new index
 --     - index rebuild -> no field in the index (validate tuple
@@ -103,12 +134,12 @@ s:drop()
 --     - alter add key part
 --     - arbitrary index
 --     - index count exhaustion
---     - test that during commit phase 
+--     - test that during commit phase
 --       -> inject error at commit, inject error at rollback
 --     - add check that doesn't allow drop of a primary
 --       key in presence of other keys, or moves the space
 --       to disabled state otherwise.
--- 
+--
 --     - add identical index - verify there is no rebuild
 --     - rename index (all non-essential propeties)
 --       -> duplicate key
@@ -116,7 +147,7 @@ s:drop()
 --     (test crap which happens while there is a record to the wal
 --     - test ambiguous field type when adding an index (ER_FIELD_TYPE_MISMATCH)
 --     - test addition of a new index on data which it can't handle
--- 
+--
 -- space cache
 -- -----------
 -- - all the various kinds of reference to a dropped space
@@ -126,26 +157,19 @@ s:drop()
 --   variable
 --   key def
 --   all userdata given away to lua - think how
--- 
--- 
+--
+--
 -- usability
 -- ---------
--- - space name in all spaces!
---   error: Duplicate key exists in unique index 1 (ugly)
--- 
--- other
--- -----
--- - space functions should not accept index no - they
--- - experiment with more readable eof marker
--- and row marker
--- ork on the primary key
--- 
+-- - space name in all error messages!
+--         error: Duplicate key exists in unique index 1 (ugly)
+--
 -- triggers
 -- --------
--- - test that after disabling triggers we can 
+-- - test that after disabling triggers we can
 -- create an empty snapshot
 -- - test for run_triggers
--- 
+--
 -- recovery
 -- --------
 --  - add primary key in snapshot
@@ -157,8 +181,8 @@ s:drop()
 --  - test start from a space entry dropped in xlog
 --  - test enabled/disabled property for these
 --  spaces and space from a snapshot
--- 
--- 
+--
+--
 -- features
 --------
 -- - ffi function to enable/disable space

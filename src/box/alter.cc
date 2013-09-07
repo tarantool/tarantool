@@ -438,13 +438,13 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "space id is immutable");
 
 	if (def.arity != 0 &&
-	    def.arity > alter->old_space->def.arity &&
+	    def.arity != alter->old_space->def.arity &&
 	    alter->old_space->engine.state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
-			  "can not enlarge arity on a non-empty space");
+			  "can not change arity on a non-empty space");
 	}
 }
 

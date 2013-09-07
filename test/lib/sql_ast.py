@@ -56,7 +56,7 @@ ER = {
    28: "ER_TUPLE_FORMAT_LIMIT"  ,
    29: "ER_LAST_DROP"           ,
    30: "ER_DROP_PRIMARY_KEY"    ,
-   31: "ER_UNUSED31"            ,
+   31: "ER_SPACE_ARITY"         ,
    32: "ER_UNUSED32"            ,
    33: "ER_UNUSED33"            ,
    34: "ER_UNUSED34"            ,

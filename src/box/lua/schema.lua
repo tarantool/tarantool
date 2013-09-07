@@ -179,6 +179,10 @@ function box.schema.space.bless(space)
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
         local pk = space.index[0]
+        if pk == nil then
+            box.raise(box.error.ER_NO_SUCH_INDEX,
+                      "No index #0 is defined in space "..space.n);
+        end
         while #pk.idx > 0 do
             for t in pk:iterator() do
                 local key = {};

@@ -292,9 +292,8 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
 	if (sp->def.arity > 0 && sp->def.arity != new_tuple->field_count)
-		tnt_raise(IllegalParams,
-			  "tuple field count must match space arity");
-
+		tnt_raise(ClientError, ER_SPACE_ARITY,
+			  new_tuple->field_count, sp->def.id, sp->def.arity);
 }
 
 void
