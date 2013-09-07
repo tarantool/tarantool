@@ -105,7 +105,8 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	int n = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
 	space_def_check(def, n, errcode);
-	if (def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
+	if (errcode != ER_ALTER_SPACE &&
+	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
 		say_warn("\n"
 "*******************************************************\n"
 "* Creating a space with a reserved id %3u.            *\n"

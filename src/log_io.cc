@@ -113,7 +113,7 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 
 		char *ext = strchr(dent->d_name, '.');
 		if (ext == NULL)
-		continue;
+			continue;
 
 		const char *suffix = strchr(ext + 1, '.');
 		/*

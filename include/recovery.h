@@ -145,6 +145,9 @@ void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
 void snapshot_save(struct recovery_state *r,
 		   void (*loop) (struct log_io *, struct fio_batch *));
 
+void
+init_storage(struct log_dir *dir);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

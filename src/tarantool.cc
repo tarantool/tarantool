@@ -69,7 +69,6 @@ extern "C" {
 #include "lua/init.h"
 #include "session.h"
 #include "box/box.h"
-#include "bootstrap.h"
 #include "scoped_guard.h"
 
 
@@ -619,28 +618,6 @@ tarantool_free(void)
 #endif
 }
 
-/** Create the initial snapshot file in the storage. */
-void
-init_storage()
-{
-	struct log_dir dir = snap_dir;
-	dir.dirname = cfg.snap_dir;
-	const char *filename = format_filename(&dir, 1 /* lsn */, NONE);
-	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir.mode);
-	say_info("saving snapshot `%s'", filename);
-	if (fd == -1) {
-		panic_syserror("failed to open snapshot file `%s' for "
-			       "writing", filename);
-	}
-	if (write(fd, bootstrap_bin, sizeof(bootstrap_bin)) !=
-						sizeof(bootstrap_bin)) {
-		panic_syserror("failed to write to snapshot file `%s'",
-			       filename);
-	}
-	close(fd);
-	say_info("done");
-}
-
 int
 main(int argc, char **argv)
 {
@@ -809,7 +786,9 @@ main(int argc, char **argv)
 	}
 
 	if (gopt(opt, 'I')) {
-		init_storage();
+		struct log_dir dir = snap_dir;
+		dir.dirname = cfg.snap_dir;
+		init_storage(&dir);
 		exit(EXIT_SUCCESS);
 	}
 
