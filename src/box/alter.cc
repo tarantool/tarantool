@@ -93,6 +93,31 @@ key_def_new_from_tuple(struct tuple *tuple)
 	return key_def;
 }
 
+/**
+ * Fill space_def structure from struct tuple.
+ */
+void
+space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
+			    uint32_t errcode)
+{
+	def->id = tuple_field_u32(tuple, ID);
+	def->arity = tuple_field_u32(tuple, ARITY);
+	int n = snprintf(def->name, sizeof(def->name),
+			 "%s", tuple_field_cstr(tuple, NAME));
+	space_def_check(def, n, errcode);
+	if (def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
+		say_warn("\n"
+"*******************************************************\n"
+"* Creating a space with a reserved id %3u.            *\n"
+"* Ids in range %3u-%3u may be used for a system space *\n"
+"* the future. Assuming you know what you're doing.    *\n"
+"*******************************************************",
+			 (unsigned) def->id,
+			 (unsigned) SC_SYSTEM_ID_MIN,
+			 (unsigned) SC_SYSTEM_ID_MAX);
+	}
+}
+
 /* }}} */
 
 /* {{{ struct alter_space - the body of a full blown alter */
@@ -881,31 +906,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		struct space_def def;
-		def.id = old_id;
-		def.arity = tuple_field_u32(new_tuple, ARITY);
-		int n = snprintf(def.name, sizeof(def.name),
-				 "%s", tuple_field_cstr(new_tuple, NAME));
-		if (def.id > BOX_SPACE_MAX) {
-			tnt_raise(ClientError, ER_CREATE_SPACE,
-				  (unsigned) def.id,
-				  "space id is too big");
-		}
-		if (def.id >= SC_SYSTEM_ID_MIN && def.id < SC_SYSTEM_ID_MAX) {
-			say_warn("\n"
-"*******************************************************\n"
-"* Creating a space with a reserved id %3u.            *\n"
-"* Ids in range %3u-%3u may be used for a system space *\n"
-"* the future. Assuming you know what you're doing.    *\n"
-"*******************************************************",
-				 (unsigned) def.id,
-				 (unsigned) SC_SYSTEM_ID_MIN,
-				 (unsigned) SC_SYSTEM_ID_MAX);
-		}
-		if (n >= sizeof(def.name)) {
-			tnt_raise(ClientError, ER_CREATE_SPACE,
-				  (unsigned) def.id,
-				  "space name is too long");
-		}
+		space_def_create_from_tuple(&def, new_tuple, ER_CREATE_SPACE);
 		struct space *space = space_new(&def, &rlist_nil);
 		(void) space_cache_replace(space);
 		/*
@@ -941,8 +942,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			ModifySpace *modify =
 				AlterSpaceOp::create<ModifySpace>();
 			alter_space_add_op(alter, modify);
-			modify->def.id = tuple_field_u32(new_tuple, ID);
-			modify->def.arity = tuple_field_u32(new_tuple, ARITY);
+			space_def_create_from_tuple(&modify->def, new_tuple,
+						    ER_ALTER_SPACE);
 			alter_space_do(txn, alter, old_space);
 		} catch (...) {
 			alter_space_delete(alter);

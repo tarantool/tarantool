@@ -156,17 +156,23 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 		lua_setfield(L, -2, "space");
 		lua_getfield(L, -1, "space");
 	}
-
 	lua_rawgeti(L, -1, space_id(space));
 	if (lua_isnil(L, -1)) {
 		/*
-		 * Important: if the space already exists,
-		 * modify it, rather than create a new one.
+		 * If the space already exists, modify it, rather
+		 * than create a new one -- to not invalidate
+		 * Lua variable references to old space outside
+		 * the box.space[].
 		 */
 		lua_pop(L, 1);
 		lua_newtable(L);
 		lua_rawseti(L, -2, space_id(space));
 		lua_rawgeti(L, -1, space_id(space));
+	} else {
+		/* Clear the reference to old space by old name. */
+		lua_getfield(L, -1, "name");
+		lua_pushnil(L);
+		lua_settable(L, -4);
 	}
 	lbox_fillspace(L, space, lua_gettop(L));
 	lua_pushstring(L, space_name(space));

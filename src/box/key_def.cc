@@ -154,3 +154,18 @@ key_def_check(uint32_t id, struct key_def *key_def)
 		break;
 	}
 }
+
+void
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
+{
+	if (def->id > BOX_SPACE_MAX) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space id is too big");
+	}
+	if (namelen >= sizeof(def->name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space name is too long");
+	}
+}

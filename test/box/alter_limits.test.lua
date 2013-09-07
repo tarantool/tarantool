@@ -56,14 +56,16 @@ s.enabled
 s:create_index('primary', 'hash', { parts = { 0, 'num' } })
 s.enabled
 -- rename space - same name
---  s:rename('tweedledum')
---  s.name
---  -- rename space - different name
---  s:rename('tweedledee')
---  s.name
---  -- rename space - bad name
---  s:rename(string.rep('t', box.schema.NAME_MAX * 2))
---  s.name
+s:rename('tweedledum')
+s.name
+-- rename space - different name
+s:rename('tweedledee')
+s.name
+-- the reference from box.space[] to the space by old name should be gone
+box.space['tweedledum']
+-- rename space - bad name
+s:rename(string.rep('t', box.schema.NAME_MAX * 2))
+s.name
 -- access to a renamed space
 s:insert(0)
 s:delete(0)
@@ -73,7 +75,6 @@ s:drop()
 -- --------
 -- add space:
 -- ---------
--- - rename space -> duplicate key 
 -- - arity change - empty, non-empty space
 -- - (wal/ test suite) longevity test for create/drop
 -- - test that during commit phase 

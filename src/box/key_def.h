@@ -182,4 +182,8 @@ struct space_def {
 	char name[BOX_NAME_MAX + 1];
 };
 
+/** Check space definition structure for errors. */
+void
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
+
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */
