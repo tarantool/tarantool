@@ -1,3 +1,12 @@
+tarantool (1.5.1.78.g2e82d26-1) unstable; urgency=low
+
+  * New snapshot. Integration upload.
+   - Add missing copyright holders, closes: #722059
+   - Drop non-free materials from tarbal, closes: #722060
+   - Fix memory leak in box.ipc.channel:put.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 02:00:51 +0400
+
 tarantool (1.5.1.76.g5ed3fbe-1) unstable; urgency=low
 
   * New snapshot.
