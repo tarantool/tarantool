@@ -1,3 +1,9 @@
+tarantool (1.5.1.81.g4382f16-1) unstable; urgency=low
+
+  * Fix debian/rules clean section (cleanup CMake files).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 23:05:29 +0400
+
 tarantool (1.5.1.80.gc84e35c-1) unstable; urgency=low
 
   * New snapshot (try to fix FTBFS with Debian/kFreeBSD).

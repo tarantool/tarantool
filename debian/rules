@@ -43,6 +43,8 @@ tarball: clean
 
 clean::
 	find -type f -name \*.pyc -delete
+	find -type d -name CMakeFiles -exec rm -fr '{}' +
+	rm -f CMakeCache.txt
 #	find test -name \*.reject -delete
 
 install/tarantool-dbg::
