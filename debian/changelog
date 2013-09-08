@@ -1,3 +1,9 @@
+tarantool (1.5.1.80.gc84e35c-1) unstable; urgency=low
+
+  * New snapshot (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 22:14:09 +0400
+
 tarantool (1.5.1.78.g2e82d26-1) unstable; urgency=low
 
   * New snapshot. Integration upload.
