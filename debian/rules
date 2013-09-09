@@ -45,7 +45,11 @@ clean::
 	find -type f -name \*.pyc -delete
 	find -type d -name CMakeFiles -exec rm -fr '{}' +
 	rm -f CMakeCache.txt
-#	find test -name \*.reject -delete
+	rm -f CPackConfig.cmake
+	rm -f CPackSourceConfig.cmake
+	rm -f include/tarantool/config.h
+	rm -f doc/tnt.ent
+	rm -f www-data.in/download
 
 install/tarantool-dbg::
 	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
