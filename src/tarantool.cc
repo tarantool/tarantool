@@ -42,7 +42,7 @@
 #include <getopt.h>
 #include <libgen.h>
 #include <sysexits.h>
-#ifdef TARGET_OS_LINUX
+#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
@@ -777,7 +777,7 @@ main(int argc, char **argv)
 			say_syserror("setrlimit");
 			exit(EX_OSERR);
 		}
-#ifdef TARGET_OS_LINUX
+#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
 			say_syserror("prctl");
 			exit(EX_OSERR);
