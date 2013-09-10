@@ -64,10 +64,13 @@ box.schema.index.create = function(space_id, name, index_type, options)
     if options == nil then
         options = { parts = { 0, 'num' } }
     end
-    local unique = tonumber(options.unique)
-    if unique == nil then
-        unique = 1
+    if options.parts == nil then
+        options.parts = {}
     end
+    if options.unique == nil then
+        options.unique = true
+    end
+    local unique = options.unique and 1 or 0
     local part_count = #options.parts/2
     local parts = options.parts
     local iid = 0

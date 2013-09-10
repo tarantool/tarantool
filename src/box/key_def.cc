@@ -106,7 +106,7 @@ key_list_del_key(struct rlist *key_list, uint32_t id)
 void
 key_def_check(uint32_t id, struct key_def *key_def)
 {
-	if (key_def->id > BOX_INDEX_MAX) {
+	if (key_def->id >= BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  (unsigned) key_def->id, (unsigned) id,
 			  "index id too big");
@@ -116,16 +116,34 @@ key_def_check(uint32_t id, struct key_def *key_def)
 			  (unsigned) key_def->id, (unsigned) id,
 			  "part count must be positive");
 	}
+	if (key_def->part_count > BOX_INDEX_PART_MAX) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) key_def->id, (unsigned) id,
+			  "too many key parts");
+	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (key_def->parts[i].type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  (unsigned) key_def->id, (unsigned) id,
 				  "unknown field type");
 		}
-		if (key_def->parts[i].fieldno > BOX_FIELD_MAX) {
+		if (key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
 				  (unsigned) key_def->id, (unsigned) id,
 				  "field no is too big");
+		}
+		for (uint32_t j = 0; j < i; j++) {
+			/*
+			 * Courtesy to a user who could have made
+			 * a typo.
+			 */
+			if (key_def->parts[i].fieldno ==
+			    key_def->parts[j].fieldno) {
+				tnt_raise(ClientError, ER_MODIFY_INDEX,
+					  (unsigned) key_def->id,
+					  (unsigned) id,
+					  "same key part is indexed twice");
+			}
 		}
 	}
 	switch (key_def->type) {

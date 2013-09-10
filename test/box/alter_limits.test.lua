@@ -3,6 +3,7 @@
 -- ----------------------------------------------------------------
 box.schema.SYSTEM_ID_MIN
 box.schema.FIELD_MAX
+box.schema.INDEX_FIELD_MAX
 box.schema.NAME_MAX
 box.schema.INDEX_ID
 box.schema.SPACE_ID
@@ -115,17 +116,78 @@ s.index[0]
 -- "disabled" on
 -- deletion of primary key
 s:drop()
-
--- -- inject error at various stages of commit and see that
--- the alter has no effects
+-- ----------------------------------------------------------------
+-- CREATE INDEX
+-- ----------------------------------------------------------------
 --
+s = box.schema.create_space('test')
+--# setopt delimiter ';'
+for k=0, box.schema.INDEX_MAX + 1, 1 do
+    s:create_index('i'..k, 'hash', { parts = {0, 'num'} } )
+end;
+--# setopt delimiter ''
+-- cleanup
+for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
+-- test limits enforced in key_def_check:
+-- unknown index type
+s:create_index('test', 'nosuchtype', { parts = {0, 'num'} })
+-- hash index is not unique
+s:create_index('test', 'hash', {parts = {0, 'num'}, unique = false })
+-- bitset index is unique
+s:create_index('test', 'bitset', {parts = {0, 'num'}, unique = true })
+-- bitset index is multipart
+s:create_index('test', 'bitset', {parts = {0, 'num', 1, 'num'}})
+-- part count must be positive
+s:create_index('test', 'hash', {parts = {}})
+-- part count must be positive
+s:create_index('test', 'hash', {parts = { 0 }})
+-- unknown field type
+s:create_index('test', 'hash', {parts = { 0, 'nosuchtype' }})
+-- bad field no
+s:create_index('test', 'hash', {parts = { 'qq', 'nosuchtype' }})
+-- big field no
+s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX, 'num' }})
+s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX - 1, 'num' }})
+s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX + 90, 'num' }})
+s:create_index('test', 'hash', {parts = { box.schema.INDEX_FIELD_MAX + 1, 'num' }})
+s:create_index('t1', 'hash', {parts = { box.schema.INDEX_FIELD_MAX, 'num' }})
+s:create_index('t2', 'hash', {parts = { box.schema.INDEX_FIELD_MAX - 1, 'num' }})
+-- cleanup
+s:drop()
+s = box.schema.create_space('test')
+-- same part can't be indexed twice
+s:create_index('t1', 'hash', {parts = { 0, 'num', 0, 'str' }})
+-- a lot of key parts
+parts = {}
+--# setopt delimiter ';'
+for k=0, box.schema.INDEX_PART_MAX, 1 do
+    table.insert(parts, k)
+    table.insert(parts, 'num')
+end;
+#parts;
+s:create_index('t1', 'hash', {parts = parts});
+parts = {};
+for k=1, box.schema.INDEX_PART_MAX, 1 do
+    table.insert(parts, k)
+    table.insert(parts, 'num')
+end;
+#parts;
+s:create_index('t1', 'hash', {parts = parts});
+--# setopt delimiter ''
+-- this is actually incorrect since key_field is a lua table
+-- and length of a lua table which has index 0 set is not correct
+#s.index[0].key_field
+-- cleanup
+s:drop()
 -- add index:
 -- ---------
---     - a test case for checks  in tuple_format_new
---     - it raises an exception, and there may be a memory
---     leak if it is not handled correctly
---     - a test case for every constraint in key_def_check
---     - test that during the rebuild there is a duplicate
+--     - a test case for contraints in tuple_format_new
+--     - index rebuild:
+--        - a duplicate in the new index
+--        - no field for the new index
+--        - wrong field type in the new index
+--     - alter algorithm correctly detects
+--        test that during the rebuild there is a duplicate
 --     according to the new index
 --     - index rebuild -> no field in the index (validate tuple
 --     during build)
@@ -134,7 +196,6 @@ s:drop()
 --     - index access by name
 --     - alter add key part
 --     - arbitrary index
---     - index count exhaustion
 --     - test that during commit phase
 --       -> inject error at commit, inject error at rollback
 --     - add check that doesn't allow drop of a primary
@@ -154,11 +215,14 @@ s:drop()
 -- - all the various kinds of reference to a dropped space
 --   - iterator to index
 --   index to space
---   space ot index
+--   space to index
 --   variable
 --   key def
 --   all userdata given away to lua - think how
 --
+--
+-- -- inject error at various stages of commit and see that
+-- the alter has no effects
 --
 -- usability
 -- ---------
@@ -168,8 +232,8 @@ s:drop()
 -- triggers
 -- --------
 -- - test that after disabling triggers we can
--- create an empty snapshot
--- - test for run_triggers
+--   create an empty snapshot
+-- - test for run_triggers on/off
 --
 -- recovery
 -- --------

@@ -1875,6 +1875,10 @@ schema_lua_init(struct lua_State *L)
 	lua_setfield(L, -2, "SPACE_MAX");
 	lua_pushnumber(L, BOX_FIELD_MAX);
 	lua_setfield(L, -2, "FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_FIELD_MAX);
+	lua_setfield(L, -2, "INDEX_FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_PART_MAX);
+	lua_setfield(L, -2, "INDEX_PART_MAX");
 	lua_pushnumber(L, BOX_NAME_MAX);
 	lua_setfield(L, -2, "NAME_MAX");
 	lua_pushnumber(L, FORMAT_ID_MAX);

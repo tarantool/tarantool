@@ -35,7 +35,16 @@ enum {
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_INDEX_MAX = 10,
 	BOX_NAME_MAX = 32,
-	BOX_FIELD_MAX = UINT32_MAX
+	BOX_FIELD_MAX = INT32_MAX,
+	/**
+	 * A fairly arbitrary limit which is still necessary
+	 * to keep tuple_format object small.
+	 */
+	BOX_INDEX_FIELD_MAX = INT16_MAX,
+	/** Yet another arbitrary limit which simply needs to
+	 * exist.
+	 */
+	BOX_INDEX_PART_MAX = UINT8_MAX
 };
 
 /*

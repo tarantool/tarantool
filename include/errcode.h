@@ -79,7 +79,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 24 */_(ER_DROP_SPACE,		2, "Can't drop space %u: %s") \
 	/* 25 */_(ER_ALTER_SPACE,		2, "Can't modify space %u: %s") \
 	/* 26 */_(ER_FIBER_STACK,		2, "Can not create a new fiber: recursion limit reached") \
-	/* 27 */_(ER_MODIFY_INDEX,		2, "Can't modify index %u in space %u: %s") \
+	/* 27 */_(ER_MODIFY_INDEX,		2, "Can't create or modify index %u in space %u: %s") \
 	/* 28 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
 	/* 29 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
 	/* 30 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
