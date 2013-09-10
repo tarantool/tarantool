@@ -32,6 +32,7 @@
 #include "txn.h"
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
+#include "scoped_guard.h"
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 
@@ -71,25 +72,24 @@ key_def_new_from_tuple(struct tuple *tuple)
 
 	struct key_def *key_def = key_def_new(index_id, type,
 					      is_unique > 0, part_count);
-	try {
-		struct tuple_iterator it;
-		tuple_rewind(&it, tuple);
-		uint32_t len; /* unused */
-		/* Parts follow part count. */
-		(void) tuple_seek(&it, INDEX_PART_COUNT, &len);
+	auto scoped_guard =
+		make_scoped_guard([=] { key_def_delete(key_def); });
 
-		for (uint32_t i = 0; i < part_count; i++) {
-			uint32_t fieldno = tuple_next_u32(&it);
-			const char *field_type_str = tuple_next_cstr(&it);
-			enum field_type field_type =
-				STR2ENUM(field_type, field_type_str);
-			key_def_set_part(key_def, i, fieldno, field_type);
-		}
-		key_def_check(id, key_def);
-	} catch (...) {
-		key_def_delete(key_def);
-		throw;
+	struct tuple_iterator it;
+	tuple_rewind(&it, tuple);
+	uint32_t len; /* unused */
+	/* Parts follow part count. */
+	(void) tuple_seek(&it, INDEX_PART_COUNT, &len);
+
+	for (uint32_t i = 0; i < part_count; i++) {
+		uint32_t fieldno = tuple_next_u32(&it);
+		const char *field_type_str = tuple_next_cstr(&it);
+		enum field_type field_type =
+			STR2ENUM(field_type, field_type_str);
+		key_def_set_part(key_def, i, fieldno, field_type);
 	}
+	key_def_check(id, key_def);
+	scoped_guard.is_active = false;
 	return key_def;
 }
 
@@ -939,17 +939,15 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * in WAL-error-safe mode.
 		 */
 		struct alter_space *alter = alter_space_new();
-		try {
-			ModifySpace *modify =
-				AlterSpaceOp::create<ModifySpace>();
-			alter_space_add_op(alter, modify);
-			space_def_create_from_tuple(&modify->def, new_tuple,
-						    ER_ALTER_SPACE);
-			alter_space_do(txn, alter, old_space);
-		} catch (...) {
-			alter_space_delete(alter);
-			throw;
-		}
+		auto scoped_guard =
+		        make_scoped_guard([=] {alter_space_delete(alter);});
+		ModifySpace *modify =
+			AlterSpaceOp::create<ModifySpace>();
+		alter_space_add_op(alter, modify);
+		space_def_create_from_tuple(&modify->def, new_tuple,
+					    ER_ALTER_SPACE);
+		alter_space_do(txn, alter, old_space);
+		scoped_guard.is_active = false;
 	}
 }
 
@@ -1001,27 +999,25 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct space *old_space = space_find(id);
 	Index *old_index = space_index(old_space, index_id);
 	struct alter_space *alter = alter_space_new();
-	try {
-		/*
-		 * The order of checks is important, DropIndex most be added
-		 * first, so that AddIndex::prepare() can change
-		 * Drop + Add to a Modify.
-		 */
-		if (old_index != NULL) {
-			DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
-			alter_space_add_op(alter, drop_index);
-			drop_index->old_key_def = old_index->key_def;
-		}
-		if (new_tuple != NULL) {
-			AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
-			alter_space_add_op(alter, add_index);
-			add_index->new_key_def = key_def_new_from_tuple(new_tuple);
-		}
-		alter_space_do(txn, alter, old_space);
-	} catch (...) {
-		alter_space_delete(alter);
-		throw;
+	auto scoped_guard =
+		make_scoped_guard([=] { alter_space_delete(alter); });
+	/*
+	 * The order of checks is important, DropIndex most be added
+	 * first, so that AddIndex::prepare() can change
+	 * Drop + Add to a Modify.
+	 */
+	if (old_index != NULL) {
+		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
+		alter_space_add_op(alter, drop_index);
+		drop_index->old_key_def = old_index->key_def;
 	}
+	if (new_tuple != NULL) {
+		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
+		alter_space_add_op(alter, add_index);
+		add_index->new_key_def = key_def_new_from_tuple(new_tuple);
+	}
+	alter_space_do(txn, alter, old_space);
+	scoped_guard.is_active = false;
 }
 
 struct trigger alter_space_on_replace_space = {

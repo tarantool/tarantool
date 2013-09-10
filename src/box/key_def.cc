@@ -38,8 +38,11 @@ key_def_new(uint32_t id, enum index_type type, bool is_unique,
 	    uint32_t part_count)
 {
 	uint32_t parts_size = sizeof(struct key_part) * part_count;
-	struct key_def *def = (struct key_def *)
-		malloc(parts_size + sizeof(*def));
+	size_t sz = parts_size + sizeof(struct key_def);
+	struct key_def *def = (struct key_def *) malloc(sz);
+	if (def == NULL)
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  sz, "struct key_def", "malloc");
 	def->type = type;
 	def->id = id;
 	def->is_unique = is_unique;

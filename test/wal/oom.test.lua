@@ -1,3 +1,5 @@
+--# stop server default
+--# start server default
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 space = box.space[0]

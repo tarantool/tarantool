@@ -31,6 +31,7 @@
 #include <string.h>
 #include <exception.h>
 #include "tuple.h"
+#include "scoped_guard.h"
 
 void
 space_fill_index_map(struct space *space)
@@ -44,7 +45,7 @@ space_fill_index_map(struct space *space)
 }
 
 struct space *
-space_new(struct space_def *space_def, struct rlist *key_list)
+space_new(struct space_def *def, struct rlist *key_list)
 {
 	uint32_t index_id_max = 0;
 	uint32_t index_count = 0;
@@ -58,34 +59,31 @@ space_new(struct space_def *space_def, struct rlist *key_list)
 	struct space *space = (struct space *) calloc(1, sz);
 
 	if (space == NULL)
-		return NULL;
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  sz, "struct space", "malloc");
+
+	auto scoped_guard = make_scoped_guard([=]
+	{
+		space_fill_index_map(space);
+		space_delete(space);
+	});
 
 	space->index_map = (Index **)((char *) space + sizeof(*space) +
 				      index_count * sizeof(Index *));
-	space->def = *space_def;
+	space->def = *def;
 	space->format = tuple_format_new(key_list);
 	tuple_format_ref(space->format, 1);
 	space->index_id_max = index_id_max;
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
-		struct key_def *dup = key_def_dup(key_def);
-		if (dup == NULL)
-			goto error;
-		Index *index = Index::factory(dup);
-		if (index == NULL) {
-			key_def_delete(dup);
-			goto error;
-		}
-		space->index_map[key_def->id] = index;
+		space->index_map[key_def->id] = Index::factory(key_def);
 	}
 	space_fill_index_map(space);
 	space->engine = engine_no_keys;
 	rlist_create(&space->on_replace);
 	space->run_triggers = true;
+	scoped_guard.is_active = false;
 	return space;
-error:
-	space_delete(space);
-	return NULL;
 }
 
 void
@@ -93,7 +91,8 @@ space_delete(struct space *space)
 {
 	for (uint32_t j = 0; j < space->index_count; j++)
 		delete space->index[j];
-	tuple_format_ref(space->format, -1);
+	if (space->format)
+		tuple_format_ref(space->format, -1);
 	free(space);
 }
 

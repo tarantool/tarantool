@@ -1,3 +1,5 @@
+--# stop server default
+--# start server default
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
 - [0, 0, 'tweedledum']

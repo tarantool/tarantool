@@ -10,6 +10,7 @@ box.schema.INDEX_MAX
 box.schema.SPACE_MAX
 box.schema.SYSTEM_ID_MAX
 box.schema.SCHEMA_ID
+box.schema.FORMAT_ID_MAX
 -- ----------------------------------------------------------------
 -- CREATE SPACE
 -- ----------------------------------------------------------------
@@ -104,25 +105,25 @@ s:insert(3, 4, 5)
 s:insert(3, 4, 5, 6)
 s:insert(7, 8, 9)
 s:select(0)
+-- check transition of space from enabled to disabled on
+-- deletion of the primary key
+s.enabled
+s.index[0]:drop()
+s.enabled
+s.index[0]
+
+-- "disabled" on
+-- deletion of primary key
 s:drop()
 
--- Test plan
--- --------
--- add space:
--- ---------
--- - arity change - empty, non-empty space
--- - test that during commit phase
---   -> inject error at commit, inject error at rollback
--- - check transition of a space to "disabled" on
--- deletion of primary key
--- wal:
--- - too many spaces
--- - find out why we run short of 32k formats
--- - longevity test for create/drop
---
+-- -- inject error at various stages of commit and see that
+-- the alter has no effects
 --
 -- add index:
 -- ---------
+--     - a test case for checks  in tuple_format_new
+--     - it raises an exception, and there may be a memory
+--     leak if it is not handled correctly
 --     - a test case for every constraint in key_def_check
 --     - test that during the rebuild there is a duplicate
 --     according to the new index

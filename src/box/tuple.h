@@ -32,6 +32,8 @@
 #include "key_def.h" /* for enum field_type */
 #include <pickle.h>
 
+enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
+
 struct tbuf;
 
 /**
@@ -106,7 +108,7 @@ tuple_format_id(struct tuple_format *format)
  *	 format.
  * @param space description
  *
- * @return tuple format
+ * @return tuple format or raise an exception on error
  */
 struct tuple_format *
 tuple_format_new(struct rlist *key_list);
