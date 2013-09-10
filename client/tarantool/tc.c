@@ -100,6 +100,20 @@ static void tc_connect(void)
 		tc_error("%s", tnt_strerror(tc.net));
 }
 
+static int get_primary_port(void)
+{
+	char *reply = NULL;
+	size_t size = 0;
+	int port = 0;
+	if (tc_admin_query(&tc.admin, "lua box.cfg.primary_port") == -1)
+		tc_error("cannot send query");
+	if (tc_admin_reply(&tc.admin, &reply, &size) == -1)
+		tc_error("cannot recv query");
+	sscanf(reply, "---\n - %d\n...", &port);
+	free(reply);
+	return port;
+}
+
 static void tc_connect_admin(void)
 {
 
@@ -107,20 +121,8 @@ static void tc_connect_admin(void)
 			     tc.opt.host,
 			     tc.opt.port_admin) == -1)
 		tc_error("admin console connection failed");
-	if (tc.opt.port == 0) {
-		char *reply = NULL;
-		size_t size = 0;
-		int port = 0;
-		if (tc_admin_query(&tc.admin, "lua box.cfg.primary_port") == -1)
-			tc_error("cannot send query");
-		if (tc_admin_reply(&tc.admin, &reply, &size) == -1)
-			tc_error("cannot recv query");
-		sscanf(reply, "---\n - %d\n...", &port);
-		if (port < 1024)
-			tc_error("cannot parse port number: %d", port);
-		tc.opt.port = port;
-		free(reply);
-	}
+	if (tc.opt.port == 0)
+		tc.opt.port = get_primary_port();
 }
 
 static void tc_validate(void)
