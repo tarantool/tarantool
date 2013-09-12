@@ -688,7 +688,7 @@ lua_checkindex(struct lua_State *L, int i)
 }
 
 static int
-lbox_index_new(struct lua_State *L)
+lbox_index_bind(struct lua_State *L)
 {
 	uint32_t id = (uint32_t) luaL_checkint(L, 1); /* get space id */
 	uint32_t iid = (uint32_t) luaL_checkint(L, 2); /* get index id in */
@@ -976,7 +976,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 };
 
 static const struct luaL_reg indexlib [] = {
-	{"new", lbox_index_new},
+	{"bind", lbox_index_bind},
 	{NULL, NULL}
 };
 

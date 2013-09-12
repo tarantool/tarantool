@@ -179,36 +179,39 @@ s:create_index('t1', 'hash', {parts = parts});
 #s.index[0].key_field
 -- cleanup
 s:drop()
--- add index:
--- ---------
---     - a test case for contraints in tuple_format_new
+-- check costraints in tuple_format_new()
+s = box.schema.create_space('test')
+s:create_index('t1', 'hash', { parts = { 0, 'num' }})
+-- field type contradicts field type of another index
+s:create_index('t2', 'hash', { parts = { 0, 'str' }})
+-- ok
+s:create_index('t2', 'hash', { parts = { 1, 'str' }})
+-- don't allow drop of the primary key in presence of other keys
+s.index[0]:drop()
+-- cleanup
+s:drop()
+-- index name, name manipulation
+
+-- box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
+-- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+-- s.name
+-- s:drop()
+-- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+-- modify index
+-- ------------
+--     - alter unique -> non unique
+--     - alter index type
+--     - add identical index - verify there is no rebuild
+--     - index access by name
+--     - alter add key part
+--     - rename index 
+--
+-- build index
+-- -----------
 --     - index rebuild:
 --        - a duplicate in the new index
 --        - no field for the new index
 --        - wrong field type in the new index
---     - alter algorithm correctly detects
---        test that during the rebuild there is a duplicate
---     according to the new index
---     - index rebuild -> no field in the index (validate tuple
---     during build)
---     - alter unique -> non unique
---     - alter index type
---     - index access by name
---     - alter add key part
---     - arbitrary index
---     - test that during commit phase
---       -> inject error at commit, inject error at rollback
---     - add check that doesn't allow drop of a primary
---       key in presence of other keys, or moves the space
---       to disabled state otherwise.
---
---     - add identical index - verify there is no rebuild
---     - rename index (all non-essential propeties)
---       -> duplicate key
---     - inject fiber sleep during commit, so that some stuff is added
---     (test crap which happens while there is a record to the wal
---     - test ambiguous field type when adding an index (ER_FIELD_TYPE_MISMATCH)
---     - test addition of a new index on data which it can't handle
 --
 -- space cache
 -- -----------
@@ -223,6 +226,8 @@ s:drop()
 --
 -- -- inject error at various stages of commit and see that
 -- the alter has no effects
+--     - test that during commit phase
+--       -> inject error at commit, inject error at rollback
 --
 -- usability
 -- ---------

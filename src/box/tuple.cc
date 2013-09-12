@@ -63,7 +63,7 @@ field_type_create(enum field_type *types, uint32_t field_count,
 			if (*ptype != UNKNOWN && *ptype != part->type) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE_MISMATCH,
-					  key_def->id, part - key_def->parts,
+					  key_def->iid, part - key_def->parts,
 					  field_type_strs[part->type],
 					  field_type_strs[*ptype]);
 			}

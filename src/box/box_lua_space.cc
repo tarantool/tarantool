@@ -93,16 +93,23 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		if (index == NULL)
 			continue;
 		struct key_def *key_def = index->key_def;
-		lua_pushnumber(L, key_def->id);
+		lua_pushnumber(L, key_def->iid);
 		lua_newtable(L);		/* space.index[i] */
 
-		lua_pushstring(L, "unique");
 		lua_pushboolean(L, key_def->is_unique);
-		lua_settable(L, -3);
+		lua_setfield(L, -2, "unique");
 
-		lua_pushstring(L, "type");
 		lua_pushstring(L, index_type_strs[key_def->type]);
-		lua_settable(L, -3);
+		lua_setfield(L, -2, "type");
+
+		lua_pushnumber(L, key_def->iid);
+		lua_setfield(L, -2, "id");
+
+		lua_pushnumber(L, key_def->space_id);
+		lua_setfield(L, -2, "n");
+
+		lua_pushstring(L, key_def->name);
+		lua_setfield(L, -2, "name");
 
 		lua_pushstring(L, "key_field");
 		lua_newtable(L);
@@ -111,21 +118,21 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_pushnumber(L, j);
 			lua_newtable(L);
 
-			lua_pushstring(L, "type");
 			lua_pushstring(L,
 			       field_type_strs[key_def->parts[j].type]);
-			lua_settable(L, -3);
+			lua_setfield(L, -2, "type");
 
-			lua_pushstring(L, "fieldno");
 			lua_pushnumber(L, key_def->parts[j].fieldno);
-			lua_settable(L, -3);
+			lua_setfield(L, -2, "fieldno");
 
-			lua_settable(L, -3);
+			lua_settable(L, -3); /* index[i].key_field[j] */
 		}
 
-		lua_settable(L, -3);	/* index[i].key_field */
+		lua_settable(L, -3); /* space.index[i].key_field */
 
-		lua_settable(L, -3);	/* space.index[i] */
+		lua_settable(L, -3); /* space.index[i] */
+		lua_rawgeti(L, -1, key_def->iid);
+		lua_setfield(L, -2, key_def->name);
 	}
 
 	lua_pop(L, 1); /* pop the index field */
@@ -175,9 +182,7 @@ box_lua_space_new(struct lua_State *L, struct space *space)
 		lua_settable(L, -4);
 	}
 	lbox_fillspace(L, space, lua_gettop(L));
-	lua_pushstring(L, space_name(space));
-	lua_insert(L, -2);
-	lua_rawset(L, -3);
+	lua_setfield(L, -2, space_name(space));
 
 	lua_pop(L, 2); /* box, space */
 }
