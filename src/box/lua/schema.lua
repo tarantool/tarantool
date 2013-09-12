@@ -184,6 +184,9 @@ function box.schema.space.bless(space)
         end
         return unpack(range)
     end
+    index_mt.select = function(index, ...)
+        return box.select(index.n, index.id, ...)
+    end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
     end

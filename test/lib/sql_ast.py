@@ -57,7 +57,7 @@ ER = {
    29: "ER_LAST_DROP"           ,
    30: "ER_DROP_PRIMARY_KEY"    ,
    31: "ER_SPACE_ARITY"         ,
-   32: "ER_UNUSED32"            ,
+   32: "ER_INDEX_ARITY"         ,
    33: "ER_UNUSED33"            ,
    34: "ER_UNUSED34"            ,
    35: "ER_UNUSED35"            ,

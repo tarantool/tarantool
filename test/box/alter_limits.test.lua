@@ -224,6 +224,7 @@ s:drop()
 s = box.schema.create_space('test')
 s:create_index('primary', 'hash')
 s.index.primary:alter({unique=false})
+-- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})
 s.index.primary
 s.index.pk.type
@@ -239,21 +240,61 @@ s.index.third:alter({id = 1, name = 'second'})
 s.index.third
 s.index.second.name
 s.index.second.id
---
--- ------------
---     - alter unique -> non unique
---     - alter index type
---     - add identical index - verify there is no rebuild
---     - index access by name
---     - alter add key part
---     - rename index 
---
--- build index
+s:drop()
+-- ----------------------------------------------------------------
+-- BUILD INDEX: changes of a non-empty index
+-- ----------------------------------------------------------------
+s = box.schema.create_space('full')
+s:create_index('primary', 'tree', {parts =  { 0, 'str' }})
+s:insert('No such movie', 999)
+s:insert('Barbara', 2012)
+s:insert('Cloud Atlas', 2012)
+s:insert('Almanya - Willkommen in Deutschland', 2011)
+s:insert('Halt auf freier Strecke', 2011)
+s:insert('Homevideo', 2011)
+s:insert('Die Fremde', 2010)
+-- create index with data
+s:create_index('year', 'tree', { unique=false, parts = { 1, 'num'} })
+s.index.primary:select()
+-- a duplicate in the created index
+s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
+-- change of non-unique index to unique: same effect
+s.index.year:alter({unique=true})
+-- num -> str -> num transition
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
+s.index.primary:select()
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+-- ambiguous field type
+s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
+-- create index on a non-existing field
+s:create_index('nosuchfield', 'tree', {unique = true, parts = { 2, 'str'}})
+s.index.year:drop()
+s:insert('Der Baader Meinhof Komplex', '2009 ')
+-- create an index on a field with a wrong type
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+-- a field is missing
+s:replace('Der Baader Meinhof Komplex')
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+s:drop()
+-- unique -> non-unique transition
+s = box.schema.create_space('test')
+-- primary key must be unique
+s:create_index('primary', 'tree', { unique = false, parts = {0, 'num'}})
+-- create primary key
+s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+s:insert(1, 1)
+s:create_index('secondary', 'tree', { unique = false, parts = {1, 'num'}})
+s:insert(2, 1)
+s.index.secondary:alter({ unique = true })
+s:delete(2)
+s.index.secondary:alter({ unique = true })
+s:insert(2, 1)
+s:insert(2, 2)
+s.index.secondary:alter({ unique = false})
+s:insert(3, 2)
+s:drop()
 -- -----------
---     - index rebuild:
---        - a duplicate in the new index
---        - no field for the new index
---        - wrong field type in the new index
+--
 --
 -- space cache
 -- -----------

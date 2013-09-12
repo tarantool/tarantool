@@ -782,11 +782,17 @@ AddIndex::alter(struct alter_space *alter)
 	new_index->endBuild();
 	/* Build the new index. */
 	struct tuple *tuple;
+	struct tuple_format *format = alter->new_space->format;
+	char *field_map = ((char *) palloc(fiber->gc_pool,
+					   format->field_map_size) +
+			   format->field_map_size);
 	while ((tuple = it->next(it))) {
 		/*
-		 * @todo:
-		 * tuple_format_validate(alter->new_space->format,
-		 * tuple)
+		 * Check that the tuple is OK according to the
+		 * new format.
+		 */
+		tuple_init_field_map(format, tuple, (uint32_t *) field_map);
+		/*
 		 * @todo: better message if there is a duplicate.
 		 */
 		struct tuple *old_tuple =

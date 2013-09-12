@@ -124,6 +124,12 @@ key_def_check(struct key_def *key_def)
 			  (unsigned) key_def->space_id,
 			  "index id too big");
 	}
+	if (key_def->iid == 0 && key_def->is_unique == false) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id,
+			  "primary key must be unique");
+	}
 	if (key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
 			  (unsigned) key_def->iid,

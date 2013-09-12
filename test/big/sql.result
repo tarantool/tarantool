@@ -51,11 +51,11 @@ box.space[0]:truncate()
 # get away with it.
 #
 insert into t0 values ('Britney')
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
 select * from t0 where k1='Anything'
 No match
 insert into t0 values ('Stephanie')
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
 select * from t0 where k1='Anything'
 No match
 insert into t0 values ('Spears', 'Britney')
@@ -287,7 +287,7 @@ select * from t0 where k1='Britney'
 Found 1 tuple:
 ['Spears', 'Britney']
 replace into t0 values ('Spears')
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
 select * from t0 where k0='Spears'
 Found 1 tuple:
 ['Spears', 'Britney']

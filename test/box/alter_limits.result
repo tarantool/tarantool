@@ -133,7 +133,7 @@ s:select(0)
 ...
 s:select_range(0, 0, 0)
 ---
-- error: '[string "-- schema.lua (internal file)..."]:202: attempt to index a nil
+- error: '[string "-- schema.lua (internal file)..."]:205: attempt to index a nil
     value'
 ...
 s:delete(0)
@@ -610,25 +610,40 @@ s:create_index('primary', 'hash')
 ...
 s.index.primary:alter({unique=false})
 ---
-- error: 'Can''t create or modify index 0 in space 512: HASH index must be unique'
+- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
 ...
+-- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})
 ---
+- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
 ...
 s.index.primary
 ---
-- null
+- unique: true
+  idx: index 0
+  n: 512
+  type: HASH
+  key_field:
+    0:
+      type: NUM
+      fieldno: 0
+  name: primary
+  id: 0
 ...
 s.index.pk.type
 ---
-- TREE
+- error: '[string "return s.index.pk.type"]:1: attempt to index field ''pk'' (a nil
+    value)'
 ...
 s.index.pk.unique
 ---
-- false
+- error: '[string "return s.index.pk.unique"]:1: attempt to index field ''pk'' (a
+    nil value)'
 ...
 s.index.pk:rename('primary')
 ---
+- error: '[string "return s.index.pk:rename(''primary'')"]:1: attempt to index field
+    ''pk'' (a nil value)'
 ...
 s:create_index('second', 'tree', { parts = {  1, 'str' } })
 ---
@@ -666,21 +681,179 @@ s.index.second.id
 ---
 - 1
 ...
---
--- ------------
---     - alter unique -> non unique
---     - alter index type
---     - add identical index - verify there is no rebuild
---     - index access by name
---     - alter add key part
---     - rename index 
---
--- build index
+s:drop()
+---
+...
+-- ----------------------------------------------------------------
+-- BUILD INDEX: changes of a non-empty index
+-- ----------------------------------------------------------------
+s = box.schema.create_space('full')
+---
+...
+s:create_index('primary', 'tree', {parts =  { 0, 'str' }})
+---
+...
+s:insert('No such movie', 999)
+---
+- ['No such movie', 999]
+...
+s:insert('Barbara', 2012)
+---
+- ['Barbara', 2012]
+...
+s:insert('Cloud Atlas', 2012)
+---
+- ['Cloud Atlas', 2012]
+...
+s:insert('Almanya - Willkommen in Deutschland', 2011)
+---
+- ['Almanya - Willkommen in Deutschland', 2011]
+...
+s:insert('Halt auf freier Strecke', 2011)
+---
+- ['Halt auf freier Strecke', 2011]
+...
+s:insert('Homevideo', 2011)
+---
+- ['Homevideo', 2011]
+...
+s:insert('Die Fremde', 2010)
+---
+- ['Die Fremde', 2010]
+...
+-- create index with data
+s:create_index('year', 'tree', { unique=false, parts = { 1, 'num'} })
+---
+...
+s.index.primary:select()
+---
+- ['Almanya - Willkommen in Deutschland', 2011]
+- ['Barbara', 2012]
+- ['Cloud Atlas', 2012]
+- ['Die Fremde', 2010]
+- ['Halt auf freier Strecke', 2011]
+- ['Homevideo', 2011]
+- ['No such movie', 999]
+...
+-- a duplicate in the created index
+s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
+---
+- error: Duplicate key exists in unique index 2
+...
+-- change of non-unique index to unique: same effect
+s.index.year:alter({unique=true})
+---
+- error: Duplicate key exists in unique index 1
+...
+-- num -> str -> num transition
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
+---
+- [512, 1, 1918985593, 1701147252, 0, 1, 1, 'str']
+...
+s.index.primary:select()
+---
+- ['Almanya - Willkommen in Deutschland', 2011]
+- ['Barbara', 2012]
+- ['Cloud Atlas', 2012]
+- ['Die Fremde', 2010]
+- ['Halt auf freier Strecke', 2011]
+- ['Homevideo', 2011]
+- ['No such movie', 999]
+...
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+---
+- [512, 1, 1918985593, 1701147252, 0, 1, 1, 'num']
+...
+-- ambiguous field type
+s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
+---
+- error: Ambiguous field type in index 2, key part 0. Requested type is STR but the
+    field has previously been defined as NUM
+...
+-- create index on a non-existing field
+s:create_index('nosuchfield', 'tree', {unique = true, parts = { 2, 'str'}})
+---
+- error: Tuple field count 2 is less than required by a defined index (expected 3)
+...
+s.index.year:drop()
+---
+...
+s:insert('Der Baader Meinhof Komplex', '2009 ')
+---
+- ['Der Baader Meinhof Komplex', '2009 ']
+...
+-- create an index on a field with a wrong type
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM'
+...
+-- a field is missing
+s:replace('Der Baader Meinhof Komplex')
+---
+- ['Der Baader Meinhof Komplex']
+...
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+---
+- error: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+s:drop()
+---
+...
+-- unique -> non-unique transition
+s = box.schema.create_space('test')
+---
+...
+-- primary key must be unique
+s:create_index('primary', 'tree', { unique = false, parts = {0, 'num'}})
+---
+- error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
+...
+-- create primary key
+s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+---
+...
+s:insert(1, 1)
+---
+- [1, 1]
+...
+s:create_index('secondary', 'tree', { unique = false, parts = {1, 'num'}})
+---
+...
+s:insert(2, 1)
+---
+- [2, 1]
+...
+s.index.secondary:alter({ unique = true })
+---
+- error: Duplicate key exists in unique index 1
+...
+s:delete(2)
+---
+- [2, 1]
+...
+s.index.secondary:alter({ unique = true })
+---
+...
+s:insert(2, 1)
+---
+- error: Duplicate key exists in unique index 1
+...
+s:insert(2, 2)
+---
+- [2, 2]
+...
+s.index.secondary:alter({ unique = false})
+---
+...
+s:insert(3, 2)
+---
+- [3, 2]
+...
+s:drop()
+---
+...
 -- -----------
---     - index rebuild:
---        - a duplicate in the new index
---        - no field for the new index
---        - wrong field type in the new index
+--
 --
 -- space cache
 -- -----------
