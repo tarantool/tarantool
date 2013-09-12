@@ -43,6 +43,9 @@ box.stat()
   CALL:
     total: 0
     rps: 0
+  SET_LSN:
+    total: 0
+    rps: 0
   UPDATE:
     total: 0
     rps: 0
@@ -70,6 +73,9 @@ box.stat()
     total: 0
     rps: 0
   CALL:
+    total: 0
+    rps: 0
+  SET_LSN:
     total: 0
     rps: 0
   UPDATE:

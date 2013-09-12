@@ -80,6 +80,7 @@ extern const char *wal_mode_STRS[];
 
 struct recovery_state {
 	int64_t lsn, confirmed_lsn;
+	int64_t last_load_snapshot_lsn, last_explicitly_set_lsn;
 	/* The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
 	struct log_dir *snap_dir;

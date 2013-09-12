@@ -67,7 +67,8 @@ struct port;
 	_(UPDATE, 19)				\
 	_(DELETE_1_3, 20)			\
 	_(DELETE, 21)				\
-	_(CALL, 22)
+	_(CALL, 22)					\
+	_(SET_LSN, 23)
 
 ENUM(requests, REQUESTS);
 extern const char *requests_strs[];
@@ -124,6 +125,10 @@ struct request
 			const char *args;
 			const char *args_end;
 		} c; /* call */
+
+		struct {
+			uint64_t lsn;
+		} sl; /* set_lsn */
 	};
 
 	const char *data;

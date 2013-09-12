@@ -51,6 +51,7 @@ t;
   - SELECT
   - REPLACE
   - CALL
+  - SET_LSN
   - UPDATE
   - DELETE_1_3
   - total
