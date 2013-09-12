@@ -45,7 +45,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  sz, "struct key_def", "malloc");
 	}
-	int n = snprintf(def->name, sizeof(def->name) - 1, "%s", name);
+	int n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
 		tnt_raise(LoggedError, ER_MODIFY_INDEX,

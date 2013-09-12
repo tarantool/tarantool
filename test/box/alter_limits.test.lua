@@ -191,13 +191,55 @@ s.index[0]:drop()
 -- cleanup
 s:drop()
 -- index name, name manipulation
-
--- box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
--- s.name
--- s:drop()
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+-- space cache is updated correctly
+s.index[0].name
+s.index[0].id
+s.index[0].type
+s.index['primary'].name
+s.index['primary'].id
+s.index['primary'].type
+s.index.primary.name
+s.index.primary.id
+-- other properties are preserved
+s.index.primary.type
+s.index.primary.unique
+s.index.primary:rename('new')
+s.index[0].name
+s.index.primary
+s.index.new.name
+-- too long name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s.index[0].name
+s.index[0]:rename('primary')
+s.index.primary.name
+-- cleanup
+s:drop()
 -- modify index
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+s.index.primary:alter({unique=false})
+s.index.primary:alter({type='tree', unique=false, name='pk'})
+s.index.primary
+s.index.pk.type
+s.index.pk.unique
+s.index.pk:rename('primary')
+s:create_index('second', 'tree', { parts = {  1, 'str' } })
+s.index.second.id
+s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+s.index.third:rename('second')
+s.index.third.id
+s.index.second:drop()
+s.index.third:alter({id = 1, name = 'second'})
+s.index.third
+s.index.second.name
+s.index.second.id
+--
 -- ------------
 --     - alter unique -> non unique
 --     - alter index type

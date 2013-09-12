@@ -133,7 +133,7 @@ s:select(0)
 ...
 s:select_range(0, 0, 0)
 ---
-- error: '[string "-- schema.lua (internal file)..."]:174: attempt to index a nil
+- error: '[string "-- schema.lua (internal file)..."]:202: attempt to index a nil
     value'
 ...
 s:delete(0)
@@ -504,12 +504,169 @@ s:drop()
 ---
 ...
 -- index name, name manipulation
--- box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
--- s.name
--- s:drop()
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s = box.schema.create_space('test')
+---
+...
+s:create_index('primary', 'hash')
+---
+...
+-- space cache is updated correctly
+s.index[0].name
+---
+- primary
+...
+s.index[0].id
+---
+- 0
+...
+s.index[0].type
+---
+- HASH
+...
+s.index['primary'].name
+---
+- primary
+...
+s.index['primary'].id
+---
+- 0
+...
+s.index['primary'].type
+---
+- HASH
+...
+s.index.primary.name
+---
+- primary
+...
+s.index.primary.id
+---
+- 0
+...
+-- other properties are preserved
+s.index.primary.type
+---
+- HASH
+...
+s.index.primary.unique
+---
+- true
+...
+s.index.primary:rename('new')
+---
+...
+s.index[0].name
+---
+- new
+...
+s.index.primary
+---
+- null
+...
+s.index.new.name
+---
+- new
+...
+-- too long name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name is too long'
+...
+s.index[0].name
+---
+- new
+...
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+---
+...
+s.index[0].name
+---
+- ttttttttttttttttttttttttttttttt_
+...
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+---
+...
+s.index[0].name
+---
+- tttttttttttttttttttttttttttttt_
+...
+s.index[0]:rename('primary')
+---
+...
+s.index.primary.name
+---
+- primary
+...
+-- cleanup
+s:drop()
+---
+...
 -- modify index
+s = box.schema.create_space('test')
+---
+...
+s:create_index('primary', 'hash')
+---
+...
+s.index.primary:alter({unique=false})
+---
+- error: 'Can''t create or modify index 0 in space 512: HASH index must be unique'
+...
+s.index.primary:alter({type='tree', unique=false, name='pk'})
+---
+...
+s.index.primary
+---
+- null
+...
+s.index.pk.type
+---
+- TREE
+...
+s.index.pk.unique
+---
+- false
+...
+s.index.pk:rename('primary')
+---
+...
+s:create_index('second', 'tree', { parts = {  1, 'str' } })
+---
+...
+s.index.second.id
+---
+- 1
+...
+s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+---
+...
+s.index.third:rename('second')
+---
+- error: Duplicate key exists in unique index 1
+...
+s.index.third.id
+---
+- 2
+...
+s.index.second:drop()
+---
+...
+s.index.third:alter({id = 1, name = 'second'})
+---
+...
+s.index.third
+---
+- null
+...
+s.index.second.name
+---
+- second
+...
+s.index.second.id
+---
+- 1
+...
+--
 -- ------------
 --     - alter unique -> non unique
 --     - alter index type
