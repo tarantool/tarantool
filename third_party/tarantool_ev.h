@@ -52,6 +52,15 @@
 #else /* !defined(ENABLE_BUNDLED_LIBEV) */
 #include <ev.h>
 #endif
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 extern const ev_tstamp TIMEOUT_INFINITY;
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_EV_H_INCLUDED */

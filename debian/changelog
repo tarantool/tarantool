@@ -1,3 +1,36 @@
+tarantool (1.5.1.84.g9f2e646-1) unstable; urgency=low
+
+  * Drop BSD dependencies in Debian/kFreeBSD (try to fix FTBFS with Debian/BSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 15:52:39 +0400
+
+tarantool (1.5.1.82.ga064ebe-1) unstable; urgency=low
+
+  * Remove tarantool/config.h pointedly (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 13:35:06 +0400
+
+tarantool (1.5.1.81.g4382f16-1) unstable; urgency=low
+
+  * Fix debian/rules clean section (cleanup CMake files).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 23:05:29 +0400
+
+tarantool (1.5.1.80.gc84e35c-1) unstable; urgency=low
+
+  * New snapshot (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 22:14:09 +0400
+
+tarantool (1.5.1.78.g2e82d26-1) unstable; urgency=low
+
+  * New snapshot. Integration upload.
+   - Add missing copyright holders, closes: #722059
+   - Drop non-free materials from tarbal, closes: #722060
+   - Fix memory leak in box.ipc.channel:put.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 02:00:51 +0400
+
 tarantool (1.5.1.76.g5ed3fbe-1) unstable; urgency=low
 
   * New snapshot.

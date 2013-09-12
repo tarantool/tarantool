@@ -35,6 +35,7 @@
 #include "tt_pthread.h"
 #include "fio.h"
 #include "errinj.h"
+#include "bootstrap.h"
 
 /*
  * Recovery subsystem
@@ -278,6 +279,26 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
+/** Create the initial snapshot file in the storage. */
+void
+init_storage(struct log_dir *dir)
+{
+	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
+	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
+	say_info("saving snapshot `%s'", filename);
+	if (fd == -1) {
+		panic_syserror("failed to open snapshot file `%s' for "
+			       "writing", filename);
+	}
+	if (write(fd, bootstrap_bin, sizeof(bootstrap_bin)) !=
+						sizeof(bootstrap_bin)) {
+		panic_syserror("failed to write to snapshot file `%s'",
+			       filename);
+	}
+	close(fd);
+	say_info("done");
+}
+
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
@@ -294,6 +315,12 @@ recover_snap(struct recovery_state *r)
 	int64_t lsn;
 
 	lsn = greatest_lsn(r->snap_dir);
+	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
+		say_info("found an empty data directory, initializing...");
+		init_storage(r->snap_dir);
+		lsn = greatest_lsn(r->snap_dir);
+	}
+
 	if (lsn <= 0) {
 		say_error("can't find snapshot");
 		goto error;

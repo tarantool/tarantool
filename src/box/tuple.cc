@@ -37,7 +37,6 @@
 #include <stdio.h>
 #include <third_party/base64.h>
 
-enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
@@ -64,7 +63,7 @@ field_type_create(enum field_type *types, uint32_t field_count,
 			if (*ptype != UNKNOWN && *ptype != part->type) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE_MISMATCH,
-					  key_def->id, part - key_def->parts,
+					  key_def->iid, part - key_def->parts,
 					  field_type_strs[part->type],
 					  field_type_strs[*ptype]);
 			}
@@ -80,27 +79,26 @@ tuple_format_register(struct tuple_format *format)
 
 		format->id = (uint16_t) recycled_format_ids;
 		recycled_format_ids = (intptr_t) tuple_formats[recycled_format_ids];
-	} else if (formats_size == formats_capacity) {
-		uint32_t new_capacity = formats_capacity ?
-			formats_capacity * 2 : 16;
-		struct tuple_format **formats;
-		if (new_capacity >= FORMAT_ID_MAX) {
-			tnt_raise(LoggedError, ER_TUPLE_FORMAT_LIMIT,
-				  (unsigned) new_capacity);
-		}
-		formats = (struct tuple_format **)
-			realloc(tuple_formats, new_capacity *
-				sizeof(tuple_formats[0]));
-		if (formats == NULL)
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-				  sizeof(struct tuple_format),
-				  "tuple_formats", "malloc");
-
-		formats_capacity = new_capacity;
-		tuple_formats = formats;
-
-		format->id = formats_size++;
 	} else {
+		if (formats_size == formats_capacity) {
+			uint32_t new_capacity = formats_capacity ?
+				formats_capacity * 2 : 16;
+			struct tuple_format **formats;
+			formats = (struct tuple_format **)
+				realloc(tuple_formats, new_capacity *
+					sizeof(tuple_formats[0]));
+			if (formats == NULL)
+				tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+					  sizeof(struct tuple_format),
+					  "tuple_formats", "malloc");
+
+			formats_capacity = new_capacity;
+			tuple_formats = formats;
+		}
+		if (formats_size == FORMAT_ID_MAX + 1) {
+			tnt_raise(LoggedError, ER_TUPLE_FORMAT_LIMIT,
+				  (unsigned) formats_capacity);
+		}
 		format->id = formats_size++;
 	}
 	tuple_formats[format->id] = format;

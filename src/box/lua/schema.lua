@@ -13,8 +13,13 @@ box.schema.space.create = function(name, options)
         options = {}
     end
     local if_not_exists = options.if_not_exists
-    if if_not_exists and box.space[name] then
-        return box.space[name], "not created"
+    if box.space[name] then
+        if options.if_not_exists then
+            return box.space[name], "not created"
+        else
+            box.raise(box.error.ER_SPACE_EXISTS,
+                     "Space '"..name.."' already exists")
+        end
     end
     local id
     if options.id then
@@ -42,7 +47,14 @@ box.schema.space.drop = function(space_id)
         local v = keys[i]
         _index:delete(v[0], v[1])
     end
-    _space:delete(space_id)
+    if _space:delete(space_id) == nil then
+        box.raise(box.error.ER_NO_SUCH_SPACE,
+                  "Space "..space_id.." does not exist")
+    end
+end
+box.schema.space.rename = function(space_id, space_name)
+    local _space = box.space[box.schema.SPACE_ID]
+    _space:update(space_id, "=p", 2, space_name)
 end
 
 box.schema.index = {}
@@ -52,10 +64,13 @@ box.schema.index.create = function(space_id, name, index_type, options)
     if options == nil then
         options = { parts = { 0, 'num' } }
     end
-    local unique = tonumber(options.unique)
-    if unique == nil then
-        unique = 1
+    if options.parts == nil then
+        options.parts = {}
     end
+    if options.unique == nil then
+        options.unique = true
+    end
+    local unique = options.unique and 1 or 0
     local part_count = #options.parts/2
     local parts = options.parts
     local iid = 0
@@ -75,6 +90,10 @@ end
 box.schema.index.drop = function(space_id, index_id)
     local _index = box.space[box.schema.INDEX_ID]
     _index:delete(space_id, index_id)
+end
+box.schema.index.rename = function(space_id, index_id, name)
+    local _index = box.space[box.schema.INDEX_ID]
+    _index:update({space_id, index_id}, "=p", 3, name)
 end
 
 function box.schema.space.bless(space)
@@ -167,6 +186,10 @@ function box.schema.space.bless(space)
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.truncate = function(space)
         local pk = space.index[0]
+        if pk == nil then
+            box.raise(box.error.ER_NO_SUCH_INDEX,
+                      "No index #0 is defined in space "..space.n);
+        end
         while #pk.idx > 0 do
             for t in pk:iterator() do
                 local key = {};
@@ -181,6 +204,9 @@ function box.schema.space.bless(space)
     space_mt.pairs = function(space) return space.index[0]:pairs() end
     space_mt.drop = function(space)
         return box.schema.space.drop(space.n)
+    end
+    space_mt.rename = function(space, name)
+        return box.schema.space.rename(space.n, name)
     end
     space_mt.create_index = function(space, ...)
         return box.schema.index.create(space.n, ...)
@@ -197,10 +223,10 @@ function box.schema.space.bless(space)
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
-            rawset(index, 'idx', box.index.new(space.n, j))
-            rawset(index, 'id', j)
-            rawset(index, 'n', space.n)
-            setmetatable(index, index_mt)
+            if type(j) == 'number' then
+                rawset(index, 'idx', box.index.bind(space.n, j))
+                setmetatable(index, index_mt)
+            end
         end
     end
 end

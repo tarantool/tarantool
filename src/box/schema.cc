@@ -72,6 +72,13 @@ space_by_id(uint32_t id)
 	return (struct space *) mh_i32ptr_node(spaces, space)->val;
 }
 
+extern "C" const char *
+space_name_by_id(uint32_t id)
+{
+	struct space *space = space_by_id(id);
+	return space ? space_name(space) : "";
+}
+
 /**
  * Visit all spaces and apply 'func'.
  */
@@ -210,25 +217,30 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct space_def space_def = { SC_SCHEMA_ID, 0, "_schema" };
-	struct key_def *key_def = key_def_new(0 /* id */,
+	struct space_def def = { SC_SCHEMA_ID, 0, "_schema" };
+	struct key_def *key_def = key_def_new(def.id,
+					      0 /* index id */,
+					      "primary", /* name */
 					      TREE /* index type */,
 					      true /* unique */,
 					      1 /* part count */);
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
-	(void) sc_space_new(&space_def, key_def, NULL);
+	(void) sc_space_new(&def, key_def, NULL);
 
 	/* _space - home for all spaces. */
-	space_def.id = SC_SPACE_ID;
-	snprintf(space_def.name, sizeof(space_def.name), "_space");
+	key_def->space_id = def.id = SC_SPACE_ID;
+	snprintf(def.name, sizeof(def.name), "_space");
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 
-	(void) sc_space_new(&space_def, key_def,
-			    &alter_space_on_replace_space);
+	(void) sc_space_new(&def, key_def, &alter_space_on_replace_space);
 	key_def_delete(key_def);
 
 	/* _index - definition of indexes in all spaces */
-	key_def = key_def_new(0 /* id */,
+	def.id = SC_INDEX_ID;
+	snprintf(def.name, sizeof(def.name), "_index");
+	key_def = key_def_new(def.id,
+			      0 /* index id */,
+			      "primary",
 			      TREE /* index type */,
 			      true /* unique */,
 			      2 /* part count */);
@@ -236,10 +248,7 @@ schema_init()
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 	/* index no */
 	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */, NUM);
-	space_def.id = SC_INDEX_ID;
-	snprintf(space_def.name, sizeof(space_def.name), "_index");
-	(void) sc_space_new(&space_def, key_def,
-			    &alter_space_on_replace_index);
+	(void) sc_space_new(&def, key_def, &alter_space_on_replace_index);
 	key_def_delete(key_def);
 }
 

@@ -232,7 +232,7 @@ replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
 static inline uint32_t
 index_id(const Index *index)
 {
-	return index->key_def->id;
+	return index->key_def->iid;
 }
 
 /** True if this index is a primary key. */

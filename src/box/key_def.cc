@@ -28,20 +28,33 @@
  */
 #include "key_def.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include "exception.h"
 
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
 STRS(index_type, ENUM_INDEX_TYPE);
 
 struct key_def *
-key_def_new(uint32_t id, enum index_type type, bool is_unique,
-	    uint32_t part_count)
+key_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	    enum index_type type, bool is_unique, uint32_t part_count)
 {
 	uint32_t parts_size = sizeof(struct key_part) * part_count;
-	struct key_def *def = (struct key_def *)
-		malloc(parts_size + sizeof(*def));
+	size_t sz = parts_size + sizeof(struct key_def);
+	struct key_def *def = (struct key_def *) malloc(sz);
+	if (def == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  sz, "struct key_def", "malloc");
+	}
+	int n = snprintf(def->name, sizeof(def->name) - 1, "%s", name);
+	if (n >= sizeof(def->name)) {
+		free(def);
+		tnt_raise(LoggedError, ER_MODIFY_INDEX,
+			  (unsigned) iid, (unsigned) space_id,
+			  "index name is too long");
+	}
 	def->type = type;
-	def->id = id;
+	def->space_id = space_id;
+	def->iid = iid;
 	def->is_unique = is_unique;
 	def->part_count = part_count;
 
@@ -76,8 +89,10 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 int
 key_def_cmp(const struct key_def *key1, const struct key_def *key2)
 {
-	if (key1->id != key2->id)
-		return key1->id < key2->id ? -1 : 1;
+	if (key1->iid != key2->iid)
+		return key1->iid < key2->iid ? -1 : 1;
+	if (strcmp(key1->name, key2->name))
+		return strcmp(key1->name, key2->name);
 	if (key1->type != key2->type)
 		return (int) key1->type < (int) key2->type ? -1 : 1;
 	if (key1->is_unique != key2->is_unique)
@@ -88,11 +103,11 @@ key_def_cmp(const struct key_def *key1, const struct key_def *key2)
 }
 
 void
-key_list_del_key(struct rlist *key_list, uint32_t id)
+key_list_del_key(struct rlist *key_list, uint32_t iid)
 {
 	struct key_def *key;
 	rlist_foreach_entry(key, key_list, link) {
-		if (key->id == id) {
+		if (key->iid == iid) {
 			rlist_del_entry(key, link);
 			return;
 		}
@@ -101,35 +116,59 @@ key_list_del_key(struct rlist *key_list, uint32_t id)
 }
 
 void
-key_def_check(uint32_t id, struct key_def *key_def)
+key_def_check(struct key_def *key_def)
 {
-	if (key_def->id > BOX_INDEX_MAX) {
+	if (key_def->iid >= BOX_INDEX_MAX) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->id, (unsigned) id,
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id,
 			  "index id too big");
 	}
 	if (key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,
-			  (unsigned) key_def->id, (unsigned) id,
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id,
 			  "part count must be positive");
+	}
+	if (key_def->part_count > BOX_INDEX_PART_MAX) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id,
+			  "too many key parts");
 	}
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		if (key_def->parts[i].type == field_type_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->id, (unsigned) id,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
 				  "unknown field type");
 		}
-		if (key_def->parts[i].fieldno > BOX_FIELD_MAX) {
+		if (key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->id, (unsigned) id,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
 				  "field no is too big");
+		}
+		for (uint32_t j = 0; j < i; j++) {
+			/*
+			 * Courtesy to a user who could have made
+			 * a typo.
+			 */
+			if (key_def->parts[i].fieldno ==
+			    key_def->parts[j].fieldno) {
+				tnt_raise(ClientError, ER_MODIFY_INDEX,
+					  (unsigned) key_def->iid,
+					  (unsigned) key_def->space_id,
+					  "same key part is indexed twice");
+			}
 		}
 	}
 	switch (key_def->type) {
 	case HASH:
 		if (! key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->id, (unsigned) id,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
 				  "HASH index must be unique");
 		}
 		break;
@@ -139,18 +178,36 @@ key_def_check(uint32_t id, struct key_def *key_def)
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->id, (unsigned) id,
-				    "BITSET index key can not be multipart");
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "BITSET index key can not be multipart");
 		}
 		if (key_def->is_unique) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->id, (unsigned) id,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
 				  "BITSET can not be unique");
 		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) key_def->id, (unsigned) id);
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id);
 		break;
+	}
+}
+
+void
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
+{
+	if (def->id > BOX_SPACE_MAX) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space id is too big");
+	}
+	if (namelen >= sizeof(def->name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space name is too long");
 	}
 }

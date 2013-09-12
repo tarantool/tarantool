@@ -67,3 +67,14 @@ _index:insert(1000, 0, 'primary', 'tree', 1, 1, 0, 'num')
 box.space[1000]:insert(0, 'hello, world')
 box.space[1000]:drop()
 box.space[1000]
+-- test that after disabling triggers on system spaces we still can
+-- get a correct snapshot
+_index:run_triggers(false)
+_space:run_triggers(false)
+box.snapshot()
+--# stop server default
+--# start server default
+box.space['_space']:insert(1000, 0, 'test')
+box.space[1000].n
+box.space['_space']:delete(1000)
+box.space[1000]

@@ -181,3 +181,33 @@ box.space[1000]
 ---
 - null
 ...
+-- test that after disabling triggers on system spaces we still can
+-- get a correct snapshot
+_index:run_triggers(false)
+---
+...
+_space:run_triggers(false)
+---
+...
+box.snapshot()
+---
+- ok
+...
+--# stop server default
+--# start server default
+box.space['_space']:insert(1000, 0, 'test')
+---
+- [1000, 0, 1953719668]
+...
+box.space[1000].n
+---
+- 1000
+...
+box.space['_space']:delete(1000)
+---
+- [1000, 0, 1953719668]
+...
+box.space[1000]
+---
+- null
+...

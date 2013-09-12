@@ -32,6 +32,7 @@
 #include "txn.h"
 #include "tuple.h"
 #include "fiber.h" /* for gc_pool */
+#include "scoped_guard.h"
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 
@@ -68,29 +69,55 @@ key_def_new_from_tuple(struct tuple *tuple)
 	enum index_type type = STR2ENUM(index_type, type_str);
 	uint32_t is_unique = tuple_field_u32(tuple, INDEX_IS_UNIQUE);
 	uint32_t part_count = tuple_field_u32(tuple, INDEX_PART_COUNT);
+	const char *name = tuple_field_cstr(tuple, NAME);
 
-	struct key_def *key_def = key_def_new(index_id, type,
+	struct key_def *key_def = key_def_new(id, index_id, name, type,
 					      is_unique > 0, part_count);
-	try {
-		struct tuple_iterator it;
-		tuple_rewind(&it, tuple);
-		uint32_t len; /* unused */
-		/* Parts follow part count. */
-		(void) tuple_seek(&it, INDEX_PART_COUNT, &len);
+	auto scoped_guard =
+		make_scoped_guard([=] { key_def_delete(key_def); });
 
-		for (uint32_t i = 0; i < part_count; i++) {
-			uint32_t fieldno = tuple_next_u32(&it);
-			const char *field_type_str = tuple_next_cstr(&it);
-			enum field_type field_type =
-				STR2ENUM(field_type, field_type_str);
-			key_def_set_part(key_def, i, fieldno, field_type);
-		}
-		key_def_check(id, key_def);
-	} catch (...) {
-		key_def_delete(key_def);
-		throw;
+	struct tuple_iterator it;
+	tuple_rewind(&it, tuple);
+	uint32_t len; /* unused */
+	/* Parts follow part count. */
+	(void) tuple_seek(&it, INDEX_PART_COUNT, &len);
+
+	for (uint32_t i = 0; i < part_count; i++) {
+		uint32_t fieldno = tuple_next_u32(&it);
+		const char *field_type_str = tuple_next_cstr(&it);
+		enum field_type field_type =
+			STR2ENUM(field_type, field_type_str);
+		key_def_set_part(key_def, i, fieldno, field_type);
 	}
+	key_def_check(key_def);
+	scoped_guard.is_active = false;
 	return key_def;
+}
+
+/**
+ * Fill space_def structure from struct tuple.
+ */
+void
+space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
+			    uint32_t errcode)
+{
+	def->id = tuple_field_u32(tuple, ID);
+	def->arity = tuple_field_u32(tuple, ARITY);
+	int n = snprintf(def->name, sizeof(def->name),
+			 "%s", tuple_field_cstr(tuple, NAME));
+	space_def_check(def, n, errcode);
+	if (errcode != ER_ALTER_SPACE &&
+	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
+		say_warn("\n"
+"*******************************************************\n"
+"* Creating a space with a reserved id %3u.            *\n"
+"* Ids in range %3u-%3u may be used for a system space *\n"
+"* the future. Assuming you know what you're doing.    *\n"
+"*******************************************************",
+			 (unsigned) def->id,
+			 (unsigned) SC_SYSTEM_ID_MIN,
+			 (unsigned) SC_SYSTEM_ID_MAX);
+	}
 }
 
 /* }}} */
@@ -413,13 +440,13 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "space id is immutable");
 
 	if (def.arity != 0 &&
-	    def.arity > alter->old_space->def.arity &&
+	    def.arity != alter->old_space->def.arity &&
 	    alter->old_space->engine.state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
-			  "can not enlarge arity on a non-empty space");
+			  "can not change arity on a non-empty space");
 	}
 }
 
@@ -536,7 +563,7 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space,
-			 old_key_def->id, new_key_def->id);
+			 old_key_def->iid, new_key_def->iid);
 }
 
 ModifyIndex::~ModifyIndex()
@@ -635,7 +662,7 @@ AddIndex::prepare(struct alter_space *alter)
 void
 AddIndex::alter_def(struct alter_space *alter)
 {
-	rlist_add_entry(&alter->key_list, new_key_def, link);
+	rlist_add_tail_entry(&alter->key_list, new_key_def, link);
 }
 
 /**
@@ -690,7 +717,7 @@ AddIndex::alter(struct alter_space *alter)
 	 * Possible both during and after recovery.
 	 */
 	if (alter->new_space->engine.state == READY_NO_KEYS) {
-		if (new_key_def->id == 0) {
+		if (new_key_def->iid == 0) {
 			/*
 			 * Adding a primary key: bring the space
 			 * up to speed with the current recovery
@@ -719,10 +746,10 @@ AddIndex::alter(struct alter_space *alter)
 		return;
 	}
 	Index *pk = index_find(alter->old_space, 0);
-	Index *new_index = index_find(alter->new_space, new_key_def->id);
+	Index *new_index = index_find(alter->new_space, new_key_def->iid);
 	/* READY_PRIMARY_KEY is a state that only occurs during WAL recovery. */
 	if (alter->new_space->engine.state == READY_PRIMARY_KEY) {
-		if (new_key_def->id == 0) {
+		if (new_key_def->iid == 0) {
 			/*
 			 * Bulk rebuild of the new primary key
 			 * from old primary key - it is safe to do
@@ -881,31 +908,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 	struct space *old_space = space_by_id(old_id);
 	if (new_tuple != NULL && old_space == NULL) { /* INSERT */
 		struct space_def def;
-		def.id = old_id;
-		def.arity = tuple_field_u32(new_tuple, ARITY);
-		int n = snprintf(def.name, sizeof(def.name),
-				 "%s", tuple_field_cstr(new_tuple, NAME));
-		if (def.id > BOX_SPACE_MAX) {
-			tnt_raise(ClientError, ER_CREATE_SPACE,
-				  (unsigned) def.id,
-				  "space id is too big");
-		}
-		if (def.id >= SC_SYSTEM_ID_MIN && def.id < SC_SYSTEM_ID_MAX) {
-			say_warn("\n"
-"*******************************************************\n"
-"* Creating a space with a reserved id %3u.            *\n"
-"* Ids in range %3u-%3u may be used for a system space *\n"
-"* the future. Assuming you know what you're doing.    *\n"
-"*******************************************************",
-				 (unsigned) def.id,
-				 (unsigned) SC_SYSTEM_ID_MIN,
-				 (unsigned) SC_SYSTEM_ID_MAX);
-		}
-		if (n > sizeof(def.name)) {
-			tnt_raise(ClientError, ER_CREATE_SPACE,
-				  (unsigned) def.id,
-				  "space name is too long");
-		}
+		space_def_create_from_tuple(&def, new_tuple, ER_CREATE_SPACE);
 		struct space *space = space_new(&def, &rlist_nil);
 		(void) space_cache_replace(space);
 		/*
@@ -937,17 +940,15 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * in WAL-error-safe mode.
 		 */
 		struct alter_space *alter = alter_space_new();
-		try {
-			ModifySpace *modify =
-				AlterSpaceOp::create<ModifySpace>();
-			alter_space_add_op(alter, modify);
-			modify->def.id = tuple_field_u32(new_tuple, ID);
-			modify->def.arity = tuple_field_u32(new_tuple, ARITY);
-			alter_space_do(txn, alter, old_space);
-		} catch (...) {
-			alter_space_delete(alter);
-			throw;
-		}
+		auto scoped_guard =
+		        make_scoped_guard([=] {alter_space_delete(alter);});
+		ModifySpace *modify =
+			AlterSpaceOp::create<ModifySpace>();
+		alter_space_add_op(alter, modify);
+		space_def_create_from_tuple(&modify->def, new_tuple,
+					    ER_ALTER_SPACE);
+		alter_space_do(txn, alter, old_space);
+		scoped_guard.is_active = false;
 	}
 }
 
@@ -994,32 +995,30 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = txn->old_tuple;
 	struct tuple *new_tuple = txn->new_tuple;
 	uint32_t id = tuple_field_u32(old_tuple ? old_tuple : new_tuple, ID);
-	uint32_t index_id = tuple_field_u32(old_tuple ? old_tuple : new_tuple,
-					    INDEX_ID);
+	uint32_t iid = tuple_field_u32(old_tuple ? old_tuple : new_tuple,
+				       INDEX_ID);
 	struct space *old_space = space_find(id);
-	Index *old_index = space_index(old_space, index_id);
+	Index *old_index = space_index(old_space, iid);
 	struct alter_space *alter = alter_space_new();
-	try {
-		/*
-		 * The order of checks is important, DropIndex most be added
-		 * first, so that AddIndex::prepare() can change
-		 * Drop + Add to a Modify.
-		 */
-		if (old_index != NULL) {
-			DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
-			alter_space_add_op(alter, drop_index);
-			drop_index->old_key_def = old_index->key_def;
-		}
-		if (new_tuple != NULL) {
-			AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
-			alter_space_add_op(alter, add_index);
-			add_index->new_key_def = key_def_new_from_tuple(new_tuple);
-		}
-		alter_space_do(txn, alter, old_space);
-	} catch (...) {
-		alter_space_delete(alter);
-		throw;
+	auto scoped_guard =
+		make_scoped_guard([=] { alter_space_delete(alter); });
+	/*
+	 * The order of checks is important, DropIndex most be added
+	 * first, so that AddIndex::prepare() can change
+	 * Drop + Add to a Modify.
+	 */
+	if (old_index != NULL) {
+		DropIndex *drop_index = AlterSpaceOp::create<DropIndex>();
+		alter_space_add_op(alter, drop_index);
+		drop_index->old_key_def = old_index->key_def;
 	}
+	if (new_tuple != NULL) {
+		AddIndex *add_index = AlterSpaceOp::create<AddIndex>();
+		alter_space_add_op(alter, add_index);
+		add_index->new_key_def = key_def_new_from_tuple(new_tuple);
+	}
+	alter_space_do(txn, alter, old_space);
+	scoped_guard.is_active = false;
 }
 
 struct trigger alter_space_on_replace_space = {

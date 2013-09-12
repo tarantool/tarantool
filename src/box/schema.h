@@ -60,6 +60,10 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
 extern "C" struct space *
 space_by_id(uint32_t id);
 
+/** No-throw conversion of space id to space name */
+extern "C" const char *
+space_name_by_id(uint32_t id);
+
 static inline struct space *
 space_find(uint32_t id)
 {

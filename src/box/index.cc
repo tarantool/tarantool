@@ -113,19 +113,18 @@ Index::factory(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
-		return new (std::nothrow) HashIndex(key_def);
+		return new HashIndex(key_def);
 	case TREE:
-		return new (std::nothrow) TreeIndex(key_def);
+		return new TreeIndex(key_def);
 	case BITSET:
-		return new (std::nothrow) BitsetIndex(key_def);
+		return new BitsetIndex(key_def);
 	default:
 		assert(false);
 	}
-	return NULL;
 }
 
 Index::Index(struct key_def *key_def_arg)
-	:key_def(key_def_arg),
+	:key_def(key_def_dup(key_def_arg)),
 	m_position(NULL)
 {}
 

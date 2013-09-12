@@ -35,7 +35,16 @@ enum {
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_INDEX_MAX = 10,
 	BOX_NAME_MAX = 32,
-	BOX_FIELD_MAX = UINT32_MAX
+	BOX_FIELD_MAX = INT32_MAX,
+	/**
+	 * A fairly arbitrary limit which is still necessary
+	 * to keep tuple_format object small.
+	 */
+	BOX_INDEX_FIELD_MAX = INT16_MAX,
+	/** Yet another arbitrary limit which simply needs to
+	 * exist.
+	 */
+	BOX_INDEX_PART_MAX = UINT8_MAX
 };
 
 /*
@@ -73,7 +82,11 @@ struct key_def {
 	/* A link in key list. */
 	struct rlist link;
 	/** Ordinal index number in the index array. */
-	uint32_t id;
+	uint32_t iid;
+	/* Space id. */
+	uint32_t space_id;
+	/** Index name. */
+	char name[BOX_NAME_MAX + 1];
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Index type. */
@@ -86,13 +99,14 @@ struct key_def {
 
 /** Initialize a pre-allocated key_def. */
 struct key_def *
-key_def_new(uint32_t id, enum index_type type,
-	    bool is_unique, uint32_t part_count);
+key_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	    enum index_type type, bool is_unique, uint32_t part_count);
 
 static inline struct key_def *
 key_def_dup(struct key_def *def)
 {
-	struct key_def *dup = key_def_new(def->id, def->type, def->is_unique,
+	struct key_def *dup = key_def_new(def->space_id, def->iid, def->name,
+					  def->type, def->is_unique,
 					  def->part_count);
 	if (dup) {
 		memcpy(dup->parts, def->parts,
@@ -137,8 +151,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 
 /**
  * One key definition is greater than the other if it's id is
- * greater, it's index type is greater (HASH < TREE < BITSET)
- * or its key part array is greater.
+ * greater, it's name is greater,  it's index type is greater
+ * (HASH < TREE < BITSET) or its key part array is greater.
  */
 int
 key_def_cmp(const struct key_def *key1, const struct key_def *key2);
@@ -166,7 +180,7 @@ key_list_del_key(struct rlist *key_list, uint32_t id);
  * @param type_str  type name (to produce a nice error)
  */
 void
-key_def_check(uint32_t id, struct key_def *key_def);
+key_def_check(struct key_def *key_def);
 
 /** Space metadata. */
 struct space_def {
@@ -179,7 +193,11 @@ struct space_def {
 	 * must have exactly this many fields.
 	 */
 	uint32_t arity;
-	char name[BOX_NAME_MAX];
+	char name[BOX_NAME_MAX + 1];
 };
+
+/** Check space definition structure for errors. */
+void
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */
