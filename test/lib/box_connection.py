@@ -20,15 +20,28 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
-
-import socket
+import os
 import sql
+import sys
+import socket
 import struct
 from tarantool_connection import TarantoolConnection
+
+try:
+    tnt_py = os.path.dirname(os.path.abspath(__file__))
+    tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
+    sys.path.append(tnt_py)
+    from tarantool import Connection as tnt_connection
+except ImportError:
+    raise
+    sys.stderr.write("\n\nNo tarantool-python library found\n")
+    sys.exit(1)
 
 class BoxConnection(TarantoolConnection):
     def __init__(self, host, port):
         super(BoxConnection, self).__init__(host, port)
+        self.py_con = tnt_connection(host, port, connect_now=False)
+        self.py_con.error = False
         self.sort = False
 
     def recvall(self, length):
@@ -47,27 +60,11 @@ class BoxConnection(TarantoolConnection):
             return "You have an error in your SQL syntax\n"
         statement.sort = self.sort
 
-        payload = statement.pack()
-        header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
-
-        self.socket.sendall(header)
-        if len(payload):
-            self.socket.sendall(payload)
-
-        IPROTO_HEADER_SIZE = 12
-
-        header = self.recvall(IPROTO_HEADER_SIZE)
-
-        response_len = struct.unpack("<lll", header)[1]
-
-        if response_len:
-            response = self.recvall(response_len)
-        else:
-            response = None
+        request = statement.pack(self.py_con)
+        response = self.py_con._send_request(request, False)
 
         if not silent:
             print command
             print statement.unpack(response)
 
-        return statement.unpack(response) + "\n"
-
+        return statement.unpack(response)
