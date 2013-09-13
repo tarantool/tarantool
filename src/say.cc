@@ -123,6 +123,7 @@ say_logger_init(int nonblock)
 			execve(argv[0], argv, envp);
 			goto error;
 		}
+#ifndef TARGET_OS_DARWIN
 		/*
 		 * A courtesy to a DBA who might have
 		 * misconfigured the logger option: check whether
@@ -135,6 +136,7 @@ say_logger_init(int nonblock)
 		timeout.tv_nsec = 1; /* Mostly to trigger preemption. */
 		if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD)
 			goto error;
+#endif
 
 		/* OK, let's hope for the best. */
 		sigprocmask(SIG_UNBLOCK, &mask, NULL);
