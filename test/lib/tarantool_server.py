@@ -25,6 +25,16 @@ try:
 except ImportError:
     import StringIO
 
+try:
+    tnt_py = os.path.dirname(os.path.abspath(__file__))
+    tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
+    sys.path.append(tnt_py)
+    import tarantool
+    from tarantool import Connection as tnt_connection
+except ImportError:
+    sys.stderr.write("\n\nNo tarantool-python library found\n")
+    sys.exit(1)
+
 def check_port(port):
     """Check if the port we're connecting to is available"""
     try:
@@ -240,6 +250,11 @@ class LuaTest(FuncTest):
 
 class PythonTest(FuncTest):
     def execute(self, server):
+        Schema = tarantool.Schema
+        tntNUM = tarantool.NUM
+        tntSTR = tarantool.STR
+        tntNUM64 = tarantool.NUM64
+        tntRAW = tarantool.RAW
         execfile(self.name, dict(locals(), **server.__dict__))
 
 class TarantoolConfigFile:

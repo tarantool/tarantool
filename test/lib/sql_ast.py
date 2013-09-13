@@ -17,7 +17,6 @@ try:
             RequestDelete,
     )
 except ImportError:
-    raise
     sys.stderr.write("\n\nNo tarantool-python library found\n")
     sys.exit(1)
 
@@ -83,7 +82,13 @@ ER = {
 }
 
 def format_error(response):
-    return "An error occurred: {0}".format(ER[response.return_code >> 8])
+    return "---\n- error: '{1}'\n...".format(ER[response.return_code],
+            response.return_message)
+
+def format_yamllike(response):
+    table = ("\n"+"\n".join(["- "+str(list(k)) for k in response])) \
+            if len(response) else ""
+    return "---{0}\n...".format(table)
 
 class Statement(object):
     def __init__(self):
@@ -100,53 +105,57 @@ class StatementPing(Statement):
     def unpack(self, response):
         if response._return_code:
             return format_error(response)
-        return "ok\n---"
+        return "---\n- ok\n..."
 
 class StatementInsert(Statement):
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0x03 # ADD
+        self.flags = 0x03 # ADD + RET
         self.value_list = value_list
 
     def pack(self, connection):
-        return RequestInsert(connection, self.space_no, self.value_list, self.flags)
+        return RequestInsert(connection, self.space_no, self.value_list,
+                self.flags)
 
     def unpack(self, response):
-        if response._return_code:
+        if response.return_code:
             return format_error(response)
-        return "Insert OK, {0} row affected".format(len(response))
+        return format_yamllike(response)
 
 class StatementReplace(Statement):
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0x05 # REPLACE
+        self.flags = 0x05 # REPLACE + RET
         self.value_list = value_list
 
     def pack(self, connection):
-        return RequestInsert(connection, self.space_no, self.value_list, self.flags)
+        return RequestInsert(connection, self.space_no, self.value_list,
+                self.flags)
 
     def unpack(self, response):
-        if response._return_code:
+        if response.return_code:
             return format_error(response)
-        return "Insert OK, {0} row affected".format(len(response))
+        return format_yamllike(response)
 
 class StatementUpdate(Statement):
     def __init__(self, table_name, update_list, where):
         self.space_no = table_name
         self.flags = 0
-        key_no = where[0]
-        if key_no != 0:
-            raise RuntimeError("UPDATE can only be made by the primary key (#0)")
+        self.key_no = where[0]
+        if self.key_no != 0:
+            raise RuntimeError("UPDATE can only be made by the"
+                    " primary key (#0)")
         self.value_list = where[1]
         self.update_list = [(pair[0], '=', pair[1]) for pair in update_list]
 
     def pack(self, connection):
-        return RequestUpdate(connection, self.space_no, self.value_list, True)
+        return RequestUpdate(connection, self.space_no, self.value_list,
+                self.update_list, True)
 
     def unpack(self, response):
-        if response._return_code:
+        if response.return_code:
             return format_error(response)
-        return "Update OK, {0} row affected".format(len(response))
+        return format_yamllike(response)
 
 class StatementDelete(Statement):
     def __init__(self, table_name, where):
@@ -154,16 +163,17 @@ class StatementDelete(Statement):
         self.flags = 0
         key_no = where[0]
         if key_no != 0:
-            raise RuntimeError("DELETE can only be made by the primary key (#0)")
+            raise RuntimeError("DELETE can only be made by the "
+                    "primary key (#0)")
         self.value_list = where[1]
 
     def pack(self, connection):
         return RequestDelete(connection, self.space_no, self.value_list, True)
 
     def unpack(self, response):
-        if response._return_code:
+        if response.return_code:
             return format_error(response)
-        return "Delete OK, {0} row affected".format(len(response))
+        return format_yamllike(response)
 
 class StatementSelect(Statement):
     def __init__(self, table_name, where, limit):
@@ -179,7 +189,8 @@ class StatementSelect(Statement):
                 if self.index_no == None:
                     self.index_no = index_no
                 elif self.index_no != index_no:
-                    raise RuntimeError("All key values in a disjunction must refer to the same index")
+                    raise RuntimeError("All key values in a disjunction must "
+                            "refer to the same index")
         self.offset = 0
         self.limit = limit
 
@@ -188,17 +199,11 @@ class StatementSelect(Statement):
                 self.key_list , self.offset, self.limit)
 
     def unpack(self, response):
-        if response._return_code:
+        if response.return_code:
             return format_error(response)
         if self.sort:
             response = sorted(response[0:])
-        if not len(response):
-            return "No match"
-        elif len(response) == 1:
-            return "Found 1 tuple:\n" + str(response[0])
-        else:
-            return "Found {0} tuples:\n".format(len(response)) + \
-                    "\n".join([str(tup) for tup in response])
+        return format_yamllike(response)
 
 class StatementCall(StatementSelect):
     def __init__(self, proc_name, value_list):
