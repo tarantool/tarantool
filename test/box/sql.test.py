@@ -1,4 +1,16 @@
-# encoding: utf-8
+sql.py_con.schema = Schema({
+    0 : {
+            'default_type': tntSTR,
+            'fields' : {
+                0 : tntNUM,
+                1 : tntSTR
+            },
+            'indexes': {
+                0 : [0] # HASH
+            }
+    }
+})
+
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
 sql("ping")
@@ -66,5 +78,3 @@ print """#
 # Admin console should not stall on unknown command.
 """
 admin("show status", simple=True)
-
-# vim: syntax=python

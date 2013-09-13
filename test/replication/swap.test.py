@@ -24,6 +24,22 @@ replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
+schema = Schema({
+    0 : {
+            'default_type': tntSTR,
+            'fields' : {
+                0 : tntNUM,
+                1 : tntSTR
+            },
+            'indexes': {
+                0 : [0] # HASH
+            }
+    }
+})
+
+master.sql.py_con.schema = schema
+replica.sql.py_con.schema = schema
+
 master.admin("box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
 master.admin("box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
 id = ID_BEGIN

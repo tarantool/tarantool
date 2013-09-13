@@ -91,14 +91,18 @@ box.stat()
     total: 0
     rps: 0
 ...
-insert into t0 values (1, 'tuple')
-Insert OK, 1 row affected
+box.insert(0, 1, 'tuple')
+---
+- [1, 'tuple']
+...
 box.snapshot()
 ---
 - ok
 ...
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
+box.delete(0, 1)
+---
+- [1, 'tuple']
+...
 box.info()
 ---
 - version: 1.minor.patch-<rev>-<commit>
