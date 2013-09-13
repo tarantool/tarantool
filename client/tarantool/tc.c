@@ -109,7 +109,7 @@ static char *send_cmd(char *cmd)
 		tc_error("cannot send query");
 	if (tc_admin_reply(&tc.admin, &reply, &size) == -1)
 		tc_error("cannot recv query");
-	if (strcmp(reply, TC_ERR_CMD) == 0) {
+	if (strncmp(reply, TC_ERR_CMD, size) == 0) {
 		free(reply);
 		return NULL;
 	}
