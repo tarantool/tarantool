@@ -51,6 +51,8 @@
 #include "client/tarantool/tc_print_xlog.h"
 
 #define TC_DEFAULT_PORT 33013
+#define TC_DEFAULT_PORT 33013
+#define TC_ERR_CMD "---\nunknown command. try typing help.\n...\n"
 
 struct tc tc;
 
@@ -100,17 +102,31 @@ static void tc_connect(void)
 		tc_error("%s", tnt_strerror(tc.net));
 }
 
-static int get_primary_port(void)
+static char *send_cmd(char *cmd)
 {
-	char *reply = NULL;
 	size_t size = 0;
-	int port = 0;
-	if (tc_admin_query(&tc.admin, "lua box.cfg.primary_port") == -1)
+	char *reply = NULL;
+	if (tc_admin_query(&tc.admin, cmd) == -1)
 		tc_error("cannot send query");
 	if (tc_admin_reply(&tc.admin, &reply, &size) == -1)
 		tc_error("cannot recv query");
-	sscanf(reply, "---\n - %d\n...", &port);
-	free(reply);
+	if (strncmp(reply, TC_ERR_CMD, size) == 0) {
+		free(reply);
+		return NULL;
+	}
+	return reply;
+}
+
+static int get_primary_port()
+{
+	int port = 0;
+	char *reply = send_cmd("box.cfg.primary_port");
+	if (reply == NULL)
+		reply = send_cmd("lua box.cfg.primary_port");
+	if (reply != NULL) {
+		sscanf(reply, "---\n - %d\n...", &port);
+		free(reply);
+	}
 	return port;
 }
 
