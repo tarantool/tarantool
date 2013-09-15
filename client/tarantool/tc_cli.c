@@ -109,7 +109,6 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "notee", 5, TC_NOTEE },
 	{ "loadfile", 8, TC_LOADFILE },
 	{ "setopt", 6, TC_SETOPT},
-	{ "delim", 5, TC_SETOPT_DELIM},
 	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };

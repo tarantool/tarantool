@@ -45,9 +45,12 @@
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
+#include "client/tarantool/tc_store.h"
+#include "client/tarantool/tc_query.h"
 #include "client/tarantool/tc_print_snap.h"
 #include "client/tarantool/tc_print_xlog.h"
-#include "client/tarantool/tc_store.h"
+
+#define TC_DEFAULT_PORT 33013
 
 struct tc tc;
 
@@ -79,6 +82,8 @@ void tc_error(char *fmt, ...) {
 
 static void tc_connect(void)
 {
+	if (tc.opt.port == 0)
+		tc.opt.port = TC_DEFAULT_PORT;
 	/* allocating stream */
 	tc.net = tnt_net(NULL);
 	if (tc.net == NULL)
@@ -95,12 +100,29 @@ static void tc_connect(void)
 		tc_error("%s", tnt_strerror(tc.net));
 }
 
+static int get_primary_port(void)
+{
+	char *reply = NULL;
+	size_t size = 0;
+	int port = 0;
+	if (tc_admin_query(&tc.admin, "lua box.cfg.primary_port") == -1)
+		tc_error("cannot send query");
+	if (tc_admin_reply(&tc.admin, &reply, &size) == -1)
+		tc_error("cannot recv query");
+	sscanf(reply, "---\n - %d\n...", &port);
+	free(reply);
+	return port;
+}
+
 static void tc_connect_admin(void)
 {
+
 	if (tc_admin_connect(&tc.admin,
 			     tc.opt.host,
 			     tc.opt.port_admin) == -1)
 		tc_error("admin console connection failed");
+	if (tc.opt.port == 0)
+		tc.opt.port = get_primary_port();
 }
 
 static void tc_validate(void)
@@ -108,12 +130,11 @@ static void tc_validate(void)
 	tc.opt.xlog_printer = tc_print_getxlogcb(tc.opt.format);
 	tc.opt.snap_printer = tc_print_getsnapcb(tc.opt.format);
 	if (tc.opt.xlog_printer == NULL)
-		return tc_error("unsupported output xlog format '%s'",
+		tc_error("unsupported output xlog format '%s'",
 				tc.opt.format);
 	if (tc.opt.snap_printer == NULL)
-		return tc_error("unsupported output snap format '%s'",
+		tc_error("unsupported output snap format '%s'",
 				tc.opt.format);
-	
 	if (tc.opt.format && strcmp(tc.opt.format, "raw") == 0)
 		tc.opt.raw = 1;
 }
@@ -144,13 +165,13 @@ int main(int argc, char *argv[])
 		rc = tc_store_play();
 		break;
 	case TC_OPT_CMD:
-		tc_connect();
 		tc_connect_admin();
+		tc_connect();
 		rc = tc_cli_cmdv();
 		break;
 	case TC_OPT_INTERACTIVE:
-		tc_connect();
 		tc_connect_admin();
+		tc_connect();
 		tc_cli_motd();
 		rc = tc_cli();
 		break;
