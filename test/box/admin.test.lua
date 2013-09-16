@@ -11,115 +11,150 @@ box.stat()
 box.insert(0, 1, 'tuple')
 box.snapshot()
 box.delete(0, 1)
---# setopt delimiter ';'
 
+--# setopt delimiter ';'
 function check_type(arg, typeof)
-    if arg == nil then
-        return false
-    elseif type(arg) == typeof then
+    if type(arg) == typeof then
         return true
     else
         return false
     end
 end;
+
 function test_box_info()
     local tmp = box.info()
-    local num = {'pid', 'lsn', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
+    local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
     local buildstr = {'flags', 'target', 'compiler', 'options'}
     local str = {'version', 'status', 'config'}
-    failed = {}
+    local failed = {}
+    if check_type(tmp.lsn, 'cdata') == false then
+        table.insert(failed1, 'box.info().lsn')
+    else
+        tmp.lsn = nil
+    end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then
             table.insert(failed, 'box.info().'..v)
+        else
+            tmp[v] = nil
         end
     end
     for k, v in ipairs(str) do
         if check_type(tmp[v], 'string') == false then
             table.insert(failed, 'box.info().'..v)
+        else
+            tmp[v] = nil
         end
     end
-    for k, v in ipairs(buildstr) do
-        if check_type(tmp.build[v], 'string') == false then
-            table.insert(failed, 'box.info().build.'..v)
+    if type(tmp.build) == 'table' then
+        for k, v in ipairs(buildstr) do
+            if check_type(tmp.build[v], 'string') == false then
+                table.insert(failed, 'box.info().build.'..v)
+            else
+                tmp.build[v] = nil
+            end
         end
-    end
-    if #failed == 0 then
-        return 'box.info() is ok.'
+        if #tmp.build == 0 then
+            tmp.build = nil
+        end
     else
-        return 'box.info() is not ok.', 'failed: ', failed
+        table.insert(failed, 'box.info().build failed')
+    end
+    if #tmp > 0 or #failed > 0 then
+        return 'box.info() is not ok.', 'failed: ', failed, tmp
+    else
+        return 'box.info() is ok.'
+    end
 end;
 
 function test_slab(tbl)
-    if type(tbl.items) == 'number' then
-        tbl.items = nil
+    local num = {'items', 'bytes_used', 'item_size', 'slabs', 'bytes_free'}
+    local failed = {}
+    for k, v in ipairs(num) do
+        if check_type(tmp[v], 'number') == false then
+            table.insert(failed, 'box.slab.info().<slab_size>.'..v)
+        else
+            tmp[v] = nil
+        end
     end
-    if type(tbl.bytes_used) == 'number' then
-        tbl.bytes_used = nil
-    end
-    if type(tbl.item_size) == 'number' then
-        tbl.item_size = nil
-    end
-    if type(tbl.slabs) == 'number' then
-        tbl.slabs = nil
-    end
-    if type(tbl.bytes_free) == 'number' then
-        tbl.bytes_free = nil
-    end
-    if #tbl > 0 then
-        return false
+    if #tbl > 0 or #failed > 0 then
+        return false, failed
     else
-        return true
+        return true, {}
     end
 end;
 
 function test_box_slab_info()
     local tmp = box.slab.info()
-
-    for name, tbl in ipairs(tmp.slabs) do
-        if test_slab(tbl) == true then
-            tmp[name] = nil
+    local cdata = {'arena_size', 'arena_used'}
+    local failed = {}
+    if type(tmp.slabs) == 'table' then
+        for name, tbl in ipairs(tmp.slabs) do
+            local bl, fld = test_slab(tbl)
+            if bl == true then
+                tmp[name] = nil
+            else
+                for k, v in ipairs(fld) do
+                    table.append(failed, v)
+                end
+            end
+        end
+    else
+        table.append(failed, 'box.slab.info().slabs is not ok')
     end
     if #tmp.slabs == 0 then
         tmp.slabs = nil
     end
-    if type(tmp.arena_size) == 'number' then
-        tmp.arena_size = nil
+    for k, v in ipairs(cdata) do
+        if check_type(tmp[v], 'cdata') == false then
+            table.insert(failed, 'box.slab.info().'..v)
+        else
+            tmp[v] = nil
+        end
     end
-    if type(tmp.arena_used) == 'number' then
-        tmp.arena_used = nil
-    end
-    if #tmp > 0 then
-        return tmp
+    if #tmp > 0 or #failed > 0 then
+        return "box.slab.info() is not ok", tmp, failed
     else
         return "box.slab.info() is ok"
+    end
 end;
 
 function test_fiber(tbl)
-    if type(tbl.fid) == 'number' then
-        tbl.fid = nil
-    end
-    if type(tbl.csw) == 'number' then
-        tbl.csw = nil
+    local num = {'fid', 'csw'}
+    for k, v in ipairs(num) do
+        if check_type(tmp[v], 'number') == false then
+            table.insert(failed, 'box.fiber.info().<fiber_name>.'..v)
+        else
+            tmp[v] = nil
+        end
     end
     if type(tbl.backtrace) == 'table' and #tbl.backtrace > 0 then
         tbl.backtrace = nil
-    end
-    if #tbl > 0 then
-        return false
     else
-        return true
+        table.append(failed, 'backtrace')
+    end
+    if #tbl > 0 or #failed > 0 then
+        return false, failed
+    else
+        return true, {}
     end
 end;
 
 function test_box_fiber_info()
     local tmp = box.fiber.info()
+    local failed = {}
     for name, tbl in ipairs(tmp) do
-        if test_fiber(tbl) == true then
+        local bl, fld = test_fiber(tbl)
+        if bl == true then
             tmp[name] = nil
+        else
+            for k, v in ipairs(fld) do
+                table.append(failed, v)
+            end
         end
     end
-    if #tmp > 0 then
-        return tmp
+    if #tmp > 0 or #failed > 0 then
+        return "box.fiber.info is not ok. failed: ", tmp, failed
     else
         return "box.fiber.info() is ok"
     end
