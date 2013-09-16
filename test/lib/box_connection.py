@@ -53,16 +53,16 @@ class BoxConnection(TarantoolConnection):
         self.py_con = tnt_connection(host, port, connect_now=False)
         self.py_con.error = False
         self.sort = False
- 
+
     def connect(self):
         self.py_con.connect()
-    
+
     def disconnect(self):
         self.py_con.close()
-    
+
     def reconnect(self):
         self.disconnect()
-        self.connect() 
+        self.connect()
 
     def set_schema(self, schemadict):
         self.py_con.schema = Schema(schemadict)
@@ -82,7 +82,7 @@ class BoxConnection(TarantoolConnection):
         if statement == None:
             return "You have an error in your SQL syntax\n"
         statement.sort = self.sort
-        
+ 
         response = None
         request = statement.pack(self.py_con)
         with warnings.catch_warnings():

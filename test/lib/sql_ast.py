@@ -196,7 +196,7 @@ class StatementSelect(Statement):
         self.limit = limit
 
     def pack(self, connection):
-        return RequestSelect(connection, self.space_no, self.index_no, 
+        return RequestSelect(connection, self.space_no, self.index_no,
                 self.key_list , self.offset, self.limit)
 
     def unpack(self, response):
