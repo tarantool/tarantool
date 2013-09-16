@@ -17,7 +17,7 @@ import ConfigParser
 
 from lib.server import Server
 from lib.box_connection import BoxConnection
-from lib.test_suite import FilteredStream, Test
+from lib.test_suite import FilteredStream, Test, chk_tnt_includes
 from lib.admin_connection import AdminConnection
 from lib.memcached_connection import MemcachedConnection
 
@@ -26,15 +26,8 @@ try:
 except ImportError:
     import StringIO
 
-try:
-    tnt_py = os.path.dirname(os.path.abspath(__file__))
-    tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
-    sys.path.append(tnt_py)
-    import tarantool
-    from tarantool import Connection as tnt_connection
-except ImportError:
-    sys.stderr.write("\n\nNo tarantool-python library found\n")
-    sys.exit(1)
+chk_tnt_includes()
+import tarantool
 
 def check_port(port):
     """Check if the port we're connecting to is available"""
@@ -251,11 +244,6 @@ class LuaTest(FuncTest):
 
 class PythonTest(FuncTest):
     def execute(self, server):
-        Schema = tarantool.Schema
-        tntNUM = tarantool.NUM
-        tntSTR = tarantool.STR
-        tntNUM64 = tarantool.NUM64
-        tntRAW = tarantool.RAW
         execfile(self.name, dict(locals(), **server.__dict__))
 
 class TarantoolConfigFile:

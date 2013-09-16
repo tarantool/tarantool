@@ -29,17 +29,23 @@ import socket
 import struct
 import warnings
 
+from test_suite import chk_tnt_includes
 from tarantool_connection import TarantoolConnection
 
-try:
-    tnt_py = os.path.dirname(os.path.abspath(__file__))
-    tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
-    sys.path.append(tnt_py)
-    from tarantool import Connection as tnt_connection
-    from tarantool import Schema
-except ImportError:
-    sys.stderr.write("\n\nNo tarantool-python library found\n")
-    sys.exit(1)
+def chk_tnt_includes():
+    try:
+        tnt_py = os.path.dirname(os.path.abspath(__file__))
+        tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
+        if tnt_py not in sys.path:
+            sys.path = [tnt_py] + sys.path
+        import tarantool
+    except ImportError:
+        sys.stderr.write("\n\nNo tarantool-python library found\n")
+        sys.exit(1)
+
+chk_tnt_includes()
+from tarantool import Connection as tnt_connection
+from tarantool import Schema
 
 class BoxConnection(TarantoolConnection):
     def __init__(self, host, port):

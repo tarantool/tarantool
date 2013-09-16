@@ -10,7 +10,9 @@ ping
 ...
 select * from t0
 ---
-- error: 'Invalid key part count in an exact match (expected 1, got 0)'
+- error:
+    errcode : ER_EXACT_MATCH
+    errmsg  : Invalid key part count in an exact match (expected 1, got 0)
 ...
 insert into t0 values (1, 'I am a tuple')
 ---
@@ -81,7 +83,9 @@ select * from t0 where k0 = 1
 ...
 update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1
 ---
-- error: 'Field 1000 was not found in the tuple'
+- error:
+    errcode : ER_NO_SUCH_FIELD
+    errmsg  : Field 1000 was not found in the tuple
 ...
 select * from t0 where k0 = 1
 ---
@@ -147,15 +151,21 @@ delete from t0 where k0=4294967295
 
 select * from t1 where k0 = 0
 ---
-- error: 'Space 1 does not exist'
+- error:
+    errcode : ER_NO_SUCH_SPACE
+    errmsg  : Space 1 does not exist
 ...
 select * from t65537 where k0 = 0
 ---
-- error: 'Space 65537 does not exist'
+- error:
+    errcode : ER_NO_SUCH_SPACE
+    errmsg  : Space 65537 does not exist
 ...
 select * from t4294967295 where k0 = 0
 ---
-- error: 'Space 4294967295 does not exist'
+- error:
+    errcode : ER_NO_SUCH_SPACE
+    errmsg  : Space 4294967295 does not exist
 ...
 box.space[0]:drop()
 ---

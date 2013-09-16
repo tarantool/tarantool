@@ -1,4 +1,5 @@
 import os
+import tarantool
 from lib.tarantool_server import TarantoolServer
 
 REPEAT = 20
@@ -24,21 +25,21 @@ replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
-schema = Schema({
+schema = {
     0 : {
-            'default_type': tntSTR,
+            'default_type': tarantool.STR,
             'fields' : {
-                0 : tntNUM,
-                1 : tntSTR
+                0 : tarantool.NUM,
+                1 : tarantool.STR
             },
             'indexes': {
                 0 : [0] # HASH
             }
     }
-})
+}
 
-master.sql.py_con.schema = schema
-replica.sql.py_con.schema = schema
+master.sql.set_schema(schema)
+replica.sql.set_schema(schema)
 
 master.admin("box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
 master.admin("box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")

@@ -1,9 +1,10 @@
-sql.py_con.schema = Schema({
+import tarantool
+sql.set_schema({
     0 : {
-            'default_type': tntSTR,
+            'default_type': tarantool.STR,
             'fields' : {
-                0 : tntNUM,
-                1 : tntSTR
+                0 : tarantool.NUM,
+                1 : tarantool.STR
             },
             'indexes': {
                 0 : [0] # HASH

@@ -64,14 +64,18 @@ box.space[0]:truncate()
 #
 insert into t0 values ('Britney')
 ---
-- error: 'Tuple field count 1 is less than required by a defined index (expected 2)'
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
 ...
 select * from t0 where k1='Anything'
 ---
 ...
 insert into t0 values ('Stephanie')
 ---
-- error: 'Tuple field count 1 is less than required by a defined index (expected 2)'
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
 ...
 select * from t0 where k1='Anything'
 ---
@@ -385,7 +389,9 @@ select * from t0 where k1='Britney'
 ...
 replace into t0 values ('Spears')
 ---
-- error: 'Tuple field count 1 is less than required by a defined index (expected 2)'
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
 ...
 select * from t0 where k0='Spears'
 ---

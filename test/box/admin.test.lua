@@ -14,11 +14,7 @@ box.delete(0, 1)
 
 --# setopt delimiter ';'
 function check_type(arg, typeof)
-    if type(arg) == typeof then
-        return true
-    else
-        return false
-    end
+    return type(arg) == typeof
 end;
 
 function test_box_info()
