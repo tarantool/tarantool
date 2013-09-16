@@ -336,6 +336,7 @@ init_storage_from_master(struct log_dir *dir)
 	int conn_res = connect(sock_fd, (sockaddr*)&addr, sizeof(addr));
 	if (conn_res < 0) {
 		say_error("failed to connect to master");
+		close(sock_fd);
 		return;
 	}
 
@@ -344,6 +345,7 @@ init_storage_from_master(struct log_dir *dir)
 	fill_handshake_replica_to_master(&send_handshake, 0, SNAPSHOT_REQUEST_BY_FILE, 0);
 	if (!do_handshare_replica_to_master(sock_fd, &send_handshake, &recv_handshake)) {
 		say_error("failed to handshake with master");
+		close(sock_fd);
 		return;
 	}
 
