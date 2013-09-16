@@ -91,6 +91,32 @@ box.schema.index.drop = function(space_id, index_id)
     local _index = box.space[box.schema.INDEX_ID]
     _index:delete(space_id, index_id)
 end
+box.schema.index.rename = function(space_id, index_id, name)
+    local _index = box.space[box.schema.INDEX_ID]
+    _index:update({space_id, index_id}, "=p", 2, name)
+end
+box.schema.index.alter = function(space_id, index_id, options)
+    if options == nil then
+        return
+    end
+    local ops = ""
+    local args = {}
+    local function add_op(op, opno)
+        if op then
+            ops = ops.."=p"
+            table.insert(args, opno)
+            table.insert(args, op)
+        end
+    end
+    add_op(options.id, 1)
+    add_op(options.name, 2)
+    add_op(options.type, 3)
+    if options.unique ~= nil then
+        add_op(options.unique and 1 or 0, 4)
+    end
+    local _index = box.space[box.schema.INDEX_ID]
+    _index:update({space_id, index_id}, ops, unpack(args))
+end
 
 function box.schema.space.bless(space)
     local index_mt = {}
@@ -158,8 +184,17 @@ function box.schema.space.bless(space)
         end
         return unpack(range)
     end
+    index_mt.select = function(index, ...)
+        return box.select(index.n, index.id, ...)
+    end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
+    end
+    index_mt.rename = function(index, name)
+        return box.schema.index.rename(index.n, index.id, name)
+    end
+    index_mt.alter= function(index, options)
+        return box.schema.index.alter(index.n, index.id, options)
     end
     --
     local space_mt = {}
@@ -219,10 +254,10 @@ function box.schema.space.bless(space)
     setmetatable(space, space_mt)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
-            rawset(index, 'idx', box.index.new(space.n, j))
-            rawset(index, 'id', j)
-            rawset(index, 'n', space.n)
-            setmetatable(index, index_mt)
+            if type(j) == 'number' then
+                rawset(index, 'idx', box.index.bind(space.n, j))
+                setmetatable(index, index_mt)
+            end
         end
     end
 end

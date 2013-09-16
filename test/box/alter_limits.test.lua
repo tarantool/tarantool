@@ -179,36 +179,122 @@ s:create_index('t1', 'hash', {parts = parts});
 #s.index[0].key_field
 -- cleanup
 s:drop()
--- add index:
--- ---------
---     - a test case for contraints in tuple_format_new
---     - index rebuild:
---        - a duplicate in the new index
---        - no field for the new index
---        - wrong field type in the new index
---     - alter algorithm correctly detects
---        test that during the rebuild there is a duplicate
---     according to the new index
---     - index rebuild -> no field in the index (validate tuple
---     during build)
---     - alter unique -> non unique
---     - alter index type
---     - index access by name
---     - alter add key part
---     - arbitrary index
---     - test that during commit phase
---       -> inject error at commit, inject error at rollback
---     - add check that doesn't allow drop of a primary
---       key in presence of other keys, or moves the space
---       to disabled state otherwise.
+-- check costraints in tuple_format_new()
+s = box.schema.create_space('test')
+s:create_index('t1', 'hash', { parts = { 0, 'num' }})
+-- field type contradicts field type of another index
+s:create_index('t2', 'hash', { parts = { 0, 'str' }})
+-- ok
+s:create_index('t2', 'hash', { parts = { 1, 'str' }})
+-- don't allow drop of the primary key in presence of other keys
+s.index[0]:drop()
+-- cleanup
+s:drop()
+-- index name, name manipulation
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+-- space cache is updated correctly
+s.index[0].name
+s.index[0].id
+s.index[0].type
+s.index['primary'].name
+s.index['primary'].id
+s.index['primary'].type
+s.index.primary.name
+s.index.primary.id
+-- other properties are preserved
+s.index.primary.type
+s.index.primary.unique
+s.index.primary:rename('new')
+s.index[0].name
+s.index.primary
+s.index.new.name
+-- too long name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s.index[0].name
+s.index[0]:rename('primary')
+s.index.primary.name
+-- cleanup
+s:drop()
+-- modify index
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+s.index.primary:alter({unique=false})
+-- unique -> non-unique, index type
+s.index.primary:alter({type='tree', unique=false, name='pk'})
+s.index.primary
+s.index.pk.type
+s.index.pk.unique
+s.index.pk:rename('primary')
+s:create_index('second', 'tree', { parts = {  1, 'str' } })
+s.index.second.id
+s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+s.index.third:rename('second')
+s.index.third.id
+s.index.second:drop()
+s.index.third:alter({id = 1, name = 'second'})
+s.index.third
+s.index.second.name
+s.index.second.id
+s:drop()
+-- ----------------------------------------------------------------
+-- BUILD INDEX: changes of a non-empty index
+-- ----------------------------------------------------------------
+s = box.schema.create_space('full')
+s:create_index('primary', 'tree', {parts =  { 0, 'str' }})
+s:insert('No such movie', 999)
+s:insert('Barbara', 2012)
+s:insert('Cloud Atlas', 2012)
+s:insert('Almanya - Willkommen in Deutschland', 2011)
+s:insert('Halt auf freier Strecke', 2011)
+s:insert('Homevideo', 2011)
+s:insert('Die Fremde', 2010)
+-- create index with data
+s:create_index('year', 'tree', { unique=false, parts = { 1, 'num'} })
+s.index.primary:select()
+-- a duplicate in the created index
+s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
+-- change of non-unique index to unique: same effect
+s.index.year:alter({unique=true})
+-- num -> str -> num transition
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
+s.index.primary:select()
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+-- ambiguous field type
+s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
+-- create index on a non-existing field
+s:create_index('nosuchfield', 'tree', {unique = true, parts = { 2, 'str'}})
+s.index.year:drop()
+s:insert('Der Baader Meinhof Komplex', '2009 ')
+-- create an index on a field with a wrong type
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+-- a field is missing
+s:replace('Der Baader Meinhof Komplex')
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+s:drop()
+-- unique -> non-unique transition
+s = box.schema.create_space('test')
+-- primary key must be unique
+s:create_index('primary', 'tree', { unique = false, parts = {0, 'num'}})
+-- create primary key
+s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+s:insert(1, 1)
+s:create_index('secondary', 'tree', { unique = false, parts = {1, 'num'}})
+s:insert(2, 1)
+s.index.secondary:alter({ unique = true })
+s:delete(2)
+s.index.secondary:alter({ unique = true })
+s:insert(2, 1)
+s:insert(2, 2)
+s.index.secondary:alter({ unique = false})
+s:insert(3, 2)
+s:drop()
+-- -----------
 --
---     - add identical index - verify there is no rebuild
---     - rename index (all non-essential propeties)
---       -> duplicate key
---     - inject fiber sleep during commit, so that some stuff is added
---     (test crap which happens while there is a record to the wal
---     - test ambiguous field type when adding an index (ER_FIELD_TYPE_MISMATCH)
---     - test addition of a new index on data which it can't handle
 --
 -- space cache
 -- -----------
@@ -223,6 +309,8 @@ s:drop()
 --
 -- -- inject error at various stages of commit and see that
 -- the alter has no effects
+--     - test that during commit phase
+--       -> inject error at commit, inject error at rollback
 --
 -- usability
 -- ---------

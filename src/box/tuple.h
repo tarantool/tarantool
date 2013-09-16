@@ -353,6 +353,10 @@ tuple_next_cstr(struct tuple_iterator *it);
 void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
+void
+tuple_init_field_map(struct tuple_format *format,
+		     struct tuple *tuple, uint32_t *field_map);
+
 struct tuple *
 tuple_update(struct tuple_format *new_format,
 	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,

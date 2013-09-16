@@ -63,7 +63,7 @@ field_type_create(enum field_type *types, uint32_t field_count,
 			if (*ptype != UNKNOWN && *ptype != part->type) {
 				tnt_raise(ClientError,
 					  ER_FIELD_TYPE_MISMATCH,
-					  key_def->id, part - key_def->parts,
+					  key_def->iid, part - key_def->parts,
 					  field_type_strs[part->type],
 					  field_type_strs[*ptype]);
 			}
@@ -216,19 +216,19 @@ tuple_format_new(struct rlist *key_list)
  * Validate a new tuple format and initialize tuple-local
  * format data.
  */
-static inline void
-tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
+void
+tuple_init_field_map(struct tuple_format *format, struct tuple *tuple, uint32_t *field_map)
 {
 	/* Check to see if the tuple has a sufficient number of fields. */
 	if (tuple->field_count < format->field_count)
-		tnt_raise(IllegalParams,
-			  "tuple must have all indexed fields");
+		tnt_raise(ClientError, ER_INDEX_ARITY,
+			  (unsigned) tuple->field_count,
+			  (unsigned) format->field_count);
 
 	int32_t *offset = format->offset;
 	enum field_type *type = format->types;
 	enum field_type *end = format->types + format->field_count;
 	const char *pos = tuple->data;
-	uint32_t *field_map = (uint32_t *) tuple;
 	uint32_t i = 0;
 
 	for (; type < end; offset++, type++, i++) {
@@ -457,7 +457,7 @@ tuple_update(struct tuple_format *format,
 
 	try {
 		tuple_update_execute(update, new_tuple->data);
-		tuple_init_field_map(new_tuple, format);
+		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (const Exception&) {
 		tuple_delete(new_tuple);
 		throw;
@@ -494,7 +494,7 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
 	try {
-		tuple_init_field_map(new_tuple, format);
+		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (...) {
 		tuple_delete(new_tuple);
 		throw;

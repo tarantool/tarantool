@@ -52,7 +52,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	struct key_def *key_def;
 	rlist_foreach_entry(key_def, key_list, link) {
 		index_count++;
-		index_id_max = MAX(index_id_max, key_def->id);
+		index_id_max = MAX(index_id_max, key_def->iid);
 	}
 	size_t sz = sizeof(struct space) +
 		(index_count + index_id_max + 1) * sizeof(Index *);
@@ -76,7 +76,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->index_id_max = index_id_max;
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
-		space->index_map[key_def->id] = Index::factory(key_def);
+		space->index_map[key_def->iid] = Index::factory(key_def);
 	}
 	space_fill_index_map(space);
 	space->engine = engine_no_keys;
@@ -307,11 +307,17 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 
 void
 space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
-		 uint32_t rhs_id)
+		 uint32_t rhs_id, bool keep_key_def)
 {
 	Index *tmp = lhs->index_map[lhs_id];
 	lhs->index_map[lhs_id] = rhs->index_map[rhs_id];
 	rhs->index_map[rhs_id] = tmp;
+	if (keep_key_def) {
+		struct key_def *tmp = lhs->index_map[lhs_id]->key_def;
+		lhs->index_map[lhs_id]->key_def =
+			rhs->index_map[rhs_id]->key_def;
+		rhs->index_map[rhs_id]->key_def = tmp;
+	}
 }
 
 extern "C" void

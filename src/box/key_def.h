@@ -82,7 +82,11 @@ struct key_def {
 	/* A link in key list. */
 	struct rlist link;
 	/** Ordinal index number in the index array. */
-	uint32_t id;
+	uint32_t iid;
+	/* Space id. */
+	uint32_t space_id;
+	/** Index name. */
+	char name[BOX_NAME_MAX + 1];
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Index type. */
@@ -95,13 +99,14 @@ struct key_def {
 
 /** Initialize a pre-allocated key_def. */
 struct key_def *
-key_def_new(uint32_t id, enum index_type type,
-	    bool is_unique, uint32_t part_count);
+key_def_new(uint32_t space_id, uint32_t iid, const char *name,
+	    enum index_type type, bool is_unique, uint32_t part_count);
 
 static inline struct key_def *
 key_def_dup(struct key_def *def)
 {
-	struct key_def *dup = key_def_new(def->id, def->type, def->is_unique,
+	struct key_def *dup = key_def_new(def->space_id, def->iid, def->name,
+					  def->type, def->is_unique,
 					  def->part_count);
 	if (dup) {
 		memcpy(dup->parts, def->parts,
@@ -146,8 +151,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 
 /**
  * One key definition is greater than the other if it's id is
- * greater, it's index type is greater (HASH < TREE < BITSET)
- * or its key part array is greater.
+ * greater, it's name is greater,  it's index type is greater
+ * (HASH < TREE < BITSET) or its key part array is greater.
  */
 int
 key_def_cmp(const struct key_def *key1, const struct key_def *key2);
@@ -175,7 +180,7 @@ key_list_del_key(struct rlist *key_list, uint32_t id);
  * @param type_str  type name (to produce a nice error)
  */
 void
-key_def_check(uint32_t id, struct key_def *key_def);
+key_def_check(struct key_def *key_def);
 
 /** Space metadata. */
 struct space_def {
