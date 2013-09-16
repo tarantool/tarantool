@@ -1,5 +1,3 @@
-# encoding: utf-8
-#
 sql.sort = True
 
 #
@@ -203,4 +201,3 @@ sql("delete from t0 where k0=3")
 admin("box.space[0]:drop()")
 
 sql.sort = False
-# vim: syntax=python

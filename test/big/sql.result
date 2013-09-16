@@ -16,29 +16,41 @@ box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 # https://bugs.launchpad.net/tarantool/+bug/729758
 #
 insert into t0 values ('Doe', 'Richard')
-Insert OK, 1 row affected
+---
+- ['Doe', 'Richard']
+...
 insert into t0 values ('Roe', 'Richard')
-Insert OK, 1 row affected
+---
+- ['Roe', 'Richard']
+...
 insert into t0 values ('Woe', 'Richard')
-Insert OK, 1 row affected
+---
+- ['Woe', 'Richard']
+...
 insert into t0 values ('Major', 'Tomas')
-Insert OK, 1 row affected
+---
+- ['Major', 'Tomas']
+...
 insert into t0 values ('Kytes', 'Tomas')
-Insert OK, 1 row affected
+---
+- ['Kytes', 'Tomas']
+...
 select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5
-Found 5 tuples:
-['Doe', 'Richard']
-['Kytes', 'Tomas']
-['Major', 'Tomas']
-['Roe', 'Richard']
-['Woe', 'Richard']
+---
+- ['Doe', 'Richard']
+- ['Kytes', 'Tomas']
+- ['Major', 'Tomas']
+- ['Roe', 'Richard']
+- ['Woe', 'Richard']
+...
 #
 # A test case for Bug#729879
 # "Zero limit is treated the same as no limit"
 # https://bugs.launchpad.net/tarantool/+bug/729879
 #
 select * from t0 where k1='Richard' or k1='Tomas' limit 0
-No match
+---
+...
 box.space[0]:truncate()
 ---
 ...
@@ -51,31 +63,50 @@ box.space[0]:truncate()
 # get away with it.
 #
 insert into t0 values ('Britney')
-An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
+---
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
+...
 select * from t0 where k1='Anything'
-No match
+---
+...
 insert into t0 values ('Stephanie')
-An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
+---
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
+...
 select * from t0 where k1='Anything'
-No match
+---
+...
 insert into t0 values ('Spears', 'Britney')
-Insert OK, 1 row affected
+---
+- ['Spears', 'Britney']
+...
 select * from t0 where k0='Spears'
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 select * from t0 where k1='Anything'
-No match
+---
+...
 select * from t0 where k1='Britney'
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 call box.select_range('0', '0', '100', 'Spears')
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 call box.select_range('0', '1', '100', 'Britney')
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 delete from t0 where k0='Spears'
-Delete OK, 1 row affected
+---
+- ['Spears', 'Britney']
+...
 box.space[0]:truncate()
 ---
 ...
@@ -87,13 +118,21 @@ box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 1, 2, 1, 'str', 2, '
 - [0, 1, 'secondary', 1701147252, 1, 2, 1, 'str', 2, 'str']
 ...
 insert into t0 values ('key1', 'part1', 'part2')
-Insert OK, 1 row affected
+---
+- ['key1', 'part1', 'part2']
+...
 replace into t0 values ('key1', 'part1', 'part2')
-Replace OK, 1 row affected
+---
+- ['key1', 'part1', 'part2']
+...
 insert into t0 values ('key2', 'part1', 'part2_a')
-Insert OK, 1 row affected
+---
+- ['key2', 'part1', 'part2_a']
+...
 insert into t0 values ('key3', 'part1', 'part2_b')
-Insert OK, 1 row affected
+---
+- ['key3', 'part1', 'part2_b']
+...
 box.space[0]:select(1)
 ---
 - [830039403, 'part1', 'part2']
@@ -101,53 +140,70 @@ box.space[0]:select(1)
 - [863593835, 'part1', 'part2_b']
 ...
 select * from t0 where k0='key1'
-Found 1 tuple:
-[830039403, 'part1', 'part2']
+---
+- ['key1', 'part1', 'part2']
+...
 select * from t0 where k0='key2'
-Found 1 tuple:
-[846816619, 'part1', 'part2_a']
+---
+- ['key2', 'part1', 'part2_a']
+...
 select * from t0 where k0='key3'
-Found 1 tuple:
-[863593835, 'part1', 'part2_b']
+---
+- ['key3', 'part1', 'part2_b']
+...
 select * from t0 where k1='part1'
-Found 3 tuples:
-[830039403, 'part1', 'part2']
-[846816619, 'part1', 'part2_a']
-[863593835, 'part1', 'part2_b']
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
 call box.select_range('0', '1', '100', 'part1')
-Found 3 tuples:
-[830039403, 'part1', 'part2']
-[846816619, 'part1', 'part2_a']
-[863593835, 'part1', 'part2_b']
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
 call box.select_range('0', '0', '100', 'key2')
-Found 3 tuples:
-[830039403, 'part1', 'part2']
-[846816619, 'part1', 'part2_a']
-[863593835, 'part1', 'part2_b']
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
 call box.select_range('0', '1', '100', 'part1', 'part2_a')
-Found 2 tuples:
-[846816619, 'part1', 'part2_a']
-[863593835, 'part1', 'part2_b']
+---
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
 select * from t0 where k0='key1'
-Found 1 tuple:
-[830039403, 'part1', 'part2']
+---
+- ['key1', 'part1', 'part2']
+...
 select * from t0 where k0='key2'
-Found 1 tuple:
-[846816619, 'part1', 'part2_a']
+---
+- ['key2', 'part1', 'part2_a']
+...
 select * from t0 where k0='key3'
-Found 1 tuple:
-[863593835, 'part1', 'part2_b']
+---
+- ['key3', 'part1', 'part2_b']
+...
 select * from t0 where k1='part1'
-Found 3 tuples:
-[830039403, 'part1', 'part2']
-[846816619, 'part1', 'part2_a']
-[863593835, 'part1', 'part2_b']
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
 delete from t0 where k0='key1'
-Delete OK, 1 row affected
+---
+- ['key1', 'part1', 'part2']
+...
 delete from t0 where k0='key2'
-Delete OK, 1 row affected
+---
+- ['key2', 'part1', 'part2_a']
+...
 delete from t0 where k0='key3'
-Delete OK, 1 row affected
+---
+- ['key3', 'part1', 'part2_b']
+...
 box.space[0]:truncate()
 ---
 ...
@@ -160,15 +216,25 @@ box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 2, 1, 'str', 2, '
 - [0, 1, 'secondary', 1701147252, 0, 2, 1, 'str', 2, 'str']
 ...
 insert into t0 values ('01234567', 'part1', 'part2')
-Insert OK, 1 row affected
+---
+- ['01234567', 'part1', 'part2']
+...
 insert into t0 values ('11234567', 'part1', 'part2')
-Insert OK, 1 row affected
+---
+- ['11234567', 'part1', 'part2']
+...
 insert into t0 values ('21234567', 'part1', 'part2_a')
-Insert OK, 1 row affected
+---
+- ['21234567', 'part1', 'part2_a']
+...
 insert into t0 values ('31234567', 'part1_a', 'part2')
-Insert OK, 1 row affected
+---
+- ['31234567', 'part1_a', 'part2']
+...
 insert into t0 values ('41234567', 'part1_a', 'part2_a')
-Insert OK, 1 row affected
+---
+- ['41234567', 'part1_a', 'part2_a']
+...
 l = {}
 ---
 ...
@@ -184,46 +250,65 @@ return l
   - [3978425819141910836, 'part1_a', 'part2_a']
 ...
 select * from t0 where k0='01234567'
-Found 1 tuple:
-['01234567', 'part1', 'part2']
+---
+- ['01234567', 'part1', 'part2']
+...
 select * from t0 where k0='11234567'
-Found 1 tuple:
-['11234567', 'part1', 'part2']
+---
+- ['11234567', 'part1', 'part2']
+...
 select * from t0 where k0='21234567'
-Found 1 tuple:
-['21234567', 'part1', 'part2_a']
+---
+- ['21234567', 'part1', 'part2_a']
+...
 select * from t0 where k1='part1'
-Found 3 tuples:
-['01234567', 'part1', 'part2']
-['11234567', 'part1', 'part2']
-['21234567', 'part1', 'part2_a']
+---
+- ['01234567', 'part1', 'part2']
+- ['11234567', 'part1', 'part2']
+- ['21234567', 'part1', 'part2_a']
+...
 select * from t0 where k1='part1_a'
-Found 2 tuples:
-['31234567', 'part1_a', 'part2']
-['41234567', 'part1_a', 'part2_a']
+---
+- ['31234567', 'part1_a', 'part2']
+- ['41234567', 'part1_a', 'part2_a']
+...
 select * from t0 where k1='part_none'
-No match
+---
+...
 call box.select('0', '1', 'part1', 'part2')
-Found 2 tuples:
-['01234567', 'part1', 'part2']
-['11234567', 'part1', 'part2']
+---
+- ['01234567', 'part1', 'part2']
+- ['11234567', 'part1', 'part2']
+...
 select * from t0 where k1='part1'
-Found 3 tuples:
-['01234567', 'part1', 'part2']
-['11234567', 'part1', 'part2']
-['21234567', 'part1', 'part2_a']
+---
+- ['01234567', 'part1', 'part2']
+- ['11234567', 'part1', 'part2']
+- ['21234567', 'part1', 'part2_a']
+...
 select * from t0 where k1='part2'
-No match
+---
+...
 delete from t0 where k0='01234567'
-Delete OK, 1 row affected
+---
+- ['01234567', 'part1', 'part2']
+...
 delete from t0 where k0='11234567'
-Delete OK, 1 row affected
+---
+- ['11234567', 'part1', 'part2']
+...
 delete from t0 where k0='21234567'
-Delete OK, 1 row affected
+---
+- ['21234567', 'part1', 'part2_a']
+...
 delete from t0 where k0='31234567'
-Delete OK, 1 row affected
+---
+- ['31234567', 'part1_a', 'part2']
+...
 delete from t0 where k0='41234567'
-Delete OK, 1 row affected
+---
+- ['41234567', 'part1_a', 'part2_a']
+...
 box.space[0]:select(0)
 ---
 ...
@@ -239,28 +324,40 @@ box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 1, 'str')
 - [0, 1, 'secondary', 1752392040, 1, 1, 1, 'str']
 ...
 insert into t0 values (1, 'hello')
-Insert OK, 1 row affected
+---
+- ['\x01\x00\x00\x00', 'hello']
+...
 insert into t0 values (2, 'brave')
-Insert OK, 1 row affected
+---
+- ['\x02\x00\x00\x00', 'brave']
+...
 insert into t0 values (3, 'new')
-Insert OK, 1 row affected
+---
+- ['\x03\x00\x00\x00', 'new']
+...
 insert into t0 values (4, 'world')
-Insert OK, 1 row affected
+---
+- ['\x04\x00\x00\x00', 'world']
+...
 #
 # Bug#929654 - secondary hash index is not built with build_indexes()
 #
 select * from t0 where k1='hello'
-Found 1 tuple:
-[1, 'hello']
+---
+- ['\x01\x00\x00\x00', 'hello']
+...
 select * from t0 where k1='brave'
-Found 1 tuple:
-[2, 'brave']
+---
+- ['\x02\x00\x00\x00', 'brave']
+...
 select * from t0 where k1='new'
-Found 1 tuple:
-[3, 'new']
+---
+- ['\x03\x00\x00\x00', 'new']
+...
 select * from t0 where k1='world'
-Found 1 tuple:
-[4, 'world']
+---
+- ['\x04\x00\x00\x00', 'world']
+...
 box.space[0]:truncate()
 ---
 ...
@@ -279,107 +376,187 @@ box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 - [0, 1, 'secondary', 1701147252, 0, 1, 1, 'str']
 ...
 insert into t0 values ('Spears', 'Britney')
-Insert OK, 1 row affected
+---
+- ['Spears', 'Britney']
+...
 select * from t0 where k0='Spears'
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 select * from t0 where k1='Britney'
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 replace into t0 values ('Spears')
-An error occurred: ER_INDEX_ARITY, 'Tuple field count 1 is less than required by a defined index (expected 2)'
+---
+- error:
+    errcode : ER_INDEX_ARITY
+    errmsg  : Tuple field count 1 is less than required by a defined index (expected 2)
+...
 select * from t0 where k0='Spears'
-Found 1 tuple:
-['Spears', 'Britney']
+---
+- ['Spears', 'Britney']
+...
 delete from t0 where k0='Spears'
-Delete OK, 1 row affected
+---
+- ['Spears', 'Britney']
+...
 insert into t0 values (1, 'duplicate one')
-Insert OK, 1 row affected
+---
+- ['\x01\x00\x00\x00', 'duplicate one']
+...
 insert into t0 values (2, 'duplicate one')
-Insert OK, 1 row affected
+---
+- ['\x02\x00\x00\x00', 'duplicate one']
+...
 insert into t0 values (3, 'duplicate one')
-Insert OK, 1 row affected
+---
+- ['\x03\x00\x00\x00', 'duplicate one']
+...
 insert into t0 values (4, 'duplicate one')
-Insert OK, 1 row affected
+---
+- ['\x04\x00\x00\x00', 'duplicate one']
+...
 insert into t0 values (5, 'duplicate one')
-Insert OK, 1 row affected
+---
+- ['\x05\x00\x00\x00', 'duplicate one']
+...
 insert into t0 values (6, 'duplicate two')
-Insert OK, 1 row affected
+---
+- ['\x06\x00\x00\x00', 'duplicate two']
+...
 insert into t0 values (7, 'duplicate two')
-Insert OK, 1 row affected
+---
+- ['\x07\x00\x00\x00', 'duplicate two']
+...
 insert into t0 values (8, 'duplicate two')
-Insert OK, 1 row affected
+---
+- ['\x08\x00\x00\x00', 'duplicate two']
+...
 insert into t0 values (9, 'duplicate two')
-Insert OK, 1 row affected
+---
+- ['\t\x00\x00\x00', 'duplicate two']
+...
 insert into t0 values (10, 'duplicate two')
-Insert OK, 1 row affected
+---
+- ['\n\x00\x00\x00', 'duplicate two']
+...
 insert into t0 values (11, 'duplicate three')
-Insert OK, 1 row affected
+---
+- ['\x0b\x00\x00\x00', 'duplicate three']
+...
 insert into t0 values (12, 'duplicate three')
-Insert OK, 1 row affected
+---
+- ['\x0c\x00\x00\x00', 'duplicate three']
+...
 insert into t0 values (13, 'duplicate three')
-Insert OK, 1 row affected
+---
+- ['\r\x00\x00\x00', 'duplicate three']
+...
 insert into t0 values (14, 'duplicate three')
-Insert OK, 1 row affected
+---
+- ['\x0e\x00\x00\x00', 'duplicate three']
+...
 insert into t0 values (15, 'duplicate three')
-Insert OK, 1 row affected
+---
+- ['\x0f\x00\x00\x00', 'duplicate three']
+...
 select * from t0 where k1='duplicate one'
-Found 5 tuples:
-[1, 'duplicate one']
-[2, 'duplicate one']
-[3, 'duplicate one']
-[4, 'duplicate one']
-[5, 'duplicate one']
+---
+- ['\x01\x00\x00\x00', 'duplicate one']
+- ['\x02\x00\x00\x00', 'duplicate one']
+- ['\x03\x00\x00\x00', 'duplicate one']
+- ['\x04\x00\x00\x00', 'duplicate one']
+- ['\x05\x00\x00\x00', 'duplicate one']
+...
 select * from t0 where k1='duplicate two'
-Found 5 tuples:
-[10, 'duplicate two']
-[6, 'duplicate two']
-[7, 'duplicate two']
-[8, 'duplicate two']
-[9, 'duplicate two']
+---
+- ['\x06\x00\x00\x00', 'duplicate two']
+- ['\x07\x00\x00\x00', 'duplicate two']
+- ['\x08\x00\x00\x00', 'duplicate two']
+- ['\t\x00\x00\x00', 'duplicate two']
+- ['\n\x00\x00\x00', 'duplicate two']
+...
 select * from t0 where k1='duplicate three'
-Found 5 tuples:
-[11, 'duplicate three']
-[12, 'duplicate three']
-[13, 'duplicate three']
-[14, 'duplicate three']
-[15, 'duplicate three']
+---
+- ['\x0b\x00\x00\x00', 'duplicate three']
+- ['\x0c\x00\x00\x00', 'duplicate three']
+- ['\r\x00\x00\x00', 'duplicate three']
+- ['\x0e\x00\x00\x00', 'duplicate three']
+- ['\x0f\x00\x00\x00', 'duplicate three']
+...
 delete from t0 where k0=1
-Delete OK, 1 row affected
+---
+- ['\x01\x00\x00\x00', 'duplicate one']
+...
 delete from t0 where k0=2
-Delete OK, 1 row affected
+---
+- ['\x02\x00\x00\x00', 'duplicate one']
+...
 delete from t0 where k0=3
-Delete OK, 1 row affected
+---
+- ['\x03\x00\x00\x00', 'duplicate one']
+...
 delete from t0 where k0=4
-Delete OK, 1 row affected
+---
+- ['\x04\x00\x00\x00', 'duplicate one']
+...
 delete from t0 where k0=5
-Delete OK, 1 row affected
+---
+- ['\x05\x00\x00\x00', 'duplicate one']
+...
 delete from t0 where k0=6
-Delete OK, 1 row affected
+---
+- ['\x06\x00\x00\x00', 'duplicate two']
+...
 delete from t0 where k0=7
-Delete OK, 1 row affected
+---
+- ['\x07\x00\x00\x00', 'duplicate two']
+...
 delete from t0 where k0=8
-Delete OK, 1 row affected
+---
+- ['\x08\x00\x00\x00', 'duplicate two']
+...
 delete from t0 where k0=9
-Delete OK, 1 row affected
+---
+- ['\t\x00\x00\x00', 'duplicate two']
+...
 delete from t0 where k0=10
-Delete OK, 1 row affected
+---
+- ['\n\x00\x00\x00', 'duplicate two']
+...
 delete from t0 where k0=11
-Delete OK, 1 row affected
+---
+- ['\x0b\x00\x00\x00', 'duplicate three']
+...
 delete from t0 where k0=12
-Delete OK, 1 row affected
+---
+- ['\x0c\x00\x00\x00', 'duplicate three']
+...
 delete from t0 where k0=13
-Delete OK, 1 row affected
+---
+- ['\r\x00\x00\x00', 'duplicate three']
+...
 delete from t0 where k0=14
-Delete OK, 1 row affected
+---
+- ['\x0e\x00\x00\x00', 'duplicate three']
+...
 delete from t0 where k0=15
-Delete OK, 1 row affected
+---
+- ['\x0f\x00\x00\x00', 'duplicate three']
+...
 insert into t0 values(1, 'Aardvark ')
-Insert OK, 1 row affected
+---
+- ['\x01\x00\x00\x00', 'Aardvark ']
+...
 insert into t0 values(2, 'Bilimbi')
-Insert OK, 1 row affected
+---
+- ['\x02\x00\x00\x00', 'Bilimbi']
+...
 insert into t0 values(3, 'Creature ')
-Insert OK, 1 row affected
+---
+- ['\x03\x00\x00\x00', 'Creature ']
+...
 box.space[0]:select(1)
 ---
 - [1, 'Aardvark ']
@@ -403,11 +580,17 @@ box.space[0].index[1].idx:max()
 - [3, 'Creature ']
 ...
 delete from t0 where k0=1
-Delete OK, 1 row affected
+---
+- ['\x01\x00\x00\x00', 'Aardvark ']
+...
 delete from t0 where k0=2
-Delete OK, 1 row affected
+---
+- ['\x02\x00\x00\x00', 'Bilimbi']
+...
 delete from t0 where k0=3
-Delete OK, 1 row affected
+---
+- ['\x03\x00\x00\x00', 'Creature ']
+...
 box.space[0]:drop()
 ---
 ...

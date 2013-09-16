@@ -10,5 +10,6 @@
 12
 # check that is server alive
 ping
-ok
 ---
+- ok
+...

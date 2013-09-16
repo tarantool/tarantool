@@ -4,3 +4,6 @@
 [submodule "third_party/luajit"]
 	path = third_party/luajit
 	url = http://luajit.org/git/luajit-2.0.git
+[submodule "test/lib/tarantool-python"]
+	path = test/lib/tarantool-python
+	url = https://github.com/mailru/tarantool-python.git
