@@ -271,3 +271,6 @@ test_box_fiber_info();
 ---
 - box.fiber.info() is ok
 ...
+box.space[0]:drop();
+---
+...

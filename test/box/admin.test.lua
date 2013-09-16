@@ -163,3 +163,4 @@ end;
 test_box_info();
 test_box_slab_info();
 test_box_fiber_info();
+box.space[0]:drop();
