@@ -34,7 +34,7 @@
 <para>
     Procedures can be invoked from the administrative
     console and using the binary protocol, for example:
-<programlisting><computeroutput>localhost> lua function f1() return 'hello' end
+<programlisting><computeroutput>localhost> function f1() return 'hello' end
 ---
 ...
 localhost> call f1()
@@ -57,15 +57,15 @@ Found 1 tuple:
     administrative console, the newly created <code
     language="Pascal">function f1()</code>
     can be called there too:
-<programlisting><computeroutput>localhost> lua f1()
+<programlisting><computeroutput>localhost> f1()
 ---
  - hello
 ...
-localhost> lua 1+2
+localhost> 1+2
 ---
  - 3
 ...
-localhost> lua "hello".." world"
+localhost> "hello".." world"
 ---
  - hello world
 ...
@@ -127,11 +127,11 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
    within the system.
  </para>
   <para>
-    There is a single global instance of the Lua interpreter, which is
-    shared across all connections. Anything prefixed with
-    <code>lua </code> on the administrative console is sent
-    directly to this interpreter. Any change of the interpreter
-    state is immediately available to all client connections.
+    There is a single global instance of the Lua interpreter,
+    which is shared across all connections. Any command typed
+    entered on the on the administrative console is sent directly
+    to this interpreter. Any change of the interpreter state is
+    immediately available to all client connections.
   </para>
   <para>
     Each connection, however, is using its own Lua
@@ -169,10 +169,10 @@ function f1(a)
     return type(a), s
 end
 kostja@atlas:~$ tarantool
-localhost> lua dofile('arg.lua')
+localhost> dofile('arg.lua')
 ---
 ...
-localhost> lua f1('1234')
+localhost> f1('1234')
 ---
  - string
  - 0x31 0x32 0x33 0x34
@@ -181,7 +181,7 @@ localhost> call f1('1234')
 Call OK, 2 rows affected
 ['string']
 ['0x31 0x32 0x33 0x34 ']
-localhost> lua f1(1234)
+localhost> f1(1234)
 ---
  - number
  - 1234
@@ -199,7 +199,7 @@ Call OK, 2 rows affected
     <para>In addition to conventional method invocation,
     Lua provides object-oriented syntax. Access to the latter is
     available on the administrative console only:
-<programlisting><computeroutput>localhost> lua box.space[0]:truncate()
+<programlisting><computeroutput>localhost> box.space[0]:truncate()
 ---
 ...
 localhost> call box.space[0]:truncate()
@@ -225,14 +225,14 @@ error: 1:15 expected '('
     Similarly, an error which has occurred inside Tarantool (observed on the
     client as an error code), when happens during execution of a
     Lua procedure, produces a genuine Lua error:
-<programlisting><computeroutput>localhost> lua function f1() error("oops") end
+<programlisting><computeroutput>localhost> function f1() error("oops") end
 ---
 ...
 localhost> call f1()
 Call ERROR, Lua error: [string "function f1() error("oops") end"]:1: oops (ER_PROC_LUA)
 localhost> call box.insert('99', 1, 'test')
 Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
-localhost> lua pcall(box.insert, 99, 1, 'test')
+localhost> pcall(box.insert, 99, 1, 'test')
 ---
  - false
  - Space 99 is disabled
@@ -245,7 +245,7 @@ localhost> lua pcall(box.insert, 99, 1, 'test')
     <code>box</code>
     Lua library. The contents of the library can be
     inspected at runtime:
-<programlisting><computeroutput>localhost> lua for k, v in pairs(box) do print(k, ": ", type(v)) end
+<programlisting><computeroutput>localhost> for k, v in pairs(box) do print(k, ": ", type(v)) end
 ---
 fiber: table
 space: table
@@ -291,15 +291,15 @@ pack: function
             arithmetics as in the built-in number type.
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> lua tonumber64('123456789'), tonumber64(123456789)
+localhost> tonumber64('123456789'), tonumber64(123456789)
 ---
  - 123456789
  - 123456789
 ...
-localhost> lua i=tonumber64(1)
+localhost> i=tonumber64(1)
 ---
 ...
-localhost> lua type(i), type(i*2),  type(i/2), i, i*2, i/2
+localhost> type(i), type(i*2),  type(i/2), i, i*2, i/2
 ---
  - cdata
  - cdata
@@ -407,11 +407,11 @@ Call OK, 1 rows affected
 localhost> call box.select(0, 0, 'test')
 Call OK, 1 rows affected
 ['test', 'my first tuple']
-localhost> lua box.insert(5, 'testtest', 'firstname', 'lastname')
+localhost> box.insert(5, 'testtest', 'firstname', 'lastname')
 ---
  - 'testtest': {'firstname', 'lastname'}
 ...
-localhost> lua box.select(5, 1, 'firstname', 'lastname')
+localhost> box.select(5, 1, 'firstname', 'lastname')
 ---
  - 'testtest': {'firstname', 'lastname'}
 ...
@@ -509,31 +509,31 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 Returns the updated tuple.
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> lua box.insert(0, 0, 'hello world')
+localhost> box.insert(0, 0, 'hello world')
 ---
  - 0: {'hello world'}
 ...
-localhost> lua box.update(0, 0, '+p', 1, 1) -- add value 1 to field #1
+localhost> box.update(0, 0, '+p', 1, 1) -- add value 1 to field #1
 ---
 error: 'Field type does not match one required by operation: expected a 32-bit or 64-bit int'
 ...
-localhost> lua box.update(0, 0, '+p', 0, 2) -- add value 2 to field 0
+localhost> box.update(0, 0, '+p', 0, 2) -- add value 2 to field 0
 ---
  - 2: {'hello world'}
 ...
-localhost> lua box.update(0, 2, '!p', 1, 'Bienvenue tout le monde!')
+localhost> box.update(0, 2, '!p', 1, 'Bienvenue tout le monde!')
 ---
  - 2: {'Bienvenue tout le monde!', 'hello world'}
 ...
-localhost> lua box.update(0, 2, '#p', 2, 1)
+localhost> box.update(0, 2, '#p', 2, 1)
 ---
  - 2: {'Bienvenue tout le monde!'}
 ...
-localhost> lua box.insert(0, 3, 'crocodile', 'giraffe', 'baobab', 'bamblebee', 'hippopotamus', 'rhino')
+localhost> box.insert(0, 3, 'crocodile', 'giraffe', 'baobab', 'bamblebee', 'hippopotamus', 'rhino')
 ---
  - 3: {'crocodile', 'giraffe', 'baobab', 'bamblebee', 'hippopotamus', 'rhino'}
 ...
-localhost> lua box.update(0, 3, '#p', 3, 2)
+localhost> box.update(0, 3, '#p', 3, 2)
 ---
  - 3: {'crocodile', 'giraffe', 'hippopotamus', 'rhino'}
 ...
@@ -609,26 +609,26 @@ localhost> insert into t4 values ('2', '2')
 Insert OK, 1 rows affected
 localhost> insert into t4 values ('3', '3')
 Insert OK, 1 rows affected
-ocalhost> lua box.select_range(4, 0, 10)
+ocalhost> box.select_range(4, 0, 10)
 ---
  - '3': {'3'}
  - '0': {'0'}
  - '1': {'1'}
  - '2': {'2'}
 ...
-localhost> lua box.select_range(4, 1, 10)
+localhost> box.select_range(4, 1, 10)
 ---
  - '0': {'0'}
  - '1': {'1'}
  - '2': {'2'}
  - '3': {'3'}
 ...
-localhost> lua box.select_range(4, 1, 2)
+localhost> box.select_range(4, 1, 2)
 ---
  - '0': {'0'}
  - '1': {'1'}
 ...
-localhost> lua box.select_range(4, 1, 2, '1')
+localhost> box.select_range(4, 1, 2, '1')
 ---
  - '1': {'1'}
  - '2': {'2'}
@@ -679,23 +679,23 @@ localhost> insert into t4 values ('2', '2')
 Insert OK, 1 rows affected
 localhost> insert into t4 values ('3', '3')
 Insert OK, 1 rows affected
-localhost> lua box.select_reverse_range(4, 0, 10)
+localhost> box.select_reverse_range(4, 0, 10)
 ---
  error: 'Illegal parameters, hash iterator is forward only
 ...
-localhost> lua box.select_reverse_range(4, 1, 10)
+localhost> box.select_reverse_range(4, 1, 10)
 ---
  - '3': {'3'}
  - '2': {'2'}
  - '1': {'1'}
  - '0': {'0'}
 ...
-localhost> lua box.select_reverse_range(4, 1, 2)
+localhost> box.select_reverse_range(4, 1, 2)
 ---
  - '3': {'3'}
  - '2': {'2'}
 ...
-localhost> lua box.select_reverse_range(4, 1, 2, '1')
+localhost> box.select_reverse_range(4, 1, 2, '1')
 ---
  - '1': {'1'}
  - '0': {'0'}
@@ -782,27 +782,27 @@ localhost> lua box.select_reverse_range(4, 1, 2, '1')
         Unknown format specifier.
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> lua box.insert(0, 0, 'hello world')
+localhost> box.insert(0, 0, 'hello world')
 ---
  - 0: {'hello world'}
 ...
-localhost> lua box.update(0, 0, "=p", 1, 'bye world')
+localhost> box.update(0, 0, "=p", 1, 'bye world')
 ---
  - 0: {'bye world'}
 ...
-localhost> lua box.update(0, 0, ":p", 1, box.pack('ppp', 0, 3, 'hello'))
+localhost> box.update(0, 0, ":p", 1, box.pack('ppp', 0, 3, 'hello'))
 ---
  - 0: {'hello world'}
 ...
-localhost> lua box.update(0, 0, "=p", 1, 4)
+localhost> box.update(0, 0, "=p", 1, 4)
 ---
  - 0: {4}
 ...
-localhost> lua box.update(0, 0, "+p", 1, 4)
+localhost> box.update(0, 0, "+p", 1, 4)
 ---
  - 0: {8}
 ...
-localhost> lua box.update(0, 0, "^p", 1, 4)
+localhost> box.update(0, 0, "^p", 1, 4)
 ---
  - 0: {12}
 ...
@@ -815,40 +815,40 @@ localhost> lua box.update(0, 0, "^p", 1, 4)
         <listitem><para>
             Counterpart to <code>box.pack()</code>.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> lua tuple=box.replace(2, 0)
+<programlisting>localhost> tuple=box.replace(2, 0)
 ---
 ...
-localhost> lua string.len(tuple[0])
+localhost> string.len(tuple[0])
 ---
  - 4
 ...
-localhost> lua box.unpack('i', tuple[0])
+localhost> box.unpack('i', tuple[0])
 ---
  - 0
 ...
-localhost> lua box.unpack('bsil', box.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))
+localhost> box.unpack('bsil', box.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))
 ---
  - 255
  - 65535
  - 4294967295
  - 18446744073709551615
 ...
-localhost> lua num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, 'string', tonumber64('666666666666666')))
+localhost> num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, 'string', tonumber64('666666666666666')))
 ---
 ...
-localhost> lua print(box.unpack('i', num));
+localhost> print(box.unpack('i', num));
 ---
 666
 ...
-localhost> lua print(str);
+localhost> print(str);
 ---
 string
 ...
-localhost> lua print(box.unpack('l', num64))
+localhost> print(box.unpack('l', num64))
 ---
 666666666666666
 ...
-localhost> lua box.unpack('=p', box.pack('=p', 1, '666'))
+localhost> box.unpack('=p', box.pack('=p', 1, '666'))
 ---
  - 1
  - 666
@@ -890,20 +890,20 @@ Note: the administrative console output must be YAML-compatible.
                 an arbitrary piece of Lua code, without having to
                 introduce changes to the global Lua environment.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>lua box.dostring('abc')
+<programlisting>box.dostring('abc')
 ---
 error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
 ...
-lua box.dostring('return 1')
+box.dostring('return 1')
 ---
  - 1
 ...
-lua box.dostring('return ...', 'hello', 'world')
+box.dostring('return ...', 'hello', 'world')
 ---
  - hello
  - world
 ...
-lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil then return t[0] else return nil end end return f(...)', 0)
+box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil then return t[0] else return nil end end return f(...)', 0)
 ---
  - nil
 ...
@@ -964,7 +964,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>
-                lua box.uuid_hex()
+                box.uuid_hex()
                 ---
                  - a4f29fa0eb6d11e19f7737696d7fa8ff
                 ...
@@ -994,7 +994,7 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>
-                lua box.raise(box.error.ER_WAL_IO, 'Wal I/O error')
+                box.raise(box.error.ER_WAL_IO, 'Wal I/O error')
                 ---
                 error: 'Wal I/O error'
                 ...
@@ -1012,11 +1012,11 @@ lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil t
                 NUM or NUM64 primary key index of type TREE.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost> lua box.auto_increment(0, "I am a duplicate")
+            <programlisting>localhost> box.auto_increment(0, "I am a duplicate")
 ---
  - 1: {'I am a duplicate'}
 ...
-localhost> lua box.auto_increment(0, "I am a duplicate")
+localhost> box.auto_increment(0, "I am a duplicate")
 ---
  - 2: {'I am a duplicate'}
 ...
@@ -1037,11 +1037,11 @@ localhost> lua box.auto_increment(0, "I am a duplicate")
                 new counter value back.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost> lua box.counter.inc(0, 'top.mail.ru')
+            <programlisting>localhost> box.counter.inc(0, 'top.mail.ru')
 ---
  - 1
 ...
-localhost> lua box.counter.inc(0, 'top.mail.ru')
+localhost> box.counter.inc(0, 'top.mail.ru')
 ---
  - 2
 ...</programlisting>
@@ -1058,11 +1058,11 @@ localhost> lua box.counter.inc(0, 'top.mail.ru')
                 drops to 0, the tuple is deleted.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost> lua box.counter.dec(0, 'top.mail.ru')
+            <programlisting>localhost> box.counter.dec(0, 'top.mail.ru')
 ---
  - 1
 ...
-localhost> lua box.counter.dec(0, 'top.mail.ru')
+localhost> box.counter.dec(0, 'top.mail.ru')
 ---
  - 0
 ...</programlisting>
@@ -1086,23 +1086,23 @@ localhost> lua box.counter.dec(0, 'top.mail.ru')
         <listitem><para>
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> lua t=box.insert(0, 1, 'abc', 'cde', 'efg', 'ghq', 'qkl')
+localhost> t=box.insert(0, 1, 'abc', 'cde', 'efg', 'ghq', 'qkl')
 ---
 ...
-localhost> lua #t
+localhost> #t
 ---
  - 6
 ...
-localhost> lua t[1], t[5]
+localhost> t[1], t[5]
 ---
  - abc
  - qkl
 ...
-localhost> lua t[6]
+localhost> t[6]
 ---
 error: 'Lua error: [string "return t[6]"]:1: box.tuple: index 6 is out of bounds (0..5)'
 ...
-localhost> lua for k,v in t:pairs() do print(v) end
+localhost> for k,v in t:pairs() do print(v) end
 ---
 
 abc
@@ -1111,7 +1111,7 @@ efg
 ghq
 qkl
 ...
-localhost> lua t:unpack()
+localhost> t:unpack()
 ---
  -
  - abc
@@ -1120,58 +1120,58 @@ localhost> lua t:unpack()
  - ghq
  - qkl
 ...
-localhost> lua t:slice(1, 2)
+localhost> t:slice(1, 2)
 ---
  - abc
 ...
-localhost> lua t:slice(1, 3)
+localhost> t:slice(1, 3)
 ---
  - abc
  - cde
 ...
-localhost> lua t:slice(1, -1)
+localhost> t:slice(1, -1)
 ---
  - abc
  - cde
  - efg
  - ghq
 ...
-localhost> lua t:transform(1, 3)
+localhost> t:transform(1, 3)
 ---
  - 1: {'ghq', 'qkl'}
 ...
-localhost> lua t:transform(0, 1, 'zyx')
+localhost> t:transform(0, 1, 'zyx')
 ---
  - 'zyx': {'abc', 'cde', 'efg', 'ghq', 'qkl'}
 ...
-localhost> lua t:transform(-1, 1, 'zyx')
+localhost> t:transform(-1, 1, 'zyx')
 ---
  - 1: {'abc', 'cde', 'efg', 'ghq', 'zyx'}
 ...
-localhost> lua t=box.insert(0, 'abc', 'def', 'abc')
+localhost> t=box.insert(0, 'abc', 'def', 'abc')
 ---
 ...
-localhost> lua t:find('abc')
+localhost> t:find('abc')
 ---
  - 0
 ...
-localhost> lua t:findall('abc')
+localhost> t:findall('abc')
 ---
  - 0
  - 2
 ...
-localhost> lua t:find(1, 'abc')
+localhost> t:find(1, 'abc')
 ---
  - 2
 ...
-localhost> lua t = box.tuple.new('abc')
+localhost> t = box.tuple.new('abc')
 ---
 ...
-localhost> lua t
+localhost> t
 ---
  - 'abc': {}
 ...
-localhost> lua t:bsize()
+localhost> t:bsize()
 ---
  - 4
 ...
@@ -1186,7 +1186,7 @@ localhost> lua t:bsize()
         Construct a new tuple from a Lua table or a scalar.
         </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost> lua box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
+            <programlisting>localhost> box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
 ---
  - 18446744073709551615: {'string', 1}
 ...
@@ -1222,35 +1222,35 @@ localhost> lua t:bsize()
 </variablelist>
     <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-lua box.cjson.encode(123)
+box.cjson.encode(123)
 ---
  - 123
 ...
-lua box.cjson.encode({123})
+box.cjson.encode({123})
 ---
  - [123]
 ...
-lua box.cjson.encode({123, 234, 345})
+box.cjson.encode({123, 234, 345})
 ---
  - [123,234,345]
 ...
-lua box.cjson.encode({abc = 234, cde = 345})
+box.cjson.encode({abc = 234, cde = 345})
 ---
  - {"cde":345,"abc":234}
 ...
-lua box.cjson.encode({hello = { 'world' } })
+box.cjson.encode({hello = { 'world' } })
 ---
  - {"hello":["world"]}
 ...
-lua box.cjson.decode('123')
+box.cjson.decode('123')
 ---
  - 123
 ...
-lua box.cjson.decode('[123, "hello"]')[2]
+box.cjson.decode('[123, "hello"]')[2]
 ---
  - hello
 ...
-lua box.cjson.decode('{"hello": "world"}').hello
+box.cjson.decode('{"hello": "world"}').hello
 ---
  - world
 ...
@@ -1418,7 +1418,7 @@ lua box.cjson.decode('{"hello": "world"}').hello
         </simpara>
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> lua for k,v in box.space[0]:pairs() do print(v) end
+localhost> for k,v in box.space[0]:pairs() do print(v) end
 ---
 1: {'hello'}
 2: {'my     '}
@@ -1560,19 +1560,19 @@ localhost> INSERT INTO t0 VALUES (5, 2, 1)
 Insert OK, 1 rows affected
 localhost> INSERT INTO t0 VALUES (6, 2, 2)
 Insert OK, 1 rows affected
-localhost> lua it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), " ", it(), " ", it());
+localhost> it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), " ", it(), " ", it());
 ---
 1: {1, 0} 2: {1, 1} 3: {1, 2}
 ...
-localhost> lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), " ", it(), " ", it());
+localhost> it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), " ", it(), " ", it());
 ---
 3: {1, 2} nil nil
 ...
-localhost> lua i = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), " ", it(), " ", it());
+localhost> i = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), " ", it(), " ", it());
 ---
 5: {2, 1} 6: {2, 2} nil
 ...
-localhost> lua for v in box.space[0].index[1]:iterator(box.index.ALL) do print(v) end
+localhost> for v in box.space[0].index[1]:iterator(box.index.ALL) do print(v) end
 ---
 1: {1, 0}
 2: {1, 1}
@@ -1581,7 +1581,7 @@ localhost> lua for v in box.space[0].index[1]:iterator(box.index.ALL) do print(v
 5: {2, 1}
 6: {2, 2}
 ...
-localhost> lua i = box.space[0].index[0]:iterator(box.index.LT, 1);
+localhost> i = box.space[0].index[0]:iterator(box.index.LT, 1);
 ---
 error: 'Iterator type is not supported'
 </programlisting>
@@ -2587,7 +2587,7 @@ self:insert("1", "Hello", "World")
     <varlistentry>
         <term><emphasis role="lua">box.cfg</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua for k, v in pairs(box.cfg) do print(k, " = ", v) end
+localhost> for k, v in pairs(box.cfg) do print(k, " = ", v) end
 ---
 io_collect_interval = 0
 pid_file = box.pid
@@ -2624,7 +2624,7 @@ logger = cat - >> tarantool.log
             </simpara>
 
        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua for k,v in pairs(box.info()) do print(k, ": ", v) end
+localhost> for k,v in pairs(box.info()) do print(k, ": ", v) end
 ---
 version: 1.4.7-92-g4ba95ca
 status: primary
@@ -2646,47 +2646,47 @@ config: /home/unera/work/tarantool/test/box/tarantool_good.cfg
         </term>
         <listitem>
        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua box.info.pid
+localhost> box.info.pid
 ---
  - 1747
 ...
-localhost> lua box.info.logger_pid
+localhost> box.info.logger_pid
 ---
  - 1748
 ...
-localhost> lua box.info.version
+localhost> box.info.version
 ---
  - 1.4.7-92-g4ba95ca
 ...
-localhost> lua box.info.config
+localhost> box.info.config
 ---
  - /home/unera/work/tarantool/test/box/tarantool_good.cfg
 ...
-localhost> lua box.info.uptime
+localhost> box.info.uptime
 ---
  - 3672
 ...
-localhost> lua box.info.lsn
+localhost> box.info.lsn
 ---
  - 1712
 ...
-localhost> lua box.info.status
+localhost> box.info.status
 ---
  - primary
 ...
-localhost> lua box.info.recovery_lag
+localhost> box.info.recovery_lag
 ---
  - 0.000
 ...
-localhost> lua box.info.recovery_last_update
+localhost> box.info.recovery_last_update
 ---
  - 1306964594.980
 ...
-localhost> lua box.info.snapshot_pid
+localhost> box.info.snapshot_pid
 ---
  - 0
 ...
-localhost> lua for k, v in pairs(box.info.build) do print(k .. ': ', v) end
+localhost> for k, v in pairs(box.info.build) do print(k .. ': ', v) end
 ---
 flags:  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DCORO_ASM -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables -fgnu89-inline -pthread  -Wno-sign-compare -Wno-strict-aliasing -std=gnu99 -Wall -Wextra -Werror
 target: Linux-x86_64-Debug
@@ -2703,20 +2703,20 @@ options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_
     <varlistentry>
         <term><emphasis role="lua">box.slab</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua box.slab.arena_used
+localhost> box.slab.arena_used
 ---
  - 4194304
 ...
-localhost> lua box.slab.arena_size
+localhost> box.slab.arena_size
 ---
  - 104857600
 ...
-localhost> lua for k, v in pairs(box.slab.slabs) do print(k) end
+localhost> for k, v in pairs(box.slab.slabs) do print(k) end
 ---
 64
 128
 ...
-localhost> lua for k, v in pairs(box.slab.slabs[64]) do print(k, ':', v) end
+localhost> for k, v in pairs(box.slab.slabs[64]) do print(k, ':', v) end
 ---
 items:1
 bytes_used:160
@@ -2735,15 +2735,15 @@ bytes_free:4194144
     <varlistentry>
         <term><emphasis role="lua">box.stat</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> lua box.stat -- a virtual table
+localhost> box.stat -- a virtual table
 ---
  - table: 0x41a07a08
 ...
-localhost> lua box.stat() -- a full table (the same)
+localhost> box.stat() -- a full table (the same)
 ---
  - table: 0x41a0ebb0
 ...
-localhost> lua for k, v in pairs(box.stat()) do print(k) end
+localhost> for k, v in pairs(box.stat()) do print(k) end
 ---
 DELETE
 SELECT
@@ -2752,17 +2752,17 @@ CALL
 UPDATE
 DELETE_1_3
 ...
-localhost> lua for k, v in pairs(box.stat().DELETE) do print(k, ': ', v) end
+localhost> for k, v in pairs(box.stat().DELETE) do print(k, ': ', v) end
 ---
 total: 23210
 rps: 22
 ...
-localhost> lua for k, v in pairs(box.stat.DELETE) do print(k, ': ', v) end -- the same
+localhost> for k, v in pairs(box.stat.DELETE) do print(k, ': ', v) end -- the same
 ---
 total: 23210
 rps: 22
 ...
-localhost> lua for k, v in pairs(box.stat.SELECT) do print(k, ': ', v) end
+localhost> for k, v in pairs(box.stat.SELECT) do print(k, ': ', v) end
 ---
 total: 34553330
 rps: 23
