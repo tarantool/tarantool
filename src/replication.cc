@@ -614,7 +614,7 @@ replication_relay_send_snapshot_by_file(int client_sock)
 	header.lsn = greatest_lsn(&snap_dir);
 	header.is_available = header.lsn > 0 ? 1 : 0;
 	const char* filename = format_filename(&snap_dir, header.lsn, NONE);
-	if(header.is_available) {
+	if (header.is_available) {
 		struct stat st;
 		stat(filename, &st);
 		header.file_size = (uint64_t)st.st_size;
@@ -622,32 +622,32 @@ replication_relay_send_snapshot_by_file(int client_sock)
 		header.file_size = 0;
 	}
 	int file_fd = -1;
-	if(header.is_available) {
+	if (header.is_available) {
 		file_fd = open(filename, O_RDONLY | snap_dir.open_wflags, snap_dir.mode);
-		if(file_fd < 0) {
+		if (file_fd < 0) {
 			say_error("can't find/open snapshot");
 			header.is_available = 0;
 		}
 	}
-	if(send(client_sock, &header, sizeof(header), 0) != sizeof(header)) {
+	if (send(client_sock, &header, sizeof(header), 0) != sizeof(header)) {
 		say_syserror("send failed");
 		close(client_sock);
-		if(file_fd >= 0) {
+		if (file_fd >= 0) {
 			close(file_fd);
 		}
 		return EXIT_FAILURE;
 	}
 	say_warn("sending snapshot to replica: %" PRIi64 " size: %" PRIi64, header.lsn, header.file_size);
-	if(header.is_available) {
+	if (header.is_available) {
 		ssize_t bytes_sent = sendfile(client_sock, file_fd, NULL, (size_t)header.file_size);
-		if(bytes_sent == (ssize_t)header.file_size) {
+		if (bytes_sent == (ssize_t)header.file_size) {
 			say_warn("snapshot sent successfully");
 		} else {
 			say_warn("snapshot sent failed, sent bytes: %" PRIi64, bytes_sent);
 		}
 	}
 	close(client_sock);
-	if(file_fd >= 0) {
+	if (file_fd >= 0) {
 		close(file_fd);
 	}
 	return EXIT_SUCCESS;

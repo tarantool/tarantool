@@ -328,7 +328,7 @@ init_storage_from_master(struct log_dir *dir)
 	addr.sin_port = htons(port);
 
 	int sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if(sock_fd < 0) {
+	if (sock_fd < 0) {
 		say_syserror("socket failure");
 		return;
 	}
@@ -351,9 +351,9 @@ init_storage_from_master(struct log_dir *dir)
 
 	snapshot_request_by_file_header header;
 	size_t recv_size = 0;
-	while(recv_size < sizeof(header)) {
+	while (recv_size < sizeof(header)) {
 		int res = recv(sock_fd, &header, sizeof(header) - recv_size, 0);
-		if(res <= 0) {
+		if (res <= 0) {
 			say_error("master connection was closed unexpectedly");
 			close(sock_fd);
 			return;
@@ -361,12 +361,12 @@ init_storage_from_master(struct log_dir *dir)
 		recv_size += res;
 	}
 
-	if(!header.is_supported) {
+	if (!header.is_supported) {
 		say_error("master does not support snapshot transferring");
 		close(sock_fd);
 		return;
 	}
-	if(!header.is_available) {
+	if (!header.is_available) {
 		say_error("master does not have snapshot!");
 		close(sock_fd);
 		return;
@@ -375,7 +375,7 @@ init_storage_from_master(struct log_dir *dir)
 	const char* filename = format_filename(recovery_state->snap_dir, header.lsn, NONE);
 	int file_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
 
-	if(file_fd < 0) {
+	if (file_fd < 0) {
 		say_error("failed to create initial snapshot file");
 		close(sock_fd);
 		return;
@@ -384,17 +384,17 @@ init_storage_from_master(struct log_dir *dir)
 	recv_size =  0;
 	const size_t local_buffer_size = 4096;
 	int8_t buffer[local_buffer_size];
-	while(recv_size < header.file_size) {
+	while (recv_size < header.file_size) {
 		size_t to_recv_now = local_buffer_size < header.file_size - recv_size ? local_buffer_size : header.file_size - recv_size;
 		int rc = recv(sock_fd, buffer, to_recv_now, 0);
-		if(rc <= 0) {
+		if (rc <= 0) {
 			say_error("failed to receive initial snapshot file");
 			close(sock_fd);
 			close(file_fd);
 			return;
 		}
 		int wc = write(file_fd, buffer, (size_t)rc);
-		if(wc <= rc) {
+		if (wc <= rc) {
 			say_error("failed to write initial snapshot file");
 			close(sock_fd);
 			close(file_fd);
