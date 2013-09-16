@@ -10,8 +10,8 @@ type(box.session.on_connect(function() nosuchfunction() end))
 select * from t0 where k0=0
 ---
 - error:
-    errcode : ER_PROC_LUA
-    errmsg  : Lua error: [string "return type(box.session.on_connect(function()..."]:1: attempt to call global 'nosuchfunction' (a nil value)
+    errcode: ER_PROC_LUA
+    errmsg: Lua error: [string "return type(box.session.on_connect(function()..."]:1: attempt to call global 'nosuchfunction' (a nil value)
 ...
 Connection is dead.
 

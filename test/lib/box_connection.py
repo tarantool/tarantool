@@ -29,21 +29,10 @@ import socket
 import struct
 import warnings
 
-from test_suite import chk_tnt_includes
+from test_suite import check_tarantool_import
 from tarantool_connection import TarantoolConnection
 
-def chk_tnt_includes():
-    try:
-        tnt_py = os.path.dirname(os.path.abspath(__file__))
-        tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
-        if tnt_py not in sys.path:
-            sys.path = [tnt_py] + sys.path
-        import tarantool
-    except ImportError:
-        sys.stderr.write("\n\nNo tarantool-python library found\n")
-        sys.exit(1)
-
-chk_tnt_includes()
+check_tarantool_import()
 from tarantool import Connection as tnt_connection
 from tarantool import Schema
 
