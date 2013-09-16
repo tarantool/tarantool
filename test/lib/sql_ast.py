@@ -4,9 +4,9 @@ import sys
 import ctypes
 import struct
 
-from lib.test_suite import chk_tnt_includes
+from lib.test_suite import check_tarantool_import
 
-chk_tnt_includes()
+check_tarantool_import()
 from tarantool.request import (
         RequestPing,
         RequestInsert,
@@ -79,8 +79,8 @@ ER = {
 
 errstr = """---
 - error:
-    errcode : {0}
-    errmsg  : {1}
+    errcode: {0}
+    errmsg: {1}
 ..."""
 
 def format_error(response):

@@ -15,7 +15,7 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-def chk_tnt_includes():
+def check_tarantool_import():
     try:
         tnt_py = os.path.dirname(os.path.abspath(__file__))
         tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
