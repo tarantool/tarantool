@@ -45,6 +45,7 @@ extern "C" {
 #include <arpa/inet.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <sys/sendfile.h>
 
 #include "fiber.h"
 #include "recovery.h"
@@ -604,6 +605,53 @@ shutdown_handler:
 	exit(EXIT_SUCCESS);
 }
 
+static int
+replication_relay_send_snapshot_by_file(int client_sock)
+{
+	snap_dir.dirname = cfg.snap_dir;
+	snapshot_request_by_file_header header;
+	header.is_supported = 1;
+	header.lsn = greatest_lsn(&snap_dir);
+	header.is_available = header.lsn > 0 ? 1 : 0;
+	const char* filename = format_filename(&snap_dir, header.lsn, NONE);
+	if(header.is_available) {
+		struct stat st;
+		stat(filename, &st);
+		header.file_size = (uint64_t)st.st_size;
+	} else {
+		header.file_size = 0;
+	}
+	int file_fd = -1;
+	if(header.is_available) {
+		file_fd = open(filename, O_RDONLY | snap_dir.open_wflags, snap_dir.mode);
+		if(file_fd < 0) {
+			say_error("can't find/open snapshot");
+			header.is_available = 0;
+		}
+	}
+	if(send(client_sock, &header, sizeof(header), 0) != sizeof(header)) {
+		say_syserror("send failed");
+		close(client_sock);
+		if(file_fd >= 0) {
+			close(file_fd);
+		}
+		return EXIT_FAILURE;
+	}
+	say_warn("sending snapshot to replica: %" PRIi64 " size: %" PRIi64, header.lsn, header.file_size);
+	if(header.is_available) {
+		ssize_t bytes_sent = sendfile(client_sock, file_fd, NULL, (size_t)header.file_size);
+		if(bytes_sent == (ssize_t)header.file_size) {
+			say_warn("snapshot sent successfully");
+		} else {
+			say_warn("snapshot sent failed, sent bytes: %" PRIi64, bytes_sent);
+		}
+	}
+	close(client_sock);
+	if(file_fd >= 0) {
+		close(file_fd);
+	}
+	return EXIT_SUCCESS;
+}
 
 /** The main loop of replication client service process. */
 static void
@@ -612,7 +660,6 @@ replication_relay_loop(int client_sock)
 	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 	int64_t lsn;
-	ssize_t r;
 
 	/* Set process title and fiber name.
 	 * Even though we use only the main fiber, the logger
@@ -653,18 +700,25 @@ replication_relay_loop(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	r = read(client_sock, &lsn, sizeof(lsn));
-	if (r != sizeof(lsn)) {
-		if (r < 0) {
-			panic_syserror("read");
-		}
-		panic("invalid LSN request size: %zu", r);
+	struct master_to_replica_handshake send_handshake;
+	struct replica_to_master_handshake recv_handshake;
+	fill_handshake_master_to_replica(&send_handshake, 0);
+	if (!do_handshare_master_to_replica(client_sock, &send_handshake, &recv_handshake)) {
+		say_error("handshake with replica failed");
+		exit(EXIT_FAILURE);
 	}
-	say_info("starting replication from lsn: %" PRIi64, lsn);
-
-	replication_relay_send_row((void *)(intptr_t) client_sock,
-				   (const char *) &default_version,
-				   sizeof(default_version));
+	if (recv_handshake.version != default_version) {
+		say_error("handshake version is wrong: %d", recv_handshake.version);
+		exit(EXIT_FAILURE);
+	}
+	if (recv_handshake.connect_mode == SNAPSHOT_REQUEST_BY_FILE) {
+		exit(replication_relay_send_snapshot_by_file(client_sock));
+	}
+	if (recv_handshake.connect_mode != NORMAL_REPLICA) {
+		say_error("replica mode is wrong:  %d", recv_handshake.connect_mode);
+		exit(EXIT_FAILURE);
+	}
+	lsn = recv_handshake.lsn;
 
 	/* init libev events handlers */
 	ev_default_loop(0);
@@ -700,3 +754,72 @@ replication_relay_loop(int client_sock)
 	exit(EXIT_SUCCESS);
 }
 
+/** See declaration for comments */
+bool do_handshare_master_to_replica(int sock_fd,
+			struct master_to_replica_handshake *send_handshake, struct replica_to_master_handshake *recv_handshake)
+{
+	static const int idle_timeout = 60; /* in seconds */
+	assert((size_t)send_handshake->handshake_size == sizeof(*send_handshake));
+	fd_set recv_fdset, send_fdset;
+	FD_ZERO(&recv_fdset); FD_ZERO(&send_fdset);
+	size_t send_count = 0, recv_count = 0;
+	size_t to_send_count = sizeof(*send_handshake);
+	size_t to_recv_count = offsetof(replica_to_master_handshake, handshake_size) + sizeof(recv_handshake->handshake_size);
+
+	do {
+		if (send_count < to_send_count) {
+			FD_SET(sock_fd, &send_fdset);
+		} else {
+			FD_CLR(sock_fd, &send_fdset);
+		}
+		if (recv_count < to_recv_count) {
+			FD_SET(sock_fd, &recv_fdset);
+		} else {
+			FD_CLR(sock_fd, &recv_fdset);
+		}
+		struct timeval idle_wait = { idle_timeout, 0 };
+		int select_res = select(sock_fd + 1, &recv_fdset, &send_fdset, 0, &idle_wait);
+		if (select_res <= 0) {
+			say_warn("handshake master/replica: select failed");
+			return false;
+		}
+		if (FD_ISSET(sock_fd, &recv_fdset)) {
+			ssize_t res;
+			if (recv_count < sizeof(*recv_handshake)) {
+				res = recv(sock_fd, ((int8_t*)recv_handshake) + recv_count, sizeof(*recv_handshake) - recv_count, 0);
+			} else {
+				const int ignore_buffer_size = 256;
+				int8_t ignore_buffer[ignore_buffer_size];
+				res = recv(sock_fd, ignore_buffer, ignore_buffer_size, 0);
+			}
+			if (res <= 0) {
+				say_warn("handshake master/replica: read failed");
+				return false;
+			}
+			recv_count += res;
+
+		}
+		if (FD_ISSET(sock_fd, &send_fdset)) {
+			ssize_t res = send(sock_fd, ((int8_t*)send_handshake) + send_count, to_send_count - send_count, 0);
+			if(res <= 0) {
+				say_warn("handshake master/replica: write failed");
+				return false;
+			}
+			send_count += res;
+		}
+		if (recv_count == offsetof(replica_to_master_handshake, handshake_size) + sizeof(recv_handshake->handshake_size)) {
+			to_recv_count = (size_t)recv_handshake->handshake_size;
+		}
+	} while (send_count < to_send_count || recv_count < to_recv_count);
+	if(recv_count < sizeof(sizeof(*recv_handshake))) {
+		memset((void*)((int8_t*)recv_handshake + recv_count), 0, sizeof(*recv_handshake) - recv_count);
+	}
+	return true;
+}
+
+void fill_handshake_master_to_replica(struct master_to_replica_handshake *send_handshake, uint64_t server_id)
+{
+	send_handshake->version = default_version;
+	send_handshake->handshake_size = (uint32_t)sizeof(*send_handshake);
+	send_handshake->server_id = server_id;
+}

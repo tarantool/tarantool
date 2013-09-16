@@ -138,6 +138,70 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
+enum replica_to_master_connect_mode {
+	NORMAL_REPLICA = 0,
+	SNAPSHOT_REQUEST_BY_FILE
+};
+
+struct master_to_replica_handshake {
+	uint32_t version; /* must be the first member */
+	uint32_t handshake_size;  /* must be the second */
+	uint64_t server_id;
+} __attribute__((packed));
+
+struct replica_to_master_handshake {
+	uint32_t version; /* must be the first member */
+	uint32_t handshake_size;  /* must be the second */
+	uint64_t server_id;
+	uint32_t connect_mode;
+	int64_t lsn;
+	int64_t last_explicitly_set_lsn;
+} __attribute__((packed));
+
+struct snapshot_request_by_file_header {
+	uint32_t is_supported;
+	uint32_t is_available;
+	uint64_t lsn;
+	uint64_t file_size;
+} __attribute__((packed));
+
+
+/** Handshake of replica with master, i.e. send to master struct replica_to_master_handshake
+ *   and receive struct master_to_replica_handshake
+ *  Returns true on success and false otherwise.
+ *  The caller must provide memory for recv_handshake buffer.
+ *  The function partially provides backward compatibility with older master/replica protocol with
+ *   guarantee to send our (different) version and afford opportunity for the opponent to gracefully close connection.
+ *  The function provides compatibility with different versions of the opponent,
+ *   i.e. if an opponent sends handshake structure with different size, the function reads from
+ *   stream exactly so many bytes as opponents sends. In any way, the function fills the *recv_handshake structure and
+ *   not a byte more; on success, the *recv_handshake structure is filled entirely (maybe with zeros, if particular
+ *   opponent has lesser handshake size).
+ */
+bool do_handshare_replica_to_master(int sock_fd,
+			struct replica_to_master_handshake *send_handshake, struct master_to_replica_handshake *recv_handshake);
+
+void fill_handshake_replica_to_master(struct replica_to_master_handshake *send_handshake, uint64_t server_id, uint32_t connect_mode, int64_t initial_lsn);
+
+
+/** Handshake of master with replica, i.e. send to replica struct master_to_replica_handshake
+ *   and receive struct replica_to_master_handshake
+ *  Returns true on success and false otherwise.
+ *  The caller must provide memory for recv_handshake buffer.
+ *  The function partially provides backward compatibility with older master/replica protocol with
+ *   guarantee to send our (different) version and afford opportunity for the opponent to gracefully close connection.
+ *  The function provides compatibility with different versions of the opponent,
+ *   i.e. if an opponent sends handshake structure with different size, the function reads from
+ *   stream exactly so many bytes as opponents sends. In any way, the function fills the *recv_handshake structure and
+ *   not a byte more; on success, the *recv_handshake structure is filled entirely (maybe with zeros, if particular
+ *   opponent has lesser handshake size).
+ */
+bool do_handshare_master_to_replica(int sock_fd,
+			struct master_to_replica_handshake *send_handshake, struct replica_to_master_handshake *recv_handshake);
+
+void fill_handshake_master_to_replica(struct master_to_replica_handshake *send_handshake, uint64_t server_id);
+
+
 struct fio_batch;
 
 void snapshot_write_row(struct log_io *i, struct fio_batch *batch,

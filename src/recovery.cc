@@ -29,6 +29,7 @@
 #include "recovery.h"
 
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 #include "log_io.h"
 #include "fiber.h"
@@ -36,6 +37,12 @@
 #include "fio.h"
 #include "errinj.h"
 #include "bootstrap.h"
+
+extern "C" {
+#include <cfg/warning.h>
+#include <cfg/tarantool_box_cfg.h>
+} /* extern "C" */
+#include "tarantool.h"
 
 /*
  * Recovery subsystem
@@ -279,9 +286,8 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
-/** Create the initial snapshot file in the storage. */
-void
-init_storage(struct log_dir *dir)
+static void
+init_default_storage(struct log_dir *dir)
 {
 	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
 	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
@@ -297,6 +303,119 @@ init_storage(struct log_dir *dir)
 	}
 	close(fd);
 	say_info("done");
+}
+
+static void
+init_storage_from_master(struct log_dir *dir)
+{
+	char ip_addr[32];
+	int port;
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	say_info("getting snapshot from master");
+
+	int rc = sscanf(cfg.replication_source, "%31[^:]:%i", ip_addr, &port);
+
+	assert(rc == 2);
+	(void)rc;
+
+	addr.sin_family = AF_INET;
+	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0) {
+		say_syserror("inet_aton: %s", ip_addr);
+		return;
+	}
+	addr.sin_port = htons(port);
+
+	int sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(sock_fd < 0) {
+		say_syserror("socket failure");
+		return;
+	}
+
+	int conn_res = connect(sock_fd, (sockaddr*)&addr, sizeof(addr));
+	if (conn_res < 0) {
+		say_error("failed to connect to master");
+		return;
+	}
+
+	replica_to_master_handshake send_handshake;
+	master_to_replica_handshake recv_handshake;
+	fill_handshake_replica_to_master(&send_handshake, 0, SNAPSHOT_REQUEST_BY_FILE, 0);
+	if (!do_handshare_replica_to_master(sock_fd, &send_handshake, &recv_handshake)) {
+		say_error("failed to handshake with master");
+		return;
+	}
+
+	snapshot_request_by_file_header header;
+	size_t recv_size = 0;
+	while(recv_size < sizeof(header)) {
+		int res = recv(sock_fd, &header, sizeof(header) - recv_size, 0);
+		if(res <= 0) {
+			say_error("master connection was closed unexpectedly");
+			close(sock_fd);
+			return;
+		}
+		recv_size += res;
+	}
+
+	if(!header.is_supported) {
+		say_error("master does not support snapshot transferring");
+		close(sock_fd);
+		return;
+	}
+	if(!header.is_available) {
+		say_error("master does not have snapshot!");
+		close(sock_fd);
+		return;
+	}
+
+	const char* filename = format_filename(recovery_state->snap_dir, header.lsn, NONE);
+	int file_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
+
+	if(file_fd < 0) {
+		say_error("failed to create initial snapshot file");
+		close(sock_fd);
+		return;
+	}
+
+	recv_size =  0;
+	const size_t local_buffer_size = 4096;
+	int8_t buffer[local_buffer_size];
+	while(recv_size < header.file_size) {
+		size_t to_recv_now = local_buffer_size < header.file_size - recv_size ? local_buffer_size : header.file_size - recv_size;
+		int rc = recv(sock_fd, buffer, to_recv_now, 0);
+		if(rc <= 0) {
+			say_error("failed to receive initial snapshot file");
+			close(sock_fd);
+			close(file_fd);
+			return;
+		}
+		int wc = write(file_fd, buffer, (size_t)rc);
+		if(wc <= rc) {
+			say_error("failed to write initial snapshot file");
+			close(sock_fd);
+			close(file_fd);
+			return;
+		}
+		recv_size += rc;
+	}
+
+	close(sock_fd);
+	close(file_fd);
+	say_info("done");
+}
+
+/** Create the initial snapshot file in the storage. */
+void
+init_storage(struct log_dir *dir)
+{
+	if (cfg.replication_source != NULL) {
+		init_storage_from_master(dir);
+	} else {
+		init_default_storage(dir);
+	}
+
 }
 
 
