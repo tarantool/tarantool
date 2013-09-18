@@ -351,7 +351,7 @@ init_storage_from_master(struct log_dir *dir)
 	}
 
 	uint32_t request = SNAPSHOT_REQUEST_BY_FILE;
-	sio_write_timeout(sock_fd, &request, sizeof(request), 10000. true);
+	sio_write_timeout(sock_fd, &request, sizeof(request), 10000, true);
 
 	uint64_t lsn;
 	sio_readn_timeout(sock_fd, &lsn, sizeof(lsn), 10000, true);
