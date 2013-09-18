@@ -74,20 +74,27 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
-	struct replica_to_master_handshake send_handshake;
-	struct master_to_replica_handshake recv_handshake;
-	fill_handshake_replica_to_master(&send_handshake, 0, 0, initial_lsn);
+	uint32_t replica_version = default_version, master_version = 0;
+	coio_write(coio, &replica_version, sizeof(replica_version));
+	coio_readn_ahead_timeout(coio, &master_version,
+		sizeof(master_version), sizeof(master_version), 1.);
 
-	*err = "can't handshake with master";
-	if (!do_handshare_replica_to_master(coio->fd, &send_handshake, &recv_handshake)) {
-		tnt_raise(IllegalParams, "handshake with master failed");
+	if (master_version < 12) {
+		evio_close(coio);
+		evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		*err = "can't connect to master";
+		coio_connect(coio, remote_addr);
+
+		coio_write(coio, &initial_lsn, sizeof(initial_lsn));
+		coio_readn(coio, &master_version, sizeof(master_version));
+	} else {
+		if (master_version >= 256*256)
+			tnt_raise(IllegalParams, "invalid remote version");
+
+		uint32_t request = NORMAL_REPLICA;
+		coio_write(coio, &request, sizeof(request));
+		coio_write(coio, &initial_lsn, sizeof(initial_lsn));
 	}
-	*err = NULL;
-
-	uint32_t version = recv_handshake.version;
-
-	if (version != default_version)
-		tnt_raise(IllegalParams, "remote version mismatch");
 
 	say_crit("successfully connected to master");
 	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);
@@ -206,76 +213,4 @@ recovery_stop_remote(struct recovery_state *r)
 	say_info("shutting down the replica");
 	fiber_cancel(r->remote->reader);
 	r->remote = NULL;
-}
-
-/** See declaration for comments */
-bool do_handshare_replica_to_master(int sock_fd,
-			struct replica_to_master_handshake *send_handshake, struct master_to_replica_handshake *recv_handshake)
-{
-	static const int idle_timeout = 1; /* in seconds */
-	assert((size_t)send_handshake->handshake_size == sizeof(*send_handshake));
-	fd_set recv_fdset, send_fdset;
-	FD_ZERO(&recv_fdset); FD_ZERO(&send_fdset);
-	size_t send_count = 0, recv_count = 0;
-	size_t to_send_count = sizeof(*send_handshake);
-	size_t to_recv_count = offsetof(replica_to_master_handshake, handshake_size) + sizeof(recv_handshake->handshake_size);
-
-	do {
-		if (send_count < to_send_count) {
-			FD_SET(sock_fd, &send_fdset);
-		} else {
-			FD_CLR(sock_fd, &send_fdset);
-		}
-		if (recv_count < to_recv_count) {
-			FD_SET(sock_fd, &recv_fdset);
-		} else {
-			FD_CLR(sock_fd, &recv_fdset);
-		}
-		struct timeval idle_wait = { idle_timeout, 0 };
-		int select_res = select(sock_fd + 1, &recv_fdset, &send_fdset, 0, &idle_wait);
-		if (select_res <= 0) {
-			say_warn("handshake master/replica: select failed");
-			return false;
-		}
-		if (FD_ISSET(sock_fd, &recv_fdset)) {
-			ssize_t res;
-			if (recv_count < sizeof(*recv_handshake)) {
-				res = recv(sock_fd, ((int8_t*)recv_handshake) + recv_count, sizeof(*recv_handshake) - recv_count, 0);
-			} else {
-				const int ignore_buffer_size = 256;
-				int8_t ignore_buffer[ignore_buffer_size];
-				res = recv(sock_fd, ignore_buffer, ignore_buffer_size, 0);
-			}
-			if (res <= 0) {
-				say_warn("handshake master/replica: read failed");
-				return false;
-			}
-			recv_count += res;
-		}
-		if (FD_ISSET(sock_fd, &send_fdset)) {
-			ssize_t res = send(sock_fd, ((int8_t*)send_handshake) + send_count, to_send_count - send_count, 0);
-			if(res <= 0) {
-				say_warn("handshake master/replica: write failed");
-				return false;
-			}
-			send_count += res;
-		}
-		if (recv_count == offsetof(replica_to_master_handshake, handshake_size) + sizeof(recv_handshake->handshake_size)) {
-			to_recv_count = (size_t)recv_handshake->handshake_size;
-		}
-	} while (send_count < to_send_count || recv_count < to_recv_count);
-	if(recv_count < sizeof(sizeof(*recv_handshake))) {
-		memset((void*)((int8_t*)recv_handshake + recv_count), 0, sizeof(*recv_handshake) - recv_count);
-	}
-	return true;
-}
-
-void fill_handshake_replica_to_master(struct replica_to_master_handshake *send_handshake, uint64_t server_id, uint32_t connect_mode, int64_t initial_lsn)
-{
-	memset((void*)send_handshake, 0, sizeof(*send_handshake));
-	send_handshake->version = default_version;
-	send_handshake->handshake_size = (uint32_t)sizeof(*send_handshake);
-	send_handshake->server_id = server_id;
-	send_handshake->lsn = initial_lsn;
-	send_handshake->connect_mode = connect_mode;
 }

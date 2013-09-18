@@ -34,7 +34,6 @@
 #include "schema.h"
 #include "port.h"
 #include "box_lua.h"
-#include "recovery.h"
 #include <errinj.h>
 #include <pickle.h>
 #include <fiber.h>
@@ -184,16 +183,6 @@ execute_delete(const struct request *request, struct txn *txn,
 	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 }
 
-static void
-execute_set_lsn(const struct request *request, struct txn *txn __attribute__((unused)), struct port *port __attribute__((unused)))
-{
-	int res = wal_write(recovery_state, next_lsn(recovery_state), request->type, request->data, request->len);
-	if(res == 0) {
-		recovery_state->last_explicitly_set_lsn = recovery_state->confirmed_lsn = recovery_state->lsn = request->sl.lsn;
-	}
-}
-
-
 /** To collects stats, we need a valid request type.
  * We must collect stats before execute.
  * Check request type here for now.
@@ -203,8 +192,7 @@ request_check_type(uint32_t type)
 {
 	return (type != REPLACE && type != SELECT &&
 		type != UPDATE && type != DELETE_1_3 &&
-		type != DELETE && type != CALL &&
-		type != SET_LSN);
+		type != DELETE && type != CALL);
 }
 
 const char *
@@ -291,10 +279,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 		request->c.args_end = *reqpos;
 		if (*reqpos != reqend)
 			tnt_raise(IllegalParams, "can't unpack request");
-		break;
-	case SET_LSN:
-		request->execute = execute_set_lsn;
-		request->sl.lsn = pick_u64(reqpos, reqend);
 		break;
 	default:
 		assert(false);

@@ -77,6 +77,40 @@ ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 
 ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
 
+/*
+ * timeout procedures: throw or return (depends on throw_on_timeout) if
+*  no activity occurred during timeout_ms milliseconds
+ * timeout_ms == 0 means "don't wait"
+ * timeout_ms < 0 means "infinite wait"
+ */
+ssize_t
+sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
+		int timeout_ms, bool throw_on_timeout);
+ssize_t
+sio_read_timeout(int fd, void *buf, size_t buf_size, int timeout_ms,
+		bool throw_on_timeout);
+ssize_t
+sio_readn_timeout(int fd, void *buf, size_t count, int timeout_ms,
+		bool throw_on_timeout);
+ssize_t
+sio_write_timeout(int fd, const void *buf, size_t count, int timeout_ms,
+		bool throw_on_timeout);
+
+/*
+ * send a file size and a file to the socket.
+ * meaning of offset and size parameters are same as is linux sendfile,
+ * with added feature: if size is negative, the file is sent till eof
+ */
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, ssize_t size);
+/*
+ * receive a file sent by sio_sendfile
+ * simply writes data to the file_fd, thus updates file offset
+*/
+ssize_t
+sio_recvfile(int sock_fd, int file_fd);
+
+
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 		   const struct sockaddr_in *dest_addr, socklen_t addrlen);
 

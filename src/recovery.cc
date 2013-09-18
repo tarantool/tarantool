@@ -35,8 +35,10 @@
 #include "fiber.h"
 #include "tt_pthread.h"
 #include "fio.h"
+#include "sio.h"
 #include "errinj.h"
 #include "bootstrap.h"
+#include "scoped_guard.h"
 
 extern "C" {
 #include <cfg/warning.h>
@@ -327,84 +329,44 @@ init_storage_from_master(struct log_dir *dir)
 	}
 	addr.sin_port = htons(port);
 
-	int sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (sock_fd < 0) {
-		say_syserror("socket failure");
+	int sock_fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	auto sock_fd_holder = make_scoped_guard([=] { close(sock_fd); });
+	sio_connect(sock_fd, &addr, sizeof(addr));
+
+	uint32_t replica_version = default_version, master_version = 0;
+	sio_write_timeout(sock_fd, &replica_version, sizeof(replica_version),
+		10000, true);
+	sio_readn_timeout(sock_fd, &master_version, sizeof(master_version),
+		10000, true);
+
+	if (master_version == 0) {
+		say_error("handshake %d", master_version);
+		return;
+	} else if (master_version < 12) {
+		say_error("master is too old %d", master_version);
+		return;
+	} else if (master_version > 256*256) {
+		say_error("invalid master version %d", master_version);
 		return;
 	}
 
-	int conn_res = connect(sock_fd, (sockaddr*)&addr, sizeof(addr));
-	if (conn_res < 0) {
-		say_error("failed to connect to master");
-		close(sock_fd);
-		return;
-	}
+	uint32_t request = SNAPSHOT_REQUEST_BY_FILE;
+	sio_write_timeout(sock_fd, &request, sizeof(request), 10000. true);
 
-	replica_to_master_handshake send_handshake;
-	master_to_replica_handshake recv_handshake;
-	fill_handshake_replica_to_master(&send_handshake, 0, SNAPSHOT_REQUEST_BY_FILE, 0);
-	if (!do_handshare_replica_to_master(sock_fd, &send_handshake, &recv_handshake)) {
-		say_error("failed to handshake with master");
-		close(sock_fd);
-		return;
-	}
+	uint64_t lsn;
+	sio_readn_timeout(sock_fd, &lsn, sizeof(lsn), 10000, true);
 
-	snapshot_request_by_file_header header;
-	size_t recv_size = 0;
-	while (recv_size < sizeof(header)) {
-		int res = recv(sock_fd, &header, sizeof(header) - recv_size, 0);
-		if (res <= 0) {
-			say_error("master connection was closed unexpectedly");
-			close(sock_fd);
-			return;
-		}
-		recv_size += res;
-	}
-
-	if (!header.is_supported) {
-		say_error("master does not support snapshot transferring");
-		close(sock_fd);
-		return;
-	}
-	if (!header.is_available) {
-		say_error("master does not have snapshot!");
-		close(sock_fd);
-		return;
-	}
-
-	const char* filename = format_filename(recovery_state->snap_dir, header.lsn, NONE);
-	int file_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
+	const char* filename = format_filename(dir, lsn, NONE);
+	int file_fd = open(filename,
+		O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
 
 	if (file_fd < 0) {
 		say_error("failed to create initial snapshot file");
-		close(sock_fd);
 		return;
 	}
+	auto file_fd_holder = make_scoped_guard([=] { close(file_fd); });
+	sio_recvfile(sock_fd, file_fd);
 
-	recv_size =  0;
-	const size_t local_buffer_size = 4096;
-	int8_t buffer[local_buffer_size];
-	while (recv_size < header.file_size) {
-		size_t to_recv_now = local_buffer_size < header.file_size - recv_size ? local_buffer_size : header.file_size - recv_size;
-		int rc = recv(sock_fd, buffer, to_recv_now, 0);
-		if (rc <= 0) {
-			say_error("failed to receive initial snapshot file");
-			close(sock_fd);
-			close(file_fd);
-			return;
-		}
-		int wc = write(file_fd, buffer, (size_t)rc);
-		if (wc <= rc) {
-			say_error("failed to write initial snapshot file");
-			close(sock_fd);
-			close(file_fd);
-			return;
-		}
-		recv_size += rc;
-	}
-
-	close(sock_fd);
-	close(file_fd);
 	say_info("done");
 }
 

@@ -36,7 +36,7 @@
 #include "fio.h"
 #include "tarantool_eio.h"
 
-const uint32_t default_version = 13;
+const uint32_t default_version = 12;
 const log_magic_t row_marker = 0xba0babed;
 const log_magic_t eof_marker = 0x10adab1e;
 const char inprogress_suffix[] = ".inprogress";
