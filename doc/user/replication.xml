@@ -101,7 +101,7 @@
   <note><simpara>
     Replication parameters are "dynamic", which allows the
     replica to become a master and vice versa with help of
-    <olink targetptr="reload-configuration"/> statement.
+    <olink targetptr="box.cfg.reload"/> statement.
   </simpara></note>
 
 </section>
@@ -152,7 +152,7 @@
       <listitem>
         <para>
           Record the replica's LSN, by issuing <olink
-          targetptr="show-info"/>. This LSN may prove useful if
+          targetptr="box.info"/>. This LSN may prove useful if
           there are updates on the master that never reached
           the replica.
         </para>

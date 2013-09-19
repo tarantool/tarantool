@@ -11,8 +11,10 @@ space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 # error that happens when saving snapshot is propagated
 # to the caller.
 
-insert into t0 values (1, 'first tuple')
-Insert OK, 1 row affected
+box.insert(0, 1, 'first tuple')
+---
+- [1, 'first tuple']
+...
 box.snapshot()
 ---
 - ok
@@ -21,17 +23,23 @@ box.snapshot()
 ---
 - error: can't save snapshot, errno 17 (File exists)
 ...
-insert into t0 values (2, 'second tuple')
-Insert OK, 1 row affected
+box.insert(0, 2, 'second tuple')
+---
+- [2, 'second tuple']
+...
 # Make 'var' directory read-only.
 box.snapshot()
 ---
 - error: can't save snapshot, errno 13 (Permission denied)
 ...
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
-delete from t0 where k0 = 2
-Delete OK, 1 row affected
+box.delete(0, 1)
+---
+- [1, 'first tuple']
+...
+box.delete(0, 2)
+---
+- [2, 'second tuple']
+...
 #
 # A test case for http://bugs.launchpad.net/bugs/727174
 # "tarantool_box crashes when saving snapshot on SIGUSR1"
@@ -39,8 +47,10 @@ Delete OK, 1 row affected
 
 # Increment the lsn number, to make sure there is no such snapshot yet
 #
-insert into t0 values (1, 'Test tuple')
-Insert OK, 1 row affected
+box.insert(0, 1, 'Test tuple')
+---
+- [1, 'Test tuple']
+...
 Snapshot exists.
 box.space[0]:drop()
 ---
