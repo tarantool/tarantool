@@ -445,7 +445,9 @@ recover_remaining_wals(struct recovery_state *r)
 		}
 
 		/* TODO: find a better way of finding the next xlog */
-		current_lsn = r->confirmed_lsn + 1;
+		current_lsn = r->confirmed_lsn;
+find_next_wal:
+		current_lsn++;
 		/*
 		 * For the last WAL, first try to open .inprogress
 		 * file: if it doesn't exist, we can safely try an
@@ -465,6 +467,13 @@ recover_remaining_wals(struct recovery_state *r)
 			filename = format_filename(r->wal_dir,
 						   current_lsn, suffix);
 			f = fopen(filename, "r");
+			/*
+			 * Try finding wal for the next lsn if there is a
+			 * gap in LSNs.
+			 */
+			if (f == NULL && errno == ENOENT &&
+			    current_lsn < wal_greatest_lsn)
+				goto find_next_wal;
 		}
 		next_wal = log_io_open(r->wal_dir, LOG_READ, filename, suffix, f);
 		/*

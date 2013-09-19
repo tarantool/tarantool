@@ -304,6 +304,7 @@ primary = s1.index.primary
 s.index.primary:drop()
 primary.id
 primary:select()
+s:drop()
 -- @todo: add a test case for dangling iterator (currently no checks
 -- for a dangling iterator in the code
 -- ----------------------------------------------------------------
@@ -411,14 +412,14 @@ r_empty.index.secondary:count(1)
 r_full.index.secondary:count(1)
 s_nil.index.secondary:count(1)
 
-s_empty.index.primary:select()
-s_full.index.primary:select()
-r_empty.index.primary:select()
-r_full.index.primary:select()
-s_nil.index.secondary:select()
+-- cleanup
+s_empty:drop()
+s_full:drop()
+r_empty:drop()
+r_full:drop()
+s_nil:drop()
+r_disabled:drop()
 
--- -- inject error at various stages of commit and see that
---    the alter has no effects
 --
 -- @todo usability
 -- ---------

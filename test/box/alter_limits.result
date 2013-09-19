@@ -882,6 +882,9 @@ primary:select()
 ---
 - error: 'No index #0 is defined in space 512'
 ...
+s:drop()
+---
+...
 -- @todo: add a test case for dangling iterator (currently no checks
 -- for a dangling iterator in the code
 -- ----------------------------------------------------------------
@@ -1166,39 +1169,25 @@ s_nil.index.secondary:count(1)
 ---
 - 0
 ...
-s_empty.index.primary:select()
+-- cleanup
+s_empty:drop()
 ---
 ...
-s_full.index.primary:select()
----
-- [1, 1, 'a']
-- [2, 2, 'b']
-- [3, 3, 'c']
-- [4, 4, 'd']
-- [5, 5, 'e']
-- [6, 6, 'f']
-- [7, 7, 'g']
-- [8, 8, 'h']
-...
-r_empty.index.primary:select()
+s_full:drop()
 ---
 ...
-r_full.index.primary:select()
+r_empty:drop()
 ---
-- [1, 1, 'a']
-- [2, 2, 'b']
-- [3, 3, 'c']
-- [4, 4, 'd']
-- [5, 5, 'e']
 ...
-s_nil.index.secondary:select()
+r_full:drop()
 ---
-- [1, 2, 3, 4, 5, 6]
-- [7, 8, 9, 10, 11, 12]
-- [13, 14, 15, 16, 17]
 ...
--- -- inject error at various stages of commit and see that
---    the alter has no effects
+s_nil:drop()
+---
+...
+r_disabled:drop()
+---
+...
 --
 -- @todo usability
 -- ---------
