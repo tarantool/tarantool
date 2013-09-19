@@ -293,49 +293,138 @@ s:insert(2, 2)
 s.index.secondary:alter({ unique = false})
 s:insert(3, 2)
 s:drop()
--- -----------
---
---
--- space cache
--- -----------
--- - all the various kinds of reference to a dropped space
---   - iterator to index
---   index to space
---   space to index
---   variable
---   key def
---   all userdata given away to lua - think how
---
---
+-- ----------------------------------------------------------------
+-- SPACE CACHE: what happens to a space cache when an object is gone
+-- ----------------------------------------------------------------
+s = box.schema.create_space('test')
+s1 = s
+s:create_index('primary', 'tree')
+s1.index.primary.id
+primary = s1.index.primary
+s.index.primary:drop()
+primary.id
+primary:select()
+-- @todo: add a test case for dangling iterator (currently no checks
+-- for a dangling iterator in the code
+-- ----------------------------------------------------------------
+-- ----------------------------------------------------------------
+-- RECOVERY: check that all indexes are correctly built
+-- during recovery regardless of when they are created
+-- ----------------------------------------------------------------
+-- primary, secondary keys in a snapshot
+s_empty = box.schema.create_space('s_empty')
+s_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+s_full = box.schema.create_space('s_full')
+s_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+s_full:insert(1, 1, 'a')
+s_full:insert(2, 2, 'b')
+s_full:insert(3, 3, 'c')
+s_full:insert(4, 4, 'd')
+s_full:insert(5, 5, 'e')
+
+s_nil = box.schema.create_space('s_nil')
+
+s_drop = box.schema.create_space('s_drop')
+
+box.snapshot()
+
+s_drop:drop()
+
+s_nil:create_index('primary', 'hash', {unique=true, parts = {0, 'num'}})
+s_nil:insert(1,2,3,4,5,6);
+s_nil:insert(7, 8, 9, 10, 11,12)
+s_nil:create_index('secondary', 'tree', {unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
+s_nil:insert(13, 14, 15, 16, 17)
+
+r_empty = box.schema.create_space('r_empty')
+r_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+r_full = box.schema.create_space('r_full')
+r_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+r_full:insert(1, 1, 'a')
+r_full:insert(2, 2, 'b')
+r_full:insert(3, 3, 'c')
+r_full:insert(4, 4, 'd')
+r_full:insert(5, 5, 'e')
+
+s_full:create_index('multikey', 'tree', {unique = true, parts = { 1, 'num', 2, 'str'}})
+s_full:insert(6, 6, 'f')
+s_full:insert(7, 7, 'g')
+s_full:insert(8, 8, 'h')
+
+r_disabled = box.schema.create_space('r_disabled')
+
+--# stop server default
+--# start server default
+
+s_empty = box.space['s_empty']
+s_full = box.space['s_full']
+s_nil = box.space['s_nil']
+s_drop = box.space['s_drop']
+r_empty = box.space['r_empty']
+r_full = box.space['r_full']
+r_disabled = box.space['r_disabled']
+
+s_drop
+
+s_empty.index.primary.type
+s_full.index.primary.type
+r_empty.index.primary.type
+r_full.index.primary.type
+s_nil.index.primary.type
+
+s_empty.index.primary.name
+s_full.index.primary.name
+r_empty.index.primary.name
+r_full.index.primary.name
+s_nil.index.primary.name
+
+s_empty.enabled
+s_full.enabled
+r_empty.enabled
+r_full.enabled
+s_nil.enabled
+r_disabled.enabled
+
+s_empty.index.secondary.name
+s_full.index.secondary.name
+r_empty.index.secondary.name
+r_full.index.secondary.name
+s_nil.index.secondary.name
+
+s_empty.index.primary:count(1)
+s_full.index.primary:count(1)
+r_empty.index.primary:count(1)
+r_full.index.primary:count(1)
+s_nil.index.primary:count(1)
+
+s_empty.index.secondary:count(1)
+s_full.index.secondary:count(1)
+r_empty.index.secondary:count(1)
+r_full.index.secondary:count(1)
+s_nil.index.secondary:count(1)
+
+s_empty.index.primary:select()
+s_full.index.primary:select()
+r_empty.index.primary:select()
+r_full.index.primary:select()
+s_nil.index.secondary:select()
+
 -- -- inject error at various stages of commit and see that
--- the alter has no effects
---     - test that during commit phase
---       -> inject error at commit, inject error at rollback
+--    the alter has no effects
 --
--- usability
+-- @todo usability
 -- ---------
 -- - space name in all error messages!
 --         error: Duplicate key exists in unique index 1 (ugly)
 --
--- triggers
--- --------
--- - test that after disabling triggers we can
---   create an empty snapshot
--- - test for run_triggers on/off
---
--- recovery
--- --------
---  - add primary key in snapshot
---  - add secondary key in snapshot
---  - add primary key in xlog
---  - add secondary key in xlog
---  - the same for an empty space and a space with data
---  - test start from a space entry added in xlog
---  - test start from a space entry dropped in xlog
---  - test enabled/disabled property for these
---  spaces and space from a snapshot
---
---
--- features
+-- @todo features
 --------
 -- - ffi function to enable/disable space
