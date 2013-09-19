@@ -293,6 +293,8 @@ s:insert(2, 2)
 s.index.secondary:alter({ unique = false})
 s:insert(3, 2)
 s:drop()
+
+
 -- -----------
 --
 --

@@ -627,6 +627,7 @@ iproto_reply_error(struct obuf *out, struct iproto_header *req,
 {
 	struct iproto_header reply = *req;
 	int errmsg_len = strlen(e.errmsg()) + 1;
+	say_error("?????????????????? error code %d", e.errcode());
 	uint32_t ret_code = tnt_errcode_val(e.errcode());
 	reply.len = sizeof(ret_code) + errmsg_len;;
 	obuf_dup(out, &reply, sizeof(reply));

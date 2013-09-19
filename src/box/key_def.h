@@ -194,6 +194,9 @@ struct space_def {
 	 */
 	uint32_t arity;
 	char name[BOX_NAME_MAX + 1];
+
+        /* The space is a temp space */
+	bool temporary;
 };
 
 /** Check space definition structure for errors. */

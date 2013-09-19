@@ -37,14 +37,15 @@
 #include <stdio.h> /* snprintf() */
 
 /** _space columns */
-#define ID 0
-#define ARITY 1
-#define NAME 2
+#define ID			0
+#define ARITY			1
+#define NAME			2
+#define PROPERTIES		3
 /** _index columns */
-#define INDEX_ID 1
-#define INDEX_TYPE 3
-#define INDEX_IS_UNIQUE 4
-#define INDEX_PART_COUNT 5
+#define INDEX_ID		1
+#define INDEX_TYPE		3
+#define INDEX_IS_UNIQUE		4
+#define INDEX_PART_COUNT	5
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -94,6 +95,46 @@ key_def_new_from_tuple(struct tuple *tuple)
 	return key_def;
 }
 
+
+static void
+extract_space_properties_from_tuple(struct space_def *def, struct tuple *tuple)
+{
+	/* default values of properties */
+	def->temporary = false;
+
+	/* there is no property in the space */
+	if (tuple_len(tuple) < PROPERTIES)
+	    return;
+
+	uint32_t l;
+	const char *p = tuple_field(tuple, PROPERTIES, &l);
+	const char *be = p;
+	for (uint32_t i = 0; i <= l; i++) {
+	    char c = i < l ? p[i] : ',';
+	    uint32_t clen = p + i - be;
+	    switch(c) {
+		case ',':
+		case ':':
+		case ';':
+		    /* temp propery */
+		    if (clen == 9 && memcmp(be, "temporary", 9) == 0) {
+			def->temporary = true;
+		    }
+		    be = p + i + 1;
+		    break;
+		/* skip spaces at the begin property name */
+		case ' ':
+		case '\t':
+		    if (be == p + i)
+			be++;
+		    break;
+		default:
+		    break;
+	    }
+	}
+
+}
+
 /**
  * Fill space_def structure from struct tuple.
  */
@@ -105,6 +146,8 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	def->arity = tuple_field_u32(tuple, ARITY);
 	int n = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
+
+	extract_space_properties_from_tuple(def, tuple);
 	space_def_check(def, n, errcode);
 	if (errcode != ER_ALTER_SPACE &&
 	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
@@ -942,6 +985,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		trigger_set(&txn->on_commit, &drop_space_trigger);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
+
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
@@ -954,6 +998,18 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		alter_space_add_op(alter, modify);
 		space_def_create_from_tuple(&modify->def, new_tuple,
 					    ER_ALTER_SPACE);
+
+		if (old_space->def.temporary && !modify->def.temporary) {
+			if (!space_is_empty(old_space)) {
+			    tnt_raise(ClientError, ER_CHANGE_SPACE_PROPERTY,
+				      (unsigned) space_id(old_space),
+				      "temporary",
+				      "space is not empty"
+			    );
+			}
+		}
+
+
 		alter_space_do(txn, alter, old_space);
 		scoped_guard.is_active = false;
 	}

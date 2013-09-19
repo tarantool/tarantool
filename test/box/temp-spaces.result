@@ -1,0 +1,134 @@
+-- temporary spaces
+-- not a temporary
+s = box.schema.create_space('t', { if_not_exists = true, properties = 'temporarytrash' })
+---
+...
+s.is_temporary
+---
+- false
+...
+s:drop()
+---
+...
+-- not a temporary, too
+s = box.schema.create_space('t', { if_not_exists = true, properties = 'temporar' })
+---
+...
+s.is_temporary
+---
+- false
+...
+s:drop()
+---
+...
+-- not a temporary, too
+s = box.schema.create_space('t', { if_not_exists = true, properties = '' })
+---
+...
+s.is_temporary
+---
+- false
+...
+s:drop()
+---
+...
+-- not a temporary, too
+s = box.schema.create_space('t', { if_not_exists = true, properties = {'a'} })
+---
+...
+s.is_temporary
+---
+- false
+...
+s:drop()
+---
+...
+-- temporary
+s = box.schema.create_space('t', { if_not_exists = true, properties = {'temporary'} })
+---
+...
+s.is_temporary
+---
+- true
+...
+s:drop()
+---
+...
+-- temporary
+s = box.schema.create_space('t', { if_not_exists = true, properties = 'temporary' })
+---
+...
+s.is_temporary
+---
+- true
+...
+s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+---
+...
+s:insert(1,2,3)
+---
+- [1, 2, 3]
+...
+s:select(0, 1)
+---
+- [1, 2, 3]
+...
+s:len()
+---
+- 1
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+---
+- [512, 0, 't', 'temporary']
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+---
+- error: 'Can''t change space 512 propery `temporary'': space is not empty'
+...
+--# stop server default
+--# start server default
+s = box.space.t
+---
+...
+s:len()
+---
+- 0
+...
+s.is_temporary
+---
+- true
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+---
+- [512, 0, 't', 'no-temporary']
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+---
+- [512, 0, 't', 'temporary']
+...
+s:select(0, 1)
+---
+...
+s:insert(1,2,3)
+---
+- [1, 2, 3]
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+---
+- [512, 0, 't', 'temporary']
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+---
+- error: 'Can''t change space 512 propery `temporary'': space is not empty'
+...
+s:delete(1)
+---
+- [1, 2, 3]
+...
+box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+---
+- [512, 0, 't', 'no-temporary']
+...
+s:drop()
+---
+...
