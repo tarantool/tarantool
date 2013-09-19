@@ -858,6 +858,8 @@ lbox_fiber_self(struct lua_State *L)
 static int
 lbox_fiber_find(struct lua_State *L)
 {
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.find(): bad arguments");
 	int fid = lua_tointeger(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)

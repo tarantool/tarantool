@@ -80,3 +80,6 @@ exec admin "lua box.fiber.find(900)"
 exec admin "lua box.fiber.find(910)"
 exec admin "lua box.fiber.find(920)"
 exec admin "lua box.space[0]:truncate()"
+# https://github.com/tarantool/tarantool/issues/33
+exec admin "lua box.fiber.find()"
+exec admin "lua box.fiber.find('test')"
