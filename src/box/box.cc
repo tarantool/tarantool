@@ -309,8 +309,8 @@ struct snapshot_space_param {
 static void
 snapshot_space(struct space *sp, void *udata)
 {
-        if (space_is_temporary(sp))
-            return;
+	if (space_is_temporary(sp))
+		return;
 	struct tuple *tuple;
 	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
 	Index *pk = space_index(sp, 0);

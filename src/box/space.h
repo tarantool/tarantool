@@ -135,17 +135,6 @@ space_name(struct space *space) { return space->def.name; }
 static inline bool
 space_is_temporary(struct space *space) { return space->def.temporary; }
 
-
-/** Return true if space is empty */
-static inline bool
-space_is_empty(struct space *space) {
-    if (space->index_count == 0)
-        return true;
-    if (space->index[0]->size() == 0)
-        return true;
-    return false;
-}
-
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *

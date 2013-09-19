@@ -194,8 +194,12 @@ struct space_def {
 	 */
 	uint32_t arity;
 	char name[BOX_NAME_MAX + 1];
-
-        /* The space is a temp space */
+        /**
+	 * The space is a temporary:
+	 * - it is empty at server start
+	 * - changes are not written to WAL
+	 * - changes are not part of a snapshot
+	 */
 	bool temporary;
 };
 

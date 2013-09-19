@@ -133,7 +133,7 @@ s:select(0)
 ...
 s:select_range(0, 0, 0)
 ---
-- error: '[string "-- schema.lua (internal file)..."]:221: attempt to index a nil
+- error: '[string "-- schema.lua (internal file)..."]:208: attempt to index a nil
     value'
 ...
 s:delete(0)

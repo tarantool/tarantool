@@ -58,7 +58,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_settable(L, i);
 
 	/* space.is_temp */
-	lua_pushstring(L, "is_temporary");
+	lua_pushstring(L, "temporary");
 	lua_pushboolean(L, space_is_temporary(space));
 	lua_settable(L, i);
 
