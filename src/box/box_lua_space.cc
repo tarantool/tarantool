@@ -63,7 +63,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
-	lua_pushboolean(L, space->engine.state != READY_NO_KEYS);
+	lua_pushboolean(L, space_index(space, 0) != 0);
 	lua_settable(L, i);
 
 	lua_getfield(L, i, "index");
