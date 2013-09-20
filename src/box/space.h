@@ -130,6 +130,11 @@ space_id(struct space *space) { return space->def.id; }
 static inline const char *
 space_name(struct space *space) { return space->def.name; }
 
+
+/** Return true if space is temporary. */
+static inline bool
+space_is_temporary(struct space *space) { return space->def.temporary; }
+
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *

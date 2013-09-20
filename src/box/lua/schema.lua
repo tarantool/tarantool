@@ -13,6 +13,9 @@ box.schema.space.create = function(name, options)
         options = {}
     end
     local if_not_exists = options.if_not_exists
+
+    local temporary = options.temporary and "temporary" or ""
+
     if box.space[name] then
         if options.if_not_exists then
             return box.space[name], "not created"
@@ -35,7 +38,7 @@ box.schema.space.create = function(name, options)
     if options.arity == nil then
         options.arity = 0
     end
-    _space:insert(id, options.arity, name)
+    _space:insert(id, options.arity, name, temporary)
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create
