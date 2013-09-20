@@ -161,7 +161,6 @@ void fiber_testcancel(void);
 bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
-void fiber_info(struct tbuf *out);
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 /**
