@@ -1154,6 +1154,7 @@ snap_write_batch(struct fio_batch *batch, int fd)
 			  rows_written, batch->rows);
 		panic_syserror("fio_batch_write");
 	}
+    fdatasync(fd);
 }
 
 void
@@ -1179,7 +1180,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	if (++rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
-	if (fio_batch_is_full(batch)) {
+    bytes += row_v11_size(row);
+	if (fio_batch_is_full(batch) || (recovery_state->snap_io_rate_limit > 0 && bytes >= recovery_state->snap_io_rate_limit)) {
 		snap_write_batch(batch, fileno(l->f));
 		fio_batch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
@@ -1190,7 +1192,6 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			ev_now_update();
 			last = ev_now();
 		}
-		bytes += row_v11_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
 
 			ev_now_update();
