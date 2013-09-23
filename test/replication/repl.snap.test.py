@@ -13,14 +13,17 @@ master.admin('for k = 1, 9 do space:insert(k, k*k) end')
 for k in glob.glob(os.path.join(master.vardir, '*.xlog')):
 	os.unlink(k)
 
-# replica test 1
+print '-------------------------------------------------------------'
+print 'replica test 1 (must be failed)'
+print '-------------------------------------------------------------'
+
 replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
 for i in range(1, 10):
-	replica.sql('select * from t42 where k0 = %d' % i)
+	replica.admin('box.select(42, 0, %d)' % i)
 
 replica.stop()
 replica.cleanup(True)
@@ -29,14 +32,19 @@ master.admin('box.snapshot()')
 master.restart()
 master.admin('for k = 10, 19 do box.insert(42, k, k*k*k) end')
 
-# replica test 2
+print '-------------------------------------------------------------'
+print 'replica test 2 (must be ok)'
+print '-------------------------------------------------------------'
+
 replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
                os.path.join(self.args.vardir, "replica"))
 
+replica.admin('space = box.space.test');
+
 for i in range(1, 20):
-	replica.sql('select * from t42 where k0 = %d' % i)
+	replica.admin('space:select(0, %d)' % i)
 
 replica.stop()
 replica.cleanup(True)
