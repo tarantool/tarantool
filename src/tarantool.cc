@@ -316,11 +316,19 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
+void snapshot_exit(int code, void* arg) {
+	(void)arg;
+	fflush(NULL);
+	_exit(code);
+}
+
 int
 snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
+
+	salloc_batch_mode(true);
 
 	pid_t p = fork();
 	if (p < 0) {
@@ -329,10 +337,15 @@ snapshot(void)
 	}
 	if (p > 0) {
 		snapshot_pid = p;
+		say_warn("waiting for dumper %d", p);
 		int status = wait_for_child(p);
+		say_warn("dumper finished %d", p);
+		salloc_batch_mode(true);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
+
+	salloc_reattach();
 
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
@@ -342,6 +355,8 @@ snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
+
+	on_exit(snapshot_exit, NULL);
 	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);
