@@ -127,7 +127,7 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	FILE *f;
 	int32_t n_accepted, n_skipped, n_ignored;
 
-	tbuf_reset(cfg_out);
+	rewind(cfg_out);
 
 	if (cfg_filename_fullpath != NULL)
 		f = fopen(cfg_filename_fullpath, "r");
@@ -209,10 +209,12 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 }
 
 int
-reload_cfg(struct tbuf *out)
+reload_cfg()
 {
 	static struct mutex *mutex = NULL;
 	struct tarantool_cfg new_cfg, aux_cfg;
+
+	rewind(cfg_out);
 
 	if (mutex == NULL) {
 		mutex = (struct mutex *) palloc(eter_pool, sizeof(*mutex));
@@ -221,8 +223,6 @@ reload_cfg(struct tbuf *out)
 
 	if (mutex_trylock(mutex) == true) {
 		out_warning(CNF_OK, "Could not reload configuration: it is being reloaded right now");
-		tbuf_append(out, cfg_out->data, cfg_out->size);
-
 		return -1;
 	}
 
@@ -230,9 +230,6 @@ reload_cfg(struct tbuf *out)
 	auto scoped_guard = make_scoped_guard([&] {
 		destroy_tarantool_cfg(&aux_cfg);
 		destroy_tarantool_cfg(&new_cfg);
-
-		if (cfg_out->size != 0)
-			tbuf_append(out, cfg_out->data, cfg_out->size);
 
 		mutex_unlock(mutex);
 	});
@@ -616,6 +613,10 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
+	if (cfg_out) {
+		fclose(cfg_out);
+		free(cfg_log);
+	}
 }
 
 int
@@ -703,23 +704,22 @@ main(int argc, char **argv)
 		strcat(cfg_filename_fullpath, cfg_filename);
 	}
 
-	cfg_out = tbuf_new(eter_pool);
-	assert(cfg_out);
+	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
 
 	if (gopt(opt, 'k')) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-			say_error("check_config FAILED"
-				  "%.*s", cfg_out->size, (char *)cfg_out->data);
+		if (fill_default_tarantool_cfg(&cfg) != 0 ||
+		    load_cfg(&cfg, 0) != 0) {
 
+			say_error("check_config FAILED%.*s",
+				  (int) cfg_logsize, cfg_log);
 			return 1;
 		}
-
 		return 0;
 	}
 
-	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
-		panic("can't load config:"
-		      "%.*s", cfg_out->size, (char *)cfg_out->data);
+	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
+		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
+	}
 
 	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;

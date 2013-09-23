@@ -187,6 +187,13 @@ void *
 memrchr(const void *s, int c, size_t n);
 #endif /* HAVE_MEMRCHR */
 
+#ifndef HAVE_OPEN_MEMSTREAM
+/* Declare open_memstream(). */
+FILE *
+open_memstream(char **ptr, size_t *sizeloc);
+#endif /* HAVE_OPEN_MEMSTREAM */
+
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -77,6 +77,7 @@ check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_function_exists(fdatasync HAVE_FDATASYNC)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
+check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
