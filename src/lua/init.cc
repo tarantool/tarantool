@@ -984,7 +984,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
 			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
-			tbuf_printf(out, "%-.*s" CRLF, len - chop, sz);
+			tbuf_printf(out, "%-.*s", len - chop, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
 	}
