@@ -41,4 +41,6 @@ for i in range(1, 20):
 replica.stop()
 replica.cleanup(True)
 
+server.stop()
+server.deploy(self.suite_ini["config"])
 
