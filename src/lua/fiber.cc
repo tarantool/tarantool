@@ -311,6 +311,7 @@ lbox_fiber_gc(struct lua_State *L)
 	return 0;
 }
 
+#ifdef ENABLE_BACKTRACE
 static int
 fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
 {
@@ -326,6 +327,7 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 	lua_settable(L, -3);
 	return 0;
 }
+#endif
 
 static int
 lbox_fiber_statof(struct fiber *f, void *cb_ctx)

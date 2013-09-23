@@ -294,7 +294,7 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 	 * Commit alter ops, this will move the changed
 	 * indexes into their new places.
 	 */
-	struct AlterSpaceOp *op;
+	class AlterSpaceOp *op;
 	rlist_foreach_entry(op, &alter->ops, link) {
 		op->commit(alter);
 	}
@@ -334,7 +334,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 		op->rollback(alter);
 	space_remove_trigger(alter);
 #endif
-	struct AlterSpaceOp *op;
+	class AlterSpaceOp *op;
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->rollback(alter);
 	alter_space_delete(alter);
@@ -402,7 +402,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * Allow for a separate prepare step so that some ops
 	 * can be optimized.
 	 */
-	struct AlterSpaceOp *op, *tmp;
+	class AlterSpaceOp *op, *tmp;
 	rlist_foreach_entry_safe(op, &alter->ops, link, tmp)
 		op->prepare(alter);
 	/*

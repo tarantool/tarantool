@@ -189,6 +189,7 @@ memrchr(const void *s, int c, size_t n);
 
 #ifndef HAVE_OPEN_MEMSTREAM
 /* Declare open_memstream(). */
+#include <stdio.h>
 FILE *
 open_memstream(char **ptr, size_t *sizeloc);
 #endif /* HAVE_OPEN_MEMSTREAM */
