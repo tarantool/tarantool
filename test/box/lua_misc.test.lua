@@ -60,3 +60,7 @@ end;
 t;
 
 space:drop();
+--# setopt delimiter ''
+-- A test case for gh-37: print of 64-bit number
+1, 1
+tonumber64(1), 1
