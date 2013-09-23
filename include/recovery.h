@@ -137,9 +137,9 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
-enum replica_to_master_request {
-	NORMAL_REPLICA = 0,
-	SNAPSHOT_REQUEST_BY_FILE
+enum rpl_request_type {
+	RPL_GET_WAL = 0,
+	RPL_GET_SNAPSHOT
 };
 
 struct fio_batch;

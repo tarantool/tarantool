@@ -66,6 +66,18 @@
  */
 #cmakedefine HAVE_MEMRCHR 1
 /*
+ * Defined if this platform has sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE 1
+/*
+ * Defined if this platform has Linux specific sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE_LINUX 1
+/*
+ * Defined if this platform has BSD specific sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE_BSD 1
+/*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */
 #cmakedefine HAVE_LIBC_STACK_END 1

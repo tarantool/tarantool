@@ -75,26 +75,24 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	coio_connect(coio, remote_addr);
 
 	uint32_t replica_version = default_version, master_version = 0;
-	coio_write(coio, &replica_version, sizeof(replica_version));
-	coio_readn_ahead_timeout(coio, &master_version,
-		sizeof(master_version), sizeof(master_version), 1.);
-
-	if (master_version < 12) {
-		evio_close(coio);
-		evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		*err = "can't connect to master";
-		coio_connect(coio, remote_addr);
-
-		coio_write(coio, &initial_lsn, sizeof(initial_lsn));
-		coio_readn(coio, &master_version, sizeof(master_version));
-	} else {
-		if (master_version >= 256*256)
-			tnt_raise(IllegalParams, "invalid remote version");
-
-		uint32_t request = NORMAL_REPLICA;
-		coio_write(coio, &request, sizeof(request));
-		coio_write(coio, &initial_lsn, sizeof(initial_lsn));
+	ssize_t write_res = coio_write_timeout(coio, &replica_version,
+		sizeof(replica_version), 1.);
+	if(write_res != sizeof(replica_version)) {
+		tnt_raise(IllegalParams, "handshake failed");
 	}
+	ssize_t read_res = coio_readn_ahead_timeout(coio, &master_version,
+		sizeof(master_version), sizeof(master_version), 1.);
+	if(read_res != sizeof(master_version)) {
+		tnt_raise(IllegalParams, "handshake failed");
+	}
+
+	if (master_version < 12 || master_version >= 256*256) {
+		tnt_raise(IllegalParams, "invalid remote version");
+	}
+
+	uint32_t request = RPL_GET_WAL;
+	coio_write(coio, &request, sizeof(request));
+	coio_write(coio, &initial_lsn, sizeof(initial_lsn));
 
 	say_crit("successfully connected to master");
 	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);

@@ -60,6 +60,35 @@ SocketError::SocketError(const char *file, unsigned line, int fd,
 	errno = save_errno;
 }
 
+FDHolder::FDHolder(int _fd) : fd(_fd)
+{
+}
+
+FDHolder::~FDHolder()
+{
+	Reset();
+}
+
+int FDHolder::Release()
+{
+	int result = fd;
+	fd = -1;
+	return result;
+}
+
+void FDHolder::Reset(int _fd)
+{
+	if(fd >= 0) {
+		close(fd);
+	}
+	fd = _fd;
+}
+
+FDHolder::operator int()
+{
+	return fd;
+}
+
 /** Pretty print socket name and peer (for exceptions) */
 const char *
 sio_socketname(int fd)
@@ -287,26 +316,27 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 
 ssize_t
 sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
-		int timeout_ms, bool throw_on_timeout)
+		float timeout)
 {
 	pollfd pfd;
 	pfd.events = POLLIN;
 	pfd.fd = fd;
 	size_t read_count = 0;
 	do {
-		int poll_res = poll(&pfd, 1, timeout_ms);
+		int poll_res = poll(&pfd, 1, (int)timeout * 1000);
 		if (poll_res <= 0) {
-			if (throw_on_timeout) {
-				tnt_raise(SocketError, fd, "read poll timeout");
-			} else {
-				return read_count;
-			}
+			return read_count;
 		}
 		if (pfd.revents & (~(short)POLLIN)) {
 			tnt_raise(SocketError, fd, "poll error %x", (int)pfd.revents);
 		}
 		ssize_t read_res = read(fd, ((int8_t *)buf) + read_count,
 			buf_size - read_count);
+		if(read_res < 0) {
+			if(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN) {
+				continue;
+			}
+		}
 		if (read_res <= 0) {
 			tnt_raise(SocketError, fd, "read (%zd)", count);
 		}
@@ -316,43 +346,39 @@ sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
 }
 
 ssize_t
-sio_read_timeout(int fd, void *buf, size_t buf_size, int timeout_ms,
-		bool throw_on_timeout)
+sio_read_timeout(int fd, void *buf, size_t buf_size, float timeout)
 {
-	return sio_read_ahead_timeout(fd, buf, 1, buf_size, timeout_ms,
-			throw_on_timeout);
+	return sio_read_ahead_timeout(fd, buf, 1, buf_size, timeout);
 }
 
 ssize_t
-sio_readn_timeout(int fd, void *buf, size_t count, int timeout_ms,
-		bool throw_on_timeout)
+sio_readn_timeout(int fd, void *buf, size_t count, float timeout)
 {
-	return sio_read_ahead_timeout(fd, buf, count, count, timeout_ms,
-			throw_on_timeout);
+	return sio_read_ahead_timeout(fd, buf, count, count, timeout);
 }
 
 ssize_t
-sio_write_timeout(int fd, const void *buf, size_t count, int timeout_ms,
-		bool throw_on_timeout)
+sio_writen_timeout(int fd, const void *buf, size_t count, float timeout)
 {
 	pollfd pfd;
 	pfd.events = POLLOUT;
 	pfd.fd = fd;
 	size_t write_count = 0;
 	do {
-		int poll_res = poll(&pfd, 1, timeout_ms);
+		int poll_res = poll(&pfd, 1, (int)timeout * 1000);
 		if (poll_res <= 0) {
-			if (throw_on_timeout) {
-				tnt_raise(SocketError, fd, "write poll timeout");
-			} else {
-				return write_count;
-			}
+			return write_count;
 		}
 		if (pfd.revents & (~(short)POLLOUT)) {
 			tnt_raise(SocketError, fd, "poll error %x", (int)pfd.revents);
 		}
 		ssize_t write_res = write(fd, ((int8_t *)buf) + write_count,
 				count - write_count);
+		if(write_res < 0) {
+			if(errno == EWOULDBLOCK || errno == EINTR || errno == EAGAIN) {
+				continue;
+			}
+		}
 		if (write_res <= 0) {
 			tnt_raise(SocketError, fd, "write (%zd)", count);
 		}
@@ -361,56 +387,48 @@ sio_write_timeout(int fd, const void *buf, size_t count, int timeout_ms,
 	return write_count;
 }
 
+#if defined(HAVE_SENDFILE_LINUX)
 ssize_t
-sio_sendfile(int sock_fd, int file_fd, off_t *offset, ssize_t size)
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 {
-	uint64_t to_send;
-	if(size >= 0) {
-		to_send = size;
-	} else {
-		struct stat st;
-		if (fstat(file_fd, &st)) {
-			tnt_raise(SocketError, sock_fd, "sendfile: fstat");
-		}
-		if (offset != NULL) {
-			if (*offset > st.st_size) {
-				tnt_raise(SocketError, sock_fd, "sendfile: wrong offset");
-			}
-			to_send = st.st_size - *offset;
-		} else {
-			off_t lseek_res = lseek(file_fd, 0, SEEK_CUR);
-			if(lseek_res == (off_t)-1) {
-				tnt_raise(SocketError, sock_fd, "sendfile: lseek");
-			}
-			if (lseek_res > st.st_size) {
-				tnt_raise(SocketError, sock_fd, "sendfile: panic");
-			}
-			to_send = st.st_size - lseek_res;
-		}
-	}
-
-	sio_write_timeout(sock_fd, &to_send, sizeof(to_send), -1, true);
-
-#ifdef TARGET_OS_LINUX
-	ssize_t send_res = sendfile(sock_fd, file_fd, offset, to_send);
-	if(send_res < to_send) {
+	ssize_t send_res = sendfile(sock_fd, file_fd, offset, size);
+	if(send_res < size) {
 		tnt_raise(SocketError, sock_fd, "sendfile");
 	}
 	return send_res;
+}
+#elif defined(HAVE_SENDFILE_BSD)
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
+	off_t sent_bytes = 0;
+	int send_res =
+			sendfile(sock_fd, file_fd, offset, size, NULL, &sent_bytes, NULL);
+	if(send_res != 0) {
+		tnt_raise(SocketError, sock_fd, "sendfile");
+	}
+	if(sent_bytes < size) {
+		tnt_raise(SocketError, sock_fd, "sendfile");
+	}
+	return send_res;
+}
 #else
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
 	if(offset) {
 		if(lseek(file_fd, *offset, SEEK_SET) == (off_t)-1) {
 			tnt_raise(SocketError, sock_fd, "sendfile: lseek");
 		}
 	}
 
-	const size_t buffer_size = 4096;
+	const size_t buffer_size = 8192;
 	int8_t buffer[buffer_size];
 	size_t bytes_sent = 0;
-	while (bytes_sent < to_send) {
-		size_t to_send_now = MIN(to_send - bytes_sent, buffer_size);
-		ssize_t n = sio_read_timeout(file_fd, buffer, to_send_now, -1, true);
-		sio_write_timeout(sock_fd, buffer, n, -1, true);
+	while (bytes_sent < size) {
+		size_t to_send_now = MIN(size - bytes_sent, buffer_size);
+		ssize_t n = sio_read_timeout(file_fd, buffer, to_send_now, -1);
+		sio_writen_timeout(sock_fd, buffer, n, -1);
 		bytes_sent += n;
 	}
 
@@ -421,25 +439,34 @@ sio_sendfile(int sock_fd, int file_fd, off_t *offset, ssize_t size)
 	}
 
 	return bytes_sent;
-#endif /* #ifdef TARGET_OS_LINUX */
 }
+#endif
 
 ssize_t
-sio_recvfile(int sock_fd, int file_fd)
+sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 {
-	const size_t buffer_size = 4096;
+	if(offset) {
+		if(lseek(file_fd, *offset, SEEK_SET) == (off_t)-1) {
+			tnt_raise(SocketError, sock_fd, "sendfile: lseek");
+		}
+	}
+
+	const size_t buffer_size = 8192;
 	int8_t buffer[buffer_size];
-
-	uint64_t to_read;
-	sio_readn_timeout(sock_fd, &to_read, sizeof(to_read), -1, true);
-
 	size_t bytes_read = 0;
-	while (bytes_read < to_read) {
-		size_t to_read_now = MIN(to_read - bytes_read, buffer_size);
-		ssize_t n = sio_read_timeout(sock_fd, buffer, to_read_now, -1, true);
-		sio_write_timeout(file_fd, buffer, n, -1, true);
+	while (bytes_read < size) {
+		size_t to_read_now = MIN(size - bytes_read, buffer_size);
+		ssize_t n = sio_read_timeout(sock_fd, buffer, to_read_now, -1);
+		sio_writen_timeout(file_fd, buffer, n, -1);
 		bytes_read += n;
 	}
+
+	if(offset) {
+		if(lseek(file_fd, *offset, SEEK_SET) == (off_t)-1) {
+			tnt_raise(SocketError, sock_fd, "sendfile: lseek");
+		}
+	}
+
 	return bytes_read;
 }
 

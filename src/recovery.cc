@@ -329,15 +329,14 @@ init_storage_from_master(struct log_dir *dir)
 	}
 	addr.sin_port = htons(port);
 
-	int sock_fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	auto sock_fd_holder = make_scoped_guard([=] { close(sock_fd); });
-	sio_connect(sock_fd, &addr, sizeof(addr));
+	FDHolder sock_fd_holder(sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+	sio_connect(sock_fd_holder, &addr, sizeof(addr));
 
 	uint32_t replica_version = default_version, master_version = 0;
-	sio_write_timeout(sock_fd, &replica_version, sizeof(replica_version),
-		10000, true);
-	sio_readn_timeout(sock_fd, &master_version, sizeof(master_version),
-		10000, true);
+	sio_writen_timeout(sock_fd_holder, &replica_version,
+		sizeof(replica_version), 10);
+	sio_readn_timeout(sock_fd_holder, &master_version,
+		sizeof(master_version), 10);
 
 	if (master_version == 0) {
 		say_error("handshake %d", master_version);
@@ -350,22 +349,23 @@ init_storage_from_master(struct log_dir *dir)
 		return;
 	}
 
-	uint32_t request = SNAPSHOT_REQUEST_BY_FILE;
-	sio_write_timeout(sock_fd, &request, sizeof(request), 10000, true);
+	uint32_t request = RPL_GET_SNAPSHOT;
+	sio_writen_timeout(sock_fd_holder, &request, sizeof(request), 10);
 
-	uint64_t lsn;
-	sio_readn_timeout(sock_fd, &lsn, sizeof(lsn), 10000, true);
+	uint64_t recv_buf[2];
+	sio_readn_timeout(sock_fd_holder, recv_buf, sizeof(recv_buf), 10);
+	uint64_t lsn = recv_buf[0];
+	uint64_t file_size = recv_buf[1];
 
 	const char* filename = format_filename(dir, lsn, NONE);
-	int file_fd = open(filename,
-		O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
+	FDHolder file_fd_holder(open(filename,
+		O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode));
 
-	if (file_fd < 0) {
+	if (file_fd_holder < 0) {
 		say_error("failed to create initial snapshot file");
 		return;
 	}
-	auto file_fd_holder = make_scoped_guard([=] { close(file_fd); });
-	sio_recvfile(sock_fd, file_fd);
+	sio_recvfile(sock_fd_holder, file_fd_holder, NULL, file_size);
 
 	say_info("done");
 }

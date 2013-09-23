@@ -48,6 +48,20 @@ public:
 		    const char *format, ...);
 };
 
+class FDHolder {
+public:
+	explicit FDHolder(int _fd = -1);
+	~FDHolder();
+	int Release();
+	void Reset(int _fd = -1);
+	operator int();
+
+private:
+	int fd;
+	FDHolder(const FDHolder&);
+	void operator=(const FDHolder&);
+};
+
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);
 
@@ -77,38 +91,59 @@ ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 
 ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
 
-/*
- * timeout procedures: throw or return (depends on throw_on_timeout) if
-*  no activity occurred during timeout_ms milliseconds
- * timeout_ms == 0 means "don't wait"
- * timeout_ms < 0 means "infinite wait"
+/**
+ * reads at least count bytes, buf_size maximum from fd.
+ * throws on error or disconnect. returns count of bytes actually read.
+ * returns if no activity occurred during timeout seconds
+  * timeout is the only reason to return value less than count parameter.
+ * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
 sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
-		int timeout_ms, bool throw_on_timeout);
-ssize_t
-sio_read_timeout(int fd, void *buf, size_t buf_size, int timeout_ms,
-		bool throw_on_timeout);
-ssize_t
-sio_readn_timeout(int fd, void *buf, size_t count, int timeout_ms,
-		bool throw_on_timeout);
-ssize_t
-sio_write_timeout(int fd, const void *buf, size_t count, int timeout_ms,
-		bool throw_on_timeout);
+		float timeout);
 
-/*
- * send a file size and a file to the socket.
- * meaning of offset and size parameters are same as is linux sendfile,
- * with added feature: if size is negative, the file is sent till eof
+/**
+ * reads from fd, buf_size maximum bytes.
+ * throws on error or disconnect. returns count of bytes actually read.
+ * returns if no activity occurred during timeout seconds
+ * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
-sio_sendfile(int sock_fd, int file_fd, off_t *offset, ssize_t size);
-/*
- * receive a file sent by sio_sendfile
- * simply writes data to the file_fd, thus updates file offset
-*/
+sio_read_timeout(int fd, void *buf, size_t buf_size, float timeout_ms);
+
+/**
+ * reads count bytes from fd.
+ * throws on error or disconnect. returns count of bytes actually read.
+ * returns if no activity occurred during timeout seconds
+ * timeout is the only reason to return value, different from count parameter.
+ * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
+ */
 ssize_t
-sio_recvfile(int sock_fd, int file_fd);
+sio_readn_timeout(int fd, void *buf, size_t count, float timeout);
+
+/**
+ * writes count bytes to fd.
+ * throws on error or disconnect. returns count of bytes actually written.
+ * returns if no activity occurred during timeout seconds
+ * timeout is the only reason to return value, different from count parameter.
+ * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
+ */
+ssize_t
+sio_writen_timeout(int fd, const void *buf, size_t count, float timeout);
+
+/**
+ * wrap over sendfile.
+ * throws if send file failed
+ */
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size);
+
+/**
+ * receive a file sent by sendfile
+ * throws if receiving failed
+ */
+ssize_t
+sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size);
 
 
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
