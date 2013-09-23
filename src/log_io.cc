@@ -69,7 +69,7 @@ row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
 struct log_dir snap_dir = {
 	/* .panic_if_error = */ false,
 	/* .sync_is_async = */ false,
-	/* .open_wflags = */ 0,
+	/* .open_wflags = */ O_SYNC,
 	/* .filetype = */ "SNAP\n",
 	/* .filename_ext = */ ".snap",
 	/* .dirname = */ NULL

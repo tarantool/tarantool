@@ -1154,7 +1154,6 @@ snap_write_batch(struct fio_batch *batch, int fd)
 			  rows_written, batch->rows);
 		panic_syserror("fio_batch_write");
 	}
-    fdatasync(fd);
 }
 
 void
