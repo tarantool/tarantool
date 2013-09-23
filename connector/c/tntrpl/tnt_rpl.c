@@ -149,15 +149,25 @@ int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn)
 		return -1;
 	if (tnt_connect(sr->net) == -1)
 		return -1;
-	/* sending initial lsn */
 	struct tnt_stream_net *sn = TNT_SNET_CAST(sr->net);
-	if (tnt_io_send_raw(sn, (char*)&lsn, sizeof(lsn), 1) == -1)
+
+	/* handshake : send version */
+	if (tnt_io_send_raw(sn, (char*)&tnt_rpl_version, sizeof(tnt_rpl_version), 1) == -1)
 		return -1;
-	/* reading and checking version */
+	/* handshake : reading and checking version */
 	uint32_t version = 0;
 	if (tnt_io_recv_raw(sn, (char*)&version, sizeof(version), 1) == -1)
 		return -1;
 	if (version != tnt_rpl_version)
+		return -1;
+
+	/* sending request */
+	uint32_t request = 0;
+	if (tnt_io_send_raw(sn, (char*)&request, sizeof(request), 1) == -1)
+		return -1;
+
+	/* sending initial lsn */
+	if (tnt_io_send_raw(sn, (char*)&lsn, sizeof(lsn), 1) == -1)
 		return -1;
 	return 0;
 }
