@@ -206,7 +206,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      int rows_per_wal)
 {
 	assert(recovery_state == NULL);
-	recovery_state = (struct recovery_state *) p0alloc(eter_pool, sizeof(struct recovery_state));
+	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
 	recovery_update_mode(r, "none", 0);
 

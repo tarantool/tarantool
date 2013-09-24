@@ -78,8 +78,6 @@ static int class_count;
 const uint32_t chunk_magic = 0xbb84fcf6;
 static const char poison_char = 'P';
 
-struct palloc_pool *eter_pool;
-
 #ifdef REDZONE
 #define PALLOC_REDZONE 4
 #endif
@@ -142,7 +140,6 @@ palloc_init(void)
 
 	TAILQ_NEXT(clazz, link) = NULL;
 
-	eter_pool = palloc_create_pool("eter_pool");
 	return 1;
 }
 

@@ -217,7 +217,7 @@ reload_cfg()
 	rewind(cfg_out);
 
 	if (mutex == NULL) {
-		mutex = (struct mutex *) palloc(eter_pool, sizeof(*mutex));
+		mutex = (struct mutex *) malloc(sizeof(*mutex));
 		mutex_create(mutex);
 	}
 
@@ -490,7 +490,7 @@ signal_init(void)
 		exit(EX_OSERR);
 	}
 
-	sigs = (ev_signal *) palloc(eter_pool, sizeof(ev_signal) * 4);
+	sigs = (ev_signal *) malloc(sizeof(ev_signal) * 4);
 	memset(sigs, 0, sizeof(ev_signal) * 4);
 	ev_signal_init(&sigs[0], sig_snapshot, SIGUSR1);
 	ev_signal_start(&sigs[0]);
@@ -805,10 +805,10 @@ main(int argc, char **argv)
 
 	/* init process title - used for logging */
 	if (cfg.custom_proc_title == NULL) {
-		custom_proc_title = (char *) palloc(eter_pool, 1);
+		custom_proc_title = (char *) malloc(1);
 		custom_proc_title[0] = '\0';
 	} else {
-		custom_proc_title = (char *) palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		custom_proc_title = (char *) malloc(strlen(cfg.custom_proc_title) + 2);
 		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}

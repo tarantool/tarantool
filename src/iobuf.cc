@@ -274,7 +274,7 @@ iobuf_new(const char *name)
 {
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
-		iobuf = (struct iobuf *) palloc(eter_pool, sizeof(struct iobuf));
+		iobuf = (struct iobuf *) malloc(sizeof(struct iobuf));
 		struct palloc_pool *pool = palloc_create_pool("");
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, pool);

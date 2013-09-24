@@ -433,9 +433,8 @@ fiber_new(const char *name, void (*f) (va_list))
 		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
 		rlist_move_entry(&fibers, fiber, link);
 	} else {
-		fiber = (struct fiber *) palloc(eter_pool, sizeof(*fiber));
+		fiber = (struct fiber *) calloc(1, sizeof(*fiber));
 
-		memset(fiber, 0, sizeof(*fiber));
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
 		fiber->gc_pool = palloc_create_pool("");
@@ -463,8 +462,8 @@ fiber_new(const char *name, void (*f) (va_list))
 /**
  * Free as much memory as possible taken by the fiber.
  *
- * @note we can't release memory allocated via palloc(eter_pool, ...)
- * so, struct fiber and some of its members are leaked forever.
+ * @note we don't release memory allocated for
+ * struct fiber and some of its members.
  */
 void
 fiber_destroy(struct fiber *f)
