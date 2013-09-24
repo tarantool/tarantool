@@ -171,8 +171,6 @@ function(tarantool_module mod)
         ${recompiled_sources} ${module_sources})
 
     add_library(lt${mod} STATIC ${recompiled_sources})
-    set_target_properties(lt${mod} PROPERTIES COMPILE_FLAGS
-        "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
     add_dependencies(lt${mod} generate_headers generate_admin_cc build_bundled_libs)
 
     target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})

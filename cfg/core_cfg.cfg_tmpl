@@ -93,3 +93,24 @@ wal_dir_rescan_delay=0.1, ro
 # when reading WALs.
 panic_on_snap_error=true, ro
 panic_on_wal_error=false, ro
+## BOX
+
+# Primary port (where updates are accepted)
+primary_port=0, ro, required
+
+# Secondary port (where only selects are accepted)
+secondary_port=0, ro
+
+# Warn about requests which take longer to process, in seconds.
+too_long_threshold=0.5
+
+# A custom process list (ps) title string, appended after the standard
+# program title.
+custom_proc_title=NULL, ro
+
+# Replication mode (if enabled, the server, once
+# bound to the primary port, will connect to
+# replication_source (ipaddr:port) and run continously
+# fetching records from it.. In replication mode the server
+# only accepts reads.
+replication_source=NULL
