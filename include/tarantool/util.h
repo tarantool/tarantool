@@ -33,6 +33,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -167,13 +168,6 @@ void symbols_load(const char *name);
 void symbols_free();
 #endif /* HAVE_BFD */
 
-#ifdef NDEBUG
-#  define assert(pred) (void)(0)
-#else
-#  define assert(pred) ((pred) ? (void)(0) : assert_fail (#pred, __FILE__, __LINE__, __FUNCTION__))
-void assert_fail(const char *assertion, const char *file,
-		 unsigned int line, const char *function) __attribute__ ((noreturn));
-#endif
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */

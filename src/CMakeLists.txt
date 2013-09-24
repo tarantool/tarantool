@@ -45,6 +45,7 @@ set (common_sources
      tbuf.c
      rlist.c
      palloc.cc
+     memory.cc
      util.cc
      sio.cc
      evio.cc
@@ -96,7 +97,7 @@ set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
 
-set (common_libraries cfg core)
+set (common_libraries cfg core small)
 
 list(APPEND common_libraries
     ${LIBEV_LIBRARIES}

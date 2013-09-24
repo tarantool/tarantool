@@ -205,6 +205,7 @@ small_stats(struct small_alloc *alloc,
 	    mempool_stats_cb cb, void *cb_ctx);
 
 #ifdef __cplusplus
+} /* extern "C" */
 #include "exception.h"
 
 static inline void *
@@ -223,7 +224,6 @@ smalloc0(struct small_alloc *alloc, size_t size)
 	return memset(smalloc(alloc, size), 0, size);
 }
 
-} /* extern "C" */
 #endif
 
 #endif /* INCLUDES_TARANTOOL_SMALL_SMALL_H */

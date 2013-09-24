@@ -218,6 +218,7 @@ region_name(struct region *region)
 }
 
 #if defined(__cplusplus)
+} /* extern "C" */
 #include "exception.h"
 
 static inline void *
@@ -235,7 +236,6 @@ region_calloc(struct region *region, size_t size)
 {
 	return memset(region_alloc(region, size), 0, size);
 }
-} /* extern "C" */
 #endif
 
 #endif /* INCLUDES_TARANTOOL_SMALL_REGION_H */

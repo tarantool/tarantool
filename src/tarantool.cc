@@ -55,6 +55,7 @@
 #include "log_io.h"
 #include <crc32.h>
 #include <palloc.h>
+#include "memory.h"
 #include <salloc.h>
 #include <say.h>
 #include <stat.h>
@@ -606,6 +607,7 @@ tarantool_free(void)
 	session_free();
 	fiber_free();
 	palloc_free();
+	memory_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
@@ -637,6 +639,7 @@ main(int argc, char **argv)
 
 	crc32_init();
 	stat_init();
+	memory_init();
 	palloc_init();
 
 #ifdef HAVE_BFD
