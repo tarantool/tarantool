@@ -9,6 +9,7 @@ Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 License: BSD
+Requires: libgcc >= 4.1.2-50
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
