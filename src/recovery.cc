@@ -1192,7 +1192,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			last = ev_now();
 		}
 		while (bytes >= recovery_state->snap_io_rate_limit) {
-
+            fdatasync(fileno(l->f));
 			ev_now_update();
 			elapsed = ev_now() - last;
 			if (elapsed < 1)

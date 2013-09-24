@@ -853,8 +853,8 @@ main(int argc, char **argv)
 
 	signal_init();
 
-
 	try {
+        say_crit("version: %s", tarantool_version());
 		tarantool_L = tarantool_lua_init();
 		box_init(false);
 		atexit(tarantool_lua_free);
