@@ -81,4 +81,12 @@ trigger_clear(struct trigger *trigger)
 	rlist_del_entry(trigger, link);
 }
 
+
+struct lua_trigger
+{
+	struct trigger trigger;
+	int ref;
+};
+
+
 #endif /* INCLUDES_TARANTOOL_TRIGGER_H */

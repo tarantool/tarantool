@@ -38,6 +38,8 @@ extern "C" {
 #include "fiber.h"
 #include "session.h"
 #include "sio.h"
+#include <scoped_guard.h>
+#include "../box/box_lua.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -90,12 +92,21 @@ lbox_session_peer(struct lua_State *L)
 	return 1;
 }
 
-struct lbox_session_trigger
-{
-	struct trigger trigger;
-	int ref;
-};
 
+/**
+ * run on_connect|on_disconnect trigger with lua context
+ */
+static void
+lbox_session_run_trigger_luactx(struct lua_State *L, va_list ap)
+{
+	struct lua_trigger *lt = va_arg(ap, struct lua_trigger *);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, lt->ref);
+	lua_call(L, 0, 0);
+}
+
+/**
+ * run on_connect|on_disconnect trigger
+ */
 static void
 lbox_session_run_trigger(struct trigger *trg, void * /* event */)
 {
@@ -117,78 +128,95 @@ lbox_session_run_trigger(struct trigger *trg, void * /* event */)
 	}
 }
 
-static struct lbox_session_trigger on_connect =
-	{ { rlist_nil, lbox_session_run_trigger, NULL, NULL }, LUA_NOREF};
-static struct lbox_session_trigger on_disconnect =
-	{ { rlist_nil, lbox_session_run_trigger, NULL, NULL }, LUA_NOREF};
-
+/**
+ * set/reset/get trigger
+ */
 static int
-lbox_session_set_trigger(struct lua_State *L,
-			 struct rlist *list,
-			 struct lbox_session_trigger *trigger)
+lbox_session_set_trigger(struct lua_State *L, struct rlist *list)
 {
-	if (lua_gettop(L) != 1 ||
-	    (lua_type(L, -1) != LUA_TFUNCTION &&
-	     lua_type(L, -1) != LUA_TNIL)) {
+	int top = lua_gettop(L);
+	if (top > 1 || (top && !lua_isfunction(L, 1) && !lua_isnil(L, 1)))
 		luaL_error(L, "session.on_connect(chunk): bad arguments");
+
+	struct lua_trigger *current = 0;
+	struct trigger *trigger;
+	rlist_foreach_entry(trigger, list, link) {
+		if (trigger->run == lbox_session_run_trigger) {
+			current = (struct lua_trigger *)trigger;
+			break;
+		}
 	}
 
-	/* Pop the old trigger */
-	if (trigger->ref != LUA_NOREF) {
-		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
-		luaL_unref(L, LUA_REGISTRYINDEX, trigger->ref);
-		trigger_clear(&trigger->trigger);
-	} else {
+	/* get current trigger */
+	if (top == 0) {
+		if (current)
+			lua_rawgeti(L, LUA_REGISTRYINDEX, current->ref);
+		else
+			lua_pushnil(L);
+		return 1;
+	}
+
+	/* cleanup the trigger */
+	if (lua_isnil(L, 1)) {
+		if (current) {
+			trigger_clear(&current->trigger);
+			luaL_unref(L, LUA_REGISTRYINDEX, current->ref);
+			free(current);
+		}
 		lua_pushnil(L);
+		return 1;
 	}
 
-	/*
-	 * Set or clear the trigger. Return the old value of the
-	 * trigger.
-	 */
-	if (lua_type(L, -2) == LUA_TNIL) {
-		trigger->ref = LUA_NOREF;
+	/* set new trigger */
+	lua_pushvalue(L, 1);
+	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+
+	if (current) {
+		luaL_unref(L, LUA_REGISTRYINDEX, current->ref);
+		current->ref = ref;
 	} else {
-		/* Move the trigger to the top of the stack. */
-		lua_insert(L, -2);
-		/* Reference the new trigger. Pops it. */
-		trigger->ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		trigger_set(list, &trigger->trigger);
+		current = (struct lua_trigger *)
+			malloc(sizeof(struct lua_trigger));
+		if (!current) {
+			luaL_unref(L, LUA_REGISTRYINDEX, ref);
+			luaL_error(L, "Can't allocate memory for trigger");
+		}
+		current->trigger.destroy = NULL;
+		current->trigger.run = lbox_session_run_trigger;
+		current->ref = ref;
+		trigger_set(list, &current->trigger);
 	}
-	/* Return the old trigger. */
+
+	lua_pushvalue(L, 1);
 	return 1;
+
 }
 
 static int
 lbox_session_on_connect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &session_on_connect, &on_connect);
+	return lbox_session_set_trigger(L, &session_on_connect);
 }
 
 static int
 lbox_session_on_disconnect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &session_on_disconnect,
-					&on_disconnect);
+	return lbox_session_set_trigger(L, &session_on_disconnect);
 }
 
-static const struct luaL_reg lbox_session_meta [] = {
-	{"id", lbox_session_id},
-	{NULL, NULL}
-};
-
-static const struct luaL_reg sessionlib[] = {
-	{"id", lbox_session_id},
-	{"exists", lbox_session_exists},
-	{"peer", lbox_session_peer},
-	{"on_connect", lbox_session_on_connect},
-	{"on_disconnect", lbox_session_on_disconnect},
-	{NULL, NULL}
-};
 
 void
 tarantool_lua_session_init(struct lua_State *L)
 {
+	static const struct luaL_reg sessionlib[] = {
+		{"id", lbox_session_id},
+		{"exists", lbox_session_exists},
+		{"peer", lbox_session_peer},
+		{"on_connect", lbox_session_on_connect},
+		{"on_disconnect", lbox_session_on_disconnect},
+		{NULL, NULL}
+	};
 	luaL_register(L, sessionlib_name, sessionlib);
 	lua_pop(L, 1);
 }

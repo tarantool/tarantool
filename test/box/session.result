@@ -51,13 +51,13 @@ box.session.peer() == box.session.peer(box.session.id())
 - true
 ...
 -- check on_connect/on_disconnect triggers
-box.session.on_connect(function() end)
+type(box.session.on_connect(function() end))
 ---
-- null
+- function
 ...
-box.session.on_disconnect(function() end)
+type(box.session.on_disconnect(function() end))
 ---
-- null
+- function
 ...
 -- check it's possible to reset these triggers
 type(box.session.on_connect(function() error('hear') end))
@@ -69,13 +69,13 @@ type(box.session.on_disconnect(function() error('hear') end))
 - function
 ...
 -- check on_connect/on_disconnect argument count and type
-box.session.on_connect()
+type(box.session.on_connect())
 ---
-- error: 'session.on_connect(chunk): bad arguments'
+- function
 ...
-box.session.on_disconnect()
+type(box.session.on_disconnect())
 ---
-- error: 'session.on_connect(chunk): bad arguments'
+- function
 ...
 box.session.on_connect(function() end, function() end)
 ---
@@ -102,21 +102,13 @@ box.session.on_disconnect(1)
 - error: 'session.on_connect(chunk): bad arguments'
 ...
 -- use of nil to clear the trigger
-type(box.session.on_connect(nil))
+box.session.on_connect(nil)
 ---
-- function
+- null
 ...
-type(box.session.on_disconnect(nil))
+box.session.on_disconnect(nil)
 ---
-- function
-...
-type(box.session.on_connect(nil))
----
-- nil
-...
-type(box.session.on_disconnect(nil))
----
-- nil
+- null
 ...
 -- check how connect/disconnect triggers work
 function inc() active_connections = active_connections + 1 end
@@ -125,13 +117,13 @@ function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
 ---
 ...
-box.session.on_connect(inc)
+type(box.session.on_connect(inc))
 ---
-- null
+- function
 ...
-box.session.on_disconnect(dec)
+type(box.session.on_disconnect(dec))
 ---
-- null
+- function
 ...
 active_connections = 0
 ---
@@ -155,22 +147,22 @@ active_connections
 ---
 - 0
 ...
-type(box.session.on_connect(nil))
+box.session.on_connect(nil)
 ---
-- function
+- null
 ...
-type(box.session.on_disconnect(nil))
+box.session.on_disconnect(nil)
 ---
-- function
+- null
 ...
 -- write audit trail of connect/disconnect into a space
-box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end)
+type(box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end))
 ---
-- null
+- function
 ...
-box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end)
+type(box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end))
 ---
-- null
+- function
 ...
 --# create connection con_three to default
 --# set connection con_three
@@ -181,13 +173,13 @@ space:select(0, box.session.id())[0] == box.session.id()
 --# set connection default
 --# drop connection con_three
 -- cleanup
-type(box.session.on_connect(nil))
+box.session.on_connect(nil)
 ---
-- function
+- null
 ...
-type(box.session.on_disconnect(nil))
+box.session.on_disconnect(nil)
 ---
-- function
+- null
 ...
 active_connections
 ---

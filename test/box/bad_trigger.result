@@ -5,7 +5,7 @@
  
 type(box.session.on_connect(function() nosuchfunction() end))
 ---
-- nil
+- function
 ...
 select * from t0 where k0=0
 ---
@@ -17,5 +17,5 @@ Connection is dead.
 
 type(box.session.on_connect(nil))
 ---
-- function
+- nil
 ...
