@@ -229,7 +229,7 @@ tuple_free(struct tuple *tuple)
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
 	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
-	sfree(ptr, "tuple");
+	sfree(ptr);
 }
 
 /**

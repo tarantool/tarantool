@@ -40,6 +40,7 @@
 #include <third_party/queue.h>
 #include "tarantool/util.h"
 #include <tbuf.h>
+#include <qbuf.h>
 #include <say.h>
 #include "exception.h"
 
@@ -59,77 +60,6 @@ static const size_t MAX_SLAB_ITEM = 1 << 20;
 /* maximum number of items in one slab */
 /* updated in slab_classes_init, depends on salloc_init params */
 size_t MAX_SLAB_ITEM_COUNT;
-
-/*
- *  slab delayed free queue.
-*/
-#define SLAB_Q_WATERMARK (512 * sizeof(void*))
-
-struct slab_q {
-	char *buf;
-	size_t bottom; /* advanced by batch free */
-	size_t top;
-	size_t size;   /* total buffer size */
-};
-
-static inline int
-slab_qinit(struct slab_q *q, size_t size) {
-	q->size = size;
-	q->bottom = 0;
-	q->top = 0;
-	q->buf = (char*)malloc(size);
-	return (q->buf == NULL ? -1 : 0);
-}
-
-static inline void
-slab_qfree(struct slab_q *q) {
-	if (q->buf) {
-		free(q->buf);
-		q->buf = NULL;
-	}
-}
-
-#ifndef unlikely
-# define unlikely __builtin_expect(!! (EXPR), 0)
-#endif
-
-static inline int
-slab_qpush(struct slab_q *q, void *ptr)
-{
-	/* reduce memory allocation and memmove
-	 * effect by reusing free pointers buffer space only after the
-	 * watermark frees reached. */
-	if (unlikely(q->bottom >= SLAB_Q_WATERMARK)) {
-		memmove(q->buf, q->buf + q->bottom, q->bottom);
-		q->top -= q->bottom;
-		q->bottom = 0;
-	}
-	if (unlikely((q->top + sizeof(void*)) > q->size)) {
-		size_t newsize = q->size * 2;
-		char *ptr = (char*)realloc((void*)q->buf, newsize);
-		if (unlikely(ptr == NULL))
-			return -1;
-		q->buf = ptr;
-		q->size = newsize;
-	}
-	memcpy(q->buf + q->top, (char*)&ptr, sizeof(ptr));
-	q->top += sizeof(void*);
-	return 0;
-}
-
-static inline int
-slab_qn(struct slab_q *q) {
-	return (q->top - q->bottom) / sizeof(void*);
-}
-
-static inline void*
-slab_qpop(struct slab_q *q) {
-	if (unlikely(q->bottom == q->top))
-		return NULL;
-	void *ret = *(void**)(q->buf + q->bottom);
-	q->bottom += sizeof(void*);
-	return ret;
-}
 
 struct slab_item {
 	struct slab_item *next;
@@ -161,7 +91,7 @@ struct arena {
 	size_t mmap_size;
 	bool delayed_free_mode;
 	size_t delayed_free_batch;
-	struct slab_q delayed_q;
+	struct qbuf delayed_q;
 	void *base;
 	size_t size;
 	size_t used;
@@ -207,7 +137,7 @@ arena_init(struct arena *arena, size_t size)
 	arena->delayed_free_mode = false;
 	arena->delayed_free_batch = 100;
 
-	int rc = slab_qinit(&arena->delayed_q, 4096);
+	int rc = qbuf_init(&arena->delayed_q, 4096);
 	if (rc == -1)
 		return false;
 
@@ -219,7 +149,7 @@ arena_init(struct arena *arena, size_t size)
 				PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if (arena->mmap_base == MAP_FAILED) {
 		say_syserror("mmap");
-		slab_qfree(&arena->delayed_q);
+		qbuf_free(&arena->delayed_q);
 		return false;
 	}
 
@@ -230,7 +160,7 @@ arena_init(struct arena *arena, size_t size)
 	return true;
 }
 
-void salloc_reattach(void) {
+void salloc_protect(void) {
 	mprotect(arena.mmap_base, arena.mmap_size, PROT_READ);
 }
 
@@ -271,7 +201,7 @@ salloc_free(void)
 {
 	if (arena.mmap_base != NULL)
 		munmap(arena.mmap_base, arena.mmap_size);
-	slab_qfree(&arena.delayed_q);
+	qbuf_free(&arena.delayed_q);
 	memset(&arena, 0, sizeof(struct arena));
 }
 
@@ -389,23 +319,22 @@ static void
 sfree_batch(void)
 {
 	ssize_t batch = arena.delayed_free_batch;
-	size_t n = slab_qn(&arena.delayed_q);
+	size_t n = qbuf_n(&arena.delayed_q);
 	while (batch-- > 0 && n-- > 0) {
-		void *ptr = slab_qpop(&arena.delayed_q);
+		void *ptr = qbuf_pop(&arena.delayed_q);
 		assert(ptr != NULL);
 		sfree_do(ptr);
 	}
 }
 
 void
-sfree(void *ptr, const char *what)
+sfree(void *ptr)
 {
 	if (ptr == NULL)
 		return;
 	if (arena.delayed_free_mode) {
-		if (slab_qpush(&arena.delayed_q, ptr) == -1)
-			tnt_raise(LoggedError, ER_MEMORY_ISSUE, arena.delayed_q.size * 2,
-				  "slab allocator", what);
+		if (qbuf_push(&arena.delayed_q, ptr) == -1)
+			panic("failed to add tuple to the delayed queue");
 		return;
 	}
 	sfree_batch();
