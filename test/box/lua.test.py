@@ -715,6 +715,10 @@ admin("t")
 admin("t:bsize()")
 admin("box.delete(0, 8989)", silent=True)
 
+# A test case for https://github.com/tarantool/tarantool/issues/44
+# IPROTO required!
+sql("call box.dostring('box.raise(33333, \"Hey!\")')")
+
 admin("box.space[0]:drop()")
 
 sys.stdout.clear_all_filters()

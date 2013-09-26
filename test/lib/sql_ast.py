@@ -84,7 +84,9 @@ errstr = """---
 ..."""
 
 def format_error(response):
-    return errstr.format(ER[response.return_code], response.return_message)
+    return errstr.format(
+        ER.get(response.return_code, "ER_UNKNOWN (%d)" % response.return_code),
+        response.return_message)
 
 def format_yamllike(response):
     table = ("\n"+"\n".join(["- "+str(list(k)) for k in response])) \
