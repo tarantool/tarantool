@@ -15,6 +15,10 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
+if (TARGET_OS_FREEBSD)
+    link_directories(/usr/local/lib)
+endif()
+
 tarantool_module("box"
     tuple.cc
     tuple_convert.cc

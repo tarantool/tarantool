@@ -172,6 +172,10 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
     endif()
 endif()
 
+if (ENABLE_DTRACE AND TARGET_OS_FREEBSD)
+    set (common_libraries ${common_libraries} elf)
+endif()
+
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 add_subdirectory(lib)
@@ -190,6 +194,16 @@ function(tarantool_module mod)
         PROPERTIES COMPILE_FLAGS ${cfg_c_flags}
         GENERATED True)
     unset(cfg_c_flags)
+    if (ENABLE_DTRACE)
+        foreach(tmp_o in ${DTRACE_OBJS})
+            set_source_files_properties(${tmp_o}
+                PROPERTIES
+                EXTERNAL_OBJECT true
+                GENERATED true
+            )
+        endforeach(tmp_o)
+        set(module_sources ${module_sources} ${DTRACE_OBJS})
+    endif()
     add_executable(tarantool_${mod}
         ${module_sources}
         ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
