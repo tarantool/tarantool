@@ -176,41 +176,33 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode) != 0 ||
 	    old_conf->wal_fsync_delay != new_conf->wal_fsync_delay) {
 
-        double new_delay = new_conf->wal_fsync_delay;
+		double new_delay = new_conf->wal_fsync_delay;
 
-        /* Mode has changed: */
-        if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
-            if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
-                strcasecmp(new_conf->wal_mode, "fsync") == 0) {
-                out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
-                return -1;
-            }
-            say_debug("%s: wal_mode [%s] -> [%s]",
-                      __func__, old_conf->wal_mode, new_conf->wal_mode);
-        }
+		/* Mode has changed: */
+		if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
+			if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
+			    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
+				out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
+				return -1;
+			}
+		}
 
-        /*
-         * Unless wal_mode=fsync_delay, wal_fsync_delay is irrelevant and must be 0.
-         */
-        if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
-            new_delay = 0.0;
+		/*
+		 * Unless wal_mode=fsync_delay, wal_fsync_delay is
+		 * irrelevant and must be 0.
+		 */
+		if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
+			new_delay = 0.0;
 
-        if (old_conf->wal_fsync_delay != new_delay)
-            say_debug("%s: wal_fsync_delay [%f] -> [%f]",
-                      __func__, old_conf->wal_fsync_delay, new_delay);
 
-        recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
-    }
+		recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
+	}
 
-    if(old_conf->snap_io_rate_limit != new_conf->snap_io_rate_limit) {
-        say_warn("snap_io_rate_limit changed: %f => %f", old_conf->snap_io_rate_limit, new_conf->snap_io_rate_limit);
-        recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
-    }
+	if (old_conf->snap_io_rate_limit != new_conf->snap_io_rate_limit)
+		recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
 
-    if(old_conf->io_collect_interval != new_conf->io_collect_interval) {
-        say_warn("io_collect_interval: %f => %f", old_conf->snap_io_rate_limit, new_conf->snap_io_rate_limit);
-        ev_set_io_collect_interval(new_conf->io_collect_interval);
-    }
+	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
+		ev_set_io_collect_interval(new_conf->io_collect_interval);
 
 	return 0;
 }
@@ -851,7 +843,7 @@ main(int argc, char **argv)
 	signal_init();
 
 	try {
-        say_crit("version: %s", tarantool_version());
+		say_crit("version %s", tarantool_version());
 		tarantool_L = tarantool_lua_init();
 		box_init(false);
 		atexit(tarantool_lua_free);
