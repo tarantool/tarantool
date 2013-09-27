@@ -203,6 +203,8 @@ tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
 	}
 }
 
+extern uint32_t snapshot_version;
+
 /** Allocate a tuple */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
@@ -212,6 +214,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
+	tuple->version = snapshot_version;
 	tuple->bsize = size;
 	tuple->format_id = tuple_format_id(format);
 
@@ -229,7 +232,10 @@ tuple_free(struct tuple *tuple)
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
 	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
-	sfree(ptr);
+	if (tuple->version == snapshot_version)
+		sfree(ptr);
+	else
+		sfree_delayed(ptr);
 }
 
 /**
@@ -510,13 +516,13 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_init()
+tuple_format_init()
 {
 	tuple_format_ber = tuple_format_new(NULL, 0);
 }
 
 void
-tuple_free()
+tuple_format_free()
 {
 	for (struct tuple_format **format = tuple_formats;
 	     format < tuple_formats + formats_size;

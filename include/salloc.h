@@ -38,10 +38,9 @@ bool salloc_init(size_t size, size_t minimal, double factor);
 void salloc_free(void);
 void *salloc(size_t size, const char *what);
 void sfree(void *ptr);
+void sfree_delayed(void *ptr);
 void slab_validate();
-
 void salloc_protect(void);
-void salloc_batch_mode(bool mode);
 
 /** Statistics on utilization of a single slab class. */
 struct slab_cache_stats {

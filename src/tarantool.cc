@@ -84,6 +84,8 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
+uint32_t snapshot_version = 0;
+
 extern const void *opt_def;
 
 static int
@@ -328,7 +330,8 @@ snapshot(void)
 	if (snapshot_pid)
 		return EINPROGRESS;
 
-	salloc_batch_mode(true);
+	/* increment snapshot version */
+	snapshot_version++;
 
 	pid_t p = fork();
 	if (p < 0) {
@@ -340,7 +343,6 @@ snapshot(void)
 		say_warn("waiting for dumper %d", p);
 		int status = wait_for_child(p);
 		say_warn("dumper finished %d", p);
-		salloc_batch_mode(true);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}

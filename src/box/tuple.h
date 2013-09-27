@@ -115,6 +115,8 @@ tuple_format_new(struct key_def *key_def, uint32_t key_count);
  */
 struct tuple
 {
+	/** snapshot generation version */
+	uint32_t version;
 	/** reference counter */
 	uint16_t refs;
 	/** format identifier */
@@ -370,10 +372,10 @@ tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
 
 /** Initialize tuple library */
 void
-tuple_init();
+tuple_format_init();
 
 /** Cleanup tuple library */
 void
-tuple_free();
+tuple_format_free();
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 
