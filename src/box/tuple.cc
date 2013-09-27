@@ -203,6 +203,14 @@ tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
 	}
 }
 
+/**
+ * Incremented on every snapshot and is used to distinguish tuples
+ * which were created after start of a snapshot (these tuples can
+ * be freed right away, since they are not used for snapshot) or
+ * before start of a snapshot (these tuples can be freed only
+ * after the snapshot has finished, otherwise it'll write bad data
+ * to the snapshot file).
+ */
 extern uint32_t snapshot_version;
 
 /** Allocate a tuple */

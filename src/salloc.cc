@@ -90,7 +90,9 @@ struct slab_cache {
 struct arena {
 	void *mmap_base;
 	size_t mmap_size;
+	/** How items tuples do we have stacked for delayed free. */
 	int64_t delayed_free_count;
+	/** How many items in the delayed free list to free at once. */
 	size_t delayed_free_batch;
 	void *base;
 	size_t size;
@@ -99,6 +101,10 @@ struct arena {
 };
 
 static uint32_t slab_active_caches;
+/**
+ * Delayed garbage collection for items which are used
+ * in a forked process.
+ */
 static struct item_slist_head free_delayed;
 static struct slab_cache slab_caches[256];
 static struct arena arena;
@@ -158,7 +164,13 @@ arena_init(struct arena *arena, size_t size)
 	return true;
 }
 
-void salloc_protect(void) {
+/**
+ * Protect slab arena from changes. A safeguard used in a forked
+ * process to prevent changes to the master process arena.
+ */
+void
+salloc_protect(void)
+{
 	mprotect(arena.mmap_base, arena.mmap_size, PROT_READ);
 }
 

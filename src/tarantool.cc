@@ -340,9 +340,7 @@ snapshot(void)
 	}
 	if (p > 0) {
 		snapshot_pid = p;
-		say_warn("waiting for dumper %d", p);
 		int status = wait_for_child(p);
-		say_warn("dumper finished %d", p);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
@@ -357,7 +355,13 @@ snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
-
+	/*
+	 * We must avoid double destruction of tuples on exit.
+	 * Since there is no way to remove existing handlers
+	 * registered in the master process, and snapshot_save()
+	 * may call exit(), push a top-level handler which will do
+	 * _exit() for us.
+	 */
 	on_exit(snapshot_exit, NULL);
 	snapshot_save(recovery_state, box_snapshot);
 
