@@ -83,7 +83,7 @@ static coro_context *new_coro, *create_coro;
 static void
 coro_init (void)
 {
-  TARANTOOL_NEW_ENTRY();
+  CORO_NEW_ENTRY();
   volatile coro_func func = coro_init_func;
   volatile void *arg = coro_init_arg;
 

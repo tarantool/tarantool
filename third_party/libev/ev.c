@@ -3023,7 +3023,7 @@ time_update (EV_P_ ev_tstamp max_block)
 int
 ev_run (EV_P_ int flags)
 {
-  TARANTOOL_TICK_START(flags);
+  EV_TICK_START(flags);
 #if EV_FEATURE_API
   ++loop_depth;
 #endif
@@ -3189,7 +3189,7 @@ ev_run (EV_P_ int flags)
 #if EV_FEATURE_API
   --loop_depth;
 #endif
-  TARANTOOL_TICK_STOP(flags);
+  EV_TICK_STOP(flags);
   return activecnt;
 }
 
