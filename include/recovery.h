@@ -96,7 +96,7 @@ struct recovery_state {
 	 */
 	row_handler *row_handler;
 	void *row_handler_param;
-	int snap_io_rate_limit;
+	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	double wal_fsync_delay;
 	struct wait_lsn wait_lsn;
