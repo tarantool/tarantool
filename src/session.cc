@@ -31,6 +31,7 @@
 
 #include "assoc.h"
 #include "exception.h"
+#include <sys/socket.h>
 
 uint32_t sid_max;
 
@@ -38,6 +39,19 @@ static struct mh_i32ptr_t *session_registry;
 
 struct session_trigger session_on_connect;
 struct session_trigger session_on_disconnect;
+
+static uint64_t
+get_cookie_by_socket(int fd)
+{
+	uint64_t cookie = 0;
+	unsigned int addrlen = (unsigned int)sizeof(cookie);
+	int get_res = getpeername(fd, (sockaddr*)&cookie, &addrlen);
+	if (get_res != 0) {
+		say_warn("getpeername failed");
+		return 0;
+	}
+	return cookie;
+}
 
 uint32_t
 session_create(int fd)
@@ -61,13 +75,13 @@ session_create(int fd)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_sid(fiber, sid);
+	fiber_set_sid(fiber, sid, get_cookie_by_socket(fd));
 	if (session_on_connect.trigger) {
 		void *param = session_on_connect.param;
 		try {
 			session_on_connect.trigger(param);
 		} catch (const Exception& e) {
-			fiber_set_sid(fiber, 0);
+			fiber_set_sid(fiber, 0, 0);
 			mh_i32ptr_remove(session_registry, &node, NULL);
 			throw;
 		}

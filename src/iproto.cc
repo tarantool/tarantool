@@ -218,6 +218,9 @@ iproto_queue_init(struct iproto_queue *i_queue,
 static inline uint32_t
 iproto_session_id(struct iproto_session *session);
 
+static inline uint64_t
+iproto_session_cookie(struct iproto_session *session);
+
 /** A handler to process all queued requests. */
 static void
 iproto_queue_handler(va_list ap)
@@ -227,7 +230,7 @@ iproto_queue_handler(va_list ap)
 restart:
 	while (iproto_dequeue_request(i_queue, &request)) {
 
-		fiber_set_sid(fiber, iproto_session_id(request.session));
+		fiber_set_sid(fiber, iproto_session_id(request.session), iproto_session_cookie(request.session));
 		request.process(&request);
 	}
 	iproto_cache_fiber(&request_queue);
@@ -274,6 +277,7 @@ struct iproto_session
 	struct ev_io output;
 	/** Session id. */
 	uint32_t sid;
+	uint64_t cookie;
 };
 
 SLIST_HEAD(, iproto_session) iproto_session_cache =
@@ -302,6 +306,12 @@ iproto_session_id(struct iproto_session *session)
 	return session->sid;
 }
 
+static inline uint64_t
+iproto_session_cookie(struct iproto_session *session)
+{
+	return session->cookie;
+}
+
 static void
 iproto_session_on_input(struct ev_io *watcher,
 			int revents __attribute__((unused)));
@@ -317,6 +327,19 @@ iproto_process_connect(struct iproto_request *request);
 
 static void
 iproto_process_disconnect(struct iproto_request *request);
+
+static uint64_t
+get_cookie_by_socket(int fd)
+{
+	uint64_t cookie = 0;
+	unsigned int addrlen = (unsigned int)sizeof(cookie);
+	int get_res = getpeername(fd, (sockaddr*)&cookie, &addrlen);
+	if (get_res != 0) {
+		say_warn("getpeername failed");
+		return 0;
+	}
+	return cookie;
+}
 
 static struct iproto_session *
 iproto_session_create(const char *name, int fd, box_process_func *param)
@@ -339,6 +362,7 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
 	session->sid = 0;
+	session->cookie = get_cookie_by_socket(fd);
 	return session;
 }
 
@@ -722,7 +746,7 @@ iproto_process_connect(struct iproto_request *request)
 static void
 iproto_process_disconnect(struct iproto_request *request)
 {
-	fiber_set_sid(fiber, request->session->sid);
+	fiber_set_sid(fiber, request->session->sid, request->session->cookie);
 	/* Runs the trigger, which may yield. */
 	iproto_session_destroy(request->session);
 }
