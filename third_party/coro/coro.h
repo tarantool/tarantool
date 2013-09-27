@@ -301,6 +301,13 @@ void coro_destroy (coro_context *ctx);
 
 #endif
 
+#include <tarantool/config.h>
+#ifdef ENABLE_DTRACE
+#include <include/dtrace.h>
+#else
+#include <include/no_dtrace.h>
+#endif
+
 #if __cplusplus
 }
 #endif

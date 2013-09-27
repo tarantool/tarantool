@@ -7,8 +7,14 @@ macro(libcoro_build)
 
     add_library(coro STATIC ${coro_src})
 
+    if (ENABLE_DTRACE)
+        dtrace_do_lib(coro coro.c.o CMakeFiles/coro.dir/third_party/coro)
+        set(LIBCORO_LIBRARIES coro_dtrace)
+    else()
+        set(LIBCORO_LIBRARIES coro)
+    endif()
+
     set(LIBCORO_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/coro)
-    set(LIBCORO_LIBRARIES coro)
 
     message(STATUS "Use bundled libcoro includes: ${LIBCORO_INCLUDE_DIR}/coro.h")
     message(STATUS "Use bundled libcoro library: ${LIBCORO_LIBRARIES}")

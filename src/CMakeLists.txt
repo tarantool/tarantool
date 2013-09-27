@@ -195,14 +195,17 @@ function(tarantool_module mod)
         GENERATED True)
     unset(cfg_c_flags)
     if (ENABLE_DTRACE)
-        foreach(tmp_o in ${DTRACE_OBJS})
-            set_source_files_properties(${tmp_o}
-                PROPERTIES
-                EXTERNAL_OBJECT true
-                GENERATED true
-            )
-        endforeach(tmp_o)
-        set(module_sources ${module_sources} ${DTRACE_OBJS})
+        set(dtrace_obj ${DTRACE_O_DIR}/dtrace_${mod}.o)
+        add_custom_command(OUTPUT ${dtrace_obj}
+            COMMAND ${DTRACE} -G -s ${DTRACE_D_FILE} -o ${dtrace_obj} ${DTRACE_OBJS} 
+        )
+        set_source_files_properties(${dtrace_obj}
+            PROPERTIES
+            EXTERNAL_OBJECT true
+            GENERATED true
+        )
+        set(module_sources ${module_sources} ${dtrace_obj})
+        unset(dtrace_obj)
     endif()
     add_executable(tarantool_${mod}
         ${module_sources}

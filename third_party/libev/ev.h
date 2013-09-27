@@ -840,10 +840,9 @@ EV_API_DECL void ev_async_send     (EV_P_ ev_async *w) EV_THROW;
 #endif
 
 #ifdef ENABLE_DTRACE
-#include "ev_dtrace.h"
+#include <include/dtrace.h>
 #else
-#define EV_TICK_START(arg0)
-#define EV_TICK_STOP(arg0)
+#include <include/no_dtrace.h>
 #endif
 
 EV_CPP(})
