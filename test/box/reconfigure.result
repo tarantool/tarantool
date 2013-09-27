@@ -50,6 +50,18 @@ box.cfg.too_long_threshold
 ---
 - 2
 ...
+box.cfg.snap_io_rate_limit
+---
+- 10
+...
+box.cfg.reload()
+---
+- ok
+...
+box.cfg.snap_io_rate_limit
+---
+- 1
+...
 box.cfg.reload()
 ---
 - error: 'can''t open config `tarantool.cfg''.

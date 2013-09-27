@@ -1210,7 +1210,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	row_header_sign(&row->header);
 
 	fio_batch_add(batch, row, wal_row_size(row));
-	bytes += row_v11_size(row);
+	bytes += wal_row_size(row);
 
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
