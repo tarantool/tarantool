@@ -249,7 +249,7 @@ void
 box_free(void)
 {
 	schema_free();
-	tuple_free();
+	tuple_format_free();
 }
 
 void
@@ -258,7 +258,7 @@ box_init()
 	title("loading");
 	atexit(box_free);
 
-	tuple_init();
+	tuple_format_init();
 	schema_init();
 
 	/* recovery initialization */

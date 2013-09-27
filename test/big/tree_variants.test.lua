@@ -22,11 +22,11 @@ space:insert(9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'f
 
 space:select(0, 1)
 space:select(1,'00000002')
-{space:select(2,'00000300')}
-{space:select(3, 'Joe', 'Sixpack')}
-{space:select(3, 'John')}
-{space:select(4, 'A Pipe')}
-{space:select(4, 'Miller Genuine Draft', 'Drinks')}
+space:select(2,'00000300')
+#{space:select(3, 'Joe', 'Sixpack')}
+#{space:select(3, 'John')}
+#{space:select(4, 'A Pipe')}
+space:select(4, 'Miller Genuine Draft', 'Drinks')
 space:select(5, 2007)
 space:select(6, 'Miller Genuine Draft', 'Drinks')
 

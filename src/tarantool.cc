@@ -84,6 +84,8 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
+uint32_t snapshot_version = 0;
+
 extern const void *opt_def;
 
 static int
@@ -311,11 +313,20 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
+void snapshot_exit(int code, void* arg) {
+	(void)arg;
+	fflush(NULL);
+	_exit(code);
+}
+
 int
 snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
+
+	/* increment snapshot version */
+	snapshot_version++;
 
 	pid_t p = fork();
 	if (p < 0) {
@@ -329,6 +340,8 @@ snapshot(void)
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
+	salloc_protect();
+
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
 
@@ -337,6 +350,14 @@ snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
+	/*
+	 * We must avoid double destruction of tuples on exit.
+	 * Since there is no way to remove existing handlers
+	 * registered in the master process, and snapshot_save()
+	 * may call exit(), push a top-level handler which will do
+	 * _exit() for us.
+	 */
+	on_exit(snapshot_exit, NULL);
 	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);
