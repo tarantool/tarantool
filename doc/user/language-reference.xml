@@ -183,20 +183,23 @@
         Take a snapshot of all data and store it in
         <filename><olink
         targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
-        To take a snapshot, Tarantool forks and quickly
-        <function>munmap(2)</function>s all memory except the area 
-        where tuples are stored. Since all modern operating systems support
-        virtual memory copy-on-write, this effectively creates a
-        consistent snapshot of all tuples in the child process,
-        which is then written to disk tuple by tuple. Since a
-        snapshot is written sequentially, you can expect a very
+        To take a snapshot, Tarantool first enters the delayed
+        garbage collection mode for all data. In this mode,
+        tuples which were allocated before the snapshot has
+        started are not freed until the snapshot has finished.
+        To preserve consistency of the primary key, used to
+        iterate over tuples, a copy-on-write technique is employed.
+        If the master process changes part of a primary key, 
+        the corresponding process page is split, and the snapshot
+        process obtains an old copy of the page. Since a
+        snapshot is written sequentially, one can expect a very
         high write performance (averaging to 80MB/second on modern
         disks), which means an average database instance gets
         saved in a matter of minutes.  Note, that as long as there
-        are any changes to the parent memory through concurrent
+        are any changes to the parent index memory through concurrent
         updates, there are going to be page splits, and therefore
-        you need to have some extra free memory to run this
-        command. 15%-30% of <olink targetptr="slab_alloc_arena"/>
+        one needs to have some extra free memory to run this
+        command. 10% of <olink targetptr="slab_alloc_arena"/>
         is, on average, sufficient. This statement waits until a
         snapshot is taken and returns operation result. For
         example:

@@ -216,7 +216,7 @@ space_free(void)
 				mh_i32ptr_node(spaces, i)->val;
 		space_delete(space);
 	}
-	tuple_free();
+	tuple_format_free();
 }
 
 
@@ -265,7 +265,7 @@ void
 space_init(void)
 {
 	spaces = mh_i32ptr_new();
-	tuple_init();
+	tuple_format_init();
 
 	/* configure regular spaces */
 	space_config();
