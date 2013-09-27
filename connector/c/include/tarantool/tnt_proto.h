@@ -33,6 +33,7 @@
 #define TNT_OP_INSERT      13
 #define TNT_OP_SELECT      17
 #define TNT_OP_UPDATE      19
+#define TNT_OP_DELETE_1_3  20
 #define TNT_OP_DELETE      21
 #define TNT_OP_CALL        22
 #define TNT_OP_PING        65280
@@ -52,6 +53,10 @@ struct tnt_header {
 struct tnt_header_insert {
 	uint32_t ns;
 	uint32_t flags;
+};
+
+struct tnt_header_delete_1_3 {
+	uint32_t ns;
 };
 
 struct tnt_header_delete {

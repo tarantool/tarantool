@@ -149,13 +149,21 @@ lbox_ipc_channel_put(struct lua_State *L)
 	lua_pushnumber(L, rid);
 	lua_pushvalue(L, 2);
 	lua_settable(L, -4);
+
+
+	int retval;
+	if (ipc_channel_put_timeout(ch, (void *)rid, timeout) == 0) {
+		retval = 1;
+	} else {
+		/* put timeout */
+		retval = 0;
+		lua_pushnumber(L, rid);
+		lua_pushnil(L);
+		lua_settable(L, -4);
+	}
+
 	lua_settop(L, top);
-
-
-	if (ipc_channel_put_timeout(ch, (void *)rid, timeout) == 0)
-		lua_pushboolean(L, 1);
-	else
-		lua_pushboolean(L, 0);
+	lua_pushboolean(L, retval);
 	return 1;
 }
 

@@ -245,8 +245,6 @@ The script understands some additional options in tarantool.cfg:
 Count of snapshots to save (default = 10). COUNT=0 disables removing
 old snapshots.
 
-=item
-
 =back
 
 =head1 OPTIONS

@@ -42,7 +42,7 @@
 #include <getopt.h>
 #include <libgen.h>
 #include <sysexits.h>
-#ifdef TARGET_OS_LINUX
+#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
 #include <admin.h>
@@ -84,7 +84,6 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
-bool booting = true;
 extern const void *opt_def;
 
 static int
@@ -800,7 +799,7 @@ main(int argc, char **argv)
 			say_syserror("setrlimit");
 			exit(EX_OSERR);
 		}
-#ifdef TARGET_OS_LINUX
+#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
 			say_syserror("prctl");
 			exit(EX_OSERR);
@@ -827,9 +826,7 @@ main(int argc, char **argv)
 		create_pid();
 	}
 
-	say_logger_init(cfg.logger_nonblock);
-
-	/* init process title */
+	/* init process title - used for logging */
 	if (cfg.custom_proc_title == NULL) {
 		custom_proc_title = (char *) palloc(eter_pool, 1);
 		custom_proc_title[0] = '\0';
@@ -839,7 +836,7 @@ main(int argc, char **argv)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	booting = false;
+	say_logger_init(cfg.logger_nonblock);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);

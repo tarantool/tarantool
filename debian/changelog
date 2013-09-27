@@ -1,13 +1,47 @@
-tarantool (1.5.3.157.g1c06d59-1) unstable; urgency=low
+tarantool (1.5.1.84.g9f2e646-1) unstable; urgency=low
+
+  * Drop BSD dependencies in Debian/kFreeBSD (try to fix FTBFS with Debian/BSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 15:52:39 +0400
+
+tarantool (1.5.1.82.ga064ebe-1) unstable; urgency=low
+
+  * Remove tarantool/config.h pointedly (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Sep 2013 13:35:06 +0400
+
+tarantool (1.5.1.81.g4382f16-1) unstable; urgency=low
+
+  * Fix debian/rules clean section (cleanup CMake files).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 23:05:29 +0400
+
+tarantool (1.5.1.80.gc84e35c-1) unstable; urgency=low
+
+  * New snapshot (try to fix FTBFS with Debian/kFreeBSD).
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 22:14:09 +0400
+
+tarantool (1.5.1.78.g2e82d26-1) unstable; urgency=low
+
+  * New snapshot. Integration upload.
+   - Add missing copyright holders, closes: #722059
+   - Drop non-free materials from tarbal, closes: #722060
+   - Fix memory leak in box.ipc.channel:put.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Sun, 08 Sep 2013 02:00:51 +0400
+
+tarantool (1.5.1.76.g5ed3fbe-1) unstable; urgency=low
 
   * New snapshot.
+   - Fix memory leak in box.ipc.channel:put(v, 0)
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 05 Sep 2013 14:36:52 +0400
+
+tarantool (1.5.1.73.gd1b3db6-1) unstable; urgency=low
+
+  * New snapshot
    - Fix crashes with broken snapshot.
-
- -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 16 Aug 2013 15:09:06 +0400
-
-tarantool (1.5.3.120.g68b26b6-1) unstable; urgency=low
-
-  * New snapshot.
    - Cleanup debian/copyright (drop php-connector section).
    - Drop empty TODO files from binary packages.
    - debian/* relicensed as tarantool.
@@ -15,19 +49,14 @@ tarantool (1.5.3.120.g68b26b6-1) unstable; urgency=low
      that contain ELF-files.
    - Fix FTBFS with Debian/kFreeBSD, closes: #715358.
    - Drop irrelevant debian/README.source.
-
- -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 12 Aug 2013 14:06:16 +0400
-
-tarantool (1.4.9+20130620.1443-1) experimental; urgency=low
-
-  * New snapshot.
    - Add postgresql-plugin package.
    - Add mysql-plugin package.
    - Add -plugins package (Now it depends on other plugin. Then it will
      contain some internal tarantool plugins).
+   - Remove non-free rfc4627.txt.
    - Update debian/copyright.
 
- -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 20 Jun 2013 14:42:48 +0400
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 04 Sep 2013 12:45:34 +0400
 
 tarantool (1.4.9+20130611.2012-1) unstable; urgency=low
 

@@ -125,14 +125,22 @@ extern struct errcode_record tnt_error_codes[];
 
 static inline const char *tnt_errcode_str(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX) {
+		/* Unknown error code - can be triggered using box.raise() */
+		return "ER_UNKNOWN";
+	}
 	return tnt_error_codes[errcode].errstr;
 }
 
 
 /** Return a 4-byte numeric error code, with status flags. */
 
+
 static inline uint32_t tnt_errcode_val(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX)
+		return (errcode << 8) | 2; /* non-recoverable */
+
 	return (errcode << 8) | tnt_error_codes[errcode].errflags;
 }
 
@@ -141,8 +149,10 @@ static inline uint32_t tnt_errcode_val(uint32_t errcode)
 
 static inline const char *tnt_errcode_desc(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX)
+		return "";
+
 	return tnt_error_codes[errcode].errdesc;
 }
-
 
 #endif /* TARANTOOL_ERRCODE_H_INCLUDED */

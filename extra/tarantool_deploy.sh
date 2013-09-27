@@ -115,6 +115,9 @@ deploy() {
 
 	# setup startup script
 	try "ln -s \"${prefix_etc}/init.d/tarantool_box\" \"${prefix_etc}/init.d/tarantool_box$id\""
+
+	# register service
+	[ -x /sbin/chkconfig ] && try "/sbin/chkconfig --add tarantool_box$id"
 }
 
 deploy_check() {

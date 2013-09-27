@@ -120,7 +120,7 @@ int wait_for_child(pid_t pid);
 static inline const char *
 fiber_name(struct fiber *f)
 {
-	return palloc_name(f->gc_pool);
+	return f->gc_pool ? palloc_name(f->gc_pool) : "(none)";
 }
 
 void

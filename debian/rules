@@ -36,12 +36,20 @@ DEB_BUILDDIR := build-area
 
 tarball: clean
 	git describe > VERSION
-	cd .. && tar --exclude=.git --exclude=debian \
+	cd .. && tar --exclude=.git --exclude=debian 		\
+		--exclude=rfc4627.txt				\
+		--exclude=doc/www-data/ycsb			\
 		-czf tarantool_$(UVERSION).orig.tar.gz tarantool-$(UVERSION)
 
 clean::
 	find -type f -name \*.pyc -delete
-#	find test -name \*.reject -delete
+	find -type d -name CMakeFiles -exec rm -fr '{}' +
+	rm -f CMakeCache.txt
+	rm -f CPackConfig.cmake
+	rm -f CPackSourceConfig.cmake
+	rm -f include/tarantool/config.h
+	rm -f doc/tnt.ent
+	rm -f www-data.in/download
 
 install/tarantool-dbg::
 	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg

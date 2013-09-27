@@ -35,7 +35,9 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef __linux__
 #include <malloc.h>
+#endif
 
 #include <connector/c/include/tarantool/tnt.h>
 

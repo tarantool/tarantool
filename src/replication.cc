@@ -119,7 +119,7 @@ spawner_main_loop();
 static void
 spawner_shutdown();
 
-/** Handle SIGINT, SIGTERM, SIGPIPE, SIGHUP. */
+/** Handle SIGINT, SIGTERM, SIGHUP. */
 static void
 spawner_signal_handler(int signal);
 
@@ -327,8 +327,7 @@ spawner_init(int sock)
 
 	if (sigaction(SIGHUP, &sa, NULL) == -1 ||
 	    sigaction(SIGINT, &sa, NULL) == -1 ||
-	    sigaction(SIGTERM, &sa, NULL) == -1 ||
-	    sigaction(SIGPIPE, &sa, NULL) == -1)
+	    sigaction(SIGTERM, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
 	sa.sa_handler = spawner_sigchld_handler;
@@ -341,15 +340,17 @@ spawner_init(int sock)
 	 * Ignore SIGUSR1, SIGUSR1 is used to make snapshots,
 	 * and if someone wrote a faulty regexp for `ps' and
 	 * fed it to `kill' the replication shouldn't die.
-	 */
-	if (sigaction(SIGUSR1, &sa, NULL) == -1)
-		say_syserror("sigaction");
-	/*
 	 * Ignore SIGUSR2 as well, since one can be pretty
 	 * inventive in ways of shooting oneself in the foot.
+	 * Ignore SIGPIPE, otherwise we may receive SIGPIPE
+	 * when trying to write to the log.
 	 */
-	if (sigaction(SIGUSR2, &sa, NULL) == -1)
+	if (sigaction(SIGUSR1, &sa, NULL) == -1 ||
+	    sigaction(SIGUSR2, &sa, NULL) == -1 ||
+	    sigaction(SIGPIPE, &sa, NULL) == -1) {
+
 		say_syserror("sigaction");
+	}
 
 	say_crit("initialized");
 	spawner_main_loop();
@@ -636,23 +637,21 @@ replication_relay_loop(int client_sock)
 	    sigaction(SIGTERM, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
-	/* Ignore SIGPIPE, we already handle EPIPE. */
-	sa.sa_handler = SIG_IGN;
-	if (sigaction(SIGPIPE, &sa, NULL) == -1)
-		say_syserror("sigaction");
 	/*
+	 * Ignore SIGPIPE, we already handle EPIPE.
 	 * Ignore SIGUSR1, SIGUSR1 is used to make snapshots,
 	 * and if someone wrote a faulty regexp for `ps' and
 	 * fed it to `kill' the replication shouldn't die.
-	 */
-	if (sigaction(SIGUSR1, &sa, NULL) == -1)
-		say_syserror("sigaction");
-	/*
 	 * Ignore SIGUSR2 as well, since one can be pretty
 	 * inventive in ways of shooting oneself in the foot.
 	 */
-	if (sigaction(SIGUSR2, &sa, NULL) == -1)
+	sa.sa_handler = SIG_IGN;
+	if (sigaction(SIGPIPE, &sa, NULL) == -1 ||
+	    sigaction(SIGUSR1, &sa, NULL) == -1 ||
+	    sigaction(SIGUSR2, &sa, NULL) == -1) {
+
 		say_syserror("sigaction");
+	}
 
 	r = read(client_sock, &lsn, sizeof(lsn));
 	if (r != sizeof(lsn)) {

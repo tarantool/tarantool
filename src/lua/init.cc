@@ -858,6 +858,8 @@ lbox_fiber_self(struct lua_State *L)
 static int
 lbox_fiber_find(struct lua_State *L)
 {
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.find(): bad arguments");
 	int fid = lua_tointeger(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)
@@ -982,7 +984,7 @@ tarantool_lua_printstack(struct lua_State *L, struct tbuf *out)
 			const char *sz = tarantool_lua_tostring(L, i);
 			int len = strlen(sz);
 			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
-			tbuf_printf(out, "%-.*s" CRLF, len - chop, sz);
+			tbuf_printf(out, "%-.*s", len - chop, sz);
 		} else
 			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
 	}
