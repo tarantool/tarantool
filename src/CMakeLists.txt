@@ -194,7 +194,7 @@ function(tarantool_module mod)
         PROPERTIES COMPILE_FLAGS ${cfg_c_flags}
         GENERATED True)
     unset(cfg_c_flags)
-    if (ENABLE_DTRACE)
+    if (ENABLE_DTRACE AND NOT TARGET_OS_DARWIN)
         set(dtrace_obj ${DTRACE_O_DIR}/dtrace_${mod}.o)
         add_custom_command(OUTPUT ${dtrace_obj}
             COMMAND ${DTRACE} -G -s ${DTRACE_D_FILE} -o ${dtrace_obj} ${DTRACE_OBJS} 

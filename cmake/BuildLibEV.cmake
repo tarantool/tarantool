@@ -42,7 +42,7 @@ macro(libev_build)
 
     add_library(ev STATIC ${libev_src})
 
-    if (ENABLE_DTRACE)
+    if (ENABLE_DTRACE AND NOT TARGET_OS_DARWIN)
         dtrace_do_lib(ev tarantool_ev.c.o CMakeFiles/ev.dir/third_party) 
         set(LIBEV_LIBRARIES ev_dtrace)
     else()

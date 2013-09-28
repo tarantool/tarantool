@@ -7,7 +7,7 @@ macro(libcoro_build)
 
     add_library(coro STATIC ${coro_src})
 
-    if (ENABLE_DTRACE)
+    if (ENABLE_DTRACE AND NOT TARGET_OS_DARWIN)
         dtrace_do_lib(coro coro.c.o CMakeFiles/coro.dir/third_party/coro)
         set(LIBCORO_LIBRARIES coro_dtrace)
     else()
