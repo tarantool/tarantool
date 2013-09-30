@@ -152,13 +152,14 @@ int tnt_rpl_open(struct tnt_stream *s, uint64_t lsn)
 	struct tnt_stream_net *sn = TNT_SNET_CAST(sr->net);
 
 	/* handshake : send version */
-	if (tnt_io_send_raw(sn, (char*)&tnt_rpl_version, sizeof(tnt_rpl_version), 1) == -1)
+	uint32_t send_version[3] = { tnt_rpl_version, 0, 0 };
+	if (tnt_io_send_raw(sn, (char*)send_version, sizeof(send_version), 1) == -1)
 		return -1;
 	/* handshake : reading and checking version */
-	uint32_t version = 0;
-	if (tnt_io_recv_raw(sn, (char*)&version, sizeof(version), 1) == -1)
+	uint32_t recv_version[3] = { 0 };
+	if (tnt_io_recv_raw(sn, (char*)recv_version, sizeof(recv_version), 1) == -1)
 		return -1;
-	if (version != tnt_rpl_version)
+	if (recv_version[0] != tnt_rpl_version)
 		return -1;
 
 	/* sending request */
