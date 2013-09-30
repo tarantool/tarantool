@@ -80,10 +80,10 @@ check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)
 if (HAVE_SENDFILE)
-message (STATUS "sendfile found, let's find what version was found")
-check_prototype_definition(sendfile "ssize_t sendfile(int out_fd, int in_fd, off_t * offset, size_t count)" "0" "sys/sendfile.h" HAVE_SENDFILE_LINUX)
-check_prototype_definition(sendfile "int sendfile(int fd, int s, off_t offset, size_t nbytes, struct sf_hdtr *hdtr, off_t *sbytes, int flags)" "0" "" HAVE_SENDFILE_BSD)
-endif ()
+   message (STATUS "sendfile found, let's find what version was found")
+   check_prototype_definition(sendfile "ssize_t sendfile(int out_fd, int in_fd, off_t * offset, size_t count)" "0" "sys/sendfile.h" HAVE_SENDFILE_LINUX)
+   check_prototype_definition(sendfile "int sendfile(int fd, int s, off_t offset, size_t nbytes, struct sf_hdtr *hdtr, off_t *sbytes, int flags)" "0" "" HAVE_SENDFILE_BSD)
+endif()
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end

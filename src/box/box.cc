@@ -147,7 +147,11 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		box_process = process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		recovery_follow_remote(recovery_state, conf->replication_source);
+		if (conf->replica_1_5_mode) {
+			recovery_follow_remote_1_5(recovery_state, conf->replication_source);
+		} else {
+			recovery_follow_remote(recovery_state, conf->replication_source);
+		}
 
 		snprintf(status, sizeof(status), "replica/%s%s",
 			 conf->replication_source, custom_proc_title);
@@ -236,8 +240,13 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 			return -1;
 		}
-		if (recovery_state->remote)
-			recovery_stop_remote(recovery_state);
+		if (recovery_state->remote) {
+			if (old_conf->replica_1_5_mode) {
+				recovery_stop_remote_1_5(recovery_state);
+			} else {
+				recovery_stop_remote(recovery_state);
+			}
+		}
 
 		box_enter_master_or_replica_mode(new_conf);
 	}

@@ -329,43 +329,41 @@ init_storage_from_master(struct log_dir *dir)
 	}
 	addr.sin_port = htons(port);
 
-	FDHolder sock_fd_holder(sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
-	sio_connect(sock_fd_holder, &addr, sizeof(addr));
+	int sock_fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	FDHolder sock_fd_holder(sock_fd);
+	sio_connect(sock_fd, &addr, sizeof(addr));
 
-	uint32_t replica_version = default_version, master_version = 0;
-	sio_writen_timeout(sock_fd_holder, &replica_version,
+	uint32_t replica_version[3] = { default_version,
+		get_package_version_packed(), 0 };
+	uint32_t master_version[3] = { 0 };
+	sio_writen_timeout(sock_fd, replica_version,
 		sizeof(replica_version), 10);
-	sio_readn_timeout(sock_fd_holder, &master_version,
+	sio_readn_timeout(sock_fd, master_version,
 		sizeof(master_version), 10);
 
-	if (master_version == 0) {
-		say_error("handshake %d", master_version);
-		return;
-	} else if (master_version < 12) {
-		say_error("master is too old %d", master_version);
-		return;
-	} else if (master_version > 256*256) {
-		say_error("invalid master version %d", master_version);
+	if (master_version[0] != default_version) {
+		say_error("invalid master version %d", master_version[0]);
 		return;
 	}
 
 	uint32_t request = RPL_GET_SNAPSHOT;
-	sio_writen_timeout(sock_fd_holder, &request, sizeof(request), 10);
+	sio_writen_timeout(sock_fd, &request, sizeof(request), 10);
 
 	uint64_t recv_buf[2];
-	sio_readn_timeout(sock_fd_holder, recv_buf, sizeof(recv_buf), 10);
+	sio_readn_timeout(sock_fd, recv_buf, sizeof(recv_buf), 10);
 	uint64_t lsn = recv_buf[0];
 	uint64_t file_size = recv_buf[1];
 
 	const char* filename = format_filename(dir, lsn, NONE);
-	FDHolder file_fd_holder(open(filename,
-		O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode));
+	int file_fd = open(filename,
+			O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
+	FDHolder file_fd_holder(file_fd);
 
-	if (file_fd_holder < 0) {
+	if (file_fd < 0) {
 		say_error("failed to create initial snapshot file");
 		return;
 	}
-	sio_recvfile(sock_fd_holder, file_fd_holder, NULL, file_size);
+	sio_recvfile(sock_fd, file_fd, NULL, file_size);
 
 	say_info("done");
 }
@@ -1386,6 +1384,36 @@ read_log(const char *filename,
 	log_io_cursor_close(&i);
 	log_io_close(&l);
 	return 0;
+}
+
+uint32_t get_package_version_packed()
+{
+	static uint32_t result = 0xFEFEFEFE;
+	if (result == 0xFEFEFEFE) {
+		uint32_t parts[4] = { 0 };
+		size_t reading_part = 0;
+		for (const char *p = PACKAGE_VERSION;
+			*p && reading_part < sizeof(parts) / sizeof(parts[0]); ++p) {
+			if (*p >= '0' && *p <= '9') {
+				parts[reading_part] = parts[reading_part] * 10 + (*p - '0');
+			} else {
+				reading_part++;
+			}
+		}
+		result = 0;
+		for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+			if (parts[i] > 0xFF) {
+				say_warn("Package version has part, greater than 255: "
+					"truncating: %u.%u.%u.%u",
+					parts[0], parts[1], parts[2], parts[3]);
+				parts[i] = 0xFF;
+			}
+			result = (result << 8) | parts[i];
+		}
+		say_info("Package version: %u.%u.%u.%u",
+			parts[0], parts[1], parts[2], parts[3]);
+	}
+	return result;
 }
 
 /* }}} */

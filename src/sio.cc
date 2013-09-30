@@ -84,11 +84,6 @@ void FDHolder::Reset(int _fd)
 	fd = _fd;
 }
 
-FDHolder::operator int()
-{
-	return fd;
-}
-
 /** Pretty print socket name and peer (for exceptions) */
 const char *
 sio_socketname(int fd)
@@ -316,7 +311,7 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 
 ssize_t
 sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
-		float timeout)
+		       ev_tstamp timeout)
 {
 	pollfd pfd;
 	pfd.events = POLLIN;
@@ -346,19 +341,19 @@ sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
 }
 
 ssize_t
-sio_read_timeout(int fd, void *buf, size_t buf_size, float timeout)
+sio_read_timeout(int fd, void *buf, size_t buf_size, ev_tstamp timeout)
 {
 	return sio_read_ahead_timeout(fd, buf, 1, buf_size, timeout);
 }
 
 ssize_t
-sio_readn_timeout(int fd, void *buf, size_t count, float timeout)
+sio_readn_timeout(int fd, void *buf, size_t count, ev_tstamp timeout)
 {
 	return sio_read_ahead_timeout(fd, buf, count, count, timeout);
 }
 
 ssize_t
-sio_writen_timeout(int fd, const void *buf, size_t count, float timeout)
+sio_writen_timeout(int fd, const void *buf, size_t count, ev_tstamp timeout)
 {
 	pollfd pfd;
 	pfd.events = POLLOUT;

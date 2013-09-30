@@ -61,6 +61,7 @@ set (common_sources
      admin.cc
      cpu_feature.c
      replica.cc
+     replica.1.5.cc
      iproto.cc
      iproto_port.cc
      session.cc

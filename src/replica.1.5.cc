@@ -37,11 +37,13 @@
 #include "pickle.h"
 #include "coio_buf.h"
 
-static void
-remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
+static const uint32_t version_1_5 = 11;
 
-const char *
-remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
+static void
+remote_apply_row_1_5(struct recovery_state *r, const char *row, uint32_t rowlne);
+
+static const char *
+remote_read_row_1_5(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
 {
 	struct ibuf *in = &iobuf->in;
 	ssize_t to_read = sizeof(struct row_header) - ibuf_size(in);
@@ -65,7 +67,7 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
 }
 
 static void
-remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
+remote_connect_1_5(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       int64_t initial_lsn, const char **err)
 {
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -80,7 +82,7 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't read version";
 	coio_readn(coio, &version, sizeof(version));
 	*err = NULL;
-	if (version != default_version)
+	if (version != version_1_5)
 		tnt_raise(IllegalParams, "remote version mismatch");
 
 	say_crit("successfully connected to master");
@@ -88,7 +90,7 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 }
 
 static void
-pull_from_remote(va_list ap)
+pull_from_remote_1_5(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct ev_io coio;
@@ -105,20 +107,20 @@ pull_from_remote(va_list ap)
 			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber));
-				remote_connect(&coio, &r->remote->addr,
+				remote_connect_1_5(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;
 			}
 			err = "can't read row";
 			uint32_t rowlen;
-			const char *row = remote_read_row(&coio, iobuf, &rowlen);
+			const char *row = remote_read_row_1_5(&coio, iobuf, &rowlen);
 			fiber_setcancellable(false);
 			err = NULL;
 
 			r->remote->recovery_lag = ev_now() - row_header(row)->tm;
 			r->remote->recovery_last_update_tstamp = ev_now();
 
-			remote_apply_row(r, row, rowlen);
+			remote_apply_row_1_5(r, row, rowlen);
 
 			iobuf_gc(iobuf);
 			fiber_gc();
@@ -141,7 +143,7 @@ pull_from_remote(va_list ap)
 }
 
 static void
-remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlen)
+remote_apply_row_1_5(struct recovery_state *r, const char *row, uint32_t rowlen)
 {
 	int64_t lsn = row_header(row)->lsn;
 
@@ -154,7 +156,7 @@ remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlen)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *addr)
+recovery_follow_remote_1_5(struct recovery_state *r, const char *addr)
 {
 	char name[FIBER_NAME_MAXLEN];
 	char ip_addr[32];
@@ -169,7 +171,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	snprintf(name, sizeof(name), "replica/%s", addr);
 
 	try {
-		f = fiber_new(name, pull_from_remote);
+		f = fiber_new(name, pull_from_remote_1_5);
 	} catch (const Exception& ) {
 		return;
 	}
@@ -195,7 +197,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 }
 
 void
-recovery_stop_remote(struct recovery_state *r)
+recovery_stop_remote_1_5(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
 	fiber_cancel(r->remote->reader);

@@ -39,6 +39,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "exception.h"
+#include <tarantool_ev.h>
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
@@ -54,7 +55,6 @@ public:
 	~FDHolder();
 	int Release();
 	void Reset(int _fd = -1);
-	operator int();
 
 private:
 	int fd;
@@ -92,55 +92,55 @@ ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
 
 /**
- * reads at least count bytes, buf_size maximum from fd.
- * throws on error or disconnect. returns count of bytes actually read.
- * returns if no activity occurred during timeout seconds
-  * timeout is the only reason to return value less than count parameter.
+ * Read at least count bytes, buf_size maximum from fd.
+ * Throw on error or disconnect. Return count of bytes actually read.
+ * Return if no activity occurred during timeout seconds.
+ * timeout is the only reason to return value less than count parameter.
  * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
 sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
-		float timeout);
+		       ev_tstamp timeout);
 
 /**
- * reads from fd, buf_size maximum bytes.
- * throws on error or disconnect. returns count of bytes actually read.
- * returns if no activity occurred during timeout seconds
+ * Read from fd, buf_size maximum bytes.
+ * Throw on error or disconnect. Return count of bytes actually read.
+ * Return if no activity occurred during timeout seconds.
  * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
-sio_read_timeout(int fd, void *buf, size_t buf_size, float timeout_ms);
+sio_read_timeout(int fd, void *buf, size_t buf_size, ev_tstamp timeout_ms);
 
 /**
- * reads count bytes from fd.
- * throws on error or disconnect. returns count of bytes actually read.
- * returns if no activity occurred during timeout seconds
+ * Read count bytes from fd.
+ * Throw on error or disconnect. Return count of bytes actually read.
+ * Return if no activity occurred during timeout seconds.
  * timeout is the only reason to return value, different from count parameter.
  * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
-sio_readn_timeout(int fd, void *buf, size_t count, float timeout);
+sio_readn_timeout(int fd, void *buf, size_t count, ev_tstamp timeout);
 
 /**
- * writes count bytes to fd.
- * throws on error or disconnect. returns count of bytes actually written.
- * returns if no activity occurred during timeout seconds
+ * Write count bytes to fd.
+ * Throw on error or disconnect. Return count of bytes actually written.
+ * Return if no activity occurred during timeout seconds.
  * timeout is the only reason to return value, different from count parameter.
  * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
  */
 ssize_t
-sio_writen_timeout(int fd, const void *buf, size_t count, float timeout);
+sio_writen_timeout(int fd, const void *buf, size_t count, ev_tstamp timeout);
 
 /**
- * wrap over sendfile.
- * throws if send file failed
+ * A wrapper over sendfile.
+ * Throw if send file failed.
  */
 ssize_t
 sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size);
 
 /**
- * receive a file sent by sendfile
- * throws if receiving failed
+ * Receive a file sent by sendfile
+ * Throw if receiving failed
  */
 ssize_t
 sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size);

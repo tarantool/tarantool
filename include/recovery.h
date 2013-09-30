@@ -137,6 +137,9 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
+void recovery_follow_remote_1_5(struct recovery_state *r, const char *addr);
+void recovery_stop_remote_1_5(struct recovery_state *r);
+
 enum rpl_request_type {
 	RPL_GET_WAL = 0,
 	RPL_GET_SNAPSHOT
@@ -152,6 +155,12 @@ void snapshot_save(struct recovery_state *r,
 
 void
 init_storage(struct log_dir *dir);
+
+/**
+ * Get version (defined in PACKAGE_VERSION), packed into uint32_t
+ * The highest byte or result means major version, next - minor etc.
+ */
+uint32_t get_package_version_packed();
 
 #if defined(__cplusplus)
 } /* extern "C" */

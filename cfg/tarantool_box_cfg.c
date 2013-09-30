@@ -60,6 +60,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
+	c->replica_1_5_mode = false;
 }
 
 int
@@ -104,6 +105,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
+	c->replica_1_5_mode = false;
 	return 0;
 }
 
@@ -209,6 +211,9 @@ static NameAtom _name__custom_proc_title[] = {
 };
 static NameAtom _name__replication_source[] = {
 	{ "replication_source", -1, NULL }
+};
+static NameAtom _name__replica_1_5_mode[] = {
+	{ "replica_1_5_mode", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t,_chk_ro, __flags)  do {                    \
@@ -692,6 +697,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->replication_source = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__replica_1_5_mode) ) {
+		if (opt->paramType != scalarType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool res;
+
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
+			res = true;
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
+			res = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->replica_1_5_mode != res)
+			return CNF_RDONLY;
+		c->replica_1_5_mode = res;
 	}
 	else {
 		return opt->optional ? CNF_OPTIONAL : CNF_MISSED;

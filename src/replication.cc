@@ -81,6 +81,8 @@ extern "C" {
  */
 static int master_to_spawner_socket;
 
+static const uint32_t supported_featutes = 0;
+
 /** Accept a new connection on the replication port: push the accepted socket
  * to the spawner.
  */
@@ -624,19 +626,20 @@ replication_relay_send_snapshot_by_file(int client_sock)
 	local_snap_dir.dirname = cfg.snap_dir;
 	int64_t lsn = greatest_lsn(&local_snap_dir);
 	const char* filename = format_filename(&local_snap_dir, lsn, NONE);
-	FDHolder file_fd_holder(open(filename,
-			O_RDONLY | local_snap_dir.open_wflags, local_snap_dir.mode));
-	if (file_fd_holder < 0) {
+	int file_fd = open(filename,
+			O_RDONLY | local_snap_dir.open_wflags, local_snap_dir.mode);
+	FDHolder file_fd_holder(file_fd);
+	if (file_fd < 0) {
 		say_error("can't find/open snapshot");
 		exit(EXIT_FAILURE);
 	}
 
-	uint64_t file_size = get_file_size(file_fd_holder);
+	uint64_t file_size = get_file_size(file_fd);
 	uint64_t send_buf[2];
 	send_buf[0] = lsn;
 	send_buf[1] = file_size;
 	sio_writen_timeout(client_sock, send_buf, sizeof(send_buf), -1);
-	sio_sendfile(client_sock, file_fd_holder, 0, file_size);
+	sio_sendfile(client_sock, file_fd, 0, file_size);
 
 	exit(EXIT_SUCCESS);
 }
@@ -688,22 +691,24 @@ replication_relay_loop(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	uint32_t master_version = default_version, replica_version = 0;
+	uint32_t master_version[3] = { default_version,
+			get_package_version_packed(), supported_featutes };
+	uint32_t replica_version[3] = { 0 };
 	ssize_t read_res = sio_readn_timeout(client_sock,
-			&replica_version, sizeof(replica_version), 10);
+			replica_version, sizeof(replica_version), 10);
 	if (read_res != sizeof(replica_version)) {
 		say_error("handshake failed");
 		exit(EXIT_FAILURE);
 	}
 	ssize_t write_res = sio_writen_timeout(client_sock,
-			&master_version, sizeof(master_version), 10);
+			master_version, sizeof(master_version), 10);
 	if (write_res != sizeof(master_version)) {
 		say_error("handshake failed");
 		exit(EXIT_FAILURE);
 	}
 
-	if (replica_version < 12) {
-		say_error("invalid replica version! %d", replica_version);
+	if (replica_version[0] < 12) {
+		say_error("invalid replica version! %d", replica_version[0]);
 		exit(EXIT_FAILURE);
 	}
 

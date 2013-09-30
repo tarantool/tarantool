@@ -38,10 +38,12 @@
 #include "coio_buf.h"
 #include "recovery.h"
 
+static const uint32_t supported_featutes = 0;
+
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
 
-const char *
+static const char *
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
 {
 	struct ibuf *in = &iobuf->in;
@@ -74,25 +76,29 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
-	uint32_t replica_version = default_version, master_version = 0;
-	ssize_t write_res = coio_write_timeout(coio, &replica_version,
+	uint32_t replica_version[3] = { default_version,
+		get_package_version_packed(), supported_featutes };
+	uint32_t master_version[3] = { 0 };
+	ssize_t write_res = coio_write_timeout(coio, replica_version,
 		sizeof(replica_version), 1.);
 	if(write_res != sizeof(replica_version)) {
 		tnt_raise(IllegalParams, "handshake failed");
 	}
-	ssize_t read_res = coio_readn_ahead_timeout(coio, &master_version,
+	ssize_t read_res = coio_readn_ahead_timeout(coio, master_version,
 		sizeof(master_version), sizeof(master_version), 1.);
 	if(read_res != sizeof(master_version)) {
 		tnt_raise(IllegalParams, "handshake failed");
 	}
 
-	if (master_version < 12 || master_version >= 256*256) {
+	if (master_version[0] != 12) {
 		tnt_raise(IllegalParams, "invalid remote version");
 	}
 
-	uint32_t request = RPL_GET_WAL;
-	coio_write(coio, &request, sizeof(request));
-	coio_write(coio, &initial_lsn, sizeof(initial_lsn));
+	struct send_request {
+		uint32_t request_type;
+		int64_t initial_lsn;
+	} __attribute__((packed)) send_request = { RPL_GET_WAL, initial_lsn };
+	coio_write(coio, &send_request, sizeof(send_request));
 
 	say_crit("successfully connected to master");
 	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);
