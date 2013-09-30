@@ -159,8 +159,12 @@ box.net = {
         -- for compatibility with the networked version,
         -- implement call
         call = function(self, proc_name, ...)
-            local proc = box.call_loadproc(proc_name)
-            return proc(...)
+            local proc = { box.call_loadproc(proc_name) }
+            if #proc == 2 then
+                return proc[1](proc[2], ...)
+            else
+                return proc[1](...)
+            end
         end,
 
         ping = function(self)

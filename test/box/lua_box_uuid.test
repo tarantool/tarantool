@@ -1,8 +1,0 @@
-# encoding: tarantool
-import os
-import sys
-
-print """# box.uuid()"""
-exec admin "lua string.len(box.uuid())"
-exec admin "lua string.len(box.uuid_hex())"
-exec admin "lua string.match(box.uuid_hex(), '^[a-f0-9]+$') ~= nil"

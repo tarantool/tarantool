@@ -43,20 +43,16 @@ extern "C" {
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"
-#include "memcached.h"
 #include "box_lua.h"
+#include "schema.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
 #include "txn.h"
-#include <third_party/base64.h>
 
-static void process_replica(struct port *port,
-			    uint32_t op, const char *reqdata, uint32_t reqlen);
-static void process_ro(struct port *port,
-		       uint32_t op, const char *reqdata, uint32_t reqlen);
-static void process_rw(struct port *port,
-		       uint32_t op, const char *reqdata, uint32_t reqlen);
+static void process_replica(struct port *port, struct request *request);
+static void process_ro(struct port *port, struct request *request);
+static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
@@ -64,10 +60,12 @@ static char status[64] = "unknown";
 
 static int stat_base;
 
+/** The snapshot row metadata repeats the structure of REPLACE request. */
 struct box_snap_row {
+	uint16_t op;
 	uint32_t space;
-	uint32_t tuple_size;
-	uint32_t data_size;
+	uint32_t flags;
+	uint32_t field_count;
 	char data[];
 } __attribute__((packed));
 
@@ -80,14 +78,13 @@ port_send_tuple(struct port *port, struct txn *txn, uint32_t flags)
 }
 
 static void
-process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_rw(struct port *port, struct request *request)
 {
 	struct txn *txn = txn_begin();
 
 	try {
-		struct request *request = request_create(op, reqdata, reqlen);
-		stat_collect(stat_base, op, 1);
-		request_execute(request, txn, port);
+		stat_collect(stat_base, request->type, 1);
+		request->execute(request, txn, port);
 		txn_commit(txn);
 		port_send_tuple(port, txn, request->flags);
 		port_eof(port);
@@ -99,83 +96,42 @@ process_rw(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
 }
 
 static void
-process_replica(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_replica(struct port *port, struct request *request)
 {
-	if (!request_is_select(op)) {
+	if (!request_is_select(request->type)) {
 		tnt_raise(ClientError, ER_NONMASTER,
 			  cfg.replication_source);
 	}
-	return process_rw(port, op, reqdata, reqlen);
+	return process_rw(port, request);
 }
 
 static void
-process_ro(struct port *port, uint32_t op, const char *reqdata, uint32_t reqlen)
+process_ro(struct port *port, struct request *request)
 {
-	if (!request_is_select(op))
+	if (!request_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
-	return process_rw(port, op, reqdata, reqlen);
-}
-
-static void
-recover_snap_row(const void *data)
-{
-	const struct box_snap_row *row = (const struct box_snap_row *) data;
-
-	struct space *space = space_find(row->space);
-	Index *index = space_index(space, 0);
-
-	struct tuple *tuple;
-	try {
-		const char *tuple_data = row->data;
-		tuple = tuple_new(space->format,
-				  row->tuple_size, &tuple_data,
-				  tuple_data + row->data_size);
-	} catch (const ClientError &e) {
-		say_error("\n"
-			  "********************************************\n"
-		          "* Found a corrupted tuple in the snapshot! *\n"
-		          "* This can be either due to a memory       *\n"
-		          "* corruption or a bug in the server.       *\n"
-		          "* The tuple can not be loaded.             *\n"
-		          "********************************************\n"
-		          "Tuple data, BAS64 encoded:                  \n");
-
-		int base64_buflen = base64_bufsize(row->data_size);
-		char *base64_buf = (char *) malloc(base64_buflen);
-		int len = base64_encode(row->data, row->data_size,
-					base64_buf, base64_buflen);
-		write(STDERR_FILENO, base64_buf, len);
-		free(base64_buf);
-		throw;
-	}
-	index->buildNext(tuple);
-	tuple_ref(tuple, 1);
+	return process_rw(port, request);
 }
 
 static int
 recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowlen)
 {
 	/* drop wal header */
-	if (rowlen < sizeof(struct header_v11)) {
+	if (rowlen < sizeof(struct row_header)) {
 		say_error("incorrect row header: expected %zd, got %zd bytes",
-			  sizeof(struct header_v11), (size_t) rowlen);
+			  sizeof(struct row_header), (size_t) rowlen);
 		return -1;
 	}
 
 	try {
 		const char *end = row + rowlen;
-		row += sizeof(struct header_v11);
-		uint16_t tag = pick_u16(&row, end);
+		row += sizeof(struct row_header);
+		(void) pick_u16(&row, end); /* drop tag - unused. */
 		(void) pick_u64(&row, end); /* drop cookie */
-		if (tag == SNAP) {
-			recover_snap_row(row);
-		} else if (tag == XLOG) {
-			uint16_t op = pick_u16(&row, end);
-			process_rw(&null_port, op, row, end - row);
-		} else {
-			say_error("unknown row tag: %i", (int)tag);
-			return -1;
-		}
+		uint16_t op = pick_u16(&row, end);
+		struct request request;
+		request_create(&request, op, row, end - row);
+		process_rw(&null_port, &request);
 	} catch (const Exception& e) {
 		e.log();
 		return -1;
@@ -199,8 +155,6 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		      custom_proc_title);
 	} else {
 		box_process = process_rw;
-
-		memcached_start_expire();
 
 		snprintf(status, sizeof(status), "primary%s",
 			 custom_proc_title);
@@ -262,22 +216,6 @@ box_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 
-	/* check if at least one space is defined */
-	if (conf->space == NULL && conf->memcached_port == 0) {
-		out_warning(CNF_OK, "at least one space or memcached port must be defined");
-		return -1;
-	}
-
-	/* check configured spaces */
-	if (check_spaces(conf) != 0) {
-		return -1;
-	}
-
-	/* check memcached configuration */
-	if (memcached_check_config(conf) != 0) {
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -298,10 +236,6 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 			return -1;
 		}
-
-		if (!old_is_replica && new_is_replica)
-			memcached_stop_expire();
-
 		if (recovery_state->remote)
 			recovery_stop_remote(recovery_state);
 
@@ -314,43 +248,35 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 void
 box_free(void)
 {
-	space_free();
+	schema_free();
+	tuple_format_free();
 }
 
 void
-box_init(bool init_storage)
+box_init()
 {
 	title("loading");
 	atexit(box_free);
 
-	/* initialization spaces */
-	space_init();
-	/* configure memcached space */
-	memcached_space_init();
+	tuple_format_init();
+	schema_init();
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, NULL,
-		      cfg.rows_per_wal,
-		      init_storage ? RECOVER_READONLY : 0);
+		      recover_row, NULL, cfg.rows_per_wal);
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
 	stat_base = stat_register(requests_strs, requests_MAX);
 
-	if (init_storage)
-		return;
-
-	begin_build_primary_indexes();
 	recover_snap(recovery_state);
-	end_build_primary_indexes();
+	space_end_recover_snapshot();
 	recover_existing_wals(recovery_state);
+	space_end_recover();
 
 	stat_cleanup(stat_base, requests_MAX);
-
-	say_info("building secondary indexes");
-	build_secondary_indexes();
 	title("orphan");
+
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
@@ -365,9 +291,10 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
+	header.op = REPLACE;
 	header.space = n;
-	header.tuple_size = tuple->field_count;
-	header.data_size = tuple->bsize;
+	header.flags = BOX_ADD;
+	header.field_count = tuple->field_count;
 
 	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
@@ -382,14 +309,18 @@ struct snapshot_space_param {
 static void
 snapshot_space(struct space *sp, void *udata)
 {
+	if (space_is_temporary(sp))
+		return;
 	struct tuple *tuple;
 	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
 	Index *pk = space_index(sp, 0);
-	struct iterator *it = pk->position();;
+	if (pk == NULL)
+		return;
+	struct iterator *it = pk->position();
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
-		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
+		snapshot_write_tuple(ud->l, ud->batch, space_id(sp), tuple);
 }
 
 void

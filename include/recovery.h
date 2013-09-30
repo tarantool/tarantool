@@ -41,8 +41,6 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-#define RECOVER_READONLY 1
-
 typedef int (row_handler)(void *, const char *, uint32_t);
 
 /** A "condition variable" that allows fibers to wait when a given
@@ -98,9 +96,8 @@ struct recovery_state {
 	 */
 	row_handler *row_handler;
 	void *row_handler_param;
-	int snap_io_rate_limit;
+	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
-	int flags;
 	double wal_fsync_delay;
 	struct wait_lsn wait_lsn;
 	enum wal_mode wal_mode;
@@ -112,7 +109,7 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   int rows_per_wal, int flags);
+		   int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
@@ -122,7 +119,7 @@ void recover_snap(struct recovery_state *);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
+int wal_write(struct recovery_state *r, int64_t lsn,
 	      uint16_t op, const char *data, uint32_t len);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
@@ -147,6 +144,9 @@ void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
 			const char *data, size_t data_size);
 void snapshot_save(struct recovery_state *r,
 		   void (*loop) (struct log_io *, struct fio_batch *));
+
+void
+init_storage(struct log_dir *dir);
 
 #if defined(__cplusplus)
 } /* extern "C" */

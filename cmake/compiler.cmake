@@ -100,9 +100,6 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX" "-std=gnu++0x")
     endif()
 
-    # Disable Run-time type information
-    add_compile_flags("CXX" "-fno-rtti")
-
     add_compile_flags("C;CXX"
         "-Wall"
         "-Wextra"

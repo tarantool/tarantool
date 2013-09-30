@@ -43,19 +43,10 @@ struct bitset_expr;
 
 class BitsetIndex: public Index {
 public:
-	BitsetIndex(struct key_def *key_def, struct space *space);
+	BitsetIndex(struct key_def *key_def);
 	virtual ~BitsetIndex();
-
-	virtual void beginBuild();
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-	virtual void build(Index *pk);
 	virtual size_t size() const;
-	virtual struct tuple *min() const;
-	virtual struct tuple *max() const;
-	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
-	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode);

@@ -17,7 +17,7 @@
   Unlike many other key/value servers, Tarantool uses
   different TCP ports and client/server protocols for data
   manipulation and administrative statements.
-  During start up, the server can connect to up to five TCP ports:
+  During start up, the server can connect to up to four TCP ports:
   <itemizedlist>
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
@@ -46,9 +46,6 @@
         set in the option file, the corresponding server process
         is not started.
       </para></listitem>
-    <listitem><para>Memcached port. Optional, read-write data port
-      that speaks Memcached text protocol. This port is off by default.
-    </para></listitem>
   </itemizedlist>
   In absence of authentication, this approach allows system
   administrators to restrict access to read/write or
@@ -57,7 +54,7 @@
   client automatically selects the correct port for you
   with help of a simple regular expression. SELECTs, UPDATEs,
   INSERTs, DELETEs and CALLs are sent to the primary port.
-  SHOW, RELOAD, SAVE and other statements are sent to the administrative port.
+  Lua commands are sent to the administrative port.
 </para>
 
 <section xml:id="data-manipulation">
@@ -121,49 +118,18 @@
     and
     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
   </para>
-  <section xml:id="memcached-protocol">
-    <title>Memcached protocol</title>
-      <para>If full access to Tarantool functionality is not needed,
-      or there is no readily available connector for the
-      programming language in use, any existing client driver for
-      Memcached will make do as a Tarantool connector.
-      To enable text Memcached protocol, turn on
-      <olink targetptr="memcached_port"/> in the option file.
-      Since Memcached has no notion of spaces or secondary
-      indexes, this port only makes it possible to access one
-      dedicated space (see <olink
-      targetptr="memcached_space"/>) via its primary key.
-      Unless tuple expiration is enabled with <olink
-      targetptr="memcached_expire"/>, TTL part of the message is
-      stored but ignored.
-     </para>
-     <para>
-       Notice, that <olink targetptr="memcached_space"/> is also
-       accessible using the primary port or Lua. A common use
-       of the Memcached port in Tarantool is when a Memcached default
-       expiration algorithm is insufficient, and a custom Lua
-       expiration procedure is used.
-     </para>
-     <para>
-      Tarantool does not support the binary protocol of Memcached.
-      If top performance is a must, Tarantool's own binary
-      protocol should be used.
-     </para>
-  </section>
 </section>
 
 <section xml:id="administrative-console">
   <title>Administrative console</title>
   <para>
-    The administrative console uses a simple text protocol.
-    All commands are case-insensitive.
-    You can connect to the administrative port using any
-    <command>telnet</command> client, or a tool like
+    The administrative console is simply an outlet of the Tarantool
+    Lua interpreter.  You can connect to the administrative port
+    using any <command>telnet</command> client, or a tool like
     <command>rlwrap</command>, if access to readline features is
     desired. Additionally, <command>tarantool</command>, the
-    SQL-capable command line client,
-    understands all administrative statements
-    and automatically directs them to the administrative port.
+    SQL-capable command line client, automatically distinguishes
+    SQL and Lua statements and directs them to the appropriate port.
     The server response to an administrative command, even though
     it is always in plain text, can be quite complex.
     It is encoded using YAML markup to simplify automated parsing.
@@ -176,41 +142,44 @@
   <variablelist>
 
     <varlistentry>
-      <term xml:id="save-snapshot" xreflabel="SAVE SNAPSHOT">
-        <emphasis role="tntadmin">save snapshot</emphasis>
+      <term xml:id="box.snapshot" xreflabel="box.snapshot()">
+        <emphasis role="tntadmin">box.snapshot()</emphasis>
       </term>
       <listitem><para>
         Take a snapshot of all data and store it in
         <filename><olink
         targetptr="snap_dir"/>/&lt;latest-lsn&gt;.snap</filename>.
-        To take a snapshot, Tarantool forks and quickly
-        <function>munmap(2)</function>s all memory except the area 
-        where tuples are stored. Since all modern operating systems support
-        virtual memory copy-on-write, this effectively creates a
-        consistent snapshot of all tuples in the child process,
-        which is then written to disk tuple by tuple. Since a
-        snapshot is written sequentially, you can expect a very
+        To take a snapshot, Tarantool first enters the delayed
+        garbage collection mode for all data. In this mode,
+        tuples which were allocated before the snapshot has
+        started are not freed until the snapshot has finished.
+        To preserve consistency of the primary key, used to
+        iterate over tuples, a copy-on-write technique is employed.
+        If the master process changes part of a primary key, 
+        the corresponding process page is split, and the snapshot
+        process obtains an old copy of the page. Since a
+        snapshot is written sequentially, one can expect a very
         high write performance (averaging to 80MB/second on modern
         disks), which means an average database instance gets
         saved in a matter of minutes.  Note, that as long as there
-        are any changes to the parent memory through concurrent
+        are any changes to the parent index memory through concurrent
         updates, there are going to be page splits, and therefore
-        you need to have some extra free memory to run this
-        command. 15%-30% of <olink targetptr="slab_alloc_arena"/>
+        one needs to have some extra free memory to run this
+        command. 10% of <olink targetptr="slab_alloc_arena"/>
         is, on average, sufficient. This statement waits until a
         snapshot is taken and returns operation result. For
         example:
-<programlisting>localhost> show info
+<programlisting>localhost> box.info()
 ---
 info:
   version: "1.4.6"
   lsn: 843301
 ...
-localhost> save snapshot
+localhost> box.snapshot()
 ---
 ok
 ...
-localhost> save snapshot
+localhost> box.snapshot()
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
@@ -221,7 +190,7 @@ fail: can't save snapshot, errno 17 (File exists)
         write ahead log. Once a snapshot is taken, old WALs can be
         deleted as long as all replicas are up to date. But the
         WAL which was current at the time <emphasis
-        role="tntadmin">save snapshot</emphasis> started must be
+        role="tntadmin">box.snapshot()</emphasis> started must be
         kept for recovery, since it still contains log records
         written after the start of <emphasis role="tntadmin">save
         snapshot</emphasis>.
@@ -238,8 +207,8 @@ fail: can't save snapshot, errno 17 (File exists)
 
 
     <varlistentry>
-      <term xml:id="reload-configuration" xreflabel="RELOAD CONFIGURATION">
-        <emphasis role="tntadmin">reload configuration</emphasis>
+      <term xml:id="box.cfg.reload" xreflabel="box.cfg.reload()">
+        <emphasis role="tntadmin">box.cfg.reload()</emphasis>
       </term>
       <listitem><para>
         Re-read the configuration file. If the file contains
@@ -251,8 +220,8 @@ fail: can't save snapshot, errno 17 (File exists)
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-configuration" xreflabel="SHOW CONFIGURATION">
-        <emphasis role="tntadmin">show configuration</emphasis>
+      <term xml:id="box.cfg.show" xreflabel="box.cfg()">
+        <emphasis role="tntadmin">box.cfg()</emphasis>
       </term>
       <listitem><para>
         Show the current settings. Displays all settings,
@@ -262,12 +231,12 @@ fail: can't save snapshot, errno 17 (File exists)
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-info" xreflabel="SHOW INFO">
-        <emphasis role="tntadmin">show info</emphasis>
+      <term xml:id="box.info" xreflabel="box.info()">
+        <emphasis role="tntadmin">box.info()</emphasis>
       </term>
       <listitem><para>
 <programlisting>
-localhost> show info
+localhost> box.info()
 ---
 info:
   version: "1.4.5-128-ga91962c"
@@ -304,15 +273,15 @@ info:
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-stat" xreflabel="SHOW STAT">
-        <emphasis role="tntadmin">show stat</emphasis>
+      <term xml:id="box.stat.show" xreflabel="box.stat()">
+        <emphasis role="tntadmin">box.stat()</emphasis>
       </term>
       <listitem><para>
       Show the average number of requests per second, and the
       total number of requests since startup, broken down by
       request type: INSERT or SELECT or UPDATE or DELETE."
 <programlisting>
-localhost> show stat
+localhost> box.stat()
 ---
 statistics:
   INSERT:        { rps:  139  , total:  48207694    }
@@ -325,8 +294,8 @@ statistics:
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-slab" xreflabel="SHOW SLAB">
-        <emphasis role="tntadmin">show slab</emphasis>
+      <term xml:id="box.slab.info" xreflabel="box.slab.info()">
+        <emphasis role="tntadmin">box.slab.info()</emphasis>
       </term>
       <listitem>
         <para>
@@ -351,19 +320,8 @@ statistics:
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-palloc" xreflabel="SHOW PALLOC">
-        <emphasis role="tntadmin">show palloc</emphasis>
-      </term>
-      <listitem><para>
-        A pool allocator is used for temporary memory, when
-        serving client requests. Every fiber has its own
-        temporary pool. Shows the current state of pools of all fibers.
-      </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="save-coredump" xreflabel="SAVE COREDUMP">
-        <emphasis role="tntadmin">save coredump</emphasis>
+      <term xml:id="box.coredump" xreflabel="box.coredump()">
+        <emphasis role="tntadmin">box.coredump()</emphasis>
       </term>
       <listitem><para>
         Fork and dump a core. Since Tarantool stores all tuples
@@ -373,8 +331,8 @@ statistics:
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-fiber" xreflabel="SHOW FIBER">
-        <emphasis role="tntadmin">show fiber</emphasis>
+      <term xml:id="box.fiber.info" xreflabel="box.fiber.info()">
+        <emphasis role="tntadmin">box.fiber.info()</emphasis>
       </term>
       <listitem><para>
         Show all running fibers, with their stack.
@@ -383,11 +341,11 @@ statistics:
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="lua-command" xreflabel="LUA ...">
-        <emphasis role="tntadmin">lua ...</emphasis>
+      <term xml:id="lua-command">
+        <emphasis role="tntadmin">...</emphasis>
       </term>
       <listitem><para>
-        Execute a chunk of Lua code. This can be used to define,
+        Execute any chunk of Lua code. This can be used to define,
         invoke, debug and drop <olink
         targetptr="stored-procedures">stored procedures</olink>,
         inspect server environment, perform automated

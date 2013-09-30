@@ -8,9 +8,8 @@
 which is normally more descriptive than error code,
 is not present in server response. The actual message may contain
 a file name, a detailed reason or operating system error code.
-All such messages, however, are logged in the error log. When
-using <emphasis role="strong">Memcached</emphasis> protocol, the error message is sent to the
-client along with the code. Below follow only general descriptions
+All such messages, however, are logged in the error log. 
+Below follow only general descriptions
 of some popular codes. A complete list of errors can be found in
 file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</filename> in the source tree.
 
@@ -82,6 +81,12 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/in
     <listitem><para>Recursion limit reached when creating a new fiber. This is
     usually an indicator of a bug in a stored procedure, recursively invoking itself
     ad infinitum.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_UPDATE_FIELD" xreflabel="ER_UPDATE_FIELD">ER_UPDATE_FIELD</term>
+    <listitem><para>A error occured during update of a field.
     </para></listitem>
   </varlistentry>
 

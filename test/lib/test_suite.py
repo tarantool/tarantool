@@ -1,25 +1,32 @@
 import os
-import os.path
+import re
 import sys
-import stat
-import glob
 import ConfigParser
-import subprocess
 import collections
 import difflib
 import filecmp
-import shlex
+import shutil
 import time
-
-from server import Server
-import tarantool_preprocessor
-import re
-import cStringIO
-import string
 import traceback
 
-class FilteredStream:
+from lib.server import Server
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
+def check_tarantool_import():
+    try:
+        tnt_py = os.path.dirname(os.path.abspath(__file__))
+        tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
+        if tnt_py not in sys.path:
+            sys.path = [tnt_py] + sys.path
+        import tarantool
+    except ImportError:
+        sys.stderr.write("\n\nNo tarantool-python library found\n")
+        sys.exit(1)
+
+class FilteredStream:
     """Helper class to filter .result file output"""
     def __init__(self, filename):
         self.stream = open(filename, "w+")
@@ -29,7 +36,7 @@ class FilteredStream:
         """Apply all filters, then write result to the undelrying stream.
         Do line-oriented filtering: the fragment doesn't have to represent
         just one line."""
-        fragment_stream = cStringIO.StringIO(fragment)
+        fragment_stream = StringIO(fragment)
         skipped = False
         for line in fragment_stream:
             original_len = len(line.strip())
@@ -49,7 +56,7 @@ class FilteredStream:
         self.filters.pop()
 
     def clear_all_filters(self):
-        filters = []
+        self.filters = []
 
     def close(self):
         self.clear_all_filters()
@@ -79,17 +86,17 @@ class Test:
 
     def __init__(self, name, args, suite_ini):
         """Initialize test properties: path to test file, path to
-        temporary result file, path to the client program, test status."""
-
+        temporary result file, path to the client program, test status.""" 
+        rg = re.compile('.test.*')
         self.name = name
         self.args = args
         self.suite_ini = suite_ini
-        self.result = name.replace(".test", ".result")
-        self.skip_cond = name.replace(".test", ".skipcond")
+        self.result = rg.sub('.result', name)
+        self.skip_cond = rg.sub('.skipcond', name)
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
         self.reject = "{0}/test/{1}".format(self.args.builddir,
-                                            name.replace(".test", ".reject"))
+                                            rg.sub('.reject', name))
         self.is_executed = False
         self.is_executed_ok = None
         self.is_equal_result = None
@@ -97,8 +104,10 @@ class Test:
 
     def passed(self):
         """Return true if this test was run successfully."""
-
         return self.is_executed and self.is_executed_ok and self.is_equal_result
+
+    def execute(self):
+        pass
 
     def run(self, server):
         """Execute the test assuming it's a python program.
@@ -107,11 +116,28 @@ class Test:
         If there is a difference, print it to stdout and raise an
         exception. The exception is raised only if is_force flag is
         not set."""
-
-
         diagnostics = "unknown"
-        builddir = self.args.builddir
-        self.execute(server)
+        save_stdout = sys.stdout
+        try:
+            self.skip = False
+            if os.path.exists(self.skip_cond):
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                execfile(self.skip_cond, dict(locals(), **server.__dict__))
+                sys.stdout.close()
+                sys.stdout = save_stdout
+            if not self.skip:
+                sys.stdout = FilteredStream(self.tmp_result)
+                stdout_fileno = sys.stdout.stream.fileno()
+                self.execute(server)
+            self.is_executed_ok = True
+        except Exception as e:
+            traceback.print_exc(e)
+            diagnostics = str(e)
+        finally:
+            if sys.stdout and sys.stdout != save_stdout:
+                sys.stdout.close()
+            sys.stdout = save_stdout
         self.is_executed = True
 
         if not self.skip:
@@ -200,7 +226,7 @@ class TestSuite:
         self.args = args
         self.tests = []
         self.ini = {}
-
+        self.suite_path = suite_path
         self.ini["core"] = "tarantool"
 
         if os.access(suite_path, os.F_OK) == False:
@@ -216,6 +242,10 @@ class TestSuite:
             self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
         for i in ["disabled", "valgrind_disabled", "release_disabled"]:
             self.ini[i] = dict.fromkeys(self.ini[i].split()) if i in self.ini else dict()
+        for i in ["lua_libs"]:
+            self.ini[i] = map(lambda x: os.path.join(suite_path, x),
+                    dict.fromkeys(self.ini[i].split()) if i in self.ini else
+                    dict())
 
         try:
             self.server = Server(self.ini["core"])
@@ -227,7 +257,7 @@ class TestSuite:
 
         print "Collecting tests in \"" + suite_path + "\": " +\
             self.ini["description"] + "."
-        self.server.find_tests(self, suite_path);
+        self.server.find_tests(self, suite_path)
         print "Found " + str(len(self.tests)) + " tests."
 
     def run_all(self):
@@ -236,13 +266,20 @@ class TestSuite:
 
         if not self.tests:
             # noting to test, exit
-            return 0
+            return []
 
         self.server.deploy(self.ini["config"],
                       self.server.find_exe(self.args.builddir, silent=False),
                       self.args.vardir, self.args.mem, self.args.start_and_exit,
                       self.args.gdb, self.args.valgrind,
                       init_lua=self.ini["init_lua"], silent=False)
+        if self.ini['core'] != 'unittest':
+            self.ini['servers'] = {'default' : self.server}
+            self.ini['connections'] = {'default' : self.server.admin}
+            self.ini['vardir'] = self.args.vardir
+            self.ini['builddir'] = self.args.builddir
+        for i in self.ini['lua_libs']:
+            shutil.copy(i, self.args.vardir)
 
         if self.args.start_and_exit:
             print "  Start and exit requested, exiting..."
@@ -251,36 +288,40 @@ class TestSuite:
         longsep = '='*70
         shortsep = '-'*60
         print longsep
-        print string.ljust("TEST", 48), "RESULT"
+        print "TEST".ljust(48), "RESULT"
         print shortsep
         failed_tests = []
+        try:
+            for test in self.tests:
+                sys.stdout.write(test.name.ljust(48))
+                # for better diagnostics in case of a long-running test
+                sys.stdout.flush()
 
-        for test in self.tests:
-            sys.stdout.write(string.ljust(test.name, 48))
-            # for better diagnostics in case of a long-running test
-            sys.stdout.flush()
+                test_name = os.path.basename(test.name)
 
-            test_name = os.path.basename(test.name)
+                if (test_name in self.ini["disabled"]
+                    or not self.server.debug and test_name in self.ini["release_disabled"]
+                    or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
+                    print "[ disabled ]"
+                else:
+                    test.run(self.server)
+                    if not test.passed():
+                        failed_tests.append(test.name)
+        except (KeyboardInterrupt) as e:
+            print '\n',
+            raise
+        finally:
+            print shortsep
+            self.server.stop(silent=False)
+            self.server.cleanup()
 
-            if (test_name in self.ini["disabled"]
-                or not self.server.debug and test_name in self.ini["release_disabled"]
-                or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                print "[ disabled ]"
-            else:
-                test.run(self.server)
-                if not test.passed():
-                    failed_tests.append(test.name)
-
-        print shortsep
         if failed_tests:
             print "Failed {0} tests: {1}.".format(len(failed_tests),
                                                 ", ".join(failed_tests))
-        self.server.stop(silent=False)
-        self.server.cleanup()
 
         if self.args.valgrind and check_valgrind_log(self.server.valgrind_log):
             print "  Error! There were warnings/errors in valgrind log file:"
             print_tail_n(self.server.valgrind_log, 20)
-            return 1
-        return len(failed_tests)
+            return ['valgrind error in ' + self.suite_path]
+        return failed_tests
 

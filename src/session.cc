@@ -30,14 +30,15 @@
 #include "fiber.h"
 
 #include "assoc.h"
+#include "trigger.h"
 #include "exception.h"
 
 uint32_t sid_max;
 
 static struct mh_i32ptr_t *session_registry;
 
-struct session_trigger session_on_connect;
-struct session_trigger session_on_disconnect;
+RLIST_HEAD(session_on_connect);
+RLIST_HEAD(session_on_disconnect);
 
 uint32_t
 session_create(int fd)
@@ -62,17 +63,13 @@ session_create(int fd)
 	 * fiber sid.
 	 */
 	fiber_set_sid(fiber, sid);
-	if (session_on_connect.trigger) {
-		void *param = session_on_connect.param;
-		try {
-			session_on_connect.trigger(param);
-		} catch (const Exception& e) {
-			fiber_set_sid(fiber, 0);
-			mh_i32ptr_remove(session_registry, &node, NULL);
-			throw;
-		}
+	try {
+		trigger_run(&session_on_connect, NULL);
+	} catch (const Exception& e) {
+		fiber_set_sid(fiber, 0);
+		mh_i32ptr_remove(session_registry, &node, NULL);
+		throw;
 	}
-
 	return sid;
 }
 
@@ -82,15 +79,12 @@ session_destroy(uint32_t sid)
 	if (sid == 0) /* no-op for a dead session. */
 		return;
 
-	if (session_on_disconnect.trigger) {
-		void *param = session_on_disconnect.param;
-		try {
-			session_on_disconnect.trigger(param);
-		} catch (const Exception& e) {
-			e.log();
-		} catch (...) {
-			/* catch all. */
-		}
+	try {
+		trigger_run(&session_on_disconnect, NULL);
+	} catch (const Exception& e) {
+		e.log();
+	} catch (...) {
+		/* catch all. */
 	}
 	struct mh_i32ptr_node_t node = { sid, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
@@ -99,8 +93,7 @@ session_destroy(uint32_t sid)
 int
 session_fd(uint32_t sid)
 {
-	struct mh_i32ptr_node_t node = { sid, NULL };
-	mh_int_t k = mh_i32ptr_get(session_registry, &node, NULL);
+	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
 	return k == mh_end(session_registry) ?
 		-1 : (intptr_t) mh_i32ptr_node(session_registry, k)->val;
 }

@@ -77,6 +77,7 @@ check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_function_exists(fdatasync HAVE_FDATASYNC)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
+check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
@@ -94,8 +95,8 @@ add_custom_target(tags COMMAND ctags -R -f tags
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
-set (CPACK_PACKAGE_VERSION_MINOR "5")
-set (CPACK_PACKAGE_VERSION_PATCH "1")
+set (CPACK_PACKAGE_VERSION_MINOR "6")
+set (CPACK_PACKAGE_VERSION_PATCH "0")
 
 set (PACKAGE_VERSION "")
 
@@ -308,6 +309,14 @@ add_dependencies(build_bundled_libs gopt)
 include(BuildLibCJSON)
 libcjson_build()
 add_dependencies(build_bundled_libs cjson)
+
+#
+# LibYAML
+#
+
+include(BuildLibYAML)
+libyaml_build()
+add_dependencies(build_bundled_libs yaml)
 
 #
 # Third-Party misc

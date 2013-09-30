@@ -1,935 +1,939 @@
-lua s = box.socket.udp()
+s = box.socket.udp()
 ---
 ...
-lua type(s)
+type(s)
 ---
- - userdata
+- userdata
 ...
-lua s:close()
----
-...
-lua s = box.socket.tcp()
+s:close()
 ---
 ...
-lua type(s)
----
- - userdata
-...
-lua s:close()
+s = box.socket.tcp()
 ---
 ...
-lua s:close()
+type(s)
+---
+- userdata
+...
+s:close()
 ---
 ...
-lua s:error()
----
- - 0
- - Success
-...
-lua s:connect('localhost', '30303')
----
- - nil
- - error
- - 111
- - Connection refused
-...
-lua s:error()
----
- - 111
- - Connection refused
-...
-lua s:connect('127.0.0.1', '30303')
----
- - nil
- - error
- - 111
- - Connection refused
-...
-lua s:error()
----
- - 111
- - Connection refused
-...
-lua s:connect('127.0.0.1', '30303', 0.01)
----
- - nil
- - error
- - 111
- - Connection refused
-...
-lua s:error()
----
- - 111
- - Connection refused
-...
-lua s:connect('127.0.0.1')
----
-error: 'bad argument #3 to ''?'' (string expected, got no value)'
-...
-lua s:connect()
----
-error: 'bad argument #2 to ''?'' (string expected, got no value)'
-...
-lua s:connect(123)
----
-error: 'bad argument #3 to ''?'' (string expected, got no value)'
-...
-lua s:close()
+s:close()
 ---
 ...
-lua s:close()
+s:error()
+---
+- 0
+- Success
+...
+s:connect('localhost', '30303')
+---
+- null
+- error
+- 111
+- Connection refused
+...
+s:error()
+---
+- 111
+- Connection refused
+...
+s:connect('127.0.0.1', '30303')
+---
+- null
+- error
+- 111
+- Connection refused
+...
+s:error()
+---
+- 111
+- Connection refused
+...
+s:connect('127.0.0.1', '30303', 0.01)
+---
+- null
+- error
+- 111
+- Connection refused
+...
+s:error()
+---
+- 111
+- Connection refused
+...
+s:connect('127.0.0.1')
+---
+- error: 'bad argument #3 to ''?'' (string expected, got no value)'
+...
+s:connect()
+---
+- error: 'bad argument #2 to ''?'' (string expected, got no value)'
+...
+s:connect(123)
+---
+- error: 'bad argument #3 to ''?'' (string expected, got no value)'
+...
+s:close()
 ---
 ...
-lua sr, se = s:connect('somewhereelse', '30303', 0.0001)
+s:close()
 ---
 ...
-lua sr == nil and se == 'error' or se == 'timeout'
----
- - true
-...
-lua e = s:error()
+sr, se = s:connect('somewhereelse', '30303', 0.0001)
 ---
 ...
-lua e == -1 or e == 110
+sr == nil and se == 'error' or se == 'timeout'
 ---
- - true
+- true
 ...
-lua s:close()
----
-...
-lua s:send()
----
-error: 'box.socket: socket is not initialized'
-...
-lua s:send(1)
----
-error: 'box.socket: socket is not initialized'
-...
-lua s = box.socket.tcp()
+e = s:error()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30303'))
+e == -1 or e == 110
 ---
- - userdata
+- true
 ...
-lua s:send('ping')
----
- - 4
-...
-lua s:error()
----
- - 0
- - Success
-...
-lua n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)
+s:close()
 ---
 ...
-lua type(n)
+s:send()
 ---
- - number
+- error: 'box.socket: socket is not initialized'
 ...
-lua type(status)
+s:send(1)
 ---
- - string
+- error: 'box.socket: socket is not initialized'
 ...
-lua type(error_code)
+s = box.socket.tcp()
 ---
- - number
 ...
-lua type(error_str)
+type(s:connect('127.0.0.1', '30303'))
 ---
- - string
+- userdata
 ...
-lua status
+s:send('ping')
 ---
- - timeout
+- 4
 ...
-lua error_code
+s:error()
 ---
- - 110
+- 0
+- Success
 ...
-lua error_str
+n, status, error_code, error_str = s:send(string.rep('=', 8388608), 0.0000001)
 ---
- - Connection timed out
 ...
-lua s:error()
+type(n)
 ---
- - 110
- - Connection timed out
+- number
+...
+type(status)
+---
+- string
+...
+type(error_code)
+---
+- number
+...
+type(error_str)
+---
+- string
+...
+status
+---
+- timeout
+...
+error_code
+---
+- 110
+...
+error_str
+---
+- Connection timed out
+...
+s:error()
+---
+- 110
+- Connection timed out
 ...
 connected
-lua s:send('ping')
+s:send('ping')
 ---
- - 0
- - error
- - 104
- - Connection reset by peer
+- 0
+- error
+- 104
+- Connection reset by peer
 ...
-lua s:error()
+s:error()
 ---
- - 104
- - Connection reset by peer
+- 104
+- Connection reset by peer
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua s:recv()
+s:recv()
 ---
-error: 'box.socket: socket is not initialized'
+- error: 'box.socket: socket is not initialized'
 ...
-lua type(s:connect('127.0.0.1', '30308'))
+type(s:connect('127.0.0.1', '30308'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 12
-lua s:recv(12)
+s:recv(12)
 ---
- - Hello, World
+- Hello, World
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30308'))
+type(s:connect('127.0.0.1', '30308'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 21
-lua s:recv(11)
+s:recv(11)
 ---
- - Hello World
+- Hello World
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- -  Over
+- ' Over'
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - sized
+- sized
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30308'))
+type(s:connect('127.0.0.1', '30308'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 connected
 3
-lua s:recv(4, 0.01)
+s:recv(4, 0.01)
 ---
- - 
- - timeout
- - 110
- - Connection timed out
+- 
+- timeout
+- 110
+- Connection timed out
 ...
-lua s:error()
+s:error()
 ---
- - 110
- - Connection timed out
+- 110
+- Connection timed out
 ...
-lua s:recv(4)
+s:recv(4)
 ---
- - ping
+- ping
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30309'))
+type(s:connect('127.0.0.1', '30309'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 connected
 4
-lua s:recv(6)
+s:recv(6)
 ---
- - ping
- - eof
+- ping
+- eof
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30311'))
+type(s:connect('127.0.0.1', '30311'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 connected
 24
-lua s:recv(5)
+s:recv(5)
 ---
- - ping 
+- 'ping '
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - ping 
+- 'ping '
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - ping 
+- 'ping '
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - ping 
+- 'ping '
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - end 
- - eof
+- 'end '
+- eof
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - 
- - eof
+- 
+- eof
 ...
-lua s:recv(5)
+s:recv(5)
 ---
- - 
- - eof
+- 
+- eof
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30305'))
+type(s:connect('127.0.0.1', '30305'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
-...
-12
-lua s:readline()
----
- - Hello World
-
- - nil
- - 
-
-...
-lua s:error()
----
- - 0
- - Success
+- 0
+- Success
 ...
 12
-lua s:readline(5)
+s:readline()
 ---
- - Hello
- - limit
-...
-lua s:error()
----
- - 0
- - Success
-...
-lua s:readline(5, 0.01)
----
- -  Worl
- - limit
-...
-lua s:error()
----
- - 0
- - Success
-...
-lua s:readline(6, 0.01)
----
- - d
+- 'Hello World
 
- - nil
- - 
+'
+- null
+- '
 
+'
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
+...
+12
+s:readline(5)
+---
+- Hello
+- limit
+...
+s:error()
+---
+- 0
+- Success
+...
+s:readline(5, 0.01)
+---
+- ' Worl'
+- limit
+...
+s:error()
+---
+- 0
+- Success
+...
+s:readline(6, 0.01)
+---
+- 'd
+
+'
+- null
+- '
+
+'
+...
+s:error()
+---
+- 0
+- Success
 ...
 9
-lua s:readline({'i', 'D'})
+s:readline({'i', 'D'})
 ---
- - AbcD
- - nil
- - D
+- AbcD
+- null
+- D
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'i', 'G'})
+s:readline({'i', 'G'})
 ---
- - efG
- - nil
- - G
+- efG
+- null
+- G
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'i'})
+s:readline({'i'})
 ---
- - hi
- - nil
- - i
+- hi
+- null
+- i
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 13
-lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
+s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
- - Cat
- - nil
- - Cat
+- Cat
+- null
+- Cat
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
+s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
- - Cow
- - nil
- - Cow
+- Cow
+- null
+- Cow
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
+s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
- - Dog
- - nil
- - Dog
+- Dog
+- null
+- Dog
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'Cat', 'Cow', 'Dog', 'Star'})
+s:readline({'Cat', 'Cow', 'Dog', 'Star'})
 ---
- - Star
- - nil
- - Star
+- Star
+- null
+- Star
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 15
-lua s:readline(3, {'Cat', 'Coow'})
+s:readline(3, {'Cat', 'Coow'})
 ---
- - Cat
- - nil
- - Cat
+- Cat
+- null
+- Cat
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(3, {'Cat', 'Coow'})
+s:readline(3, {'Cat', 'Coow'})
 ---
- - Coo
- - limit
+- Coo
+- limit
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(3, {'Dogg', 'Star'})
+s:readline(3, {'Dogg', 'Star'})
 ---
- - wDo
- - limit
+- wDo
+- limit
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(3, {'Dogg', 'Star'})
+s:readline(3, {'Dogg', 'Star'})
 ---
- - ggS
- - limit
+- ggS
+- limit
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(3)
+s:readline(3)
 ---
- - tar
- - limit
+- tar
+- limit
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 23
-lua sl = {'Crown', 'King', 'Kong', 'Cezar'}
+sl = {'Crown', 'King', 'Kong', 'Cezar'}
 ---
 ...
-lua s:readline(sl, 1.0)
+s:readline(sl, 1.0)
 ---
- - KKong
- - nil
- - Kong
+- KKong
+- null
+- Kong
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(sl, 1.0)
+s:readline(sl, 1.0)
 ---
- - King
- - nil
- - King
+- King
+- null
+- King
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(sl, 1.0)
+s:readline(sl, 1.0)
 ---
- - CezaCezar
- - nil
- - Cezar
+- CezaCezar
+- null
+- Cezar
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(sl, 1.0)
+s:readline(sl, 1.0)
 ---
- - Crown
- - nil
- - Crown
+- Crown
+- null
+- Crown
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 26
-lua sl = {'Agatha', 'Road', 'Corn', 'Drive', 'Pop'}
+sl = {'Agatha', 'Road', 'Corn', 'Drive', 'Pop'}
 ---
 ...
-lua s:readline(64, sl, 1.0)
+s:readline(64, sl, 1.0)
 ---
- - RoAgatha
- - nil
- - Agatha
+- RoAgatha
+- null
+- Agatha
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(64, sl, 1.0)
+s:readline(64, sl, 1.0)
 ---
- - Pop
- - nil
- - Pop
+- Pop
+- null
+- Pop
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(64, sl, 1.0)
+s:readline(64, sl, 1.0)
 ---
- - PoCorn
- - nil
- - Corn
+- PoCorn
+- null
+- Corn
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline(64, sl, 1.0)
+s:readline(64, sl, 1.0)
 ---
- - Drive
- - nil
- - Drive
+- Drive
+- null
+- Drive
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 21
-lua s:readline({'Canada'}, 0.01)
+s:readline({'Canada'}, 0.01)
 ---
- - 
- - timeout
- - 110
- - Connection timed out
+- 
+- timeout
+- 110
+- Connection timed out
 ...
-lua s:error()
+s:error()
 ---
- - 110
- - Connection timed out
+- 110
+- Connection timed out
 ...
 2
-lua s:readline({'Canada'}, 0.01)
+s:readline({'Canada'}, 0.01)
 ---
- - RoadAfricaCubaRomaniaCanada
- - nil
- - Canada
+- RoadAfricaCubaRomaniaCanada
+- null
+- Canada
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 6
-lua s:readline({'Canada'}, 0.01)
+s:readline({'Canada'}, 0.01)
 ---
- - Canada
- - nil
- - Canada
+- Canada
+- null
+- Canada
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 19
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- - msg
- - nil
- - msg
+- msg
+- null
+- msg
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- -  msg
- - nil
- - msg
+- ' msg'
+- null
+- msg
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- -  msg
- - nil
- - msg
+- ' msg'
+- null
+- msg
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- -  msg
- - nil
- - msg
+- ' msg'
+- null
+- msg
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- -  msg
- - nil
- - msg
+- ' msg'
+- null
+- msg
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- - 
- - eof
+- 
+- eof
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:readline({'msg'})
+s:readline({'msg'})
 ---
- - 
- - eof
+- 
+- eof
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('127.0.0.1', '30307'))
+type(s:connect('127.0.0.1', '30307'))
 ---
- - userdata
+- userdata
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
 29
-lua s:readline({'Z'})
+s:readline({'Z'})
 ---
- - SomelongLongStringStrinString
- - eof
+- SomelongLongStringStrinString
+- eof
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:close()
+s:close()
 ---
 ...
-lua type(s:connect('localhost', '30303'))
+type(s:connect('localhost', '30303'))
 ---
- - userdata
+- userdata
 ...
-lua s:send('ping')
+s:send('ping')
 ---
- - 4
+- 4
 ...
 connected
-lua s:recv(4)
+s:recv(4)
 ---
- - ping
+- ping
 ...
-lua s:send('ping')
+s:send('ping')
 ---
- - 4
+- 4
 ...
-lua s:error()
+s:error()
 ---
- - 0
- - Success
+- 0
+- Success
 ...
-lua s:send('ping')
+s:send('ping')
 ---
- - 0
- - error
- - 32
- - Broken pipe
+- 0
+- error
+- 32
+- Broken pipe
 ...
-lua s:error()
+s:error()
 ---
- - 32
- - Broken pipe
+- 32
+- Broken pipe
 ...
-lua s:close()
----
-...
-lua type(s:bind('127.0.0.1', '30303'))
----
- - userdata
-...
-lua type(s:listen())
----
- - userdata
-...
-lua client, status, addr = s:accept()
+s:close()
 ---
 ...
-lua addr
+type(s:bind('127.0.0.1', '30303'))
 ---
- - 127.0.0.1
+- userdata
 ...
-lua data = client:recv(4)
+type(s:listen())
 ---
+- userdata
 ...
-lua data
----
- - ping
-...
-lua client:send(data, 4)
----
- - 4
-...
-lua client:close()
+client, status, addr = s:accept()
 ---
 ...
-lua s:close()
+addr
+---
+- 127.0.0.1
+...
+data = client:recv(4)
 ---
 ...
-ping
-lua s = box.socket.udp()
+data
+---
+- ping
+...
+client:send(data, 4)
+---
+- 4
+...
+client:close()
 ---
 ...
-lua type(s:sendto('ping', '127.0.0.1', '30302'))
+s:close()
 ---
- - number
-...
-lua s:error()
----
- - 0
- - Success
 ...
 ping
-lua s:recv(4)
----
- - 
- - error
- - 107
- - Transport endpoint is not connected
-...
-lua s:close()
+s = box.socket.udp()
 ---
 ...
-lua s = box.socket.udp()
+type(s:sendto('ping', '127.0.0.1', '30302'))
 ---
+- number
 ...
-lua type(s:bind('127.0.0.1', '30301'))
+s:error()
 ---
- - userdata
-...
-lua s:error()
----
- - 0
- - Success
-...
-lua data, status, client, port = s:recvfrom(4)
----
-...
-lua s:error()
----
- - 0
- - Success
-...
-lua data
----
- - ping
-...
-lua client
----
- - 127.0.0.1
-...
-lua type(s:sendto(data, client, port))
----
- - number
-...
-lua s:error()
----
- - 0
- - Success
+- 0
+- Success
 ...
 ping
-lua s:close()
+s:recv(4)
+---
+- 
+- error
+- 107
+- Transport endpoint is not connected
+...
+s:close()
 ---
 ...
-lua  replies = 0 function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			replies = replies + 1 		end 	end) ) 	return s:send(box.pack('iii', 65280, 0, 1)) end 
+s = box.socket.udp()
 ---
 ...
-lua bug1160869()
+type(s:bind('127.0.0.1', '30301'))
 ---
- - 12
+- userdata
 ...
-lua bug1160869()
+s:error()
 ---
- - 12
+- 0
+- Success
 ...
-lua bug1160869()
----
- - 12
-...
-lua replies
----
- - 3
-...
-lua  s = nil syncno = 0 reps = 0 function iostart() 	if s ~= nil then 		return 	end 	s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			reps = reps + 1 		end 	end)) end  function iotest() 	iostart() 	syncno = syncno + 1 	return s:send(box.pack('iii', 65280, 0, syncno)) end 
+data, status, client, port = s:recvfrom(4)
 ---
 ...
-lua iotest()
+s:error()
 ---
- - 12
+- 0
+- Success
 ...
-lua iotest()
+data
 ---
- - 12
+- ping
 ...
-lua iotest()
+client
 ---
- - 12
+- 127.0.0.1
 ...
-lua reps
+type(s:sendto(data, client, port))
 ---
- - 3
+- number
+...
+s:error()
+---
+- 0
+- Success
+...
+ping
+s:close()
+---
+...
+ replies = 0 function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			replies = replies + 1 		end 	end) ) 	return s:send(box.pack('iii', 65280, 0, 1)) end 
+---
+...
+bug1160869()
+---
+- 12
+...
+bug1160869()
+---
+- 12
+...
+bug1160869()
+---
+- 12
+...
+replies
+---
+- 3
+...
+ s = nil syncno = 0 reps = 0 function iostart() 	if s ~= nil then 		return 	end 	s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			reps = reps + 1 		end 	end)) end  function iotest() 	iostart() 	syncno = syncno + 1 	return s:send(box.pack('iii', 65280, 0, syncno)) end 
+---
+...
+iotest()
+---
+- 12
+...
+iotest()
+---
+- 12
+...
+iotest()
+---
+- 12
+...
+reps
+---
+- 3
 ...

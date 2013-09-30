@@ -161,7 +161,6 @@ void fiber_testcancel(void);
 bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
-void fiber_info(struct tbuf *out);
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 /**
@@ -172,5 +171,9 @@ fiber_set_sid(struct fiber *f, uint32_t sid)
 {
 	f->sid = sid;
 }
+
+typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
+
+int fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

@@ -48,14 +48,15 @@ extern "C" {
 
 #include "pickle.h"
 #include "tuple.h"
+#include "schema.h"
 #include "space.h"
 #include "port.h"
 #include "tbuf.h"
 #include "scoped_guard.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char box_lua[], box_net_lua[], misc_lua[], sql_lua[];
-static const char *lua_sources[] = { box_lua, box_net_lua, misc_lua, sql_lua, NULL };
+extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[], sql_lua[];
+static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, sql_lua, NULL };
 
 /**
  * All box connections share the same Lua state. We use
@@ -620,6 +621,18 @@ static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 static const char *indexlib_name = "box.index";
 static const char *iteratorlib_name = "box.index.iterator";
 
+/* Index userdata. */
+struct lbox_index
+{
+	Index *index;
+	/* space id. */
+	uint32_t id;
+	/* index id. */
+	uint32_t iid;
+	/* space cache version at the time of push. */
+	int sc_version;
+};
+
 static struct iterator *
 lbox_checkiterator(struct lua_State *L, int i)
 {
@@ -664,23 +677,32 @@ lbox_iterator_gc(struct lua_State *L)
 static Index *
 lua_checkindex(struct lua_State *L, int i)
 {
-	Index **index = (Index **) luaL_checkudata(L, i, indexlib_name);
+	struct lbox_index *index =
+		(struct lbox_index *) luaL_checkudata(L, i, indexlib_name);
 	assert(index != NULL);
-	return *index;
+	if (index->sc_version != sc_version) {
+		index->index = index_find(space_find(index->id), index->iid);
+		index->sc_version = sc_version;
+	}
+	return index->index;
 }
 
 static int
-lbox_index_new(struct lua_State *L)
+lbox_index_bind(struct lua_State *L)
 {
-	int n = luaL_checkint(L, 1); /* get space id */
-	int idx = luaL_checkint(L, 2); /* get index id in */
+	uint32_t id = (uint32_t) luaL_checkint(L, 1); /* get space id */
+	uint32_t iid = (uint32_t) luaL_checkint(L, 2); /* get index id in */
 	/* locate the appropriate index */
-	struct space *sp = space_find(n);
-	Index *index = index_find(sp, idx);
+	struct space *space = space_find(id);
+	Index *i = index_find(space, iid);
 
 	/* create a userdata object */
-	void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
-	*ptr = index;
+	struct lbox_index *index = (struct lbox_index *)
+		lua_newuserdata(L, sizeof(struct lbox_index));
+	index->id = id;
+	index->iid = iid;
+	index->sc_version = sc_version;
+	index->index = i;
 	/* set userdata object metatable to indexlib */
 	luaL_getmetatable(L, indexlib_name);
 	lua_setmetatable(L, -2);
@@ -692,8 +714,7 @@ static int
 lbox_index_tostring(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lua_pushfstring(L, "index %d in space %d",
-			index_n(index), space_n(index->space));
+	lua_pushfstring(L, " index %d", (int) index_id(index));
 	return 1;
 }
 
@@ -955,7 +976,7 @@ static const struct luaL_reg lbox_index_meta[] = {
 };
 
 static const struct luaL_reg indexlib [] = {
-	{"new", lbox_index_new},
+	{"bind", lbox_index_bind},
 	{NULL, NULL}
 };
 
@@ -1094,10 +1115,7 @@ static void
 port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 {
 	struct tuple *tuple = lua_totuple(L, index);
-	auto scoped_guard = make_scoped_guard([=] {
-		if (tuple->refs == 0)
-			tuple_free(tuple);
-	});
+	TupleGuard guard(tuple);
 	port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
 }
 
@@ -1184,7 +1202,9 @@ lbox_process(lua_State *L)
 	size_t allocated_size = palloc_allocated(fiber->gc_pool);
 	struct port *port_lua = port_lua_create(L);
 	try {
-		box_process(port_lua, op, req, sz);
+		struct request request;
+		request_create(&request, op, req, sz);
+		box_process(port_lua, &request);
 
 		/*
 		 * This only works as long as port_lua doesn't
@@ -1215,10 +1235,11 @@ lbox_raise(lua_State *L)
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
-static void
+static int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
+	int objstack = 0;
 	const char *start = name, *end;
 
 	while ((end = (const char *) memchr(start, '.', name_end - start))) {
@@ -1231,6 +1252,22 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
 	}
+
+	/* box.something:method */
+	if ((end = (const char *) memchr(start, ':', name_end - start))) {
+		lua_checkstack(L, 3);
+		lua_pushlstring(L, start, end - start);
+		lua_gettable(L, index);
+		if (! (lua_istable(L, -1) ||
+			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) ))
+				tnt_raise(ClientError, ER_NO_SUCH_PROC,
+					  name_end - name, name);
+		start = end + 1; /* next piece of a.b.c */
+		index = lua_gettop(L); /* top of the stack */
+		objstack = 1;
+	}
+
+
 	lua_pushlstring(L, start, name_end - start);
 	lua_gettable(L, index);
 	if (! lua_isfunction(L, -1)) {
@@ -1243,8 +1280,11 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
 		lua_replace(L, 1);
-		lua_settop(L, 1);
+		if (objstack)
+			lua_replace(L, 2);
+		lua_settop(L, 1 + objstack);
 	}
+	return 1 + objstack;
 }
 
 
@@ -1261,8 +1301,7 @@ lbox_call_loadproc(struct lua_State *L)
 	const char *name;
 	size_t name_len;
 	name = lua_tolstring(L, 1, &name_len);
-	box_lua_find(L, name, name + name_len);
-	return 1;
+	return box_lua_find(L, name, name + name_len);
 }
 
 /**
@@ -1270,14 +1309,12 @@ lbox_call_loadproc(struct lua_State *L)
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct port *port)
+box_lua_execute(const struct request *request, struct txn *txn,
+		struct port *port)
 {
-	const char **reqpos = &request->data;
-	const char *reqend = request->data + request->len;
+	(void) txn;
 	lua_State *L = lua_newthread(root_L);
 	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
-	/* Request flags: not used. */
-	(void) (pick_u32(reqpos, reqend));
 
 	try {
 		auto scoped_guard = make_scoped_guard([=] {
@@ -1288,18 +1325,20 @@ box_lua_execute(struct request *request, struct port *port)
 			luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
 		});
 
-		uint32_t field_len;
 		/* proc name */
-		const char *field = pick_field_str(reqpos, reqend, &field_len);
-		box_lua_find(L, field, field + field_len);
+		int oc = box_lua_find(L, request->c.procname,
+				 request->c.procname + request->c.procname_len);
 		/* Push the rest of args (a tuple). */
-		uint32_t nargs = pick_u32(reqpos, reqend);
-		luaL_checkstack(L, nargs, "call: out of stack");
-		for (int i = 0; i < nargs; i++) {
-			field = pick_field_str(reqpos, reqend, &field_len);
+		const char *args = request->c.args;
+		luaL_checkstack(L, request->c.arg_count, "call: out of stack");
+
+		for (uint32_t i = 0; i < request->c.arg_count; i++) {
+			uint32_t field_len = load_varint32(&args);
+			const char *field = args;
+			args += field_len;
 			lua_pushlstring(L, field, field_len);
 		}
-		lua_call(L, nargs, LUA_MULTRET);
+		lua_call(L, request->c.arg_count + oc - 1, LUA_MULTRET);
 		/* Send results of the called procedure to the client. */
 		port_add_lua_multret(port, L);
 	} catch (const Exception& e) {
@@ -1814,12 +1853,47 @@ static const struct luaL_reg boxlib[] = {
 };
 
 void
+schema_lua_init(struct lua_State *L)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_newtable(L);
+	lua_setfield(L, -2, "schema");
+	lua_getfield(L, -1, "schema");
+	lua_pushnumber(L, SC_SCHEMA_ID);
+	lua_setfield(L, -2, "SCHEMA_ID");
+	lua_pushnumber(L, SC_SPACE_ID);
+	lua_setfield(L, -2, "SPACE_ID");
+	lua_pushnumber(L, SC_INDEX_ID);
+	lua_setfield(L, -2, "INDEX_ID");
+	lua_pushnumber(L, SC_SYSTEM_ID_MIN);
+	lua_setfield(L, -2, "SYSTEM_ID_MIN");
+	lua_pushnumber(L, SC_SYSTEM_ID_MAX);
+	lua_setfield(L, -2, "SYSTEM_ID_MAX");
+	lua_pushnumber(L, BOX_INDEX_MAX);
+	lua_setfield(L, -2, "INDEX_MAX");
+	lua_pushnumber(L, BOX_SPACE_MAX);
+	lua_setfield(L, -2, "SPACE_MAX");
+	lua_pushnumber(L, BOX_FIELD_MAX);
+	lua_setfield(L, -2, "FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_FIELD_MAX);
+	lua_setfield(L, -2, "INDEX_FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_PART_MAX);
+	lua_setfield(L, -2, "INDEX_PART_MAX");
+	lua_pushnumber(L, BOX_NAME_MAX);
+	lua_setfield(L, -2, "NAME_MAX");
+	lua_pushnumber(L, FORMAT_ID_MAX);
+	lua_setfield(L, -2, "FORMAT_ID_MAX");
+	lua_pop(L, 2); /* box, schema */
+}
+
+void
 mod_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
 	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
+	schema_lua_init(L);
 	tarantool_lua_register_type(L, tuple_iteratorlib_name,
 				    lbox_tuple_iterator_meta);
 	luaL_register(L, "box", boxlib);

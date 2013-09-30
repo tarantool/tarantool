@@ -1,73 +1,133 @@
-insert into t27 values (0, 'foo', 0, '', 1)
-Insert OK, 1 row affected
-insert into t27 values (0, 'foo', 1, '', 1)
-Insert OK, 1 row affected
-insert into t27 values (1, 'foo', 0, '', 2)
-Insert OK, 1 row affected
-insert into t27 values (1, 'foo', 1, '', 2)
-Insert OK, 1 row affected
-insert into t27 values (0, 'bar', 0, '', 3)
-Insert OK, 1 row affected
-insert into t27 values (0, 'bar', 1, '', 3)
-Insert OK, 1 row affected
-insert into t27 values (1, 'bar', 0, '', 4)
-Insert OK, 1 row affected
-insert into t27 values (1, 'bar', 1, '', 4)
-Insert OK, 1 row affected
-insert into t27 values (1, 'bar', 1, '', 5)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
-lua  function box.select_all(space)     space = tonumber(space)     local result = {}         for k, v in box.space[space]:pairs() do             table.insert(result, v)     end     return unpack(result) end 
+dofile('utils.lua')
 ---
 ...
-call box.select_all('27')
-Found 8 tuples:
-[0, 'bar', 0, '', 3]
-[0, 'bar', 1, '', 3]
-[0, 'foo', 0, '', 1]
-[0, 'foo', 1, '', 1]
-[1, 'bar', 0, '', 4]
-[1, 'bar', 1, '', 4]
-[1, 'foo', 0, '', 2]
-[1, 'foo', 1, '', 2]
-lua box.select(27, 0, 1, 'foo', 0)
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 1: {'foo', 0, '', 2}
+- [0, 0, 'tweedledum']
 ...
-lua box.select(27, 0, 1, 'bar', 0)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 3, 0, 'num', 1, 'str', 2, 'num')
 ---
- - 1: {'bar', 0, '', 4}
+- [0, 0, 'primary', 1752392040, 1, 3, 0, 'num', 1, 'str', 2, 'num']
 ...
-lua box.select(27, 0, 1, 'foo')
+box.insert(box.schema.INDEX_ID, 0, 1, 'unique', 'hash', 1, 2, 2, 'num', 4, 'num')
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 2)'
+- [0, 1, 'unique', 1752392040, 1, 2, 2, 'num', 4, 'num']
 ...
-lua box.select(27, 0, 1, 'foo', 0, 0)
----
-error: 'Invalid key part count (expected [0..3], got 4)'
-...
-lua box.select(27, 0, 1, 'foo', 'baz')
----
-error: 'Supplied key field type does not match index type: expected u32'
-...
-lua box.select(27, 1, 1, 4)
----
- - 1: {'bar', 1, '', 4}
-...
-lua box.select(27, 1, 1, 5)
+hash = box.space[0]
 ---
 ...
-lua box.select(27, 1, 1)
+-- insert rows
+hash:insert(0, 'foo', 0, '', 1)
 ---
-error: 'Invalid key part count in an exact match (expected 2, got 1)'
+- [0, 'foo', 0, '', 1]
 ...
-lua box.select(27, 1, 1, 'baz')
+hash:insert(0, 'foo', 1, '', 1)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+- [0, 'foo', 1, '', 1]
 ...
-lua box.space[27]:truncate()
+hash:insert(1, 'foo', 0, '', 2)
+---
+- [1, 'foo', 0, '', 2]
+...
+hash:insert(1, 'foo', 1, '', 2)
+---
+- [1, 'foo', 1, '', 2]
+...
+hash:insert(0, 'bar', 0, '', 3)
+---
+- [0, 'bar', 0, '', 3]
+...
+hash:insert(0, 'bar', 1, '', 3)
+---
+- [0, 'bar', 1, '', 3]
+...
+hash:insert(1, 'bar', 0, '', 4)
+---
+- [1, 'bar', 0, '', 4]
+...
+hash:insert(1, 'bar', 1, '', 4)
+---
+- [1, 'bar', 1, '', 4]
+...
+-- try to insert a row with a duplicate key
+hash:insert(1, 'bar', 1, '', 5)
+---
+- error: Duplicate key exists in unique index 0
+...
+-- output all rows
+--# setopt delimiter ';'
+function box.select_all(space)
+    local result = {}
+    for k, v in box.space[space]:pairs() do
+        table.insert(result, v)
+    end
+    return result
+end;
 ---
 ...
-lua box.space[27]:len()
+--# setopt delimiter ''
+box.sort(box.select_all(0))
 ---
- - 0
+- - [0, 'bar', 0, '', 3]
+  - [0, 'bar', 1, '', 3]
+  - [0, 'foo', 0, '', 1]
+  - [0, 'foo', 1, '', 1]
+  - [1, 'bar', 0, '', 4]
+  - [1, 'bar', 1, '', 4]
+  - [1, 'foo', 0, '', 2]
+  - [1, 'foo', 1, '', 2]
+...
+-- primary index select
+hash:select(0, 1, 'foo', 0)
+---
+- [1, 'foo', 0, '', 2]
+...
+hash:select(0, 1, 'bar', 0)
+---
+- [1, 'bar', 0, '', 4]
+...
+-- primary index select with missing part
+hash:select(0, 1, 'foo')
+---
+- error: Invalid key part count in an exact match (expected 3, got 2)
+...
+-- primary index select with extra part
+hash:select(0, 1, 'foo', 0, 0)
+---
+- error: Invalid key part count (expected [0..3], got 4)
+...
+-- primary index select with wrong type
+hash:select(0, 1, 'foo', 'baz')
+---
+- error: 'Supplied key type of part 2 does not match index part type: expected NUM'
+...
+-- secondary index select
+hash:select(1, 1, 4)
+---
+- [1, 'bar', 1, '', 4]
+...
+-- secondary index select with no such key
+hash:select(1, 1, 5)
+---
+...
+-- secondary index select with missing part
+hash:select(1, 1)
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+-- secondary index select with wrong type
+hash:select(1, 1, 'baz')
+---
+- error: 'Supplied key type of part 1 does not match index part type: expected NUM'
+...
+-- cleanup
+hash:truncate()
+---
+...
+hash:len()
+---
+- 0
+...
+hash:drop()
+---
 ...

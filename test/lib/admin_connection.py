@@ -27,13 +27,14 @@ import sys
 import re
 from tarantool_connection import TarantoolConnection
 
-is_admin_re = re.compile("^\s*(show|set|save|lua|exit|reload|help)", re.I)
-
 ADMIN_SEPARATOR = '\n'
 
 class AdminConnection(TarantoolConnection):
     def execute_no_reconnect(self, command, silent):
-        self.socket.sendall(command + ADMIN_SEPARATOR)
+        if not command:
+            return
+        cmd = command.replace('\n', ' ') + ADMIN_SEPARATOR
+        self.socket.sendall(cmd)
 
         bufsiz = 4096
         res = ""
@@ -53,6 +54,4 @@ class AdminConnection(TarantoolConnection):
             if not silent:
                 sys.stdout.write(command + ADMIN_SEPARATOR)
                 sys.stdout.write(res.replace("\r\n", "\n"))
-
         return res
-

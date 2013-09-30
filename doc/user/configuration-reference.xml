@@ -102,7 +102,7 @@ Tarantool 1.4.0-69-g45551dd
       <para><option>--check-config</option></para>
       <para>Check the configuration file for errors. This option is
         normally used on the command line
-        before <quote>reload configuration</quote>
+        before <quote>box.cfg.reload()</quote>
         is issued on the administrative port, to ensure that the new
         configuration is valid. When configuration is
         indeed correct, the program produces no output and returns <literal>0</literal>.
@@ -130,16 +130,11 @@ Tarantool 1.4.0-69-g45551dd
       </option></para>
       <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
       configuration option by creating an empty snapshot file in
-      it. If <filename>vardir</filename> doesn't contain at
-      least one snapshot, the server does not start. There is no
-      <quote>magic</quote> with automatic initialization of
-      <filename>vardir</filename> on boot to make
-      potential system errors more noticeable. For example, if the
-      operating system reboots and fails to mount the partition on
-      which <filename>vardir</filename> is expected to reside, the
-      <filename>rc.d</filename> or <command>service</command> script
-      responsible for server restart will also fail, thanks to this
-      option.
+      it. Prior to Tarantool 1.6, if <filename>vardir</filename>
+      didn't contain at least one snapshot, the server did not
+      start. Starting from 1.6, the initial storage file is
+      created automatically when starting in a clean data
+      directory.
       </para>
     </listitem>
   </itemizedlist>
@@ -185,7 +180,7 @@ Tarantool 1.4.0-69-g45551dd
   <para>
     To facilitate centralized and automated configuration
     management, runtime configuration modifications are supported
-    solely through <olink targetptr="reload-configuration"/>
+    solely through <olink targetptr="box.cfg.reload"/>
     administrative statement. Thus, the
     procedure to change Tarantool configuration at runtime is to
     edit the configuration file.  This ensures that, should the
@@ -197,7 +192,7 @@ Tarantool 1.4.0-69-g45551dd
     such settings will be highlighted in this reference.
     If the same setting is given more than once, the latest occurrence
     takes effect.
-    You can always invoke <olink targetptr="show-configuration"/>
+    You can always invoke <olink targetptr="box.cfg.show"/>
     from the administrative console to show the current
     configuration.
   </para>
@@ -532,7 +527,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>no</entry>
           <entry>yes</entry>
           <entry>Reduce the throttling effect of <olink
-          targetptr="save-snapshot"/> on the INSERT/UPDATE/DELETE
+          targetptr="box.snapshot"/> on the INSERT/UPDATE/DELETE
           performance by setting a limit on
           how many megabytes per second it can write to disk.
           The same can be achieved by splitting <olink
@@ -622,7 +617,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           on <olink targetptr="primary_port"/>. This parameter is
           dynamic, that is, to enter master mode, simply set the
           value to an empty string and issue <olink
-          targetptr="reload-configuration"/>.</entry>
+          targetptr="box.cfg.reload"/>.</entry>
         </row>
 
       </tbody>
@@ -771,114 +766,6 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           given value (in seconds), warn about it in the log.
           Has effect only if log_level is no less than 3
           (WARNING).</entry>
-        </row>
-
-      </tbody>
-    </tgroup>
-  </table>
-
-  <table frame='all' pgwide='1'>
-    <title>Memcached protocol support</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
-      <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
-
-      <thead>
-        <row>
-          <entry>Name</entry>
-          <entry>Type</entry>
-          <entry>Default</entry>
-          <entry>Required?</entry>
-          <entry>Dynamic?</entry>
-          <entry>Description</entry>
-        </row>
-      </thead>
-
-      <tbody>
-
-        <row>
-          <entry>memcached_port</entry>
-          <entry>integer</entry>
-          <entry>none</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>
-            <anchor xml:id="memcached_port" xreflabel="memcached_port"/>
-
-          Turn on Memcached protocol support on the given
-            port. All requests on this port are directed to
-            a dedicated space, set in <olink
-            targetptr="memcached_space"/>.
-            Memcached-style flags are supported and stored
-            along with the value. The expiration time can also be
-            set and is persistent, but is ignored, unless <olink
-            targetptr="memcached_expire"/> is turned on.
-            Unlike Memcached, all data still goes to the binary
-            log and to the replica, if latter one is set up, which
-            means that power outage does not lead to loss of all
-            data. Thanks to data persistence, cache warm up time
-            is also very short.
-          </entry>
-        </row>
-
-        <row>
-          <entry>memcached_space</entry>
-          <entry>integer</entry>
-          <entry>23</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>
-            <anchor xml:id="memcached_space"
-            xreflabel="memcached_space"/>
-          Space id to store memcached data in. The
-          format of tuple is [key, metadata, value], with a HASH
-          index based on the key. Since the space format
-          is defined by Memcached data model, it must not be
-          previously configured.</entry>
-        </row>
-
-        <row>
-          <entry>memcached_expire</entry>
-          <entry>boolean</entry>
-          <entry>false</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>
-            <anchor xml:id="memcached_expire"
-            xreflabel="memcached_expire"/>
-            Turn on tuple time-to-live support in
-            <olink targetptr="memcached_space"/>. This
-            effectively turns Tarantool into a persistent,
-            replicated and scriptable implementation of Memcached.
-          </entry>
-        </row>
-
-        <row>
-          <entry>memcached_expire_per_loop</entry>
-          <entry>integer</entry>
-          <entry>1024</entry>
-          <entry>no</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>How many records to consider per iteration of the
-            expiration loop. Tuple expiration is performed in a separate
-            <quote>green</quote> thread within our cooperative multitasking
-            framework and this setting effectively limits how long
-            the expiration loop stays on CPU uninterrupted.
-          </entry>
-        </row>
-
-        <row>
-          <entry>memcached_expire_full_sweep</entry>
-          <entry>float</entry>
-          <entry>3600</entry>
-          <entry>no</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>Try to make sure that every tuple is considered
-            for expiration within this time frame (in seconds).
-            Together with memcached_expire_per_loop this defines
-            how often the expiration <quote>green</quote> thread
-            is scheduled on CPU.
-          </entry>
         </row>
 
       </tbody>

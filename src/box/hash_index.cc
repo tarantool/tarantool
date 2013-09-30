@@ -31,7 +31,6 @@
 #include "tuple.h"
 #include "pickle.h"
 #include "exception.h"
-#include "space.h"
 #include "errinj.h"
 
 #include "third_party/PMurHash.h"
@@ -59,7 +58,7 @@ mh_index_eq_key(const char *key, struct tuple *const *tuple,
 static inline uint32_t
 mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 {
-	struct key_part *part = key_def->parts;
+	const struct key_part *part = key_def->parts;
 	uint32_t size = 0;
 	/*
 	 * Speed up the simplest case when we have a
@@ -85,7 +84,7 @@ mh_index_hash(struct tuple *const *tuple, const struct key_def *key_def)
 static inline uint32_t
 mh_index_hash_key(const char *key, const struct key_def *key_def)
 {
-	struct key_part *part = key_def->parts;
+	const struct key_part *part = key_def->parts;
 
 	if (key_def->part_count == 1 && part->type == NUM) {
 		(void) load_varint32(&key);
@@ -171,10 +170,10 @@ hash_iterator_eq(struct iterator *it)
 
 /* }}} */
 
-/* {{{ HashIndex -- base class for all hashes. ********************/
+/* {{{ HashIndex -- implementation of all hashes. **********************/
 
-HashIndex::HashIndex(struct key_def *key_def, struct space *space)
-	: Index(key_def, space)
+HashIndex::HashIndex(struct key_def *key_def)
+	: Index(key_def)
 {
 	hash = mh_index_new();
 	if (hash == NULL) {
@@ -189,67 +188,15 @@ HashIndex::~HashIndex()
 }
 
 void
-HashIndex::beginBuild()
+HashIndex::reserve(uint32_t size_hint)
 {
-}
-
-void
-HashIndex::buildNext(struct tuple *tuple)
-{
-	replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-HashIndex::endBuild()
-{
-}
-
-void
-HashIndex::build(Index *pk)
-{
-	uint32_t n_tuples = pk->size();
-
-	if (n_tuples == 0)
-		return;
-
-	reserve(n_tuples);
-
-	say_info("Adding %" PRIu32 " keys to HASH index %"
-		 PRIu32 "...", n_tuples, index_n(this));
-
-	struct iterator *it = pk->position();
-	struct tuple *tuple;
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	while ((tuple = it->next(it)))
-	      replace(NULL, tuple, DUP_INSERT);
-}
-
-void
-HashIndex::reserve(uint32_t n_tuples)
-{
-	mh_index_reserve(hash, n_tuples, key_def);
+	mh_index_reserve(hash, size_hint, key_def);
 }
 
 size_t
 HashIndex::size() const
 {
 	return mh_size(hash);
-}
-
-
-struct tuple *
-HashIndex::min() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "Hash index", "min()");
-	return NULL;
-}
-
-struct tuple *
-HashIndex::max() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "Hash index", "max()");
-	return NULL;
 }
 
 struct tuple *
@@ -308,7 +255,7 @@ HashIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 					      "recover of int hash");
 				}
 			}
-			tnt_raise(ClientError, errcode, index_n(this));
+			tnt_raise(ClientError, errcode, index_id(this));
 		}
 
 		if (dup_tuple)

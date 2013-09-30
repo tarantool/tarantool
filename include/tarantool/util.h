@@ -149,6 +149,11 @@ extern void *__libc_stack_end;
 #ifdef ENABLE_BACKTRACE
 void print_backtrace();
 char *backtrace(void *frame, void *stack, size_t stack_size);
+
+typedef int (backtrace_cb)(int frameno, void *frameret,
+                           const char *func, size_t offset, void *cb_ctx);
+void backtrace_foreach(backtrace_cb cb, void *frame, void *stack, size_t stack_size,
+                       void *cb_ctx);
 #endif /* ENABLE_BACKTRACE */
 
 #ifdef HAVE_BFD
@@ -181,6 +186,14 @@ memmem(const void *block, size_t blen, const void *pat, size_t plen);
 void *
 memrchr(const void *s, int c, size_t n);
 #endif /* HAVE_MEMRCHR */
+
+#ifndef HAVE_OPEN_MEMSTREAM
+/* Declare open_memstream(). */
+#include <stdio.h>
+FILE *
+open_memstream(char **ptr, size_t *sizeloc);
+#endif /* HAVE_OPEN_MEMSTREAM */
+
 
 #if defined(__cplusplus)
 } /* extern "C" */

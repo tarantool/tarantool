@@ -1,25 +1,52 @@
-
-# A test case for Bug#1042738
-# https://bugs.launchpad.net/tarantool/+bug/1042738
-# Iteration over a non-unique TREE index
-#
-lua for i=1, 1000 do box.space[1]:truncate() for j=1, 30 do box.insert(1, j, os.time(), 1) end; index = box.space[1].index[1]; count = 0; for k,v in index.next, index, nil do count = count+1; end; if count ~= 30 then print("bug at iteration ", i, ", count is ", count) end end
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+...
+box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'num')
+---
+- [0, 1, 'secondary', 1701147252, 0, 1, 1, 'num']
+...
+space = box.space[0]
 ---
 ...
-lua box.space[1]:truncate()
+-- A test case for Bug#1042738
+-- https://bugs.launchpad.net/tarantool/+bug/1042738
+-- Iteration over a non-unique TREE index
+--# setopt delimiter ';'
+for i = 1, 1000 do
+    space:truncate()
+    for j = 1, 30 do
+        space:insert(j, os.time(), 1)
+    end
+    count = 0
+    for v in space.index[1]:iterator(box.index.ALL) do
+        count = count + 1
+    end
+    if count ~= 30 then
+        error('bug at iteration '..i..', count is '..count)
+    end
+end;
 ---
 ...
-
-# A test case for Bug#1043858 server crash on lua stack overflow on CentOS
-# 5.4
-#
-lua for i = 1, 100000, 1 do box.space[1]:insert(i,i) end
+--# setopt delimiter ''
+space:truncate()
 ---
 ...
-lua local t1 = {box.select(1, 1)}
+--
+-- A test case for Bug#1043858 server crash on lua stack overflow on CentOS
+-- 5.4
+--
+for i = 1, 100000, 1 do space:insert(i,i) end
 ---
-error: 'Lua error: stack overflow'
 ...
-lua box.space[1]:truncate()
+local t1 = {space:select(1)}
+---
+- error: 'Lua error: stack overflow'
+...
+space:drop()
 ---
 ...

@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "trigger.h"
 
 struct tuple;
 struct space;
@@ -38,6 +39,9 @@ struct txn {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
+
+	struct rlist on_commit;
+	struct rlist on_rollback;
 
 	/* Redo info: binary packet */
 	const char *data;

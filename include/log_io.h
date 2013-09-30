@@ -36,7 +36,7 @@
 
 extern const uint32_t default_version;
 
-enum log_format { XLOG = 65534, SNAP = 65535 };
+enum log_format { WAL = 65534 };
 
 enum log_mode {
 	LOG_READ,
@@ -58,6 +58,8 @@ struct log_dir {
 	const char *filetype;
 	const char *filename_ext;
 	char *dirname;
+	/** File create mode in this directory. */
+	mode_t mode;
 };
 
 extern struct log_dir snap_dir;
@@ -114,7 +116,7 @@ log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen);
 
 typedef uint32_t log_magic_t;
 
-struct header_v11 {
+struct row_header {
 	uint32_t header_crc32c;
 	int64_t lsn;
 	double tm;
@@ -122,13 +124,13 @@ struct header_v11 {
 	uint32_t data_crc32c;
 } __attribute__((packed));
 
-static inline struct header_v11 *header_v11(const char *t)
+static inline struct row_header *row_header(const char *t)
 {
-	return (struct header_v11 *)t;
+	return (struct row_header *)t;
 }
 
 static inline void
-header_v11_fill(struct header_v11 *header, int64_t lsn, size_t data_len)
+row_header_fill(struct row_header *header, int64_t lsn, size_t data_len)
 {
 	header->lsn = lsn;
 	header->tm = ev_now();
@@ -136,25 +138,25 @@ header_v11_fill(struct header_v11 *header, int64_t lsn, size_t data_len)
 }
 
 void
-header_v11_sign(struct header_v11 *header);
+row_header_sign(struct row_header *header);
 
-struct row_v11 {
+struct wal_row {
 	log_magic_t marker;
-	struct header_v11 header;
+	struct row_header header;
 	uint16_t tag;
 	uint64_t cookie;
 	uint8_t data[];
 } __attribute__((packed));
 
 void
-row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag,
-	     uint64_t cookie, const char *metadata, size_t metadata_len,
+wal_row_fill(struct wal_row *row, int64_t lsn,
+	     const char *metadata, size_t metadata_len,
 	     const char *data, size_t data_len);
 
 static inline size_t
-row_v11_size(struct row_v11 *row)
+wal_row_size(struct wal_row *row)
 {
-	return sizeof(row->marker) + sizeof(struct header_v11) + row->header.len;
+	return sizeof(row->marker) + sizeof(struct row_header) + row->header.len;
 }
 
 int

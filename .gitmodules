@@ -5,3 +5,6 @@
 	path = third_party/lua-cjson
 	url = git://github.com/zloidemon/lua-cjson.git
 	branch = add-dtrace
+[submodule "test/lib/tarantool-python"]
+	path = test/lib/tarantool-python
+	url = https://github.com/mailru/tarantool-python.git

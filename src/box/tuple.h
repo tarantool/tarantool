@@ -29,8 +29,10 @@
  * SUCH DAMAGE.
  */
 #include "tarantool/util.h"
-#include "key_def.h"
+#include "key_def.h" /* for enum field_type */
 #include <pickle.h>
+
+enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 
 struct tbuf;
 
@@ -39,6 +41,8 @@ struct tbuf;
  */
 struct tuple_format {
 	uint16_t id;
+	/* Format objects are reference counted. */
+	int refs;
 	/**
 	 * Max field no which participates in any of the space
 	 * indexes. Each tuple of this format must have,
@@ -104,10 +108,24 @@ tuple_format_id(struct tuple_format *format)
  *	 format.
  * @param space description
  *
- * @return tuple format
+ * @return tuple format or raise an exception on error
  */
 struct tuple_format *
-tuple_format_new(struct key_def *key_def, uint32_t key_count);
+tuple_format_new(struct rlist *key_list);
+
+/** Delete a format with zero ref count. */
+void
+tuple_format_delete(struct tuple_format *format);
+
+static inline void
+tuple_format_ref(struct tuple_format *format, int count)
+{
+	assert(format->refs + count >= 0);
+	format->refs += count;
+	if (format->refs == 0)
+		tuple_format_delete(format);
+
+};
 
 /**
  * An atom of Tarantool/Box storage. Consists of a list of fields.
@@ -115,6 +133,8 @@ tuple_format_new(struct key_def *key_def, uint32_t key_count);
  */
 struct tuple
 {
+	/** snapshot generation version */
+	uint32_t version;
 	/** reference counter */
 	uint16_t refs;
 	/** format identifier */
@@ -158,6 +178,16 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
  */
 void
 tuple_ref(struct tuple *tuple, int count);
+
+void
+tuple_delete(struct tuple *tuple);
+
+/** Make tuple references exception-friendly in absence of @finally. */
+struct TupleGuard {
+	struct tuple *tuple;
+	TupleGuard(struct tuple *arg) :tuple(arg) {}
+	~TupleGuard() { if (tuple->refs == 0) tuple_delete(tuple); }
+};
 
 /**
 * @brief Return a tuple format instance
@@ -225,8 +255,23 @@ tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
 		*len = load_varint32(&field);
 		return field;
 	}
+	*len = 0;
 	return NULL;
 }
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as uint32_t.
+ */
+uint32_t
+tuple_field_u32(struct tuple *tuple, uint32_t i);
+
+/**
+ * A convenience shortcut for data dictionary - get a tuple field
+ * as a NUL-terminated string - returns a string of up to 256 bytes.
+ */
+const char *
+tuple_field_cstr(struct tuple *tuple, uint32_t i);
 
 /**
  * @brief Tuple Interator
@@ -238,6 +283,8 @@ struct tuple_iterator {
 	/** Always points to the beginning of the next field. */
 	const char *pos;
 	/** @endcond **/
+	/** field no of the next field. */
+	int fieldno;
 };
 
 /**
@@ -262,6 +309,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
 {
 	it->tuple = tuple;
 	it->pos = tuple->data;
+	it->fieldno = 0;
 }
 
 /**
@@ -282,6 +330,22 @@ const char *
 tuple_next(struct tuple_iterator *it, uint32_t *len);
 
 /**
+ * A convenience shortcut for the data dictionary - get next field
+ * from iterator as uint32_t or raise an error if there is
+ * no next field.
+ */
+uint32_t
+tuple_next_u32(struct tuple_iterator *it);
+
+/**
+ * A convenience shortcut for the data dictionary - get next field
+ * from iterator as a C string or raise an error if there is no
+ * next field.
+ */
+const char *
+tuple_next_cstr(struct tuple_iterator *it);
+
+/**
  * @brief Print a tuple in yaml-compatible mode to tbuf:
  * key: { value, value, value }
  *
@@ -290,6 +354,10 @@ tuple_next(struct tuple_iterator *it, uint32_t *len);
  */
 void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
+
+void
+tuple_init_field_map(struct tuple_format *format,
+		     struct tuple *tuple, uint32_t *field_map);
 
 struct tuple *
 tuple_update(struct tuple_format *new_format,
@@ -315,7 +383,6 @@ tuple_range_size(const char **begin, const char *end, uint32_t count)
 	return *begin - start;
 }
 
-void tuple_free(struct tuple *tuple);
 
 /**
  * @brief Compare two tuples using field by field using key definition
@@ -370,10 +437,10 @@ tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
 
 /** Initialize tuple library */
 void
-tuple_init();
+tuple_format_init();
 
 /** Cleanup tuple library */
 void
-tuple_free();
+tuple_format_free();
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

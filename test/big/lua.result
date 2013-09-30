@@ -1,1295 +1,911 @@
-lua dofile('index_random_test.lua')
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
+- [0, 0, 'tweedledum']
 ...
-insert into t1 values ('brave', 'new', 'world')
-Insert OK, 1 row affected
-lua box.space[1].index[1]:min()
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
- - 'brave': {'new', 'world'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
 ...
-lua box.space[1].index[1]:max()
+box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
- - 'brave': {'new', 'world'}
+- [0, 1, 'minmax', 1701147252, 1, 2, 1, 'str', 2, 'str']
 ...
-call box.select('1', '1', 'new', 'world')
-Found 1 tuple:
-['brave', 'new', 'world']
-#
-# A test case for Bug #904208
-# "assert failed, when key cardinality is greater than index cardinality"
-# https://bugs.launchpad.net/tarantool/+bug/904208
-#
-call box.select('1', '1', 'new', 'world', 'order')
-An error occurred: ER_KEY_PART_COUNT, 'Invalid key part count (expected [0..2], got 3)'
-call box.delete('1', 'brave')
-Found 1 tuple:
-['brave', 'new', 'world']
-#
-# A test case for Bug #902091
-# "Positioned iteration over a multipart index doesn't work"
-# https://bugs.launchpad.net/tarantool/+bug/902091
-#
-insert into t1 values ('item 1', 'alabama', 'song')
-Insert OK, 1 row affected
-lua box.select(1, 1, 'alabama')
+space = box.space[0]
 ---
- - 'item 1': {'alabama', 1735290739}
 ...
-insert into t1 values ('item 2', 'california', 'dreaming ')
-Insert OK, 1 row affected
-insert into t1 values ('item 3', 'california', 'uber alles')
-Insert OK, 1 row affected
-insert into t1 values ('item 4', 'georgia', 'on my mind')
-Insert OK, 1 row affected
-lua iter, tuple = box.space[1].index[1]:next('california')
+space:insert('brave', 'new', 'world')
 ---
+- ['brave', 'new', 'world']
 ...
-lua tuple
+space.index[1]:min()
 ---
- - 'item 2': {'california', 'dreaming '}
+- ['brave', 'new', 'world']
 ...
-lua iter, tuple = box.space[1].index[1]:next(iter)
+space.index[1]:max()
 ---
+- ['brave', 'new', 'world']
 ...
-lua tuple
+space:select(1, 'new', 'world')
 ---
- - 'item 3': {'california', 'uber alles'}
+- ['brave', 'new', 'world']
 ...
-call box.delete('1', 'item 1')
-Found 1 tuple:
-['item 1', 'alabama', 1735290739]
-call box.delete('1', 'item 2')
-Found 1 tuple:
-['item 2', 'california', 'dreaming ']
-call box.delete('1', 'item 3')
-Found 1 tuple:
-['item 3', 'california', 'uber alles']
-call box.delete('1', 'item 4')
-Found 1 tuple:
-['item 4', 'georgia', 'on my mind']
-insert into t5 values ('01234567', 'new', 'world')
-Insert OK, 1 row affected
-insert into t5 values ('00000000', 'of', 'puppets')
-Insert OK, 1 row affected
-insert into t5 values ('00000001', 'of', 'might', 'and', 'magic')
-Insert OK, 1 row affected
-call box.select_range(5, 1, 2, 'of')
-Found 2 tuples:
-['00000001', 'of', 'might', 'and', 'magic']
-['00000000', 'of', 'puppets']
-call box.select_reverse_range(5, 1, 2, 'of')
-Found 2 tuples:
-['00000000', 'of', 'puppets']
-['00000001', 'of', 'might', 'and', 'magic']
-lua box.space[5]:truncate()
+-- A test case for Bug #904208
+-- "assert failed, when key cardinality is greater than index cardinality"
+--  https://bugs.launchpad.net/tarantool/+bug/904208
+space:select(1, 'new', 'world', 'order')
 ---
+- error: Invalid key part count (expected [0..2], got 3)
 ...
-lua box.insert('8', tonumber64('18446744073709551615'), 'magic')
+space:delete('brave')
 ---
- - 18446744073709551615: {'magic'}
+- ['brave', 'new', 'world']
 ...
-lua tu = box.select('8', '0', tonumber64('18446744073709551615'))
+-- A test case for Bug #902091
+-- "Positioned iteration over a multipart index doesn't work"
+-- https://bugs.launchpad.net/tarantool/+bug/902091
+space:insert('item 1', 'alabama', 'song')
 ---
+- ['item 1', 'alabama', 1735290739]
 ...
-lua num = box.unpack('l', tu[0])
+space:select(1, 'alabama')
 ---
+- ['item 1', 'alabama', 1735290739]
 ...
-lua print(num)
+space:insert('item 2', 'california', 'dreaming ')
 ---
-18446744073709551615
+- ['item 2', 'california', 'dreaming ']
 ...
-lua type(num) == 'cdata'
+space:insert('item 3', 'california', 'uber alles')
 ---
- - true
+- ['item 3', 'california', 'uber alles']
 ...
-lua num == tonumber64('18446744073709551615')
+space:insert('item 4', 'georgia', 'on my mind')
 ---
- - true
+- ['item 4', 'georgia', 'on my mind']
 ...
-lua num = box.unpack('l', tu[0])
+iter, tuple = space.index[1]:next('california')
 ---
 ...
-lua num == tonumber64('18446744073709551615')
+tuple
 ---
- - true
+- ['item 2', 'california', 'dreaming ']
 ...
-lua box.delete(8, 18446744073709551615ULL)
+_, tuple = space.index[1]:next(iter)
 ---
- - 18446744073709551615: {'magic'}
 ...
-lua box.insert('8', 125ULL, 'magic')
+tuple
 ---
- - 125: {'magic'}
+- ['item 3', 'california', 'uber alles']
 ...
-lua tu = box.select('8', '0', 125)
+space:delete('item 1')
 ---
+- ['item 1', 'alabama', 1735290739]
 ...
-lua tu2 = box.select('8', '0', 125LL)
+space:delete('item 2')
 ---
+- ['item 2', 'california', 'dreaming ']
 ...
-lua num = box.unpack('l', tu[0])
+space:delete('item 3')
 ---
+- ['item 3', 'california', 'uber alles']
 ...
-lua num2 = box.unpack('l', tu2[0])
+space:delete('item 4')
 ---
+- ['item 4', 'georgia', 'on my mind']
 ...
-lua print(num)
+space:truncate()
 ---
-125
 ...
-lua print(num2)
+--
+-- Test that we print index number in error ER_INDEX_VIOLATION
+--
+space:insert(1, 'hello', 'world')
 ---
-125
+- [1, 'hello', 'world']
 ...
-lua type(num) == 'cdata'
+space:insert(2, 'hello', 'world')
 ---
- - true
+- error: Duplicate key exists in unique index 1
 ...
-lua type(num2) == 'cdata'
+space:drop()
 ---
- - true
 ...
-lua num == tonumber64('125')
+--
+-- Check range scan over multipart keys
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - true
+- [0, 0, 'tweedledum']
 ...
-lua num2 == tonumber64('125')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
 ---
- - true
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num64']
 ...
-lua box.space[8]:truncate()
+box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 0, 2, 1, 'str', 2, 'str')
 ---
+- [0, 1, 'minmax', 1701147252, 0, 2, 1, 'str', 2, 'str']
 ...
-lua box.insert(14, 0, 0)
+space = box.space[0]
 ---
- - 0: {0}
 ...
-lua box.insert(14, 1, 0)
+space:insert('01234567', 'new', 'world')
 ---
- - 1: {0}
+- [3978425819141910832, 'new', 'world']
 ...
-lua box.insert(14, 2, 0)
+space:insert('00000000', 'of', 'puppets')
 ---
- - 2: {0}
+- [3472328296227680304, 26223, 'puppets']
 ...
-lua box.insert(14, 3, 0)
+space:insert('00000001', 'of', 'might', 'and', 'magic')
 ---
- - 3: {0}
+- [3544385890265608240, 26223, 'might', 'and', 'magic']
 ...
-lua box.insert(14, 4, 0)
+space:select_range(1, 2, 'of')
 ---
- - 4: {0}
+- [3544385890265608240, 26223, 'might', 'and', 'magic']
+- [3472328296227680304, 26223, 'puppets']
 ...
-lua box.insert(14, 5, 0)
+space:select_reverse_range(1, 2, 'of')
 ---
- - 5: {0}
+- [3472328296227680304, 26223, 'puppets']
+- [3544385890265608240, 26223, 'might', 'and', 'magic']
 ...
-lua box.insert(14, 6, 0)
+space:truncate()
 ---
- - 6: {0}
 ...
-lua box.insert(14, 7, 0)
+--
+-- A test case for Bug#1060967: truncation of 64-bit numbers
+--
+space:insert(2^51, 'hello', 'world')
 ---
- - 7: {0}
+- [2251799813685248, 'hello', 'world']
 ...
-lua box.insert(14, 8, 0)
+space:select(0, 2^51)
 ---
- - 8: {0}
+- [2251799813685248, 'hello', 'world']
 ...
-lua box.insert(14, 9, 0)
+space:drop()
 ---
- - 9: {0}
 ...
-lua box.select_range(14, 1, 10)
+--
+-- Lua 64bit numbers support
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 0: {0}
- - 1: {0}
- - 2: {0}
- - 3: {0}
- - 4: {0}
- - 5: {0}
- - 6: {0}
- - 7: {0}
- - 8: {0}
- - 9: {0}
+- [0, 0, 'tweedledum']
 ...
-lua box.select_reverse_range(14, 1, 10)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
 ---
- - 9: {0}
- - 8: {0}
- - 7: {0}
- - 6: {0}
- - 5: {0}
- - 4: {0}
- - 3: {0}
- - 2: {0}
- - 1: {0}
- - 0: {0}
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num64']
 ...
-lua box.select_reverse_range(14, 1, 4)
+space = box.space[0]
 ---
- - 9: {0}
- - 8: {0}
- - 7: {0}
- - 6: {0}
 ...
-lua box.space[14]:truncate()
+space:insert(tonumber64('18446744073709551615'), 'magic')
 ---
+- [18446744073709551615, 'magic']
 ...
-
-#
-# Tests for box.index iterators
-#
-
-lua box.insert(16, 'pid_1', 'sid_1', 'tid_999')
+tuple = space:select(0, tonumber64('18446744073709551615'))
 ---
- - 'pid_1': {'sid_1', 'tid_999'}
 ...
-lua box.insert(16, 'pid_2', 'sid_1', 'tid_998')
+num = box.unpack('l', tuple[0])
 ---
- - 'pid_2': {'sid_1', 'tid_998'}
 ...
-lua box.insert(16, 'pid_3', 'sid_1', 'tid_997')
+num
 ---
- - 'pid_3': {'sid_1', 'tid_997'}
+- 18446744073709551615
 ...
-lua box.insert(16, 'pid_4', 'sid_2', 'tid_996')
+type(num) == 'cdata'
 ---
- - 'pid_4': {'sid_2', 'tid_996'}
+- true
 ...
-lua box.insert(16, 'pid_5', 'sid_2', 'tid_995')
+num == tonumber64('18446744073709551615')
 ---
- - 'pid_5': {'sid_2', 'tid_995'}
+- true
 ...
-lua box.insert(16, 'pid_6', 'sid_2', 'tid_994')
+num = box.unpack('l', tuple[0])
 ---
- - 'pid_6': {'sid_2', 'tid_994'}
 ...
-lua for k, v in box.space[16].index[1].next, box.space[16].index[1], 'sid_1' do print(v) end
+num == tonumber64('18446744073709551615')
 ---
-'pid_3': {'sid_1', 'tid_997'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_1': {'sid_1', 'tid_999'}
-'pid_6': {'sid_2', 'tid_994'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_4': {'sid_2', 'tid_996'}
+- true
 ...
-lua for k, v in box.space[16].index[1].prev, box.space[16].index[1], 'sid_2' do print(v) end
+space:delete(18446744073709551615ULL)
 ---
-'pid_4': {'sid_2', 'tid_996'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_6': {'sid_2', 'tid_994'}
-'pid_1': {'sid_1', 'tid_999'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_3': {'sid_1', 'tid_997'}
+- [18446744073709551615, 'magic']
 ...
-lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_1' do print(v) end
+space:insert(125ULL, 'magic')
 ---
-'pid_3': {'sid_1', 'tid_997'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_1': {'sid_1', 'tid_999'}
+- [125, 'magic']
 ...
-lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_1' do print(v) end
+tuple = space:select(0, 125)
 ---
-'pid_1': {'sid_1', 'tid_999'}
-'pid_2': {'sid_1', 'tid_998'}
-'pid_3': {'sid_1', 'tid_997'}
 ...
-lua for k, v in box.space[16].index[1].next_equal, box.space[16].index[1], 'sid_2' do print(v) end
+tuple2 = space:select(0, 125LL)
 ---
-'pid_6': {'sid_2', 'tid_994'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_4': {'sid_2', 'tid_996'}
 ...
-lua for k, v in box.space[16].index[1].prev_equal, box.space[16].index[1], 'sid_2' do print(v) end
+num = box.unpack('l', tuple[0])
 ---
-'pid_4': {'sid_2', 'tid_996'}
-'pid_5': {'sid_2', 'tid_995'}
-'pid_6': {'sid_2', 'tid_994'}
 ...
-lua box.space[16]:truncate()
+num2 = box.unpack('l', tuple2[0])
 ---
 ...
-lua box.insert(17, 1, 1, 1)
+num, num2
 ---
- - 1: {1, 1}
+- 125
+- 125
 ...
-lua box.insert(17, 2, 2, 0)
+type(num) == 'cdata'
 ---
- - 2: {2, 0}
+- true
 ...
-lua box.insert(17, 3, 2, 1)
+type(num2) == 'cdata'
 ---
- - 3: {2, 1}
+- true
 ...
-lua box.insert(17, 4, 3, 0)
+num == tonumber64('125')
 ---
- - 4: {3, 0}
+- true
 ...
-lua box.insert(17, 5, 3, 1)
+num2 == tonumber64('125')
 ---
- - 5: {3, 1}
+- true
 ...
-lua box.insert(17, 6, 3, 2)
+space:truncate()
 ---
- - 6: {3, 2}
 ...
-lua box.space[17].index[1]:count(1)
+--
+-- Tests for lua box.auto_increment with NUM64 keys
+--
+-- lua box.auto_increment() with NUM64 keys testing
+box.auto_increment(space.n, 'a')
 ---
- - 1
+- [1, 'a']
 ...
-lua box.space[17].index[1]:count(2)
+space:insert(tonumber64(5))
 ---
- - 2
+- [5]
 ...
-lua box.space[17].index[1]:count(2, 1)
+box.auto_increment(space.n, 'b')
 ---
- - 1
+- [6, 'b']
 ...
-lua box.space[17].index[1]:count(2, 2)
+box.auto_increment(space.n, 'c')
 ---
- - 0
+- [7, 'c']
 ...
-lua box.space[17].index[1]:count(3)
+space:drop()
 ---
- - 3
 ...
-lua box.space[17].index[1]:count(3, 3)
+--
+-- Lua select_reverse_range
+--
+-- lua select_reverse_range() testing
+-- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 0
+- [0, 0, 'tweedledum']
 ...
-lua box.space[17].index[1]:count()
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-error: 'index.count(): one or more arguments expected'
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
 ...
-lua box.space[17]:truncate()
+box.insert(box.schema.INDEX_ID, 0, 1, 'range', 'tree', 1, 2, 1, 'num', 0, 'num')
 ---
+- [0, 1, 'range', 1701147252, 1, 2, 1, 'num', 0, 'num']
 ...
-lua box.space[18]:truncate()
+space = box.space[0]
 ---
 ...
-lua box.auto_increment(18, 'a')
+space:insert(0, 0)
 ---
- - 1: {'a'}
+- [0, 0]
 ...
-lua box.insert(18, 5)
+space:insert(1, 0)
 ---
- - 5: {}
+- [1, 0]
 ...
-lua box.auto_increment(18, 'b')
+space:insert(2, 0)
 ---
- - 6: {'b'}
+- [2, 0]
 ...
-lua box.auto_increment(18, 'c')
+space:insert(3, 0)
 ---
- - 7: {'c'}
+- [3, 0]
 ...
-lua box.space[18]:truncate()
+space:insert(4, 0)
 ---
+- [4, 0]
 ...
-lua box.space[25]:truncate()
+space:insert(5, 0)
 ---
+- [5, 0]
 ...
-lua box.auto_increment(25, 'a')
+space:insert(6, 0)
 ---
- - 1: {'a'}
+- [6, 0]
 ...
-lua box.insert(25, tonumber64(5))
+space:insert(7, 0)
 ---
- - 5: {}
+- [7, 0]
 ...
-lua box.auto_increment(25, 'b')
+space:insert(8, 0)
 ---
- - 6: {'b'}
+- [8, 0]
 ...
-lua box.auto_increment(25, 'c')
+space:insert(9, 0)
 ---
- - 7: {'c'}
+- [9, 0]
 ...
-lua box.space[25]:truncate()
+space:select_range(1, 10)
 ---
+- [0, 0]
+- [1, 0]
+- [2, 0]
+- [3, 0]
+- [4, 0]
+- [5, 0]
+- [6, 0]
+- [7, 0]
+- [8, 0]
+- [9, 0]
 ...
-lua t=box.insert(12, '1', '2', '3', '4', '5', '6', '7')
+space:select_reverse_range(1, 10)
 ---
+- [9, 0]
+- [8, 0]
+- [7, 0]
+- [6, 0]
+- [5, 0]
+- [4, 0]
+- [3, 0]
+- [2, 0]
+- [1, 0]
+- [0, 0]
 ...
-lua t:transform(7, 0, '8', '9', '100')
+space:select_reverse_range(1, 4)
 ---
- - '1': {'2', '3', '4', '5', '6', '7', '8', '9', '100'}
+- [9, 0]
+- [8, 0]
+- [7, 0]
+- [6, 0]
 ...
-lua t:transform(0, 1)
+space:drop()
 ---
- - '2': {'3', '4', '5', '6', '7'}
 ...
-lua t:transform(1, 4)
+--
+-- Tests for box.index iterators
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - '1': {'6', '7'}
+- [0, 0, 'tweedledum']
 ...
-lua t:transform(-1, 1)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
- - '1': {'2', '3', '4', '5', '6'}
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'str']
 ...
-lua t:transform(-3, 2)
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
- - '1': {'2', '3', '4', '7'}
+- [0, 1, 12649, 1701147252, 1, 2, 1, 'str', 2, 'str']
 ...
-lua t:transform(0, 0, 'A')
+space = box.space[0]
 ---
- - 'A': {'1', '2', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(-1, 0, 'A')
+pid = 1
 ---
- - '1': {'2', '3', '4', '5', '6', 'A', '7'}
 ...
-lua t:transform(0, 1, 'A')
+tid = 999
 ---
- - 'A': {'2', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(-1, 1, 'B')
+--# setopt delimiter ';'
+for sid = 1, 2 do
+    for i = 1, 3 do
+        space:insert('pid_'..pid, 'sid_'..sid, 'tid_'..tid)
+        pid = pid + 1
+        tid = tid - 1
+    end
+end;
 ---
- - '1': {'2', '3', '4', '5', '6', 'B'}
 ...
-lua t:transform(0, 2, 'C')
+--# setopt delimiter ''
+index = space.index[1]
 ---
- - 'C': {'3', '4', '5', '6', '7'}
 ...
-lua t:transform(2, 0, 'hello')
+t = {}
 ---
- - '1': {'2', 'hello', '3', '4', '5', '6', '7'}
 ...
-lua t:transform(0, -1, 'C')
+for k, v in index.next, index, 'sid_1' do table.insert(t, v) end
 ---
-error: 'tuple.transform(): len is negative'
 ...
-lua t:transform(0, 100)
+t
 ---
- - '': {}
+- - ['pid_3', 'sid_1', 'tid_997']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_4', 'sid_2', 'tid_996']
 ...
-lua t:transform(-100, 1)
+t = {}
 ---
-error: 'tuple.transform(): offset is out of bound'
 ...
-lua t:transform(0, 3, 1, 2, 3)
+for k, v in index.prev, index, 'sid_2' do table.insert(t, v) end
 ---
- - 1: {2, 3, '4', '5', '6', '7'}
 ...
-lua t:transform(3, 1, tonumber64(4))
+t
 ---
- - '1': {'2', '3', 4, '5', '6', '7'}
+- - ['pid_4', 'sid_2', 'tid_996']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_3', 'sid_1', 'tid_997']
 ...
-lua t:transform(0, 1, {})
+t = {}
 ---
-error: 'tuple.transform(): unsupported field type ''table'''
 ...
-lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
+for k, v in index.next_equal, index, 'sid_1' do table.insert(t, v) end
 ---
 ...
-lua t:find('2')
+t
 ---
- - 1
+- - ['pid_3', 'sid_1', 'tid_997']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_1', 'sid_1', 'tid_999']
 ...
-lua t:find('4')
+t = {}
 ---
- - 3
 ...
-lua t:find('5')
+for k, v in index.prev_equal, index, 'sid_1' do table.insert(t, v) end
 ---
- - 6
 ...
-lua t:find('A')
+t
 ---
- - 0
+- - ['pid_1', 'sid_1', 'tid_999']
+  - ['pid_2', 'sid_1', 'tid_998']
+  - ['pid_3', 'sid_1', 'tid_997']
 ...
-lua t:find('0')
+t = {}
 ---
 ...
-lua t:findall('A')
+for k, v in index.next_equal, index, 'sid_2' do table.insert(t, v) end
 ---
- - 0
 ...
-lua t:findall('2')
+t
 ---
- - 1
- - 5
+- - ['pid_6', 'sid_2', 'tid_994']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_4', 'sid_2', 'tid_996']
 ...
-lua t:findall('3')
+t = {}
 ---
- - 2
- - 4
- - 8
 ...
-lua t:findall('0')
+for k, v in index.prev_equal, index, 'sid_2' do table.insert(t, v) end
 ---
 ...
-lua t:find(2, '2')
+t
 ---
- - 5
+- - ['pid_4', 'sid_2', 'tid_996']
+  - ['pid_5', 'sid_2', 'tid_995']
+  - ['pid_6', 'sid_2', 'tid_994']
 ...
-lua t:find(89, '2')
+t = {}
 ---
 ...
-lua t:findall(4, '3')
+space:drop()
 ---
- - 4
- - 8
 ...
-lua t=box.insert(12, 'Z', '2', 2, 3, tonumber64(2))
+--
+-- Tests for lua idx:count()
+--
+-- https://blueprints.launchpad.net/tarantool/+spec/lua-builtin-size-of-subtree
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
+- [0, 0, 'tweedledum']
 ...
-lua t:find(2)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
- - 2
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
-lua t:find(tonumber64(2))
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 2, 1, 'num', 2, 'num')
 ---
- - 4
+- [0, 1, 12649, 1701147252, 0, 2, 1, 'num', 2, 'num']
 ...
-lua t:find('2')
+space = box.space[0]
 ---
- - 1
 ...
-lua box.space[12]:truncate()
+space:insert(1, 1, 1)
 ---
+- [1, 1, 1]
 ...
-#
-# A test case for Bug #1038784
-# transform returns wrong tuple and put broken reply into socket
-# https://bugs.launchpad.net/tarantool/+bug/1038784
-#
-lua dofile('push.lua')
+space:insert(2, 2, 0)
 ---
+- [2, 2, 0]
 ...
-lua push_collection(0, 1038784, 'hello')
+space:insert(3, 2, 1)
 ---
- - 1038784: {'hello'}
+- [3, 2, 1]
 ...
-lua push_collection(0, 1038784, 'hello')
+space:insert(4, 3, 0)
 ---
- - 1038784: {}
+- [4, 3, 0]
 ...
-lua push_collection(0, 1038784, 'hello')
+space:insert(5, 3, 1)
 ---
- - 1038784: {}
+- [5, 3, 1]
 ...
-lua push_collection(1, 1038784, 'hi')
+space:insert(6, 3, 2)
 ---
- - 1038784: {26984}
+- [6, 3, 2]
 ...
-lua push_collection(2, 1038784, 'hi')
+space.index[1]:count(1)
 ---
- - 1038784: {26984, 26984}
+- 1
 ...
-lua push_collection(2, 1038784, 'hi')
+space.index[1]:count(2)
 ---
- - 1038784: {26984, 26984}
+- 2
 ...
-lua push_collection(5, 1038784, 'hey')
+space.index[1]:count(2, 1)
 ---
- - 1038784: {26984, 26984, 'hey'}
+- 1
 ...
-lua push_collection(5, 1038784, 'hey')
+space.index[1]:count(2, 2)
 ---
- - 1038784: {26984, 26984, 'hey', 'hey'}
+- 0
 ...
-lua push_collection(5, 1038784, 'hey')
+space.index[1]:count(3)
 ---
- - 1038784: {26984, 26984, 'hey', 'hey', 'hey'}
+- 3
 ...
-lua push_collection(5, 1038784, 'hey')
+space.index[1]:count(3, 3)
 ---
- - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
+- 0
 ...
-# A test case for Bug#1060967: truncation of 64-bit numbers
-lua box.space[5]:insert(2^51, 'hello', 'world')
+space.index[1]:count()
 ---
- - 2251799813685248: {'hello', 'world'}
+- error: 'index.count(): one or more arguments expected'
 ...
-lua box.space[5]:select(0, 2^51)
+space:drop()
 ---
- - 2251799813685248: {'hello', 'world'}
 ...
-lua box.space[5]:truncate()
+--
+-- Tests for lua tuple:transform()
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
+- [0, 0, 'tweedledum']
 ...
-# Test that we print index number in error ER_INDEX_VIOLATION
-lua box.space[1]:insert(1, 'hello', 'world')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
- - 1: {'hello', 'world'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
 ...
-lua box.space[1]:insert(2, 'hello', 'world')
+space = box.space[0]
 ---
-error: 'Duplicate key exists in unique index 1'
 ...
-lua box.space[1]:truncate()
+t = space:insert('1', '2', '3', '4', '5', '6', '7')
 ---
 ...
-#
-# A test case for Bug #1042798
-# Truncate hangs when primary key is not in linear or starts at the first field
-# https://bugs.launchpad.net/tarantool/+bug/1042798
-#
-lua for k, f in pairs(box.space[23].index[0].key_field) do print(k, ' => ', f.fieldno) end
+t:transform(7, 0, '8', '9', '100')
 ---
-0 => 2
-1 => 1
+- ['1', '2', '3', '4', '5', '6', '7', '8', '9', '100']
 ...
-lua box.insert(23, 1, 2, 3, 4)
+t:transform(0, 1)
 ---
- - 1: {2, 3, 4}
+- ['2', '3', '4', '5', '6', '7']
 ...
-lua box.insert(23, 10, 20, 30, 40)
+t:transform(1, 4)
 ---
- - 10: {20, 30, 40}
+- ['1', '6', '7']
 ...
-lua box.insert(23, 20, 30, 40, 50)
+t:transform(-1, 1)
 ---
- - 20: {30, 40, 50}
+- ['1', '2', '3', '4', '5', '6']
 ...
-lua for _k, v in box.space[23]:pairs() do print(v) end
+t:transform(-3, 2)
 ---
-1: {2, 3, 4}
-10: {20, 30, 40}
-20: {30, 40, 50}
+- ['1', '2', '3', '4', '7']
 ...
-lua box.space[23]:truncate()
+t:transform(0, 0, 'A')
 ---
+- ['A', '1', '2', '3', '4', '5', '6', '7']
 ...
-lua for _k, v in box.space[23]:pairs() do print(v) end
+t:transform(-1, 0, 'A')
 ---
+- ['1', '2', '3', '4', '5', '6', 'A', '7']
 ...
-
-#-----------------------------------------------------------------------------#
-# TreeIndex::random()
-#-----------------------------------------------------------------------------#
-
-lua index_random_test(26, 0)
+t:transform(0, 1, 'A')
 ---
-all values have been found
- - true
+- ['A', '2', '3', '4', '5', '6', '7']
 ...
-
-#-----------------------------------------------------------------------------#
-# HashIndex::random()
-#-----------------------------------------------------------------------------#
-
-lua index_random_test(26, 1)
+t:transform(-1, 1, 'B')
 ---
-all values have been found
- - true
+- ['1', '2', '3', '4', '5', '6', 'B']
 ...
-
-#
-# A test case for Bug#1200228
-# https://bugs.launchpad.net/tarantool/+bug/1200228
-# box.auto_increment counter resets
-# Test for correct little-endian comparison of integer fields.
-# (unsigned)
-#
-lua for i = 1, 300 do box.insert(2, i, i) print(box.space[2].index[0]:max()) end
+t:transform(0, 2, 'C')
 ---
-1: {1}
-2: {2}
-3: {3}
-4: {4}
-5: {5}
-6: {6}
-7: {7}
-8: {8}
-9: {9}
-10: {10}
-11: {11}
-12: {12}
-13: {13}
-14: {14}
-15: {15}
-16: {16}
-17: {17}
-18: {18}
-19: {19}
-20: {20}
-21: {21}
-22: {22}
-23: {23}
-24: {24}
-25: {25}
-26: {26}
-27: {27}
-28: {28}
-29: {29}
-30: {30}
-31: {31}
-32: {32}
-33: {33}
-34: {34}
-35: {35}
-36: {36}
-37: {37}
-38: {38}
-39: {39}
-40: {40}
-41: {41}
-42: {42}
-43: {43}
-44: {44}
-45: {45}
-46: {46}
-47: {47}
-48: {48}
-49: {49}
-50: {50}
-51: {51}
-52: {52}
-53: {53}
-54: {54}
-55: {55}
-56: {56}
-57: {57}
-58: {58}
-59: {59}
-60: {60}
-61: {61}
-62: {62}
-63: {63}
-64: {64}
-65: {65}
-66: {66}
-67: {67}
-68: {68}
-69: {69}
-70: {70}
-71: {71}
-72: {72}
-73: {73}
-74: {74}
-75: {75}
-76: {76}
-77: {77}
-78: {78}
-79: {79}
-80: {80}
-81: {81}
-82: {82}
-83: {83}
-84: {84}
-85: {85}
-86: {86}
-87: {87}
-88: {88}
-89: {89}
-90: {90}
-91: {91}
-92: {92}
-93: {93}
-94: {94}
-95: {95}
-96: {96}
-97: {97}
-98: {98}
-99: {99}
-100: {100}
-101: {101}
-102: {102}
-103: {103}
-104: {104}
-105: {105}
-106: {106}
-107: {107}
-108: {108}
-109: {109}
-110: {110}
-111: {111}
-112: {112}
-113: {113}
-114: {114}
-115: {115}
-116: {116}
-117: {117}
-118: {118}
-119: {119}
-120: {120}
-121: {121}
-122: {122}
-123: {123}
-124: {124}
-125: {125}
-126: {126}
-127: {127}
-128: {128}
-129: {129}
-130: {130}
-131: {131}
-132: {132}
-133: {133}
-134: {134}
-135: {135}
-136: {136}
-137: {137}
-138: {138}
-139: {139}
-140: {140}
-141: {141}
-142: {142}
-143: {143}
-144: {144}
-145: {145}
-146: {146}
-147: {147}
-148: {148}
-149: {149}
-150: {150}
-151: {151}
-152: {152}
-153: {153}
-154: {154}
-155: {155}
-156: {156}
-157: {157}
-158: {158}
-159: {159}
-160: {160}
-161: {161}
-162: {162}
-163: {163}
-164: {164}
-165: {165}
-166: {166}
-167: {167}
-168: {168}
-169: {169}
-170: {170}
-171: {171}
-172: {172}
-173: {173}
-174: {174}
-175: {175}
-176: {176}
-177: {177}
-178: {178}
-179: {179}
-180: {180}
-181: {181}
-182: {182}
-183: {183}
-184: {184}
-185: {185}
-186: {186}
-187: {187}
-188: {188}
-189: {189}
-190: {190}
-191: {191}
-192: {192}
-193: {193}
-194: {194}
-195: {195}
-196: {196}
-197: {197}
-198: {198}
-199: {199}
-200: {200}
-201: {201}
-202: {202}
-203: {203}
-204: {204}
-205: {205}
-206: {206}
-207: {207}
-208: {208}
-209: {209}
-210: {210}
-211: {211}
-212: {212}
-213: {213}
-214: {214}
-215: {215}
-216: {216}
-217: {217}
-218: {218}
-219: {219}
-220: {220}
-221: {221}
-222: {222}
-223: {223}
-224: {224}
-225: {225}
-226: {226}
-227: {227}
-228: {228}
-229: {229}
-230: {230}
-231: {231}
-232: {232}
-233: {233}
-234: {234}
-235: {235}
-236: {236}
-237: {237}
-238: {238}
-239: {239}
-240: {240}
-241: {241}
-242: {242}
-243: {243}
-244: {244}
-245: {245}
-246: {246}
-247: {247}
-248: {248}
-249: {249}
-250: {250}
-251: {251}
-252: {252}
-253: {253}
-254: {254}
-255: {255}
-256: {256}
-257: {257}
-258: {258}
-259: {259}
-260: {260}
-261: {261}
-262: {262}
-263: {263}
-264: {264}
-265: {265}
-266: {266}
-267: {267}
-268: {268}
-269: {269}
-270: {270}
-271: {271}
-272: {272}
-273: {273}
-274: {274}
-275: {275}
-276: {276}
-277: {277}
-278: {278}
-279: {279}
-280: {280}
-281: {281}
-282: {282}
-283: {283}
-284: {284}
-285: {285}
-286: {286}
-287: {287}
-288: {288}
-289: {289}
-290: {290}
-291: {291}
-292: {292}
-293: {293}
-294: {294}
-295: {295}
-296: {296}
-297: {297}
-298: {298}
-299: {299}
-300: {300}
+- ['C', '3', '4', '5', '6', '7']
 ...
-lua box.space[2]:select_range(0, 300)
+t:transform(2, 0, 'hello')
 ---
- - 1: {1}
- - 2: {2}
- - 3: {3}
- - 4: {4}
- - 5: {5}
- - 6: {6}
- - 7: {7}
- - 8: {8}
- - 9: {9}
- - 10: {10}
- - 11: {11}
- - 12: {12}
- - 13: {13}
- - 14: {14}
- - 15: {15}
- - 16: {16}
- - 17: {17}
- - 18: {18}
- - 19: {19}
- - 20: {20}
- - 21: {21}
- - 22: {22}
- - 23: {23}
- - 24: {24}
- - 25: {25}
- - 26: {26}
- - 27: {27}
- - 28: {28}
- - 29: {29}
- - 30: {30}
- - 31: {31}
- - 32: {32}
- - 33: {33}
- - 34: {34}
- - 35: {35}
- - 36: {36}
- - 37: {37}
- - 38: {38}
- - 39: {39}
- - 40: {40}
- - 41: {41}
- - 42: {42}
- - 43: {43}
- - 44: {44}
- - 45: {45}
- - 46: {46}
- - 47: {47}
- - 48: {48}
- - 49: {49}
- - 50: {50}
- - 51: {51}
- - 52: {52}
- - 53: {53}
- - 54: {54}
- - 55: {55}
- - 56: {56}
- - 57: {57}
- - 58: {58}
- - 59: {59}
- - 60: {60}
- - 61: {61}
- - 62: {62}
- - 63: {63}
- - 64: {64}
- - 65: {65}
- - 66: {66}
- - 67: {67}
- - 68: {68}
- - 69: {69}
- - 70: {70}
- - 71: {71}
- - 72: {72}
- - 73: {73}
- - 74: {74}
- - 75: {75}
- - 76: {76}
- - 77: {77}
- - 78: {78}
- - 79: {79}
- - 80: {80}
- - 81: {81}
- - 82: {82}
- - 83: {83}
- - 84: {84}
- - 85: {85}
- - 86: {86}
- - 87: {87}
- - 88: {88}
- - 89: {89}
- - 90: {90}
- - 91: {91}
- - 92: {92}
- - 93: {93}
- - 94: {94}
- - 95: {95}
- - 96: {96}
- - 97: {97}
- - 98: {98}
- - 99: {99}
- - 100: {100}
- - 101: {101}
- - 102: {102}
- - 103: {103}
- - 104: {104}
- - 105: {105}
- - 106: {106}
- - 107: {107}
- - 108: {108}
- - 109: {109}
- - 110: {110}
- - 111: {111}
- - 112: {112}
- - 113: {113}
- - 114: {114}
- - 115: {115}
- - 116: {116}
- - 117: {117}
- - 118: {118}
- - 119: {119}
- - 120: {120}
- - 121: {121}
- - 122: {122}
- - 123: {123}
- - 124: {124}
- - 125: {125}
- - 126: {126}
- - 127: {127}
- - 128: {128}
- - 129: {129}
- - 130: {130}
- - 131: {131}
- - 132: {132}
- - 133: {133}
- - 134: {134}
- - 135: {135}
- - 136: {136}
- - 137: {137}
- - 138: {138}
- - 139: {139}
- - 140: {140}
- - 141: {141}
- - 142: {142}
- - 143: {143}
- - 144: {144}
- - 145: {145}
- - 146: {146}
- - 147: {147}
- - 148: {148}
- - 149: {149}
- - 150: {150}
- - 151: {151}
- - 152: {152}
- - 153: {153}
- - 154: {154}
- - 155: {155}
- - 156: {156}
- - 157: {157}
- - 158: {158}
- - 159: {159}
- - 160: {160}
- - 161: {161}
- - 162: {162}
- - 163: {163}
- - 164: {164}
- - 165: {165}
- - 166: {166}
- - 167: {167}
- - 168: {168}
- - 169: {169}
- - 170: {170}
- - 171: {171}
- - 172: {172}
- - 173: {173}
- - 174: {174}
- - 175: {175}
- - 176: {176}
- - 177: {177}
- - 178: {178}
- - 179: {179}
- - 180: {180}
- - 181: {181}
- - 182: {182}
- - 183: {183}
- - 184: {184}
- - 185: {185}
- - 186: {186}
- - 187: {187}
- - 188: {188}
- - 189: {189}
- - 190: {190}
- - 191: {191}
- - 192: {192}
- - 193: {193}
- - 194: {194}
- - 195: {195}
- - 196: {196}
- - 197: {197}
- - 198: {198}
- - 199: {199}
- - 200: {200}
- - 201: {201}
- - 202: {202}
- - 203: {203}
- - 204: {204}
- - 205: {205}
- - 206: {206}
- - 207: {207}
- - 208: {208}
- - 209: {209}
- - 210: {210}
- - 211: {211}
- - 212: {212}
- - 213: {213}
- - 214: {214}
- - 215: {215}
- - 216: {216}
- - 217: {217}
- - 218: {218}
- - 219: {219}
- - 220: {220}
- - 221: {221}
- - 222: {222}
- - 223: {223}
- - 224: {224}
- - 225: {225}
- - 226: {226}
- - 227: {227}
- - 228: {228}
- - 229: {229}
- - 230: {230}
- - 231: {231}
- - 232: {232}
- - 233: {233}
- - 234: {234}
- - 235: {235}
- - 236: {236}
- - 237: {237}
- - 238: {238}
- - 239: {239}
- - 240: {240}
- - 241: {241}
- - 242: {242}
- - 243: {243}
- - 244: {244}
- - 245: {245}
- - 246: {246}
- - 247: {247}
- - 248: {248}
- - 249: {249}
- - 250: {250}
- - 251: {251}
- - 252: {252}
- - 253: {253}
- - 254: {254}
- - 255: {255}
- - 256: {256}
- - 257: {257}
- - 258: {258}
- - 259: {259}
- - 260: {260}
- - 261: {261}
- - 262: {262}
- - 263: {263}
- - 264: {264}
- - 265: {265}
- - 266: {266}
- - 267: {267}
- - 268: {268}
- - 269: {269}
- - 270: {270}
- - 271: {271}
- - 272: {272}
- - 273: {273}
- - 274: {274}
- - 275: {275}
- - 276: {276}
- - 277: {277}
- - 278: {278}
- - 279: {279}
- - 280: {280}
- - 281: {281}
- - 282: {282}
- - 283: {283}
- - 284: {284}
- - 285: {285}
- - 286: {286}
- - 287: {287}
- - 288: {288}
- - 289: {289}
- - 290: {290}
- - 291: {291}
- - 292: {292}
- - 293: {293}
- - 294: {294}
- - 295: {295}
- - 296: {296}
- - 297: {297}
- - 298: {298}
- - 299: {299}
- - 300: {300}
-...
-lua box.space[2]:truncate()
+- ['1', '2', 'hello', '3', '4', '5', '6', '7']
+...
+t:transform(0, -1, 'C')
+---
+- error: 'tuple.transform(): len is negative'
+...
+t:transform(0, 100)
+---
+- []
+...
+t:transform(-100, 1)
+---
+- error: 'tuple.transform(): offset is out of bound'
+...
+t:transform(0, 3, 1, 2, 3)
+---
+- [1, 2, 3, '4', '5', '6', '7']
+...
+t:transform(3, 1, tonumber64(4))
+---
+- ['1', '2', '3', 4, '5', '6', '7']
+...
+t:transform(0, 1, {})
+---
+- error: 'tuple.transform(): unsupported field type ''table'''
+...
+space:truncate()
+---
+...
+--
+-- Tests for lua tuple:find() and tuple:findall()
+--
+-- First space for hash_str tests
+t = space:insert('A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
+---
+...
+t:find('2')
+---
+- 1
+...
+t:find('4')
+---
+- 3
+...
+t:find('5')
+---
+- 6
+...
+t:find('A')
+---
+- 0
+...
+t:find('0')
+---
+...
+t:findall('A')
+---
+- 0
+...
+t:findall('2')
+---
+- 1
+- 5
+...
+t:findall('3')
+---
+- 2
+- 4
+- 8
+...
+t:findall('0')
+---
+...
+t:find(2, '2')
+---
+- 5
+...
+t:find(89, '2')
+---
+...
+t:findall(4, '3')
+---
+- 4
+- 8
+...
+t = space:insert('Z', '2', 2, 3, tonumber64(2))
+---
+...
+t:find(2)
+---
+- 2
+...
+t:find(tonumber64(2))
+---
+- 4
+...
+t:find('2')
+---
+- 1
+...
+space:drop()
+---
+...
+-- A test case for Bug #1038784
+-- transform returns wrong tuple and put broken reply into socket
+-- http://bugs.launchpad.net/tarantool/+bug/1038784
+--  https://bugs.launchpad.net/tarantool/+bug/1006354
+--  lua box.auto_increment() testing
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+...
+space = box.space[0]
+---
+...
+dofile('push.lua')
+---
+...
+push_collection(space, 0, 1038784, 'hello')
+---
+- [1038784, 'hello']
+...
+push_collection(space, 0, 1038784, 'hello')
+---
+- [1038784]
+...
+push_collection(space, 0, 1038784, 'hello')
+---
+- [1038784]
+...
+push_collection(space, 1, 1038784, 'hi')
+---
+- [1038784, 26984]
+...
+push_collection(space, 2, 1038784, 'hi')
+---
+- [1038784, 26984, 26984]
+...
+push_collection(space, 2, 1038784, 'hi')
+---
+- [1038784, 26984, 26984]
+...
+push_collection(space, 5, 1038784, 'hey')
+---
+- [1038784, 26984, 26984, 'hey']
+...
+push_collection(space, 5, 1038784, 'hey')
+---
+- [1038784, 26984, 26984, 'hey', 'hey']
+...
+push_collection(space, 5, 1038784, 'hey')
+---
+- [1038784, 26984, 26984, 'hey', 'hey', 'hey']
+...
+push_collection(space, 5, 1038784, 'hey')
+---
+- [1038784, 26984, 'hey', 'hey', 'hey', 'hey']
+...
+-- # lua box.auto_increment() testing
+-- # http://bugs.launchpad.net/tarantool/+bug/1006354
+--
+-- Tests for lua box.auto_increment
+--
+space:truncate()
+---
+...
+box.auto_increment(space.n, 'a')
+---
+- [1, 'a']
+...
+space:insert(5)
+---
+- [5]
+...
+box.auto_increment(space.n, 'b')
+---
+- [6, 'b']
+...
+box.auto_increment(space.n, 'c')
+---
+- [7, 'c']
+...
+space:drop()
+---
+...
+-- A test case for Bug #1042798
+-- Truncate hangs when primary key is not in linear or starts at the first field
+-- https://bugs.launchpad.net/tarantool/+bug/1042798
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 2, 'num', 1, 'num')
+---
+- [0, 0, 'primary', 1701147252, 1, 2, 2, 'num', 1, 'num']
+...
+space = box.space[0]
+---
+...
+-- Print key fields in pk
+space.index[0].key_field
+---
+- - type: NUM
+    fieldno: 1
+...
+space:insert(1, 2, 3, 4)
+---
+- [1, 2, 3, 4]
+...
+space:insert(10, 20, 30, 40)
+---
+- [10, 20, 30, 40]
+...
+space:insert(20, 30, 40, 50)
+---
+- [20, 30, 40, 50]
+...
+space:select(0)
+---
+- [1, 2, 3, 4]
+- [10, 20, 30, 40]
+- [20, 30, 40, 50]
+...
+-- Truncate must not hang
+space:truncate()
+---
+...
+-- Empty result
+space:select(0)
+---
+...
+space:drop()
+---
+...
+--
+-- index:random test
+-- 
+dofile('index_random_test.lua')
+---
+...
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+...
+box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 1, 'secondary', 1752392040, 1, 1, 0, 'num']
+...
+space = box.space[0]
+---
+...
+-------------------------------------------------------------------------------
+-- TreeIndex::random()
+-------------------------------------------------------------------------------
+index_random_test(space, 0)
+---
+- true
+...
+-------------------------------------------------------------------------------
+-- HashIndex::random()
+-------------------------------------------------------------------------------
+index_random_test(space, 1)
+---
+- true
+...
+space:drop()
+---
+...
+space = nil
 ---
 ...
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua

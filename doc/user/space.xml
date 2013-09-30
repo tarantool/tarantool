@@ -44,7 +44,7 @@ struct space_t
    * If given, each tuple in the space must have exactly
    * this many fields.
    */
-  unsigned int cardinality;
+  unsigned int arity;
   /* Only used for HASH indexes, to preallocate memory. */
   unsigned int estimated_rows;
   struct index_t index[];

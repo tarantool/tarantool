@@ -33,7 +33,6 @@
 
 #include "salloc.h"
 #include "tuple.h"
-#include "space.h"
 #include "exception.h"
 #include "pickle.h"
 #include <lib/bitset/index.h>
@@ -86,10 +85,10 @@ bitset_index_iterator_next(struct iterator *iterator)
 	return value_to_tuple(value);
 }
 
-BitsetIndex::BitsetIndex(struct key_def *key_def, struct space *space)
-	: Index(key_def, space)
+BitsetIndex::BitsetIndex(struct key_def *key_def)
+	: Index(key_def)
 {
-	assert(!key_def->is_unique);
+	assert(!this->key_def->is_unique);
 
 	if (bitset_index_create(&index, realloc) != 0)
 		panic_syserror("bitset_index_create");
@@ -100,64 +99,10 @@ BitsetIndex::~BitsetIndex()
 	bitset_index_destroy(&index);
 }
 
-void
-BitsetIndex::beginBuild()
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "beginBuild()");
-}
-
-void
-BitsetIndex::buildNext(struct tuple *tuple)
-{
-	(void) tuple;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "buildNext()");
-}
-
-void
-BitsetIndex::endBuild()
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "endBuild()");
-}
-
-void
-BitsetIndex::build(Index *pk)
-{
-	assert(!key_def->is_unique);
-
-	struct iterator *it = pk->position();
-	struct tuple *tuple;
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-
-	while ((tuple = it->next(it)))
-		replace(NULL, tuple, DUP_INSERT);
-}
-
 size_t
 BitsetIndex::size() const
 {
 	return bitset_index_size(&index);
-}
-
-struct tuple *
-BitsetIndex::min() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "min()");
-	return NULL;
-}
-
-struct tuple *
-BitsetIndex::max() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "max()");
-	return NULL;
-}
-
-struct tuple *
-BitsetIndex::random(uint32_t rnd) const
-{
-	(void) rnd;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "random()");
-	return NULL;
 }
 
 struct iterator *
@@ -183,14 +128,6 @@ BitsetIndex::findByKey(const char *key, uint32_t part_count) const
 	(void) key;
 	(void) part_count;
 	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "findByKey()");
-	return NULL;
-}
-
-struct tuple *
-BitsetIndex::findByTuple(struct tuple *tuple) const
-{
-	(void) tuple;
-	tnt_raise(ClientError, ER_UNSUPPORTED, "BitsetIndex", "findByTuple()");
 	return NULL;
 }
 

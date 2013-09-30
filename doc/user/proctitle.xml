@@ -48,9 +48,8 @@
   </itemizedlist>
   Possible port names are: <quote>pri</quote> for
   <olink targetptr="primary_port"/>, <quote>sec</quote> for <olink
-  targetptr="secondary_port"/>, <quote>adm</quote> for <olink
-  targetptr="admin_port"/> and <quote>memcached</quote> for <olink
-  targetptr="memcached_port"/>.
+  targetptr="secondary_port"/> and <quote>adm</quote> for <olink
+  targetptr="admin_port"/>.
 </para>
 <para>
   For example:

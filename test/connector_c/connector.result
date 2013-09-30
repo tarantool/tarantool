@@ -1,3 +1,11 @@
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+...
 > tuple1                        [OK]
 > tuple2                        [OK]
 > list                          [OK]
@@ -40,3 +48,6 @@
 > sql select limit              [OK]
 > sql delete                    [OK]
 > sql call                      [OK]
+box.space[0]:drop()
+---
+...

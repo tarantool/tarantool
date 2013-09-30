@@ -112,13 +112,12 @@ tarantool_lua(struct lua_State *L,
  */
 int luaL_pushnumber64(struct lua_State *L, uint64_t val);
 
-
-
 /**
- * show plugin statistics (for admin port)
+ * show plugin statistics
  */
-struct tbuf;
-void show_plugins_stat(struct tbuf *out);
+typedef int (*tarantool_plugin_stat_cb)(struct tarantool_plugin *p, void *cb_ctx);
+
+int plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx);
 
 /**
  * @brief A palloc-like wrapper to allocate memory using lua_newuserdata
@@ -128,5 +127,11 @@ void show_plugins_stat(struct tbuf *out);
  */
 void *
 lua_region_alloc(void *ctx, size_t size);
+
+void
+tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out);
+
+void
+tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_H */

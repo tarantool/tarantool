@@ -1,89 +1,148 @@
+space = box.schema.create_space('tweedledum', { id = 0 })
+---
+...
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+---
+...
 ping
-ok
 ---
+- ok
+...
 select * from t0
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected u32'
-insert into t0 values (1, 'I am a tuple')
-Insert OK, 1 row affected
-select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am a tuple']
-select * from t0 where k0 = 0
-No match
-select * from t0 where k0 = 2
-No match
-select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am a tuple']
-save snapshot
 ---
-ok
+- error:
+    errcode: ER_EXACT_MATCH
+    errmsg: Invalid key part count in an exact match (expected 1, got 0)
+...
+insert into t0 values (1, 'I am a tuple')
+---
+- [1, u'I am a tuple']
 ...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am a tuple']
+---
+- [1, u'I am a tuple']
+...
+select * from t0 where k0 = 0
+---
+...
+select * from t0 where k0 = 2
+---
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am a tuple']
+---
+- [1, u'I am a tuple']
+...
+box.snapshot()
+---
+- ok
+...
+select * from t0 where k0 = 1
+---
+- [1, u'I am a tuple']
+...
+select * from t0 where k0 = 1
+---
+- [1, u'I am a tuple']
+...
 delete from t0 where k0 = 1
-Delete OK, 1 row affected
+---
+- [1, u'I am a tuple']
+...
 select * from t0 where k0 = 1
-No match
+---
+...
 update t0 set k1 = 'I am a new tuple' where k0=1
-Update OK, 0 row affected
+---
+...
 select * from t0 where k0=1
-No match
+---
+...
 insert into t0 values (1, 'I am a new tuple')
-Insert OK, 1 row affected
+---
+- [1, u'I am a new tuple']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am a new tuple']
+---
+- [1, u'I am a new tuple']
+...
 update t0 set k1 = 'I am the newest tuple' where k0=1
-Update OK, 1 row affected
+---
+- [1, u'I am the newest tuple']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'I am the newest tuple']
+---
+- [1, u'I am the newest tuple']
+...
 update t0 set k1 = 'Huh', k2 = 'I am a new field! I was added via append' where k0=1
-Update OK, 1 row affected
+---
+- [1, u'Huh', u'I am a new field! I was added via append']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'Huh', 'I am a new field! I was added via append']
+---
+- [1, u'Huh', u'I am a new field! I was added via append']
+...
 update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1
-An error occurred: ER_NO_SUCH_FIELD, 'Field 1000 was not found in the tuple'
+---
+- error:
+    errcode: ER_NO_SUCH_FIELD
+    errmsg: Field 1000 was not found in the tuple
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'Huh', 'I am a new field! I was added via append']
+---
+- [1, u'Huh', u'I am a new field! I was added via append']
+...
 replace into t0 values (1, 'I am a new tuple', 'stub')
-Replace OK, 1 row affected
+---
+- [1, u'I am a new tuple', u'stub']
+...
 update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1
-Update OK, 1 row affected
+---
+- [1, u'Huh', u'Oh-ho-ho']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 'Huh', 'Oh-ho-ho']
+---
+- [1, u'Huh', u'Oh-ho-ho']
+...
 update t0 set k1 = '', k2 = '' where k0=1
-Update OK, 1 row affected
+---
+- [1, u'', u'']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, '', '']
+---
+- [1, u'', u'']
+...
 update t0 set k1 = 2, k2 = 3 where k0=1
-Update OK, 1 row affected
+---
+- [1, u'\x02\x00\x00\x00', u'\x03\x00\x00\x00']
+...
 select * from t0 where k0 = 1
-Found 1 tuple:
-[1, 2, 3]
+---
+- [1, u'\x02\x00\x00\x00', u'\x03\x00\x00\x00']
+...
 insert into t0 values (0)
-Insert OK, 1 row affected
+---
+- [0]
+...
 select * from t0 where k0=0
-Found 1 tuple:
-[0]
+---
+- [0]
+...
 insert into t0 values (4294967295)
-Insert OK, 1 row affected
+---
+- [4294967295]
+...
 select * from t0 where k0=4294967295
-Found 1 tuple:
-[4294967295]
+---
+- [4294967295]
+...
 delete from t0 where k0=0
-Delete OK, 1 row affected
+---
+- [0]
+...
 delete from t0 where k0=4294967295
-Delete OK, 1 row affected
+---
+- [4294967295]
+...
 #
 # A test case for: http://bugs.launchpad.net/bugs/712456
 # Verify that when trying to access a non-existing or
@@ -91,12 +150,24 @@ Delete OK, 1 row affected
 #
 
 select * from t1 where k0 = 0
-An error occurred: ER_NO_SUCH_SPACE, 'Space 1 does not exist'
+---
+- error:
+    errcode: ER_NO_SUCH_SPACE
+    errmsg: Space 1 does not exist
+...
 select * from t65537 where k0 = 0
-An error occurred: ER_NO_SUCH_SPACE, 'Space 65537 does not exist'
+---
+- error:
+    errcode: ER_NO_SUCH_SPACE
+    errmsg: Space 65537 does not exist
+...
 select * from t4294967295 where k0 = 0
-An error occurred: ER_NO_SUCH_SPACE, 'Space 4294967295 does not exist'
-lua box.space[0]:truncate()
+---
+- error:
+    errcode: ER_NO_SUCH_SPACE
+    errmsg: Space 4294967295 does not exist
+...
+box.space[0]:drop()
 ---
 ...
 #
@@ -105,5 +176,5 @@ lua box.space[0]:truncate()
 
 show status
 ---
-unknown command. try typing help.
+- error: '[string "show status"]:1: ''='' expected near ''status'''
 ...

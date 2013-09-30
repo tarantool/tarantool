@@ -1,251 +1,40 @@
 
-# Bug #708685:
-#  Addition of required configuration file options broke backward
-#  compatibility
-#  (https://bugs.launchpad.net/bugs/708685)
-
-show configuration
----
-configuration:
-  username: (null)
-  local_hot_standby: "false"
-  bind_ipaddr: "INADDR_ANY"
-  coredump: "false"
-  admin_port: "33015"
-  replication_port: "0"
-  log_level: "4"
-  slab_alloc_arena: "0.1"
-  slab_alloc_minimal: "64"
-  slab_alloc_factor: "2"
-  work_dir: (null)
-  snap_dir: "."
-  wal_dir: "."
-  script_dir: "."
-  pid_file: "box.pid"
-  logger: "cat - >> tarantool.log"
-  logger_nonblock: "true"
-  io_collect_interval: "0"
-  backlog: "1024"
-  readahead: "16320"
-  snap_io_rate_limit: "0"
-  rows_per_wal: "50"
-  wal_writer_inbox_size: "16384"
-  wal_mode: "fsync_delay"
-  wal_fsync_delay: "0"
-  wal_dir_rescan_delay: "0.1"
-  panic_on_snap_error: "true"
-  panic_on_wal_error: "false"
-  primary_port: "33013"
-  secondary_port: "33014"
-  too_long_threshold: "0.5"
-  custom_proc_title: (null)
-  memcached_port: "0"
-  memcached_space: "23"
-  memcached_expire: "false"
-  memcached_expire_per_loop: "1024"
-  memcached_expire_full_sweep: "3600"
-  replication_source: (null)
-  space[0].enabled: "true"
-  space[0].cardinality: "-1"
-  space[0].estimated_rows: "0"
-  space[0].index[0].type: "HASH"
-  space[0].index[0].unique: "true"
-  space[0].index[0].key_field[0].fieldno: "0"
-  space[0].index[0].key_field[0].type: "NUM"
-  space[1].enabled: "false"
-  space[1].cardinality: "-1"
-  space[1].estimated_rows: "0"
-  space[2].enabled: "true"
-  space[2].cardinality: "-1"
-  space[2].estimated_rows: "0"
-  space[2].index[0].type: "HASH"
-  space[2].index[0].unique: "true"
-  space[2].index[0].key_field[0].fieldno: "0"
-  space[2].index[0].key_field[0].type: "NUM"
-...
-
-# Bug #884768:
-#  Test representation of boolean values
-#  (https://bugs.launchpad.net/bugs/884768)
-
-show configuration
----
-configuration:
-  username: (null)
-  local_hot_standby: "false"
-  bind_ipaddr: "INADDR_ANY"
-  coredump: "false"
-  admin_port: "33015"
-  replication_port: "0"
-  log_level: "4"
-  slab_alloc_arena: "0.1"
-  slab_alloc_minimal: "64"
-  slab_alloc_factor: "2"
-  work_dir: (null)
-  snap_dir: "."
-  wal_dir: "."
-  script_dir: "."
-  pid_file: "box.pid"
-  logger: "cat - >> tarantool.log"
-  logger_nonblock: "true"
-  io_collect_interval: "0"
-  backlog: "1024"
-  readahead: "16320"
-  snap_io_rate_limit: "0"
-  rows_per_wal: "50"
-  wal_writer_inbox_size: "16384"
-  wal_mode: "fsync_delay"
-  wal_fsync_delay: "0"
-  wal_dir_rescan_delay: "0.1"
-  panic_on_snap_error: "true"
-  panic_on_wal_error: "false"
-  primary_port: "33013"
-  secondary_port: "33014"
-  too_long_threshold: "0.5"
-  custom_proc_title: (null)
-  memcached_port: "0"
-  memcached_space: "23"
-  memcached_expire: "false"
-  memcached_expire_per_loop: "1024"
-  memcached_expire_full_sweep: "3600"
-  replication_source: (null)
-  space[0].enabled: "false"
-  space[0].cardinality: "-1"
-  space[0].estimated_rows: "0"
-  space[0].index[0].type: "HASH"
-  space[0].index[0].unique: "false"
-  space[0].index[0].key_field[0].fieldno: "0"
-  space[0].index[0].key_field[0].type: "NUM"
-  space[1].enabled: "true"
-  space[1].cardinality: "-1"
-  space[1].estimated_rows: "0"
-  space[1].index[0].type: "HASH"
-  space[1].index[0].unique: "true"
-  space[1].index[0].key_field[0].fieldno: "0"
-  space[1].index[0].key_field[0].type: "NUM"
-  space[2].enabled: "false"
-  space[2].cardinality: "-1"
-  space[2].estimated_rows: "0"
-  space[2].index[0].type: "HASH"
-  space[2].index[0].unique: "false"
-  space[2].index[0].key_field[0].fieldno: "0"
-  space[2].index[0].key_field[0].type: "NUM"
-  space[3].enabled: "true"
-  space[3].cardinality: "-1"
-  space[3].estimated_rows: "0"
-  space[3].index[0].type: "HASH"
-  space[3].index[0].unique: "true"
-  space[3].index[0].key_field[0].fieldno: "0"
-  space[3].index[0].key_field[0].type: "NUM"
-  space[4].enabled: "false"
-  space[4].cardinality: "-1"
-  space[4].estimated_rows: "0"
-  space[4].index[0].type: "HASH"
-  space[4].index[0].unique: "false"
-  space[4].index[0].key_field[0].fieldno: "0"
-  space[4].index[0].key_field[0].type: "NUM"
-  space[5].enabled: "true"
-  space[5].cardinality: "-1"
-  space[5].estimated_rows: "0"
-  space[5].index[0].type: "HASH"
-  space[5].index[0].unique: "true"
-  space[5].index[0].key_field[0].fieldno: "0"
-  space[5].index[0].key_field[0].type: "NUM"
-  space[6].enabled: "false"
-  space[6].cardinality: "-1"
-  space[6].estimated_rows: "0"
-  space[6].index[0].type: "HASH"
-  space[6].index[0].unique: "false"
-  space[6].index[0].key_field[0].fieldno: "0"
-  space[6].index[0].key_field[0].type: "NUM"
-  space[7].enabled: "true"
-  space[7].cardinality: "-1"
-  space[7].estimated_rows: "0"
-  space[7].index[0].type: "HASH"
-  space[7].index[0].unique: "true"
-  space[7].index[0].key_field[0].fieldno: "0"
-  space[7].index[0].key_field[0].type: "NUM"
-  space[8].enabled: "false"
-  space[8].cardinality: "-1"
-  space[8].estimated_rows: "0"
-  space[8].index[0].type: "HASH"
-  space[8].index[0].unique: "false"
-  space[8].index[0].key_field[0].fieldno: "0"
-  space[8].index[0].key_field[0].type: "NUM"
-  space[9].enabled: "true"
-  space[9].cardinality: "-1"
-  space[9].estimated_rows: "0"
-  space[9].index[0].type: "HASH"
-  space[9].index[0].unique: "true"
-  space[9].index[0].key_field[0].fieldno: "0"
-  space[9].index[0].key_field[0].type: "NUM"
-...
-
 # Bug #876541:
 #  Test floating point values (wal_fsync_delay) with fractional part
 #  (https://bugs.launchpad.net/bugs/876541)
 
-lua box.cfg.wal_fsync_delay
+box.cfg.wal_fsync_delay
 ---
- - 0.01
+- 0.01
 ...
-
-# Bug#928413 Lua malfunction on certain configuration
-#  (https://bugs.launchpad.net/bugs/928413)
-
-lua box.cfg.wal_fsync_delay
+print_config()
 ---
- - 0.1
-...
-lua box.space[0].enabled
----
- - true
-...
-reload configuration
----
-ok
-...
-
-#  Test field type conflict in keys
-
-tarantool_box -c tarantool_bad_type.cfg
-tarantool_box: can't load config:
- - (space = 0 fieldno = 0) index field type mismatch
-
-lua print_config()
----
-io_collect_interval = 0
-pid_file = box.pid
-slab_alloc_minimal = 64
-primary_port = 33013
-log_level = 4
-logger_nonblock = true
-memcached_expire_per_loop = 1024
-snap_dir = .
-coredump = false
-panic_on_snap_error = true
-memcached_expire_full_sweep = 3600
-replication_port = 0
-wal_fsync_delay = 0
-too_long_threshold = 0.5
-slab_alloc_factor = 2
-admin_port = 33015
-logger = cat - >> tarantool.log
-snap_io_rate_limit = 0
-wal_writer_inbox_size = 16384
-memcached_expire = false
-backlog = 1024
-memcached_space = 23
-memcached_port = 0
-rows_per_wal = 50
-wal_mode = fsync_delay
-local_hot_standby = false
-secondary_port = 33014
-panic_on_wal_error = false
-script_dir = script_dir
-wal_dir = .
-bind_ipaddr = INADDR_ANY
-readahead = 16320
-slab_alloc_arena = 0.1
-wal_dir_rescan_delay = 0.1
+- io_collect_interval: 0
+  pid_file: box.pid
+  slab_alloc_factor: 2
+  slab_alloc_minimal: 64
+  admin_port: 33015
+  logger: cat - >> tarantool.log
+  snap_io_rate_limit: 0
+  log_level: 4
+  slab_alloc_arena: 0.1
+  backlog: 1024
+  primary_port: 33013
+  logger_nonblock: true
+  secondary_port: 33014
+  snap_dir: .
+  coredump: false
+  wal_dir: .
+  readahead: 16320
+  local_hot_standby: false
+  wal_mode: fsync_delay
+  rows_per_wal: 50
+  panic_on_snap_error: true
+  panic_on_wal_error: false
+  script_dir: script_dir
+  replication_port: 0
+  bind_ipaddr: INADDR_ANY
+  wal_fsync_delay: 0
+  too_long_threshold: 0.5
+  wal_dir_rescan_delay: 0.1
 ...

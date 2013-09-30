@@ -1,184 +1,234 @@
-lua remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+space = box.schema.create_space('tweedledum')
 ---
 ...
-lua type(remote)
----
- - table
-...
-lua remote:ping()
----
- - true
-...
-lua remote:ping()
----
- - true
-...
-lua box.net.box.ping(remote)
----
- - true
-...
-lua box.insert(0, 123, 'test1', 'test2')
----
- - 123: {'test1', 'test2'}
-...
-lua box.select(0, 0, 123)
----
- - 123: {'test1', 'test2'}
-...
-lua tuple = remote:select(0, 0, 123)
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
 ...
-lua remote:call('box.select', '0', '0', 123)
----
- - 123: {'test1', 'test2'}
-...
-lua tuple
----
- - 123: {'test1', 'test2'}
-...
-lua type(tuple)
----
- - userdata
-...
-lua #tuple
----
- - 3
-...
-lua box.update(0, 123, '=p', 1, 'test1-updated')
----
- - 123: {'test1-updated', 'test2'}
-...
-lua remote:update(0, 123, '=p', 2, 'test2-updated')
----
- - 123: {'test1-updated', 'test2-updated'}
-...
-lua box.insert(0, 123, 'test1', 'test2')
----
-error: 'Duplicate key exists in unique index 0'
-...
-lua remote:insert(0, 123, 'test1', 'test2')
----
-error: 'Duplicate key exists in unique index 0'
-...
-lua remote:insert(0, 345, 'test1', 'test2')
----
- - 345: {'test1', 'test2'}
-...
-lua remote:select(0, 0, 345)
----
- - 345: {'test1', 'test2'}
-...
-lua remote:call('box.select', '0', '0', 345)
----
- - 345: {'test1', 'test2'}
-...
-lua box.select(0, 0, 345)
----
- - 345: {'test1', 'test2'}
-...
-lua remote:replace(0, 345, 'test1-replaced', 'test2-replaced')
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua box.select(0, 0, 345)
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua remote:select_limit(0, 0, 0, 1000, 345)
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua box.select_range(0, 0, 1000)
----
- - 123: {'test1-updated', 'test2-updated'}
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua remote:select_range(0, 0, 1000)
----
- - 123: {'test1-updated', 'test2-updated'}
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua box.select(0, 0, 345)
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua remote:select(0, 0, 345)
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua remote:timeout(0.5):select(0, 0, 345)
----
- - 345: {'test1-replaced', 'test2-replaced'}
-...
-lua remote:call('box.fiber.sleep', '.01')
+remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 ---
 ...
-lua remote:timeout(0.01):call('box.fiber.sleep', '10')
+type(remote)
 ---
- - nil
+- table
 ...
-lua pstart = box.time()
+remote:ping()
+---
+- true
+...
+remote:ping()
+---
+- true
+...
+box.net.box.ping(remote)
+---
+- true
+...
+space:insert(123, 'test1', 'test2')
+---
+- [123, 'test1', 'test2']
+...
+space:select(0, 123)
+---
+- [123, 'test1', 'test2']
+...
+tuple = remote:select(space.n, 0, 123)
 ---
 ...
-lua parallel = {}
+remote:call('box.select', tostring(space.n), '0', 123)
+---
+- [123, 'test1', 'test2']
+...
+slf, foo = box.call_loadproc('box.select')
 ---
 ...
-lua function parallel_foo(id) box.fiber.sleep(math.random() * .05) return id end
+type(slf)
+---
+- function
+...
+type(foo)
+---
+- nil
+...
+slf, foo = box.call_loadproc('box.net.self:select')
 ---
 ...
-lua parallel_foo('abc')
+type(slf)
 ---
- - abc
+- function
 ...
-lua for i = 1, 20 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() local s = string.format('%07d', i) local so = remote:call('parallel_foo', s) table.insert(parallel, tostring(s == so[0]) ) end)) end
+type(foo)
+---
+- table
+...
+tuple
+---
+- [123, 'test1', 'test2']
+...
+type(tuple)
+---
+- userdata
+...
+#tuple
+---
+- 3
+...
+space:update(123, '=p', 1, 'test1-updated')
+---
+- [123, 'test1-updated', 'test2']
+...
+remote:update(space.n, 123, '=p', 2, 'test2-updated')
+---
+- [123, 'test1-updated', 'test2-updated']
+...
+space:insert(123, 'test1', 'test2')
+---
+- error: Duplicate key exists in unique index 0
+...
+remote:insert(space.n, 123, 'test1', 'test2')
+---
+- error: Duplicate key exists in unique index 0
+...
+remote:insert(space.n, 345, 'test1', 'test2')
+---
+- [345, 'test1', 'test2']
+...
+remote:select(space.n, 0, 345)
+---
+- [345, 'test1', 'test2']
+...
+remote:call('box.select', tostring(space.n), '0', 345)
+---
+- [345, 'test1', 'test2']
+...
+space:select(0, 345)
+---
+- [345, 'test1', 'test2']
+...
+remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+space:select(0, 345)
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+remote:select_limit(space.n, 0, 0, 1000, 345)
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+space:select_range(0, 1000)
+---
+- [123, 'test1-updated', 'test2-updated']
+- [345, 'test1-replaced', 'test2-replaced']
+...
+remote:select_range(space.n, 0, 1000)
+---
+- [123, 'test1-updated', 'test2-updated']
+- [345, 'test1-replaced', 'test2-replaced']
+...
+space:select(0, 345)
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+remote:select(space.n, 0, 345)
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+remote:timeout(0.5):select(space.n, 0, 345)
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
+remote:call('box.fiber.sleep', '.01')
 ---
 ...
-lua for i = 1, 20 do if #parallel == 20 then break end box.fiber.sleep(0.1) end
+remote:timeout(0.01):call('box.fiber.sleep', '10')
+---
+- null
+...
+--# setopt delimiter ';'
+pstart = box.time();
 ---
 ...
-lua unpack(parallel)
+parallel = {};
 ---
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
- - true
 ...
-lua #parallel
+function parallel_foo(id)
+    box.fiber.sleep(math.random() * .05)
+    return id
+end;
 ---
- - 20
 ...
-lua box.time() - pstart < 0.5
+parallel_foo('abc');
 ---
- - true
+- abc
 ...
-lua remote:close()
+for i = 1, 20 do
+    box.fiber.resume(
+        box.fiber.create(
+            function()
+                box.fiber.detach()
+                local s = string.format('%07d', i)
+                local so = remote:call('parallel_foo', s)
+                table.insert(parallel, s == so[0])
+            end
+        )
+    )
+end;
 ---
- - true
 ...
-lua remote:close()
+for i = 1, 20 do
+    if #parallel == 20 then
+        break
+    end
+    box.fiber.sleep(0.1)
+end;
 ---
-error: '[string "-- box_net.lua (internal file)..."]:404: box.net.box: already closed'
 ...
-lua remote:ping()
+--# setopt delimiter ''
+unpack(parallel)
 ---
-error: '[string "-- box_net.lua (internal file)..."]:409: box.net.box: connection was closed'
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
+- true
 ...
-lua box.space[0]:truncate()
+#parallel
+---
+- 20
+...
+box.time() - pstart < 0.5
+---
+- true
+...
+remote:close()
+---
+- true
+...
+remote:close()
+---
+- error: '[string "-- box_net.lua (internal file)..."]:408: box.net.box: already closed'
+...
+remote:ping()
+---
+- error: '[string "-- box_net.lua (internal file)..."]:413: box.net.box: connection
+    was closed'
+...
+space:drop()
 ---
 ...

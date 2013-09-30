@@ -1,111 +1,285 @@
-show injections
----
-error injections:
-  - name: ERRINJ_TESTING
-    state: off
-  - name: ERRINJ_WAL_IO
-    state: off
-  - name: ERRINJ_WAL_ROTATE
-    state: off
-  - name: ERRINJ_INDEX_ALLOC
-    state: off
-...
-set injection some-injection on
----
-fail:can't find error injection 'some-injection'
-...
-select * from t0 where k0 = 222444
-No match
-set injection ERRINJ_TESTING on
----
-ok
-...
-select * from t0 where k0 = 222444
-An error occurred: ER_INJECTION, 'Error injection 'ERRINJ_TESTING''
-set injection ERRINJ_TESTING off
----
-ok
-...
-set injection ERRINJ_WAL_IO on
----
-ok
-...
-insert into t0 values (1)
-An error occurred: ER_WAL_IO, 'Failed to write to disk'
-select * from t0 where k0=1
-No match
-set injection ERRINJ_WAL_IO off
----
-ok
-...
-insert into t0 values (1)
-Insert OK, 1 row affected
-set injection ERRINJ_WAL_IO on
----
-ok
-...
-update t0 set k0=2 where k0=1
-An error occurred: ER_WAL_IO, 'Failed to write to disk'
-select * from t0 where k0=1
-Found 1 tuple:
-[1]
-select * from t0 where k0=2
-No match
-set injection ERRINJ_WAL_IO off
----
-ok
-...
-lua box.space[0]:truncate()
+space = box.schema.create_space('tweedledum')
 ---
 ...
-set injection ERRINJ_WAL_ROTATE on
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-ok
 ...
-insert into t0 values (1)
-An error occurred: ER_WAL_IO, 'Failed to write to disk'
-select * from t0 where k0=1
-No match
-set injection ERRINJ_WAL_ROTATE off
+box.errinj.info()
 ---
-ok
+- ERRINJ_INDEX_ALLOC:
+    state: false
+  ERRINJ_WAL_IO:
+    state: false
+  ERRINJ_WAL_ROTATE:
+    state: false
+  ERRINJ_TESTING:
+    state: false
 ...
-insert into t0 values (1)
-Insert OK, 1 row affected
-set injection ERRINJ_WAL_ROTATE on
+box.errinj.set("some-injection", true)
 ---
-ok
+- 'error: can''t find error injection ''some-injection'''
 ...
-update t0 set k0=2 where k0=1
-An error occurred: ER_WAL_IO, 'Failed to write to disk'
-select * from t0 where k0=1
-Found 1 tuple:
-[1]
-select * from t0 where k0=2
-No match
-set injection ERRINJ_WAL_ROTATE off
+box.errinj.set("some-injection") -- check error
 ---
-ok
+- 'error: can''t find error injection ''some-injection'''
 ...
-update t0 set k0=2 where k0=1
-Update OK, 1 row affected
-select * from t0 where k0=1
-No match
-select * from t0 where k0=2
-Found 1 tuple:
-[2]
-set injection ERRINJ_WAL_ROTATE on
+space:select(0,222444)
 ---
-ok
 ...
-lua box.space[0]:truncate()
+box.errinj.set("ERRINJ_TESTING", true)
 ---
-error: 'Failed to write to disk'
+- ok
 ...
-set injection ERRINJ_WAL_ROTATE off
+space:select(0,222444)
 ---
-ok
+- error: Error injection 'ERRINJ_TESTING'
 ...
-lua box.space[0]:truncate()
+box.errinj.set("ERRINJ_TESTING", false)
+---
+- ok
+...
+-- Check how well we handle a failed log write
+box.errinj.set("ERRINJ_WAL_IO", true)
+---
+- ok
+...
+space:insert(1)
+---
+- error: Failed to write to disk
+...
+space:select(0,1)
+---
+...
+box.errinj.set("ERRINJ_WAL_IO", false)
+---
+- ok
+...
+space:insert(1)
+---
+- [1]
+...
+box.errinj.set("ERRINJ_WAL_IO", true)
+---
+- ok
+...
+space:update(1, '=p', 0, 2)
+---
+- error: Failed to write to disk
+...
+space:select(0,1)
+---
+- [1]
+...
+space:select(0,2)
+---
+...
+box.errinj.set("ERRINJ_WAL_IO", false)
+---
+- ok
+...
+space:truncate()
+---
+...
+-- Check a failed log rotation
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
+---
+- ok
+...
+space:insert(1)
+---
+- error: Failed to write to disk
+...
+space:select(0,1)
+---
+...
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
+---
+- ok
+...
+space:insert(1)
+---
+- [1]
+...
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
+---
+- ok
+...
+space:update(1, '=p', 0, 2)
+---
+- error: Failed to write to disk
+...
+space:select(0,1)
+---
+- [1]
+...
+space:select(0,2)
+---
+...
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
+---
+- ok
+...
+space:update(1, '=p', 0, 2)
+---
+- [2]
+...
+space:select(0,1)
+---
+...
+space:select(0,2)
+---
+- [2]
+...
+box.errinj.set("ERRINJ_WAL_ROTATE", true)
+---
+- ok
+...
+space:truncate()
+---
+- error: Failed to write to disk
+...
+box.errinj.set("ERRINJ_WAL_ROTATE", false)
+---
+- ok
+...
+space:truncate()
+---
+...
+space:drop()
+---
+...
+-- Check how well we handle a failed log write in DDL
+s_disabled = box.schema.create_space('disabled')
+---
+...
+s_withindex = box.schema.create_space('withindex')
+---
+...
+s_withindex:create_index('primary', 'hash')
+---
+...
+s_withdata = box.schema.create_space('withdata')
+---
+...
+s_withdata:create_index('primary', 'tree')
+---
+...
+s_withdata:insert(1, 2, 3, 4, 5)
+---
+- [1, 2, 3, 4, 5]
+...
+s_withdata:insert(4, 5, 6, 7, 8)
+---
+- [4, 5, 6, 7, 8]
+...
+s_withdata:create_index('secondary', 'hash', {parts = {1, 'num', 2, 'num' }})
+---
+...
+box.errinj.set("ERRINJ_WAL_IO", true)
+---
+- ok
+...
+test = box.schema.create_space('test')
+---
+- error: Failed to write to disk
+...
+s_disabled:create_index('primary', 'hash')
+---
+- error: Failed to write to disk
+...
+s_disabled.enabled
+---
+- false
+...
+s_disabled:insert(0)
+---
+- error: 'No index #0 is defined in space 512'
+...
+s_withindex:create_index('secondary', 'tree', { parts = { 1, 'num'} })
+---
+- error: Failed to write to disk
+...
+s_withindex.index.secondary
+---
+- null
+...
+s_withdata.index.secondary:drop()
+---
+- error: Failed to write to disk
+...
+s_withdata.index.secondary.unique
+---
+- true
+...
+s_withdata:drop()
+---
+- error: Failed to write to disk
+...
+box.space['withdata'].enabled
+---
+- true
+...
+s_withdata:create_index('another', 'tree', {parts = { 4, 'num' }, unique = false})
+---
+- error: Failed to write to disk
+...
+s_withdata.index.another
+---
+- null
+...
+box.errinj.set("ERRINJ_WAL_IO", false)
+---
+- ok
+...
+test = box.schema.create_space('test')
+---
+...
+s_disabled:create_index('primary', 'hash')
+---
+...
+s_disabled.enabled
+---
+- true
+...
+s_disabled:insert(0)
+---
+- [0]
+...
+s_withindex:create_index('secondary', 'tree', { parts = { 1, 'num'} })
+---
+...
+s_withindex.index.secondary.unique
+---
+- true
+...
+s_withdata.index.secondary:drop()
+---
+...
+s_withdata.index.secondary
+---
+- null
+...
+s_withdata:drop()
+---
+...
+box.space['withdata']
+---
+- null
+...
+s_withdata:create_index('another', 'tree', {parts = { 4, 'num' }, unique = false})
+---
+- error: Space 514 does not exist
+...
+s_withdata.index.another
+---
+- null
+...
+test:drop()
+---
+...
+s_disabled:drop()
+---
+...
+s_withindex:drop()
 ---
 ...

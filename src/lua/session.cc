@@ -92,20 +92,15 @@ lbox_session_peer(struct lua_State *L)
 
 struct lbox_session_trigger
 {
-	struct session_trigger *trigger;
+	struct trigger trigger;
 	int ref;
 };
 
-static struct lbox_session_trigger on_connect =
-	{ &session_on_connect, LUA_NOREF};
-static struct lbox_session_trigger on_disconnect =
-	{ &session_on_disconnect, LUA_NOREF};
-
 static void
-lbox_session_run_trigger(void *param)
+lbox_session_run_trigger(struct trigger *trg, void * /* event */)
 {
 	struct lbox_session_trigger *trigger =
-			(struct lbox_session_trigger *) param;
+			(struct lbox_session_trigger *) trg;
 	/* Copy the referenced callable object object stack. */
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
@@ -125,8 +120,14 @@ lbox_session_run_trigger(void *param)
 	}
 }
 
+static struct lbox_session_trigger on_connect =
+	{ { rlist_nil, lbox_session_run_trigger }, LUA_NOREF};
+static struct lbox_session_trigger on_disconnect =
+	{ { rlist_nil, lbox_session_run_trigger }, LUA_NOREF};
+
 static int
 lbox_session_set_trigger(struct lua_State *L,
+			 struct rlist *list,
 			 struct lbox_session_trigger *trigger)
 {
 	if (lua_gettop(L) != 1 ||
@@ -139,6 +140,7 @@ lbox_session_set_trigger(struct lua_State *L,
 	if (trigger->ref != LUA_NOREF) {
 		lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 		luaL_unref(L, LUA_REGISTRYINDEX, trigger->ref);
+		trigger_clear(&trigger->trigger);
 	} else {
 		lua_pushnil(L);
 	}
@@ -149,15 +151,12 @@ lbox_session_set_trigger(struct lua_State *L,
 	 */
 	if (lua_type(L, -2) == LUA_TNIL) {
 		trigger->ref = LUA_NOREF;
-		trigger->trigger->trigger = NULL;
-		trigger->trigger->param = NULL;
 	} else {
 		/* Move the trigger to the top of the stack. */
 		lua_insert(L, -2);
 		/* Reference the new trigger. Pops it. */
 		trigger->ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		trigger->trigger->trigger = lbox_session_run_trigger;
-		trigger->trigger->param = trigger;
+		trigger_set(list, &trigger->trigger);
 	}
 	/* Return the old trigger. */
 	return 1;
@@ -166,13 +165,14 @@ lbox_session_set_trigger(struct lua_State *L,
 static int
 lbox_session_on_connect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &on_connect);
+	return lbox_session_set_trigger(L, &session_on_connect, &on_connect);
 }
 
 static int
 lbox_session_on_disconnect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &on_disconnect);
+	return lbox_session_set_trigger(L, &session_on_disconnect,
+					&on_disconnect);
 }
 
 static const struct luaL_reg lbox_session_meta [] = {

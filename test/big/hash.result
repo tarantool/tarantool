@@ -1,641 +1,687 @@
-
-#=============================================================================#
-# 32-bit hash tests
-#=============================================================================#
-
-
-#-----------------------------------------------------------------------------#
-# 32-bit hash insert fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Insert valid fieds
-
-lua box.space[10]:insert(0, 'value1 v1.0', 'value2 v1.0')
+dofile('utils.lua')
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[10]:insert(1, 'value1 v1.0', 'value2 v1.0')
+--=============================================================================
+-- 32-bit hash tests
+--=============================================================================
+-------------------------------------------------------------------------------
+-- 32-bit hash insert fields tests
+-------------------------------------------------------------------------------
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 1: {'value1 v1.0', 'value2 v1.0'}
+- [0, 0, 'tweedledum']
 ...
-lua box.space[10]:insert(2, 'value1 v1.0', 'value2 v1.0')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
- - 2: {'value1 v1.0', 'value2 v1.0'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
 ...
-lua box.space[10]:insert(3, 'value1 v1.0', 'value2 v1.0')
+hash = box.space[0]
 ---
- - 3: {'value1 v1.0', 'value2 v1.0'}
 ...
-
-# Insert invalid fields
-
-lua box.space[10]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
+-- Insert valid fields
+hash:insert(0, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-
-#-----------------------------------------------------------------------------#
-# 32-bit hash replace fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Replace valid fieds
-
-lua box.space[10]:replace(3, 'value1 v1.31', 'value2 1.12')
+hash:insert(1, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[10]:replace(1, 'value1 v1.32', 'value2 1.72')
+hash:insert(2, 'value1 v1.0', 'value2 v1.0')
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[10]:replace(2, 'value1 v1.43', 'value2 1.92')
+hash:insert(3, 'value1 v1.0', 'value2 v1.0')
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
-
-# Replace invalid fields
-
-lua box.space[10]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+-- Insert invalid fields
+hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
-
-#-----------------------------------------------------------------------------#
-# 32-bit hash select fields test
-#-----------------------------------------------------------------------------#
-
-
-# select by valid keys
-
-lua box.space[10]:select(0, 0)
+-------------------------------------------------------------------------------
+-- 32-bit hash replace fields tests
+-------------------------------------------------------------------------------
+-- Replace valid fields
+hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[10]:select(0, 1)
+hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[10]:select(0, 2)
+hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[10]:select(0, 3)
+-- Replace invalid fields
+hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
-lua box.space[10]:select(0, 4)
+-------------------------------------------------------------------------------
+-- 32-bit hash select fields test
+-------------------------------------------------------------------------------
+-- select by valid keys
+hash:select(0, 0)
 ---
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[10]:select(0, 5)
+hash:select(0, 1)
 ---
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-
-# select by invalid keys
-
-lua box.space[10]:select(0, 'invalid key')
+hash:select(0, 2)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[10]:select(0, 1, 2)
+hash:select(0, 3)
 ---
-error: 'Invalid key part count (expected [0..1], got 2)'
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-
-#-----------------------------------------------------------------------------#
-# 32-bit hash delete fields test
-#-----------------------------------------------------------------------------#
-
-
-# delete by valid keys
-
-lua box.space[10]:delete(0)
+hash:select(0, 4)
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[10]:delete(1)
+hash:select(0, 5)
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
 ...
-lua box.space[10]:delete(2)
+-- select by invalid keys
+hash:select(0, 'invalid key')
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-lua box.space[10]:delete(3)
+hash:select(0, 1, 2)
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- error: Invalid key part count (expected [0..1], got 2)
 ...
-lua box.space[10]:delete(4)
+-------------------------------------------------------------------------------
+-- 32-bit hash delete fields test
+-------------------------------------------------------------------------------
+-- delete by valid keys
+hash:delete(0)
 ---
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[10]:delete(5)
+hash:delete(1)
 ---
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-
-# delete by invalid keys
-
-lua box.space[10]:delete('invalid key')
+hash:delete(2)
 ---
-error: 'Supplied key field type does not match index type: expected u32'
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[10]:delete(1, 2)
+hash:delete(3)
 ---
-error: 'Invalid key part count in an exact match (expected 1, got 2)'
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-
-#=============================================================================#
-# 64-bit hash tests
-#=============================================================================#
-
-
-#-----------------------------------------------------------------------------#
-# 64-bit hash inset fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Insert valid fieds
-
-lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
+hash:delete(4)
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
+hash:delete(5)
 ---
- - 1: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
+-- delete by invalid keys
+hash:delete('invalid key')
 ---
- - 2: {'value1 v1.0', 'value2 v1.0'}
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
+hash:delete(1, 2)
 ---
- - 3: {'value1 v1.0', 'value2 v1.0'}
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
-
-# Insert invalid fields
-
-lua box.space[11]:insert(100, 'value1 v1.0', 'value2 v1.0')
+hash:truncate()
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
 ...
-lua box.space[11]:insert(101, 'value1 v1.0', 'value2 v1.0')
+--=============================================================================
+-- 64-bit hash tests
+--=============================================================================
+-------------------------------------------------------------------------------
+-- 64-bit hash inset fields tests
+-------------------------------------------------------------------------------
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num64')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num64']
 ...
-lua box.space[11]:insert(102, 'value1 v1.0', 'value2 v1.0')
+hash = box.space[0]
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
 ...
-lua box.space[11]:insert(103, 'value1 v1.0', 'value2 v1.0')
+-- Insert valid fields
+hash:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
+hash:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
-
-#-----------------------------------------------------------------------------#
-# 64-bit hash replace fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Replace valid fieds
-
-lua box.space[11]:replace(3ULL, 'value1 v1.31', 'value2 1.12')
+hash:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:replace(1ULL, 'value1 v1.32', 'value2 1.72')
+hash:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:replace(2ULL, 'value1 v1.43', 'value2 1.92')
+-- Insert invalid fields
+hash:insert(100, 'value1 v1.0', 'value2 v1.0')
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-
-# Replace invalid fields
-
-lua box.space[11]:replace(3, 'value1 v1.31', 'value2 1.12')
+hash:insert(101, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:replace(1, 'value1 v1.32', 'value2 1.72')
+hash:insert(102, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:replace(2, 'value1 v1.43', 'value2 1.92')
+hash:insert(103, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
+hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-
-#-----------------------------------------------------------------------------#
-# 64-bit hash select fields test
-#-----------------------------------------------------------------------------#
-
-
-# select by valid keys
-
-lua box.space[11]:select(0, 0ULL)
+-------------------------------------------------------------------------------
+-- 64-bit hash replace fields tests
+-------------------------------------------------------------------------------
+-- Replace valid fields
+hash:replace(3ULL, 'value1 v1.31', 'value2 1.12')
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[11]:select(0, 1ULL)
+hash:replace(1ULL, 'value1 v1.32', 'value2 1.72')
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[11]:select(0, 2ULL)
+hash:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[11]:select(0, 3ULL)
+-- Replace invalid fields
+hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:select(0, 4ULL)
+hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:select(0, 5ULL)
+hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-
-# select by valid NUM keys
-
-lua box.space[11]:select(0, 0)
+hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
 ...
-lua box.space[11]:select(0, 1)
+-------------------------------------------------------------------------------
+-- 64-bit hash select fields test
+-------------------------------------------------------------------------------
+-- select by valid keys
+hash:select(0, 0ULL)
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:select(0, 2)
+hash:select(0, 1ULL)
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[11]:select(0, 3)
+hash:select(0, 2ULL)
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[11]:select(0, 4)
+hash:select(0, 3ULL)
 ---
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[11]:select(0, 5)
+hash:select(0, 4ULL)
 ---
 ...
-
-# select by invalid keys
-
-lua box.space[11]:select(0, 'invalid key')
+hash:select(0, 5ULL)
 ---
-error: 'Supplied key field type does not match index type: expected u64'
 ...
-lua box.space[11]:select(0, '00000001', '00000002')
+-- select by valid NUM keys
+hash:select(0, 0)
 ---
-error: 'Invalid key part count (expected [0..1], got 2)'
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-
-#-----------------------------------------------------------------------------#
-# 64-bit hash delete fields test
-#-----------------------------------------------------------------------------#
-
-
-# delete by valid keys
-
-lua box.space[11]:delete(0ULL)
+hash:select(0, 1)
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[11]:delete(1ULL)
+hash:select(0, 2)
 ---
- - 1: {'value1 v1.32', 'value2 1.72'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[11]:delete(2ULL)
+hash:select(0, 3)
 ---
- - 2: {'value1 v1.43', 'value2 1.92'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[11]:delete(3ULL)
+hash:select(0, 4)
 ---
- - 3: {'value1 v1.31', 'value2 1.12'}
 ...
-lua box.space[11]:delete(4ULL)
+hash:select(0, 5)
 ---
 ...
-lua box.space[11]:delete(5ULL)
+-- select by invalid keys
+hash:select(0, 'invalid key')
 ---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
 ...
-lua box.space[11]:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
+hash:select(0, '00000001', '00000002')
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- error: Invalid key part count (expected [0..1], got 2)
 ...
-lua box.space[11]:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
+-------------------------------------------------------------------------------
+-- 64-bit hash delete fields test
+-------------------------------------------------------------------------------
+-- delete by valid keys
+hash:delete(0ULL)
 ---
- - 1: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
+hash:delete(1ULL)
 ---
- - 2: {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[11]:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
+hash:delete(2ULL)
 ---
- - 3: {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
-
-# delete by valid NUM keys
-
-lua box.space[11]:delete(0)
+hash:delete(3ULL)
 ---
- - 0: {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[11]:delete(1)
+hash:delete(4ULL)
 ---
- - 1: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:delete(2)
+hash:delete(5ULL)
 ---
- - 2: {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[11]:delete(3)
+hash:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
 ---
- - 3: {'value1 v1.0', 'value2 v1.0'}
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:delete(4)
+hash:insert(1ULL, 'value1 v1.0', 'value2 v1.0')
 ---
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:delete(5)
+hash:insert(2ULL, 'value1 v1.0', 'value2 v1.0')
 ---
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
-
-# delete by invalid keys
-
-lua box.space[11]:delete('invalid key')
+hash:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Supplied key field type does not match index type: expected u64'
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[11]:delete('00000001', '00000002')
+-- delete by valid NUM keys
+hash:delete(0)
 ---
-error: 'Invalid key part count in an exact match (expected 1, got 2)'
+- [0, 'value1 v1.0', 'value2 v1.0']
 ...
-
-#=============================================================================#
-# String hash tests
-#=============================================================================#
-
-
-#-----------------------------------------------------------------------------#
-# String hash inset fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Insert valid fieds
-
-lua box.space[12]:insert('key 0', 'value1 v1.0', 'value2 v1.0')
+hash:delete(1)
 ---
- - 'key 0': {'value1 v1.0', 'value2 v1.0'}
+- [1, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:insert('key 1', 'value1 v1.0', 'value2 v1.0')
+hash:delete(2)
 ---
- - 'key 1': {'value1 v1.0', 'value2 v1.0'}
+- [2, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:insert('key 2', 'value1 v1.0', 'value2 v1.0')
+hash:delete(3)
 ---
- - 'key 2': {'value1 v1.0', 'value2 v1.0'}
+- [3, 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:insert('key 3', 'value1 v1.0', 'value2 v1.0')
+hash:delete(4)
 ---
- - 'key 3': {'value1 v1.0', 'value2 v1.0'}
 ...
-
-#-----------------------------------------------------------------------------#
-# String hash replace fields tests
-#-----------------------------------------------------------------------------#
-
-
-# Replace valid fieds
-
-lua box.space[12]:replace('key 3', 'value1 v1.31', 'value2 1.12')
+hash:delete(5)
 ---
- - 'key 3': {'value1 v1.31', 'value2 1.12'}
 ...
-lua box.space[12]:replace('key 1', 'value1 v1.32', 'value2 1.72')
+-- delete by invalid keys
+hash:delete('invalid key')
 ---
- - 'key 1': {'value1 v1.32', 'value2 1.72'}
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
 ...
-lua box.space[12]:replace('key 2', 'value1 v1.43', 'value2 1.92')
+hash:delete('00000001', '00000002')
 ---
- - 'key 2': {'value1 v1.43', 'value2 1.92'}
+- error: Invalid key part count in an exact match (expected 1, got 2)
 ...
-
-#-----------------------------------------------------------------------------#
-# String hash select fields test
-#-----------------------------------------------------------------------------#
-
-
-# select by valid keys
-
-lua box.space[12]:select(0, 'key 0')
+hash:truncate()
 ---
- - 'key 0': {'value1 v1.0', 'value2 v1.0'}
 ...
-lua box.space[12]:select(0, 'key 1')
+--=============================================================================
+-- String hash tests
+--=============================================================================
+-------------------------------------------------------------------------------
+-- String hash inset fields tests
+-------------------------------------------------------------------------------
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
- - 'key 1': {'value1 v1.32', 'value2 1.72'}
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
 ...
-lua box.space[12]:select(0, 'key 2')
+hash = box.space[0]
 ---
- - 'key 2': {'value1 v1.43', 'value2 1.92'}
 ...
-lua box.space[12]:select(0, 'key 3')
+-- Insert valid fields
+hash:insert('key 0', 'value1 v1.0', 'value2 v1.0')
 ---
- - 'key 3': {'value1 v1.31', 'value2 1.12'}
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:select(0, 'key 4')
+hash:insert('key 1', 'value1 v1.0', 'value2 v1.0')
 ---
+- ['key 1', 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:select(0, 'key 5')
+hash:insert('key 2', 'value1 v1.0', 'value2 v1.0')
 ---
+- ['key 2', 'value1 v1.0', 'value2 v1.0']
 ...
-
-# select by invalid keys
-
-lua box.space[12]:select(0, 'key 1', 'key 2')
+hash:insert('key 3', 'value1 v1.0', 'value2 v1.0')
 ---
-error: 'Invalid key part count (expected [0..1], got 2)'
+- ['key 3', 'value1 v1.0', 'value2 v1.0']
 ...
-
-#-----------------------------------------------------------------------------#
-# String hash delete fields test
-#-----------------------------------------------------------------------------#
-
-
-# delete by valid keys
-
-lua box.space[12]:delete('key 0')
+-------------------------------------------------------------------------------
+-- String hash replace fields tests
+-------------------------------------------------------------------------------
+-- Replace valid fields
+hash:replace('key 3', 'value1 v1.31', 'value2 1.12')
 ---
- - 'key 0': {'value1 v1.0', 'value2 v1.0'}
+- ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[12]:delete('key 1')
+hash:replace('key 1', 'value1 v1.32', 'value2 1.72')
 ---
- - 'key 1': {'value1 v1.32', 'value2 1.72'}
+- ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[12]:delete('key 2')
+hash:replace('key 2', 'value1 v1.43', 'value2 1.92')
 ---
- - 'key 2': {'value1 v1.43', 'value2 1.92'}
+- ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
-lua box.space[12]:delete('key 3')
+-------------------------------------------------------------------------------
+-- String hash select fields test
+-------------------------------------------------------------------------------
+-- select by valid keys
+hash:select(0, 'key 0')
 ---
- - 'key 3': {'value1 v1.31', 'value2 1.12'}
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
-lua box.space[12]:delete('key 4')
+hash:select(0, 'key 1')
 ---
+- ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
-lua box.space[12]:delete('key 5')
+hash:select(0, 'key 2')
 ---
+- ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
-
-# delete by invalid keys
-
-lua box.space[12]:delete('key 1', 'key 2')
+hash:select(0, 'key 3')
 ---
-error: 'Invalid key part count in an exact match (expected 1, got 2)'
+- ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
-lua box.space[10]:truncate()
+hash:select(0, 'key 4')
 ---
 ...
-lua box.space[11]:truncate()
+hash:select(0, 'key 5')
 ---
 ...
-lua box.space[12]:truncate()
+-- select by invalid keys
+hash:select(0, 'key 1', 'key 2')
 ---
+- error: Invalid key part count (expected [0..1], got 2)
 ...
-lua box.space[21]:truncate()
+-------------------------------------------------------------------------------
+-- String hash delete fields test
+-------------------------------------------------------------------------------
+-- delete by valid keys
+hash:delete('key 0')
 ---
+- ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
-insert into t21 values (0, 0, 0, 0)
-Insert OK, 1 row affected
-insert into t21 values (1, 1, 1, 1)
-Insert OK, 1 row affected
-insert into t21 values (2, 2, 2, 2)
-Insert OK, 1 row affected
-replace into t21 values (1, 1, 1, 1)
-Replace OK, 1 row affected
-replace into t21 values (1, 10, 10, 10)
-Replace OK, 1 row affected
-replace into t21 values (1, 1, 1, 1)
-Replace OK, 1 row affected
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k0 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t21 WHERE k1 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t21 WHERE k2 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t21 WHERE k3 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-insert into t21 values (10, 10, 10, 10)
-Insert OK, 1 row affected
-delete from t21 WHERE k0 = 10
-Delete OK, 1 row affected
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-insert into t21 values (1, 10, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k0 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-replace into t21 values (10, 10, 10, 10)
-An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist in index 0'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-insert into t21 values (10, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k1 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-replace into t21 values (2, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k1 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-insert into t21 values (10, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k3 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-replace into t21 values (2, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
-select * from t21 WHERE k0 = 10
-No match
-select * from t21 WHERE k1 = 10
-No match
-select * from t21 WHERE k2 = 10
-No match
-select * from t21 WHERE k3 = 10
-No match
-select * from t21 WHERE k3 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-lua box.space[21]:truncate()
+hash:delete('key 1')
+---
+- ['key 1', 'value1 v1.32', 'value2 1.72']
+...
+hash:delete('key 2')
+---
+- ['key 2', 'value1 v1.43', 'value2 1.92']
+...
+hash:delete('key 3')
+---
+- ['key 3', 'value1 v1.31', 'value2 1.12']
+...
+hash:delete('key 4')
+---
+...
+hash:delete('key 5')
+---
+...
+-- delete by invalid keys
+hash:delete('key 1', 'key 2')
+---
+- error: Invalid key part count in an exact match (expected 1, got 2)
+...
+hash:truncate()
+---
+...
+------------------------
+-- hash::replace tests
+------------------------
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+...
+box.replace(box.schema.INDEX_ID, 0, 1, 'field1', 'hash', 1, 1, 1, 'num')
+---
+- [0, 1, 'field1', 1752392040, 1, 1, 1, 'num']
+...
+box.replace(box.schema.INDEX_ID, 0, 2, 'field2', 'hash', 1, 1, 2, 'num')
+---
+- [0, 2, 'field2', 1752392040, 1, 1, 2, 'num']
+...
+box.replace(box.schema.INDEX_ID, 0, 3, 'field3', 'hash', 1, 1, 3, 'num')
+---
+- [0, 3, 'field3', 1752392040, 1, 1, 3, 'num']
+...
+hash = box.space[0]
+---
+...
+hash:insert(0, 0, 0, 0)
+---
+- [0, 0, 0, 0]
+...
+hash:insert(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:insert(2, 2, 2, 2)
+---
+- [2, 2, 2, 2]
+...
+-- OK
+hash:replace_if_exists(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:replace_if_exists(1, 10, 10, 10)
+---
+- [1, 10, 10, 10]
+...
+hash:replace_if_exists(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(0, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:select(1, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:select(2, 1)
+---
+- [1, 1, 1, 1]
+...
+hash:select(3, 1)
+---
+- [1, 1, 1, 1]
+...
+-- OK
+hash:insert(10, 10, 10, 10)
+---
+- [10, 10, 10, 10]
+...
+hash:delete(10)
+---
+- [10, 10, 10, 10]
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+-- TupleFound (primary key)
+hash:insert(1, 10, 10, 10)
+---
+- error: Duplicate key exists in unique index 0
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(0, 1)
+---
+- [1, 1, 1, 1]
+...
+-- TupleNotFound (primary key)
+hash:replace_if_exists(10, 10, 10, 10)
+---
+- error: Tuple doesn't exist in index 0
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+-- TupleFound (key --1)
+hash:insert(10, 0, 10, 10)
+---
+- error: Duplicate key exists in unique index 1
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(1, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key --1)
+hash:replace_if_exists(2, 0, 10, 10)
+---
+- error: Duplicate key exists in unique index 1
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(1, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key --3)
+hash:insert(10, 10, 10, 0)
+---
+- error: Duplicate key exists in unique index 3
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(3, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key --3)
+hash:replace_if_exists(2, 10, 10, 0)
+---
+- error: Duplicate key exists in unique index 3
+...
+hash:select(0, 10)
+---
+...
+hash:select(1, 10)
+---
+...
+hash:select(2, 10)
+---
+...
+hash:select(3, 10)
+---
+...
+hash:select(3, 0)
+---
+- [0, 0, 0, 0]
+...
+hash:drop()
 ---
 ...

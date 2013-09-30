@@ -1,915 +1,955 @@
-lua dofile('utils.lua')
+dofile('utils.lua')
 ---
 ...
-lua box.insert(20, 'pid_001', 'sid_001', 'tid_998', 'a')
+# Tree single-part unique
 ---
- - 'pid_001': {'sid_001', 'tid_998', 'a'}
 ...
-lua box.insert(20, 'pid_002', 'sid_001', 'tid_997', 'a')
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 'pid_002': {'sid_001', 'tid_997', 'a'}
+- [0, 0, 'tweedledum']
 ...
-lua box.insert(20, 'pid_003', 'sid_002', 'tid_997', 'b')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
- - 'pid_003': {'sid_002', 'tid_997', 'b'}
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'str']
 ...
-lua box.insert(20, 'pid_005', 'sid_002', 'tid_996', 'b')
+-- Tree single-part non-unique
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 1, 1, 'str')
 ---
- - 'pid_005': {'sid_002', 'tid_996', 'b'}
+- [0, 1, 12649, 1701147252, 0, 1, 1, 'str']
 ...
-lua box.insert(20, 'pid_007', 'sid_003', 'tid_996', 'a')
+-- Tree multi-part unique
+box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
- - 'pid_007': {'sid_003', 'tid_996', 'a'}
+- [0, 2, 12905, 1701147252, 1, 2, 1, 'str', 2, 'str']
 ...
-lua box.insert(20, 'pid_011', 'sid_004', 'tid_996', 'c')
+-- Tree multi-part non-unique
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 2, 'str', 3, 'str')
 ---
- - 'pid_011': {'sid_004', 'tid_996', 'c'}
+- [0, 3, 13161, 1701147252, 0, 2, 2, 'str', 3, 'str']
 ...
-lua box.insert(20, 'pid_013', 'sid_005', 'tid_996', 'b')
+-- Hash single-part unique
+box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'hash', 1, 1, 0, 'str')
 ---
- - 'pid_013': {'sid_005', 'tid_996', 'b'}
+- [0, 4, 13417, 1752392040, 1, 1, 0, 'str']
 ...
-lua box.insert(20, 'pid_017', 'sid_006', 'tid_996', 'a')
+-- Hash multi-part unique
+box.insert(box.schema.INDEX_ID, 0, 5, 'i5', 'hash', 1, 2, 1, 'str', 2, 'str')
 ---
- - 'pid_017': {'sid_006', 'tid_996', 'a'}
+- [0, 5, 13673, 1752392040, 1, 2, 1, 'str', 2, 'str']
 ...
-lua box.insert(20, 'pid_019', 'sid_005', 'tid_995', 'a')
+space = box.space[0]
 ---
- - 'pid_019': {'sid_005', 'tid_995', 'a'}
 ...
-lua box.insert(20, 'pid_023', 'sid_005', 'tid_994', 'a')
+space:insert('pid_001', 'sid_001', 'tid_998', 'a')
 ---
- - 'pid_023': {'sid_005', 'tid_994', 'a'}
+- ['pid_001', 'sid_001', 'tid_998', 'a']
 ...
-
-#-----------------------------------------------------------------------------#
-# Iterator: tree single-part unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 0, 0, 1)
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.ALL)
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.EQ)
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.REQ)
----
-$pid_023$
-$pid_019$
-$pid_017$
-$pid_013$
-$pid_011$
-$pid_007$
-$pid_005$
-$pid_003$
-$pid_002$
-$pid_001$
-...
-lua iterate(20, 0, 0, 1, box.index.GE)
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.GT)
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.LE)
----
-$pid_023$
-$pid_019$
-$pid_017$
-$pid_013$
-$pid_011$
-$pid_007$
-$pid_005$
-$pid_003$
-$pid_002$
-$pid_001$
-...
-lua iterate(20, 0, 0, 1, box.index.LT)
----
-$pid_023$
-$pid_019$
-$pid_017$
-$pid_013$
-$pid_011$
-$pid_007$
-$pid_005$
-$pid_003$
-$pid_002$
-$pid_001$
-...
-lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_003')
----
-$pid_003$
-...
-lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_003')
----
-$pid_003$
-...
-lua iterate(20, 0, 0, 1, box.index.EQ, 'pid_666')
----
-...
-lua iterate(20, 0, 0, 1, box.index.REQ, 'pid_666')
----
-...
-lua iterate(20, 0, 0, 1, box.index.GE, 'pid_001')
----
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.GT, 'pid_001')
----
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 0, 0, 1, box.index.GE, 'pid_999')
----
-...
-lua iterate(20, 0, 0, 1, box.index.GT, 'pid_999')
----
-...
-lua iterate(20, 0, 0, 1, box.index.LE, 'pid_002')
----
-$pid_002$
-$pid_001$
-...
-lua iterate(20, 0, 0, 1, box.index.LT, 'pid_002')
----
-$pid_001$
-...
-lua iterate(20, 0, 0, 1, box.index.LE, 'pid_000')
----
-...
-lua iterate(20, 0, 0, 1, box.index.LT, 'pid_000')
----
-...
-
-#-----------------------------------------------------------------------------#
-# Iterator: tree single-part non-unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 1, 1, 2, box.index.ALL)
----
-$sid_001$
-$sid_001$
-$sid_002$
-$sid_002$
-$sid_003$
-$sid_004$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.EQ)
----
-$sid_001$
-$sid_001$
-$sid_002$
-$sid_002$
-$sid_003$
-$sid_004$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.REQ)
----
-$sid_006$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_004$
-$sid_003$
-$sid_002$
-$sid_002$
-$sid_001$
-$sid_001$
-...
-lua iterate(20, 1, 1, 2, box.index.GE)
----
-$sid_001$
-$sid_001$
-$sid_002$
-$sid_002$
-$sid_003$
-$sid_004$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.GT)
----
-$sid_001$
-$sid_001$
-$sid_002$
-$sid_002$
-$sid_003$
-$sid_004$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.LE)
----
-$sid_006$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_004$
-$sid_003$
-$sid_002$
-$sid_002$
-$sid_001$
-$sid_001$
-...
-lua iterate(20, 1, 1, 2, box.index.LT)
----
-$sid_006$
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_004$
-$sid_003$
-$sid_002$
-$sid_002$
-$sid_001$
-$sid_001$
-...
-lua iterate(20, 1, 1, 2, box.index.EQ, 'sid_005')
----
-$sid_005$
-$sid_005$
-$sid_005$
-...
-lua iterate(20, 1, 1, 2, box.index.REQ, 'sid_005')
----
-$sid_005$
-$sid_005$
-$sid_005$
-...
-lua iterate(20, 1, 1, 2, box.index.GE, 'sid_005')
----
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.GT, 'sid_005')
----
-$sid_006$
-...
-lua iterate(20, 1, 1, 2, box.index.GE, 'sid_999')
----
-...
-lua iterate(20, 1, 1, 2, box.index.GT, 'sid_999')
----
-...
-lua iterate(20, 1, 1, 2, box.index.LE, 'sid_005')
----
-$sid_005$
-$sid_005$
-$sid_005$
-$sid_004$
-$sid_003$
-$sid_002$
-$sid_002$
-$sid_001$
-$sid_001$
-...
-lua iterate(20, 1, 1, 2, box.index.LT, 'sid_005')
----
-$sid_004$
-$sid_003$
-$sid_002$
-$sid_002$
-$sid_001$
-$sid_001$
-...
-lua iterate(20, 1, 1, 2, box.index.LE, 'sid_000')
----
-...
-lua iterate(20, 1, 1, 2, box.index.LT, 'sid_000')
----
-...
-
-#-----------------------------------------------------------------------------#
-# Iterator: tree multi-part unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 2, 1, 3, box.index.ALL)
----
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.EQ)
----
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.REQ)
----
-$sid_006$tid_996$
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.GE)
----
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GT)
----
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.LE)
----
-$sid_006$tid_996$
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LT)
+space:insert('pid_002', 'sid_001', 'tid_997', 'a')
 ---
-$sid_006$tid_996$
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
+- ['pid_002', 'sid_001', 'tid_997', 'a']
 ...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005')
----
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
----
-$sid_005$tid_995$
-...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
----
-...
-lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005')
----
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-...
-lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_995')
----
-$sid_005$tid_995$
-...
-lua iterate(20, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_999')
----
-...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005')
----
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005')
----
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')
----
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_995')
----
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
----
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GT, 'sid_005', 'tid_999')
----
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_999')
----
-...
-lua iterate(20, 2, 1, 3, box.index.GT, 'sid_999')
----
-...
-lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005')
----
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005')
----
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_997')
----
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_997')
----
-$sid_005$tid_996$
-$sid_005$tid_995$
-$sid_005$tid_994$
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LE, 'sid_005', 'tid_000')
----
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LT, 'sid_005', 'tid_000')
----
-$sid_004$tid_996$
-$sid_003$tid_996$
-$sid_002$tid_997$
-$sid_002$tid_996$
-$sid_001$tid_998$
-$sid_001$tid_997$
-...
-lua iterate(20, 2, 1, 3, box.index.LE, 'sid_000')
----
-...
-lua iterate(20, 2, 1, 3, box.index.LT, 'sid_000')
----
-...
-
-#-----------------------------------------------------------------------------#
-# Iterator: tree multi-part non-unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 3, 2, 4, box.index.ALL)
----
-$tid_994$a$
-$tid_995$a$
-$tid_996$a$
-$tid_996$a$
-$tid_996$b$
-$tid_996$b$
-$tid_996$c$
-$tid_997$a$
-$tid_997$b$
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.EQ)
----
-$tid_994$a$
-$tid_995$a$
-$tid_996$a$
-$tid_996$a$
-$tid_996$b$
-$tid_996$b$
-$tid_996$c$
-$tid_997$a$
-$tid_997$b$
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.REQ)
----
-$tid_998$a$
-$tid_997$b$
-$tid_997$a$
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-$tid_995$a$
-$tid_994$a$
-...
-lua iterate(20, 3, 2, 4, box.index.GE)
----
-$tid_994$a$
-$tid_995$a$
-$tid_996$a$
-$tid_996$a$
-$tid_996$b$
-$tid_996$b$
-$tid_996$c$
-$tid_997$a$
-$tid_997$b$
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.GT)
----
-$tid_994$a$
-$tid_995$a$
-$tid_996$a$
-$tid_996$a$
-$tid_996$b$
-$tid_996$b$
-$tid_996$c$
-$tid_997$a$
-$tid_997$b$
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.LE)
----
-$tid_998$a$
-$tid_997$b$
-$tid_997$a$
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-$tid_995$a$
-$tid_994$a$
-...
-lua iterate(20, 3, 2, 4, box.index.LT)
----
-$tid_998$a$
-$tid_997$b$
-$tid_997$a$
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-$tid_995$a$
-$tid_994$a$
-...
-lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996')
----
-$tid_996$a$
-$tid_996$a$
-$tid_996$b$
-$tid_996$b$
-$tid_996$c$
-...
-lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'a')
----
-$tid_996$a$
-$tid_996$a$
-...
-lua iterate(20, 3, 2, 4, box.index.EQ, 'tid_996', 'z')
----
-...
-lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996')
----
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-...
-lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', 'a')
----
-$tid_996$a$
-$tid_996$a$
-...
-lua iterate(20, 3, 2, 4, box.index.REQ, 'tid_996', '0')
----
-...
-lua iterate(20, 3, 2, 4, box.index.GE, 'tid_997')
----
-$tid_997$a$
-$tid_997$b$
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.GT, 'tid_997')
----
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.GE, 'tid_998')
----
-$tid_998$a$
-...
-lua iterate(20, 3, 2, 4, box.index.GT, 'tid_998')
----
-...
-lua iterate(20, 3, 2, 4, box.index.LE, 'tid_997')
----
-$tid_997$b$
-$tid_997$a$
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-$tid_995$a$
-$tid_994$a$
-...
-lua iterate(20, 3, 2, 4, box.index.LT, 'tid_997')
----
-$tid_996$c$
-$tid_996$b$
-$tid_996$b$
-$tid_996$a$
-$tid_996$a$
-$tid_995$a$
-$tid_994$a$
-...
-lua iterate(20, 3, 2, 4, box.index.LE, 'tid_000')
----
-...
-lua iterate(20, 3, 2, 4, box.index.LT, 'tid_000')
----
-...
-lua iterate(20, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
----
-error: 'utils.lua:27: Key part count 4 is greater than index part count 2'
-...
-
-#-----------------------------------------------------------------------------#
-# Iterator: hash single-part unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 4, 0, 1)
----
-sorted output
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 4, 0, 1, box.index.ALL)
----
-sorted output
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 4, 0, 1, box.index.EQ)
----
-error: 'Invalid key part count in an exact match (expected 1, got 0)'
-...
-lua iterate(20, 4, 0, 1, box.index.GE)
----
-sorted output
-$pid_001$
-$pid_002$
-$pid_003$
-$pid_005$
-$pid_007$
-$pid_011$
-$pid_013$
-$pid_017$
-$pid_019$
-$pid_023$
-...
-lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_003')
----
-sorted output
-$pid_003$
-...
-lua iterate(20, 4, 0, 1, box.index.EQ, 'pid_666')
----
-sorted output
-...
-lua iterate(20, 4, 0, 1, box.index.GE, 'pid_001')
+space:insert('pid_003', 'sid_002', 'tid_997', 'b')
 ---
-sorted output
-$pid_001$
-$pid_007$
-$pid_011$
-$pid_019$
-$pid_023$
+- ['pid_003', 'sid_002', 'tid_997', 'b']
 ...
-lua iterate(20, 4, 0, 1, box.index.GE, 'pid_999')
+space:insert('pid_005', 'sid_002', 'tid_996', 'b')
 ---
-sorted output
+- ['pid_005', 'sid_002', 'tid_996', 'b']
 ...
-
-#-----------------------------------------------------------------------------#
-# Iterator: hash multi-part unique
-#-----------------------------------------------------------------------------#
-
-lua iterate(20, 5, 1, 3, box.index.ALL)
+space:insert('pid_007', 'sid_003', 'tid_996', 'a')
 ---
-sorted output
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
+- ['pid_007', 'sid_003', 'tid_996', 'a']
 ...
-lua iterate(20, 5, 1, 3, box.index.EQ)
+space:insert('pid_011', 'sid_004', 'tid_996', 'c')
 ---
-error: 'Invalid key part count in an exact match (expected 2, got 0)'
+- ['pid_011', 'sid_004', 'tid_996', 'c']
 ...
-lua iterate(20, 5, 1, 3, box.index.EQ, 'sid_005')
+space:insert('pid_013', 'sid_005', 'tid_996', 'b')
 ---
-error: 'Invalid key part count in an exact match (expected 2, got 1)'
+- ['pid_013', 'sid_005', 'tid_996', 'b']
 ...
-lua iterate(20, 5, 1, 3, box.index.GE)
+space:insert('pid_017', 'sid_006', 'tid_996', 'a')
 ---
-sorted output
-$sid_001$tid_997$
-$sid_001$tid_998$
-$sid_002$tid_996$
-$sid_002$tid_997$
-$sid_003$tid_996$
-$sid_004$tid_996$
-$sid_005$tid_994$
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
+- ['pid_017', 'sid_006', 'tid_996', 'a']
 ...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
+space:insert('pid_019', 'sid_005', 'tid_995', 'a')
 ---
-$sid_005$tid_995$
+- ['pid_019', 'sid_005', 'tid_995', 'a']
 ...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
+space:insert('pid_023', 'sid_005', 'tid_994', 'a')
 ---
+- ['pid_023', 'sid_005', 'tid_994', 'a']
 ...
-lua iterate(20, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
+-------------------------------------------------------------------------------
+-- Iterator: tree single-part unique
+-------------------------------------------------------------------------------
+iterate(space.n, 0, 0, 1)
 ---
-error: 'utils.lua:27: Key part count 3 is greater than index part count 2'
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
 ...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')
+iterate(space.n, 0, 0, 1, box.index.ALL)
 ---
-$sid_005$tid_995$
-$sid_005$tid_996$
-$sid_006$tid_996$
-...
-lua iterate(20, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
----
-$sid_006$tid_996$
-...
-
-#-----------------------------------------------------------------------------#
-# Iterator: various
-#-----------------------------------------------------------------------------#
-
-lua box.space[20].index[0]:iterator(-666)
----
-error: 'unknown iterator type: -666'
-...
-lua box.space[20]:truncate()
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.EQ)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.REQ)
+---
+- - $pid_023$
+  - $pid_019$
+  - $pid_017$
+  - $pid_013$
+  - $pid_011$
+  - $pid_007$
+  - $pid_005$
+  - $pid_003$
+  - $pid_002$
+  - $pid_001$
+...
+iterate(space.n, 0, 0, 1, box.index.GE)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.GT)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.LE)
+---
+- - $pid_023$
+  - $pid_019$
+  - $pid_017$
+  - $pid_013$
+  - $pid_011$
+  - $pid_007$
+  - $pid_005$
+  - $pid_003$
+  - $pid_002$
+  - $pid_001$
+...
+iterate(space.n, 0, 0, 1, box.index.LT)
+---
+- - $pid_023$
+  - $pid_019$
+  - $pid_017$
+  - $pid_013$
+  - $pid_011$
+  - $pid_007$
+  - $pid_005$
+  - $pid_003$
+  - $pid_002$
+  - $pid_001$
+...
+iterate(space.n, 0, 0, 1, box.index.EQ, 'pid_003')
+---
+- - $pid_003$
+...
+iterate(space.n, 0, 0, 1, box.index.REQ, 'pid_003')
+---
+- - $pid_003$
+...
+iterate(space.n, 0, 0, 1, box.index.EQ, 'pid_666')
+---
+- {}
+...
+iterate(space.n, 0, 0, 1, box.index.REQ, 'pid_666')
+---
+- {}
+...
+iterate(space.n, 0, 0, 1, box.index.GE, 'pid_001')
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.GT, 'pid_001')
+---
+- - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 0, 0, 1, box.index.GE, 'pid_999')
+---
+- {}
+...
+iterate(space.n, 0, 0, 1, box.index.GT, 'pid_999')
+---
+- {}
+...
+iterate(space.n, 0, 0, 1, box.index.LE, 'pid_002')
+---
+- - $pid_002$
+  - $pid_001$
+...
+iterate(space.n, 0, 0, 1, box.index.LT, 'pid_002')
+---
+- - $pid_001$
+...
+iterate(space.n, 0, 0, 1, box.index.LE, 'pid_000')
+---
+- {}
+...
+iterate(space.n, 0, 0, 1, box.index.LT, 'pid_000')
+---
+- {}
+...
+-------------------------------------------------------------------------------
+-- Iterator: tree single-part non-unique
+-------------------------------------------------------------------------------
+iterate(space.n, 1, 1, 2, box.index.ALL)
+---
+- - $sid_001$
+  - $sid_001$
+  - $sid_002$
+  - $sid_002$
+  - $sid_003$
+  - $sid_004$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.EQ)
+---
+- - $sid_001$
+  - $sid_001$
+  - $sid_002$
+  - $sid_002$
+  - $sid_003$
+  - $sid_004$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.REQ)
+---
+- - $sid_006$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_004$
+  - $sid_003$
+  - $sid_002$
+  - $sid_002$
+  - $sid_001$
+  - $sid_001$
+...
+iterate(space.n, 1, 1, 2, box.index.GE)
+---
+- - $sid_001$
+  - $sid_001$
+  - $sid_002$
+  - $sid_002$
+  - $sid_003$
+  - $sid_004$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.GT)
+---
+- - $sid_001$
+  - $sid_001$
+  - $sid_002$
+  - $sid_002$
+  - $sid_003$
+  - $sid_004$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.LE)
+---
+- - $sid_006$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_004$
+  - $sid_003$
+  - $sid_002$
+  - $sid_002$
+  - $sid_001$
+  - $sid_001$
+...
+iterate(space.n, 1, 1, 2, box.index.LT)
+---
+- - $sid_006$
+  - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_004$
+  - $sid_003$
+  - $sid_002$
+  - $sid_002$
+  - $sid_001$
+  - $sid_001$
+...
+iterate(space.n, 1, 1, 2, box.index.EQ, 'sid_005')
+---
+- - $sid_005$
+  - $sid_005$
+  - $sid_005$
+...
+iterate(space.n, 1, 1, 2, box.index.REQ, 'sid_005')
+---
+- - $sid_005$
+  - $sid_005$
+  - $sid_005$
+...
+iterate(space.n, 1, 1, 2, box.index.GE, 'sid_005')
+---
+- - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.GT, 'sid_005')
+---
+- - $sid_006$
+...
+iterate(space.n, 1, 1, 2, box.index.GE, 'sid_999')
+---
+- {}
+...
+iterate(space.n, 1, 1, 2, box.index.GT, 'sid_999')
+---
+- {}
+...
+iterate(space.n, 1, 1, 2, box.index.LE, 'sid_005')
+---
+- - $sid_005$
+  - $sid_005$
+  - $sid_005$
+  - $sid_004$
+  - $sid_003$
+  - $sid_002$
+  - $sid_002$
+  - $sid_001$
+  - $sid_001$
+...
+iterate(space.n, 1, 1, 2, box.index.LT, 'sid_005')
+---
+- - $sid_004$
+  - $sid_003$
+  - $sid_002$
+  - $sid_002$
+  - $sid_001$
+  - $sid_001$
+...
+iterate(space.n, 1, 1, 2, box.index.LE, 'sid_000')
+---
+- {}
+...
+iterate(space.n, 1, 1, 2, box.index.LT, 'sid_000')
+---
+- {}
+...
+-------------------------------------------------------------------------------
+-- Iterator: tree multi-part unique
+-------------------------------------------------------------------------------
+iterate(space.n, 2, 1, 3, box.index.ALL)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.REQ)
+---
+- - $sid_006$tid_996$
+  - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.GE)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GT)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.LE)
+---
+- - $sid_006$tid_996$
+  - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LT)
+---
+- - $sid_006$tid_996$
+  - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005')
+---
+- - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_995$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005')
+---
+- - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+...
+iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_995$
+...
+iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_999')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005')
+---
+- - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GT, 'sid_005')
+---
+- - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GT, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
+---
+- - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GT, 'sid_005', 'tid_999')
+---
+- - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_999')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.GT, 'sid_999')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.LE, 'sid_005')
+---
+- - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LT, 'sid_005')
+---
+- - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LE, 'sid_005', 'tid_997')
+---
+- - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LT, 'sid_005', 'tid_997')
+---
+- - $sid_005$tid_996$
+  - $sid_005$tid_995$
+  - $sid_005$tid_994$
+  - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LE, 'sid_005', 'tid_000')
+---
+- - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LT, 'sid_005', 'tid_000')
+---
+- - $sid_004$tid_996$
+  - $sid_003$tid_996$
+  - $sid_002$tid_997$
+  - $sid_002$tid_996$
+  - $sid_001$tid_998$
+  - $sid_001$tid_997$
+...
+iterate(space.n, 2, 1, 3, box.index.LE, 'sid_000')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.LT, 'sid_000')
+---
+- {}
+...
+-------------------------------------------------------------------------------
+-- Iterator: tree multi-part non-unique
+-------------------------------------------------------------------------------
+iterate(space.n, 3, 2, 4, box.index.ALL)
+---
+- - $tid_994$a$
+  - $tid_995$a$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$c$
+  - $tid_997$a$
+  - $tid_997$b$
+  - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.EQ)
+---
+- - $tid_994$a$
+  - $tid_995$a$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$c$
+  - $tid_997$a$
+  - $tid_997$b$
+  - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.REQ)
+---
+- - $tid_998$a$
+  - $tid_997$b$
+  - $tid_997$a$
+  - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_995$a$
+  - $tid_994$a$
+...
+iterate(space.n, 3, 2, 4, box.index.GE)
+---
+- - $tid_994$a$
+  - $tid_995$a$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$c$
+  - $tid_997$a$
+  - $tid_997$b$
+  - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.GT)
+---
+- - $tid_994$a$
+  - $tid_995$a$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$c$
+  - $tid_997$a$
+  - $tid_997$b$
+  - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.LE)
+---
+- - $tid_998$a$
+  - $tid_997$b$
+  - $tid_997$a$
+  - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_995$a$
+  - $tid_994$a$
+...
+iterate(space.n, 3, 2, 4, box.index.LT)
+---
+- - $tid_998$a$
+  - $tid_997$b$
+  - $tid_997$a$
+  - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_995$a$
+  - $tid_994$a$
+...
+iterate(space.n, 3, 2, 4, box.index.EQ, 'tid_996')
+---
+- - $tid_996$a$
+  - $tid_996$a$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$c$
+...
+iterate(space.n, 3, 2, 4, box.index.EQ, 'tid_996', 'a')
+---
+- - $tid_996$a$
+  - $tid_996$a$
+...
+iterate(space.n, 3, 2, 4, box.index.EQ, 'tid_996', 'z')
+---
+- {}
+...
+iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996')
+---
+- - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+...
+iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996', 'a')
+---
+- - $tid_996$a$
+  - $tid_996$a$
+...
+iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996', '0')
+---
+- {}
+...
+iterate(space.n, 3, 2, 4, box.index.GE, 'tid_997')
+---
+- - $tid_997$a$
+  - $tid_997$b$
+  - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.GT, 'tid_997')
+---
+- - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.GE, 'tid_998')
+---
+- - $tid_998$a$
+...
+iterate(space.n, 3, 2, 4, box.index.GT, 'tid_998')
+---
+- {}
+...
+iterate(space.n, 3, 2, 4, box.index.LE, 'tid_997')
+---
+- - $tid_997$b$
+  - $tid_997$a$
+  - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_995$a$
+  - $tid_994$a$
+...
+iterate(space.n, 3, 2, 4, box.index.LT, 'tid_997')
+---
+- - $tid_996$c$
+  - $tid_996$b$
+  - $tid_996$b$
+  - $tid_996$a$
+  - $tid_996$a$
+  - $tid_995$a$
+  - $tid_994$a$
+...
+iterate(space.n, 3, 2, 4, box.index.LE, 'tid_000')
+---
+- {}
+...
+iterate(space.n, 3, 2, 4, box.index.LT, 'tid_000')
+---
+- {}
+...
+iterate(space.n, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
+---
+- error: 'utils.lua:27: Key part count 4 is greater than index part count 2'
+...
+-------------------------------------------------------------------------------
+-- Iterator: hash single-part unique
+-------------------------------------------------------------------------------
+iterate(space.n, 4, 0, 1)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 4, 0, 1, box.index.ALL)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 4, 0, 1, box.index.EQ)
+---
+- error: Invalid key part count in an exact match (expected 1, got 0)
+...
+iterate(space.n, 4, 0, 1, box.index.GE)
+---
+- - $pid_001$
+  - $pid_002$
+  - $pid_003$
+  - $pid_005$
+  - $pid_007$
+  - $pid_011$
+  - $pid_013$
+  - $pid_017$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 4, 0, 1, box.index.EQ, 'pid_003')
+---
+- - $pid_003$
+...
+iterate(space.n, 4, 0, 1, box.index.EQ, 'pid_666')
+---
+- {}
+...
+iterate(space.n, 4, 0, 1, box.index.GE, 'pid_001')
+---
+- - $pid_001$
+  - $pid_007$
+  - $pid_011$
+  - $pid_019$
+  - $pid_023$
+...
+iterate(space.n, 4, 0, 1, box.index.GE, 'pid_999')
+---
+- {}
+...
+-------------------------------------------------------------------------------
+-- Iterator: hash multi-part unique
+-------------------------------------------------------------------------------
+iterate(space.n, 5, 1, 3, box.index.ALL)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 5, 1, 3, box.index.EQ)
+---
+- error: Invalid key part count in an exact match (expected 2, got 0)
+...
+iterate(space.n, 5, 1, 3, box.index.EQ, 'sid_005')
+---
+- error: Invalid key part count in an exact match (expected 2, got 1)
+...
+iterate(space.n, 5, 1, 3, box.index.GE)
+---
+- - $sid_001$tid_997$
+  - $sid_001$tid_998$
+  - $sid_002$tid_996$
+  - $sid_002$tid_997$
+  - $sid_003$tid_996$
+  - $sid_004$tid_996$
+  - $sid_005$tid_994$
+  - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_995$
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
+---
+- {}
+...
+iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
+---
+- error: 'utils.lua:27: Key part count 3 is greater than index part count 2'
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')
+---
+- - $sid_005$tid_995$
+  - $sid_005$tid_996$
+  - $sid_006$tid_996$
+...
+iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
+---
+- - $sid_006$tid_996$
+...
+-------------------------------------------------------------------------------
+-- Iterator: various
+-------------------------------------------------------------------------------
+space.index[0]:iterator(-666)
+---
+- error: 'unknown iterator type: -666'
+...
+space:drop()
 ---
 ...

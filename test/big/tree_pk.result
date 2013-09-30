@@ -1,283 +1,517 @@
-insert into t2 values (1, 'tuple')
-Insert OK, 1 row affected
-save snapshot
----
-ok
-...
-insert into t2 values (2, 'tuple 2')
-Insert OK, 1 row affected
-save snapshot
----
-ok
-...
-insert into t2 values (3, 'tuple 3')
-Insert OK, 1 row affected
-select * from t2 where k0 = 1
-Found 1 tuple:
-[1, 'tuple']
-select * from t2 where k0 = 2
-Found 1 tuple:
-[2, 'tuple 2']
-select * from t2 where k0 = 3
-Found 1 tuple:
-[3, 'tuple 3']
-delete from t2 where k0 = 1
-Delete OK, 1 row affected
-delete from t2 where k0 = 2
-Delete OK, 1 row affected
-delete from t2 where k0 = 3
-Delete OK, 1 row affected
-insert into t2 VALUES('xxxxxxx')
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
-insert into t2 VALUES('')
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
-insert into t2 VALUES('12')
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
-insert into t3 values ('identifier', 'tuple')
-Insert OK, 1 row affected
-save snapshot
----
-ok
-...
-insert into t3 values ('second', 'tuple 2')
-Insert OK, 1 row affected
-save snapshot
----
-ok
-...
-call box.select_range('3', '0', '100', 'second')
-Found 1 tuple:
-['second', 'tuple 2']
-call box.select_range('3', '0', '100', 'identifier')
-Found 2 tuples:
-['identifier', 'tuple']
-['second', 'tuple 2']
-insert into t3 values ('third', 'tuple 3')
-Insert OK, 1 row affected
-select * from t3 where k0 = 'identifier'
-Found 1 tuple:
-['identifier', 'tuple']
-select * from t3 where k0 = 'second'
-Found 1 tuple:
-['second', 'tuple 2']
-select * from t3 where k0 = 'third'
-Found 1 tuple:
-['third', 'tuple 3']
-delete from t3 where k0 = 'identifier'
-Delete OK, 1 row affected
-delete from t3 where k0 = 'second'
-Delete OK, 1 row affected
-delete from t3 where k0 = 'third'
-Delete OK, 1 row affected
-insert into t2 values (1, 'tuple')
-Insert OK, 1 row affected
-insert into t3 values (1, 'tuple')
-Insert OK, 1 row affected
-insert into t3 values (2, 'tuple')
-Insert OK, 1 row affected
-lua  function box.crossjoin(space0, space1, limit)   space0 = tonumber(space0)   space1 = tonumber(space1)   limit = tonumber(limit)   local result = {}   for k0, v0 in box.space[space0]:pairs() do     for k1, v1 in box.space[space1]:pairs() do       if limit <= 0 then         return unpack(result)       end       newtuple = {v0:unpack()}       for _, v in v1:pairs() do table.insert(newtuple, v) end       table.insert(result, newtuple)       limit = limit - 1     end   end   return unpack(result) end
+dofile('utils.lua')
 ---
 ...
-call box.crossjoin('3', '3', '0')
-No match
-call box.crossjoin('3', '3', '5')
-Found 4 tuples:
-[1, 'tuple', 1, 'tuple']
-[1, 'tuple', 2, 'tuple']
-[2, 'tuple', 1, 'tuple']
-[2, 'tuple', 2, 'tuple']
-call box.crossjoin('3', '3', '10000')
-Found 4 tuples:
-[1, 'tuple', 1, 'tuple']
-[1, 'tuple', 2, 'tuple']
-[2, 'tuple', 1, 'tuple']
-[2, 'tuple', 2, 'tuple']
-call box.crossjoin('3', '2', '10000')
-Found 2 tuples:
-[1, 'tuple', 1, 'tuple']
-[2, 'tuple', 1, 'tuple']
-lua box.space[3]:truncate()
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+...
+s0 = box.space[0]
 ---
 ...
-insert into t2 values (200, 'select me!')
-Insert OK, 1 row affected
-select * from t2 where k0 = 200
-Found 1 tuple:
-[200, 'select me!']
-select * from t2 where k0 = 199
-No match
-select * from t2 where k0 = 201
-No match
-insert into t15 values ('abcd')
-Insert OK, 1 row affected
-insert into t15 values ('abcda')
-Insert OK, 1 row affected
-insert into t15 values ('abcda_')
-Insert OK, 1 row affected
-insert into t15 values ('abcdb')
-Insert OK, 1 row affected
-insert into t15 values ('abcdb_')
-Insert OK, 1 row affected
-insert into t15 values ('abcdb__')
-Insert OK, 1 row affected
-insert into t15 values ('abcdb___')
-Insert OK, 1 row affected
-insert into t15 values ('abcdc')
-Insert OK, 1 row affected
-insert into t15 values ('abcdc_')
-Insert OK, 1 row affected
-lua box.space[15].index[0]:select_range(3, 'abcdb')
+-- integer keys
+s0:insert(1, 'tuple')
 ---
- - 'abcdb': {}
- - 'abcdb_': {}
- - 'abcdb__': {}
+- [1, 'tuple']
 ...
-lua box.space[15]:truncate()
+box.snapshot()
+---
+- ok
+...
+s0:insert(2, 'tuple 2')
+---
+- [2, 'tuple 2']
+...
+box.snapshot()
+---
+- ok
+...
+s0:insert(3, 'tuple 3')
+---
+- [3, 'tuple 3']
+...
+s0:select(0, 1)
+---
+- [1, 'tuple']
+...
+s0:select(0, 2)
+---
+- [2, 'tuple 2']
+...
+s0:select(0, 3)
+---
+- [3, 'tuple 3']
+...
+-- Cleanup
+s0:delete(1)
+---
+- [1, 'tuple']
+...
+s0:delete(2)
+---
+- [2, 'tuple 2']
+...
+s0:delete(3)
+---
+- [3, 'tuple 3']
+...
+-- Test incorrect keys - supplied key field type does not match index type
+-- https://bugs.launchpad.net/tarantool/+bug/1072624
+s0:insert('xxxxxxx')
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+s0:insert('')
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+s0:insert('12')
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+box.insert(box.schema.SPACE_ID, 1, 0, 'tweedledee')
+---
+- [1, 0, 'tweedledee']
+...
+box.insert(box.schema.INDEX_ID, 1, 0, 'primary', 'tree', 1, 1, 0, 'str')
+---
+- [1, 0, 'primary', 1701147252, 1, 1, 0, 'str']
+...
+s1 = box.space[1]
 ---
 ...
-lua box.space[22]:truncate()
+-- string keys
+s1:insert('identifier', 'tuple')
+---
+- ['identifier', 'tuple']
+...
+box.snapshot()
+---
+- ok
+...
+s1:insert('second', 'tuple 2')
+---
+- ['second', 'tuple 2']
+...
+box.snapshot()
+---
+- ok
+...
+s1:select_range(0, '100', 'second')
+---
+- ['second', 'tuple 2']
+...
+s1:select_range(0, '100', 'identifier')
+---
+- ['identifier', 'tuple']
+- ['second', 'tuple 2']
+...
+s1:insert('third', 'tuple 3')
+---
+- ['third', 'tuple 3']
+...
+s1:select(0, 'identifier')
+---
+- ['identifier', 'tuple']
+...
+s1:select(0, 'second')
+---
+- ['second', 'tuple 2']
+...
+s1:select(0, 'third')
+---
+- ['third', 'tuple 3']
+...
+-- Cleanup
+s1:delete('identifier')
+---
+- ['identifier', 'tuple']
+...
+s1:delete('second')
+---
+- ['second', 'tuple 2']
+...
+s1:delete('third')
+---
+- ['third', 'tuple 3']
+...
+--# setopt delimiter ';'
+function crossjoin(space0, space1, limit)
+    local result = {}
+    for k0, v0 in space0:pairs() do
+        for k1, v1 in space1:pairs() do
+            if limit <= 0 then
+                return result
+            end
+            newtuple = {v0:unpack()}
+            for _, v in v1:pairs() do
+                table.insert(newtuple, v)
+            end
+            table.insert(result, box.tuple.new(newtuple))
+            limit = limit - 1
+        end
+    end
+    return result
+end;
 ---
 ...
-insert into t22 values (0, 0, 0, 0)
-Insert OK, 1 row affected
-insert into t22 values (1, 1, 1, 1)
-Insert OK, 1 row affected
-insert into t22 values (2, 2, 2, 2)
-Insert OK, 1 row affected
-replace into t22 values (1, 1, 1, 1)
-Replace OK, 1 row affected
-replace into t22 values (1, 10, 10, 10)
-Replace OK, 1 row affected
-replace into t22 values (1, 1, 1, 1)
-Replace OK, 1 row affected
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k0 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t22 WHERE k1 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t22 WHERE k2 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-select * from t22 WHERE k3 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-insert into t22 values (10, 10, 10, 10)
-Insert OK, 1 row affected
-delete from t22 WHERE k0 = 10
-Delete OK, 1 row affected
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-insert into t22 values (1, 10, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k0 = 1
-Found 1 tuple:
-[1, 1, 1, 1]
-replace into t22 values (10, 10, 10, 10)
-An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist in index 0'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-insert into t22 values (10, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k1 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-replace into t22 values (2, 0, 10, 10)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k1 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-insert into t22 values (10, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k3 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-replace into t22 values (2, 10, 10, 0)
-An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
-select * from t22 WHERE k0 = 10
-No match
-select * from t22 WHERE k1 = 10
-No match
-select * from t22 WHERE k2 = 10
-No match
-select * from t22 WHERE k3 = 10
-No match
-select * from t22 WHERE k3 = 0
-Found 1 tuple:
-[0, 0, 0, 0]
-insert into t22 values (4, 4, 0, 4)
-Insert OK, 1 row affected
-insert into t22 values (5, 5, 0, 5)
-Insert OK, 1 row affected
-insert into t22 values (6, 6, 0, 6)
-Insert OK, 1 row affected
-replace into t22 values (5, 5, 0, 5)
-Replace OK, 1 row affected
-select * from t22 WHERE k2 = 0
-Found 4 tuples:
-[0, 0, 0, 0]
-[4, 4, 0, 4]
-[5, 5, 0, 5]
-[6, 6, 0, 6]
-delete from t22 WHERE k0 = 5
-Delete OK, 1 row affected
-select * from t22 WHERE k2 = 0
-Found 3 tuples:
-[0, 0, 0, 0]
-[4, 4, 0, 4]
-[6, 6, 0, 6]
-lua box.space[22]:truncate()
+--# setopt delimiter ''
+s0:insert(1, 'tuple')
+---
+- [1, 'tuple']
+...
+s1:insert(1, 'tuple')
+---
+- [1, 'tuple']
+...
+s1:insert(2, 'tuple')
+---
+- [2, 'tuple']
+...
+crossjoin(s1, s1, 0)
+---
+- {}
+...
+crossjoin(s1, s1, 5)
+---
+- - [1, 'tuple', 1, 'tuple']
+  - [1, 'tuple', 2, 'tuple']
+  - [2, 'tuple', 1, 'tuple']
+  - [2, 'tuple', 2, 'tuple']
+...
+crossjoin(s1, s1, 10000)
+---
+- - [1, 'tuple', 1, 'tuple']
+  - [1, 'tuple', 2, 'tuple']
+  - [2, 'tuple', 1, 'tuple']
+  - [2, 'tuple', 2, 'tuple']
+...
+crossjoin(s1, s0, 10000)
+---
+- - [1, 'tuple', 1, 'tuple']
+  - [2, 'tuple', 1, 'tuple']
+...
+s1:truncate()
+---
+...
+-- Bug #922520 - select missing keys
+s0:insert(200, 'select me!')
+---
+- [200, 'select me!']
+...
+s0:select(0, 200)
+---
+- [200, 'select me!']
+...
+s0:select(0, 199)
+---
+...
+s0:select(0, 201)
+---
+...
+-- Test partially specified keys in TREE indexes
+s1:insert('abcd')
+---
+- [1684234849]
+...
+s1:insert('abcda')
+---
+- ['abcda']
+...
+s1:insert('abcda_')
+---
+- ['abcda_']
+...
+s1:insert('abcdb')
+---
+- ['abcdb']
+...
+s1:insert('abcdb_')
+---
+- ['abcdb_']
+...
+s1:insert('abcdb__')
+---
+- ['abcdb__']
+...
+s1:insert('abcdb___')
+---
+- [6872316432586334817]
+...
+s1:insert('abcdc')
+---
+- ['abcdc']
+...
+s1:insert('abcdc_')
+---
+- ['abcdc_']
+...
+box.sort({s1.index[0]:select_range(3, 'abcdb')})
+---
+- - ['abcdb']
+  - ['abcdb_']
+  - ['abcdb__']
+...
+s1:drop()
+---
+...
+s1 = nil
+---
+...
+--
+-- tree::replace tests
+--
+s0:truncate()
+---
+...
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 1, 1, 'num')
+---
+- [0, 1, 12649, 1701147252, 1, 1, 1, 'num']
+...
+box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 0, 1, 2, 'num')
+---
+- [0, 2, 12905, 1701147252, 0, 1, 2, 'num']
+...
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 1, 1, 3, 'num')
+---
+- [0, 3, 13161, 1701147252, 1, 1, 3, 'num']
+...
+s0:insert(0, 0, 0, 0)
+---
+- [0, 0, 0, 0]
+...
+s0:insert(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:insert(2, 2, 2, 2)
+---
+- [2, 2, 2, 2]
+...
+-- OK
+s0:replace_if_exists(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:replace_if_exists(1, 10, 10, 10)
+---
+- [1, 10, 10, 10]
+...
+s0:replace_if_exists(1, 1, 1, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(0, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:select(1, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:select(2, 1)
+---
+- [1, 1, 1, 1]
+...
+s0:select(3, 1)
+---
+- [1, 1, 1, 1]
+...
+-- OK
+s0:insert(10, 10, 10, 10)
+---
+- [10, 10, 10, 10]
+...
+s0:delete(10)
+---
+- [10, 10, 10, 10]
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+-- TupleFound (primary key)
+s0:insert(1, 10, 10, 10)
+---
+- error: Duplicate key exists in unique index 0
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(0, 1)
+---
+- [1, 1, 1, 1]
+...
+-- TupleNotFound (primary key)
+s0:replace_if_exists(10, 10, 10, 10)
+---
+- error: Tuple doesn't exist in index 0
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+-- TupleFound (key #1)
+s0:insert(10, 0, 10, 10)
+---
+- error: Duplicate key exists in unique index 1
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(1, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key #1)
+s0:replace_if_exists(2, 0, 10, 10)
+---
+- error: Duplicate key exists in unique index 1
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(1, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key #3)
+s0:insert(10, 10, 10, 0)
+---
+- error: Duplicate key exists in unique index 3
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(3, 0)
+---
+- [0, 0, 0, 0]
+...
+-- TupleFound (key #3)
+s0:replace_if_exists(2, 10, 10, 0)
+---
+- error: Duplicate key exists in unique index 3
+...
+s0:select(0, 10)
+---
+...
+s0:select(1, 10)
+---
+...
+s0:select(2, 10)
+---
+...
+s0:select(3, 10)
+---
+...
+s0:select(3, 0)
+---
+- [0, 0, 0, 0]
+...
+-- Non-Uniq test (key #2)
+s0:insert(4, 4, 0, 4)
+---
+- [4, 4, 0, 4]
+...
+s0:insert(5, 5, 0, 5)
+---
+- [5, 5, 0, 5]
+...
+s0:insert(6, 6, 0, 6)
+---
+- [6, 6, 0, 6]
+...
+s0:replace_if_exists(5, 5, 0, 5)
+---
+- [5, 5, 0, 5]
+...
+box.sort({s0:select(2, 0)})
+---
+- - [0, 0, 0, 0]
+  - [4, 4, 0, 4]
+  - [5, 5, 0, 5]
+  - [6, 6, 0, 6]
+...
+s0:delete(5)
+---
+- [5, 5, 0, 5]
+...
+box.sort({s0:select(2, 0)})
+---
+- - [0, 0, 0, 0]
+  - [4, 4, 0, 4]
+  - [6, 6, 0, 6]
+...
+s0:drop()
+---
+...
+s0 = nil
 ---
 ...

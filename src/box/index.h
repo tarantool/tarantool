@@ -33,9 +33,9 @@
 
 #include "object.h"
 #include "key_def.h"
+#include "exception.h"
 
 struct tuple;
-struct space;
 
 /**
  * @abstract Iterator type
@@ -131,31 +131,23 @@ enum dup_replace_mode {
 
 class Index: public Object {
 public:
-
-	/* Index owner space */
-	struct space *space;
 	/* Description of a possibly multipart key. */
 	struct key_def *key_def;
-
 
 	/**
 	 * Allocate index instance.
 	 *
-	 * @param type     index type
 	 * @param key_def  key part description
-	 * @param space    space the index belongs to
 	 */
-	static Index *factory(enum index_type type, struct key_def *key_def,
-		      struct space *space);
+	static Index *factory(struct key_def *key_def);
 
+protected:
 	/**
 	 * Initialize index instance.
 	 *
 	 * @param key_def  key part description
-	 * @param space    space the index belongs to
 	 */
-protected:
-	Index(struct key_def *key_def, struct space *space);
+	Index(struct key_def *key_def);
 
 public:
 	virtual ~Index();
@@ -163,15 +155,19 @@ public:
 	/**
 	 * Two-phase index creation: begin building, add tuples, finish.
 	 */
-	virtual void beginBuild() = 0;
-	virtual void buildNext(struct tuple *tuple) = 0;
-	virtual void endBuild() = 0;
-	/** Build this index based on the contents of another index. */
-	virtual void build(Index *pk) = 0;
+	virtual void beginBuild();
+	/**
+	 * Optional hint, given to the index, about
+	 * the total size of the index. If given,
+	 * is given after beginBuild().
+	 */
+	virtual void reserve(uint32_t /* size_hint */);
+	virtual void buildNext(struct tuple *tuple);
+	virtual void endBuild();
 	virtual size_t size() const = 0;
-	virtual struct tuple *min() const = 0;
-	virtual struct tuple *max() const = 0;
-	virtual struct tuple *random(uint32_t rnd) const = 0;
+	virtual struct tuple *min() const;
+	virtual struct tuple *max() const;
+	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
@@ -192,12 +188,6 @@ public:
 			m_position = allocIterator();
 		return m_position;
 	}
-protected:
-	static uint32_t
-	replace_check_dup(struct tuple *old_tuple,
-			  struct tuple *dup_tuple,
-			  enum dup_replace_mode mode);
-
 private:
 	/*
 	 * Pre-allocated iterator to speed up the main case of
@@ -205,5 +195,55 @@ private:
 	 */
 	struct iterator *m_position;
 };
+
+/**
+ * Check if replacement of an old tuple with a new one is
+ * allowed.
+ */
+static inline uint32_t
+replace_check_dup(struct tuple *old_tuple, struct tuple *dup_tuple,
+		  enum dup_replace_mode mode)
+{
+	if (dup_tuple == NULL) {
+		if (mode == DUP_REPLACE) {
+			/*
+			 * dup_replace_mode is DUP_REPLACE, and
+			 * a tuple with the same key is not found.
+			 */
+			return ER_TUPLE_NOT_FOUND;
+		}
+	} else { /* dup_tuple != NULL */
+		if (dup_tuple != old_tuple &&
+		    (old_tuple != NULL || mode == DUP_INSERT)) {
+			/*
+			 * There is a duplicate of new_tuple,
+			 * and it's not old_tuple: we can't
+			 * possibly delete more than one tuple
+			 * at once.
+			 */
+			return ER_TUPLE_FOUND;
+		}
+	}
+	return 0;
+}
+
+
+/** Get index ordinal number in space. */
+static inline uint32_t
+index_id(const Index *index)
+{
+	return index->key_def->iid;
+}
+
+/** True if this index is a primary key. */
+static inline bool
+index_is_primary(const Index *index)
+{
+	return index_id(index) == 0;
+}
+
+/** Build this index based on the contents of another index. */
+void
+index_build(Index *index, Index *pk);
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */

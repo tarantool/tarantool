@@ -71,38 +71,11 @@ salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
-
 	return 0;
 }
 
 static int
-lbox_slab_slabs(struct lua_State *L)
-{
-	lua_newtable(L);
-	salloc_stat(salloc_stat_lua_cb, NULL, L);
-	return 1;
-}
-
-static int
-lbox_slab_arena_used(struct lua_State *L)
-{
-	struct slab_arena_stats astat;
-	salloc_stat(NULL, &astat, NULL);
-	luaL_pushnumber64(L, astat.used);
-	return 1;
-}
-
-static int
-lbox_slab_arena_size(struct lua_State *L)
-{
-	struct slab_arena_stats astat;
-	salloc_stat(NULL, &astat, NULL);
-	luaL_pushnumber64(L, astat.size);
-	return 1;
-}
-
-static int
-lbox_slab_call(struct lua_State *L)
+lbox_slab_info(struct lua_State *L)
 {
 	struct slab_arena_stats astat;
 
@@ -119,31 +92,14 @@ lbox_slab_call(struct lua_State *L)
 	lua_pushstring(L, "arena_size");
 	luaL_pushnumber64(L, astat.size);
 	lua_settable(L, -3);
-
 	return 1;
 }
 
-static const struct luaL_reg lbox_slab_dynamic_meta [] = {
-	{"slabs", lbox_slab_slabs},
-	{"arena_used", lbox_slab_arena_used},
-	{"arena_size", lbox_slab_arena_size},
-	{NULL, NULL}
-};
-
 static int
-lbox_slab_index(struct lua_State *L)
+lbox_slab_check(struct lua_State *L __attribute__((unused)))
 {
-	lua_pushvalue(L, -1);			/* dup key */
-	lua_gettable(L, lua_upvalueindex(1));   /* table[key] */
-
-	if (!lua_isfunction(L, -1)) {
-		/* If key is not found, leave nil on the stack. */
-		return 1;
-	}
-
-	lua_call(L, 0, 1);
-	lua_remove(L, -2);
-	return 1;
+	slab_validate();
+	return 0;
 }
 
 /** Initialize box.slab package. */
@@ -151,22 +107,17 @@ void
 tarantool_lua_slab_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-
 	lua_pushstring(L, "slab");
-	lua_newtable(L);		/* box.slab */
+	lua_newtable(L);
 
-	lua_newtable(L);
-	lua_pushstring(L, "__call");
-	lua_pushcfunction(L, lbox_slab_call);
-	lua_settable(L, -3);
-	lua_pushstring(L, "__index");
-	lua_newtable(L);
-	luaL_register(L, NULL, lbox_slab_dynamic_meta);
-	lua_pushcclosure(L, lbox_slab_index, 1);
+	lua_pushstring(L, "info");
+	lua_pushcfunction(L, lbox_slab_info);
 	lua_settable(L, -3);
 
-	lua_setmetatable(L, -2);
+	lua_pushstring(L, "check");
+	lua_pushcfunction(L, lbox_slab_check);
+	lua_settable(L, -3);
 
-	lua_settable(L, -3);    /* box.slab = created table */
-	lua_pop(L, 1);          /* cleanup stack */
+	lua_settable(L, -3);
+	lua_pop(L, 1);
 }

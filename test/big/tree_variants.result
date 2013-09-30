@@ -1,129 +1,201 @@
-insert into t6 values (0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000 )
-Insert OK, 1 row affected
-insert into t6 values (1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001 )
-Insert OK, 1 row affected
-insert into t6 values (2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002 )
-Insert OK, 1 row affected
-insert into t6 values (3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003 )
-Insert OK, 1 row affected
-insert into t6 values (4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004 )
-Insert OK, 1 row affected
-insert into t6 values (5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005 )
-Insert OK, 1 row affected
-insert into t6 values (6, '00000006', '00000400', 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006 )
-Insert OK, 1 row affected
-insert into t6 values (7, '00000007', '00000400', 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007 )
-Insert OK, 1 row affected
-insert into t6 values (8, '00000008', '00000400', 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008 )
-Insert OK, 1 row affected
-insert into t6 values (9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009 )
-Insert OK, 1 row affected
-select * from t6 where k0 = 1
-Found 1 tuple:
-[1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001]
-select * from t6 where k1 = '00000002'
-Found 1 tuple:
-[2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
-select * from t6 where k2 = '00000300'
-Found 3 tuples:
-[3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
-[4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
-[5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
-lua box.space[6]:select(3, 'Joe', 'Sixpack')
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
- - 1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
- - 2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
- - 3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
- - 4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+- [0, 0, 'tweedledum']
 ...
-lua box.space[6]:select(3, 'John')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
 ...
-lua box.space[6]:select(4, 'A Pipe')
+box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 1, 1, 'num64')
 ---
- - 6: {3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+- [0, 1, 12649, 1701147252, 1, 1, 1, 'num64']
 ...
-lua box.space[6]:select(4, 'Miller Genuine Draft', 'Drinks')
+box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 0, 1, 2, 'num64')
 ---
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+- [0, 2, 12905, 1701147252, 0, 1, 2, 'num64']
 ...
-select * from t6 where k5 = 2007
-Found 1 tuple:
-[7, '00000007', '00000400', 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
-lua box.space[6]:select(6, 'Miller Genuine Draft', 'Drinks')
+box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 3, 'str', 4, 'str')
 ---
- - 5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
+- [0, 3, 13161, 1701147252, 0, 2, 3, 'str', 4, 'str']
 ...
-delete from t6 where k0 = 6
-Delete OK, 1 row affected
-delete from t6 where k0 = 7
-Delete OK, 1 row affected
-delete from t6 where k0 = 8
-Delete OK, 1 row affected
-delete from t6 where k0 = 9
-Delete OK, 1 row affected
-lua box.insert(6, 6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006 )
+box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'tree', 0, 2, 6, 'str', 5, 'str')
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+- [0, 4, 13417, 1701147252, 0, 2, 6, 'str', 5, 'str']
 ...
-lua box.insert(6, 7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007 )
+box.insert(box.schema.INDEX_ID, 0, 5, 'i5', 'tree', 0, 1, 8, 'num')
 ---
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
+- [0, 5, 13673, 1701147252, 0, 1, 8, 'num']
 ...
-lua box.insert(6, 8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008 )
+box.insert(box.schema.INDEX_ID, 0, 6, 'i6', 'tree', 1, 5, 6, 'str', 5, 'str', 3, 'str', 4, 'str', 8, 'num')
 ---
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
+- [0, 6, 13929, 1701147252, 1, 5, 6, 'str', 5, 'str', 3, 'str', 4, 'str', 8, 'num']
 ...
-lua box.insert(6, 9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009 )
+space = box.space[0]
 ---
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 ...
-lua box.select(6, 1, 6ULL)
+space:insert(0, '00000000', '00000100', 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+- [0, 3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000]
 ...
-lua box.select(6, 1, 6)
+space:insert(1, '00000001', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
+- [1, 3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001]
 ...
-lua box.select(6, 2, 400ULL)
+space:insert(2, '00000002', '00000200', 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+- [2, 3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
 ...
-lua box.select(6, 2, 400)
+space:insert(3, '00000003', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003)
 ---
- - 6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
- - 7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
- - 8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
- - 9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+- [3, 3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
 ...
-lua for k,v in box.space[6]:pairs() do print(v) end
+space:insert(4, '00000004', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004)
 ---
-0: {3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
-1: {3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001}
-2: {3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002}
-3: {3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003}
-4: {3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004}
-5: {3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005}
-6: {6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006}
-7: {7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007}
-8: {8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008}
-9: {9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
+- [4, 3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
 ...
-insert into t6 VALUES('', '00000001', '00000002', '', '', '', '', '', 0)
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
-insert into t6 VALUES('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
-insert into t6 VALUES(1, '', '00000002', '', '', '', '', '', 0)
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'
-insert into t6 VALUES(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
-An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM64'
+space:insert(5, '00000005', '00000300', 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005)
+---
+- [5, 3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+...
+space:insert(6, '00000006', '00000400', 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
+---
+- [6, 3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+...
+space:insert(7, '00000007', '00000400', 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
+---
+- [7, 3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+...
+space:insert(8, '00000008', '00000400', 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
+---
+- [8, 4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+...
+space:insert(9, '00000009', '00000400', 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
+---
+- [9, 4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+space:select(0, 1)
+---
+- [1, 3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001]
+...
+space:select(1,'00000002')
+---
+- [2, 3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
+...
+space:select(2,'00000300')
+---
+- [3, 3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
+- [4, 3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
+- [5, 3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+...
+#{space:select(3, 'Joe', 'Sixpack')}
+---
+- 6
+...
+#{space:select(3, 'John')}
+---
+- 4
+...
+#{space:select(4, 'A Pipe')}
+---
+- 1
+...
+space:select(4, 'Miller Genuine Draft', 'Drinks')
+---
+- [5, 3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+...
+space:select(5, 2007)
+---
+- [7, 3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+...
+space:select(6, 'Miller Genuine Draft', 'Drinks')
+---
+- [5, 3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+...
+space:delete(6)
+---
+- [6, 3904673860455247920, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+...
+space:delete(7)
+---
+- [7, 3976731454493175856, 3472332694274191408, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+...
+space:delete(8)
+---
+- [8, 4048789048531103792, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+...
+space:delete(9)
+---
+- [9, 4120846642569031728, 3472332694274191408, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+space:insert(6, 6ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006)
+---
+- [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+...
+space:insert(7, 7ULL, 400ULL, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007)
+---
+- [7, 7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+...
+space:insert(8, 8ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008)
+---
+- [8, 8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+...
+space:insert(9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009)
+---
+- [9, 9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+space:select(1, 6ULL)
+---
+- [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+...
+space:select(1, 6)
+---
+- [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+...
+{space:select(2, 400ULL)}
+---
+- - [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+  - [7, 7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+  - [8, 8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+  - [9, 9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+{space:select(2, 400)}
+---
+- - [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+  - [7, 7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+  - [8, 8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+  - [9, 9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+{space:select(0)}
+---
+- - [0, 3472328296227680304, 3472329395739308080, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000]
+  - [1, 3544385890265608240, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 7954882400208119112, 'bar', 2001]
+  - [2, 3616443484303536176, 3472330495250935856, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
+  - [3, 3688501078341464112, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
+  - [4, 3760558672379392048, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
+  - [5, 3832616266417319984, 3472331594762563632, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
+  - [6, 6, 400, 1852337994, 'Smoker', 1937008968, 'A Pipe', 'foo', 2006]
+  - [7, 7, 400, 1852337994, 'Smoker', 1937008968, 'A Bong', 'foo', 2007]
+  - [8, 8, 400, 1852337994, 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
+  - [9, 9, 400, 1852337994, 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
+...
+-- Test incorrect keys - supplied key field type does not match index type
+-- https://bugs.launchpad.net/tarantool/+bug/1072624
+space:insert('', '00000001', '00000002', '', '', '', '', '', 0)
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+space:insert('xxxxxxxx', '00000001', '00000002', '', '', '', '', '', 0)
+---
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+...
+space:insert(1, '', '00000002', '', '', '', '', '', 0)
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
+...
+space:insert(1, 'xxxxxxxxxxx', '00000002', '', '', '', '', '', 0)
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected NUM64'
+...
+space:drop()
+---
+...

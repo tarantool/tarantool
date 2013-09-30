@@ -90,9 +90,9 @@ class Options:
                 dest = "gdb",
                 action = "store_true",
                 default = False,
-                help = """Start the server under 'gdb' debugger.
-                See also --start-and-exit. This option is mutually exclusive with
-                --valgrind. Default: false.""")
+                help = """Start the server under 'gdb' debugger in detached
+                Screen. See also --start-and-exit. This option is mutually
+                exclusive with --valgrind. Default: false.""")
 
         parser.add_argument(
                 "--valgrind",
@@ -164,7 +164,7 @@ def main():
         path = '.'
     os.chdir(path)
 
-    failed_tests = 0
+    failed_tests = []
 
     try:
         print "Started", " ".join(sys.argv)
@@ -177,9 +177,9 @@ def main():
                     suite_names.append(os.path.basename(root))
 
         suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
-        
+
         for suite in suites:
-            failed_tests += suite.run_all()
+            failed_tests.extend(suite.run_all())
     except RuntimeError as e:
         print "\nFatal error: {0}. Execution aborted.".format(e)
         if options.args.gdb:
@@ -188,7 +188,12 @@ def main():
     finally:
         os.chdir(oldcwd)
 
-    return -failed_tests
+    if failed_tests and options.args.is_force:
+        print '\n===== %d tests failed:' % len(failed_tests)
+        for test in failed_tests:
+            print "----- %s" % test
+
+    return (-1 if failed_tests else 0)
 
 if __name__ == "__main__":
   exit(main())

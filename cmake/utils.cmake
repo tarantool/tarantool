@@ -55,3 +55,21 @@ function(lua_source varname filename)
     set(var ${${varname}})
     set(${varname} ${var} ${dstfile} PARENT_SCOPE)
 endfunction()
+
+function(bin_source varname srcfile dstfile)
+    set(var ${${varname}})
+    set(${varname} ${var} ${dstfile} PARENT_SCOPE)
+    set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${srcfile}")
+    set (dstfile "${CMAKE_CURRENT_SOURCE_DIR}/${dstfile}")
+    set (tmpfile "${dstfile}.tmp")
+    get_filename_component(module ${dstfile} NAME_WE)
+
+    ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
+        COMMAND ${ECHO} 'const unsigned char ${module}_bin[] = {' > ${tmpfile}
+        COMMAND ${CMAKE_BINARY_DIR}/extra/bin2c "${srcfile}" >> ${tmpfile}
+        COMMAND ${ECHO} '}\;' >> ${tmpfile}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
+        COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
+        DEPENDS ${srcfile} bin2c)
+
+endfunction()

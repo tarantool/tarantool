@@ -1,337 +1,453 @@
-insert into t9 values ('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 1, 'Then what do they call it?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 3, 'That`s right.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 4, '`Le Big Mac!`')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 5, 'Ha, ha, ha.')
-Insert OK, 1 row affected
-insert into t9 values ('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 0, 'A please would be nice.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 1, 'Come again?')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
-Insert OK, 1 row affected
-insert into t9 values ('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
-Insert OK, 1 row affected
-insert into t9 values ('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
-Insert OK, 1 row affected
-lua box.select(9, 0, 'Vincent', 'Jules', 0)
+--
+-- Insert test
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
+- [0, 0, 'tweedledum']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 0)
+-- Multipart primary key (sender nickname, receiver nickname, message id)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 3, 0, 'str', 1, 'str', 2, 'num')
 ---
- - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
+- [0, 0, 'primary', 1701147252, 1, 3, 0, 'str', 1, 'str', 2, 'num']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 1)
+space = box.space[0]
 ---
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 1)
+space:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
 ---
- - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 2)
+space:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
 ---
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
+- ['Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 2)
+space:insert('Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.')
 ---
- - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 3)
+space:insert('Jules', 'Vincent', 1, 'Then what do they call it?')
 ---
- - 'Vincent': {'Jules', 3, 'That`s right.'}
+- ['Jules', 'Vincent', 1, 'Then what do they call it?']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 3)
+space:insert('Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.')
 ---
- - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 4)
+space:insert('Jules', 'Vincent', 2, 'A `Royale` with cheese!')
 ---
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
+- ['Jules', 'Vincent', 2, 'A `Royale` with cheese!']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 4)
+space:insert('Vincent', 'Jules', 3, 'That`s right.')
 ---
- - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
+- ['Vincent', 'Jules', 3, 'That`s right.']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 5)
+space:insert('Jules', 'Vincent', 3, 'What do they call a Big Mac?')
 ---
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
+- ['Jules', 'Vincent', 3, 'What do they call a Big Mac?']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent', 5)
+space:insert('Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`')
 ---
- - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules', 6)
+space:insert('Jules', 'Vincent', 4, '`Le Big Mac!`')
 ---
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+- ['Jules', 'Vincent', 4, '`Le Big Mac!`']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent', 0)
+space:insert('Vincent', 'Jules', 5, 'Ha, ha, ha.')
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!', 0)
+space:insert('Jules', 'Vincent', 5, 'What do they call a `Whopper`?')
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+- ['Jules', 'Vincent', 5, 'What do they call a `Whopper`?']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent', 1)
+space:insert('Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.')
 ---
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!', 1)
+space:insert('The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.')
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+- ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent', 2)
+space:insert('Vincent', 'The Wolf!', 0, 'A please would be nice.')
 ---
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent', 3)
+space:insert('The Wolf!', 'Vincent', 1, 'Come again?')
 ---
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!', 2)
+space:insert('Vincent', 'The Wolf!', 1, 'I said a please would be nice.')
 ---
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
 ...
-lua box.select(9, 0, 'Vincent', 'Jules')
+space:insert('The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.')
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
- - 'Vincent': {'Jules', 3, 'That`s right.'}
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
-lua box.select(9, 0, 'Jules', 'Vincent')
+space:insert('The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.')
 ---
- - 'Jules': {'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
- - 'Jules': {'Vincent', 1, 'Then what do they call it?'}
- - 'Jules': {'Vincent', 2, 'A `Royale` with cheese!'}
- - 'Jules': {'Vincent', 3, 'What do they call a Big Mac?'}
- - 'Jules': {'Vincent', 4, '`Le Big Mac!`'}
- - 'Jules': {'Vincent', 5, 'What do they call a `Whopper`?'}
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!')
+space:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.')
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent')
+--
+-- Select test
+--
+-- Select by one entry
+space:select(0, 'Vincent', 'Jules', 0)
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
 ...
-lua box.select(9, 0, 'Vincent')
+space:select(0, 'Jules', 'Vincent', 0)
 ---
- - 'Vincent': {'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
- - 'Vincent': {'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
- - 'Vincent': {'Jules', 2, 'They call it a `Royale` with cheese.'}
- - 'Vincent': {'Jules', 3, 'That`s right.'}
- - 'Vincent': {'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`'}
- - 'Vincent': {'Jules', 5, 'Ha, ha, ha.'}
- - 'Vincent': {'Jules', 6, 'I dunno, I didn`t go into Burger King.'}
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+- ['Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?']
 ...
-lua box.delete(9, 'The Wolf!', 'Vincent', 0)
+space:select(0, 'Vincent', 'Jules', 1)
 ---
- - 'The Wolf!': {'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.'}
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
 ...
-lua box.delete(9, 'The Wolf!', 'Vincent', 3)
+space:select(0, 'Jules', 'Vincent', 1)
 ---
- - 'The Wolf!': {'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
+- ['Jules', 'Vincent', 1, 'Then what do they call it?']
 ...
-lua box.delete(9, 'Vincent', 'The Wolf!', 0)
+space:select(0, 'Vincent', 'Jules', 2)
 ---
- - 'Vincent': {'The Wolf!', 0, 'A please would be nice.'}
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
 ...
-lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
+space:select(0, 'Jules', 'Vincent', 2)
 ---
- - 'Updated': {'The Wolf!', 1, 'I said a please would be nice.', 'New'}
+- ['Jules', 'Vincent', 2, 'A `Royale` with cheese!']
 ...
-lua box.update(9, {'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
+space:select(0, 'Vincent', 'Jules', 3)
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
+- ['Vincent', 'Jules', 3, 'That`s right.']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!')
+space:select(0, 'Jules', 'Vincent', 3)
 ---
- - 'Vincent': {'The Wolf!', 1, 'I said a please would be nice.'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+- ['Jules', 'Vincent', 3, 'What do they call a Big Mac?']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent')
+space:select(0, 'Vincent', 'Jules', 4)
 ---
- - 'The Wolf!': {'Vincent', 1, 'Come again?'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
 ...
-lua box.delete(9, 'Vincent', 'The Wolf!', 3)
+space:select(0, 'Jules', 'Vincent', 4)
 ---
+- ['Jules', 'Vincent', 4, '`Le Big Mac!`']
 ...
-lua box.delete(9, 'Vincent', 'The Wolf!')
+space:select(0, 'Vincent', 'Jules', 5)
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 2)'
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
 ...
-lua box.delete(9, 'The Wolf!', 'Vincent', 1, 'Come again?')
+space:select(0, 'Jules', 'Vincent', 5)
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 4)'
+- ['Jules', 'Vincent', 5, 'What do they call a `Whopper`?']
 ...
-lua box.update(9, {'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
+space:select(0, 'Vincent', 'Jules', 6)
 ---
- - 'The Wolf!': {'Vincent', 1, '<ooops>'}
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
 ...
-lua box.update(9, {'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
+space:select(0, 'The Wolf!', 'Vincent', 0)
 ---
- - 'Vincent': {'The Wolf!', 1, '<ooops>'}
+- ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
 ...
-lua box.select(9, 0, 'Vincent', 'The Wolf!')
+space:select(0, 'Vincent', 'The Wolf!', 0)
 ---
- - 'Vincent': {'The Wolf!', 1, '<ooops>'}
- - 'Vincent': {'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
 ...
-lua box.select(9, 0, 'The Wolf!', 'Vincent')
+space:select(0, 'The Wolf!', 'Vincent', 1)
 ---
- - 'The Wolf!': {'Vincent', 1, '<ooops>'}
- - 'The Wolf!': {'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
 ...
-lua box.update(9, {'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
+space:select(0, 'Vincent', 'The Wolf!', 1)
 ---
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
 ...
-lua box.update(9, {'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
+space:select(0, 'The Wolf!', 'Vincent', 2)
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 2)'
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
-lua box.update(9, {'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
+space:select(0, 'The Wolf!', 'Vincent', 3)
 ---
-error: 'Invalid key part count in an exact match (expected 3, got 4)'
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
-lua box.space[9]:len()
+space:select(0, 'Vincent', 'The Wolf!', 2)
 ---
- - 17
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua box.space[9]:truncate()
+-- Select all messages from Vincent to Jules
+space:select(0, 'Vincent', 'Jules')
 ---
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
+- ['Vincent', 'Jules', 3, 'That`s right.']
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
 ...
-lua box.space[9]:len()
+-- Select all messages from Jules to Vincent
+space:select(0, 'Jules', 'Vincent')
 ---
- - 0
+- ['Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?']
+- ['Jules', 'Vincent', 1, 'Then what do they call it?']
+- ['Jules', 'Vincent', 2, 'A `Royale` with cheese!']
+- ['Jules', 'Vincent', 3, 'What do they call a Big Mac?']
+- ['Jules', 'Vincent', 4, '`Le Big Mac!`']
+- ['Jules', 'Vincent', 5, 'What do they call a `Whopper`?']
 ...
- A test case for Bug#1051006 Tree iterators return garbage
-if an index is modified between calls
-lua box.space[16]:insert('a', 'a', 'a')
+-- Select all messages from Vincent to The Wolf
+space:select(0, 'Vincent', 'The Wolf!')
 ---
- - 'a': {'a', 'a'}
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua box.space[16]:insert('d', 'd', 'd')
+-- Select all messages from The Wolf to Vincent
+space:select(0, 'The Wolf!', 'Vincent')
 ---
- - 'd': {'d', 'd'}
+- ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
-lua box.space[16]:insert('e', 'e', 'e')
+-- Select all Vincent messages
+space:select(0, 'Vincent')
 ---
- - 'e': {'e', 'e'}
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
+- ['Vincent', 'Jules', 3, 'That`s right.']
+- ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
+- ['Vincent', 'Jules', 5, 'Ha, ha, ha.']
+- ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua box.space[16]:insert('b', 'b', 'b')
+--
+-- Delete test
+--
+-- Delete some messages from the The Wolf and Vincent dialog
+space:delete('The Wolf!', 'Vincent', 0)
 ---
- - 'b': {'b', 'b'}
+- ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
 ...
-lua box.space[16]:insert('c', 'c', 'c')
+space:delete('The Wolf!', 'Vincent', 3)
 ---
- - 'c': {'c', 'c'}
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
-lua k,v = box.space[16].index[1]:next(k)
+space:delete('Vincent', 'The Wolf!', 0)
 ---
+- ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
 ...
-lua print(v)
+space:update({'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
 ---
-'a': {'a', 'a'}
+- ['Updated', 'The Wolf!', 1, 'I said a please would be nice.', 'New']
 ...
-lua k,v = box.space[16].index[1]:next(k)
+space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
 ---
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
 ...
-lua print(v)
+-- Checking Vincent's last messages
+space:select(0, 'Vincent', 'The Wolf!')
 ---
-'b': {'b', 'b'}
+- ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua box.space[16]:truncate()
+-- Checking The Wolf's last messages
+space:select(0, 'The Wolf!', 'Vincent')
 ---
+- ['The Wolf!', 'Vincent', 1, 'Come again?']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
-lua print(v)
+-- try to delete nonexistent message
+space:delete('Vincent', 'The Wolf!', 3)
 ---
-'b': {'b', 'b'}
 ...
-lua collectgarbage('collect')
+-- try to delete patrial defined key
+space:delete('Vincent', 'The Wolf!')
 ---
- - 0
+- error: Invalid key part count in an exact match (expected 3, got 2)
 ...
-lua print(v)
+-- try to delete by invalid key
+space:delete('The Wolf!', 'Vincent', 1, 'Come again?')
 ---
-'b': {'b', 'b'}
+- error: Invalid key part count in an exact match (expected 3, got 4)
 ...
-lua k,v = box.space[16].index[1]:next(k)
+--
+-- Update test
+--
+space:update({'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 ---
+- ['The Wolf!', 'Vincent', 1, '<ooops>']
 ...
-lua print(v)
+space:update({'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 ---
-nil
+- ['Vincent', 'The Wolf!', 1, '<ooops>']
 ...
-lua collectgarbage('collect')
+-- Checking Vincent's last messages
+space:select(0, 'Vincent', 'The Wolf!')
 ---
- - 0
+- ['Vincent', 'The Wolf!', 1, '<ooops>']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
-lua print(v)
+-- Checking The Wolf's last messages
+space:select(0, 'The Wolf!', 'Vincent')
 ---
-nil
+- ['The Wolf!', 'Vincent', 1, '<ooops>']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
-lua k,v = box.space[16].index[1]:next(k)
+-- try to update a nonexistent message
+space:update({'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
 ---
 ...
-lua print(v)
+-- try to update patrial defined key
+space:update({'Vincent', 'The Wolf!'}, '=p', 3, '<ooops>')
 ---
-nil
+- error: Invalid key part count in an exact match (expected 3, got 2)
 ...
-lua k,v = box.space[16].index[1]:next(k)
+-- try to update by invalid key
+space:update({'The Wolf!', 'Vincent', 1, 'Come again?'}, '=p', 3, '<ooops>')
 ---
+- error: Invalid key part count in an exact match (expected 3, got 4)
 ...
-lua print(v)
+space:len()
 ---
-nil
+- 17
 ...
-lua k,v = box.space[16].index[1]:next(k)
+space:truncate()
 ---
 ...
-lua print(v)
+space:len()
 ---
-nil
+- 0
 ...
-insert into t19 values(1, 1)
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
-replace into t19 values(1, 1)
-An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters, tuple must have all indexed fields'
+-- A test case for Bug#1051006 Tree iterators return garbage
+--if an index is modified between calls
+--
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
+---
+- [0, 0, 'primary', 1701147252, 1, 1, 0, 'str']
+...
+box.replace(box.schema.INDEX_ID, 0, 1, 'second', 'tree', 1, 2, 1, 'str', 2, 'str')
+---
+- [0, 1, 'second', 1701147252, 1, 2, 1, 'str', 2, 'str']
+...
+space = box.space[0]
+---
+...
+space:insert('a', 'a', 'a')
+---
+- ['a', 'a', 'a']
+...
+space:insert('d', 'd', 'd')
+---
+- ['d', 'd', 'd']
+...
+space:insert('e', 'e', 'e')
+---
+- ['e', 'e', 'e']
+...
+space:insert('b', 'b', 'b')
+---
+- ['b', 'b', 'b']
+...
+space:insert('c', 'c', 'c')
+---
+- ['c', 'c', 'c']
+...
+t = {}
+---
+...
+--# setopt delimiter ';'
+for i = 1, 2 do
+    k,v = space.index[1]:next(k)
+    table.insert(t, v)
+end;
+---
+...
+--# setopt delimiter ''
+t
+---
+- - ['a', 'a', 'a']
+  - ['b', 'b', 'b']
+...
+space:truncate()
+---
+...
+v
+---
+- ['b', 'b', 'b']
+...
+collectgarbage('collect')
+---
+- 0
+...
+v
+---
+- ['b', 'b', 'b']
+...
+k,v = space.index[1]:next(k)
+---
+...
+v
+---
+- null
+...
+collectgarbage('collect')
+---
+- 0
+...
+v
+---
+- null
+...
+t = {}
+---
+...
+--# setopt delimiter ';'
+for i = 1, 3 do
+    k,v = space.index[1]:next(k)
+    table.insert(t, v)
+end;
+---
+...
+--# setopt delimiter ''
+t
+---
+- {}
+...
+space:drop()
+---
+...
+-- Bug #1082356
+-- Space #19, https://bugs.launchpad.net/tarantool/+bug/1082356
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+---
+- [0, 0, 'tweedledum']
+...
+-- Multipart primary key (sender nickname, receiver nickname, message id)
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 0, 'num', 2, 'num')
+---
+- [0, 0, 'primary', 1701147252, 1, 2, 0, 'num', 2, 'num']
+...
+space = box.space[0]
+---
+...
+space:insert(1, 1)
+---
+- error: Tuple field count 2 is less than required by a defined index (expected 3)
+...
+space:replace_if_exists(1, 1)
+---
+- error: Tuple field count 2 is less than required by a defined index (expected 3)
+...
+space:drop()
+---
+...
+space = nil
+---
+...
