@@ -34,6 +34,10 @@
 #include "tarantool/util.h"
 #include "tarantool_ev.h"
 
+#if TARGET_OS_FREEBSD || TARGET_OS_DARWIN
+#define fdatasync fsync
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
