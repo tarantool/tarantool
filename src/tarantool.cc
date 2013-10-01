@@ -313,10 +313,8 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
-void snapshot_exit(int code, void* arg) {
-	(void)arg;
+void snapshot_exit(void) {
 	fflush(NULL);
-	_exit(code);
 }
 
 int
@@ -357,7 +355,7 @@ snapshot(void)
 	 * may call exit(), push a top-level handler which will do
 	 * _exit() for us.
 	 */
-	on_exit(snapshot_exit, NULL);
+	atexit(snapshot_exit);
 	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);

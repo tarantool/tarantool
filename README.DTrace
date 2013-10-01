@@ -1,0 +1,62 @@
+DTrace how to:
+
+1. How to build
+-------------
+
+DTrace supported only on FreeBSD and Mac OS X.
+
+For enable DTrace use an option -DENABLE_DTRACE=ON in cmake.
+
+Example commands to build:
+
+mkdir build && cd build
+
+cmake ..  -DCMAKE_INSTALL_PREFIX=/path/to/install \
+          -DCMAKE_BUILD_TYPE=Rel \
+          -DENABLE_BACKTRACE=OFF \
+          -DCMAKE_C_COMPILER="clang" \
+          -DCMAKE_CXX_COMPILER="clang++" \
+          -DENABLE_DTRACE=ON
+
+make && make install
+
+2. USDT probes
+-------------
+
+* libcoro
+** caro_init
+* libev
+** ev_run
+* lua_cjson module
+** json_encode and json_decode
+
+
+3. Example of usage
+-------------
+
+Tracing tarantool encode/decode cjson function:
+
+In command line tarantool client:
+```
+localhost> c = box.cjson.encode({test=123456})
+---
+...
+localhost> box.cjson.decode(c)
+---
+- test: 123456
+...
+localhost>
+```
+
+On the host machine(server):
+
+```
+$ sudo dtrace -n 'lua_cjson*:tarantool_box:json_*:end { trace(copyinstr(arg1)); }'
+dtrace: description 'lua_cjson*:tarantool_box:json_*:end ' matched 4 probes
+
+CPU     ID                    FUNCTION:NAME
+  1   4230                  json_encode:end   {"test":123456}@
+  0   4229                  json_decode:end   {"test":123456}
+^C
+```
+

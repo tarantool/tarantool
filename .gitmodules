@@ -1,9 +1,10 @@
-[submodule "third_party/lua-cjson"]
-	path = third_party/lua-cjson
-	url = git://github.com/mpx/lua-cjson.git
 [submodule "third_party/luajit"]
 	path = third_party/luajit
 	url = http://luajit.org/git/luajit-2.0.git
+[submodule "third_party/lua-cjson"]
+	path = third_party/lua-cjson
+	url = git://github.com/zloidemon/lua-cjson.git
+	branch = add-dtrace
 [submodule "test/lib/tarantool-python"]
 	path = test/lib/tarantool-python
 	url = https://github.com/mailru/tarantool-python.git
