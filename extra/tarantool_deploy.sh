@@ -35,6 +35,7 @@ act_prompt=1
 act_status=0
 act_debug=0
 act_dry=0
+act_quiet=0
 
 error() {
 	echo "$prompt_name error: $*" 1>&2
@@ -126,7 +127,7 @@ deploy_check() {
 	if [ $deploy_exists -eq 1 ]; then
 		grep "^\(${id}\)$" $deploy_cfg > /dev/null
 		if [ $? -eq 0 ]; then
-			log "Instance '${id}' is already deployed."
+			[ $act_quiet -eq 0 ] && log "Instance '${id}' is already deployed."
 			exit 0
 		fi
 	fi
@@ -155,6 +156,7 @@ deploy_name=""
 while [ $# -ge 1 ]; do
 	case $1 in
 		--yes) act_prompt=0; shift 1 ;;
+		--quiet) act_quiet=1; shift 1 ;;
 		--prefix) prefix=$2; shift 2 ;;
 		--prefix_var) prefix_var=$2; shift 2 ;;
 		--prefix_etc) prefix_etc=$2; shift 2 ;;
@@ -175,6 +177,16 @@ deploy_exists=0
 
 # check deployment configuration file
 [ -f $deploy_cfg ] && deploy_exists=1
+
+# do migration from old deployment (if necessary)
+if [ $deploy_exists -eq 0 ]; then
+	deploy_cfg_old="/usr/local/etc/tarantool_deploy.cfg"
+	if [ -f $deploy_cfg_old ]; then
+		mkdir -p /etc/tarantool
+		cp /usr/local/etc/tarantool* "${prefix_etc}/tarantool/"
+		deploy_exists=1
+	fi
+fi
 
 # display status
 if [ $act_status -ne 0 ]; then
