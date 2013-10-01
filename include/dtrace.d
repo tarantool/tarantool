@@ -1,7 +1,6 @@
-provider cjson {
-	probe new__entry();
-	probe encode__start();
-	probe encode__done(int len, char *);
+provider lua_cjson {
+	probe start();
+	probe end(int, char *);
 };
 provider coro {
 	probe new__entry();
