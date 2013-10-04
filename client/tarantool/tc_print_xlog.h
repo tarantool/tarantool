@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-typedef void (*tc_printerf_xlog_t)(struct tnt_log_header_v11 *hdr,
+typedef void (*tc_printerf_xlog_t)(struct tnt_log_row *row,
 				   struct tnt_request *r);
 
 tc_printerf_xlog_t tc_print_getxlogcb(const char *name);
