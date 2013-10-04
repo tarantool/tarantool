@@ -130,7 +130,7 @@ static int tc_store_xlog_printer(struct tnt_iter *i) {
 		return 0;
 	struct tnt_stream_xlog *s =
 		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
-	((tc_printerf_xlog_t)tc.opt.xlog_printer)(&s->log.current.hdr, r);
+	((tc_printerf_xlog_t)tc.opt.xlog_printer)(&s->log.current, r);
 	return 0;
 }
 
@@ -142,7 +142,7 @@ static int tc_store_snap_printer(struct tnt_iter *i) {
 		if (ss->log.current.row_snap.space != tc.opt.space)
 			return 0;
 	}
-	((tc_printerf_snap_t)tc.opt.snap_printer)(&ss->log.current.row_snap, tu);
+	((tc_printerf_snap_t)tc.opt.snap_printer)(&ss->log.current, tu);
 	return 0;
 }
 

@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-typedef void (*tc_printerf_snap_t)(struct tnt_log_row_snap_v11 *row,
+typedef void (*tc_printerf_snap_t)(struct tnt_log_row *row,
 				   struct tnt_tuple *tu);
 
 tc_printerf_snap_t tc_print_getsnapcb(const char *name);

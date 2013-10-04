@@ -20,30 +20,30 @@
 extern struct tc tc;
 
 static void
-tc_printer_snap_raw( struct tnt_log_row_snap_v11 *row,
+tc_printer_snap_raw( struct tnt_log_row *row,
 		     struct tnt_tuple *tu)
 {
 	if (tc.opt.raw_with_headers) {
 		fwrite(&tnt_log_marker_v11,
 			sizeof(tnt_log_marker_v11), 1, stdout);
 	}
-	fwrite(row, sizeof(row), 1, stdout);
+	fwrite(&(row->row_snap), sizeof(row->row_snap), 1, stdout);
 	fwrite(tu->data, tu->size, 1, stdout);
 }
 static void
-tc_printer_snap_tarantool( struct tnt_log_row_snap_v11 *row,
+tc_printer_snap_tarantool( struct tnt_log_row *row,
 			   struct tnt_tuple *tu)
 {
 	tc_printf("space: %"PRIu32" ",
-		row->space);
+		row->row_snap.space);
 	tc_print_tuple(tu);
 
 }
 static void
-tc_printer_snap_lua( struct tnt_log_row_snap_v11 *row,
+tc_printer_snap_lua( struct tnt_log_row *row,
 		     struct tnt_tuple *tu)
 {
-	tc_printf("lua box.insert(%"PRIu32", ", row->space);
+	tc_printf("lua box.insert(%"PRIu32", ", row->row_snap.space);
 	tc_print_lua_fields(tu);
 	tc_printf(")");
 	if (tc.opt.delim_len > 0)

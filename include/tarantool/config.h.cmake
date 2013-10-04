@@ -57,6 +57,10 @@
  * Defined if fdatasync(2) call is present.
  */
 #cmakedefine HAVE_FDATASYNC 1
+
+#ifndef HAVE_FDATASYNC
+	#define fdatasync fsync
+#endif
 /*
  * Defined if this platform has GNU specific memmem().
  */
