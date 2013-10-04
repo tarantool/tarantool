@@ -51,7 +51,7 @@
  * trigger fails or runs out of resources.
  */
 uint32_t
-session_create(int fd);
+session_create(int fd, uint64_t cookie);
 
 /**
  * Destroy a session.

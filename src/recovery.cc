@@ -1142,7 +1142,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn,
+wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	  uint16_t op, const char *row, uint32_t row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
@@ -1159,7 +1159,7 @@ wal_write(struct recovery_state *r, int64_t lsn,
 
 	req->fiber = fiber;
 	req->res = -1;
-	wal_row_fill(&req->row, lsn, (const char *) &op,
+	wal_row_fill(&req->row, lsn, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
@@ -1206,7 +1206,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 				     sizeof(struct wal_row) +
 				     data_len + metadata_len);
 
-	wal_row_fill(row, ++rows, metadata, metadata_len, data, data_len);
+	wal_row_fill(row, ++rows, snapshot_cookie, metadata,
+		     metadata_len, data, data_len);
 	row_header_sign(&row->header);
 
 	fio_batch_add(batch, row, wal_row_size(row));

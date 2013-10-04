@@ -87,8 +87,8 @@ txn_commit(struct txn *txn)
 		int64_t lsn = next_lsn(recovery_state);
 
 		ev_tstamp start = ev_now(), stop;
-		int res = wal_write(recovery_state, lsn, txn->op,
-				    txn->data, txn->len);
+		int res = wal_write(recovery_state, lsn, fiber->cookie,
+				    txn->op, txn->data, txn->len);
 		stop = ev_now();
 
 		if (stop - start > cfg.too_long_threshold) {
