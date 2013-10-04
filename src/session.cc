@@ -40,21 +40,8 @@ static struct mh_i32ptr_t *session_registry;
 struct session_trigger session_on_connect;
 struct session_trigger session_on_disconnect;
 
-static uint64_t
-get_cookie_by_socket(int fd)
-{
-	uint64_t cookie = 0;
-	unsigned int addrlen = (unsigned int)sizeof(cookie);
-	int get_res = getpeername(fd, (sockaddr*)&cookie, &addrlen);
-	if (get_res != 0) {
-		say_warn("getpeername failed");
-		return 0;
-	}
-	return cookie;
-}
-
 uint32_t
-session_create(int fd)
+session_create(int fd, uint64_t cookie)
 {
 	/* Return the next sid rolling over the reserved value of 0. */
 	while (++sid_max == 0)
@@ -75,7 +62,7 @@ session_create(int fd)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_sid(fiber, sid, get_cookie_by_socket(fd));
+	fiber_set_sid(fiber, sid, cookie);
 	if (session_on_connect.trigger) {
 		void *param = session_on_connect.param;
 		try {

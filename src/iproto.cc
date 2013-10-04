@@ -328,21 +328,9 @@ iproto_process_connect(struct iproto_request *request);
 static void
 iproto_process_disconnect(struct iproto_request *request);
 
-static uint64_t
-get_cookie_by_socket(int fd)
-{
-	uint64_t cookie = 0;
-	unsigned int addrlen = (unsigned int)sizeof(cookie);
-	int get_res = getpeername(fd, (sockaddr*)&cookie, &addrlen);
-	if (get_res != 0) {
-		say_warn("getpeername failed");
-		return 0;
-	}
-	return cookie;
-}
-
 static struct iproto_session *
-iproto_session_create(const char *name, int fd, box_process_func *param)
+iproto_session_create(const char *name, int fd, struct sockaddr_in *addr,
+		      box_process_func *param)
 {
 	struct iproto_session *session;
 	if (SLIST_EMPTY(&iproto_session_cache)) {
@@ -362,7 +350,7 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
 	session->sid = 0;
-	session->cookie = get_cookie_by_socket(fd);
+	session->cookie = *(uint64_t *) addr;
 	return session;
 }
 
@@ -717,7 +705,7 @@ iproto_process_connect(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	int fd = session->input.fd;
 	try {              /* connect. */
-		session->sid = session_create(fd);
+		session->sid = session_create(fd, session->cookie);
 	} catch (const ClientError& e) {
 		iproto_reply_error(&iobuf->out, request->header, e);
 		try {
@@ -767,7 +755,7 @@ iproto_on_accept(struct evio_service *service, int fd,
 
 	box_process_func *process_fun =
 		(box_process_func*) service->on_accept_param;
-	session = iproto_session_create(name, fd, process_fun);
+	session = iproto_session_create(name, fd, addr, process_fun);
 	iproto_enqueue_request(&request_queue, session,
 			       session->iobuf[0], &dummy_header,
 			       iproto_process_connect);
