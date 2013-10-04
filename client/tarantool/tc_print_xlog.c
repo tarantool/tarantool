@@ -63,11 +63,14 @@ static void
 tc_printer_xlog_tarantool(struct tnt_log_header_v11 *hdr,
 			  struct tnt_request *r)
 {
-	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+	tc_printf("%s, lsn: %"PRIu64", time: %lf, len: %"PRIu32", space: "
+			"%"PRIu32" ",
 		tc_query_type(r->h.type),
 		hdr->lsn,
 		hdr->tm,
-		hdr->len);
+		hdr->len,
+		r->r.insert.h.ns
+		);
 	switch (r->h.type) {
 	case TNT_OP_INSERT:
 		tc_print_tuple(&r->r.insert.t);

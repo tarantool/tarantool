@@ -683,3 +683,7 @@ exec admin "lua t:bsize()"
 exec admin silent "lua box.delete(0, 8989)"
 print """#A test case for gh-37 - print(tonumber64(1)) adds extra newline"""
 exec admin "lua print(1, tonumber64(2), 3)"
+
+# A test case for https://github.com/tarantool/tarantool/issues/44
+# IPROTO required!
+exec sql "call box.dostring('box.raise(33333, \"Hey!\")')"

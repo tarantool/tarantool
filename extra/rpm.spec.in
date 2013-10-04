@@ -61,10 +61,10 @@ make %{?_smp_mflags}
 make DESTDIR=%{buildroot} install
 
 %post
-groupadd tarantool
-useradd -r -g tarantool tarantool
+groupadd tarantool > /dev/null 2>&1
+useradd -r -g tarantool tarantool > /dev/null 2>&1
 # Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes 1.1
+/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
 
 %preun
 

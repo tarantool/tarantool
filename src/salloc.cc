@@ -61,14 +61,16 @@ static const size_t MAX_SLAB_ITEM = 1 << 20;
 size_t MAX_SLAB_ITEM_COUNT;
 
 struct slab_item {
-	struct slab_item *next;
+    SLIST_ENTRY(slab_item) next;
 };
+
+SLIST_HEAD(item_slist_head, slab_item);
 
 struct slab {
 	uint32_t magic;
 	size_t used;
 	size_t items;
-	struct slab_item *free;
+	struct item_slist_head free;
 	struct slab_cache *cache;
 	void *brk;
 	SLIST_ENTRY(slab) link;
@@ -88,7 +90,10 @@ struct slab_cache {
 struct arena {
 	void *mmap_base;
 	size_t mmap_size;
-
+	/** How items tuples do we have stacked for delayed free. */
+	int64_t delayed_free_count;
+	/** How many items in the delayed free list to free at once. */
+	size_t delayed_free_batch;
 	void *base;
 	size_t size;
 	size_t used;
@@ -96,6 +101,11 @@ struct arena {
 };
 
 static uint32_t slab_active_caches;
+/**
+ * Delayed garbage collection for items which are used
+ * in a forked process.
+ */
+static struct item_slist_head free_delayed;
 static struct slab_cache slab_caches[256];
 static struct arena arena;
 
@@ -126,17 +136,22 @@ slab_caches_init(size_t minimal, double factor)
 
 	MAX_SLAB_ITEM_COUNT = (size_t) (SLAB_SIZE - sizeof(struct slab)) /
 			slab_caches[0].item_size;
+
+	SLIST_INIT(&free_delayed);
 }
 
 static bool
 arena_init(struct arena *arena, size_t size)
 {
+	arena->delayed_free_batch = 100;
+	arena->delayed_free_count = 0;
+
 	arena->used = 0;
 	arena->size = size - size % SLAB_SIZE;
 	arena->mmap_size = size - size % SLAB_SIZE + SLAB_SIZE;	/* spend SLAB_SIZE bytes on align :-( */
 
 	arena->mmap_base = mmap(NULL, arena->mmap_size,
-				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+				PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if (arena->mmap_base == MAP_FAILED) {
 		say_syserror("mmap");
 		return false;
@@ -147,6 +162,16 @@ arena_init(struct arena *arena, size_t size)
 	SLIST_INIT(&arena->free_slabs);
 
 	return true;
+}
+
+/**
+ * Protect slab arena from changes. A safeguard used in a forked
+ * process to prevent changes to the master process arena.
+ */
+void
+salloc_protect(void)
+{
+	mprotect(arena.mmap_base, arena.mmap_size, PROT_READ);
 }
 
 static void *
@@ -182,7 +207,6 @@ salloc_free(void)
 {
 	if (arena.mmap_base != NULL)
 		munmap(arena.mmap_base, arena.mmap_size);
-
 	memset(&arena, 0, sizeof(struct arena));
 }
 
@@ -192,7 +216,7 @@ format_slab(struct slab_cache *cache, struct slab *slab)
 	assert(cache->item_size <= MAX_SLAB_ITEM);
 
 	slab->magic = SLAB_MAGIC;
-	slab->free = NULL;
+	SLIST_INIT(&slab->free);
 	slab->cache = cache;
 	slab->items = 0;
 	slab->used = 0;
@@ -269,61 +293,20 @@ valid_item(struct slab *slab, void *item)
 }
 #endif
 
-void *
-salloc(size_t size, const char *what)
-{
-	struct slab_cache *cache;
-	struct slab *slab;
-	struct slab_item *item;
-
-	if ((cache = cache_for(size)) == NULL ||
-	    (slab = slab_of(cache)) == NULL) {
-
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE, size,
-			  "slab allocator", what);
-	}
-
-	if (slab->free == NULL) {
-		assert(valid_item(slab, slab->brk));
-		item = (struct slab_item *) slab->brk;
-		memcpy((char *)item + cache->item_size, red_zone, sizeof(red_zone));
-		slab->brk = (char *) slab->brk + cache->item_size + sizeof(red_zone);
-	} else {
-		assert(valid_item(slab, slab->free));
-		item = slab->free;
-
-		(void) VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
-		slab->free = item->next;
-		(void) VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
-	}
-
-	if (fully_formatted(slab) && slab->free == NULL)
-		TAILQ_REMOVE(&cache->free_slabs, slab, cache_free_link);
-
-	slab->used += cache->item_size + sizeof(red_zone);
-	slab->items += 1;
-
-	VALGRIND_MALLOCLIKE_BLOCK(item, cache->item_size, sizeof(red_zone), 0);
-	return (void *)item;
-}
-
 void
 sfree(void *ptr)
 {
-	if (ptr == NULL)
-		return;
 	struct slab *slab = slab_header(ptr);
 	struct slab_cache *cache = slab->cache;
 	struct slab_item *item = (struct slab_item *) ptr;
 
-	if (fully_formatted(slab) && slab->free == NULL)
+	if (fully_formatted(slab) && SLIST_EMPTY(&slab->free))
 		TAILQ_INSERT_TAIL(&cache->free_slabs, slab, cache_free_link);
 
 	assert(valid_item(slab, item));
-	assert(slab->free == NULL || valid_item(slab, slab->free));
+	assert(SLIST_EMPTY(&slab->free) || valid_item(slab, SLIST_FIRST(&slab->free)));
 
-	item->next = slab->free;
-	slab->free = item;
+	SLIST_INSERT_HEAD(&slab->free, item, next);
 	slab->used -= cache->item_size + sizeof(red_zone);
 	slab->items -= 1;
 
@@ -336,6 +319,70 @@ sfree(void *ptr)
 	VALGRIND_FREELIKE_BLOCK(item, sizeof(red_zone));
 }
 
+static void
+sfree_batch(void)
+{
+	ssize_t batch = arena.delayed_free_batch;
+
+	while (--batch >= 0 && !SLIST_EMPTY(&free_delayed)) {
+		assert(arena.delayed_free_count > 0);
+		struct slab_item *item = SLIST_FIRST(&free_delayed);
+		SLIST_REMOVE_HEAD(&free_delayed, next);
+		arena.delayed_free_count--;
+		sfree(item);
+	}
+}
+
+void
+sfree_delayed(void *ptr)
+{
+	if (ptr == NULL)
+		return;
+	struct slab_item *item = (struct slab_item *)ptr;
+	struct slab *slab = slab_header(item);
+	assert(valid_item(slab, item));
+	SLIST_INSERT_HEAD(&free_delayed, item, next);
+	arena.delayed_free_count++;
+}
+
+void *
+salloc(size_t size, const char *what)
+{
+	struct slab_cache *cache;
+	struct slab *slab;
+	struct slab_item *item;
+
+	sfree_batch();
+
+	if ((cache = cache_for(size)) == NULL ||
+	    (slab = slab_of(cache)) == NULL) {
+
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE, size,
+			  "slab allocator", what);
+	}
+
+	if (SLIST_EMPTY(&slab->free)) {
+		assert(valid_item(slab, slab->brk));
+		item = (struct slab_item *) slab->brk;
+		memcpy((char *)item + cache->item_size, red_zone, sizeof(red_zone));
+		slab->brk = (char *) slab->brk + cache->item_size + sizeof(red_zone);
+	} else {
+		item = SLIST_FIRST(&slab->free);
+		assert(valid_item(slab, item));
+		(void) VALGRIND_MAKE_MEM_DEFINED(item, sizeof(void *));
+		SLIST_REMOVE_HEAD(&slab->free, next);
+		(void) VALGRIND_MAKE_MEM_UNDEFINED(item, sizeof(void *));
+	}
+
+	if (fully_formatted(slab) && SLIST_EMPTY(&slab->free))
+		TAILQ_REMOVE(&cache->free_slabs, slab, cache_free_link);
+
+	slab->used += cache->item_size + sizeof(red_zone);
+	slab->items += 1;
+
+	VALGRIND_MALLOCLIKE_BLOCK(item, cache->item_size, sizeof(red_zone), 0);
+	return (void *)item;
+}
 
 size_t
 salloc_ptr_to_index(void *ptr)

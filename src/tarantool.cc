@@ -84,6 +84,8 @@ struct tarantool_cfg cfg;
 static ev_signal *sigs = NULL;
 
 int snapshot_pid = 0; /* snapshot processes pid */
+uint32_t snapshot_version = 0;
+
 extern const void *opt_def;
 
 static int
@@ -173,38 +175,36 @@ static int
 core_reload_config(const struct tarantool_cfg *old_conf,
 		   const struct tarantool_cfg *new_conf)
 {
-	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode) == 0 &&
-	    old_conf->wal_fsync_delay == new_conf->wal_fsync_delay)
-		return 0;
+	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode) != 0 ||
+	    old_conf->wal_fsync_delay != new_conf->wal_fsync_delay) {
 
-	double new_delay = new_conf->wal_fsync_delay;
+		double new_delay = new_conf->wal_fsync_delay;
 
-	/* Mode has changed: */
-	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
-		if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
-		    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
-			out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
-			return -1;
+		/* Mode has changed: */
+		if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
+			if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
+			    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
+				out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
+				return -1;
+			}
 		}
-		say_debug("%s: wal_mode [%s] -> [%s]",
-			__func__, old_conf->wal_mode, new_conf->wal_mode);
+
+		/*
+		 * Unless wal_mode=fsync_delay, wal_fsync_delay is
+		 * irrelevant and must be 0.
+		 */
+		if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
+			new_delay = 0.0;
+
+
+		recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
 	}
 
-	/*
-	 * Unless wal_mode=fsync_delay, wal_fsync_delay is irrelevant and must be 0.
-	 */
-	if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
-		new_delay = 0.0;
+	if (old_conf->snap_io_rate_limit != new_conf->snap_io_rate_limit)
+		recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
 
-	if (old_conf->wal_fsync_delay != new_delay)
-		say_debug("%s: wal_fsync_delay [%f] -> [%f]",
-			__func__, old_conf->wal_fsync_delay, new_delay);
-
-	recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
-
-	recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
-
-	ev_set_io_collect_interval(new_conf->io_collect_interval);
+	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
+		ev_set_io_collect_interval(new_conf->io_collect_interval);
 
 	return 0;
 }
@@ -316,11 +316,20 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
+void snapshot_exit(int code, void* arg) {
+	(void)arg;
+	fflush(NULL);
+	_exit(code);
+}
+
 int
 snapshot(void)
 {
 	if (snapshot_pid)
 		return EINPROGRESS;
+
+	/* increment snapshot version */
+	snapshot_version++;
 
 	pid_t p = fork();
 	if (p < 0) {
@@ -334,6 +343,8 @@ snapshot(void)
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
+	salloc_protect();
+
 	fiber_set_name(fiber, "dumper");
 	set_proc_title("dumper (%" PRIu32 ")", getppid());
 
@@ -342,6 +353,14 @@ snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
+	/*
+	 * We must avoid double destruction of tuples on exit.
+	 * Since there is no way to remove existing handlers
+	 * registered in the master process, and snapshot_save()
+	 * may call exit(), push a top-level handler which will do
+	 * _exit() for us.
+	 */
+	on_exit(snapshot_exit, NULL);
 	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);
@@ -844,8 +863,8 @@ main(int argc, char **argv)
 
 	signal_init();
 
-
 	try {
+		say_crit("version %s", tarantool_version());
 		tarantool_L = tarantool_lua_init();
 		box_init(false);
 		atexit(tarantool_lua_free);
