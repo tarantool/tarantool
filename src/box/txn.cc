@@ -78,7 +78,7 @@ txn_commit(struct txn *txn)
 		int64_t lsn = next_lsn(recovery_state);
 
 		ev_tstamp start = ev_now(), stop;
-		int res = wal_write(recovery_state, lsn, 0,
+		int res = wal_write(recovery_state, lsn, fiber->cookie,
 				    txn->op, txn->data, txn->len);
 		stop = ev_now();
 

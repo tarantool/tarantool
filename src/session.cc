@@ -31,6 +31,7 @@
 
 #include "assoc.h"
 #include "exception.h"
+#include <sys/socket.h>
 
 uint32_t sid_max;
 
@@ -40,7 +41,7 @@ struct session_trigger session_on_connect;
 struct session_trigger session_on_disconnect;
 
 uint32_t
-session_create(int fd)
+session_create(int fd, uint64_t cookie)
 {
 	/* Return the next sid rolling over the reserved value of 0. */
 	while (++sid_max == 0)
@@ -61,13 +62,13 @@ session_create(int fd)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_sid(fiber, sid);
+	fiber_set_sid(fiber, sid, cookie);
 	if (session_on_connect.trigger) {
 		void *param = session_on_connect.param;
 		try {
 			session_on_connect.trigger(param);
 		} catch (const Exception& e) {
-			fiber_set_sid(fiber, 0);
+			fiber_set_sid(fiber, 0, 0);
 			mh_i32ptr_remove(session_registry, &node, NULL);
 			throw;
 		}

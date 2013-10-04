@@ -412,9 +412,12 @@ static void
 memcached_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
+	struct sockaddr_in *addr = va_arg(ap, struct sockaddr_in *);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	stats.total_connections++;
 	stats.curr_connections++;
+
+	(void) addr;
 
 	try {
 		auto scoped_guard = make_scoped_guard([&] {
