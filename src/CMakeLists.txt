@@ -153,7 +153,12 @@ if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
 endif()
 
 if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
-    set (common_libraries ${common_libraries} intl)
+    find_library (INTL intl)
+    if (NOT INTL)
+        message(FATAL_ERROR "intl library not found")
+    else()
+        set (common_libraries ${common_libraries} ${INTL})
+    endif()
 endif()
 
 if (ENABLE_BACKTRACE AND HAVE_BFD)
