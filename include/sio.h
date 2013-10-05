@@ -49,17 +49,14 @@ public:
 		    const char *format, ...);
 };
 
-class FDHolder {
-public:
-	explicit FDHolder(int _fd = -1);
-	~FDHolder();
-	int Release();
-	void Reset(int _fd = -1);
-
-private:
+/** Close a file descriptor on exception or end of scope. */
+struct FDGuard {
 	int fd;
-	FDHolder(const FDHolder&);
-	void operator=(const FDHolder&);
+	explicit FDGuard(int fd_arg):fd(fd_arg) {}
+	~FDGuard() { if (fd >= 0) close(fd); }
+private:
+	explicit FDGuard(const FDGuard&) = delete;
+	FDGuard& operator=(const FDGuard&) = delete;
 };
 
 const char *sio_socketname(int fd);
@@ -92,44 +89,34 @@ ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
 
 /**
- * Read at least count bytes, buf_size maximum from fd.
- * Throw on error or disconnect. Return count of bytes actually read.
- * Return if no activity occurred during timeout seconds.
- * timeout is the only reason to return value less than count parameter.
- * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
+ * Read at least count and up to buf_size bytes from fd.
+ * Throw exception on error or disconnect.
+ *
+ * @return the number of of bytes actually read.
  */
 ssize_t
-sio_read_ahead_timeout(int fd, void *buf, size_t count, size_t buf_size,
-		       ev_tstamp timeout);
-
-/**
- * Read from fd, buf_size maximum bytes.
- * Throw on error or disconnect. Return count of bytes actually read.
- * Return if no activity occurred during timeout seconds.
- * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
- */
-ssize_t
-sio_read_timeout(int fd, void *buf, size_t buf_size, ev_tstamp timeout_ms);
+sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size);
 
 /**
  * Read count bytes from fd.
- * Throw on error or disconnect. Return count of bytes actually read.
- * Return if no activity occurred during timeout seconds.
- * timeout is the only reason to return value, different from count parameter.
- * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
+ * Throw an exception on error or disconnect.
+ *
+ * @return count of bytes actually read.
  */
-ssize_t
-sio_readn_timeout(int fd, void *buf, size_t count, ev_tstamp timeout);
+static inline ssize_t
+sio_readn(int fd, void *buf, size_t count)
+{
+	return sio_readn_ahead(fd, buf, count, count);
+}
 
 /**
  * Write count bytes to fd.
- * Throw on error or disconnect. Return count of bytes actually written.
- * Return if no activity occurred during timeout seconds.
- * timeout is the only reason to return value, different from count parameter.
- * timeout == 0 means "don't wait", timeout < 0 means "infinite wait"
+ * Throw an exception on error or disconnect.
+ *
+ * @return count of bytes actually written.
  */
 ssize_t
-sio_writen_timeout(int fd, const void *buf, size_t count, ev_tstamp timeout);
+sio_writen(int fd, const void *buf, size_t count);
 
 /**
  * A wrapper over sendfile.

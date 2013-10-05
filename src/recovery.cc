@@ -29,7 +29,6 @@
 #include "recovery.h"
 
 #include <fcntl.h>
-#include <arpa/inet.h>
 
 #include "log_io.h"
 #include "fiber.h"
@@ -38,13 +37,8 @@
 #include "sio.h"
 #include "errinj.h"
 #include "bootstrap.h"
-#include "scoped_guard.h"
 
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
-#include "tarantool.h"
+#include "replication.h"
 
 /*
  * Recovery subsystem
@@ -290,8 +284,13 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
+/** Write the bootstrap snapshot.
+ *
+ *  @return panics on error
+ *  Errors are logged to the log file.
+ */
 static void
-init_default_storage(struct log_dir *dir)
+init_storage_on_master(struct log_dir *dir)
 {
 	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
 	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
@@ -306,89 +305,56 @@ init_default_storage(struct log_dir *dir)
 			       filename);
 	}
 	close(fd);
-	say_info("done");
 }
 
+/** Download the latest snapshot from master. */
 static void
-init_storage_from_master(struct log_dir *dir)
+init_storage_on_replica(struct log_dir *dir, const char *replication_source)
 {
-	char ip_addr[32];
-	int port;
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
+	say_info("downloading snapshot from master %s...",
+		 replication_source);
 
-	say_info("getting snapshot from master");
-
-	int rc = sscanf(cfg.replication_source, "%31[^:]:%i", ip_addr, &port);
-
-	assert(rc == 2);
-	(void)rc;
-
-	addr.sin_family = AF_INET;
-	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0) {
-		say_syserror("inet_aton: %s", ip_addr);
-		return;
-	}
-	addr.sin_port = htons(port);
-
-	int sock_fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	FDHolder sock_fd_holder(sock_fd);
-	sio_connect(sock_fd, &addr, sizeof(addr));
-
-	uint32_t replica_version[3] = { default_version,
-		get_package_version_packed(), 0 };
-	uint32_t master_version[3] = { 0 };
-	sio_writen_timeout(sock_fd, replica_version,
-		sizeof(replica_version), 10);
-	sio_readn_timeout(sock_fd, master_version,
-		sizeof(master_version), 10);
-
-	if (master_version[0] != default_version) {
-		say_error("invalid master version %d", master_version[0]);
-		return;
-	}
+	int master = replica_connect(replication_source);
+	FDGuard guard_master(master);
 
 	uint32_t request = RPL_GET_SNAPSHOT;
-	sio_writen_timeout(sock_fd, &request, sizeof(request), 10);
+	sio_writen(master, &request, sizeof(request));
 
-	uint64_t recv_buf[2];
-	sio_readn_timeout(sock_fd, recv_buf, sizeof(recv_buf), 10);
-	uint64_t lsn = recv_buf[0];
-	uint64_t file_size = recv_buf[1];
+	struct {
+		uint64_t lsn;
+		uint64_t file_size;
+	} response;
+	sio_readn(master, &response, sizeof(response));
 
-	const char* filename = format_filename(dir, lsn, NONE);
-	int file_fd = open(filename,
-			O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, dir->mode);
-	FDHolder file_fd_holder(file_fd);
-
-	if (file_fd < 0) {
-		say_error("failed to create initial snapshot file");
-		return;
+	const char *filename = format_filename(dir, response.lsn, NONE);
+	say_info("saving snapshot `%s'", filename);
+	int fd = open(filename, O_WRONLY|O_CREAT|O_EXCL, dir->mode);
+	if (fd == -1) {
+		panic_syserror("failed to open snapshot file `%s' for "
+			       "writing", filename);
 	}
-	sio_recvfile(sock_fd, file_fd, NULL, file_size);
+	FDGuard guard_fd(fd);
 
+	sio_recvfile(master, fd, NULL, response.file_size);
+}
+
+/** Create the initial snapshot file in the snap directory. */
+void
+init_storage(struct log_dir *dir, const char *replication_source)
+{
+	if (replication_source)
+		init_storage_on_replica(dir, replication_source);
+	else
+		init_storage_on_master(dir);
 	say_info("done");
 }
-
-/** Create the initial snapshot file in the storage. */
-void
-init_storage(struct log_dir *dir)
-{
-	if (cfg.replication_source != NULL) {
-		init_storage_from_master(dir);
-	} else {
-		init_default_storage(dir);
-	}
-
-}
-
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
  */
 void
-recover_snap(struct recovery_state *r)
+recover_snap(struct recovery_state *r, const char *replication_source)
 {
 	/*  current_wal isn't open during initial recover. */
 	assert(r->current_wal == NULL);
@@ -400,7 +366,7 @@ recover_snap(struct recovery_state *r)
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
 		say_info("found an empty data directory, initializing...");
-		init_storage(r->snap_dir);
+		init_storage(r->snap_dir, replication_source);
 		lsn = greatest_lsn(r->snap_dir);
 	}
 
@@ -1417,35 +1383,6 @@ read_log(const char *filename,
 	return 0;
 }
 
-uint32_t get_package_version_packed()
-{
-	static uint32_t result = 0xFEFEFEFE;
-	if (result == 0xFEFEFEFE) {
-		uint32_t parts[4] = { 0 };
-		size_t reading_part = 0;
-		for (const char *p = PACKAGE_VERSION;
-			*p && reading_part < sizeof(parts) / sizeof(parts[0]); ++p) {
-			if (*p >= '0' && *p <= '9') {
-				parts[reading_part] = parts[reading_part] * 10 + (*p - '0');
-			} else {
-				reading_part++;
-			}
-		}
-		result = 0;
-		for (size_t i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
-			if (parts[i] > 0xFF) {
-				say_warn("Package version has part, greater than 255: "
-					"truncating: %u.%u.%u.%u",
-					parts[0], parts[1], parts[2], parts[3]);
-				parts[i] = 0xFF;
-			}
-			result = (result << 8) | parts[i];
-		}
-		say_info("Package version: %u.%u.%u.%u",
-			parts[0], parts[1], parts[2], parts[3]);
-	}
-	return result;
-}
 
 /* }}} */
 

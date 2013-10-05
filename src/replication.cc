@@ -50,7 +50,6 @@ extern "C" {
 #include "recovery.h"
 #include "log_io.h"
 #include "evio.h"
-#include "scoped_guard.h"
 
 /** Replication topology
  * ----------------------
@@ -80,8 +79,6 @@ extern "C" {
  * children and exits.
  */
 static int master_to_spawner_socket;
-
-static const uint32_t supported_featutes = 0;
 
 /** Accept a new connection on the replication port: push the accepted socket
  * to the spawner.
@@ -292,6 +289,49 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 	close(client_sock);
 }
 
+
+void
+replication_handshake(int fd, const char *who)
+{
+	uint32_t greeting[3] = { xlog_format, tarantool_version_id(), 0};
+	uint32_t replica_greeting[3] = { 0 };
+	sio_writen(fd, greeting, sizeof(greeting));
+	sio_readn(fd, replica_greeting, sizeof(replica_greeting));
+	if (replica_greeting[0] != greeting[0]) {
+		say_error("unsupported %s xlog format %d",
+			  who, replica_greeting[0]);
+		panic("handshake failed");
+	}
+}
+
+int
+replica_connect(const char *replication_source)
+{
+	char ip_addr[32];
+	int port;
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	int rc = sscanf(replication_source, "%31[^:]:%i",
+			ip_addr, &port);
+
+	assert(rc == 2);
+	(void)rc;
+
+	addr.sin_family = AF_INET;
+	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0)
+		panic_syserror("inet_aton: %s", ip_addr);
+
+	addr.sin_port = htons(port);
+
+	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	FDGuard guard(master);
+	sio_connect(master, &addr, sizeof(addr));
+
+	replication_handshake(master, "master");
+	guard.fd = -1;
+	return master;
+}
 
 /*--------------------------------------------------------------------------*
  * spawner process                                                          *
@@ -607,39 +647,29 @@ shutdown_handler:
 	exit(EXIT_SUCCESS);
 }
 
-static size_t
-get_file_size(int file_fd)
-{
-	struct stat st;
-	if (fstat(file_fd, &st) != 0) {
-		return 0;
-	}
-	return st.st_size;
-}
-
 static void
-replication_relay_send_snapshot_by_file(int client_sock)
+replication_relay_send_snapshot(int client_sock)
 {
-	FDHolder sock_fd_holder(client_sock);
-	struct log_dir local_snap_dir;
-	memcpy(&local_snap_dir, &snap_dir, sizeof(local_snap_dir));
-	local_snap_dir.dirname = cfg.snap_dir;
-	int64_t lsn = greatest_lsn(&local_snap_dir);
-	const char* filename = format_filename(&local_snap_dir, lsn, NONE);
-	int file_fd = open(filename,
-			O_RDONLY | local_snap_dir.open_wflags, local_snap_dir.mode);
-	FDHolder file_fd_holder(file_fd);
-	if (file_fd < 0) {
-		say_error("can't find/open snapshot");
-		exit(EXIT_FAILURE);
-	}
+	FDGuard guard_replica(client_sock);
+	struct log_dir dir = snap_dir;
+	dir.dirname = cfg.snap_dir;
+	int64_t lsn = greatest_lsn(&dir);
+	const char *filename = format_filename(&dir, lsn, NONE);
+	int snapshot = open(filename, O_RDONLY);
+	if (snapshot < 0)
+		panic_syserror("can't find/open snapshot");
 
-	uint64_t file_size = get_file_size(file_fd);
-	uint64_t send_buf[2];
-	send_buf[0] = lsn;
-	send_buf[1] = file_size;
-	sio_writen_timeout(client_sock, send_buf, sizeof(send_buf), -1);
-	sio_sendfile(client_sock, file_fd, 0, file_size);
+	FDGuard guard_snapshot(snapshot);
+
+	struct stat st;
+	if (fstat(snapshot, &st) != 0)
+		panic_syserror("fstat");
+
+	uint64_t header[2];
+	header[0] = lsn;
+	header[1] = st.st_size;
+	sio_writen(client_sock, header, sizeof(header));
+	sio_sendfile(client_sock, snapshot, NULL, header[1]);
 
 	exit(EXIT_SUCCESS);
 }
@@ -691,37 +721,17 @@ replication_relay_loop(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	uint32_t master_version[3] = { default_version,
-			get_package_version_packed(), supported_featutes };
-	uint32_t replica_version[3] = { 0 };
-	ssize_t read_res = sio_readn_timeout(client_sock,
-			replica_version, sizeof(replica_version), 10);
-	if (read_res != sizeof(replica_version)) {
-		say_error("handshake failed");
-		exit(EXIT_FAILURE);
-	}
-	ssize_t write_res = sio_writen_timeout(client_sock,
-			master_version, sizeof(master_version), 10);
-	if (write_res != sizeof(master_version)) {
-		say_error("handshake failed");
-		exit(EXIT_FAILURE);
-	}
-
-	if (replica_version[0] < 12) {
-		say_error("invalid replica version! %d", replica_version[0]);
-		exit(EXIT_FAILURE);
-	}
-
+	replication_handshake(client_sock, "replica");
 	uint32_t request;
-	sio_readn_timeout(client_sock, &request, sizeof(request), -1);
+	sio_readn(client_sock, &request, sizeof(request));
 	if (request == RPL_GET_SNAPSHOT) {
-		replication_relay_send_snapshot_by_file(client_sock); /*exits*/
+		replication_relay_send_snapshot(client_sock); /* exits */
 	}
 	if (request != RPL_GET_WAL) {
 		say_error("unknown replica request:  %d", request);
 		exit(EXIT_FAILURE);
 	}
-	sio_readn_timeout(client_sock, &lsn, sizeof(lsn), -1);
+	sio_readn(client_sock, &lsn, sizeof(lsn));
 
 	/* init libev events handlers */
 	ev_default_loop(0);

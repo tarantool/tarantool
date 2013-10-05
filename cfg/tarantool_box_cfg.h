@@ -161,10 +161,11 @@ typedef struct tarantool_cfg {
 	char*	replication_source;
 
 	/*
-	 * 1.5 (Old) replication mode
-	 * If enabled, the replica will successfully connect to 1.5 master
+	 * 1.6 (default) or 1.5 (old) replication mode
+	 * If 1.5 mode is enabled, the replica will successfully
+	 * connect to 1.5 master
 	 */
-	bool replica_1_5_mode;
+	char*	replication_protocol;
 } tarantool_cfg;
 
 #ifndef CNF_FLAG_STRUCT_NEW

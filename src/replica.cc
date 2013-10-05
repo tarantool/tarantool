@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "recovery.h"
+#include "tarantool.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -37,8 +38,6 @@
 #include "pickle.h"
 #include "coio_buf.h"
 #include "recovery.h"
-
-static const uint32_t supported_featutes = 0;
 
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
@@ -76,23 +75,12 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
-	uint32_t replica_version[3] = { default_version,
-		get_package_version_packed(), supported_featutes };
-	uint32_t master_version[3] = { 0 };
-	ssize_t write_res = coio_write_timeout(coio, replica_version,
-		sizeof(replica_version), 1.);
-	if(write_res != sizeof(replica_version)) {
-		tnt_raise(IllegalParams, "handshake failed");
-	}
-	ssize_t read_res = coio_readn_ahead_timeout(coio, master_version,
-		sizeof(master_version), sizeof(master_version), 1.);
-	if(read_res != sizeof(master_version)) {
-		tnt_raise(IllegalParams, "handshake failed");
-	}
-
-	if (master_version[0] != 12) {
-		tnt_raise(IllegalParams, "invalid remote version");
-	}
+	uint32_t greeting[3] = { xlog_format, tarantool_version_id(), 0 };
+	uint32_t master_greeting[3];
+	coio_write(coio, greeting, sizeof(greeting));
+	coio_readn(coio, master_greeting, sizeof(master_greeting));
+	if (master_greeting[0] != greeting[0])
+		tnt_raise(IllegalParams, "master has unknown log format");
 
 	struct send_request {
 		uint32_t request_type;

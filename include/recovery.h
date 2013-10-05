@@ -115,7 +115,7 @@ void recovery_update_mode(struct recovery_state *r,
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();
-void recover_snap(struct recovery_state *);
+void recover_snap(struct recovery_state *, const char *replication_source);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
@@ -140,6 +140,11 @@ void recovery_stop_remote(struct recovery_state *r);
 void recovery_follow_remote_1_5(struct recovery_state *r, const char *addr);
 void recovery_stop_remote_1_5(struct recovery_state *r);
 
+/**
+ * The replication protocol is request/response. The
+ * replica saends a request, and the master responds with
+ * appropriate data.
+ */
 enum rpl_request_type {
 	RPL_GET_WAL = 0,
 	RPL_GET_SNAPSHOT
@@ -154,13 +159,7 @@ void snapshot_save(struct recovery_state *r,
 		   void (*loop) (struct log_io *, struct fio_batch *));
 
 void
-init_storage(struct log_dir *dir);
-
-/**
- * Get version (defined in PACKAGE_VERSION), packed into uint32_t
- * The highest byte or result means major version, next - minor etc.
- */
-uint32_t get_package_version_packed();
+init_storage(struct log_dir *dir, const char *replication_source);
 
 #if defined(__cplusplus)
 } /* extern "C" */

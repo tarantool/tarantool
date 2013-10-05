@@ -34,7 +34,7 @@
 #include "tarantool/util.h"
 #include "tarantool_ev.h"
 
-extern const uint32_t default_version;
+extern const uint32_t xlog_format;
 
 enum log_format { WAL = 65534 };
 
