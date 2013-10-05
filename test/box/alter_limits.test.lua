@@ -191,68 +191,241 @@ s.index[0]:drop()
 -- cleanup
 s:drop()
 -- index name, name manipulation
-
--- box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
--- s.name
--- s:drop()
--- s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+-- space cache is updated correctly
+s.index[0].name
+s.index[0].id
+s.index[0].type
+s.index['primary'].name
+s.index['primary'].id
+s.index['primary'].type
+s.index.primary.name
+s.index.primary.id
+-- other properties are preserved
+s.index.primary.type
+s.index.primary.unique
+s.index.primary:rename('new')
+s.index[0].name
+s.index.primary
+s.index.new.name
+-- too long name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 1)..'_')
+s.index[0].name
+s.index[0]:rename(string.rep('t', box.schema.NAME_MAX - 2)..'_')
+s.index[0].name
+s.index[0]:rename('primary')
+s.index.primary.name
+-- cleanup
+s:drop()
 -- modify index
--- ------------
---     - alter unique -> non unique
---     - alter index type
---     - add identical index - verify there is no rebuild
---     - index access by name
---     - alter add key part
---     - rename index 
+s = box.schema.create_space('test')
+s:create_index('primary', 'hash')
+s.index.primary:alter({unique=false})
+-- unique -> non-unique, index type
+s.index.primary:alter({type='tree', unique=false, name='pk'})
+s.index.primary
+s.index.pk.type
+s.index.pk.unique
+s.index.pk:rename('primary')
+s:create_index('second', 'tree', { parts = {  1, 'str' } })
+s.index.second.id
+s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+s.index.third:rename('second')
+s.index.third.id
+s.index.second:drop()
+s.index.third:alter({id = 1, name = 'second'})
+s.index.third
+s.index.second.name
+s.index.second.id
+s:drop()
+-- ----------------------------------------------------------------
+-- BUILD INDEX: changes of a non-empty index
+-- ----------------------------------------------------------------
+s = box.schema.create_space('full')
+s:create_index('primary', 'tree', {parts =  { 0, 'str' }})
+s:insert('No such movie', 999)
+s:insert('Barbara', 2012)
+s:insert('Cloud Atlas', 2012)
+s:insert('Almanya - Willkommen in Deutschland', 2011)
+s:insert('Halt auf freier Strecke', 2011)
+s:insert('Homevideo', 2011)
+s:insert('Die Fremde', 2010)
+-- create index with data
+s:create_index('year', 'tree', { unique=false, parts = { 1, 'num'} })
+s.index.primary:select()
+-- a duplicate in the created index
+s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
+-- change of non-unique index to unique: same effect
+s.index.year:alter({unique=true})
+-- num -> str -> num transition
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
+s.index.primary:select()
+box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+-- ambiguous field type
+s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
+-- create index on a non-existing field
+s:create_index('nosuchfield', 'tree', {unique = true, parts = { 2, 'str'}})
+s.index.year:drop()
+s:insert('Der Baader Meinhof Komplex', '2009 ')
+-- create an index on a field with a wrong type
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+-- a field is missing
+s:replace('Der Baader Meinhof Komplex')
+s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+s:drop()
+-- unique -> non-unique transition
+s = box.schema.create_space('test')
+-- primary key must be unique
+s:create_index('primary', 'tree', { unique = false, parts = {0, 'num'}})
+-- create primary key
+s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+s:insert(1, 1)
+s:create_index('secondary', 'tree', { unique = false, parts = {1, 'num'}})
+s:insert(2, 1)
+s.index.secondary:alter({ unique = true })
+s:delete(2)
+s.index.secondary:alter({ unique = true })
+s:insert(2, 1)
+s:insert(2, 2)
+s.index.secondary:alter({ unique = false})
+s:insert(3, 2)
+s:drop()
+-- ----------------------------------------------------------------
+-- SPACE CACHE: what happens to a space cache when an object is gone
+-- ----------------------------------------------------------------
+s = box.schema.create_space('test')
+s1 = s
+s:create_index('primary', 'tree')
+s1.index.primary.id
+primary = s1.index.primary
+s.index.primary:drop()
+primary.id
+primary:select()
+s:drop()
+-- @todo: add a test case for dangling iterator (currently no checks
+-- for a dangling iterator in the code
+-- ----------------------------------------------------------------
+-- ----------------------------------------------------------------
+-- RECOVERY: check that all indexes are correctly built
+-- during recovery regardless of when they are created
+-- ----------------------------------------------------------------
+-- primary, secondary keys in a snapshot
+s_empty = box.schema.create_space('s_empty')
+s_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+s_full = box.schema.create_space('s_full')
+s_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+s_full:insert(1, 1, 'a')
+s_full:insert(2, 2, 'b')
+s_full:insert(3, 3, 'c')
+s_full:insert(4, 4, 'd')
+s_full:insert(5, 5, 'e')
+
+s_nil = box.schema.create_space('s_nil')
+
+s_drop = box.schema.create_space('s_drop')
+
+box.snapshot()
+
+s_drop:drop()
+
+s_nil:create_index('primary', 'hash', {unique=true, parts = {0, 'num'}})
+s_nil:insert(1,2,3,4,5,6);
+s_nil:insert(7, 8, 9, 10, 11,12)
+s_nil:create_index('secondary', 'tree', {unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
+s_nil:insert(13, 14, 15, 16, 17)
+
+r_empty = box.schema.create_space('r_empty')
+r_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+r_full = box.schema.create_space('r_full')
+r_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+
+r_full:insert(1, 1, 'a')
+r_full:insert(2, 2, 'b')
+r_full:insert(3, 3, 'c')
+r_full:insert(4, 4, 'd')
+r_full:insert(5, 5, 'e')
+
+s_full:create_index('multikey', 'tree', {unique = true, parts = { 1, 'num', 2, 'str'}})
+s_full:insert(6, 6, 'f')
+s_full:insert(7, 7, 'g')
+s_full:insert(8, 8, 'h')
+
+r_disabled = box.schema.create_space('r_disabled')
+
+--# stop server default
+--# start server default
+
+s_empty = box.space['s_empty']
+s_full = box.space['s_full']
+s_nil = box.space['s_nil']
+s_drop = box.space['s_drop']
+r_empty = box.space['r_empty']
+r_full = box.space['r_full']
+r_disabled = box.space['r_disabled']
+
+s_drop
+
+s_empty.index.primary.type
+s_full.index.primary.type
+r_empty.index.primary.type
+r_full.index.primary.type
+s_nil.index.primary.type
+
+s_empty.index.primary.name
+s_full.index.primary.name
+r_empty.index.primary.name
+r_full.index.primary.name
+s_nil.index.primary.name
+
+s_empty.enabled
+s_full.enabled
+r_empty.enabled
+r_full.enabled
+s_nil.enabled
+r_disabled.enabled
+
+s_empty.index.secondary.name
+s_full.index.secondary.name
+r_empty.index.secondary.name
+r_full.index.secondary.name
+s_nil.index.secondary.name
+
+s_empty.index.primary:count(1)
+s_full.index.primary:count(1)
+r_empty.index.primary:count(1)
+r_full.index.primary:count(1)
+s_nil.index.primary:count(1)
+
+s_empty.index.secondary:count(1)
+s_full.index.secondary:count(1)
+r_empty.index.secondary:count(1)
+r_full.index.secondary:count(1)
+s_nil.index.secondary:count(1)
+
+-- cleanup
+s_empty:drop()
+s_full:drop()
+r_empty:drop()
+r_full:drop()
+s_nil:drop()
+r_disabled:drop()
+
 --
--- build index
--- -----------
---     - index rebuild:
---        - a duplicate in the new index
---        - no field for the new index
---        - wrong field type in the new index
---
--- space cache
--- -----------
--- - all the various kinds of reference to a dropped space
---   - iterator to index
---   index to space
---   space to index
---   variable
---   key def
---   all userdata given away to lua - think how
---
---
--- -- inject error at various stages of commit and see that
--- the alter has no effects
---     - test that during commit phase
---       -> inject error at commit, inject error at rollback
---
--- usability
+-- @todo usability
 -- ---------
 -- - space name in all error messages!
 --         error: Duplicate key exists in unique index 1 (ugly)
 --
--- triggers
--- --------
--- - test that after disabling triggers we can
---   create an empty snapshot
--- - test for run_triggers on/off
---
--- recovery
--- --------
---  - add primary key in snapshot
---  - add secondary key in snapshot
---  - add primary key in xlog
---  - add secondary key in xlog
---  - the same for an empty space and a space with data
---  - test start from a space entry added in xlog
---  - test start from a space entry dropped in xlog
---  - test enabled/disabled property for these
---  spaces and space from a snapshot
---
---
--- features
+-- @todo features
 --------
 -- - ffi function to enable/disable space

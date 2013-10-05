@@ -71,6 +71,7 @@ static RLIST_HEAD(loaded_plugins);
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>
+#include <cfg/warning.h>
 } /* extern "C" */
 
 /**
@@ -708,9 +709,8 @@ is_string(const char *str)
 static int
 lbox_cfg_reload(struct lua_State *L)
 {
-	struct tbuf *err = tbuf_new(fiber->gc_pool);
-	if (reload_cfg(err))
-		luaL_error(L, err->data);
+	if (reload_cfg())
+		luaL_error(L, cfg_log);
 	lua_pushstring(L, "ok");
 	return 1;
 }

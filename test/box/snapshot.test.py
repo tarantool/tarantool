@@ -13,7 +13,7 @@ print """#
 # error that happens when saving snapshot is propagated
 # to the caller.
 """
-sql("insert into t0 values (1, 'first tuple')")
+admin("box.insert(0, 1, 'first tuple')")
 admin("box.snapshot()")
 
 # In absence of data modifications, two consecutive
@@ -24,7 +24,7 @@ admin("box.snapshot()")
 admin("box.snapshot()")
 #
 # Increment LSN
-sql("insert into t0 values (2, 'second tuple')")
+admin("box.insert(0, 2, 'second tuple')")
 #
 # Check for other errors, e.g. "Permission denied".
 print "# Make 'var' directory read-only."
@@ -33,8 +33,9 @@ admin("box.snapshot()")
 
 # cleanup
 os.chmod(vardir, 0755)
-sql("delete from t0 where k0 = 1")
-sql("delete from t0 where k0 = 2")
+
+admin("box.delete(0, 1)")
+admin("box.delete(0, 2)")
 
 print """#
 # A test case for http://bugs.launchpad.net/bugs/727174
@@ -45,7 +46,7 @@ print """
 # Increment the lsn number, to make sure there is no such snapshot yet
 #"""
 
-sql("insert into t0 values (1, 'Test tuple')")
+admin("box.insert(0, 1, 'Test tuple')")
 
 pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
 lsn = yaml.load(admin("box.info.lsn", silent=True))[0]
@@ -69,5 +70,3 @@ else:
   print "Snapshot exists."
 
 admin("box.space[0]:drop()")
-
-# vim: syntax=python spell

@@ -133,6 +133,8 @@ tuple_format_ref(struct tuple_format *format, int count)
  */
 struct tuple
 {
+	/** snapshot generation version */
+	uint32_t version;
 	/** reference counter */
 	uint16_t refs;
 	/** format identifier */
@@ -353,6 +355,10 @@ tuple_next_cstr(struct tuple_iterator *it);
 void
 tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
+void
+tuple_init_field_map(struct tuple_format *format,
+		     struct tuple *tuple, uint32_t *field_map);
+
 struct tuple *
 tuple_update(struct tuple_format *new_format,
 	     void *(*region_alloc)(void *, size_t), void *alloc_ctx,
@@ -431,10 +437,10 @@ tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
 
 /** Initialize tuple library */
 void
-tuple_init();
+tuple_format_init();
 
 /** Cleanup tuple library */
 void
-tuple_free();
+tuple_format_free();
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

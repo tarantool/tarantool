@@ -35,16 +35,18 @@
 #include "scoped_guard.h"
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
+#include <ctype.h>
 
 /** _space columns */
-#define ID 0
-#define ARITY 1
-#define NAME 2
+#define ID			0
+#define ARITY			1
+#define NAME			2
+#define FLAGS			3
 /** _index columns */
-#define INDEX_ID 1
-#define INDEX_TYPE 3
-#define INDEX_IS_UNIQUE 4
-#define INDEX_PART_COUNT 5
+#define INDEX_ID		1
+#define INDEX_TYPE		3
+#define INDEX_IS_UNIQUE		4
+#define INDEX_PART_COUNT	5
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -94,6 +96,28 @@ key_def_new_from_tuple(struct tuple *tuple)
 	return key_def;
 }
 
+static void
+space_def_init_flags(struct space_def *def, struct tuple *tuple)
+{
+	/* default values of flags */
+	def->temporary = false;
+
+	/* there is no property in the space */
+	if (tuple->field_count <= FLAGS)
+		return;
+
+	const char *flags = tuple_field_cstr(tuple, FLAGS);
+	while (flags && *flags) {
+		while (isspace(*flags)) /* skip space */
+			flags++;
+		if (strncmp(flags, "temporary", strlen("temporary")) == 0)
+			def->temporary = true;
+		flags = strchr(flags, ',');
+		if (flags)
+			flags++;
+	}
+}
+
 /**
  * Fill space_def structure from struct tuple.
  */
@@ -105,6 +129,8 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	def->arity = tuple_field_u32(tuple, ARITY);
 	int n = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
+
+	space_def_init_flags(def, tuple);
 	space_def_check(def, n, errcode);
 	if (errcode != ER_ALTER_SPACE &&
 	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
@@ -260,14 +286,15 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 			space_swap_index(alter->old_space,
 					 alter->new_space,
 					 index_id(old_index),
-					 index_id(new_index));
+					 index_id(new_index),
+					 false);
 		}
 	}
 	/*
 	 * Commit alter ops, this will move the changed
 	 * indexes into their new places.
 	 */
-	struct AlterSpaceOp *op;
+	class AlterSpaceOp *op;
 	rlist_foreach_entry(op, &alter->ops, link) {
 		op->commit(alter);
 	}
@@ -307,7 +334,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 		op->rollback(alter);
 	space_remove_trigger(alter);
 #endif
-	struct AlterSpaceOp *op;
+	class AlterSpaceOp *op;
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->rollback(alter);
 	alter_space_delete(alter);
@@ -375,7 +402,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * Allow for a separate prepare step so that some ops
 	 * can be optimized.
 	 */
-	struct AlterSpaceOp *op, *tmp;
+	class AlterSpaceOp *op, *tmp;
 	rlist_foreach_entry_safe(op, &alter->ops, link, tmp)
 		op->prepare(alter);
 	/*
@@ -447,6 +474,13 @@ ModifySpace::prepare(struct alter_space *alter)
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
 			  "can not change arity on a non-empty space");
+	}
+	if (def.temporary != alter->old_space->def.temporary &&
+	    alter->old_space->engine.state != READY_NO_KEYS &&
+	    space_size(alter->old_space) > 0) {
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  (unsigned) space_id(alter->old_space),
+			  "can not switch temporary flag on a non-empty space");
 	}
 }
 
@@ -563,7 +597,7 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space,
-			 old_key_def->iid, new_key_def->iid);
+			 old_key_def->iid, new_key_def->iid, true);
 }
 
 ModifyIndex::~ModifyIndex()
@@ -781,11 +815,17 @@ AddIndex::alter(struct alter_space *alter)
 	new_index->endBuild();
 	/* Build the new index. */
 	struct tuple *tuple;
+	struct tuple_format *format = alter->new_space->format;
+	char *field_map = ((char *) palloc(fiber->gc_pool,
+					   format->field_map_size) +
+			   format->field_map_size);
 	while ((tuple = it->next(it))) {
 		/*
-		 * @todo:
-		 * tuple_format_validate(alter->new_space->format,
-		 * tuple)
+		 * Check that the tuple is OK according to the
+		 * new format.
+		 */
+		tuple_init_field_map(format, tuple, (uint32_t *) field_map);
+		/*
 		 * @todo: better message if there is a duplicate.
 		 */
 		struct tuple *old_tuple =

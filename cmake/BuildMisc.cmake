@@ -21,6 +21,11 @@ macro(libmisc_build)
         )
     endif()
 
+    if (NOT HAVE_OPEN_MEMSTREAM)
+        list(APPEND misc_src
+            ${PROJECT_SOURCE_DIR}/third_party/open_memstream.c
+        )
+    endif()
     if (NOT TARGET_OS_DEBIAN_FREEBSD)
         if (TARGET_OS_FREEBSD)
             set_source_files_properties(

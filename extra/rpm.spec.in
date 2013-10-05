@@ -9,6 +9,7 @@ Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 License: BSD
+Requires: libgcc >= 4.1.2-50
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -60,10 +61,10 @@ make %{?_smp_mflags}
 make DESTDIR=%{buildroot} install
 
 %post
-groupadd tarantool
-useradd -r -g tarantool tarantool
+groupadd tarantool > /dev/null 2>&1
+useradd -r -g tarantool tarantool > /dev/null 2>&1
 # Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes 1.1
+/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
 
 %preun
 

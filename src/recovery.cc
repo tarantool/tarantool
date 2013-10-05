@@ -253,6 +253,8 @@ void
 recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 {
 	r->snap_io_rate_limit = new_limit * 1024 * 1024;
+	if (r->snap_io_rate_limit == 0)
+		r->snap_io_rate_limit = UINT64_MAX;
 }
 
 void
@@ -526,7 +528,9 @@ recover_remaining_wals(struct recovery_state *r)
 		}
 
 		/* TODO: find a better way of finding the next xlog */
-		current_lsn = r->confirmed_lsn + 1;
+		current_lsn = r->confirmed_lsn;
+find_next_wal:
+		current_lsn++;
 		/*
 		 * For the last WAL, first try to open .inprogress
 		 * file: if it doesn't exist, we can safely try an
@@ -546,6 +550,13 @@ recover_remaining_wals(struct recovery_state *r)
 			filename = format_filename(r->wal_dir,
 						   current_lsn, suffix);
 			f = fopen(filename, "r");
+			/*
+			 * Try finding wal for the next lsn if there is a
+			 * gap in LSNs.
+			 */
+			if (f == NULL && errno == ENOENT &&
+			    current_lsn < wal_greatest_lsn)
+				goto find_next_wal;
 		}
 		next_wal = log_io_open(r->wal_dir, LOG_READ, filename, suffix, f);
 		/*
@@ -1212,7 +1223,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn,
+wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	  uint16_t op, const char *row, uint32_t row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
@@ -1229,7 +1240,7 @@ wal_write(struct recovery_state *r, int64_t lsn,
 
 	req->fiber = fiber;
 	req->res = -1;
-	wal_row_fill(&req->row, lsn, (const char *) &op,
+	wal_row_fill(&req->row, lsn, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
@@ -1268,7 +1279,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 		   const char *data, size_t data_len)
 {
 	static int rows;
-	static int bytes;
+	static uint64_t bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
@@ -1276,30 +1287,50 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 				     sizeof(struct wal_row) +
 				     data_len + metadata_len);
 
-	wal_row_fill(row, ++rows, metadata, metadata_len, data, data_len);
+	wal_row_fill(row, ++rows, snapshot_cookie, metadata,
+		     metadata_len, data, data_len);
 	row_header_sign(&row->header);
 
 	fio_batch_add(batch, row, wal_row_size(row));
+	bytes += wal_row_size(row);
 
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
-	if (fio_batch_is_full(batch)) {
+	if (fio_batch_is_full(batch) ||
+	    bytes > recovery_state->snap_io_rate_limit) {
+
 		snap_write_batch(batch, fileno(l->f));
 		fio_batch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
-	}
-
-	if (recovery_state->snap_io_rate_limit > 0) {
-		if (last == 0) {
-			ev_now_update();
-			last = ev_now();
+		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
+			if (last == 0) {
+				/*
+				 * Remember the time of first
+				 * write to disk.
+				 */
+				ev_now_update();
+				last = ev_now();
+			}
+			/**
+			 * If io rate limit is set, flush the
+			 * filesystem cache, otherwise the limit is
+			 * not really enforced.
+			 */
+			fdatasync(fileno(l->f));
 		}
-		bytes += wal_row_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
-
 			ev_now_update();
+			/*
+			 * How much time have passed since
+			 * last write?
+			 */
 			elapsed = ev_now() - last;
+			/*
+			 * If last write was in less than
+			 * a second, sleep until the
+			 * second is reached.
+			 */
 			if (elapsed < 1)
 				usleep(((1 - elapsed) * 1000000));
 

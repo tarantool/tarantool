@@ -216,19 +216,19 @@ tuple_format_new(struct rlist *key_list)
  * Validate a new tuple format and initialize tuple-local
  * format data.
  */
-static inline void
-tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
+void
+tuple_init_field_map(struct tuple_format *format, struct tuple *tuple, uint32_t *field_map)
 {
 	/* Check to see if the tuple has a sufficient number of fields. */
 	if (tuple->field_count < format->field_count)
-		tnt_raise(IllegalParams,
-			  "tuple must have all indexed fields");
+		tnt_raise(ClientError, ER_INDEX_ARITY,
+			  (unsigned) tuple->field_count,
+			  (unsigned) format->field_count);
 
 	int32_t *offset = format->offset;
 	enum field_type *type = format->types;
 	enum field_type *end = format->types + format->field_count;
 	const char *pos = tuple->data;
-	uint32_t *field_map = (uint32_t *) tuple;
 	uint32_t i = 0;
 
 	for (; type < end; offset++, type++, i++) {
@@ -251,6 +251,16 @@ tuple_init_field_map(struct tuple *tuple, struct tuple_format *format)
 	}
 }
 
+/**
+ * Incremented on every snapshot and is used to distinguish tuples
+ * which were created after start of a snapshot (these tuples can
+ * be freed right away, since they are not used for snapshot) or
+ * before start of a snapshot (these tuples can be freed only
+ * after the snapshot has finished, otherwise it'll write bad data
+ * to the snapshot file).
+ */
+extern uint32_t snapshot_version;
+
 /** Allocate a tuple */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
@@ -260,6 +270,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
+	tuple->version = snapshot_version;
 	tuple->bsize = size;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format, 1);
@@ -280,7 +291,10 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	sfree(ptr);
+	if (tuple->version == snapshot_version)
+		sfree(ptr);
+	else
+		sfree_delayed(ptr);
 }
 
 /**
@@ -457,7 +471,7 @@ tuple_update(struct tuple_format *format,
 
 	try {
 		tuple_update_execute(update, new_tuple->data);
-		tuple_init_field_map(new_tuple, format);
+		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (const Exception&) {
 		tuple_delete(new_tuple);
 		throw;
@@ -494,7 +508,7 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 	new_tuple->field_count = field_count;
 	memcpy(new_tuple->data, end - tuple_len, tuple_len);
 	try {
-		tuple_init_field_map(new_tuple, format);
+		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (...) {
 		tuple_delete(new_tuple);
 		throw;
@@ -632,7 +646,7 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_init()
+tuple_format_init()
 {
 	tuple_format_ber = tuple_format_new(&rlist_nil);
 	/* Make sure this one stays around. */
@@ -640,7 +654,7 @@ tuple_init()
 }
 
 void
-tuple_free()
+tuple_format_free()
 {
 	/* Clear recycled ids. */
 	while (recycled_format_ids != FORMAT_ID_NIL) {

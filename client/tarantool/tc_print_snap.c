@@ -34,9 +34,7 @@ static void
 tc_printer_snap_tarantool( struct tnt_log_row_snap_v11 *row,
 			   struct tnt_tuple *tu)
 {
-	tc_printf("tag: %"PRIu16", cookie: %"PRIu64", space: %"PRIu32"\n",
-		row->tag,
-		row->cookie,
+	tc_printf("space: %"PRIu32" ",
 		row->space);
 	tc_print_tuple(tu);
 

@@ -311,6 +311,7 @@ lbox_fiber_gc(struct lua_State *L)
 	return 0;
 }
 
+#ifdef ENABLE_BACKTRACE
 static int
 fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
 {
@@ -326,6 +327,7 @@ fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset,
 	lua_settable(L, -3);
 	return 0;
 }
+#endif
 
 static int
 lbox_fiber_statof(struct fiber *f, void *cb_ctx)
@@ -380,7 +382,7 @@ lbox_fiber_detach(struct lua_State *L)
 	/* Request a detach. */
 	lua_pushinteger(L, DETACH);
 	/* A detached fiber has no associated session. */
-	fiber_set_sid(fiber, 0);
+	fiber_set_sid(fiber, 0, 0);
 	fiber_yield_to(caller);
 	return 0;
 }
@@ -501,7 +503,7 @@ lbox_fiber_create(struct lua_State *L)
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Preserve the session in a child fiber. */
-	fiber_set_sid(f, fiber->sid);
+	fiber_set_sid(f, fiber->sid, fiber->cookie);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -762,6 +764,8 @@ lbox_fiber_self(struct lua_State *L)
 static int
 lbox_fiber_find(struct lua_State *L)
 {
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.find(id): bad arguments");
 	int fid = lua_tointeger(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)

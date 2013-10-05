@@ -137,9 +137,10 @@ t;
   - 'box.error.ER_FIELD_TYPE : 10242'
   - 'box.error.ER_OK : 0'
   - 'box.error.ER_TUPLE_NOT_FOUND : 12546'
+  - 'box.error.ER_INDEX_ARITY : 8194'
   - 'box.error.ER_WAL_IO : 9986'
   - 'box.error.ER_INJECTION : 2306'
-  - 'box.error.ER_DROP_PRIMARY_KEY : 7682'
+  - 'box.error.ER_LAST_DROP : 7426'
   - 'box.error.ER_INDEX_TYPE : 1282'
   - 'box.error.ER_ARG_TYPE : 10498'
   - 'box.error.ER_KEY_PART_COUNT : 12034'
@@ -153,7 +154,7 @@ t;
   - 'box.error.ER_SECONDARY : 770'
   - 'box.error.ER_UPDATE_FIELD : 14338'
   - 'box.error.ER_DROP_SPACE : 6146'
-  - 'box.error.ER_UNKNOWN_UPDATE_OP : 11266'
+  - 'box.error.ER_SPLICE : 10754'
   - 'box.error.ER_NO_SUCH_SPACE : 14594'
   - 'box.error.ER_UNSUPPORTED : 2562'
   - 'box.error.ER_TUPLE_FOUND : 14082'
@@ -161,15 +162,27 @@ t;
   - 'box.error.ER_SPACE_DISABLED : 13314'
   - 'box.error.ER_PROC_LUA : 13058'
   - 'box.error.ER_ALTER_SPACE : 6402'
-  - 'box.error.ER_TUPLE_IS_RO : 1025'
   - 'box.error.ER_FIBER_STACK : 6658'
+  - 'box.error.ER_TUPLE_IS_RO : 1025'
   - 'box.error.ER_NO_SUCH_PROC : 12802'
-  - 'box.error.ER_LAST_DROP : 7426'
-  - 'box.error.ER_SPLICE : 10754'
+  - 'box.error.ER_DROP_PRIMARY_KEY : 7682'
   - 'box.error.ER_SPACE_ARITY : 7938'
+  - 'box.error.ER_UNKNOWN_UPDATE_OP : 11266'
   - 'box.error.ER_FIELD_TYPE_MISMATCH : 11778'
   - 'box.error.ER_SPACE_EXISTS : 1538'
 ...
 space:drop();
 ---
+...
+--# setopt delimiter ''
+-- A test case for gh-37: print of 64-bit number
+1, 1
+---
+- 1
+- 1
+...
+tonumber64(1), 1
+---
+- 1
+- 1
 ...

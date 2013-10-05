@@ -45,7 +45,7 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  sz, "struct key_def", "malloc");
 	}
-	int n = snprintf(def->name, sizeof(def->name) - 1, "%s", name);
+	int n = snprintf(def->name, sizeof(def->name), "%s", name);
 	if (n >= sizeof(def->name)) {
 		free(def);
 		tnt_raise(LoggedError, ER_MODIFY_INDEX,
@@ -123,6 +123,12 @@ key_def_check(struct key_def *key_def)
 			  (unsigned) key_def->iid,
 			  (unsigned) key_def->space_id,
 			  "index id too big");
+	}
+	if (key_def->iid == 0 && key_def->is_unique == false) {
+		tnt_raise(ClientError, ER_MODIFY_INDEX,
+			  (unsigned) key_def->iid,
+			  (unsigned) key_def->space_id,
+			  "primary key must be unique");
 	}
 	if (key_def->part_count == 0) {
 		tnt_raise(ClientError, ER_MODIFY_INDEX,

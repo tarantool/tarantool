@@ -32,8 +32,30 @@ then
         exit
 fi
 
+checkactive() {
+        if [ -f ${WRAP_PIDFILE} ]
+        then
+                ps -p $(cat ${WRAP_PIDFILE}) >/dev/null 2>&1
+                if [ $? -eq 0 ]; then
+                        echo -n "(instance is active)"
+                        echo_failure
+                        exit 1
+                fi
+        fi
+        if [ -f ${PIDFILE} ]
+        then
+                ps -p $(cat ${PIDFILE}) >/dev/null 2>&1
+                if [ $? -eq 0 ]; then
+                        echo -n "(instance is active)"
+                        echo_failure
+                        exit 1
+                fi
+        fi
+}
+
 start() {
         echo -n $"Starting ${INST}: "
+        checkactive
         /usr/bin/${INST}.sh ${OPTIONS} >> /var/${INST}/logs/init.log 2>&1
         RETVAL=${?}
         if [ ${RETVAL} -eq 0 ]

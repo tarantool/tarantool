@@ -280,3 +280,11 @@ box.fiber.find(920)
 space:drop()
 ---
 ...
+box.fiber.find()
+---
+- error: 'fiber.find(id): bad arguments'
+...
+box.fiber.find('test')
+---
+- null
+...

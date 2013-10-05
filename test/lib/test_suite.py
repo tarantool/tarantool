@@ -15,6 +15,17 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+def check_tarantool_import():
+    try:
+        tnt_py = os.path.dirname(os.path.abspath(__file__))
+        tnt_py = os.path.join(tnt_py, 'tarantool-python/src')
+        if tnt_py not in sys.path:
+            sys.path = [tnt_py] + sys.path
+        import tarantool
+    except ImportError:
+        sys.stderr.write("\n\nNo tarantool-python library found\n")
+        sys.exit(1)
+
 class FilteredStream:
     """Helper class to filter .result file output"""
     def __init__(self, filename):

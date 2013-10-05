@@ -84,7 +84,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 29 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
 	/* 30 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
 	/* 31 */_(ER_SPACE_ARITY,		2, "Tuple field count %u does not match space %u arity %u") \
-	/* 32 */_(ER_UNUSED32,			2, "Unused32") \
+	/* 32 */_(ER_INDEX_ARITY,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 33 */_(ER_UNUSED33,			2, "Unused33") \
 	/* 34 */_(ER_UNUSED34,			2, "Unused34") \
 	/* 35 */_(ER_UNUSED35,			2, "Unused35") \
@@ -125,14 +125,22 @@ extern struct errcode_record tnt_error_codes[];
 
 static inline const char *tnt_errcode_str(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX) {
+		/* Unknown error code - can be triggered using box.raise() */
+		return "ER_UNKNOWN";
+	}
 	return tnt_error_codes[errcode].errstr;
 }
 
 
 /** Return a 4-byte numeric error code, with status flags. */
 
+
 static inline uint32_t tnt_errcode_val(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX)
+		return (errcode << 8) | 2; /* non-recoverable */
+
 	return (errcode << 8) | tnt_error_codes[errcode].errflags;
 }
 
@@ -141,6 +149,9 @@ static inline uint32_t tnt_errcode_val(uint32_t errcode)
 
 static inline const char *tnt_errcode_desc(uint32_t errcode)
 {
+	if (errcode >= tnt_error_codes_enum_MAX)
+		return "";
+
 	return tnt_error_codes[errcode].errdesc;
 }
 

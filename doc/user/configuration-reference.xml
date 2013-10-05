@@ -102,7 +102,7 @@ Tarantool 1.4.0-69-g45551dd
       <para><option>--check-config</option></para>
       <para>Check the configuration file for errors. This option is
         normally used on the command line
-        before <quote>reload configuration</quote>
+        before <quote>box.cfg.reload()</quote>
         is issued on the administrative port, to ensure that the new
         configuration is valid. When configuration is
         indeed correct, the program produces no output and returns <literal>0</literal>.
@@ -130,16 +130,11 @@ Tarantool 1.4.0-69-g45551dd
       </option></para>
       <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
       configuration option by creating an empty snapshot file in
-      it. If <filename>vardir</filename> doesn't contain at
-      least one snapshot, the server does not start. There is no
-      <quote>magic</quote> with automatic initialization of
-      <filename>vardir</filename> on boot to make
-      potential system errors more noticeable. For example, if the
-      operating system reboots and fails to mount the partition on
-      which <filename>vardir</filename> is expected to reside, the
-      <filename>rc.d</filename> or <command>service</command> script
-      responsible for server restart will also fail, thanks to this
-      option.
+      it. Prior to Tarantool 1.6, if <filename>vardir</filename>
+      didn't contain at least one snapshot, the server did not
+      start. Starting from 1.6, the initial storage file is
+      created automatically when starting in a clean data
+      directory.
       </para>
     </listitem>
   </itemizedlist>
@@ -185,7 +180,7 @@ Tarantool 1.4.0-69-g45551dd
   <para>
     To facilitate centralized and automated configuration
     management, runtime configuration modifications are supported
-    solely through <olink targetptr="reload-configuration"/>
+    solely through <olink targetptr="box.cfg.reload"/>
     administrative statement. Thus, the
     procedure to change Tarantool configuration at runtime is to
     edit the configuration file.  This ensures that, should the
@@ -197,7 +192,7 @@ Tarantool 1.4.0-69-g45551dd
     such settings will be highlighted in this reference.
     If the same setting is given more than once, the latest occurrence
     takes effect.
-    You can always invoke <olink targetptr="show-configuration"/>
+    You can always invoke <olink targetptr="box.cfg.show"/>
     from the administrative console to show the current
     configuration.
   </para>
@@ -532,7 +527,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>no</entry>
           <entry>yes</entry>
           <entry>Reduce the throttling effect of <olink
-          targetptr="save-snapshot"/> on the INSERT/UPDATE/DELETE
+          targetptr="box.snapshot"/> on the INSERT/UPDATE/DELETE
           performance by setting a limit on
           how many megabytes per second it can write to disk.
           The same can be achieved by splitting <olink
@@ -622,7 +617,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           on <olink targetptr="primary_port"/>. This parameter is
           dynamic, that is, to enter master mode, simply set the
           value to an empty string and issue <olink
-          targetptr="reload-configuration"/>.</entry>
+          targetptr="box.cfg.reload"/>.</entry>
         </row>
 
       </tbody>

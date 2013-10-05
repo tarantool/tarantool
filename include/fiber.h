@@ -106,6 +106,7 @@ struct fiber {
 	va_list f_data;
 	uint32_t flags;
 	struct fiber *waiter;
+	uint64_t cookie;
 };
 
 extern __thread struct fiber *fiber;
@@ -161,16 +162,16 @@ void fiber_testcancel(void);
 bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
-void fiber_info(struct tbuf *out);
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 /**
- * Attach this fiber to a session identified by sid.
+ * Attach this fiber to a session identified by sid and to a cookie.
  */
 static inline void
-fiber_set_sid(struct fiber *f, uint32_t sid)
+fiber_set_sid(struct fiber *f, uint32_t sid, uint64_t cookie)
 {
 	f->sid = sid;
+	f->cookie = cookie;
 }
 
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);

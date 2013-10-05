@@ -568,7 +568,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.
 	 */
-	fiber_call(f, coio, iobuf, service->handler_param);
+	fiber_call(f, coio, addr, iobuf, service->handler_param);
 }
 
 void

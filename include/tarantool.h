@@ -45,7 +45,7 @@ extern char *cfg_filename_fullpath;
 extern bool booting;
 extern char *binary_filename;
 extern char *custom_proc_title;
-int reload_cfg(struct tbuf *out);
+int reload_cfg();
 void show_cfg(struct tbuf *out);
 int snapshot(void);
 const char *tarantool_version(void);

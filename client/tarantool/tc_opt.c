@@ -37,7 +37,6 @@
 
 
 #define TC_DEFAULT_HOST "localhost"
-#define TC_DEFAULT_PORT 33013
 #define TC_DEFAULT_PORT_ADMIN 33015
 
 /* supported cli options */
@@ -116,7 +115,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 
 	/* server port */
 	const char *arg = NULL;
-	opt->port = TC_DEFAULT_PORT;
+	opt->port = 0;
 	if (gopt_arg(tc_options, 'p', &arg))
 		opt->port = atoi(arg);
 

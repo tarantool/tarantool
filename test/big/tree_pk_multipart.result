@@ -439,11 +439,11 @@ space = box.space[0]
 ...
 space:insert(1, 1)
 ---
-- error: Illegal parameters, tuple must have all indexed fields
+- error: Tuple field count 2 is less than required by a defined index (expected 3)
 ...
 space:replace_if_exists(1, 1)
 ---
-- error: Illegal parameters, tuple must have all indexed fields
+- error: Tuple field count 2 is less than required by a defined index (expected 3)
 ...
 space:drop()
 ---

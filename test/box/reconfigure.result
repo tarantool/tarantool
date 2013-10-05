@@ -50,6 +50,18 @@ box.cfg.too_long_threshold
 ---
 - 2
 ...
+box.cfg.snap_io_rate_limit
+---
+- 10
+...
+box.cfg.reload()
+---
+- ok
+...
+box.cfg.snap_io_rate_limit
+---
+- 1
+...
 box.cfg.reload()
 ---
 - error: 'can''t open config `tarantool.cfg''.
@@ -75,8 +87,10 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
 ...
-insert into t0 values (1, 'tuple')
-Insert OK, 1 row affected
+box.insert(0, 1, 'tuple')
+---
+- [1, 'tuple']
+...
 box.snapshot()
 ---
 - ok
@@ -87,8 +101,10 @@ box.cfg.reload()
 
 '
 ...
-insert into t0 values (2, 'tuple 2')
-Insert OK, 1 row affected
+box.insert(0, 2, 'tuple2')
+---
+- [2, 'tuple2']
+...
 box.snapshot()
 ---
 - ok
@@ -97,8 +113,10 @@ box.cfg.reload()
 ---
 - ok
 ...
-insert into t0 values (3, 'tuple 3')
-Insert OK, 1 row affected
+box.insert(0, 3, 'tuple3')
+---
+- [3, 'tuple3']
+...
 box.snapshot()
 ---
 - ok

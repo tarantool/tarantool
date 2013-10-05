@@ -78,6 +78,7 @@ static void
 admin_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
+	struct sockaddr_in *addr = va_arg(ap, struct sockaddr_in *);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
@@ -95,7 +96,7 @@ admin_handler(va_list ap)
 	 * a remote client: it's used in Lua
 	 * stored procedures.
 	 */
-	session_create(coio.fd);
+	session_create(coio.fd, *(uint64_t *) addr);
 
 	for (;;) {
 		if (admin_dispatch(&coio, iobuf, L) < 0)

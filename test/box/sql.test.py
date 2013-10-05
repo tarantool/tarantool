@@ -1,4 +1,17 @@
-# encoding: utf-8
+import tarantool
+sql.set_schema({
+    0 : {
+            'default_type': tarantool.STR,
+            'fields' : {
+                0 : tarantool.NUM,
+                1 : tarantool.STR
+            },
+            'indexes': {
+                0 : [0] # HASH
+            }
+    }
+})
+
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
 sql("ping")
@@ -66,5 +79,3 @@ print """#
 # Admin console should not stall on unknown command.
 """
 admin("show status", simple=True)
-
-# vim: syntax=python

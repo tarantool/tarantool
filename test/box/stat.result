@@ -1,34 +1,17 @@
+-- clear statistics
+--# stop server default
+--# start server default
 space = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
 space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
 ...
-#
-# check stat_cleanup
-#  add several tuples
-#
-
-insert into t0 values (0, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (1, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (2, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (3, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (4, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (5, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (6, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (7, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (8, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (9, 'tuple')
-Insert OK, 1 row affected
+-- check stat_cleanup
+-- add several tuples
+for i=1,10 do box.insert(0, i, 'tuple'..tostring(i)) end;
+---
+...
 box.stat()
 ---
 - DELETE:
@@ -50,14 +33,9 @@ box.stat()
     total: 0
     rps: 0
 ...
-#
-# restart server
-#
-
-#
-# statistics must be zero
-#
-
+--# stop server default
+--# start server default
+-- statistics must be zero
 box.stat()
 ---
 - DELETE:
@@ -79,6 +57,7 @@ box.stat()
     total: 0
     rps: 0
 ...
+-- cleanup
 box.space[0]:drop()
 ---
 ...

@@ -130,6 +130,11 @@ space_id(struct space *space) { return space->def.id; }
 static inline const char *
 space_name(struct space *space) { return space->def.name; }
 
+
+/** Return true if space is temporary. */
+static inline bool
+space_is_temporary(struct space *space) { return space->def.temporary; }
+
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *
@@ -259,7 +264,7 @@ space_dump_def(const struct space *space, struct rlist *key_list);
  */
 void
 space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
-		 uint32_t rhs_id);
+		 uint32_t rhs_id, bool keep_key_def);
 
 /** Rebuild index map in a space after a series of swap index. */
 void

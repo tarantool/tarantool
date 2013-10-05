@@ -4,6 +4,7 @@ import sys
 import glob
 import time
 import yaml
+import errno
 import daemon
 import socket
 import signal
@@ -16,7 +17,7 @@ import ConfigParser
 
 from lib.server import Server
 from lib.box_connection import BoxConnection
-from lib.test_suite import FilteredStream, Test
+from lib.test_suite import FilteredStream, Test, check_tarantool_import
 from lib.admin_connection import AdminConnection
 from lib.memcached_connection import MemcachedConnection
 
@@ -24,6 +25,9 @@ try:
     import cStringIO as StringIO
 except ImportError:
     import StringIO
+
+check_tarantool_import()
+import tarantool
 
 def check_port(port):
     """Check if the port we're connecting to is available"""
@@ -505,7 +509,7 @@ class TarantoolServer(Server):
         else:
             self.process.wait()
 
-        self.wait_until_stopped()
+        self.wait_until_stopped(pid)
         # clean-up processs flags
         self.is_started = False
         self.process = None
@@ -601,17 +605,17 @@ class TarantoolServer(Server):
             except socket.error as e:
                 time.sleep(0.001)
 
-    def wait_until_stopped(self):
+    def wait_until_stopped(self, pid):
         """Wait until the server is stoped and has closed sockets"""
         while True:
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect(("localhost", self.port))
-                sock.close()
                 time.sleep(0.001)
+                os.kill(pid, 0)
                 continue
-            except socket.error as e:
-                break
+            except OSError as err:
+                if err.errno == errno.ESRCH:
+                    break
+                raise
 
     def find_tests(self, test_suite, suite_path):
         def patterned(test, patterns):

@@ -1,116 +1,22 @@
 --# stop server default
 --# start server default
+
 space = box.schema.create_space('tweedledum', { id = 0 })
----
-...
 space:create_index('primary', 'hash', { parts = { 0, 'num' }})
----
-...
+
 box.stat()
----
-- DELETE:
-    total: 0
-    rps: 0
-  SELECT:
-    total: 0
-    rps: 0
-  REPLACE:
-    total: 2
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
-  DELETE_1_3:
-    total: 0
-    rps: 0
-...
 help()
----
-- server admin commands
-- - box.snapshot()
-  - box.info()
-  - box.stat()
-  - box.slab.info()
-  - box.slab.check()
-  - box.fiber.info()
-  - box.plugin.info()
-  - box.cfg()
-  - box.cfg.reload()
-  - box.coredump()
-...
 box.cfg()
----
-- io_collect_interval: 0
-  pid_file: box.pid
-  slab_alloc_factor: 2
-  slab_alloc_minimal: 64
-  admin_port: 33015
-  logger: cat - >> tarantool.log
-  snap_io_rate_limit: 0
-  log_level: 4
-  slab_alloc_arena: 0.1
-  backlog: 1024
-  primary_port: 33013
-  logger_nonblock: true
-  secondary_port: 33014
-  snap_dir: .
-  coredump: false
-  wal_dir: .
-  readahead: 16320
-  local_hot_standby: false
-  wal_mode: fsync_delay
-  rows_per_wal: 50
-  panic_on_snap_error: true
-  panic_on_wal_error: false
-  script_dir: .
-  replication_port: 0
-  bind_ipaddr: INADDR_ANY
-  wal_fsync_delay: 0
-  too_long_threshold: 0.5
-  wal_dir_rescan_delay: 0.1
-...
 box.stat()
----
-- DELETE:
-    total: 0
-    rps: 0
-  SELECT:
-    total: 0
-    rps: 0
-  REPLACE:
-    total: 2
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
-  DELETE_1_3:
-    total: 0
-    rps: 0
-...
 box.insert(0, 1, 'tuple')
----
-- [1, 'tuple']
-...
 box.snapshot()
----
-- ok
-...
 box.delete(0, 1)
----
-- [1, 'tuple']
-...
+
 --# setopt delimiter ';'
 function check_type(arg, typeof)
     return type(arg) == typeof
 end;
----
-...
+
 function test_box_info()
     local tmp = box.info()
     local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
@@ -156,8 +62,7 @@ function test_box_info()
         return 'box.info() is ok.'
     end
 end;
----
-...
+
 function test_slab(tbl)
     local num = {'items', 'bytes_used', 'item_size', 'slabs', 'bytes_free'}
     local failed = {}
@@ -174,8 +79,7 @@ function test_slab(tbl)
         return true, {}
     end
 end;
----
-...
+
 function test_box_slab_info()
     local tmp = box.slab.info()
     local cdata = {'arena_size', 'arena_used'}
@@ -210,8 +114,7 @@ function test_box_slab_info()
         return "box.slab.info() is ok"
     end
 end;
----
-...
+
 function test_fiber(tbl)
     local num = {'fid', 'csw'}
     for k, v in ipairs(num) do
@@ -232,8 +135,7 @@ function test_fiber(tbl)
         return true, {}
     end
 end;
----
-...
+
 function test_box_fiber_info()
     local tmp = box.fiber.info()
     local failed = {}
@@ -253,20 +155,8 @@ function test_box_fiber_info()
         return "box.fiber.info() is ok"
     end
 end;
----
-...
+
 test_box_info();
----
-- box.info() is ok.
-...
 test_box_slab_info();
----
-- box.slab.info() is ok
-...
 test_box_fiber_info();
----
-- box.fiber.info() is ok
-...
 box.space[0]:drop();
----
-...

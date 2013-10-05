@@ -714,7 +714,7 @@ static int
 lbox_index_tostring(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	lua_pushfstring(L, "index %d", (int) index_id(index));
+	lua_pushfstring(L, " index %d", (int) index_id(index));
 	return 1;
 }
 
