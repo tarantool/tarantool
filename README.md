@@ -91,8 +91,7 @@ you could follow these steps:
     # Run tarantool
     tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
 
-Please report bugs at http://bugs.launchpad.net/tarantool or
-http://github.com/tarantool/tarantool/issues
+Please report bugs at http://github.com/tarantool/tarantool/issues
 We also warmly welcome your feedback in the discussion mailing
 list, tarantool@googlegroups.com.
 
