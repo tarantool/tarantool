@@ -38,3 +38,15 @@ print_config()
   too_long_threshold: 0.5
   wal_dir_rescan_delay: 0.1
 ...
+string.gmatch(package.path, '([^;]*)')()
+---
+- script_dir/?.lua
+...
+string.gmatch(package.cpath, '([^;]*)')()
+---
+- script_dir/?.so
+...
+mod.test(10, 15)
+---
+- 25
+...
