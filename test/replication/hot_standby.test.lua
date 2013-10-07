@@ -5,29 +5,56 @@
 
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
-function _insert(_begin, _end)
-    a = {}
-    for i = _begin, _end do
-        table.insert(a, box.insert(0, i, 'the tuple '..i))
+do
+    begin_lsn = box.info.lsn
+
+    function _set_pri_lsn(_lsn)
+        a = {}
+        begin_lsn = box.unpack('l', _lsn)
     end
-    return unpack(a)
-end;
-function _select(_begin, _end)
-    a = {}
-    for i = _begin, _end do
-        table.insert(a, box.select(0, 0, i))
+
+    function _print_lsn()
+        return (box.info.lsn - begin_lsn + 1)
     end
-    return unpack(a)
-end;
-begin_lsn = box.info.lsn;
-function _wait_lsn(_lsnd)
-    while box.info.lsn < _lsnd + begin_lsn do
-        box.fiber.sleep(0.001)
+
+    function _insert(_begin, _end)
+        a = {}
+        for i = _begin, _end do
+            table.insert(a, box.insert(0, i, 'the tuple '..i))
+        end
+        return unpack(a)
     end
-    begin_lsn = begin_lsn + _lsnd
+
+    function _select(_begin, _end)
+        a = {}
+        for i = _begin, _end do
+            table.insert(a, box.select(0, 0, i))
+        end
+        return unpack(a)
+    end
+
+    function _wait_lsn(_lsnd)
+        while box.info.lsn < _lsnd + begin_lsn do
+            box.fiber.sleep(0.001)
+        end
+        begin_lsn = begin_lsn + _lsnd
+    end
 end;
 --# setopt delimiter ''
 --# set connection default
+
+-- set begin lsn on master, replica and hot_standby.
+begin_lsn = box.info.lsn
+
+a = box.net.box.new('127.0.0.1', 33114)
+a:call('_set_pri_lsn', box.info.lsn)
+a:close()
+
+a = box.net.box.new('127.0.0.1', 33024)
+a:call('_set_pri_lsn', box.info.lsn)
+a:close()
+
+
 box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 
