@@ -1296,9 +1296,14 @@ tarantool_lua_init()
 	 * packages, Tarantool-specific Lua libs and
 	 * instance-specific Lua scripts.
 	 */
-	tarantool_lua_setpath(L, "path", cfg.script_dir, LUA_LIBPATH,
+
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "%s/?.lua", cfg.script_dir);
+	tarantool_lua_setpath(L, "path", path, LUA_LIBPATH,
 	                      LUA_SYSPATH, NULL);
-	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH,
+	snprintf(path, sizeof(path), "%s/?.so", cfg.script_dir);
+	tarantool_lua_setpath(L, "cpath", path, LUA_LIBCPATH,
 	                      LUA_SYSCPATH, NULL);
 
 	/* Loadi 'ffi' extension and make it inaccessible */
