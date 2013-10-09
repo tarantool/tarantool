@@ -305,6 +305,14 @@ tarantool_version(void)
 	return PACKAGE_VERSION;
 }
 
+uint32_t
+tarantool_version_id()
+{
+	return (((PACKAGE_VERSION_MAJOR << 8) |
+		 PACKAGE_VERSION_MINOR) << 8) |
+		PACKAGE_VERSION_PATCH;
+}
+
 static double start_time;
 
 double
@@ -807,7 +815,7 @@ main(int argc, char **argv)
 	if (gopt(opt, 'I')) {
 		struct log_dir dir = snap_dir;
 		dir.dirname = cfg.snap_dir;
-		init_storage(&dir);
+		init_storage(&dir, cfg.replication_source);
 		exit(EXIT_SUCCESS);
 	}
 

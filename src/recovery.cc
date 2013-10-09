@@ -34,8 +34,11 @@
 #include "fiber.h"
 #include "tt_pthread.h"
 #include "fio.h"
+#include "sio.h"
 #include "errinj.h"
 #include "bootstrap.h"
+
+#include "replication.h"
 
 /*
  * Recovery subsystem
@@ -281,9 +284,13 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
-/** Create the initial snapshot file in the storage. */
-void
-init_storage(struct log_dir *dir)
+/** Write the bootstrap snapshot.
+ *
+ *  @return panics on error
+ *  Errors are logged to the log file.
+ */
+static void
+init_storage_on_master(struct log_dir *dir)
 {
 	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
 	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
@@ -298,16 +305,56 @@ init_storage(struct log_dir *dir)
 			       filename);
 	}
 	close(fd);
-	say_info("done");
 }
 
+/** Download the latest snapshot from master. */
+static void
+init_storage_on_replica(struct log_dir *dir, const char *replication_source)
+{
+	say_info("downloading snapshot from master %s...",
+		 replication_source);
+
+	int master = replica_connect(replication_source);
+	FDGuard guard_master(master);
+
+	uint32_t request = RPL_GET_SNAPSHOT;
+	sio_writen(master, &request, sizeof(request));
+
+	struct {
+		uint64_t lsn;
+		uint64_t file_size;
+	} response;
+	sio_readn(master, &response, sizeof(response));
+
+	const char *filename = format_filename(dir, response.lsn, NONE);
+	say_info("saving snapshot `%s'", filename);
+	int fd = open(filename, O_WRONLY|O_CREAT|O_EXCL, dir->mode);
+	if (fd == -1) {
+		panic_syserror("failed to open snapshot file `%s' for "
+			       "writing", filename);
+	}
+	FDGuard guard_fd(fd);
+
+	sio_recvfile(master, fd, NULL, response.file_size);
+}
+
+/** Create the initial snapshot file in the snap directory. */
+void
+init_storage(struct log_dir *dir, const char *replication_source)
+{
+	if (replication_source)
+		init_storage_on_replica(dir, replication_source);
+	else
+		init_storage_on_master(dir);
+	say_info("done");
+}
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
  */
 void
-recover_snap(struct recovery_state *r)
+recover_snap(struct recovery_state *r, const char *replication_source)
 {
 	/*  current_wal isn't open during initial recover. */
 	assert(r->current_wal == NULL);
@@ -319,7 +366,7 @@ recover_snap(struct recovery_state *r)
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
 		say_info("found an empty data directory, initializing...");
-		init_storage(r->snap_dir);
+		init_storage(r->snap_dir, replication_source);
 		lsn = greatest_lsn(r->snap_dir);
 	}
 
@@ -1335,6 +1382,7 @@ read_log(const char *filename,
 	log_io_close(&l);
 	return 0;
 }
+
 
 /* }}} */
 

@@ -147,7 +147,13 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		box_process = process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		recovery_follow_remote(recovery_state, conf->replication_source);
+		if (strcmp(conf->replication_protocol, "1.5") == 0) {
+			recovery_follow_remote_1_5(recovery_state,
+						   conf->replication_source);
+		} else {
+			recovery_follow_remote(recovery_state,
+					       conf->replication_source);
+		}
 
 		snprintf(status, sizeof(status), "replica/%s%s",
 			 conf->replication_source, custom_proc_title);
@@ -184,6 +190,14 @@ box_check_config(struct tarantool_cfg *conf)
 			       "can't be enabled simultaneously");
 		return -1;
 	}
+
+	if (strcmp(conf->replication_protocol, "1.5") != 0 &&
+	    strcmp(conf->replication_protocol, "1.6") != 0) {
+		out_warning(CNF_OK, "unknown replication protocol %s",
+			    conf->replication_protocol);
+		return -1;
+	}
+
 
 	/* check replication mode */
 	if (conf->replication_source != NULL) {
@@ -236,8 +250,14 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 			return -1;
 		}
-		if (recovery_state->remote)
-			recovery_stop_remote(recovery_state);
+		if (recovery_state->remote) {
+			if (strcmp(new_conf->replication_protocol,
+				   "1.5") == 0) {
+				recovery_stop_remote_1_5(recovery_state);
+			} else {
+				recovery_stop_remote(recovery_state);
+			}
+		}
 
 		box_enter_master_or_replica_mode(new_conf);
 	}
@@ -269,7 +289,7 @@ box_init()
 
 	stat_base = stat_register(requests_strs, requests_MAX);
 
-	recover_snap(recovery_state);
+	recover_snap(recovery_state, cfg.replication_source);
 	space_end_recover_snapshot();
 	recover_existing_wals(recovery_state);
 	space_end_recover();
