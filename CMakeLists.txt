@@ -75,7 +75,7 @@ check_include_file(cpuid.h HAVE_CPUID_H)
 check_include_file(sys/prctl.h HAVE_PRCTL_H)
 
 check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
-check_function_exists(fdatasync HAVE_FDATASYNC)
+check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)
