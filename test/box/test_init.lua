@@ -33,3 +33,11 @@ box.fiber.resume(fiber)
 --
 
 space:insert(2, 4, 8, 16)
+
+--
+-- A test case for https://github.com/tarantool/tarantool/issues/53
+--
+
+assert (require ~= nil)
+box.fiber.sleep(0.0)
+assert (require ~= nil)

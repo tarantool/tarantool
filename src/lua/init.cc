@@ -818,6 +818,13 @@ load_init_script(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 
+	/*
+	 * Return control to tarantool_lua_load_init_script.
+	 * tarantool_lua_load_init_script when will start an auxiliary event
+	 * loop and re-schedule this fiber.
+	 */
+	fiber_sleep(0.0);
+
 	char path[PATH_MAX + 1];
 	snprintf(path, PATH_MAX, "%s/%s",
 		 cfg.script_dir, TARANTOOL_LUA_INIT_SCRIPT);
@@ -835,6 +842,12 @@ load_init_script(va_list ap)
 	 * The file doesn't exist. It's OK, tarantool may
 	 * have no init file.
 	 */
+
+	/*
+	 * Lua script finished. Stop the auxiliary event loop and
+	 * return control back to tarantool_lua_load_init_script.
+	 */
+	ev_break(EVBREAK_ALL);
 }
 
 /**
@@ -878,6 +891,13 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	struct fiber *loader = fiber_new(TARANTOOL_LUA_INIT_SCRIPT,
 					 load_init_script);
 	fiber_call(loader, L);
+
+	/*
+	 * Run an auxiliary event loop to re-schedule load_init_script fiber.
+	 * When this fiber finishes, it will call ev_break to stop the loop.
+	 */
+	ev_run(0);
+
 	/* Outside the startup file require() or ffi are not
 	 * allowed.
 	*/
