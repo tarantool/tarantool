@@ -14,3 +14,15 @@ if (${HAVE_BYTE_ORDER_BIG_ENDIAN} OR
     message (FATAL_ERROR "Tarantool currently only supports little-endian hardware")
     message (FATAL_ERROR "with unaligned word access.")
 endif()
+
+#
+# Bug in CMake, Darwin always detect on i386
+# Fixed with check types
+#
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    if (CMAKE_SIZEOF_VOID_P MATCHES 8)
+        set(CMAKE_SYSTEM_PROCESSOR "x86_64")
+    else(CMAKE_SIZEOF_VOID_P MATCHES 8)
+        set(CMAKE_SYSTEM_PROCESSOR "x86")
+    endif(CMAKE_SIZEOF_VOID_P MATCHES 8)
+endif()
