@@ -252,7 +252,7 @@ int ts_space_fill(struct ts_spaces *s, struct ts_options *opts)
 
 static inline struct ts_key*
 ts_space_keyalloc_sha(struct ts_space *s, struct tnt_tuple *t, int fileid,
-                      int offset, int attach)
+                      uint64_t offset, int attach)
 {
 	int size = sizeof(struct ts_key) + s->key_size;
 	if (attach)
@@ -297,7 +297,7 @@ ts_space_keyalloc_sha(struct ts_space *s, struct tnt_tuple *t, int fileid,
 
 static inline struct ts_key*
 ts_space_keyalloc_sparse(struct ts_space *s, struct tnt_tuple *t, int fileid,
-                         int offset, int attach)
+                         uint64_t offset, int attach)
 {
 	int size = sizeof(struct ts_key) + s->key_size;
 	if (attach)
@@ -341,7 +341,7 @@ ts_space_keyalloc_sparse(struct ts_space *s, struct tnt_tuple *t, int fileid,
 
 struct ts_key*
 ts_space_keyalloc(struct ts_space *s, struct tnt_tuple *t, int fileid,
-                  int offset, int attach)
+                  uint64_t offset, int attach)
 {
 	struct ts_key *k = NULL;
 	switch (s->c) {
