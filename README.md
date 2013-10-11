@@ -6,7 +6,7 @@ Lua application server, blended.
 Key features of the system:
  * flexible data model
  * multiple index types: HASH, TREE, BITSET
- * optional persistency and strong data durability
+ * optional persistence and strong data durability
  * log streaming replication
  * Lua functions, procedures, triggers, with
    rich access to database API, JSON support,
@@ -68,7 +68,7 @@ additional Python modules:
  * daemon
  * pyyaml
 
-Once all pre-requisites are installed, try:
+Once all prerequisites are installed, try:
 
     tarantool $ cd test
     tarantool $ ./test-run.py --suite box --start-and-exit
