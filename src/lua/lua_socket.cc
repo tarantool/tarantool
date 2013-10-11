@@ -271,7 +271,7 @@ lbox_socket_close(struct lua_State *L)
 static int
 lbox_socket_shutdown(struct lua_State *L)
 {
-	struct bio_socket *s = bio_checkactivesocket(L, -1);
+	struct bio_socket *s = bio_checkactivesocket(L, 1);
 	int how = luaL_checkint(L, 2);
 	bio_clearerr(s);
 	if (shutdown(s->io_w.fd, how))
