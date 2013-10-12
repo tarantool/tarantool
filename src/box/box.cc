@@ -276,7 +276,6 @@ void
 box_init()
 {
 	title("loading");
-	atexit(box_free);
 
 	tuple_format_init();
 	schema_init();

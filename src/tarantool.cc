@@ -321,12 +321,6 @@ tarantool_uptime(void)
 	return ev_now() - start_time;
 }
 
-void snapshot_exit(int code, void* arg) {
-	(void)arg;
-	fflush(NULL);
-	_exit(code);
-}
-
 int
 snapshot(void)
 {
@@ -365,7 +359,6 @@ snapshot(void)
 	 * may call exit(), push a top-level handler which will do
 	 * _exit() for us.
 	 */
-	on_exit(snapshot_exit, NULL);
 	snapshot_save(recovery_state, box_snapshot);
 
 	exit(EXIT_SUCCESS);
@@ -528,7 +521,6 @@ signal_init(void)
 	ev_signal_init(&sigs[3], signal_cb, SIGHUP);
 	ev_signal_start(&sigs[3]);
 
-	atexit(signal_free);
 	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
 
@@ -616,6 +608,12 @@ tarantool_lua_free()
 void
 tarantool_free(void)
 {
+	/* Do nothing in a fork. */
+	if (getpid() != master_pid)
+		return;
+	signal_free();
+	tarantool_lua_free();
+	box_free();
 	recovery_free();
 	stat_free();
 
@@ -858,7 +856,6 @@ main(int argc, char **argv)
 		say_crit("version %s", tarantool_version());
 		tarantool_L = tarantool_lua_init();
 		box_init();
-		atexit(tarantool_lua_free);
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*
 		 * init iproto before admin:
