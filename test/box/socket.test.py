@@ -561,3 +561,45 @@ admin("iotest()")
 admin("iotest()")
 admin("iotest()")
 admin("reps")
+
+# Bug #43: incorrect box:shutdown() arg handling
+# https://github.com/tarantool/tarantool/issues/43
+#
+test="""
+function server()
+	ms = box.socket.tcp()
+	ms:bind('127.0.0.1', 8181)
+	ms:listen()
+
+	while true do
+		local s = ms:accept( .5 )
+		if s ~= 'timeout' then
+			print("accepted connection ", s)
+			s:send('Hello world')
+			s:shutdown(box.socket.SHUT_RDWR)
+		end
+	end
+end
+
+box.fiber.wrap(server)
+"""
+
+admin(test.replace('\n', ' '))
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8181))
+data = s.recv(1024)
+s.close()
+print data
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8181))
+data = s.recv(1024)
+s.close()
+print data
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect(('127.0.0.1', 8181))
+data = s.recv(1024)
+s.close()
+print data
