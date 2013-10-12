@@ -499,7 +499,7 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 		char *base64_buf = (char *) malloc(base64_buflen);
 		int len = base64_encode(end - tuple_len, tuple_len,
 					base64_buf, base64_buflen);
-		write(STDERR_FILENO, base64_buf, len);
+		(void) write(STDERR_FILENO, base64_buf, len);
 		free(base64_buf);
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 	}

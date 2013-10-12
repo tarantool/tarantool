@@ -467,7 +467,7 @@ tarantool_plugin_dir(struct lua_State *L, const char *dir)
 		if (dent->d_type != DT_REG)
 			continue;
 		char *path;
-		asprintf(&path, "%s/%s", dir, dent->d_name);
+		(void) asprintf(&path, "%s/%s", dir, dent->d_name);
 		if (!path) {
 			say_error("Can't allocate memory for %s plugin dir",
 				 dir);
