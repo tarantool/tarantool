@@ -321,7 +321,6 @@ void
 box_init(bool init_storage)
 {
 	title("loading");
-	atexit(box_free);
 
 	/* initialization spaces */
 	space_init();

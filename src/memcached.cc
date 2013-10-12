@@ -469,7 +469,7 @@ memcached_check_config(struct tarantool_cfg *conf)
 	return 0;
 }
 
-static void
+void
 memcached_free(void)
 {
 	if (memcached_it)
@@ -482,8 +482,6 @@ memcached_init(const char *bind_ipaddr, int memcached_port)
 {
 	if (memcached_port == 0)
 		return;
-
-	atexit(memcached_free);
 
 	stat_base = stat_register(memcached_stat_strs, memcached_stat_MAX);
 

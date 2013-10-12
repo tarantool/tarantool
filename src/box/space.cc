@@ -209,6 +209,8 @@ space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 void
 space_free(void)
 {
+	if (spaces == NULL)
+		return;
 	while (mh_size(spaces) > 0) {
 		mh_int_t i = mh_first(spaces);
 

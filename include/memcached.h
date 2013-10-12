@@ -36,6 +36,9 @@ void
 memcached_init(const char *bind_ipaddr, int memcached_port);
 
 void
+memcached_free(void);
+
+void
 memcached_space_init();
 
 int
