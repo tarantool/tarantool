@@ -117,9 +117,6 @@ git push --tags
 Update the Web site in doc/www-data.
 </para>
 <para>
-Go to launchpad and move all "Fix committed" bugs to "Fix released".
-</para>
-<para>
 Update all blueprints, upload the ChangeLog, based on <prompt>git log</prompt>output.
 The ChangeLog must only include items which are mentioned as bugs
 or blueprints on Launchpad. If anything significant is there,
@@ -132,9 +129,6 @@ release. Alert the driver to target bugs and blueprints
 to the new milestone.
 </para>
 <para>
-Upload the milestone from http://tarantool.org/dist to Launchpad. Use the .src.tar.gz build.
-</para>
-<para>
 </para>
   </section>
 </chapter>
@@ -144,7 +138,7 @@ Upload the milestone from http://tarantool.org/dist to Launchpad. Use the .src.t
 <title>How to work on a bug</title>
 <para>Any defect, even minor, if it changes the user-visible
 server behavior, needs a bug report. Report a bug at
-http://bugs.launchpad.net/tarantool.
+http://github.com/tarantool/tarantool/issues.
 
 When reporting a bug, try to come up with a test case right away. 
 Set the current maintenance milestone for the bug fix, and specify
@@ -154,7 +148,7 @@ review' and solicit a review for the fix.
 </para>
 <para>
 Once there is a positive code review, push the patch 
-and set the status to 'Fix committed'
+and set the status to 'Closed'
 </para>
 <para>
 Patches for bugs should contain a reference to the respective

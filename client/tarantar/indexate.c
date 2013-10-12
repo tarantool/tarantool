@@ -57,7 +57,7 @@ search_equal(const struct ts_key *a,
 }
 
 static int
-snapshot_process_row(struct ts_spaces *s, int fileid, int offset,
+snapshot_process_row(struct ts_spaces *s, int fileid, uint64_t offset,
                      struct tnt_iter_storage *is,
                      struct tnt_stream_snapshot *ss)
 {
@@ -163,7 +163,8 @@ error:
 }
 
 static int
-xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request *r)
+xlog_process_row(struct ts_spaces *s, int fileid, uint64_t offset,
+                 struct tnt_request *r)
 {
 	/* validate operation */
 	uint32_t ns = 0;
@@ -177,6 +178,10 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 	case TNT_OP_DELETE:
 		ns = r->r.del.h.ns;
 		t = &r->r.del.t;
+		break;
+	case TNT_OP_DELETE_1_3:
+		ns = r->r.del_1_3.h.ns;
+		t = &r->r.del_1_3.t;
 		break;
 	case TNT_OP_UPDATE:
 		ns = r->r.update.h.ns;
@@ -214,6 +219,7 @@ xlog_process_row(struct ts_spaces *s, int fileid, int offset, struct tnt_request
 		}
 		ts_oomcheck();
 		break;
+	case TNT_OP_DELETE_1_3:
 	case TNT_OP_DELETE: {
 		pos = mh_pk_get(space->index, &node, space);
 		assert(pos != mh_end(space->index));
@@ -353,7 +359,7 @@ done:
 static int
 waldir_processof(struct ts_spaces *s, struct tnt_dir *wal_dir, int i)
 {
-	int rc;
+	int rc = 0;
 	if (i < wal_dir->count) {
 		rc = xlog_process(s, wal_dir->path, wal_dir->files[i].lsn,
 		                  tss.last_snap_lsn, &tss.last_xlog_lsn);

@@ -36,7 +36,7 @@
 #include "fio.h"
 #include "tarantool_eio.h"
 
-const uint32_t default_version = 12;
+const uint32_t xlog_format = 12;
 const log_magic_t row_marker = 0xba0babed;
 const log_magic_t eof_marker = 0x10adab1e;
 const char inprogress_suffix[] = ".inprogress";
@@ -53,13 +53,13 @@ row_header_sign(struct row_header *header)
 }
 
 void
-wal_row_fill(struct wal_row *row, int64_t lsn,
+wal_row_fill(struct wal_row *row, int64_t lsn, uint64_t cookie,
 	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len)
 {
 	row->marker = row_marker;
 	row->tag  = WAL; /* unused. */
-	row->cookie = 0; /* unused. */
+	row->cookie = cookie;
 	memcpy(row->data, metadata, metadata_len);
 	memcpy(row->data + metadata_len, data, data_len);
 	row_header_fill(&row->header, lsn, metadata_len + data_len +

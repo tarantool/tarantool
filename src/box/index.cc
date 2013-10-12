@@ -120,6 +120,7 @@ Index::factory(struct key_def *key_def)
 		return new BitsetIndex(key_def);
 	default:
 		assert(false);
+		return NULL; /* silent compiler warning. */
 	}
 }
 

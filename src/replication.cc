@@ -290,6 +290,49 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 }
 
 
+void
+replication_handshake(int fd, const char *who)
+{
+	uint32_t greeting[3] = { xlog_format, tarantool_version_id(), 0};
+	uint32_t replica_greeting[3] = { 0 };
+	sio_writen(fd, greeting, sizeof(greeting));
+	sio_readn(fd, replica_greeting, sizeof(replica_greeting));
+	if (replica_greeting[0] != greeting[0]) {
+		say_error("unsupported %s xlog format %d",
+			  who, replica_greeting[0]);
+		panic("handshake failed");
+	}
+}
+
+int
+replica_connect(const char *replication_source)
+{
+	char ip_addr[32];
+	int port;
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	int rc = sscanf(replication_source, "%31[^:]:%i",
+			ip_addr, &port);
+
+	assert(rc == 2);
+	(void)rc;
+
+	addr.sin_family = AF_INET;
+	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0)
+		panic_syserror("inet_aton: %s", ip_addr);
+
+	addr.sin_port = htons(port);
+
+	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	FDGuard guard(master);
+	sio_connect(master, &addr, sizeof(addr));
+
+	replication_handshake(master, "master");
+	guard.fd = -1;
+	return master;
+}
+
 /*--------------------------------------------------------------------------*
  * spawner process                                                          *
  * -------------------------------------------------------------------------*/
@@ -604,6 +647,32 @@ shutdown_handler:
 	exit(EXIT_SUCCESS);
 }
 
+static void
+replication_relay_send_snapshot(int client_sock)
+{
+	FDGuard guard_replica(client_sock);
+	struct log_dir dir = snap_dir;
+	dir.dirname = cfg.snap_dir;
+	int64_t lsn = greatest_lsn(&dir);
+	const char *filename = format_filename(&dir, lsn, NONE);
+	int snapshot = open(filename, O_RDONLY);
+	if (snapshot < 0)
+		panic_syserror("can't find/open snapshot");
+
+	FDGuard guard_snapshot(snapshot);
+
+	struct stat st;
+	if (fstat(snapshot, &st) != 0)
+		panic_syserror("fstat");
+
+	uint64_t header[2];
+	header[0] = lsn;
+	header[1] = st.st_size;
+	sio_writen(client_sock, header, sizeof(header));
+	sio_sendfile(client_sock, snapshot, NULL, header[1]);
+
+	exit(EXIT_SUCCESS);
+}
 
 /** The main loop of replication client service process. */
 static void
@@ -612,7 +681,6 @@ replication_relay_loop(int client_sock)
 	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 	int64_t lsn;
-	ssize_t r;
 
 	/* Set process title and fiber name.
 	 * Even though we use only the main fiber, the logger
@@ -653,18 +721,17 @@ replication_relay_loop(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	r = read(client_sock, &lsn, sizeof(lsn));
-	if (r != sizeof(lsn)) {
-		if (r < 0) {
-			panic_syserror("read");
-		}
-		panic("invalid LSN request size: %zu", r);
+	replication_handshake(client_sock, "replica");
+	uint32_t request;
+	sio_readn(client_sock, &request, sizeof(request));
+	if (request == RPL_GET_SNAPSHOT) {
+		replication_relay_send_snapshot(client_sock); /* exits */
 	}
-	say_info("starting replication from lsn: %" PRIi64, lsn);
-
-	replication_relay_send_row((void *)(intptr_t) client_sock,
-				   (const char *) &default_version,
-				   sizeof(default_version));
+	if (request != RPL_GET_WAL) {
+		say_error("unknown replica request:  %d", request);
+		exit(EXIT_FAILURE);
+	}
+	sio_readn(client_sock, &lsn, sizeof(lsn));
 
 	/* init libev events handlers */
 	ev_default_loop(0);
@@ -699,4 +766,3 @@ replication_relay_loop(int client_sock)
 	say_crit("exiting the relay loop");
 	exit(EXIT_SUCCESS);
 }
-

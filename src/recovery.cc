@@ -34,8 +34,11 @@
 #include "fiber.h"
 #include "tt_pthread.h"
 #include "fio.h"
+#include "sio.h"
 #include "errinj.h"
 #include "bootstrap.h"
+
+#include "replication.h"
 
 /*
  * Recovery subsystem
@@ -244,6 +247,8 @@ void
 recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 {
 	r->snap_io_rate_limit = new_limit * 1024 * 1024;
+	if (r->snap_io_rate_limit == 0)
+		r->snap_io_rate_limit = UINT64_MAX;
 }
 
 void
@@ -279,9 +284,13 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir->panic_if_error = on_snap_error;
 }
 
-/** Create the initial snapshot file in the storage. */
-void
-init_storage(struct log_dir *dir)
+/** Write the bootstrap snapshot.
+ *
+ *  @return panics on error
+ *  Errors are logged to the log file.
+ */
+static void
+init_storage_on_master(struct log_dir *dir)
 {
 	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
 	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
@@ -296,16 +305,56 @@ init_storage(struct log_dir *dir)
 			       filename);
 	}
 	close(fd);
-	say_info("done");
 }
 
+/** Download the latest snapshot from master. */
+static void
+init_storage_on_replica(struct log_dir *dir, const char *replication_source)
+{
+	say_info("downloading snapshot from master %s...",
+		 replication_source);
+
+	int master = replica_connect(replication_source);
+	FDGuard guard_master(master);
+
+	uint32_t request = RPL_GET_SNAPSHOT;
+	sio_writen(master, &request, sizeof(request));
+
+	struct {
+		uint64_t lsn;
+		uint64_t file_size;
+	} response;
+	sio_readn(master, &response, sizeof(response));
+
+	const char *filename = format_filename(dir, response.lsn, NONE);
+	say_info("saving snapshot `%s'", filename);
+	int fd = open(filename, O_WRONLY|O_CREAT|O_EXCL, dir->mode);
+	if (fd == -1) {
+		panic_syserror("failed to open snapshot file `%s' for "
+			       "writing", filename);
+	}
+	FDGuard guard_fd(fd);
+
+	sio_recvfile(master, fd, NULL, response.file_size);
+}
+
+/** Create the initial snapshot file in the snap directory. */
+void
+init_storage(struct log_dir *dir, const char *replication_source)
+{
+	if (replication_source)
+		init_storage_on_replica(dir, replication_source);
+	else
+		init_storage_on_master(dir);
+	say_info("done");
+}
 
 /**
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
  */
 void
-recover_snap(struct recovery_state *r)
+recover_snap(struct recovery_state *r, const char *replication_source)
 {
 	/*  current_wal isn't open during initial recover. */
 	assert(r->current_wal == NULL);
@@ -317,7 +366,7 @@ recover_snap(struct recovery_state *r)
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
 		say_info("found an empty data directory, initializing...");
-		init_storage(r->snap_dir);
+		init_storage(r->snap_dir, replication_source);
 		lsn = greatest_lsn(r->snap_dir);
 	}
 
@@ -1140,7 +1189,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn,
+wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	  uint16_t op, const char *row, uint32_t row_len)
 {
 	say_debug("wal_write lsn=%" PRIi64, lsn);
@@ -1157,7 +1206,7 @@ wal_write(struct recovery_state *r, int64_t lsn,
 
 	req->fiber = fiber;
 	req->res = -1;
-	wal_row_fill(&req->row, lsn, (const char *) &op,
+	wal_row_fill(&req->row, lsn, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
@@ -1196,7 +1245,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 		   const char *data, size_t data_len)
 {
 	static int rows;
-	static int bytes;
+	static uint64_t bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
@@ -1204,30 +1253,50 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 				     sizeof(struct wal_row) +
 				     data_len + metadata_len);
 
-	wal_row_fill(row, ++rows, metadata, metadata_len, data, data_len);
+	wal_row_fill(row, ++rows, snapshot_cookie, metadata,
+		     metadata_len, data, data_len);
 	row_header_sign(&row->header);
 
 	fio_batch_add(batch, row, wal_row_size(row));
+	bytes += wal_row_size(row);
 
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
-	if (fio_batch_is_full(batch)) {
+	if (fio_batch_is_full(batch) ||
+	    bytes > recovery_state->snap_io_rate_limit) {
+
 		snap_write_batch(batch, fileno(l->f));
 		fio_batch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
-	}
-
-	if (recovery_state->snap_io_rate_limit > 0) {
-		if (last == 0) {
-			ev_now_update();
-			last = ev_now();
+		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
+			if (last == 0) {
+				/*
+				 * Remember the time of first
+				 * write to disk.
+				 */
+				ev_now_update();
+				last = ev_now();
+			}
+			/**
+			 * If io rate limit is set, flush the
+			 * filesystem cache, otherwise the limit is
+			 * not really enforced.
+			 */
+			fdatasync(fileno(l->f));
 		}
-		bytes += wal_row_size(row);
 		while (bytes >= recovery_state->snap_io_rate_limit) {
-
 			ev_now_update();
+			/*
+			 * How much time have passed since
+			 * last write?
+			 */
 			elapsed = ev_now() - last;
+			/*
+			 * If last write was in less than
+			 * a second, sleep until the
+			 * second is reached.
+			 */
 			if (elapsed < 1)
 				usleep(((1 - elapsed) * 1000000));
 
@@ -1313,6 +1382,7 @@ read_log(const char *filename,
 	log_io_close(&l);
 	return 0;
 }
+
 
 /* }}} */
 

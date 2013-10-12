@@ -39,6 +39,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "exception.h"
+#include <tarantool_ev.h>
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
@@ -46,6 +47,16 @@ class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, int fd,
 		    const char *format, ...);
+};
+
+/** Close a file descriptor on exception or end of scope. */
+struct FDGuard {
+	int fd;
+	explicit FDGuard(int fd_arg):fd(fd_arg) {}
+	~FDGuard() { if (fd >= 0) close(fd); }
+private:
+	explicit FDGuard(const FDGuard&) = delete;
+	FDGuard& operator=(const FDGuard&) = delete;
 };
 
 const char *sio_socketname(int fd);
@@ -76,6 +87,51 @@ ssize_t sio_write(int fd, const void *buf, size_t count);
 ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 
 ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
+
+/**
+ * Read at least count and up to buf_size bytes from fd.
+ * Throw exception on error or disconnect.
+ *
+ * @return the number of of bytes actually read.
+ */
+ssize_t
+sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size);
+
+/**
+ * Read count bytes from fd.
+ * Throw an exception on error or disconnect.
+ *
+ * @return count of bytes actually read.
+ */
+static inline ssize_t
+sio_readn(int fd, void *buf, size_t count)
+{
+	return sio_readn_ahead(fd, buf, count, count);
+}
+
+/**
+ * Write count bytes to fd.
+ * Throw an exception on error or disconnect.
+ *
+ * @return count of bytes actually written.
+ */
+ssize_t
+sio_writen(int fd, const void *buf, size_t count);
+
+/**
+ * A wrapper over sendfile.
+ * Throw if send file failed.
+ */
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size);
+
+/**
+ * Receive a file sent by sendfile
+ * Throw if receiving failed
+ */
+ssize_t
+sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size);
+
 
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 		   const struct sockaddr_in *dest_addr, socklen_t addrlen);

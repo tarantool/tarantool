@@ -34,7 +34,7 @@
 #include "tarantool/util.h"
 #include "tarantool_ev.h"
 
-extern const uint32_t default_version;
+extern const uint32_t xlog_format;
 
 enum log_format { WAL = 65534 };
 
@@ -149,7 +149,7 @@ struct wal_row {
 } __attribute__((packed));
 
 void
-wal_row_fill(struct wal_row *row, int64_t lsn,
+wal_row_fill(struct wal_row *row, int64_t lsn, uint64_t cookie,
 	     const char *metadata, size_t metadata_len,
 	     const char *data, size_t data_len);
 

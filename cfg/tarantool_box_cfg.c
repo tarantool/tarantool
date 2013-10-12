@@ -60,6 +60,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
+	c->replication_protocol = NULL;
 }
 
 int
@@ -104,6 +105,8 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
+	c->replication_protocol = strdup("1.6");
+	if (c->replication_protocol == NULL) return CNF_NOMEMORY;
 	return 0;
 }
 
@@ -209,6 +212,9 @@ static NameAtom _name__custom_proc_title[] = {
 };
 static NameAtom _name__replication_source[] = {
 	{ "replication_source", -1, NULL }
+};
+static NameAtom _name__replication_protocol[] = {
+	{ "replication_protocol", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t,_chk_ro, __flags)  do {                    \
@@ -693,6 +699,18 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (opt->paramValue.scalarval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
 	}
+	else if ( cmpNameAtoms( opt->name, _name__replication_protocol) ) {
+		if (opt->paramType != scalarType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->replication_protocol == NULL) || strcmp(opt->paramValue.scalarval, c->replication_protocol) != 0))
+			return CNF_RDONLY;
+		 if (c->replication_protocol) free(c->replication_protocol);
+		c->replication_protocol = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
+		if (opt->paramValue.scalarval && c->replication_protocol == NULL)
+			return CNF_NOMEMORY;
+	}
 	else {
 		return opt->optional ? CNF_OPTIONAL : CNF_MISSED;
 	}
@@ -836,6 +854,7 @@ typedef enum IteratorState {
 	S_name__too_long_threshold,
 	S_name__custom_proc_title,
 	S_name__replication_source,
+	S_name__replication_protocol,
 	_S_Finished
 } IteratorState;
 
@@ -1199,6 +1218,16 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "replication_source");
+			i->state = S_name__replication_protocol;
+			return buf;
+		case S_name__replication_protocol:
+			*v = (c->replication_protocol) ? strdup(c->replication_protocol) : NULL;
+			if (*v == NULL && c->replication_protocol) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			snprintf(buf, PRINTBUFLEN-1, "replication_protocol");
 			i->state = _S_Finished;
 			return buf;
 		case _S_Finished:
@@ -1281,6 +1310,9 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 		return CNF_NOMEMORY;
 	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
 	if (src->replication_source != NULL && dst->replication_source == NULL)
+		return CNF_NOMEMORY;
+	if (dst->replication_protocol) free(dst->replication_protocol);dst->replication_protocol = src->replication_protocol == NULL ? NULL : strdup(src->replication_protocol);
+	if (src->replication_protocol != NULL && dst->replication_protocol == NULL)
 		return CNF_NOMEMORY;
 
 	return CNF_OK;
@@ -1509,6 +1541,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 }
 	}
+	if (confetti_strcmp(c1->replication_protocol, c2->replication_protocol) != 0) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_protocol");
+
+		return diff;
+}
 
 	return 0;
 }

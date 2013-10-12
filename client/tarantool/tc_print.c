@@ -194,7 +194,6 @@ void tc_print_fields(struct tnt_tuple *tu)
 	while (tnt_next(&ifl)) {
 		if (TNT_IFIELD_IDX(&ifl) != 0)
 			tc_printf(", ");
-		tc_printf("'");
 		char *data = TNT_IFIELD_DATA(&ifl);
 		uint32_t size = TNT_IFIELD_SIZE(&ifl);
 		switch (size) {
@@ -205,9 +204,10 @@ void tc_print_fields(struct tnt_tuple *tu)
 			tc_printf("%"PRIu64, *((uint64_t*)data));
 			break;
 		default:
+			tc_printf("'");
 			tc_print_string(data, size, 0);
+			tc_printf("'");
 		}
-		tc_printf("'");
 	}
 	if (ifl.status == TNT_ITER_FAIL)
 		tc_printf("<parsing error>");

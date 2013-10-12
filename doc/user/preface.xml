@@ -39,11 +39,11 @@
     A simple solution is employed: the server <emphasis
     role="strong">can be requested to save a concise
     snapshot</emphasis> of
-    its current data. The underlying operating system's
-    <quote>copy-on-write</quote> feature is employed to take the
-    snapshot in a quick, resource-savvy and non-blocking manner.
-    The <quote>copy-on-write</quote> technique guarantees that
-    snapshotting has minimal impact on server performance.
+    its current data. A combination of delayed garbage collection
+    for data pages and <quote>copy-on-write</quote> technique for
+    index pages is employed to provide the snapshot process
+    with a consistent read view, so that the snapshot is taken
+    in a quick, resource-savvy and non-blocking manner.
   </para>
 
   <para>
@@ -158,7 +158,7 @@
   <title>Reporting bugs</title>
   <para>
     Please report bugs in Tarantool at <link
-    xlink:href="http://bugs.launchpad.net/tarantool"/>. You can
+    xlink:href="http://github.com/tarantool/tarantool/issues"/>. You can
     contact developers directly on
     <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
     IRC channel or via a mailing list,

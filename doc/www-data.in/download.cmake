@@ -125,7 +125,8 @@ In the same manner as for [the stable
 branch](http://github.com/tarantool/tarantool/tree/stable), every push into [the master
 branch](http://github.com/tarantool/tarantool) is [available
 online](http://tarantool.org/dist/master).
-The server roadmap is maintained on [Launchpad](http://launchpad.net/tarantool).
+The server roadmap is maintained on
+[Github](http://github.com/tarantool/tarantool/issues?labels=feature).
 
 ## Connectors
 

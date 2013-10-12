@@ -251,6 +251,16 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple, uint32_t 
 	}
 }
 
+/**
+ * Incremented on every snapshot and is used to distinguish tuples
+ * which were created after start of a snapshot (these tuples can
+ * be freed right away, since they are not used for snapshot) or
+ * before start of a snapshot (these tuples can be freed only
+ * after the snapshot has finished, otherwise it'll write bad data
+ * to the snapshot file).
+ */
+extern uint32_t snapshot_version;
+
 /** Allocate a tuple */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
@@ -260,6 +270,7 @@ tuple_alloc(struct tuple_format *format, size_t size)
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
+	tuple->version = snapshot_version;
 	tuple->bsize = size;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format, 1);
@@ -280,7 +291,10 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	sfree(ptr);
+	if (tuple->version == snapshot_version)
+		sfree(ptr);
+	else
+		sfree_delayed(ptr);
 }
 
 /**
@@ -485,7 +499,7 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 		char *base64_buf = (char *) malloc(base64_buflen);
 		int len = base64_encode(end - tuple_len, tuple_len,
 					base64_buf, base64_buflen);
-		write(STDERR_FILENO, base64_buf, len);
+		(void) write(STDERR_FILENO, base64_buf, len);
 		free(base64_buf);
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 	}
@@ -632,7 +646,7 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_init()
+tuple_format_init()
 {
 	tuple_format_ber = tuple_format_new(&rlist_nil);
 	/* Make sure this one stays around. */
@@ -640,7 +654,7 @@ tuple_init()
 }
 
 void
-tuple_free()
+tuple_format_free()
 {
 	/* Clear recycled ids. */
 	while (recycled_format_ids != FORMAT_ID_NIL) {

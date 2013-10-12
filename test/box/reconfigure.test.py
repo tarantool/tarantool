@@ -12,6 +12,9 @@ admin("box.cfg.io_collect_interval")
 # empty
 server.reconfigure("box/tarantool_empty.cfg")
 admin("box.cfg.too_long_threshold")
+admin("box.cfg.snap_io_rate_limit")
+server.reconfigure("box/snap_io_rate_limit.cfg")
+admin("box.cfg.snap_io_rate_limit")
 
 # no config
 server.reconfigure(None)

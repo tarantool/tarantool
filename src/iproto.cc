@@ -218,6 +218,9 @@ iproto_queue_init(struct iproto_queue *i_queue,
 static inline uint32_t
 iproto_session_id(struct iproto_session *session);
 
+static inline uint64_t
+iproto_session_cookie(struct iproto_session *session);
+
 /** A handler to process all queued requests. */
 static void
 iproto_queue_handler(va_list ap)
@@ -227,7 +230,7 @@ iproto_queue_handler(va_list ap)
 restart:
 	while (iproto_dequeue_request(i_queue, &request)) {
 
-		fiber_set_sid(fiber, iproto_session_id(request.session));
+		fiber_set_sid(fiber, iproto_session_id(request.session), iproto_session_cookie(request.session));
 		request.process(&request);
 	}
 	iproto_cache_fiber(&request_queue);
@@ -274,6 +277,7 @@ struct iproto_session
 	struct ev_io output;
 	/** Session id. */
 	uint32_t sid;
+	uint64_t cookie;
 };
 
 SLIST_HEAD(, iproto_session) iproto_session_cache =
@@ -302,6 +306,12 @@ iproto_session_id(struct iproto_session *session)
 	return session->sid;
 }
 
+static inline uint64_t
+iproto_session_cookie(struct iproto_session *session)
+{
+	return session->cookie;
+}
+
 static void
 iproto_session_on_input(struct ev_io *watcher,
 			int revents __attribute__((unused)));
@@ -319,7 +329,8 @@ static void
 iproto_process_disconnect(struct iproto_request *request);
 
 static struct iproto_session *
-iproto_session_create(const char *name, int fd, box_process_func *param)
+iproto_session_create(const char *name, int fd, struct sockaddr_in *addr,
+		      box_process_func *param)
 {
 	struct iproto_session *session;
 	if (SLIST_EMPTY(&iproto_session_cache)) {
@@ -339,6 +350,7 @@ iproto_session_create(const char *name, int fd, box_process_func *param)
 	session->parse_size = 0;
 	session->write_pos = obuf_create_svp(&session->iobuf[0]->out);
 	session->sid = 0;
+	session->cookie = *(uint64_t *) addr;
 	return session;
 }
 
@@ -694,7 +706,7 @@ iproto_process_connect(struct iproto_request *request)
 	struct iobuf *iobuf = request->iobuf;
 	int fd = session->input.fd;
 	try {              /* connect. */
-		session->sid = session_create(fd);
+		session->sid = session_create(fd, session->cookie);
 	} catch (const ClientError& e) {
 		iproto_reply_error(&iobuf->out, request->header, e);
 		try {
@@ -723,7 +735,7 @@ iproto_process_connect(struct iproto_request *request)
 static void
 iproto_process_disconnect(struct iproto_request *request)
 {
-	fiber_set_sid(fiber, request->session->sid);
+	fiber_set_sid(fiber, request->session->sid, request->session->cookie);
 	/* Runs the trigger, which may yield. */
 	iproto_session_destroy(request->session);
 }
@@ -744,7 +756,7 @@ iproto_on_accept(struct evio_service *service, int fd,
 
 	box_process_func *process_fun =
 		(box_process_func*) service->on_accept_param;
-	session = iproto_session_create(name, fd, process_fun);
+	session = iproto_session_create(name, fd, addr, process_fun);
 	iproto_enqueue_request(&request_queue, session,
 			       session->iobuf[0], &dummy_header,
 			       iproto_process_connect);

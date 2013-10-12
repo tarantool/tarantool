@@ -15,16 +15,17 @@ print_config()
   slab_alloc_minimal: 64
   admin_port: 33015
   logger: cat - >> tarantool.log
-  snap_io_rate_limit: 0
-  log_level: 4
   slab_alloc_arena: 0.1
+  log_level: 4
+  snap_io_rate_limit: 0
   backlog: 1024
-  primary_port: 33013
-  logger_nonblock: true
   secondary_port: 33014
+  too_long_threshold: 0.5
+  logger_nonblock: true
+  wal_dir: .
   snap_dir: .
   coredump: false
-  wal_dir: .
+  replication_protocol: 1.6
   readahead: 16320
   local_hot_standby: false
   wal_mode: fsync_delay
@@ -35,6 +36,18 @@ print_config()
   replication_port: 0
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  too_long_threshold: 0.5
+  primary_port: 33013
   wal_dir_rescan_delay: 0.1
+...
+string.gmatch(package.path, '([^;]*)')()
+---
+- script_dir/?.lua
+...
+string.gmatch(package.cpath, '([^;]*)')()
+---
+- script_dir/?.so
+...
+mod.test(10, 15)
+---
+- 25
 ...

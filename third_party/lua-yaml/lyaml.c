@@ -407,8 +407,9 @@ static int dump_node(struct lua_yaml_dumper *dumper);
   111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
   1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
 */
-static int is_utf8(const unsigned char *str, size_t len)
+static int is_utf8(const char *data, size_t len)
 {
+    const unsigned char *str = (const unsigned char *) data;
     size_t i = 0;
     size_t continuation_bytes = 0;
 

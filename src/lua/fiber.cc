@@ -382,7 +382,7 @@ lbox_fiber_detach(struct lua_State *L)
 	/* Request a detach. */
 	lua_pushinteger(L, DETACH);
 	/* A detached fiber has no associated session. */
-	fiber_set_sid(fiber, 0);
+	fiber_set_sid(fiber, 0, 0);
 	fiber_yield_to(caller);
 	return 0;
 }
@@ -503,7 +503,7 @@ lbox_fiber_create(struct lua_State *L)
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Preserve the session in a child fiber. */
-	fiber_set_sid(f, fiber->sid);
+	fiber_set_sid(f, fiber->sid, fiber->cookie);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 

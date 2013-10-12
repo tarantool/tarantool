@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <strings.h>
+#include <arpa/inet.h>
 
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
@@ -48,26 +49,32 @@
 extern struct tc tc;
 
 static void
-tc_printer_xlog_raw(struct tnt_log_header_v11 *hdr,
+tc_printer_xlog_raw(struct tnt_log_row *row,
 		    struct tnt_request *r)
 {
 	if (tc.opt.raw_with_headers) {
 		fwrite(&tnt_log_marker_v11,
 			sizeof(tnt_log_marker_v11), 1, stdout);
 	}
-	fwrite(hdr, sizeof(*hdr), 1, stdout);
+	fwrite(&(row->hdr), sizeof(row->hdr), 1, stdout);
 	fwrite(r->origin, r->origin_size, 1, stdout);
 }
 
 static void
-tc_printer_xlog_tarantool(struct tnt_log_header_v11 *hdr,
+tc_printer_xlog_tarantool(struct tnt_log_row *row,
 			  struct tnt_request *r)
 {
-	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
+	struct sockaddr_in *peer = (void *)&row->row.cookie;
+	tc_printf("%s, lsn: %"PRIu64", time: %lf, len: %"PRIu32", space: "
+			"%"PRIu32", cookie: %s:%d ",
 		tc_query_type(r->h.type),
-		hdr->lsn,
-		hdr->tm,
-		hdr->len);
+		row->hdr.lsn,
+		row->hdr.tm,
+		row->hdr.len,
+		r->r.insert.h.ns,
+		inet_ntoa(peer->sin_addr),
+		ntohs(peer->sin_port)
+		);
 	switch (r->h.type) {
 	case TNT_OP_INSERT:
 		tc_print_tuple(&r->r.insert.t);
@@ -82,7 +89,7 @@ tc_printer_xlog_tarantool(struct tnt_log_header_v11 *hdr,
 }
 
 static void
-tc_printer_xlog_lua(struct tnt_log_header_v11 *hdr,
+tc_printer_xlog_lua(struct tnt_log_row *row,
 		    struct tnt_request *r)
 {
 	tc_printf("lua box.");
@@ -176,7 +183,7 @@ tc_printer_xlog_lua(struct tnt_log_header_v11 *hdr,
 		}
 		break;
 	}
-	tc_printf(") -- %"PRIu64, hdr->lsn);
+	tc_printf(") -- %"PRIu64, row->hdr.lsn);
 	if (tc.opt.delim_len > 0)
 		tc_printf("%s\n", tc.opt.delim);
 	else

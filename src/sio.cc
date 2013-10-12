@@ -34,6 +34,12 @@
 #include <limits.h>
 #include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h> /* inet_ntoa */
+#include <poll.h>
+#include <unistd.h> /* lseek for sending file */
+#include <sys/stat.h> /* fstat for sending file */
+#ifdef TARGET_OS_LINUX
+#include <sys/sendfile.h> /* sendfile system call */
+#endif /* #ifdef TARGET_OS_LINUX */
 
 #include "say.h"
 
@@ -277,6 +283,119 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 		tnt_raise(SocketError, fd, "writev(%d)", iovcnt);
 	}
 	return n;
+}
+
+ssize_t
+sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size)
+{
+	size_t read_count = 0;
+	while (read_count < count) {
+		ssize_t read_res = read(fd, (char *) buf + read_count,
+					buf_size - read_count);
+		if (read_res < 0 && (errno == EWOULDBLOCK ||
+				     errno == EINTR || errno == EAGAIN))
+			continue;
+
+		if (read_res <= 0)
+			tnt_raise(SocketError, fd, "read (%zd)", count);
+
+		read_count += read_res;
+	}
+	return read_count;
+}
+
+ssize_t
+sio_writen(int fd, const void *buf, size_t count)
+{
+	size_t write_count = 0;
+	while (write_count < count) {
+		ssize_t write_res = write(fd, (char *) buf + write_count,
+					  count - write_count);
+		if (write_res < 0 && (errno == EWOULDBLOCK ||
+				      errno == EINTR || errno == EAGAIN))
+			continue;
+
+		if (write_res <= 0)
+			tnt_raise(SocketError, fd, "write (%zd)", count);
+
+		write_count += write_res;
+	}
+	return write_count;
+}
+
+static inline off_t
+sio_lseek(int fd, off_t offset, int whence)
+{
+	off_t res = lseek(fd, offset, whence);
+	if (res == -1)
+		tnt_raise(SocketError, fd, "lseek");
+	return res;
+}
+
+#if defined(HAVE_SENDFILE_LINUX)
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
+	ssize_t send_res = sendfile(sock_fd, file_fd, offset, size);
+	if (send_res < size)
+		tnt_raise(SocketError, sock_fd, "sendfile");
+	return send_res;
+}
+#elif defined(HAVE_SENDFILE_BSD)
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
+	off_t sent_bytes = 0;
+	int send_res = sendfile(sock_fd, file_fd, offset, size,
+				NULL, &sent_bytes, NULL);
+	if (send_res != 0 || sent_bytes < size)
+		tnt_raise(SocketError, sock_fd, "sendfile");
+	return send_res;
+}
+#else
+ssize_t
+sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
+	if (offset)
+		sio_lseek(file_fd, *offset, SEEK_SET);
+
+	const size_t buffer_size = 8192;
+	char buffer[buffer_size];
+	size_t bytes_sent = 0;
+	while (bytes_sent < size) {
+		size_t to_send_now = MIN(size - bytes_sent, buffer_size);
+		ssize_t n = sio_read(file_fd, buffer, to_send_now);
+		sio_writen(sock_fd, buffer, n);
+		bytes_sent += n;
+	}
+
+	if (offset)
+		lseek(file_fd, *offset, SEEK_SET);
+
+	return bytes_sent;
+}
+#endif
+
+ssize_t
+sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size)
+{
+	if (offset)
+		sio_lseek(file_fd, *offset, SEEK_SET);
+
+	const size_t buffer_size = 8192;
+	char buffer[buffer_size];
+	size_t bytes_read = 0;
+	while (bytes_read < size) {
+		size_t to_read_now = MIN(size - bytes_read, buffer_size);
+		ssize_t n = sio_read(sock_fd, buffer, to_read_now);
+		sio_writen(file_fd, buffer, n);
+		bytes_read += n;
+	}
+
+	if (offset)
+		sio_lseek(file_fd, *offset, SEEK_SET);
+
+	return bytes_read;
 }
 
 /** Send a message on a socket. */
