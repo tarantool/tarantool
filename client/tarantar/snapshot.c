@@ -88,11 +88,11 @@ ts_snapshot_xfer(FILE *snapshot, struct tnt_log *current,
 {
 	int rc = tnt_log_seek(current, k->offset);
 	if (rc == -1) {
-		printf("failed to seek for: %s:%d\n", r->file, k->offset);
+		printf("failed to seek for: %s:%"PRIu64"\n", r->file, k->offset);
 		return -1;
 	}
 	if (tnt_log_next(current) == NULL) {
-		printf("failed to read: %s:%d\n", r->file, k->offset);
+		printf("failed to read: %s:%"PRIu64"\n", r->file, k->offset);
 		return -1;
 	}
 
@@ -106,8 +106,10 @@ ts_snapshot_xfer(FILE *snapshot, struct tnt_log *current,
 		case TNT_OP_INSERT:
 			t = &rp->r.insert.t;
 			break;
+		case TNT_OP_DELETE_1_3:
 		case TNT_OP_DELETE:
-			t = &rp->r.del.t;
+			/* skip */
+			//t = &rp->r.del.t;
 			return 0;
 		case TNT_OP_UPDATE:
 			assert(0);

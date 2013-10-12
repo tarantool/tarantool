@@ -44,12 +44,12 @@ ts_cursor_open(struct ts_cursor *c, struct ts_key *k)
 	}
 	rc = tnt_log_seek(&c->current, k->offset);
 	if (rc == -1) {
-		printf("failed to seek for: %s:%d\n", c->r->file, k->offset);
+		printf("failed to seek for: %s:%"PRIu64"\n", c->r->file, k->offset);
 		tnt_log_close(&c->current);
 		return -1;
 	}
 	if (tnt_log_next(&c->current) == NULL) {
-		printf("failed to read: %s:%d\n", c->r->file, k->offset);
+		printf("failed to read: %s:%"PRIu64"\n", c->r->file, k->offset);
 		tnt_log_close(&c->current);
 		return -1;
 	}
@@ -69,9 +69,12 @@ ts_cursor_tuple(struct ts_cursor *c)
 		case TNT_OP_INSERT:
 			t = &rp->r.insert.t;
 			break;
+		case TNT_OP_DELETE_1_3:
+			t = &rp->r.del_1_3.t;
+			return t;
 		case TNT_OP_DELETE:
 			t = &rp->r.del.t;
-			return 0;
+			return t;
 		case TNT_OP_UPDATE:
 			assert(0);
 			break;
