@@ -816,7 +816,7 @@ main(int argc, char **argv)
 	if (gopt(opt, 'I')) {
 		struct log_dir dir = snap_dir;
 		dir.dirname = cfg.snap_dir;
-		init_storage(&dir, cfg.replication_source);
+		init_storage(&dir, NULL);
 		exit(EXIT_SUCCESS);
 	}
 
