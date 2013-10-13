@@ -249,7 +249,7 @@ lbox_print(struct lua_State *L)
 	/* pop 'out' */
 	lua_pop(L, 1);
 	/* always output to log only */
-	out = tbuf_new(fiber->gc_pool);
+	out = tbuf_new(&fiber->gc);
 	/* serialize arguments of 'print' Lua built-in to tbuf */
 	int top = lua_gettop(L);
 	for (int i = 1; i <= top; i++) {
@@ -602,7 +602,7 @@ tarantool_lua_close(struct lua_State *L)
 static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
-	struct tbuf *buf = tbuf_new(fiber->gc_pool);
+	struct tbuf *buf = tbuf_new(&fiber->gc);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));
 	if (r) {

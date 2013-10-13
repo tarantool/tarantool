@@ -33,7 +33,6 @@ extern "C" {
 #include <cfg/warning.h>
 #include <cfg/tarantool_box_cfg.h>
 } /* extern "C" */
-#include <palloc.h>
 #include <stddef.h>
 
 #include <stddef.h>
@@ -342,7 +341,7 @@ replica_connect(const char *replication_source)
 static void
 spawner_init(int sock)
 {
-	char name[FIBER_NAME_MAXLEN];
+	char name[FIBER_NAME_MAX];
 	struct sigaction sa;
 
 	snprintf(name, sizeof(name), "spawner%s", custom_proc_title);
@@ -678,7 +677,7 @@ replication_relay_send_snapshot(int client_sock)
 static void
 replication_relay_loop(int client_sock)
 {
-	char name[FIBER_NAME_MAXLEN];
+	char name[FIBER_NAME_MAX];
 	struct sigaction sa;
 	int64_t lsn;
 

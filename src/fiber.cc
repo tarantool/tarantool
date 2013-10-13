@@ -43,6 +43,7 @@ extern "C" {
 #include <assoc.h>
 #include "iobuf.h"
 #include <rlist.h>
+#include "memory.h"
 
 enum { FIBER_CALL_STACK = 16 };
 
@@ -345,12 +346,12 @@ unregister_fid(struct fiber *fiber)
 void
 fiber_gc(void)
 {
-	if (palloc_allocated(fiber->gc_pool) < 128 * 1024) {
-		palloc_reset(fiber->gc_pool);
+	if (region_used(&fiber->gc) < 128 * 1024) {
+		region_reset(&fiber->gc);
 		return;
 	}
 
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 }
 
 
@@ -369,7 +370,7 @@ fiber_zombificate()
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 	rlist_move_entry(&zombie_fibers, fiber, link);
 }
 
@@ -410,7 +411,7 @@ void
 fiber_set_name(struct fiber *fiber, const char *name)
 {
 	assert(name != NULL);
-	palloc_set_name(fiber->gc_pool, name);
+	region_set_name(&fiber->gc, name);
 }
 
 /**
@@ -437,7 +438,7 @@ fiber_new(const char *name, void (*f) (va_list))
 
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
-		fiber->gc_pool = palloc_create_pool("");
+		region_create(&fiber->gc, slabc_runtime);
 
 		rlist_add_entry(&fibers, fiber, link);
 		rlist_create(&fiber->state);
@@ -474,7 +475,7 @@ fiber_destroy(struct fiber *f)
 		return;
 
 	rlist_del(&f->state);
-	palloc_destroy_pool(f->gc_pool);
+	region_destroy(&f->gc);
 	tarantool_coro_destroy(&f->coro);
 }
 
@@ -498,7 +499,7 @@ fiber_init(void)
 
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
-	sched.gc_pool = palloc_create_pool("");
+	region_create(&sched.gc, slabc_runtime);
 	fiber_set_name(&sched, "sched");
 
 	sp = call_stack;

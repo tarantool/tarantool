@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include "tarantool/util.h"
 #include "third_party/queue.h"
+#include "lib/small/region.h"
 
 struct ev_io;
 
@@ -52,7 +53,7 @@ struct ev_io;
  */
 struct ibuf
 {
-	struct palloc_pool *pool;
+	struct region *pool;
 	char *buf;
 	/** Start of input. */
 	char *pos;
@@ -98,7 +99,7 @@ enum { IOBUF_IOV_MAX = 32 };
 /**
  * An output buffer is an array of struct iovec vectors
  * for writev().
- * Each buffer is allocated on palloc pool.
+ * Each buffer is allocated on region allocator.
  * Buffer size grows by a factor of 2. With this growth factor,
  * the number of used buffers is unlikely to ever exceed the
  * hard limit of IOBUF_IOV_MAX. If it does, an exception is
@@ -106,7 +107,7 @@ enum { IOBUF_IOV_MAX = 32 };
  */
 struct obuf
 {
-	struct palloc_pool *pool;
+	struct region *pool;
 	/* How many bytes are in the buffer. */
 	size_t size;
 	/** Position of the "current" iovec. */
@@ -201,6 +202,7 @@ struct iobuf
 	struct ibuf in;
 	/** Output buffer. */
 	struct obuf out;
+	struct region pool;
 };
 
 /** Create an instance of input/output buffer. */

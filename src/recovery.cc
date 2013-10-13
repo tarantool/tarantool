@@ -583,7 +583,7 @@ recover_current_wal:
 		result = -1;
 	}
 
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 	return result;
 }
 
@@ -607,7 +607,7 @@ recover_existing_wals(struct recovery_state *r)
 		panic("recover failed");
 	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
 out:
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 }
 
 void
@@ -1201,8 +1201,8 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req = (struct wal_write_request *)
-		palloc(fiber->gc_pool, sizeof(struct wal_write_request) +
-		       sizeof(op) + row_len);
+		region_alloc(&fiber->gc, sizeof(struct wal_write_request) +
+			     sizeof(op) + row_len);
 
 	req->fiber = fiber;
 	req->res = -1;
@@ -1249,7 +1249,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct wal_row *row = (struct wal_row *) palloc(fiber->gc_pool,
+	struct wal_row *row = (struct wal_row *) region_alloc(&fiber->gc,
 				     sizeof(struct wal_row) +
 				     data_len + metadata_len);
 
@@ -1268,7 +1268,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 
 		snap_write_batch(batch, fileno(l->f));
 		fio_batch_start(batch, INT_MAX);
-		prelease_after(fiber->gc_pool, 128 * 1024);
+		region_free_after(&fiber->gc, 128 * 1024);
 		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
 			if (last == 0) {
 				/*

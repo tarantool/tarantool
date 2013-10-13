@@ -136,7 +136,7 @@ static void
 bio_initbuf(struct bio_socket *s)
 {
 	assert(s->iob == NULL);
-	char name[PALLOC_POOL_NAME_MAXLEN];
+	char name[FIBER_NAME_MAX];
 	const char *type = s->socktype == SOCK_STREAM ? "tcp" : "udp";
 	snprintf(name, sizeof(name), "box.io.%s(%d)",
 		 type, s->io_w.fd);
@@ -657,7 +657,7 @@ lbox_socket_readline(struct lua_State *L)
 		 * to determine current position of a possible
 		 * separator. */
 		struct readline_state *rs = (struct readline_state *)
-			palloc(in->pool, sizeof(struct readline_state) * rs_size);
+			region_alloc(in->pool, sizeof(struct readline_state) * rs_size);
 		readline_state_init(L, rs, seplist);
 
 		while (1) {

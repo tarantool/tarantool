@@ -30,7 +30,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#include "palloc.h"
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
@@ -101,7 +100,8 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 	ssize_t result = -1;
 	size_t i = 0, size = 1024;
 	ssize_t ext_len = strlen(dir->filename_ext);
-	int64_t *lsn = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size);
+	int64_t *lsn = (int64_t *) region_alloc(&fiber->gc,
+						sizeof(int64_t) * size);
 	DIR *dh = opendir(dir->dirname);
 
 	if (lsn == NULL || dh == NULL)
@@ -145,7 +145,7 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 
 		i++;
 		if (i == size) {
-			int64_t *n = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size * 2);
+			int64_t *n = (int64_t *) region_alloc(&fiber->gc, sizeof(int64_t) * size * 2);
 			if (n == NULL)
 				goto out;
 			memcpy(n, lsn, sizeof(int64_t) * size);
@@ -241,7 +241,7 @@ row_reader(FILE *f, uint32_t *rowlen)
 		say_error("header crc32c mismatch");
 		return NULL;
 	}
-	char *row = (char *) palloc(fiber->gc_pool, sizeof(m) + m.len);
+	char *row = (char *) region_alloc(&fiber->gc, sizeof(m) + m.len);
 	memcpy(row, &m, sizeof(m));
 
 	if (fread(row + sizeof(m), m.len, 1, f) != 1)
@@ -279,7 +279,7 @@ log_io_cursor_close(struct log_io_cursor *i)
 	 * Seek back to last known good offset.
 	 */
 	fseeko(l->f, i->good_offset, SEEK_SET);
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 }
 
 /**
@@ -307,7 +307,7 @@ log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen)
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
-	prelease_after(fiber->gc_pool, 128 * 1024);
+	region_free_after(&fiber->gc, 128 * 1024);
 
 restart:
 	if (marker_offset > 0)

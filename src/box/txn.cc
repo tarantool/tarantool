@@ -73,7 +73,8 @@ txn_replace(struct txn *txn, struct space *space,
 struct txn *
 txn_begin()
 {
-	struct txn *txn = (struct txn *) p0alloc(fiber->gc_pool, sizeof(*txn));
+	struct txn *txn = (struct txn *)
+		region_alloc0(&fiber->gc, sizeof(*txn));
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
 	return txn;

@@ -35,7 +35,6 @@ extern "C" {
 } /* extern "C" */
 
 #include <errcode.h>
-#include "palloc.h"
 #include <recovery.h>
 #include <log_io.h>
 #include <pickle.h>

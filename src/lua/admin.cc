@@ -37,7 +37,6 @@ extern "C" {
 #include <string.h>
 #include <say.h>
 #include <errinj.h>
-#include "palloc.h"
 #include "salloc.h"
 #include "tbuf.h"
 #include "fiber.h"

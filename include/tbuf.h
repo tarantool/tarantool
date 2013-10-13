@@ -45,11 +45,11 @@ struct tbuf {
 	uint32_t capacity;
 	/* Allocated buffer. */
 	char *data;
-	struct palloc_pool *pool;
+	struct region *pool;
 };
 
 struct tbuf *
-tbuf_new(struct palloc_pool *pool);
+tbuf_new(struct region *pool);
 
 void tbuf_ensure_resize(struct tbuf *e, size_t bytes_required);
 static inline void tbuf_ensure(struct tbuf *e, size_t required)
@@ -76,7 +76,7 @@ tbuf_end(struct tbuf *tbuf) { return tbuf->data + tbuf->size; }
 static inline size_t
 tbuf_unused(const struct tbuf *tbuf) { return tbuf->capacity - tbuf->size; }
 
-struct tbuf *tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig);
+struct tbuf *tbuf_clone(struct region *pool, const struct tbuf *orig);
 struct tbuf *tbuf_split(struct tbuf *e, size_t at);
 void tbuf_reset(struct tbuf *b);
 void *tbuf_peek(struct tbuf *b, size_t count);

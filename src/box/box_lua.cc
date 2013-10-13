@@ -503,7 +503,7 @@ lbox_tuple_tostring(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
-	struct tbuf *tbuf = tbuf_new(fiber->gc_pool);
+	struct tbuf *tbuf = tbuf_new(&fiber->gc);
 	tuple_print(tbuf, tuple);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
 	return 1;
@@ -1028,7 +1028,7 @@ static struct port *
 port_lua_create(struct lua_State *L)
 {
 	struct port_lua *port = (struct port_lua *)
-			palloc(fiber->gc_pool, sizeof(struct port_lua));
+			region_alloc(&fiber->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
 	return (struct port *) port;
@@ -1199,7 +1199,7 @@ lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
-	size_t allocated_size = palloc_allocated(fiber->gc_pool);
+	size_t allocated_size = region_used(&fiber->gc);
 	struct port *port_lua = port_lua_create(L);
 	try {
 		struct request request;
@@ -1208,11 +1208,11 @@ lbox_process(lua_State *L)
 
 		/*
 		 * This only works as long as port_lua doesn't
-		 * use fiber->cleanup and fiber->gc_pool.
+		 * use fiber->cleanup and fiber->gc.
 		 */
-		ptruncate(fiber->gc_pool, allocated_size);
+		region_truncate(&fiber->gc, allocated_size);
 	} catch (const Exception& e) {
-		ptruncate(fiber->gc_pool, allocated_size);
+		region_truncate(&fiber->gc, allocated_size);
 		throw;
 	}
 	return lua_gettop(L) - top;

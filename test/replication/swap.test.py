@@ -10,9 +10,8 @@ def insert_tuples(_server, begin, end, msg = "tuple"):
     for i in range(begin, end):
         _server.sql("insert into t0 values (%d, '%s %d')" % (i, msg, i))
 
-def select_tuples(_server, begin, end):
-    # the last lsn is end id + 1
-    _server.wait_lsn(end + 1)
+def select_tuples(_server, begin, end, lsn):
+    _server.wait_lsn(lsn)
     for i in range(begin, end):
         _server.sql("select * from t0 where k0 = %d" % i)
 
@@ -50,13 +49,13 @@ for i in range(REPEAT):
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
     # select from replica
-    select_tuples(replica, id, id + ID_STEP)
+    select_tuples(replica, id, id + ID_STEP, master.get_param("lsn"))
     id += ID_STEP
 
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
     # select from replica
-    select_tuples(replica, id, id + ID_STEP)
+    select_tuples(replica, id, id + ID_STEP, master.get_param("lsn"))
     id += ID_STEP
 
     print "swap servers"
@@ -68,13 +67,13 @@ for i in range(REPEAT):
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
     # select from master
-    select_tuples(master, id, id + ID_STEP)
+    select_tuples(master, id, id + ID_STEP, replica.get_param("lsn"))
     id += ID_STEP
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
     # select from master
-    select_tuples(master, id, id + ID_STEP)
+    select_tuples(master, id, id + ID_STEP, replica.get_param("lsn"))
     id += ID_STEP
 
     print "rollback servers configuration"

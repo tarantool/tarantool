@@ -101,8 +101,8 @@ execute_update(const struct request *request, struct txn *txn,
 
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
-					       palloc_region_alloc,
-					       fiber->gc_pool,
+					       region_alloc_cb,
+					       &fiber->gc,
 					       old_tuple, request->u.expr,
 					       request->u.expr_end);
 	TupleGuard guard(new_tuple);

@@ -54,7 +54,6 @@
 #include <recovery.h>
 #include "log_io.h"
 #include <crc32.h>
-#include <palloc.h>
 #include "memory.h"
 #include <salloc.h>
 #include <say.h>
@@ -631,7 +630,6 @@ tarantool_free(void)
 
 	session_free();
 	fiber_free();
-	palloc_free();
 	memory_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
@@ -665,7 +663,6 @@ main(int argc, char **argv)
 	crc32_init();
 	stat_init();
 	memory_init();
-	palloc_init();
 
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);
@@ -878,7 +875,7 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(tarantool_L);
-		prelease(fiber->gc_pool);
+		region_free(&fiber->gc);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering the event loop");
 		if (cfg.io_collect_interval > 0)

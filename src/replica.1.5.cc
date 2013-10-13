@@ -158,7 +158,7 @@ remote_apply_row_1_5(struct recovery_state *r, const char *row, uint32_t rowlen)
 void
 recovery_follow_remote_1_5(struct recovery_state *r, const char *addr)
 {
-	char name[FIBER_NAME_MAXLEN];
+	char name[FIBER_NAME_MAX];
 	char ip_addr[32];
 	int port;
 	int rc;

@@ -44,7 +44,6 @@ set (recompiled_sources
 set (common_sources
      tbuf.c
      rlist.c
-     palloc.cc
      memory.cc
      util.cc
      sio.cc
