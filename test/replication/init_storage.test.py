@@ -20,7 +20,8 @@ print '-------------------------------------------------------------'
 replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"))
+               os.path.join(self.args.vardir, "replica"),
+               need_init=False)
 
 for i in range(1, 10):
 	replica.admin('box.select(42, 0, %d)' % i)
@@ -39,7 +40,8 @@ print '-------------------------------------------------------------'
 replica = TarantoolServer()
 replica.deploy("replication/cfg/replica.cfg",
                replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"))
+               os.path.join(self.args.vardir, "replica"),
+               need_init=False)
 
 replica.admin('space = box.space.test');
 
