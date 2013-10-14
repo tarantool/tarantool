@@ -81,7 +81,9 @@ char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
 struct tarantool_cfg cfg;
-static ev_signal sigs[4];
+/** Signals handled after start as part of the event loop. */
+static ev_signal ev_sigs[4];
+static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 int snapshot_pid = 0; /* snapshot processes pid */
 uint32_t snapshot_version = 0;
@@ -445,19 +447,16 @@ end:
 static void
 signal_free(void)
 {
-	if (sigs == NULL)
-		return;
-
 	int i;
-	for (i = 0 ; i < 4 ; i++)
-		ev_signal_stop(&sigs[i]);
+	for (i = 0; i < ev_sig_count; i++)
+		ev_signal_stop(&ev_sigs[i]);
 }
 
 static void
 signal_start(void)
 {
-	for (int i = 0 ; i < 4 ; i++)
-		ev_signal_start(&sigs[i]);
+	for (int i = 0; i < ev_sig_count; i++)
+		ev_signal_start(&ev_sigs[i]);
 }
 
 /** Make sure the child has a default signal disposition. */
@@ -512,10 +511,10 @@ signal_init(void)
 		exit(EX_OSERR);
 	}
 
-	ev_signal_init(&sigs[0], sig_snapshot, SIGUSR1);
-	ev_signal_init(&sigs[1], signal_cb, SIGINT);
-	ev_signal_init(&sigs[2], signal_cb, SIGTERM);
-	ev_signal_init(&sigs[3], signal_cb, SIGHUP);
+	ev_signal_init(&ev_sigs[0], sig_snapshot, SIGUSR1);
+	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
+	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
+	ev_signal_init(&ev_sigs[3], signal_cb, SIGHUP);
 
 	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
