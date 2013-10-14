@@ -81,7 +81,7 @@ char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
 struct tarantool_cfg cfg;
-static ev_signal *sigs = NULL;
+static ev_signal sigs[4];
 
 int snapshot_pid = 0; /* snapshot processes pid */
 uint32_t snapshot_version = 0;
@@ -453,6 +453,13 @@ signal_free(void)
 		ev_signal_stop(&sigs[i]);
 }
 
+static void
+signal_start(void)
+{
+	for (int i = 0 ; i < 4 ; i++)
+		ev_signal_start(&sigs[i]);
+}
+
 /** Make sure the child has a default signal disposition. */
 static void
 signal_reset()
@@ -505,16 +512,10 @@ signal_init(void)
 		exit(EX_OSERR);
 	}
 
-	sigs = (ev_signal *) palloc(eter_pool, sizeof(ev_signal) * 4);
-	memset(sigs, 0, sizeof(ev_signal) * 4);
 	ev_signal_init(&sigs[0], sig_snapshot, SIGUSR1);
-	ev_signal_start(&sigs[0]);
 	ev_signal_init(&sigs[1], signal_cb, SIGINT);
-	ev_signal_start(&sigs[1]);
 	ev_signal_init(&sigs[2], signal_cb, SIGTERM);
-	ev_signal_start(&sigs[2]);
 	ev_signal_init(&sigs[3], signal_cb, SIGHUP);
-	ev_signal_start(&sigs[3]);
 
 	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
@@ -896,6 +897,7 @@ main(int argc, char **argv)
 			ev_set_io_collect_interval(cfg.io_collect_interval);
 		ev_now_update();
 		start_time = ev_now();
+		signal_start();
 		ev_loop(0);
 	} catch (const Exception& e) {
 		e.log();
