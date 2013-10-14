@@ -70,9 +70,10 @@ SystemError::init(const char *format, va_list ap)
 void
 SystemError::log() const
 {
-	say(S_ERROR, strerror(m_errnum), "%s in %s", "SystemError",
-	    m_errmsg);
+	_say(S_ERROR, m_file, m_line, strerror(m_errnum), "SystemError %s",
+	     m_errmsg);
 }
+
 
 ClientError::ClientError(const char *file, unsigned line, uint32_t errcode, ...)
 	: Exception(file, line)
@@ -98,8 +99,8 @@ ClientError::ClientError(const char *file, unsigned line, const char *msg,
 void
 ClientError::log() const
 {
-	say_error("%s at %s:%d, %s", "ClientError",
-		  m_file, m_line, m_errmsg);
+	_say(S_ERROR, m_file, m_line, NULL, "%s: %s", tnt_errcode_str(m_errcode),
+	     m_errmsg);
 }
 
 IllegalParams::IllegalParams(const char *file, unsigned line, const char *msg)
