@@ -443,6 +443,21 @@ end:
 	abort();
 }
 
+/**
+ * This SIGTERM handler is only used before the main event loop started to
+ * cleanup server pid file. The handler is replaced by ev_signal after the boot.
+ * @sa signal_start
+ */
+static void
+sig_term_cb(int signo)
+{
+	(void) signo;
+	/* unlink pidfile. */
+	if (cfg.pid_file != NULL)
+		unlink(cfg.pid_file);
+
+	_exit(EXIT_SUCCESS);
+}
 
 static void
 signal_free(void)
@@ -507,6 +522,12 @@ signal_init(void)
 
 	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
 	    sigaction(SIGFPE, &sa, 0) == -1) {
+		say_syserror("sigaction");
+		exit(EX_OSERR);
+	}
+
+	sa.sa_handler = sig_term_cb;
+	if (sigaction(SIGTERM, &sa, 0) == -1) {
 		say_syserror("sigaction");
 		exit(EX_OSERR);
 	}
@@ -599,7 +620,6 @@ tarantool_lua_free()
 	tarantool_L = NULL;
 }
 
-
 void
 tarantool_free(void)
 {
@@ -619,8 +639,8 @@ tarantool_free(void)
 		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
-	/* unlink pidfile but not in replication process. */
-	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
+	/* unlink pidfile. */
+	if (cfg.pid_file != NULL)
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
 
