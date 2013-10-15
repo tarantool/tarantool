@@ -81,7 +81,9 @@ char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
 struct tarantool_cfg cfg;
-static ev_signal *sigs = NULL;
+/** Signals handled after start as part of the event loop. */
+static ev_signal ev_sigs[4];
+static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 int snapshot_pid = 0; /* snapshot processes pid */
 uint32_t snapshot_version = 0;
@@ -446,16 +448,35 @@ end:
 	abort();
 }
 
+/**
+ * This SIGTERM handler is only used before the main event loop started to
+ * cleanup server pid file. The handler is replaced by ev_signal after the boot.
+ * @sa signal_start
+ */
+static void
+sig_term_cb(int signo)
+{
+	psignal(signo, "");
+	/* unlink pidfile. */
+	if (cfg.pid_file != NULL)
+		unlink(cfg.pid_file);
+
+	_exit(EXIT_SUCCESS);
+}
 
 static void
 signal_free(void)
 {
-	if (sigs == NULL)
-		return;
-
 	int i;
-	for (i = 0 ; i < 4 ; i++)
-		ev_signal_stop(&sigs[i]);
+	for (i = 0; i < ev_sig_count; i++)
+		ev_signal_stop(&ev_sigs[i]);
+}
+
+static void
+signal_start(void)
+{
+	for (int i = 0; i < ev_sig_count; i++)
+		ev_signal_start(&ev_sigs[i]);
 }
 
 /** Make sure the child has a default signal disposition. */
@@ -497,29 +518,28 @@ signal_init(void)
 	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 
-	if (sigaction(SIGPIPE, &sa, 0) == -1) {
-		say_syserror("sigaction");
-		exit(EX_OSERR);
-	}
+	if (sigaction(SIGPIPE, &sa, 0) == -1)
+		panic_syserror("sigaction");
 
 	sa.sa_handler = sig_fatal_cb;
 
 	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
 	    sigaction(SIGFPE, &sa, 0) == -1) {
-		say_syserror("sigaction");
-		exit(EX_OSERR);
+		panic_syserror("sigaction");
 	}
 
-	sigs = (ev_signal *) malloc(sizeof(ev_signal) * 4);
-	memset(sigs, 0, sizeof(ev_signal) * 4);
-	ev_signal_init(&sigs[0], sig_snapshot, SIGUSR1);
-	ev_signal_start(&sigs[0]);
-	ev_signal_init(&sigs[1], signal_cb, SIGINT);
-	ev_signal_start(&sigs[1]);
-	ev_signal_init(&sigs[2], signal_cb, SIGTERM);
-	ev_signal_start(&sigs[2]);
-	ev_signal_init(&sigs[3], signal_cb, SIGHUP);
-	ev_signal_start(&sigs[3]);
+	sa.sa_handler = sig_term_cb;
+	if (sigaction(SIGUSR1, &sa, 0) == -1 ||
+	    sigaction(SIGINT, &sa, 0) == -1  ||
+	    sigaction(SIGTERM, &sa, 0) == -1 ||
+	    sigaction(SIGHUP, &sa, 0) == -1) {
+		panic_syserror("sigaction");
+	}
+
+	ev_signal_init(&ev_sigs[0], sig_snapshot, SIGUSR1);
+	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
+	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
+	ev_signal_init(&ev_sigs[3], signal_cb, SIGHUP);
 
 	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
@@ -604,7 +624,6 @@ tarantool_lua_free()
 	tarantool_L = NULL;
 }
 
-
 void
 tarantool_free(void)
 {
@@ -623,8 +642,8 @@ tarantool_free(void)
 		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
-	/* unlink pidfile but not in replication process. */
-	if ((cfg.pid_file != NULL) && (master_pid == getpid()))
+	/* unlink pidfile. */
+	if (cfg.pid_file != NULL)
 		unlink(cfg.pid_file);
 	destroy_tarantool_cfg(&cfg);
 
@@ -882,6 +901,7 @@ main(int argc, char **argv)
 			ev_set_io_collect_interval(cfg.io_collect_interval);
 		ev_now_update();
 		start_time = ev_now();
+		signal_start();
 		ev_loop(0);
 	} catch (const Exception& e) {
 		e.log();
