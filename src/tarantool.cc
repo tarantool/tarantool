@@ -451,7 +451,7 @@ end:
 static void
 sig_term_cb(int signo)
 {
-	(void) signo;
+	psignal(signo, "");
 	/* unlink pidfile. */
 	if (cfg.pid_file != NULL)
 		unlink(cfg.pid_file);
@@ -513,23 +513,22 @@ signal_init(void)
 	sa.sa_handler = SIG_IGN;
 	sigemptyset(&sa.sa_mask);
 
-	if (sigaction(SIGPIPE, &sa, 0) == -1) {
-		say_syserror("sigaction");
-		exit(EX_OSERR);
-	}
+	if (sigaction(SIGPIPE, &sa, 0) == -1)
+		panic_syserror("sigaction");
 
 	sa.sa_handler = sig_fatal_cb;
 
 	if (sigaction(SIGSEGV, &sa, 0) == -1 ||
 	    sigaction(SIGFPE, &sa, 0) == -1) {
-		say_syserror("sigaction");
-		exit(EX_OSERR);
+		panic_syserror("sigaction");
 	}
 
 	sa.sa_handler = sig_term_cb;
-	if (sigaction(SIGTERM, &sa, 0) == -1) {
-		say_syserror("sigaction");
-		exit(EX_OSERR);
+	if (sigaction(SIGUSR1, &sa, 0) == -1 ||
+	    sigaction(SIGINT, &sa, 0) == -1  ||
+	    sigaction(SIGTERM, &sa, 0) == -1 ||
+	    sigaction(SIGHUP, &sa, 0) == -1) {
+		panic_syserror("sigaction");
 	}
 
 	ev_signal_init(&ev_sigs[0], sig_snapshot, SIGUSR1);
