@@ -9,7 +9,7 @@
   <title>Tarantool: an overview</title>
   <para>
     <productname>Tarantool</productname> is an in-memory NoSQL
-    database. The code is available for free under the terms of
+    database management system. The code is available for free under the terms of the
     <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
     license</citetitle>. Supported platforms are GNU/Linux, Mac OS
@@ -20,89 +20,87 @@
   <para>
     The server <emphasis role="strong">maintains all its data in
     random-access memory</emphasis>, and therefore has very low read
-    latency. At the same time, a copy of the data
-    is kept on non-volatile storage (a disk drive), and inserts
-    and updates are performed atomically.
+    latency. The server <emphasis role="strong">keeps persistent copies of
+    the data in non-volatile storage</emphasis>, such as disk,
+    when users request "snapshots". The server <emphasis role="strong">
+    maintains a write-ahead log (WAL)</emphasis> to ensure
+    consistency and crash safety of the persistent copies.
+    The server <emphasis role="strong">performs inserts and updates atomically</emphasis> --
+    changes are not considered complete until the WAL is written.
+    The logging subsystem supports group commit.
   </para>
 
   <para>
-    To ensure atomicity, consistency and crash-safety of the
-    persistent copy, a write-ahead log (WAL) is maintained, and
-    each change is recorded in the WAL before it is considered
-    complete. The logging subsystem supports group commit.
-  </para>
-
-  <para>
-    If update and delete rate is high, a constantly growing
-    write-ahead log file (or files) can pose a disk space problem,
-    and significantly increase time necessary to restart from disk.
-    A simple solution is employed: the server <emphasis
-    role="strong">can be requested to save a concise
-    snapshot</emphasis> of
-    its current data. A combination of delayed garbage collection
-    for data pages and <quote>copy-on-write</quote> technique for
-    index pages is employed to provide the snapshot process
-    with a consistent read view, so that the snapshot is taken
-    in a quick, resource-savvy and non-blocking manner.
+    When the rate of data changes is high, the write-ahead log file
+    (or files) can grow quickly. This uses up disk space, and
+    increases the time necessary to restart the server (because
+    the server must start with the last snapshot, and then replay
+    the transactions that are in the log). The solution is to
+    make snapshots frequently. Therefore the server ensures that
+    <emphasis role="strong">snapshots are quick, resource-savvy, and non-blocking
+    </emphasis>. To accomplish this, the server uses delayed garbage
+    collection for data pages and uses a copy-on-write technique for
+    index pages. This ensures that the snapshot process has a
+    consistent read view.
   </para>
 
   <para>
     <emphasis role="strong">Tarantool is lock-free</emphasis>.
     Instead of the operating system's concurrency primitives, such
-    as threads and mutexes, Tarantool uses a cooperative
-    multitasking environment to simultaneously operate on
-    thousands of connections. A fixed number of independent
-    execution threads within the server do not share state, but
-    exchange data using low overhead message queues. While this
-    approach limits server scalability to a few CPU cores,
-    it removes competition for the memory bus and sets
-    the scalability limit to the top of memory and network
-    throughput.  CPU utilization of a typical highly-loaded
+    as mutexes, Tarantool uses cooperative
+    multitasking to handle thousands of connections simultaneously.
+    There is a fixed number of independent execution threads.
+    The threads do not share state. Instead they
+    exchange data using low-overhead message queues. While this
+    approach limits the number of cores that the server will use,
+    it removes competition for the memory bus and ensures peak
+    scalability of memory access and network throughput.
+    CPU utilization of a typical highly-loaded
     Tarantool server is under 10%.
   </para>
 
   <para>
-    Unlike most of NoSQL databases, Tarantool supports primary,
-    <emphasis role="strong"> secondary keys, multi-part
-    keys</emphasis>, HASH, TREE and BITSET index types.
+    Unlike most NoSQL DBMSs, Tarantool supports <emphasis role="strong">
+    secondary index keys and multi-part index keys</emphasis>
+    as well as primary keys. The possible index types are
+    HASH, TREE, and BITSET.
   </para>
 
   <para>
-    The key feature of Tarantool is <emphasis
-    role="strong">support for Lua stored procedures</emphasis>, which
+    As its key feature, Tarantool supports <emphasis
+    role="strong">Lua stored procedures</emphasis>, which
     can access and modify data atomically.
-    Procedures can be created, modified and dropped at runtime.
+    Users can create, modify and drop Lua procedures at runtime.
   </para>
   <para>
-    Use of Lua as an extension language does not end with stored 
-    procedures: Lua programs can be used during startup, to define
-    triggers and background tasks, interact with networked peers.
+    There is a role not only for Lua procedures, but also for Lua programs.
+    During startup, Lua programs can be used to define
+    triggers and background tasks, or interact with networked peers.
     Unlike popular application development frameworks based on
-    "reactor" pattern, networking in server-side Lua is
-    sequential, yet very efficient, as is built on top of the
-    cooperating multitasking environment used by the server
-    itself.
+    a "reactor" pattern, networking in server-side Lua is
+    sequential, yet very efficient, as it is built on top of the
+    cooperative multitasking environment that Tarantool itself uses.
     </para>
     <para>
     Extended with Lua, Tarantool typically replaces
-    not one but a few existing components with a single
-    well-performing system, changing and simplifying complex
-    multi-tier Web application architectures.
+    multiple components of an existing system. Complex
+    multi-tier Web application architectures
+    become simpler, and performance is good.
   </para>
 
   <para>
-    Tarantool supports replication. Replicas may run locally or on
-    a remote host. Tarantool replication is asynchronous and does
-    not block writes to the master. When or if the master becomes
-    unavailable, the replica can be switched to assume the role of
-    the master without server restart.
+    Tarantool supports <emphasis role="strong">asynchronous replication
+    </emphasis>, locally or to a remote host. Replication does not
+    cause blocking of writes to the master database.
+    If the master becomes unavailable, a replica can assume the
+    master role without requiring a restart.
   </para>
 
   <para>
-    <emphasis role="strong">The software is production-ready</emphasis>.
-    Tarantool has been created and is actively used at
+    Tarantool is <emphasis role="strong">in production today</emphasis>.
+    Tarantool was created by and is actively used at
     <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
-    one of the leading Russian web content providers. At Mail.Ru,
+    one of the leading Russian web content providers. At Mail.Ru
     the software serves the <quote>hottest</quote>
     data, such as online users and their sessions, online application
     properties, mapping between users and their serving shards,
@@ -110,12 +108,12 @@
    </para>
    <para>
    Outside Mail.Ru the software is used by a growing
-    number of projects in online gaming, digital marketing, social
+    number of projects in online gaming, digital marketing, and social
     media industries. While product development is sponsored by Mail.Ru, the
-    roadmap, bugs database and the development process are fully
+    roadmap and the bugs database and the development process are fully
     open. The software incorporates patches from dozens of
-    community contributors, and most of the programming language drivers
-    are written and maintained by the community.
+    community contributors. The Tarantool community writes and maintains
+    most of the drivers for programming languages.
   </para>
 
 </section>
@@ -128,30 +126,21 @@
     xlink:href="http://docbook.sourceforge.net/release/xsl/current/doc/">DocBook
     XSL</citetitle> formatting conventions:</para>
   <para>
-    UNIX shell command input is prefixed with '$ ' and is 
-    formatted using a fixed-width font:
-    <programlisting><prompt>$ </prompt>tarantool_box <option>--background</option>
-    </programlisting>
+    UNIX shell command input is prefixed with '$ ' and is in
+    a fixed-width font:
+    <programlisting><prompt>$ </prompt>tarantool_box <option>--background</option></programlisting>
   </para>
   <para>
-    The same formatting style is used for file names:
-    <filename>/path/to/var/dir</filename>.
+    File names are also in a fixed-width font:
+    <programlisting><filename>/path/to/var/dir</filename></programlisting>
   </para>
-
   <para>
-    Text that represents user input is formatted in boldface:
-    <programlisting>
-      <prompt>$ </prompt><userinput>your input here</userinput>
-    </programlisting>
-
+    Text that represents user input is in boldface:
+    <programlisting><prompt>$ </prompt><userinput>your input here</userinput></programlisting>
   </para>
-
   <para>
-    Within user input, replaceable items are printed in italics:
-    <programlisting>
-      <prompt>$ </prompt><userinput>tarantool_box <replaceable>--option</replaceable></userinput>
-    </programlisting>
-
+    Within user input, replaceable items are in italics:
+    <programlisting><prompt>$ </prompt><userinput>tarantool_box <replaceable>--option</replaceable></userinput></programlisting>
   </para>
 </section>
 <section xml:id="reporting-bugs">
@@ -165,12 +154,13 @@
     <link xlink:href="https://launchpad.net/~tarantool-developers">tarantool-developers@lists.launchpad.net</link>.
   </para>
   <para>
-    <emphasis role="strong">Caution:</emphasis> To prevent spam, Launchpad
-    mailing list software silently drops all mail sent from
-    non-registered email addresses. Launchpad registration also
+    <emphasis role="strong">Caution:</emphasis> To prevent spam, the Launchpad
+    mailing-list software silently drops all mail coming from
+    non-registered email addresses -- so register with Launchpad
+    before sending emails. Launchpad registration also
     allows you to report bugs and create feature requests.
-    You can always check whether or not your mail has been
-    delivered to the mailing list in the public list archive, <link
+    You can check that your mail was delivered by looking at the
+    mailing list archive, <link
     xlink:href="https://lists.launchpad.net/tarantool-developers"/>.
   </para>
 </section>
