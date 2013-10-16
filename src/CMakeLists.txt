@@ -211,7 +211,7 @@ function(tarantool_module mod)
         "-DTARANTOOL_CONFIG='<cfg/tarantool_${mod}_cfg.h>'")
     add_dependencies(lt${mod} generate_headers generate_admin_cc generate_memcached_grammar_cc build_bundled_libs)
 
-    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
+    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries} -rdynamic)
 
     if (ENABLE_STATIC)
         set_target_properties(tarantool_${mod} PROPERTIES
