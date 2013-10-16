@@ -4,6 +4,7 @@ find_path(MYSQL_INCLUDE_DIR
 )
 find_library(MYSQL_LIBRARIES
     NAMES mysqlclient_r
+    PATH_SUFFIXES mysql
 )
 
 if(MYSQL_INCLUDE_DIR AND MYSQL_LIBRARIES)
