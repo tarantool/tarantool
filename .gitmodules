@@ -3,4 +3,4 @@
 	url = git://github.com/mpx/lua-cjson.git
 [submodule "third_party/luajit"]
 	path = third_party/luajit
-	url = http://luajit.org/git/luajit-2.0.git
+    url = git://github.com/tarantool/luajit.git
