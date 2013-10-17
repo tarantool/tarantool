@@ -865,6 +865,8 @@ tarantool_lua_sandbox(struct lua_State *L)
 	 * 1. Some os.* functions (like os.execute, os.exit, etc..)
 	 * 2. require(), since it can be used to provide access to ffi
 	 * or anything else we unset in 1.
+	 * 3. package, because it can be used to invoke require or to get
+	 * any builtin module using package.loaded
 	 */
 	int result = tarantool_lua_dostring(L,
 					    "os.execute = nil\n"
@@ -873,7 +875,9 @@ tarantool_lua_sandbox(struct lua_State *L)
 					    "os.tmpname = nil\n"
 					    "os.remove = nil\n"
 					    "io = nil\n"
-					    "require = nil\n");
+					    "require = nil\n"
+					    "package = nil\n");
+
 	if (result)
 		panic("%s", lua_tostring(L, -1));
 }

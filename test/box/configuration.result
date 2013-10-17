@@ -39,11 +39,11 @@ print_config()
   primary_port: 33013
   wal_dir_rescan_delay: 0.1
 ...
-string.gmatch(package.path, '([^;]*)')()
+string.gmatch(package_path, '([^;]*)')()
 ---
 - script_dir/?.lua
 ...
-string.gmatch(package.cpath, '([^;]*)')()
+string.gmatch(package_cpath, '([^;]*)')()
 ---
 - script_dir/?.so
 ...
