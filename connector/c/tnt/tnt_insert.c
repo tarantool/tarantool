@@ -66,9 +66,9 @@ tnt_insert(struct tnt_stream *s, uint32_t ns, uint32_t flags,
 	hdr_insert.flags = flags;
 	/* writing data to stream */
 	struct iovec v[3];
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void *)&hdr;
 	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_insert;
+	v[1].iov_base = (void *)&hdr_insert;
 	v[1].iov_len  = sizeof(struct tnt_header_insert);
 	v[2].iov_base = kv->data;
 	v[2].iov_len  = kv->size;

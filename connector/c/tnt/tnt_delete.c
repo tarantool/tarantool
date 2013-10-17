@@ -65,9 +65,9 @@ tnt_delete(struct tnt_stream *s, uint32_t ns, uint32_t flags, struct tnt_tuple *
 	hdr_del.flags = flags;
 	/* writing data to stream */
 	struct iovec v[3];
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void *)&hdr;
 	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_del;
+	v[1].iov_base = (void *)&hdr_del;
 	v[1].iov_len  = sizeof(struct tnt_header_delete);
 	v[2].iov_base = k->data;
 	v[2].iov_len  = k->size;

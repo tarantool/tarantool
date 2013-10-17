@@ -74,9 +74,9 @@ tnt_call(struct tnt_stream *s, uint32_t flags, const char *proc,
 	hdr_call.flags = flags;
 	/* writing data to stream */
 	struct iovec v[5];
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void *)&hdr;
 	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_call;
+	v[1].iov_base = (void *)&hdr_call;
 	v[1].iov_len  = sizeof(struct tnt_header_call);
 	v[2].iov_base = proc_enc;
 	v[2].iov_len  = proc_enc_size;
@@ -84,7 +84,7 @@ tnt_call(struct tnt_stream *s, uint32_t flags, const char *proc,
 	v[3].iov_len  = proc_len;
 	uint32_t argc = 0;
 	if (args->size == 0) {
-		v[4].iov_base = &argc;
+		v[4].iov_base = (void *)&argc;
 		v[4].iov_len  = 4;
 	} else {
 		v[4].iov_base = args->data;

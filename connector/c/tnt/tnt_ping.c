@@ -58,7 +58,7 @@ tnt_ping(struct tnt_stream *s)
 	hdr.reqid = s->reqid;
 	/* writing data to stream */
 	struct iovec v[1];
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void*)&hdr;
 	v[0].iov_len = sizeof(struct tnt_header);
 	return s->writev(s, v, 1);
 }
