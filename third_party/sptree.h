@@ -42,12 +42,12 @@ extern "C" {
 /*
  * user could suggest pointer's storage himself
  */
-typedef    u_int32_t spnode_t;
+typedef    uint32_t spnode_t;
 #define    SPNIL (0xffffffff)
 
 typedef struct sptree_node_pointers {
-    u_int32_t    left;   /* sizeof(spnode_t) >= sizeof(sptree_node_pointers.left) !!! */
-    u_int32_t    right;
+    uint32_t    left;   /* sizeof(spnode_t) >= sizeof(sptree_node_pointers.left) !!! */
+    uint32_t    right;
 } sptree_node_pointers;
 
 #define GET_SPNODE_LEFT(snp)        ( (snp)->left )
