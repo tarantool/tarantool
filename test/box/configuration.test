@@ -80,8 +80,8 @@ server.stop()
 shutil.copy("box/require_init.lua", os.path.join(script_dir_path, "init.lua"))
 shutil.copy("box/require_mod.lua", os.path.join(script_dir_path, "mod.lua"))
 server.deploy("box/tarantool_scriptdir.cfg")
-exec admin "lua string.gmatch(package.path, '([^;]*)')()"
-exec admin "lua string.gmatch(package.cpath, '([^;]*)')()"
+exec admin "lua string.gmatch(package_path, '([^;]*)')()"
+exec admin "lua string.gmatch(package_cpath, '([^;]*)')()"
 exec admin "lua mod.test(10, 15)"
 
 # restore default server

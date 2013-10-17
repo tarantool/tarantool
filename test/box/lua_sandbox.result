@@ -1,0 +1,36 @@
+lua os.execute
+---
+ - nil
+...
+lua os.exit
+---
+ - nil
+...
+lua os.rename 
+---
+ - nil
+...
+lua os.tmpname
+---
+ - nil
+...
+lua os.remove
+---
+ - nil
+...
+lua io
+---
+ - nil
+...
+lua require
+---
+ - nil
+...
+lua package
+---
+ - nil
+...
+lua ffi
+---
+ - nil
+...

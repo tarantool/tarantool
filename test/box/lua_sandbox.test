@@ -1,0 +1,15 @@
+# encoding: tarantool
+
+#
+# Test that some built-in functions were disabled by sandbox
+#
+exec admin "lua os.execute"
+exec admin "lua os.exit"
+exec admin "lua os.rename"
+exec admin "lua os.tmpname"
+exec admin "lua os.remove"
+exec admin "lua io"
+exec admin "lua require"
+exec admin "lua package"
+# FFI can be mistakenly saved to the global variable by the one of our modules
+exec admin "lua ffi"
