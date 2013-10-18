@@ -88,11 +88,11 @@ tnt_select(struct tnt_stream *s,
 		return -1;
 	}
 	/* filling write vector */
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void *)&hdr;
 	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_sel;
+	v[1].iov_base = (void *)&hdr_sel;
 	v[1].iov_len  = sizeof(struct tnt_header_select);
-	v[2].iov_base = &keys->count;
+	v[2].iov_base = (void *)&keys->count;
 	v[2].iov_len  = 4;
 	int vi = 3;
 	tnt_rewind(&i);

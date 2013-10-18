@@ -53,10 +53,10 @@ tnt_update_op(struct tnt_stream *s,
 	struct iovec iov[4];
 	int iovc = 3;
 	/* field */
-	iov[0].iov_base = &field;
+	iov[0].iov_base = (void *)&field;
 	iov[0].iov_len = 4;
 	/* operation */
-	iov[1].iov_base = &op;
+	iov[1].iov_base = (void *)&op;
 	iov[1].iov_len = 1;
 	/* encoding size */
 	iov[2].iov_base = enc;
@@ -248,13 +248,13 @@ tnt_update(struct tnt_stream *s, uint32_t ns, uint32_t flags,
 	hdr_update.flags = flags;
 	/* writing data to stream */
 	struct iovec v[5];
-	v[0].iov_base = &hdr;
+	v[0].iov_base = (void *)&hdr;
 	v[0].iov_len  = sizeof(struct tnt_header);
-	v[1].iov_base = &hdr_update;
+	v[1].iov_base = (void *)&hdr_update;
 	v[1].iov_len  = sizeof(struct tnt_header_update);
 	v[2].iov_base = k->data;
 	v[2].iov_len  = k->size;
-	v[3].iov_base = &ops->wrcnt;
+	v[3].iov_base = (void *)&ops->wrcnt;
 	v[3].iov_len  = 4;
 	v[4].iov_base = TNT_SBUF_DATA(ops);
 	v[4].iov_len  = TNT_SBUF_SIZE(ops);

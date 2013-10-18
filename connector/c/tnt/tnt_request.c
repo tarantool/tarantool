@@ -146,9 +146,9 @@ tnt_request_insert(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 		tnt_mem_free(buf);
 		return -1;
 	}
-	r->v[0].iov_base = &r->h;
+	r->v[0].iov_base = (void *)&r->h;
 	r->v[0].iov_len  = sizeof(struct tnt_header);
-	r->v[1].iov_base = &r->r.insert.h;
+	r->v[1].iov_base = (void *)&r->r.insert.h;
 	r->v[1].iov_len  = sizeof(struct tnt_header_insert);
 	r->v[2].iov_base = r->r.insert.t.data;
 	r->v[2].iov_len  = r->r.insert.t.size;
@@ -181,9 +181,9 @@ tnt_request_delete_1_3(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 		tnt_mem_free(buf);
 		return -1;
 	}
-	r->v[0].iov_base = &r->h;
+	r->v[0].iov_base = (void *)&r->h;
 	r->v[0].iov_len  = sizeof(struct tnt_header);
-	r->v[1].iov_base = &r->r.del_1_3.h;
+	r->v[1].iov_base = (void *)&r->r.del_1_3.h;
 	r->v[1].iov_len  = sizeof(struct tnt_header_delete_1_3);
 	r->v[2].iov_base = r->r.del_1_3.t.data;
 	r->v[2].iov_len  = r->r.del_1_3.t.size;
@@ -216,9 +216,9 @@ tnt_request_delete(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 		tnt_mem_free(buf);
 		return -1;
 	}
-	r->v[0].iov_base = &r->h;
+	r->v[0].iov_base = (void *)&r->h;
 	r->v[0].iov_len  = sizeof(struct tnt_header);
-	r->v[1].iov_base = &r->r.del.h;
+	r->v[1].iov_base = (void *)&r->r.del.h;
 	r->v[1].iov_len  = sizeof(struct tnt_header_delete);
 	r->v[2].iov_base = r->r.del.t.data;
 	r->v[2].iov_len  = r->r.del.t.size;
@@ -260,9 +260,9 @@ tnt_request_call(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	r->v = tnt_mem_alloc(r->vc * sizeof(struct iovec));
 	if (r->v == NULL)
 		goto error;
-	r->v[0].iov_base = &r->h;
+	r->v[0].iov_base = (void *)&r->h;
 	r->v[0].iov_len  = sizeof(struct tnt_header);
-	r->v[1].iov_base = &r->r.call.h;
+	r->v[1].iov_base = (void *)&r->r.call.h;
 	r->v[1].iov_len  = sizeof(struct tnt_header_call);
 	r->v[2].iov_base = r->r.call.proc_enc;
 	r->v[2].iov_len  = r->r.call.proc_enc_len;
@@ -391,13 +391,13 @@ tnt_request_update(struct tnt_request *r, tnt_request_t rcv, void *ptr)
 	r->v = tnt_mem_alloc(r->vc * sizeof(struct iovec));
 	if (r->v == NULL)
 		goto error;
-	r->v[0].iov_base = &r->h;
+	r->v[0].iov_base = (void *)&r->h;
 	r->v[0].iov_len  = sizeof(struct tnt_header);
-	r->v[1].iov_base = &r->r.update.h;
+	r->v[1].iov_base = (void *)&r->r.update.h;
 	r->v[1].iov_len  = sizeof(struct tnt_header_update);
 	r->v[2].iov_base = r->r.update.t.data;
 	r->v[2].iov_len  = r->r.update.t.size;
-	r->v[3].iov_base = &r->r.update.opc;
+	r->v[3].iov_base = (void *)&r->r.update.opc;
 	r->v[3].iov_len  = 4;
 	r->v[4].iov_base = r->r.update.ops;
 	r->v[4].iov_len  = r->r.update.ops_size;

@@ -51,8 +51,8 @@
 #endif
 
 
-static u_int32_t
-crc32c_hw_byte(u_int32_t crc, unsigned char const *data, unsigned int length)
+static uint32_t
+crc32c_hw_byte(uint32_t crc, unsigned char const *data, unsigned int length)
 {
 	while (length--) {
 		__asm__ __volatile__(
@@ -67,8 +67,8 @@ crc32c_hw_byte(u_int32_t crc, unsigned char const *data, unsigned int length)
 }
 
 
-u_int32_t
-crc32c_hw(u_int32_t crc, const unsigned char *buf, unsigned int len)
+uint32_t
+crc32c_hw(uint32_t crc, const unsigned char *buf, unsigned int len)
 {
 	unsigned int iquotient = len / SCALE_F;
 	unsigned int iremainder = len % SCALE_F;
