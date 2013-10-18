@@ -30,6 +30,7 @@
  */
 #include <sys/types.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Check whether CPU supports SSE 4.2 (needed to compute CRC32 in hardware).
  *

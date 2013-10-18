@@ -1,6 +1,8 @@
 #ifndef TS_SHA1_H_INCLUDED
 #define TS_SHA1_H_INCLUDED
 
+#include <stdint.h>
+
 /* ================ sha1.h ================ */
 /*
 SHA-1 in C
