@@ -6,7 +6,7 @@ lua os.exit
 ---
  - nil
 ...
-lua os.rename 
+lua os.rename
 ---
  - nil
 ...
