@@ -44,7 +44,7 @@ The section about sandbox is <link linkend="starting"><quote>Starting Tarantool 
 <para>
 The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
 The repositories for the <quote>master</quote> release are at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
-Since this is the manual for the <quote>stable</quote> release, all instructions use.<link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
+Since this is the manual for the <quote>stable</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
 </para>
 
 <para>
@@ -52,8 +52,8 @@ An automatic build system creates, tests and publishes packages for every push i
 Therefore if you looked at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link> you would see many files.
 Names of binary packages have the format <computeroutput><filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename></computeroutput>.
 Here is one example:
-<computeroutput>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55             3664777</computeroutput>
-which means <quote>Tarantool package, major version = 1, minor version number = 5, patch number 97,
+<programlisting>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55             3664777</programlisting>
+which means <quote>Tarantool package, major version = 1, minor version number = 5, patch number 1,
 git revision id g8e8cd06, is a Linux x86 64-bit compressed tarball, pushed on
 September 26 2013, which contains 3.6 MB.</quote>
 </para>
@@ -445,9 +445,9 @@ You only have to do this once.<programlisting>
 <para>
 Start the server.
 The server name is <computeroutput><filename>tarantool_box</filename></computeroutput>.<programlisting>
-<command>/usr/bin/tarantool_box --background</command>             #if you downloaded a binary with apt-get or yum
-<command>~/tarantool/bin/tarantool_box --background</command>     	#if you downloaded and untarred a binary tarball to ~/tarantool
-<command>~/tarantool/src/box/tarantool_box --background</command> 	#f you built from a source download</programlisting>
+<command>/usr/bin/tarantool_box</command>             #if you downloaded a binary with apt-get or yum
+<command>~/tarantool/bin/tarantool_box</command>     	#if you downloaded and untarred a binary tarball to ~/tarantool
+<command>~/tarantool/src/box/tarantool_box</command> 	#f you built from a source download</programlisting>
 </para>
 
 <para>
