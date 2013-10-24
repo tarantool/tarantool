@@ -1,3 +1,9 @@
+tarantool (1.5.1.148.g6dddbc7-1) unstable; urgency=low
+
+  * New Debian snapshot.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 23 Oct 2013 13:46:46 +0400
+
 tarantool (1.5.1.84.g9f2e646-1) unstable; urgency=low
 
   * Drop BSD dependencies in Debian/kFreeBSD (try to fix FTBFS with Debian/BSD).
