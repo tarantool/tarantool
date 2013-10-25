@@ -1,3 +1,7 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="getting-started">
@@ -15,7 +19,9 @@ That makes analysis easier if later you need to
 report a problem, and avoids subtle problems that might happen if
 you used different tools or different parameters when building from source.
 All programs in the binary tarballs are linked statically so there will be no external dependencies.
-	The section about binaries is <link linkend="binary"><quote>Downloading and installing a binary package</quote></link>.
+	The section about binaries is <olink
+targetptr="getting-started-binary"><quote>Downloading and
+installing a binary package</quote></olink>.
 </para>
 
 <para>
@@ -23,7 +29,8 @@ For development, you will want to download a source package and make the binary
 by yourself using a C/C++ compiler and common tools.
 Although this is a bit harder, it gives more control.
 And the source packages include additional files, for example the Tarantool test suite.
-	The section about source is <link linkend="source"><quote>Downloading and building a source package</quote></link>.
+	The section about source is <olink
+targetptr="getting-started-source"><quote>Downloading and building a source package</quote></olink>.
 </para>
 
 <para>
@@ -31,10 +38,11 @@ If the installation has already been done, then you should try it out.
 	So we've provided some instructions that you can use to make a temporary <quote>sandbox</quote>.
 In a few minutes you can start the server, start the client, and type in some
 database-manipulation statements.
-The section about sandbox is <link linkend="starting"><quote>Starting Tarantool and making your first database</quote></link>.
+The section about sandbox is <olink
+targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>.
 </para>
 
-<section xml:id="binary">
+<section xml:id="getting-started-binary">
 <title>Downloading and installing a binary package</title>
 
 <para>
@@ -104,10 +112,10 @@ release=`lsb_release -c -s`
 # CENTOS commands for Tarantool stable binary download:
 # These instructions are applicable for CentOS version 5 or 6, and RHEL version 5 or 6
 # Pick the CentOS repository which fits your CentOS/RHEL version and your x86 platform:
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32">http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64">http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32">http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64">http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/centos/5/os/i386">http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/centos/5/os/x86_64">http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/centos/6/os/i386">http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/centos/6/os/x86_64">http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64</link>
 # Add the following section to your yum repository list (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
 # (in the following instructions, $releasever i.e. CentOS release version must be either 5 or 6)
 # (in the following instructions, $basearch i.e. base architecture must be either i386 or x86_64)
@@ -116,7 +124,8 @@ release=`lsb_release -c -s`
 # baseurl=http://tarantool.org/dist/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
 # enabled=1
 # gpgcheck=0
-# For example, if you have CentOS version 6 and x86-64, you can add the new section thus:
+# For example, if you have CentOS version 6 and x86-64, you can
+# add the new section thus:
 <command>echo</command> "[tarantool]" | <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "baseurl=http://tarantool.org/dist/centos/6/os/x86_64/" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -186,7 +195,8 @@ More advice for binary downloads is at <link xlink:href="http://tarantool.org/do
 
 </section>
 
-<section xml:id="source">
+
+<section xml:id="getting-started-source">
 <title>Downloading and building a source package</title>
 <para>
 For downloading Tarantool source and building it, the platforms can differ
@@ -390,8 +400,7 @@ the server and the client (but not the documentation), and run tests after build
 </para>
 
 </section>
-
-<section xml:id="starting">
+<section xml:id="getting-started-start-stop">
 <title>Starting Tarantool and making your first database</title>
 
 <para>
