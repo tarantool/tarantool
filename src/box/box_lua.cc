@@ -333,7 +333,7 @@ lbox_tuple_transform(struct lua_State *L)
 	uint32_t offset_u32 = (uint32_t) offset;
 	for (uint32_t i = 0; i < (uint32_t) field_count; i++) {
 		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
-		luaL_addchar(&b, UPDATE_OP_DELETE);
+		luaL_addchar(&b, UPDATE_OP_DELETE_1_4);
 		luaL_addvarint32(&b, 0); /* Unused. */
 	}
 

@@ -319,10 +319,37 @@ init_update_op_set(struct tuple_update *update, struct update_op *op)
 }
 
 static void
-init_update_op_delete(struct tuple_update *update, struct update_op *op)
+init_update_op_delete_1_4(struct tuple_update *update, struct update_op *op)
 {
 	op_adjust_field_no(op, rope_size(update->rope) - 1);
 	rope_erase(update->rope, op->field_no);
+}
+
+static void
+init_update_op_delete(struct tuple_update *update, struct update_op *op)
+{
+	op_adjust_field_no(op, rope_size(update->rope) - 1);
+
+	uint32_t delete_count = 1;
+	if (op->arg.set.length > 0) {
+		/* Check the operand type, if present. */
+		if (op->arg.set.length != sizeof(int32_t))
+			tnt_raise(ClientError, ER_ARG_TYPE,
+				  op->field_no, "NUM");
+
+		delete_count = *(int32_t *)op->arg.set.value;
+		if (delete_count == UINT32_MAX)
+			delete_count = rope_size(update->rope) - op->field_no;
+		else if (op->field_no + delete_count > rope_size(update->rope))
+			delete_count = rope_size(update->rope) - op->field_no;
+
+		if (delete_count == 0)
+			tnt_raise(ClientError, ER_UPDATE_FIELD,
+				  op->field_no, "cannot delete 0 fields");
+	}
+
+	for (uint32_t u = 0; u < delete_count; u++)
+		rope_erase(update->rope, op->field_no);
 }
 
 static void
@@ -342,7 +369,7 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 		/* Check the operand type. */
 		if (op->arg.set.length != sizeof(int32_t))
 			tnt_raise(ClientError, ER_ARG_TYPE,
-				  "32-bit int");
+				  op->field_no, "NUM");
 
 		arg->i32_val = *(int32_t *)op->arg.set.value;
 		break;
@@ -360,7 +387,7 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 			break;
 		default:
 			tnt_raise(ClientError, ER_ARG_TYPE,
-				  "32-bit or 64-bit int");
+				  op->field_no, "NUM or NUM64");
 		}
 		break;
 	default:
@@ -423,16 +450,17 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	STAILQ_INSERT_TAIL(&field->ops, op, next);
 }
 
-static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
+static struct update_op_meta update_op_meta[update_op_codes_MAX] = {
 	{ init_update_op_set, (do_op_func) do_update_op_set, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_add, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_and, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_xor, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_or, true },
 	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
-	{ init_update_op_delete, (do_op_func) NULL, true },
+	{ init_update_op_delete_1_4, (do_op_func) NULL, true },
 	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_subtract, true },
+	{ init_update_op_delete, (do_op_func) NULL, true },
 };
 
 static inline size_t
@@ -625,7 +653,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		op->field_no = pick_u32(&expr, expr_end);
 		op->opcode = pick_u8(&expr, expr_end);
 
-		if (op->opcode >= UPDATE_OP_MAX)
+		if (op->opcode >= update_op_codes_MAX)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->meta = &update_op_meta[op->opcode];
 

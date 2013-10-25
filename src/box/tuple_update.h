@@ -45,10 +45,10 @@ enum {
 	_(UPDATE_OP_XOR, 3)			\
 	_(UPDATE_OP_OR, 4)			\
 	_(UPDATE_OP_SPLICE, 5)			\
-	_(UPDATE_OP_DELETE, 6)			\
+	_(UPDATE_OP_DELETE_1_4, 6)		\
 	_(UPDATE_OP_INSERT, 7)			\
 	_(UPDATE_OP_SUBTRACT, 8)		\
-	_(UPDATE_OP_MAX, 10)			\
+	_(UPDATE_OP_DELETE, 9)
 
 ENUM(update_op_codes, UPDATE_OP_CODES);
 
