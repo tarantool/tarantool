@@ -314,7 +314,9 @@ lbox_tuple_transform(struct lua_State *L)
 	/*
 	 * Calculate the number of operations and length of UPDATE expression
 	 */
-	uint32_t op_cnt = offset < tuple->field_count ? field_count : 0;
+	uint32_t op_cnt = 0;
+	if (offset < tuple->field_count && field_count > 0)
+		op_cnt++;
 	if (argc > 3)
 		op_cnt += argc - 3;
 
@@ -331,10 +333,13 @@ lbox_tuple_transform(struct lua_State *L)
 	luaL_buffinit(L, &b);
 	luaL_addlstring(&b, (char *) &op_cnt, sizeof(op_cnt));
 	uint32_t offset_u32 = (uint32_t) offset;
-	for (uint32_t i = 0; i < (uint32_t) field_count; i++) {
+	uint32_t field_count_u32 = (uint32_t) field_count;
+	if (field_count > 0) {
 		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
-		luaL_addchar(&b, UPDATE_OP_DELETE_1_4);
-		luaL_addvarint32(&b, 0); /* Unused. */
+		luaL_addchar(&b, UPDATE_OP_DELETE); /* multi-delete */
+		luaL_addvarint32(&b, sizeof(field_count_u32));
+		luaL_addlstring(&b, (char *) &field_count_u32,
+				sizeof(field_count_u32));
 	}
 
 	for (int i = argc ; i > 3; i--) {
