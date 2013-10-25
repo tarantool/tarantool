@@ -105,8 +105,9 @@ box.error.ER_NONMASTER: 258
 box.error.ER_PROC_RET: 12290
 box.error.ER_TUPLE_IS_TOO_LONG: 11010
 box.error.ER_EXACT_MATCH: 11522
-box.error.ER_FIELD_TYPE: 10242
 box.error.ER_PROC_LUA: 13058
+box.error.ER_FIELD_TYPE: 10242
+box.error.ER_UPDATE_FIELD: 14338
 box.error.ER_TUPLE_FOUND: 14082
 box.error.ER_OK: 0
 box.error.ER_NO_SUCH_FIELD: 13826

@@ -176,6 +176,17 @@ exec admin "lua t:transform(3, 1, tonumber64(4))"
 exec admin "lua t:transform(0, 1, {})"
 
 #
+# Tests for OPENTAR-64 - a limitation for the second argument to tuple:transform
+#
+
+# 50K is enough for everyone
+exec admin "lua n = 50000;"
+exec admin "lua tab = {}; for i=1,n,1 do table.insert(tab, i) end"
+exec admin "lua t = box.tuple.new(tab)"
+exec admin "lua t:transform(0, n - 1)"
+exec admin "lua t = nil"
+
+#
 # Tests for lua tuple:find() and tuple:findall()
 #
 exec admin "lua t=box.insert(12, 'A', '2', '3', '4', '3', '2', '5', '6', '3', '7')"
