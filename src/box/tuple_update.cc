@@ -443,7 +443,7 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 	STAILQ_INSERT_TAIL(&field->ops, op, next);
 }
 
-static struct update_op_meta update_op_meta[UPDATE_OP_MAX + 1] = {
+static struct update_op_meta update_op_meta[update_op_codes_MAX] = {
 	{ init_update_op_set, (do_op_func) do_update_op_set, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_add, true },
 	{ init_update_op_arith, (do_op_func) do_update_op_and, true },
@@ -641,7 +641,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		op->field_no = pick_u32(&expr, expr_end);
 		op->opcode = pick_u8(&expr, expr_end);
 
-		if (op->opcode >= UPDATE_OP_MAX)
+		if (op->opcode >= update_op_codes_MAX)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->meta = &update_op_meta[op->opcode];
 
