@@ -223,6 +223,17 @@ t:transform(0, 1, {})
 space:truncate()
 
 --
+-- Tests for OPENTAR-64 - a limitation for the second argument to tuple:transform
+--
+
+-- 50K is enough for everyone
+n = 50000
+tab = {}; for i=1,n,1 do table.insert(tab, i) end
+t = box.tuple.new(tab)
+t:transform(0, n - 1)
+t = nil
+
+--
 -- Tests for lua tuple:find() and tuple:findall()
 --
 -- First space for hash_str tests
