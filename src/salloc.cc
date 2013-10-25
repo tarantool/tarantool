@@ -45,6 +45,8 @@
 
 #define SLAB_ALIGN_PTR(ptr) (void *)((uintptr_t)(ptr) & ~(SLAB_SIZE - 1))
 
+extern int snapshot_pid;
+
 #ifdef SLAB_DEBUG
 #undef NDEBUG
 uint8_t red_zone[4] = { 0xfa, 0xfa, 0xfa, 0xfa };
@@ -322,6 +324,9 @@ sfree(void *ptr)
 static void
 sfree_batch(void)
 {
+	if (snapshot_pid)
+		return;
+
 	ssize_t batch = arena.delayed_free_batch;
 
 	while (--batch >= 0 && !SLIST_EMPTY(&free_delayed)) {

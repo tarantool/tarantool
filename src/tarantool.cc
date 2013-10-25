@@ -324,8 +324,6 @@ snapshot(void)
 	if (snapshot_pid)
 		return EINPROGRESS;
 
-	/* increment snapshot version */
-	snapshot_version++;
 
 	pid_t p = fork();
 	if (p < 0) {
@@ -334,6 +332,8 @@ snapshot(void)
 	}
 	if (p > 0) {
 		snapshot_pid = p;
+		/* increment snapshot version */
+		snapshot_version++;
 		int status = wait_for_child(p);
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));

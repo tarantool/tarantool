@@ -93,7 +93,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 38 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key field type does not match index type: expected %s") \
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 40 */_(ER_FIELD_TYPE,		2, "Field type does not match one required by operation: expected a %s") \
-	/* 41 */_(ER_ARG_TYPE,			2, "Argument type in operation does not match field type: expected a %s") \
+	/* 41 */_(ER_ARG_TYPE,			2, "Argument type in operation on field %u does not match field type: expected a %s") \
 	/* 42 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
 	/* 43 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 44 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
@@ -108,7 +108,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 53 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 54 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 55 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index %u") \
-	/* 56 */_(ER_UNUSED,		        2, "") \
+	/* 56 */_(ER_UPDATE_FIELD,		2, "Field %u UPDATE error: %s") \
 	/* 57 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exist")
 
 
