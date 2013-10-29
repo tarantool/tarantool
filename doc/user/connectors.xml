@@ -13,10 +13,182 @@
 
 <para>Apart from the native Tarantool client driver, you can always use a <emphasis role="strong">Memcached</emphasis> driver of your choice, after enabling Memcached protocol in the configuration file.</para>
 
+<section xml:id="connector-packet-example">
+<title>Packet example</title>
+<para>
+The Tarantool API exists so that a client program can send a request packet
+to the server, and receive a response. Here is an example of a what the client
+ would send for <command>INSERT INTO t0 VALUES ('A','BB')</command>. The BNF description of the components
+is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
+</para>
+                <informaltable frame='topbot'>
+                <tgroup cols='5' align='left' colsep='1' rowsep='1'>
+                <colspec colname='c1'/>
+                <colspec colname='c2'/>
+                <colspec colname='c3'/>
+                <colspec colname='c4'/>
+                <colspec colname='c5'/>
+                <thead>
+                <row>
+                <entry>Component</entry>
+                <entry>Byte#0</entry>
+                <entry>Byte#1</entry>
+                <entry>Byte#2</entry>
+                <entry>Byte#3</entry>
+                </row>
+                </thead>
+                      <tbody>
+                        <row>
+                          <entry>type</entry>
+                          <entry>13</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>body_length</entry>
+                          <entry>17</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>request_id</entry>
+                          <entry>1</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>space_no</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>flags</entry>
+                          <entry>2</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>cardinality</entry>
+                          <entry>2</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                          <entry>0</entry>
+                        </row>
+                        <row>
+                          <entry>field[0] size</entry>
+                          <entry>1</entry>
+                          <entry namest="c1" nameend="c4"></entry>
+                        </row>
+                        <row>
+                          <entry>field[0] data</entry>
+                          <entry>65</entry>
+                          <entry namest="c2" nameend="c4"></entry>
+                        </row>
+                        <row>
+                          <entry>field[1] size</entry>
+                          <entry>2</entry>
+                          <entry namest="c2" nameend="c5"></entry>
+                        </row>
+                        <row>
+                          <entry>field[1] data</entry>
+                          <entry>66</entry>
+                          <entry>66</entry>
+                          <entry namest="c3" nameend="c4"></entry>
+                        </row>
+                       </tbody>
+                    </tgroup>
+                </informaltable>
+<para>
+Now, one could send that packet to the tarantool_box server,
+and interpret the response (box-protocol.txt has a description
+of the packet format for responses as well as requests).
+But it would be easier, and less error-prone, if one could
+invoke a routine that formats the packet according to typed
+parameters. Something like <code>response=tarantool_routine("insert",0,"A","B");</code>.
+And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on.
+</para>
+  </section>
+
   <section xml:id="connector-c">
     <title>C</title>
     <para>
-       Please see <link
+    Here is a complete C program that inserts ['A','BB'] into space[0] via the C API for the
+    binary protocol. To compile, paste the code into a file named example.c and say <code>
+    gcc -o example example.c -I/<replaceable>tarantool-directory</replaceable>/connector/c/include</code>
+    where tarantool-directory = the directory that contains
+    the necessary file <filename>tp.h</filename>, and the default library path contains
+    the directory where Tarantool library files were placed at installation time.
+    Before trying to run, check that the server
+    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
+    space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
+    To run, say <code>./example</code>.
+    The program will format a buffer for sending an INSERT request, then open a socket connection
+    with the tarantool_box server at localhost:33013, then send the request, then check if the
+    server returned an error, then &mdash; if all is well &mdash; print "Insert succeeded". If the
+    row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
+    </para>
+<programlisting><code>
+#include &lt;arpa/inet.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;tp.h&gt;                                               /* the usual Tarantool include */
+
+int main ()
+{
+ struct tp request;                                           /* area for sending to server */
+ struct tp reply;                                             /* area for getting server reply */
+ int fd;                                                      /* file descriptor for socket */
+ struct sockaddr_in tt;                                       /* the usual socket address info */
+ tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
+ tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
+ tp_tuple(&amp;request);                                          /* begin appending body */
+ tp_sz(&amp;request,"");                                          /* append field[0] */
+ tp_sz(&amp;request,"BB");                                        /* append field[1] */
+ if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket, abort if failure */
+  exit(1);
+ memset(&amp;tt, 0, sizeof(tt));                                  /* connect to localhost:33013 */
+ tt.sin_family = AF_INET;
+ tt.sin_addr.s_addr = inet_addr("127.0.0.1");
+ tt.sin_port = htons(33013);
+ if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt;= 0)   /* connect, abort if failure */
+  exit(1);
+ int rc = write(fd, tp_buf(&amp;request), tp_used(&amp;request));     /* send the INSERT request */
+ if (rc != tp_used(&amp;request))                                 /* abort if send failed */
+  exit(1);
+ tp_init(&amp;reply, NULL, 0, tp_realloc, NULL);                  /* initialize reply buffer */
+ while (1) {
+  ssize_t to_read = tp_req(&amp;reply);
+  if (to_read &lt;= 0)
+   break;
+  ssize_t new_size = tp_ensure(&amp;reply, to_read);
+  if (new_size == -1)                                         /* abort if error e.g. no memory */
+   exit(1);
+  ssize_t res = read(fd, reply.p, to_read);                   /* get reply */
+  if (res &lt;= 0)                                               /* abort if error e.g. no reply */
+   exit(1);
+  tp_use(&amp;reply, res);
+  }
+ ssize_t server_code = tp_reply(&amp;reply);                      /* display+abort if error e.g. duplicate key */
+ if (server_code != 0) {
+  printf("error: %-.*s\n", tp_replyerrorlen(&amp;reply),
+     tp_replyerror(&amp;reply));
+  tp_free(&amp;reply);
+  exit(1);
+ }
+ tp_free(&amp;request);                                           /* clean up */
+ tp_free(&amp;reply);
+ close(fd);
+ printf("Insert succeeded\n");                                /* congratulate self */
+}
+</code></programlisting>
+    <para>
+       The example program only shows one command and does not show all that's necessary for
+       good practice. For that, please see <link
        xlink:href="https://github.com/tarantool/tarantool/blob/master/connector/c/include/tp.h"><filename>connector/c</filename></link> in the source tree.
     </para>
   </section>
@@ -31,6 +203,7 @@
   <section xml:id="connector-perl">
     <title>Perl</title>
     <para>
+       The Perl driver requires a schema definition.
        Please refer to CPAN module <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
     </para>
   </section>
