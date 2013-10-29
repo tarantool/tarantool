@@ -1,0 +1,169 @@
+#! /bin/bash
+#
+# tarantool-watch    tarantool instances watchdog
+#
+# chkconfig: - 70 30
+# description: Monitor tarantool instances via tarantool service
+#              Restart fallen instances
+# processname: tarantool-watch
+
+### BEGIN INIT INFO
+# Provides: tarantool-watch
+# Required-Start: $local_fs $network tarantool
+# Required-Stop: $local_fs $network tarantool
+# Short-Description: tarantool instances watchdog
+# Description: Monitor tarantool instances via tarantool service
+#              Restart fallen instances
+### END INIT INFO
+
+# Source function library.
+. /etc/init.d/functions
+
+prog=tarantool-watch
+lockfile=/var/lock/subsys/${prog}
+pidfile=/var/run/${prog}.pid
+
+LOG_SYSLOG=no
+SYSLOG_FACILITY='daemon'
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
+WATCH_INSTANCE_LIST=$(service tarantool list 2>/dev/null)
+
+if [ -f /etc/sysconfig/tarantool-watch ] ; then
+	. /etc/sysconfig/tarantool-watch
+fi
+
+WATCH_SLEEP_INTERVAL=${WATCH_SLEEP_INTERVAL:-2}
+
+logfile="${logfile:-/var/log/$prog.log}"
+
+tnt_logger(){
+	local PRIORITY=".info"	
+	if [ "$1" = "-p" ];then
+		PRIORITY=".$2"
+		shift 2
+	fi 
+	test -n "$SYSLOG_FACILITY" && PRIORITY="${SYSLOG_FACILITY}${PRIORITY}"
+
+	if [ "$LOG_SYSLOG" = 'yes' ]; then
+		logger -p "$PRIORITY" $*
+	else
+		echo $(date -R) $* >> $logfile
+	fi
+}
+
+tnt_watchdog(){
+  #{ 
+	tnt_logger "Starting tarantool instances watchdog"
+	if [ -z "$pidfile" ]; then
+		tnt_logger "no pidfile specified. Would not run."
+		exit 1
+	fi
+	
+	trap "{ tnt_logger 'exiting'; rm -f ${pidfile:-no_empty} ; exit 255; }" EXIT #TERM INT EXIT
+
+	echo "$BASHPID" > ${pidfile} 
+	if [ "$(cat ${pidfile} 2>/dev/null )" -ne $BASHPID ]; then
+		tnt_logger 'Failed to write to pidfile'
+		return 1
+	fi
+
+	tnt_logger "Entering main loop"
+	while sleep $WATCH_SLEEP_INTERVAL; do
+		for INSTANCE in $WATCH_INSTANCE_LIST; do
+			service tarantool -i "$INSTANCE" status &>/dev/null
+			if [ "$?" -ne 0 ]; then
+				tnt_logger -p error "Tarantool instance $INSTANCE is not running. Trying to restart"
+				service tarantool -i "$INSTANCE" start &>/dev/null \
+					|| tnt_logger -p error "Failed to restart $INSTANCE: exit code is [$?]"
+			fi
+		done
+	done 
+	tnt_logger "Exiting main loop. This is not OK."
+	
+  #} 
+}
+
+start() {
+	echo -n "Starting tarantool watchdog: "
+	status -p $pidfile -l $lockfile $prog >/dev/null
+	RETVAL=$?
+	if [ "$RETVAL" -ne 0 ]; then
+		#cd "$WORK_DIR" && 
+		tnt_watchdog </dev/null >/dev/null 2>&1 & disown
+		RETVAL=$?
+		if [ "$RETVAL" -eq 0 ]; then
+			echo_success
+		else
+			echo_failure
+		fi
+		echo
+	else 
+		echo -n 'Already started'; echo_success
+		RETVAL=0
+	fi
+	echo 
+
+	[ $RETVAL -eq 0 ] && touch $lockfile
+	return $RETVAL
+}
+
+stop() {
+	echo -n "Stopping tarantool watchdog: "
+
+	status -p $pidfile -l $lockfile $prog >/dev/null
+	RETVAL=$?
+	if [ "$RETVAL" = 0 ]; then
+		killproc -p $pidfile $prog
+		RETVAL=$?
+	else 
+		echo -n 'Not running'; echo_success
+		RETVAL=0
+	fi
+	echo 
+	[ $RETVAL -eq 0 ] && rm -f $lockfile
+	return $RETVAL
+}	
+
+restart() {
+  	stop
+	start
+}	
+
+show_status() {
+	echo -n "Status: "
+	status -p $pidfile -l $lockfile $prog
+	#RETVAL=$?
+	#if [ "$RETVAL" -eq 0 ]; then
+	#	echo -n 'running'; echo_success
+	#else
+	#	echo -n 'stopped'; echo_warning
+	#fi
+	#echo
+	return $RETVAL
+}
+
+
+
+ACTION=$1
+
+RETVAL=0
+
+case "$ACTION" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart)
+	restart
+	;;
+  status)
+	show_status
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart}"
+	RETVAL=2;
+esac
+
+exit $RETVAL

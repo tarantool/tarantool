@@ -1,0 +1,30 @@
+# /etc/sysconfig/tarantool-watch
+# This file is used by tarantool-watch init script
+
+# LOG_SYSLOG=no
+# Set this to yes, if you want logs go to syslog
+# Any other value makes watcher log into file
+# Default value is 'no'
+
+# SYSLOG_FACILITY='daemon'
+# When LOG_SYSLOG=yes, use this facility
+# Default is 'daemon'
+
+# PATH=/usr/bin:/usr/sbin:/bin:/sbin
+# PATH is reset inside init script. Here one may override it's value if desired
+# Default value is '/usr/bin:/usr/sbin:/bin:/sbin'
+
+# WATCH_SLEEP_INTERVAL=2
+# Tarantool watcher sleeps for this interval beteen instance checks
+# This value is passed to bash sleep() function
+# Default is 2, which means two seconds
+
+# logfile=/var/log/tarantool-watch.log
+# Path to log file, used if LOG_SYSLOG set to anything except 'yes'
+# Default is '/var/log/tarantool-watch.log'
+
+#WATCH_INSTANCE_LIST='instance1 instance2'
+# By default watchdog will monitor all instances which are returned by 
+# 'service tarantool list' command. Here you can override this list with
+# a fixed set.
+#

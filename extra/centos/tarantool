@@ -1,0 +1,238 @@
+#! /bin/bash
+#
+# tarantool    Start/Stop tarantool daemon[s]
+#
+# chkconfig: - 65 35
+# description: Tarantool is an in-memory key/value storage with LUA extentions
+#              onboard
+# processname: tarantool_box
+
+### BEGIN INIT INFO
+# Provides: tarantool
+# Required-Start: $local_fs $network
+# Required-Stop: $local_fs $network
+# Short-Description: Start/Stop tarantool daemon[s]
+# Description: Tarantool is an in-memory key/value storage with LUA extentions
+#              onboard
+### END INIT INFO
+
+# Source function library.
+. /etc/init.d/functions
+
+tarantool_param() {
+	local param_name=$1
+	local CONFIG=$2
+	cat "$CONFIG" | sed -n 's/^ *'"$param_name"'[ 	]*=[ 	]*"\(..*\)".*$/\1/ p' | tail -1
+}
+
+# Source our configuration file for these variables.
+TARANTOOL_OPTIONS=''
+CONF_DIR=/etc/tarantool/instances.enabled
+
+
+if [ -f /etc/sysconfig/tarantool ] ; then
+	. /etc/sysconfig/tarantool
+fi
+
+
+# Set up some common variables before we launch into what might be
+# considered boilerplate by now.
+prog=tarantool_box
+path=/usr/bin/tarantool_box
+
+
+config_test() {
+	if [ ! -f "$CONFIG" ] ; then
+		echo "(config file $CONFIG not found) "
+		echo_failure;echo
+		RETVAL=1; return $RETVAL
+	fi
+	$path --config "$CONFIG" --check-config
+	RETVAL=$?
+	if [ "$RETVAL" -ne 0 ] ; then
+		echo "invalid config file $CONFIG "
+		echo_failure;echo
+		return $RETVAL
+	fi
+	if [ -z "$WORK_DIR" ]; then
+		echo "work_dir parameter is not set in config file $CONFIG"
+		echo_failure;echo
+		RETVAL=1; return $RETVAL
+		exit 1
+	fi 
+	if [ -z "$USERNAME" ]; then
+		echo "username parameter is not set in config file $CONFIG"
+		echo_failure
+		RETVAL=1; return $RETVAL
+	fi 
+	if [ -z "$pidfile" ]; then
+		echo "pid_file parameter is not set in config file $CONFIG"
+		echo_failure;echo
+		RETVAL=1; return $RETVAL
+	fi 
+	if [ -z "$(tarantool_param logger $CONFIG)" ]; then
+		echo "logger parameter is not set in config file $CONFIG"
+		echo_failure;echo
+		RETVAL=1; return $RETVAL
+	fi 
+}
+
+instance_storage_init() {
+	echo -n "Init tarantool $INSTANCE: "
+	test -z "$WORK_DIR" && echo -n "Instance $INSTANCE: WORK_DIR variable is not set in instance_storage_init! " && echo_failure && return 1
+	if [ ! -d "$WORK_DIR" ]; then
+		mkdir -p "$WORK_DIR"
+		chown "$USERNAME" "$WORK_DIR"
+	fi
+	if [ ! -f "$WORK_DIR/00000000000000000001.snap" ]; then
+		echo -n "Storage is not initialized. Create empty storage"
+		$path --config "$CONFIG" --init-storage
+		RETVAL=$?
+		if [ "$RETVAL" -ne 0 ]; then
+			echo_failure; echo
+			return $RETVAL
+		fi
+	else
+		echo -n 'Already initialized '
+	fi
+	echo_success; echo
+	return $RETVAL
+}
+
+work_dir_ensure(){
+	if [ ! -f "$WORK_DIR/00000000000000000001.snap" ]; then
+		echo -n "Storage is not initialized. Run with init parameter. "
+		echo_failure
+		RETVAL=1; return $RETVAL
+	fi
+	if [ ! -d "$WORK_DIR/logs" ]; then
+		echo -n "trying to create logs directory in $WORK_DIR"
+		mkdir -p "$WORK_DIR/logs" && \
+			chown "$USERNAME" "$WORK_DIR/logs"
+		RETVAL=$?
+		if [ "$RETVAL" -ne 0 ]; then
+			echo_failure
+		fi
+	fi
+	return $RETVAL
+}
+
+start_instance() {
+	[ -x $path ] || exit 5
+	echo -n "Starting tarantool $INSTANCE: "
+	config_test || return $RETVAL
+	work_dir_ensure || return $RETVAL
+	status -p $pidfile -l $lockfile $prog >/dev/null
+	RETVAL=$?
+	if [ "$RETVAL" != 0 ]; then
+		#cd "$WORK_DIR" && 
+		daemon --pidfile="$pidfile" $path --config "$CONFIG" --background ${TARANTOOL_OPTIONS}
+		RETVAL=$?
+	else 
+		echo -n 'Already started'; echo_success
+		RETVAL=0
+	fi
+	echo 
+
+	[ $RETVAL -eq 0 ] && touch $lockfile
+	return $RETVAL
+}
+
+stop_instance() {
+	echo -n "Stopping tarantool $INSTANCE: "
+	config_test || return $RETVAL
+
+	status -p $pidfile -l $lockfile $prog >/dev/null
+	RETVAL=$?
+	if [ "$RETVAL" = 0 ]; then
+		killproc -p $pidfile $prog
+		RETVAL=$?
+	else 
+		echo -n 'Not running'; echo_success
+		RETVAL=0
+	fi
+	echo 
+	[ $RETVAL -eq 0 ] && rm -f $lockfile
+	return $RETVAL
+}	
+
+restart_instance() {
+  	stop_instance
+	start_instance
+}	
+
+status_instance() {
+	echo -n "Service $INSTANCE: "
+	status -p $pidfile -l $lockfile $prog >/dev/null 2>&1
+	RETVAL=$?
+	if [ "$RETVAL" -eq 0 ]; then
+		echo -n 'running'; echo_success
+	else
+		echo -n 'stopped'; echo_warning
+	fi
+	echo
+	return $RETVAL
+}
+
+
+INSTANCE_LIST=$( test -d "$CONF_DIR" && cd $CONF_DIR && ls -1 *.cfg 2>/dev/null| sort | sed -e 's/\.cfg$//' -e 's/^tarantool_//' )
+
+if [ -z "$INSTANCE_LIST" ]; then
+	echo "Instance list should not be empty, create .cfg file[s] in $CONF_DIR" >&2
+	exit 0 # Maybe we want list? It's ok if it's empty
+fi
+
+
+if [ "$1" = "-i" ]; then
+	INSTANCE_LIST=$2
+	shift 2
+fi
+
+ACTION=$1
+
+for INSTANCE in $INSTANCE_LIST; do
+	RETVAL=0
+	# Instance dependent parameters
+	CONFIG="$CONF_DIR/tarantool_$INSTANCE.cfg"
+	
+	if [ ! -f "$CONFIG" ]; then
+		echo -n "Instance $INSTANCE have no config file" >&2
+		echo_failure >&2; echo >&2
+		RETVAL=1
+		continue
+	fi
+
+	WORK_DIR=$( tarantool_param 'work_dir' "$CONFIG" )
+	USERNAME=$( tarantool_param 'username' "$CONFIG" )
+	lockfile=/var/lock/subsys/${prog}-${INSTANCE}
+	pidfile=$( tarantool_param 'pid_file' "$CONFIG" )
+	if [ "$pidfile" = "${pidfile#/}" ]; then
+		pidfile="$WORK_DIR/$pidfile"
+	fi
+
+	case "$ACTION" in
+	  start)
+		start_instance
+		;;
+	  stop)
+		stop_instance
+		;;
+	  restart)
+		restart_instance
+		;;
+	  status)
+		status_instance
+		;;
+	  init)
+		instance_storage_init
+		;;
+	  list)
+		echo $INSTANCE
+		;;
+	  *)
+		echo $"Usage: $0 [ -i <instance name> ] {start|stop|status|restart|init|list}"
+		RETVAL=2; exit $RETVAL;
+	esac
+done
+
+exit $RETVAL
