@@ -182,7 +182,7 @@ macro(luajit_build)
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
             COMMAND cp -r ${PROJECT_SOURCE_DIR}/third_party/luajit/* .
-            COMMAND $(MAKE) clean
+            COMMAND $(MAKE) ${luajit_buildoptions} clean
             COMMAND $(MAKE) -C src ${luajit_buildoptions} libluajit.a
             DEPENDS ${PROJECT_BINARY_DIR}/CMakeCache.txt ${PROJECT_BINARY_DIR}/third_party/luajit
         )
