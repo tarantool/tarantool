@@ -3,7 +3,7 @@
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="space">
 <bridgehead>Space settings explained</bridgehead>
-Space is a composite parameter, i.e. it has properties.
+Space is a composite parameter, that is, it has properties.
 <programlisting language="cpp">
 /*
  * Each tuple consists of fields. Three field types are
@@ -24,10 +24,10 @@ struct index_field_t {
 };
 
 /*
- * HASH and TREE index types are supported.
+ * HASH and TREE and BITSET index types are supported.
  */
 
-enum { HASH, TREE } index_type;
+enum { HASH, TREE, BITSET } index_type;
 
 struct index_t {
   index_field_t key_field[];
@@ -41,18 +41,18 @@ struct space_t
   /* A space can be quickly disabled and re-enabled at run time. */
   bool enabled;
   /*
-   * If given, each tuple in the space must have exactly
+   * If cardinality is given, each tuple in the space must have exactly
    * this many fields.
    */
   unsigned int cardinality;
-  /* Only used for HASH indexes, to preallocate memory. */
+  /* estimated_rows is only used for HASH indexes, to preallocate memory. */
   unsigned int estimated_rows;
   struct index_t index[];
 };
 </programlisting>
 The way a space is defined in a configuration file is similar to how
-you would initialize a C structure in a program. For example,
-a minimal storage configuration looks like below:
+one would initialize a C structure in a program. For example,
+a minimal storage configuration looks like the following:
 <programlisting language="c">
 space[0].enabled = 1
 space[0].index[0].type = HASH
