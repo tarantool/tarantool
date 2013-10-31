@@ -341,17 +341,6 @@ sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 		tnt_raise(SocketError, sock_fd, "sendfile");
 	return send_res;
 }
-#elif defined(HAVE_SENDFILE_BSD)
-ssize_t
-sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
-{
-	off_t sent_bytes = 0;
-	int send_res = sendfile(sock_fd, file_fd, offset, size,
-				NULL, &sent_bytes, NULL);
-	if (send_res != 0 || sent_bytes < size)
-		tnt_raise(SocketError, sock_fd, "sendfile");
-	return send_res;
-}
 #else
 ssize_t
 sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size)
