@@ -33,6 +33,7 @@
 #include <inttypes.h>
 #include <strings.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
