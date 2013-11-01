@@ -13,6 +13,13 @@ First of all, make sure mac ports are available (to install packages from).
 1. Install necessary packages (ports):
 -------------
 
+Developer tools by Apple:
+
+sudo xcode-select --install
+sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+
+Homebrew:
+
 port install autoconf binutils cmake ncurses zlib readline
 
 2. Upgrade clang to 3.2+
@@ -58,6 +65,27 @@ To run all tests then, execute:
 
 cd ~/build/tarantool/test
 ./run
+
+6. Build DMG package
+-------------
+
+Building DMG depended by "Auxiliary Tools for Xcode", which be able to download from:
+
+https://developer.apple.com (necessary login with Apple ID account).
+
+Execute commands to get DMG package by root (if you not root you'll get files with incorrect permissions):
+
+sudo -s
+cmake ..  \
+	-DCMAKE_INSTALL_PREFIX=/usr/local \
+	-DCMAKE_BUILD_TYPE=Rel \
+	-DENABLE_BACKTRACE=OFF \
+	-DCMAKE_C_COMPILER="clang" \
+	-DCMAKE_CXX_COMPILER="clang++" \
+	-DENABLE_CLIENT=ON
+
+make package
+
 
 -- EOF
 

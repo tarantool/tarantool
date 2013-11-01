@@ -25,4 +25,15 @@ endif()
 
 configure_file(rpm.spec.in rpm.spec @ONLY)
 
+if (TARGET_OS_DARWIN)
+	configure_file(org.tarantool.in org.tarantool.tarantool_${TARANTOOL_PRODUCT} @ONLY)
+	# chmod +x 655
+	install (FILES ${CMAKE_BINARY_DIR}/extra/org.tarantool.tarantool_${TARANTOOL_PRODUCT}
+                 DESTINATION share/tarantool
+		 PERMISSIONS
+		 OWNER_READ OWNER_WRITE
+		 GROUP_READ GROUP_EXECUTE
+		 WORLD_READ WORLD_EXECUTE)
+endif()
+
 add_executable(txt2c txt2c.c)
