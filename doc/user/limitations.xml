@@ -1,0 +1,64 @@
+<appendix xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="limitations">
+
+<title>Limitations</title>
+
+
+<variablelist>
+
+  <varlistentry>
+    <term xml:id="limitations-index-field-count" xreflabel="limitations-index-field-count">Number of fields in an index</term>
+    <listitem><para>For BITSET indexes, the maximum is 1.
+    For TREE indexes, the theoretical maximum is about 4 billion (BOX_FIELD_MAX)
+    but the practical maximum is the number of fields in a tuple.
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-index-count" xreflabel="limitations-index-count">Number of indexes in a space</term>
+    <listitem><para>10 (BOX_INDEX_MAX).
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-tuple-field-count" xreflabel="limitations-tuple-field-count">Number of fields in a tuple</term>
+    <listitem><para>There is no theoretical maximum.
+    The practical maximum is whatever is specified by space.cardinality in the configuration file,
+    or the maximum tuple length.
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-space-count" xreflabel="limitations-space-count">Number of spaces</term>
+    <listitem><para>255.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-connections-count" xreflabel="limitations-connections-count">Number of connections</term>
+    <listitem><para>The practical limit is the number of file descriptors that one can set with
+    the operating system.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-slab-alloc-arena-size" xreflabel="limitations-slab-alloc-arena-size">Space size</term>
+    <listitem><para>The total maximum size for all spaces is in effect set by the slab_alloc_arena_size
+    parameter in the configuration file, which in turn is limited by the total available memory.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-update-count" xreflabel="limitations-updae-count">Update operations count</term>
+    <listitem><para>The maximum number of operations that can be in a single update is 4000 (BOX_UPDATE_OP_CNT_MAX).
+    </para></listitem>
+  </varlistentry>
+
+</variablelist>
+</appendix>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->
