@@ -6,7 +6,7 @@ if (MYSQL_FOUND)
 	
 	include_directories(${MYSQL_INCLUDE_DIRS})
 	add_library(mysql SHARED mysql.cc)
-	target_link_libraries(mysql ${MYSQL_LIBRARIES})
+	target_link_libraries(mysql ${MYSQL_LIBRARIES} -rdynamic)
 	install(TARGETS mysql LIBRARY DESTINATION ${PLUGIN_DIR})
 else()
 	message(STATUS "MySQL client not found, box.net.sql(mysql) disabled")
