@@ -81,7 +81,6 @@ lua_check_pgconn(struct lua_State *L, int index)
 	return conn;
 }
 
-
 /** do execute request (is run in the other thread) */
 static ssize_t
 pg_exec(va_list ap)
@@ -210,14 +209,19 @@ lua_pg_execute(struct lua_State *L)
 	Oid *paramTypes = NULL;
 
 	if (count > 0) {
-		paramValues = (typeof(paramValues))
-			alloca( count * sizeof(*paramValues) );
-		paramLengths = (typeof(paramLengths))
-			alloca( count * sizeof(*paramLengths) );
-		paramFormats = (typeof(paramFormats))
-			alloca( count * sizeof(*paramFormats) );
-		paramTypes = (typeof(paramTypes))
-			alloca( count * sizeof(*paramTypes) );
+		/* Allocate memory for params using lua_newuserdata */
+		char *buf = (char *) lua_newuserdata(L, count *
+			(sizeof(*paramValues) + sizeof(*paramLengths) +
+			 sizeof(*paramFormats) + sizeof(*paramTypes)));
+
+		paramValues = (const char **) buf;
+		buf += count * sizeof(*paramValues);
+		paramLengths = (int *) buf;
+		buf += count * sizeof(*paramLengths);
+		paramFormats = (int *) buf;
+		buf += count * sizeof(*paramFormats);
+		paramTypes = (Oid *) buf;
+		buf += count * sizeof(*paramTypes);
 
 		for(int i = 0, idx = 3; i < count; i++, idx++) {
 			if (lua_isnil(L, idx)) {
@@ -288,6 +292,7 @@ lua_pg_execute(struct lua_State *L)
 	auto scope_guard = make_scoped_guard([&]{
 		PQclear(res);
 	});
+	lua_settop(L, 0);
 	return lua_push_pgres(L, res);
 }
 

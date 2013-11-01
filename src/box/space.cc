@@ -488,8 +488,13 @@ check_spaces(struct tarantool_cfg *conf)
 
 		/* Check for index field type conflicts */
 		if (max_key_fieldno > 0) {
-			char *types = (char *) alloca(max_key_fieldno);
-			memset(types, 0, max_key_fieldno);
+			enum field_type *types = (enum field_type *)
+				calloc(1, sizeof(*types) * max_key_fieldno);
+			if (types == NULL) {
+				out_warning(CNF_OK, "cannot allocate %zd bytes",
+					    max_key_fieldno);
+				return -1;
+			}
 			for (size_t j = 0; space->index[j] != NULL; ++j) {
 				auto index = space->index[j];
 				for (size_t k = 0; index->key_field[k] != NULL; ++k) {
@@ -506,12 +511,15 @@ check_spaces(struct tarantool_cfg *conf)
 						} else {
 							out_warning(CNF_OK, "(space = %zu fieldno = %zu) "
 								    "index field type mismatch", i, f);
+							free(types);
 							return -1;
 						}
 					}
 				}
 
 			}
+
+			free(types);
 		}
 	}
 
