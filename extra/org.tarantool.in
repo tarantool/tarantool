@@ -3,32 +3,29 @@
 <plist version="1.0">
 <dict>
     <key>StandardOutPath</key>
-    <string>tarantool_@TARANTOOL_PRODUCT@.log</string>
+    <string>/var/log/tarantool_@TARANTOOL_PRODUCT@.log</string>
     <key>StandardErrorPath</key>
-    <string>tarantool_@TARANTOOL_PRODUCT@-err.log</string>
+    <string>/var/log/tarantool_@TARANTOOL_PRODUCT@.log</string>
+    <key>WorkingDirectory</key>
+    <string>@CMAKE_INSTALL_PREFIX@</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-	<string>/opt/local/bin:/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin:@CMAKE_INSTALL_PREFIX@/bin</string>
+	<string>@CMAKE_INSTALL_PREFIX@/bin:/bin:/sbin:/opt/bin</string>
     </dict>
-    <key>GroupName</key>
-    <string>daemon</string>
+    <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
         <false/>
     </dict>
     <key>Label</key>
-    <string>org.tarantool.tarantool_@TARANTOOL_PRODUCT@</string>
+    <string>@DARWIN_PACKAGE_ID@.@CPACK_PACKAGE_VENDOR@.tarantool_@TARANTOOL_PRODUCT@</string>
     <key>ProgramArguments</key>
     <array>
         <string>tarantool_@TARANTOOL_PRODUCT@</string>
 	<string>--config=@CMAKE_INSTALL_PREFIX@/etc/tarantool.cfg</string>
     </array>
-    <key>KeepAlive</key>
+    <key>RunAtLoad</key>
     <true/>
-    <key>UserName</key>
-    <string>tarantool</string>
-    <key>WorkingDirectory</key>
-    <string>@CMAKE_INSTALL_PREFIX@</string>
 </dict>
 </plist>
