@@ -1,155 +1,279 @@
-<!DOCTYPE section [
-<!ENTITY % tnt SYSTEM "../tnt.ent">
-%tnt;
-]>
+
 <section xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xml:id="dynamic-data-model">
+
 <title>Dynamic data model</title>
-<para>
-  Tarantool data is organized in <emphasis>tuples</emphasis>. Tuple
-  length is varying: a tuple can contain any number
-  of fields. A field can be either numeric &mdash;
-  32- or 64- bit unsigned integer, or binary
-  string &mdash; a sequence of octets.
-  Tuples are stored and retrieved by means of indexing. An index
-  can cover one or multiple fields, in any order. Fields included
-  into the first index are always assumed to be the identifying
-  (unique) key. The remaining fields make up a value, associated
-  with the key. 
-</para>
-<para>
-  Apart from the primary key, it is possible to define secondary
-  <emphasis>indexes</emphasis> on other tuple fields.
-
-  A secondary index does not have to be unique and can cover
-  multiple fields. The total number of fields in a tuple must be
-  at least equal to the ordinal number of the last field
-  participating in any index.
-</para>
-<para>
-  Supported index types are HASH, TREE and BITSET. HASH
-  index is the fastest one, with smallest memory footprint.
-  TREE index, in addition to key/value look ups, support partial
-  key lookups, key-part lookups for multipart keys and ordered
-  retrieval. BITSET indexes, while can serve as a standard unique
-  key, are best suited for bit-pattern look-ups, i.e. search for
-  objects satisfying multiple properties.
-</para>
-<para>
-  Tuple sets together with defined indexes form
-  <emphasis>spaces<alt>the paradigm of tuples and spaces is
-  derived from distributed computing</alt></emphasis>.
-
-  The basic server operations are insert, replace, delete,
-  update, which modify a tuple in a space, and select,
-  which retrieves tuples from a space. All operations that modify
-  data require the primary key for look up. Select, however, may
-  use any index.
- </para>
- <para>
- A Lua stored procedure can combine multiple
-  trivial commands, as well as access data using <olink
-  targetptr="box.index.iterator">index iterators</olink>. Indeed,
-  the iterators provide full access to the power of indexes,
-  enabling index-type specific access, such as boolean expression
-  evaluation for BITMAP indexes, or reverse range retrieval for
-  TREEs.
-</para>
-<para>
-  All operations in Tarantool are atomic and durable: they are
-  either executed and written to the write ahead log or rolled back.
-  A stored procedure, containing a combination of basic operations,
-  holds a consistent view of the database as long as it doesn't 
-  incur writes to the write ahead log or to network. In particular,
-  a select followed by an update or delete is atomic. 
-</para>
-<para>
-  While the subject of each data changing command is a
-  single tuple, an update may modify one or more tuple fields, as
-  well as add or delete fields, all in one command. It thus
-  provides an alternative way to achieve multi-operation
-  atomicity.
-</para>
-<para>
-  Currently, entire server <emphasis>schema</emphasis> must be
-  specified in the configuration file. The schema contains all
-  spaces and indexes. A server started with a configuration
-  file that doesn't match contents of its data directory will most
-  likely crash, but may also behave in a non-defined way. 
-  It is, however, possible to stop the server,
-  add new spaces and indexes to the schema or temporarily disable
-  existing spaces and indexes, and then restart the server.
-</para>
-<para>
-  Schema objects, such as spaces and indexes, are referred to
-  by a numeric id. For example, to insert a tuple, it is necessary
-  to provide id of the destination space; to select
-  a tuple, one must provide the identifying key, space id and
-  index id of the index used for lookup. Many Tarantool drivers
-  provide a local aliasing scheme, mapping numeric identifiers
-  to names. Use of numeric identifiers on the wire protocol
-  makes it lightweight and easy to parse.
-</para>
 
 <para>
-  The configuration file shipped with the binary package defines
-  only one space with id <literal>0</literal>. It has no keys
-  other than the primary. The primary key numeric id is also 
-  <literal>0</literal>. Tarantool command line client
-  supports a small subset of SQL, and it'll be used to
-  demonstrate supported data manipulation commands:
-  <programlisting>
-  localhost> insert into t0 values (1)
-  Insert OK, 1 row affected
-  localhost> select * from t0 where k0=1
-  Found 1 tuple:
-  [1]
-  localhost> insert into t0 values ('hello')
-  An error occurred: ER_ILLEGAL_PARAMS, 'Illegal parameters'
-  localhost> replace into t0 values (1, 'hello')
-  Replace OK, 1 row affected
-  localhost> select * from t0 where k0=1 
-  Found 1 tuple:
-  [1, 'hello']
-  localhost> update t0 set k1='world' where k0=1
-  Update OK, 1 row affected
-  localhost> select * from t0 where k0=1
-  Found 1 tuple:
-  [1, 'world']
-  localhost> delete from t0 where k0=1
-  Delete OK, 1 row affected
-  localhost> select * from t0 where k0=1
-  No match</programlisting>
 
-  <itemizedlist>
-    <title>Please observe:</title>
-    <listitem><para>
-      Since all object identifiers are numeric, Tarantool SQL subset
-      expects identifiers that end with a number (<literal>t0</literal>,
-      <literal>k0</literal>, <literal>k1</literal>, and so on):
-      this number is used to refer to the actual space or
-      index.
-    </para></listitem>
-    <listitem><para>
-       All commands actually tell the server which key/value pair
-       to change. In SQL terms, that means that all DML statements
-       must be qualified with the primary key. WHERE clause
-       is, therefore, mandatory.
-    </para></listitem>
-    <listitem><para>
-       REPLACE replaces data when a
-       tuple with given primary key already exists. Such replace
-       can insert a tuple with a different number of fields.
-    </para></listitem>
-  </itemizedlist>
+If you tried out the <link linkend="starting"><quote>Starting Tarantool and making your first database</quote></link>
+exercise from the last chapter, then your database looks like this:
+<programlisting>
++--------------------------------------------+
+|                                            |
+| SPACE 'space[0]'                           |
+| +----------------------------------------+ |
+| |                                        | |
+| | TUPLE SET 't0'                         | |
+| | +-----------------------------------+  | |
+| | | Tuple: [ 1 ]                      |  | |
+| | | Tuple: [ 2, 'Music' ]             |  | |
+| | | Tuple: [ 3, 'length', 93 ]        |  | |
+| | +-----------------------------------+  | |
+| |                                        | |
+| | INDEX 'index[0]'                       | |
+| | +-----------------------------------+  | |
+| | | Key: 1                            |  | |
+| | | Key: 2                            |  | |
+| | | Key: 3                            |  | |
+| | +-----------------------------------+  | |
+| |                                        | |
+| +----------------------------------------+ |
++--------------------------------------------+
+</programlisting>
+</para>
+
+<bridgehead renderas="sect2">Space</bridgehead>
+
+<para>
+A <emphasis>space<alt>the paradigm of tuples and spaces is
+derived from distributed computing</alt></emphasis> -- 'space[0]' in the example -- is a container.
 </para>
 <para>
-  Additional examples of SQL statements can be found in <citetitle
+There is always at least one space; there can be many spaces,
+numbered as space[0], space[1], and so on. Spaces always
+contain one tuple set and one or more indexes.
+</para>
+
+<bridgehead renderas="sect2">Tuple Set</bridgehead>
+
+<para>
+A <emphasis>tuple set<alt>There's a Wikipedia article about tuples: https://en.wikipedia.org/wiki/Tuple</alt></emphasis> -- 't0' in the example -- is a group of tuples.
+</para>
+<para>
+There is always one tuple set in a space.
+For the tarantool client, the identifier of a tuple set is <quote>t</quote> followed by the
+space's number, for example <quote>t0</quote> refers to the tuple
+set of space[0]. (The letter <quote>t</quote> stands for <quote>tuple set.</quote>)
+</para>
+<para>
+A tuple fills
+the same role as a <quote>row</quote> or a <quote>record</quote>, and the
+components of a tuple (which we call <quote>fields</quote>)
+fill the same role as a
+<quote>row column</quote> or <quote>record field</quote>, except that: the
+fields of a tuple don't need to have names.
+That's why there was no need to pre-define the
+tuple set in the configuration file, and that's
+why each tuple can have a different number of
+elements, and that's why we say that Tarantool has
+a <quote>dynamic</quote> data model.
+</para>
+<para>
+Any given tuple may have any number of fields and the
+fields may have any of these three types:
+NUM (32-bit unsigned integer between 0 and 2,147,483,647),
+NUM64 (64-bit unsigned integer between 0 and 18,446,744,073,709,551,615),
+or STR (string, any sequence of octets). 
+The identifier of a field is
+<quote>k</quote> followed by the field's number, for example
+<quote>k0</quote> refers to the first field of a tuple.
+</para>
+<note><para>This manual is following the tarantool client convention by
+using tuple identifier = <quote>t</quote> followed by the space's number, and
+using field identifier = <quote>k</quote> followed by the field's number.
+The server knows nothing about such identifiers, it only cares
+about the number. Other clients follow different conventions,
+and may even have sophisticated ways of mapping meaningful names
+to numbers.</para></note>
+<para>
+When the tarantool client displays a tuple, it surrounds
+strings with single quotes, separates fields with commas,
+and encloses the tuple inside square brackets. For example:
+<computeroutput>[ 3, 'length', 93 ]</computeroutput>.
+</para>
+
+<bridgehead renderas="sect2">Index</bridgehead>
+
+<para>
+An index -- 'index[0]' in the example -- is a group of key values and pointers.
+</para>
+<para>
+There is always at least one index in a space; there can be many.
+The identifier of an index is 'index' followed by the index's number
+within the space, so in our example there is one index and its
+identifier is <quote>index[0]</quote>.
+</para>
+
+<para>
+An index may be <emphasis>multi-field</emphasis>, that is, the user can declare
+that an index key value is taken from two or more fields
+in the tuple, in any order. An index may be <emphasis>unique</emphasis>, that is, the user can declare
+that it would be illegal to have the same key value twice.
+An index may have <emphasis>one of three types</emphasis>:
+HASH which is fastest and uses the least memory but must be unique,
+TREE which allows partial-key searching and ordered results,
+and BITSET which can be good for searches that contain '=' and 'AND' in the WHERE clause.
+The first index -- index[0] -- is called the <emphasis><quote>primary key</quote> index</emphasis>
+and it must be unique; all other indexes -- index[1], index[2], and so on -- are
+<quote>secondary</quote> indexes.
+</para>
+
+<para>
+An index definition always includes at least one identifier of a tuple field and its expected type.
+Take our example configuration file, which has the lines:<programlisting>space[0].index[0].key_field[0].fieldno = 0
+space[0].index[0].key_field[0].type = "NUM"</programlisting>The effect is that, for all tuples in t0, field number 0 (k0)
+must exist and must be a 32-bit unsigned integer.
+</para>
+
+<para>
+For the current version of the Tarantool server, space definitions and index definitions must
+be in the configuration file. Administrators must take care that what's in the configuration
+file matches what's in the database. If a server is started with the wrong configuration file,
+it could behave in an unexpected way or crash. However, it is possible to stop the server
+or disable database accesses, then add new spaces and indexes,
+then restart the server or re-enable database accesses.
+The syntax details for defining spaces and indexes are in chapter 7
+ <olink targetdoc="tarantool-user-guide" targetptr="configuration-reference">Configuration reference</olink>.
+</para>
+
+
+<bridgehead renderas="sect2">Operations</bridgehead>
+
+<para>
+The basic operations are: the four data-change operations
+(INSERT, UPDATE, DELETE, REPLACE), and the data-retrieval
+operation (SELECT). There are also minor operations like <quote>ping</quote>
+which are not available via the tarantool client's SQL-like
+interface but can only be used with the binary protocol.
+Also, there are  <olink
+targetptr="box.index.iterator">index iterator</olink> operations,
+which can only be used with Lua stored procedures.
+(Index iterators are for traversing indexes one key at a time,
+taking advantage of features that are specific
+to an index type, for example evaluating Boolean expressions
+when traversing BITSET indexes, or going in descending order
+when traversing TREE indexes.)
+</para>
+
+<para>
+Five examples of basic operations:
+<programlisting>
+/* Add a new tuple to tuple set t0.
+   The first field, k0, will be 999 (type is NUM).
+   The second field, k1, will be 'Taranto' (type is STR). */
+INSERT INTO t0 VALUES (999,'Taranto')
+
+/* Update the tuple, changing field k1.
+   The clause "WHERE <replaceable>primary-key-field-identifier</replaceable> = <replaceable>value</replaceable> is mandatory
+   because UPDATE statements must always have a WHERE clause that
+   specifies the primary key, which in this case is k0. */
+UPDATE t0 SET k1 = 'Tarantino' WHERE k0 = 999
+
+/* Replace the tuple, adding a new field.
+   This is not possible with the UPDATE statement because
+   the SET clause of an UPDATE statement can only refer to
+   fields that already exist. */
+REPLACE INTO t0 VALUES (999,'Tarantella',Tarantula')
+
+/* Retrieve the tuple.
+   The WHERE clause is still mandatory, although it does not have to
+   mention the primary key. */
+SELECT * FROM t0 WHERE k0 = 999
+
+/* Delete the tuple.
+   Once again the clause "WHERE k0 = <replaceable>value</replaceable> is mandatory. */
+DELETE FROM t0 WHERE k0 = 999
+</programlisting>
+</para>
+
+<para>
+How does Tarantool do a basic operation? Let's take this example:
+<programlisting>
+UPDATE t0 SET k1 = 'size', k2=0 WHERE k0 = 3
+</programlisting>
+</para>
+
+<para>
+STEP #1: the client parses the statement and changes it to a
+binary-protocol instruction which has already been checked,
+and which the server can understand without needing to parse
+everything again. The client ships a packet to the server.
+</para>
+<para>
+STEP #2: the server's <quote>transaction processor</quote> thread uses the
+primary-key index on field k0 to find the location of the
+tuple in memory. It determines that the tuple can be updated
+(not much can go wrong when you're merely changing an unindexed
+field value to something shorter).
+</para>
+<para>
+STEP #3: the transaction processor thread sends a message to
+the <emphasis>write-ahead logging<alt>There's a Wikipedia article about write-ahead logging: https://en.wikipedia.org/wiki/Write-ahead_logging</alt></emphasis> (WAL) thread.
+</para>
+<para>
+At this point a <quote>yield</quote> takes place. To know
+the significance of that -- and it's quite significant -- you
+have to know a few facts and a few new words.
+</para>
+<para>
+FACT #1: there is only one transaction processor thread.
+Some people are used to the idea that there can be multiple
+threads operating on the database, with (say) thread #1
+reading row #x while thread#2 writes row#y. With Tarantool
+no such thing ever happens. Only the transaction processor
+thread can access the database, and there is only one
+transaction processor thread for each instance of the server.
+</para>
+<para>
+FACT #2: the transaction processor thread can handle many
+<emphasis>fibers<alt>There's a Wikipedia article about fibers: https://en.wikipedia.org/wiki/Fiber_%28computer_science%29</alt></emphasis>.
+A fiber is a set of computer instructions that may contain <quote>yield</quote> signals.
+The transaction processor thread will execute all computer instructions
+until a yield, then switch to execute the instructions of a different fiber.
+Thus (say) the thread reads row#x for the sake of fiber#1,
+then writes row#y for the sake of fiber#2.
+</para>
+<para>
+FACT #3: yields must happen, otherwise the transaction processor thread
+would stick permanently on the same fiber. There are implicit yields:
+every data-change operation or network-access causes an implicit yield,
+and every statement that goes through the tarantool client causes an
+implicit yield. And there are explicit yields: in a Lua stored procedure
+one can and should add <quote>yield</quote> statements to prevent hogging.
+This is called <emphasis>cooperative multitasking<alt>There's a Wikipedia
+article with a section about cooperative multitasking:
+https://en.wikipedia.org/wiki/Cooperative_multitasking#Cooperative_multitasking.2Ftime-sharing</alt></emphasis>.
+</para>
+<para>
+Since all data-change operations end with an implicit yield and
+an implicit commit, and since no data-change operation can change
+more than one tuple, there is no need for any locking.
+Consider, for example, a stored procedure that does three operations:<programlisting>
+SELECT              /* this does not yield and does not commit */
+UPDATE              /* this yields and commits */
+SELECT              /* this does not yield and does not commit */</programlisting>
+The combination <quote>SELECT plus UPDATE</quote> is an atomic transaction:
+the stored procedure holds a consistent view of the database
+until the UPDATE ends. For the combination <quote>UPDATE plus SELECT</quote>
+the view is not consistent, because after the UPDATE the transaction processor
+thread can switch to another fiber, and delete the tuple that
+was just updated.
+</para>
+<para>
+Since locks don't exist, and disk writes only involve the write-ahead log,
+transactions are usually fast. Also the Tarantool server may not be
+using up all the threads of a powerful multi-core processor,
+so advanced users may be able to start a second Tarantool
+server on the same processor without ill effects.
+</para>
+<para>
+  Additional examples of SQL statements can be found in the <citetitle
   xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of
-  supported SQL is provided in <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
+  supported SQL is provided in the <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
 </para>
 <para>
   Since not all Tarantool operations can be expressed in SQL, to gain

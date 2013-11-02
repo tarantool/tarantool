@@ -7,7 +7,7 @@
 <para>In the current version of the binary protocol, error message,
 which is normally more descriptive than error code,
 is not present in server response. The actual message may contain
-a file name, a detailed reason or operating system error code.
+a file name, a detailed reason or an operating system error code.
 All such messages, however, are logged in the error log. When
 using <emphasis role="strong">Memcached</emphasis> protocol, the error message is sent to the
 client along with the code. Below follow only general descriptions
@@ -42,13 +42,6 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/in
     <term xml:id="ER_WAL_IO" xreflabel="ER_WAL_IO">ER_WAL_IO</term>
     <listitem><para>Failed to record the change in the write ahead
     log. Some sort of disk error.
-    </para></listitem>
-  </varlistentry>
-
-  <varlistentry>
-    <term xml:id="ER_INDEX_VIOLATION" xreflabel="ER_INDEX_VIOLATION">ER_INDEX_VIOLATION</term>
-    <listitem><para>A unique index constraint violation: a tuple
-    with the same key is already present in the index.
     </para></listitem>
   </varlistentry>
 
