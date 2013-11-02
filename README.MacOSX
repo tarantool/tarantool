@@ -2,7 +2,11 @@ OS X Readme
 ===========
 
 This manual explains how to manually build tarantool from sources.
-If you just need a working binary, please use homebrew:
+
+Supporting kinds of build with default Apple developer software and external as
+homebrew as MacPorts.
+
+If you want to build at the Homebrew environment execute just:
 
         brew install http://tarantool.org/dist/tarantool.rb
 
@@ -13,16 +17,17 @@ First of all, make sure mac ports are available (to install packages from).
 1. Install necessary packages (ports):
 -------------
 
-Developer tools by Apple:
+Default build depended by Developer tools by Apple and -DDARWIN_BUILD_TYPE=None:
 
-sudo xcode-select --install
-sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+	sudo xcode-select --install
+	sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
 
-Homebrew:
+To enable build type with MacPorts set up the flag -DDARWIN_BUILD_TYPE=Ports:
 
-port install autoconf binutils cmake ncurses zlib readline
+	port install autoconf binutils cmake ncurses zlib readline
 
 2. Upgrade clang to 3.2+
+-------------
 
 Go to http://developer.apple.com/ to download and install the latest version
 of "Command Line Tools for Xcode". This package contains /usr/bin/clang and
@@ -43,10 +48,16 @@ the directory the module's archive deflates into.
 4. Download & build tarantool source code:
 -------------
 
+NOTE: If you want to get DMG package go to section 6.
+
 git clone --recursive git://github.com/tarantool/tarantool.git
 
 cd tarantool
-CC=clang CXX=clang++ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
+mkdir build && cd build
+CC=clang CXX=clang++ cmake .. \
+	-DCMAKE_BUILD_TYPE=RelWithDebugInfo \
+	-DENABLE_CLIENT=true \
+	-DDARWIN_BUILD_TYPE=Ports
 make
 
 5. Run tarantool test suite
@@ -75,6 +86,7 @@ https://developer.apple.com (necessary login with Apple ID account).
 
 Execute commands to get DMG package by root (if you not root you'll get files with incorrect permissions):
 
+mkdir build && cd build
 sudo -s
 cmake ..  \
 	-DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -82,6 +94,7 @@ cmake ..  \
 	-DENABLE_BACKTRACE=OFF \
 	-DCMAKE_C_COMPILER="clang" \
 	-DCMAKE_CXX_COMPILER="clang++" \
+	-DDARWIN_BUILD_TYPE=None \
 	-DENABLE_CLIENT=ON
 
 make package
