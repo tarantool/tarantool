@@ -7,7 +7,7 @@
 
 <para>
 
-If you tried out the <link linkend="starting"><quote>Starting Tarantool and making your first database</quote></link>
+If you tried out the <link linkend="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></link>
 exercise from the last chapter, then your database looks like this:
 <programlisting>
 +--------------------------------------------+

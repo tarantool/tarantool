@@ -165,7 +165,7 @@ Tarantool 1.4.0-69-g45551dd
         either redirect its standard out and standard error
         streams, or provide <emphasis>logger</emphasis> option
         in the configuration file, since otherwise all logging
-        information will be lost</para></caution>.
+        information will be lost.</para></caution>
       </para>
     </listitem>
   </itemizedlist>
@@ -252,8 +252,8 @@ Tarantool 1.4.0-69-g45551dd
           <entry>no</entry>
           <entry>A directory where database working files will be stored.
           The server switches to work_dir with chdir(2) after
-          start. Can be relative to the configuration file directory.
-          If not specified, defaults to configuration file directory.</entry>
+          start. Can be relative to the current directory.
+          If not specified, defaults to the current directory.</entry>
         </row>
 
         <row>
@@ -377,7 +377,7 @@ Tarantool 1.4.0-69-g45551dd
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
 tarantool_box: primary pri: 33013 sec: 33014 adm: 33015</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
-          the output looks like::</para>
+          the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
 tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting>
           </entry>
