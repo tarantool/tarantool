@@ -178,7 +178,7 @@ function(tarantool_module mod)
     add_library(lt${mod} STATIC ${recompiled_sources})
     add_dependencies(lt${mod} generate_headers generate_admin_cc build_bundled_libs)
 
-    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries})
+    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries} -rdynamic)
 
     if (ENABLE_STATIC)
         set_target_properties(tarantool_${mod} PROPERTIES

@@ -7,7 +7,7 @@ if (PostgreSQL_FOUND)
 
 	include_directories(${PostgreSQL_INCLUDE_DIRS})
 	add_library(pg SHARED pg.cc)
-	target_link_libraries(pg ${PostgreSQL_LIBRARIES})
+	target_link_libraries(pg ${PostgreSQL_LIBRARIES} -rdynamic)
 	install(TARGETS pg LIBRARY DESTINATION ${PLUGIN_DIR})
 
 else()

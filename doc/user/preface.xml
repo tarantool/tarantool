@@ -110,7 +110,7 @@
    Outside Mail.Ru the software is used by a growing
     number of projects in online gaming, digital marketing, and social
     media industries. While product development is sponsored by Mail.Ru, the
-    roadmap and the bugs database and the development process are fully
+    roadmap, the bugs database and the development process are fully
     open. The software incorporates patches from dozens of
     community contributors. The Tarantool community writes and maintains
     most of the drivers for programming languages.
@@ -151,17 +151,7 @@
     contact developers directly on
     <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
     IRC channel or via a mailing list,
-    <link xlink:href="https://launchpad.net/~tarantool-developers">tarantool-developers@lists.launchpad.net</link>.
-  </para>
-  <para>
-    <emphasis role="strong">Caution:</emphasis> To prevent spam, the Launchpad
-    mailing-list software silently drops all mail coming from
-    non-registered email addresses -- so register with Launchpad
-    before sending emails. Launchpad registration also
-    allows you to report bugs and create feature requests.
-    You can check that your mail was delivered by looking at the
-    mailing list archive, <link
-    xlink:href="https://lists.launchpad.net/tarantool-developers"/>.
+    <link xlink:href="https://googlegroups.com/group/tarantool">Tarantool Google group</link>.
   </para>
 </section>
 

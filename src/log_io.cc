@@ -390,7 +390,7 @@ int
 inprogress_log_rename(struct log_io *l)
 {
 	char *filename = l->filename;
-	char *new_filename;
+	char new_filename[PATH_MAX];
 	char *suffix = strrchr(filename, '.');
 
 	assert(l->is_inprogress);
@@ -398,7 +398,6 @@ inprogress_log_rename(struct log_io *l)
 	assert(strcmp(suffix, inprogress_suffix) == 0);
 
 	/* Create a new filename without '.inprogress' suffix. */
-	new_filename = (char *) alloca(suffix - filename + 1);
 	memcpy(new_filename, filename, suffix - filename);
 	new_filename[suffix - filename] = '\0';
 

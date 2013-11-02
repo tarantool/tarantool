@@ -16,8 +16,8 @@
 
 <para>
 Tarantool splits its configuration parameters between command
-line options and a configuration file. Command line flags
-are provided for the most basic properties only: the rest
+line options and a configuration file. Command line options
+are provided only for the most basic properties; the rest
 must be set in the configuration file.
 At runtime, this allows to disambiguate the source of
 a configuration setting: it unequivocally comes either from
@@ -139,7 +139,7 @@ Tarantool 1.4.0-69-g45551dd
     </listitem>
   </itemizedlist>
   <para>
-    The only two options which have effect on a running server are:
+    The only two options which could affect a running server are:
   </para>
   <itemizedlist>
     <listitem>
@@ -150,7 +150,7 @@ Tarantool 1.4.0-69-g45551dd
 
     <listitem>
       <para><option>--background</option>, <option>-b</option></para>
-      <para>Detach from the controlling terminal and run in
+      <para>Detach from the controlling terminal and run in the
         background.
         <caution><para>Tarantool uses
         <filename>stdout</filename> and
@@ -160,7 +160,7 @@ Tarantool 1.4.0-69-g45551dd
         either redirect its standard out and standard error
         streams, or provide <emphasis>logger</emphasis> option
         in the configuration file, since otherwise all logging
-        information will be lost</para></caution>
+        information will be lost.</para></caution>
       </para>
     </listitem>
   </itemizedlist>
@@ -245,11 +245,10 @@ Tarantool 1.4.0-69-g45551dd
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>A directory to switch to with chdir(2) after
-          start. Can be relative to the starting directory.
-          If not specified, the current working directory
-          of the server is the same as starting
-          directory.</entry>
+          <entry>A directory where database working files will be stored.
+          The server switches to work_dir with chdir(2) after
+          start. Can be relative to the current directory.
+          If not specified, defaults to the current directory.</entry>
         </row>
 
         <row>
@@ -272,11 +271,11 @@ Tarantool 1.4.0-69-g45551dd
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>A directory to store the write ahead log files
-          (WAL) in. Can be relative to work_dir. You may choose
-          to separate your snapshots and logs and store them
-          on separate disks. This is how this parameter is most
-          commonly used. If not specified, defaults to work_dir.</entry>
+          <entry>A directory where write ahead log (.xlog) files are stored.
+          Can be relative to work_dir. Most commonly used so
+          that snapshot files and write ahead log files
+          can be stored on separate disks.
+          If not specified, defaults to work_dir.</entry>
         </row>
 
         <row>
@@ -285,7 +284,7 @@ Tarantool 1.4.0-69-g45551dd
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>A directory to store snapshots in. Can be
+          <entry>A directory where snapshot (.snap) files will be stored. Can be
           relative to work_dir. If not specified, defaults to
           work_dir. See also <olink targetptr="wal_dir"/>.</entry>
         </row>
@@ -317,7 +316,7 @@ Tarantool 1.4.0-69-g45551dd
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
           in the configuration file. Normally set to 33013.
-          Note: a replica also binds to this port, accepts
+          Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.</entry>
         </row>
@@ -366,16 +365,16 @@ Tarantool 1.4.0-69-g45551dd
           <entry>
             <para>Inject the given string into <olink
             targetptr="proctitle">server process title</olink>
-            (what's shown in COMMAND column of <command>ps</command>
+            (what's shown in the COMMAND column for <command>ps</command>
             and <command>top</command> commands). For example,
-            an unmodified Tarantool process group looks like:
+             ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary pri:33013 sec:33014 adm:33015</programlisting>
-          <para>After "sessions" custom_proc_title is injected it
-          looks like:</para>
+tarantool_box: primary pri: 33013 sec: 33014 adm: 33015</programlisting>
+          <para>But if the configuration file contains custom_proc_title=sessions then
+          the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
+tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting>
           </entry>
         </row>
 
@@ -454,10 +453,10 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry><emphasis role="strong">no</emphasis></entry>
           <entry>This is the main Tarantool parameter, describing
-          the data structure that users get access to via
+          the data structure that users get access to via the
           client/server protocol. It holds an array of
-          entries, and each entry represents a tuple set
-          served by the server. Every entry is a composite object,
+          entries, and each entry describes a tuple set
+          and its indexes. Every entry is a composite object,
           best seen as a C programming language "struct"
           <footnote><xi:include href="space.xml"/></footnote>.
           </entry>
@@ -492,7 +491,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>true</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>If there is an error reading the snapshot (at
+          <entry>If there is an error reading the snapshot file (at
             server start), abort.</entry>
         </row>
 
@@ -502,8 +501,8 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>If there is an error reading from a write ahead
-          log (at server start), abort.</entry>
+          <entry>If there is an error reading a write ahead
+          log file (at server start), abort.</entry>
         </row>
 
         <row>
@@ -515,7 +514,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>How many log records to store in a single write
           ahead log file. When this limit is reached, Tarantool
           creates another WAL file named
-          <filename>&lt;first-lsn-in-wal&gt;.wal</filename>
+          <filename>&lt;first-lsn-in-wal&gt;.xlog</filename>
           This can be useful for simple rsync-based backups.
           </entry>
         </row>
@@ -527,7 +526,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>no</entry>
           <entry>yes</entry>
           <entry>Reduce the throttling effect of <olink
-          targetptr="box.snapshot"/> on the INSERT/UPDATE/DELETE
+          targetptr="box.snapshot"/> on INSERT/UPDATE/DELETE
           performance by setting a limit on
           how many megabytes per second it can write to disk.
           The same can be achieved by splitting <olink
@@ -548,7 +547,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           Setting the delay may be necessary to increase write
           throughput, but may lead to several last updates being
           lost in case of a power failure. Such failure, however,
-          does not read to data corruption: all WAL records have a
+          does not lead to data corruption: all WAL records have a
           checksum, and only complete records are processed during
           recovery.</entry>
         </row>
@@ -598,8 +597,10 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>0</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>Replication port. If non-zero, Tarantool listens
-          on the given port for incoming connections from
+          <entry>If replication_port is greater than zero, the
+          server is considered to be a Tarantool master.
+          The master server listens on the specified port
+          for incoming connections from
           replicas. See also <olink
           targetptr="replication_source"/>, which complements
           this setting on the replica side.</entry>
@@ -612,11 +613,16 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>NULL</entry>
           <entry>no</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>Pair ip:port describing the master. If not empty,
-          replication is on, and Tarantool does not accept updates
+          <entry>If replication_source is not an empty string, the
+          server is considered to be a Tarantool replica.
+          The replica server will try to connect to the master
+          which replication_source specifies with format ip:port.
+          For example, if replication_source = "1.2.3.4:55555" then
+          the replica server tries to connect to 1.2.3.4 port 55555.
+          A replica server does not accept updates
           on <olink targetptr="primary_port"/>. This parameter is
-          dynamic, that is, to enter master mode, simply set the
-          value to an empty string and issue <olink
+          dynamic, that is, to enter master mode, simply set
+          replication_source to an empty string and issue <olink
           targetptr="box.cfg.reload"/>.</entry>
         </row>
 
@@ -649,11 +655,11 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>0.0</entry>
           <entry>no</entry>
           <entry>yes</entry>
-          <entry>If non-zero, a sleep given duration is
-          injected between iterations of the event loop. Can be
+          <entry>The server will sleep for io_collect_interval seconds
+          between iterations of the event loop. Can be
           used to reduce CPU load in deployments in which the
           number of client connections is large, but requests are
-          not so frequent (for example, each connection issuing
+          not so frequent (for example, each connection issues
           just a handful of requests per second). </entry>
         </row>
 
@@ -663,14 +669,14 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>16384</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>The size of read-ahead buffer associated with a
-          client connection. The larger is the buffer, the more
-          memory an active connection consumes and more requests
+          <entry>The size of the read-ahead buffer associated with a
+          client connection. The larger the buffer, the more
+          memory an active connection consumes and the more requests
           can be read from the operating system buffer in a single
-          system call. The rule of tumb is to make sure the buffer
+          system call. The rule of thumb is to make sure the buffer
           can contain at least a few dozen requests. Therefore, if
           a typical tuple in a request is large, e.g. a few
-          kilobytes or even megabytes, the readahead buffer should
+          kilobytes or even megabytes, the read-ahead buffer size should
           be increased.  If batched request processing is not
           used, it's prudent to leave this setting at its
           default.</entry>
@@ -682,7 +688,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>1024</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>The size of listen backlog.</entry>
+          <entry>The size of the listen backlog.</entry>
        </row>
 
       </tbody>
@@ -717,10 +723,10 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>How verbose the logging is. There are 5 log
             verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
             WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
-            you can enable logging of all classes below or equal
+            one can enable logging of all classes below or equal
             to the given level. Tarantool prints its logs to the
             standard error stream by default, but this can be
-            changed with "logger" configuration parameter.
+            changed with the "logger" configuration parameter.
           </entry>
         </row>
 
@@ -747,7 +753,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry>0</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>If this option is given, Tarantool does not
+          <entry>If logger_nonblock equals 1, Tarantool does not
           block on the log file descriptor when it's not
           ready for write, and drops the message instead. If
           log_level is high, and a lot of messages go to the log
@@ -764,7 +770,7 @@ tarantool_box: primary@sessions pri:33013 sec:33014 adm:33015</programlisting>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>If processing a request takes longer than the
           given value (in seconds), warn about it in the log.
-          Has effect only if log_level is no less than 3
+          Has effect only if log_level is less than or equal to 3
           (WARNING).</entry>
         </row>
 
