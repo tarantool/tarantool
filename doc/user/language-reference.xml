@@ -43,7 +43,7 @@
         targetptr="replication_port"/>), by default set to
         <literal>33016</literal>, used to send updates to
         replicas. Replication is optional, and if this port is not
-        set in the option file, the corresponding server process
+        set in the configuration file, the corresponding server process
         is not started.
       </para></listitem>
     <listitem><para>Memcached port. Optional, read-write data port
@@ -128,7 +128,7 @@
       programming language in use, any existing client driver for
       Memcached will make do as a Tarantool connector.
       To enable text Memcached protocol, turn on
-      <olink targetptr="memcached_port"/> in the option file.
+      <olink targetptr="memcached_port"/> in the configuration file.
       Since Memcached has no notion of spaces or secondary
       indexes, this port only makes it possible to access one
       dedicated space (see <olink
