@@ -82,6 +82,46 @@ For an explanation of tarantar's design see <link xlink:href="https://github.com
 
 </section>
 
+<section xml:id="tarancheck">
+<title>Utility <code>tarancheck</code></title>
+<para>
+The tarancheck utility program will generate and verify <quote>signature files</quote>.
+A signature file contains, along with basic information that identifies the database,
+checksums calculated for each index in each space of the database,
+based on the latest snapshot and all subsequent entries in the write-ahead log.
+Signature files are useful for ensuring that databases have been saved without error,
+and for quick comparisons to see whether a database's components have been modified.
+</para>
+
+<para>
+To prepare: ensure that the configuration file contains 
+<olink targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
+clauses. Tarancheck does not assume that wal_dir and snap_dir have default values.
+</para>
+<para>
+To run:<programlisting> <command>tarancheck</command> [options] <replaceable>configuration-file</replaceable></programlisting>
+where possible options are:<simplelist>
+ <member><code>-G <replaceable>signature file</replaceable></code> or <code>--generate <replaceable>signature-file</replaceable></code> &mdash; generate signature file. example: <code>-G x.crc</code></member>
+ <member><code>-V <replaceable>signature file</replaceable></code> or <code>--verify <replaceable>signature-file</replaceable></code> &mdash; verify signature file. example: <code>--verify x.crc</code></member>
+ <member><code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
+ <member><code>-v </code> or <code>--version</code> &mdash; display version and exit. example: <code>-v</code></member></simplelist></para>
+<para>
+Example:
+<programlisting>
+<prompt>$ </prompt>~/tarantool/client/tarantar/tarancheck --generate=x.crc tarantool.cfg
+&gt;&gt;&gt; Signature file generation
+configured spaces: 1
+snap_dir: ./work_dir
+wal_dir: ./work_dir
+last snapshot lsn: 1
+last xlog lsn: 0
+(snapshot) 00000000000000000001.snap
+(signature) saving x.crc
+</programlisting>
+</para>
+
+</section>
+
 <section xml:id="os-install-notes">
 <title>System-specific administration notes</title>
 <blockquote><para>
