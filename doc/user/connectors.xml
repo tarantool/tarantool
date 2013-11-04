@@ -144,7 +144,7 @@ int main()
   struct tp reply;                                             /* area for getting server reply */
   int fd;                                                      /* file descriptor for socket */
   struct sockaddr_in tt;                                       /* the usual socket address info */
-  tp_init(&amp;request, NULL, 0, tp_realloc, NULL)                 /* initialize request buffer */
+  tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
   tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
   tp_tuple(&amp;request);                                          /* begin appending body */
   tp_sz(&amp;request,"");                                          /* append field[0] */
