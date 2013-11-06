@@ -31,12 +31,13 @@
 
 #include "index.h"
 
+#include <qsort_arg_mt.h>
 #include <third_party/sptree.h>
 
 /**
  * Instantiate sptree definitions
  */
-SPTREE_DEF(index, realloc);
+SPTREE_DEF(index, realloc, qsort_arg_mt);
 
 class TreeIndex: public Index {
 public:
