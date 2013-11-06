@@ -59,5 +59,17 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set (CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}-debug")
 endif()
 
+
+if (${TARGET_OS_DARWIN})
+    set (CPACK_GENERATOR "PackageMaker")
+    set (CPACK_SOURCE_GENERATOR "PackageMaker")
+    set (CPACK_PACKAGE_VENDOR "tarantool")
+    set (CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+    set (CPACK_POSTFLIGHT_SCRIPT "${CMAKE_BINARY_DIR}/extra/postflight")
+    set (CPACK_RESOURCE_FILE_WELCOME "${PROJECT_SOURCE_DIR}/extra/dmg/DESCRIPTION.rtf")
+    set (CPACK_RESOURCE_FILE_README  "${PROJECT_SOURCE_DIR}/extra/dmg/README.rtf")
+    set (CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/extra/dmg/LICENSE.rtf")
+endif()
+
 ##
 include (CPack)
