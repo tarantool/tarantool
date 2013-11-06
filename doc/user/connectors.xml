@@ -191,10 +191,24 @@ int main()
     </para>
   </section>
 
+  <section xml:id="connector-erlang">
+    <title>Erlang</title>
+    <para>
+       Please see <link xlink:href="https://github.com/tarantool/tarantool-erlang"><filename>https://github.com/tarantool/tarantool-erlang</filename></link>.
+    </para>
+  </section>
+
+  <section xml:id="connector-java">
+    <title>Java</title>
+    <para>
+       Please see <link xlink:href="http://dgreenru.github.io/tarantool-java/"><filename>http://dgreenru.github.io/tarantool-java/</filename></link>.
+    </para>
+  </section>
+
   <section xml:id="connector-node.js">
     <title>node.js</title>
     <para>
-       <link xlink:href="https://github.com/devgru/node-tarantool"><filename>http://github.com/devgru/node-tarantool</filename></link>.
+       Please see <link xlink:href="https://github.com/devgru/node-tarantool"><filename>http://github.com/devgru/node-tarantool</filename></link>.
     </para>
   </section>
 
@@ -217,8 +231,8 @@ int main()
   <section xml:id="connector-python">
     <title>Python</title>
     <para>
-       Please see <link
-       xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link>.
+       Please see <link xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link> and
+       <link xlink:href="https://github.com/zlobspb/txtarantool"><filename>https://github.com/zlobspb/txtarantool</filename></link>.
     </para>
   </section>
 
