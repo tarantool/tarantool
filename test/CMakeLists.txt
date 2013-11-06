@@ -13,16 +13,23 @@ add_subdirectory(unit)
 add_subdirectory(box)
 add_subdirectory(connector_c)
 
-if (ENABLE_RPM)
-    install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_rpm.cfg
-             DESTINATION ${CMAKE_SYSCONF_DIR}/tarantool/
+macro(install_cfg type_cfg dest)
+    install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_${type_cfg}.cfg
+             DESTINATION ${dest}
              RENAME "tarantool.cfg")
+endmacro(install_cfg)
+
+if (ENABLE_RPM)
+    install_cfg(rpm ${CMAKE_SYSCONF_DIR}/tarantool/)
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION share/tarantool)
 else()
-    install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_tgz.cfg
-             DESTINATION "${CMAKE_SYSCONF_DIR}"
-             RENAME "tarantool.cfg")
+    if (TARGET_OS_DARWIN)
+        install_cfg(dmg ${CMAKE_SYSCONF_DIR})
+    else()
+        install_cfg(tgz ${CMAKE_SYSCONF_DIR})
+    endif()
+
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
 endif()
