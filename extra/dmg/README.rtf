@@ -1,0 +1,43 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265
+{\fonttbl\f0\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red26\green26\blue26;\red48\green48\blue48;}
+\margl1440\margr1440\vieww12600\viewh7800\viewkind0
+\deftab720
+\pard\pardeftab720\sa298
+
+\f0\b\fs24 \cf2 What is Tarantool?\
+\pard\pardeftab720\sa380
+
+\b0 \cf2 Tarantool is an in-memory NoSQL database. The code is available for free under the terms of {\field{\*\fldinst{HYPERLINK "http://www.gnu.org/licenses/license-list.html#ModifiedBSD"}}{\fldrslt 
+\i \ul \ulc3 BSD license}}. Supported platforms are GNU/Linux, Mac OS and FreeBSD.\
+\pard\pardeftab720\sa298
+
+\b \cf2 An overview of the architecture\
+\pard\pardeftab720\sa380
+
+\b0 \cf2 The server 
+\b maintains all its data in random-access memory
+\b0 , and therefore has very low read latency. At the same time, a copy of the data is kept on non-volatile storage (a disk drive), and inserts and updates are performed atomically.\
+To ensure atomicity, consistency and crash-safety of the persistent copy, a write-ahead log (WAL) is maintained, and each change is recorded in the WAL before it is considered complete. The logging subsystem supports group commit.\
+If update and delete rate is high, a constantly growing write-ahead log file (or files) can pose a disk space problem, and significantly increase time necessary to restart from disk. A simple solution is employed: the server 
+\b can be requested to save a concise snapshot
+\b0  of its current data. The underlying operating system's \'93copy-on-write\'94 feature is employed to take the snapshot in a quick, resource-savvy and non-blocking manner. The \'93copy-on-write\'94 technique guarantees that snapshotting has minimal impact on server performance.\
+\pard\pardeftab720\sa380
+
+\b \cf2 Tarantool is lock-free
+\b0 . Instead of the operating system's concurrency primitives, such as threads and mutexes, Tarantool uses a cooperative multitasking environment to simultaneously operate on thousands of connections. A fixed number of independent execution threads within the server do not share state, but exchange data using low overhead message queues. While this approach limits server scalability to a few CPU cores, it removes competition for the memory bus and sets the scalability limit to the top of memory and network throughput. CPU utilization of a typical highly-loaded Tarantool server is under 10%.\
+\pard\pardeftab720\sa298
+
+\b \cf2 Key features\
+\pard\pardeftab720\sa380
+
+\b0 \cf2 Unlike most of NoSQL databases, Tarantool supports primary, 
+\b secondary keys, multi-part keys
+\b0 , HASH, TREE and BITSET index types.\
+Tarantool supports 
+\b Lua stored procedures
+\b0 , which can access and modify data atomically. Procedures can be created, modified and dropped at runtime.\
+Use of Lua as an extension language does not end with stored procedures: Lua programs can be used during startup, to define triggers and background tasks, interact with networked peers. Unlike popular application development frameworks implemented around "reactor" pattern, networking in server-side Lua is sequential, yet very efficient, as is built on top of the cooperating multitasking environment used by the server itself.\
+Extended with Lua, Tarantool typically replaces more not one but a few existing components with a single well-performing system, changing and simplifying complex multi-tier Web application architectures.\
+Tarantool supports replication. Replicas may run locally or on a remote host. Tarantool replication is asynchronous and does not block writes to the master. When or if the master becomes unavailable, the replica can be switched to assume the role of the master without server restart.\
+}

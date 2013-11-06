@@ -23,9 +23,23 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     message(STATUS "Building for FreeBSD")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(TARGET_OS_DARWIN 1)
-    # Mac ports get installed into /opt/local, hence:
-    include_directories("/opt/local/include")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/local/lib")
+
+#
+# Default build type is None, which uses depends by Apple
+# command line tools. Also supportting install with MacPorts.
+#
+    if (NOT DARWIN_BUILD_TYPE)
+        set(DARWIN_BUILD_TYPE None CACHE STRING
+        "Choose the type of Darwin build, options are: None, Ports."
+        FORCE)
+    endif()
+
+    if (${DARWIN_BUILD_TYPE} STREQUAL "Ports")
+       # Mac ports get installed into /opt/local, hence:
+       include_directories("/opt/local/include")
+       set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L/opt/local/lib")
+    endif()
+
     message(STATUS "Building for Mac OS X")
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
