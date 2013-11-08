@@ -1,0 +1,64 @@
+This init scripts are tested under CentOS 6
+They are likely to work under other versions of CentOS
+
+There are two services provided: tarantool and tarantool-watch
+
+### tarantool
+  This service is able to launch many tarantool instances at once, as 
+  well as to manage single tarantool instance.
+
+  To add intance one should place configuration file (or a link to it)
+  under /etc/tarantool/instances.enabled directory, naming it in the following
+  format:
+    tarantool_<instance name>.cfg
+  For example, to add instance named 'foobar', create a file
+  /etc/tarantool/instances.enabled/tarantool_foobar.cfg
+
+  There are some options which should present in every configuraton file
+  managed by this service, otherwise an instance will not tried to start:
+
+    *  work_dir
+    *  username
+    *  logger
+    *  pid_file
+
+  Usage examples:
+
+  service tarantool start   - Start all available instances
+  service tarantool stop    - Stop all available instances
+  service tarantool restart - Stop and then start every available instance
+  service tarantool status  - Show status information for every instance
+
+  service tarantool -i foobar start - Start only instance named foobar
+  service tarantool -i foobar init - In case if tarantool storage has not
+    been created previewsly, call tarantool_box with --init-storage 
+    parameter
+
+  service tarantool list    - list every instance name
+
+### tarantool-watch
+  This service is a watchdog for tarantool instances, managed by tarantool 
+  service. It is started in background and monitors all available instances
+  (as returned by service tarantool list) for their status ( by caling 
+  service tarantool -i <instance> status) with configurable time interval 
+  (defaults to two seconds). Should the instance die unexpectedly,
+  tarantool-watch will restart it.
+
+  It is possible to make tarantool-watch only monitor specified instances 
+  by editing /etc/sysconfig/tarantool-watch file, adding string like this:
+
+    WATCH_INSTANCE_LIST='instance1 instance2'
+
+  Only instance1 and instance2 will be monitored and automatically restarted
+  with the last example. 
+
+  Other useful settings are available via /etc/sysconfig/tarantool-watch,
+  such as logging via syslog. See provided example for details.
+
+### BUGS AND KNOWN ISSUES
+
+  It is not currently possible to tell if tarantool instance started 
+  correctly, so 'service tarantool start' will report OK for every instance.
+  instance itself may die some (often very short) time after it starts,
+  for example if it is not able to bind to configured address and/or port.
+  
