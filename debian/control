@@ -39,7 +39,7 @@ Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-common
-Suggests: libmr-tarantool-perl, libdr-tarantool-perl
+Suggests: tarantool-dbg, tarantool-client-dbg, libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
@@ -61,7 +61,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version}),
  tarantool-postgresql-plugin,
  tarantool-mysql-plugin
-Suggests: libmr-tarantool-perl, libdr-tarantool-perl
+Suggests: tarantool-dbg, tarantool-client-dbg, libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
@@ -81,7 +81,7 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
-Suggests: libmr-tarantool-perl, libdr-tarantool-perl
+Suggests: tarantool-dbg, tarantool-client-dbg, libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
@@ -102,7 +102,7 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
-Suggests: libmr-tarantool-perl, libdr-tarantool-perl
+Suggests: tarantool-dbg, tarantool-client-dbg, libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
@@ -142,7 +142,7 @@ Package: tarantool-client
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Suggests: libmr-tarantool-perl
+Suggests: tarantool-dbg, tarantool-client-dbg, libmr-tarantool-perl, libdr-tarantool-perl
 Description: high performance key/value storage server
  Tarantool is an open-source NoSQL database, developed by Mail.ru.
  Its key properties include:
