@@ -19,6 +19,7 @@
 <xi:include href="proctitle.xml"/>
 <xi:include href="errcode.xml"/>
 <xi:include href="limitations.xml"/>
+<xi:include href="client-reference.xml"/>
 <!--
 <xi:include href="faq.xml"/>
 -->
