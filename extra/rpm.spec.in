@@ -1,6 +1,8 @@
 %define _topdir @RPM_ROOT@
 %define _rpmdir @RPM_ROOT@
 
+# Require for libbfd (backtrace support)
+BuildRequires: binutils-devel
 BuildRoot: @RPM_BUILDROOT@
 
 Name: tarantool
@@ -10,7 +12,7 @@ Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
-Requires: libgcc >= 4.1.2-50
+Requires: libgcc >= 4.1.2-50 tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -28,6 +30,7 @@ Vendor: tarantool.org
 Group: Applications/Databases
 Provides: tarantool-client
 Obsoletes: tarantool-client
+Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description -n tarantool-client
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -44,6 +47,7 @@ Group: Applications/Databases
 #Requires: /sbin/ldconfig
 Provides: tarantool-dev
 Obsoletes: tarantool-dev
+Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description -n tarantool-dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
