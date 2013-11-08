@@ -8,6 +8,7 @@ Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
+Vendor: tarantool.org
 License: BSD
 Requires: libgcc >= 4.1.2-50
 URL: http://tarantool.org
@@ -23,6 +24,7 @@ scripts.
 
 %package client
 Summary: Tarantool command line client with history support
+Vendor: tarantool.org
 Group: Applications/Databases
 Provides: tarantool-client
 Obsoletes: tarantool-client
@@ -37,6 +39,7 @@ with history support.
 
 %package dev
 Summary: Tarantool C connector and header files
+Vendor: tarantool.org
 Group: Applications/Databases
 #Requires: /sbin/ldconfig
 Provides: tarantool-dev
@@ -46,6 +49,10 @@ Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
 This package provides Tarantool client libraries.
+
+# Tarantool debug package
+
+%debug_package
 
 ###
 
