@@ -28,7 +28,7 @@
 <title>Utility <code>tarantar</code></title>
 <para>
 The tarantar utility program will create new snapshots by reading existing
-snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="save-snapshot"/>,
+snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="box.snapshot"/>,
 which creates new snapshots from the database. Since tarantar uses less
 memory than SAVE SNAPSHOT, it is especially appropriate for taking periodic
 snapshots as a background task.
@@ -80,6 +80,90 @@ snapshot exists, skip.
 For an explanation of tarantar's design see <link xlink:href="https://github.com/tarantool/tarantool/wiki/Tarantar">the Tarantool wiki</link>.
 </para>
 
+</section>
+
+<section xml:id="tarancheck">
+<title>Utility <code>tarancheck</code></title>
+<para>
+The tarancheck utility program will generate and verify <quote>signature files</quote>.
+A signature file contains, along with basic information that identifies the database,
+checksums calculated for each index in each space of the database,
+based on the latest snapshot and all subsequent entries in the write-ahead log.
+Signature files are useful for ensuring that databases have been saved without error,
+and for quick comparisons to see whether a database's components have been modified.
+</para>
+
+<para>
+To prepare: ensure that the configuration file contains 
+<olink targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
+clauses. Tarancheck does not assume that wal_dir and snap_dir have default values.
+</para>
+<para>
+To run:<programlisting> <command>tarancheck</command> [options] <replaceable>configuration-file</replaceable></programlisting>
+where possible options are:<simplelist>
+ <member><code>-G <replaceable>signature file</replaceable></code> or <code>--generate <replaceable>signature-file</replaceable></code> &mdash; generate signature file. example: <code>-G x.crc</code></member>
+ <member><code>-V <replaceable>signature file</replaceable></code> or <code>--verify <replaceable>signature-file</replaceable></code> &mdash; verify signature file. example: <code>--verify x.crc</code></member>
+ <member><code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
+ <member><code>-v </code> or <code>--version</code> &mdash; display version and exit. example: <code>-v</code></member></simplelist></para>
+<para>
+Example:
+<programlisting>
+<prompt>$ </prompt>~/tarantool/client/tarantar/tarancheck --generate=x.crc tarantool.cfg
+&gt;&gt;&gt; Signature file generation
+configured spaces: 1
+snap_dir: ./work_dir
+wal_dir: ./work_dir
+last snapshot lsn: 1
+last xlog lsn: 0
+(snapshot) 00000000000000000001.snap
+(signature) saving x.crc
+</programlisting>
+</para>
+
+</section>
+
+<section xml:id="tarantool_deploy">
+<title>Utility <code>tarantool_deploy</code></title>
+<para>
+With tarantool_deploy one can set up so that, during system boot,
+one or more instances of the tarantool_box server will start.
+Technically, tarantool_deploy will place instructions in <filename>/etc/init.d</filename>
+which will initiate tarantool_box with appropriate options and
+with settings that maximize resource usage.
+The root password is necessary. These options are available,
+as shown by <code>tarantool_deploy --help</code>:
+<programlisting>
+Tarantool deployment script: add more Tarantool instances.
+usage: tarantool_deploy.sh [options] &lt;instance&gt;
+
+  --prefix &lt;path&gt;       installation path (/usr)
+  --prefix_etc &lt;path&gt;   installation etc path (/etc)
+  --prefix_var &lt;path&gt;   installation var path (/var)
+
+  --status              display deployment status
+  --dry                 don't create anything, show commands
+
+  --debug               show commands
+  --yes                 don't prompt
+  --help                display this usage
+</programlisting>
+</para>
+<para>
+The default prefixes (<filename>/usr</filename> and <filename>/etc</filename> and <filename>/var</filename>) are appropriate
+if a Tarantool installation was done with default settings,
+for example tarantool_box should be in <filename>/usr/bin</filename>.
+The only necessary argument is the "instance", which is an
+arbitrary numeric identification formatted as digit.digit.
+The following is a sample run:
+<programlisting><prompt>$ </prompt>tarantool_deploy.sh 0.1
+tarantool_deploy.sh: About to deploy Tarantool instance 0.1.
+tarantool_deploy.sh: Continue? [n/y]
+y
+tarantool_deploy.sh: &gt;&gt;&gt; deploy instance 0.1
+tarantool_deploy.sh: &gt;&gt;&gt; updating deployment config
+tarantool_deploy.sh: done
+</programlisting>
+</para>
 </section>
 
 <section xml:id="os-install-notes">

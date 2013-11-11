@@ -1104,126 +1104,253 @@ localhost> box.counter.dec(0, 'top.mail.ru')
 
 <section xml:id="sp-box-tuple">
     <title>Package <code>box.tuple</code></title>
-
 <variablelist xml:id="box.tuple" xreflabel="box.tuple">
-    <para>This package handles the <code>box.tuple</code> userdata
-    type. It is possible to access individual tuple fields using
-    an index, select a range of fields, iterate over all fields in
-    a tuple or convert a tuple to a Lua table. Tuples are
-    immutable.
+    <para>This package provides read-only access for the <code>box.tuple</code> userdata
+    type. It allows, for a single tuple: selective retrieval of the
+    field contents, retrieval of information about size,
+    iteration over all the fields, and conversion to a Lua table.
     </para>
     <varlistentry>
-        <term><emphasis role="lua"> </emphasis></term>
-        <listitem><para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-localhost> t=box.insert(0, 1, 'abc', 'cde', 'efg', 'ghq', 'qkl')
+        <term>
+            <emphasis role="lua">box.tuple.new(...)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Construct a new tuple from a Lua table or a scalar.
+                Alternatively, one can get new tuples from tarantool's
+                SQL-like statements: SELECT, INSERT, UPDATE, REPLACE,
+                which can be regarded as statements that do new()
+                implicitly.
+                In the following example, x and t will be new tuple objects.
+                Saying <code>lua t</code> returns the entire tuple t.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost>localhost&gt; lua x=box.insert(0,'a',tonumber('1'),tonumber64('2')):totable()
 ---
 ...
-localhost> #t
----
- - 6
-...
-localhost> t[1], t[5]
----
- - abc
- - qkl
-...
-localhost> t[6]
----
-error: 'Lua error: [string "return t[6]"]:1: box.tuple: index 6 is out of bounds (0..5)'
-...
-localhost> for k,v in t:pairs() do print(v) end
----
-
-abc
-cde
-efg
-ghq
-qkl
-...
-localhost> t:unpack()
----
- -
- - abc
- - cde
- - efg
- - ghq
- - qkl
-...
-localhost> t:slice(1, 2)
----
- - abc
-...
-localhost> t:slice(1, 3)
----
- - abc
- - cde
-...
-localhost> t:slice(1, -1)
----
- - abc
- - cde
- - efg
- - ghq
-...
-localhost> t:transform(1, 3)
----
- - 1: {'ghq', 'qkl'}
-...
-localhost> t:transform(0, 1, 'zyx')
----
- - 'zyx': {'abc', 'cde', 'efg', 'ghq', 'qkl'}
-...
-localhost> t:transform(-1, 1, 'zyx')
----
- - 1: {'abc', 'cde', 'efg', 'ghq', 'zyx'}
-...
-localhost> t=box.insert(0, 'abc', 'def', 'abc')
+localhost> lua t=box.tuple.new({'abc','def','ghi','abc'})
 ---
 ...
-localhost> t:find('abc')
+localhost> lua t
 ---
- - 0
-...
-localhost> t:findall('abc')
+ - 'abc': {'def', 'ghi', 'abc'}
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua"># or __len()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                The # operand in Lua means "return count of components".
+                So, if t is a tuple instance, either <code>#t</code>
+                or <code>t:__len()</code> will return the number of
+                fields.
+                In the following example, a tuple named t is created
+                and then the number of fields in t is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})
 ---
- - 0
- - 2
 ...
-localhost> t:find(1, 'abc')
----
- - 2
-...
-localhost> t = box.tuple.new('abc')
----
-...
-localhost> t
----
- - 'abc': {}
-...
-localhost> t:bsize()
+localhost&gt; lua #t
 ---
  - 4
 ...
-
-</programlisting>
-
-        </para></listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua">box.tuple.new(...)</emphasis></term>
-        <listitem><para>
-        Construct a new tuple from a Lua table or a scalar.
-        </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost> box.tuple.new({tonumber64('18446744073709551615'), 'string', 1})
+localhost&gt; lua t:__len()
 ---
- - 18446744073709551615: {'string', 1}
-...
-</programlisting>
+ - 4
+...</programlisting>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">bsize()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             If t is a tuple instance, <code>t:bsize()</code>
+             will return the number of bytes in the tuple, plus the number of fields.
+             In the following example, a tuple named t is created
+             which has three three-byte fields, so (3*3)+3 is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'aaa','bbb','ccc'})
+---
+...
+localhost&gt; lua t:bsize()
+---
+ - 12
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">[] or __index()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                If t is a tuple instance, either <code>t[<replaceable>n</replaceable>]</code>
+                or <code>t:__index(<replaceable>n</replaceable>)</code> will return the
+                 <code>n</code>th field in the tuple. The first field is t[0].
+                In the following example, a tuple named t is created
+                and then the second field in t is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})
+---
+...
+localhost&gt; lua t[1]
+---
+ - Field#2
+...
+localhost&gt; lua t:__index(1)
+---
+ - Field#2
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">find() or findall()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             If t is a tuple instance, <code>t:find(<replaceable>search-value</replaceable>)</code>
+             will return the number of the first field in t that matches search-value, and
+              <code>t:findall(<replaceable>search-value</replaceable>)</code>
+             will return numbers of all fields in t that match search-value. Optionally
+             one can put a numeric argument n before the search-value to indicate
+              <quote>start searching at field number n.</quote>
+              In the following example, a tuple named t is created
+              and then: the number of the first field in t which matches 'a' is returned,
+              then the numbers of all the fields in t which match 'a' are returned,
+              then the numbers of all the fields in t which match 'a' and are at or after the second field
+              are returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'a','b','c','a'})
+---
+...
+localhost&gt; lua t:find('a')
+---
+ - 0
+...
+localhost&gt; lua t:findall('a')
+---
+ - 0
+ - 3
+...
+localhost&gt; lua t:findall(1,'a')
+---
+ - 3
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">transform()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             If t is a tuple instance, <code>t:transform(<replaceable>n1</replaceable>,<replaceable>n2</replaceable>)</code>
+             will return a tuple where, starting from field n1, a number of fields (n2) are removed.
+             Optionally one can add more arguments after n2 to indicate new values that will replace
+             what was removed.
+             In the following example, a tuple named t is created
+             and then, starting from the second field, two fields are removed
+             but one new one is added, then the result is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+---
+...
+localhost&gt; lua t:transform(1,2,'x')
+---
+ - 'Field#1': {'x', 'Field#4', 'Field#5'}
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">slice()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             If t is a tuple instance, <code>t:slice(<replaceable>n</replaceable>)</code>
+             will return all fields starting with field number n, and
+             <code>t:slice(<replaceable>n1</replaceable>,<replaceable>n2</replaceable>)</code>
+             will return a tuple containing fields starting with field number n1, but
+             stopping <emphasis>before</emphasis> field number n2.
+             In the following example, a tuple named t is created
+             and then, starting from the second field, fields before the fourth field are selected,
+             then the result is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+---
+...
+localhost&gt; lua t:slice(1,3)
+---
+ - Field#2
+ - Field#3
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">unpack()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             If t is a tuple instance, <code>t:unpack(<replaceable>n</replaceable>)</code>
+             will return all fields. In effect, <code>unpack()</code> is the same as <code>slice(0,-1)</code>.
+             In the following example, a tuple named t is created
+             and then all its fields are selected,
+             then the result is returned.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+---
+...
+localhost&gt; lua t:unpack()
+---
+ - Field#1
+ - Field#2
+ - Field#3
+ - Field#4
+ - Field#5
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">pairs()</emphasis>
+        </term>
+        <listitem>
+            <para>
+            In Lua, pairs() is a method which returns: function, value, nil.
+            It is useful for Lua iterators, because Lua iterators traverse
+            a value's components until an end marker is reached.
+            In the following example, a tuple named t is created
+            and then all its fields are selected using a Lua for-end loop.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+---
+...
+localhost&gt; lua for k,v in t:pairs() do print(v) end
+---
+Field#1
+Field#2
+Field#3
+Field#4
+Field#5
+...</programlisting>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 </section>
 
@@ -2647,7 +2774,7 @@ logger = cat - >> tarantool.log
         This package provides access to information about
         server variables: pid, uptime, version and such.
         Its contents are identical to the output from <olink
-        targetptr="show-info"/>.
+        targetptr="box.info"/>.
     </para>
     <varlistentry>
         <term>

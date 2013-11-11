@@ -166,8 +166,8 @@ Tarantool 1.4.0-69-g45551dd
   </itemizedlist>
 </section>
 
-<section xml:id="option-file" xreflabel="option file">
-<title>The option file</title>
+<section xml:id="configuration-file" xreflabel="configuration file">
+<title>The configuration file</title>
   <para>
     All advanced configuration parameters must be specified in a
     configuration file, which is required for server start. If no path to
@@ -419,7 +419,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           beyond the defined limit to allocate tuples, there is
           additional memory used to store indexes and connection
           information.  Depending on actual configuration and
-          workload, Tarantool can consume up to 20-40% of the
+          workload, Tarantool can consume up to 20% more than the
           limit set here.</entry>
         </row>
 
@@ -542,8 +542,8 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
         <entry>yes</entry>
         <entry>Do not flush the write ahead log to disk more often
           than once in wal_fsync_delay seconds. By default the
-          delay is zero,
-          that is, the write ahead log is flushed after every write.
+          delay is zero, which means there is no flushing after writes
+          (the meaning of wait_fsync_delay=0 meay change in later versions).
           Setting the delay may be necessary to increase write
           throughput, but may lead to several last updates being
           lost in case of a power failure. Such failure, however,
@@ -737,9 +737,9 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           <entry>no</entry>
           <entry>no</entry>
           <entry>By default, the log is sent to the standard
-          error stream (<filename>stderr</filename>). If this
-          option is given, Tarantool creates a child process,
-          executes the given command in it, and pipes its standard
+          error stream (<filename>stderr</filename>). If logger
+          is given a value, Tarantool creates a child process,
+          executes the command indicated by the value, and pipes its standard
           output to the standard input of the created process.
           Example setting: <command>tee --append
           tarantool.log</command> (this will duplicate log output
@@ -757,7 +757,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           block on the log file descriptor when it's not
           ready for write, and drops the message instead. If
           log_level is high, and a lot of messages go to the log
-          file, setting this option to 1 may improve logging
+          file, setting logger_nonblock to 1 may improve logging
           performance at the cost of some log messages getting
           lost.</entry>
         </row>
