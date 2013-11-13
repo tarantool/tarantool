@@ -1,4 +1,6 @@
-TARANTOOL, http://tarantool.org
+# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=master)](https://travis-ci.org/tarantool/tarantool)
+
+http://tarantool.org 
 
 Tarantool is an efficient in-memory NoSQL database and a
 Lua application server, blended.
@@ -8,7 +10,7 @@ Key features of the system:
  * multiple index types: HASH, TREE, BITSET
  * optional persistence and strong data durability
  * log streaming replication
- * Lua functions, procedures, triggers, with
+ * lua functions, procedures, triggers, with
    rich access to database API, JSON support,
    inter-procedure and network communication libraries
  * a command line client supporting simple SQL and
@@ -20,7 +22,7 @@ servers, in-memory data store for hot data, and so on.
 
 Supported platforms are Linux/x86 and FreeBSD/x86, Mac OS X.
 
-COMPILATION AND INSTALL
+## Compilation and install
 
 Tarantool is written in C and C++.
 To build, you will need GCC or Apple CLang compiler.
