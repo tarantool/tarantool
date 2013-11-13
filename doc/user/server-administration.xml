@@ -92,6 +92,22 @@ based on the latest snapshot and all subsequent entries in the write-ahead log.
 Signature files are useful for ensuring that databases have been saved without error,
 and for quick comparisons to see whether a database's components have been modified.
 </para>
+<para>
+The main reason that tarancheck was created was
+so that users would be able to compare the
+consistency of two running servers, the master and the replica.
+By creating a signature file on the master using the master
+directory, and then copying the signature file to the replica,
+one will be able to confirm that the replica is not corrupt.
+</para>
+<para>
+There is one necessary warning. Since either the master or the
+replica is likely to be active when tarancheck runs, the check
+can only be applicable for the database as of the
+last transaction that was run on both the master and the replica.
+That is why tarancheck displays last_xlog_lsn, which is the log
+sequence number of the write-ahead log, when it finishes.
+</para>
 
 <para>
 To prepare: ensure that the configuration file contains 
@@ -127,6 +143,10 @@ last xlog lsn: 0
 <para>
 With tarantool_deploy one can set up so that, during system boot,
 one or more instances of the tarantool_box server will start.
+This utility is for use on Red Hat or CentOS where Tarantool
+was installed using <code>rpm --install</code>.
+</para>
+<para>
 Technically, tarantool_deploy will place instructions in <filename>/etc/init.d</filename>
 which will initiate tarantool_box with appropriate options and
 with settings that maximize resource usage.
