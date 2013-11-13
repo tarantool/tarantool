@@ -39,7 +39,6 @@
  * be the case when another implementation is used.
  */
 #define atomic_cas(a, b, c) __sync_val_compare_and_swap(a, b, c)
-#define atomic_add(a, b) __sync_add_and_fetch(a, b)
 
 /**
  * A very primitive implementation of lock-free

@@ -1,4 +1,5 @@
 #include "lib/small/lf_lifo.h"
+#include "tarantool/config.h"
 #include "unit.h"
 #include <sys/mman.h>
 
