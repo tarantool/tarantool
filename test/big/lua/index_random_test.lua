@@ -30,7 +30,7 @@ function index_random_test(space, index_no)
 			return nil;
 		end
 
-		local k = box.unpack('i', tuple[0]);
+		local k = tuple[0];
 		if tuples[k] == nil then
 			found = found + 1;
 		end

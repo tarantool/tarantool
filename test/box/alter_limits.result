@@ -266,7 +266,7 @@ box.space['_space']:update(s.n, "=p", 1, 1)
 -- remove arity - ok
 box.space['_space']:update(s.n, "=p", 1, 0)
 ---
-- [512, 0, 1953719668, '']
+- [512, 0, 'test', '']
 ...
 s:select(0)
 ---
@@ -286,7 +286,7 @@ s:select(0)
 -- set arity of an empty space
 box.space['_space']:update(s.n, "=p", 1, 3)
 ---
-- [512, 3, 1953719668, '']
+- [512, 3, 'test', '']
 ...
 s:select(0)
 ---
@@ -620,7 +620,7 @@ s.index.primary:alter({type='tree', unique=false, name='pk'})
 s.index.primary
 ---
 - unique: true
-  idx: index 0
+  idx: ' index 0'
   n: 512
   type: HASH
   key_field:
@@ -652,7 +652,7 @@ s.index.second.id
 ---
 - 1
 ...
-s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+s:create_index('third', 'hash', { parts = {  2, 'num' } })
 ---
 ...
 s.index.third:rename('second')
@@ -745,11 +745,6 @@ s.index.year:alter({unique=true})
 ---
 - error: Duplicate key exists in unique index 1
 ...
--- num -> str -> num transition
-box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
----
-- [512, 1, 1918985593, 1701147252, 0, 1, 1, 'str']
-...
 s.index.primary:select()
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
@@ -762,7 +757,7 @@ s.index.primary:select()
 ...
 box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
 ---
-- [512, 1, 1918985593, 1701147252, 0, 1, 1, 'num']
+- [512, 1, 'year', 'tree', 0, 1, 1, 'num']
 ...
 -- ambiguous field type
 s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})

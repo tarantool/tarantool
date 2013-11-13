@@ -103,7 +103,6 @@ struct request
 
 		struct {
 			uint32_t space_no;
-			uint32_t key_part_count;
 			const char *key;
 			const char *key_end;
 			const char *expr;
@@ -112,7 +111,6 @@ struct request
 
 		struct {
 			uint32_t space_no;
-			uint32_t key_part_count;
 			const char *key;
 			const char *key_end;
 		} d; /* delete */
@@ -120,7 +118,6 @@ struct request
 		struct {
 			const char *procname;
 			uint32_t procname_len;
-			uint32_t arg_count;
 			const char *args;
 			const char *args_end;
 		} c; /* call */

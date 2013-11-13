@@ -28,6 +28,7 @@
  */
 #include "lua/init.h"
 #include "lua/plugin.h"
+#include "lua/utils.h"
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
@@ -58,6 +59,7 @@ extern "C" {
 #include "lua/session.h"
 #include "lua/cjson.h"
 #include "lua/yaml.h"
+#include "lua/msgpack.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -143,15 +145,13 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	}
 	case LUA_TCDATA:
 	{
-		/* Calculate absolute value in the stack. */
-		if (idx < 0)
-			idx = lua_gettop(L) + idx + 1;
-		GCcdata *cd = cdataV(L->base + idx - 1);
-		if (cd->ctypeid != CTID_INT64 && cd->ctypeid != CTID_UINT64) {
+		uint32_t ctypeid = 0;
+		void *cdata = luaL_checkcdata(L, idx, &ctypeid);
+		if (ctypeid != CTID_INT64 && ctypeid != CTID_UINT64) {
 			luaL_error(L,
 				   "lua_tointeger64: unsupported cdata type");
 		}
-		result = *(uint64_t*)cdataptr(cd);
+		result = *(uint64_t*)cdata;
 		break;
 	}
 	default:
@@ -162,26 +162,11 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
-static GCcdata*
-luaL_pushcdata(struct lua_State *L, CTypeID id, int bits)
-{
-	CTState *cts = ctype_cts(L);
-	CType *ct = ctype_raw(cts, id);
-	CTSize sz;
-	lj_ctype_info(cts, id, &sz);
-	GCcdata *cd = lj_cdata_new(cts, id, bits);
-	TValue *o = L->top;
-	setcdataV(L, o, cd);
-	lj_cconv_ct_init(cts, ct, sz, (uint8_t *) cdataptr(cd), o, 0);
-	incr_top(L);
-	return cd;
-}
-
 int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
-	GCcdata *cd = luaL_pushcdata(L, CTID_UINT64, 8);
-	*(uint64_t*)cdataptr(cd) = val;
+	void *cdata = luaL_pushcdata(L, CTID_UINT64, sizeof(uint64_t));
+	*(uint64_t*) cdata = val;
 	return 1;
 }
 
@@ -568,6 +553,8 @@ tarantool_lua_init()
 	tarantool_lua_socket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
+	luaopen_msgpack(L);
+	lua_pop(L, 1);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s++) {
@@ -640,9 +627,9 @@ extern "C" {
 	int yamlL_encode(lua_State*);
 };
 
-void
-tarantool_lua(struct lua_State *L,
-              struct tbuf *out, const char *str)
+
+static void
+tarantool_lua_do(struct lua_State *L, struct tbuf *out, const char *str)
 {
 	tarantool_lua_set_out(L, out);
 	int r = tarantool_lua_dostring(L, str);
@@ -691,6 +678,19 @@ tarantool_lua(struct lua_State *L,
 	lua_pop(L, 1);
 	tbuf_printf(out, "%s", lua_tostring(L, 1));
 	lua_settop(L, 0);
+}
+
+void
+tarantool_lua(struct lua_State *L,
+	      struct tbuf *out, const char *str)
+{
+	try {
+		tarantool_lua_do(L, out, str);
+	} catch (...) {
+		const char *err = lua_tostring(L, -1);
+		tbuf_printf(out, "---\n- error: %s\n...\n", err);
+		lua_settop(L, 0);
+	}
 }
 
 /**

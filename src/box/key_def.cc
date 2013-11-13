@@ -31,8 +31,14 @@
 #include <stdio.h>
 #include "exception.h"
 
-const char *field_type_strs[] = {"UNKNOWN", "NUM", "NUM64", "STR", "\0"};
+const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "\0"};
 STRS(index_type, ENUM_INDEX_TYPE);
+
+const uint16_t key_mp_type[] = {
+	/* [UNKNOWN] = */ UINT16_MAX,
+	/* [NUM]     = */ 1U << MP_UINT,
+	/* [_STR]    = */ 1U << MP_STR
+};
 
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,

@@ -4,11 +4,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
-- [0, 1, 'minmax', 1701147252, 1, 2, 1, 'str', 2, 'str']
+- [0, 1, 'minmax', 'tree', 1, 2, 1, 'str', 2, 'str']
 ...
 space = box.space[0]
 ---
@@ -45,11 +45,11 @@ space:delete('brave')
 -- https://bugs.launchpad.net/tarantool/+bug/902091
 space:insert('item 1', 'alabama', 'song')
 ---
-- ['item 1', 'alabama', 1735290739]
+- ['item 1', 'alabama', 'song']
 ...
 space:select(1, 'alabama')
 ---
-- ['item 1', 'alabama', 1735290739]
+- ['item 1', 'alabama', 'song']
 ...
 space:insert('item 2', 'california', 'dreaming ')
 ---
@@ -79,7 +79,7 @@ tuple
 ...
 space:delete('item 1')
 ---
-- ['item 1', 'alabama', 1735290739]
+- ['item 1', 'alabama', 'song']
 ...
 space:delete('item 2')
 ---
@@ -99,11 +99,11 @@ space:truncate()
 --
 -- Test that we print index number in error ER_INDEX_VIOLATION
 --
-space:insert(1, 'hello', 'world')
+space:insert('1', 'hello', 'world')
 ---
-- [1, 'hello', 'world']
+- ['1', 'hello', 'world']
 ...
-space:insert(2, 'hello', 'world')
+space:insert('2', 'hello', 'world')
 ---
 - error: Duplicate key exists in unique index 1
 ...
@@ -117,38 +117,38 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
 - [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num64']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 0, 2, 1, 'str', 2, 'str')
 ---
-- [0, 1, 'minmax', 1701147252, 0, 2, 1, 'str', 2, 'str']
+- [0, 1, 'minmax', 'tree', 0, 2, 1, 'str', 2, 'str']
 ...
 space = box.space[0]
 ---
 ...
-space:insert('01234567', 'new', 'world')
+space:insert(1234567, 'new', 'world')
 ---
-- [3978425819141910832, 'new', 'world']
+- [1234567, 'new', 'world']
 ...
-space:insert('00000000', 'of', 'puppets')
+space:insert(0, 'of', 'puppets')
 ---
-- [3472328296227680304, 26223, 'puppets']
+- [0, 'of', 'puppets']
 ...
-space:insert('00000001', 'of', 'might', 'and', 'magic')
+space:insert(00000001ULL, 'of', 'might', 'and', 'magic')
 ---
-- [3544385890265608240, 26223, 'might', 'and', 'magic']
+- [1, 'of', 'might', 'and', 'magic']
 ...
 space:select_range(1, 2, 'of')
 ---
-- [3544385890265608240, 26223, 'might', 'and', 'magic']
-- [3472328296227680304, 26223, 'puppets']
+- [1, 'of', 'might', 'and', 'magic']
+- [0, 'of', 'puppets']
 ...
 space:select_reverse_range(1, 2, 'of')
 ---
-- [3472328296227680304, 26223, 'puppets']
-- [3544385890265608240, 26223, 'might', 'and', 'magic']
+- [0, 'of', 'puppets']
+- [1, 'of', 'might', 'and', 'magic']
 ...
 space:truncate()
 ---
@@ -174,9 +174,9 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
 - [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num64']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 space = box.space[0]
 ---
@@ -188,7 +188,7 @@ space:insert(tonumber64('18446744073709551615'), 'magic')
 tuple = space:select(0, tonumber64('18446744073709551615'))
 ---
 ...
-num = box.unpack('l', tuple[0])
+num = tuple[0]
 ---
 ...
 num
@@ -203,7 +203,7 @@ num == tonumber64('18446744073709551615')
 ---
 - true
 ...
-num = box.unpack('l', tuple[0])
+num = tuple[0]
 ---
 ...
 num == tonumber64('18446744073709551615')
@@ -224,10 +224,10 @@ tuple = space:select(0, 125)
 tuple2 = space:select(0, 125LL)
 ---
 ...
-num = box.unpack('l', tuple[0])
+num = tuple[0]
 ---
 ...
-num2 = box.unpack('l', tuple2[0])
+num2 = tuple2[0]
 ---
 ...
 num, num2
@@ -235,11 +235,11 @@ num, num2
 - 125
 - 125
 ...
-type(num) == 'cdata'
+type(num) == 'number'
 ---
 - true
 ...
-type(num2) == 'cdata'
+type(num2) == 'number'
 ---
 - true
 ...
@@ -255,9 +255,9 @@ space:truncate()
 ---
 ...
 --
--- Tests for lua box.auto_increment with NUM64 keys
+-- Tests for lua box.auto_increment with NUM keys
 --
--- lua box.auto_increment() with NUM64 keys testing
+-- lua box.auto_increment() with NUM keys testing
 box.auto_increment(space.n, 'a')
 ---
 - [1, 'a']
@@ -288,11 +288,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'range', 'tree', 1, 2, 1, 'num', 0, 'num')
 ---
-- [0, 1, 'range', 1701147252, 1, 2, 1, 'num', 0, 'num']
+- [0, 1, 'range', 'tree', 1, 2, 1, 'num', 0, 'num']
 ...
 space = box.space[0]
 ---
@@ -382,11 +382,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'str']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
-- [0, 1, 12649, 1701147252, 1, 2, 1, 'str', 2, 'str']
+- [0, 1, 'i1', 'tree', 1, 2, 1, 'str', 2, 'str']
 ...
 space = box.space[0]
 ---
@@ -505,11 +505,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 2, 1, 'num', 2, 'num')
 ---
-- [0, 1, 12649, 1701147252, 0, 2, 1, 'num', 2, 'num']
+- [0, 1, 'i1', 'tree', 0, 2, 1, 'num', 2, 'num']
 ...
 space = box.space[0]
 ---
@@ -562,9 +562,11 @@ space.index[1]:count(3, 3)
 ---
 - 0
 ...
+-- Returns total number of records
+-- https://github.com/tarantool/tarantool/issues/46
 space.index[1]:count()
 ---
-- error: 'index.count(): one or more arguments expected'
+- 6
 ...
 space:drop()
 ---
@@ -578,7 +580,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 space = box.space[0]
 ---
@@ -652,7 +654,7 @@ t:transform(3, 1, tonumber64(4))
 ...
 t:transform(0, 1, {})
 ---
-- error: 'tuple.transform(): unsupported field type ''table'''
+- [[], '2', '3', '4', '5', '6', '7']
 ...
 space:truncate()
 ---
@@ -661,7 +663,7 @@ space:truncate()
 -- Tests for OPENTAR-64 - a limitation for the second argument to tuple:transform
 --
 -- 50K is enough for everyone
-n = 50000
+n = 2000
 ---
 ...
 tab = {}; for i=1,n,1 do table.insert(tab, i) end
@@ -672,7 +674,7 @@ t = box.tuple.new(tab)
 ...
 t:transform(0, n - 1)
 ---
-- [50000]
+- [2000]
 ...
 t = nil
 ---
@@ -723,15 +725,12 @@ t:findall('0')
 ...
 t:find(2, '2')
 ---
-- 5
 ...
 t:find(89, '2')
 ---
 ...
 t:findall(4, '3')
 ---
-- 4
-- 8
 ...
 t = space:insert('Z', '2', 2, 3, tonumber64(2))
 ---
@@ -740,8 +739,9 @@ t:find(2)
 ---
 - 2
 ...
-t:find(tonumber64(2))
+t:findall(tonumber64(2))
 ---
+- 2
 - 4
 ...
 t:find('2')
@@ -762,7 +762,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 space = box.space[0]
 ---
@@ -784,31 +784,31 @@ push_collection(space, 0, 1038784, 'hello')
 ...
 push_collection(space, 1, 1038784, 'hi')
 ---
-- [1038784, 26984]
+- [1038784, 'hi']
 ...
 push_collection(space, 2, 1038784, 'hi')
 ---
-- [1038784, 26984, 26984]
+- [1038784, 'hi', 'hi']
 ...
 push_collection(space, 2, 1038784, 'hi')
 ---
-- [1038784, 26984, 26984]
+- [1038784, 'hi', 'hi']
 ...
 push_collection(space, 5, 1038784, 'hey')
 ---
-- [1038784, 26984, 26984, 'hey']
+- [1038784, 'hi', 'hi', 'hey']
 ...
 push_collection(space, 5, 1038784, 'hey')
 ---
-- [1038784, 26984, 26984, 'hey', 'hey']
+- [1038784, 'hi', 'hi', 'hey', 'hey']
 ...
 push_collection(space, 5, 1038784, 'hey')
 ---
-- [1038784, 26984, 26984, 'hey', 'hey', 'hey']
+- [1038784, 'hi', 'hi', 'hey', 'hey', 'hey']
 ...
 push_collection(space, 5, 1038784, 'hey')
 ---
-- [1038784, 26984, 'hey', 'hey', 'hey', 'hey']
+- [1038784, 'hi', 'hey', 'hey', 'hey', 'hey']
 ...
 -- # lua box.auto_increment() testing
 -- # http://bugs.launchpad.net/tarantool/+bug/1006354
@@ -847,7 +847,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 2, 'num', 1, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 2, 2, 'num', 1, 'num']
+- [0, 0, 'primary', 'tree', 1, 2, 2, 'num', 1, 'num']
 ...
 space = box.space[0]
 ---
@@ -855,7 +855,11 @@ space = box.space[0]
 -- Print key fields in pk
 space.index[0].key_field
 ---
-- - type: NUM
+- 0:
+    type: NUM
+    fieldno: 2
+  1:
+    type: NUM
     fieldno: 1
 ...
 space:insert(1, 2, 3, 4)
@@ -899,11 +903,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 1, 'secondary', 1752392040, 1, 1, 0, 'num']
+- [0, 1, 'secondary', 'hash', 1, 1, 0, 'num']
 ...
 space = box.space[0]
 ---

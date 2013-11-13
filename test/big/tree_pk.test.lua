@@ -29,7 +29,12 @@ s0:insert('12')
 
 box.insert(box.schema.SPACE_ID, 1, 0, 'tweedledee')
 box.insert(box.schema.INDEX_ID, 1, 0, 'primary', 'tree', 1, 1, 0, 'str')
+
+box.insert(box.schema.SPACE_ID, 2, 0, 'alice')
+box.insert(box.schema.INDEX_ID, 2, 0, 'primary', 'tree', 1, 1, 0, 'str')
+
 s1 = box.space[1]
+s2 = box.space[1]
 
 -- string keys
 s1:insert('identifier', 'tuple')
@@ -57,7 +62,7 @@ function crossjoin(space0, space1, limit)
             if limit <= 0 then
                 return result
             end
-            newtuple = {v0:unpack()}
+            newtuple = v0:totable()
             for _, v in v1:pairs() do
                 table.insert(newtuple, v)
             end
@@ -69,15 +74,16 @@ function crossjoin(space0, space1, limit)
 end;
 --# setopt delimiter ''
 
-s0:insert(1, 'tuple')
-s1:insert(1, 'tuple')
-s1:insert(2, 'tuple')
+s2:insert('1', 'tuple')
+s1:insert('1', 'tuple')
+s1:insert('2', 'tuple')
 
 crossjoin(s1, s1, 0)
 crossjoin(s1, s1, 5)
 crossjoin(s1, s1, 10000)
-crossjoin(s1, s0, 10000)
+crossjoin(s1, s2, 10000)
 s1:truncate()
+s2:truncate()
 
 -- Bug #922520 - select missing keys
 s0:insert(200, 'select me!')

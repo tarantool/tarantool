@@ -17,9 +17,7 @@ function iterate(space_no, index_no, f1, f2, ...)
 	function get_field(tuple, field_no)
 		local f = tuple[field_no]
 		if (types[field_no] == 'NUM') then
-			return string.format('%8d', box.unpack('i', f));
-		elseif (types[field_no] == 'NUM64') then
-			return string.format('%8ld', box.unpack('l', f));
+			return string.format('%8d', f);
 		else
 			return f
 		end
@@ -94,9 +92,9 @@ function box.tuple.to_string(tuple, yaml)
     ans = '['
     for i = 0, #tuple - 1 do
         if #i == 4 then
-            ans = ans..box.unpack('i', i)
+            ans = ans..i
         elseif #i == 8 then
-            ans = ans..box.unpack('l', i)
+            ans = ans..i
         else
             ans = ans..'\''..tostring(i)..'\''
         end

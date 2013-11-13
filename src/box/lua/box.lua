@@ -9,10 +9,10 @@ function box.select_limit(space, index, offset, limit, ...)
     local key_part_count = select('#', ...)
     return box.process(17,
         box.pack('iiiiiV',
-            tonumber(space),
-            tonumber(index),
-            tonumber(offset),
-            tonumber(limit),
+            space,
+            index,
+            offset,
+            limit,
             1, -- key count
             key_part_count, ...))
 end
@@ -50,7 +50,7 @@ function box.delete(space, ...)
     local key_part_count = select('#', ...)
     return box.process(21,
         box.pack('iiV',
-            tonumber(space),
+            space,
             box.flags.BOX_RETURN_TUPLE,  -- flags
             key_part_count, ...))
 end
@@ -60,7 +60,7 @@ function box.replace(space, ...)
     local field_count = select('#', ...)
     return box.process(13,
         box.pack('iiV',
-            tonumber(space),
+            space,
             box.flags.BOX_RETURN_TUPLE,  -- flags
             field_count, ...))
 end
@@ -70,7 +70,7 @@ function box.replace_if_exists(space, ...)
     local field_count = select('#', ...)
         return box.process(13,
             box.pack('iiV',
-                tonumber(space),
+                space,
                 bit.bor(box.flags.BOX_RETURN_TUPLE, box.flags.BOX_REPLACE),
                 field_count, ...))
 end;
@@ -80,7 +80,7 @@ function box.insert(space, ...)
     local field_count = select('#', ...)
     return box.process(13,
         box.pack('iiV',
-            tonumber(space),
+            space,
             bit.bor(box.flags.BOX_RETURN_TUPLE,
                 box.flags.BOX_ADD),  -- flags
             field_count, ...))
@@ -88,10 +88,10 @@ end
 
 --
 function box.update(space, key, format, ...)
-    local op_count = select('#', ...)/2
+    local op_count = bit.rshift(select('#', ...), 1)
     return box.process(19,
         box.pack('iiVi'..format,
-            tonumber(space),
+            space,
             box.flags.BOX_RETURN_TUPLE,
             1, key,
             op_count,

@@ -23,7 +23,6 @@ dump(box.index.BITS_ALL_SET, 2)
 dump(box.index.BITS_ALL_SET, 8)
 dump(box.index.BITS_ALL_SET, 1073741824)
 dump(box.index.BITS_ALL_SET, 2147483648)
-dump(box.index.BITS_ALL_SET, 4294967296)
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_SET (multiple bit)
 ------------------------------------------------------------------------------
@@ -42,7 +41,6 @@ dump(box.index.BITS_ALL_SET, 4294967295)
 dump(box.index.BITS_ALL_NOT_SET, 0)
 dump(box.index.BITS_ALL_NOT_SET, 2)
 dump(box.index.BITS_ALL_NOT_SET, 8)
-dump(box.index.BITS_ALL_NOT_SET, 4294967296)
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ALL_NOT_SET (multiple bit)
 ------------------------------------------------------------------------------
@@ -58,7 +56,6 @@ dump(box.index.BITS_ALL_NOT_SET, 4294967295)
 dump(box.index.BITS_ANY_SET, 0)
 dump(box.index.BITS_ANY_SET, 16)
 dump(box.index.BITS_ANY_SET, 128)
-dump(box.index.BITS_ANY_SET, 4294967296)
 ------------------------------------------------------------------------------
 -- BitsetIndex: BITS_ANY_SET (multiple bit)
 ------------------------------------------------------------------------------

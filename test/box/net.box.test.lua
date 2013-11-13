@@ -8,7 +8,7 @@ box.net.box.ping(remote)
 space:insert(123, 'test1', 'test2')
 space:select(0, 123)
 tuple = remote:select(space.n, 0, 123)
-remote:call('box.select', tostring(space.n), '0', 123)
+remote:call('box.select', space.n, 0, 123)
 
 slf, foo = box.call_loadproc('box.select')
 type(slf)
@@ -29,7 +29,7 @@ remote:insert(space.n, 123, 'test1', 'test2')
 
 remote:insert(space.n, 345, 'test1', 'test2')
 remote:select(space.n, 0, 345)
-remote:call('box.select', tostring(space.n), '0', 345)
+remote:call('box.select', space.n, 0, 345)
 space:select(0, 345)
 
 remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
@@ -42,8 +42,8 @@ space:select(0, 345)
 remote:select(space.n, 0, 345)
 remote:timeout(0.5):select(space.n, 0, 345)
 
-remote:call('box.fiber.sleep', '.01')
-remote:timeout(0.01):call('box.fiber.sleep', '10')
+remote:call('box.fiber.sleep', .01)
+remote:timeout(0.01):call('box.fiber.sleep', 10)
 
 --# setopt delimiter ';'
 pstart = box.time();

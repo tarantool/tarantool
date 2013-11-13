@@ -232,7 +232,7 @@ s.index.pk.unique
 s.index.pk:rename('primary')
 s:create_index('second', 'tree', { parts = {  1, 'str' } })
 s.index.second.id
-s:create_index('third', 'hash', { parts = {  2, 'num64' } })
+s:create_index('third', 'hash', { parts = {  2, 'num' } })
 s.index.third:rename('second')
 s.index.third.id
 s.index.second:drop()
@@ -260,8 +260,6 @@ s.index.primary:select()
 s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
--- num -> str -> num transition
-box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'str')
 s.index.primary:select()
 box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
 -- ambiguous field type

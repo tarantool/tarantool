@@ -105,7 +105,6 @@ void
 primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count);
 
-
 /**
  * The manner in which replace in a unique index must treat
  * duplicates (tuples with the same value of indexed key),

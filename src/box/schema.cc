@@ -87,8 +87,10 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 {
 	mh_int_t i;
 	struct space *space;
-	struct { char len; uint32_t id; } __attribute__((packed))
-		key = { sizeof(uint32_t), SC_SYSTEM_ID_MIN };
+	char key[6];
+	assert (mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
+	mp_encode_uint(key, SC_SYSTEM_ID_MIN);
+
 	/*
 	 * Make sure we always visit system spaces first,
 	 * in order from lowest space id to the highest..
@@ -100,7 +102,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	if (pk) {
 		struct iterator *it = pk->allocIterator();
 		auto scoped_guard = make_scoped_guard([=] { it->free(it); });
-		pk->initIterator(it, ITER_GE, (char *) &key, 1);
+		pk->initIterator(it, ITER_GE, key, 1);
 		struct tuple *tuple;
 		while ((tuple = it->next(it))) {
 			/* Get space id, primary key, field 0. */
@@ -263,6 +265,12 @@ space_end_recover_snapshot()
 	space_foreach(do_one_recover_step, NULL);
 }
 
+static void
+fix_lua(struct space *space, void * /* param */)
+{
+	box_lua_space_new(tarantool_L, space);
+}
+
 void
 space_end_recover()
 {
@@ -272,6 +280,8 @@ space_end_recover()
 	 */
 	engine_no_keys.recover = space_build_all_keys;
 	space_foreach(do_one_recover_step, NULL);
+	/* TODO: temporary solution for Bug#1229709 */
+	space_foreach(fix_lua, NULL);
 }
 
 void

@@ -17,15 +17,6 @@ Tarantool IPROTO protocol.
 
 ; int64 - a 64-bit integer in little-endian format (Intel x86)
 ;
-; int32_varint - a 1 to 5 byte representation of an integer
-;
-; This is what Perl's "pack" function calls "BER compressed 
-; integer (BER stands for Basic Encoding Rules, but in reality it
-; has little to do with ASN.1 standard). 
-; See http://en.wikipedia.org/wiki/Variable-length_quantity
-; for encoding description, or core/pickle.m for implementation
-; in Tarantool.
-
 ; All requests and responses utilize the same basic structure:
 
 <packet> ::= <request> | <response>
@@ -156,48 +147,10 @@ Tarantool IPROTO protocol.
 ; elements). Each key in <select_request_body> can have a
 ; different cardinality.
 
-<tuple> ::= <cardinality><field>+
+<tuple> ::= <message_pack_array>
 
 ;
-; If a key is not fully specified, i.e. has smaller cardinality
-; than the corresponding index, each unspecified field is treated
-; as a wildcard.
-;
-
-<cardinality> ::= <int32>
-
-;
-; A field represents a single atom of storage. In key/value
-; paradigm, Tarantool's "value" is a sequence of fields.
-; A single unit of storage, therefore, must contain all fields
-; of all (possibly multipart) keys and zero or more fields
-; treated as "data". To do a <select> the user only needs to
-; define fields of the key used for search.
-;
-
-<field> ::= <int32_varint><data>
-
-; Tarantool understands only 3 field types: unsigned 4-byte
-; int, unsigned 8-byte int and an octet string.
-; Even this type awareness is very limited: it's only used when
-; the field participates in an index. For example, when a numeric
-; 32-bit index is defined on a field, and a non-32-bit value
-; is supplied for that field, an ER_BAD_PARAMS
-; is returned.
-;
-
-<data> ::= <int8>+
-
-;
-; Compressed integer
-;
-
-<int32_varint> ::= <int8>+
-;
-; SELECT may return zero, one or several tuples.
-; CALL response is identical to one for SELECT.
-; <select_response_body> starts with the number of found
-; tuples:
+; See http://msgpack.org/ for <message_pack_array> definition
 ;
 
 <select_response_body> ::= <count><fq_tuple>*
@@ -309,11 +262,11 @@ Tarantool IPROTO protocol.
 ; field data in case of splice argument contains 3 nested <field>
 ; objects, which store the arguments:
 
-<op_arg_splice> ::= <int32_varint><offset><length><string>
+<op_arg_splice> ::= <message_pack_array(3)><offset><length><string>
 
-<offset> ::= <field>
-<length> ::= <field>
-<string> ::= <field>
+<offset> ::= <message_pack_uint>
+<length> ::= <message_pack_uint>
+<string> ::= <message_pack_str>
 
 ;
 

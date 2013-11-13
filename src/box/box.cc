@@ -64,7 +64,6 @@ struct box_snap_row {
 	uint16_t op;
 	uint32_t space;
 	uint32_t flags;
-	uint32_t field_count;
 	char data[];
 } __attribute__((packed));
 
@@ -312,8 +311,6 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 	header.op = REPLACE;
 	header.space = n;
 	header.flags = BOX_ADD;
-	header.field_count = tuple->field_count;
-
 	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }

@@ -39,7 +39,7 @@ _space:update(_space.n, '+p', 0, 2)
 --
 t = box.auto_increment(_space.n, 0, 'hello')
 -- Check that a space exists
-space = box.space[box.unpack('i', t[0])]
+space = box.space[t[0]]
 space.n
 space.arity
 space.index[0]
@@ -52,7 +52,7 @@ space:replace(0, 0)
 space:update(0, '+p', 0, 1)
 space:delete(0)
 t = _space:delete(space.n)
-space_deleted = box.space[box.unpack('i', t[0])]
+space_deleted = box.space[t[0]]
 space_deleted
 space:replace(0)
 _index:insert(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')

@@ -67,7 +67,7 @@ box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.
 
 --# create connection con_three to default 
 --# set connection con_three
-box.unpack('i', space:select(0, box.session.id())[0]) == box.session.id()
+space:select(0, box.session.id())[0] == box.session.id()
 --# set connection default
 --# drop connection con_three
 

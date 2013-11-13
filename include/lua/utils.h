@@ -1,0 +1,157 @@
+#ifndef TARANTOOL_LUA_UTILS_H_INCLUDED
+#define TARANTOOL_LUA_UTILS_H_INCLUDED
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include <stdint.h>
+
+#include <lib/msgpuck/msgpuck.h> /* enum mp_type */
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+#include <lua.h>
+
+/* TODO: add autodetection */
+#if !defined(LUAJIT)
+#define LUAJIT 1
+#endif /* defined(LUAJIT) */
+
+struct lua_State;
+
+#if defined(LUAJIT)
+
+/**
+ * @brief Allocate a new block of memory with the given size, push onto the
+ * stack a new cdata of type ctypeid with the block address, and returns
+ * this address. Allocated memory is a subject of GC.
+ * CTypeID must be used from FFI at least once.
+ * @param L Lua State
+ * @param ctypeid FFI's CTypeID of this cdata
+ * @param size size to allocate
+ * @sa luaL_checkcdata
+ * @return memory associated with this cdata
+ */
+void *
+luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size);
+
+/**
+ * @brief Checks whether the function argument idx is a cdata
+ * @param L Lua State
+ * @param idx stack index
+ * @param ctypeid FFI's CTypeID of this cdata
+ * @sa luaL_pushcdata
+ * @return memory associated with this cdata
+ */
+void *
+luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
+
+#endif /* defined(LUAJIT) */
+
+/** A single value on the Lua stack. */
+struct luaL_field {
+	union {
+		struct {
+			const char *data;
+			uint32_t len;
+		} sval;
+		int64_t ival;
+		double dval;
+		float fval;
+		bool bval;
+		uint32_t max;        /* MP_ARRAY */
+		uint32_t size;       /* MP_MAP */
+	};
+	enum mp_type type;
+	bool compact;                /* a flag used by YAML serializer */
+};
+
+/**
+ * @brief Convert a value from the Lua stack to a lua_field structure.
+ * This function is designed to use with lua bindings and data
+ * serializators (YAML, MsgPack, JSON, etc.).
+ *
+ * Conversion rules:
+ * - LUA_TNUMBER when is integer and >= 0 -> UINT
+ * - LUA_TNUMBER when is integer and < 0 -> INT
+ * - LUA_TNUMBER when is not integer -> DOUBLE
+ * - LUA_TBOOLEAN -> BOOL
+ * - LUA_TSTRING -> STRING
+ * - LUA_TNIL -> NIL
+ * - LUA_TTABLE when is array -> ARRAY
+ * - LUA_TTABLE when is not array -> MAP
+ * - LUA_TUSERDATA, LUA_TLIGHTUSERDATA, CTID_P_VOID when == NULL -> NIL
+ * - CTID_INT*, CTID_CCHAR when >= 0 -> UINT
+ * - CTID_INT*, CTID_CCHAR when < 0 -> INT
+ * - CTID_FLOAT -> FLOAT
+ * - CTID_DOUBLE -> DOUBLE
+ * - CTID_BOOL -> BOOL
+ * - otherwise -> EXT
+ *
+ * By default all LUA_TTABLEs (incl. empty ones) are handled as ARRAYs.
+ * If a table has non-numbering indexes or the table is too sparse when it will
+ * be handles as a map. The user can force MAP or ARRAY serialization by
+ * setting a metatable with "_serializer_type" = "map" | "array" value.
+ *
+ * YAML also supports special "_serializer_compact" = true | false
+ * flag that controls block vs flow output ([1,2,3] vs - 1\n - 2\n - 3\n).
+ *
+ * MAP and ARRAY members are not saved to lua_field structure and should be
+ * process manually.
+ *
+ * Use the following code for ARRAYs:
+ * field.max; // the maximal index of the array
+ * for (uint32_t i = 0; i < field.max; i++) {
+ * lua_rawgeti(L, index, i + 1);
+ *	handle_value(L, -1)
+ *	lua_pop(L, 1);
+ * }
+ *
+ * Use the following code for MAPs:
+ * field.size; // the number of members in the map
+ * lua_pushnil(L);
+ * while (lua_next(L, index) != 0) {
+ *	handle_key(L, -2)
+ *	handle_value(L, -1)
+ *	lua_pop(L, 1);
+ * }
+ *
+ * @param L stack
+ * @param index stack index
+ * @param field conversion result
+ */
+void
+luaL_tofield(struct lua_State *L, int index, struct luaL_field *field);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
+
+#endif /* TARANTOOL_LUA_UTILS_H_INCLUDED */

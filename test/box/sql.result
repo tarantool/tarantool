@@ -16,11 +16,11 @@ select * from t0
 ...
 insert into t0 values (1, 'I am a tuple')
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 select * from t0 where k0 = 0
 ---
@@ -30,7 +30,7 @@ select * from t0 where k0 = 2
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 box.snapshot()
 ---
@@ -38,15 +38,15 @@ box.snapshot()
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 delete from t0 where k0 = 1
 ---
-- [1, u'I am a tuple']
+- [1, 'I am a tuple']
 ...
 select * from t0 where k0 = 1
 ---
@@ -59,27 +59,27 @@ select * from t0 where k0=1
 ...
 insert into t0 values (1, 'I am a new tuple')
 ---
-- [1, u'I am a new tuple']
+- [1, 'I am a new tuple']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am a new tuple']
+- [1, 'I am a new tuple']
 ...
 update t0 set k1 = 'I am the newest tuple' where k0=1
 ---
-- [1, u'I am the newest tuple']
+- [1, 'I am the newest tuple']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'I am the newest tuple']
+- [1, 'I am the newest tuple']
 ...
 update t0 set k1 = 'Huh', k2 = 'I am a new field! I was added via append' where k0=1
 ---
-- [1, u'Huh', u'I am a new field! I was added via append']
+- [1, 'Huh', 'I am a new field! I was added via append']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'Huh', u'I am a new field! I was added via append']
+- [1, 'Huh', 'I am a new field! I was added via append']
 ...
 update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1
 ---
@@ -89,35 +89,35 @@ update t0 set k1 = 'Huh', k1000 = 'invalid field' where k0=1
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'Huh', u'I am a new field! I was added via append']
+- [1, 'Huh', 'I am a new field! I was added via append']
 ...
 replace into t0 values (1, 'I am a new tuple', 'stub')
 ---
-- [1, u'I am a new tuple', u'stub']
+- [1, 'I am a new tuple', 'stub']
 ...
 update t0 set k1 = 'Huh', k2 = 'Oh-ho-ho' where k0=1
 ---
-- [1, u'Huh', u'Oh-ho-ho']
+- [1, 'Huh', 'Oh-ho-ho']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'Huh', u'Oh-ho-ho']
+- [1, 'Huh', 'Oh-ho-ho']
 ...
 update t0 set k1 = '', k2 = '' where k0=1
 ---
-- [1, u'', u'']
+- [1, '', '']
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'', u'']
+- [1, '', '']
 ...
 update t0 set k1 = 2, k2 = 3 where k0=1
 ---
-- [1, u'\x02\x00\x00\x00', u'\x03\x00\x00\x00']
+- [1, 2, 3]
 ...
 select * from t0 where k0 = 1
 ---
-- [1, u'\x02\x00\x00\x00', u'\x03\x00\x00\x00']
+- [1, 2, 3]
 ...
 insert into t0 values (0)
 ---

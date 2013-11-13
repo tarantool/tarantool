@@ -7,7 +7,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 s0 = box.space[0]
 ---
@@ -78,9 +78,20 @@ box.insert(box.schema.SPACE_ID, 1, 0, 'tweedledee')
 ...
 box.insert(box.schema.INDEX_ID, 1, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
-- [1, 0, 'primary', 1701147252, 1, 1, 0, 'str']
+- [1, 0, 'primary', 'tree', 1, 1, 0, 'str']
+...
+box.insert(box.schema.SPACE_ID, 2, 0, 'alice')
+---
+- [2, 0, 'alice']
+...
+box.insert(box.schema.INDEX_ID, 2, 0, 'primary', 'tree', 1, 1, 0, 'str')
+---
+- [2, 0, 'primary', 'tree', 1, 1, 0, 'str']
 ...
 s1 = box.space[1]
+---
+...
+s2 = box.space[1]
 ---
 ...
 -- string keys
@@ -146,7 +157,7 @@ function crossjoin(space0, space1, limit)
             if limit <= 0 then
                 return result
             end
-            newtuple = {v0:unpack()}
+            newtuple = v0:totable()
             for _, v in v1:pairs() do
                 table.insert(newtuple, v)
             end
@@ -159,42 +170,47 @@ end;
 ---
 ...
 --# setopt delimiter ''
-s0:insert(1, 'tuple')
+s2:insert('1', 'tuple')
 ---
-- [1, 'tuple']
+- ['1', 'tuple']
 ...
-s1:insert(1, 'tuple')
+s1:insert('1', 'tuple')
 ---
-- [1, 'tuple']
+- error: Duplicate key exists in unique index 0
 ...
-s1:insert(2, 'tuple')
+s1:insert('2', 'tuple')
 ---
-- [2, 'tuple']
+- ['2', 'tuple']
 ...
 crossjoin(s1, s1, 0)
 ---
-- {}
+- []
 ...
 crossjoin(s1, s1, 5)
 ---
-- - [1, 'tuple', 1, 'tuple']
-  - [1, 'tuple', 2, 'tuple']
-  - [2, 'tuple', 1, 'tuple']
-  - [2, 'tuple', 2, 'tuple']
+- - ['1', 'tuple', '1', 'tuple']
+  - ['1', 'tuple', '2', 'tuple']
+  - ['2', 'tuple', '1', 'tuple']
+  - ['2', 'tuple', '2', 'tuple']
 ...
 crossjoin(s1, s1, 10000)
 ---
-- - [1, 'tuple', 1, 'tuple']
-  - [1, 'tuple', 2, 'tuple']
-  - [2, 'tuple', 1, 'tuple']
-  - [2, 'tuple', 2, 'tuple']
+- - ['1', 'tuple', '1', 'tuple']
+  - ['1', 'tuple', '2', 'tuple']
+  - ['2', 'tuple', '1', 'tuple']
+  - ['2', 'tuple', '2', 'tuple']
 ...
-crossjoin(s1, s0, 10000)
+crossjoin(s1, s2, 10000)
 ---
-- - [1, 'tuple', 1, 'tuple']
-  - [2, 'tuple', 1, 'tuple']
+- - ['1', 'tuple', '1', 'tuple']
+  - ['1', 'tuple', '2', 'tuple']
+  - ['2', 'tuple', '1', 'tuple']
+  - ['2', 'tuple', '2', 'tuple']
 ...
 s1:truncate()
+---
+...
+s2:truncate()
 ---
 ...
 -- Bug #922520 - select missing keys
@@ -215,7 +231,7 @@ s0:select(0, 201)
 -- Test partially specified keys in TREE indexes
 s1:insert('abcd')
 ---
-- [1684234849]
+- ['abcd']
 ...
 s1:insert('abcda')
 ---
@@ -239,7 +255,7 @@ s1:insert('abcdb__')
 ...
 s1:insert('abcdb___')
 ---
-- [6872316432586334817]
+- ['abcdb___']
 ...
 s1:insert('abcdc')
 ---
@@ -269,15 +285,15 @@ s0:truncate()
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 1, 1, 'num')
 ---
-- [0, 1, 12649, 1701147252, 1, 1, 1, 'num']
+- [0, 1, 'i1', 'tree', 1, 1, 1, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 0, 1, 2, 'num')
 ---
-- [0, 2, 12905, 1701147252, 0, 1, 2, 'num']
+- [0, 2, 'i2', 'tree', 0, 1, 2, 'num']
 ...
 box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 1, 1, 3, 'num')
 ---
-- [0, 3, 13161, 1701147252, 1, 1, 3, 'num']
+- [0, 3, 'i3', 'tree', 1, 1, 3, 'num']
 ...
 s0:insert(0, 0, 0, 0)
 ---

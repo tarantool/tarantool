@@ -7,3 +7,9 @@
 [submodule "test/lib/tarantool-python"]
 	path = test/lib/tarantool-python
 	url = https://github.com/mailru/tarantool-python.git
+[submodule "test/lib/msgpack-python"]
+	path = test/lib/msgpack-python
+	url = https://github.com/msgpack/msgpack-python.git
+[submodule "src/lib/msgpuck"]
+	path = src/lib/msgpuck
+	url = https://github.com/rtsisyk/msgpuck.git

@@ -29,10 +29,10 @@ import socket
 import struct
 import warnings
 
-from test_suite import check_tarantool_import
+from test_suite import check_libs
 from tarantool_connection import TarantoolConnection
 
-check_tarantool_import()
+check_libs()
 from tarantool import Connection as tnt_connection
 from tarantool import Schema
 

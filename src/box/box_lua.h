@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
+
 struct lua_State;
 struct txn;
 /**

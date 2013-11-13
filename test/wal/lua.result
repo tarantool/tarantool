@@ -4,11 +4,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'num')
 ---
-- [0, 1, 'secondary', 1701147252, 0, 1, 1, 'num']
+- [0, 1, 'secondary', 'tree', 0, 1, 1, 'num']
 ...
 space = box.space[0]
 ---
@@ -20,7 +20,7 @@ space = box.space[0]
 for i = 1, 1000 do
     space:truncate()
     for j = 1, 30 do
-        space:insert(j, os.time(), 1)
+        space:insert(tostring(j), os.time(), 1)
     end
     count = 0
     for v in space.index[1]:iterator(box.index.ALL) do
@@ -40,7 +40,7 @@ space:truncate()
 -- A test case for Bug#1043858 server crash on lua stack overflow on CentOS
 -- 5.4
 --
-for i = 1, 100000, 1 do space:insert(i,i) end
+for i = 1, 100000, 1 do space:insert(tostring(i),i) end
 ---
 ...
 local t1 = {space:select(1)}

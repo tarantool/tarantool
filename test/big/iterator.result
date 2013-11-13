@@ -10,32 +10,32 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'str']
 ...
 -- Tree single-part non-unique
 box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 1, 1, 'str')
 ---
-- [0, 1, 12649, 1701147252, 0, 1, 1, 'str']
+- [0, 1, 'i1', 'tree', 0, 1, 1, 'str']
 ...
 -- Tree multi-part unique
 box.insert(box.schema.INDEX_ID, 0, 2, 'i2', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
-- [0, 2, 12905, 1701147252, 1, 2, 1, 'str', 2, 'str']
+- [0, 2, 'i2', 'tree', 1, 2, 1, 'str', 2, 'str']
 ...
 -- Tree multi-part non-unique
 box.insert(box.schema.INDEX_ID, 0, 3, 'i3', 'tree', 0, 2, 2, 'str', 3, 'str')
 ---
-- [0, 3, 13161, 1701147252, 0, 2, 2, 'str', 3, 'str']
+- [0, 3, 'i3', 'tree', 0, 2, 2, 'str', 3, 'str']
 ...
 -- Hash single-part unique
 box.insert(box.schema.INDEX_ID, 0, 4, 'i4', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 4, 13417, 1752392040, 1, 1, 0, 'str']
+- [0, 4, 'i4', 'hash', 1, 1, 0, 'str']
 ...
 -- Hash multi-part unique
 box.insert(box.schema.INDEX_ID, 0, 5, 'i5', 'hash', 1, 2, 1, 'str', 2, 'str')
 ---
-- [0, 5, 13673, 1752392040, 1, 2, 1, 'str', 2, 'str']
+- [0, 5, 'i5', 'hash', 1, 2, 1, 'str', 2, 'str']
 ...
 space = box.space[0]
 ---
@@ -197,11 +197,11 @@ iterate(space.n, 0, 0, 1, box.index.REQ, 'pid_003')
 ...
 iterate(space.n, 0, 0, 1, box.index.EQ, 'pid_666')
 ---
-- {}
+- []
 ...
 iterate(space.n, 0, 0, 1, box.index.REQ, 'pid_666')
 ---
-- {}
+- []
 ...
 iterate(space.n, 0, 0, 1, box.index.GE, 'pid_001')
 ---
@@ -230,11 +230,11 @@ iterate(space.n, 0, 0, 1, box.index.GT, 'pid_001')
 ...
 iterate(space.n, 0, 0, 1, box.index.GE, 'pid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 0, 0, 1, box.index.GT, 'pid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 0, 0, 1, box.index.LE, 'pid_002')
 ---
@@ -247,11 +247,11 @@ iterate(space.n, 0, 0, 1, box.index.LT, 'pid_002')
 ...
 iterate(space.n, 0, 0, 1, box.index.LE, 'pid_000')
 ---
-- {}
+- []
 ...
 iterate(space.n, 0, 0, 1, box.index.LT, 'pid_000')
 ---
-- {}
+- []
 ...
 -------------------------------------------------------------------------------
 -- Iterator: tree single-part non-unique
@@ -372,11 +372,11 @@ iterate(space.n, 1, 1, 2, box.index.GT, 'sid_005')
 ...
 iterate(space.n, 1, 1, 2, box.index.GE, 'sid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 1, 1, 2, box.index.GT, 'sid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 1, 1, 2, box.index.LE, 'sid_005')
 ---
@@ -401,11 +401,11 @@ iterate(space.n, 1, 1, 2, box.index.LT, 'sid_005')
 ...
 iterate(space.n, 1, 1, 2, box.index.LE, 'sid_000')
 ---
-- {}
+- []
 ...
 iterate(space.n, 1, 1, 2, box.index.LT, 'sid_000')
 ---
-- {}
+- []
 ...
 -------------------------------------------------------------------------------
 -- Iterator: tree multi-part unique
@@ -513,7 +513,7 @@ iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
 ...
 iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005')
 ---
@@ -527,7 +527,7 @@ iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_995')
 ...
 iterate(space.n, 2, 1, 3, box.index.REQ, 'sid_005', 'tid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005')
 ---
@@ -561,11 +561,11 @@ iterate(space.n, 2, 1, 3, box.index.GT, 'sid_005', 'tid_999')
 ...
 iterate(space.n, 2, 1, 3, box.index.GE, 'sid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.GT, 'sid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.LE, 'sid_005')
 ---
@@ -632,11 +632,11 @@ iterate(space.n, 2, 1, 3, box.index.LT, 'sid_005', 'tid_000')
 ...
 iterate(space.n, 2, 1, 3, box.index.LE, 'sid_000')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.LT, 'sid_000')
 ---
-- {}
+- []
 ...
 -------------------------------------------------------------------------------
 -- Iterator: tree multi-part non-unique
@@ -747,7 +747,7 @@ iterate(space.n, 3, 2, 4, box.index.EQ, 'tid_996', 'a')
 ...
 iterate(space.n, 3, 2, 4, box.index.EQ, 'tid_996', 'z')
 ---
-- {}
+- []
 ...
 iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996')
 ---
@@ -764,7 +764,7 @@ iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996', 'a')
 ...
 iterate(space.n, 3, 2, 4, box.index.REQ, 'tid_996', '0')
 ---
-- {}
+- []
 ...
 iterate(space.n, 3, 2, 4, box.index.GE, 'tid_997')
 ---
@@ -782,7 +782,7 @@ iterate(space.n, 3, 2, 4, box.index.GE, 'tid_998')
 ...
 iterate(space.n, 3, 2, 4, box.index.GT, 'tid_998')
 ---
-- {}
+- []
 ...
 iterate(space.n, 3, 2, 4, box.index.LE, 'tid_997')
 ---
@@ -808,15 +808,15 @@ iterate(space.n, 3, 2, 4, box.index.LT, 'tid_997')
 ...
 iterate(space.n, 3, 2, 4, box.index.LE, 'tid_000')
 ---
-- {}
+- []
 ...
 iterate(space.n, 3, 2, 4, box.index.LT, 'tid_000')
 ---
-- {}
+- []
 ...
 iterate(space.n, 3, 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
 ---
-- error: 'utils.lua:27: Key part count 4 is greater than index part count 2'
+- error: Invalid key part count (expected [0..2], got 4)
 ...
 -------------------------------------------------------------------------------
 -- Iterator: hash single-part unique
@@ -870,19 +870,17 @@ iterate(space.n, 4, 0, 1, box.index.EQ, 'pid_003')
 ...
 iterate(space.n, 4, 0, 1, box.index.EQ, 'pid_666')
 ---
-- {}
+- []
 ...
 iterate(space.n, 4, 0, 1, box.index.GE, 'pid_001')
 ---
 - - $pid_001$
-  - $pid_007$
-  - $pid_011$
-  - $pid_019$
-  - $pid_023$
+  - $pid_002$
+  - $pid_017$
 ...
 iterate(space.n, 4, 0, 1, box.index.GE, 'pid_999')
 ---
-- {}
+- []
 ...
 -------------------------------------------------------------------------------
 -- Iterator: hash multi-part unique
@@ -927,11 +925,11 @@ iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995')
 ...
 iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_999')
 ---
-- {}
+- []
 ...
 iterate(space.n, 2, 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
 ---
-- error: 'utils.lua:27: Key part count 3 is greater than index part count 2'
+- error: Invalid key part count (expected [0..2], got 3)
 ...
 iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_995')
 ---
