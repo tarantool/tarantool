@@ -1139,13 +1139,13 @@ localhost> lua t
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua"># or __len()</emphasis>
+            <emphasis role="lua">#</emphasis>
         </term>
         <listitem>
             <para>
                 The # operand in Lua means "return count of components".
-                So, if t is a tuple instance, either <code>#t</code>
-                or <code>t:__len()</code> will return the number of
+                So, if t is a tuple instance, <code>#t</code>
+                will return the number of
                 fields.
                 In the following example, a tuple named t is created
                 and then the number of fields in t is returned.
@@ -1155,10 +1155,6 @@ localhost> lua t
 ---
 ...
 localhost&gt; lua #t
----
- - 4
-...
-localhost&gt; lua t:__len()
 ---
  - 4
 ...</programlisting>
@@ -1171,9 +1167,16 @@ localhost&gt; lua t:__len()
         <listitem>
             <para>
              If t is a tuple instance, <code>t:bsize()</code>
-             will return the number of bytes in the tuple, plus the number of fields.
+             will return the number of bytes in the tuple.
+             It is useful to check this number when making changes to data,
+             because there is a fixed maximum: one megabyte.
+             Every field has one or more "length" bytes preceding the
+             actual contents, so bsize() returns a value which is
+             slightly greater than the sum of the lengths of the contents.
              In the following example, a tuple named t is created
-             which has three three-byte fields, so (3*3)+3 is returned.
+             which has three fields, and for each field it takes one byte
+             to store the length and three bytes to store the contents,
+             so bsize() returns  3*(1+3).
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
             <programlisting>localhost&gt; lua t=box.tuple.new({'aaa','bbb','ccc'})
@@ -1187,12 +1190,12 @@ localhost&gt; lua t:bsize()
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">[] or __index()</emphasis>
+            <emphasis role="lua">[ ]</emphasis>
         </term>
         <listitem>
             <para>
-                If t is a tuple instance, either <code>t[<replaceable>n</replaceable>]</code>
-                or <code>t:__index(<replaceable>n</replaceable>)</code> will return the
+                If t is a tuple instance, <code>t[<replaceable>n</replaceable>]</code>
+                will return the
                  <code>n</code>th field in the tuple. The first field is t[0].
                 In the following example, a tuple named t is created
                 and then the second field in t is returned.
@@ -1202,10 +1205,6 @@ localhost&gt; lua t:bsize()
 ---
 ...
 localhost&gt; lua t[1]
----
- - Field#2
-...
-localhost&gt; lua t:__index(1)
 ---
  - Field#2
 ...</programlisting>
