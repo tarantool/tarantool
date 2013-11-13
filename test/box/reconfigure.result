@@ -115,6 +115,19 @@ save snapshot
 ---
 ok
 ...
+#
+# A test case for https://github.com/tarantool/tarantool/issues/112:
+# Tarantool crushes with SIGSEGV during reload configuration
+#
+reload configuration
+---
+ok
+...
+reload configuration
+---
+fail:
+ - Could not accept read only 'custom_proc_title' option
+...
 reload configuration
 ---
 ok

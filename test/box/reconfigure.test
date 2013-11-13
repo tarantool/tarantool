@@ -42,6 +42,14 @@ exec admin "save snapshot"
 server.reconfigure("box/tarantool_good.cfg")
 exec sql "insert into t0 values (3, 'tuple 3')"
 exec admin "save snapshot"
+
+print """#
+# A test case for https://github.com/tarantool/tarantool/issues/112:
+# Tarantool crushes with SIGSEGV during reload configuration
+#"""
+server.reconfigure("box/tarantool_wo_cpt.cfg")
+server.reconfigure("box/tarantool_with_cpt.cfg")
+
 # Cleanup
 server.reconfigure(self.suite_ini["config"])
 exec admin "lua box.space[0]:truncate()"
