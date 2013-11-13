@@ -37,7 +37,9 @@ find_program(POD2MAN pod2man)
 #
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
-set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
+# Disable tarancheck and tarantar for 1.6
+# set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
+set (TARANTOOL_CLIENTS "")
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
 
@@ -345,7 +347,8 @@ include (cmake/package.cmake)
 include (cmake/rpm.cmake)
 
 add_subdirectory(cfg)
-add_subdirectory(connector)
+# Disable connector_c for 1.6
+# add_subdirectory(connector)
 add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(client)

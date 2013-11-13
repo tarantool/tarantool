@@ -10,7 +10,8 @@ add_custom_target(test-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
 
 add_subdirectory(unit)
-add_subdirectory(connector_c)
+# Disable connector_c for 1.6
+#add_subdirectory(connector_c)
 
 macro(install_cfg type_cfg dest)
     install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_${type_cfg}.cfg
