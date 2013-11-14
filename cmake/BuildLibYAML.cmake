@@ -12,6 +12,9 @@ macro(libyaml_build)
 	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/writer.c
 	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c)
 
+    set_source_files_properties(${yaml_src} PROPERTIES COMPILE_FLAGS
+        "-std=c99")
+
     add_library(yaml STATIC ${yaml_src})
 
     set(LIBYAML_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/third_party/lua-yaml)

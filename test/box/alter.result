@@ -81,7 +81,7 @@ t = box.auto_increment(_space.n, 0, 'hello')
 ---
 ...
 -- Check that a space exists
-space = box.space[box.unpack('i', t[0])]
+space = box.space[t[0]]
 ---
 ...
 space.n
@@ -122,7 +122,7 @@ space:delete(0)
 t = _space:delete(space.n)
 ---
 ...
-space_deleted = box.space[box.unpack('i', t[0])]
+space_deleted = box.space[t[0]]
 ---
 ...
 space_deleted
@@ -139,7 +139,7 @@ _index:insert(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ...
 _index:replace(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [280, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 _index:insert(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
 ---
@@ -147,15 +147,15 @@ _index:insert(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
 ...
 _index:replace(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
 ---
-- [288, 0, 'primary', 1701147252, 1, 2, 0, 'num', 1, 'num']
+- [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
 ...
 _index:select(0)
 ---
-- [272, 0, 'primary', 1701147252, 1, 1, 0, 'str']
-- [280, 0, 'primary', 1701147252, 1, 1, 0, 'num']
-- [280, 1, 1701667182, 1701147252, 1, 1, 2, 'str']
-- [288, 0, 'primary', 1701147252, 1, 2, 0, 'num', 1, 'num']
-- [288, 1, 1701667182, 1701147252, 1, 2, 0, 'num', 2, 'str']
+- [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
+- [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
+- [280, 1, 'name', 'tree', 1, 1, 2, 'str']
+- [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
+- [288, 1, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
 ...
 -- modify indexes of a system space
 _index:delete(_index.n, 0)
@@ -168,7 +168,7 @@ _space:insert(1000, 0, 'hello')
 ...
 _index:insert(1000, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [1000, 0, 'primary', 1701147252, 1, 1, 0, 'num']
+- [1000, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 box.space[1000]:insert(0, 'hello, world')
 ---
@@ -197,7 +197,7 @@ box.snapshot()
 --# start server default
 box.space['_space']:insert(1000, 0, 'test')
 ---
-- [1000, 0, 1953719668]
+- [1000, 0, 'test']
 ...
 box.space[1000].n
 ---
@@ -205,7 +205,7 @@ box.space[1000].n
 ...
 box.space['_space']:delete(1000)
 ---
-- [1000, 0, 1953719668]
+- [1000, 0, 'test']
 ...
 box.space[1000]
 ---

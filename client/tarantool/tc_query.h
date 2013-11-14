@@ -29,14 +29,17 @@
  * SUCH DAMAGE.
  */
 
-typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
 typedef int (*tc_query_admin_t)(char *r, char **e);
+
+#if 0
+typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
 
 char *tc_query_type(uint32_t type);
 
 int tc_query_printer(struct tnt_reply *r, void *ptr, char **e);
 int tc_query_foreach(tc_query_t cb, void *cba, char **e);
 int tc_query(char *q, char **e);
+#endif
 
 int tc_query_admin_printer(char *r, char **e);
 int tc_query_admin(char *q, tc_query_admin_t cb, char **e);

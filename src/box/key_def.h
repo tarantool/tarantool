@@ -30,6 +30,8 @@
  */
 #include "tarantool/util.h"
 #include "rlist.h"
+#include <exception.h>
+#include <lib/msgpuck/msgpuck.h>
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
@@ -52,7 +54,7 @@ enum {
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_type { UNKNOWN = 0, NUM, NUM64, STRING, field_type_MAX };
+enum field_type { UNKNOWN = 0, NUM, STRING, field_type_MAX };
 extern const char *field_type_strs[];
 
 static inline uint32_t
@@ -138,7 +140,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no,
  *
  * One key part is considered to be greater than the other if:
  * - its fieldno is greater
- * - given the same fieldno, NUM < NUM64 < STRING
+ * - given the same fieldno, NUM < STRING
  *   (coarsely speaking, based on field_type_maxlen()).
  *
  * A key part array is considered greater than the other if all
@@ -206,5 +208,26 @@ struct space_def {
 /** Check space definition structure for errors. */
 void
 space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
+
+/** A helper table for key_mp_type_validate */
+extern const uint16_t key_mp_type[];
+
+/**
+ * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
+ * @param type KeyDef type
+ * @param field_type MsgPack type
+ * @param field_no - a field number (is used to show an error message)
+ */
+static inline void
+key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
+	       int err, uint32_t field_no)
+{
+	assert(key_type < field_type_MAX);
+	assert((1U << mp_type) < 8 * sizeof(*key_mp_type));
+
+	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
+		tnt_raise(ClientError, err, field_no,
+			  field_type_strs[key_type]);
+}
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

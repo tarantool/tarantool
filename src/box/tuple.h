@@ -141,8 +141,6 @@ struct tuple
 	uint16_t format_id;
 	/** length of the variable part of the tuple */
 	uint32_t bsize;
-	/** number of fields in the variable part. */
-	uint32_t field_count;
 	/**
 	 * Fields can have variable length, and thus are packed
 	 * into a contiguous byte array. Each field is prefixed
@@ -168,8 +166,7 @@ tuple_alloc(struct tuple_format *format, size_t size);
  * Throws an exception if tuple format is incorrect.
  */
 struct tuple *
-tuple_new(struct tuple_format *format, uint32_t field_count,
-	  const char **data, const char *end);
+tuple_new(struct tuple_format *format, const char **data, const char *end);
 
 /**
  * Change tuple reference counter. If it has reached zero, free the tuple.
@@ -203,6 +200,18 @@ tuple_format(const struct tuple *tuple)
 }
 
 /**
+ * @brief Return the number of fields in tuple
+ * @param tuple
+ * @return the number of fields in tuple
+ */
+static inline uint32_t
+tuple_arity(const struct tuple *tuple)
+{
+	const char *data = tuple->data;
+	return mp_decode_array(&data);
+}
+
+/**
  * Get a field from tuple by index.
  * Returns a pointer to BER-length prefixed field.
  *
@@ -213,30 +222,33 @@ static inline const char *
 tuple_field_old(const struct tuple_format *format,
 		const struct tuple *tuple, uint32_t i)
 {
-	const char *field = tuple->data;
+	if (likely(i < format->field_count)) {
+		/* Indexed field */
 
-	if (i == 0)
-		return field;
-	i--;
-	if (i < format->max_fieldno) {
-		if (format->offset[i] > 0)
-			return field + format->offset[i];
+		if (i == 0) {
+			const char *pos = tuple->data;
+			mp_decode_array(&pos);
+			return pos;
+		}
+
 		if (format->offset[i] != INT32_MIN) {
 			uint32_t *field_map = (uint32_t *) tuple;
 			int32_t idx = format->offset[i];
-			return field + field_map[idx];
+			return tuple->data + field_map[idx];
 		}
 	}
-	const char *tuple_end = field + tuple->bsize;
 
-	while (field < tuple_end) {
-		uint32_t len = load_varint32(&field);
-		field += len;
-		if (i == 0)
-			return field;
-		i--;
+	const char *pos = tuple->data;
+	uint32_t size = mp_decode_array(&pos);
+	if (unlikely(i >= size))
+		return NULL;
+
+	for (uint32_t k = 0; k < i; k++) {
+		mp_next(&pos);
 	}
-	return tuple_end;
+
+	assert(pos <= tuple->data + tuple->bsize);
+	return pos;
 }
 
 /**
@@ -247,24 +259,30 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-static inline const char *
-tuple_field(const struct tuple *tuple, uint32_t i, uint32_t *len)
+inline const char *
+tuple_field(const struct tuple *tuple, uint32_t i)
 {
-	const char *field = tuple_field_old(tuple_format(tuple), tuple, i);
-	if (field < tuple->data + tuple->bsize) {
-		*len = load_varint32(&field);
-		return field;
-	}
-	*len = 0;
-	return NULL;
+	return tuple_field_old(tuple_format(tuple), tuple, i);
 }
 
 /**
  * A convenience shortcut for data dictionary - get a tuple field
  * as uint32_t.
  */
-uint32_t
-tuple_field_u32(struct tuple *tuple, uint32_t i);
+inline uint32_t
+tuple_field_u32(struct tuple *tuple, uint32_t i)
+{
+	const char *field = tuple_field(tuple, i);
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, i);
+	if (mp_typeof(*field) != MP_UINT)
+		tnt_raise(ClientError, ER_FIELD_TYPE, i, field_type_strs[NUM]);
+
+	uint64_t val = mp_decode_uint(&field);
+	if (val > UINT32_MAX)
+		tnt_raise(ClientError, ER_FIELD_TYPE, i, field_type_strs[NUM]);
+	return (uint32_t) val;
+}
 
 /**
  * A convenience shortcut for data dictionary - get a tuple field
@@ -309,6 +327,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
 {
 	it->tuple = tuple;
 	it->pos = tuple->data;
+	(void) mp_decode_array(&it->pos); /* Skip array header */
 	it->fieldno = 0;
 }
 
@@ -319,7 +338,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
  * @retval NULL   otherwise (iteration is out of range)
  */
 const char *
-tuple_seek(struct tuple_iterator *it, uint32_t field_no, uint32_t *len);
+tuple_seek(struct tuple_iterator *it, uint32_t field_no);
 
 /**
  * @brief Iterate to the next field
@@ -327,15 +346,30 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no, uint32_t *len);
  * @return next field or NULL if the iteration is out of range
  */
 const char *
-tuple_next(struct tuple_iterator *it, uint32_t *len);
+tuple_next(struct tuple_iterator *it);
 
 /**
  * A convenience shortcut for the data dictionary - get next field
  * from iterator as uint32_t or raise an error if there is
  * no next field.
  */
-uint32_t
-tuple_next_u32(struct tuple_iterator *it);
+inline uint32_t
+tuple_next_u32(struct tuple_iterator *it)
+{
+	uint32_t fieldno = it->fieldno;
+	const char *field = tuple_next(it);
+	if (field == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
+	if (mp_typeof(*field) != MP_UINT)
+		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno,
+			  field_type_strs[NUM]);
+
+	uint32_t val = mp_decode_uint(&field);
+	if (val > UINT32_MAX)
+		tnt_raise(ClientError, ER_FIELD_TYPE, fieldno,
+			  field_type_strs[NUM]);
+	return (uint32_t) val;
+}
 
 /**
  * A convenience shortcut for the data dictionary - get next field
@@ -344,16 +378,6 @@ tuple_next_u32(struct tuple_iterator *it);
  */
 const char *
 tuple_next_cstr(struct tuple_iterator *it);
-
-/**
- * @brief Print a tuple in yaml-compatible mode to tbuf:
- * key: { value, value, value }
- *
- * @param buf tbuf
- * @param tuple tuple
- */
-void
-tuple_print(struct tbuf *buf, const struct tuple *tuple);
 
 void
 tuple_init_field_map(struct tuple_format *format,
@@ -368,21 +392,8 @@ tuple_update(struct tuple_format *new_format,
 /** Tuple length when adding to iov. */
 static inline size_t tuple_len(struct tuple *tuple)
 {
-	return tuple->bsize + sizeof(tuple->bsize) +
-		sizeof(tuple->field_count);
+	return tuple->bsize + sizeof(tuple->bsize);
 }
-
-static inline size_t
-tuple_range_size(const char **begin, const char *end, uint32_t count)
-{
-	const char *start = *begin;
-	while (*begin < end && count-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin += len;
-	}
-	return *begin - start;
-}
-
 
 /**
  * @brief Compare two tuples using field by field using key definition

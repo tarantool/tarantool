@@ -35,20 +35,22 @@
 
 #include <unistd.h>
 
+#if 0
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
+#endif
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_store.h"
+/*#include "client/tarantool/tc_store.h"*/
 #include "client/tarantool/tc_query.h"
-#include "client/tarantool/tc_print_snap.h"
-#include "client/tarantool/tc_print_xlog.h"
+/*#include "client/tarantool/tc_print_snap.h"*/
+/*#include "client/tarantool/tc_print_xlog.h"*/
 
 #define TC_DEFAULT_PORT 33013
 #define TC_DEFAULT_PORT 33013
@@ -63,11 +65,15 @@ static void tc_init(void) {
 }
 
 static void tc_free(void) {
+	/*
 	if (tc.net) {
 		tnt_stream_free(tc.net);
 	}
+	*/
 	tc_admin_close(&tc.admin);
+	/*
 	tc_cmd_tee_close();
+	*/
 }
 
 void tc_error(char *fmt, ...) {
@@ -82,6 +88,7 @@ void tc_error(char *fmt, ...) {
 	exit(1);
 }
 
+#if 0
 static void tc_connect(void)
 {
 	if (tc.opt.port == 0)
@@ -101,6 +108,7 @@ static void tc_connect(void)
 	if (tnt_connect(tc.net) == -1)
 		tc_error("%s", tnt_strerror(tc.net));
 }
+#endif
 
 static char *send_cmd(char *cmd)
 {
@@ -132,7 +140,6 @@ static int get_primary_port()
 
 static void tc_connect_admin(void)
 {
-
 	if (tc_admin_connect(&tc.admin,
 			     tc.opt.host,
 			     tc.opt.port_admin) == -1)
@@ -141,6 +148,7 @@ static void tc_connect_admin(void)
 		tc.opt.port = get_primary_port();
 }
 
+#if 0
 static void tc_validate(void)
 {
 	tc.opt.xlog_printer = tc_print_getxlogcb(tc.opt.format);
@@ -154,6 +162,7 @@ static void tc_validate(void)
 	if (tc.opt.format && strcmp(tc.opt.format, "raw") == 0)
 		tc.opt.raw = 1;
 }
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -161,7 +170,7 @@ int main(int argc, char *argv[])
 
 	int rc = 0;
 	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv);
-	tc_validate();
+	/*tc_validate();*/
 	switch (mode) {
 	case TC_OPT_USAGE:
 		tc_opt_usage();
@@ -169,6 +178,7 @@ int main(int argc, char *argv[])
 	case TC_OPT_VERSION:
 		tc_opt_version();
 		break;
+#if 0
 	case TC_OPT_RPL:
 		tc_connect();
 		rc = tc_store_remote();
@@ -180,14 +190,15 @@ int main(int argc, char *argv[])
 		tc_connect();
 		rc = tc_store_play();
 		break;
+#endif
 	case TC_OPT_CMD:
 		tc_connect_admin();
-		tc_connect();
+		//tc_connect();
 		rc = tc_cli_cmdv();
 		break;
 	case TC_OPT_INTERACTIVE:
 		tc_connect_admin();
-		tc_connect();
+		//tc_connect();
 		tc_cli_motd();
 		rc = tc_cli();
 		break;

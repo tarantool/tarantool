@@ -36,4 +36,4 @@ tarantool_module("box"
     box_lua.cc
     box_lua_space.cc)
 
-target_link_libraries(tarantool_box bitset)
+target_link_libraries(tarantool_box bitset msgpuck)

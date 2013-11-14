@@ -34,7 +34,7 @@ space:select(0, 123)
 tuple = remote:select(space.n, 0, 123)
 ---
 ...
-remote:call('box.select', tostring(space.n), '0', 123)
+remote:call('box.select', space.n, 0, 123)
 ---
 - [123, 'test1', 'test2']
 ...
@@ -96,7 +96,7 @@ remote:select(space.n, 0, 345)
 ---
 - [345, 'test1', 'test2']
 ...
-remote:call('box.select', tostring(space.n), '0', 345)
+remote:call('box.select', space.n, 0, 345)
 ---
 - [345, 'test1', 'test2']
 ...
@@ -138,10 +138,10 @@ remote:timeout(0.5):select(space.n, 0, 345)
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:call('box.fiber.sleep', '.01')
+remote:call('box.fiber.sleep', .01)
 ---
 ...
-remote:timeout(0.01):call('box.fiber.sleep', '10')
+remote:timeout(0.01):call('box.fiber.sleep', 10)
 ---
 - null
 ...
@@ -222,11 +222,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:408: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:407: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:413: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:412: box.net.box: connection
     was closed'
 ...
 space:drop()

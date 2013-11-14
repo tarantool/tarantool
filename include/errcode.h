@@ -88,8 +88,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 33 */_(ER_UNUSED33,			2, "Unused33") \
 	/* 34 */_(ER_UNUSED34,			2, "Unused34") \
 	/* 35 */_(ER_UNUSED35,			2, "Unused35") \
-	/* 36 */_(ER_UNUSED36,			2, "Unused36") \
-	/* 37 */_(ER_UNUSED37,			2, "Unused37") \
+	/* 36 */_(ER_INVALID_MSGPACK,		2, "Invalid MsgPack") \
+	/* 37 */_(ER_TUPLE_NOT_ARRAY,		2, "Tuple/Key must be MsgPack array") \
 	/* 38 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
 	/* 39 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 40 */_(ER_FIELD_TYPE,		2, "Tuple field %u type does not match one required by operation: expected %s") \

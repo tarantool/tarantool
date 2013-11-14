@@ -40,7 +40,7 @@ box.net = {
 
         -- update a tuple
         update = function(self, space, key, format, ...)
-            local op_count = select('#', ...)/2
+            local op_count = bit.rshift(select('#', ...), 1)
             return self:process(19,
                    box.pack('iiVi'..format,
                         space,
@@ -80,11 +80,11 @@ box.net = {
         end,
 
         call    = function(self, proc_name, ...)
+            assert(type(proc_name) == 'string')
             local count = select('#', ...)
             return self:process(22,
-                box.pack('iwaV',
+                box.pack('ipV',
                     0,                      -- flags
-                    string.len(proc_name),
                     proc_name,
                     count,
                     ...))
@@ -93,9 +93,9 @@ box.net = {
         select_range = function(self, sno, ino, limit, ...)
             return self:call(
                 'box.select_range',
-                tostring(sno),
-                tostring(ino),
-                tostring(limit),
+                sno,
+                ino,
+                limit,
                 ...
             )
         end,
@@ -103,9 +103,9 @@ box.net = {
         select_reverse_range = function(self, sno, ino, limit, ...)
             return self:call(
                 'box.select_reverse_range',
-                tostring(sno),
-                tostring(ino),
-                tostring(limit),
+                sno,
+                ino,
+                limit,
                 ...
             )
         end,
@@ -147,13 +147,12 @@ box.net = {
         end,
 
         select_range = function(self, sno, ino, limit, ...)
-            return box.space[tonumber(sno)].index[tonumber(ino)]
-                :select_range(tonumber(limit), ...)
+            return box.space[sno].index[ino]:select_range(limit, ...)
         end,
 
         select_reverse_range = function(self, sno, ino, limit, ...)
-            return box.space[tonumber(sno)].index[tonumber(ino)]
-                :select_reverse_range(tonumber(limit), ...)
+            return box.space[sno].index[ino]
+                :select_reverse_range(limit, ...)
         end,
 
         -- for compatibility with the networked version,

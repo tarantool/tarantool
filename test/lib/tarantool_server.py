@@ -17,7 +17,7 @@ import ConfigParser
 
 from lib.server import Server
 from lib.box_connection import BoxConnection
-from lib.test_suite import FilteredStream, Test, check_tarantool_import
+from lib.test_suite import FilteredStream, Test, check_libs
 from lib.admin_connection import AdminConnection
 from lib.memcached_connection import MemcachedConnection
 
@@ -26,7 +26,7 @@ try:
 except ImportError:
     import StringIO
 
-check_tarantool_import()
+check_libs()
 import tarantool
 
 def check_port(port):

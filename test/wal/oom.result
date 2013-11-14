@@ -6,7 +6,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 space = box.space[0]
 ---
@@ -20,11 +20,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 19436 bytes in slab allocator for tuple
+- error: Failed to allocate 19435 bytes in slab allocator for tuple
 ...
 space:len();
 ---
-- 4852
+- 4853
 ...
 i = 1;
 ---
@@ -38,7 +38,7 @@ end;
 ...
 space:len();
 ---
-- 5869
+- 5871
 ...
 i = 1;
 ---
@@ -53,11 +53,11 @@ end;
 --# setopt delimiter ''
 space:len()
 ---
-- 6375
+- 6378
 ...
 space:select(0, 0)
 ---
-- [0, 1953719668]
+- [0, 'test']
 ...
 space:select(0, 5)
 ---
@@ -95,8 +95,8 @@ end;
 --# setopt delimiter ''
 t
 ---
-- - [0, 1953719668]
-  - [1, 8391162081565697396]
+- - [0, 'test']
+  - [1, 'testtest']
   - [2, 'testtesttest']
   - [3, 'testtesttesttest']
   - [4, 'testtesttesttesttest']
@@ -151,11 +151,11 @@ space:truncate()
 ...
 space:insert(0, 'test')
 ---
-- [0, 1953719668]
+- [0, 'test']
 ...
 space:select(0, 0)
 ---
-- [0, 1953719668]
+- [0, 'test']
 ...
 space:drop()
 ---

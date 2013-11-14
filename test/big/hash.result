@@ -13,7 +13,7 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 hash = box.space[0]
 ---
@@ -140,9 +140,9 @@ hash:truncate()
 -------------------------------------------------------------------------------
 -- 64-bit hash inset fields tests
 -------------------------------------------------------------------------------
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num64')
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num64']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 hash = box.space[0]
 ---
@@ -167,23 +167,23 @@ hash:insert(3ULL, 'value1 v1.0', 'value2 v1.0')
 -- Insert invalid fields
 hash:insert(100, 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [100, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(101, 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [101, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(102, 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [102, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert(103, 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [103, 'value1 v1.0', 'value2 v1.0']
 ...
 hash:insert('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash replace fields tests
@@ -204,19 +204,19 @@ hash:replace(2ULL, 'value1 v1.43', 'value2 1.92')
 -- Replace invalid fields
 hash:replace(3, 'value1 v1.31', 'value2 1.12')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [3, 'value1 v1.31', 'value2 1.12']
 ...
 hash:replace(1, 'value1 v1.32', 'value2 1.72')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [1, 'value1 v1.32', 'value2 1.72']
 ...
 hash:replace(2, 'value1 v1.43', 'value2 1.92')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- [2, 'value1 v1.43', 'value2 1.92']
 ...
 hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM64'
+- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 -------------------------------------------------------------------------------
 -- 64-bit hash select fields test
@@ -270,7 +270,7 @@ hash:select(0, 5)
 -- select by invalid keys
 hash:select(0, 'invalid key')
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 hash:select(0, '00000001', '00000002')
 ---
@@ -344,7 +344,7 @@ hash:delete(5)
 -- delete by invalid keys
 hash:delete('invalid key')
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM64'
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
 hash:delete('00000001', '00000002')
 ---
@@ -361,7 +361,7 @@ hash:truncate()
 -------------------------------------------------------------------------------
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 hash = box.space[0]
 ---
@@ -469,19 +469,19 @@ hash:truncate()
 ------------------------
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'field1', 'hash', 1, 1, 1, 'num')
 ---
-- [0, 1, 'field1', 1752392040, 1, 1, 1, 'num']
+- [0, 1, 'field1', 'hash', 1, 1, 1, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 2, 'field2', 'hash', 1, 1, 2, 'num')
 ---
-- [0, 2, 'field2', 1752392040, 1, 1, 2, 'num']
+- [0, 2, 'field2', 'hash', 1, 1, 2, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 3, 'field3', 'hash', 1, 1, 3, 'num')
 ---
-- [0, 3, 'field3', 1752392040, 1, 1, 3, 'num']
+- [0, 3, 'field3', 'hash', 1, 1, 3, 'num']
 ...
 hash = box.space[0]
 ---

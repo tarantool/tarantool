@@ -37,18 +37,27 @@
 #include "pickle.h"
 #include <lib/bitset/index.h>
 
+static inline struct tuple *
+value_to_tuple(size_t value);
+
 static inline size_t
 tuple_to_value(struct tuple *tuple)
 {
-	size_t value = salloc_ptr_to_index(tuple);
-	assert(salloc_ptr_from_index(value) == tuple);
+	/*
+	 * TODO(roman): salloc_index_to_ptr is broken
+	 * https://github.com/tarantool/tarantool/issues/49
+	 */
+	/* size_t value = salloc_ptr_to_index(tuple); */
+	size_t value = (intptr_t) tuple >> 2;
+	assert(value_to_tuple(value) == tuple);
 	return value;
 }
 
 static inline struct tuple *
 value_to_tuple(size_t value)
 {
-	return (struct tuple *) salloc_ptr_from_index(value);
+	/* return (struct tuple *) salloc_ptr_from_index(value); */
+	return (struct tuple *) (value << 2);
 }
 
 struct bitset_index_iterator {
@@ -131,6 +140,26 @@ BitsetIndex::findByKey(const char *key, uint32_t part_count) const
 	return NULL;
 }
 
+static inline const char *
+make_key(const char *field, uint32_t *key_len)
+{
+	static uint64_t u64key;
+	switch (mp_typeof(*field)) {
+	case MP_UINT:
+		u64key = mp_decode_uint(&field);
+		*key_len = sizeof(uint64_t);
+		return (const char *) &u64key;
+		break;
+	case MP_STR:
+		return mp_decode_str(&field, key_len);
+		break;
+	default:
+		*key_len = 0;
+		assert(false);
+		return NULL;
+	}
+}
+
 struct tuple *
 BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		     enum dup_replace_mode mode)
@@ -152,13 +181,12 @@ BitsetIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 	}
 
 	if (new_tuple != NULL) {
-		uint32_t len = 0;
 		const char *field;
-		field = tuple_field(new_tuple, key_def->parts[0].fieldno,
-				    &len);
-
+		field = tuple_field(new_tuple, key_def->parts[0].fieldno);
+		uint32_t key_len;
+		const void *key = make_key(field, &key_len);
 		size_t value = tuple_to_value(new_tuple);
-		if (bitset_index_insert(&index, field, len, value) < 0) {
+		if (bitset_index_insert(&index, key, key_len, value) < 0) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
 				  "BitsetIndex", "insert");
 		}
@@ -172,18 +200,17 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			  const char *key, uint32_t part_count) const
 {
 	assert(iterator->free == bitset_index_iterator_free);
-	assert (part_count != 0 || key == NULL);
+	assert(part_count != 0 || key == NULL);
 	(void) part_count;
 
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
 	const void *bitset_key = NULL;
-	size_t bitset_key_size = 0;
+	uint32_t bitset_key_size = 0;
 
 	if (type != ITER_ALL) {
-		const char *key2 = key;
-		bitset_key_size = (size_t) load_varint32(&key2);
-		bitset_key = key2;
+		assert(part_count == 1);
+		bitset_key = make_key(key, &bitset_key_size);
 	}
 
 	struct bitset_expr expr;

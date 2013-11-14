@@ -9,7 +9,7 @@ do
 
     function _set_pri_lsn(_lsn)
         a = {}
-        begin_lsn = box.unpack('l', _lsn)
+        begin_lsn = _lsn
     end
 
     function _print_lsn()
@@ -73,7 +73,7 @@ box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 _insert(1, 10)
 ---
@@ -129,7 +129,7 @@ box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 _insert(11, 20)
 ---

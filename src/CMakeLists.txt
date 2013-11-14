@@ -85,6 +85,8 @@ set (common_sources
      lua/session.cc
      lua/cjson.cc
      lua/yaml.cc
+     lua/msgpack.c
+     lua/utils.c
      ${lua_sources}
      ${bin_sources}
 )

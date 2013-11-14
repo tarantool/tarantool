@@ -80,15 +80,14 @@ key_def_new_from_tuple(struct tuple *tuple)
 
 	struct tuple_iterator it;
 	tuple_rewind(&it, tuple);
-	uint32_t len; /* unused */
 	/* Parts follow part count. */
-	(void) tuple_seek(&it, INDEX_PART_COUNT, &len);
+	(void) tuple_seek(&it, INDEX_PART_COUNT);
 
 	for (uint32_t i = 0; i < part_count; i++) {
 		uint32_t fieldno = tuple_next_u32(&it);
 		const char *field_type_str = tuple_next_cstr(&it);
-		enum field_type field_type =
-			STR2ENUM(field_type, field_type_str);
+		enum field_type field_type;
+		field_type = STR2ENUM(field_type, field_type_str);
 		key_def_set_part(key_def, i, fieldno, field_type);
 	}
 	key_def_check(key_def);
@@ -103,7 +102,7 @@ space_def_init_flags(struct space_def *def, struct tuple *tuple)
 	def->temporary = false;
 
 	/* there is no property in the space */
-	if (tuple->field_count <= FLAGS)
+	if (tuple_arity(tuple) <= FLAGS)
 		return;
 
 	const char *flags = tuple_field_cstr(tuple, FLAGS);

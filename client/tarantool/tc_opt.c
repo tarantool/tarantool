@@ -43,10 +43,13 @@
 static const void *tc_options_def = gopt_start(
 	gopt_option('h', GOPT_ARG, gopt_shorts('h'),
 		    gopt_longs("host"), " <host>", "server address"),
+#if 0
 	gopt_option('p', GOPT_ARG, gopt_shorts('p'),
 		    gopt_longs("port"), " <port>", "server port"),
+#endif
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
 		    gopt_longs("admin-port"), " <port>", "server admin port"),
+#if 0
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 		    gopt_longs("cat"), " <file>", "print xlog or snapshot file content"),
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
@@ -71,6 +74,7 @@ static const void *tc_options_def = gopt_start(
 		    "if you use --cat, then it will add delim to an end of every line of your"
 		    "lua file, when used at CLI start of client, then it's replacement of "
 		    "setopt delim='<delim>' command"),
+#endif
 	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
@@ -113,17 +117,21 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	if (opt->host == NULL)
 		opt->host = TC_DEFAULT_HOST;
 
+#if 0
 	/* server port */
 	const char *arg = NULL;
 	opt->port = 0;
 	if (gopt_arg(tc_options, 'p', &arg))
 		opt->port = atoi(arg);
+#endif
 
+	const char *arg = NULL;
 	/* server admin port */
 	opt->port_admin = TC_DEFAULT_PORT_ADMIN;
 	if (gopt_arg(tc_options, 'a', &arg))
 		opt->port_admin = atoi(arg);
 
+#if 0
 	/* space */
 	opt->space = 0;
 	opt->space_set = 0;
@@ -160,7 +168,9 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	opt->str_instead_int = 0;
 	if (gopt(tc_options, 'B'))
 		opt->str_instead_int = 1;
+#endif
 
+#if 0
 	/* set delimiter on start */
 	opt->delim = "";
 	opt->delim_len = 0;
@@ -187,6 +197,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 		opt->mode = TC_OPT_WAL_PLAY;
 		goto done;
 	}
+#endif
 
 	/* default */
 	if (argc >= 2) {

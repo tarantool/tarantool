@@ -4,9 +4,9 @@ import sys
 import ctypes
 import struct
 
-from lib.test_suite import check_tarantool_import
+from lib.test_suite import check_libs
 
-check_tarantool_import()
+check_libs()
 from tarantool.request import (
         RequestPing,
         RequestInsert,
@@ -211,9 +211,7 @@ class StatementSelect(Statement):
 class StatementCall(StatementSelect):
     def __init__(self, proc_name, value_list):
         self.proc_name = proc_name
-# the binary protocol passes everything into procedure as strings
-# convert input to strings to avoid data mangling by the protocol
-        self.value_list = map(lambda val: str(val), value_list)
+        self.value_list = value_list
 
     def pack(self, connection):
         return RequestCall(connection, self.proc_name, self.value_list, True)

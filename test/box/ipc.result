@@ -206,7 +206,7 @@ buffer = {}
 ...
 buffer
 ---
-- {}
+- []
 ...
 ch:is_full()
 ---

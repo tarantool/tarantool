@@ -39,27 +39,19 @@ STRS(iterator_type, ITERATOR_TYPE);
 
 /* {{{ Utilities. **********************************************/
 
-
-
 void
-key_validate_parts(struct key_def *key_def,
-		   const char *key, uint32_t part_count)
+key_validate_parts(struct key_def *key_def, const char *key,
+		   uint32_t part_count)
 {
+	(void) key_def;
+	(void) key;
+
 	for (uint32_t part = 0; part < part_count; part++) {
-		uint32_t part_size = load_varint32(&key);
+		enum mp_type mp_type = mp_typeof(*key);
+		mp_next(&key);
 
-		enum field_type part_type = key_def->parts[part].type;
-
-		if (part_type == NUM && part_size != sizeof(uint32_t))
-			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-				  part, field_type_strs[part_type]);
-
-		if (part_type == NUM64 && part_size != sizeof(uint64_t) &&
-		    part_size != sizeof(uint32_t))
-			tnt_raise(ClientError, ER_KEY_FIELD_TYPE,
-				  part, field_type_strs[part_type]);
-
-		key += part_size;
+		key_mp_type_validate(key_def->parts[part].type, mp_type,
+				     ER_KEY_FIELD_TYPE, part);
 	}
 }
 
@@ -67,8 +59,8 @@ void
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count)
 {
+	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
-		assert(key == NULL);
 		/*
 		 * Zero key parts are allowed:
 		 * - for TREE index, all iterator types,
@@ -97,6 +89,7 @@ void
 primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count)
 {
+	assert(key != NULL || part_count == 0);
 	if (key_def->part_count != part_count) {
 		tnt_raise(ClientError, ER_EXACT_MATCH,
 			  key_def->part_count, part_count);

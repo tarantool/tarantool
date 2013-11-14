@@ -38,18 +38,38 @@
 #include <pickle.h>
 #include <fiber.h>
 #include <scoped_guard.h>
+#include <third_party/base64.h>
 
 STRS(requests, REQUESTS);
 
 static const char *
-read_key(const char **reqpos, const char *reqend, uint32_t *key_part_count)
+read_tuple(const char **reqpos, const char *reqend)
 {
-	*key_part_count = pick_u32(reqpos, reqend);
-	const char *key = *key_part_count ? *reqpos : NULL;
-	/* Advance remaining fields of a key */
-	for (uint32_t i = 0; i < *key_part_count; i++)
-		pick_field(reqpos, reqend);
-	return key;
+	const char *tuple = *reqpos;
+	if (unlikely(!mp_check(reqpos, reqend))) {
+		say_error("\n"
+			  "********************************************\n"
+			  "* Found a corrupted tuple in a request!    *\n"
+			  "* This can be either due to a memory       *\n"
+			  "* corruption or a bug in the server.       *\n"
+			  "* The tuple can not be loaded.             *\n"
+			  "********************************************\n"
+			  "Request tail, BASE64 encoded:               \n");
+
+		uint32_t tuple_len = reqend - tuple;
+		int base64_buflen = base64_bufsize(tuple_len);
+		char *base64_buf = (char *) malloc(base64_buflen);
+		int len = base64_encode(tuple, tuple_len,
+					base64_buf, base64_buflen);
+		write(STDERR_FILENO, base64_buf, len);
+		free(base64_buf);
+		tnt_raise(ClientError, ER_INVALID_MSGPACK);
+	}
+
+	if (unlikely(mp_typeof(*tuple) != MP_ARRAY))
+		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
+
+	return tuple;
 }
 
 enum dup_replace_mode
@@ -69,10 +89,8 @@ execute_replace(const struct request *request, struct txn *txn,
 
 	struct space *space = space_find(request->r.space_no);
 	const char *tuple = request->r.tuple;
-	uint32_t field_count = pick_u32(&tuple, request->r.tuple_end);
-
-	struct tuple *new_tuple = tuple_new(space->format, field_count,
-					    &tuple, request->r.tuple_end);
+	struct tuple *new_tuple = tuple_new(space->format, &tuple,
+					    request->r.tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->flags);
@@ -91,10 +109,10 @@ execute_update(const struct request *request, struct txn *txn,
 	struct space *space = space_find(request->u.space_no);
 	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
-	primary_key_validate(pk->key_def, request->u.key,
-			     request->u.key_part_count);
-	struct tuple *old_tuple = pk->findByKey(request->u.key,
-						request->u.key_part_count);
+	const char *key = request->u.key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -136,13 +154,12 @@ execute_select(const struct request *request, struct txn *txn,
 			return;
 
 		/* read key */
-		uint32_t key_part_count;
-		const char *key = read_key(&keys, request->s.keys_end,
-					   &key_part_count);
+		const char *key = read_tuple(&keys, request->s.keys_end);
+		uint32_t part_count = mp_decode_array(&key);
 
 		struct iterator *it = index->position();
-		key_validate(index->key_def, ITER_EQ, key, key_part_count);
-		index->initIterator(it, ITER_EQ, key, key_part_count);
+		key_validate(index->key_def, ITER_EQ, key, part_count);
+		index->initIterator(it, ITER_EQ, key, part_count);
 
 		struct tuple *tuple;
 		while ((tuple = it->next(it)) != NULL) {
@@ -172,10 +189,10 @@ execute_delete(const struct request *request, struct txn *txn,
 
 	/* Try to find tuple by primary key */
 	Index *pk = index_find(space, 0);
-	primary_key_validate(pk->key_def, request->d.key,
-			     request->d.key_part_count);
-	struct tuple *old_tuple = pk->findByKey(request->d.key,
-						request->d.key_part_count);
+	const char *key = request->d.key;
+	uint32_t part_count = mp_decode_array(&key);
+	primary_key_validate(pk->key_def, key, part_count);
+	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	if (old_tuple == NULL)
 		return;
@@ -220,6 +237,7 @@ request_create(struct request *request, uint32_t type, const char *data,
 
 	const char **reqpos = &data;
 	const char *reqend = data + len;
+	const char *s;
 
 	switch (request->type) {
 	case REPLACE:
@@ -227,9 +245,11 @@ request_create(struct request *request, uint32_t type, const char *data,
 		request->r.space_no = pick_u32(reqpos, reqend);
 		request->flags |= (pick_u32(reqpos, reqend) &
 				   BOX_ALLOWED_REQUEST_FLAGS);
-		request->r.tuple = *reqpos;
-		/* Do not parse the tail, execute_replace will do it */
-		request->r.tuple_end = reqend;
+		request->r.tuple = read_tuple(reqpos, reqend);
+		if (unlikely(*reqpos != reqend))
+			tnt_raise(IllegalParams, "can't unpack request");
+
+		request->r.tuple_end = *reqpos;
 		break;
 	case SELECT:
 		request->execute = execute_select;
@@ -247,8 +267,7 @@ request_create(struct request *request, uint32_t type, const char *data,
 		request->u.space_no = pick_u32(reqpos, reqend);
 		request->flags |= (pick_u32(reqpos, reqend) &
 				   BOX_ALLOWED_REQUEST_FLAGS);
-		request->u.key = read_key(reqpos, reqend,
-					       &request->u.key_part_count);
+		request->u.key = read_tuple(reqpos, reqend);
 		request->u.key_end = *reqpos;
 		request->u.expr = *reqpos;
 		/* Do not parse the tail, tuple_update will do it */
@@ -262,22 +281,25 @@ request_create(struct request *request, uint32_t type, const char *data,
 			request->flags |= pick_u32(reqpos, reqend) &
 				BOX_ALLOWED_REQUEST_FLAGS;
 		}
-		request->d.key = read_key(reqpos, reqend,
-					    &request->d.key_part_count);
+		request->d.key = read_tuple(reqpos, reqend);
 		request->d.key_end = *reqpos;
-		if (*reqpos != reqend)
+		if (unlikely(*reqpos != reqend))
 			tnt_raise(IllegalParams, "can't unpack request");
 		break;
 	case CALL:
 		request->execute = box_lua_execute;
 		request->flags |= (pick_u32(reqpos, reqend) &
 				   BOX_ALLOWED_REQUEST_FLAGS);
-		request->c.procname = pick_field_str(reqpos, reqend,
-						     &request->c.procname_len);
-		request->c.args = read_key(reqpos, reqend,
-					   &request->c.arg_count);;
+		s = *reqpos;
+		if (unlikely(!mp_check(reqpos, reqend)))
+			tnt_raise(ClientError, ER_INVALID_MSGPACK);
+		if (unlikely(mp_typeof(*s) != MP_STR))
+			tnt_raise(ClientError, ER_ARG_TYPE, 0, "STR");
+		request->c.procname = mp_decode_str(&s, &request->c.procname_len);
+		assert(s == *reqpos);
+		request->c.args = read_tuple(reqpos, reqend);
 		request->c.args_end = *reqpos;
-		if (*reqpos != reqend)
+		if (unlikely(*reqpos != reqend))
 			tnt_raise(IllegalParams, "can't unpack request");
 		break;
 	default:

@@ -45,6 +45,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#if 0
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_queue.h>
@@ -53,6 +54,7 @@
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
+#endif
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
@@ -78,10 +80,12 @@ static inline int tc_cli_error(char *e) {
 }
 
 static int tc_cli_reconnect(void) {
+#if 0
 	if (tnt_connect(tc.net) == -1) {
 		tc_printf("reconnect: %s\n", tnt_strerror(tc.net));
 		return 1;
 	}
+#endif
 	if (tc_admin_reconnect(&tc.admin) == -1) {
 		tc_printf("reconnect: admin console connection failed\n");
 		return 1;
@@ -90,6 +94,7 @@ static int tc_cli_reconnect(void) {
 	return 0;
 }
 
+#if 0
 enum tc_keywords {
 	TC_EXIT = TNT_TK_CUSTOM + 1,
 	TC_TEE,
@@ -112,6 +117,7 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };
+#endif
 
 enum tc_cli_cmd_ret {
 	TC_CLI_OK,
@@ -119,6 +125,7 @@ enum tc_cli_cmd_ret {
 	TC_CLI_EXIT
 };
 
+#if 0
 static void
 tc_cmd_usage(void)
 {
@@ -134,6 +141,7 @@ tc_cmd_usage(void)
 		"...\n";
 	tc_printf("%s", usage);
 }
+#endif
 
 static int tc_cli_admin(char *cmd, int exit) {
 	char *e = NULL;
@@ -143,6 +151,7 @@ static int tc_cli_admin(char *cmd, int exit) {
 	return 0;
 }
 
+#if 0
 int tc_cmd_tee_close(void)
 {
 	if (tc.tee_fd == -1)
@@ -163,7 +172,9 @@ static int tc_cmd_tee_open(char *path)
 	}
 	return 0;
 }
+#endif
 
+#if 0
 static int
 tc_cmd_dostring(char *buf, size_t size, int *reconnect)
 {
@@ -223,7 +234,9 @@ tc_cmd_loadfile(char *path, int *reconnect)
 	free(buf);
 	return rc;
 }
+#endif
 
+#if 0
 static void replace_newline(char *cmd) {
 	int len = strlen(cmd);
 	int offset = 0;
@@ -234,11 +247,16 @@ static void replace_newline(char *cmd) {
 			cmd[i - offset] = cmd[i];
 	cmd[len - offset] = '\0';
 }
+#endif
 
 static enum tc_cli_cmd_ret
 tc_cmd_try(char *cmd, size_t size, int *reconnect)
 {
+	(void)size;
 	enum tc_cli_cmd_ret rc = TC_CLI_OK;
+	if (! strcmp(cmd, "help"))
+		cmd = "help()";
+#if 0
 	struct tnt_lex lex;
 	if (!tnt_lex_init(&lex, tc_lex_keywords, (unsigned char*)cmd, size))
 		return TC_CLI_ERROR;
@@ -305,11 +323,14 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 		}
 		goto done;
 	}
+#endif
 	*reconnect = tc_cli_admin(cmd, rc == TC_CLI_EXIT);
 	if (*reconnect)
 		return TC_CLI_ERROR;
+	/*
 done:
 	tnt_lex_free(&lex);
+	*/
 	return rc;
 }
 
@@ -322,6 +343,7 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 			if (reconnect)
 				return TC_CLI_ERROR;
 		}
+#if 0
 		char *e = NULL;
 		if (tnt_query_is(cmd, size)) {
 			if (tc_query(cmd, &e) == 0) {
@@ -334,12 +356,15 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 			if (reconnect && tnt_error(tc.net) != TNT_ESYSTEM)
 				reconnect = 0;
 		} else {
+#endif
 			enum tc_cli_cmd_ret rc = tc_cmd_try(cmd, size, &reconnect);
 			if (reconnect)
 				continue;
 			if (rc == TC_CLI_EXIT || rc == TC_CLI_ERROR)
 				return rc;
+#if 0
 		}
+#endif
 	} while (reconnect);
 
 	return TC_CLI_OK;

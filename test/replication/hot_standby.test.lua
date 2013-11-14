@@ -10,7 +10,7 @@ do
 
     function _set_pri_lsn(_lsn)
         a = {}
-        begin_lsn = box.unpack('l', _lsn)
+        begin_lsn = _lsn
     end
 
     function _print_lsn()

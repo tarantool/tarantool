@@ -81,7 +81,7 @@ space:delete('The Wolf!', 'Vincent', 3)
 space:delete('Vincent', 'The Wolf!', 0)
 
 space:update({'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
-space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, '')
+space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, 1)
 -- Checking Vincent's last messages
 space:select(0, 'Vincent', 'The Wolf!')
 -- Checking The Wolf's last messages

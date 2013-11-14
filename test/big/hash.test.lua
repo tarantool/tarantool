@@ -73,7 +73,7 @@ hash:truncate()
 -------------------------------------------------------------------------------
 -- 64-bit hash inset fields tests
 -------------------------------------------------------------------------------
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num64')
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 hash = box.space[0]
 
 -- Insert valid fields

@@ -4,11 +4,11 @@ box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ...
 box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 ---
-- [0, 1, 'secondary', 1701147252, 0, 1, 1, 'str']
+- [0, 1, 'secondary', 'tree', 0, 1, 1, 'str']
 ...
 #
 # A test case for Bug#729758
@@ -95,11 +95,11 @@ select * from t0 where k1='Britney'
 ---
 - ['Spears', 'Britney']
 ...
-call box.select_range('0', '0', '100', 'Spears')
+call box.select_range(0, 0, 100, 'Spears')
 ---
 - ['Spears', 'Britney']
 ...
-call box.select_range('0', '1', '100', 'Britney')
+call box.select_range(0, 1, 100, 'Britney')
 ---
 - ['Spears', 'Britney']
 ...
@@ -115,7 +115,7 @@ box.space[0]:truncate()
 #
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 1, 2, 1, 'str', 2, 'str')
 ---
-- [0, 1, 'secondary', 1701147252, 1, 2, 1, 'str', 2, 'str']
+- [0, 1, 'secondary', 'tree', 1, 2, 1, 'str', 2, 'str']
 ...
 insert into t0 values ('key1', 'part1', 'part2')
 ---
@@ -135,9 +135,9 @@ insert into t0 values ('key3', 'part1', 'part2_b')
 ...
 box.space[0]:select(1)
 ---
-- [830039403, 'part1', 'part2']
-- [846816619, 'part1', 'part2_a']
-- [863593835, 'part1', 'part2_b']
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
 ...
 select * from t0 where k0='key1'
 ---
@@ -157,19 +157,19 @@ select * from t0 where k1='part1'
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range('0', '1', '100', 'part1')
+call box.select_range(0, 1, 100, 'part1')
 ---
 - ['key1', 'part1', 'part2']
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range('0', '0', '100', 'key2')
+call box.select_range(0, 0, 100, 'key2')
 ---
 - ['key1', 'part1', 'part2']
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range('0', '1', '100', 'part1', 'part2_a')
+call box.select_range(0, 1, 100, 'part1', 'part2_a')
 ---
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
@@ -207,33 +207,33 @@ delete from t0 where k0='key3'
 box.space[0]:truncate()
 ---
 ...
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1701147252, 1, 1, 0, 'num64']
+- [0, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 2, 1, 'str', 2, 'str')
 ---
-- [0, 1, 'secondary', 1701147252, 0, 2, 1, 'str', 2, 'str']
+- [0, 1, 'secondary', 'tree', 0, 2, 1, 'str', 2, 'str']
 ...
-insert into t0 values ('01234567', 'part1', 'part2')
+insert into t0 values (01234567, 'part1', 'part2')
 ---
-- ['01234567', 'part1', 'part2']
+- [1234567, 'part1', 'part2']
 ...
-insert into t0 values ('11234567', 'part1', 'part2')
+insert into t0 values (11234567, 'part1', 'part2')
 ---
-- ['11234567', 'part1', 'part2']
+- [11234567, 'part1', 'part2']
 ...
-insert into t0 values ('21234567', 'part1', 'part2_a')
+insert into t0 values (21234567, 'part1', 'part2_a')
 ---
-- ['21234567', 'part1', 'part2_a']
+- [21234567, 'part1', 'part2_a']
 ...
-insert into t0 values ('31234567', 'part1_a', 'part2')
+insert into t0 values (31234567, 'part1_a', 'part2')
 ---
-- ['31234567', 'part1_a', 'part2']
+- [31234567, 'part1_a', 'part2']
 ...
-insert into t0 values ('41234567', 'part1_a', 'part2_a')
+insert into t0 values (41234567, 'part1_a', 'part2_a')
 ---
-- ['41234567', 'part1_a', 'part2_a']
+- [41234567, 'part1_a', 'part2_a']
 ...
 l = {}
 ---
@@ -243,71 +243,71 @@ for k, v in box.space[0]:pairs() do table.insert(l, v) end
 ...
 return l
 ---
-- - [3978425819141910832, 'part1', 'part2']
-  - [3978425819141910833, 'part1', 'part2']
-  - [3978425819141910834, 'part1', 'part2_a']
-  - [3978425819141910835, 'part1_a', 'part2']
-  - [3978425819141910836, 'part1_a', 'part2_a']
+- - [1234567, 'part1', 'part2']
+  - [11234567, 'part1', 'part2']
+  - [21234567, 'part1', 'part2_a']
+  - [31234567, 'part1_a', 'part2']
+  - [41234567, 'part1_a', 'part2_a']
 ...
-select * from t0 where k0='01234567'
+select * from t0 where k0=01234567
 ---
-- ['01234567', 'part1', 'part2']
+- [1234567, 'part1', 'part2']
 ...
-select * from t0 where k0='11234567'
+select * from t0 where k0=11234567
 ---
-- ['11234567', 'part1', 'part2']
+- [11234567, 'part1', 'part2']
 ...
-select * from t0 where k0='21234567'
+select * from t0 where k0=21234567
 ---
-- ['21234567', 'part1', 'part2_a']
+- [21234567, 'part1', 'part2_a']
 ...
 select * from t0 where k1='part1'
 ---
-- ['01234567', 'part1', 'part2']
-- ['11234567', 'part1', 'part2']
-- ['21234567', 'part1', 'part2_a']
+- [1234567, 'part1', 'part2']
+- [11234567, 'part1', 'part2']
+- [21234567, 'part1', 'part2_a']
 ...
 select * from t0 where k1='part1_a'
 ---
-- ['31234567', 'part1_a', 'part2']
-- ['41234567', 'part1_a', 'part2_a']
+- [31234567, 'part1_a', 'part2']
+- [41234567, 'part1_a', 'part2_a']
 ...
 select * from t0 where k1='part_none'
 ---
 ...
-call box.select('0', '1', 'part1', 'part2')
+call box.select(0, 1, 'part1', 'part2')
 ---
-- ['01234567', 'part1', 'part2']
-- ['11234567', 'part1', 'part2']
+- [1234567, 'part1', 'part2']
+- [11234567, 'part1', 'part2']
 ...
 select * from t0 where k1='part1'
 ---
-- ['01234567', 'part1', 'part2']
-- ['11234567', 'part1', 'part2']
-- ['21234567', 'part1', 'part2_a']
+- [1234567, 'part1', 'part2']
+- [11234567, 'part1', 'part2']
+- [21234567, 'part1', 'part2_a']
 ...
 select * from t0 where k1='part2'
 ---
 ...
-delete from t0 where k0='01234567'
+delete from t0 where k0=01234567
 ---
-- ['01234567', 'part1', 'part2']
+- [1234567, 'part1', 'part2']
 ...
-delete from t0 where k0='11234567'
+delete from t0 where k0=11234567
 ---
-- ['11234567', 'part1', 'part2']
+- [11234567, 'part1', 'part2']
 ...
-delete from t0 where k0='21234567'
+delete from t0 where k0=21234567
 ---
-- ['21234567', 'part1', 'part2_a']
+- [21234567, 'part1', 'part2_a']
 ...
-delete from t0 where k0='31234567'
+delete from t0 where k0=31234567
 ---
-- ['31234567', 'part1_a', 'part2']
+- [31234567, 'part1_a', 'part2']
 ...
-delete from t0 where k0='41234567'
+delete from t0 where k0=41234567
 ---
-- ['41234567', 'part1_a', 'part2_a']
+- [41234567, 'part1_a', 'part2_a']
 ...
 box.space[0]:select(0)
 ---
@@ -317,46 +317,46 @@ box.space[0]:truncate()
 ...
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'num']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 1, 'str')
 ---
-- [0, 1, 'secondary', 1752392040, 1, 1, 1, 'str']
+- [0, 1, 'secondary', 'hash', 1, 1, 1, 'str']
 ...
 insert into t0 values (1, 'hello')
 ---
-- ['\x01\x00\x00\x00', 'hello']
+- [1, 'hello']
 ...
 insert into t0 values (2, 'brave')
 ---
-- ['\x02\x00\x00\x00', 'brave']
+- [2, 'brave']
 ...
 insert into t0 values (3, 'new')
 ---
-- ['\x03\x00\x00\x00', 'new']
+- [3, 'new']
 ...
 insert into t0 values (4, 'world')
 ---
-- ['\x04\x00\x00\x00', 'world']
+- [4, 'world']
 ...
 #
 # Bug#929654 - secondary hash index is not built with build_indexes()
 #
 select * from t0 where k1='hello'
 ---
-- ['\x01\x00\x00\x00', 'hello']
+- [1, 'hello']
 ...
 select * from t0 where k1='brave'
 ---
-- ['\x02\x00\x00\x00', 'brave']
+- [2, 'brave']
 ...
 select * from t0 where k1='new'
 ---
-- ['\x03\x00\x00\x00', 'new']
+- [3, 'new']
 ...
 select * from t0 where k1='world'
 ---
-- ['\x04\x00\x00\x00', 'world']
+- [4, 'world']
 ...
 box.space[0]:truncate()
 ---
@@ -369,11 +369,11 @@ box.space[0]:truncate()
 
 box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
 ---
-- [0, 0, 'primary', 1752392040, 1, 1, 0, 'str']
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
 box.replace(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'str')
 ---
-- [0, 1, 'secondary', 1701147252, 0, 1, 1, 'str']
+- [0, 1, 'secondary', 'tree', 0, 1, 1, 'str']
 ...
 insert into t0 values ('Spears', 'Britney')
 ---
@@ -401,161 +401,165 @@ delete from t0 where k0='Spears'
 ---
 - ['Spears', 'Britney']
 ...
+box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+---
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
+...
 insert into t0 values (1, 'duplicate one')
 ---
-- ['\x01\x00\x00\x00', 'duplicate one']
+- [1, 'duplicate one']
 ...
 insert into t0 values (2, 'duplicate one')
 ---
-- ['\x02\x00\x00\x00', 'duplicate one']
+- [2, 'duplicate one']
 ...
 insert into t0 values (3, 'duplicate one')
 ---
-- ['\x03\x00\x00\x00', 'duplicate one']
+- [3, 'duplicate one']
 ...
 insert into t0 values (4, 'duplicate one')
 ---
-- ['\x04\x00\x00\x00', 'duplicate one']
+- [4, 'duplicate one']
 ...
 insert into t0 values (5, 'duplicate one')
 ---
-- ['\x05\x00\x00\x00', 'duplicate one']
+- [5, 'duplicate one']
 ...
 insert into t0 values (6, 'duplicate two')
 ---
-- ['\x06\x00\x00\x00', 'duplicate two']
+- [6, 'duplicate two']
 ...
 insert into t0 values (7, 'duplicate two')
 ---
-- ['\x07\x00\x00\x00', 'duplicate two']
+- [7, 'duplicate two']
 ...
 insert into t0 values (8, 'duplicate two')
 ---
-- ['\x08\x00\x00\x00', 'duplicate two']
+- [8, 'duplicate two']
 ...
 insert into t0 values (9, 'duplicate two')
 ---
-- ['\t\x00\x00\x00', 'duplicate two']
+- [9, 'duplicate two']
 ...
 insert into t0 values (10, 'duplicate two')
 ---
-- ['\n\x00\x00\x00', 'duplicate two']
+- [10, 'duplicate two']
 ...
 insert into t0 values (11, 'duplicate three')
 ---
-- ['\x0b\x00\x00\x00', 'duplicate three']
+- [11, 'duplicate three']
 ...
 insert into t0 values (12, 'duplicate three')
 ---
-- ['\x0c\x00\x00\x00', 'duplicate three']
+- [12, 'duplicate three']
 ...
 insert into t0 values (13, 'duplicate three')
 ---
-- ['\r\x00\x00\x00', 'duplicate three']
+- [13, 'duplicate three']
 ...
 insert into t0 values (14, 'duplicate three')
 ---
-- ['\x0e\x00\x00\x00', 'duplicate three']
+- [14, 'duplicate three']
 ...
 insert into t0 values (15, 'duplicate three')
 ---
-- ['\x0f\x00\x00\x00', 'duplicate three']
+- [15, 'duplicate three']
 ...
 select * from t0 where k1='duplicate one'
 ---
-- ['\x01\x00\x00\x00', 'duplicate one']
-- ['\x02\x00\x00\x00', 'duplicate one']
-- ['\x03\x00\x00\x00', 'duplicate one']
-- ['\x04\x00\x00\x00', 'duplicate one']
-- ['\x05\x00\x00\x00', 'duplicate one']
+- [1, 'duplicate one']
+- [2, 'duplicate one']
+- [3, 'duplicate one']
+- [4, 'duplicate one']
+- [5, 'duplicate one']
 ...
 select * from t0 where k1='duplicate two'
 ---
-- ['\x06\x00\x00\x00', 'duplicate two']
-- ['\x07\x00\x00\x00', 'duplicate two']
-- ['\x08\x00\x00\x00', 'duplicate two']
-- ['\t\x00\x00\x00', 'duplicate two']
-- ['\n\x00\x00\x00', 'duplicate two']
+- [6, 'duplicate two']
+- [7, 'duplicate two']
+- [8, 'duplicate two']
+- [9, 'duplicate two']
+- [10, 'duplicate two']
 ...
 select * from t0 where k1='duplicate three'
 ---
-- ['\x0b\x00\x00\x00', 'duplicate three']
-- ['\x0c\x00\x00\x00', 'duplicate three']
-- ['\r\x00\x00\x00', 'duplicate three']
-- ['\x0e\x00\x00\x00', 'duplicate three']
-- ['\x0f\x00\x00\x00', 'duplicate three']
+- [11, 'duplicate three']
+- [12, 'duplicate three']
+- [13, 'duplicate three']
+- [14, 'duplicate three']
+- [15, 'duplicate three']
 ...
 delete from t0 where k0=1
 ---
-- ['\x01\x00\x00\x00', 'duplicate one']
+- [1, 'duplicate one']
 ...
 delete from t0 where k0=2
 ---
-- ['\x02\x00\x00\x00', 'duplicate one']
+- [2, 'duplicate one']
 ...
 delete from t0 where k0=3
 ---
-- ['\x03\x00\x00\x00', 'duplicate one']
+- [3, 'duplicate one']
 ...
 delete from t0 where k0=4
 ---
-- ['\x04\x00\x00\x00', 'duplicate one']
+- [4, 'duplicate one']
 ...
 delete from t0 where k0=5
 ---
-- ['\x05\x00\x00\x00', 'duplicate one']
+- [5, 'duplicate one']
 ...
 delete from t0 where k0=6
 ---
-- ['\x06\x00\x00\x00', 'duplicate two']
+- [6, 'duplicate two']
 ...
 delete from t0 where k0=7
 ---
-- ['\x07\x00\x00\x00', 'duplicate two']
+- [7, 'duplicate two']
 ...
 delete from t0 where k0=8
 ---
-- ['\x08\x00\x00\x00', 'duplicate two']
+- [8, 'duplicate two']
 ...
 delete from t0 where k0=9
 ---
-- ['\t\x00\x00\x00', 'duplicate two']
+- [9, 'duplicate two']
 ...
 delete from t0 where k0=10
 ---
-- ['\n\x00\x00\x00', 'duplicate two']
+- [10, 'duplicate two']
 ...
 delete from t0 where k0=11
 ---
-- ['\x0b\x00\x00\x00', 'duplicate three']
+- [11, 'duplicate three']
 ...
 delete from t0 where k0=12
 ---
-- ['\x0c\x00\x00\x00', 'duplicate three']
+- [12, 'duplicate three']
 ...
 delete from t0 where k0=13
 ---
-- ['\r\x00\x00\x00', 'duplicate three']
+- [13, 'duplicate three']
 ...
 delete from t0 where k0=14
 ---
-- ['\x0e\x00\x00\x00', 'duplicate three']
+- [14, 'duplicate three']
 ...
 delete from t0 where k0=15
 ---
-- ['\x0f\x00\x00\x00', 'duplicate three']
+- [15, 'duplicate three']
 ...
 insert into t0 values(1, 'Aardvark ')
 ---
-- ['\x01\x00\x00\x00', 'Aardvark ']
+- [1, 'Aardvark ']
 ...
 insert into t0 values(2, 'Bilimbi')
 ---
-- ['\x02\x00\x00\x00', 'Bilimbi']
+- [2, 'Bilimbi']
 ...
 insert into t0 values(3, 'Creature ')
 ---
-- ['\x03\x00\x00\x00', 'Creature ']
+- [3, 'Creature ']
 ...
 box.space[0]:select(1)
 ---
@@ -581,15 +585,15 @@ box.space[0].index[1].idx:max()
 ...
 delete from t0 where k0=1
 ---
-- ['\x01\x00\x00\x00', 'Aardvark ']
+- [1, 'Aardvark ']
 ...
 delete from t0 where k0=2
 ---
-- ['\x02\x00\x00\x00', 'Bilimbi']
+- [2, 'Bilimbi']
 ...
 delete from t0 where k0=3
 ---
-- ['\x03\x00\x00\x00', 'Creature ']
+- [3, 'Creature ']
 ...
 box.space[0]:drop()
 ---

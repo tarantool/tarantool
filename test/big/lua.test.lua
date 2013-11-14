@@ -38,21 +38,21 @@ space:truncate()
 --
 -- Test that we print index number in error ER_INDEX_VIOLATION
 --
-space:insert(1, 'hello', 'world')
-space:insert(2, 'hello', 'world')
+space:insert('1', 'hello', 'world')
+space:insert('2', 'hello', 'world')
 space:drop()
 
 --
 -- Check range scan over multipart keys
 --
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 0, 2, 1, 'str', 2, 'str')
 space = box.space[0]
 
-space:insert('01234567', 'new', 'world')
-space:insert('00000000', 'of', 'puppets')
-space:insert('00000001', 'of', 'might', 'and', 'magic')
+space:insert(1234567, 'new', 'world')
+space:insert(0, 'of', 'puppets')
+space:insert(00000001ULL, 'of', 'might', 'and', 'magic')
 space:select_range(1, 2, 'of')
 space:select_reverse_range(1, 2, 'of')
 space:truncate()
@@ -69,34 +69,34 @@ space:drop()
 -- Lua 64bit numbers support
 --
 box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num64')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
 space = box.space[0]
 
 space:insert(tonumber64('18446744073709551615'), 'magic')
 tuple = space:select(0, tonumber64('18446744073709551615'))
-num = box.unpack('l', tuple[0])
+num = tuple[0]
 num
 type(num) == 'cdata'
 num == tonumber64('18446744073709551615')
-num = box.unpack('l', tuple[0])
+num = tuple[0]
 num == tonumber64('18446744073709551615')
 space:delete(18446744073709551615ULL)
 space:insert(125ULL, 'magic')
 tuple = space:select(0, 125)
 tuple2 = space:select(0, 125LL)
-num = box.unpack('l', tuple[0])
-num2 = box.unpack('l', tuple2[0])
+num = tuple[0]
+num2 = tuple2[0]
 num, num2
-type(num) == 'cdata'
-type(num2) == 'cdata'
+type(num) == 'number'
+type(num2) == 'number'
 num == tonumber64('125')
 num2 == tonumber64('125')
 space:truncate()
 
 --
--- Tests for lua box.auto_increment with NUM64 keys
+-- Tests for lua box.auto_increment with NUM keys
 --
--- lua box.auto_increment() with NUM64 keys testing
+-- lua box.auto_increment() with NUM keys testing
 box.auto_increment(space.n, 'a')
 space:insert(tonumber64(5))
 box.auto_increment(space.n, 'b')
@@ -192,6 +192,8 @@ space.index[1]:count(2, 1)
 space.index[1]:count(2, 2)
 space.index[1]:count(3)
 space.index[1]:count(3, 3)
+-- Returns total number of records
+-- https://github.com/tarantool/tarantool/issues/46
 space.index[1]:count()
 space:drop()
 
@@ -227,7 +229,7 @@ space:truncate()
 --
 
 -- 50K is enough for everyone
-n = 50000
+n = 2000
 tab = {}; for i=1,n,1 do table.insert(tab, i) end
 t = box.tuple.new(tab)
 t:transform(0, n - 1)
@@ -256,7 +258,7 @@ t:findall(4, '3')
 
 t = space:insert('Z', '2', 2, 3, tonumber64(2))
 t:find(2)
-t:find(tonumber64(2))
+t:findall(tonumber64(2))
 t:find('2')
 space:drop()
 

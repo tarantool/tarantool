@@ -286,7 +286,7 @@ void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			const char *key, uint32_t part_count) const
 {
-	assert (key != NULL || part_count == 0);
+	assert(key != NULL || part_count == 0);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (part_count == 0) {

@@ -22,12 +22,14 @@
  * THE SOFTWARE.
  * 
  * Portions of this software were inspired by Perl's YAML::LibYAML module by 
- * Ingy döt Net <ingy@cpan.org>
+ * Ingy dï¿½t Net <ingy@cpan.org>
  * 
  */
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <inttypes.h>
 
 #include <lauxlib.h>
 #include <lua.h>
@@ -40,6 +42,7 @@
 
 #include "yaml.h"
 #include "b64.h"
+#include "lua/utils.h"
 
 /* configurable flags */
 static char Dump_Auto_Array = 1;
@@ -50,10 +53,6 @@ static char Load_Numeric_Scalars = 1;
 static char Load_Nulls_As_Nil = 0;
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
-
-#define LUAYAML_KIND_UNKNOWN 0
-#define LUAYAML_KIND_SEQUENCE 1
-#define LUAYAML_KIND_MAPPING 2
 
 #define RETURN_ERRMSG(s, msg) do { \
       lua_pushstring(s->L, msg); \
@@ -451,79 +450,6 @@ dump_tostring(struct lua_State *L, int index)
 	return lua_tostring(L, index);
 }
 
-static int dump_scalar(struct lua_yaml_dumper *dumper) {
-   int type = lua_type(dumper->L, -1);
-   size_t len;
-   const char *str = NULL;
-   yaml_char_t *tag = NULL;
-   yaml_event_t ev;
-   yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
-   int is_binary = 0;
-
-   if (type == LUA_TSTRING) {
-      str = lua_tolstring(dumper->L, -1, &len);
-      if (len <= 5 && (!strcmp(str, "true")
-         || !strcmp(str, "false")
-         || !strcmp(str, "~")
-         || !strcmp(str, "null"))) {
-         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-      } else if (lua_isnumber(dumper->L, -1)) {
-         /* string is convertible to number, quote it to preserve type */
-         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-      } else if ((is_binary = !is_utf8(str, len))) {
-         tobase64(dumper->L, -1);
-         str = lua_tolstring(dumper->L, -1, &len);
-         tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
-      }
-   } else if (type == LUA_TNUMBER) {
-      /* have Lua convert number to a string */
-      str = lua_tolstring(dumper->L, -1, &len);
-   } else if (type == LUA_TBOOLEAN) {
-      if (lua_toboolean(dumper->L, -1)) {
-         str = "true";
-         len = 4;
-      } else {
-         str = "false";
-         len = 5;
-      }
-   } else if (type == LUA_TCDATA) {
-		GCcdata *cd = cdataV(dumper->L->base + lua_gettop(dumper->L) - 1);
-		str = dump_tostring(dumper->L, -1);
-		len = strlen(str);
-		switch (cd->ctypeid) {
-		case CTID_UINT64:
-			len -= 3;
-			break;
-		case CTID_INT64:
-			len -= 2;
-			break;
-		}
-   } else if (type == LUA_TUSERDATA) {
-		str = dump_tostring(dumper->L, -1);
-		len = strlen(str);
-		style = YAML_VERBATIM_SCALAR_STYLE;
-   } else if (type == LUA_TLIGHTUSERDATA) {
-		void *ptr = luaL_checkudata(dumper->L, -1, NULL);
-		if (ptr == NULL) {
-			str = "null";
-			len = 4;
-			style = YAML_PLAIN_SCALAR_STYLE;
-		} else {
-			str = dump_tostring(dumper->L, -1);
-			len = strlen(str);
-			style = YAML_VERBATIM_SCALAR_STYLE;
-		}
-   } else if (type == LUA_TFUNCTION) {
-		str = dump_tostring(dumper->L, -1);
-		len = strlen(str);
-   }
-   yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
-      !is_binary, !is_binary, style);
-   if (is_binary)
-      lua_pop(dumper->L, 1);
-   return yaml_emitter_emit(&dumper->emitter, &ev);
-}
-
 static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    const char *s = "";
    lua_pushvalue(dumper->L, -1);
@@ -552,14 +478,15 @@ static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    return (yaml_char_t *)s;
 }
 
-static int dump_table(struct lua_yaml_dumper *dumper) {
+static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
    yaml_event_t ev;
    yaml_char_t *anchor = get_yaml_anchor(dumper);
 
    if (anchor && !*anchor) return 1;
 
-   yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0,
-      YAML_BLOCK_MAPPING_STYLE);
+   yaml_mapping_style_t yaml_style = (field->compact)
+		   ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
+   yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
    yaml_emitter_emit(&dumper->emitter, &ev);
 
    lua_pushnil(dumper->L);
@@ -578,19 +505,20 @@ static int dump_table(struct lua_yaml_dumper *dumper) {
    return 1;
 }
 
-static int dump_array(struct lua_yaml_dumper *dumper) {
-   int i, n = luaL_getn(dumper->L, -1);
+static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
+   int i;
    yaml_event_t ev;
    yaml_char_t *anchor = get_yaml_anchor(dumper);
 
    if (anchor && !*anchor)
       return 1;
 
-   yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0,
-      YAML_BLOCK_SEQUENCE_STYLE);
+   yaml_sequence_style_t yaml_style = (field->compact)
+		   ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
+   yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
    yaml_emitter_emit(&dumper->emitter, &ev);
 
-   for (i = 0; i < n; i++) {
+   for (i = 0; i < field->max; i++) {
       lua_rawgeti(dumper->L, -1, i + 1);
       if (!dump_node(dumper) || dumper->error)
          return 0;
@@ -603,26 +531,6 @@ static int dump_array(struct lua_yaml_dumper *dumper) {
    return 1;
 }
 
-static int figure_table_type(lua_State *L) {
-   int type = LUAYAML_KIND_UNKNOWN;
-
-   if (lua_getmetatable(L, -1)) {
-      /* has metatable, look for _yaml key */
-      lua_pushliteral(L, "_yaml");
-      lua_rawget(L, -2);
-      if (lua_isstring(L, -1)) {
-         const char *s = lua_tostring(L, -1);
-         if (!strcmp(s, "sequence") || !strcmp(s, "seq"))
-            type = LUAYAML_KIND_SEQUENCE;
-         else if (!strcmp(s, "map") || !strcmp(s, "mapping"))
-            type = LUAYAML_KIND_MAPPING;
-      }
-      lua_pop(L, 2); /* pop value and metatable */
-   }
-
-   return type;
-}
-
 static int dump_null(struct lua_yaml_dumper *dumper) {
    yaml_event_t ev;
    yaml_scalar_event_initialize(&ev, NULL, NULL,
@@ -630,43 +538,158 @@ static int dump_null(struct lua_yaml_dumper *dumper) {
    return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
-static int dump_node(struct lua_yaml_dumper *dumper) {
-   int type = lua_type(dumper->L, -1);
+static int
+dump_node(struct lua_yaml_dumper *dumper)
+{
+	size_t len;
+	const char *str = NULL;
+	yaml_char_t *tag = NULL;
+	yaml_event_t ev;
+	yaml_event_t *evp;
+	yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
+	int is_binary = 0;
+	char buf[25];
+	struct luaL_field field;
 
-	if (type == LUA_TCDATA ||
-	    type == LUA_TSTRING || type == LUA_TBOOLEAN ||
-	    type == LUA_TNUMBER || type == LUA_TUSERDATA) {
-		return dump_scalar(dumper);
-   } else
-	if (type == LUA_TTABLE) {
-      int type = LUAYAML_KIND_UNKNOWN;
+	int top = lua_gettop(dumper->L);
+	luaL_tofield(dumper->L, top, &field);
 
-      if (Dump_Check_Metatables)
-         type = figure_table_type(dumper->L);
+	/* Unknown type on the stack, try to call 'totable' from metadata */
+	if (field.type == MP_EXT && lua_type(dumper->L, top) == LUA_TUSERDATA &&
+			lua_getmetatable(dumper->L, top)) {
+		/* has metatable, try to call 'totable' and use return value */
+		lua_pushliteral(dumper->L, "totable");
+		lua_rawget(dumper->L, -2);
+		if (lua_isfunction(dumper->L, -1)) {
+			lua_pushvalue(dumper->L, -3); /* copy object itself */
+			lua_call(dumper->L, 1, 1);
+			lua_replace(dumper->L, -3);
+			luaL_tofield(dumper->L, -1, &field);
+		} else {
+			lua_pop(dumper->L, 1); /* pop result */
+		}
+		lua_pop(dumper->L, 1);  /* pop metatable */
+	}
 
-      if (type == LUAYAML_KIND_UNKNOWN && Dump_Auto_Array &&
-          luaL_getn(dumper->L, -1) > 0) {
-         type = LUAYAML_KIND_SEQUENCE;
-      }
+	luaL_tofield(dumper->L, top, &field);
 
-      if (type == LUAYAML_KIND_SEQUENCE)
-         return dump_array(dumper);
-      return dump_table(dumper);
-   } else
-	if (type == LUA_TFUNCTION) {
-	  return dump_scalar(dumper);
-   } else { /* unsupported Lua type */
-      if (Dump_Error_on_Unsupported) {
-         char buf[256];
-         snprintf(buf, sizeof(buf),
-            "cannot dump object of type: %s", lua_typename(dumper->L, type));
-         lua_pushstring(dumper->L, buf);
-         dumper->error = 1;
-      } else {
-         return dump_null(dumper);
-      }
-   }
-   return 0;
+	/* Still have unknown type on the stack,
+	 * try to call 'tostring' */
+	if (field.type == MP_EXT) {
+		lua_getglobal(dumper->L, "tostring");
+		lua_pushvalue(dumper->L, top);
+		lua_call(dumper->L, 1, 1);
+		lua_replace(dumper->L, top);
+		lua_settop(dumper->L, top);
+		luaL_tofield(dumper->L, -1, &field);
+	}
+
+	switch(field.type) {
+	case MP_UINT:
+		snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
+		buf[sizeof(buf) - 1] = 0;
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_INT:
+		snprintf(buf, sizeof(buf) - 1, "%" PRIi64, field.ival);
+		buf[sizeof(buf) - 1] = 0;
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_FLOAT:
+		snprintf(buf, sizeof(buf) - 1, "%.14g", field.fval);
+		buf[sizeof(buf) - 1] = 0;
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_DOUBLE:
+		snprintf(buf, sizeof(buf) - 1, "%.14lg", field.dval);
+		buf[sizeof(buf) - 1] = 0;
+		str = buf;
+		len = strlen(buf);
+		break;
+	case MP_ARRAY:
+		return dump_array(dumper, &field);
+	case MP_MAP:
+		return dump_table(dumper, &field);
+	case MP_BIN:
+	case MP_STR:
+		str = lua_tolstring(dumper->L, -1, &len);
+		if (field.type == MP_BIN || !is_utf8((unsigned char *) str, len)) {
+			is_binary = 1;
+			tobase64(dumper->L, -1);
+			str = lua_tolstring(dumper->L, -1, &len);
+			tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
+			break;
+		}
+
+		/*
+		 * Always quote strings in FLOW SEQUENCE
+		 * Flow: [1, 'a', 'testing']
+		 * Block:
+		 * - 1
+		 * - a
+		 * - testing
+		 */
+		if (dumper->emitter.flow_level > 0) {
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			break;
+		}
+
+		for (evp = dumper->emitter.events.head;
+		     evp != dumper->emitter.events.tail; evp++) {
+			if (evp->type == YAML_SEQUENCE_START_EVENT &&
+			     evp->data.sequence_start.style ==
+			     YAML_FLOW_SEQUENCE_STYLE) {
+				style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+				goto strbreak;
+			}
+		}
+
+		if (len <= 5 && (!strcmp(str, "true")
+			|| !strcmp(str, "false")
+			|| !strcmp(str, "~")
+			|| !strcmp(str, "null"))) {
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		} else if (lua_isnumber(dumper->L, -1)) {
+			/* string is convertible to number, quote it to preserve type */
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		}
+		strbreak:
+		break;
+	case MP_BOOL:
+		if (field.bval) {
+			str = "true";
+			len = 4;
+		} else {
+			str = "false";
+			len = 5;
+		}
+		break;
+	case MP_NIL:
+		return dump_null(dumper);
+	case MP_EXT:
+		if (Dump_Error_on_Unsupported) {
+			char buf[256];
+			snprintf(buf, sizeof(buf),
+				 "cannot dump object of type: %s",
+				 lua_typename(dumper->L, lua_type(dumper->L, -1)));
+			lua_pushstring(dumper->L, buf);
+			dumper->error = 1;
+			return 0;
+		} else {
+			return dump_null(dumper);
+		}
+		break;
+	}
+
+	yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
+		!is_binary, !is_binary, style);
+	if (is_binary)
+		lua_pop(dumper->L, 1);
+
+	return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
 static void dump_document(struct lua_yaml_dumper *dumper) {

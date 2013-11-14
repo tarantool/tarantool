@@ -10,8 +10,8 @@ function find_or_create_fifo(name)
 end
 function fifo_push(name, val)
     fifo = find_or_create_fifo(name)
-    top = box.unpack('i', fifo[1])
-    bottom = box.unpack('i', fifo[2])
+    top = fifo[1]
+    bottom = fifo[2]
     if top == fifomax+2 then -- % size
         top = 3
     elseif top ~= bottom then -- was not empty
@@ -26,6 +26,6 @@ function fifo_push(name, val)
 end
 function fifo_top(name)
     fifo = find_or_create_fifo(name)
-    top = box.unpack('i', fifo[1])
-    return box.unpack('i', fifo[top])
+    top = fifo[1]
+    return fifo[top]
 end
