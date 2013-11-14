@@ -12,4 +12,4 @@
 	url = https://github.com/msgpack/msgpack-python.git
 [submodule "src/lib/msgpuck"]
 	path = src/lib/msgpuck
-	url = https://github.com/rtsisyk/msgpuck.git
+	url = https://github.com/tarantool/msgpuck.git

@@ -30,11 +30,6 @@
  */
 #include <stddef.h>
 #include <inttypes.h>
-#include <lib/msgpuck/msgpuck.h> /* enum mp_type */
-
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
 
 struct lua_State;
 struct luaL_Reg;
@@ -120,7 +115,6 @@ int luaL_pushnumber64(struct lua_State *L, uint64_t val);
 /**
  * show plugin statistics
  */
-struct tarantool_plugin;
 typedef int (*tarantool_plugin_stat_cb)(struct tarantool_plugin *p, void *cb_ctx);
 
 int plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx);
@@ -139,9 +133,5 @@ tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out);
 
 void
 tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LUA_H */
