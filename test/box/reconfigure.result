@@ -121,29 +121,24 @@ box.snapshot()
 ---
 - ok
 ...
-<<<<<<< HEAD
 box.cfg.reload()
-||||||| merged common ancestors
-reload configuration
-=======
-#
-# A test case for https://github.com/tarantool/tarantool/issues/112:
-# Tarantool crushes with SIGSEGV during reload configuration
-#
-reload configuration
----
-ok
-...
-reload configuration
----
-fail:
- - Could not accept read only 'custom_proc_title' option
-...
-reload configuration
->>>>>>> stable
 ---
 - ok
 ...
 box.space[0]:drop()
 ---
+...
+#
+# A test case for https://github.com/tarantool/tarantool/issues/112:
+# Tarantool crashes with SIGSEGV during reload configuration
+#
+box.cfg.reload()
+---
+- ok
+...
+box.cfg.reload()
+---
+- error: 'Could not accept read only ''custom_proc_title'' option.
+
+'
 ...

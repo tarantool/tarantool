@@ -33,6 +33,14 @@ macro(libmisc_build)
         endif()
     endif()
 
+    if (HAVE_OPENMP)
+        list(APPEND misc_src
+             ${PROJECT_SOURCE_DIR}/third_party/qsort_arg_mt.c)
+    else()
+        list(APPEND misc_src
+             ${PROJECT_SOURCE_DIR}/third_party/qsort_arg.c)
+    endif()
+
     add_library(misc STATIC ${misc_src})
 
     unset(misc_src)

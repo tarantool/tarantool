@@ -42,14 +42,13 @@ endif()
 #
 # Check for an omp support
 #
-set(CMAKE_REQUIRED_FLAGS "-fopenmp")
-check_cxx_source_compiles("int main(void) { return 0; }" HAVE_OPENMP)
-set(CMAKE_REQUIRED_FLAGS "")
-if (HAVE_OPENMP)
-    message (STATUS "OpenMP support found")
-else ()
-    message (WARNING "OpenMP support not found")
-endif ()
+set(CMAKE_REQUIRED_FLAGS "-fopenmp -Werror")
+check_cxx_source_compiles("int main(void) {
+#pragma omp parallel
+    {
+    }
+    return 0;
+}" HAVE_OPENMP)
 
 #
 # Perform build type specific configuration.

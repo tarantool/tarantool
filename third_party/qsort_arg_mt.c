@@ -198,8 +198,8 @@ qsort_arg_mt_internal(void *a, size_t n, size_t es,
 }
 
 void
-qsort_arg_mt(void *a, size_t n, size_t es,
-	     int (*cmp)(const void *a, const void *b, void *arg), void *arg)
+qsort_arg(void *a, size_t n, size_t es,
+	  int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 #pragma omp parallel
 	{
