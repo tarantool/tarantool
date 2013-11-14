@@ -40,6 +40,18 @@ if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
 endif()
 
 #
+# Check for an omp support
+#
+set(CMAKE_REQUIRED_FLAGS "-fopenmp")
+check_cxx_source_compiles("int main(void) { return 0; }" HAVE_OPENMP)
+set(CMAKE_REQUIRED_FLAGS "")
+if (HAVE_OPENMP)
+    message (STATUS "OpenMP support found")
+else ()
+    message (WARNING "OpenMP support not found")
+endif ()
+
+#
 # Perform build type specific configuration.
 #
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -112,6 +124,10 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("CXX"
             "-Wno-invalid-offsetof"
         )
+    endif()
+
+    if (HAVE_OPENMP)
+        add_compile_flags("C;CXX" "-fopenmp")
     endif()
 
     add_definitions("-D__STDC_FORMAT_MACROS=1")

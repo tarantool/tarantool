@@ -73,6 +73,7 @@ set (common_sources
      crc32.c
      rope.c
      ipc.cc
+     qsort_arg_mt.cc
      lua/fiber.cc
      lua/admin.cc
      lua/info.cc

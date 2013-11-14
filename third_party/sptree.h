@@ -32,8 +32,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <third_party/qsort_arg.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -99,7 +97,7 @@ typedef struct sptree_node_pointers {
  *   void* sptree_NAME_iterator_reverse_next(sptree_NAME_iterator *i)
  */
 
-#define SPTREE_DEF(name, realloc)                                                         \
+#define SPTREE_DEF(name, realloc, qsort_arg)                                              \
 typedef int (*sptree_##name##_compare)(const void *, const void *, void *);               \
                                                                                           \
 typedef struct sptree_##name {                                                            \
