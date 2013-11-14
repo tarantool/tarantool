@@ -88,7 +88,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 	mh_int_t i;
 	struct space *space;
 	char key[6];
-	assert (mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
+	assert(mp_sizeof_uint(SC_SYSTEM_ID_MIN) <= sizeof(key));
 	mp_encode_uint(key, SC_SYSTEM_ID_MIN);
 
 	/*

@@ -285,7 +285,7 @@ void
 HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 			const char *key, uint32_t part_count) const
 {
-	assert (key != NULL || part_count == 0);
+	assert(key != NULL || part_count == 0);
 	(void) part_count;
 	assert(ptr->free == hash_iterator_free);
 

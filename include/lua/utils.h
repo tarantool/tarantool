@@ -50,7 +50,7 @@ struct lua_State;
 
 /**
  * @brief Allocate a new block of memory with the given size, push onto the
- * stack a new cdata of type ctypeid with the block address, and returns
+ * stack a new cdata of type ctypeid with the block address, and return
  * this address. Allocated memory is a subject of GC.
  * CTypeID must be used from FFI at least once.
  * @param L Lua State
@@ -95,8 +95,8 @@ struct luaL_field {
 
 /**
  * @brief Convert a value from the Lua stack to a lua_field structure.
- * This function is designed to use with lua bindings and data
- * serializators (YAML, MsgPack, JSON, etc.).
+ * This function is designed for use with Lua bindings and data
+ * serialization functions (YAML, MsgPack, JSON, etc.).
  *
  * Conversion rules:
  * - LUA_TNUMBER when is integer and >= 0 -> UINT
@@ -115,26 +115,28 @@ struct luaL_field {
  * - CTID_BOOL -> BOOL
  * - otherwise -> EXT
  *
- * By default all LUA_TTABLEs (incl. empty ones) are handled as ARRAYs.
- * If a table has non-numbering indexes or the table is too sparse when it will
- * be handles as a map. The user can force MAP or ARRAY serialization by
- * setting a metatable with "_serializer_type" = "map" | "array" value.
+ * By default all LUA_TTABLEs (including empty ones) are handled as ARRAYs.
+ * If a table has other than numeric indexes or is too
+ * sparse, then it is handled as a map. The user can force MAP or
+ * ARRAY serialization by setting * "_serializer_type" = "map" | "array"
+ * in the table's metatable.
  *
- * YAML also supports special "_serializer_compact" = true | false
+ * YAML also supports a special "_serializer_compact" = true | false
  * flag that controls block vs flow output ([1,2,3] vs - 1\n - 2\n - 3\n).
+ * It can be set in the table's metatable.
  *
  * MAP and ARRAY members are not saved to lua_field structure and should be
- * process manually.
+ * processed manually.
  *
- * Use the following code for ARRAYs:
+ * Use the following code for arrays:
  * field.max; // the maximal index of the array
  * for (uint32_t i = 0; i < field.max; i++) {
- * lua_rawgeti(L, index, i + 1);
+ *	lua_rawgeti(L, index, i + 1);
  *	handle_value(L, -1)
  *	lua_pop(L, 1);
  * }
  *
- * Use the following code for MAPs:
+ * Use the following code for maps:
  * field.size; // the number of members in the map
  * lua_pushnil(L);
  * while (lua_next(L, index) != 0) {

@@ -14,8 +14,11 @@ Tarantool IPROTO protocol.
 ; int8 - a single 8-bit byte (i.e. an octet)
 ;
 ; int32 - a 32-bit integer in little-endian format (Intel x86)
-
+;
 ; int64 - a 64-bit integer in little-endian format (Intel x86)
+;
+; msgpack - a valid msgpack sequence for everything else, see
+; http://msgpack.org
 ;
 ; All requests and responses utilize the same basic structure:
 
@@ -27,7 +30,7 @@ Tarantool IPROTO protocol.
 ; response is an error message.
 ;
 
-<response> ::= <header><return_code>{<response_body>}
+<response> ::= <header><response_body>
 
 ;
 ; <header> has a fixed structure of three 4-byte integers (12 bytes):
@@ -86,15 +89,13 @@ Tarantool IPROTO protocol.
 
 ;
 ; <response_body> carries command reply
-; It is only present if <return_code> is 0 (success).
-; <call_response_body> can be arbitrary, it purely depends
-; on what your procedure does.
+; If <return_code> is 0 (success), it contains zero or more
+; tuples, otherwise it carries an error message that corresponds 
+; the return code.
 ; 
 
-<response_body> ::= <select_response_body> |
-                    <insert_response_body> |
-                    <update_response_body> |
-                    <delete_response_body>
+<response_body> ::= <return_code><text> |
+                    <0><count><fq_tuple>*
 
 ; <select_request_body> (required <header> <type> is 17):
 ;
@@ -262,7 +263,7 @@ Tarantool IPROTO protocol.
 ; field data in case of splice argument contains 3 nested <field>
 ; objects, which store the arguments:
 
-<op_arg_splice> ::= <message_pack_array(3)><offset><length><string>
+<op_arg_splice> ::= <message_pack_array(3)> # <offset><length><string>
 
 <offset> ::= <message_pack_uint>
 <length> ::= <message_pack_uint>

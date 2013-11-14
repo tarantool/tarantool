@@ -59,7 +59,7 @@ void
 key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	     uint32_t part_count)
 {
-	assert (key != NULL || part_count == 0);
+	assert(key != NULL || part_count == 0);
 	if (part_count == 0) {
 		/*
 		 * Zero key parts are allowed:
@@ -89,7 +89,7 @@ void
 primary_key_validate(struct key_def *key_def, const char *key,
 		     uint32_t part_count)
 {
-	assert (key != NULL || part_count == 0);
+	assert(key != NULL || part_count == 0);
 	if (key_def->part_count != part_count) {
 		tnt_raise(ClientError, ER_EXACT_MATCH,
 			  key_def->part_count, part_count);

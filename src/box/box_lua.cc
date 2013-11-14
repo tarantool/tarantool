@@ -31,7 +31,6 @@
 #include "lua/init.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
-#include <signal.h>
 #include <fiber.h>
 #include "box/box.h"
 #include "request.h"
@@ -538,14 +537,14 @@ lbox_tuple_next(struct lua_State *L)
 	struct tuple_iterator *it = NULL;
 	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
 		it = (struct tuple_iterator *) lua_newuserdata(L, sizeof(*it));
-		assert (it != NULL);
+		assert(it != NULL);
 		luaL_getmetatable(L, tuple_iteratorlib_name);
 		lua_setmetatable(L, -2);
 		tuple_rewind(it, tuple);
 	} else if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
 		it = (struct tuple_iterator *)
 			luaL_checkudata(L, 2, tuple_iteratorlib_name);
-		assert (it != NULL);
+		assert(it != NULL);
 		lua_pushvalue(L, 2);
 	} else {
 		return luaL_error(L, "tuple.next(): bad arguments");
