@@ -44,4 +44,11 @@ admin("box.snapshot()")
 server.reconfigure(self.suite_ini["config"])
 admin("box.space[0]:drop()")
 
+print """#
+# A test case for https://github.com/tarantool/tarantool/issues/112:
+# Tarantool crashes with SIGSEGV during reload configuration
+#"""
+server.reconfigure("box/tarantool_wo_cpt.cfg")
+server.reconfigure("box/tarantool_with_cpt.cfg")
+
 # vim: syntax=python

@@ -245,6 +245,9 @@ static NameAtom _name__replication_protocol[] = {
    }                                                                \
 } while(0)
 
+int
+confetti_strcmp(char *s1, char *s2);
+
 static ConfettyError
 acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 
@@ -253,9 +256,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->username == NULL) || strcmp(opt->paramValue.scalarval, c->username) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->username == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->username) != 0))
 			return CNF_RDONLY;
-		 if (c->username) free(c->username);
+		if (c->username) free(c->username);
 		c->username = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->username == NULL)
 			return CNF_NOMEMORY;
@@ -290,9 +293,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->bind_ipaddr == NULL) || strcmp(opt->paramValue.scalarval, c->bind_ipaddr) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->bind_ipaddr == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->bind_ipaddr) != 0))
 			return CNF_RDONLY;
-		 if (c->bind_ipaddr) free(c->bind_ipaddr);
+		if (c->bind_ipaddr) free(c->bind_ipaddr);
 		c->bind_ipaddr = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->bind_ipaddr == NULL)
 			return CNF_NOMEMORY;
@@ -405,9 +408,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->work_dir == NULL) || strcmp(opt->paramValue.scalarval, c->work_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->work_dir == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->work_dir) != 0))
 			return CNF_RDONLY;
-		 if (c->work_dir) free(c->work_dir);
+		if (c->work_dir) free(c->work_dir);
 		c->work_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->work_dir == NULL)
 			return CNF_NOMEMORY;
@@ -417,9 +420,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->snap_dir == NULL) || strcmp(opt->paramValue.scalarval, c->snap_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->snap_dir == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->snap_dir) != 0))
 			return CNF_RDONLY;
-		 if (c->snap_dir) free(c->snap_dir);
+		if (c->snap_dir) free(c->snap_dir);
 		c->snap_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->snap_dir == NULL)
 			return CNF_NOMEMORY;
@@ -429,9 +432,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->wal_dir == NULL) || strcmp(opt->paramValue.scalarval, c->wal_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->wal_dir == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->wal_dir) != 0))
 			return CNF_RDONLY;
-		 if (c->wal_dir) free(c->wal_dir);
+		if (c->wal_dir) free(c->wal_dir);
 		c->wal_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->wal_dir == NULL)
 			return CNF_NOMEMORY;
@@ -441,9 +444,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->script_dir == NULL) || strcmp(opt->paramValue.scalarval, c->script_dir) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->script_dir == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->script_dir) != 0))
 			return CNF_RDONLY;
-		 if (c->script_dir) free(c->script_dir);
+		if (c->script_dir) free(c->script_dir);
 		c->script_dir = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->script_dir == NULL)
 			return CNF_NOMEMORY;
@@ -453,9 +456,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->pid_file == NULL) || strcmp(opt->paramValue.scalarval, c->pid_file) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->pid_file == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->pid_file) != 0))
 			return CNF_RDONLY;
-		 if (c->pid_file) free(c->pid_file);
+		if (c->pid_file) free(c->pid_file);
 		c->pid_file = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->pid_file == NULL)
 			return CNF_NOMEMORY;
@@ -465,9 +468,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->logger == NULL) || strcmp(opt->paramValue.scalarval, c->logger) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->logger == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->logger) != 0))
 			return CNF_RDONLY;
-		 if (c->logger) free(c->logger);
+		if (c->logger) free(c->logger);
 		c->logger = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->logger == NULL)
 			return CNF_NOMEMORY;
@@ -562,7 +565,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		 if (c->wal_mode) free(c->wal_mode);
+		if (c->wal_mode) free(c->wal_mode);
 		c->wal_mode = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->wal_mode == NULL)
 			return CNF_NOMEMORY;
@@ -682,9 +685,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->custom_proc_title == NULL) || strcmp(opt->paramValue.scalarval, c->custom_proc_title) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->custom_proc_title == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->custom_proc_title) != 0))
 			return CNF_RDONLY;
-		 if (c->custom_proc_title) free(c->custom_proc_title);
+		if (c->custom_proc_title) free(c->custom_proc_title);
 		c->custom_proc_title = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->custom_proc_title == NULL)
 			return CNF_NOMEMORY;
@@ -694,7 +697,7 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		 if (c->replication_source) free(c->replication_source);
+		if (c->replication_source) free(c->replication_source);
 		c->replication_source = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->replication_source == NULL)
 			return CNF_NOMEMORY;
@@ -704,9 +707,9 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGTYPE;
 		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
 		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->replication_protocol == NULL) || strcmp(opt->paramValue.scalarval, c->replication_protocol) != 0))
+		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->replication_protocol == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->replication_protocol) != 0))
 			return CNF_RDONLY;
-		 if (c->replication_protocol) free(c->replication_protocol);
+		if (c->replication_protocol) free(c->replication_protocol);
 		c->replication_protocol = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->replication_protocol == NULL)
 			return CNF_NOMEMORY;
