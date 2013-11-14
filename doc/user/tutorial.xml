@@ -271,7 +271,7 @@ the tarantool download will go inside it, as <computeroutput><filename>~/taranto
 <para>
 3. Use <productname>git</productname> to download from github.com.<programlisting>
 <command>cd</command> ~
-<command>git clone</command> <option>-b stable</option> https://github.com/tarantool.git <option>tarantool</option></programlisting>
+<command>git clone</command> <option>-b stable</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
 The optional argument <quote>-b stable</quote> causes download from the stable branch instead of the master branch,
 and the optional last word on the line, <quote>tarantool</quote>, means download is to <computeroutput>~/tarantool</computeroutput>.
 </para>

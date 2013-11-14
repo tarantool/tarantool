@@ -19,7 +19,7 @@
     A replica gets all updates from the master by continuously
     fetching and applying its write ahead log (WAL).
     Each record in the WAL represents a single Tarantool
-    command, such as INSERT, UPDATE, DELETE and is assigned
+    command such as INSERT or UPDATE or DELETE, and is assigned
     a monotonically growing log sequence number (LSN).
     In essence, Tarantool replication is row-based:
     all data change commands are fully deterministic and operate
@@ -32,7 +32,7 @@
     for actual UPDATEs and DELETEs, performed by the Lua code,
     are written to the log. This ensures that possible
     non-determinism of Lua does not cause replication
-    going out of sync.
+    to go out of sync.
   </para>
 <!--
   <para>
@@ -49,10 +49,10 @@
   <para>
     For replication to work correctly, the latest LSN
     on the replica must match or fall behind the latest LSN
-    on the master. If the replica has its own updates,
-    this leads to it getting out of sync, since
-    updates from the master having identical LSNs are
-    not applied. Indeed, if replication is ON, Tarantool
+    on the master. If the replica had its own updates,
+    this would lead to it getting out of sync, since
+    updates from the master having identical LSNs would
+    not be applied. In fact, if replication is ON, Tarantool
     does not accept updates, even on its <olink
     targetptr="primary_port"/>.
   </para>
@@ -61,7 +61,7 @@
 <section xml:id="setting-up-the-master">
   <title>Setting up the master</title>
   <para>
-    To prepare the master for connections from replica, it's only
+    To prepare the master for connections from the replica, it's only
     necessary to enable <olink targetptr="replication_port"/> in
     the configuration file. An example configuration file can be
     found in <link
@@ -73,16 +73,16 @@
 <section xml:id="settin-up-a-replica">
   <title>Setting up a replica</title>
   <para>
-    The server, master or replica, always requires a valid
-    snapshot file to boot from. For a master, it's usually
-    prepared with with <olink targetptr="init-storage-option"/> option,
-    for replicas it's usually copied from the master.
+    A server, whether master or replica, always requires a valid
+    snapshot file to boot from. For a master, a snapshot file is usually
+    prepared with with the <olink targetptr="init-storage-option"/> option.
+    For a replica, it's usually copied from the master.
   </para>
   <para>
     To start replication, configure <olink
     targetptr="replication_source"/>.
     Other parameters can also be changed, but existing spaces and
-    their primary keys on the replica must be identical to ones on the
+    their primary keys on the replica must be identical to the ones on the
     master.
   </para>
   <para>
@@ -94,13 +94,13 @@
     xlink:href="https://github.com/tarantool/tarantool/blob/master/test/replication/cfg/replica.cfg"><filename>test/replication/cfg/replica.cfg</filename></link>.
   </para>
   <para>
-    In absence of required WALs, a replica can be "re-seeded" at
+    If required WAL files are absent, a replica can be "re-seeded" at
     any time with a newer snapshot file, manually copied from the
     master.
   </para>
   <note><simpara>
     Replication parameters are "dynamic", which allows the
-    replica to become a master and vice versa with help of
+    replica to become a master and vice versa with the help of the
     <olink targetptr="box.cfg.reload"/> statement.
   </simpara></note>
 
@@ -109,17 +109,17 @@
   <title>Recovering from a degraded state</title>
   <para>
     "Degraded state" is a situation when the master becomes
-    unavailable -- either due to hardware or network failure, or a
+    unavailable -- due to hardware or network failure, or due to a
     programming bug. There is no reliable way for a replica to detect
     that the master is gone for good, since sources of failure and
     replication environments vary significantly.
   </para>
   <para>
-    A separate monitoring script (or scripts, if decision making
+    A separate monitoring script (or scripts, if a decision-making
     quorum is desirable) is necessary to detect a master failure.
-    Such script would typically try to update a tuple in an
-    auxiliary space on the master, and raise alarm if a
-    network or disk error persists longer than is acceptable.
+    Such a script would typically try to update a tuple in an
+    auxiliary space on the master, and raise an alarm if a
+    network or disk error persists for longer than is acceptable.
   </para>
   <para>
     When a master failure is detected, the following needs
@@ -128,7 +128,7 @@
       <listitem>
         <para>
           First and foremost, make sure that the master does not
-          accepts updates. This is necessary to prevent the
+          accept updates. This is necessary to prevent the
           situation when, should the master failure end up being
           transient, some updates still go to the master, while
           others already end up on the replica.
@@ -136,7 +136,7 @@
         <para>
           If the master is available, the easiest way to turn
           on read-only mode is to turn Tarantool into a replica of
-          itself. This can be done by setting master's <olink
+          itself. This can be done by setting the master's <olink
           targetptr="replication_source"/> to point to self.
         </para>
         <para>
@@ -169,7 +169,7 @@
           Change the application configuration to point to the new
           master. This can be done either by changing the
           application's internal routing table, or by setting up
-          old master's IP address on the new master's machine, or
+          the old master's IP address on the new master's machine, or
           using some other approach.
         </para>
       </listitem>
@@ -177,8 +177,8 @@
         <para>
           Recover the old master. If there are updates that didn't
           make it to the new master, they have to be applied
-          manually. You can use Tarantool command line client
-          to read server logs.
+          manually. You can use the Tarantool command line client
+          to read the server log files.
         </para>
       </listitem>
     </itemizedlist>
