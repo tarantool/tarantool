@@ -41,4 +41,8 @@ int tc_query(char *q, char **e);
 int tc_query_admin_printer(char *r, char **e);
 int tc_query_admin(char *q, tc_query_admin_t cb, char **e);
 
+
+char *tc_query_error(char *fmt, ...);
+char *tc_query_op(struct tnt_reply *r);
+
 #endif /* TC_QUERY_H_INCLUDED */
