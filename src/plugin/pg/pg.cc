@@ -341,7 +341,11 @@ self_field(struct lua_State *L, const char *name, int index)
 	if (index < 0)
 		index--;
 	lua_rawget(L, index);
-	const char *res = lua_tostring(L, -1);
+	const char *res;
+	if (lua_isnil(L, -1))
+	    res = NULL;
+	else
+	    res = lua_tostring(L, -1);
 	lua_pop(L, 1);
 	return res;
 }
@@ -401,24 +405,38 @@ lua_pg_quote_ident(struct lua_State *L)
 static int
 lbox_net_pg_connect(struct lua_State *L)
 {
+	const char *host = self_field(L, "host", 1);
+	const char *port = self_field(L, "port", 1);
+	const char *user = self_field(L, "user", 1);
+	const char *pass = self_field(L, "password", 1);
+	const char *db   = self_field(L, "db", 1);
+
+
+	if (!host || (!port) || (!user) || (!pass) || (!db)) {
+		luaL_error(L,
+			 "Usage: box.net.sql.connect"
+			 "('pg', host, port, user, password, db, ...)"
+		);
+	}
+
 	PGconn     *conn = NULL;
 
 	luaL_Buffer b;
 	luaL_buffinit(L, &b);
 	luaL_addstring(&b, "host='");
-	luaL_addstring(&b, self_field(L, "host", 1));
+	luaL_addstring(&b, host);
 
 	luaL_addstring(&b, "' port='");
-	luaL_addstring(&b, self_field(L, "port", 1));
+	luaL_addstring(&b, port);
 
 	luaL_addstring(&b, "' user='");
-	luaL_addstring(&b, self_field(L, "user", 1));
+	luaL_addstring(&b, user);
 
 	luaL_addstring(&b, "' password='");
-	luaL_addstring(&b, self_field(L, "password", 1));
+	luaL_addstring(&b, pass);
 
 	luaL_addstring(&b, "' dbname='");
-	luaL_addstring(&b, self_field(L, "db", 1));
+	luaL_addstring(&b, db);
 
 	luaL_addchar(&b, '\'');
 	luaL_pushresult(&b);

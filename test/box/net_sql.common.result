@@ -1,0 +1,12 @@
+lua c = box.net.sql.connect('abcd')
+---
+error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+...
+lua c = box.net.sql.connect('mysql')
+---
+error: '[string "-- sql.lua (internal file)..."]:64: Usage: box.net.sql.connect(''mysql'', host, port, user, password, db, ...)'
+...
+lua c = box.net.sql.connect('pg')
+---
+error: '[string "-- sql.lua (internal file)..."]:64: Usage: box.net.sql.connect(''pg'', host, port, user, password, db, ...)'
+...
