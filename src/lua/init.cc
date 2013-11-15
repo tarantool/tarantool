@@ -61,6 +61,7 @@ extern "C" {
 #include <dirent.h>
 #include <stdio.h>
 #include "tarantool/plugin.h"
+#include "scoped_guard.h"
 
 static RLIST_HEAD(loaded_plugins);
 
@@ -1022,6 +1023,11 @@ lbox_print(struct lua_State *L)
 		if (out->size < 2 || tbuf_str(out)[out->size-1] != '\n')
 			tbuf_printf(out, CRLF);
 	} else {
+		size_t allocated = palloc_allocated(fiber->gc_pool);
+		auto scoped_guard = make_scoped_guard([=] {
+			ptruncate(fiber->gc_pool, allocated);
+		});
+
 		/* Add a message to the server log */
 		out = tbuf_new(fiber->gc_pool);
 		tarantool_lua_printstack(L, out);
@@ -1371,8 +1377,10 @@ static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
 	struct tbuf *buf = tbuf_new(fiber->gc_pool);
+	size_t allocated = palloc_allocated(fiber->gc_pool);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));
+	ptruncate(fiber->gc_pool, allocated);
 	if (r) {
 		/* pop the error message */
 		lua_pop(L, 1);

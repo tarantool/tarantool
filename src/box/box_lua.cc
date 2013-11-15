@@ -507,9 +507,11 @@ lbox_tuple_tostring(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
 	/* @todo: print the tuple */
+	size_t allocated = palloc_allocated(fiber->gc_pool);
 	struct tbuf *tbuf = tbuf_new(fiber->gc_pool);
 	tuple_print(tbuf, tuple);
 	lua_pushlstring(L, tbuf->data, tbuf->size);
+	ptruncate(fiber->gc_pool, allocated);
 	return 1;
 }
 
