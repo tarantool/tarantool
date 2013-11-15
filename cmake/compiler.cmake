@@ -49,6 +49,7 @@ check_cxx_source_compiles("int main(void) {
     }
     return 0;
 }" HAVE_OPENMP)
+set(CMAKE_REQUIRED_FLAGS "")
 
 #
 # Perform build type specific configuration.

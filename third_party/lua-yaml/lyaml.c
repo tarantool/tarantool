@@ -616,7 +616,7 @@ dump_node(struct lua_yaml_dumper *dumper)
 	case MP_BIN:
 	case MP_STR:
 		str = lua_tolstring(dumper->L, -1, &len);
-		if (field.type == MP_BIN || !is_utf8((unsigned char *) str, len)) {
+		if (field.type == MP_BIN || !is_utf8(str, len)) {
 			is_binary = 1;
 			tobase64(dumper->L, -1);
 			str = lua_tolstring(dumper->L, -1, &len);
