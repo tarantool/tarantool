@@ -40,9 +40,6 @@ admin("box.snapshot()")
 server.reconfigure("box/tarantool_good.cfg")
 admin("box.insert(0, 3, 'tuple3')")
 admin("box.snapshot()")
-# Cleanup
-server.reconfigure(self.suite_ini["config"])
-admin("box.space[0]:drop()")
 
 print """#
 # A test case for https://github.com/tarantool/tarantool/issues/112:
@@ -50,5 +47,9 @@ print """#
 #"""
 server.reconfigure("box/tarantool_wo_cpt.cfg")
 server.reconfigure("box/tarantool_with_cpt.cfg")
+
+# Cleanup
+server.reconfigure(self.suite_ini["config"])
+admin("box.space[0]:drop()")
 
 # vim: syntax=python

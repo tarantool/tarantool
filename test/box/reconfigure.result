@@ -121,13 +121,6 @@ box.snapshot()
 ---
 - ok
 ...
-box.cfg.reload()
----
-- ok
-...
-box.space[0]:drop()
----
-...
 #
 # A test case for https://github.com/tarantool/tarantool/issues/112:
 # Tarantool crashes with SIGSEGV during reload configuration
@@ -141,4 +134,11 @@ box.cfg.reload()
 - error: 'Could not accept read only ''custom_proc_title'' option.
 
 '
+...
+box.cfg.reload()
+---
+- ok
+...
+box.space[0]:drop()
+---
 ...
