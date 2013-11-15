@@ -529,6 +529,8 @@ admin(test.replace('\n', ' '))
 admin("bug1160869()")
 admin("bug1160869()")
 admin("bug1160869()")
+# Due to delays in event loop the value can be not updated
+admin("wait_cout = 100 while replies ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end")
 admin("replies")
 
 test="""
@@ -560,6 +562,8 @@ admin(test.replace('\n', ' '))
 admin("iotest()")
 admin("iotest()")
 admin("iotest()")
+# Due to delays in event loop the value can be not updated
+admin("wait_cout = 100 while replies ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end")
 admin("reps")
 
 # Bug #43: incorrect box:shutdown() arg handling
@@ -570,6 +574,7 @@ function server()
 	ms = box.socket.tcp()
 	ms:bind('127.0.0.1', 8181)
 	ms:listen()
+	test_listen_done = true
 
 	while true do
 		local s = ms:accept( .5 )
@@ -584,7 +589,11 @@ end
 box.fiber.wrap(server)
 """
 
+admin("test_listen_done = false")
 admin(test.replace('\n', ' '))
+# Due to delays in event loop the value can be not updated
+admin("wait_cout = 100 while not test_listen_done and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end")
+
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('127.0.0.1', 8181))
