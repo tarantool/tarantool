@@ -124,7 +124,11 @@ self_field(struct lua_State *L, const char *name, int index)
 	if (index < 0)
 		index--;
 	lua_rawget(L, index);
-	const char *res = lua_tostring(L, -1);
+	const char *res;
+	if (lua_isnil(L, -1))
+		res = NULL;
+	else
+		res = lua_tostring(L, -1);
 	lua_pop(L, 1);
 	return res;
 }
@@ -406,6 +410,14 @@ lbox_net_mysql_connect(struct lua_State *L)
 	const char *user = self_field(L, "user", 1);
 	const char *pass = self_field(L, "password", 1);
 	const char *db   = self_field(L, "db", 1);
+
+
+	if (!host || (!port) || (!user) || (!pass) || (!db)) {
+		luaL_error(L,
+			 "Usage: box.net.sql.connect"
+			 "('mysql', host, port, user, password, db, ...)"
+		);
+	}
 
 
 	if (coeio_custom(connect_mysql, TIMEOUT_INFINITY, mysql,

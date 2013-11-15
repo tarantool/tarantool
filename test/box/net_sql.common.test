@@ -1,0 +1,7 @@
+# encoding: tarantool
+
+exec admin "lua c = box.net.sql.connect('abcd')"
+
+exec admin "lua c = box.net.sql.connect('mysql')"
+exec admin "lua c = box.net.sql.connect('pg')"
+
