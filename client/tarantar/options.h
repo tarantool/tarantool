@@ -7,6 +7,9 @@ enum ts_options_mode {
 	TS_MODE_CREATE
 };
 
+#define TT_VERSION_MINOR "1"
+#define TT_VERSION_MAJOR "0"
+
 struct ts_options {
 	uint64_t limit;
 	enum ts_options_mode mode;
@@ -24,5 +27,6 @@ enum ts_options_mode
 ts_options_process(struct ts_options *opts, int argc, char **argv);
 
 int ts_options_usage(void);
+int ts_options_version(void);
 
 #endif
