@@ -45,39 +45,39 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("host"), " <host>", "server address"),
 #if 0
 	gopt_option('p', GOPT_ARG, gopt_shorts('p'),
-		    gopt_longs("port"), " <port>", "server port"),
+		    gopt_longs("port"), " <port number>", "server port"),
 #endif
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
-		    gopt_longs("admin-port"), " <port>", "server admin port"),
+		    gopt_longs("admin-port"), " <port number>", "server admin port"),
 #if 0
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
-		    gopt_longs("cat"), " <file>", "print xlog or snapshot file content"),
+		    gopt_longs("cat"), " <file name>", "print xlog or snapshot file content"),
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
-		    gopt_longs("play"), " <file>", "replay xlog file to the specified server"),
+		    gopt_longs("play"), " <file name>", "replay xlog file to the specified server"),
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
-		    gopt_longs("space"), " <space>", "filter by space number"),
+		    gopt_longs("space"), " <space number>", "filter by space number"),
 	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
-		    gopt_longs("from"), " <lsn>", "start xlog file from the specified lsn"),
+		    gopt_longs("from"), " <log serial number>", "start xlog file from the specified lsn"),
 	gopt_option('T', GOPT_ARG, gopt_shorts('T'),
-		    gopt_longs("to"), " <lsn>", "stop on specified xlog lsn"),
+		    gopt_longs("to"), " <log serial number>", "stop on specified xlog lsn"),
 	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
 		    gopt_longs("format"), " <name>", "cat output format (tarantool, raw)"),
 	gopt_option('H', 0, gopt_shorts('H'),
 		    gopt_longs("header"), NULL, "add file headers for the raw output"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
-		    gopt_longs("rpl"), " <lsn>", "act as replica for the specified server"),
+		    gopt_longs("rpl"), " <log serial number>", "act as replica for the specified server"),
 	gopt_option('B', 0, gopt_shorts('B'),
 		    gopt_longs("bin"), NULL, "print STR in lua printer instead"
 		    " of NUM32 and NUM64, except arithmetic update arguments"),
 	gopt_option('D', GOPT_ARG, gopt_shorts('D'),
 		    gopt_longs("delim"), " <delim>",
-		    "if you use --cat, then it will add delim to an end of every line of your"
-		    "lua file, when used at CLI start of client, then it's replacement of "
+		    "if you use --cat, then it will add delim to an end of every line of your "
+		    "Lua file, when used at CLI start of client, then it's replacement of "
 		    "setopt delim='<delim>' command"),
 #endif
-	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
+	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
-	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
+	gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
 		    NULL, "display version information and exit")
 );
 
@@ -107,7 +107,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	}
 
 	/* version */
-	if (gopt(tc_options, 'v')) {
+	if (gopt(tc_options, 'V')) {
 		opt->mode = TC_OPT_VERSION;
 		goto done;
 	}

@@ -46,7 +46,7 @@ static const void *opts_def = gopt_start(
 		    gopt_longs("generate"), " <file>", "generate signature file"),
 	gopt_option('V', GOPT_ARG, gopt_shorts('V'),
 		    gopt_longs("verify"), " <file>", "verify signature file"),
-	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
+	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
 		    NULL, "display version information and exit")

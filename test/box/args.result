@@ -2,16 +2,16 @@ tarantool_box --help
 Tarantool -- an efficient in-memory data store.
 Usage: tarantool_box [OPTIONS]
 
-      --cfg-get=KEY       return a value from configuration file described by
-                          KEY
-      --check-config      Check configuration file for errors
-  -c, --config=FILE       path to configuration file (default: tarantool.cfg)
-      --init-storage      initialize storage (an empty snapshot file) and exit
-  -v, --verbose           increase verbosity level in log messages
-  -B, --background        redirect input/output streams to a log file and run as
-                          daemon
-  -h, --help              display this help and exit
-  -V, --version           print program version and exit
+      --cfg-get=KEY                return a value from configuration file described by
+                                   KEY
+      --check-config               Check configuration file for errors
+  -c, --config=FILE                path to configuration file (default: tarantool.cfg)
+      --init-storage               initialize storage (an empty snapshot file) and exit
+  -v, --verbose                    increase verbosity level in log messages
+  -B, --background                 redirect input/output streams to a log file and run as
+                                   daemon
+  -h, --help                       display this help and exit
+  -V, --version                    print program version and exit
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
@@ -20,16 +20,16 @@ tarantool_box -h
 Tarantool -- an efficient in-memory data store.
 Usage: tarantool_box [OPTIONS]
 
-      --cfg-get=KEY       return a value from configuration file described by
-                          KEY
-      --check-config      Check configuration file for errors
-  -c, --config=FILE       path to configuration file (default: tarantool.cfg)
-      --init-storage      initialize storage (an empty snapshot file) and exit
-  -v, --verbose           increase verbosity level in log messages
-  -B, --background        redirect input/output streams to a log file and run as
-                          daemon
-  -h, --help              display this help and exit
-  -V, --version           print program version and exit
+      --cfg-get=KEY                return a value from configuration file described by
+                                   KEY
+      --check-config               Check configuration file for errors
+  -c, --config=FILE                path to configuration file (default: tarantool.cfg)
+      --init-storage               initialize storage (an empty snapshot file) and exit
+  -v, --verbose                    increase verbosity level in log messages
+  -B, --background                 redirect input/output streams to a log file and run as
+                                   daemon
+  -h, --help                       display this help and exit
+  -V, --version                    print program version and exit
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
