@@ -296,6 +296,7 @@ box.auto_increment(space.n, 'a')
 space:insert(5)
 box.auto_increment(space.n, 'b')
 box.auto_increment(space.n, 'c')
+space:auto_increment('d')
 space:drop()
 
 -- A test case for Bug #1042798

@@ -834,6 +834,10 @@ box.auto_increment(space.n, 'c')
 ---
 - [7, 'c']
 ...
+space:auto_increment('d')
+---
+- [8, 'd']
+...
 space:drop()
 ---
 ...
