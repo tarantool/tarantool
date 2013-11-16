@@ -424,7 +424,18 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
         <term>
             <emphasis role="lua" xml:id="box.insert">box.insert(space_no, ...)</emphasis>
         </term>
-        <listitem><simpara></simpara></listitem>
+        <listitem>
+	    <para>
+	        Insert a tuple into a space. Tuple fields
+                follow <code>space_no</code>. If a tuple with
+                the same primary key already exists,
+                <code>box.insert()</code> returns an error.
+                This function is a
+                wrapper around <code>box.process()</code>.
+                <bridgehead renderas="sect4">Returns</bridgehead>
+                Returns the inserted tuple.
+	    </para>
+	</listitem>
     </varlistentry>
 
     <varlistentry>
@@ -455,10 +466,9 @@ localhost> lua box.select(5, 1, 'firstname', 'lastname')
                 Insert a tuple into a space. Tuple fields
                 follow <code>space_no</code>. If a tuple with
                 the same primary key already exists,
-                <code>box.insert()</code> returns an error, while
                 <code>box.replace()</code> replaces the existing
-                tuple with a new one. These functions are
-                wrappers around <code>box.process()</code>
+                tuple with a new one. This function is a
+                wrapper around <code>box.process()</code>.
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 Returns the inserted tuple.
             </para>
