@@ -673,7 +673,6 @@ lbox_socket_readline(struct lua_State *L)
 			/* if current read position (bottom) equals to
 			 * the readahead size, then read new data. */
 			if (bottom == ibuf_size(in)) {
-
 				ssize_t nrd = coio_bread_timeout(&s->io_r, &s->iob->in, 1,
 								 delay);
 				/* case #5: eof (step 1)*/
@@ -685,14 +684,13 @@ lbox_socket_readline(struct lua_State *L)
 					mutex_unlock(&s->io_r_mutex);
 					return rc;
 				}
+				evio_timeout_update(start, &delay);
 			}
 
 			match = readline_state_next(rs, rs_size, in->pos[bottom]);
 			bottom++;
 			if (match >= 0)
 				break;
-
-			evio_timeout_update(start, &delay);
 		}
 
 		mutex_unlock(&s->io_r_mutex);
