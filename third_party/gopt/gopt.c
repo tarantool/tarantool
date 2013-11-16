@@ -280,9 +280,9 @@ void gopt_help(const void *opt_def){
    * help padding: 25 spaces
    */
 
-  const int long_opt_width = 18; /* not counting leading "--" */
+  const int long_opt_width = 27; /* not counting leading "--" */
   const int help_width = 54;
-  const char help_padding[] = "                         ";
+  const char help_padding[] = "                                  ";
 
     while (opt->key) {
     const char *shorts = opt->shorts;
