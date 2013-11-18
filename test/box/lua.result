@@ -2063,7 +2063,7 @@ tostring(tonumber64(tonumber64(3)))
 # box.tuple.new test
 box.tuple.new()
 ---
-- error: 'tuple.new(): bad arguments'
+- []
 ...
 box.tuple.new(1)
 ---
@@ -2201,4 +2201,52 @@ call box.dostring('box.raise(33333, "Hey!")')
 ...
 box.space[0]:drop()
 ---
+...
+box.tuple.new()
+---
+- []
+...
+box.tuple.new({})
+---
+- []
+...
+box.tuple.new(1)
+---
+- [1]
+...
+box.tuple.new({1})
+---
+- [1]
+...
+box.tuple.new(1, 2, 3, 4, 5)
+---
+- [1, 2, 3, 4, 5]
+...
+box.tuple.new({1, 2, 3, 4, 5})
+---
+- [1, 2, 3, 4, 5]
+...
+box.tuple.new({'a', 'b'}, {'c', 'd'}, {'e', 'f'})
+---
+- [['a', b], ['c', 'd'], ['e', 'f']]
+...
+box.tuple.new({{'a', 'b'}, {'c', 'd'}, {'e', 'f'}})
+---
+- [['a', b], ['c', 'd'], ['e', 'f']]
+...
+box.tuple.new({1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6})
+---
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new({{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}})
+---
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})
+---
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new({'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}})
+---
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
 ...

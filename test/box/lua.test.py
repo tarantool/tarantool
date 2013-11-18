@@ -723,4 +723,25 @@ sql("call box.dostring('box.raise(33333, \"Hey!\")')")
 
 admin("box.space[0]:drop()")
 
+#
+# Test cases for #106 box.tuple.new fails on multiple items
+#
+admin("box.tuple.new()")
+admin("box.tuple.new({})")
+
+admin("box.tuple.new(1)")
+admin("box.tuple.new({1})")
+
+admin("box.tuple.new(1, 2, 3, 4, 5)")
+admin("box.tuple.new({1, 2, 3, 4, 5})")
+
+admin("box.tuple.new({'a', 'b'}, {'c', 'd'}, {'e', 'f'})")
+admin("box.tuple.new({{'a', 'b'}, {'c', 'd'}, {'e', 'f'}})")
+
+admin("box.tuple.new({1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6})")
+admin("box.tuple.new({{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}})")
+
+admin("box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})")
+admin("box.tuple.new({'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}})")
+
 sys.stdout.clear_all_filters()

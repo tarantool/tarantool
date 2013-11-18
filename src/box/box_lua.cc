@@ -122,8 +122,10 @@ static int
 lbox_tuple_new(lua_State *L)
 {
 	int argc = lua_gettop(L);
-	if (argc < 1)
-		luaL_error(L, "tuple.new(): bad arguments");
+	if (unlikely(argc < 1)) {
+		lua_newtable(L); /* create an empty tuple */
+		++argc;
+	}
 	struct tuple *tuple = lua_totuple(L, 1, argc);
 	lbox_pushtuple(L, tuple);
 	return 1;
