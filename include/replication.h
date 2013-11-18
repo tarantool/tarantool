@@ -57,5 +57,13 @@ replication_prefork();
 void
 replication_init(const char *bind_ipaddr, int replication_port);
 
+/** Connect to a master and perform an initial handshake.
+ * Raises an exception on error.
+ *
+ * @return A connected socket
+ */
+int
+replica_connect(const char *replication_source);
+
 #endif // TARANTOOL_REPLICATION_H_INCLUDED
 

@@ -39,20 +39,22 @@ This package provides a command line client for Tarantool
 with history support.
 
 # Tarantool dev spec
+#
 
-%package dev
-Summary: Tarantool C connector and header files
-Vendor: tarantool.org
-Group: Applications/Databases
-#Requires: /sbin/ldconfig
-Provides: tarantool-dev
-Obsoletes: tarantool-dev
-Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%description -n tarantool-dev
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides Tarantool client libraries.
+#%package dev
+#Summary: Tarantool C connector and header files
+#Vendor: tarantool.org
+#Group: Applications/Databases
+##Requires: /sbin/ldconfig
+#Provides: tarantool-dev
+#Obsoletes: tarantool-dev
+#Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+#%description -n tarantool-dev
+#Tarantool is a high performance in-memory NoSQL database.
+#It supports replication, online backup, stored procedures in Lua.
+#
+## This package provides Tarantool client libraries.
+#
 
 # Tarantool debug package
 
@@ -99,62 +101,65 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %dir "%{_sysconfdir}/tarantool"
 %config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"
 
-%files dev
-%defattr(-,root,root,-)
-%dir "/usr/include/tarantool"
-"/usr/include/tarantool/tnt.h"
-"/usr/include/tarantool/tnt_buf.h"
-"/usr/include/tarantool/tnt_call.h"
-"/usr/include/tarantool/tnt_delete.h"
-"/usr/include/tarantool/tnt_dir.h"
-"/usr/include/tarantool/tnt_enc.h"
-"/usr/include/tarantool/tnt_insert.h"
-"/usr/include/tarantool/tnt_io.h"
-"/usr/include/tarantool/tnt_iob.h"
-"/usr/include/tarantool/tnt_iter.h"
-"/usr/include/tarantool/tnt_lex.h"
-"/usr/include/tarantool/tnt_log.h"
-"/usr/include/tarantool/tnt_mem.h"
-"/usr/include/tarantool/tnt_net.h"
-"/usr/include/tarantool/tnt_opt.h"
-"/usr/include/tarantool/tnt_ping.h"
-"/usr/include/tarantool/tnt_proto.h"
-"/usr/include/tarantool/tnt_queue.h"
-"/usr/include/tarantool/tnt_reply.h"
-"/usr/include/tarantool/tnt_request.h"
-"/usr/include/tarantool/tnt_rpl.h"
-"/usr/include/tarantool/tnt_select.h"
-"/usr/include/tarantool/tnt_snapshot.h"
-"/usr/include/tarantool/tnt_sql.h"
-"/usr/include/tarantool/tnt_stream.h"
-"/usr/include/tarantool/tnt_tuple.h"
-"/usr/include/tarantool/tnt_update.h"
-"/usr/include/tarantool/tnt_utf8.h"
-"/usr/include/tarantool/tnt_xlog.h"
-"/usr/lib/libtarantool.a"
-"/usr/lib/libtarantool.so"
-"/usr/lib/libtarantool.so.1"
-"/usr/lib/libtarantool.so.1.1"
-"/usr/lib/libtarantoolnet.a"
-"/usr/lib/libtarantoolnet.so"
-"/usr/lib/libtarantoolnet.so.1"
-"/usr/lib/libtarantoolnet.so.1.1"
-"/usr/lib/libtarantoolrpl.a"
-"/usr/lib/libtarantoolrpl.so"
-"/usr/lib/libtarantoolrpl.so.1"
-"/usr/lib/libtarantoolrpl.so.1.1"
-"/usr/lib/libtarantoolsql.a"
-"/usr/lib/libtarantoolsql.so"
-"/usr/lib/libtarantoolsql.so.1"
-"/usr/lib/libtarantoolsql.so.1.1"
+#%files dev
+#%defattr(-,root,root,-)
+#%dir "/usr/include/tarantool"
+#"/usr/include/tarantool/tnt.h"
+#"/usr/include/tarantool/tnt_buf.h"
+#"/usr/include/tarantool/tnt_call.h"
+#"/usr/include/tarantool/tnt_delete.h"
+#"/usr/include/tarantool/tnt_dir.h"
+#"/usr/include/tarantool/tnt_enc.h"
+#"/usr/include/tarantool/tnt_insert.h"
+#"/usr/include/tarantool/tnt_io.h"
+#"/usr/include/tarantool/tnt_iob.h"
+#"/usr/include/tarantool/tnt_iter.h"
+#"/usr/include/tarantool/tnt_lex.h"
+#"/usr/include/tarantool/tnt_log.h"
+#"/usr/include/tarantool/tnt_mem.h"
+#"/usr/include/tarantool/tnt_net.h"
+#"/usr/include/tarantool/tnt_opt.h"
+#"/usr/include/tarantool/tnt_ping.h"
+#"/usr/include/tarantool/tnt_proto.h"
+#"/usr/include/tarantool/tnt_queue.h"
+#"/usr/include/tarantool/tnt_reply.h"
+#"/usr/include/tarantool/tnt_request.h"
+#"/usr/include/tarantool/tnt_rpl.h"
+#"/usr/include/tarantool/tnt_select.h"
+#"/usr/include/tarantool/tnt_snapshot.h"
+#"/usr/include/tarantool/tnt_sql.h"
+#"/usr/include/tarantool/tnt_stream.h"
+#"/usr/include/tarantool/tnt_tuple.h"
+#"/usr/include/tarantool/tnt_update.h"
+#"/usr/include/tarantool/tnt_utf8.h"
+#"/usr/include/tarantool/tnt_xlog.h"
+# "/usr/lib/libtarantool.a"
+# "/usr/lib/libtarantool.so"
+# "/usr/lib/libtarantool.so.1"
+# "/usr/lib/libtarantool.so.1.1"
+# "/usr/lib/libtarantoolnet.a"
+# "/usr/lib/libtarantoolnet.so"
+# "/usr/lib/libtarantoolnet.so.1"
+# "/usr/lib/libtarantoolnet.so.1.1"
+# "/usr/lib/libtarantoolrpl.a"
+# "/usr/lib/libtarantoolrpl.so"
+# "/usr/lib/libtarantoolrpl.so.1"
+# "/usr/lib/libtarantoolrpl.so.1.1"
+# "/usr/lib/libtarantoolsql.a"
+# "/usr/lib/libtarantoolsql.so"
+# "/usr/lib/libtarantoolsql.so.1"
+# "/usr/lib/libtarantoolsql.so.1.1"
 
 %files client
 %defattr(-,root,root,-)
 "%{_mandir}/man1/tarantool.1.gz"
 "%{_bindir}/tarantool"
-"%{_bindir}/tarancheck"
-"%{_bindir}/tarantar"
+#"%{_bindir}/tarancheck"
+#"%{_bindir}/tarantar"
 
 %changelog
-* Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
+* Wed Nov 13 2013 Tarantool Team <support@tarantool.org> 1.0-2
+- Temporary disable client for 1.6
+
+* Mon May 20 2013 Tarantool Team <support@tarantool.org> 1.0-1
 - Initial version of the RPM spec

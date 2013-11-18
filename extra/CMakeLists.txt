@@ -49,3 +49,4 @@ if (TARGET_OS_DARWIN)
 endif()
 
 add_executable(txt2c txt2c.c)
+add_executable(bin2c bin2c.c)

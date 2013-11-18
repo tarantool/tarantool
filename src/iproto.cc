@@ -203,7 +203,7 @@ iproto_queue_init(struct iproto_queue *i_queue,
 {
 	i_queue->size = size;
 	i_queue->begin = i_queue->end = 0;
-	i_queue->queue = (struct iproto_request *) palloc(eter_pool, size *
+	i_queue->queue = (struct iproto_request *) calloc(size,
 				sizeof (struct iproto_request));
 	/**
 	 * Initialize an ev_async event which would start
@@ -334,7 +334,7 @@ iproto_session_create(const char *name, int fd, struct sockaddr_in *addr,
 {
 	struct iproto_session *session;
 	if (SLIST_EMPTY(&iproto_session_cache)) {
-		session = (struct iproto_session *) palloc(eter_pool, sizeof(*session));
+		session = (struct iproto_session *) malloc(sizeof(*session));
 		session->input.data = session->output.data = session;
 	} else {
 		session = SLIST_FIRST(&iproto_session_cache);
@@ -658,8 +658,9 @@ iproto_reply(struct iproto_port *port, box_process_func callback,
 	char *body = (char *) &header[1];
 	iproto_port_init(port, out, header);
 	try {
-		callback((struct port *) port, header->msg_code,
-			 body, header->len);
+		struct request request;
+		request_create(&request, header->msg_code, body, header->len);
+		callback((struct port *) port, &request);
 	} catch (const ClientError& e) {
 		if (port->reply.found)
 			obuf_rollback_to_svp(out, &port->svp);

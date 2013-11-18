@@ -1,36 +1,40 @@
-lua os.execute
+--
+-- Test that some built-in functions were disabled by sandbox
+--
+os.execute
 ---
- - nil
+- null
 ...
-lua os.exit
+os.exit
 ---
- - nil
+- null
 ...
-lua os.rename
+os.rename
 ---
- - nil
+- null
 ...
-lua os.tmpname
+os.tmpname
 ---
- - nil
+- null
 ...
-lua os.remove
+os.remove
 ---
- - nil
+- null
 ...
-lua io
+io
 ---
- - nil
+- null
 ...
-lua require
+require
 ---
- - nil
+- null
 ...
-lua package
+package
 ---
- - nil
+- null
 ...
-lua ffi
+-- FFI can be mistakenly saved to the global variable by the one of our modules
+ffi
 ---
- - nil
+- null
 ...

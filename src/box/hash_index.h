@@ -35,16 +35,11 @@ struct mh_index_t;
 
 class HashIndex: public Index {
 public:
-	HashIndex(struct key_def *key_def, struct space *space);
+	HashIndex(struct key_def *key_def);
 	~HashIndex();
 
-	virtual void beginBuild();
-	virtual void buildNext(struct tuple *tuple);
-	virtual void endBuild();
-	virtual void build(Index *pk);
+	virtual void reserve(uint32_t size_hint);
 	virtual size_t size() const;
-	virtual struct tuple *min() const;
-	virtual struct tuple *max() const;
 	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
 	virtual struct tuple *replace(struct tuple *old_tuple,
@@ -55,9 +50,6 @@ public:
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
-
-	virtual void reserve(uint32_t n_tuples);
-
 protected:
 	struct mh_index_t *hash;
 };

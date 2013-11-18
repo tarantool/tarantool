@@ -265,6 +265,38 @@ out:
 }
 
 void
+backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
+                  void *cb_ctx)
+{
+	struct frame *frame = (struct frame *) frame_;
+	void *stack_top = (char *) stack + stack_size;
+	void *stack_bottom = stack;
+	int frameno = 0;
+	const char *sym = NULL;
+	size_t offset = 0;
+	while (stack_bottom <= (void *)frame && (void *)frame < stack_top) {
+#ifdef HAVE_BFD
+		struct symbol *s = addr2symbol(frame->ret);
+		if (s != NULL) {
+			sym = s->name;
+			offset = (const char *) frame->ret - (const char *) s->addr;
+			if (strcmp(s->name, "main") == 0) {
+				cb(frameno, frame->ret, sym, offset, cb_ctx);
+				break;
+			}
+		}
+#endif /* HAVE_BFD */
+		int rc = cb(frameno, frame->ret, sym, offset, cb_ctx);
+		if (rc != 0)
+			return;
+		frame = frame->rbp;
+		sym = NULL;
+		offset = 0;
+		frameno++;
+	}
+}
+
+void
 print_backtrace()
 {
 	void *frame = __builtin_frame_address(0);

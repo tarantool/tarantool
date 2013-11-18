@@ -5,20 +5,12 @@ floor = require("math").floor
 -- Access to box.cfg from start-up script
 --
 
-box_cfg = {}
-function copy_box_cfg()
-    for i, v in pairs(box.cfg) do
-        box_cfg[i] = v
-    end
-end
+box_cfg = box.cfg()
 
 function print_config()
-    for i, v in pairs(box_cfg) do
-        print(i, " = ", v)
-    end
+	return box_cfg
 end
 
-copy_box_cfg()
 
 --
 -- Test for bug #977898
@@ -30,6 +22,9 @@ local function do_insert()
     box.insert(0, 1, 2, 4, 8)
 end
 
+space = box.schema.create_space('tweedledum', { id = 0 })
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+
 fiber = box.fiber.create(do_insert)
 box.fiber.resume(fiber)
 
@@ -37,7 +32,7 @@ box.fiber.resume(fiber)
 -- Test insert from start-up script
 --
 
-box.insert(0, 2, 4, 8, 16)
+space:insert(2, 4, 8, 16)
 
 --
 -- A test case for https://github.com/tarantool/tarantool/issues/53

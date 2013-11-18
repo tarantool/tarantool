@@ -45,6 +45,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#if 0
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_queue.h>
@@ -53,6 +54,7 @@
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
+#endif
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
@@ -78,10 +80,12 @@ static inline int tc_cli_error(char *e) {
 }
 
 static int tc_cli_reconnect(void) {
+#if 0
 	if (tnt_connect(tc.net) == -1) {
 		tc_printf("reconnect: %s\n", tnt_strerror(tc.net));
 		return 1;
 	}
+#endif
 	if (tc_admin_reconnect(&tc.admin) == -1) {
 		tc_printf("reconnect: admin console connection failed\n");
 		return 1;
@@ -90,6 +94,7 @@ static int tc_cli_reconnect(void) {
 	return 0;
 }
 
+#if 0
 enum tc_keywords {
 	TC_EXIT = TNT_TK_CUSTOM + 1,
 	TC_TEE,
@@ -102,13 +107,7 @@ enum tc_keywords {
 
 static struct tnt_lex_keyword tc_lex_keywords[] =
 {
-	{ "e", 1, TC_EXIT },
-	{ "ex", 2, TC_EXIT },
-	{ "exi", 3, TC_EXIT },
 	{ "exit", 4, TC_EXIT },
-	{ "q", 1, TC_EXIT },
-	{ "qu", 2, TC_EXIT },
-	{ "qui", 3, TC_EXIT },
 	{ "quit", 4, TC_EXIT },
 	{ "help", 4, TC_HELP },
 	{ "tee", 3, TC_TEE },
@@ -118,6 +117,7 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "delimiter", 9, TC_SETOPT_DELIM},
 	{ NULL, 0, TNT_TK_NONE }
 };
+#endif
 
 enum tc_cli_cmd_ret {
 	TC_CLI_OK,
@@ -125,6 +125,7 @@ enum tc_cli_cmd_ret {
 	TC_CLI_EXIT
 };
 
+#if 0
 static void
 tc_cmd_usage(void)
 {
@@ -135,11 +136,12 @@ tc_cmd_usage(void)
 		" - tee 'path'\n"
 		" - notee\n"
 		" - loadfile 'path'\n"
-		" - setopt key=val\n"
-		" - (possible pairs: delim=\'str\')\n"
+		" - setopt key val\n"
+		" - (possible pairs: delimiter 'string')\n"
 		"...\n";
 	tc_printf("%s", usage);
 }
+#endif
 
 static int tc_cli_admin(char *cmd, int exit) {
 	char *e = NULL;
@@ -149,6 +151,7 @@ static int tc_cli_admin(char *cmd, int exit) {
 	return 0;
 }
 
+#if 0
 int tc_cmd_tee_close(void)
 {
 	if (tc.tee_fd == -1)
@@ -169,7 +172,9 @@ static int tc_cmd_tee_open(char *path)
 	}
 	return 0;
 }
+#endif
 
+#if 0
 static int
 tc_cmd_dostring(char *buf, size_t size, int *reconnect)
 {
@@ -229,11 +234,29 @@ tc_cmd_loadfile(char *path, int *reconnect)
 	free(buf);
 	return rc;
 }
+#endif
+
+#if 0
+static void replace_newline(char *cmd) {
+	int len = strlen(cmd);
+	int offset = 0;
+	for (int i = 0; i < len - 1; ++i)
+		if (cmd[i] == '\\' && cmd[i + 1] == 'n')
+			cmd[i++ - offset++] = '\n';
+		else if (offset != 0)
+			cmd[i - offset] = cmd[i];
+	cmd[len - offset] = '\0';
+}
+#endif
 
 static enum tc_cli_cmd_ret
 tc_cmd_try(char *cmd, size_t size, int *reconnect)
 {
+	(void)size;
 	enum tc_cli_cmd_ret rc = TC_CLI_OK;
+	if (! strcmp(cmd, "help"))
+		cmd = "help()";
+#if 0
 	struct tnt_lex lex;
 	if (!tnt_lex_init(&lex, tc_lex_keywords, (unsigned char*)cmd, size))
 		return TC_CLI_ERROR;
@@ -244,6 +267,7 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 		break;
 	case TC_HELP:
 		tc_cmd_usage();
+		cmd = "help()";
 		break;
 	case TC_TEE:
 		if (tnt_lex(&lex, &tk) != TNT_TK_STRING) {
@@ -267,8 +291,10 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 	case TC_SETOPT:
 		switch (tnt_lex(&lex, &tk)) {
 		case TC_SETOPT_DELIM:
-			if (tnt_lex(&lex, &tk) == '=' &&
-			    tnt_lex(&lex, &tk) == TNT_TK_STRING) {
+			if (tnt_lex(&lex, &tk) != '=') {
+				tnt_lex_push(&lex, tk);
+			}
+			if (tnt_lex(&lex, &tk) == TNT_TK_STRING) {
 				if (!TNT_TK_S(tk)->size) {
 					tc.opt.delim = "";
 					tc.opt.delim_len = 0;
@@ -281,11 +307,12 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 				strncpy(temp,
 					(const char *)TNT_TK_S(tk)->data,
 					TNT_TK_S(tk)->size + 1);
+				replace_newline(temp);
 				tc.opt.delim = temp;
 				tc.opt.delim_len = strlen(tc.opt.delim);
 			} else {
 				tc_printf("---\n");
-				tc_printf(" - Expected delim='string'\n");
+				tc_printf(" - Expected `setopt delimiter 'string'`\n");
 				tc_printf("---\n");
 			}
 			break;
@@ -296,11 +323,14 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 		}
 		goto done;
 	}
+#endif
 	*reconnect = tc_cli_admin(cmd, rc == TC_CLI_EXIT);
 	if (*reconnect)
 		return TC_CLI_ERROR;
+	/*
 done:
 	tnt_lex_free(&lex);
+	*/
 	return rc;
 }
 
@@ -313,6 +343,7 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 			if (reconnect)
 				return TC_CLI_ERROR;
 		}
+#if 0
 		char *e = NULL;
 		if (tnt_query_is(cmd, size)) {
 			if (tc_query(cmd, &e) == 0) {
@@ -325,12 +356,15 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 			if (reconnect && tnt_error(tc.net) != TNT_ESYSTEM)
 				reconnect = 0;
 		} else {
+#endif
 			enum tc_cli_cmd_ret rc = tc_cmd_try(cmd, size, &reconnect);
 			if (reconnect)
 				continue;
 			if (rc == TC_CLI_EXIT || rc == TC_CLI_ERROR)
 				return rc;
+#if 0
 		}
+#endif
 	} while (reconnect);
 
 	return TC_CLI_OK;
@@ -385,9 +419,9 @@ static char* tc_cli_readline_pipe() {
 				ungetc(c_t, stdin);
 			wctomb(str + pos++, 0);
 			break;
-		}
-		else
+		} else {
 			pos += wctomb(str + pos, c);
+		}
 	}
 	if (pos == 1 && c == WEOF) {
 		free(str);
@@ -396,11 +430,8 @@ static char* tc_cli_readline_pipe() {
 	return str;
 }
 
-
-
 static int check_delim(char* str, size_t len, size_t sep_len) {
 	const char *sep = tc.opt.delim;
-	len = strip_end_ws(str);
 	if (sep_len == 0)
 		return 1;
 	if (len < sep_len)
@@ -409,8 +440,6 @@ static int check_delim(char* str, size_t len, size_t sep_len) {
 	for (i = len; sep_len > 0; --sep_len, --i)
 		if (str[i - 1] != sep[sep_len - 1])
 			return 0;
-	str[i] = '\0';
-	len = strip_end_ws(str);
 	return 1;
 }
 
@@ -440,44 +469,44 @@ int tc_cli(void)
 		if (isatty(STDIN_FILENO)) {
 			snprintf(prompt_delim, sizeof(prompt_delim),
 				 "%*s> ", prompt_len, "-");
-			part_cmd = readline(!tc_buf_str_isempty(&cmd) ? prompt_delim
-							   : prompt);
+			part_cmd = readline(! tc_buf_str_isempty(&cmd)
+					    ? prompt_delim
+					    : prompt);
 		} else {
 			clearerr(stdin);
 			part_cmd = tc_cli_readline_pipe();
 		}
 		if (!part_cmd)
 			break;
-		size_t part_cmd_len = strlen(part_cmd);
-		int delim_exists = check_delim(part_cmd,
-					       part_cmd_len,
-					       tc.opt.delim_len);
 		if (tc_buf_str_append(&cmd, part_cmd, strlen(part_cmd)))
 			tc_error(TC_REALLOCATION_ERROR,
 				 cmd.size);
+		int delim_exists = check_delim( cmd.data,
+						cmd.used - 1,
+						tc.opt.delim_len);
+		if (tc_buf_str_append(&cmd, "\n", 1)) /* Append '\n' to the STR */
+			tc_error(TC_REALLOCATION_ERROR,
+				 cmd.size);
 		free(part_cmd);
-		if (!delim_exists && !feof(stdin)) {
-			if (tc_buf_str_append(&cmd, " ", 1))
-				tc_error(TC_REALLOCATION_ERROR,
-					 cmd.size);
+		if (!delim_exists && !feof(stdin)) /* If still without delimiter and not EOF */
 			continue;
-		}
-		tc_buf_str_stripws(&cmd);
+		tc_buf_str_delete(&cmd, 1); /* Delete last appended '\n' */
+		if (isatty(STDIN_FILENO)) /* Enable history on readline use only */
+			add_history(cmd.data);
+		tc_buf_cmdfy(&cmd, tc.opt.delim_len); /* Create admin cmd from STR */
 		if (delim_exists && tc_buf_str_isempty(&cmd))
-			goto next;
+			goto next; /* If empty - don't send to server, it crashes */
 		tc_print_cmd2tee(cmd.used != 1 ? prompt_delim : prompt,
 				 cmd.data, cmd.used - 1);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
 						     cmd.used - 1);
-		if (isatty(STDIN_FILENO))
-			add_history(cmd.data);
 next:
 		tc_buf_clear(&cmd);
 		if (ret == TC_CLI_EXIT || feof(stdin)) {
 			tc_buf_free(&cmd);
 			break;
 		}
-}
+	}
 
 	/* updating history file */
 	write_history(history);
@@ -487,3 +516,92 @@ next:
 
 #undef TC_ALLOCATION_ERROR
 #undef TC_REALLOCATION_ERROR
+
+#if 0
+struct tc_version {
+	int a, b, c;
+	int commit;
+};
+
+static int
+tc_versionof(struct tc_version *v, char *str)
+{
+	int rc = sscanf(str, "%d.%d.%d-%d", &v->a, &v->b, &v->c, &v->commit);
+	return rc == 4;
+}
+
+static int
+tc_versioncmp(struct tc_version *v, int a, int b, int c, int commit)
+{
+	int rc;
+	rc = v->a - a;
+	if (rc != 0)
+		return rc;
+	rc = v->b - b;
+	if (rc != 0)
+		return rc;
+	rc = v->c - c;
+	if (rc != 0)
+		return rc;
+	rc = v->commit - commit;
+	if (rc != 0)
+		return rc;
+	return 0;
+}
+#endif
+
+#if 0
+	if (tc_admin_query(&tc.admin, "box.info.version") == -1)
+		return -1;
+	char *message = NULL;
+	size_t size = 0;
+	int rc = tc_admin_reply(&tc.admin, &message, &size);
+	if (rc == -1 || size < 8) {
+		free(message);
+		return -1;
+	}
+	char *version = message + 7;
+	char *eol = strchr(version, '\n');
+	*eol = 0;
+	struct tc_version v;
+	rc = tc_versionof(&v, version);
+	if (rc == 0) {
+		free(message);
+		return -1;
+	}
+	free(message);
+
+	/* call motd for version >= 1.5.3-93 */
+	if (tc_versioncmp(&v, 1, 5, 3, 93) < 0)
+		return 0;
+	if (tc_admin_query(&tc.admin, "motd()") == -1)
+		return -1;
+	rc = tc_admin_reply(&tc.admin, &message, &size);
+	if (rc == -1 || size < 8) {
+		free(message);
+		return -1;
+	}
+	tc_printf("%s", message);
+	free(message);
+#endif
+
+int tc_cli_motd(void)
+{
+	/* call motd for version >= 1.5.3-93 */
+	if (tc_admin_query(&tc.admin, "motd()") == -1)
+		return -1;
+	char *message = NULL;
+	size_t size = 0;
+	int rc = tc_admin_reply(&tc.admin, &message, &size);
+	if (rc == -1 || size < 8) {
+		free(message);
+		return -1;
+	}
+	if (strcmp(message, "---\nunknown command. try typing help.\n...\n") == 0) {
+		free(message);
+		return 0;
+	}
+	tc_printf("%s", message);
+	free(message);
+	return 0;
+}

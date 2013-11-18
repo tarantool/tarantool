@@ -3,7 +3,10 @@
 
 #include "prscfg.h"
 
-extern struct tbuf *cfg_out;
+/** Begin logging - must be called before load_cfg() . */
+extern FILE *cfg_out;
+extern char *cfg_log;
+extern size_t cfg_logsize;
 
 void out_warning(ConfettyError r, const char *format, ...);
 

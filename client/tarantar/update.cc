@@ -66,6 +66,10 @@ _alloc(void *arg, unsigned int size) {
 struct tnt_tuple*
 ts_update(struct tnt_request *r, struct tnt_tuple *old)
 {
+	(void) r;
+	(void) old;
+	/* TODO: MessagePack */
+#if 0
 	void *buf = NULL;
 	uint32_t new_size = 0;
 	uint32_t new_count = 0;
@@ -108,6 +112,8 @@ ts_update(struct tnt_request *r, struct tnt_tuple *old)
 
 	free(buf);
 	return n;
+#endif
+	return NULL;
 }
 
 } // extern "C"

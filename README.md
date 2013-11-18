@@ -1,20 +1,28 @@
-TARANTOOL, http://tarantool.org
+# tarantool [![Build Status](https://travis-ci.org/tarantool/tarantool.png?branch=master)](https://travis-ci.org/tarantool/tarantool)
 
-Tarantool is a framework for in-memory key/value storage and
-Box is a yet another in-memory key-value database.
+http://tarantool.org 
 
-Key features of the pair include:
+Tarantool is an efficient in-memory NoSQL database and a
+Lua application server, blended.
+
+Key features of the system:
+ * flexible data model
+ * multiple index types: HASH, TREE, BITSET
+ * optional persistence and strong data durability
  * log streaming replication
- * hot standby
- * a simple binary protocol, as well as emulation of memcached
-   protocol
- * extensibility and speed
+ * lua functions, procedures, triggers, with
+   rich access to database API, JSON support,
+   inter-procedure and network communication libraries
+ * a command line client supporting simple SQL and
+   a native Lua console
 
-Caveats:
- * supported platforms are Linux/x86 and FreeBSD/x86
- * supported compilers are clang and gcc.
+Tarantool is ideal for data-enriched components of 
+scalable Web architecture: traditional database caches, queue
+servers, in-memory data store for hot data, and so on.
 
-COMPILATION AND INSTALL
+Supported platforms are Linux/x86 and FreeBSD/x86, Mac OS X.
+
+## Compilation and install
 
 Tarantool is written in C and C++.
 To build, you will need GCC or Apple CLang compiler.
@@ -36,19 +44,20 @@ a stack trace after a crash.
 
 Please follow these steps to compile Tarantool:
 
-tarantool $ git submodule init; git submodule update # if compiling from git
-tarantool $ cmake .
-tarantool $ make
+    # If compiling from git
+    tarantool $ git submodule init
+    tarantool $ git submodule update
+
+    tarantool $ cmake .
+    tarantool $ make
 
 To use a different release type, say, RelWithDebugInfo, use:
 
-tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
 Additional build options can be set similarly:
 
-tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true
-
--- builds the command line client.
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true # builds the command line client.
 
 'make' creates tarantool_box executable in directory
 src/box and tarantool executable in client/tarantool.
@@ -60,33 +69,29 @@ simplest way to setup and start the server, but it requires a few
 additional Python modules:
  * daemon
  * pyyaml
- * pexpect.
 
-Once all pre-requisites are installed, try:
+Once all prerequisites are installed, try:
 
-tarantool $ cd test && ./test-run.py --suite box --start-and-exit
+    tarantool $ cd test
+    tarantool $ ./test-run.py --suite box --start-and-exit
 
 This will create a 'var' subdirectory in directory 'test',
 populate it with necessary files, and
 start the server. To connect, you could use
 a simple command-line client:
 
-'''
-tarantool $ ./test/tarantool
-'''
+    tarantool $ ./test/tarantool
 
 Alternatively, if a customized server configuration is required,
 you could follow these steps:
 
-```
-tarantool $ emacs cfg/tarantool.cfg # edit the configuration
-# Initialize the storage directory, path to this directory
-# is specified in the configuration file:
-tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg --init-storage
-#
-# run
-tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
-```
+
+    tarantool $ emacs cfg/tarantool.cfg # edit the configuration
+    # Initialize the storage directory, path to this directory
+    # is specified in the configuration file:
+    tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg --init-storage
+    # Run tarantool
+    tarantool $ src/box/tarantool_box --config cfg/tarantool.cfg
 
 Please report bugs at http://github.com/tarantool/tarantool/issues
 We also warmly welcome your feedback in the discussion mailing

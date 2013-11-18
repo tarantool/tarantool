@@ -29,19 +29,16 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
-struct lua_State;
 
+struct lua_State;
+struct txn;
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(struct request *request, struct port *port);
-
-/**
- * Create an instance of Lua interpreter in box.
- */
-void box_lua_init();
+box_lua_execute(const struct request *request, struct txn *txn,
+		struct port *port);
 
 struct tuple *lua_istuple(struct lua_State *L, int narg);
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */

@@ -43,6 +43,7 @@ extern "C" {
 #include <assoc.h>
 #include "iobuf.h"
 #include <rlist.h>
+#include "memory.h"
 
 enum { FIBER_CALL_STACK = 16 };
 
@@ -321,8 +322,7 @@ fiber_ready_async(ev_async *watcher, int revents)
 struct fiber *
 fiber_find(uint32_t fid)
 {
-	struct mh_i32ptr_node_t node = { fid, NULL };
-	mh_int_t k = mh_i32ptr_get(fiber_registry, &node, NULL);
+	mh_int_t k = mh_i32ptr_find(fiber_registry, fid, NULL);
 
 	if (k == mh_end(fiber_registry))
 		return NULL;
@@ -346,12 +346,12 @@ unregister_fid(struct fiber *fiber)
 void
 fiber_gc(void)
 {
-	if (palloc_allocated(fiber->gc_pool) < 128 * 1024) {
-		palloc_reset(fiber->gc_pool);
+	if (region_used(&fiber->gc) < 128 * 1024) {
+		region_reset(&fiber->gc);
 		return;
 	}
 
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 }
 
 
@@ -370,7 +370,7 @@ fiber_zombificate()
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 	rlist_move_entry(&zombie_fibers, fiber, link);
 }
 
@@ -411,7 +411,7 @@ void
 fiber_set_name(struct fiber *fiber, const char *name)
 {
 	assert(name != NULL);
-	palloc_set_name(fiber->gc_pool, name);
+	region_set_name(&fiber->gc, name);
 }
 
 /**
@@ -434,12 +434,11 @@ fiber_new(const char *name, void (*f) (va_list))
 		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
 		rlist_move_entry(&fibers, fiber, link);
 	} else {
-		fiber = (struct fiber *) palloc(eter_pool, sizeof(*fiber));
+		fiber = (struct fiber *) calloc(1, sizeof(*fiber));
 
-		memset(fiber, 0, sizeof(*fiber));
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
-		fiber->gc_pool = palloc_create_pool("");
+		region_create(&fiber->gc, slabc_runtime);
 
 		rlist_add_entry(&fibers, fiber, link);
 		rlist_create(&fiber->state);
@@ -464,8 +463,8 @@ fiber_new(const char *name, void (*f) (va_list))
 /**
  * Free as much memory as possible taken by the fiber.
  *
- * @note we can't release memory allocated via palloc(eter_pool, ...)
- * so, struct fiber and some of its members are leaked forever.
+ * @note we don't release memory allocated for
+ * struct fiber and some of its members.
  */
 void
 fiber_destroy(struct fiber *f)
@@ -476,7 +475,7 @@ fiber_destroy(struct fiber *f)
 		return;
 
 	rlist_del(&f->state);
-	palloc_destroy_pool(f->gc_pool);
+	region_destroy(&f->gc);
 	tarantool_coro_destroy(&f->coro);
 }
 
@@ -490,36 +489,6 @@ fiber_destroy_all()
 		fiber_destroy(f);
 }
 
-
-static void
-fiber_info_print(struct tbuf *out, struct fiber *fiber)
-{
-	void *stack_top = (char *) fiber->coro.stack + fiber->coro.stack_size;
-
-	tbuf_printf(out, "  - fid: %4i" CRLF, fiber->fid);
-	tbuf_printf(out, "    csw: %i" CRLF, fiber->csw);
-	tbuf_printf(out, "    name: %s" CRLF, fiber_name(fiber));
-	tbuf_printf(out, "    stack: %p" CRLF, stack_top);
-#ifdef ENABLE_BACKTRACE
-	tbuf_printf(out, "    backtrace:" CRLF "%s",
-		    backtrace(fiber->last_stack_frame,
-			      fiber->coro.stack, fiber->coro.stack_size));
-#endif /* ENABLE_BACKTRACE */
-}
-
-void
-fiber_info(struct tbuf *out)
-{
-	struct fiber *fiber;
-
-	tbuf_printf(out, "fibers:" CRLF);
-
-	rlist_foreach_entry(fiber, &fibers, link)
-		fiber_info_print(out, fiber);
-	rlist_foreach_entry(fiber, &zombie_fibers, link)
-		fiber_info_print(out, fiber);
-}
-
 void
 fiber_init(void)
 {
@@ -530,7 +499,7 @@ fiber_init(void)
 
 	memset(&sched, 0, sizeof(sched));
 	sched.fid = 1;
-	sched.gc_pool = palloc_create_pool("");
+	region_create(&sched.gc, slabc_runtime);
 	fiber_set_name(&sched, "sched");
 
 	sp = call_stack;
@@ -552,4 +521,21 @@ fiber_free(void)
 		fiber_destroy_all();
 		mh_i32ptr_delete(fiber_registry);
 	}
+}
+
+int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
+{
+	struct fiber *fiber;
+	int res;
+	rlist_foreach_entry(fiber, &fibers, link) {
+		res = cb(fiber, cb_ctx);
+		if (res != 0)
+			return res;
+	}
+	rlist_foreach_entry(fiber, &zombie_fibers, link) {
+		res = cb(fiber, cb_ctx);
+		if (res != 0)
+			return res;
+	}
+	return 0;
 }

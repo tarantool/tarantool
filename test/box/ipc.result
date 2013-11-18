@@ -1,231 +1,301 @@
-lua ch = box.ipc.channel()
+ch = box.ipc.channel()
 ---
 ...
-lua ch:is_full()
+ch:is_full()
 ---
- - false
+- false
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
- - true
+- true
 ...
-lua ch:get(.1)
+ch:get(.1)
 ---
- - nil
+- null
 ...
-lua ch:put()
+ch:put()
 ---
-error: 'usage: channel:put(var [, timeout])'
+- error: 'usage: channel:put(var [, timeout])'
 ...
-lua ch:put('test')
+ch:put('test')
 ---
- - true
+- true
 ...
-lua ch:get()
+ch:get()
 ---
- - test
+- test
 ...
-lua ch:get('wrong timeout')
+ch:get('wrong timeout')
 ---
-error: 'timeout must be a number'
+- error: timeout must be a number
 ...
-lua ch:get(-10)
+ch:get(-10)
 ---
-error: 'wrong timeout'
+- error: wrong timeout
 ...
-lua ch:put(234)
+ch:put(234)
 ---
- - true
+- true
 ...
-lua ch:put(345, .5)
+ch:put(345, .5)
 ---
- - false
+- false
 ...
-lua ch:is_full()
+ch:is_full()
 ---
- - true
+- true
 ...
-lua ch:is_empty()
+ch:is_empty()
 ---
- - false
+- false
 ...
-lua buffer = {}
----
-...
-lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)
+buffer = {}
 ---
 ...
-lua box.fiber.resume(tfbr)
+--# setopt delimiter ';'
+tfbr = box.fiber.create(
+    function()
+        box.fiber.detach()
+        while true do
+            table.insert(buffer, ch:get())
+        end
+    end
+);
 ---
 ...
-lua for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end
----
-1 true
-2 true
-3 true
-4 true
-5 true
-6 true
-7 true
-8 true
-9 true
-10 true
-...
-lua ch:has_readers()
----
- - true
-...
-lua ch:has_writers()
----
- - false
-...
-lua box.fiber.cancel(tfbr)
+box.fiber.resume(tfbr);
 ---
 ...
-lua ch:has_readers()
----
- - false
-...
-lua ch:has_writers()
----
- - false
-...
-lua ch:put(box.info.pid)
----
- - true
-...
-lua ch:is_full()
----
- - true
-...
-lua ch:is_empty()
----
- - false
-...
-lua ch:get(box.info.pid) == box.info.pid
----
- - true
-...
-lua for i, v in pairs(buffer) do print(v) end
----
-234
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-...
-lua ch:is_empty()
----
- - true
-...
-lua ch:broadcast()
----
-error: 'usage: channel:broadcast(variable)'
-...
-lua ch:broadcast(123)
----
- - true
-...
-lua ch:get()
----
- - 123
-...
-lua ch:is_full()
----
- - false
-...
-lua ch:is_empty()
----
- - true
-...
-lua tfbr = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr  - ' .. tostring(v)) end end)
+t = {};
 ---
 ...
-lua box.fiber.resume(tfbr)
+for i = 1, 10 do
+    table.insert(t, {i, ch:put(i, 0.1)})
+end;
 ---
 ...
-lua tfbr2 = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr2 - ' .. tostring(v)) end end)
+--# setopt delimiter ''
+t
+---
+- - - 1
+    - true
+  - - 2
+    - true
+  - - 3
+    - true
+  - - 4
+    - true
+  - - 5
+    - true
+  - - 6
+    - true
+  - - 7
+    - true
+  - - 8
+    - true
+  - - 9
+    - true
+  - - 10
+    - true
+...
+ch:has_readers()
+---
+- true
+...
+ch:has_writers()
+---
+- false
+...
+box.fiber.cancel(tfbr)
 ---
 ...
-lua box.fiber.resume(tfbr2)
+ch:has_readers()
+---
+- false
+...
+ch:has_writers()
+---
+- false
+...
+ch:put(box.info.pid)
+---
+- true
+...
+ch:is_full()
+---
+- true
+...
+ch:is_empty()
+---
+- false
+...
+ch:get(box.info.pid) == box.info.pid
+---
+- true
+...
+buffer
+---
+- - 234
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+...
+ch:is_empty()
+---
+- true
+...
+ch:broadcast()
+---
+- error: 'usage: channel:broadcast(variable)'
+...
+ch:broadcast(123)
+---
+- true
+...
+ch:get()
+---
+- 123
+...
+ch:is_full()
+---
+- false
+...
+ch:is_empty()
+---
+- true
+...
+--# setopt delimiter ';'
+tfbr = box.fiber.create(
+    function()
+        box.fiber.detach()
+        while true do
+            local v = ch:get()
+            table.insert(buffer, {'tfbr', tostring(v)})
+        end
+    end
+);
 ---
 ...
-lua buffer = {}
+tfbr2 = box.fiber.create(
+    function()
+        box.fiber.detach()
+        while true do
+            local v = ch:get()
+            table.insert(buffer, {'tfbr2', tostring(v)})
+        end
+    end
+);
 ---
 ...
-lua for i, v in pairs(buffer) do print(v) end
+--# setopt delimiter ''
+box.fiber.resume(tfbr)
 ---
 ...
-lua ch:is_full()
+box.fiber.resume(tfbr2)
 ---
- - false
 ...
-lua ch:is_empty()
+buffer = {}
 ---
- - true
 ...
-lua ch:put(1)
+buffer
 ---
- - true
+- []
 ...
-lua ch:put(2)
+ch:is_full()
 ---
- - true
+- false
 ...
-lua ch:put(3)
+ch:is_empty()
 ---
- - true
+- true
 ...
-lua ch:put(4)
+ch:put(1)
 ---
- - true
+- true
 ...
-lua ch:put(5)
+ch:put(2)
 ---
- - true
+- true
 ...
-lua ch:broadcast('broadcast message!')
+ch:put(3)
 ---
- - 2
+- true
 ...
-lua for i = 35, 45 do print(ch:put(i)) end
+ch:put(4)
 ---
-true
-true
-true
-true
-true
-true
-true
-true
-true
-true
-true
+- true
 ...
-lua for i, v in pairs(buffer) do print(v) end
+ch:put(5)
 ---
-tfbr  - 1
-tfbr2 - 2
-tfbr  - 3
-tfbr2 - 4
-tfbr  - 5
-tfbr2 - broadcast message!
-tfbr  - broadcast message!
-tfbr2 - 35
-tfbr  - 36
-tfbr2 - 37
-tfbr  - 38
-tfbr2 - 39
-tfbr  - 40
-tfbr2 - 41
-tfbr  - 42
-tfbr2 - 43
-tfbr  - 44
-tfbr2 - 45
+- true
+...
+ch:broadcast('broadcast message!')
+---
+- 2
+...
+t = {}
+---
+...
+for i = 35, 45 do table.insert(t, ch:put(i)) end
+---
+...
+t
+---
+- - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+...
+buffer
+---
+- - - tfbr
+    - '1'
+  - - tfbr2
+    - '2'
+  - - tfbr
+    - '3'
+  - - tfbr2
+    - '4'
+  - - tfbr
+    - '5'
+  - - tfbr2
+    - broadcast message!
+  - - tfbr
+    - broadcast message!
+  - - tfbr2
+    - '35'
+  - - tfbr
+    - '36'
+  - - tfbr2
+    - '37'
+  - - tfbr
+    - '38'
+  - - tfbr2
+    - '39'
+  - - tfbr
+    - '40'
+  - - tfbr2
+    - '41'
+  - - tfbr
+    - '42'
+  - - tfbr2
+    - '43'
+  - - tfbr
+    - '44'
+  - - tfbr2
+    - '45'
 ...

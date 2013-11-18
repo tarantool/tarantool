@@ -1,17 +1,21 @@
 
 # Inprogress xlog must be renamed before second insert.
 
-insert into t0 values (1, 'first tuple')
-Insert OK, 1 row affected
+space = box.schema.create_space('tweedledum', { id = 0 })
+---
+...
 00000000000000000002.xlog.inprogress exists
-insert into t0 values (2, 'second tuple')
-Insert OK, 1 row affected
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+---
+...
 00000000000000000002.xlog.inprogress has been successfully renamed
 
 # Inprogress xlog must be renamed during regular termination.
 
-insert into t0 values (3, 'third tuple')
-Insert OK, 1 row affected
+box.space[0]:insert(3, 'third tuple')
+---
+- [3, 'third tuple']
+...
 00000000000000000004.xlog.inprogress exists
 Stopping the server...
 00000000000000000004.xlog.inprogress has been successfully renamed
@@ -36,15 +40,14 @@ Stopping the server...
 A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
 panic_on_wal_error doens't work for duplicate key errors
 
-lua box.space[0]:select(0, 1)
+box.space[0]:select(0, 1)
 ---
- - 1: {}
+- [1, 2]
 ...
-lua box.space[0]:select(0, 2)
+box.space[0]:select(0, 2)
 ---
- - 2: {}
 ...
-lua #box.space[0]
+#box.space[0]
 ---
- - 0
+- 0
 ...

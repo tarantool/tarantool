@@ -101,19 +101,14 @@ errinj_set_byname(char *name, bool state)
 }
 
 /**
- * Dump error injection states to the buffer.
- *
- * @param out output buffer
+ * Dump error injection states to the callback function.
  */
-void
-errinj_info(struct tbuf *out)
-{
-	tbuf_printf(out, "error injections:" CRLF);
+int errinj_foreach(errinj_cb cb, void *cb_ctx) {
 	int i;
 	for (i = 0 ; i < errinj_enum_MAX ; i++) {
-		struct errinj *inj = &errinjs[i];
-		tbuf_printf(out, "  - name: %s" CRLF, inj->name);
-		tbuf_printf(out, "    state: %s" CRLF,
-			    (inj->state) ? "on" : "off");
+		int res = cb(&errinjs[i], cb_ctx);
+		if (res != 0)
+			return res;
 	}
+	return 0;
 }

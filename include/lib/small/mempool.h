@@ -245,6 +245,7 @@ mempool_total(struct mempool *pool)
 }
 
 #if defined(__cplusplus)
+} /* extern "C" */
 #include "exception.h"
 
 static inline void *
@@ -259,12 +260,11 @@ mempool_alloc(struct mempool *pool)
 }
 
 static inline void *
-mempool_calloc(struct mempool *pool)
+mempool_alloc0(struct mempool *pool)
 {
 	return memset(mempool_alloc(pool), 0, pool->objsize);
 }
 
-} /* extern "C" */
 #endif /* __cplusplus */
 
 #endif /* INCLUDES_TARANTOOL_SMALL_MEMPOOL_H */

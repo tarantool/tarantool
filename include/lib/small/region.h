@@ -103,6 +103,12 @@ region_create(struct region *region, struct slab_cache *cache)
 void
 region_free(struct region *region);
 
+static inline void
+region_destroy(struct region *region)
+{
+	return region_free(region);
+}
+
 /** Internal: a single block in a region.  */
 struct rslab
 {
@@ -138,7 +144,7 @@ rslab_unused(struct rslab *slab)
  * @pre block must have enough unused space
  */
 static inline void *
-slab_alloc(struct rslab *slab, size_t size)
+rslab_alloc(struct rslab *slab, size_t size)
 {
 	assert(size <= rslab_unused(slab));
 	char *ptr = (char*)rslab_data(slab) + slab->used;
@@ -159,7 +165,7 @@ region_alloc_nothrow(struct region *region, size_t size)
 						       slab.next_in_list);
 		if (size <= rslab_unused(slab)) {
 			region->slabs.stats.used += size;
-			return slab_alloc(slab, size);
+			return rslab_alloc(slab, size);
 		}
 	}
 	return region_alloc_slow(region, size);
@@ -218,6 +224,7 @@ region_name(struct region *region)
 }
 
 #if defined(__cplusplus)
+} /* extern "C" */
 #include "exception.h"
 
 static inline void *
@@ -231,11 +238,18 @@ region_alloc(struct region *region, size_t size)
 }
 
 static inline void *
-region_calloc(struct region *region, size_t size)
+region_alloc0(struct region *region, size_t size)
 {
 	return memset(region_alloc(region, size), 0, size);
 }
-} /* extern "C" */
+
+extern "C" {
+static inline void *
+region_alloc_cb(void *ctx, size_t size)
+{
+	return region_alloc((struct region *) ctx, size);
+}
+}
 #endif
 
 #endif /* INCLUDES_TARANTOOL_SMALL_REGION_H */

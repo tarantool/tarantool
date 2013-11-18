@@ -33,6 +33,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <assert.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -149,6 +150,11 @@ extern void *__libc_stack_end;
 #ifdef ENABLE_BACKTRACE
 void print_backtrace();
 char *backtrace(void *frame, void *stack, size_t stack_size);
+
+typedef int (backtrace_cb)(int frameno, void *frameret,
+                           const char *func, size_t offset, void *cb_ctx);
+void backtrace_foreach(backtrace_cb cb, void *frame, void *stack, size_t stack_size,
+                       void *cb_ctx);
 #endif /* ENABLE_BACKTRACE */
 
 #ifdef HAVE_BFD
@@ -162,13 +168,6 @@ void symbols_load(const char *name);
 void symbols_free();
 #endif /* HAVE_BFD */
 
-#ifdef NDEBUG
-#  define assert(pred) (void)(0)
-#else
-#  define assert(pred) ((pred) ? (void)(0) : assert_fail (#pred, __FILE__, __LINE__, __FUNCTION__))
-void assert_fail(const char *assertion, const char *file,
-		 unsigned int line, const char *function) __attribute__ ((noreturn));
-#endif
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */
@@ -181,6 +180,14 @@ memmem(const void *block, size_t blen, const void *pat, size_t plen);
 void *
 memrchr(const void *s, int c, size_t n);
 #endif /* HAVE_MEMRCHR */
+
+#ifndef HAVE_OPEN_MEMSTREAM
+/* Declare open_memstream(). */
+#include <stdio.h>
+FILE *
+open_memstream(char **ptr, size_t *sizeloc);
+#endif /* HAVE_OPEN_MEMSTREAM */
+
 
 #if defined(__cplusplus)
 } /* extern "C" */

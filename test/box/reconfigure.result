@@ -1,137 +1,144 @@
-lua box.cfg.too_long_threshold
+box.cfg.too_long_threshold
 ---
- - 0.5
+- 0.5
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - Could not accept read only 'slab_alloc_arena' option
- - Could not accept read only 'pid_file' option
- - Could not accept read only 'logger' option
- - Could not accept read only 'primary_port' option
- - Could not accept read only 'secondary_port' option
- - Could not accept read only 'admin_port' option
- - Could not accept read only 'rows_per_wal' option
- - Could not accept read only 'space[0].enabled' option
- - Could not accept read only 'space[0].index[0].type' option
- - Could not accept read only 'space[0].index[0].unique' option
- - Could not accept read only 'space[0].index[0].key_field[0].fieldno' option
- - Could not accept read only 'space[0].index[0].key_field[0].type' option
+- error: 'Could not accept read only ''slab_alloc_arena'' option.
+
+    Could not accept read only ''pid_file'' option.
+
+    Could not accept read only ''logger'' option.
+
+    Could not accept read only ''primary_port'' option.
+
+    Could not accept read only ''secondary_port'' option.
+
+    Could not accept read only ''admin_port'' option.
+
+    Could not accept read only ''rows_per_wal'' option.
+
+'
 ...
-lua box.cfg.too_long_threshold
+box.cfg.too_long_threshold
 ---
- - 0.5
+- 0.5
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - Option 'primary_port' is not set (or has a default value)
- - Option 'space[0].enabled' is not set (or has a default value)
- - Option 'space[0].index[0].type' is not set (or has a default value)
- - Option 'space[0].index[0].key_field[0].fieldno' is not set (or has a default value)
+- ok
 ...
-reload configuration
+box.cfg.too_long_threshold
 ---
-fail:
- - at least one space or memcached port must be defined
+- 2
 ...
-reload configuration
+box.cfg.snap_io_rate_limit
 ---
-fail:
- - Could not accept read only 'space[1].enabled' option
+- 10
 ...
-reload configuration
+box.cfg.io_collect_interval
 ---
-fail:
- - Could not accept read only 'space[0].index[0].key_field[1].fieldno' option
+- 0.01
 ...
-reload configuration
+box.cfg.reload()
 ---
-ok
+- error: 'empty configuration file ''tarantool.cfg''.
+
+'
 ...
-lua box.cfg.too_long_threshold
+box.cfg.too_long_threshold
 ---
- - 2
+- 2
 ...
-lua box.cfg.snap_io_rate_limit
+box.cfg.snap_io_rate_limit
 ---
- - 10
+- 10
 ...
-lua box.cfg.io_collect_interval
+box.cfg.reload()
 ---
- - 0.01
+- ok
 ...
-reload configuration
+box.cfg.snap_io_rate_limit
 ---
-fail:
- - empty configuration file 'tarantool.cfg'
+- 1
 ...
-lua box.cfg.too_long_threshold
+box.cfg.reload()
 ---
- - 2
+- error: 'can''t open config `tarantool.cfg''.
+
+'
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - can't open config `tarantool.cfg'
+- ok
 ...
-reload configuration
+box.cfg.too_long_threshold
 ---
-ok
-...
-lua box.cfg.too_long_threshold
----
- - 0.5
+- 0.5
 ...
 #
 # A test case for http://bugs.launchpad.net/bugs/712447:
 # Valgrind reports use of not initialized memory after 'reload
 # configuration'
 #
-insert into t0 values (1, 'tuple')
-Insert OK, 1 row affected
-save snapshot
+space = box.schema.create_space('tweedledum', { id = 0 })
 ---
-ok
 ...
-reload configuration
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-fail:
- - can't open config `tarantool.cfg'
 ...
-insert into t0 values (2, 'tuple 2')
-Insert OK, 1 row affected
-save snapshot
+box.insert(0, 1, 'tuple')
 ---
-ok
+- [1, 'tuple']
 ...
-reload configuration
+box.snapshot()
 ---
-ok
+- ok
 ...
-insert into t0 values (3, 'tuple 3')
-Insert OK, 1 row affected
-save snapshot
+box.cfg.reload()
 ---
-ok
+- error: 'can''t open config `tarantool.cfg''.
+
+'
+...
+box.insert(0, 2, 'tuple2')
+---
+- [2, 'tuple2']
+...
+box.snapshot()
+---
+- ok
+...
+box.cfg.reload()
+---
+- ok
+...
+box.insert(0, 3, 'tuple3')
+---
+- [3, 'tuple3']
+...
+box.snapshot()
+---
+- ok
 ...
 #
 # A test case for https://github.com/tarantool/tarantool/issues/112:
-# Tarantool crushes with SIGSEGV during reload configuration
+# Tarantool crashes with SIGSEGV during reload configuration
 #
-reload configuration
+box.cfg.reload()
 ---
-ok
+- ok
 ...
-reload configuration
+box.cfg.reload()
 ---
-fail:
- - Could not accept read only 'custom_proc_title' option
+- error: 'Could not accept read only ''custom_proc_title'' option.
+
+'
 ...
-reload configuration
+box.cfg.reload()
 ---
-ok
+- ok
 ...
-lua box.space[0]:truncate()
+box.space[0]:drop()
 ---
 ...

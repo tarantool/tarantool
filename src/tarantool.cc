@@ -52,8 +52,9 @@
 #include <iproto.h>
 #include "mutex.h"
 #include <recovery.h>
+#include "log_io.h"
 #include <crc32.h>
-#include <palloc.h>
+#include "memory.h"
 #include <salloc.h>
 #include <say.h>
 #include <stat.h>
@@ -66,7 +67,6 @@ extern "C" {
 } /* extern "C" */
 #include "tt_pthread.h"
 #include "lua/init.h"
-#include "memcached.h"
 #include "session.h"
 #include "box/box.h"
 #include "scoped_guard.h"
@@ -112,10 +112,9 @@ title(const char *fmt, ...)
 	va_end(ap);
 
 	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.memcached_port, cfg.admin_port,
-			cfg.replication_port };
+			cfg.admin_port, cfg.replication_port };
 	int *pptr = ports;
-	const char *names[] = { "pri", "sec", "memc", "adm", "rpl", NULL };
+	const char *names[] = { "pri", "sec", "adm", "rpl", NULL };
 	const char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -132,7 +131,7 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	FILE *f;
 	int32_t n_accepted, n_skipped, n_ignored;
 
-	tbuf_reset(cfg_out);
+	rewind(cfg_out);
 
 	if (cfg_filename_fullpath != NULL)
 		f = fopen(cfg_filename_fullpath, "r");
@@ -212,20 +211,20 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 }
 
 int
-reload_cfg(struct tbuf *out)
+reload_cfg()
 {
 	static struct mutex *mutex = NULL;
 	struct tarantool_cfg new_cfg, aux_cfg;
 
+	rewind(cfg_out);
+
 	if (mutex == NULL) {
-		mutex = (struct mutex *) palloc(eter_pool, sizeof(*mutex));
+		mutex = (struct mutex *) malloc(sizeof(*mutex));
 		mutex_create(mutex);
 	}
 
 	if (mutex_trylock(mutex) == true) {
 		out_warning(CNF_OK, "Could not reload configuration: it is being reloaded right now");
-		tbuf_append(out, cfg_out->data, cfg_out->size);
-
 		return -1;
 	}
 
@@ -233,9 +232,6 @@ reload_cfg(struct tbuf *out)
 	auto scoped_guard = make_scoped_guard([&] {
 		destroy_tarantool_cfg(&aux_cfg);
 		destroy_tarantool_cfg(&new_cfg);
-
-		if (cfg_out->size != 0)
-			tbuf_append(out, cfg_out->data, cfg_out->size);
 
 		mutex_unlock(mutex);
 	});
@@ -278,6 +274,7 @@ reload_cfg(struct tbuf *out)
 	/* Now pass the config to the module, to take action. */
 	if (box_reload_config(&cfg, &new_cfg) != 0)
 		return -1;
+
 	/* All OK, activate the config. */
 	swap_tarantool_cfg(&cfg, &new_cfg);
 	tarantool_lua_load_cfg(tarantool_L, &cfg);
@@ -296,10 +293,10 @@ show_cfg(struct tbuf *out)
 	i = tarantool_cfg_iterator_init();
 	while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
 		if (value) {
-			tbuf_printf(out, "  %s: \"%s\"" CRLF, key, value);
+			tbuf_printf(out, " - %s: \"%s\"" CRLF, key, value);
 			free(value);
 		} else {
-			tbuf_printf(out, "  %s: (null)" CRLF, key);
+			tbuf_printf(out, " - %s: (null)" CRLF, key);
 		}
 	}
 }
@@ -308,6 +305,14 @@ const char *
 tarantool_version(void)
 {
 	return PACKAGE_VERSION;
+}
+
+uint32_t
+tarantool_version_id()
+{
+	return (((PACKAGE_VERSION_MAJOR << 8) |
+		 PACKAGE_VERSION_MINOR) << 8) |
+		PACKAGE_VERSION_PATCH;
 }
 
 static double start_time;
@@ -626,7 +631,6 @@ tarantool_free(void)
 	if (getpid() != master_pid)
 		return;
 	signal_free();
-	memcached_free();
 	tarantool_lua_free();
 	box_free();
 	recovery_free();
@@ -645,7 +649,7 @@ tarantool_free(void)
 
 	session_free();
 	fiber_free();
-	palloc_free();
+	memory_free();
 	ev_default_destroy();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
@@ -653,22 +657,10 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
-}
-
-static void
-initialize_minimal()
-{
-	if (!salloc_init(64 * 1000 * 1000, 4, 2))
-		panic_syserror("can't initialize slab allocator");
-	fiber_init();
-	coeio_init();
-}
-
-/** Callback of snapshot_save() when doing --init-storage */
-void
-init_storage(struct log_io * /* l */, struct fio_batch * /* batch */)
-{
-	/* Nothing. */
+	if (cfg_out) {
+		fclose(cfg_out);
+		free(cfg_log);
+	}
 }
 
 int
@@ -689,7 +681,7 @@ main(int argc, char **argv)
 
 	crc32_init();
 	stat_init();
-	palloc_init();
+	memory_init();
 
 #ifdef HAVE_BFD
 	symbols_load(argv[0]);
@@ -756,23 +748,22 @@ main(int argc, char **argv)
 		strcat(cfg_filename_fullpath, cfg_filename);
 	}
 
-	cfg_out = tbuf_new(eter_pool);
-	assert(cfg_out);
+	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
 
 	if (gopt(opt, 'k')) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-			say_error("check_config FAILED"
-				  "%.*s", cfg_out->size, (char *)cfg_out->data);
+		if (fill_default_tarantool_cfg(&cfg) != 0 ||
+		    load_cfg(&cfg, 0) != 0) {
 
+			say_error("check_config FAILED%.*s",
+				  (int) cfg_logsize, cfg_log);
 			return 1;
 		}
-
 		return 0;
 	}
 
-	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0)
-		panic("can't load config:"
-		      "%.*s", cfg_out->size, (char *)cfg_out->data);
+	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
+		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
+	}
 
 	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;
@@ -839,10 +830,9 @@ main(int argc, char **argv)
 	}
 
 	if (gopt(opt, 'I')) {
-		initialize_minimal();
-		box_init(true);
-		set_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, init_storage);
+		struct log_dir dir = snap_dir;
+		dir.dirname = cfg.snap_dir;
+		init_storage(&dir, NULL);
 		exit(EXIT_SUCCESS);
 	}
 
@@ -859,10 +849,10 @@ main(int argc, char **argv)
 
 	/* init process title - used for logging */
 	if (cfg.custom_proc_title == NULL) {
-		custom_proc_title = (char *) palloc(eter_pool, 1);
+		custom_proc_title = (char *) malloc(1);
 		custom_proc_title[0] = '\0';
 	} else {
-		custom_proc_title = (char *) palloc(eter_pool, strlen(cfg.custom_proc_title) + 2);
+		custom_proc_title = (char *) malloc(strlen(cfg.custom_proc_title) + 2);
 		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
@@ -884,17 +874,13 @@ main(int argc, char **argv)
 	try {
 		say_crit("version %s", tarantool_version());
 		tarantool_L = tarantool_lua_init();
-		box_init(false);
-		memcached_init(cfg.bind_ipaddr, cfg.memcached_port);
+		box_init();
 		tarantool_lua_load_cfg(tarantool_L, &cfg);
 		/*
-		 * init iproto before admin and after memcached:
+		 * init iproto before admin:
 		 * recovery is finished on bind to the primary port,
 		 * and it has to happen before requests on the
 		 * administrative port start to arrive.
-		 * And when recovery is finalized, memcached
-		 * expire loop is started, so binding can happen
-		 * only after memcached is initialized.
 		 */
 		iproto_init(cfg.bind_ipaddr, cfg.primary_port,
 			    cfg.secondary_port);
@@ -908,9 +894,9 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(tarantool_L);
-		prelease(fiber->gc_pool);
+		region_free(&fiber->gc);
 		say_crit("log level %i", cfg.log_level);
-		say_crit("entering event loop");
+		say_crit("entering the event loop");
 		if (cfg.io_collect_interval > 0)
 			ev_set_io_collect_interval(cfg.io_collect_interval);
 		ev_now_update();
@@ -919,10 +905,10 @@ main(int argc, char **argv)
 		ev_loop(0);
 	} catch (const Exception& e) {
 		e.log();
-		panic("%s", "Fatal error, exiting loop");
+		panic("%s", "fatal error, exiting the event loop");
 	}
 
-	say_crit("exiting loop");
+	say_crit("exiting the event loop");
 	/* freeing resources */
 	return 0;
 }

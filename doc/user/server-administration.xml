@@ -28,7 +28,7 @@
 <title>Utility <code>tarantar</code></title>
 <para>
 The tarantar utility program will create new snapshots by reading existing
-snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="save-snapshot"/>,
+snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="box.snapshot"/>,
 which creates new snapshots from the database. Since tarantar uses less
 memory than SAVE SNAPSHOT, it is especially appropriate for taking periodic
 snapshots as a background task.

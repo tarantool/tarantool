@@ -35,6 +35,7 @@ void tc_space_free(struct tc_spaces *s);
 struct tc_space *tc_space_create(struct tc_spaces *s, uint32_t id);
 struct tc_space *tc_space_match(struct tc_spaces *s, uint32_t id);
 
+#if 0
 int tc_space_fill(struct tc_spaces *s, struct tc_options *opts);
-
+#endif
 #endif

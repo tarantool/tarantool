@@ -34,7 +34,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#include <palloc.h>
+#include "lib/small/region.h"
 
 #ifdef POISON
 #  define TBUF_POISON
@@ -46,7 +46,7 @@
 #  define poison(ptr, len)
 #endif
 
-/** Try to make all palloc allocations a multiple of  this number. */
+/** Try to make all region allocations a multiple of  this number. */
 enum { TBUF_ALLOC_FACTOR = 128 };
 
 static void
@@ -57,9 +57,9 @@ tbuf_assert(const struct tbuf *b)
 }
 
 struct tbuf *
-tbuf_new(struct palloc_pool *pool)
+tbuf_new(struct region *pool)
 {
-	struct tbuf *e = (struct tbuf *) palloc(pool, TBUF_ALLOC_FACTOR);
+	struct tbuf *e = (struct tbuf *) region_alloc_nothrow(pool, TBUF_ALLOC_FACTOR);
 	e->size = 0;
 	e->capacity = TBUF_ALLOC_FACTOR - sizeof(struct tbuf);
 	e->data = (char *)e + sizeof(struct tbuf);
@@ -80,7 +80,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 	while (new_capacity < e->size + required)
 		new_capacity *= 2;
 
-	char *p = (char *) palloc(e->pool, new_capacity);
+	char *p = (char *) region_alloc_nothrow(e->pool, new_capacity);
 
 	poison(p, new_capacity);
 	memcpy(p, e->data, e->size);
@@ -91,7 +91,7 @@ tbuf_ensure_resize(struct tbuf *e, size_t required)
 }
 
 struct tbuf *
-tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig)
+tbuf_clone(struct region *pool, const struct tbuf *orig)
 {
 	struct tbuf *clone = tbuf_new(pool);
 	tbuf_assert(orig);
@@ -102,7 +102,7 @@ tbuf_clone(struct palloc_pool *pool, const struct tbuf *orig)
 struct tbuf *
 tbuf_split(struct tbuf *orig, size_t at)
 {
-	struct tbuf *head = (struct tbuf *) palloc(orig->pool, sizeof(*orig));
+	struct tbuf *head = (struct tbuf *) region_alloc_nothrow(orig->pool, sizeof(*orig));
 	assert(at <= orig->size);
 	tbuf_assert(orig);
 	head->pool = orig->pool;
@@ -191,7 +191,7 @@ tbuf_to_hex(const struct tbuf *x)
 {
 	const char *data = x->data;
 	size_t size = x->size;
-	char *out = (char *) palloc(x->pool, size * 3 + 1);
+	char *out = (char *) region_alloc_nothrow(x->pool, size * 3 + 1);
 	out[size * 3] = 0;
 
 	for (int i = 0; i < size; i++) {

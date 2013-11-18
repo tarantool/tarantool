@@ -1,171 +1,198 @@
-lua box.session.exists(box.session.id())
----
- - 1
-...
-lua box.session.exists()
----
-error: 'session.exists(sid): bad arguments'
-...
-lua box.session.exists(1, 2, 3)
----
-error: 'session.exists(sid): bad arguments'
-...
-lua box.session.exists(1234567890)
----
- - 0
-...
-lua box.session.id() > 0
----
- - true
-...
-lua f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)
+space = box.schema.create_space('tweedledum')
 ---
 ...
-lua box.fiber.resume(f)
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
 ...
-lua failed
+box.session.exists(box.session.id())
 ---
- - false
+- 1
 ...
-lua f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)
+box.session.exists()
 ---
+- error: 'session.exists(sid): bad arguments'
 ...
-lua box.fiber.resume(f1)
+box.session.exists(1, 2, 3)
 ---
- - true
+- error: 'session.exists(sid): bad arguments'
 ...
-lua failed
+box.session.exists(1234567890)
 ---
- - false
+- 0
 ...
-lua box.session.peer() == box.session.peer(box.session.id())
+-- check session.id()
+box.session.id() > 0
 ---
- - true
+- true
 ...
-lua box.session.on_connect(function() end)
----
- - nil
-...
-lua box.session.on_disconnect(function() end)
----
- - nil
-...
-lua type(box.session.on_connect(function() error('hear') end))
----
- - function
-...
-lua type(box.session.on_disconnect(function() error('hear') end))
----
- - function
-...
-lua box.session.on_connect()
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_disconnect()
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_connect(function() end, function() end)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_disconnect(function() end, function() end)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_connect(1, 2)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_disconnect(1, 2)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_connect(1)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua box.session.on_disconnect(1)
----
-error: 'session.on_connect(chunk): bad arguments'
-...
-lua type(box.session.on_connect(nil))
----
- - function
-...
-lua type(box.session.on_disconnect(nil))
----
- - function
-...
-lua type(box.session.on_connect(nil))
----
- - nil
-...
-lua type(box.session.on_disconnect(nil))
----
- - nil
-...
-lua function inc() active_connections = active_connections + 1 end
+f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)
 ---
 ...
-lua function dec() active_connections = active_connections - 1 end
+box.fiber.resume(f)
 ---
 ...
-lua box.session.on_connect(inc)
+failed
 ---
- - nil
+- false
 ...
-lua box.session.on_disconnect(dec)
----
- - nil
-...
-lua active_connections = 0
+f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)
 ---
 ...
-lua active_connections
+box.fiber.resume(f1)
 ---
- - 1
+- true
 ...
-lua active_connections
+failed
 ---
- - 2
+- false
 ...
-lua type(box.session.on_connect(nil))
+box.session.peer() == box.session.peer(box.session.id())
 ---
- - function
+- true
 ...
-lua type(box.session.on_disconnect(nil))
+-- check on_connect/on_disconnect triggers
+box.session.on_connect(function() end)
 ---
- - function
+- null
 ...
-lua box.session.on_connect(function() box.insert(0, box.session.id()) end)
+box.session.on_disconnect(function() end)
 ---
- - nil
+- null
 ...
-lua box.session.on_disconnect(function() box.delete(0, box.session.id()) end)
+-- check it's possible to reset these triggers
+type(box.session.on_connect(function() error('hear') end))
 ---
- - nil
+- function
 ...
-lua box.unpack('i', box.select(0, 0, box.session.id())[0]) == box.session.id()
+type(box.session.on_disconnect(function() error('hear') end))
 ---
- - true
+- function
 ...
-lua type(box.session.on_connect(function() nosuchfunction() end))
+-- check on_connect/on_disconnect argument count and type
+box.session.on_connect()
 ---
- - function
+- error: 'session.on_connect(chunk): bad arguments'
 ...
-disconnected
-lua type(box.session.on_connect(nil))
+box.session.on_disconnect()
 ---
- - function
+- error: 'session.on_connect(chunk): bad arguments'
 ...
-lua type(box.session.on_disconnect(nil))
+box.session.on_connect(function() end, function() end)
 ---
- - function
+- error: 'session.on_connect(chunk): bad arguments'
 ...
-lua active_connections
+box.session.on_disconnect(function() end, function() end)
 ---
- - 0
+- error: 'session.on_connect(chunk): bad arguments'
+...
+box.session.on_connect(1, 2)
+---
+- error: 'session.on_connect(chunk): bad arguments'
+...
+box.session.on_disconnect(1, 2)
+---
+- error: 'session.on_connect(chunk): bad arguments'
+...
+box.session.on_connect(1)
+---
+- error: 'session.on_connect(chunk): bad arguments'
+...
+box.session.on_disconnect(1)
+---
+- error: 'session.on_connect(chunk): bad arguments'
+...
+-- use of nil to clear the trigger
+type(box.session.on_connect(nil))
+---
+- function
+...
+type(box.session.on_disconnect(nil))
+---
+- function
+...
+type(box.session.on_connect(nil))
+---
+- nil
+...
+type(box.session.on_disconnect(nil))
+---
+- nil
+...
+-- check how connect/disconnect triggers work
+function inc() active_connections = active_connections + 1 end
+---
+...
+function dec() active_connections = active_connections - 1 end
+---
+...
+box.session.on_connect(inc)
+---
+- null
+...
+box.session.on_disconnect(dec)
+---
+- null
+...
+active_connections = 0
+---
+...
+--# create connection con_one to default
+active_connections
+---
+- 1
+...
+--# create connection con_two to default
+active_connections
+---
+- 2
+...
+--# drop connection con_one
+--# drop connection con_two
+box.fiber.sleep(0) -- yield
+---
+...
+active_connections
+---
+- 0
+...
+type(box.session.on_connect(nil))
+---
+- function
+...
+type(box.session.on_disconnect(nil))
+---
+- function
+...
+-- write audit trail of connect/disconnect into a space
+box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end)
+---
+- null
+...
+box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end)
+---
+- null
+...
+--# create connection con_three to default
+--# set connection con_three
+space:select(0, box.session.id())[0] == box.session.id()
+---
+- true
+...
+--# set connection default
+--# drop connection con_three
+-- cleanup
+type(box.session.on_connect(nil))
+---
+- function
+...
+type(box.session.on_disconnect(nil))
+---
+- function
+...
+active_connections
+---
+- 0
+...
+space:drop()
+---
 ...

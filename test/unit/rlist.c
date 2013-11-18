@@ -4,7 +4,7 @@
 #include "test.h"
 
 
-#define PLAN		65
+#define PLAN		87
 
 #define ITEMS		7
 
@@ -32,6 +32,25 @@ main(void)
 		items[i].no = i;
 		rlist_add_tail(&head, &(items[i].list));
 	}
+	ok(rlist_empty(&rlist_nil), "rlist_nil is empty");
+	ok(rlist_empty(&head2), "head2 is empty");
+	rlist_swap(&head2, &rlist_nil);
+	ok(rlist_empty(&rlist_nil), "rlist_nil is empty after swap");
+	ok(rlist_empty(&head2), "head2 is empty after swap");
+	rlist_swap(&head, &head2);
+	ok(rlist_empty(&head), "head is empty after swap");
+	is(rlist_first(&head2), &items[0].list, "first item");
+	is(rlist_last(&head2), &items[ITEMS - 1].list, "last item");
+	i = 0;
+	rlist_foreach(rlist, &head2) {
+		is(rlist, &items[i].list, "element (foreach) %d", i);
+		i++;
+	}
+	rlist_foreach_reverse(rlist, &head2) {
+		i--;
+		is(rlist, &items[i].list, "element (foreach_reverse) %d", i);
+	}
+	rlist_swap(&head2, &head);
 
 
 	is(rlist_first(&head), &items[0].list, "first item");
@@ -108,6 +127,10 @@ main(void)
 		i--;
 		is(it, items + i, "element (foreach_entry) %d", i);
 	}
+	rlist_create(&head);
+	rlist_add_entry(&head, &items[0], list);
+	ok(rlist_prev_entry_safe(&items[0], &head, list) == NULL,
+	   "prev is null");
 	return check_plan();
 }
 

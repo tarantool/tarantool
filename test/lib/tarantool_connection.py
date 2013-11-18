@@ -23,7 +23,6 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 
 import socket
 import sys
-import cStringIO
 import errno
 
 class TarantoolConnection(object):
@@ -31,7 +30,6 @@ class TarantoolConnection(object):
         self.host = host
         self.port = port
         self.is_connected = False
-        self.stream = cStringIO.StringIO()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
@@ -74,4 +72,6 @@ class TarantoolConnection(object):
 
     def __exit__(self, type, value, tb):
         self.disconnect()
-
+ 
+    def __call__(self, command, silent=False, simple=False):
+        return self.execute(command, silent)

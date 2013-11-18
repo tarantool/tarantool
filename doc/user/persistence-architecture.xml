@@ -91,7 +91,7 @@ possible to turn the write ahead log completely off, by setting
 <olink targetptr="wal_mode"/> to <emphasis>none</emphasis>.
 Even without the write ahead log it's still possible to take a
 persistent copy of the entire data set with
-<olink targetptr="save-snapshot"/>.
+<olink targetptr="box.snapshot"/>.
 </para>
 
 

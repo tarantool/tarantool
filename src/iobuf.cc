@@ -28,13 +28,13 @@
  */
 #include "iobuf.h"
 #include "coio_buf.h"
-#include "palloc.h"
+#include "memory.h"
 
 /* {{{ struct ibuf */
 
 /** Initialize an input buffer. */
 static void
-ibuf_create(struct ibuf *ibuf, struct palloc_pool *pool)
+ibuf_create(struct ibuf *ibuf, struct region *pool)
 {
 	ibuf->pool = pool;
 	ibuf->capacity = 0;
@@ -73,7 +73,7 @@ ibuf_reserve(struct ibuf *ibuf, size_t size)
 		while (new_capacity < current_size + size)
 			new_capacity *= 2;
 
-		ibuf->buf = (char *) palloc(ibuf->pool, new_capacity);
+		ibuf->buf = (char *) region_alloc(ibuf->pool, new_capacity);
 		memcpy(ibuf->buf, ibuf->pos, current_size);
 		ibuf->capacity = new_capacity;
 	}
@@ -110,7 +110,7 @@ obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
 		capacity *=2;
 	}
 
-	buf->iov[pos].iov_base = palloc(buf->pool, capacity);
+	buf->iov[pos].iov_base = region_alloc(buf->pool, capacity);
 	buf->capacity[buf->pos] = capacity;
 	assert(buf->iov[pos].iov_len == 0);
 }
@@ -119,7 +119,7 @@ obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
  * yet -- it may never be needed.
  */
 void
-obuf_create(struct obuf *buf, struct palloc_pool *pool)
+obuf_create(struct obuf *buf, struct region *pool)
 {
 	buf->pool = pool;
 	buf->pos = 0;
@@ -274,18 +274,18 @@ iobuf_new(const char *name)
 {
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
-		iobuf = (struct iobuf *) palloc(eter_pool, sizeof(struct iobuf));
-		struct palloc_pool *pool = palloc_create_pool("");
+		iobuf = (struct iobuf *) malloc(sizeof(struct iobuf));
+		region_create(&iobuf->pool, slabc_runtime);
 		/* Note: do not allocate memory upfront. */
-		ibuf_create(&iobuf->in, pool);
-		obuf_create(&iobuf->out, pool);
+		ibuf_create(&iobuf->in, &iobuf->pool);
+		obuf_create(&iobuf->out, &iobuf->pool);
 	} else {
 		iobuf = SLIST_FIRST(&iobuf_cache);
 		SLIST_REMOVE_HEAD(&iobuf_cache, next);
 	}
 	/* When releasing the buffer, we trim it to iobuf_max_pool_size. */
-	assert(palloc_allocated(iobuf->in.pool) <= iobuf_max_pool_size());
-	palloc_set_name(iobuf->in.pool, name);
+	assert(region_used(&iobuf->pool) <= iobuf_max_pool_size());
+	region_set_name(&iobuf->pool, name);
 	return iobuf;
 }
 
@@ -293,16 +293,16 @@ iobuf_new(const char *name)
 void
 iobuf_delete(struct iobuf *iobuf)
 {
-	struct palloc_pool *pool = iobuf->in.pool;
-	if (palloc_allocated(pool) < iobuf_max_pool_size()) {
+	struct region *pool = &iobuf->pool;
+	if (region_used(pool) < iobuf_max_pool_size()) {
 		ibuf_reset(&iobuf->in);
 		obuf_reset(&iobuf->out);
 	} else {
-		prelease(pool);
+		region_free(pool);
 		ibuf_create(&iobuf->in, pool);
 		obuf_create(&iobuf->out, pool);
 	}
-	palloc_set_name(pool, "iobuf_cache");
+	region_set_name(pool, "iobuf_cache");
 	SLIST_INSERT_HEAD(&iobuf_cache, iobuf, next);
 }
 

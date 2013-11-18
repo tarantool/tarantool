@@ -37,7 +37,9 @@ find_program(POD2MAN pod2man)
 #
 set (TARANTOOL_PRODUCT "box")
 set (TARANTOOL_MODULES "box")
-set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
+# Disable tarancheck and tarantar for 1.6
+# set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
+set (TARANTOOL_CLIENTS "")
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
 
@@ -77,6 +79,15 @@ check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
+check_function_exists(sendfile HAVE_SENDFILE)
+if (HAVE_SENDFILE)
+    if (TARGET_OS_LINUX)
+        set(HAVE_SENDFILE_LINUX 1)
+    else(HAVE_SENDFILE)
+        set(HAVE_SENDFILE_BSD 1)
+    endif()
+endif()
+check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
@@ -94,8 +105,8 @@ add_custom_target(tags COMMAND ctags -R -f tags
 # Define PACKAGE_VERSION -- a string constant with tarantool version.
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
-set (CPACK_PACKAGE_VERSION_MINOR "5")
-set (CPACK_PACKAGE_VERSION_PATCH "1")
+set (CPACK_PACKAGE_VERSION_MINOR "6")
+set (CPACK_PACKAGE_VERSION_PATCH "0")
 
 set (PACKAGE_VERSION "")
 
@@ -137,6 +148,7 @@ endif()
 # Specify where to look for include files.
 #
 include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${PROJECT_SOURCE_DIR}/src") # for lib/
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
 include_directories("${PROJECT_SOURCE_DIR}/third_party")
@@ -305,6 +317,14 @@ libcjson_build()
 add_dependencies(build_bundled_libs cjson)
 
 #
+# LibYAML
+#
+
+include(BuildLibYAML)
+libyaml_build()
+add_dependencies(build_bundled_libs yaml)
+
+#
 # Third-Party misc
 #
 
@@ -328,7 +348,8 @@ include (cmake/package.cmake)
 include (cmake/rpm.cmake)
 
 add_subdirectory(cfg)
-add_subdirectory(connector)
+# Disable connector_c for 1.6
+# add_subdirectory(connector)
 add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(client)

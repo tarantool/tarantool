@@ -45,23 +45,18 @@ enum {
 	_(UPDATE_OP_XOR, 3)			\
 	_(UPDATE_OP_OR, 4)			\
 	_(UPDATE_OP_SPLICE, 5)			\
-	_(UPDATE_OP_DELETE_1_4, 6)		\
+	_(UPDATE_OP_DELETE, 6)			\
 	_(UPDATE_OP_INSERT, 7)			\
-	_(UPDATE_OP_SUBTRACT, 8)		\
-	_(UPDATE_OP_DELETE, 9)
+	_(UPDATE_OP_SUBTRACT, 8)
 
 ENUM(update_op_codes, UPDATE_OP_CODES);
 
 typedef void *(*region_alloc_func)(void *, size_t);
 
-struct tuple_update *
-tuple_update_prepare(region_alloc_func alloc, void *alloc_ctx,
+const char *
+tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t old_fcount, uint32_t *p_new_size,
-		     uint32_t *p_new_fcount);
-
-void
-tuple_update_execute(struct tuple_update *update, char *new_data);
+		     uint32_t *p_new_size);
 
 #endif /* TARANTOOL_BOX_TUPLE_UPDATE_H_INCLUDED */

@@ -9,6 +9,10 @@
  * release.
  */
 #define PACKAGE_VERSION "@PACKAGE_VERSION@"
+#define PACKAGE_VERSION_MAJOR @CPACK_PACKAGE_VERSION_MAJOR@
+#define PACKAGE_VERSION_MINOR @CPACK_PACKAGE_VERSION_MINOR@
+#define PACKAGE_VERSION_PATCH @CPACK_PACKAGE_VERSION_PATCH@
+
 #define PACKAGE "@PACKAGE@"
 /*  Defined if building for Linux */
 #cmakedefine TARGET_OS_LINUX 1
@@ -70,6 +74,18 @@
  */
 #cmakedefine HAVE_MEMRCHR 1
 /*
+ * Defined if this platform has sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE 1
+/*
+ * Defined if this platform has Linux specific sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE_LINUX 1
+/*
+ * Defined if this platform has BSD specific sendfile(..).
+ */
+#cmakedefine HAVE_SENDFILE_BSD 1
+/*
  * Set if this is a GNU system and libc has __libc_stack_end.
  */
 #cmakedefine HAVE_LIBC_STACK_END 1
@@ -103,6 +119,8 @@
 
 
 #cmakedefine HAVE_PRCTL_H 1
+
+#cmakedefine HAVE_OPEN_MEMSTREAM 1
 
 /*
  * predefined /etc directory prefix.

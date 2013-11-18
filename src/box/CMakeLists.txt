@@ -5,6 +5,7 @@ endif()
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
 set(lua_sources)
+lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/box.lua)
 lua_source(lua_sources lua/box_net.lua)
 lua_source(lua_sources lua/misc.lua)
@@ -25,6 +26,8 @@ tarantool_module("box"
     tree_index.cc
     bitset_index.cc
     space.cc
+    alter.cc
+    schema.cc
     port.cc
     request.cc
     txn.cc
@@ -33,4 +36,4 @@ tarantool_module("box"
     box_lua.cc
     box_lua_space.cc)
 
-target_link_libraries(tarantool_box bitset)
+target_link_libraries(tarantool_box bitset msgpuck)

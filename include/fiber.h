@@ -37,15 +37,14 @@
 #include <coro.h>
 #include <tarantool/util.h>
 #include "third_party/queue.h"
+#include "lib/small/region.h"
 
 #if defined(__cplusplus)
 #include "exception.h"
 #endif /* defined(__cplusplus) */
-#include "palloc.h"
 #include <rlist.h>
 
-#define FIBER_NAME_MAXLEN PALLOC_POOL_NAME_MAXLEN
-
+#define FIBER_NAME_MAX REGION_NAME_MAX
 #define FIBER_READING_INBOX (1 << 0)
 /** This fiber can be cancelled synchronously. */
 #define FIBER_CANCELLABLE   (1 << 1)
@@ -81,7 +80,7 @@ struct fiber {
 	int csw;
 	struct tarantool_coro coro;
 	/* A garbage-collected memory pool. */
-	struct palloc_pool *gc_pool;
+	struct region gc;
 	/** Fiber id. */
 	uint32_t fid;
 	/**
@@ -121,7 +120,7 @@ int wait_for_child(pid_t pid);
 static inline const char *
 fiber_name(struct fiber *f)
 {
-	return f->gc_pool ? palloc_name(f->gc_pool) : "(none)";
+	return region_name(&f->gc);
 }
 
 void
@@ -162,7 +161,6 @@ void fiber_testcancel(void);
 bool fiber_setcancellable(bool enable);
 void fiber_sleep(ev_tstamp s);
 struct tbuf;
-void fiber_info(struct tbuf *out);
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
 /**
@@ -174,5 +172,9 @@ fiber_set_sid(struct fiber *f, uint32_t sid, uint64_t cookie)
 	f->sid = sid;
 	f->cookie = cookie;
 }
+
+typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
+
+int fiber_stat(fiber_stat_cb cb, void *cb_ctx);
 
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

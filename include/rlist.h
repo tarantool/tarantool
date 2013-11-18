@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#include <stddef.h>
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -47,6 +47,7 @@ struct rlist {
 	struct rlist *next;
 };
 
+extern struct rlist rlist_nil;
 
 /**
  * init list head (or list entry as ins't included in list)
@@ -173,6 +174,23 @@ rlist_move_tail(struct rlist *to, struct rlist *item)
 	rlist_add_tail(to, item);
 }
 
+static inline void
+rlist_swap(struct rlist *rhs, struct rlist *lhs)
+{
+	struct rlist tmp = *rhs;
+	*rhs = *lhs;
+	*lhs = tmp;
+	/* Relink the nodes. */
+	if (lhs->next == rhs)              /* Take care of empty list case */
+		lhs->next = lhs;
+	lhs->next->prev = lhs;
+	lhs->prev->next = lhs;
+	if (rhs->next == lhs)              /* Take care of empty list case */
+		rhs->next = rhs;
+	rhs->next->prev = rhs;
+	rhs->prev->next = rhs;
+}
+
 /**
  * allocate and init head of list
  */
@@ -217,6 +235,10 @@ rlist_move_tail(struct rlist *to, struct rlist *item)
  */
 #define rlist_prev_entry(item, member)					\
 	rlist_entry(rlist_prev(&(item)->member), typeof(*item), member)
+
+#define rlist_prev_entry_safe(item, head, member)			\
+	((rlist_prev(&(item)->member) == (head)) ? NULL :               \
+	 rlist_entry(rlist_prev(&(item)->member), typeof(*item), member))
 
 /**
  * add entry to list

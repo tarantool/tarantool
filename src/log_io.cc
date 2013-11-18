@@ -30,39 +30,38 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#include "palloc.h"
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
 #include "tarantool_eio.h"
 
-const uint32_t default_version = 11;
-const log_magic_t row_marker_v11 = 0xba0babed;
-const log_magic_t eof_marker_v11 = 0x10adab1e;
+const uint32_t xlog_format = 12;
+const log_magic_t row_marker = 0xba0babed;
+const log_magic_t eof_marker = 0x10adab1e;
 const char inprogress_suffix[] = ".inprogress";
-const char v11[] = "0.11\n";
+const char v12[] = "0.12\n";
 
 void
-header_v11_sign(struct header_v11 *header)
+row_header_sign(struct row_header *header)
 {
 	header->data_crc32c = crc32_calc(0, (const unsigned char *) header + sizeof(struct
-						  header_v11), header->len);
+						  row_header), header->len);
 	header->header_crc32c = crc32_calc(0, (const unsigned char *) &header->lsn,
-					   sizeof(struct header_v11) -
+					   sizeof(struct row_header) -
 					   sizeof(header->header_crc32c));
 }
 
 void
-row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
+wal_row_fill(struct wal_row *row, int64_t lsn, uint64_t cookie,
 	     const char *metadata, size_t metadata_len, const char
 	     *data, size_t data_len)
 {
-	row->marker = row_marker_v11;
-	row->tag  = tag;
+	row->marker = row_marker;
+	row->tag  = WAL; /* unused. */
 	row->cookie = cookie;
 	memcpy(row->data, metadata, metadata_len);
 	memcpy(row->data + metadata_len, data, data_len);
-	header_v11_fill(&row->header, lsn, metadata_len + data_len +
+	row_header_fill(&row->header, lsn, metadata_len + data_len +
 			sizeof(row->tag) + sizeof(row->cookie));
 }
 
@@ -72,7 +71,8 @@ struct log_dir snap_dir = {
 	/* .open_wflags = */ 0,
 	/* .filetype = */ "SNAP\n",
 	/* .filename_ext = */ ".snap",
-	/* .dirname = */ NULL
+	/* .dirname = */ NULL,
+	/* .mode = */ 0660
 };
 
 struct log_dir wal_dir = {
@@ -81,7 +81,8 @@ struct log_dir wal_dir = {
 	/* .open_wflags = */ 0,
 	/* .filetype = */ "XLOG\n",
 	/* .filename_ext = */ ".xlog",
-	/* .dirname = */ NULL
+	/* .dirname = */ NULL,
+	/* .mode = */ 0660
 };
 
 static int
@@ -99,7 +100,8 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 	ssize_t result = -1;
 	size_t i = 0, size = 1024;
 	ssize_t ext_len = strlen(dir->filename_ext);
-	int64_t *lsn = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size);
+	int64_t *lsn = (int64_t *) region_alloc(&fiber->gc,
+						sizeof(int64_t) * size);
 	DIR *dh = opendir(dir->dirname);
 
 	if (lsn == NULL || dh == NULL)
@@ -111,7 +113,7 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 
 		char *ext = strchr(dent->d_name, '.');
 		if (ext == NULL)
-		continue;
+			continue;
 
 		const char *suffix = strchr(ext + 1, '.');
 		/*
@@ -143,7 +145,7 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 
 		i++;
 		if (i == size) {
-			int64_t *n = (int64_t *) palloc(fiber->gc_pool, sizeof(int64_t) * size * 2);
+			int64_t *n = (int64_t *) region_alloc(&fiber->gc, sizeof(int64_t) * size * 2);
 			if (n == NULL)
 				goto out;
 			memcpy(n, lsn, sizeof(int64_t) * size);
@@ -222,9 +224,9 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 static const char ROW_EOF[] = "";
 
 const char *
-row_reader_v11(FILE *f, uint32_t *rowlen)
+row_reader(FILE *f, uint32_t *rowlen)
 {
-	struct header_v11 m;
+	struct row_header m;
 
 	uint32_t header_crc, data_crc;
 
@@ -232,14 +234,14 @@ row_reader_v11(FILE *f, uint32_t *rowlen)
 		return ROW_EOF;
 
 	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, (unsigned char *) &m + offsetof(struct header_v11, lsn),
-				sizeof(m) - offsetof(struct header_v11, lsn));
+	header_crc = crc32_calc(0, (unsigned char *) &m + offsetof(struct row_header, lsn),
+				sizeof(m) - offsetof(struct row_header, lsn));
 
 	if (m.header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
 		return NULL;
 	}
-	char *row = (char *) palloc(fiber->gc_pool, sizeof(m) + m.len);
+	char *row = (char *) region_alloc(&fiber->gc, sizeof(m) + m.len);
 	memcpy(row, &m, sizeof(m));
 
 	if (fread(row + sizeof(m), m.len, 1, f) != 1)
@@ -277,7 +279,7 @@ log_io_cursor_close(struct log_io_cursor *i)
 	 * Seek back to last known good offset.
 	 */
 	fseeko(l->f, i->good_offset, SEEK_SET);
-	prelease(fiber->gc_pool);
+	region_free(&fiber->gc);
 }
 
 /**
@@ -298,14 +300,14 @@ log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen)
 	assert(i->eof_read == false);
 
 	say_debug("log_io_cursor_next: marker:0x%016X/%zu",
-		  row_marker_v11, sizeof(row_marker_v11));
+		  row_marker, sizeof(row_marker));
 
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
-	prelease_after(fiber->gc_pool, 128 * 1024);
+	region_free_after(&fiber->gc, 128 * 1024);
 
 restart:
 	if (marker_offset > 0)
@@ -314,7 +316,7 @@ restart:
 	if (fread(&magic, sizeof(magic), 1, l->f) != 1)
 		goto eof;
 
-	while (magic != row_marker_v11) {
+	while (magic != row_marker) {
 		int c = fgetc(l->f);
 		if (c == EOF) {
 			say_debug("eof while looking for magic");
@@ -323,14 +325,14 @@ restart:
 		magic = magic >> 8 |
 			((log_magic_t) c & 0xff) << (sizeof(magic)*8 - 8);
 	}
-	marker_offset = ftello(l->f) - sizeof(row_marker_v11);
+	marker_offset = ftello(l->f) - sizeof(row_marker);
 	if (i->good_offset != marker_offset)
 		say_warn("skipped %jd bytes after 0x%08jx offset",
 			(intmax_t)(marker_offset - i->good_offset),
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
-	row = row_reader_v11(l->f, rowlen);
+	row = row_reader(l->f, rowlen);
 	if (row == ROW_EOF)
 		goto eof;
 
@@ -354,15 +356,15 @@ eof:
 	 * 1. sizeof(eof_marker) > 0 and it is the last record in file
 	 * 2. sizeof(eof_marker) == 0 and there is no unread data in file
 	 */
-	if (ftello(l->f) == i->good_offset + sizeof(eof_marker_v11)) {
+	if (ftello(l->f) == i->good_offset + sizeof(eof_marker)) {
 		fseeko(l->f, i->good_offset, SEEK_SET);
 		if (fread(&magic, sizeof(magic), 1, l->f) != 1) {
 
 			say_error("can't read eof marker");
-		} else if (magic == eof_marker_v11) {
+		} else if (magic == eof_marker) {
 			i->good_offset = ftello(l->f);
 			i->eof_read = true;
-		} else if (magic != row_marker_v11) {
+		} else if (magic != row_marker) {
 			say_error("eof marker is corrupt: %lu",
 				  (unsigned long) magic);
 		} else {
@@ -438,7 +440,7 @@ log_io_close(struct log_io **lptr)
 	int r;
 
 	if (l->mode == LOG_WRITE) {
-		fio_write(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
+		fio_write(fileno(l->f), &eof_marker, sizeof(log_magic_t));
 		/*
 		 * Sync the file before closing, since
 		 * otherwise we can end up with a partially
@@ -511,7 +513,7 @@ log_io_sync(struct log_io *l)
 static int
 log_io_write_header(struct log_io *l)
 {
-	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v11);
+	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v12);
 
 	return ret < 0 ? -1 : 0;
 }
@@ -541,8 +543,8 @@ log_io_verify_meta(struct log_io *l, const char **errmsg)
 		goto error;
 	}
 
-	if (strcmp(v11, version) != 0) {
-		*errmsg = "unknown version";
+	if (strcmp(v12, version) != 0) {
+		*errmsg = "unsupported file format version";
 		goto error;
 	}
 	for (;;) {
@@ -584,10 +586,8 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 	l->dir = dir;
 	l->is_inprogress = suffix == INPROGRESS;
 	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, &errmsg) != 0) {
-			errmsg = strerror(errno);
+		if (log_io_verify_meta(l, &errmsg) != 0)
 			goto error;
-		}
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
 		if (log_io_write_header(l) != 0) {
@@ -646,8 +646,8 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * open will fail.
 	 */
 
-	fd = open(filename,
-		      O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, 0664);
+	fd = open(filename, O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags,
+		  dir->mode);
 	if (fd < 0)
 		goto error;
 	say_info("creating `%s'", filename);

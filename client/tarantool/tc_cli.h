@@ -30,6 +30,7 @@
  */
 int tc_cli_cmdv(void);
 int tc_cli(void);
+int tc_cli_motd(void);
 
 int tc_cmd_tee_close(void);
 

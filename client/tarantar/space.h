@@ -44,7 +44,9 @@ void ts_space_recycle(struct ts_spaces *s);
 struct ts_space *ts_space_create(struct ts_spaces *s, uint32_t id);
 struct ts_space *ts_space_match(struct ts_spaces *s, uint32_t id);
 
+#if 0
 int ts_space_fill(struct ts_spaces *s, struct ts_options *opts);
+#endif
 
 struct ts_key*
 ts_space_keyalloc(struct ts_space *s, struct tnt_tuple *t, int fileid,

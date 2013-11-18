@@ -20,54 +20,66 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
-
-import socket
+import os
 import sql
+import sys
+import errno
+import ctypes
+import socket
 import struct
+import warnings
+
+from test_suite import check_libs
 from tarantool_connection import TarantoolConnection
+
+check_libs()
+from tarantool import Connection as tnt_connection
+from tarantool import Schema
 
 class BoxConnection(TarantoolConnection):
     def __init__(self, host, port):
         super(BoxConnection, self).__init__(host, port)
+        self.py_con = tnt_connection(host, port, connect_now=False)
+        self.py_con.error = False
         self.sort = False
 
-    def recvall(self, length):
-        res = ""
-        while len(res) < length:
-            buf = self.socket.recv(length - len(res))
-            if not buf:
-                raise RuntimeError("Got EOF from socket, the server has "
-                                   "probably crashed")
-            res = res + buf
-        return res
+    def connect(self):
+        self.py_con.connect()
+
+    def disconnect(self):
+        self.py_con.close()
+
+    def reconnect(self):
+        self.disconnect()
+        self.connect()
+
+    def set_schema(self, schemadict):
+        self.py_con.schema = Schema(schemadict)
+
+    def check_connection(self):
+        rc = self.py_con._recv(self.py_con._socket.fileno(), '', 0, socket.MSG_DONTWAIT)
+        if ctypes.get_errno() == errno.EAGAIN:
+            ctypes.set_errno(0)
+            return True
+        return False
+
+    def execute(self, command, silent=True):
+        return self.execute_no_reconnect(command, silent)
 
     def execute_no_reconnect(self, command, silent=True):
         statement = sql.parse("sql", command)
         if statement == None:
             return "You have an error in your SQL syntax\n"
         statement.sort = self.sort
-
-        payload = statement.pack()
-        header = struct.pack("<lll", statement.reqeust_type, len(payload), 0)
-
-        self.socket.sendall(header)
-        if len(payload):
-            self.socket.sendall(payload)
-
-        IPROTO_HEADER_SIZE = 12
-
-        header = self.recvall(IPROTO_HEADER_SIZE)
-
-        response_len = struct.unpack("<lll", header)[1]
-
-        if response_len:
-            response = self.recvall(response_len)
-        else:
-            response = None
+ 
+        response = None
+        request = statement.pack(self.py_con)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            response = self.py_con._send_request(request, False)
 
         if not silent:
             print command
             print statement.unpack(response)
 
-        return statement.unpack(response) + "\n"
-
+        return statement.unpack(response)

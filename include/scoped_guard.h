@@ -33,33 +33,30 @@
 #include "object.h"
 
 template <typename Functor>
-class ScopedGuard {
-public:
+struct ScopedGuard {
+	Functor f;
+	bool is_active;
+
 	explicit ScopedGuard(const Functor& fun)
-		: m_fun(fun), m_active(true) {
+		: f(fun), is_active(true) {
 		/* nothing */
 	}
 
 	ScopedGuard(ScopedGuard&& guard)
-		: m_fun(guard.m_fun), m_active(true) {
-		guard.m_active = false;
+		: f(guard.f), is_active(true) {
+		guard.is_active = false;
 		abort();
 	}
 
 	~ScopedGuard()
 	{
-		if (!m_active)
-			return;
-
-		m_fun();
+		if (is_active)
+			f();
 	}
 
 private:
 	explicit ScopedGuard(const ScopedGuard&) = delete;
 	ScopedGuard& operator=(const ScopedGuard&) = delete;
-
-	Functor m_fun;
-	bool m_active;
 };
 
 template <typename Functor>

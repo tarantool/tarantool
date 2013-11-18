@@ -41,8 +41,6 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-#define RECOVER_READONLY 1
-
 typedef int (row_handler)(void *, const char *, uint32_t);
 
 /** A "condition variable" that allows fibers to wait when a given
@@ -100,7 +98,6 @@ struct recovery_state {
 	void *row_handler_param;
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
-	int flags;
 	double wal_fsync_delay;
 	struct wait_lsn wait_lsn;
 	enum wal_mode wal_mode;
@@ -112,13 +109,13 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   int rows_per_wal, int flags);
+		   int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();
-void recover_snap(struct recovery_state *);
+void recover_snap(struct recovery_state *, const char *replication_source);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
@@ -140,6 +137,19 @@ int read_log(const char *filename,
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 
+void recovery_follow_remote_1_5(struct recovery_state *r, const char *addr);
+void recovery_stop_remote_1_5(struct recovery_state *r);
+
+/**
+ * The replication protocol is request/response. The
+ * replica saends a request, and the master responds with
+ * appropriate data.
+ */
+enum rpl_request_type {
+	RPL_GET_WAL = 0,
+	RPL_GET_SNAPSHOT
+};
+
 struct fio_batch;
 
 void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
@@ -147,6 +157,9 @@ void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
 			const char *data, size_t data_size);
 void snapshot_save(struct recovery_state *r,
 		   void (*loop) (struct log_io *, struct fio_batch *));
+
+void
+init_storage(struct log_dir *dir, const char *replication_source);
 
 #if defined(__cplusplus)
 } /* extern "C" */

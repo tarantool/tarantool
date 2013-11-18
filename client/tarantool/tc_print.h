@@ -36,6 +36,7 @@ void tc_print_buf(char *buf, size_t size);
 
 void tc_print_string(char *data, uint32_t size, char lua);
 
+#if 0
 void tc_print_fields(struct tnt_tuple *tu);
 void tc_print_tuple(struct tnt_tuple *tu);
 void tc_print_list(struct tnt_list *l);
@@ -43,5 +44,6 @@ void tc_print_list(struct tnt_list *l);
 void tc_print_lua_field(char *data, uint32_t size, char string);
 void tc_print_lua_fields(struct tnt_tuple *tu);
 void tc_print_lua_tuple(struct tnt_tuple *tu);
+#endif
 
 #endif /* TC_PRINT_H_INCLUDED */

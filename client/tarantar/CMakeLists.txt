@@ -11,6 +11,7 @@ list(APPEND util_snap_sources
     ${CMAKE_SOURCE_DIR}/src/errcode.c
     ${CMAKE_SOURCE_DIR}/src/exception.cc
     ${CMAKE_SOURCE_DIR}/src/rope.c
+    ${CMAKE_SOURCE_DIR}/src/pickle.cc
     ${CMAKE_SOURCE_DIR}/src/box/tuple_update.cc )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cfg/tarantool_box_cfg.c
@@ -24,6 +25,6 @@ set_source_files_properties(${util_snap_sources} PROPERTIES OBJECT_DEPENDS
 set_source_files_compile_flags(${util_snap_sources})
 add_executable(${util_snap} ${util_snap_sources})
 
-target_link_libraries (${util_snap} ${util_snap_libs} gopt small)
+target_link_libraries (${util_snap} ${util_snap_libs} gopt small msgpack)
 
 install (TARGETS ${util_snap} DESTINATION bin)

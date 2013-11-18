@@ -1,36 +1,60 @@
-lua box.cfg.wal_mode
+box.cfg.wal_mode
 ---
- - none
+- none
 ...
-insert into t0 values  (1)
-Insert OK, 1 row affected
-insert into t0 values  (2)
-Insert OK, 1 row affected
-insert into t0 values  (3)
-Insert OK, 1 row affected
-select * from t0 where k0 = 1
-Found 1 tuple:
-[1]
-select * from t0 where k0 = 2
-Found 1 tuple:
-[2]
-select * from t0 where k0 = 3
-Found 1 tuple:
-[3]
-select * from t0 where k0 = 4
-No match
-save snapshot
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
 ---
-ok
+- [0, 0, 'tweedledum']
 ...
-save snapshot
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 ---
-fail: can't save snapshot, errno 17 (File exists)
+- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
-lua box.space[0]:truncate()
+space = box.space[0]
 ---
 ...
-save snapshot
+space:insert(1)
 ---
-ok
+- [1]
+...
+space:insert(2)
+---
+- [2]
+...
+space:insert(3)
+---
+- [3]
+...
+space:select(0, 1)
+---
+- [1]
+...
+space:select(0, 2)
+---
+- [2]
+...
+space:select(0, 3)
+---
+- [3]
+...
+space:select(0, 4)
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.snapshot()
+---
+- error: can't save snapshot, errno 17 (File exists)
+...
+space:truncate()
+---
+...
+box.snapshot()
+---
+- ok
+...
+space:drop()
+---
 ...

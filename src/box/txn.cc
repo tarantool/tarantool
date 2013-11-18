@@ -62,19 +62,29 @@ txn_replace(struct txn *txn, struct space *space,
 		tuple_ref(txn->new_tuple, 1);
 	}
 	txn->space = space;
+	/*
+	 * Run on_replace triggers. For now, disallow mutation
+	 * of tuples in the trigger.
+	 */
+	if (! rlist_empty(&space->on_replace) && space->run_triggers)
+		trigger_run(&space->on_replace, txn);
 }
 
 struct txn *
 txn_begin()
 {
-	struct txn *txn = (struct txn *) p0alloc(fiber->gc_pool, sizeof(*txn));
+	struct txn *txn = (struct txn *)
+		region_alloc0(&fiber->gc, sizeof(*txn));
+	rlist_create(&txn->on_commit);
+	rlist_create(&txn->on_rollback);
 	return txn;
 }
 
 void
 txn_commit(struct txn *txn)
 {
-	if (txn->old_tuple || txn->new_tuple) {
+	if ((txn->old_tuple || txn->new_tuple) &&
+	    !space_is_temporary(txn->space)) {
 		int64_t lsn = next_lsn(recovery_state);
 
 		ev_tstamp start = ev_now(), stop;
@@ -93,8 +103,14 @@ txn_commit(struct txn *txn)
 			tnt_raise(LoggedError, ER_WAL_IO);
 
 	}
+	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
 
+/**
+ * txn_finish() follows txn_commit() on success.
+ * It's moved to a separate call to be able to send
+ * old tuple to the user before it's deleted.
+ */
 void
 txn_finish(struct txn *txn)
 {
@@ -107,7 +123,9 @@ void
 txn_rollback(struct txn *txn)
 {
 	if (txn->old_tuple || txn->new_tuple) {
-		space_replace(txn->space, txn->new_tuple, txn->old_tuple, DUP_INSERT);
+		space_replace(txn->space, txn->new_tuple,
+			      txn->old_tuple, DUP_INSERT);
+		trigger_run(&txn->on_rollback, txn); /* must not throw. */
 		if (txn->new_tuple)
 			tuple_ref(txn->new_tuple, -1);
 	}

@@ -7,10 +7,9 @@
 <para>In the current version of the binary protocol, error message,
 which is normally more descriptive than error code,
 is not present in server response. The actual message may contain
-a file name, a detailed reason or an operating system error code.
-All such messages, however, are logged in the error log. When
-using <emphasis role="strong">Memcached</emphasis> protocol, the error message is sent to the
-client along with the code. Below follow only general descriptions
+a file name, a detailed reason or operating system error code.
+All such messages, however, are logged in the error log. 
+Below follow only general descriptions
 of some popular codes. A complete list of errors can be found in
 file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</filename> in the source tree.
 

@@ -1,7 +1,7 @@
 file(GLOB all_sources *.c *.m *.mm)
 set_source_files_compile_flags(${all_sources})
 
-add_executable(rlist.test rlist.c test.c)
+add_executable(rlist.test rlist.c test.c ${CMAKE_SOURCE_DIR}/src/rlist.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)
 add_executable(rope_basic.test rope_basic.c ${CMAKE_SOURCE_DIR}/src/rope.c)
@@ -25,3 +25,17 @@ add_executable(mempool.test mempool.c)
 target_link_libraries(mempool.test small)
 add_executable(small_alloc.test small_alloc.c)
 target_link_libraries(small_alloc.test small)
+add_executable(lf_lifo.test lf_lifo.c)
+
+set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
+add_executable(msgpack.test
+    ${MSGPUCK_DIR}/test/msgpuck.c
+    ${MSGPUCK_DIR}/test/test.c)
+
+set_source_files_properties(
+    ${MSGPUCK_DIR}/test/msgpuck.c
+    ${MSGPUCK_DIR}/test/test.c
+    PROPERTIES COMPILE_FLAGS
+    "-I${MSGPUCK_DIR} -I${MSGPUCK_DIR}/test")
+
+target_link_libraries(msgpack.test msgpuck)

@@ -1,0 +1,421 @@
+--------------------------------------------------------------------------------
+-- Parameters parsing
+--------------------------------------------------------------------------------
+msgpack.encode()
+---
+- error: 'msgpack.encode: a Lua object expected'
+...
+msgpack.decode()
+---
+- error: 'msgpack.decode: a Lua string expected'
+...
+msgpack.encode('a', 'b')
+---
+- error: 'msgpack.encode: a Lua object expected'
+...
+msgpack.decode('a', 'b')
+---
+- error: 'msgpack.decode: a Lua string expected'
+...
+--# setopt delimiter ';'
+function deepcompare(a, b)
+    if type(a) == "number" or type(b) == "number" then
+        return a == b
+    end
+
+    if type(a) ~= type(b) then return false end
+
+    if type(a) == "table" then
+        for k in pairs(a) do
+            if not deepcompare(a[k], b[k]) then return false end
+        end
+        for k in pairs(b) do
+            if not deepcompare(a[k], b[k]) then return false end
+        end
+
+        return true
+    else
+        return a == b
+    end
+end;
+---
+...
+function test(x)
+    local x2 = msgpack.decode(msgpack.encode(x))
+    xstr = type(x) == "table" and "table" or tostring(x)
+    if deepcompare(x2, x) then
+        return string.format("%s ok", xstr)
+    else
+        return string.format("%s fail, got %s", xstr, x2)
+    end
+end;
+---
+...
+--# setopt delimiter ''
+--------------------------------------------------------------------------------
+-- Test uint, int, double encoding / decoding
+--------------------------------------------------------------------------------
+--
+-- unsigned int
+--
+test(0)
+---
+- 0 ok
+...
+test(0LL)
+---
+- 0LL ok
+...
+test(0ULL)
+---
+- 0ULL ok
+...
+test(1)
+---
+- 1 ok
+...
+test(1LL)
+---
+- 1LL ok
+...
+test(1ULL)
+---
+- 1ULL ok
+...
+test(4294967294)
+---
+- 4294967294 ok
+...
+test(4294967294LL)
+---
+- 4294967294LL ok
+...
+test(4294967294ULL)
+---
+- 4294967294ULL ok
+...
+test(4294967295)
+---
+- 4294967295 ok
+...
+test(4294967295LL)
+---
+- 4294967295LL ok
+...
+test(4294967295ULL)
+---
+- 4294967295ULL ok
+...
+test(4294967296)
+---
+- 4294967296 ok
+...
+test(4294967296LL)
+---
+- 4294967296LL ok
+...
+test(4294967296ULL)
+---
+- 4294967296ULL ok
+...
+test(4294967297)
+---
+- 4294967297 ok
+...
+test(4294967297LL)
+---
+- 4294967297LL ok
+...
+test(4294967297ULL)
+---
+- 4294967297ULL ok
+...
+test(9007199254740992)
+---
+- 9.007199254741e+15 ok
+...
+test(9007199254740992LL)
+---
+- 9007199254740992LL ok
+...
+test(9007199254740992ULL)
+---
+- 9007199254740992ULL ok
+...
+test(9223372036854775807LL)
+---
+- 9223372036854775807LL ok
+...
+test(9223372036854775807ULL)
+---
+- 9223372036854775807ULL ok
+...
+test(9223372036854775808ULL)
+---
+- 9223372036854775808ULL ok
+...
+test(9223372036854775809ULL)
+---
+- 9223372036854775809ULL ok
+...
+test(18446744073709551614ULL)
+---
+- 18446744073709551614ULL ok
+...
+test(18446744073709551615ULL)
+---
+- 18446744073709551615ULL ok
+...
+test(-1ULL)
+---
+- 18446744073709551615ULL ok
+...
+--
+-- signed int
+--
+test(-1)
+---
+- -1 ok
+...
+test(-1LL)
+---
+- -1LL ok
+...
+test(-2147483647)
+---
+- -2147483647 ok
+...
+test(-2147483647LL)
+---
+- -2147483647LL ok
+...
+test(-9007199254740992)
+---
+- -9.007199254741e+15 ok
+...
+test(-9007199254740992LL)
+---
+- -9007199254740992LL ok
+...
+test(-9223372036854775806LL)
+---
+- -9223372036854775806LL ok
+...
+test(-9223372036854775807LL)
+---
+- -9223372036854775807LL ok
+...
+--
+-- double
+--
+test(-1.1)
+---
+- -1.1 ok
+...
+test(3.14159265358979323846)
+---
+- 3.1415926535898 ok
+...
+test(-3.14159265358979323846)
+---
+- -3.1415926535898 ok
+...
+test(-1e100)
+---
+- -1e+100 ok
+...
+test(1e100)
+---
+- 1e+100 ok
+...
+--------------------------------------------------------------------------------
+-- Test str, bool, nil encoding / decoding 
+--------------------------------------------------------------------------------
+test(nil)
+---
+- nil ok
+...
+test(false)
+---
+- false ok
+...
+test(true)
+---
+- true ok
+...
+test("")
+---
+- ' ok'
+...
+test("abcde")
+---
+- abcde ok
+...
+test(string.rep("x", 33))
+---
+- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ok
+...
+--------------------------------------------------------------------------------
+-- Test tables encoding / decoding
+--------------------------------------------------------------------------------
+test({})
+---
+- table ok
+...
+test({1, 2, 3})
+---
+- table ok
+...
+test({k1 = 'v1', k2 = 'v2', k3 = 'v3'})
+---
+- table ok
+...
+test({[0] = 1, 2, 3, 4, 5})
+---
+- table ok
+...
+msgpack.decode(msgpack.encode({[0] = 1, 2, 3, 4, 5}))
+---
+- 0: 1
+  2: 3
+  3: 4
+  1: 2
+  4: 5
+...
+-- test sparse / dense arrays
+test({1, 2, 3, 4, 5, [10] = 10 })
+---
+- table ok
+...
+msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
+---
+- - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - null
+  - null
+  - null
+  - null
+  - 10
+...
+test({1, 2, 3, 4, 5, [100] = 100 })
+---
+- table ok
+...
+msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
+---
+- 2: 2
+  5: 5
+  3: 3
+  1: 1
+  100: 100
+  4: 4
+...
+--------------------------------------------------------------------------------
+-- Test serializer flags
+--------------------------------------------------------------------------------
+t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "array"})
+---
+...
+t2 = msgpack.decode(msgpack.encode(t1))
+---
+...
+#t2
+---
+- 100
+...
+getmetatable(t2)._serializer_type
+---
+- array
+...
+t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "map"})
+---
+...
+t2 = msgpack.decode(msgpack.encode(t1))
+---
+...
+t2
+---
+- 100: 100
+  1: 1
+...
+getmetatable(t2)._serializer_type
+---
+- map
+...
+--------------------------------------------------------------------------------
+-- Test resursive tables
+--------------------------------------------------------------------------------
+--# setopt delimiter ';'
+a = {1, 2, 3}
+b = {'a', 'b', 'c'}
+a[4] = b
+b[4] = a;
+---
+...
+a;
+---
+- &0
+  - 1
+  - 2
+  - 3
+  - - a
+    - b
+    - c
+    - *0
+...
+msgpack.decode(msgpack.encode(a));
+---
+- - 1
+  - 2
+  - 3
+  - - a
+    - b
+    - c
+    - - 1
+      - 2
+      - 3
+      - - a
+        - b
+        - c
+        - - 1
+          - 2
+          - 3
+          - - a
+            - b
+            - c
+            - - 1
+              - 2
+              - 3
+              - - a
+                - b
+                - c
+                - - 1
+                  - 2
+                  - 3
+                  - - a
+                    - b
+                    - c
+                    - - 1
+                      - 2
+                      - 3
+                      - - a
+                        - b
+                        - c
+                        - - 1
+                          - 2
+                          - 3
+                          - - a
+                            - b
+                            - c
+                            - - 1
+                              - 2
+                              - 3
+                              - - a
+                                - b
+                                - c
+                                - null
+...
+--# setopt delimiter ''

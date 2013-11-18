@@ -32,8 +32,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <third_party/qsort_arg.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -44,6 +42,7 @@ extern "C" {
  */
 typedef    uint32_t spnode_t;
 #define    SPNIL (0xffffffff)
+#define SPTREE_MIN_SIZE 64
 
 typedef struct sptree_node_pointers {
     uint32_t    left;   /* sizeof(spnode_t) >= sizeof(sptree_node_pointers.left) !!! */
@@ -98,7 +97,9 @@ typedef struct sptree_node_pointers {
  *   void* sptree_NAME_iterator_reverse_next(sptree_NAME_iterator *i)
  */
 
-#define SPTREE_DEF(name, realloc)                                                         \
+#define SPTREE_DEF(name, realloc, qsort_arg)                                              \
+typedef int (*sptree_##name##_compare)(const void *, const void *, void *);               \
+                                                                                          \
 typedef struct sptree_##name {                                                            \
     void                    *members;                                                     \
     sptree_node_pointers    *lrpointers;                                                  \
@@ -106,8 +107,8 @@ typedef struct sptree_##name {                                                  
     spnode_t                nmember;                                                      \
     spnode_t                ntotal;                                                       \
                                                                                           \
-    int                     (*compare)(const void *key, const void *elem, void *);        \
-    int                     (*elemcompare)(const void *e1, const void *e2, void *);       \
+    sptree_##name##_compare compare;                                                      \
+    sptree_##name##_compare elemcompare;                                                  \
     void*                   arg;                                                          \
     size_t                  elemsize;                                                     \
                                                                                           \
@@ -141,8 +142,8 @@ sptree_##name##_mktree(sptree_##name *t, spnode_t depth, spnode_t start, spnode_
 static inline void                                                                        \
 sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                          \
                      spnode_t nm, spnode_t nt,                                            \
-                     int (*compare)(const void *, const void *, void *),                  \
-                     int (*elemcompare)(const void *, const void *, void *),              \
+                     sptree_##name##_compare compare,                                     \
+                     sptree_##name##_compare elemcompare,                                 \
                      void *arg) {                                                         \
     memset(t, 0, sizeof(*t));                                                             \
     t->members = m;                                                                       \
@@ -157,7 +158,7 @@ sptree_##name##_init(sptree_##name *t, size_t elemsize, void *m,                
     if (t->ntotal == 0 || t->members == NULL) { /* from scratch */                        \
         if (t->ntotal == 0) {                                                             \
             t->members = NULL;                                                            \
-            t->ntotal = 64;                                                               \
+            t->ntotal = SPTREE_MIN_SIZE;                                                  \
         }                                                                                 \
                                                                                           \
         if (t->members == NULL)                                                           \
@@ -195,7 +196,7 @@ static inline void*                                                             
 sptree_##name##_find(const sptree_##name *t, void *k) {                                   \
     spnode_t    node = t->root;                                                           \
     while(node != SPNIL) {                                                                \
-    int r = t->compare(k, ITHELEM(t, node), t->arg);                                  \
+    int r = t->compare(k, ITHELEM(t, node), t->arg);                                      \
         if (r > 0) {                                                                      \
             node = _GET_SPNODE_RIGHT(node);                                               \
         } else if (r < 0) {                                                               \
@@ -372,8 +373,8 @@ sptree_##name##_replace(sptree_##name *t, void *v, void **p_old) {              
             }                                                                             \
         }                                                                                 \
     }                                                                                     \
-    if (p_old)                                                                        \
-        *p_old = NULL;                                                                \
+    if (p_old)                                                                            \
+        *p_old = NULL;                                                                    \
                                                                                           \
     t->size++;                                                                            \
     if ( t->size > t->max_size )                                                          \

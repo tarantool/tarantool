@@ -34,11 +34,13 @@
 
 #include <include/errcode.h>
 
+#if 0
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #include <connector/c/include/tarantool/tnt_rpl.h>
+#endif
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
@@ -48,6 +50,19 @@
 
 extern struct tc tc;
 
+static char *tc_query_error(char *fmt, ...) {
+	char msg[256];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(msg, sizeof(msg), fmt, args);
+	va_end(args);
+	char *ptr = strdup(msg);
+	if (ptr == NULL)
+		tc_error("memory allocation failed");
+	return ptr;
+}
+
+#if 0
 char *tc_query_type(uint32_t type) {
 	switch (type) {
 	case TNT_OP_PING:   return "Ping";
@@ -71,18 +86,6 @@ int tc_query_printer(struct tnt_reply *r, void *ptr, char **e) {
 		  r->count);
 	tc_print_list(TNT_REPLY_LIST(r));
 	return 0;
-}
-
-static char *tc_query_error(char *fmt, ...) {
-	char msg[256];
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, args);
-	va_end(args);
-	char *ptr = strdup(msg);
-	if (ptr == NULL)
-		tc_error("memory allocation failed");
-	return ptr;
 }
 
 int tc_query_foreach(tc_query_t cb, void *cba, char **e)
@@ -129,6 +132,7 @@ int tc_query(char *q, char **e) {
 	}
 	return 0;
 }
+#endif
 
 int tc_query_admin_printer(char *r, char **e) {
 	(void)e;

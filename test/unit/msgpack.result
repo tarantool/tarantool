@@ -1,0 +1,1241 @@
+1..15
+    1..120
+    # *** test_uints ***
+    # uint 0U
+    ok 1 - mp_decode(mp_encode(0U)) == 0U
+    ok 2 - mp_check_uint(0U)
+    ok 3 - len(mp_encode_uint(0U)
+    ok 4 - len(mp_decode_uint(0U))
+    ok 5 - len(mp_next_uint(0U))
+    ok 6 - len(mp_check_uint(0U))
+    ok 7 - mp_sizeof_uint(0U)
+    ok 8 - mp_encode(0U) == "\x00"
+    # uint 1U
+    ok 9 - mp_decode(mp_encode(1U)) == 1U
+    ok 10 - mp_check_uint(1U)
+    ok 11 - len(mp_encode_uint(1U)
+    ok 12 - len(mp_decode_uint(1U))
+    ok 13 - len(mp_next_uint(1U))
+    ok 14 - len(mp_check_uint(1U))
+    ok 15 - mp_sizeof_uint(1U)
+    ok 16 - mp_encode(1U) == "\x01"
+    # uint 0x7eU
+    ok 17 - mp_decode(mp_encode(0x7eU)) == 0x7eU
+    ok 18 - mp_check_uint(0x7eU)
+    ok 19 - len(mp_encode_uint(0x7eU)
+    ok 20 - len(mp_decode_uint(0x7eU))
+    ok 21 - len(mp_next_uint(0x7eU))
+    ok 22 - len(mp_check_uint(0x7eU))
+    ok 23 - mp_sizeof_uint(0x7eU)
+    ok 24 - mp_encode(0x7eU) == "\x7e"
+    # uint 0x7fU
+    ok 25 - mp_decode(mp_encode(0x7fU)) == 0x7fU
+    ok 26 - mp_check_uint(0x7fU)
+    ok 27 - len(mp_encode_uint(0x7fU)
+    ok 28 - len(mp_decode_uint(0x7fU))
+    ok 29 - len(mp_next_uint(0x7fU))
+    ok 30 - len(mp_check_uint(0x7fU))
+    ok 31 - mp_sizeof_uint(0x7fU)
+    ok 32 - mp_encode(0x7fU) == "\x7f"
+    # uint 0x80U
+    ok 33 - mp_decode(mp_encode(0x80U)) == 0x80U
+    ok 34 - mp_check_uint(0x80U)
+    ok 35 - len(mp_encode_uint(0x80U)
+    ok 36 - len(mp_decode_uint(0x80U))
+    ok 37 - len(mp_next_uint(0x80U))
+    ok 38 - len(mp_check_uint(0x80U))
+    ok 39 - mp_sizeof_uint(0x80U)
+    ok 40 - mp_encode(0x80U) == "\xcc\x80"
+    # uint 0xfeU
+    ok 41 - mp_decode(mp_encode(0xfeU)) == 0xfeU
+    ok 42 - mp_check_uint(0xfeU)
+    ok 43 - len(mp_encode_uint(0xfeU)
+    ok 44 - len(mp_decode_uint(0xfeU))
+    ok 45 - len(mp_next_uint(0xfeU))
+    ok 46 - len(mp_check_uint(0xfeU))
+    ok 47 - mp_sizeof_uint(0xfeU)
+    ok 48 - mp_encode(0xfeU) == "\xcc\xfe"
+    # uint 0xffU
+    ok 49 - mp_decode(mp_encode(0xffU)) == 0xffU
+    ok 50 - mp_check_uint(0xffU)
+    ok 51 - len(mp_encode_uint(0xffU)
+    ok 52 - len(mp_decode_uint(0xffU))
+    ok 53 - len(mp_next_uint(0xffU))
+    ok 54 - len(mp_check_uint(0xffU))
+    ok 55 - mp_sizeof_uint(0xffU)
+    ok 56 - mp_encode(0xffU) == "\xcc\xff"
+    # uint 0xfffeU
+    ok 57 - mp_decode(mp_encode(0xfffeU)) == 0xfffeU
+    ok 58 - mp_check_uint(0xfffeU)
+    ok 59 - len(mp_encode_uint(0xfffeU)
+    ok 60 - len(mp_decode_uint(0xfffeU))
+    ok 61 - len(mp_next_uint(0xfffeU))
+    ok 62 - len(mp_check_uint(0xfffeU))
+    ok 63 - mp_sizeof_uint(0xfffeU)
+    ok 64 - mp_encode(0xfffeU) == "\xcd\xff\xfe"
+    # uint 0xffffU
+    ok 65 - mp_decode(mp_encode(0xffffU)) == 0xffffU
+    ok 66 - mp_check_uint(0xffffU)
+    ok 67 - len(mp_encode_uint(0xffffU)
+    ok 68 - len(mp_decode_uint(0xffffU))
+    ok 69 - len(mp_next_uint(0xffffU))
+    ok 70 - len(mp_check_uint(0xffffU))
+    ok 71 - mp_sizeof_uint(0xffffU)
+    ok 72 - mp_encode(0xffffU) == "\xcd\xff\xff"
+    # uint 0x10000U
+    ok 73 - mp_decode(mp_encode(0x10000U)) == 0x10000U
+    ok 74 - mp_check_uint(0x10000U)
+    ok 75 - len(mp_encode_uint(0x10000U)
+    ok 76 - len(mp_decode_uint(0x10000U))
+    ok 77 - len(mp_next_uint(0x10000U))
+    ok 78 - len(mp_check_uint(0x10000U))
+    ok 79 - mp_sizeof_uint(0x10000U)
+    ok 80 - mp_encode(0x10000U) == "\xce\x00\x01\x00\x00"
+    # uint 0xfffffffeU
+    ok 81 - mp_decode(mp_encode(0xfffffffeU)) == 0xfffffffeU
+    ok 82 - mp_check_uint(0xfffffffeU)
+    ok 83 - len(mp_encode_uint(0xfffffffeU)
+    ok 84 - len(mp_decode_uint(0xfffffffeU))
+    ok 85 - len(mp_next_uint(0xfffffffeU))
+    ok 86 - len(mp_check_uint(0xfffffffeU))
+    ok 87 - mp_sizeof_uint(0xfffffffeU)
+    ok 88 - mp_encode(0xfffffffeU) == "\xce\xff\xff\xff\xfe"
+    # uint 0xffffffffU
+    ok 89 - mp_decode(mp_encode(0xffffffffU)) == 0xffffffffU
+    ok 90 - mp_check_uint(0xffffffffU)
+    ok 91 - len(mp_encode_uint(0xffffffffU)
+    ok 92 - len(mp_decode_uint(0xffffffffU))
+    ok 93 - len(mp_next_uint(0xffffffffU))
+    ok 94 - len(mp_check_uint(0xffffffffU))
+    ok 95 - mp_sizeof_uint(0xffffffffU)
+    ok 96 - mp_encode(0xffffffffU) == "\xce\xff\xff\xff\xff"
+    # uint 0x100000000UL
+    ok 97 - mp_decode(mp_encode(0x100000000UL)) == 0x100000000UL
+    ok 98 - mp_check_uint(0x100000000UL)
+    ok 99 - len(mp_encode_uint(0x100000000UL)
+    ok 100 - len(mp_decode_uint(0x100000000UL))
+    ok 101 - len(mp_next_uint(0x100000000UL))
+    ok 102 - len(mp_check_uint(0x100000000UL))
+    ok 103 - mp_sizeof_uint(0x100000000UL)
+    ok 104 - mp_encode(0x100000000UL) == "\xcf\x00\x00\x00\x01\x00\x00\x00\x00"
+    # uint 0xfffffffffffffffeUL
+    ok 105 - mp_decode(mp_encode(0xfffffffffffffffeUL)) == 0xfffffffffffffffeUL
+    ok 106 - mp_check_uint(0xfffffffffffffffeUL)
+    ok 107 - len(mp_encode_uint(0xfffffffffffffffeUL)
+    ok 108 - len(mp_decode_uint(0xfffffffffffffffeUL))
+    ok 109 - len(mp_next_uint(0xfffffffffffffffeUL))
+    ok 110 - len(mp_check_uint(0xfffffffffffffffeUL))
+    ok 111 - mp_sizeof_uint(0xfffffffffffffffeUL)
+    ok 112 - mp_encode(0xfffffffffffffffeUL) == "\xcf\xff\xff\xff\xff\xff\xff\xff\xfe"
+    # uint 0xffffffffffffffffUL
+    ok 113 - mp_decode(mp_encode(0xffffffffffffffffUL)) == 0xffffffffffffffffUL
+    ok 114 - mp_check_uint(0xffffffffffffffffUL)
+    ok 115 - len(mp_encode_uint(0xffffffffffffffffUL)
+    ok 116 - len(mp_decode_uint(0xffffffffffffffffUL))
+    ok 117 - len(mp_next_uint(0xffffffffffffffffUL))
+    ok 118 - len(mp_check_uint(0xffffffffffffffffUL))
+    ok 119 - mp_sizeof_uint(0xffffffffffffffffUL)
+    ok 120 - mp_encode(0xffffffffffffffffUL) == "\xcf\xff\xff\xff\xff\xff\xff\xff\xff"
+    # *** test_uints: done ***
+ok 1 - subtests
+    1..136
+    # *** test_ints ***
+    # int -0x01
+    ok 1 - mp_decode(mp_encode(-0x01)) == -0x01
+    ok 2 - mp_check_int(-0x01)
+    ok 3 - len(mp_encode_int(-0x01)
+    ok 4 - len(mp_decode_int(-0x01))
+    ok 5 - len(mp_next_int(-0x01))
+    ok 6 - len(mp_check_int(-0x01))
+    ok 7 - mp_sizeof_int(-0x01)
+    ok 8 - mp_encode(-0x01) == "\xff"
+    # int -0x1e
+    ok 9 - mp_decode(mp_encode(-0x1e)) == -0x1e
+    ok 10 - mp_check_int(-0x1e)
+    ok 11 - len(mp_encode_int(-0x1e)
+    ok 12 - len(mp_decode_int(-0x1e))
+    ok 13 - len(mp_next_int(-0x1e))
+    ok 14 - len(mp_check_int(-0x1e))
+    ok 15 - mp_sizeof_int(-0x1e)
+    ok 16 - mp_encode(-0x1e) == "\xe2"
+    # int -0x1f
+    ok 17 - mp_decode(mp_encode(-0x1f)) == -0x1f
+    ok 18 - mp_check_int(-0x1f)
+    ok 19 - len(mp_encode_int(-0x1f)
+    ok 20 - len(mp_decode_int(-0x1f))
+    ok 21 - len(mp_next_int(-0x1f))
+    ok 22 - len(mp_check_int(-0x1f))
+    ok 23 - mp_sizeof_int(-0x1f)
+    ok 24 - mp_encode(-0x1f) == "\xe1"
+    # int -0x20
+    ok 25 - mp_decode(mp_encode(-0x20)) == -0x20
+    ok 26 - mp_check_int(-0x20)
+    ok 27 - len(mp_encode_int(-0x20)
+    ok 28 - len(mp_decode_int(-0x20))
+    ok 29 - len(mp_next_int(-0x20))
+    ok 30 - len(mp_check_int(-0x20))
+    ok 31 - mp_sizeof_int(-0x20)
+    ok 32 - mp_encode(-0x20) == "\xe0"
+    # int -0x21
+    ok 33 - mp_decode(mp_encode(-0x21)) == -0x21
+    ok 34 - mp_check_int(-0x21)
+    ok 35 - len(mp_encode_int(-0x21)
+    ok 36 - len(mp_decode_int(-0x21))
+    ok 37 - len(mp_next_int(-0x21))
+    ok 38 - len(mp_check_int(-0x21))
+    ok 39 - mp_sizeof_int(-0x21)
+    ok 40 - mp_encode(-0x21) == "\xd0\xdf"
+    # int -0x7f
+    ok 41 - mp_decode(mp_encode(-0x7f)) == -0x7f
+    ok 42 - mp_check_int(-0x7f)
+    ok 43 - len(mp_encode_int(-0x7f)
+    ok 44 - len(mp_decode_int(-0x7f))
+    ok 45 - len(mp_next_int(-0x7f))
+    ok 46 - len(mp_check_int(-0x7f))
+    ok 47 - mp_sizeof_int(-0x7f)
+    ok 48 - mp_encode(-0x7f) == "\xd0\x81"
+    # int -0x80
+    ok 49 - mp_decode(mp_encode(-0x80)) == -0x80
+    ok 50 - mp_check_int(-0x80)
+    ok 51 - len(mp_encode_int(-0x80)
+    ok 52 - len(mp_decode_int(-0x80))
+    ok 53 - len(mp_next_int(-0x80))
+    ok 54 - len(mp_check_int(-0x80))
+    ok 55 - mp_sizeof_int(-0x80)
+    ok 56 - mp_encode(-0x80) == "\xd0\x80"
+    # int -0x81
+    ok 57 - mp_decode(mp_encode(-0x81)) == -0x81
+    ok 58 - mp_check_int(-0x81)
+    ok 59 - len(mp_encode_int(-0x81)
+    ok 60 - len(mp_decode_int(-0x81))
+    ok 61 - len(mp_next_int(-0x81))
+    ok 62 - len(mp_check_int(-0x81))
+    ok 63 - mp_sizeof_int(-0x81)
+    ok 64 - mp_encode(-0x81) == "\xd1\xff\x7f"
+    # int -0x7fff
+    ok 65 - mp_decode(mp_encode(-0x7fff)) == -0x7fff
+    ok 66 - mp_check_int(-0x7fff)
+    ok 67 - len(mp_encode_int(-0x7fff)
+    ok 68 - len(mp_decode_int(-0x7fff))
+    ok 69 - len(mp_next_int(-0x7fff))
+    ok 70 - len(mp_check_int(-0x7fff))
+    ok 71 - mp_sizeof_int(-0x7fff)
+    ok 72 - mp_encode(-0x7fff) == "\xd1\x80\x01"
+    # int -0x8000
+    ok 73 - mp_decode(mp_encode(-0x8000)) == -0x8000
+    ok 74 - mp_check_int(-0x8000)
+    ok 75 - len(mp_encode_int(-0x8000)
+    ok 76 - len(mp_decode_int(-0x8000))
+    ok 77 - len(mp_next_int(-0x8000))
+    ok 78 - len(mp_check_int(-0x8000))
+    ok 79 - mp_sizeof_int(-0x8000)
+    ok 80 - mp_encode(-0x8000) == "\xd1\x80\x00"
+    # int -0x8001
+    ok 81 - mp_decode(mp_encode(-0x8001)) == -0x8001
+    ok 82 - mp_check_int(-0x8001)
+    ok 83 - len(mp_encode_int(-0x8001)
+    ok 84 - len(mp_decode_int(-0x8001))
+    ok 85 - len(mp_next_int(-0x8001))
+    ok 86 - len(mp_check_int(-0x8001))
+    ok 87 - mp_sizeof_int(-0x8001)
+    ok 88 - mp_encode(-0x8001) == "\xd2\xff\xff\x7f\xff"
+    # int -0x7fffffff
+    ok 89 - mp_decode(mp_encode(-0x7fffffff)) == -0x7fffffff
+    ok 90 - mp_check_int(-0x7fffffff)
+    ok 91 - len(mp_encode_int(-0x7fffffff)
+    ok 92 - len(mp_decode_int(-0x7fffffff))
+    ok 93 - len(mp_next_int(-0x7fffffff))
+    ok 94 - len(mp_check_int(-0x7fffffff))
+    ok 95 - mp_sizeof_int(-0x7fffffff)
+    ok 96 - mp_encode(-0x7fffffff) == "\xd2\x80\x00\x00\x01"
+    # int -0x80000000L
+    ok 97 - mp_decode(mp_encode(-0x80000000L)) == -0x80000000L
+    ok 98 - mp_check_int(-0x80000000L)
+    ok 99 - len(mp_encode_int(-0x80000000L)
+    ok 100 - len(mp_decode_int(-0x80000000L))
+    ok 101 - len(mp_next_int(-0x80000000L))
+    ok 102 - len(mp_check_int(-0x80000000L))
+    ok 103 - mp_sizeof_int(-0x80000000L)
+    ok 104 - mp_encode(-0x80000000L) == "\xd2\x80\x00\x00\x00"
+    # int -0x80000001L
+    ok 105 - mp_decode(mp_encode(-0x80000001L)) == -0x80000001L
+    ok 106 - mp_check_int(-0x80000001L)
+    ok 107 - len(mp_encode_int(-0x80000001L)
+    ok 108 - len(mp_decode_int(-0x80000001L))
+    ok 109 - len(mp_next_int(-0x80000001L))
+    ok 110 - len(mp_check_int(-0x80000001L))
+    ok 111 - mp_sizeof_int(-0x80000001L)
+    ok 112 - mp_encode(-0x80000001L) == "\xd3\xff\xff\xff\xff\x7f\xff\xff\xff"
+    # int -0x80000001L
+    ok 113 - mp_decode(mp_encode(-0x80000001L)) == -0x80000001L
+    ok 114 - mp_check_int(-0x80000001L)
+    ok 115 - len(mp_encode_int(-0x80000001L)
+    ok 116 - len(mp_decode_int(-0x80000001L))
+    ok 117 - len(mp_next_int(-0x80000001L))
+    ok 118 - len(mp_check_int(-0x80000001L))
+    ok 119 - mp_sizeof_int(-0x80000001L)
+    ok 120 - mp_encode(-0x80000001L) == "\xd3\xff\xff\xff\xff\x7f\xff\xff\xff"
+    # int -0x7fffffffffffffffL
+    ok 121 - mp_decode(mp_encode(-0x7fffffffffffffffL)) == -0x7fffffffffffffffL
+    ok 122 - mp_check_int(-0x7fffffffffffffffL)
+    ok 123 - len(mp_encode_int(-0x7fffffffffffffffL)
+    ok 124 - len(mp_decode_int(-0x7fffffffffffffffL))
+    ok 125 - len(mp_next_int(-0x7fffffffffffffffL))
+    ok 126 - len(mp_check_int(-0x7fffffffffffffffL))
+    ok 127 - mp_sizeof_int(-0x7fffffffffffffffL)
+    ok 128 - mp_encode(-0x7fffffffffffffffL) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x01"
+    # int -0x8000000000000000L
+    ok 129 - mp_decode(mp_encode(-0x8000000000000000L)) == -0x8000000000000000L
+    ok 130 - mp_check_int(-0x8000000000000000L)
+    ok 131 - len(mp_encode_int(-0x8000000000000000L)
+    ok 132 - len(mp_decode_int(-0x8000000000000000L))
+    ok 133 - len(mp_next_int(-0x8000000000000000L))
+    ok 134 - len(mp_check_int(-0x8000000000000000L))
+    ok 135 - mp_sizeof_int(-0x8000000000000000L)
+    ok 136 - mp_encode(-0x8000000000000000L) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x00"
+    # *** test_ints: done ***
+ok 2 - subtests
+    1..16
+    # *** test_bools ***
+    # bool 1
+    ok 1 - mp_decode(mp_encode(1)) == 1
+    ok 2 - mp_check_bool(1)
+    ok 3 - len(mp_encode_bool(1)
+    ok 4 - len(mp_decode_bool(1))
+    ok 5 - len(mp_next_bool(1))
+    ok 6 - len(mp_check_bool(1))
+    ok 7 - mp_sizeof_bool(1)
+    ok 8 - mp_encode(1) == "\xc3"
+    # bool 0
+    ok 9 - mp_decode(mp_encode(0)) == 0
+    ok 10 - mp_check_bool(0)
+    ok 11 - len(mp_encode_bool(0)
+    ok 12 - len(mp_decode_bool(0))
+    ok 13 - len(mp_next_bool(0))
+    ok 14 - len(mp_check_bool(0))
+    ok 15 - mp_sizeof_bool(0)
+    ok 16 - mp_encode(0) == "\xc2"
+    # *** test_bools: done ***
+ok 3 - subtests
+    1..24
+    # *** test_floats ***
+    # float 1.0f
+    ok 1 - mp_decode(mp_encode(1.0f)) == 1.0f
+    ok 2 - mp_check_float(1.0f)
+    ok 3 - len(mp_encode_float(1.0f)
+    ok 4 - len(mp_decode_float(1.0f))
+    ok 5 - len(mp_next_float(1.0f))
+    ok 6 - len(mp_check_float(1.0f))
+    ok 7 - mp_sizeof_float(1.0f)
+    ok 8 - mp_encode(1.0f) == "\xca\x3f\x80\x00\x00"
+    # float 3.141592653589793f
+    ok 9 - mp_decode(mp_encode(3.141592653589793f)) == 3.141592653589793f
+    ok 10 - mp_check_float(3.141592653589793f)
+    ok 11 - len(mp_encode_float(3.141592653589793f)
+    ok 12 - len(mp_decode_float(3.141592653589793f))
+    ok 13 - len(mp_next_float(3.141592653589793f))
+    ok 14 - len(mp_check_float(3.141592653589793f))
+    ok 15 - mp_sizeof_float(3.141592653589793f)
+    ok 16 - mp_encode(3.141592653589793f) == "\xca\x40\x49\x0f\xdb"
+    # float -1e38f
+    ok 17 - mp_decode(mp_encode(-1e38f)) == -1e38f
+    ok 18 - mp_check_float(-1e38f)
+    ok 19 - len(mp_encode_float(-1e38f)
+    ok 20 - len(mp_decode_float(-1e38f))
+    ok 21 - len(mp_next_float(-1e38f))
+    ok 22 - len(mp_check_float(-1e38f))
+    ok 23 - mp_sizeof_float(-1e38f)
+    ok 24 - mp_encode(-1e38f) == "\xca\xfe\x96\x76\x99"
+    # *** test_floats: done ***
+ok 4 - subtests
+    1..24
+    # *** test_doubles ***
+    # double 1.0
+    ok 1 - mp_decode(mp_encode(1.0)) == 1.0
+    ok 2 - mp_check_double(1.0)
+    ok 3 - len(mp_encode_double(1.0)
+    ok 4 - len(mp_decode_double(1.0))
+    ok 5 - len(mp_next_double(1.0))
+    ok 6 - len(mp_check_double(1.0))
+    ok 7 - mp_sizeof_double(1.0)
+    ok 8 - mp_encode(1.0) == "\xcb\x3f\xf0\x00\x00\x00\x00\x00\x00"
+    # double 3.141592653589793
+    ok 9 - mp_decode(mp_encode(3.141592653589793)) == 3.141592653589793
+    ok 10 - mp_check_double(3.141592653589793)
+    ok 11 - len(mp_encode_double(3.141592653589793)
+    ok 12 - len(mp_decode_double(3.141592653589793))
+    ok 13 - len(mp_next_double(3.141592653589793))
+    ok 14 - len(mp_check_double(3.141592653589793))
+    ok 15 - mp_sizeof_double(3.141592653589793)
+    ok 16 - mp_encode(3.141592653589793) == "\xcb\x40\x09\x21\xfb\x54\x44\x2d\x18"
+    # double -1e99
+    ok 17 - mp_decode(mp_encode(-1e99)) == -1e99
+    ok 18 - mp_check_double(-1e99)
+    ok 19 - len(mp_encode_double(-1e99)
+    ok 20 - len(mp_decode_double(-1e99))
+    ok 21 - len(mp_next_double(-1e99))
+    ok 22 - len(mp_check_double(-1e99))
+    ok 23 - mp_sizeof_double(-1e99)
+    ok 24 - mp_encode(-1e99) == "\xcb\xd4\x7d\x42\xae\xa2\x87\x9f\x2e"
+    # *** test_doubles: done ***
+ok 5 - subtests
+    1..6
+    # *** test_nils ***
+    # nil
+    ok 1 - mp_check_nil()
+    ok 2 - len(mp_encode_nil() == 1
+    ok 3 - len(mp_decode_nil()) == 1
+    ok 4 - len(mp_next_nil()) == 1
+    ok 5 - len(mp_check_nil()) == 1
+    ok 6 - mp_sizeof_nil() == 1
+    # *** test_nils: done ***
+ok 6 - subtests
+    1..65
+    # *** test_strls ***
+    # strl 0x00U
+    ok 1 - mp_decode(mp_encode(0x00U)) == 0x00U
+    ok 2 - len(mp_encode_strl(0x00U)
+    ok 3 - len(mp_decode_strl(0x00U))
+    ok 4 - mp_sizeof_strl(0x00U)
+    ok 5 - mp_encode(0x00U) == "\xa0"
+    # strl 0x01U
+    ok 6 - mp_decode(mp_encode(0x01U)) == 0x01U
+    ok 7 - len(mp_encode_strl(0x01U)
+    ok 8 - len(mp_decode_strl(0x01U))
+    ok 9 - mp_sizeof_strl(0x01U)
+    ok 10 - mp_encode(0x01U) == "\xa1"
+    # strl 0x1eU
+    ok 11 - mp_decode(mp_encode(0x1eU)) == 0x1eU
+    ok 12 - len(mp_encode_strl(0x1eU)
+    ok 13 - len(mp_decode_strl(0x1eU))
+    ok 14 - mp_sizeof_strl(0x1eU)
+    ok 15 - mp_encode(0x1eU) == "\xbe"
+    # strl 0x1fU
+    ok 16 - mp_decode(mp_encode(0x1fU)) == 0x1fU
+    ok 17 - len(mp_encode_strl(0x1fU)
+    ok 18 - len(mp_decode_strl(0x1fU))
+    ok 19 - mp_sizeof_strl(0x1fU)
+    ok 20 - mp_encode(0x1fU) == "\xbf"
+    # strl 0x20U
+    ok 21 - mp_decode(mp_encode(0x20U)) == 0x20U
+    ok 22 - len(mp_encode_strl(0x20U)
+    ok 23 - len(mp_decode_strl(0x20U))
+    ok 24 - mp_sizeof_strl(0x20U)
+    ok 25 - mp_encode(0x20U) == "\xd9\x20"
+    # strl 0xfeU
+    ok 26 - mp_decode(mp_encode(0xfeU)) == 0xfeU
+    ok 27 - len(mp_encode_strl(0xfeU)
+    ok 28 - len(mp_decode_strl(0xfeU))
+    ok 29 - mp_sizeof_strl(0xfeU)
+    ok 30 - mp_encode(0xfeU) == "\xd9\xfe"
+    # strl 0xffU
+    ok 31 - mp_decode(mp_encode(0xffU)) == 0xffU
+    ok 32 - len(mp_encode_strl(0xffU)
+    ok 33 - len(mp_decode_strl(0xffU))
+    ok 34 - mp_sizeof_strl(0xffU)
+    ok 35 - mp_encode(0xffU) == "\xd9\xff"
+    # strl 0x0100U
+    ok 36 - mp_decode(mp_encode(0x0100U)) == 0x0100U
+    ok 37 - len(mp_encode_strl(0x0100U)
+    ok 38 - len(mp_decode_strl(0x0100U))
+    ok 39 - mp_sizeof_strl(0x0100U)
+    ok 40 - mp_encode(0x0100U) == "\xda\x01\x00"
+    # strl 0xfffeU
+    ok 41 - mp_decode(mp_encode(0xfffeU)) == 0xfffeU
+    ok 42 - len(mp_encode_strl(0xfffeU)
+    ok 43 - len(mp_decode_strl(0xfffeU))
+    ok 44 - mp_sizeof_strl(0xfffeU)
+    ok 45 - mp_encode(0xfffeU) == "\xda\xff\xfe"
+    # strl 0xffffU
+    ok 46 - mp_decode(mp_encode(0xffffU)) == 0xffffU
+    ok 47 - len(mp_encode_strl(0xffffU)
+    ok 48 - len(mp_decode_strl(0xffffU))
+    ok 49 - mp_sizeof_strl(0xffffU)
+    ok 50 - mp_encode(0xffffU) == "\xda\xff\xff"
+    # strl 0x00010000U
+    ok 51 - mp_decode(mp_encode(0x00010000U)) == 0x00010000U
+    ok 52 - len(mp_encode_strl(0x00010000U)
+    ok 53 - len(mp_decode_strl(0x00010000U))
+    ok 54 - mp_sizeof_strl(0x00010000U)
+    ok 55 - mp_encode(0x00010000U) == "\xdb\x00\x01\x00\x00"
+    # strl 0xfffffffeU
+    ok 56 - mp_decode(mp_encode(0xfffffffeU)) == 0xfffffffeU
+    ok 57 - len(mp_encode_strl(0xfffffffeU)
+    ok 58 - len(mp_decode_strl(0xfffffffeU))
+    ok 59 - mp_sizeof_strl(0xfffffffeU)
+    ok 60 - mp_encode(0xfffffffeU) == "\xdb\xff\xff\xff\xfe"
+    # strl 0xffffffffU
+    ok 61 - mp_decode(mp_encode(0xffffffffU)) == 0xffffffffU
+    ok 62 - len(mp_encode_strl(0xffffffffU)
+    ok 63 - len(mp_decode_strl(0xffffffffU))
+    ok 64 - mp_sizeof_strl(0xffffffffU)
+    ok 65 - mp_encode(0xffffffffU) == "\xdb\xff\xff\xff\xff"
+    # *** test_strls: done ***
+ok 7 - subtests
+    1..65
+    # *** test_binls ***
+    # binl 0x00U
+    ok 1 - mp_decode(mp_encode(0x00U)) == 0x00U
+    ok 2 - len(mp_encode_binl(0x00U)
+    ok 3 - len(mp_decode_binl(0x00U))
+    ok 4 - mp_sizeof_binl(0x00U)
+    ok 5 - mp_encode(0x00U) == "\xc4\x00"
+    # binl 0x01U
+    ok 6 - mp_decode(mp_encode(0x01U)) == 0x01U
+    ok 7 - len(mp_encode_binl(0x01U)
+    ok 8 - len(mp_decode_binl(0x01U))
+    ok 9 - mp_sizeof_binl(0x01U)
+    ok 10 - mp_encode(0x01U) == "\xc4\x01"
+    # binl 0x1eU
+    ok 11 - mp_decode(mp_encode(0x1eU)) == 0x1eU
+    ok 12 - len(mp_encode_binl(0x1eU)
+    ok 13 - len(mp_decode_binl(0x1eU))
+    ok 14 - mp_sizeof_binl(0x1eU)
+    ok 15 - mp_encode(0x1eU) == "\xc4\x1e"
+    # binl 0x1fU
+    ok 16 - mp_decode(mp_encode(0x1fU)) == 0x1fU
+    ok 17 - len(mp_encode_binl(0x1fU)
+    ok 18 - len(mp_decode_binl(0x1fU))
+    ok 19 - mp_sizeof_binl(0x1fU)
+    ok 20 - mp_encode(0x1fU) == "\xc4\x1f"
+    # binl 0x20U
+    ok 21 - mp_decode(mp_encode(0x20U)) == 0x20U
+    ok 22 - len(mp_encode_binl(0x20U)
+    ok 23 - len(mp_decode_binl(0x20U))
+    ok 24 - mp_sizeof_binl(0x20U)
+    ok 25 - mp_encode(0x20U) == "\xc4\x20"
+    # binl 0xfeU
+    ok 26 - mp_decode(mp_encode(0xfeU)) == 0xfeU
+    ok 27 - len(mp_encode_binl(0xfeU)
+    ok 28 - len(mp_decode_binl(0xfeU))
+    ok 29 - mp_sizeof_binl(0xfeU)
+    ok 30 - mp_encode(0xfeU) == "\xc4\xfe"
+    # binl 0xffU
+    ok 31 - mp_decode(mp_encode(0xffU)) == 0xffU
+    ok 32 - len(mp_encode_binl(0xffU)
+    ok 33 - len(mp_decode_binl(0xffU))
+    ok 34 - mp_sizeof_binl(0xffU)
+    ok 35 - mp_encode(0xffU) == "\xc4\xff"
+    # binl 0x0100U
+    ok 36 - mp_decode(mp_encode(0x0100U)) == 0x0100U
+    ok 37 - len(mp_encode_binl(0x0100U)
+    ok 38 - len(mp_decode_binl(0x0100U))
+    ok 39 - mp_sizeof_binl(0x0100U)
+    ok 40 - mp_encode(0x0100U) == "\xc5\x01\x00"
+    # binl 0xfffeU
+    ok 41 - mp_decode(mp_encode(0xfffeU)) == 0xfffeU
+    ok 42 - len(mp_encode_binl(0xfffeU)
+    ok 43 - len(mp_decode_binl(0xfffeU))
+    ok 44 - mp_sizeof_binl(0xfffeU)
+    ok 45 - mp_encode(0xfffeU) == "\xc5\xff\xfe"
+    # binl 0xffffU
+    ok 46 - mp_decode(mp_encode(0xffffU)) == 0xffffU
+    ok 47 - len(mp_encode_binl(0xffffU)
+    ok 48 - len(mp_decode_binl(0xffffU))
+    ok 49 - mp_sizeof_binl(0xffffU)
+    ok 50 - mp_encode(0xffffU) == "\xc5\xff\xff"
+    # binl 0x00010000U
+    ok 51 - mp_decode(mp_encode(0x00010000U)) == 0x00010000U
+    ok 52 - len(mp_encode_binl(0x00010000U)
+    ok 53 - len(mp_decode_binl(0x00010000U))
+    ok 54 - mp_sizeof_binl(0x00010000U)
+    ok 55 - mp_encode(0x00010000U) == "\xc6\x00\x01\x00\x00"
+    # binl 0xfffffffeU
+    ok 56 - mp_decode(mp_encode(0xfffffffeU)) == 0xfffffffeU
+    ok 57 - len(mp_encode_binl(0xfffffffeU)
+    ok 58 - len(mp_decode_binl(0xfffffffeU))
+    ok 59 - mp_sizeof_binl(0xfffffffeU)
+    ok 60 - mp_encode(0xfffffffeU) == "\xc6\xff\xff\xff\xfe"
+    # binl 0xffffffffU
+    ok 61 - mp_decode(mp_encode(0xffffffffU)) == 0xffffffffU
+    ok 62 - len(mp_encode_binl(0xffffffffU)
+    ok 63 - len(mp_decode_binl(0xffffffffU))
+    ok 64 - mp_sizeof_binl(0xffffffffU)
+    ok 65 - mp_encode(0xffffffffU) == "\xc6\xff\xff\xff\xff"
+    # *** test_binls: done ***
+ok 8 - subtests
+    1..84
+    # *** test_strs ***
+    # str len=0x01
+    ok 1 - len(mp_decode_str(x, 1))
+    ok 2 - mp_check_str(mp_encode_str(x, 0x01))
+    ok 3 - len(mp_decode_str(x, 0x01)
+    ok 4 - len(mp_next_str(x, 0x01)
+    ok 5 - len(mp_check_str(x, 0x01)
+    ok 6 - mp_sizeof_str(0x01)
+    ok 7 - mp_encode_str(x, 0x01) == x
+    # str len=0x1e
+    ok 8 - len(mp_decode_str(x, 30))
+    ok 9 - mp_check_str(mp_encode_str(x, 0x1e))
+    ok 10 - len(mp_decode_str(x, 0x1e)
+    ok 11 - len(mp_next_str(x, 0x1e)
+    ok 12 - len(mp_check_str(x, 0x1e)
+    ok 13 - mp_sizeof_str(0x1e)
+    ok 14 - mp_encode_str(x, 0x1e) == x
+    # str len=0x1f
+    ok 15 - len(mp_decode_str(x, 31))
+    ok 16 - mp_check_str(mp_encode_str(x, 0x1f))
+    ok 17 - len(mp_decode_str(x, 0x1f)
+    ok 18 - len(mp_next_str(x, 0x1f)
+    ok 19 - len(mp_check_str(x, 0x1f)
+    ok 20 - mp_sizeof_str(0x1f)
+    ok 21 - mp_encode_str(x, 0x1f) == x
+    # str len=0x20
+    ok 22 - len(mp_decode_str(x, 32))
+    ok 23 - mp_check_str(mp_encode_str(x, 0x20))
+    ok 24 - len(mp_decode_str(x, 0x20)
+    ok 25 - len(mp_next_str(x, 0x20)
+    ok 26 - len(mp_check_str(x, 0x20)
+    ok 27 - mp_sizeof_str(0x20)
+    ok 28 - mp_encode_str(x, 0x20) == x
+    # str len=0xfe
+    ok 29 - len(mp_decode_str(x, 254))
+    ok 30 - mp_check_str(mp_encode_str(x, 0xfe))
+    ok 31 - len(mp_decode_str(x, 0xfe)
+    ok 32 - len(mp_next_str(x, 0xfe)
+    ok 33 - len(mp_check_str(x, 0xfe)
+    ok 34 - mp_sizeof_str(0xfe)
+    ok 35 - mp_encode_str(x, 0xfe) == x
+    # str len=0xff
+    ok 36 - len(mp_decode_str(x, 255))
+    ok 37 - mp_check_str(mp_encode_str(x, 0xff))
+    ok 38 - len(mp_decode_str(x, 0xff)
+    ok 39 - len(mp_next_str(x, 0xff)
+    ok 40 - len(mp_check_str(x, 0xff)
+    ok 41 - mp_sizeof_str(0xff)
+    ok 42 - mp_encode_str(x, 0xff) == x
+    # str len=0x100
+    ok 43 - len(mp_decode_str(x, 256))
+    ok 44 - mp_check_str(mp_encode_str(x, 0x100))
+    ok 45 - len(mp_decode_str(x, 0x100)
+    ok 46 - len(mp_next_str(x, 0x100)
+    ok 47 - len(mp_check_str(x, 0x100)
+    ok 48 - mp_sizeof_str(0x100)
+    ok 49 - mp_encode_str(x, 0x100) == x
+    # str len=0x101
+    ok 50 - len(mp_decode_str(x, 257))
+    ok 51 - mp_check_str(mp_encode_str(x, 0x101))
+    ok 52 - len(mp_decode_str(x, 0x101)
+    ok 53 - len(mp_next_str(x, 0x101)
+    ok 54 - len(mp_check_str(x, 0x101)
+    ok 55 - mp_sizeof_str(0x101)
+    ok 56 - mp_encode_str(x, 0x101) == x
+    # str len=0xfffe
+    ok 57 - len(mp_decode_str(x, 65534))
+    ok 58 - mp_check_str(mp_encode_str(x, 0xfffe))
+    ok 59 - len(mp_decode_str(x, 0xfffe)
+    ok 60 - len(mp_next_str(x, 0xfffe)
+    ok 61 - len(mp_check_str(x, 0xfffe)
+    ok 62 - mp_sizeof_str(0xfffe)
+    ok 63 - mp_encode_str(x, 0xfffe) == x
+    # str len=0xffff
+    ok 64 - len(mp_decode_str(x, 65535))
+    ok 65 - mp_check_str(mp_encode_str(x, 0xffff))
+    ok 66 - len(mp_decode_str(x, 0xffff)
+    ok 67 - len(mp_next_str(x, 0xffff)
+    ok 68 - len(mp_check_str(x, 0xffff)
+    ok 69 - mp_sizeof_str(0xffff)
+    ok 70 - mp_encode_str(x, 0xffff) == x
+    # str len=0x10000
+    ok 71 - len(mp_decode_str(x, 65536))
+    ok 72 - mp_check_str(mp_encode_str(x, 0x10000))
+    ok 73 - len(mp_decode_str(x, 0x10000)
+    ok 74 - len(mp_next_str(x, 0x10000)
+    ok 75 - len(mp_check_str(x, 0x10000)
+    ok 76 - mp_sizeof_str(0x10000)
+    ok 77 - mp_encode_str(x, 0x10000) == x
+    # str len=0x10001
+    ok 78 - len(mp_decode_str(x, 65537))
+    ok 79 - mp_check_str(mp_encode_str(x, 0x10001))
+    ok 80 - len(mp_decode_str(x, 0x10001)
+    ok 81 - len(mp_next_str(x, 0x10001)
+    ok 82 - len(mp_check_str(x, 0x10001)
+    ok 83 - mp_sizeof_str(0x10001)
+    ok 84 - mp_encode_str(x, 0x10001) == x
+    # *** test_strs: done ***
+ok 9 - subtests
+    1..84
+    # *** test_bins ***
+    # bin len=0x01
+    ok 1 - len(mp_decode_bin(x, 1))
+    ok 2 - mp_check_bin(mp_encode_bin(x, 0x01))
+    ok 3 - len(mp_decode_bin(x, 0x01)
+    ok 4 - len(mp_next_bin(x, 0x01)
+    ok 5 - len(mp_check_bin(x, 0x01)
+    ok 6 - mp_sizeof_bin(0x01)
+    ok 7 - mp_encode_bin(x, 0x01) == x
+    # bin len=0x1e
+    ok 8 - len(mp_decode_bin(x, 30))
+    ok 9 - mp_check_bin(mp_encode_bin(x, 0x1e))
+    ok 10 - len(mp_decode_bin(x, 0x1e)
+    ok 11 - len(mp_next_bin(x, 0x1e)
+    ok 12 - len(mp_check_bin(x, 0x1e)
+    ok 13 - mp_sizeof_bin(0x1e)
+    ok 14 - mp_encode_bin(x, 0x1e) == x
+    # bin len=0x1f
+    ok 15 - len(mp_decode_bin(x, 31))
+    ok 16 - mp_check_bin(mp_encode_bin(x, 0x1f))
+    ok 17 - len(mp_decode_bin(x, 0x1f)
+    ok 18 - len(mp_next_bin(x, 0x1f)
+    ok 19 - len(mp_check_bin(x, 0x1f)
+    ok 20 - mp_sizeof_bin(0x1f)
+    ok 21 - mp_encode_bin(x, 0x1f) == x
+    # bin len=0x20
+    ok 22 - len(mp_decode_bin(x, 32))
+    ok 23 - mp_check_bin(mp_encode_bin(x, 0x20))
+    ok 24 - len(mp_decode_bin(x, 0x20)
+    ok 25 - len(mp_next_bin(x, 0x20)
+    ok 26 - len(mp_check_bin(x, 0x20)
+    ok 27 - mp_sizeof_bin(0x20)
+    ok 28 - mp_encode_bin(x, 0x20) == x
+    # bin len=0xfe
+    ok 29 - len(mp_decode_bin(x, 254))
+    ok 30 - mp_check_bin(mp_encode_bin(x, 0xfe))
+    ok 31 - len(mp_decode_bin(x, 0xfe)
+    ok 32 - len(mp_next_bin(x, 0xfe)
+    ok 33 - len(mp_check_bin(x, 0xfe)
+    ok 34 - mp_sizeof_bin(0xfe)
+    ok 35 - mp_encode_bin(x, 0xfe) == x
+    # bin len=0xff
+    ok 36 - len(mp_decode_bin(x, 255))
+    ok 37 - mp_check_bin(mp_encode_bin(x, 0xff))
+    ok 38 - len(mp_decode_bin(x, 0xff)
+    ok 39 - len(mp_next_bin(x, 0xff)
+    ok 40 - len(mp_check_bin(x, 0xff)
+    ok 41 - mp_sizeof_bin(0xff)
+    ok 42 - mp_encode_bin(x, 0xff) == x
+    # bin len=0x100
+    ok 43 - len(mp_decode_bin(x, 256))
+    ok 44 - mp_check_bin(mp_encode_bin(x, 0x100))
+    ok 45 - len(mp_decode_bin(x, 0x100)
+    ok 46 - len(mp_next_bin(x, 0x100)
+    ok 47 - len(mp_check_bin(x, 0x100)
+    ok 48 - mp_sizeof_bin(0x100)
+    ok 49 - mp_encode_bin(x, 0x100) == x
+    # bin len=0x101
+    ok 50 - len(mp_decode_bin(x, 257))
+    ok 51 - mp_check_bin(mp_encode_bin(x, 0x101))
+    ok 52 - len(mp_decode_bin(x, 0x101)
+    ok 53 - len(mp_next_bin(x, 0x101)
+    ok 54 - len(mp_check_bin(x, 0x101)
+    ok 55 - mp_sizeof_bin(0x101)
+    ok 56 - mp_encode_bin(x, 0x101) == x
+    # bin len=0xfffe
+    ok 57 - len(mp_decode_bin(x, 65534))
+    ok 58 - mp_check_bin(mp_encode_bin(x, 0xfffe))
+    ok 59 - len(mp_decode_bin(x, 0xfffe)
+    ok 60 - len(mp_next_bin(x, 0xfffe)
+    ok 61 - len(mp_check_bin(x, 0xfffe)
+    ok 62 - mp_sizeof_bin(0xfffe)
+    ok 63 - mp_encode_bin(x, 0xfffe) == x
+    # bin len=0xffff
+    ok 64 - len(mp_decode_bin(x, 65535))
+    ok 65 - mp_check_bin(mp_encode_bin(x, 0xffff))
+    ok 66 - len(mp_decode_bin(x, 0xffff)
+    ok 67 - len(mp_next_bin(x, 0xffff)
+    ok 68 - len(mp_check_bin(x, 0xffff)
+    ok 69 - mp_sizeof_bin(0xffff)
+    ok 70 - mp_encode_bin(x, 0xffff) == x
+    # bin len=0x10000
+    ok 71 - len(mp_decode_bin(x, 65536))
+    ok 72 - mp_check_bin(mp_encode_bin(x, 0x10000))
+    ok 73 - len(mp_decode_bin(x, 0x10000)
+    ok 74 - len(mp_next_bin(x, 0x10000)
+    ok 75 - len(mp_check_bin(x, 0x10000)
+    ok 76 - mp_sizeof_bin(0x10000)
+    ok 77 - mp_encode_bin(x, 0x10000) == x
+    # bin len=0x10001
+    ok 78 - len(mp_decode_bin(x, 65537))
+    ok 79 - mp_check_bin(mp_encode_bin(x, 0x10001))
+    ok 80 - len(mp_decode_bin(x, 0x10001)
+    ok 81 - len(mp_next_bin(x, 0x10001)
+    ok 82 - len(mp_check_bin(x, 0x10001)
+    ok 83 - mp_sizeof_bin(0x10001)
+    ok 84 - mp_encode_bin(x, 0x10001) == x
+    # *** test_bins: done ***
+ok 10 - subtests
+    1..45
+    # *** test_arrays ***
+    # array 0
+    ok 1 - mp_decode(mp_encode(0)) == 0
+    ok 2 - len(mp_encode_array(0)
+    ok 3 - len(mp_decode_array(0))
+    ok 4 - mp_sizeof_array(0)
+    ok 5 - mp_encode(0) == "\x90"
+    # array 1
+    ok 6 - mp_decode(mp_encode(1)) == 1
+    ok 7 - len(mp_encode_array(1)
+    ok 8 - len(mp_decode_array(1))
+    ok 9 - mp_sizeof_array(1)
+    ok 10 - mp_encode(1) == "\x91"
+    # array 15
+    ok 11 - mp_decode(mp_encode(15)) == 15
+    ok 12 - len(mp_encode_array(15)
+    ok 13 - len(mp_decode_array(15))
+    ok 14 - mp_sizeof_array(15)
+    ok 15 - mp_encode(15) == "\x9f"
+    # array 16
+    ok 16 - mp_decode(mp_encode(16)) == 16
+    ok 17 - len(mp_encode_array(16)
+    ok 18 - len(mp_decode_array(16))
+    ok 19 - mp_sizeof_array(16)
+    ok 20 - mp_encode(16) == "\xdc\x00\x10"
+    # array (65535) - 1
+    ok 21 - mp_decode(mp_encode((65535) - 1)) == (65535) - 1
+    ok 22 - len(mp_encode_array((65535) - 1)
+    ok 23 - len(mp_decode_array((65535) - 1))
+    ok 24 - mp_sizeof_array((65535) - 1)
+    ok 25 - mp_encode((65535) - 1) == "\xdc\xff\xfe"
+    # array (65535)
+    ok 26 - mp_decode(mp_encode((65535))) == (65535)
+    ok 27 - len(mp_encode_array((65535))
+    ok 28 - len(mp_decode_array((65535)))
+    ok 29 - mp_sizeof_array((65535))
+    ok 30 - mp_encode((65535)) == "\xdc\xff\xff"
+    # array (65535) + 1
+    ok 31 - mp_decode(mp_encode((65535) + 1)) == (65535) + 1
+    ok 32 - len(mp_encode_array((65535) + 1)
+    ok 33 - len(mp_decode_array((65535) + 1))
+    ok 34 - mp_sizeof_array((65535) + 1)
+    ok 35 - mp_encode((65535) + 1) == "\xdd\x00\x01\x00\x00"
+    # array (4294967295U) - 1
+    ok 36 - mp_decode(mp_encode((4294967295U) - 1)) == (4294967295U) - 1
+    ok 37 - len(mp_encode_array((4294967295U) - 1)
+    ok 38 - len(mp_decode_array((4294967295U) - 1))
+    ok 39 - mp_sizeof_array((4294967295U) - 1)
+    ok 40 - mp_encode((4294967295U) - 1) == "\xdd\xff\xff\xff\xfe"
+    # array (4294967295U)
+    ok 41 - mp_decode(mp_encode((4294967295U))) == (4294967295U)
+    ok 42 - len(mp_encode_array((4294967295U))
+    ok 43 - len(mp_decode_array((4294967295U)))
+    ok 44 - mp_sizeof_array((4294967295U))
+    ok 45 - mp_encode((4294967295U)) == "\xdd\xff\xff\xff\xff"
+    # *** test_arrays: done ***
+ok 11 - subtests
+    1..45
+    # *** test_maps ***
+    # map 0
+    ok 1 - mp_decode(mp_encode(0)) == 0
+    ok 2 - len(mp_encode_map(0)
+    ok 3 - len(mp_decode_map(0))
+    ok 4 - mp_sizeof_map(0)
+    ok 5 - mp_encode(0) == "\x80"
+    # map 1
+    ok 6 - mp_decode(mp_encode(1)) == 1
+    ok 7 - len(mp_encode_map(1)
+    ok 8 - len(mp_decode_map(1))
+    ok 9 - mp_sizeof_map(1)
+    ok 10 - mp_encode(1) == "\x81"
+    # map 15
+    ok 11 - mp_decode(mp_encode(15)) == 15
+    ok 12 - len(mp_encode_map(15)
+    ok 13 - len(mp_decode_map(15))
+    ok 14 - mp_sizeof_map(15)
+    ok 15 - mp_encode(15) == "\x8f"
+    # map 16
+    ok 16 - mp_decode(mp_encode(16)) == 16
+    ok 17 - len(mp_encode_map(16)
+    ok 18 - len(mp_decode_map(16))
+    ok 19 - mp_sizeof_map(16)
+    ok 20 - mp_encode(16) == "\xde\x00\x10"
+    # map (65535) - 1
+    ok 21 - mp_decode(mp_encode((65535) - 1)) == (65535) - 1
+    ok 22 - len(mp_encode_map((65535) - 1)
+    ok 23 - len(mp_decode_map((65535) - 1))
+    ok 24 - mp_sizeof_map((65535) - 1)
+    ok 25 - mp_encode((65535) - 1) == "\xde\xff\xfe"
+    # map (65535)
+    ok 26 - mp_decode(mp_encode((65535))) == (65535)
+    ok 27 - len(mp_encode_map((65535))
+    ok 28 - len(mp_decode_map((65535)))
+    ok 29 - mp_sizeof_map((65535))
+    ok 30 - mp_encode((65535)) == "\xde\xff\xff"
+    # map (65535) + 1
+    ok 31 - mp_decode(mp_encode((65535) + 1)) == (65535) + 1
+    ok 32 - len(mp_encode_map((65535) + 1)
+    ok 33 - len(mp_decode_map((65535) + 1))
+    ok 34 - mp_sizeof_map((65535) + 1)
+    ok 35 - mp_encode((65535) + 1) == "\xdf\x00\x01\x00\x00"
+    # map (4294967295U) - 1
+    ok 36 - mp_decode(mp_encode((4294967295U) - 1)) == (4294967295U) - 1
+    ok 37 - len(mp_encode_map((4294967295U) - 1)
+    ok 38 - len(mp_decode_map((4294967295U) - 1))
+    ok 39 - mp_sizeof_map((4294967295U) - 1)
+    ok 40 - mp_encode((4294967295U) - 1) == "\xdf\xff\xff\xff\xfe"
+    # map (4294967295U)
+    ok 41 - mp_decode(mp_encode((4294967295U))) == (4294967295U)
+    ok 42 - len(mp_encode_map((4294967295U))
+    ok 43 - len(mp_decode_map((4294967295U)))
+    ok 44 - mp_sizeof_map((4294967295U))
+    ok 45 - mp_encode((4294967295U)) == "\xdf\xff\xff\xff\xff"
+    # *** test_maps: done ***
+ok 12 - subtests
+    1..52
+    # *** test_next_on_arrays ***
+    # next/check on array(0)
+    ok 1 - mp_check(array 0))
+    ok 2 - len(array 0) == 1
+    ok 3 - len(mp_check(array 0)) == 1
+    ok 4 - len(mp_next(array 0)) == 1
+    # next/check on array(1)
+    ok 5 - mp_check(array 1))
+    ok 6 - len(array 1) == 2
+    ok 7 - len(mp_check(array 1)) == 2
+    ok 8 - len(mp_next(array 1)) == 2
+    # next/check on array(15)
+    ok 9 - mp_check(array 15))
+    ok 10 - len(array 15) == 16
+    ok 11 - len(mp_check(array 15)) == 16
+    ok 12 - len(mp_next(array 15)) == 16
+    # next/check on array(16)
+    ok 13 - mp_check(array 16))
+    ok 14 - len(array 16) == 19
+    ok 15 - len(mp_check(array 16)) == 19
+    ok 16 - len(mp_next(array 16)) == 19
+    # next/check on array(17)
+    ok 17 - mp_check(array 17))
+    ok 18 - len(array 17) == 20
+    ok 19 - len(mp_check(array 17)) == 20
+    ok 20 - len(mp_next(array 17)) == 20
+    # next/check on array(254)
+    ok 21 - mp_check(array 254))
+    ok 22 - len(array 254) == 257
+    ok 23 - len(mp_check(array 254)) == 257
+    ok 24 - len(mp_next(array 254)) == 257
+    # next/check on array(255)
+    ok 25 - mp_check(array 255))
+    ok 26 - len(array 255) == 258
+    ok 27 - len(mp_check(array 255)) == 258
+    ok 28 - len(mp_next(array 255)) == 258
+    # next/check on array(256)
+    ok 29 - mp_check(array 256))
+    ok 30 - len(array 256) == 259
+    ok 31 - len(mp_check(array 256)) == 259
+    ok 32 - len(mp_next(array 256)) == 259
+    # next/check on array(257)
+    ok 33 - mp_check(array 257))
+    ok 34 - len(array 257) == 260
+    ok 35 - len(mp_check(array 257)) == 260
+    ok 36 - len(mp_next(array 257)) == 260
+    # next/check on array(65534)
+    ok 37 - mp_check(array 65534))
+    ok 38 - len(array 65534) == 65537
+    ok 39 - len(mp_check(array 65534)) == 65537
+    ok 40 - len(mp_next(array 65534)) == 65537
+    # next/check on array(65535)
+    ok 41 - mp_check(array 65535))
+    ok 42 - len(array 65535) == 65538
+    ok 43 - len(mp_check(array 65535)) == 65538
+    ok 44 - len(mp_next(array 65535)) == 65538
+    # next/check on array(65536)
+    ok 45 - mp_check(array 65536))
+    ok 46 - len(array 65536) == 65541
+    ok 47 - len(mp_check(array 65536)) == 65541
+    ok 48 - len(mp_next(array 65536)) == 65541
+    # next/check on array(65537)
+    ok 49 - mp_check(array 65537))
+    ok 50 - len(array 65537) == 65542
+    ok 51 - len(mp_check(array 65537)) == 65542
+    ok 52 - len(mp_next(array 65537)) == 65542
+    # *** test_next_on_arrays: done ***
+ok 13 - subtests
+    1..52
+    # *** test_next_on_maps ***
+    # next/check on map(0)
+    ok 1 - mp_check(map 0))
+    ok 2 - len(map 0) == 1
+    ok 3 - len(mp_check(map 0)) == 1
+    ok 4 - len(mp_next(map 0)) == 1
+    # next/check on map(1)
+    ok 5 - mp_check(map 1))
+    ok 6 - len(map 1) == 3
+    ok 7 - len(mp_check(map 1)) == 3
+    ok 8 - len(mp_next(map 1)) == 3
+    # next/check on map(15)
+    ok 9 - mp_check(map 15))
+    ok 10 - len(map 15) == 31
+    ok 11 - len(mp_check(map 15)) == 31
+    ok 12 - len(mp_next(map 15)) == 31
+    # next/check on map(16)
+    ok 13 - mp_check(map 16))
+    ok 14 - len(map 16) == 35
+    ok 15 - len(mp_check(map 16)) == 35
+    ok 16 - len(mp_next(map 16)) == 35
+    # next/check on map(17)
+    ok 17 - mp_check(map 17))
+    ok 18 - len(map 17) == 37
+    ok 19 - len(mp_check(map 17)) == 37
+    ok 20 - len(mp_next(map 17)) == 37
+    # next/check on map(254)
+    ok 21 - mp_check(map 254))
+    ok 22 - len(map 254) == 511
+    ok 23 - len(mp_check(map 254)) == 511
+    ok 24 - len(mp_next(map 254)) == 511
+    # next/check on map(255)
+    ok 25 - mp_check(map 255))
+    ok 26 - len(map 255) == 513
+    ok 27 - len(mp_check(map 255)) == 513
+    ok 28 - len(mp_next(map 255)) == 513
+    # next/check on map(256)
+    ok 29 - mp_check(map 256))
+    ok 30 - len(map 256) == 515
+    ok 31 - len(mp_check(map 256)) == 515
+    ok 32 - len(mp_next(map 256)) == 515
+    # next/check on map(257)
+    ok 33 - mp_check(map 257))
+    ok 34 - len(map 257) == 517
+    ok 35 - len(mp_check(map 257)) == 517
+    ok 36 - len(mp_next(map 257)) == 517
+    # next/check on map(65534)
+    ok 37 - mp_check(map 65534))
+    ok 38 - len(map 65534) == 131071
+    ok 39 - len(mp_check(map 65534)) == 131071
+    ok 40 - len(mp_next(map 65534)) == 131071
+    # next/check on map(65535)
+    ok 41 - mp_check(map 65535))
+    ok 42 - len(map 65535) == 131073
+    ok 43 - len(mp_check(map 65535)) == 131073
+    ok 44 - len(mp_next(map 65535)) == 131073
+    # next/check on map(65536)
+    ok 45 - mp_check(map 65536))
+    ok 46 - len(map 65536) == 131077
+    ok 47 - len(mp_check(map 65536)) == 131077
+    ok 48 - len(mp_next(map 65536)) == 131077
+    # next/check on map(65537)
+    ok 49 - mp_check(map 65537))
+    ok 50 - len(map 65537) == 131079
+    ok 51 - len(mp_check(map 65537)) == 131079
+    ok 52 - len(mp_next(map 65537)) == 131079
+    # *** test_next_on_maps: done ***
+ok 14 - subtests
+    1..227
+    # *** test_compare_uints ***
+    ok 1 - mp_compare_uint(0, 0) == 0
+    ok 2 - mp_compare_uint(0, 0) == 0
+    ok 3 - mp_compare_uint(0, 0) == 0
+    ok 4 - mp_compare_uint(0, 1) < 0
+    ok 5 - mp_compare_uint(0, 126) < 0
+    ok 6 - mp_compare_uint(0, 127) < 0
+    ok 7 - mp_compare_uint(0, 128) < 0
+    ok 8 - mp_compare_uint(0, 254) < 0
+    ok 9 - mp_compare_uint(0, 255) < 0
+    ok 10 - mp_compare_uint(0, 65534) < 0
+    ok 11 - mp_compare_uint(0, 65535) < 0
+    ok 12 - mp_compare_uint(0, 65536) < 0
+    ok 13 - mp_compare_uint(0, 4294967294) < 0
+    ok 14 - mp_compare_uint(0, 4294967295) < 0
+    ok 15 - mp_compare_uint(0, 4294967296) < 0
+    ok 16 - mp_compare_uint(0, 18446744073709551614) < 0
+    ok 17 - mp_compare_uint(0, 18446744073709551615) < 0
+    ok 18 - mp_compare_uint(1, 0) > 0
+    ok 19 - mp_compare_uint(1, 1) == 0
+    ok 20 - mp_compare_uint(1, 126) < 0
+    ok 21 - mp_compare_uint(1, 127) < 0
+    ok 22 - mp_compare_uint(1, 128) < 0
+    ok 23 - mp_compare_uint(1, 254) < 0
+    ok 24 - mp_compare_uint(1, 255) < 0
+    ok 25 - mp_compare_uint(1, 65534) < 0
+    ok 26 - mp_compare_uint(1, 65535) < 0
+    ok 27 - mp_compare_uint(1, 65536) < 0
+    ok 28 - mp_compare_uint(1, 4294967294) < 0
+    ok 29 - mp_compare_uint(1, 4294967295) < 0
+    ok 30 - mp_compare_uint(1, 4294967296) < 0
+    ok 31 - mp_compare_uint(1, 18446744073709551614) < 0
+    ok 32 - mp_compare_uint(1, 18446744073709551615) < 0
+    ok 33 - mp_compare_uint(126, 0) > 0
+    ok 34 - mp_compare_uint(126, 1) > 0
+    ok 35 - mp_compare_uint(126, 126) == 0
+    ok 36 - mp_compare_uint(126, 127) < 0
+    ok 37 - mp_compare_uint(126, 128) < 0
+    ok 38 - mp_compare_uint(126, 254) < 0
+    ok 39 - mp_compare_uint(126, 255) < 0
+    ok 40 - mp_compare_uint(126, 65534) < 0
+    ok 41 - mp_compare_uint(126, 65535) < 0
+    ok 42 - mp_compare_uint(126, 65536) < 0
+    ok 43 - mp_compare_uint(126, 4294967294) < 0
+    ok 44 - mp_compare_uint(126, 4294967295) < 0
+    ok 45 - mp_compare_uint(126, 4294967296) < 0
+    ok 46 - mp_compare_uint(126, 18446744073709551614) < 0
+    ok 47 - mp_compare_uint(126, 18446744073709551615) < 0
+    ok 48 - mp_compare_uint(127, 0) > 0
+    ok 49 - mp_compare_uint(127, 1) > 0
+    ok 50 - mp_compare_uint(127, 126) > 0
+    ok 51 - mp_compare_uint(127, 127) == 0
+    ok 52 - mp_compare_uint(127, 128) < 0
+    ok 53 - mp_compare_uint(127, 254) < 0
+    ok 54 - mp_compare_uint(127, 255) < 0
+    ok 55 - mp_compare_uint(127, 65534) < 0
+    ok 56 - mp_compare_uint(127, 65535) < 0
+    ok 57 - mp_compare_uint(127, 65536) < 0
+    ok 58 - mp_compare_uint(127, 4294967294) < 0
+    ok 59 - mp_compare_uint(127, 4294967295) < 0
+    ok 60 - mp_compare_uint(127, 4294967296) < 0
+    ok 61 - mp_compare_uint(127, 18446744073709551614) < 0
+    ok 62 - mp_compare_uint(127, 18446744073709551615) < 0
+    ok 63 - mp_compare_uint(128, 0) > 0
+    ok 64 - mp_compare_uint(128, 1) > 0
+    ok 65 - mp_compare_uint(128, 126) > 0
+    ok 66 - mp_compare_uint(128, 127) > 0
+    ok 67 - mp_compare_uint(128, 128) == 0
+    ok 68 - mp_compare_uint(128, 254) < 0
+    ok 69 - mp_compare_uint(128, 255) < 0
+    ok 70 - mp_compare_uint(128, 65534) < 0
+    ok 71 - mp_compare_uint(128, 65535) < 0
+    ok 72 - mp_compare_uint(128, 65536) < 0
+    ok 73 - mp_compare_uint(128, 4294967294) < 0
+    ok 74 - mp_compare_uint(128, 4294967295) < 0
+    ok 75 - mp_compare_uint(128, 4294967296) < 0
+    ok 76 - mp_compare_uint(128, 18446744073709551614) < 0
+    ok 77 - mp_compare_uint(128, 18446744073709551615) < 0
+    ok 78 - mp_compare_uint(254, 0) > 0
+    ok 79 - mp_compare_uint(254, 1) > 0
+    ok 80 - mp_compare_uint(254, 126) > 0
+    ok 81 - mp_compare_uint(254, 127) > 0
+    ok 82 - mp_compare_uint(254, 128) > 0
+    ok 83 - mp_compare_uint(254, 254) == 0
+    ok 84 - mp_compare_uint(254, 255) < 0
+    ok 85 - mp_compare_uint(254, 65534) < 0
+    ok 86 - mp_compare_uint(254, 65535) < 0
+    ok 87 - mp_compare_uint(254, 65536) < 0
+    ok 88 - mp_compare_uint(254, 4294967294) < 0
+    ok 89 - mp_compare_uint(254, 4294967295) < 0
+    ok 90 - mp_compare_uint(254, 4294967296) < 0
+    ok 91 - mp_compare_uint(254, 18446744073709551614) < 0
+    ok 92 - mp_compare_uint(254, 18446744073709551615) < 0
+    ok 93 - mp_compare_uint(255, 0) > 0
+    ok 94 - mp_compare_uint(255, 1) > 0
+    ok 95 - mp_compare_uint(255, 126) > 0
+    ok 96 - mp_compare_uint(255, 127) > 0
+    ok 97 - mp_compare_uint(255, 128) > 0
+    ok 98 - mp_compare_uint(255, 254) > 0
+    ok 99 - mp_compare_uint(255, 255) == 0
+    ok 100 - mp_compare_uint(255, 65534) < 0
+    ok 101 - mp_compare_uint(255, 65535) < 0
+    ok 102 - mp_compare_uint(255, 65536) < 0
+    ok 103 - mp_compare_uint(255, 4294967294) < 0
+    ok 104 - mp_compare_uint(255, 4294967295) < 0
+    ok 105 - mp_compare_uint(255, 4294967296) < 0
+    ok 106 - mp_compare_uint(255, 18446744073709551614) < 0
+    ok 107 - mp_compare_uint(255, 18446744073709551615) < 0
+    ok 108 - mp_compare_uint(65534, 0) > 0
+    ok 109 - mp_compare_uint(65534, 1) > 0
+    ok 110 - mp_compare_uint(65534, 126) > 0
+    ok 111 - mp_compare_uint(65534, 127) > 0
+    ok 112 - mp_compare_uint(65534, 128) > 0
+    ok 113 - mp_compare_uint(65534, 254) > 0
+    ok 114 - mp_compare_uint(65534, 255) > 0
+    ok 115 - mp_compare_uint(65534, 65534) == 0
+    ok 116 - mp_compare_uint(65534, 65535) < 0
+    ok 117 - mp_compare_uint(65534, 65536) < 0
+    ok 118 - mp_compare_uint(65534, 4294967294) < 0
+    ok 119 - mp_compare_uint(65534, 4294967295) < 0
+    ok 120 - mp_compare_uint(65534, 4294967296) < 0
+    ok 121 - mp_compare_uint(65534, 18446744073709551614) < 0
+    ok 122 - mp_compare_uint(65534, 18446744073709551615) < 0
+    ok 123 - mp_compare_uint(65535, 0) > 0
+    ok 124 - mp_compare_uint(65535, 1) > 0
+    ok 125 - mp_compare_uint(65535, 126) > 0
+    ok 126 - mp_compare_uint(65535, 127) > 0
+    ok 127 - mp_compare_uint(65535, 128) > 0
+    ok 128 - mp_compare_uint(65535, 254) > 0
+    ok 129 - mp_compare_uint(65535, 255) > 0
+    ok 130 - mp_compare_uint(65535, 65534) > 0
+    ok 131 - mp_compare_uint(65535, 65535) == 0
+    ok 132 - mp_compare_uint(65535, 65536) < 0
+    ok 133 - mp_compare_uint(65535, 4294967294) < 0
+    ok 134 - mp_compare_uint(65535, 4294967295) < 0
+    ok 135 - mp_compare_uint(65535, 4294967296) < 0
+    ok 136 - mp_compare_uint(65535, 18446744073709551614) < 0
+    ok 137 - mp_compare_uint(65535, 18446744073709551615) < 0
+    ok 138 - mp_compare_uint(65536, 0) > 0
+    ok 139 - mp_compare_uint(65536, 1) > 0
+    ok 140 - mp_compare_uint(65536, 126) > 0
+    ok 141 - mp_compare_uint(65536, 127) > 0
+    ok 142 - mp_compare_uint(65536, 128) > 0
+    ok 143 - mp_compare_uint(65536, 254) > 0
+    ok 144 - mp_compare_uint(65536, 255) > 0
+    ok 145 - mp_compare_uint(65536, 65534) > 0
+    ok 146 - mp_compare_uint(65536, 65535) > 0
+    ok 147 - mp_compare_uint(65536, 65536) == 0
+    ok 148 - mp_compare_uint(65536, 4294967294) < 0
+    ok 149 - mp_compare_uint(65536, 4294967295) < 0
+    ok 150 - mp_compare_uint(65536, 4294967296) < 0
+    ok 151 - mp_compare_uint(65536, 18446744073709551614) < 0
+    ok 152 - mp_compare_uint(65536, 18446744073709551615) < 0
+    ok 153 - mp_compare_uint(4294967294, 0) > 0
+    ok 154 - mp_compare_uint(4294967294, 1) > 0
+    ok 155 - mp_compare_uint(4294967294, 126) > 0
+    ok 156 - mp_compare_uint(4294967294, 127) > 0
+    ok 157 - mp_compare_uint(4294967294, 128) > 0
+    ok 158 - mp_compare_uint(4294967294, 254) > 0
+    ok 159 - mp_compare_uint(4294967294, 255) > 0
+    ok 160 - mp_compare_uint(4294967294, 65534) > 0
+    ok 161 - mp_compare_uint(4294967294, 65535) > 0
+    ok 162 - mp_compare_uint(4294967294, 65536) > 0
+    ok 163 - mp_compare_uint(4294967294, 4294967294) == 0
+    ok 164 - mp_compare_uint(4294967294, 4294967295) < 0
+    ok 165 - mp_compare_uint(4294967294, 4294967296) < 0
+    ok 166 - mp_compare_uint(4294967294, 18446744073709551614) < 0
+    ok 167 - mp_compare_uint(4294967294, 18446744073709551615) < 0
+    ok 168 - mp_compare_uint(4294967295, 0) > 0
+    ok 169 - mp_compare_uint(4294967295, 1) > 0
+    ok 170 - mp_compare_uint(4294967295, 126) > 0
+    ok 171 - mp_compare_uint(4294967295, 127) > 0
+    ok 172 - mp_compare_uint(4294967295, 128) > 0
+    ok 173 - mp_compare_uint(4294967295, 254) > 0
+    ok 174 - mp_compare_uint(4294967295, 255) > 0
+    ok 175 - mp_compare_uint(4294967295, 65534) > 0
+    ok 176 - mp_compare_uint(4294967295, 65535) > 0
+    ok 177 - mp_compare_uint(4294967295, 65536) > 0
+    ok 178 - mp_compare_uint(4294967295, 4294967294) > 0
+    ok 179 - mp_compare_uint(4294967295, 4294967295) == 0
+    ok 180 - mp_compare_uint(4294967295, 4294967296) < 0
+    ok 181 - mp_compare_uint(4294967295, 18446744073709551614) < 0
+    ok 182 - mp_compare_uint(4294967295, 18446744073709551615) < 0
+    ok 183 - mp_compare_uint(4294967296, 0) > 0
+    ok 184 - mp_compare_uint(4294967296, 1) > 0
+    ok 185 - mp_compare_uint(4294967296, 126) > 0
+    ok 186 - mp_compare_uint(4294967296, 127) > 0
+    ok 187 - mp_compare_uint(4294967296, 128) > 0
+    ok 188 - mp_compare_uint(4294967296, 254) > 0
+    ok 189 - mp_compare_uint(4294967296, 255) > 0
+    ok 190 - mp_compare_uint(4294967296, 65534) > 0
+    ok 191 - mp_compare_uint(4294967296, 65535) > 0
+    ok 192 - mp_compare_uint(4294967296, 65536) > 0
+    ok 193 - mp_compare_uint(4294967296, 4294967294) > 0
+    ok 194 - mp_compare_uint(4294967296, 4294967295) > 0
+    ok 195 - mp_compare_uint(4294967296, 4294967296) == 0
+    ok 196 - mp_compare_uint(4294967296, 18446744073709551614) < 0
+    ok 197 - mp_compare_uint(4294967296, 18446744073709551615) < 0
+    ok 198 - mp_compare_uint(18446744073709551614, 0) > 0
+    ok 199 - mp_compare_uint(18446744073709551614, 1) > 0
+    ok 200 - mp_compare_uint(18446744073709551614, 126) > 0
+    ok 201 - mp_compare_uint(18446744073709551614, 127) > 0
+    ok 202 - mp_compare_uint(18446744073709551614, 128) > 0
+    ok 203 - mp_compare_uint(18446744073709551614, 254) > 0
+    ok 204 - mp_compare_uint(18446744073709551614, 255) > 0
+    ok 205 - mp_compare_uint(18446744073709551614, 65534) > 0
+    ok 206 - mp_compare_uint(18446744073709551614, 65535) > 0
+    ok 207 - mp_compare_uint(18446744073709551614, 65536) > 0
+    ok 208 - mp_compare_uint(18446744073709551614, 4294967294) > 0
+    ok 209 - mp_compare_uint(18446744073709551614, 4294967295) > 0
+    ok 210 - mp_compare_uint(18446744073709551614, 4294967296) > 0
+    ok 211 - mp_compare_uint(18446744073709551614, 18446744073709551614) == 0
+    ok 212 - mp_compare_uint(18446744073709551614, 18446744073709551615) < 0
+    ok 213 - mp_compare_uint(18446744073709551615, 0) > 0
+    ok 214 - mp_compare_uint(18446744073709551615, 1) > 0
+    ok 215 - mp_compare_uint(18446744073709551615, 126) > 0
+    ok 216 - mp_compare_uint(18446744073709551615, 127) > 0
+    ok 217 - mp_compare_uint(18446744073709551615, 128) > 0
+    ok 218 - mp_compare_uint(18446744073709551615, 254) > 0
+    ok 219 - mp_compare_uint(18446744073709551615, 255) > 0
+    ok 220 - mp_compare_uint(18446744073709551615, 65534) > 0
+    ok 221 - mp_compare_uint(18446744073709551615, 65535) > 0
+    ok 222 - mp_compare_uint(18446744073709551615, 65536) > 0
+    ok 223 - mp_compare_uint(18446744073709551615, 4294967294) > 0
+    ok 224 - mp_compare_uint(18446744073709551615, 4294967295) > 0
+    ok 225 - mp_compare_uint(18446744073709551615, 4294967296) > 0
+    ok 226 - mp_compare_uint(18446744073709551615, 18446744073709551614) > 0
+    ok 227 - mp_compare_uint(18446744073709551615, 18446744073709551615) == 0
+    # *** test_compare_uints: done ***
+ok 15 - subtests

@@ -1,73 +1,63 @@
-#
-# check stat_cleanup
-#  add several tuples
-#
-
-insert into t0 values (0, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (1, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (2, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (3, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (4, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (5, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (6, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (7, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (8, 'tuple')
-Insert OK, 1 row affected
-insert into t0 values (9, 'tuple')
-Insert OK, 1 row affected
-show stat
+-- clear statistics
+--# stop server default
+--# start server default
+space = box.schema.create_space('tweedledum', { id = 0 })
 ---
-statistics:
-  REPLACE:    { rps:  2    , total:  10          }
-  SELECT:     { rps:  0    , total:  0           }
-  UPDATE:     { rps:  0    , total:  0           }
-  DELETE_1_3: { rps:  0    , total:  0           }
-  DELETE:     { rps:  0    , total:  0           }
-  CALL:       { rps:  0    , total:  0           }
 ...
-#
-# restart server
-#
-
-#
-# statistics must be zero
-#
-
-show stat
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-statistics:
-  REPLACE:    { rps:  0    , total:  0           }
-  SELECT:     { rps:  0    , total:  0           }
-  UPDATE:     { rps:  0    , total:  0           }
-  DELETE_1_3: { rps:  0    , total:  0           }
-  DELETE:     { rps:  0    , total:  0           }
-  CALL:       { rps:  0    , total:  0           }
 ...
-delete from t0 where k0 = 0
-Delete OK, 1 row affected
-delete from t0 where k0 = 1
-Delete OK, 1 row affected
-delete from t0 where k0 = 2
-Delete OK, 1 row affected
-delete from t0 where k0 = 3
-Delete OK, 1 row affected
-delete from t0 where k0 = 4
-Delete OK, 1 row affected
-delete from t0 where k0 = 5
-Delete OK, 1 row affected
-delete from t0 where k0 = 6
-Delete OK, 1 row affected
-delete from t0 where k0 = 7
-Delete OK, 1 row affected
-delete from t0 where k0 = 8
-Delete OK, 1 row affected
-delete from t0 where k0 = 9
-Delete OK, 1 row affected
+-- check stat_cleanup
+-- add several tuples
+for i=1,10 do box.insert(0, i, 'tuple'..tostring(i)) end;
+---
+...
+box.stat()
+---
+- DELETE:
+    total: 0
+    rps: 0
+  SELECT:
+    total: 0
+    rps: 0
+  REPLACE:
+    total: 12
+    rps: 2
+  CALL:
+    total: 0
+    rps: 0
+  UPDATE:
+    total: 0
+    rps: 0
+  DELETE_1_3:
+    total: 0
+    rps: 0
+...
+--# stop server default
+--# start server default
+-- statistics must be zero
+box.stat()
+---
+- DELETE:
+    total: 0
+    rps: 0
+  SELECT:
+    total: 0
+    rps: 0
+  REPLACE:
+    total: 0
+    rps: 0
+  CALL:
+    total: 0
+    rps: 0
+  UPDATE:
+    total: 0
+    rps: 0
+  DELETE_1_3:
+    total: 0
+    rps: 0
+...
+-- cleanup
+box.space[0]:drop()
+---
+...

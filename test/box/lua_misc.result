@@ -1,132 +1,190 @@
-
-#
-# box.raise
-#
-
-lua 1 + 1
+space = box.schema.create_space('tweedledum')
 ---
- - 2
 ...
-lua box.raise(123, 'test')
+space:create_index('primary', 'hash', { parts = { 0, 'num' }})
 ---
-error: 'test'
 ...
-lua box.raise(0, 'the other test')
+----------------
+-- # box.raise
+----------------
+1 + 1
 ---
-error: 'box.raise(): unknown error code'
+- 2
 ...
-lua box.raise(12, 345)
+box.raise(123, 'test')
 ---
-error: '345'
+- error: test
 ...
-
-#
-# box.stat
-#
-
-lua for k, v in pairs(box.stat()) do print(k) end
+box.raise(0, 'the other test')
 ---
-DELETE
-SELECT
-REPLACE
-CALL
-UPDATE
-DELETE_1_3
+- error: 'box.raise(): unknown error code'
 ...
-lua for k, v in pairs(box.stat().DELETE) do print(k) end
+box.raise(12, 345)
 ---
-total
-rps
+- error: '345'
 ...
-lua for k, v in pairs(box.stat.DELETE) do print(k) end
+----------------
+-- # box.stat
+----------------
+t = {}
 ---
-total
-rps
 ...
-
-#
-# box.space
-#
-
-lua type(box)
+--# setopt delimiter ';'
+for k, v in pairs(box.stat()) do
+    table.insert(t, k)
+end;
 ---
- - table
 ...
-lua type(box.space)
+for k, v in pairs(box.stat().DELETE) do
+    table.insert(t, k)
+end;
 ---
- - table
 ...
-lua box.cfg.memcached_space
+for k, v in pairs(box.stat.DELETE) do
+    table.insert(t, k)
+end;
 ---
- - 23
 ...
-lua for i, v in pairs(box.space[0].index[0].key_field[0]) do print(i, ': ', v) end
+t;
 ---
-type: NUM
-fieldno: 0
+- - DELETE
+  - SELECT
+  - REPLACE
+  - CALL
+  - UPDATE
+  - DELETE_1_3
+  - total
+  - rps
+  - total
+  - rps
 ...
-
-#
-# box.space
-#
-
-lua string.match(tostring(box.slab), '^table:') ~= nil
+----------------
+-- # box.space
+----------------
+type(box);
 ---
- - true
+- table
 ...
-lua box.slab.arena_used >= 0
+type(box.space);
 ---
- - true
+- table
 ...
-lua box.slab.arena_size > 0
+box.cfg.memcached_space;
 ---
- - true
+- null
 ...
-lua string.match(tostring(box.slab.slabs), '^table:') ~= nil
+t = {};
 ---
- - true
 ...
-lua for k, v in pairs(box.slab()) do print(k) end
+for i, v in pairs(space.index[0].key_field[0]) do
+    table.insert(t, tostring(i)..' : '..tostring(v))
+end;
 ---
-slabs
-arena_size
-arena_used
 ...
-
-#
-# box.error
-#
-
-lua for k,v in pairs(box.error) do print('box.error.', k, ': ', v) end
+t;
 ---
-box.error.ER_ILLEGAL_PARAMS: 514
-box.error.ER_KEY_FIELD_TYPE: 9730
-box.error.ER_NONMASTER: 258
-box.error.ER_PROC_RET: 12290
-box.error.ER_TUPLE_IS_TOO_LONG: 11010
-box.error.ER_EXACT_MATCH: 11522
-box.error.ER_PROC_LUA: 13058
-box.error.ER_FIELD_TYPE: 10242
-box.error.ER_UPDATE_FIELD: 14338
-box.error.ER_TUPLE_FOUND: 14082
-box.error.ER_OK: 0
-box.error.ER_NO_SUCH_FIELD: 13826
-box.error.ER_TUPLE_NOT_FOUND: 12546
-box.error.ER_FIBER_STACK: 6658
-box.error.ER_SPLICE: 10754
-box.error.ER_NO_SUCH_INDEX: 13570
-box.error.ER_UNSUPPORTED: 2562
-box.error.ER_INJECTION: 2306
-box.error.ER_SPACE_DISABLED: 13314
-box.error.ER_INDEX_TYPE: 1282
-box.error.ER_ARG_TYPE: 10498
-box.error.ER_NO_SUCH_SPACE: 14594
-box.error.ER_UNKNOWN_UPDATE_OP: 11266
-box.error.ER_SPACE_EXISTS: 1538
-box.error.ER_NO_SUCH_PROC: 12802
-box.error.ER_WAL_IO: 9986
-box.error.ER_KEY_PART_COUNT: 12034
-box.error.ER_TUPLE_IS_RO: 1025
-box.error.ER_SECONDARY: 770
-box.error.ER_MEMORY_ISSUE: 1793
+- - 'type : NUM'
+  - 'fieldno : 0'
+...
+----------------
+-- # box.space
+----------------
+string.match(tostring(box.slab.info()), '^table:') ~= nil;
+---
+- true
+...
+box.slab.info().arena_used >= 0;
+---
+- true
+...
+box.slab.info().arena_size > 0;
+---
+- true
+...
+string.match(tostring(box.slab.info().slabs), '^table:') ~= nil;
+---
+- true
+...
+t = {};
+---
+...
+for k, v in pairs(box.slab.info()) do
+    table.insert(t, k)
+end;
+---
+...
+t;
+---
+- - slabs
+  - arena_size
+  - arena_used
+...
+----------------
+-- # box.error
+----------------
+t = {}
+for k,v in pairs(box.error) do
+   table.insert(t, 'box.error.'..tostring(k)..' : '..tostring(v))
+end;
+---
+...
+t;
+---
+- - 'box.error.ER_NO_SUCH_INDEX : 13570'
+  - 'box.error.ER_PROC_RET : 12290'
+  - 'box.error.ER_CREATE_SPACE : 2050'
+  - 'box.error.ER_TUPLE_FORMAT_LIMIT : 7170'
+  - 'box.error.ER_FIELD_TYPE : 10242'
+  - 'box.error.ER_OK : 0'
+  - 'box.error.ER_TUPLE_NOT_FOUND : 12546'
+  - 'box.error.ER_INDEX_ARITY : 8194'
+  - 'box.error.ER_WAL_IO : 9986'
+  - 'box.error.ER_INJECTION : 2306'
+  - 'box.error.ER_LAST_DROP : 7426'
+  - 'box.error.ER_INDEX_TYPE : 1282'
+  - 'box.error.ER_ARG_TYPE : 10498'
+  - 'box.error.ER_INVALID_MSGPACK : 9218'
+  - 'box.error.ER_KEY_PART_COUNT : 12034'
+  - 'box.error.ER_MEMORY_ISSUE : 1793'
+  - 'box.error.ER_ILLEGAL_PARAMS : 514'
+  - 'box.error.ER_KEY_FIELD_TYPE : 9730'
+  - 'box.error.ER_NONMASTER : 258'
+  - 'box.error.ER_TUPLE_IS_TOO_LONG : 11010'
+  - 'box.error.ER_MODIFY_INDEX : 6914'
+  - 'box.error.ER_EXACT_MATCH : 11522'
+  - 'box.error.ER_SECONDARY : 770'
+  - 'box.error.ER_NO_SUCH_SPACE : 14594'
+  - 'box.error.ER_UPDATE_FIELD : 14338'
+  - 'box.error.ER_DROP_SPACE : 6146'
+  - 'box.error.ER_UNKNOWN_UPDATE_OP : 11266'
+  - 'box.error.ER_TUPLE_FOUND : 14082'
+  - 'box.error.ER_UNSUPPORTED : 2562'
+  - 'box.error.ER_NO_SUCH_FIELD : 13826'
+  - 'box.error.ER_TUPLE_NOT_ARRAY : 9474'
+  - 'box.error.ER_SPACE_DISABLED : 13314'
+  - 'box.error.ER_PROC_LUA : 13058'
+  - 'box.error.ER_ALTER_SPACE : 6402'
+  - 'box.error.ER_FIBER_STACK : 6658'
+  - 'box.error.ER_TUPLE_IS_RO : 1025'
+  - 'box.error.ER_NO_SUCH_PROC : 12802'
+  - 'box.error.ER_DROP_PRIMARY_KEY : 7682'
+  - 'box.error.ER_SPACE_ARITY : 7938'
+  - 'box.error.ER_SPLICE : 10754'
+  - 'box.error.ER_FIELD_TYPE_MISMATCH : 11778'
+  - 'box.error.ER_SPACE_EXISTS : 1538'
+...
+space:drop();
+---
+...
+--# setopt delimiter ''
+-- A test case for gh-37: print of 64-bit number
+1, 1
+---
+- 1
+- 1
+...
+tonumber64(1), 1
+---
+- 1
+- 1
 ...

@@ -71,10 +71,6 @@ snap_io_rate_limit=0.0
 # Write no more rows in WAL
 rows_per_wal=500000, ro
 
-# OBSOLETE
-# Starting from 1.4.5, this variable has no effect.
-wal_writer_inbox_size=16384, ro
-
 # Defines fiber/data synchronization fsync(2) policy:
 #   "none":           does not write to WAL
 #   "write":          fibers wait for their data to be written to the log.
@@ -97,3 +93,29 @@ wal_dir_rescan_delay=0.1, ro
 # when reading WALs.
 panic_on_snap_error=true, ro
 panic_on_wal_error=false, ro
+## BOX
+
+# Primary port (where updates are accepted)
+primary_port=0, ro, required
+
+# Secondary port (where only selects are accepted)
+secondary_port=0, ro
+
+# Warn about requests which take longer to process, in seconds.
+too_long_threshold=0.5
+
+# A custom process list (ps) title string, appended after the standard
+# program title.
+custom_proc_title=NULL, ro
+
+# Replication mode (if enabled, the server, once
+# bound to the primary port, will connect to
+# replication_source (ipaddr:port) and run continously
+# fetching records from it.. In replication mode the server
+# only accepts reads.
+replication_source=NULL
+
+# 1.6 (default) or 1.5 (old) replication mode
+# If 1.5 mode is enabled, the replica will successfully
+# connect to 1.5 master
+replication_protocol="1.6", ro

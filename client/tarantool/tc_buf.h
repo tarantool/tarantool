@@ -40,12 +40,15 @@ struct tc_buf {
 int tc_buf(struct tc_buf *buf);
 void *tc_buf_realloc(void *data, size_t size);
 int tc_buf_append(struct tc_buf *buf, void *str, size_t len);
-size_t tc_buf_delete(struct tc_buf *buf, size_t len);
+size_t tc_buf_delete(struct tc_buf *buf, size_t num);
 int tc_buf_isempty(struct tc_buf *buf);
 void tc_buf_clear(struct tc_buf *buf);
 void tc_buf_free(struct tc_buf *buf);
 
 int tc_buf_str(struct tc_buf *buf);
 int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len);
+size_t tc_buf_str_delete(struct tc_buf *buf, size_t num);
 int tc_buf_str_stripws(struct tc_buf *buf);
 int tc_buf_str_isempty(struct tc_buf *buf);
+
+void tc_buf_cmdfy(struct tc_buf *buf, size_t num);

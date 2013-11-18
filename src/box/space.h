@@ -30,44 +30,110 @@
  */
 #include "index.h"
 #include "key_def.h"
+#include "rlist.h"
 #include <exception.h>
 
-#include <box/box.h>
+typedef void (*space_f)(struct space *space);
+typedef struct tuple *(*space_replace_f)
+	(struct space *space, struct tuple *old_tuple,
+	 struct tuple *new_tuple, enum dup_replace_mode mode);
 
-struct tarantool_cfg;
+/** Reflects what space_replace() is supposed to do. */
+enum space_state {
+	/**
+	 * The space is created, but has no data
+	 * and no primary key, or, if there is a primary
+	 * key, it's not ready for use (being built with
+	 * buildNext()).
+	 * Replace is always an error, since there are no
+	 * indexes to add data to.
+	 */
+	READY_NO_KEYS,
+	/**
+	 * The space has a functional primary key.
+	 * Replace adds the tuple to this key.
+	 */
+	READY_PRIMARY_KEY,
+	/**
+	 * The space is fully functional, all keys
+	 * are fully built, replace adds its tuple
+	 * to all keys.
+	 */
+	READY_ALL_KEYS
+};
+
+struct engine {
+	enum space_state state;
+	/* Recover is called after each recover step to enable
+	 * keys. When recovery is complete, it enables all keys
+	 * at once and resets itself to a no-op.
+	 */
+	space_f recover;
+	space_replace_f replace;
+};
+
+extern struct engine engine_no_keys;
+void space_build_primary_key(struct space *space);
+void space_build_all_keys(struct space *space);
 
 struct space {
-	Index *index[BOX_INDEX_MAX];
-	/** If not set (is 0), any tuple in the
-	 * space can have any number of fields.
-	 * If set, each tuple
-	 * must have exactly this many fields.
-	 */
-	uint32_t arity;
-
 	/**
-	 * The number of indexes in the space.
+	 * Reflects the current space state and is also a vtab
+	 * with methods. Unlike a C++ vtab, changes during space
+	 * life cycle, throughout phases of recovery or with
+	 * deletion and addition of indexes.
+	 */
+	struct engine engine;
+
+	/** Triggers fired after space_replace() -- see txn_replace(). */
+	struct rlist on_replace;
+	/**
+	 * The number of *enabled* indexes in the space.
 	 *
-	 * It is equal to the number of non-nil members of the index
-	 * array and defines the key_defs array size as well.
+	 * After all indexes are built, it is equal to the number
+	 * of non-nil members of the index[] array.
 	 */
-	uint32_t key_count;
-
+	uint32_t index_count;
 	/**
-	 * The descriptors for all indexes that belong to the space.
+	 * There may be gaps index ids, i.e. index 0 and 2 may exist,
+	 * while index 1 is not defined. This member stores the
+	 * max id of a defined index in the space. It defines the
+	 * size of index_map array.
 	 */
-	struct key_def *key_defs;
-
-	/** Space number. */
-	uint32_t no;
+	uint32_t index_id_max;
+	/** Space meta. */
+	struct space_def def;
+	/** Enable/disable triggers. */
+	bool run_triggers;
 
 	/** Default tuple format used by this space */
 	struct tuple_format *format;
+	/**
+	 * Sparse array of indexes defined on the space, indexed
+	 * by id. Used to quickly find index by id (for SELECTs).
+	 */
+	Index **index_map;
+	/**
+	 * Dense array of indexes defined on the space, in order
+	 * of index id. Initially stores only the primary key at
+	 * position 0, and is fully built by
+	 * space_build_secondary_keys().
+	 */
+	Index *index[];
 };
 
-
 /** Get space ordinal number. */
-static inline uint32_t space_n(struct space *sp) { return sp->no; }
+static inline uint32_t
+space_id(struct space *space) { return space->def.id; }
+
+/** Get space name. */
+static inline const char *
+space_name(struct space *space) { return space->def.name; }
+
+
+/** Return true if space is temporary. */
+static inline bool
+space_is_temporary(struct space *space) { return space->def.temporary; }
 
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
@@ -154,9 +220,16 @@ static inline uint32_t space_n(struct space *sp) { return sp->no; }
  *         Otherwise, it's taken into account only for the
  *         primary key.
  */
-struct tuple *
+static inline struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
-	      struct tuple *new_tuple, enum dup_replace_mode mode);
+	      struct tuple *new_tuple, enum dup_replace_mode mode)
+{
+	return space->engine.replace(space, old_tuple, new_tuple,
+				     mode);
+}
+
+uint32_t
+space_size(struct space *space);
 
 /**
  * Check that the tuple has correct arity and correct field
@@ -166,84 +239,64 @@ void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple);
 
 /**
- * Get index by index number.
- * @return NULL if index not found.
+ * Allocate and initialize a space. The space
+ * needs to be loaded before it can be used
+ * (see space->engine.recover()).
+ */
+struct space *
+space_new(struct space_def *space_def, struct rlist *key_list);
+
+/** Destroy and free a space. */
+void
+space_delete(struct space *space);
+
+/**
+ * Dump space definition (key definitions, key count)
+ * for ALTER.
+ */
+void
+space_dump_def(const struct space *space, struct rlist *key_list);
+
+/**
+ * Exchange two index objects in two spaces. Used
+ * to update a space with a newly built index, while
+ * making sure the old index doesn't leak.
+ */
+void
+space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
+		 uint32_t rhs_id, bool keep_key_def);
+
+/** Rebuild index map in a space after a series of swap index. */
+void
+space_fill_index_map(struct space *space);
+
+/**
+ * Get index by index id.
+ * @return NULL if the index is not found.
  */
 static inline Index *
-space_index(struct space *sp, uint32_t index_no)
+space_index(struct space *space, uint32_t id)
 {
-	if (index_no < BOX_INDEX_MAX)
-		return sp->index[index_no];
+	if (id <= space->index_id_max)
+		return space->index_map[id];
 	return NULL;
 }
 
 /**
- * Call a visitor function on every enabled space.
+ * Look up index by id.
+ * Raise an error if the index is not found.
  */
-void
-space_foreach(void (*func)(struct space *sp, void *udata), void *udata);
-
-/**
- * Try to look up a space by space number.
- *
- * @return NULL if space not found, otherwise space object.
- */
-struct space *space_by_n(uint32_t space_no);
-
-static inline struct space *
-space_find(uint32_t space_no)
-{
-	struct space *s = space_by_n(space_no);
-	if (s)
-		return s;
-
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, space_no);
-}
-
-/** Get key_def ordinal number. */
-static inline uint32_t
-key_def_n(struct space *sp, struct key_def *kp)
-{
-	assert(kp >= sp->key_defs && kp < (sp->key_defs + sp->key_count));
-	return kp - sp->key_defs;
-}
-
-struct space *
-space_new(uint32_t space_no, struct key_def *key_defs,
-	  uint32_t key_count, uint32_t arity);
-
-
-/** Get index ordinal number in space. */
-static inline uint32_t
-index_n(Index *index)
-{
-	return key_def_n(index->space, index->key_def);
-}
-
-/** Check whether or not an index is primary in space.  */
-static inline bool
-index_is_primary(Index *index)
-{
-	return index_n(index) == 0;
-}
-
-void space_init(void);
-void space_free(void);
-int
-check_spaces(struct tarantool_cfg *conf);
-/* Build secondary keys. */
-void begin_build_primary_indexes(void);
-void end_build_primary_indexes(void);
-void build_secondary_indexes(void);
-
 static inline Index *
-index_find(struct space *sp, uint32_t index_no)
+index_find(struct space *space, uint32_t index_id)
 {
-	Index *idx = space_index(sp, index_no);
-	if (idx == NULL)
-		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_no,
-			  space_n(sp));
-	return idx;
+	Index *index = space_index(space, index_id);
+	if (index == NULL)
+		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_id,
+			  space_id(space));
+	return index;
 }
+
+extern "C" void
+space_run_triggers(struct space *space, bool yesno);
 
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */
