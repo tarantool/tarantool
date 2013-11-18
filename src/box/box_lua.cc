@@ -441,16 +441,18 @@ lbox_tuple_findall(struct lua_State *L)
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
+	int argc = lua_gettop(L);
 	struct tuple *tuple = lua_checktuple(L, 1);
 
 	struct tuple_iterator it;
 	tuple_rewind(&it, tuple);
 	const char *field;
+
 	uint32_t len;
 	while ((field = tuple_next(&it, &len)))
 		lua_pushlstring(L, field, len);
 
-	assert(lua_gettop(L) == tuple->field_count + 1);
+	assert(lua_gettop(L) == argc + tuple->field_count);
 	return tuple->field_count;
 }
 

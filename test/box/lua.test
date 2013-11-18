@@ -687,3 +687,10 @@ exec admin "lua print(1, tonumber64(2), 3)"
 # A test case for https://github.com/tarantool/tarantool/issues/44
 # IPROTO required!
 exec sql "call box.dostring('box.raise(33333, \"Hey!\")')"
+
+#
+# A test case for #107 "box.tuple.unpack asserts on extra arguments"
+#
+exec admin "lua t=box.tuple.new({'a','b','c'})"
+exec admin "lua t:unpack(5)"
+exec admin "lua t:unpack(1, 2, 3, 4, 5)"
