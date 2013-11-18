@@ -412,6 +412,7 @@ lbox_tuple_findall(struct lua_State *L)
 static int
 lbox_tuple_unpack(struct lua_State *L)
 {
+	int argc = lua_gettop(L);
 	struct tuple *tuple = lua_checktuple(L, 1);
 
 	struct tuple_iterator it;
@@ -420,8 +421,8 @@ lbox_tuple_unpack(struct lua_State *L)
 	while ((field = tuple_next(&it)))
 		luamp_decode(L, &field);
 
-	assert(lua_gettop(L) == tuple_arity(tuple) + 1);
-	return lua_gettop(L) - 1;
+	assert(lua_gettop(L) == argc + tuple_arity(tuple));
+	return tuple_arity(tuple);
 }
 
 static int

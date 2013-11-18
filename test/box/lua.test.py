@@ -744,4 +744,11 @@ admin("box.tuple.new({{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}})")
 admin("box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})")
 admin("box.tuple.new({'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}})")
 
+#
+# A test case for #107 "box.tuple.unpack asserts on extra arguments"
+#
+admin("t=box.tuple.new({'a','b','c'})")
+admin("t:unpack(5)")
+admin("t:unpack(1, 2, 3, 4, 5)")
+
 sys.stdout.clear_all_filters()
