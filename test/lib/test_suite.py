@@ -113,6 +113,7 @@ class Test:
         builddir = self.args.builddir
         self.execute(server)
         self.is_executed = True
+        sys.stdout.flush()
 
         if not self.skip:
             if self.is_executed_ok and os.path.isfile(self.result):
