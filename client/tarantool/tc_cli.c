@@ -92,8 +92,6 @@ static int tc_cli_reconnect(void) {
 
 enum tc_keywords {
 	TC_EXIT = TNT_TK_CUSTOM + 1,
-	TC_TEE,
-	TC_NOTEE,
 	TC_LOADFILE,
 	TC_HELP,
 	TC_SETOPT,
@@ -111,8 +109,6 @@ static struct tnt_lex_keyword tc_lex_keywords[] =
 	{ "qui", 3, TC_EXIT },
 	{ "quit", 4, TC_EXIT },
 	{ "help", 4, TC_HELP },
-	{ "tee", 3, TC_TEE },
-	{ "notee", 5, TC_NOTEE },
 	{ "loadfile", 8, TC_LOADFILE },
 	{ "setopt", 6, TC_SETOPT},
 	{ "delimiter", 9, TC_SETOPT_DELIM},
@@ -132,8 +128,6 @@ tc_cmd_usage(void)
 		"---\n"
 		"console client commands:\n"
 		" - help\n"
-		" - tee 'path'\n"
-		" - notee\n"
 		" - loadfile 'path'\n"
 		" - setopt key=val\n"
 		" - (possible pairs: delim=\'str\')\n"
@@ -146,27 +140,6 @@ static int tc_cli_admin(char *cmd, int exit) {
 	tc_query_admin_t cb = (exit) ? NULL : tc_query_admin_printer;
 	if (tc_query_admin(cmd, cb, &e) == -1)
 		return tc_cli_error(e);
-	return 0;
-}
-
-int tc_cmd_tee_close(void)
-{
-	if (tc.tee_fd == -1)
-		return 0;
-	fsync(tc.tee_fd);
-	int rc = close(tc.tee_fd);
-	tc.tee_fd = -1;
-	return rc;
-}
-
-static int tc_cmd_tee_open(char *path)
-{
-	tc_cmd_tee_close();
-	tc.tee_fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0644);
-	if (tc.tee_fd == -1) {
-		tc_printf("error: open(): %s\n", strerror(errno));
-		return -1;
-	}
 	return 0;
 }
 
@@ -245,17 +218,6 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 	case TC_HELP:
 		tc_cmd_usage();
 		break;
-	case TC_TEE:
-		if (tnt_lex(&lex, &tk) != TNT_TK_STRING) {
-			rc = TC_CLI_ERROR;
-			goto done;
-		}
-		if (tc_cmd_tee_open((char*)TNT_TK_S(tk)->data) == -1)
-			rc = TC_CLI_ERROR;
-		goto done;
-	case TC_NOTEE:
-		tc_cmd_tee_close();
-		goto done;
 	case TC_LOADFILE:
 		if (tnt_lex(&lex, &tk) != TNT_TK_STRING) {
 			rc = TC_CLI_ERROR;
@@ -342,7 +304,6 @@ int tc_cli_cmdv(void)
 	for (i = 0 ; i < tc.opt.cmdc ; i++) {
 		char *cmd = tc.opt.cmdv[i];
 		int cmd_len = strlen(tc.opt.cmdv[i]);
-		tc_print_cmd2tee(NULL, cmd, cmd_len);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd, cmd_len);
 		if (ret == TC_CLI_EXIT)
 			break;
@@ -465,8 +426,6 @@ int tc_cli(void)
 		tc_buf_str_stripws(&cmd);
 		if (delim_exists && tc_buf_str_isempty(&cmd))
 			goto next;
-		tc_print_cmd2tee(cmd.used != 1 ? prompt_delim : prompt,
-				 cmd.data, cmd.used - 1);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
 						     cmd.used - 1);
 		if (isatty(STDIN_FILENO))

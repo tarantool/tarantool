@@ -56,7 +56,6 @@ struct tc tc;
 
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
-	tc.tee_fd = -1;
 	setlocale(LC_ALL, "");
 }
 
@@ -65,7 +64,6 @@ static void tc_free(void) {
 		tnt_stream_free(tc.net);
 	}
 	tc_admin_close(&tc.admin);
-	tc_cmd_tee_close();
 }
 
 void tc_error(char *fmt, ...) {

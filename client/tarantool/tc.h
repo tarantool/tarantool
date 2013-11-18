@@ -33,7 +33,6 @@ struct tc {
 	struct tc_opt opt;
 	struct tc_admin admin;
 	struct tnt_stream *net;
-	int tee_fd;
 };
 
 void tc_error(char *fmt, ...);

@@ -51,51 +51,17 @@
 extern struct tc tc;
 
 /*##################### Base printing functions #####################*/
-
-void tc_print_tee(char *buf, size_t size) {
-	if (tc.tee_fd == -1)
-		return;
-	size_t off = 0;
-	do {
-		ssize_t r = write(tc.tee_fd, buf + off, size - off);
-		if (r == -1) {
-			printf("error: read(): %s\n", strerror(errno));
-			return;
-		}
-		off += r;
-	} while (off != size);
-}
-
-void tc_print_cmd2tee(char *prompt, char *cmd, int size) {
-	if (tc.tee_fd == -1)
-		return;
-	if (prompt)
-		tc_print_tee(prompt, strlen(prompt));
-	tc_print_tee(cmd, size);
-	tc_print_tee("\n", 1);
-}
-
 void tc_print_buf(char *buf, size_t size) {
 	printf("%-.*s", (int)size, buf);
 	fflush(stdout);
-	tc_print_tee(buf, size);
 }
 
 void tc_printf(char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	if (tc.tee_fd == -1) {
-		vprintf(fmt, args);
-		va_end(args);
-		return;
-	}
-	char *buf;
-	int size = vasprintf(&buf, fmt, args);
+	vprintf(fmt, args);
 	va_end(args);
-	if (size >= 0) {
-		tc_print_buf(buf, size);
-		free(buf);
-	}
+	return;
 }
 
 /*##################### string functions #####################*/
