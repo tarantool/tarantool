@@ -47,6 +47,9 @@
 
 extern int snapshot_pid;
 
+
+static bool private_arena = false;
+
 #ifdef SLAB_DEBUG
 #undef NDEBUG
 uint8_t red_zone[4] = { 0xfa, 0xfa, 0xfa, 0xfa };
@@ -152,8 +155,15 @@ arena_init(struct arena *arena, size_t size)
 	arena->size = size - size % SLAB_SIZE;
 	arena->mmap_size = size - size % SLAB_SIZE + SLAB_SIZE;	/* spend SLAB_SIZE bytes on align :-( */
 
+	int flags = MAP_SHARED | MAP_ANONYMOUS;
+	if (access("/proc/user_beancounters", F_OK) == 0) {
+		say_warn("Don't use shared arena under OpenVZ");
+		flags = MAP_PRIVATE | MAP_ANONYMOUS;
+		private_arena = true;
+	}
+
 	arena->mmap_base = mmap(NULL, arena->mmap_size,
-				PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+				PROT_READ | PROT_WRITE, flags, -1, 0);
 	if (arena->mmap_base == MAP_FAILED) {
 		say_syserror("mmap");
 		return false;
@@ -343,6 +353,8 @@ sfree_delayed(void *ptr)
 {
 	if (ptr == NULL)
 		return;
+	if (private_arena)
+		return sfree(ptr);
 	struct slab_item *item = (struct slab_item *)ptr;
 	struct slab *slab = slab_header(item);
 	(void) slab;

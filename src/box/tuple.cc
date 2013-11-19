@@ -42,6 +42,7 @@ struct tuple_format *tuple_format_ber;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size, formats_capacity;
+extern int snapshot_pid;
 
 /** Extract all available type info from keys. */
 void
@@ -272,7 +273,7 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	if (tuple->version == snapshot_version)
+	if (snapshot_pid == 0 || tuple->version == snapshot_version)
 		sfree(ptr);
 	else
 		sfree_delayed(ptr);
