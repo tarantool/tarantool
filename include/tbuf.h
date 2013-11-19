@@ -70,7 +70,7 @@ static inline void tbuf_append(struct tbuf *b, const void *data, size_t len)
 static inline char *
 tbuf_str(struct tbuf *tbuf) { return tbuf->data; }
 
-static inline void *
+static inline char *
 tbuf_end(struct tbuf *tbuf) { return tbuf->data + tbuf->size; }
 
 static inline size_t
@@ -91,7 +91,6 @@ void *tbuf_peek(struct tbuf *b, size_t count);
  */
 void tbuf_ltrim(struct tbuf *b, size_t count);
 
-void tbuf_append_field(struct tbuf *b, const void *f);
 void tbuf_vprintf(struct tbuf *b, const char *format, va_list ap)
 	__attribute__ ((format(FORMAT_PRINTF, 2, 0)));
 void tbuf_printf(struct tbuf *b, const char *format, ...)

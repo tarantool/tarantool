@@ -68,6 +68,24 @@ palloc_region_alloc(void *ctx, size_t size)
 }
 
 #if defined(__cplusplus)
+struct PallocGuard {
+	struct palloc_pool *pool;
+	size_t allocated;
+
+	PallocGuard(struct palloc_pool *_pool)
+		: pool(_pool),
+		  allocated(palloc_allocated(_pool)) {
+		/* nothing */
+	}
+
+	~PallocGuard() {
+		ptruncate(pool, allocated);
+	}
+};
+#endif /* defined(__cplusplus) */
+
+
+#if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 

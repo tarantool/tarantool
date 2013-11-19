@@ -28,6 +28,8 @@
  */
 #include "tuple.h"
 #include "iobuf.h"
+#include "tbuf.h"
+
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
@@ -41,7 +43,7 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 }
 
 void
-tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b)
+tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf)
 {
-	luaL_addlstring(b, (char*)tuple->data, tuple->bsize);
+	tbuf_append(buf, tuple->data, tuple->bsize);
 }

@@ -23,3 +23,17 @@ error: 'Lua error: stack overflow'
 lua box.space[1]:truncate()
 ---
 ...
+lua  function mktuple(n)     local fields = { [n] = n }     for i = 1,n do         fields[i] = i;     end     local t = box.replace(0, fields);     assert(box.unpack("i", t[0]) == 1, "tuple check")     assert(box.unpack("i", t[n-1]) == n, "tuple check")     return string.format("count %u len %u", #t, t:bsize()) end 
+---
+...
+lua mktuple(5000)
+---
+ - count 5000 len 25000
+...
+lua mktuple(100000)
+---
+ - count 100000 len 500000
+...
+lua box.space[0]:truncate()
+---
+...
