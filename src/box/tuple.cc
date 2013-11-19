@@ -44,6 +44,7 @@ struct tuple_format **tuple_formats;
 struct tuple_format *tuple_format_ber;
 
 static uint32_t formats_size, formats_capacity;
+extern int snapshot_pid;
 
 /** Extract all available type info from keys. */
 void
@@ -240,7 +241,7 @@ tuple_free(struct tuple *tuple)
 	say_debug("tuple_free(%p)", tuple);
 	assert(tuple->refs == 0);
 	char *ptr = (char *) tuple - tuple_format(tuple)->field_map_size;
-	if (tuple->version == snapshot_version)
+	if (snapshot_pid == 0 || tuple->version == snapshot_version)
 		sfree(ptr);
 	else
 		sfree_delayed(ptr);
