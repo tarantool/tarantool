@@ -44,11 +44,11 @@
 static const void *opts_def = gopt_start(
 	gopt_option('G', GOPT_ARG, gopt_shorts('G'),
 		    gopt_longs("generate"), " <file>", "generate signature file"),
-	gopt_option('V', GOPT_ARG, gopt_shorts('V'),
+	gopt_option('W', GOPT_ARG, gopt_shorts('W'),
 		    gopt_longs("verify"), " <file>", "verify signature file"),
 	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
-	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
+	gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
 		    NULL, "display version information and exit")
 );
 
@@ -69,17 +69,25 @@ int tc_options_usage(void)
 	return 1;
 }
 
+int tc_options_version(void)
+{
+	printf("tarancheck client, version %s.%s\n",
+	       TC_VERSION_MAJOR,
+	       TC_VERSION_MINOR);
+	return 1;
+}
+
 enum tc_options_mode
 tc_options_process(struct tc_options *opts, int argc, char **argv)
 {
 	void *opt = gopt_sort(&argc, (const char**)argv, opts_def);
 	/* usage */
-	if (gopt(opt, '?') || argc != 2) {
+	if (gopt(opt, '?')) {
 		opts->mode = TC_MODE_USAGE;
 		goto done;
 	}
 	/* version */
-	if (gopt(opt, 'v')) {
+	if (gopt(opt, 'V')) {
 		opts->mode = TC_MODE_VERSION;
 		goto done;
 	}
@@ -87,7 +95,7 @@ tc_options_process(struct tc_options *opts, int argc, char **argv)
 	if (gopt_arg(opt, 'G', &opts->file)) {
 		opts->mode = TC_MODE_GENERATE;
 	} else
-	if (gopt_arg(opt, 'V', &opts->file)) {
+	if (gopt_arg(opt, 'W', &opts->file)) {
 		opts->mode = TC_MODE_VERIFY;
 	} else {
 		opts->mode = TC_MODE_USAGE;
