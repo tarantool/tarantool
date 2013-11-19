@@ -58,7 +58,11 @@ with history support.
 
 # Tarantool debug package
 
+%if 0%{?fedora}
+# Fedora includes debug package by default.
+%else
 %debug_package
+%endif
 
 ###
 
