@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 		return ts_options_usage();
 	case TS_MODE_VERSION:
 		ts_options_free(&tss.opts);
-		return 0;
+		return ts_options_version();
 	case TS_MODE_CREATE:
 		break;
 	}
