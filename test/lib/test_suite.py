@@ -95,7 +95,7 @@ class Test:
 
     def __init__(self, name, args, suite_ini):
         """Initialize test properties: path to test file, path to
-        temporary result file, path to the client program, test status.""" 
+        temporary result file, path to the client program, test status."""
         rg = re.compile('.test.*')
         self.name = name
         self.args = args
@@ -139,6 +139,7 @@ class Test:
                 sys.stdout = FilteredStream(self.tmp_result)
                 stdout_fileno = sys.stdout.stream.fileno()
                 self.execute(server)
+                sys.stdout.stream.flush()
             self.is_executed_ok = True
         except Exception as e:
             traceback.print_exc(e)
