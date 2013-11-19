@@ -157,10 +157,11 @@ arena_init(struct arena *arena, size_t size)
 
 	int flags = MAP_SHARED | MAP_ANONYMOUS;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
-		say_warn("Don't use shared arena under OpenVZ");
+		say_warn("Disable shared arena since running under OpenVZ "
+		    "(https://bugzilla.openvz.org/show_bug.cgi?id=2805)");
 		flags = MAP_PRIVATE | MAP_ANONYMOUS;
 		private_arena = true;
-	}
+        }
 
 	arena->mmap_base = mmap(NULL, arena->mmap_size,
 				PROT_READ | PROT_WRITE, flags, -1, 0);
