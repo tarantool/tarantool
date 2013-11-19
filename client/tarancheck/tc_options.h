@@ -8,6 +8,9 @@ enum tc_options_mode {
 	TC_MODE_VERIFY
 };
 
+#define TC_VERSION_MINOR "1"
+#define TC_VERSION_MAJOR "0"
+
 struct tc_options {
 	enum tc_options_mode mode;
 	const char *file;
@@ -20,5 +23,6 @@ void tc_options_free(struct tc_options *opts);
 
 enum tc_options_mode tc_options_process(struct tc_options *opts, int argc, char **argv);
 int tc_options_usage(void);
+int tc_options_version(void);
 
 #endif

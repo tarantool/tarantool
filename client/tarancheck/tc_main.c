@@ -72,8 +72,10 @@ int main(int argc, char *argv[])
 	switch (mode) {
 	case TC_MODE_USAGE:
 		return tc_options_usage();
+		break;
 	case TC_MODE_VERSION:
-		return 0;
+		return tc_options_version();
+		break;
 	case TC_MODE_VERIFY:
 		rc = tc_config_load(&opts);
 		if (rc == -1)
