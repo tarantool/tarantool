@@ -39,6 +39,7 @@
 #include <connector/c/include/tarantool/tnt.h>
 #include <connector/c/include/tarantool/tnt_net.h>
 #include <connector/c/include/tarantool/tnt_sql.h>
+#include <connector/c/include/tarantool/tnt_iter.h>
 #include <connector/c/include/tarantool/tnt_xlog.h>
 #endif
 
@@ -89,6 +90,43 @@ void tc_error(char *fmt, ...) {
 }
 
 #if 0
+static int get_admin_port(void)
+{
+	char *e = NULL;
+	tc_query("call box.dostring('return box.cfg.admin_port')", &e);
+	struct tnt_iter i, it, ifl;
+	tnt_iter_reply(&i, tc.net);
+	struct tnt_reply *r = TNT_IREPLY_PTR(&i);
+	if (!tnt_next(&i)) {
+		tnt_iter_free(&i);
+	}
+	if (tnt_error(tc.net) != TNT_EOK) {
+		tc_error(tc_query_error("%s ERROR, %s",
+				tc_query_op(r),
+				tnt_strerror(tc.net)));
+	} else if (r->code != 0) {
+		tc_error(tc_query_error("%s ERROR, %s (%s)",
+				tc_query_op(r), ((r->error) ? r->error : ""),
+				tnt_strerror(tc.net)));
+	}
+	tnt_iter_list(&it, TNT_REPLY_LIST(r));
+	if (!tnt_next(&it)) {
+		tnt_iter_free(&it);
+		tnt_iter_free(&i);
+	}
+	struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
+	tnt_iter(&ifl, tu);
+	if (!tnt_next(&ifl)) { goto end; }
+	int port = *((uint32_t* )TNT_IFIELD_DATA(&ifl));
+end:
+	tnt_iter_free(&ifl);
+	tnt_iter_free(&it);
+	tnt_iter_free(&i);
+	if (e != NULL)
+		free(e);
+	return port;
+}
+
 static void tc_connect(void)
 {
 	if (tc.opt.port == 0)
@@ -107,6 +145,8 @@ static void tc_connect(void)
 	/* connecting to server */
 	if (tnt_connect(tc.net) == -1)
 		tc_error("%s", tnt_strerror(tc.net));
+	if (tc.opt.port_admin == 0)
+		tc.opt.port_admin = get_admin_port();
 }
 #endif
 
@@ -149,6 +189,17 @@ static void tc_connect_admin(void)
 }
 
 #if 0
+static void tc_connect_both(void)
+{
+	if (!tc.opt.port && tc.opt.port_admin) {
+		tc_connect_admin();
+		tc_connect();
+	} else {
+		tc_connect();
+		tc_connect_admin();
+	}
+}
+
 static void tc_validate(void)
 {
 	tc.opt.xlog_printer = tc_print_getxlogcb(tc.opt.format);
@@ -193,12 +244,10 @@ int main(int argc, char *argv[])
 #endif
 	case TC_OPT_CMD:
 		tc_connect_admin();
-		//tc_connect();
 		rc = tc_cli_cmdv();
 		break;
 	case TC_OPT_INTERACTIVE:
 		tc_connect_admin();
-		//tc_connect();
 		tc_cli_motd();
 		rc = tc_cli();
 		break;
