@@ -1,0 +1,19 @@
+# encoding: tarantool
+
+from lib.admin_connection import AdminConnection
+from lib.box_connection import BoxConnection
+
+exec admin "lua type(box.session.id())"
+exec admin "lua box.session.unknown_field"
+exec admin "lua type(box.session.storage)"
+exec admin "lua box.session.storage.abc = 'cde'"
+exec admin "lua box.session.storage.abc"
+
+
+con1 = AdminConnection('localhost', server.admin_port)
+exec con1  "lua type(box.session.storage)"
+exec con1  "lua type(box.session.storage.abc)"
+exec con1  "lua box.session.storage.abc = 'def'"
+exec con1  "lua box.session.storage.abc"
+exec admin "lua box.session.storage.abc"
+con1.disconnect()

@@ -40,6 +40,7 @@ extern "C" {
 #include "sio.h"
 
 static const char *sessionlib_name = "box.session";
+static int session_ref = 0;
 
 /**
  * Return a unique monotonic session
@@ -175,23 +176,60 @@ lbox_session_on_disconnect(struct lua_State *L)
 	return lbox_session_set_trigger(L, &on_disconnect);
 }
 
-static const struct luaL_reg lbox_session_meta [] = {
-	{"id", lbox_session_id},
-	{NULL, NULL}
-};
 
-static const struct luaL_reg sessionlib[] = {
-	{"id", lbox_session_id},
-	{"exists", lbox_session_exists},
-	{"peer", lbox_session_peer},
-	{"on_connect", lbox_session_on_connect},
-	{"on_disconnect", lbox_session_on_disconnect},
-	{NULL, NULL}
-};
+
+static int
+lbox_session_index(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return 0;
+	if (lua_isstring(L, 2) && strcmp(lua_tostring(L, 2), "storage") == 0) {
+		if (!fiber->sid)
+			return 0;
+
+		assert(session_ref != 0);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, session_ref);
+
+		lua_rawgeti(L, -1, fiber->sid);
+
+		/* create session.storage on-demand */
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);			/* nil */
+			lua_newtable(L);		/* new storage */
+			lua_pushvalue(L, -1);		/* ref to storage */
+			lua_rawseti(L, -3, fiber->sid);
+		}
+		lua_remove(L, -2);			/* storages storage */
+		return 1;
+	}
+	return 0;
+}
 
 void
 tarantool_lua_session_init(struct lua_State *L)
 {
+        static const struct luaL_reg sessionlib[] = {
+                {"id", lbox_session_id},
+                {"exists", lbox_session_exists},
+                {"peer", lbox_session_peer},
+                {"on_connect", lbox_session_on_connect},
+                {"on_disconnect", lbox_session_on_disconnect},
+                {NULL, NULL}
+        };
+
+
 	luaL_register(L, sessionlib_name, sessionlib);
+
+	lua_newtable(L);
+	lua_pushliteral(L, "__index");
+	lua_pushcfunction(L, lbox_session_index);
+	lua_rawset(L, -3);
+	lua_setmetatable(L, -2);
+
 	lua_pop(L, 1);
+
+
+	/* all lua sessions storage */
+	lua_newtable(L);
+	session_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
