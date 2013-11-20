@@ -30,12 +30,20 @@
 #include "lua/msgpack.h"
 
 #include "lua/utils.h"
+
+extern "C" {
 #if defined(LUAJIT)
 #include <lj_ctype.h>
 #endif /* defined(LUAJIT) */
+#include <lauxlib.h> /* struct luaL_error */
+} /* extern "C" */
+
+#include <tbuf.h>
+#include <fiber.h>
+#include <lib/small/region.h>
 
 static void
-luamp_encode_extension_default(struct lua_State *L, int idx, luaL_Buffer *b);
+luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *buf);
 
 static void
 luamp_decode_extension_default(struct lua_State *L, const char **data);
@@ -46,87 +54,105 @@ static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
 
 void
-luamp_encode_array(luaL_Buffer *buf, uint32_t size)
+luamp_encode_array(struct tbuf *buf, uint32_t size)
 {
-	char tmp[5];
-	assert(mp_sizeof_array(size) <= sizeof(tmp));
-	char *end = mp_encode_array(tmp, size);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_array(size) <= 5);
+	tbuf_ensure(buf, 5 + size);
+	char *data = mp_encode_array(buf->data + buf->size, size);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_map(luaL_Buffer *buf, uint32_t size)
+luamp_encode_map(struct tbuf *buf, uint32_t size)
 {
-	char tmp[5];
-	assert(mp_sizeof_map(size) <= sizeof(tmp));
-	char *end = mp_encode_map(tmp, size);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_map(size) <= 5);
+	tbuf_ensure(buf, 5 + size);
+
+	char *data = mp_encode_map(buf->data + buf->size, size);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_uint(luaL_Buffer *buf, uint64_t num)
+luamp_encode_uint(struct tbuf *buf, uint64_t num)
 {
-	char tmp[9];
-	assert(mp_sizeof_uint(num) <= sizeof(tmp));
-	char *end = mp_encode_uint(tmp, num);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_uint(num) <= 9);
+	tbuf_ensure(buf, 9);
+
+	char *data = mp_encode_uint(buf->data + buf->size, num);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_int(luaL_Buffer *buf, int64_t num)
+luamp_encode_int(struct tbuf *buf, int64_t num)
 {
-	char tmp[9];
-	assert(mp_sizeof_int(num) <= sizeof(tmp));
-	char *end = mp_encode_int(tmp, num);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_int(num) <= 9);
+	tbuf_ensure(buf, 9);
+
+	char *data = mp_encode_int(buf->data + buf->size, num);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_float(luaL_Buffer *buf, float num)
+luamp_encode_float(struct tbuf *buf, float num)
 {
-	char tmp[5];
-	assert(mp_sizeof_float(num) <= sizeof(tmp));
-	char *end = mp_encode_float(tmp, num);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_float(num) <= 5);
+	tbuf_ensure(buf, 5);
+
+	char *data = mp_encode_float(buf->data + buf->size, num);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_double(luaL_Buffer *buf, double num)
+luamp_encode_double(struct tbuf *buf, double num)
 {
-	char tmp[9];
-	assert(mp_sizeof_double(num) <= sizeof(tmp));
-	char *end = mp_encode_double(tmp, num);
-	luaL_addlstring(buf, tmp, end - tmp);
+	assert(mp_sizeof_double(num) <= 9);
+	tbuf_ensure(buf, 9);
+
+	char *data = mp_encode_double(buf->data + buf->size, num);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_str(luaL_Buffer *buf, const char *str, uint32_t len)
+luamp_encode_str(struct tbuf *buf, const char *str, uint32_t len)
 {
-	char tmp[5];
-	assert(mp_sizeof_str(len) <= sizeof(tmp) + len);
-	char *end = mp_encode_strl(tmp, len);
-	luaL_addlstring(buf, tmp, end - tmp);
-	luaL_addlstring(buf, str, len);
+	assert(mp_sizeof_str(len) <= 5 + len);
+	tbuf_ensure(buf, 5 + len);
+
+	char *data = mp_encode_str(buf->data + buf->size, str, len);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_nil(luaL_Buffer *buf)
+luamp_encode_nil(struct tbuf *buf)
 {
-	char tmp;
-	mp_encode_nil(&tmp);
-	luaL_addchar(buf, tmp);
+	assert(mp_sizeof_nil() <= 1);
+	tbuf_ensure(buf, 1);
+
+	char *data = mp_encode_nil(buf->data + buf->size);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 void
-luamp_encode_bool(luaL_Buffer *buf, bool val)
+luamp_encode_bool(struct tbuf *buf, bool val)
 {
-	char tmp;
-	mp_encode_bool(&tmp, val);
-	luaL_addchar(buf, tmp);
+	assert(mp_sizeof_bool(val) <= 1);
+	tbuf_ensure(buf, 1);
+
+	char *data = mp_encode_bool(buf->data + buf->size, val);
+	assert(data <= buf->data + buf->capacity);
+	buf->size = data - buf->data;
 }
 
 static void
-luamp_encode_extension_default(struct lua_State *L, int idx, luaL_Buffer *b)
+luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *b)
 {
 	(void) b;
 	luaL_error(L, "msgpack.encode: can not encode Lua type '%s'",
@@ -163,7 +189,7 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 }
 
 static void
-luamp_encode_r(struct lua_State *L, luaL_Buffer *b, int level)
+luamp_encode_r(struct lua_State *L, struct tbuf *b, int level)
 {
 	int index = lua_gettop(L);
 
@@ -217,7 +243,7 @@ luamp_encode_r(struct lua_State *L, luaL_Buffer *b, int level)
 }
 
 void
-luamp_encode(struct lua_State *L, luaL_Buffer *b, int index)
+luamp_encode(struct lua_State *L, struct tbuf *b, int index)
 {
 	int top = lua_gettop(L);
 	if (index < 0)
@@ -372,10 +398,10 @@ lua_msgpack_encode(lua_State *L)
 	if (index != 1)
 		luaL_error(L, "msgpack.encode: a Lua object expected");
 
-	luaL_Buffer b;
-	luaL_buffinit(L, &b);
-	luamp_encode_r(L, &b, 0);
-	luaL_pushresult(&b);
+	RegionGuard region_guard(&fiber->gc);
+	struct tbuf *buf = tbuf_new(&fiber->gc);
+	luamp_encode_r(L, buf, 0);
+	lua_pushlstring(L, buf->data, buf->size);
 	return 1;
 }
 

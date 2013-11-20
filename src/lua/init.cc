@@ -68,6 +68,7 @@ extern "C" {
 #include <dirent.h>
 #include <stdio.h>
 #include "tarantool/plugin.h"
+#include <lib/small/region.h>
 
 static RLIST_HEAD(loaded_plugins);
 
@@ -589,6 +590,7 @@ tarantool_lua_close(struct lua_State *L)
 static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
+	RegionGuard region_guard(&fiber->gc);
 	struct tbuf *buf = tbuf_new(&fiber->gc);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));

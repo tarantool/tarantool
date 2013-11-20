@@ -249,7 +249,22 @@ region_alloc_cb(void *ctx, size_t size)
 {
 	return region_alloc((struct region *) ctx, size);
 }
-}
+} /* extern "C" */
+
+struct RegionGuard {
+	struct region *region;
+	size_t used;
+
+	RegionGuard(struct region *_region)
+		: region(_region),
+		  used(region_used(_region)) {
+		/* nothing */
+	}
+
+	~RegionGuard() {
+		region_truncate(region, used);
+	}
+};
 #endif
 
 #endif /* INCLUDES_TARANTOOL_SMALL_REGION_H */

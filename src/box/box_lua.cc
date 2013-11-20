@@ -206,12 +206,12 @@ lbox_tuple_slice(struct lua_State *L)
 
 /* A MsgPack extensions handler that supports tuples */
 static void
-luamp_encode_extension_box(struct lua_State *L, int idx, luaL_Buffer *b)
+luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
 {
 	if (lua_type(L, idx) == LUA_TUSERDATA &&
 			lua_istuple(L, idx)) {
 		struct tuple *tuple = lua_checktuple(L, idx);
-		tuple_to_luabuf(tuple, b);
+		tuple_to_tbuf(tuple, b);
 		return;
 	}
 
@@ -224,7 +224,7 @@ luamp_encode_extension_box(struct lua_State *L, int idx, luaL_Buffer *b)
  * Will be removed after API change.
  */
 static int
-luamp_encodestack(struct lua_State *L, luaL_Buffer *b, int first, int last)
+luamp_encodestack(struct lua_State *L, struct tbuf *b, int first, int last)
 {
 	if (first == last && (lua_istable(L, first) ||
 	    (lua_isuserdata(L, first) && lua_istuple(L, first)))) {
@@ -240,6 +240,12 @@ luamp_encodestack(struct lua_State *L, luaL_Buffer *b, int first, int last)
 		}
 		return last + 1 - first;
 	}
+}
+
+static void *
+tuple_update_region_alloc(void *alloc_ctx, size_t size)
+{
+	return region_alloc((struct region *) alloc_ctx, size);
 }
 
 /**
@@ -293,34 +299,50 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
+	RegionGuard region_guard(&fiber->gc);
+
 	/*
 	 * Prepare UPDATE expression
 	 */
-	luaL_Buffer b;
-	luaL_buffinit(L, &b);
-	luaL_addlstring(&b, (char *) &op_cnt, sizeof(op_cnt));
-	uint32_t offset_u32 = (uint32_t) offset;
+	struct tbuf *b = tbuf_new(&fiber->gc);
+	tbuf_append(b, (char *) &op_cnt, sizeof(op_cnt));
 	if (field_count > 0) {
-		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
-		luaL_addchar(&b, UPDATE_OP_DELETE); /* multi-delete */
-		luamp_encode_uint(&b, field_count);
+		tbuf_ensure(b, sizeof(uint32_t) + 1 + 9);
+
+		/* offset */
+		char *data = pack_u32(b->data + b->size, offset);
+
+		/* operation */
+		*data++ = UPDATE_OP_DELETE;
+
+		assert(data <= b->data + b->capacity);
+		b->size = data - b->data;
+
+		/* field: count */
+		luamp_encode_uint(b, field_count);
 	}
 
 	for (int i = argc ; i > 3; i--) {
-		luaL_addlstring(&b, (char *) &offset_u32, sizeof(offset_u32));
-		luaL_addchar(&b, UPDATE_OP_INSERT);
-		luamp_encode(L, &b, i);
+		tbuf_ensure(b, sizeof(uint32_t) + 1 + 10);
+
+		/* offset */
+		char *data = pack_u32(b->data + b->size, offset);
+
+		/* operation */
+		*data++ = UPDATE_OP_INSERT;
+
+		assert(data <= b->data + b->capacity);
+		b->size = data - b->data;
+
+		/* field */
+		luamp_encode(L, b, i);
 	}
-	luaL_pushresult(&b);
-	size_t expr_len;
-	const char *expr = lua_tolstring(L, -1, &expr_len);
 
 	/* Execute tuple_update */
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
-					       lua_region_alloc, L,
-					       tuple, expr, expr + expr_len);
-	/* Cleanup memory allocated by lua_region_alloc */
-	lua_settop(L, 0);
+					       tuple_update_region_alloc,
+					       &fiber->gc,
+					       tuple, tbuf_str(b), tbuf_end(b));
 	lbox_pushtuple(L, new_tuple);
 	return 1;
 }
@@ -422,6 +444,7 @@ lbox_tuple_unpack(struct lua_State *L)
 		luamp_decode(L, &field);
 
 	assert(lua_gettop(L) == argc + tuple_arity(tuple));
+	(void) argc;
 	return tuple_arity(tuple);
 }
 
@@ -507,7 +530,6 @@ lbox_tuple_tostring(struct lua_State *L)
 	const char *e = rindex(str, ']');
 	assert(s != NULL && e != NULL && s + 1 <= e);
 	lua_pushlstring(L, s, e - s + 1);
-
 	return 1;
 }
 
@@ -808,14 +830,15 @@ lbox_create_iterator(struct lua_State *L)
 			luaL_error(L, "unknown iterator type: %d", type);
 	}
 
+	RegionGuard region_guard(&fiber->gc);
+
 	/* What else do we have on the stack? */
 	if (argc > 2 && (lua_type(L, 3) != LUA_TNIL)) {
 		/* Single or multi- part key. */
-		luaL_Buffer b;
-		luaL_buffinit(L, &b);
-		luamp_encodestack(L, &b, 3, argc);
-		luaL_pushresult(&b);
-		key = lua_tolstring(L, -1, &key_size);
+		struct tbuf *b = tbuf_new(&fiber->gc);
+		luamp_encodestack(L, b, 3, argc);
+		key = b->data;
+		key_size = b->size;
 		assert(key_size != 0);
 		if (unlikely(mp_typeof(*key) != MP_ARRAY))
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
@@ -905,8 +928,6 @@ lbox_index_count(struct lua_State *L)
 		luaL_error(L, "index.count(): one or more arguments expected");
 
 	/* preparing single or multi-part key */
-	luaL_Buffer b;
-	luaL_buffinit(L, &b);
 	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
 		/* Nothing */
 		/* Return index size */
@@ -914,13 +935,13 @@ lbox_index_count(struct lua_State *L)
 		return 1;
 	}
 
-	/* Single or multi- part key. */
-	luamp_encodestack(L, &b, 2, argc);
+	RegionGuard region_guard(&fiber->gc);
+	struct tbuf *b = tbuf_new(&fiber->gc);
 
-	luaL_pushresult(&b);
-	size_t key_size;
-	const char *key = lua_tolstring(L, -1, &key_size);
-	assert(key_size != 0);
+	/* Single or multi- part key. */
+	luamp_encodestack(L, b, 2, argc);
+
+	const char *key = b->data;
 	if (unlikely(mp_typeof(*key) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	uint32_t part_count = mp_decode_array(&key);
@@ -1015,16 +1036,13 @@ port_lua_create(struct lua_State *L)
 static struct tuple*
 lua_totuple(struct lua_State *L, int first, int last)
 {
-	luaL_Buffer b;
-	luaL_buffinit(L, &b);
-	luamp_encodestack(L, &b, first, last);
-	luaL_pushresult(&b);
-	size_t len = 0;
-	const char *data = lua_tolstring(L, -1, &len);
+	RegionGuard region_guard(&fiber->gc);
+	struct tbuf *b = tbuf_new(&fiber->gc);
+	luamp_encodestack(L, b, first, last);
+	const char *data = b->data;
 	if (unlikely(mp_typeof(*data) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	struct tuple *tuple = tuple_new(tuple_format_ber, &data, data + len);
-	lua_pop(L, 1);
+	struct tuple *tuple = tuple_new(tuple_format_ber, &data, tbuf_end(b));
 	return tuple;
 }
 
@@ -1341,7 +1359,6 @@ static char opcode_to_format(char opcode)
 static int
 lbox_pack(struct lua_State *L)
 {
-	luaL_Buffer b;
 	const char *format = luaL_checkstring(L, 1);
 	/* first arg comes second */
 	int i = 2;
@@ -1349,14 +1366,13 @@ lbox_pack(struct lua_State *L)
 	size_t size;
 	const char *str;
 
-	luaL_buffinit(L, &b);
+	RegionGuard region_guard(&fiber->gc);
+	struct tbuf *b = tbuf_new(&fiber->gc);
 
 	struct luaL_field field;
 	double dbl;
 	float flt;
-	uint16_t u16;
-	uint32_t u32;
-	uint64_t u64;
+	char *data;
 	while (*format) {
 		if (i > nargs)
 			luaL_error(L, "box.pack: argument count does not match "
@@ -1369,71 +1385,74 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "box.pack: expected 8-bit int");
 
-			luaL_addchar(&b, field.ival);
+			tbuf_append(b, (char *) &field.ival, sizeof(uint8_t));
 			break;
 		case 'S':
 		case 's':
 			/* signed and unsigned 16-bit integers */
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "box.pack: expected 16-bit int");
-			luaL_addlstring(&b, (const char *) &field.ival,
-					sizeof(uint16_t));
+
+			tbuf_append(b, (char *) &field.ival, sizeof(uint16_t));
 			break;
 		case 'n':
 			/* signed and unsigned 16-bit big endian integers */
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "box.pack: expected 16-bit int");
-			u16 = htons( (uint16_t) field.ival );
-			luaL_addlstring(&b, (char *)&u16, sizeof(u16));
+
+			field.ival = (uint16_t) htons((uint16_t) field.ival);
+			tbuf_append(b, (char *) &field.ival, sizeof(uint16_t));
 			break;
 		case 'I':
 		case 'i':
 			/* signed and unsigned 32-bit integers */
 			if (field.type != MP_UINT && field.ival != MP_INT)
 				luaL_error(L, "box.pack: expected 32-bit int");
-			luaL_addlstring(&b, (const char *) &field.ival,
-					sizeof(uint32_t));
+
+			tbuf_append(b, (char *) &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
 			if (field.type != MP_UINT && field.ival != MP_INT)
 				luaL_error(L, "box.pack: expected 32-bit int");
-			u32 = htonl( field.ival );
-			luaL_addlstring(&b, (char *)&u32, sizeof(uint32_t));
+
+			field.ival = htonl(field.ival);
+			tbuf_append(b, (char *) &field.ival, sizeof(uint32_t));
 			break;
 		case 'L':
 		case 'l':
 			/* signed and unsigned 64-bit integers */
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "box.pack: expected 64-bit int");
-			luaL_addlstring(&b, (const char *) &field.ival,
-					sizeof(uint64_t));
+
+			tbuf_append(b, (char *) &field.ival, sizeof(uint64_t));
 			break;
 		case 'Q':
 		case 'q':
 			/* signed and unsigned 64-bit integers */
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "box.pack: expected 64-bit int");
-			u64 = bswap_u64(field.ival);
-			luaL_addlstring(&b, (char *)&u64, sizeof(u64));
+
+			field.ival = bswap_u64(field.ival);
+			tbuf_append(b, (char *) &field.ival, sizeof(uint64_t));
 			break;
 		case 'd':
 			dbl = (double) lua_tonumber(L, i);
-			luaL_addlstring(&b, (char *) &dbl, sizeof(dbl));
+			tbuf_append(b, (char *) &dbl, sizeof(double));
 			break;
 		case 'f':
 			flt = (float) lua_tonumber(L, i);
-			luaL_addlstring(&b, (char *) &flt, sizeof(flt));
+			tbuf_append(b, (char *) &flt, sizeof(float));
 			break;
 		case 'A':
 		case 'a':
 			/* A sequence of bytes */
 			str = luaL_checklstring(L, i, &size);
-			luaL_addlstring(&b, str, size);
+			tbuf_append(b, str, size);
 			break;
 		case 'P':
 		case 'p':
-			luamp_encode(L, &b, i);
+			luamp_encode(L, b, i);
 			break;
 		case 'V':
 		{
@@ -1441,10 +1460,9 @@ lbox_pack(struct lua_State *L)
 			if (i + arg_count > nargs)
 				luaL_error(L, "box.pack: argument count does not match "
 					   "the format");
-
 			int first = i + 1;
 			int last = i + arg_count;
-			i += luamp_encodestack(L, &b, first, last);
+			i += luamp_encodestack(L, b, first, last);
 			break;
 		}
 		case '=':
@@ -1464,14 +1482,17 @@ lbox_pack(struct lua_State *L)
 		case '#':
 			/* delete field */
 		case '!':
-		{
 			/* insert field */
 			/* field no */
-			uint32_t u32buf = (uint32_t) lua_tointeger(L, i);
-			luaL_addlstring(&b, (char *) &u32buf, sizeof(uint32_t));
-			luaL_addchar(&b, format_to_opcode(*format));
+			tbuf_ensure(b, sizeof(uint32_t) + 1);
+			data = b->data + b->size;
+
+			data = pack_u32(data, lua_tointeger(L, i));
+			*data++ = format_to_opcode(*format);
+
+			assert(data <= b->data + b->capacity);
+			b->size = data - b->data;
 			break;
-		}
 		default:
 			luaL_error(L, "box.pack: unsupported pack "
 				   "format specifier '%c'", *format);
@@ -1479,7 +1500,9 @@ lbox_pack(struct lua_State *L)
 		i++;
 		format++;
 	}
-	luaL_pushresult(&b);
+
+	lua_pushlstring(L, tbuf_str(b), b->size);
+
 	return 1;
 }
 

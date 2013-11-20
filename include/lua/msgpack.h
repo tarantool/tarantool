@@ -37,45 +37,46 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <lua.h>
-#include <lauxlib.h> /* luaL_Buffer */
 
 enum { LUA_MP_MAXNESTING = 16 }; /* Max nesting levels. */
 
-void
-luamp_encode_array(luaL_Buffer *buf, uint32_t size);
+struct tbuf;
 
 void
-luamp_encode_map(luaL_Buffer *buf, uint32_t size);
+luamp_encode_array(struct tbuf *buf, uint32_t size);
 
 void
-luamp_encode_uint(luaL_Buffer *buf, uint64_t num);
+luamp_encode_map(struct tbuf *buf, uint32_t size);
 
 void
-luamp_encode_int(luaL_Buffer *buf, int64_t num);
+luamp_encode_uint(struct tbuf *buf, uint64_t num);
 
 void
-luamp_encode_float(luaL_Buffer *buf, float num);
+luamp_encode_int(struct tbuf *buf, int64_t num);
 
 void
-luamp_encode_double(luaL_Buffer *buf, double num);
+luamp_encode_float(struct tbuf *buf, float num);
 
 void
-luamp_encode_str(luaL_Buffer *buf, const char *str, uint32_t len);
+luamp_encode_double(struct tbuf *buf, double num);
 
 void
-luamp_encode_nil(luaL_Buffer *buf);
+luamp_encode_str(struct tbuf *buf, const char *str, uint32_t len);
 
 void
-luamp_encode_bool(luaL_Buffer *buf, bool val);
+luamp_encode_nil(struct tbuf *buf);
 
 void
-luamp_encode(struct lua_State *L, luaL_Buffer *b, int index);
+luamp_encode_bool(struct tbuf *buf, bool val);
+
+void
+luamp_encode(struct lua_State *L, struct tbuf *buf, int index);
 
 void
 luamp_decode(struct lua_State *L, const char **data);
 
 typedef void
-(*luamp_encode_extension_f)(struct lua_State *, int, luaL_Buffer *);
+(*luamp_encode_extension_f)(struct lua_State *, int, struct tbuf *);
 
 /**
  * @brief Set a callback that executed by encoder on unsupported Lua type

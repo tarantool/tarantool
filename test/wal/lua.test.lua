@@ -30,3 +30,30 @@ space:truncate()
 for i = 1, 100000, 1 do space:insert(tostring(i),i) end
 local t1 = {space:select(1)}
 space:drop()
+
+
+--
+-- A test case for https://github.com/tarantool/tarantool/issues/65
+-- Space does not exist error on repetitive access to space 0 in Lua
+--
+box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+
+--# setopt delimiter ';'
+
+function mktuple(n)
+    local fields = { [n] = n }
+    for i = 1,n do
+        fields[i] = i
+    end
+    local t = space:replace(fields)
+    assert(t[0] == 1, "tuple check")
+    assert(t[n-1] == n, "tuple check")
+    return string.format("count %u len %u", #t, t:bsize())
+end
+;
+
+--# setopt delimiter ''
+
+mktuple(5000)
+mktuple(100000)
