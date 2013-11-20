@@ -694,3 +694,13 @@ exec sql "call box.dostring('box.raise(33333, \"Hey!\")')"
 exec admin "lua t=box.tuple.new({'a','b','c'})"
 exec admin "lua t:unpack(5)"
 exec admin "lua t:unpack(1, 2, 3, 4, 5)"
+
+
+#
+# A test case for #122 box.pack('p', t) segfault on recursive tables
+#
+
+exec admin "lua t = {1, 2, 3}"
+exec admin "lua table.insert(t, t)"
+exec admin "lua #box.pack('p', t)"
+exec admin "lua #box.pack('V', 1, t)"

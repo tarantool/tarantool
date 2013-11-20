@@ -1382,8 +1382,14 @@ static char opcode_to_format(char opcode)
 	}
 }
 
+enum { BOX_PACK_MAXNESTING = 16 }; /* Max nesting levels. */
+
+/*
+ * This function is recursive. \a level param is needed to control
+ * the maximum recursion level.
+ */
 static int
-luaL_packsize(struct lua_State *L, int index)
+luaL_packsize_r(struct lua_State *L, int index, int level)
 {
 	switch (lua_type(L, index)) {
 	case LUA_TNUMBER:
@@ -1399,11 +1405,14 @@ luaL_packsize(struct lua_State *L, int index)
 	}
 	case LUA_TTABLE:
 	{
+		if (level >= BOX_PACK_MAXNESTING)
+			return 0; /* Limit nested tables */
+
 		int size = 0;
 		lua_pushnil(L);
 		while (lua_next(L, index) != 0) {
 			/* Sic: use absolute index. */
-			size += luaL_packsize(L, lua_gettop(L));
+			size += luaL_packsize_r(L, lua_gettop(L), level++);
 			lua_pop(L, 1);
 		}
 		return size;
@@ -1414,8 +1423,19 @@ luaL_packsize(struct lua_State *L, int index)
 	return 0;
 }
 
+static int
+luaL_packsize(struct lua_State *L, int index)
+{
+	return luaL_packsize_r(L, index, 0);
+}
+
+
+/*
+ * This function is recursive. \a level param is needed to control
+ * the maximum recursion level.
+ */
 static void
-luaL_packvalue(struct lua_State *L, struct tbuf *b, int index)
+luaL_packvalue_r(struct lua_State *L, struct tbuf *b, int index, int level)
 {
 	struct lua_field field;
 	lua_tofield(L, index, &field);
@@ -1438,10 +1458,12 @@ luaL_packvalue(struct lua_State *L, struct tbuf *b, int index)
 	}
 	case LUA_TTABLE:
 	{
+		if (level >= BOX_PACK_MAXNESTING)
+			return; /* Limit nested tables */
 		lua_pushnil(L);
 		while (lua_next(L, index) != 0) {
 			/* Sic: use absolute index. */
-			luaL_packvalue(L, b, lua_gettop(L));
+			luaL_packvalue_r(L, b, lua_gettop(L), level + 1);
 			lua_pop(L, 1);
 		}
 		return;
@@ -1450,6 +1472,12 @@ luaL_packvalue(struct lua_State *L, struct tbuf *b, int index)
 		luaL_error(L, "box.pack: unsupported type");
 		return;
 	}
+}
+
+static void
+luaL_packvalue(struct lua_State *L, struct tbuf *b, int index)
+{
+	return luaL_packvalue_r(L, b, index, 0);
 }
 
 static void
