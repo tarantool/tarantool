@@ -57,9 +57,15 @@ void tc_print_buf(char *buf, size_t size) {
 }
 
 void tc_printf(char *fmt, ...) {
+	char *str;
 	va_list args;
 	va_start(args, fmt);
-	vprintf(fmt, args);
+	ssize_t str_len = vasprintf(&str, fmt, args);
+	if (str_len == -1)
+		tc_error("Error in vasprintf - %d", errno);
+	ssize_t stat = write(tc.pager_fd, str, str_len);
+	if (stat == -1)
+		tc_error("Can't write into pager - %d", errno);
 	va_end(args);
 	return;
 }

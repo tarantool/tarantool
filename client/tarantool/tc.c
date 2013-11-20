@@ -43,6 +43,7 @@
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
+#include "client/tarantool/tc_pager.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
 #include "client/tarantool/tc_store.h"
@@ -57,13 +58,15 @@ struct tc tc;
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
 	setlocale(LC_ALL, "");
+	tc.pager_fd = fileno(stdout);
+	tc.pager_pid = 0;
 }
 
 static void tc_free(void) {
-	if (tc.net) {
+	if (tc.net)
 		tnt_stream_free(tc.net);
-	}
 	tc_admin_close(&tc.admin);
+	tc_pager_kill();
 }
 
 void tc_error(char *fmt, ...) {
