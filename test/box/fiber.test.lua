@@ -99,3 +99,8 @@ box.fiber.find(920)
 space:drop()
 box.fiber.find()
 box.fiber.find('test')
+--  https://github.com/tarantool/tarantool/issues/131
+--  box.fiber.resume(box.fiber.cancel()) -- hang
+f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)
+box.fiber.resume(f)
+f = nil

@@ -288,3 +288,15 @@ box.fiber.find('test')
 ---
 - null
 ...
+--  https://github.com/tarantool/tarantool/issues/131
+--  box.fiber.resume(box.fiber.cancel()) -- hang
+f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)
+---
+...
+box.fiber.resume(f)
+---
+- error: 'fiber.resume(): the child fiber got cancelled'
+...
+f = nil
+---
+...
