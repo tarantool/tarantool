@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
@@ -24,19 +25,20 @@ void tc_pager_start() {
 	const char *const argv[] = {"/bin/bash", "-c", tc.opt.pager, NULL};
 
 	if (pipe(pipefd) < 0)
-		tc_error("Failed to open pipe. Errno: %d", errno);
+		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
 	pid_t pid = fork();
-	if (pid < 0)
-		tc_error("Failed to fork. Errno: %d", errno);
-	if (pid == 0) {
+	if (pid < 0) {
+		tc_error("Failed to fork. Errno: %s", strerror(errno));
+	} else if (pid == 0) {
 		close(pipefd[1]);
 		dup2(pipefd[0], STDIN_FILENO);
 		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
-		tc_error("Can't start pager! Errno: %d", errno);
+		tc_error("Can't start pager! Errno: %s", strerror(errno));
+	} else {
+		close(pipefd[0]);
+		tc.pager_fd = pipefd[1];
+		tc.pager_pid = pid;
 	}
-	close(pipefd[0]);
-	tc.pager_fd = pipefd[1];
-	tc.pager_pid = pid;
 	return;
 }
 

@@ -142,10 +142,10 @@ tc_cmd_usage(void)
 static int tc_cli_admin(char *cmd, int exit) {
 	char *e = NULL;
 	tc_query_admin_t cb = (exit) ? NULL : tc_query_admin_printer;
-	tc_pager_start();
+	if (!exit) tc_pager_start();
 	if (tc_query_admin(cmd, cb, &e) == -1)
 		return tc_cli_error(e);
-	tc_pager_stop();
+	if (!exit) tc_pager_stop();
 	return 0;
 }
 
@@ -163,10 +163,12 @@ tc_cmd_dostring(char *buf, size_t size, int *reconnect)
 		goto error;
 	tnt_tuple_free(&args);
 	char *e = NULL;
+	tc_pager_start();
 	if (tc_query_foreach(tc_query_printer, NULL, &e) == -1) {
 		*reconnect = tc_cli_error(e);
 		return -1;
 	}
+	tc_pager_stop();
 	return 0;
 error:
 	tc_printf("error: %s\n", tnt_strerror(tc.net));
@@ -419,7 +421,8 @@ int tc_cli(void)
 
 	/* setting prompt */
 	char prompt[128];
-	int prompt_len = snprintf(prompt, sizeof(prompt), "%s> ", tc.opt.host) - 2;
+	int prompt_len = snprintf(prompt, sizeof(prompt),
+				  "%s> ", tc.opt.host) - 2;
 	char prompt_delim[128];
 	/* interactive mode */
 	char *part_cmd;
@@ -431,8 +434,9 @@ int tc_cli(void)
 		if (isatty(STDIN_FILENO)) {
 			snprintf(prompt_delim, sizeof(prompt_delim),
 				 "%*s> ", prompt_len, "-");
-			part_cmd = readline(!tc_buf_str_isempty(&cmd) ? prompt_delim
-							   : prompt);
+			part_cmd = readline(!tc_buf_str_isempty(&cmd) ?
+					    prompt_delim :
+					    prompt);
 		} else {
 			clearerr(stdin);
 			part_cmd = tc_cli_readline_pipe();
