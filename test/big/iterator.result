@@ -910,6 +910,14 @@ lua box.space[20].index[0]:iterator(-666)
 ---
 error: 'unknown iterator type: -666'
 ...
+lua box.space[20].index[0]:iterator(box.index.EQ, {})
+---
+error: 'unsupported Lua type ''table'''
+...
+lua box.space[20].index[0]:iterator(box.index.EQ, function() end)
+---
+error: 'unsupported Lua type ''function'''
+...
 lua box.space[20]:truncate()
 ---
 ...

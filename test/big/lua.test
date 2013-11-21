@@ -132,6 +132,9 @@ exec admin "lua box.space[17].index[1]:count(3)"
 exec admin "lua box.space[17].index[1]:count(3, 3)"
 exec admin "lua box.space[17].index[1]:count()"
 exec admin "lua box.space[17]:truncate()"
+# Test cases for #123: box.index.count does not check arguments properly
+exec admin "lua box.space[17].index[1]:count({})"
+exec admin "lua box.space[17].index[1]:count(function() end)"
 
 #
 # Tests for lua box.auto_increment
@@ -174,6 +177,7 @@ exec admin "lua t:transform(-100, 1)"
 exec admin "lua t:transform(0, 3, 1, 2, 3)"
 exec admin "lua t:transform(3, 1, tonumber64(4))"
 exec admin "lua t:transform(0, 1, {})"
+exec admin "lua t:transform(0, 1, function() end)"
 
 #
 # Tests for OPENTAR-64 - a limitation for the second argument to tuple:transform
