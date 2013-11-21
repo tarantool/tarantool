@@ -222,10 +222,11 @@ static const struct luaL_reg boxlib[] = {
  * An attached fiber is a child of the creator,
  * and is running only if the creator has called
  * box.fiber.resume(). A detached fiber is a child of
- * Tarntool/Box internal 'sched' fiber, and is gets
+ * Tarntool/Box internal 'sched' fiber, and gets
  * scheduled only if there is a libev event associated
  * with it.
- * To detach, a running fiber must invoke box.fiber.detach().
+ * To detach itself, a running fiber must invoke
+ * box.fiber.detach().
  * A detached fiber loses connection with its parent
  * forever.
  *
@@ -294,7 +295,9 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 {
 	/*
 	 * Use 'memoize'  pattern and keep a single userdata for
-	 * the given fiber.
+	 * the given fiber. This is important to not run __gc
+	 * twice for a copy of an attached fiber -- __gc should
+	 * not remove attached fiber's coro prematurely.
 	 */
 	luaL_getmetatable(L, fiberlib_name);
 	int top = lua_gettop(L);
@@ -307,22 +310,22 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 		lbox_create_weak_table(L, "memoize");
 	}
 	/* Find out whether the fiber is  already in the memoize table. */
-	lua_pushlightuserdata(L, f);
+	lua_pushinteger(L, f->fid);
 	lua_gettable(L, -2);
 	if (lua_isnil(L, -1)) {
 		/* no userdata for fiber created so far */
 		/* pop the nil */
 		lua_pop(L, 1);
 		/* push the key back */
-		lua_pushlightuserdata(L, f);
+		lua_pushinteger(L, f->fid);
 		/* create a new userdata */
-		void **ptr = (void **) lua_newuserdata(L, sizeof(void *));
-		*ptr = f;
+		int *ptr = (int *) lua_newuserdata(L, sizeof(int));
+		*ptr = f->fid;
 		luaL_getmetatable(L, fiberlib_name);
 		lua_setmetatable(L, -2);
 		/* memoize it */
 		lua_settable(L, -3);
-		lua_pushlightuserdata(L, f);
+		lua_pushinteger(L, f->fid);
 		/* get it back */
 		lua_gettable(L, -2);
 	}
@@ -340,18 +343,22 @@ lbox_pushfiber(struct lua_State *L, struct fiber *f)
 static struct fiber *
 lbox_checkfiber(struct lua_State *L, int index)
 {
-	return *(struct fiber **) luaL_checkudata(L, index, fiberlib_name);
+	uint32_t fid = *(uint32_t *) luaL_checkudata(L, index, fiberlib_name);
+	struct fiber *f = fiber_find(fid);
+	if (f == NULL)
+		luaL_error(L, "fiber.resume(): the fiber is dead");
+	return f;
 }
 
 static struct fiber *
-lua_isfiber(struct lua_State *L, int narg)
+lbox_isfiber(struct lua_State *L, int narg)
 {
 	if (lua_getmetatable(L, narg) == 0)
 		return NULL;
 	luaL_getmetatable(L, fiberlib_name);
 	struct fiber *f = NULL;
 	if (lua_equal(L, -1, -2))
-		f = * (struct fiber **) lua_touserdata(L, narg);
+		f = fiber_find(* (int *) lua_touserdata(L, narg));
 	lua_pop(L, 2);
 	return f;
 }
@@ -403,12 +410,11 @@ box_lua_fiber_push_caller(struct lua_State *child_L)
 		lbox_create_weak_table(child_L, "callers");
 	}
 	lua_pushthread(child_L);
-	lua_pushlightuserdata(child_L, fiber);
+	lua_pushinteger(child_L, fiber->fid);
 	lua_settable(child_L, -3);
 	/* Pop the fiberlib metatable and callers table. */
 	lua_pop(child_L, 2);
 }
-
 
 static struct fiber *
 box_lua_fiber_get_caller(struct lua_State *L)
@@ -417,7 +423,7 @@ box_lua_fiber_get_caller(struct lua_State *L)
 	lua_getfield(L, -1, "callers");
 	lua_pushthread(L);
 	lua_gettable(L, -2);
-	struct fiber *caller = (struct fiber *) lua_touserdata(L, -1);
+	struct fiber *caller = fiber_find(lua_tointeger(L, -1));
 	/* Pop the caller, the callers table, the fiberlib metatable. */
 	lua_pop(L, 3);
 	return caller;
@@ -426,7 +432,11 @@ box_lua_fiber_get_caller(struct lua_State *L)
 static int
 lbox_fiber_gc(struct lua_State *L)
 {
-	struct fiber *f = lbox_checkfiber(L, 1);
+	if (lua_gettop(L) == 0)
+		return 0;
+	struct fiber *f = lbox_isfiber(L, 1);
+	if (f == NULL)
+		return 0;
 	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
 	/*
 	 * A non-NULL coro is an indicator of a 1) alive,
@@ -516,7 +526,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		lua_insert(L, 1);
 
 		cleanup();
-	} catch (const FiberCancelException& e) {
+	} catch (const FiberCancelException &e) {
 		if (box_lua_fiber_get_coro(L, fiber)) {
 			struct fiber *caller = box_lua_fiber_get_caller(L);
 			fiber_wakeup(caller);
@@ -531,7 +541,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 
 		cleanup();
 		throw;
-	} catch (const Exception& e) {
+	} catch (const Exception &e) {
 		/* pop any possible garbage */
 		lua_settop(L, 0);
 		/* completion status */
@@ -539,11 +549,8 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		/* error message */
 		lua_pushstring(L, e.errmsg());
 
-		if (box_lua_fiber_get_coro(tarantool_L, fiber) == NULL) {
-			/* The fiber is detached, log the error. */
-			e.log();
-		}
-
+		/* Always log the error. */
+		e.log();
 		cleanup();
 	} catch (...) {
 		lua_settop(L, 1);
@@ -553,12 +560,8 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		 */
 		lua_pushboolean(L, false);
 		lua_insert(L, -2);
-		if (box_lua_fiber_get_coro(tarantool_L, fiber) == NULL &&
-		    lua_tostring(L, -1) != NULL) {
-
-			/* The fiber is detached, log the error. */
-			say_error("%s", lua_tostring(L, -1));
-		}
+		/* Always log the error. */
+		say_error("%s", lua_tostring(L, -1));
 
 		cleanup();
 	}
@@ -620,8 +623,6 @@ static int
 lbox_fiber_resume(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	if (f->fid == 0)
-		luaL_error(L, "fiber.resume(): the fiber is dead");
 	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
 	if (child_L == NULL)
 		luaL_error(L, "fiber.resume(): can't resume a "
@@ -748,14 +749,16 @@ lbox_fiber_yield(struct lua_State *L)
 	 * whatever arguments are taken.
 	 */
 	fiber_setcancellable(true);
-	if (box_lua_fiber_get_coro(L, fiber) == NULL) {
+	struct lua_State *coro_L;
+	struct fiber *caller;
+	if ((coro_L = box_lua_fiber_get_coro(L, fiber)) &&
+	     (caller = box_lua_fiber_get_caller(coro_L))) {
+		lua_pushinteger(L, YIELD);
+		fiber_yield_to(caller);
+	} else {
 		fiber_wakeup(fiber);
 		fiber_yield();
 		fiber_testcancel();
-	} else {
-		struct fiber *caller = box_lua_fiber_get_caller(L);
-		lua_pushinteger(L, YIELD);
-		fiber_yield_to(caller);
 	}
 	fiber_setcancellable(false);
 	/*
@@ -768,7 +771,8 @@ lbox_fiber_yield(struct lua_State *L)
 }
 
 static bool
-fiber_is_caller(struct lua_State *L, struct fiber *f) {
+fiber_is_caller(struct lua_State *L, struct fiber *f)
+{
 	struct fiber *child = fiber;
 	while ((L = box_lua_fiber_get_coro(L, child)) != NULL) {
 		struct fiber *caller = box_lua_fiber_get_caller(L);
@@ -794,9 +798,16 @@ fiber_is_caller(struct lua_State *L, struct fiber *f) {
 static int
 lbox_fiber_status(struct lua_State *L)
 {
-	struct fiber *f = lua_gettop(L) ? lbox_checkfiber(L, 1) : fiber;
+	struct fiber *f;
+	if (lua_gettop(L)) {
+		uint32_t fid = *(uint32_t *)
+			luaL_checkudata(L, 1, fiberlib_name);
+		f = fiber_find(fid);
+	} else {
+		f = fiber;
+	}
 	const char *status;
-	if (f->fid == 0) {
+	if (f == NULL || f->fid == 0) {
 		/* This fiber is dead. */
 		status = "dead";
 	} else if (f == fiber) {
@@ -823,7 +834,7 @@ lbox_fiber_name(struct lua_State *L)
 {
 	struct fiber *f = fiber;
 	int name_index = 1;
-	if (lua_gettop(L) >= 1 && lua_isfiber(L, 1)) {
+	if (lua_gettop(L) >= 1 && lbox_isfiber(L, 1)) {
 		f = lbox_checkfiber(L, 1);
 		name_index = 2;
 	}

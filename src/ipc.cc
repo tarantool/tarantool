@@ -247,7 +247,7 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 	}
 
 	unsigned cnt = 0;
-	while(!rlist_empty(&ch->readers)) {
+	while (!rlist_empty(&ch->readers)) {
 		f = rlist_first_entry(&ch->readers, struct fiber, state);
 
 		ch->bcast_msg = data;
