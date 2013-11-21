@@ -83,3 +83,8 @@ exec admin "lua box.space[0]:truncate()"
 # https://github.com/tarantool/tarantool/issues/33
 exec admin "lua box.fiber.find()"
 exec admin "lua box.fiber.find('test')"
+# https://github.com/tarantool/tarantool/issues/131
+# box.fiber.resume(box.fiber.cancel()) -- hang
+exec admin "lua f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)"
+exec admin "lua box.fiber.resume(f)"
+exec admin "lua f = nil"

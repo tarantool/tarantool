@@ -517,6 +517,10 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 
 		cleanup();
 	} catch (const FiberCancelException& e) {
+		if (box_lua_fiber_get_coro(L, fiber)) {
+			struct fiber *caller = box_lua_fiber_get_caller(L);
+			fiber_wakeup(caller);
+		}
 		box_lua_fiber_clear_coro(tarantool_L, fiber);
 		/*
 		 * Note: FiberCancelException leaves garbage on
@@ -638,14 +642,17 @@ lbox_fiber_resume(struct lua_State *L)
 	 */
 	fiber_yield_to(f);
 	/*
-	 * The called fiber could have done only 3 things:
+	 * The called fiber could have done 4 things:
 	 * - yielded to us (then we should grab its return)
 	 * - completed (grab return values, wake up the fiber,
 	 *   so that it can die)
 	 * - detached (grab return values, wakeup the fiber so it
 	 *   can continue).
+	 * - got cancelled (return)
 	 */
-	assert(f->fid == fid);
+	if (f->fid != fid)
+		luaL_error(L, "fiber.resume(): the child fiber got cancelled");
+
 	tarantool_lua_set_out(child_L, NULL);
 	/* Find out the state of the child fiber. */
 	enum fiber_state child_state = (enum fiber_state) lua_tointeger(child_L, -1);
