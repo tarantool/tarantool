@@ -63,6 +63,7 @@ struct tc_opt {
 	const char *file;
 	char **cmdv;
 	int cmdc;
+	char **envp;
 	const char *delim;
 	size_t delim_len;
 	const char *pager;
@@ -72,6 +73,6 @@ void tc_opt_usage(void);
 void tc_opt_version(void);
 
 enum tc_opt_mode
-tc_opt_init(struct tc_opt *opt, int argc, char **argv);
+tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp);
 
 #endif /* TC_OPT_H_INCLUDED */

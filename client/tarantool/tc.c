@@ -140,12 +140,12 @@ static void tc_validate(void)
 		tc.opt.raw = 1;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[], char *envp[])
 {
 	tc_init();
 
 	int rc = 0;
-	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv);
+	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv, envp);
 	tc_validate();
 	switch (mode) {
 	case TC_OPT_USAGE:

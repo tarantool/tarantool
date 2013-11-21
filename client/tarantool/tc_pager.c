@@ -20,11 +20,8 @@ void tc_pager_start() {
 		tc.pager_fd = fileno(stdout);
 		return;
 	}
-	char cmd[] = {"/bin/bash"};
-	char args[] = {"-c"};
 	int pipefd[2];
-	const char *const argv[] = {cmd, args, tc.opt.pager, NULL};
-
+	const char *const argv[] = {"/bin/bash", "-c", tc.opt.pager, NULL};
 
 	if (pipe(pipefd) < 0)
 		tc_error("Failed to open pipe. Errno: %d", errno);
@@ -34,7 +31,7 @@ void tc_pager_start() {
 	if (pid == 0) {
 		close(pipefd[1]);
 		dup2(pipefd[0], STDIN_FILENO);
-		execve(argv[0], (char * const*)argv, NULL);
+		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
 		tc_error("Can't start pager! Errno: %d", errno);
 	}
 	close(pipefd[0]);

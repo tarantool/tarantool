@@ -93,7 +93,7 @@ void tc_opt_version(void)
 	exit(0);
 }
 
-enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
+enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 {
 	/* usage */
 	void *tc_options = gopt_sort(&argc, (const char**)argv, tc_options_def);
@@ -197,6 +197,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 		opt->mode = TC_OPT_INTERACTIVE;
 	}
 	opt->pager = NULL;
+	opt->envp  = envp;
 done:
 	gopt_free(tc_options);
 	return opt->mode;
