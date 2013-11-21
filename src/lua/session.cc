@@ -40,7 +40,6 @@ extern "C" {
 #include "sio.h"
 
 static const char *sessionlib_name = "box.session";
-static int session_ref = 0;
 extern lua_State *root_L;
 
 /**
@@ -182,47 +181,22 @@ lbox_session_on_disconnect(struct lua_State *L)
 void
 session_storage_cleanup(int sid)
 {
-	assert(session_ref != 0);
-	lua_rawgeti(root_L, LUA_REGISTRYINDEX, session_ref);
+	lua_pushliteral(root_L, "box");
+	lua_rawget(root_L, LUA_GLOBALSINDEX);
+
+	lua_pushliteral(root_L, "session");
+	lua_rawget(root_L, -2);
+
+	lua_getmetatable(root_L, -1);
+
+	lua_pushliteral(root_L, "aggregate_storage");
+	lua_rawget(root_L, -2);
+
 	lua_pushnil(root_L);
 	lua_rawseti(root_L, -2, sid);
-	lua_pop(root_L, 1);
+	lua_pop(root_L, 4);
 }
 
-static int
-lbox_session_index(struct lua_State *L)
-{
-	if (lua_gettop(L) < 2)
-		return 0;
-	if (lua_isstring(L, 2) && strcmp(lua_tostring(L, 2), "storage") == 0) {
-		if (!fiber->sid)
-			return 0;
-
-		assert(session_ref != 0);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, session_ref);
-
-		lua_rawgeti(L, -1, fiber->sid);
-
-		/* create session.storage on-demand */
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);			/* nil */
-			lua_newtable(L);		/* new storage */
-			lua_pushvalue(L, -1);		/* ref to storage */
-			lua_rawseti(L, -3, fiber->sid);
-		}
-		lua_remove(L, -2);			/* storages storage */
-		return 1;
-	}
-	return 0;
-}
-
-static int
-lbox_session_storages(struct lua_State *L)
-{
-	assert(session_ref != 0);
-	lua_rawgeti(L, LUA_REGISTRYINDEX, session_ref);
-	return 1;
-}
 
 void
 tarantool_lua_session_init(struct lua_State *L)
@@ -234,24 +208,10 @@ tarantool_lua_session_init(struct lua_State *L)
                 {"on_connect", lbox_session_on_connect},
                 {"on_disconnect", lbox_session_on_disconnect},
 
-                /* only for testcase */
-                {"storages", lbox_session_storages},
                 {NULL, NULL}
         };
 
 
 	luaL_register(L, sessionlib_name, sessionlib);
-
-	lua_newtable(L);
-	lua_pushliteral(L, "__index");
-	lua_pushcfunction(L, lbox_session_index);
-	lua_rawset(L, -3);
-	lua_setmetatable(L, -2);
-
 	lua_pop(L, 1);
-
-
-	/* all lua sessions storage */
-	lua_newtable(L);
-	session_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }

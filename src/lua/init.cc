@@ -77,7 +77,8 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[];
-static const char *lua_sources[] = { uuid_lua, NULL };
+extern char storage_lua[];
+static const char *lua_sources[] = { uuid_lua, storage_lua, NULL };
 
 /**
  * Remember the output of the administrative console in the

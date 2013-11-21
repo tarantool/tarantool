@@ -11,6 +11,8 @@ exec admin "lua type(box.session.storage)"
 exec admin "lua box.session.storage.abc = 'cde'"
 exec admin "lua box.session.storage.abc"
 
+exec admin "lua all = getmetatable(box.session).aggregate_storage"
+
 
 
 con1 = AdminConnection('localhost', server.admin_port)
@@ -19,15 +21,15 @@ exec con1  "lua type(box.session.storage.abc)"
 exec con1  "lua box.session.storage.abc = 'def'"
 exec con1  "lua box.session.storage.abc"
 exec admin "lua box.session.storage.abc"
-exec con1  "lua dump(box.session.storages()[box.session.id()])"
-exec admin "lua dump(box.session.storages()[box.session.id()])"
+exec con1  "lua dump(all[box.session.id()])"
+exec admin "lua dump(all[box.session.id()])"
 exec admin "lua tres1 = {}"
 exec admin "lua tres2 = {}"
-exec admin "lua for k,v in pairs(box.session.storages()) do table.insert(tres1, v.abc) end"
+exec admin "lua for k,v in pairs(all) do table.insert(tres1, v.abc) end"
 con1.disconnect()
 # to call session cleanup
 exec admin "lua box.fiber.sleep(.01)"
-exec admin "lua for k,v in pairs(box.session.storages()) do table.insert(tres2, v.abc) end"
+exec admin "lua for k,v in pairs(all) do table.insert(tres2, v.abc) end"
 
 exec admin "lua table.sort(tres1)"
 exec admin "lua table.sort(tres2)"

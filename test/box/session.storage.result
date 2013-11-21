@@ -20,6 +20,9 @@ lua box.session.storage.abc
 ---
  - cde
 ...
+lua all = getmetatable(box.session).aggregate_storage
+---
+...
 lua type(box.session.storage)
 ---
  - table
@@ -39,11 +42,11 @@ lua box.session.storage.abc
 ---
  - cde
 ...
-lua dump(box.session.storages()[box.session.id()])
+lua dump(all[box.session.id()])
 ---
  - '{"abc":"def"}'
 ...
-lua dump(box.session.storages()[box.session.id()])
+lua dump(all[box.session.id()])
 ---
  - '{"abc":"cde"}'
 ...
@@ -53,13 +56,13 @@ lua tres1 = {}
 lua tres2 = {}
 ---
 ...
-lua for k,v in pairs(box.session.storages()) do table.insert(tres1, v.abc) end
+lua for k,v in pairs(all) do table.insert(tres1, v.abc) end
 ---
 ...
 lua box.fiber.sleep(.01)
 ---
 ...
-lua for k,v in pairs(box.session.storages()) do table.insert(tres2, v.abc) end
+lua for k,v in pairs(all) do table.insert(tres2, v.abc) end
 ---
 ...
 lua table.sort(tres1)
