@@ -948,6 +948,11 @@ space.index[0]:iterator(-666)
 ---
 - error: 'unknown iterator type: -666'
 ...
+-- Test cases for #123: box.index.count does not check arguments properly
+space.index[0]:iterator(box.index.EQ, function() end)
+---
+- error: 'msgpack.encode: can not encode Lua type ''function'''
+...
 space:drop()
 ---
 ...

@@ -568,6 +568,11 @@ space.index[1]:count()
 ---
 - 6
 ...
+-- Test cases for #123: box.index.count does not check arguments properly
+space.index[1]:count(function() end)
+---
+- error: 'msgpack.encode: can not encode Lua type ''function'''
+...
 space:drop()
 ---
 ...

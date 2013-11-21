@@ -38,6 +38,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <lua.h>
+#include <lauxlib.h> /* luaL_error */
 
 /* TODO: add autodetection */
 #if !defined(LUAJIT)
@@ -151,6 +152,23 @@ struct luaL_field {
  */
 void
 luaL_tofield(struct lua_State *L, int index, struct luaL_field *field);
+
+/**
+ * @brief A wrapper for luaL_tofield that raises an error if Lua type can not
+ * be converted to luaL_field structure
+ * @param L stack
+ * @param index stack index
+ * @param field conversion result
+ * @sa lua_tofield()
+ */
+static inline void
+luaL_checkfield(lua_State *L, int i, struct luaL_field *field)
+{
+	luaL_tofield(L, i, field);
+	if (field->type == MP_EXT)
+		luaL_error(L, "unsupported Lua type '%s'",
+			   lua_typename(L, lua_type(L, i)));
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

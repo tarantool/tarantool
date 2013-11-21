@@ -195,6 +195,8 @@ space.index[1]:count(3, 3)
 -- Returns total number of records
 -- https://github.com/tarantool/tarantool/issues/46
 space.index[1]:count()
+-- Test cases for #123: box.index.count does not check arguments properly
+space.index[1]:count(function() end)
 space:drop()
 
 --

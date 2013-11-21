@@ -375,7 +375,7 @@ lbox_tuple_find_do(struct lua_State *L, bool all)
 	int idx = offset;
 
 	struct luaL_field arg;
-	luaL_tofield(L, 2, &arg);
+	luaL_checkfield(L, 2, &arg);
 	struct tuple_iterator it;
 	tuple_rewind(&it, tuple);
 	const char *field = tuple_seek(&it, idx);

@@ -168,5 +168,6 @@ iterate(space.n, 2, 1, 3, box.index.GE, 'sid_005', 'tid_999')
 -------------------------------------------------------------------------------
 
 space.index[0]:iterator(-666)
-
+-- Test cases for #123: box.index.count does not check arguments properly
+space.index[0]:iterator(box.index.EQ, function() end)
 space:drop()
