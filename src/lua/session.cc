@@ -176,8 +176,6 @@ lbox_session_on_disconnect(struct lua_State *L)
 	return lbox_session_set_trigger(L, &on_disconnect);
 }
 
-
-
 void
 session_storage_cleanup(int sid)
 {
@@ -198,7 +196,6 @@ session_storage_cleanup(int sid)
 
 	lua_settop(root_L, top);
 }
-
 
 static const struct luaL_reg sessionlib[] = {
 	{"id", lbox_session_id},

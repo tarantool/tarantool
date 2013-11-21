@@ -13,8 +13,6 @@ exec admin "lua box.session.storage.abc"
 
 exec admin "lua all = getmetatable(box.session).aggregate_storage"
 
-
-
 con1 = AdminConnection('localhost', server.admin_port)
 exec con1  "lua type(box.session.storage)"
 exec con1  "lua type(box.session.storage.abc)"

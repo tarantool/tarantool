@@ -1,4 +1,4 @@
--- session-storage.lua
+-- box.session.lua
 
 setmetatable(box.session, {
     __index = function(tbl, idx)
