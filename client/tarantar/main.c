@@ -36,11 +36,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
+#include <limits.h>
 #ifdef __linux__
 #  include <malloc.h>
-#  include <linux/limits.h>
-#else
-#  define PATH_MAX 4096
 #endif
 
 #include <connector/c/include/tarantool/tnt.h>
