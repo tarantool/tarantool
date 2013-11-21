@@ -2265,3 +2265,12 @@ t:unpack(1, 2, 3, 4, 5)
 - b
 - c
 ...
+box.tuple.new({1, 2, 3}):totable()
+---
+- [1, 2, 3]
+...
+getmetatable(box.tuple.new({1, 2, 3}):totable())
+---
+- _serializer_type: array
+  _serializer_compact: true
+...

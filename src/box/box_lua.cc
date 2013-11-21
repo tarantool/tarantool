@@ -90,6 +90,7 @@ static lua_State *root_L;
 
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
+static int tuple_totable_mt_ref = 0; /* a precreated metable for totable() */
 
 static void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
@@ -465,10 +466,8 @@ lbox_tuple_totable(struct lua_State *L)
 	}
 
 	/* Hint serializer */
-	lua_newtable(L);
-	lua_pushstring(L, "_serializer_compact");
-	lua_pushboolean(L, true);
-	lua_settable(L, -3);
+	assert(tuple_totable_mt_ref != 0);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, tuple_totable_mt_ref);
 	lua_setmetatable(L, -2);
 
 	return 1;
@@ -1756,9 +1755,22 @@ mod_lua_init(struct lua_State *L)
 			      *s, lua_tostring(L, -1));
 	}
 
-	assert(lua_gettop(L) == 0);
-
 	luamp_set_encode_extension(luamp_encode_extension_box);
+
+
+
+	/* Precreate a metatable for tuple_unpack */
+	lua_newtable(L);
+	lua_pushstring(L, "_serializer_compact");
+	lua_pushboolean(L, true);
+	lua_settable(L, -3);
+	lua_pushstring(L, "_serializer_type");
+	lua_pushstring(L, "array");
+	lua_settable(L, -3);
+	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	assert(tuple_totable_mt_ref != 0);
+
+	assert(lua_gettop(L) == 0);
 
 	root_L = L;
 }

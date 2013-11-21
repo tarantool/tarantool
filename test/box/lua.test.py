@@ -751,4 +751,10 @@ admin("t=box.tuple.new({'a','b','c'})")
 admin("t:unpack(5)")
 admin("t:unpack(1, 2, 3, 4, 5)")
 
+#
+# Check that tuple:totable correctly sets serializer hints
+#
+admin("box.tuple.new({1, 2, 3}):totable()")
+admin("getmetatable(box.tuple.new({1, 2, 3}):totable())")
+
 sys.stdout.clear_all_filters()
