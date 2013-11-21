@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  * 
  * Portions of this software were inspired by Perl's YAML::LibYAML module by 
- * Ingy d�t Net <ingy@cpan.org>
+ * Ingy döt Net <ingy@cpan.org>
  * 
  */
 
