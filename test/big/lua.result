@@ -365,6 +365,14 @@ error: 'index.count(): one or more arguments expected'
 lua box.space[17]:truncate()
 ---
 ...
+lua box.space[17].index[1]:count({})
+---
+error: 'unsupported Lua type ''table'''
+...
+lua box.space[17].index[1]:count(function() end)
+---
+error: 'unsupported Lua type ''function'''
+...
 lua box.space[18]:truncate()
 ---
 ...
@@ -478,7 +486,11 @@ lua t:transform(3, 1, tonumber64(4))
 ...
 lua t:transform(0, 1, {})
 ---
-error: 'tuple.transform(): unsupported field type ''table'''
+error: 'unsupported Lua type ''table'''
+...
+lua t:transform(0, 1, function() end)
+---
+error: 'unsupported Lua type ''function'''
 ...
 lua n = 50000;
 ---

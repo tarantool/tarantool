@@ -171,4 +171,7 @@ print """
 
 exec admin "lua box.space[20].index[0]:iterator(-666)"
 
+# Test cases for #123: box.index.count does not check arguments properly
+exec admin "lua box.space[20].index[0]:iterator(box.index.EQ, {})"
+exec admin "lua box.space[20].index[0]:iterator(box.index.EQ, function() end)"
 exec admin "lua box.space[20]:truncate()"

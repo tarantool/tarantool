@@ -266,6 +266,23 @@ lua_tofield(lua_State *L, int i, struct lua_field *field)
 }
 
 /**
+ * @brief A wrapper for lua_tofield that raises an error if Lua type can not
+ * be converted to lua_field structure
+ * @param L stack
+ * @param index stack index
+ * @param field conversion result
+ * @sa lua_tofield()
+ */
+static inline void
+lua_checkfield(lua_State *L, int i, struct lua_field *field)
+{
+	lua_tofield(L, i, field);
+	if (unlikely(field->type == UNKNOWN))
+		luaL_error(L, "unsupported Lua type '%s'",
+			   lua_typename(L, lua_type(L, i)));
+}
+
+/**
  * Tuple transforming function.
  *
  * Remove the fields designated by 'offset' and 'len' from an tuple,
@@ -341,13 +358,7 @@ lbox_tuple_transform(struct lua_State *L)
 
 	for (int i = argc ; i > 3; i--) {
 		struct lua_field field;
-		lua_tofield(L, i, &field);
-		if (field.type == UNKNOWN) {
-			return luaL_error(L, "tuple.transform(): "
-					  "unsupported field type '%s'",
-					  lua_typename(L, lua_type(L, i)));
-		}
-
+		lua_checkfield(L, i, &field);
 		tbuf_ensure(b, sizeof(uint32_t) + 1 + 5 + field.len);
 
 		/* offset */
@@ -420,11 +431,7 @@ lbox_tuple_find_do(struct lua_State *L, bool all)
 	}
 
 	struct lua_field field;
-	lua_tofield(L, argc, &field);
-	if (field.type == UNKNOWN)
-		return luaL_error(L, "tuple.find(): unsupported field "
-				  "type: %s",
-				  lua_typename(L, lua_type(L, argc)));
+	lua_checkfield(L, argc, &field);
 
 	return tuple_find(L, tuple, offset, field.data, field.len, all);
 }
@@ -819,7 +826,7 @@ lbox_create_iterator(struct lua_State *L)
 			key_part_count = argc - 2;
 			struct lua_field field;
 			for (uint32_t i = 0; i < key_part_count; i++) {
-				lua_tofield(L, i + 3, &field);
+				lua_checkfield(L, i + 3, &field);
 				tbuf_ensure(b, field.len + 5);
 				char *data = pack_lstr(b->data + b->size,
 							field.data, field.len);
@@ -938,7 +945,7 @@ lbox_index_count(struct lua_State *L)
 		key_part_count = argc;
 		struct lua_field field;
 		for (uint32_t i = 0; i < key_part_count; i++) {
-			lua_tofield(L, i + 2, &field);
+			lua_checkfield(L, i + 2, &field);
 			tbuf_ensure(b, field.len + 5);
 			char *data = pack_lstr(b->data + b->size,
 						field.data, field.len);
