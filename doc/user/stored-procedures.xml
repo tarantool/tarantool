@@ -2051,6 +2051,16 @@ event.
         peer, for example "127.0.0.1:55457", or "0.0.0.0:0" if the session
         is not connected.</simpara></listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term>
+           <emphasis role="lua">box.session.storage</emphasis>
+        </term>
+        <listitem><simpara>Is a virtual table that is localized
+        for each session. The table is exists until disconnect.
+        The storage can be used for private connector's lua data.
+        </simpara></listitem>
+    </varlistentry>
 
 </variablelist>
     <para>

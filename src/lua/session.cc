@@ -41,6 +41,7 @@ extern "C" {
 
 static const char *sessionlib_name = "box.session";
 static int session_ref = 0;
+extern lua_State *root_L;
 
 /**
  * Return a unique monotonic session
@@ -178,6 +179,16 @@ lbox_session_on_disconnect(struct lua_State *L)
 
 
 
+void
+session_storage_cleanup(int sid)
+{
+	assert(session_ref != 0);
+	lua_rawgeti(root_L, LUA_REGISTRYINDEX, session_ref);
+	lua_pushnil(root_L);
+	lua_rawseti(root_L, -2, sid);
+	lua_pop(root_L, 1);
+}
+
 static int
 lbox_session_index(struct lua_State *L)
 {
@@ -205,6 +216,14 @@ lbox_session_index(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_session_storages(struct lua_State *L)
+{
+	assert(session_ref != 0);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, session_ref);
+	return 1;
+}
+
 void
 tarantool_lua_session_init(struct lua_State *L)
 {
@@ -214,6 +233,9 @@ tarantool_lua_session_init(struct lua_State *L)
                 {"peer", lbox_session_peer},
                 {"on_connect", lbox_session_on_connect},
                 {"on_disconnect", lbox_session_on_disconnect},
+
+                /* only for testcase */
+                {"storages", lbox_session_storages},
                 {NULL, NULL}
         };
 
