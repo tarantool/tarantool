@@ -1,7 +1,5 @@
 -- session-storage.lua
 
-box.session.storages = {}
-
 setmetatable(box.session, {
     __index = function(tbl, idx)
 

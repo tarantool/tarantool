@@ -181,6 +181,7 @@ lbox_session_on_disconnect(struct lua_State *L)
 void
 session_storage_cleanup(int sid)
 {
+	int top = lua_gettop(root_L);
 	lua_pushliteral(root_L, "box");
 	lua_rawget(root_L, LUA_GLOBALSINDEX);
 
@@ -194,24 +195,23 @@ session_storage_cleanup(int sid)
 
 	lua_pushnil(root_L);
 	lua_rawseti(root_L, -2, sid);
-	lua_pop(root_L, 4);
+
+	lua_settop(root_L, top);
 }
 
+
+static const struct luaL_reg sessionlib[] = {
+	{"id", lbox_session_id},
+	{"exists", lbox_session_exists},
+	{"peer", lbox_session_peer},
+	{"on_connect", lbox_session_on_connect},
+	{"on_disconnect", lbox_session_on_disconnect},
+	{NULL, NULL}
+};
 
 void
 tarantool_lua_session_init(struct lua_State *L)
 {
-        static const struct luaL_reg sessionlib[] = {
-                {"id", lbox_session_id},
-                {"exists", lbox_session_exists},
-                {"peer", lbox_session_peer},
-                {"on_connect", lbox_session_on_connect},
-                {"on_disconnect", lbox_session_on_disconnect},
-
-                {NULL, NULL}
-        };
-
-
 	luaL_register(L, sessionlib_name, sessionlib);
 	lua_pop(L, 1);
 }
