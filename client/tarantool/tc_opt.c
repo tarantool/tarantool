@@ -196,7 +196,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **e
 	} else {
 		opt->mode = TC_OPT_INTERACTIVE;
 	}
-	opt->pager = NULL;
+	opt->pager = getenv("PAGER");
 	opt->envp  = envp;
 done:
 	gopt_free(tc_options);

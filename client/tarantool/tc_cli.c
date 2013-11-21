@@ -244,10 +244,10 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 					tc.opt.delim_len = 0;
 					goto done;
 				}
-				char * temp = (char *)malloc(TNT_TK_S(tk)->size);
+				char * temp = (char *)malloc(TNT_TK_S(tk)->size + 1);
 				if (temp == NULL)
 					tc_error(TC_ALLOCATION_ERROR,
-						 TNT_TK_S(tk)->size);
+						 TNT_TK_S(tk)->size + 1);
 				strncpy(temp,
 					(const char *)TNT_TK_S(tk)->data,
 					TNT_TK_S(tk)->size + 1);
@@ -266,10 +266,10 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 					tc.opt.pager = NULL;
 					goto done;
 				}
-				char * temp = (char *)malloc(TNT_TK_S(tk)->size);
+				char * temp = (char *)malloc(TNT_TK_S(tk)->size + 1);
 				if (temp == NULL)
 					tc_error(TC_ALLOCATION_ERROR,
-						 TNT_TK_S(tk)->size);
+						 TNT_TK_S(tk)->size + 1);
 				strncpy(temp,
 					(const char *)TNT_TK_S(tk)->data,
 					TNT_TK_S(tk)->size + 1);
