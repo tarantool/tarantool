@@ -141,13 +141,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	char cur_dir_snap[2*PATH_MAX], cur_dir_wal[2*PATH_MAX];
+	char cur_dir_snap[PATH_MAX], cur_dir_wal[PATH_MAX];
 	tss.snap_dir = cur_dir_snap;
 	tss.wal_dir  = cur_dir_wal;
 
 	if (tss.opts.cfg.work_dir != NULL) {
-		strcpy((char *)tss.snap_dir, tss.opts.cfg.work_dir);
-		strcpy((char *)tss.wal_dir, tss.opts.cfg.work_dir);
+		strncpy((char *)tss.snap_dir, tss.opts.cfg.work_dir, PATH_MAX);
+		strncpy((char *)tss.wal_dir, tss.opts.cfg.work_dir, PATH_MAX);
 	} else {
 		getcwd((char *)tss.snap_dir, PATH_MAX);
 		getcwd((char *)tss.wal_dir, PATH_MAX);
@@ -156,13 +156,15 @@ int main(int argc, char *argv[])
 		if (tss.opts.cfg.snap_dir[0] == '/')
 			tss.snap_dir = tss.opts.cfg.snap_dir;
 		else
-			strcat((char *)tss.snap_dir, tss.opts.cfg.snap_dir);
+			strncat((char *)tss.snap_dir, tss.opts.cfg.snap_dir,
+				PATH_MAX);
 	}
 	if (tss.opts.cfg.wal_dir != NULL) {
 		if (tss.opts.cfg.wal_dir[0] == '/')
 			tss.wal_dir = tss.opts.cfg.wal_dir;
 		else
-			strcat((char *)tss.wal_dir, tss.opts.cfg.wal_dir);
+			strncat((char *)tss.wal_dir, tss.opts.cfg.wal_dir,
+				PATH_MAX);
 	}
 	/* create spaces */
 	rc = ts_space_init(&tss.s);
