@@ -35,8 +35,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 #ifdef __linux__
-#include <malloc.h>
+#  include <malloc.h>
+#  include <linux/limits.h>
+#else
+#  define PATH_MAX 4096
 #endif
 
 #include <connector/c/include/tarantool/tnt.h>
@@ -136,10 +140,27 @@ int main(int argc, char *argv[])
 		ts_options_free(&tss.opts);
 		return 1;
 	}
-	if (tss.opts.cfg.snap_dir == NULL) {
-		printf("snap_dir and wal_dir must be defined.\n");
-		ts_options_free(&tss.opts);
-		return 1;
+
+	if (tss.opts.cfg.snap_dir != NULL && tss.opts.cfg.wal_dir != NULL) {
+		tss.snap_dir = tss.opts.cfg.snap_dir;
+		tss.wal_dir  = tss.opts.cfg.wal_dir;
+	} else if (tss.opts.cfg.work_dir != NULL) {
+		tss.snap_dir = tss.opts.cfg.work_dir;
+		tss.wal_dir  = tss.opts.cfg.work_dir;
+	} else {
+		tss.snap_dir = (char *)malloc(PATH_MAX*2);
+		tss.wal_dir  = tss.snap_dir + PATH_MAX;
+		if (tss.snap_dir == NULL) {
+			printf("Error: Can't allocate %db with malloc",
+			       PATH_MAX*2);
+			exit(3);
+		}
+		tss.snap_dir = getcwd((char *)tss.snap_dir, PATH_MAX);
+		tss.wal_dir = getcwd((char *)tss.wal_dir,  PATH_MAX);
+		if (tss.snap_dir == NULL || tss.wal_dir == NULL){
+			printf("Error: Can't getcwd() - %s", strerror(errno));
+			exit(3);
+		}
 	}
 
 	/* create spaces */
@@ -156,8 +177,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("snap_dir: %s\n", tss.opts.cfg.snap_dir);
-	printf("wal_dir:  %s\n", tss.opts.cfg.wal_dir);
+	printf("snap_dir: %s\n", tss.snap_dir);
+	printf("wal_dir:  %s\n", tss.wal_dir);
 	printf("spaces:   %d\n", mh_size(tss.s.t));
 	printf("interval: %d\n", tss.opts.interval);
 	printf("memory_limit: %dM\n", (int)(tss.opts.limit / 1024 / 1024));
