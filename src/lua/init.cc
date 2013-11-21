@@ -88,37 +88,6 @@ struct lua_State *tarantool_L;
 extern char uuid_lua[];
 static const char *lua_sources[] = { uuid_lua, NULL };
 
-/**
- * Remember the output of the administrative console in the
- * registry, to use with 'print'.
- */
-void
-tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out)
-{
-	lua_pushthread(L);
-	if (out)
-		lua_pushlightuserdata(L, (void *) out);
-	else
-		lua_pushnil(L);
-	lua_settable(L, LUA_REGISTRYINDEX);
-}
-
-/**
- * dup out from parent to child L. Used in fiber_create
- */
-void
-tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L)
-{
-	lua_pushthread(L);
-	lua_gettable(L, LUA_REGISTRYINDEX);
-	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
-	/* pop 'out' */
-	lua_pop(L, 1);
-	if (out)
-		tarantool_lua_set_out(child_L, out);
-}
-
-
 /*
  * {{{ box Lua library: common functions
  */
@@ -229,13 +198,8 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 static int
 lbox_print(struct lua_State *L)
 {
-	lua_pushthread(L);
-	lua_gettable(L, LUA_REGISTRYINDEX);
-	struct tbuf *out = (struct tbuf *) lua_topointer(L, -1);
-	/* pop 'out' */
-	lua_pop(L, 1);
 	/* always output to log only */
-	out = tbuf_new(&fiber->gc);
+	struct tbuf *out = tbuf_new(&fiber->gc);
 	/* serialize arguments of 'print' Lua built-in to tbuf */
 	int top = lua_gettop(L);
 	for (int i = 1; i <= top; i++) {
@@ -633,9 +597,7 @@ extern "C" {
 static void
 tarantool_lua_do(struct lua_State *L, struct tbuf *out, const char *str)
 {
-	tarantool_lua_set_out(L, out);
 	int r = tarantool_lua_dostring(L, str);
-	tarantool_lua_set_out(L, NULL);
 	if (r) {
 		assert(lua_gettop(L) == 1);
 		const char *msg = lua_tostring(L, -1);

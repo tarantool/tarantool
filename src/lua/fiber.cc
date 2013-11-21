@@ -531,7 +531,6 @@ lbox_fiber_resume(struct lua_State *L)
 	if (nargs > 0)
 		lua_xmove(L, child_L, nargs);
 	/* dup 'out' for admin fibers */
-	tarantool_lua_dup_out(L, child_L);
 	int fid = f->fid;
 	/* Silent compiler warnings in a release build. */
 	(void) fid;
@@ -551,7 +550,6 @@ lbox_fiber_resume(struct lua_State *L)
 	 *   can continue).
 	 */
 	assert(f->fid == fid);
-	tarantool_lua_set_out(child_L, NULL);
 	/* Find out the state of the child fiber. */
 	enum fiber_state child_state = (enum fiber_state) lua_tointeger(child_L, -1);
 	lua_pop(child_L, 1);
