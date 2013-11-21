@@ -141,28 +141,29 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	if (tss.opts.cfg.snap_dir != NULL && tss.opts.cfg.wal_dir != NULL) {
-		tss.snap_dir = tss.opts.cfg.snap_dir;
-		tss.wal_dir  = tss.opts.cfg.wal_dir;
-	} else if (tss.opts.cfg.work_dir != NULL) {
-		tss.snap_dir = tss.opts.cfg.work_dir;
-		tss.wal_dir  = tss.opts.cfg.work_dir;
-	} else {
-		tss.snap_dir = (char *)malloc(PATH_MAX*2);
-		tss.wal_dir  = tss.snap_dir + PATH_MAX;
-		if (tss.snap_dir == NULL) {
-			printf("Error: Can't allocate %db with malloc",
-			       PATH_MAX*2);
-			exit(3);
-		}
-		tss.snap_dir = getcwd((char *)tss.snap_dir, PATH_MAX);
-		tss.wal_dir = getcwd((char *)tss.wal_dir,  PATH_MAX);
-		if (tss.snap_dir == NULL || tss.wal_dir == NULL){
-			printf("Error: Can't getcwd() - %s", strerror(errno));
-			exit(3);
-		}
-	}
+	char cur_dir_snap[2*PATH_MAX], cur_dir_wal[2*PATH_MAX];
+	tss.snap_dir = cur_dir_snap;
+	tss.wal_dir  = cur_dir_wal;
 
+	if (tss.opts.cfg.work_dir != NULL) {
+		strcpy((char *)tss.snap_dir, tss.opts.cfg.work_dir);
+		strcpy((char *)tss.wal_dir, tss.opts.cfg.work_dir);
+	} else {
+		getcwd((char *)tss.snap_dir, PATH_MAX);
+		getcwd((char *)tss.wal_dir, PATH_MAX);
+	}
+	if (tss.opts.cfg.snap_dir != NULL) {
+		if (tss.opts.cfg.snap_dir[0] == '/')
+			tss.snap_dir = tss.opts.cfg.snap_dir;
+		else
+			strcat((char *)tss.snap_dir, tss.opts.cfg.snap_dir);
+	}
+	if (tss.opts.cfg.wal_dir != NULL) {
+		if (tss.opts.cfg.wal_dir[0] == '/')
+			tss.wal_dir = tss.opts.cfg.wal_dir;
+		else
+			strcat((char *)tss.wal_dir, tss.opts.cfg.wal_dir);
+	}
 	/* create spaces */
 	rc = ts_space_init(&tss.s);
 	if (rc == -1) {
