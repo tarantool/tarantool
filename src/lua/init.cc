@@ -198,6 +198,7 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 static int
 lbox_print(struct lua_State *L)
 {
+	RegionGuard region_guard(&fiber->gc);
 	/* always output to log only */
 	struct tbuf *out = tbuf_new(&fiber->gc);
 	/* serialize arguments of 'print' Lua built-in to tbuf */
