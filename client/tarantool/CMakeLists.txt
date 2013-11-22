@@ -9,8 +9,7 @@ endif()
 
 set (cli "tarantool")
 set (cli_sources tc.c tc_opt.c tc_admin.c tc_query.c tc_print.c tc_buf.c
-                 tc_cli.c)
-#                tc_store.c tc_print_xlog.c tc_print_snap.c)
+                 tc_cli.c tc_pager.c)
 
 set (cli_libs gopt ${READLINE_LIBRARIES})
 

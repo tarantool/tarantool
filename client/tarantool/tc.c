@@ -46,6 +46,7 @@
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
+#include "client/tarantool/tc_pager.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
 /*#include "client/tarantool/tc_store.h"*/
@@ -61,8 +62,9 @@ struct tc tc;
 
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
-	tc.tee_fd = -1;
 	setlocale(LC_ALL, "");
+	tc.pager_fd = fileno(stdout);
+	tc.pager_pid = 0;
 }
 
 static void tc_free(void) {
@@ -75,6 +77,7 @@ static void tc_free(void) {
 	/*
 	tc_cmd_tee_close();
 	*/
+	tc_pager_kill();
 }
 
 void tc_error(char *fmt, ...) {
@@ -150,6 +153,7 @@ static void tc_connect(void)
 }
 #endif
 
+#if 0
 static char *send_cmd(char *cmd)
 {
 	size_t size = 0;
@@ -177,15 +181,19 @@ static int get_primary_port()
 	}
 	return port;
 }
+#endif
 
 static void tc_connect_admin(void)
 {
+	tc.opt.port_admin = 33015;
 	if (tc_admin_connect(&tc.admin,
 			     tc.opt.host,
 			     tc.opt.port_admin) == -1)
 		tc_error("admin console connection failed");
+#if 0
 	if (tc.opt.port == 0)
 		tc.opt.port = get_primary_port();
+#endif
 }
 
 #if 0
@@ -215,12 +223,12 @@ static void tc_validate(void)
 }
 #endif
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[], char *envp[])
 {
 	tc_init();
 
 	int rc = 0;
-	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv);
+	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv, envp);
 	/*tc_validate();*/
 	switch (mode) {
 	case TC_OPT_USAGE:
