@@ -20,7 +20,7 @@
 */
 
 /* private function, use ok(...) instead */
-int __ok(int condition, const char *fmt, ...);
+int _ok(int condition, const char *fmt, ...);
 
 /**
 @brief set and print plan
@@ -37,7 +37,7 @@ void plan(int count);
 int check_plan(void);
 
 #define ok(condition, fmt, args...)	{		\
-	int res = __ok(condition, fmt, ##args);		\
+	int res = _ok(condition, fmt, ##args);		\
 	if (!res) {					\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\
@@ -48,7 +48,7 @@ int check_plan(void);
 }
 
 #define is(a, b, fmt, args...)	{			\
-	int res = __ok((a) == (b), fmt, ##args);	\
+	int res = _ok((a) == (b), fmt, ##args);	\
 	if (!res) {					\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\
@@ -59,7 +59,7 @@ int check_plan(void);
 }
 
 #define isnt(a, b, fmt, args...) {			\
-	int res = __ok((a) != (b), fmt, ##args);	\
+	int res = _ok((a) != (b), fmt, ##args);	\
 	if (!res) {					\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\

@@ -38,7 +38,7 @@ check_plan(void)
 }
 
 int
-__ok(int condition, const char *fmt, ...)
+_ok(int condition, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -50,4 +50,3 @@ __ok(int condition, const char *fmt, ...)
 	printf("\n");
 	return condition;
 }
-
