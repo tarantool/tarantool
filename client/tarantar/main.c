@@ -35,8 +35,10 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
+#include <limits.h>
 #ifdef __linux__
-#include <malloc.h>
+#  include <malloc.h>
 #endif
 
 #include <connector/c/include/tarantool/tnt.h>
@@ -136,12 +138,32 @@ int main(int argc, char *argv[])
 		ts_options_free(&tss.opts);
 		return 1;
 	}
-	if (tss.opts.cfg.snap_dir == NULL) {
-		printf("snap_dir and wal_dir must be defined.\n");
-		ts_options_free(&tss.opts);
-		return 1;
-	}
 
+	char cur_dir_snap[PATH_MAX], cur_dir_wal[PATH_MAX];
+	tss.snap_dir = cur_dir_snap;
+	tss.wal_dir  = cur_dir_wal;
+
+	if (tss.opts.cfg.work_dir != NULL) {
+		strncpy((char *)tss.snap_dir, tss.opts.cfg.work_dir, PATH_MAX);
+		strncpy((char *)tss.wal_dir, tss.opts.cfg.work_dir, PATH_MAX);
+	} else {
+		getcwd((char *)tss.snap_dir, PATH_MAX);
+		getcwd((char *)tss.wal_dir, PATH_MAX);
+	}
+	if (tss.opts.cfg.snap_dir != NULL) {
+		if (tss.opts.cfg.snap_dir[0] == '/')
+			tss.snap_dir = tss.opts.cfg.snap_dir;
+		else
+			strncat((char *)tss.snap_dir, tss.opts.cfg.snap_dir,
+				PATH_MAX);
+	}
+	if (tss.opts.cfg.wal_dir != NULL) {
+		if (tss.opts.cfg.wal_dir[0] == '/')
+			tss.wal_dir = tss.opts.cfg.wal_dir;
+		else
+			strncat((char *)tss.wal_dir, tss.opts.cfg.wal_dir,
+				PATH_MAX);
+	}
 	/* create spaces */
 	rc = ts_space_init(&tss.s);
 	if (rc == -1) {
@@ -158,8 +180,8 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	printf("snap_dir: %s\n", tss.opts.cfg.snap_dir);
-	printf("wal_dir:  %s\n", tss.opts.cfg.wal_dir);
+	printf("snap_dir: %s\n", tss.snap_dir);
+	printf("wal_dir:  %s\n", tss.wal_dir);
 	printf("spaces:   %d\n", mh_size(tss.s.t));
 	printf("interval: %d\n", tss.opts.interval);
 	printf("memory_limit: %dM\n", (int)(tss.opts.limit / 1024 / 1024));

@@ -147,7 +147,7 @@ int ts_snapshot_create(void)
 	}
 
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020llu.snap.inprocess", tss.opts.cfg.snap_dir,
+	snprintf(path, sizeof(path), "%s/%020llu.snap.inprocess", tss.snap_dir,
 	         (unsigned long long) snap_lsn);
 
 	FILE *snapshot = fopen(path, "a");
