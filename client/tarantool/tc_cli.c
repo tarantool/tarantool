@@ -57,6 +57,7 @@
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
+#include "client/tarantool/tc_pager.h"
 #include "client/tarantool/tc_query.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
@@ -92,31 +93,29 @@ static int tc_cli_reconnect(void) {
 
 enum tc_keywords {
 	TC_EXIT = TNT_TK_CUSTOM + 1,
-	TC_TEE,
-	TC_NOTEE,
 	TC_LOADFILE,
 	TC_HELP,
 	TC_SETOPT,
-	TC_SETOPT_DELIM
+	TC_SETOPT_DELIM,
+	TC_SETOPT_PAGER
 };
 
 static struct tnt_lex_keyword tc_lex_keywords[] =
 {
-	{ "e", 1, TC_EXIT },
-	{ "ex", 2, TC_EXIT },
-	{ "exi", 3, TC_EXIT },
-	{ "exit", 4, TC_EXIT },
-	{ "q", 1, TC_EXIT },
-	{ "qu", 2, TC_EXIT },
-	{ "qui", 3, TC_EXIT },
-	{ "quit", 4, TC_EXIT },
-	{ "help", 4, TC_HELP },
-	{ "tee", 3, TC_TEE },
-	{ "notee", 5, TC_NOTEE },
-	{ "loadfile", 8, TC_LOADFILE },
-	{ "setopt", 6, TC_SETOPT},
-	{ "delimiter", 9, TC_SETOPT_DELIM},
-	{ NULL, 0, TNT_TK_NONE }
+	{ "e",         1, TC_EXIT         },
+	{ "ex",        2, TC_EXIT         },
+	{ "exi",       3, TC_EXIT         },
+	{ "exit",      4, TC_EXIT         },
+	{ "q",         1, TC_EXIT         },
+	{ "qu",        2, TC_EXIT         },
+	{ "qui",       3, TC_EXIT         },
+	{ "quit",      4, TC_EXIT         },
+	{ "help",      4, TC_HELP         },
+	{ "loadfile",  8, TC_LOADFILE     },
+	{ "setopt",    6, TC_SETOPT       },
+	{ "delimiter", 9, TC_SETOPT_DELIM },
+	{ "pager",     5, TC_SETOPT_PAGER },
+	{ NULL,        0, TNT_TK_NONE     }
 };
 
 enum tc_cli_cmd_ret {
@@ -132,11 +131,10 @@ tc_cmd_usage(void)
 		"---\n"
 		"console client commands:\n"
 		" - help\n"
-		" - tee 'path'\n"
-		" - notee\n"
 		" - loadfile 'path'\n"
 		" - setopt key=val\n"
-		" - (possible pairs: delim=\'str\')\n"
+		" - (possible pairs: delimiter = \'string\'  )\n"
+		" - (                pager     = \'command\' )\n"
 		"...\n";
 	tc_printf("%s", usage);
 }
@@ -144,29 +142,10 @@ tc_cmd_usage(void)
 static int tc_cli_admin(char *cmd, int exit) {
 	char *e = NULL;
 	tc_query_admin_t cb = (exit) ? NULL : tc_query_admin_printer;
+	if (!exit) tc_pager_start();
 	if (tc_query_admin(cmd, cb, &e) == -1)
 		return tc_cli_error(e);
-	return 0;
-}
-
-int tc_cmd_tee_close(void)
-{
-	if (tc.tee_fd == -1)
-		return 0;
-	fsync(tc.tee_fd);
-	int rc = close(tc.tee_fd);
-	tc.tee_fd = -1;
-	return rc;
-}
-
-static int tc_cmd_tee_open(char *path)
-{
-	tc_cmd_tee_close();
-	tc.tee_fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0644);
-	if (tc.tee_fd == -1) {
-		tc_printf("error: open(): %s\n", strerror(errno));
-		return -1;
-	}
+	if (!exit) tc_pager_stop();
 	return 0;
 }
 
@@ -184,10 +163,12 @@ tc_cmd_dostring(char *buf, size_t size, int *reconnect)
 		goto error;
 	tnt_tuple_free(&args);
 	char *e = NULL;
+	tc_pager_start();
 	if (tc_query_foreach(tc_query_printer, NULL, &e) == -1) {
 		*reconnect = tc_cli_error(e);
 		return -1;
 	}
+	tc_pager_stop();
 	return 0;
 error:
 	tc_printf("error: %s\n", tnt_strerror(tc.net));
@@ -245,17 +226,6 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 	case TC_HELP:
 		tc_cmd_usage();
 		break;
-	case TC_TEE:
-		if (tnt_lex(&lex, &tk) != TNT_TK_STRING) {
-			rc = TC_CLI_ERROR;
-			goto done;
-		}
-		if (tc_cmd_tee_open((char*)TNT_TK_S(tk)->data) == -1)
-			rc = TC_CLI_ERROR;
-		goto done;
-	case TC_NOTEE:
-		tc_cmd_tee_close();
-		goto done;
 	case TC_LOADFILE:
 		if (tnt_lex(&lex, &tk) != TNT_TK_STRING) {
 			rc = TC_CLI_ERROR;
@@ -274,10 +244,10 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 					tc.opt.delim_len = 0;
 					goto done;
 				}
-				char * temp = (char *)malloc(TNT_TK_S(tk)->size);
+				char * temp = (char *)malloc(TNT_TK_S(tk)->size + 1);
 				if (temp == NULL)
 					tc_error(TC_ALLOCATION_ERROR,
-						 TNT_TK_S(tk)->size);
+						 TNT_TK_S(tk)->size + 1);
 				strncpy(temp,
 					(const char *)TNT_TK_S(tk)->data,
 					TNT_TK_S(tk)->size + 1);
@@ -285,7 +255,29 @@ tc_cmd_try(char *cmd, size_t size, int *reconnect)
 				tc.opt.delim_len = strlen(tc.opt.delim);
 			} else {
 				tc_printf("---\n");
-				tc_printf(" - Expected delim='string'\n");
+				tc_printf(" - Expected delimiter='string'\n");
+				tc_printf("---\n");
+			}
+			break;
+		case TC_SETOPT_PAGER:
+			if (tnt_lex(&lex, &tk) == '=' &&
+			    tnt_lex(&lex, &tk) == TNT_TK_STRING) {
+				if (!TNT_TK_S(tk)->size) {
+					tc.opt.pager = NULL;
+					goto done;
+				}
+				char * temp = (char *)malloc(TNT_TK_S(tk)->size + 1);
+				if (temp == NULL)
+					tc_error(TC_ALLOCATION_ERROR,
+						 TNT_TK_S(tk)->size + 1);
+				strncpy(temp,
+					(const char *)TNT_TK_S(tk)->data,
+					TNT_TK_S(tk)->size + 1);
+				temp[TNT_TK_S(tk)->size] = '\0';
+				tc.opt.pager = temp;
+			} else {
+				tc_printf("---\n");
+				tc_printf(" - Expected pager='command'\n");
 				tc_printf("---\n");
 			}
 			break;
@@ -315,12 +307,14 @@ static enum tc_cli_cmd_ret tc_cli_cmd(char *cmd, size_t size)
 		}
 		char *e = NULL;
 		if (tnt_query_is(cmd, size)) {
+			tc_pager_start();
 			if (tc_query(cmd, &e) == 0) {
 				if (tc_query_foreach(tc_query_printer, NULL, &e) == -1)
 					reconnect = tc_cli_error(e);
 			} else {
 				reconnect = tc_cli_error(e);
 			}
+			tc_pager_stop();
 			/* reconnect only for network errors */
 			if (reconnect && tnt_error(tc.net) != TNT_ESYSTEM)
 				reconnect = 0;
@@ -342,7 +336,6 @@ int tc_cli_cmdv(void)
 	for (i = 0 ; i < tc.opt.cmdc ; i++) {
 		char *cmd = tc.opt.cmdv[i];
 		int cmd_len = strlen(tc.opt.cmdv[i]);
-		tc_print_cmd2tee(NULL, cmd, cmd_len);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd, cmd_len);
 		if (ret == TC_CLI_EXIT)
 			break;
@@ -428,7 +421,8 @@ int tc_cli(void)
 
 	/* setting prompt */
 	char prompt[128];
-	int prompt_len = snprintf(prompt, sizeof(prompt), "%s> ", tc.opt.host) - 2;
+	int prompt_len = snprintf(prompt, sizeof(prompt),
+				  "%s> ", tc.opt.host) - 2;
 	char prompt_delim[128];
 	/* interactive mode */
 	char *part_cmd;
@@ -440,8 +434,9 @@ int tc_cli(void)
 		if (isatty(STDIN_FILENO)) {
 			snprintf(prompt_delim, sizeof(prompt_delim),
 				 "%*s> ", prompt_len, "-");
-			part_cmd = readline(!tc_buf_str_isempty(&cmd) ? prompt_delim
-							   : prompt);
+			part_cmd = readline(!tc_buf_str_isempty(&cmd) ?
+					    prompt_delim :
+					    prompt);
 		} else {
 			clearerr(stdin);
 			part_cmd = tc_cli_readline_pipe();
@@ -465,8 +460,6 @@ int tc_cli(void)
 		tc_buf_str_stripws(&cmd);
 		if (delim_exists && tc_buf_str_isempty(&cmd))
 			goto next;
-		tc_print_cmd2tee(cmd.used != 1 ? prompt_delim : prompt,
-				 cmd.data, cmd.used - 1);
 		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
 						     cmd.used - 1);
 		if (isatty(STDIN_FILENO))

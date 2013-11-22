@@ -44,6 +44,7 @@
 #include "client/tarantool/tc_opt.h"
 #include "client/tarantool/tc_admin.h"
 #include "client/tarantool/tc.h"
+#include "client/tarantool/tc_pager.h"
 #include "client/tarantool/tc_cli.h"
 #include "client/tarantool/tc_print.h"
 #include "client/tarantool/tc_store.h"
@@ -57,16 +58,16 @@ struct tc tc;
 
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
-	tc.tee_fd = -1;
 	setlocale(LC_ALL, "");
+	tc.pager_fd = fileno(stdout);
+	tc.pager_pid = 0;
 }
 
 static void tc_free(void) {
-	if (tc.net) {
+	if (tc.net)
 		tnt_stream_free(tc.net);
-	}
 	tc_admin_close(&tc.admin);
-	tc_cmd_tee_close();
+	tc_pager_kill();
 }
 
 void tc_error(char *fmt, ...) {
@@ -189,12 +190,12 @@ static void tc_validate(void)
 		tc.opt.raw = 1;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[], char *envp[])
 {
 	tc_init();
 
 	int rc = 0;
-	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv);
+	enum tc_opt_mode mode = tc_opt_init(&tc.opt, argc, argv, envp);
 	tc_validate();
 	switch (mode) {
 	case TC_OPT_USAGE:
