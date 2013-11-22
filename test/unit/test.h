@@ -25,7 +25,7 @@
 int _ok(int condition, const char *fmt, ...);
 
 /* private function, use note(...) or diag(...) instead */
-void __space(FILE *stream);
+void _space(FILE *stream);
 
 #define msg(stream, ...) ({ __space(stream); fprintf(stream, "# ");            \
 	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
@@ -50,11 +50,11 @@ int check_plan(void);
 #define ok(condition, fmt, args...)	{		\
 	int res = _ok(condition, fmt, ##args);		\
 	if (!res) {					\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\
 		fprintf(stderr, "'\n");			\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
 	res = res;					\
@@ -63,11 +63,11 @@ int check_plan(void);
 #define is(a, b, fmt, args...)	{			\
 	int res = _ok((a) == (b), fmt, ##args);	\
 	if (!res) {					\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\
 		fprintf(stderr, "'\n");			\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
 	res = res;					\
@@ -76,11 +76,11 @@ int check_plan(void);
 #define isnt(a, b, fmt, args...) {			\
 	int res = _ok((a) != (b), fmt, ##args);	\
 	if (!res) {					\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   Failed test '");	\
 		fprintf(stderr, fmt, ##args);		\
 		fprintf(stderr, "'\n");			\
-		__space(stderr);			\
+		_space(stderr);			\
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
 	res = res;					\

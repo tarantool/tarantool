@@ -10,7 +10,7 @@ static int plan_test[MAX_LEVELS];
 static int level = -1;
 
 void
-__space(FILE *stream)
+_space(FILE *stream)
 {
 	for (int i = 0 ; i < level; i++) {
 		fprintf(stream, "    ");
@@ -25,7 +25,7 @@ plan(int count)
 	tests_done[level] = 0;
 	tests_failed[level] = 0;
 
-	__space(stdout);
+	_space(stdout);
 	printf("%d..%d\n", 1, plan_test[level]);
 }
 
@@ -34,7 +34,7 @@ check_plan(void)
 {
 	int r = 0;
 	if (tests_done[level] != plan_test[level]) {
-		__space(stderr);
+		_space(stderr);
 		fprintf(stderr,
 			"# Looks like you planned %d tests but ran %d.\n",
 			plan_test[level], tests_done[level]);
@@ -42,7 +42,7 @@ check_plan(void)
 	}
 
 	if (tests_failed[level]) {
-		__space(stderr);
+		_space(stderr);
 		fprintf(stderr,
 			"# Looks like you failed %d test of %d run.\n",
 			tests_failed[level], tests_done[level]);
@@ -60,7 +60,7 @@ _ok(int condition, const char *fmt, ...)
 {
 	va_list ap;
 
-	__space(stdout);
+	_space(stdout);
 	printf("%s %d - ", condition ? "ok" : "not ok", ++tests_done[level]);
 	if (!condition)
 		tests_failed[level]++;
