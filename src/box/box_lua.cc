@@ -667,7 +667,7 @@ lbox_checkiterator(struct lua_State *L, int i)
 static void
 lbox_pushiterator(struct lua_State *L, Index *index,
 		  struct iterator *it, enum iterator_type type,
-		  const char *key, uint32_t part_count, size_t size)
+		  const char *key, size_t key_size, uint32_t part_count)
 {
 	struct lbox_iterator_udata {
 		struct iterator *it;
@@ -675,13 +675,13 @@ lbox_pushiterator(struct lua_State *L, Index *index,
 	};
 
 	struct lbox_iterator_udata *udata = (struct lbox_iterator_udata *)
-		lua_newuserdata(L, sizeof(*udata) + size);
+		lua_newuserdata(L, sizeof(*udata) + key_size);
 	luaL_getmetatable(L, iteratorlib_name);
 	lua_setmetatable(L, -2);
 
 	udata->it = it;
 	if (key) {
-		memcpy(udata->key, key, size);
+		memcpy(udata->key, key, key_size);
 		key = udata->key;
 	}
 	key_validate(index->key_def, type, key, part_count);
@@ -837,17 +837,15 @@ lbox_create_iterator(struct lua_State *L)
 		struct tbuf *b = tbuf_new(&fiber->gc);
 		luamp_encodestack(L, b, 3, argc);
 		key = b->data;
-		key_size = b->size;
-		assert(key_size != 0);
+		assert(b->size > 0);
 		if (unlikely(mp_typeof(*key) != MP_ARRAY))
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-		const char *key2 = key;
 		key_part_count = mp_decode_array(&key);
-		key_size -= (key - key2);
+		key_size = b->data + b->size - key;
 	}
 
 	struct iterator *it = index->allocIterator();
-	lbox_pushiterator(L, index, it, type, key, key_part_count, key_size);
+	lbox_pushiterator(L, index, it, type, key, key_size, key_part_count);
 	return it;
 }
 
