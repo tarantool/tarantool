@@ -16,3 +16,25 @@ print """
 exec admin "lua for i = 1, 100000, 1 do box.space[1]:insert(i,i) end"
 exec admin "lua local t1 = {box.select(1, 1)}"
 exec admin "lua box.space[1]:truncate()"
+
+#
+# A test case for https://github.com/tarantool/tarantool/issues/65
+# Space does not exist error on repetitive access to space 0 in Lua
+#
+lua = """
+function mktuple(n)
+    local fields = { [n] = n }
+    for i = 1,n do
+        fields[i] = i;
+    end
+    local t = box.replace(0, fields);
+    assert(box.unpack("i", t[0]) == 1, "tuple check")
+    assert(box.unpack("i", t[n-1]) == n, "tuple check")
+    return string.format("count %u len %u", #t, t:bsize())
+end
+"""
+
+exec admin "lua " + lua.replace('\n', ' ')
+exec admin "lua mktuple(5000)"
+exec admin "lua mktuple(100000)"
+exec admin "lua box.space[0]:truncate()"

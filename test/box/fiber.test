@@ -83,3 +83,20 @@ exec admin "lua box.space[0]:truncate()"
 # https://github.com/tarantool/tarantool/issues/33
 exec admin "lua box.fiber.find()"
 exec admin "lua box.fiber.find('test')"
+# https://github.com/tarantool/tarantool/issues/131
+# box.fiber.resume(box.fiber.cancel()) -- hang
+exec admin "lua f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)"
+exec admin "lua box.fiber.resume(f)"
+exec admin "lua f = nil"
+# encoding: tarantool
+# https://github.com/tarantool/tarantool/issues/119
+exec admin "lua ftest = function() box.fiber.sleep(0.01 * math.random() ) return true end"
+
+for i in xrange(1, 10):
+    exec admin "lua result = {}"
+
+    exec admin "lua for i = 1, 300 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() table.insert( result, ftest() ) end )) end"
+
+exec admin "lua while #result < 300 do box.fiber.sleep(0.01) end"
+exec admin "lua #result"
+

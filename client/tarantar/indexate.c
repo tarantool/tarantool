@@ -86,7 +86,7 @@ static int
 snapshot_process(void)
 {
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%020llu.snap", tss.opts.cfg.snap_dir,
+	snprintf(path, sizeof(path), "%s/%020llu.snap", tss.snap_dir,
 	         (unsigned long long) tss.last_snap_lsn);
 
 	int fileid = ts_reftable_add(&tss.rt, path, 1);
@@ -138,7 +138,7 @@ snapdir_process(void)
 	struct tnt_dir snap_dir;
 	tnt_dir_init(&snap_dir, TNT_DIR_SNAPSHOT);
 
-	int rc = tnt_dir_scan(&snap_dir, tss.opts.cfg.snap_dir);
+	int rc = tnt_dir_scan(&snap_dir, (char *)tss.snap_dir);
 	if (rc == -1) {
 		printf("failed to open snapshot directory\n");
 		goto error;
@@ -382,7 +382,7 @@ waldir_process(void)
 	struct tnt_dir wal_dir;
 	tnt_dir_init(&wal_dir, TNT_DIR_XLOG);
 
-	int rc = tnt_dir_scan(&wal_dir, tss.opts.cfg.wal_dir);
+	int rc = tnt_dir_scan(&wal_dir, (char *)tss.wal_dir);
 	if (rc == -1) {
 		printf("failed to open wal directory\n");
 		tnt_dir_free(&wal_dir);

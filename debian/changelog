@@ -1,3 +1,12 @@
+tarantool (1.5.1.218.g1a69fd6-1) unstable; urgency=low
+
+  * New Debian snapshot
+   - patch for OpenVZ (disable MAP_SHARED mmap flag with OpenVZ).
+   - fix socket:readline(..., timeout) bug.
+   - suggests -dbg version of package.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Tue, 19 Nov 2013 16:17:23 +0400
+
 tarantool (1.5.1.150.g029f82f-1) unstable; urgency=low
 
   * New Debian snapshot (fix memory corruption).

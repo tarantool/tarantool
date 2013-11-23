@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 
-void tc_print_tee(char *buf, size_t size);
-void tc_print_cmd2tee(char *prompt, char *cmd, int size);
 void tc_printf(char *fmt, ...);
 void tc_print_buf(char *buf, size_t size);
 

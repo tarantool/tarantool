@@ -366,9 +366,9 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
-/* Store tuple fields in the Lua buffer, BER-length-encoded. */
+/* Store tuple fields in the tbuf, BER-length-encoded. */
 void
-tuple_to_luabuf(struct tuple *tuple, struct luaL_Buffer *b);
+tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf);
 
 /** Initialize tuple library */
 void

@@ -56,7 +56,11 @@ This package provides Tarantool client libraries.
 
 # Tarantool debug package
 
+%if 0%{?fedora}
+# Fedora includes debug package by default.
+%else
 %debug_package
+%endif
 
 ###
 

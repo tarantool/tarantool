@@ -37,7 +37,6 @@
 
 
 #define TC_DEFAULT_HOST "localhost"
-#define TC_DEFAULT_PORT_ADMIN 33015
 
 /* supported cli options */
 static const void *tc_options_def = gopt_start(
@@ -93,7 +92,7 @@ void tc_opt_version(void)
 	exit(0);
 }
 
-enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
+enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 {
 	/* usage */
 	void *tc_options = gopt_sort(&argc, (const char**)argv, tc_options_def);
@@ -120,7 +119,7 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 		opt->port = atoi(arg);
 
 	/* server admin port */
-	opt->port_admin = TC_DEFAULT_PORT_ADMIN;
+	opt->port_admin = 0;
 	if (gopt_arg(tc_options, 'a', &arg))
 		opt->port_admin = atoi(arg);
 
@@ -196,6 +195,8 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv)
 	} else {
 		opt->mode = TC_OPT_INTERACTIVE;
 	}
+	opt->pager = getenv("PAGER");
+	opt->envp  = envp;
 done:
 	gopt_free(tc_options);
 	return opt->mode;

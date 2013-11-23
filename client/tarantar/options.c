@@ -50,9 +50,9 @@ static const void *opts_def = gopt_start(
 		    gopt_longs("lsn"), " <u64>", "snapshot lsn (latest by default)"),
 	gopt_option('l', GOPT_ARG, gopt_shorts('l'),
 		    gopt_longs("limit"), " <limit>", "memory limit (bytes)"),
-	gopt_option('?', 0, gopt_shorts(0), gopt_longs("help"),
+	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
-	gopt_option('v', 0, gopt_shorts('v'), gopt_longs("version"),
+	gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
 		    NULL, "display version information and exit")
 );
 
@@ -68,11 +68,19 @@ void ts_options_free(struct ts_options *opts) {
 int ts_options_usage(void)
 {
 	printf("Tarantool xlog compression utility.\n\n");
-
 	printf("Usage: tarantar <options> <tarantool_config>\n");
 	gopt_help(opts_def);
 	return 1;
 }
+
+int ts_options_version(void)
+{
+	printf("tarantar client, version %s.%s\n",
+	       TT_VERSION_MAJOR,
+	       TT_VERSION_MINOR);
+	return 1;
+}
+
 
 enum ts_options_mode
 ts_options_process(struct ts_options *opts, int argc, char **argv)
@@ -84,7 +92,7 @@ ts_options_process(struct ts_options *opts, int argc, char **argv)
 		goto done;
 	}
 	/* version */
-	if (gopt(opt, 'v')) {
+	if (gopt(opt, 'V')) {
 		opts->mode = TS_MODE_VERSION;
 		goto done;
 	}
