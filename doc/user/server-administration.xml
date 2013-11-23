@@ -34,17 +34,17 @@ memory than SAVE SNAPSHOT, it is especially appropriate for taking periodic
 snapshots as a background task.
 </para>
 <para>
-To prepare: ensure that the configuration file contains 
-<olink targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
-clauses. Tarantar does not assume that wal_dir and snap_dir have default values.
+To prepare: ensure that the configuration file is available.
 </para>
 <para>
 To run:<programlisting> <command>tarantar</command> [options] <replaceable>configuration-file</replaceable></programlisting>
-where possible options are:<simplelist> <member><code>-i <replaceable>seconds-count</replaceable></code> or <code>--interval <replaceable>seconds-count</replaceable></code> &mdash; repeat every seconds-count seconds. example: <code>-i 3600</code></member>
+where possible options are:<simplelist>
+ <member><code>-c </code> or <code>--create </code> &mdash; create snapshot file. example: <code>--create</code></member>
+ <member><code>-i <replaceable>seconds-count</replaceable></code> or <code>--interval <replaceable>seconds-count</replaceable></code> &mdash; repeat every seconds-count seconds. example: <code>-i 3600</code></member>
  <member><code>-n <replaceable>lsn-number</replaceable></code> or <code>--lsn <replaceable>lsn-number</replaceable></code> &mdash; start from lsn = lsn-number. if not specified, lsn = latest. example: <code>-n 5</code></member>
  <member><code>-l <replaceable>bytes-count</replaceable></code> or <code>--limit <replaceable>bytes-count</replaceable></code> &mdash; do not use more than bytes-count bytes of memory. example: <code>-l 5000000</code></member>
- <member><code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
- <member><code>-v </code> or <code>--version</code> &mdash; display version and exit. example: <code>-v</code></member></simplelist></para>
+ <member><code>-? </code> or <code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
+ <member><code>-V </code> or <code>--version</code> &mdash; display version and exit. example: <code>-V</code></member></simplelist></para>
 <para>
 Example:
 <programlisting>
@@ -118,9 +118,9 @@ clauses. Tarancheck does not assume that wal_dir and snap_dir have default value
 To run:<programlisting> <command>tarancheck</command> [options] <replaceable>configuration-file</replaceable></programlisting>
 where possible options are:<simplelist>
  <member><code>-G <replaceable>signature file</replaceable></code> or <code>--generate <replaceable>signature-file</replaceable></code> &mdash; generate signature file. example: <code>-G x.crc</code></member>
- <member><code>-V <replaceable>signature file</replaceable></code> or <code>--verify <replaceable>signature-file</replaceable></code> &mdash; verify signature file. example: <code>--verify x.crc</code></member>
- <member><code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
- <member><code>-v </code> or <code>--version</code> &mdash; display version and exit. example: <code>-v</code></member></simplelist></para>
+ <member><code>-W <replaceable>signature file</replaceable></code> or <code>--verify <replaceable>signature-file</replaceable></code> &mdash; verify signature file. example: <code>--verify x.crc</code></member>
+ <member><code>-? </code> or <code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
+ <member><code>-V </code> or <code>--version</code> &mdash; display version and exit. example: <code>-V</code></member></simplelist></para>
 <para>
 Example:
 <programlisting>
