@@ -30,6 +30,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
+#include "errinj.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -96,6 +97,16 @@ sptree_index_node_compare_with_key(const void *key, const void *node, void *arg)
 	return -tuple_compare_with_key(tuple, key_data->key,
 				       key_data->part_count, self->key_def);
 }
+
+#ifndef NDEBUG
+void *
+realloc_inject(void *ptr, size_t size)
+{
+	if (size)
+		ERROR_INJECT(ERRINJ_TREE_ALLOC, return 0);
+	return realloc(ptr, size);
+}
+#endif
 
 /* {{{ TreeIndex Iterators ****************************************/
 
@@ -270,7 +281,13 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		sptree_index_fold(&new_node, new_tuple);
 
 		/* Try to optimistically replace the new_tuple. */
-		sptree_index_replace(&tree, &new_node, (void **) &p_dup_node);
+		int tree_res =  sptree_index_replace(&tree, &new_node,
+						     (void **) &p_dup_node);
+
+		if (tree_res) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, tree_res,
+				  "TreeIndex", "replace");
+		}
 
 		struct tuple *dup_tuple = sptree_index_unfold(p_dup_node);
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
@@ -325,12 +342,19 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 	it->key_data.key = key;
 	it->key_data.part_count = part_count;
 
-	if (iterator_type_is_reverse(type))
-		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
-						       &it->key_data);
-	else
-		sptree_index_iterator_init_set(&tree, &it->iter,
-					       &it->key_data);
+	if (iterator_type_is_reverse(type)) {
+		int r = sptree_index_iterator_reverse_init_set(&tree,
+				&it->iter, &it->key_data);
+		if (r)
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  r, "TreeIndex", "init iterator");
+	} else {
+		int r = sptree_index_iterator_init_set(&tree,
+				&it->iter, &it->key_data);
+		if (r)
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  r, "TreeIndex", "init iterator");
+	}
 
 	switch (type) {
 	case ITER_EQ:
@@ -369,7 +393,8 @@ TreeIndex::beginBuild()
 	size_t sz = tree.max_size * sizeof(struct sptree_index_node);
 	tree.members = malloc(sz);
 	if (tree.members == NULL) {
-		panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  sz, "TreeIndex", "begin build");
 	}
 }
 
@@ -382,7 +407,8 @@ TreeIndex::buildNext(struct tuple *tuple)
 		size_t sz = tree.max_size * sizeof(struct sptree_index_node);
 		tree.members = realloc(tree.members, sz);
 		if (tree.members == NULL) {
-			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  sz, "TreeIndex", "begin build");
 		}
 	}
 
@@ -401,11 +427,16 @@ TreeIndex::endBuild()
 	uint32_t estimated_tuples = tree.max_size;
 	void *nodes = tree.members;
 
+	int tree_res =
 	sptree_index_init(&tree, sizeof(struct sptree_index_node),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
 			  sptree_index_node_compare,
 			  this);
+	if (tree_res) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  tree_res, "TreeIndex", "init tree");
+	}
 }
 
 void
@@ -424,7 +455,8 @@ TreeIndex::build(Index *pk)
 		size_t sz = estimated_tuples * sizeof(struct sptree_index_node);
 		nodes = malloc(sz);
 		if (nodes == NULL) {
-			panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  sz, "TreeIndex", "build");
 		}
 	}
 
@@ -445,10 +477,15 @@ TreeIndex::build(Index *pk)
 	}
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
+	int tree_res =
 	sptree_index_init(&tree, sizeof(struct sptree_index_node),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
 			  key_def->is_unique ? sptree_index_node_compare
 					     : sptree_index_node_compare_dup,
 			  this);
+	if (tree_res) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  tree_res, "TreeIndex", "init tree");
+	}
 }
