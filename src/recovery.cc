@@ -209,8 +209,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	struct recovery_state *r = recovery_state;
 	recovery_update_mode(r, "none", 0);
 
-	if (rows_per_wal <= 1)
-		panic("unacceptable value of 'rows_per_wal'");
+	assert(rows_per_wal > 1);
 
 	r->row_handler = row_handler;
 	r->row_handler_param = row_handler_param;

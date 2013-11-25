@@ -57,6 +57,14 @@ exec admin "lua box.space[0].enabled"
 exec admin "reload configuration"
 
 print """
+# Bug#100 Segmentation fault if rows_per_wal = 1
+#  (https://github.com/tarantool/tarantool/issues/100)
+"""
+# stop current server
+server.stop()
+server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bug_gh100.cfg"))
+
+print """
 #  Test field type conflict in keys
 """
 # stop current server
