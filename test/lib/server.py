@@ -323,6 +323,9 @@ class Server(object):
 
         is_connected = False
         while not is_connected:
+            if not self.process.isalive():
+                raise OSError("Can't start tarantool");
+
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))

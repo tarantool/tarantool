@@ -276,6 +276,7 @@ tnt_log_open(struct tnt_log *l, char *file, enum tnt_log_type type)
 	/* getting current offset */
 	l->offset = ftello(l->fd);
 	l->current_offset = 0;
+	memset(&l->current_value, 0, sizeof(l->current_value));
 	return 0;
 }
 
