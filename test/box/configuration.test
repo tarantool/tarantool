@@ -62,7 +62,9 @@ print """
 """
 # stop current server
 server.stop()
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
 server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bug_gh100.cfg"))
+sys.stdout.pop_filter()
 
 print """
 #  Test field type conflict in keys

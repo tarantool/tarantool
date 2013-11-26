@@ -209,8 +209,8 @@ ok
 # Bug#100 Segmentation fault if rows_per_wal = 1
 #  (https://github.com/tarantool/tarantool/issues/100)
 
-tarantool_box -c /data/work/tarantool/stable/test/box/tarantool_bug_gh100.cfg
-/data/work/tarantool/stable/src/box/tarantool_box: can't load config:
+tarantool_box -c tarantool_bug_gh100.cfg
+tarantool_box: can't load config:
  - rows_per_wal must be greater than one
 
 
