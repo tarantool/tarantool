@@ -228,6 +228,12 @@ box_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 
+	/* check rows_per_wal configuration */
+	if (conf->rows_per_wal <= 1) {
+		out_warning(CNF_OK, "rows_per_wal must be greater than one");
+		return -1;
+	}
+
 	return 0;
 }
 

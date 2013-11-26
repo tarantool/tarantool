@@ -46,6 +46,16 @@ try:
 except OSError as e:
     print("ok")
 
+print """
+# Bug#100 Segmentation fault if rows_per_wal = 1
+#  (https://github.com/tarantool/tarantool/issues/100)
+"""
+# stop current server
+server.stop()
+sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
+server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bug_gh100.cfg"))
+sys.stdout.pop_filter()
+
 # restore default server
 server.stop()
 shutil.rmtree(script_dir_path, True)
