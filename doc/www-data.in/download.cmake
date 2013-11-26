@@ -76,6 +76,20 @@ to enable it:
     enabled=1
     gpgcheck=0
 
+### Fedora
+
+Fedora repository is available at
+<a href="http://tarantool.org/dist/fedora">http://tarantool.org/dist/fedora</a>.
+
+Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
+to enable it:
+
+    [tarantool]
+    name=Fedora-$releasever - Tarantool
+    baseurl=http://tarantool.org/dist/fedora/$releasever/os/$basearch/
+    enabled=1
+    gpgcheck=0
+
 ### Gentoo Linux
 
 Tarantool is available from `tarantool` portage overlay. Use
