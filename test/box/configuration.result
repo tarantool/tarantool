@@ -51,3 +51,8 @@ mod.test(10, 15)
 ---
 - 25
 ...
+
+# Bug#99 Salloc initialization is not checked on startup
+#  (https://github.com/tarantool/tarantool/issues/99)
+
+ok

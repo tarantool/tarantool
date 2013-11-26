@@ -597,6 +597,8 @@ class TarantoolServer(Server):
 
         is_connected = False
         while not is_connected and not self.gdb:
+            if self.process.poll():
+                raise OSError("Can't start tarantool");
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect(("localhost", self.port))
