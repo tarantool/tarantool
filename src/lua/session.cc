@@ -28,6 +28,7 @@
  */
 #include "lua/session.h"
 #include "lua/utils.h"
+#include "lua/trigger.h"
 
 extern "C" {
 #include <lua.h>
@@ -38,8 +39,6 @@ extern "C" {
 #include "fiber.h"
 #include "session.h"
 #include "sio.h"
-#include <scoped_guard.h>
-#include "../box/box_lua.h"
 
 static const char *sessionlib_name = "box.session";
 
@@ -92,119 +91,31 @@ lbox_session_peer(struct lua_State *L)
 	return 1;
 }
 
-
-/**
- * run on_connect|on_disconnect trigger with lua context
- */
-static void
-lbox_session_run_trigger_luactx(struct lua_State *L, va_list ap)
-{
-	struct lua_trigger *lt = va_arg(ap, struct lua_trigger *);
-	lua_rawgeti(L, LUA_REGISTRYINDEX, lt->ref);
-	lua_call(L, 0, 0);
-}
-
 /**
  * run on_connect|on_disconnect trigger
  */
 static void
-lbox_session_run_trigger(struct trigger *trg, void * /* event */)
+lbox_session_run_trigger(struct trigger *trigger, void * /* event */)
 {
-	struct lbox_session_trigger *trigger =
-			(struct lbox_session_trigger *) trg;
-	/* Copy the referenced callable object object stack. */
 	lua_State *L = lua_newthread(tarantool_L);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	lua_rawgeti(tarantool_L, LUA_REGISTRYINDEX, trigger->ref);
-	/** Move the function to be called to the new coro. */
-	lua_xmove(tarantool_L, L, 1);
-
-	try {
-		lbox_call(L, 0, 0);
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	} catch (const Exception& e) {
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		throw;
-	}
-}
-
-/**
- * set/reset/get trigger
- */
-static int
-lbox_session_set_trigger(struct lua_State *L, struct rlist *list)
-{
-	int top = lua_gettop(L);
-	if (top > 1 || (top && !lua_isfunction(L, 1) && !lua_isnil(L, 1)))
-		luaL_error(L, "session.on_connect(chunk): bad arguments");
-
-	struct lua_trigger *current = 0;
-	struct trigger *trigger;
-	rlist_foreach_entry(trigger, list, link) {
-		if (trigger->run == lbox_session_run_trigger) {
-			current = (struct lua_trigger *)trigger;
-			break;
-		}
-	}
-
-	/* get current trigger */
-	if (top == 0) {
-		if (current)
-			lua_rawgeti(L, LUA_REGISTRYINDEX, current->ref);
-		else
-			lua_pushnil(L);
-		return 1;
-	}
-
-	/* cleanup the trigger */
-	if (lua_isnil(L, 1)) {
-		if (current) {
-			trigger_clear(&current->trigger);
-			luaL_unref(L, LUA_REGISTRYINDEX, current->ref);
-			free(current);
-		}
-		lua_pushnil(L);
-		return 1;
-	}
-
-	/* set new trigger */
-	lua_pushvalue(L, 1);
-	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
-
-
-	if (current) {
-		luaL_unref(L, LUA_REGISTRYINDEX, current->ref);
-		current->ref = ref;
-	} else {
-		current = (struct lua_trigger *)
-			malloc(sizeof(struct lua_trigger));
-		if (!current) {
-			luaL_unref(L, LUA_REGISTRYINDEX, ref);
-			luaL_error(L, "Can't allocate memory for trigger");
-		}
-		current->trigger.destroy = NULL;
-		current->trigger.run = lbox_session_run_trigger;
-		current->ref = ref;
-		trigger_set(list, &current->trigger);
-	}
-
-	lua_pushvalue(L, 1);
-	return 1;
-
+	LuarefGuard coro_guard(tarantool_L);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
+	lbox_call(L, 0, 0);
 }
 
 static int
 lbox_session_on_connect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &session_on_connect);
+	return lbox_trigger_reset(L, 2, &session_on_connect,
+				  lbox_session_run_trigger);
 }
 
 static int
 lbox_session_on_disconnect(struct lua_State *L)
 {
-	return lbox_session_set_trigger(L, &session_on_disconnect);
+	return lbox_trigger_reset(L, 2, &session_on_disconnect,
+				  lbox_session_run_trigger);
 }
-
 
 void
 tarantool_lua_session_init(struct lua_State *L)

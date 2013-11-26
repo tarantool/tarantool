@@ -498,7 +498,7 @@ t
   - 'backlog: 1024'
   - 'wal_dir_rescan_delay: 0.1'
 ...
-t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' then table.insert(t, k..': '..tostring(v)) end end
+t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
 ---
 ...
 t
@@ -549,7 +549,7 @@ t
   - 'backlog: 1024'
   - 'wal_dir_rescan_delay: 0.1'
 ...
-t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' then table.insert(t, k..': '..tostring(v)) end end
+t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
 ---
 ...
 t

@@ -75,6 +75,7 @@ set (common_sources
      rlist.c
      cpu_feature.c
      lua/fiber.cc
+     lua/trigger.cc
      lua/admin.cc
      lua/info.cc
      lua/stat.cc

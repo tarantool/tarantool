@@ -3,19 +3,20 @@
  # if on_connect() trigger raises an exception, the connection is dropped
  # 
  
-type(box.session.on_connect(function() nosuchfunction() end))
+function f1() nosuchfunction() end
 ---
-- function
+...
+box.session.on_connect(f1)
+---
 ...
 select * from t0 where k0=0
 ---
 - error:
     errcode: ER_PROC_LUA
-    errmsg: [string "return type(box.session.on_connect(function()..."]:1: attempt to call global 'nosuchfunction' (a nil value)
+    errmsg: [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
 ...
 Connection is dead.
 
-type(box.session.on_connect(nil))
+box.session.on_connect(nil, f1)
 ---
-- nil
 ...

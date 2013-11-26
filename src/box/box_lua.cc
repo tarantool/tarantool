@@ -1260,31 +1260,6 @@ box_lua_execute(const struct request *request, struct txn *txn,
 	port_add_lua_multret(port, L);
 }
 
-/**
- * Invoke C function with lua context
- */
-void
-box_luactx(void (*f)(struct lua_State *L, va_list args), ...)
-{
-        lua_State *L = lua_newthread(root_L);
-        int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
-
-        try {
-                auto scoped_guard = make_scoped_guard([=] {
-                        luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
-                });
-
-                va_list args;
-                va_start(args, f);
-                f(L, args);
-        } catch (const Exception& e) {
-                throw;
-        } catch (...) {
-                tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
-        }
-}
-
-
 static void
 box_index_init_iterator_types(struct lua_State *L, int idx)
 {

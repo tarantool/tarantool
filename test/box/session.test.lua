@@ -17,16 +17,18 @@ failed
 box.session.peer() == box.session.peer(box.session.id())
 
 -- check on_connect/on_disconnect triggers
-type(box.session.on_connect(function() end))
-type(box.session.on_disconnect(function() end))
+function noop() end
+box.session.on_connect(noop)
+box.session.on_disconnect(noop)
 
 -- check it's possible to reset these triggers
-type(box.session.on_connect(function() error('hear') end))
-type(box.session.on_disconnect(function() error('hear') end))
+function fail() error('hear') end
+box.session.on_connect(fail, noop)
+box.session.on_disconnect(fail, noop)
 
 -- check on_connect/on_disconnect argument count and type
-type(box.session.on_connect())
-type(box.session.on_disconnect())
+box.session.on_connect()
+box.session.on_disconnect()
 
 box.session.on_connect(function() end, function() end)
 box.session.on_disconnect(function() end, function() end)
@@ -38,14 +40,14 @@ box.session.on_connect(1)
 box.session.on_disconnect(1)
 
 -- use of nil to clear the trigger
-box.session.on_connect(nil)
-box.session.on_disconnect(nil)
+box.session.on_connect(nil, fail)
+box.session.on_disconnect(nil, fail)
 
 -- check how connect/disconnect triggers work
 function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
-type(box.session.on_connect(inc))
-type(box.session.on_disconnect(dec))
+box.session.on_connect(inc)
+box.session.on_disconnect(dec)
 active_connections = 0
 --# create connection con_one to default
 active_connections
@@ -56,12 +58,14 @@ active_connections
 box.fiber.sleep(0) -- yield
 active_connections
 
-box.session.on_connect(nil)
-box.session.on_disconnect(nil)
+box.session.on_connect(nil, inc)
+box.session.on_disconnect(nil, dec)
 
 -- write audit trail of connect/disconnect into a space
-type(box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end))
-type(box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end))
+function audit_connect() box.space['tweedledum']:insert(box.session.id()) end
+function audit_disconnect() box.space['tweedledum']:delete(box.session.id()) end
+box.session.on_connect(audit_connect)
+box.session.on_disconnect(audit_disconnect)
 
 --# create connection con_three to default
 --# set connection con_three
@@ -70,8 +74,8 @@ space:select(0, box.session.id())[0] == box.session.id()
 --# drop connection con_three
 
 -- cleanup
-box.session.on_connect(nil)
-box.session.on_disconnect(nil)
+box.session.on_connect(nil, audit_connect)
+box.session.on_disconnect(nil, audit_disconnect)
 active_connections
 
 space:drop()

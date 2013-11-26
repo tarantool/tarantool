@@ -44,12 +44,6 @@ box_lua_execute(const struct request *request, struct txn *txn,
 
 
 /**
- * Invoke C function with lua context
- */
-void
-box_luactx(void (*f)(struct lua_State *L, va_list args), ...);
-
-/**
  * Push tuple on lua stack
  */
 void
