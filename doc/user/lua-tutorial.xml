@@ -1,0 +1,489 @@
+<appendix xmlns="http://docbook.org/ns/docbook" version="5.0"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:id="lua-tutorial">
+
+<title>Lua tutorial</title>
+
+<para>
+<bridgehead renderas="sect4">Insert one million tuples with a Lua stored procedure</bridgehead>
+This is an exercise assignment: <quote>Insert one million tuples.
+Each tuple should have a constantly-increasing numeric primary-key field
+and a random alphabetic 10-character string field.</quote>
+</para>
+
+<para>
+The purpose of the exercise is to show what Lua functions
+look like inside Tarantool. It will be necessary to employ
+the Lua math library, the Lua string library, the Tarantool
+box library, the Tarantool box.tuple library, loops, and concatenations. It should be easy
+to follow even for a person who has not used either Lua
+or Tarantool before. The only requirement is a knowledge
+of how other programming languages work and a memory of
+the first two chapters of this manual. But for better understanding,
+follow the comments and the links, which point to the Lua
+manual or to elsewhere in this Tarantool manual.
+To further enhance learning, type the statements
+in with the tarantool client while reading along.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Configure</bridgehead>
+We are going to use the "tarantool_sandbox" that was created in section
+<olink targetptr="getting-started-start-stop">Starting Tarantool and making your first database</olink>.
+So there is a single space, and a numeric primary key,
+a runnning tarantool_box server, and a running tarantool client.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Delimiter</bridgehead>
+We'll be making functions which go over one line. We don't want the client to send to the server after every line.
+So we <link linkend="client-reference-delim">declare a delimiter</link>.
+This means <quote>Do not send to the server until you see an exclamation mark.</quote>
+
+<programlisting>
+localhost> <userinput>SETOPT DELIMITER = '!'</userinput>
+</programlisting>
+From now on it will be possible to use multiple-line statements,
+but it will be necessary to end all statements with exclamation marks.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Create a function that returns a string</bridgehead>
+
+We will start by making a function that returns a fixed string, <quote>Hello world</quote>.
+<programlisting>
+lua function string_function()
+  return "hello world"
+  end!
+</programlisting>
+The word <link linkend="client-reference-lua">LUA</link>
+is a Tarantool keyword that means <quote>we're about to go into Lua.</quote>
+The function name is string_function.
+The function has one executable statement, <code>return "hello world"</code>.
+The string "hello world" is enclosed in double quotes here,
+although Lua doesn't care -- one could use single quotes instead.
+The word "end" means <quote>this is the end of the Lua function declaration.</quote>
+The word "end" is followed by "!" because "!" happens to be the delimiter that we chose in the previous step.
+
+To confirm that the function works, we can say
+<programlisting>
+call string_function()!
+</programlisting>
+The word <link linkend="client-reference-call">CALL</link> is a Tarantool keyword that means <quote>invoke the Lua function.</quote>
+The effect is that the string which the function returns will end up on the screen.
+</para>
+
+<para>
+For more about Lua strings see Lua manual chapter 2.4 "Strings"
+<productname xlink:href="http://www.lua.org/pil/2.4.html">http://www.lua.org/pil/2.4.html</productname>.
+
+For more about functions see Lua manual chapter 5 "Functions"
+<productname xlink:href="http://www.lua.org/pil/5.html">http://www.lua.org/pil/5.html</productname>.
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function string_function()</userinput>
+        -&gt;   <userinput>return "hello world"</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call string_function()!</userinput>
+Call OK, 1 rows affected
+['hello world']
+localhost&gt;
+</programlisting>
+</para>
+
+ <para>
+<bridgehead renderas="sect4">Create a function that calls another function and sets a variable</bridgehead>
+
+Now that string_function exists, we can invoke it from another function.
+<programlisting>
+lua function main_function()
+  local string_value
+  string_value = string_function()
+  return string_value
+  end!
+</programlisting>
+We begin by declaring a variable "string_value".
+The word "local" means that string_value appears only in main_function.
+If we didn't use "local" then string_value would be visible everywhere
+-- even by other users using other clients connected to this server!
+Sometimes that's a very desirable feature for inter-client communication, but not this time.
+</para>
+
+<para>
+Then we assign a value to string_value, namely, the result of string_function().
+We don't need the word CALL for this (CALL is only meaningful to the tarantool client, not to the Lua compiler).
+But we will CALL main_function() to check that it got the value.
+</para>
+
+<para>
+For more about Lua variables see Lua manual chapter 4.2 "Local Variables and Blocks"
+<productname xlink:href="http://www.lua.org/pil/4.2.html">http://www.lua.org/pil/4.2.html</productname>.
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function main_function()</userinput>
+        -&gt;   <userinput>local string_value</userinput>
+        -&gt;   <userinput>string_value = string_function()</userinput>
+        -&gt;   <userinput>return string_value</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 1 rows affected
+['hello world']
+localhost&gt;
+</programlisting>
+</para>
+
+<para>
+<bridgehead renderas="sect4">Modify the function so it returns a one-letter random string</bridgehead>
+
+Now that it's a bit clearer how to make a variable, we can change string_function()
+so that, instead of returning a fixed literal 'Hello world", it returns a random letter between 'A' and 'Z'.
+<programlisting>
+lua function string_function()
+  local random_number
+  local random_string
+  random_number = math.random(65,90)
+  random_string = string.char(random_number)
+  return random_string
+  end!
+</programlisting>
+It is not necessary to destroy the old string_function() contents, they're simply overwritten.
+The first assignment invokes a random-number function in Lua's math library; the parameters mean <quote>the number must be an integer between 65 and 90.</quote>
+The second assignment invokes an integer-to-character function in Lua's string library; the parameter is the code point of the character.
+Luckily the ASCII value of 'A' is 65 and the ASCII value of 'Z' is 90 so the result will always be a letter between A and Z.
+</para>
+
+<para>
+For more about Lua math-library functions see Lua users "Math Library Tutorial"
+<productname xlink:href="http://lua-users.org/wiki/MathLibraryTutorial">http://lua-users.org/wiki/MathLibraryTutorial</productname>.
+For more about Lua string-library functions see Lua users "String Library Tutorial"
+<productname xlink:href="http://lua-users.org/wiki/StringLibraryTutorial">http://lua-users.org/wiki/StringLibraryTutorial</productname>.
+</para>
+
+<para>
+Once again the string_function() can be invoked from main_function() which can be invoked with
+</para>
+<para>
+call main_function()
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function string_function()</userinput>
+        -&gt;   <userinput>local random_number</userinput>
+        -&gt;   <userinput>local random_string</userinput>
+        -&gt;   <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;   <userinput>random_string = string.char(random_number)</userinput>
+        -&gt;   <userinput>return random_string</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 1 rows affected
+['C']
+localhost&gt;
+</programlisting>
+... Well, actually it won't always look like this because math.random() produces random numbers.
+But for the illustration purposes it won't matter what the random string values are.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Modify the function so it returns a ten-letter random string</bridgehead>
+Now that it's clear how to produce one-letter random strings, we can reach our goal
+of producing a ten-letter string by concatenating ten one-letter strings, in a loop.
+<programlisting>
+lua function string_function()
+  local random_number
+  local random_string
+  random_string = ""
+  for x = 1,10,1 do
+    random_number = math.random(65,90)
+    random_string = random_string .. string.char(random_number)
+    end
+  return random_string
+  end!
+</programlisting>
+The words "for x = 1,10,1" mean <quote>start with x equals 1, loop until x equals 10, increment x by 1 for each iteration.</quote>
+The symbol ".." means "concatenate", that is, add the string on the right of the ".." sign to the string on the left of the ".." sign.
+Since we start by saying that random_string is "" (a blank string), the end result is that random_string has 10 random letters.
+
+Once again the string_function() can be invoked from main_function() which can be invoked with
+</para>
+<para>
+call main_function()
+</para>
+
+<para>
+For more about Lua loops see Lua manual chapter 4.3.4 "Numeric for"
+<productname xlink:href="http://www.lua.org/pil/4.3.4.html">http://www.lua.org/pil/4.3.4.html</productname>.
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function string_function()</userinput>
+        -&gt;   <userinput>local random_number</userinput>
+        -&gt;   <userinput>local random_string</userinput>
+        -&gt;   <userinput>random_string = ""</userinput>
+        -&gt;   <userinput>for x = 1,10,1 do</userinput>
+        -&gt;     <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;     <userinput>random_string = random_string .. string.char(random_number)</userinput>
+        -&gt;     <userinput>end</userinput>
+        -&gt;   <userinput>return random_string</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 1 rows affected
+['ZUDJBHKEFM']
+localhost&gt;
+</programlisting>
+</para>
+
+<para>
+<bridgehead renderas="sect4">Make a tuple out of a number and a string</bridgehead>
+
+Now that it's clear how to make a 10-letter random string, it's possible to
+make a tuple that contains a number and a 10-letter random string, by invoking
+a function in Tarantool's library of Lua functions.
+<programlisting>
+lua function main_function()
+  local string_value
+  string_value = string_function()
+  t = box.tuple.new({1,string_value})
+  return t
+  end!
+</programlisting>
+Once this is done, t will be the value of a new tuple which has two
+fields. The first field is numeric: 1. The second field is a random string.
+
+Once again the string_function() can be invoked from main_function() which can be invoked with
+</para>
+<para>
+call main_function()
+</para>
+
+<para>
+For more about Tarantool tuples see Tarantool manual section
+<olink targetptr="sp-box-tuple">Package box.tuple</olink>.
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function main_function()</userinput>
+        -&gt;   <userinput>local string_value</userinput>
+        -&gt;   <userinput>string_value = string_function()</userinput>
+        -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
+        -&gt;   <userinput>return t</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 1 rows affected
+[1, 'PNPZPCOOKA']
+localhost&gt;
+</programlisting>
+</para>
+
+<para>
+<bridgehead renderas="sect4">Modify main_function to insert a tuple into the database</bridgehead>
+
+Now that it's clear how to make a tuple that contains a number and a 10-letter random string,
+the only trick remaining is putting that tuple into space[0]. Remember that space[0] is
+the first space that was defined in the configuration file, so it's like a database table.
+<programlisting>
+lua function main_function()
+  local string_value
+  string_value = string_function()
+  t = box.tuple.new({1,string_value})
+  box.replace(0,t)
+  end!
+</programlisting>
+The new line here is box.replace(0,t). The first parameter is 0, because the
+insertion is going to be to space[0]. The second parmeter is the tuple value.
+To be perfectly correct we could have said box.insert(0,t) here, rather than
+box.replace(0,t), but "replace" means <quote>insert even if there is already a tuple
+whose primary-key value is a duplicate</quote>, and that makes it easier to re-run
+the exercise even if the sandbox database isn't empty.
+
+Once this is done, space[0] will contain a tuple with two fields. The first
+field will be 1. The second field will be a random 10-letter string.
+
+Once again the string_function() can be invoked from main_function() which can be invoked with
+call main_function(). But main_function() won't tell the whole story, because it does not
+return t, it only puts t into the database. To confirm that something got inserted, we'll
+use a <link linkend="client-reference-select">SELECT statement</link>.
+
+<programlisting>
+call main_function()!
+SELECT * FROM t0 WHERE k0 = 1!
+</programlisting>
+</para>
+
+<para>
+For more about Tarantool insert and replace calls, see Tarantool manual section
+<olink targetptr="sp-box">Package box</olink>.
+</para>
+
+<para>
+The screen now looks like this:
+<programlisting>
+localhost&gt; <userinput>lua function main_function()</userinput>
+        -&gt;   <userinput>local string_value</userinput>
+        -&gt;   <userinput>string_value = string_function()</userinput>
+        -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
+        -&gt;   <userinput>box.replace(0,t)</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 0 rows affected
+localhost&gt; <userinput>SELECT * FROM t0 WHERE k0 = 1!</userinput>
+Select OK, 1 rows affected
+[1, 'EUJYVEECIL']
+localhost&gt;
+</programlisting>
+</para>
+
+<para>
+<bridgehead renderas="sect4">Modify main_function to insert a million tuples into the database</bridgehead>
+
+Now that it's clear how to insert one tuple into the database,
+it's no big deal to figure out how to scale up: instead of
+inserting with a literal value = 1 for the primary key, insert
+with a variable value = between 1 and 1 million, in a loop.
+Since we already saw how to loop, that's a simple thing.
+The only extra wrinkle that we add here is a timing function.
+<programlisting>
+lua function main_function()
+  local string_value
+  start_time = os.clock()
+  for i = 1,1000000,1 do
+    string_value = string_function()
+    t = box.tuple.new({i,string_value})
+    box.replace(0,t)
+    end
+  end_time = os.clock()
+  end!
+call main_function()!
+lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!
+</programlisting>
+
+The Lua os.clock() function will return the number of seconds since the start.
+Therefore, by getting start_time = number of seconds just before the inserting,
+and then getting end_time = number of seconds just after the inserting,
+we can calculate (end_time - start_time) = elapsed time in seconds.
+We will display that value with Lua's answer to the C printf() function, which is print().
+</para>
+
+<para>
+For more on Lua os.clock() see Lua manual chapter 22.1 "Date and Time"
+<productname xlink:href="http://www.lua.org/pil/22.1.html">http://www.lua.org/pil/22.1.html</productname>.
+For more on Lua print() see Lua manual chapter 5 "Functions"
+<productname xlink:href="http://www.lua.org/pil/5.html">http://www.lua.org/pil/5.html</productname>.
+</para>
+
+<para>
+Since this is the grand finale, we will redo the final versions of all the necessary
+statements: the SETOPT DELIMITER statement, the statement that created string_function(),
+the statement that created main_function(), and the statement that invokes main_function().
+
+
+<programlisting>
+#NB: If you have already said "setopt delimiter = '!'", do not say it again -- skip this statement.
+setopt delimiter = '!'
+
+lua function string_function()
+  local random_number
+  local random_string
+  random_string = ""
+  for x = 1,10,1 do
+    random_number = math.random(65,90)
+    random_string = random_string .. string.char(random_number)
+    end
+  return random_string
+  end!
+
+lua function main_function()
+  local string_value
+  start_time = os.clock()
+  for i = 1,1000000,1 do
+    string_value = string_function()
+    t = box.tuple.new({i,string_value})
+    box.replace(0,t)
+    end
+  end_time = os.clock()
+  end!
+call main_function()!
+lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!
+</programlisting>
+
+The screen now looks like this:
+
+<programlisting>
+localhost&gt; <userinput>setopt delimiter = '!'!</userinput>
+localhost&gt; <userinput>lua function string_function()</userinput>
+        -&gt;   <userinput>local random_number</userinput>
+        -&gt;   <userinput>local random_string</userinput>
+        -&gt;   <userinput>random_string = ""</userinput>
+        -&gt;   <userinput>for x = 1,10,1 do</userinput>
+        -&gt;     <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;     <userinput>random_string = random_string .. string.char(random_number)</userinput>
+        -&gt;     <userinput>end</userinput>
+        -&gt;   <userinput>return random_string</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>lua function main_function()</userinput>
+        -&gt;   <userinput>local string_value</userinput>
+        -&gt;   <userinput>start_time = os.clock()</userinput>
+        -&gt;   <userinput>for i = 1,1000000,1 do</userinput>
+        -&gt;     <userinput>string_value = string_function()</userinput>
+        -&gt;     <userinput>t = box.tuple.new({i,string_value})</userinput>
+        -&gt;     <userinput>box.replace(0,t)</userinput>
+        -&gt;     <userinput>end</userinput>
+        -&gt;   <userinput>end_time = os.clock()</userinput>
+        -&gt;   <userinput>end!</userinput>
+---
+...
+localhost&gt; <userinput>call main_function()!</userinput>
+Call OK, 0 rows affected
+localhost&gt; <userinput>lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!</userinput>
+---
+inserted 1 million tuples in 41.66 seconds
+...
+localhost&gt;
+</programlisting>
+</para>
+
+<para>
+What has been shown is that Lua functions are quite expressive
+(in fact one can do more with Tarantool's Lua stored procedures
+than one can do with stored procedures in some SQL DBMSs), and
+that it's straightforward to combine Lua-library functions and
+Tarantool-library functions.
+</para>
+
+<para>
+What has also been shown is that inserting a million
+tuples took 42 seconds. The host computer was a Toshiba
+laptop with a 2.2-GHz Intel Core Duo CPU.
+</para>
+
+</appendix>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->
