@@ -93,13 +93,13 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	 * Fill space.index table with
 	 * all defined indexes.
 	 */
-	for (int i = 0; i <= space->index_id_max; i++) {
-		Index *index = space_index(space, i);
+	for (int k = 0; k <= space->index_id_max; k++) {
+		Index *index = space_index(space, k);
 		if (index == NULL)
 			continue;
 		struct key_def *key_def = index->key_def;
 		lua_pushnumber(L, key_def->iid);
-		lua_newtable(L);		/* space.index[i] */
+		lua_newtable(L);		/* space.index[k] */
 
 		lua_pushboolean(L, key_def->is_unique);
 		lua_setfield(L, -2, "unique");
@@ -130,12 +130,12 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 			lua_pushnumber(L, key_def->parts[j].fieldno);
 			lua_setfield(L, -2, "fieldno");
 
-			lua_settable(L, -3); /* index[i].key_field[j] */
+			lua_settable(L, -3); /* index[k].key_field[j] */
 		}
 
-		lua_settable(L, -3); /* space.index[i].key_field */
+		lua_settable(L, -3); /* space.index[k].key_field */
 
-		lua_settable(L, -3); /* space.index[i] */
+		lua_settable(L, -3); /* space.index[k] */
 		lua_rawgeti(L, -1, key_def->iid);
 		lua_setfield(L, -2, key_def->name);
 	}
