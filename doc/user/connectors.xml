@@ -118,7 +118,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
   <section xml:id="connector-c">
     <title>C</title>
     <para>
-    Here is a complete C program that inserts ['A','BB'] into space[0] via the C API for the
+    Here is a complete C program that inserts [99999,'BB'] into space[0] via the C API for the
     binary protocol. To compile, paste the code into a file named example.c and say <code>
     gcc -o example example.c -I/<replaceable>tarantool-directory</replaceable>/connector/c/include</code>
     where tarantool-directory = the directory that contains
@@ -126,7 +126,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
     (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
-    space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
     To run, say <code>./example</code>.
     The program will format a buffer for sending an INSERT request, then open a socket connection
     with the tarantool_box server at localhost:33013, then send the request, then check if the
@@ -136,6 +136,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
 <programlisting language="cpp">
 #include &lt;arpa/inet.h&gt;
 #include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
 #include &lt;tp.h&gt;                                                /* the usual Tarantool include */
 
 int main()
@@ -143,19 +144,20 @@ int main()
   struct tp request;                                           /* area for sending to server */
   struct tp reply;                                             /* area for getting server reply */
   int fd;                                                      /* file descriptor for socket */
+  int pk_field_value = 99999;
   struct sockaddr_in tt;                                       /* the usual socket address info */
   tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
   tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
   tp_tuple(&amp;request);                                          /* begin appending body */
-  tp_sz(&amp;request,"");                                          /* append field[0] */
-  tp_sz(&amp;request,"BB");                                        /* append field[1] */
+  tp_field(&amp;request, (char*) &amp;pk_field_value, 4);              /* append field[0] */
+  tp_sz(&amp;request, "BB");                                       /* append field[1] */
   if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket, abort if failure */
     exit(1);
   memset(&amp;tt, 0, sizeof(tt));                                  /* connect to localhost:33013 */
   tt.sin_family = AF_INET;
   tt.sin_addr.s_addr = inet_addr("127.0.0.1");
   tt.sin_port = htons(33013);
-  if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt;= 0)   /* connect, abort if failure */
+  if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt; 0)    /* connect, abort if failure */
     exit(1);
   int rc = write(fd, tp_buf(&amp;request), tp_used(&amp;request));     /* send the INSERT request */
   if (rc != tp_used(&amp;request))                                 /* abort if send failed */
@@ -184,6 +186,7 @@ int main()
   tp_free(&amp;reply);
   close(fd);
   printf("Insert succeeded\n");                                /* congratulate self */
+  exit(0);
 }
 </programlisting>
     <para>
