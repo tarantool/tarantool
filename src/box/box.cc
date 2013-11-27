@@ -60,8 +60,6 @@ static void process_rw(struct port *port,
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
-static char status[64] = "unknown";
-
 static int stat_base;
 
 struct box_snap_row {
@@ -192,19 +190,12 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, conf->replication_source);
-
-		snprintf(status, sizeof(status), "replica/%s%s",
-			 conf->replication_source, custom_proc_title);
-		title("replica/%s%s", conf->replication_source,
-		      custom_proc_title);
 	} else {
 		box_process = process_rw;
 
 		memcached_start_expire();
 
-		snprintf(status, sizeof(status), "primary%s",
-			 custom_proc_title);
-		title("primary%s", custom_proc_title);
+		title("primary", NULL);
 
 		say_info("I am primary");
 	}
@@ -326,7 +317,7 @@ box_free(void)
 void
 box_init(bool init_storage)
 {
-	title("loading");
+	title("loading", NULL);
 
 	/* initialization spaces */
 	space_init();
@@ -355,13 +346,11 @@ box_init(bool init_storage)
 
 	say_info("building secondary indexes");
 	build_secondary_indexes();
-	title("orphan");
+	title("orphan", NULL);
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
-		snprintf(status, sizeof(status), "hot_standby%s",
-			 custom_proc_title);
-		title("hot_standby%s", custom_proc_title);
+		title("hot_standby", NULL);
 	}
 }
 
