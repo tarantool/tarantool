@@ -286,7 +286,7 @@ class TestSuite:
                       init_lua=self.ini["init_lua"], silent=False)
         if self.ini['core'] != 'unittest':
             self.ini['servers'] = {'default' : self.server}
-            self.ini['connections'] = {'default' : self.server.admin}
+            self.ini['connections'] = {'default' : [self.server.admin, 'default']}
             self.ini['vardir'] = self.args.vardir
             self.ini['builddir'] = self.args.builddir
         for i in self.ini['lua_libs']:

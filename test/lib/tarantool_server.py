@@ -21,6 +21,8 @@ from lib.test_suite import FilteredStream, Test, check_libs
 from lib.admin_connection import AdminConnection
 from lib.memcached_connection import MemcachedConnection
 
+from lib.preprocessor import State
+
 try:
     import cStringIO as StringIO
 except ImportError:
@@ -62,189 +64,49 @@ class FuncTest(Test):
     def execute(self, server):
         execfile(self.name, dict(locals(), **server.__dict__))
 
-class LuaPreprocessorException(Exception):
-    def __init__(self, val):
-        super(LuaPreprocessorException, self).__init__()
-        self.value = val
-    def __str__(self):
-        return "lua preprocessor error: " + repr(self.value)
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        delimiter = ''
+        ts = State(self.suite_ini, server.admin, TarantoolServer)
         cmd = None
-        curcon = server.admin
+
+        def send_command(command):
+            result = ts.curcon[0](command, silent=True)
+            for conn in ts.curcon[1:]:
+                conn(command, silent=True)
+            return result
+
         for line in open(self.name, 'r'):
             if not cmd:
                 cmd = StringIO.StringIO()
             if line.find('--#') == 0:
-                line = line[3:].strip()
-                matched1 = re.match(r"setopt\s+(.*)", line)
-                matched2 = re.match(r"(.*)\s+server\s+(.*)", line)
-                matched3 = re.match(r"(.*)\s+connection\s+(.*)", line)
-                matched4 = re.match(r"(.*)\s+filter[s]?(\s+.*)?", line)
-                if matched1:
-                    command = re.split(r'\s*=\s*|\s+|\s*,\s*', matched1.group(1))
-                    command = { command[i] : command[i + 1] for i in xrange(0, len(command) - 1, 2) }
-                    if 'delimiter' in command:
-                        delimiter = command['delimiter'].strip()[1:-1]
-                        command.pop('delimiter')
-                    if command:
-                        raise LuaPreprocessorException("Wrong setopt options - " + str(command))
-                elif matched2:
-                    try:
-                        if matched2.group(1) == 'create':
-                            name, params = re.match(r"(.*)\s+with\s+(.*)", matched2.group(2)).groups()
-                            params = re.split(r'\s*=\s*|\s+|\s*,\s*', params)
-                            params = { params[i] : params[i + 1] for i in xrange(0, len(params) - 1, 2) }
-                            temp_server = TarantoolServer()
-                            if 'configuration' in params:
-                                temp_server.config = params['configuration'][1:-1]
-                            else:
-                                temp_server.config = self.suite_ini['config']
-                            if 'need_init' in params:
-                                temp_server.need_init = False
-                            if 'init' in params:
-                                temp_server.init_lua = params['init'][1:-1]
-                                        
-                            temp_server.vardir = os.path.join(self.suite_ini['vardir'], name)
-                            temp_server.binary = temp_server.find_exe(self.suite_ini['builddir'])
-                            self.suite_ini['servers'][name] = temp_server
-                            temp_server.configure(temp_server.config)
-                            temp_server.install(temp_server.binary,
-                                    temp_server.vardir, temp_server.mem, True)
-                            if temp_server.need_init:
-                                temp_server.init()
-                        elif matched2.group(1) == 'start':
-                            name = matched2.group(2)
-                            if name in self.suite_ini['servers']:
-                                self.suite_ini['servers'][name].start(silent=True)
-                                self.suite_ini['connections'][name] = self.suite_ini['servers'][name].admin
-                                try:
-                                    self.suite_ini['connections'][name]('print( 1 )', silent=True)
-                                except socket.error as e:
-                                    raise LuaPreprocessorException("Can't connect to server with errno " + str(e.errno))
-                            else:
-                                raise LuaPreprocessorException("Wrong server name: " + name)
-                        elif matched2.group(1) == 'stop':
-                            name = matched2.group(2)
-                            if name in self.suite_ini['servers']:
-                                self.suite_ini['servers'][name].stop()
-                                self.suite_ini['connections'].pop(name)
-                            else:
-                                raise LuaPreprocessorException("Wrong server name: " + name)
-                        elif matched2.group(1) == 'deploy':
-                            name = matched2.group(2)
-                            if name in self.suite_ini['servers']:
-                                self.suite_ini['servers'][name].deploy(silent=True)
-                            else:
-                                raise LuaPreprocessorException("Wrong server name: " + name)
-                        elif matched2.group(1) == 'reconfigure':
-                            name, params = re.match(r"(.*)\s+with\s+(.*)", matched2.group(2)).groups()
-                            if name not in self.suite_ini['servers']:
-                                raise LuaPreprocessorException("Wrong server name: " + name)
-                            params = re.split(r'\s*=\s*|\s+|\s*,\s*', params)
-                            params = { params[i] : params[i + 1] for i in xrange(0, len(params) - 1, 2) }
-                            tmp_srv = self.suite_ini['servers'][name]
-
-                            if 'configuration' in params:
-                                tmp_srv.reconfigure(params['configuration'][1:-1], silent=True)
-                            else:
-                                tmp_srv.config = self.suite_ini['config']
-
-                            if tmp_srv.init_lua != None:
-                                var_init_lua = os.path.join(tmp_srv.vardir, tmp_srv.default_init_lua_name)
-                                if os.path.exists(var_init_lua):
-                                    os.path.remove(var_init_lua)
-                            if 'init' in params:
-                                tmp_srv.init_lua = params['init'][1:-1]
-                                var_init_lua = os.path.join(tmp_srv.vardir, tmp_srv.default_init_lua_name)
-                                shutil.copy(tmp_srv.init_lua, var_init_lua)
-                                tmp_srv.restart()
-
-                        elif matched2.group(1) == 'cleanup':
-                            name = matched2.group(2)
-                            if name in self.suite_ini['servers']:
-                                self.suite_ini['servers'][name].cleanup()
-                        else:
-                            raise LuaPreprocessorException("Wrong command for server - " + repr(matched2.group(1)))
-                    except (AttributeError, ValueError) as e:
-                        raise LuaPreprocessorException("Wrong command for server - " + repr(e.message))
-                elif matched3:
-                    try:
-                        if matched3.group(1) == 'create':
-                            namecon, name = re.match("(.*)\s+to\s+(.*)", matched3.group(2)).groups()
-                            self.suite_ini['connections'][namecon] = AdminConnection('localhost', self.suite_ini['servers'][name].port)
-                            self.suite_ini['connections'][namecon].connect()
-                        elif matched3.group(1) == 'drop':
-                            name = matched3.group(2)
-                            if name in self.suite_ini['connections']:
-                                self.suite_ini['connections'][name].disconnect()
-                                self.suite_ini['connections'].pop(name)
-                            else:
-                                raise LuaPreprocessorException("Wrong connection name: " + name)
-                        elif matched3.group(1) == 'set':
-                            name = re.split(",\s*", matched3.group(2))
-                            for _name in name:
-                                if not _name in self.suite_ini['connections']:
-                                    raise LuaPreprocessorException("Wrong connection name: " + _name)
-                            if len(name) == 1:
-                                curcon = self.suite_ini['connections'][name[0]]
-                            else:
-                                curcon = [self.suite_ini['connections'][_name] for _name in name]
-                        else:
-                            raise LuaPreprocessorException("Wrong command for connection - " + repr(matched3.group(1)))
-                    except (AttributeError, ValueError) as e:
-                        raise LuaPreprocessorException("Wrong command for connection - " + repr(e.message))
-                elif matched4:
-                    try:
-                        if matched4.group(1) == 'push':
-                            p1, p2 = re.split(r"\"\s*to\s*\"|\'\s*to\s*\'", matched4.group(2).strip())
-                            sys.stdout.push_filter(p1[1:], p2[:-1])
-                        elif matched4.group(1) == 'pop':
-                            sys.stdout.pop_filter()
-                        elif matched4.group(1) == 'clear':
-                            sys.stdout.clear_all_filters()
-                        else:
-                            raise LuaPreprocessorException("Wrong command for filters - " + repr(matched4.group(1)))
-                    except (AttributeError, ValueError) as e:
-                        raise LuaPreprocessorException("Wrong command for filters - " + repr(e.message))
-                else:
-                    raise LuaPreprocessorException("Wrong command - " + repr(line))
-                sys.stdout.write("--# " + line + '\n')
+                rescom = cmd.getvalue().replace('\n\n', '\n')
+                if rescom:
+                    result = send_command(rescom)
+                    sys.stdout.write(cmd.getvalue())
+                    sys.stdout.write(result.replace("\r\n", "\n"))
+                sys.stdout.write(line)
+                ts(line)
             elif line.find('--') == 0:
                 sys.stdout.write(line)
             else:
-                if not delimiter:
-                    if line.strip():
-                        curcon(line.strip())
-                    continue
-                cmd.write(line)
-                if cmd.getvalue().endswith(delimiter + '\n') and cmd.getvalue():
-                    if isinstance(curcon, list):
-                        for con in curcon:
-                            res = con(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
-                    else:
-                        res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
-                    sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
-                    sys.stdout.write(res.replace("\r\n", "\n"))
+                if line.strip() or cmd.getvalue():
+                    cmd.write(line)
+                delim_len = -len(ts.delimiter) if len(ts.delimiter) else None
+                if line.endswith(ts.delimiter+'\n') and cmd.getvalue().strip()[:delim_len].strip():
+                    rescom = cmd.getvalue()[:delim_len].replace('\n\n', '\n')
+                    result = send_command(rescom)
+                    sys.stdout.write(cmd.getvalue())
+                    sys.stdout.write(result.replace("\r\n", "\n"))
                     cmd.close()
                     cmd = None
-        if cmd and cmd.getvalue().strip():
-            if isinstance(curcon, list):
-                for con in curcon:
-                    res = con(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
-            else:
-                res = curcon(cmd.getvalue()[:-len(delimiter)].replace('\n\n', '\n'), silent=True)
-            sys.stdout.write(cmd.getvalue()[:-1].strip() + '\n')
-            sys.stdout.write(res.replace("\r\n", "\n"))
-            cmd.close
-            cmd = None
-        sys.stdout.clear_all_filters()
+        ts.flush()
+
 
 class PythonTest(FuncTest):
     def execute(self, server):
         execfile(self.name, dict(locals(), **server.__dict__))
+
 
 class TarantoolConfigFile:
     """ConfigParser can't read files without sections, work it around"""

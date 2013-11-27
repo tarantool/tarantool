@@ -51,7 +51,7 @@ _select(1, 10)
 -- Master LSN:
 _print_lsn()
 
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -72,7 +72,7 @@ _select (11, 15)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -84,7 +84,7 @@ _select(11, 20)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -105,7 +105,7 @@ _select(21, 30)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -118,7 +118,7 @@ _select(21, 30)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -139,7 +139,7 @@ _select(31, 50)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
@@ -156,7 +156,7 @@ _select(41, 60)
 --# set connection default
 -- Master LSN:
 _print_lsn()
---# set connection replica 
+--# set connection replica
 -- Replica LSN:
 _print_lsn()
 
