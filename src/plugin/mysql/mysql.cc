@@ -47,7 +47,7 @@ extern "C" {
 #include <tarantool_ev.h>
 
 
-#include <lua/init.h>
+#include <lua/utils.h>
 #include <say.h>
 #include <mysql.h>
 #include <scoped_guard.h>
