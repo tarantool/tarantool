@@ -19,7 +19,6 @@ from lib.server import Server
 from lib.box_connection import BoxConnection
 from lib.test_suite import FilteredStream, Test, check_libs
 from lib.admin_connection import AdminConnection
-from lib.memcached_connection import MemcachedConnection
 
 from lib.preprocessor import State
 
@@ -235,14 +234,10 @@ class TarantoolServer(Server):
             self.pidfile = get_option(config, dummy_section_name, "pid_file")
             self.primary_port = get_option(config, dummy_section_name, "primary_port")
             self.admin_port = get_option(config, dummy_section_name, "admin_port")
-            self.memcached_port = get_option(config, dummy_section_name, "memcached_port")
 
         self.port = self.admin_port
         self.admin = AdminConnection("localhost", self.admin_port)
         self.sql = BoxConnection("localhost", self.primary_port)
-        if self.memcached_port != 0:
-            # Run memcached client
-            self.memcached = MemcachedConnection('localhost', self.memcached_port)
 
     def reconfigure(self, config, silent=False):
         if config == None:
