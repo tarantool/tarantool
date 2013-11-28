@@ -65,7 +65,7 @@ type(box.session.on_disconnect(nil))
 box.session.on_connect(function() box.space['tweedledum']:insert(box.session.id()) end)
 box.session.on_disconnect(function() box.space['tweedledum']:delete(box.session.id()) end)
 
---# create connection con_three to default 
+--# create connection con_three to default
 --# set connection con_three
 space:select(0, box.session.id())[0] == box.session.id()
 --# set connection default

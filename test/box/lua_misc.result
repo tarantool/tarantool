@@ -69,10 +69,6 @@ type(box.space);
 ---
 - table
 ...
-box.cfg.memcached_space;
----
-- null
-...
 t = {};
 ---
 ...

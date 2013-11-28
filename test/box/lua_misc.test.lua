@@ -30,7 +30,6 @@ t;
 ----------------
 type(box);
 type(box.space);
-box.cfg.memcached_space;
 t = {};
 for i, v in pairs(space.index[0].key_field[0]) do
     table.insert(t, tostring(i)..' : '..tostring(v))

@@ -632,17 +632,17 @@ s.index.primary
 ...
 s.index.pk.type
 ---
-- error: '[string "return s.index.pk.type"]:1: attempt to index field ''pk'' (a nil
+- error: '[string "return s.index.pk.type "]:1: attempt to index field ''pk'' (a nil
     value)'
 ...
 s.index.pk.unique
 ---
-- error: '[string "return s.index.pk.unique"]:1: attempt to index field ''pk'' (a
+- error: '[string "return s.index.pk.unique "]:1: attempt to index field ''pk'' (a
     nil value)'
 ...
 s.index.pk:rename('primary')
 ---
-- error: '[string "return s.index.pk:rename(''primary'')"]:1: attempt to index field
+- error: '[string "return s.index.pk:rename(''primary'') "]:1: attempt to index field
     ''pk'' (a nil value)'
 ...
 s:create_index('second', 'tree', { parts = {  1, 'str' } })
