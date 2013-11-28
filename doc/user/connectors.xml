@@ -220,8 +220,60 @@ int main()
   <section xml:id="connector-perl">
     <title>Perl</title>
     <para>
-       The Perl driver requires a schema definition.
-       Please refer to CPAN module <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
+     The most commonly used Perl driver is <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
+     It is not supplied as part of the Tarantool repository; it must be installed separately.
+     The most common way to install it is with <link xlink:href='https://en.wikipedia.org/wiki/Cpan'>CPAN, the Comprehensive Perl Archive Network</link>.
+     DR::Tarantool requires other modules which should be installed first.
+     For example, on Ubuntu, the installation could look like this:
+      <programlisting>
+sudo cpan install AnyEvent
+sudo cpan install Devel::GlobalDestruction
+sudo cpan install Coro
+sudo cpan install Test::Pod
+sudo cpan install Test::Spelling
+sudo cpan install PAR::Dist
+sudo cpan install DR::Tarantool
+      </programlisting>
+     </para>
+    <para>
+    Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
+    Before trying to run, check that the server
+    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
+    The program will connect using an application-specific definition of the space.
+    The program will open a socket connection
+    with the tarantool_box server at localhost:33013, then send an INSERT request,
+    then &mdash; if all is well &mdash; end without displaying any messages.
+    If tarantool_box is not running on localhost with primary port = 33013, the program will print
+    <quote>Connection refused</quote>.
+    </para>
+    <para>
+     <programlisting language="perl">
+#!/usr/bin/perl
+use DR::Tarantool ':constant', 'tarantool';
+use DR::Tarantool ':all';
+
+my $tnt = tarantool
+  host    =&gt; '127.0.0.1',                      # look for tarantool_box on localhost
+  port    =&gt; 33013,                            # assume tarantool_box primary port = default
+  spaces  =&gt; {
+    0 =&gt; {                                     # definition of space[0] ...
+      name =&gt; 't0',                            #   space[0] name = 't0'
+      default_type =&gt; 'STR',                   #   space[0] field type is 'STR' if undefined
+      fields =&gt; [ {                            #   definition of space[0].fields ...
+          name =&gt; 'k0', type =&gt; 'NUM' } ],     #     space[0].field[0] name='k0',type='NUM'
+      indexes =&gt; {                             #   definition of space[0] indexes ...
+        0 =&gt; {
+          name =&gt; 'k0', fields =&gt; 'k0' } } } };
+
+$tnt-&gt;insert('t0' => [ 99999, 'BB' ]);         # INSERT INTO t0 VALUES (99999,'BB')
+     </programlisting>
+    </para>
+    <para>
+       The example program only shows one command and does not show all that's necessary for
+       good practice. For that, please see
+       <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool CPAN repository</link>.
     </para>
   </section>
 
