@@ -33,6 +33,7 @@
 #include <dlfcn.h>
 #include <string.h>
 #include "say.h"
+#include <limits.h>
 
 static RLIST_HEAD(loaded_plugins);
 
