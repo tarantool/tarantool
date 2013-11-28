@@ -308,5 +308,4 @@ delete from one list and add_tail as another's head
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-
 #endif /* TARANTOOL_RLIST_H_INCLUDED */

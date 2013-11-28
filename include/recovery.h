@@ -130,10 +130,6 @@ void set_lsn(struct recovery_state *r, int64_t lsn);
 
 void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
 
-int read_log(const char *filename,
-	     row_handler xlog_handler, row_handler snap_handler,
-	     void *param);
-
 void recovery_follow_remote(struct recovery_state *r, const char *addr);
 void recovery_stop_remote(struct recovery_state *r);
 

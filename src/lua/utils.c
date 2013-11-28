@@ -47,8 +47,8 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size)
 {
 	/*
 	 * ctypeid is actually has CTypeID type.
-	 * CTypeId is defined somewhere inside luajit's internal headers
-	 * which should not be included in init.h header.
+	 * CTypeId is defined somewhere inside luajit's internal
+	 * headers.
 	 */
 	assert(sizeof(ctypeid) == sizeof(CTypeID));
 	CTState *cts = ctype_cts(L);
@@ -291,3 +291,33 @@ luaL_tofield(struct lua_State *L, int index, struct luaL_field *field)
 		return;
 	}
 }
+
+/**
+ * A helper to register a single type metatable.
+ */
+void
+luaL_register_type(struct lua_State *L, const char *type_name,
+		   const struct luaL_Reg *methods)
+{
+	luaL_newmetatable(L, type_name);
+	/*
+	 * Conventionally, make the metatable point to itself
+	 * in __index. If 'methods' contain a field for __index,
+	 * this is a no-op.
+	 */
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -2, "__index");
+	lua_pushstring(L, type_name);
+	lua_setfield(L, -2, "__metatable");
+	luaL_register(L, NULL, methods);
+	lua_pop(L, 1);
+}
+
+int
+luaL_pushnumber64(struct lua_State *L, uint64_t val)
+{
+	void *cdata = luaL_pushcdata(L, CTID_UINT64, sizeof(uint64_t));
+	*(uint64_t*) cdata = val;
+	return 1;
+}
+

@@ -42,7 +42,7 @@ extern "C" {
 #include "fiber.h"
 #include "tarantool.h"
 #include "box/box.h"
-#include "lua/init.h"
+#include "lua/utils.h"
 
 static int
 lbox_save_coredump(struct lua_State *L __attribute__((unused)))

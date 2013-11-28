@@ -52,7 +52,7 @@ extern "C" {
 }
 
 #include "box/box.h"
-#include "lua/init.h"
+#include "lua/utils.h"
 #include "session.h"
 #include "scoped_guard.h"
 

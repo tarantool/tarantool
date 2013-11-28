@@ -140,6 +140,9 @@
 
 #define PLUGIN_DIR "@PLUGIN_DIR@"
 
+#define DEFAULT_CFG_FILENAME "tarantool.cfg"
+#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
+
 /*
  * vim: syntax=c
  */

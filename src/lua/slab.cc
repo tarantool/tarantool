@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/slab.h"
+#include "lua/utils.h"
 
 extern "C" {
 #include <lua.h>
@@ -34,7 +35,6 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "lua/init.h"
 #include <salloc.h>
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */

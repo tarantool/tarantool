@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/session.h"
-#include "lua/init.h"
+#include "lua/utils.h"
 
 extern "C" {
 #include <lua.h>
@@ -109,14 +109,11 @@ lbox_session_run_trigger(struct trigger *trg, void * /* event */)
 	lua_xmove(tarantool_L, L, 1);
 
 	try {
-		lua_call(L, 0, 0);
+		lbox_call(L, 0, 0);
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 	} catch (const Exception& e) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		throw;
-	} catch (...) {
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
 }
 

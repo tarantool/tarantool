@@ -28,14 +28,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 #define PLUGIN_API_VERSION		1
 
-#include <rlist.h>
-#include <tbuf.h>
 #include <stddef.h>
+#include "rlist.h"
 
 struct lua_State;
+struct tbuf;
 
 typedef void(*plugin_init_cb)(struct lua_State *L);
 typedef void(*plugin_stat_cb)(struct tbuf *out);
@@ -49,17 +53,36 @@ struct tarantool_plugin {
         struct rlist list;
 };
 
-#define DECLARE_PLUGIN(name, version, init, stat)	        \
+#define DECLARE_PLUGIN(name, version, init, stat)		\
 	extern "C" {						\
 		struct tarantool_plugin plugin_meta = {		\
 			PLUGIN_API_VERSION,			\
 			version,				\
 			name,					\
-			init,                                 \
-			stat,                                 \
+			init,					\
+			stat,					\
 			{ NULL, NULL }				\
 		};						\
 	}
 
+
+/**
+ * Iterate over all loaded plug-ins with a callback.
+ */
+typedef int (*plugin_foreach_cb)(struct tarantool_plugin *p,
+				 void *cb_ctx);
+
+int
+plugin_foreach(plugin_foreach_cb cb, void *cb_ctx);
+
+/**
+ * Initialize plug-in subsystem.
+ */
+void
+tarantool_plugin_init(struct lua_State *L);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_PLUGIN_H_INCLUDED */

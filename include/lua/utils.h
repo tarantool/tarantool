@@ -170,8 +170,55 @@ luaL_checkfield(lua_State *L, int i, struct luaL_field *field)
 			   lua_typename(L, lua_type(L, i)));
 }
 
+void
+luaL_register_type(struct lua_State *L, const char *type_name,
+		   const struct luaL_Reg *methods);
+
+/**
+ * Convert Lua string, number or cdata (u64) to 64bit value
+ */
+uint64_t
+luaL_tointeger64(struct lua_State *L, int idx);
+
+/**
+ * push uint64_t to Lua stack
+ *
+ * @param L is a Lua State
+ * @param val is a value to push
+ *
+ */
+int luaL_pushnumber64(struct lua_State *L, uint64_t val);
+
 #if defined(__cplusplus)
 } /* extern "C" */
+
+#include "exception.h"
+
+/**
+ * A wrapper around lua_call() which converts Lua error(...)
+ * to ER_PROC_LUA
+ */
+static inline void
+lbox_call(struct lua_State *L, int nargs, int nreturns)
+{
+	try {
+		lua_call(L, nargs, nreturns);
+	} catch (const Exception &e) {
+		/* Let all well-behaved exceptions pass through. */
+		throw;
+	} catch (...) {
+		/* Convert Lua error to a Tarantool exception. */
+		const char *msg = lua_tostring(L, -1);
+		tnt_raise(ClientError, ER_PROC_LUA, msg ? msg : "");
+	}
+}
+
+/**
+ * Single global lua_State shared by core and modules.
+ * Created with tarantool_lua_init().
+ */
+extern struct lua_State *tarantool_L;
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LUA_UTILS_H_INCLUDED */

@@ -28,7 +28,6 @@
  */
 #include "box_lua.h"
 
-#include "lua/init.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 #include <fiber.h>
@@ -62,13 +61,6 @@ extern "C" {
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[], sql_lua[];
 static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, sql_lua, NULL };
-
-/**
- * All box connections share the same Lua state. We use
- * Lua coroutines (lua_newthread()) to have multiple
- * procedures running at the same time.
- */
-static lua_State *root_L;
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -216,8 +208,8 @@ luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
 		return;
 	}
 
-	luaL_error(L, "msgpack.encode: can not encode Lua type '%s'",
-		   lua_typename(L, lua_type(L, idx)));
+	tnt_raise(ClientError, ER_PROC_RET,
+		  lua_typename(L, lua_type(L, idx)));
 }
 
 /*
@@ -1035,7 +1027,13 @@ lua_totuple(struct lua_State *L, int first, int last)
 {
 	RegionGuard region_guard(&fiber->gc);
 	struct tbuf *b = tbuf_new(&fiber->gc);
-	luamp_encodestack(L, b, first, last);
+	try {
+		luamp_encodestack(L, b, first, last);
+	} catch (const Exception &e) {
+		throw;
+	} catch (...) {
+		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+	}
 	const char *data = b->data;
 	if (unlikely(mp_typeof(*data) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
@@ -1143,7 +1141,7 @@ lbox_process(lua_State *L)
 		 * use fiber->cleanup and fiber->gc.
 		 */
 		region_truncate(&fiber->gc, allocated_size);
-	} catch (const Exception& e) {
+	} catch (const Exception &e) {
 		region_truncate(&fiber->gc, allocated_size);
 		throw;
 	}
@@ -1245,37 +1243,31 @@ box_lua_execute(const struct request *request, struct txn *txn,
 		struct port *port)
 {
 	(void) txn;
-	lua_State *L = lua_newthread(root_L);
-	int coro_ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
+	lua_State *L = lua_newthread(tarantool_L);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 
-	try {
-		auto scoped_guard = make_scoped_guard([=] {
-			/*
-			 * Allow the used coro to be garbage collected.
-			 * @todo: cache and reuse it instead.
-			 */
-			luaL_unref(root_L, LUA_REGISTRYINDEX, coro_ref);
-		});
+	auto scoped_guard = make_scoped_guard([=] {
+		/*
+		 * Allow the used coro to be garbage collected.
+		 * @todo: cache and reuse it instead.
+		 */
+		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	});
 
-		/* proc name */
-		int oc = box_lua_find(L, request->c.procname,
-				 request->c.procname + request->c.procname_len);
-		/* Push the rest of args (a tuple). */
-		const char *args = request->c.args;
-		uint32_t arg_count = mp_decode_array(&args);
-		luaL_checkstack(L, arg_count, "call: out of stack");
+	/* proc name */
+	int oc = box_lua_find(L, request->c.procname,
+			 request->c.procname + request->c.procname_len);
+	/* Push the rest of args (a tuple). */
+	const char *args = request->c.args;
+	uint32_t arg_count = mp_decode_array(&args);
+	luaL_checkstack(L, arg_count, "call: out of stack");
 
-		for (uint32_t i = 0; i < arg_count; i++) {
-			luamp_decode(L, &args);
-		}
-		lua_call(L, arg_count + oc - 1, LUA_MULTRET);
-		/* Send results of the called procedure to the client. */
-		port_add_lua_multret(port, L);
-	} catch (const Exception& e) {
-		throw;
-	} catch (...) {
-		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+	for (uint32_t i = 0; i < arg_count; i++) {
+		luamp_decode(L, &args);
 	}
+	lbox_call(L, arg_count + oc - 1, LUA_MULTRET);
+	/* Send results of the called procedure to the client. */
+	port_add_lua_multret(port, L);
 }
 
 static void
@@ -1731,20 +1723,20 @@ void
 mod_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
-	tarantool_lua_register_type(L, tuplelib_name, lbox_tuple_meta);
+	luaL_register_type(L, tuplelib_name, lbox_tuple_meta);
 	luaL_register(L, tuplelib_name, lbox_tuplelib);
 	lua_pop(L, 1);
 	schema_lua_init(L);
-	tarantool_lua_register_type(L, tuple_iteratorlib_name,
+	luaL_register_type(L, tuple_iteratorlib_name,
 				    lbox_tuple_iterator_meta);
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
 	/* box.index */
-	tarantool_lua_register_type(L, indexlib_name, lbox_index_meta);
+	luaL_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
 	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
-	tarantool_lua_register_type(L, iteratorlib_name, lbox_iterator_meta);
+	luaL_register_type(L, iteratorlib_name, lbox_iterator_meta);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s++) {
@@ -1769,6 +1761,4 @@ mod_lua_init(struct lua_State *L)
 	assert(tuple_totable_mt_ref != 0);
 
 	assert(lua_gettop(L) == 0);
-
-	root_L = L;
 }

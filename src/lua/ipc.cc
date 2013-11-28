@@ -37,7 +37,7 @@ extern "C" {
 
 #include "ipc.h"
 #include "lua/ipc.h"
-#include "lua/init.h"
+#include "lua/utils.h"
 
 static const char channel_lib[]   = "box.ipc.channel";
 
@@ -284,7 +284,7 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"has_writers",	lbox_ipc_channel_has_writers},
 		{NULL, NULL}
 	};
-	tarantool_lua_register_type(L, channel_lib, channel_meta);
+	luaL_register_type(L, channel_lib, channel_meta);
 
 	static const struct luaL_reg ipc_meta[] = {
 		{"channel",	lbox_ipc_channel},

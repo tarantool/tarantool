@@ -26,20 +26,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/slab.h"
-
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include "tarantool/plugin.h"
 } /* extern "C" */
+#include "tarantool/plugin.h"
 
-#include "lua/init.h"
-#include <salloc.h>
+#include "lua/utils.h"
 
 static int
-plugin_cb(struct tarantool_plugin *p, void *cb_ctx)
+plugin_lua_stat_cb(struct tarantool_plugin *p, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 	lua_pushstring(L, p->name);
@@ -55,9 +52,9 @@ static int
 lbox_plugin_info(struct lua_State *L)
 {
 	lua_newtable(L);
-	lua_pushstring(L, "plugins");
+	lua_pushstring(L, "plugin");
 	lua_newtable(L);
-	plugin_stat(plugin_cb, L);
+	plugin_foreach(plugin_lua_stat_cb, L);
 	lua_settable(L, -3);
 	return 1;
 }

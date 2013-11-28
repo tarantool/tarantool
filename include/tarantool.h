@@ -42,8 +42,6 @@ extern int snapshot_pid;
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;
-extern bool booting;
-extern char *binary_filename;
 extern char *custom_proc_title;
 int reload_cfg();
 void show_cfg(struct tbuf *out);
@@ -63,9 +61,6 @@ char **init_set_proc_title(int argc, char **argv);
 void free_proc_title(int argc, char **argv);
 void set_proc_title(const char *format, ...);
 void title(const char *fmt, ...);
-
-#define DEFAULT_CFG_FILENAME "tarantool.cfg"
-#define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
 
 #if defined(__cplusplus)
 } /* extern "C" */

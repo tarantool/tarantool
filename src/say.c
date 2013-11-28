@@ -34,21 +34,18 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 #ifndef PIPE_BUF
 #include <sys/param.h>
 #endif
 
-#include <fiber.h>
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
-#include "tarantool.h"
-#include "sio.h"
+#include "fiber.h"
 
 int sayfd = STDERR_FILENO;
 pid_t logger_pid;
-bool booting = true;
+static bool booting = true;
+static const char *binary_filename;
+static int *log_level;
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -78,17 +75,24 @@ level_to_char(int level)
 }
 
 void
-say_logger_init(int nonblock)
+say_init(const char *argv0, int *level)
+{
+	binary_filename = strdup(argv0);
+	log_level = level;
+}
+
+void
+say_logger_init(char *logger, int nonblock)
 {
 	int pipefd[2];
 	pid_t pid;
 	char cmd[] = { "/bin/sh" };
 	char args[] = { "-c" };
-	char *argv[] = { cmd, args, cfg.logger, NULL };
+	char *argv[] = { cmd, args, logger, NULL };
 	char *envp[] = { NULL };
 	setvbuf(stderr, NULL, _IONBF, 0);
 
-	if (cfg.logger != NULL) {
+	if (logger != NULL) {
 		sigset_t mask;
 		sigemptyset(&mask);
 		sigaddset(&mask, SIGCHLD);
@@ -150,11 +154,13 @@ say_logger_init(int nonblock)
 		sayfd = STDERR_FILENO;
 	}
 	booting = false;
-	if (nonblock)
-		sio_setfl(sayfd, O_NONBLOCK, 1);
+	if (nonblock) {
+		int flags = fcntl(sayfd, F_GETFL, 0);
+		fcntl(sayfd, F_SETFL, flags | O_NONBLOCK);
+	}
 	return;
 error:
-	say_syserror("Can't start logger: %s", cfg.logger);
+	say_syserror("Can't start logger: %s", logger);
 	_exit(EXIT_FAILURE);
 }
 
@@ -218,7 +224,7 @@ static void
 sayf(int level, const char *filename, int line, const char *error, const char *format, ...)
 {
 	int errsv = errno; /* Preserve the errno. */
-	if (cfg.log_level < level)
+	if (*log_level < level)
 		return;
 	va_list ap;
 	va_start(ap, format);

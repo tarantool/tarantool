@@ -32,17 +32,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <say.h>
-#include "tarantool.h"
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
-#include <tbuf.h>
-#include <stat.h>
-#include <assoc.h>
-#include "iobuf.h"
-#include <rlist.h>
+#include "say.h"
+#include "stat.h"
+#include "assoc.h"
+#include "rlist.h"
 #include "memory.h"
 
 enum { FIBER_CALL_STACK = 16 };
@@ -505,8 +498,6 @@ fiber_init(void)
 	sp = call_stack;
 	fiber = &sched;
 	last_used_fid = 100;
-
-	iobuf_init_readahead(cfg.readahead);
 
 	ev_async_init(&ready_async, fiber_ready_async);
 	ev_async_start(&ready_async);

@@ -30,7 +30,7 @@
 #include "space.h"
 #include "tuple.h"
 #include "assoc.h"
-#include "lua/init.h"
+#include "lua/utils.h"
 #include "box_lua_space.h"
 #include "key_def.h"
 #include "alter.h"

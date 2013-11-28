@@ -45,7 +45,7 @@ for i = 1, 100000, 1 do space:insert(tostring(i),i) end
 ...
 local t1 = {space:select(1)}
 ---
-- error: 'Lua error: stack overflow'
+- error: stack overflow
 ...
 space:drop()
 ---

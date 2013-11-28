@@ -49,6 +49,7 @@
 #include <replication.h>
 #include <fiber.h>
 #include <coeio.h>
+#include "iobuf.h"
 #include <iproto.h>
 #include "mutex.h"
 #include <recovery.h>
@@ -75,7 +76,6 @@ extern "C" {
 static pid_t master_pid;
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
-char *binary_filename;
 char *custom_proc_title;
 char **main_argv;
 int main_argc;
@@ -277,7 +277,7 @@ reload_cfg()
 
 	/* All OK, activate the config. */
 	swap_tarantool_cfg(&cfg, &new_cfg);
-	tarantool_lua_load_cfg(tarantool_L, &cfg);
+	tarantool_lua_load_cfg(&cfg);
 
 	return 0;
 }
@@ -560,7 +560,7 @@ create_pid(void)
 	/*
 	 * fopen() is not guaranteed to set the seek position to
 	 * the beginning of file according to ANSI C (and, e.g.,
-	 * on FreeBSD.
+	 * on FreeBSD).
 	 */
 	if (fseeko(f, 0, SEEK_SET) != 0)
 		panic_syserror("can't fseek to the beginning of pid file");
@@ -610,18 +610,6 @@ background()
 	return;
 error:
 	exit(EXIT_FAILURE);
-}
-
-void
-tarantool_lua_free()
-{
-	/*
-	 * Got to be done prior to anything else, since GC
-	 * handlers can refer to other subsystems (e.g. fibers).
-	 */
-	if (tarantool_L)
-		tarantool_lua_close(tarantool_L);
-	tarantool_L = NULL;
 }
 
 void
@@ -693,7 +681,7 @@ main(int argc, char **argv)
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	main_opt = opt;
-	binary_filename = argv[0];
+	say_init(argv[0], &cfg.log_level);
 
 	if (gopt(opt, 'V')) {
 		printf("Tarantool %s\n", tarantool_version());
@@ -857,7 +845,7 @@ main(int argc, char **argv)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	say_logger_init(cfg.logger_nonblock);
+	say_logger_init(cfg.logger, cfg.logger_nonblock);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);
@@ -865,6 +853,7 @@ main(int argc, char **argv)
 	ev_default_loop(EVFLAG_AUTO);
 	fiber_init();
 	replication_prefork();
+	iobuf_init_readahead(cfg.readahead);
 	coeio_init();
 	if (!salloc_init(cfg.slab_alloc_arena * (1 << 30) /* GB */,
 		    cfg.slab_alloc_minimal, cfg.slab_alloc_factor))
@@ -874,9 +863,9 @@ main(int argc, char **argv)
 
 	try {
 		say_crit("version %s", tarantool_version());
-		tarantool_L = tarantool_lua_init();
+		tarantool_lua_init();
 		box_init();
-		tarantool_lua_load_cfg(tarantool_L, &cfg);
+		tarantool_lua_load_cfg(&cfg);
 		/*
 		 * init iproto before admin:
 		 * recovery is finished on bind to the primary port,
@@ -894,7 +883,7 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_load_init_script(tarantool_L);
+		tarantool_lua_load_init_script();
 		region_free(&fiber->gc);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering the event loop");

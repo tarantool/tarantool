@@ -44,8 +44,6 @@ extern "C" {
 #include <lj_state.h>
 } /* extern "C" */
 
-#include <sys/types.h>
-#include <dirent.h>
 
 #include "fiber.h"
 #include "lua/fiber.h"
@@ -64,13 +62,9 @@ extern "C" {
 #include <ctype.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <dlfcn.h>
-#include <dirent.h>
 #include <stdio.h>
 #include "tarantool/plugin.h"
 #include <lib/small/region.h>
-
-static RLIST_HEAD(loaded_plugins);
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>
@@ -132,14 +126,6 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 	return result;
 }
 
-int
-luaL_pushnumber64(struct lua_State *L, uint64_t val)
-{
-	void *cdata = luaL_pushcdata(L, CTID_UINT64, sizeof(uint64_t));
-	*(uint64_t*) cdata = val;
-	return 1;
-}
-
 /** Report libev time (cheap). */
 static int
 lbox_time(struct lua_State *L)
@@ -180,38 +166,22 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 }
 
 /**
- * Redefine lua 'print' built-in to print either to the log file
- * (when Lua is used inside a module) or back to the user (for the
- * administrative console).
- *
- * When printing to the log file, we use 'say_info'.  To print to
- * the administrative console, we simply append everything to the
- * 'out' buffer, which is flushed to network at the end of every
- * administrative command.
- *
- * Note: administrative console output must be YAML-compatible.
- * If this is done automatically, the result is ugly, so we
- * don't do it. Creators of Lua procedures have to do it
- * themselves. Best we can do here is to add a trailing
- * CRLF if it's forgotten.
+ * Redefine lua 'print' built-in to print to the log file
+ * When printing to the log file, we use 'say_info'.
  */
 static int
 lbox_print(struct lua_State *L)
 {
 	RegionGuard region_guard(&fiber->gc);
-	/* always output to log only */
 	struct tbuf *out = tbuf_new(&fiber->gc);
 	/* serialize arguments of 'print' Lua built-in to tbuf */
 	int top = lua_gettop(L);
 	for (int i = 1; i <= top; i++) {
-		if (lua_type(L, i) == LUA_TCDATA) {
-			GCcdata *cd = cdataV(L->base + i - 1);
-			const char *sz = tarantool_lua_tostring(L, i);
-			int len = strlen(sz);
-			int chop = (cd->ctypeid == CTID_UINT64 ? 3 : 2);
-			tbuf_printf(out, "%-.*s" CRLF, len - chop, sz);
-		} else
-			tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+		tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
+		if (i != top) {
+			/* Conventional in Lua print() */
+			tbuf_append(out, "\t", 1);
+		}
 	}
 	say_info("%s", tbuf_str(out));
 	return 0;
@@ -231,7 +201,7 @@ lbox_pcall(struct lua_State *L)
 	 * plus whatever the called function returns.
 	 */
 	try {
-		lua_call(L, lua_gettop(L) - 1, LUA_MULTRET);
+		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 		/* push completion status */
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
@@ -248,14 +218,6 @@ lbox_pcall(struct lua_State *L)
 		lua_pushboolean(L, false);
 		/* error message */
 		lua_pushstring(L, e.errmsg());
-	} catch (const Exception& e) {
-		throw;
-	} catch (...) {
-		lua_settop(L, 1);
-		/* completion status */
-		lua_pushboolean(L, false);
-		/* put the completion status below the error message. */
-		lua_insert(L, -2);
 	}
 	return lua_gettop(L);
 }
@@ -270,27 +232,6 @@ lbox_tonumber64(struct lua_State *L)
 		luaL_error(L, "tonumber64: wrong number of arguments");
 	uint64_t result = tarantool_lua_tointeger64(L, 1);
 	return luaL_pushnumber64(L, result);
-}
-
-/**
- * A helper to register a single type metatable.
- */
-void
-tarantool_lua_register_type(struct lua_State *L, const char *type_name,
-			    const struct luaL_Reg *methods)
-{
-	luaL_newmetatable(L, type_name);
-	/*
-	 * Conventionally, make the metatable point to itself
-	 * in __index. If 'methods' contain a field for __index,
-	 * this is a no-op.
-	 */
-	lua_pushvalue(L, -1);
-	lua_setfield(L, -2, "__index");
-	lua_pushstring(L, type_name);
-	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, methods);
-	lua_pop(L, 1);
 }
 
 static const struct luaL_reg errorlib [] = {
@@ -309,6 +250,10 @@ tarantool_lua_error_init(struct lua_State *L) {
 	}
 	lua_pop(L, 1);
 }
+
+/* }}} */
+
+/* {{{ package.path for require */
 
 static void
 tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
@@ -346,127 +291,12 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 	lua_pop(L, 1);
 }
 
-/**
- * show statistics for all loaded plugins
- */
-int
-plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx)
-{
-	int res;
-	struct tarantool_plugin *p;
-	rlist_foreach_entry(p, &loaded_plugins, list) {
-		res = cb(p, cb_ctx);
-		if (res != 0)
-			return res;
-	}
-	return 0;
-}
-
-static void
-tarantool_load_plugin(struct lua_State *L, const char *plugin)
-{
-	if (strstr(plugin, ".so") == NULL)
-		return;
-
-	say_info("Loading plugin: %s", plugin);
-
-	void *dl = dlopen(plugin, RTLD_NOW);
-	if (!dl) {
-		say_error("Can't load plugin %s: %s", plugin, dlerror());
-		return;
-	}
-
-	struct tarantool_plugin *p = (typeof(p))dlsym(dl, "plugin_meta");
-
-	if (!p) {
-		say_error("Can't find plugin metadata in plugin %s", plugin);
-		dlclose(dl);
-		return;
-	}
-
-	if (p->api_version != PLUGIN_API_VERSION) {
-		say_error("Plugin %s has api_version: %d but tarantool has: %d",
-			plugin,
-			p->api_version,
-			PLUGIN_API_VERSION);
-		return;
-	}
-
-	rlist_add_entry(&loaded_plugins, p, list);
-
-	if (p->init)
-		p->init(L);
-
-	say_info("Plugin '%s' was loaded, version: %d", p->name, p->version);
-}
-
-/** Load all plugins in a plugin dir. */
-static void
-tarantool_plugin_dir(struct lua_State *L, const char *dir)
-{
-	if (!dir)
-		return;
-	if (!*dir)
-		return;
-	DIR *dh = opendir(dir);
-
-	if (!dh)
-		return;
-
-	struct dirent *dent;
-	while ((dent = readdir(dh)) != NULL) {
-		if (dent->d_type != DT_REG)
-			continue;
-		char *path;
-		(void) asprintf(&path, "%s/%s", dir, dent->d_name);
-		if (!path) {
-			say_error("Can't allocate memory for %s plugin dir",
-				 dir);
-			continue;
-		}
-
-		tarantool_load_plugin(L, path);
-
-		free(path);
-	}
-
-	closedir(dh);
-}
-
-static void
-tarantool_plugin_init(struct lua_State *L)
-{
-	int top = lua_gettop(L);
-
-	char *plugins = getenv("TARANTOOL_PLUGIN_DIR");
-
-	if (plugins) {
-		plugins = strdup(plugins);
-		char *ptr = plugins;
-		for (;;) {
-			char *divider = strchr(ptr, ':');
-			if (divider == NULL) {
-				tarantool_plugin_dir(L, ptr);
-				break;
-			}
-			*divider = 0;
-			tarantool_plugin_dir(L, ptr);
-			ptr = divider + 1;
-		}
-		free(plugins);
-	}
-
-	tarantool_plugin_dir(L, PLUGIN_DIR);
-
-	lua_settop(L, top);
-}
-
-struct lua_State *
+void
 tarantool_lua_init()
 {
 	lua_State *L = luaL_newstate();
 	if (L == NULL)
-		return L;
+		return;
 	luaL_openlibs(L);
 	/*
 	 * Search for Lua modules, apart from the standard
@@ -486,19 +316,6 @@ tarantool_lua_init()
 	tarantool_lua_setpath(L, "cpath", path, LUA_LIBCPATH,
 	                      LUA_SYSCPATH, NULL);
 
-	/* Load 'ffi' extension and make it inaccessible */
-	lua_getglobal(L, "require");
-	lua_pushstring(L, "ffi");
-	if (lua_pcall(L, 1, 0, 0) != 0)
-		panic("%s", lua_tostring(L, -1));
-	lua_getglobal(L, "ffi");
-	/**
-	 * Remember the LuaJIT FFI extension reference index
-	 * to protect it from being garbage collected.
-	 */
-	(void) luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushnil(L);
-	lua_setglobal(L, "ffi");
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
 
@@ -536,14 +353,7 @@ tarantool_lua_init()
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
-	return L;
-}
-
-void
-tarantool_lua_close(struct lua_State *L)
-{
-	/* collects garbage, invoking userdata gc */
-	lua_close(L);
+	tarantool_L = L;
 }
 
 /**
@@ -567,14 +377,12 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 			return r;
 	}
 	try {
-		lua_call(L, 0, LUA_MULTRET);
+		lbox_call(L, 0, LUA_MULTRET);
 	} catch (const FiberCancelException& e) {
 		throw;
 	} catch (const Exception& e) {
 		lua_settop(L, 0);
 		lua_pushstring(L, e.errmsg());
-		return 1;
-	} catch (...) {
 		return 1;
 	}
 	return 0;
@@ -693,8 +501,9 @@ lbox_cfg_reload(struct lua_State *L)
  * table and export the table into Lua.
  */
 void
-tarantool_lua_load_cfg(struct lua_State *L, struct tarantool_cfg *cfg)
+tarantool_lua_load_cfg(struct tarantool_cfg *cfg)
 {
+	struct lua_State *L = tarantool_L;
 	luaL_Buffer b;
 	char *key, *value;
 
@@ -839,6 +648,7 @@ tarantool_lua_sandbox(struct lua_State *L)
 					    "os.rename = nil\n"
 					    "os.tmpname = nil\n"
 					    "os.remove = nil\n"
+					    "ffi = nil\n"
 					    "io = nil\n"
 					    "require = nil\n"
 					    "package = nil\n");
@@ -848,7 +658,7 @@ tarantool_lua_sandbox(struct lua_State *L)
 }
 
 void
-tarantool_lua_load_init_script(struct lua_State *L)
+tarantool_lua_load_init_script()
 {
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
@@ -859,7 +669,7 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	 */
 	struct fiber *loader = fiber_new(TARANTOOL_LUA_INIT_SCRIPT,
 					 load_init_script);
-	fiber_call(loader, L);
+	fiber_call(loader, tarantool_L);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule load_init_script fiber.
@@ -873,9 +683,17 @@ tarantool_lua_load_init_script(struct lua_State *L)
 	tarantool_lua_sandbox(tarantool_L);
 }
 
-void *
-lua_region_alloc(void *ctx, size_t size)
+void
+tarantool_lua_free()
 {
-	struct lua_State *L = (struct lua_State *) ctx;
-	return lua_newuserdata(L, size);
+	/*
+	 * Got to be done prior to anything else, since GC
+	 * handlers can refer to other subsystems (e.g. fibers).
+	 */
+	if (tarantool_L) {
+		/* collects garbage, invoking userdata gc */
+		lua_close(tarantool_L);
+	}
+	tarantool_L = NULL;
 }
+

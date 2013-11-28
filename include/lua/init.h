@@ -36,24 +36,14 @@ struct luaL_Reg;
 struct tarantool_cfg;
 struct tbuf;
 
-/*
- * Single global lua_State shared by core and modules.
- * Created with tarantool_lua_init().
- */
-extern struct lua_State *tarantool_L;
-
 /**
  * This is a callback used by tarantool_lua_init() to open
  * module-specific libraries into given Lua state.
  *
  * No return value, panics if error.
  */
-void
+extern void
 mod_lua_init(struct lua_State *L);
-
-void
-tarantool_lua_register_type(struct lua_State *L, const char *type_name,
-			    const struct luaL_Reg *methods);
 
 /**
  * Create an instance of Lua interpreter and load it with
@@ -64,11 +54,12 @@ tarantool_lua_register_type(struct lua_State *L, const char *type_name,
  *
  * @return  L on success, 0 if out of memory
  */
-struct lua_State *
+void
 tarantool_lua_init();
 
+/** Free Lua subsystem resources. */
 void
-tarantool_lua_close(struct lua_State *L);
+tarantool_lua_free();
 
 /**
  * This function exists because lua_tostring does not use
@@ -79,17 +70,10 @@ const char *
 tarantool_lua_tostring(struct lua_State *L, int index);
 
 /**
- * Convert Lua string, number or cdata (u64) to 64bit value
- */
-uint64_t
-tarantool_lua_tointeger64(struct lua_State *L, int idx);
-
-/**
  * Make a new configuration available in Lua
  */
 void
-tarantool_lua_load_cfg(struct lua_State *L,
-		       struct tarantool_cfg *cfg);
+tarantool_lua_load_cfg(struct tarantool_cfg *cfg);
 
 /**
  * Load and execute start-up file
@@ -97,41 +81,10 @@ tarantool_lua_load_cfg(struct lua_State *L,
  * @param L is a Lua State.
  */
 void
-tarantool_lua_load_init_script(struct lua_State *L);
+tarantool_lua_load_init_script();
 
 void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
-
-/**
- * push uint64_t to Lua stack
- *
- * @param L is a Lua State
- * @param val is a value to push
- *
- */
-int luaL_pushnumber64(struct lua_State *L, uint64_t val);
-
-/**
- * show plugin statistics
- */
-typedef int (*tarantool_plugin_stat_cb)(struct tarantool_plugin *p, void *cb_ctx);
-
-int plugin_stat(tarantool_plugin_stat_cb cb, void *cb_ctx);
-
-/**
- * @brief A palloc-like wrapper to allocate memory using lua_newuserdata
- * @param ctx lua_State
- * @param size a number of bytes to allocate
- * @return a pointer to the allocated memory
- */
-void *
-lua_region_alloc(void *ctx, size_t size);
-
-void
-tarantool_lua_set_out(struct lua_State *L, const struct tbuf *out);
-
-void
-tarantool_lua_dup_out(struct lua_State *L, struct lua_State *child_L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_H */

@@ -194,7 +194,7 @@ call box.pack(1953719668)
 ---
 - error:
     errcode: ER_PROC_LUA
-    errmsg: Lua error: box.pack: argument count does not match the format
+    errmsg: box.pack: argument count does not match the format
 ...
 call box.pack('p', 'this string is 45 characters long 1234567890 ')
 ---
@@ -242,8 +242,8 @@ function f1() return f1 end
 call f1()
 ---
 - error:
-    errcode: ER_PROC_LUA
-    errmsg: Lua error: msgpack.encode: can not encode Lua type 'function'
+    errcode: ER_PROC_RET
+    errmsg: msgpack.encode: can not encode Lua type 'function'
 ...
 insert into t0 values (1, 'test box delete')
 ---

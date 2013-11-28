@@ -48,7 +48,7 @@ extern "C" {
 
 #include "fiber.h"
 #include "tbuf.h"
-#include <lua/init.h>
+#include <lua/utils.h>
 #include <stdlib.h>
 #include <mutex.h>
 
@@ -971,7 +971,7 @@ tarantool_lua_socket_init(struct lua_State *L)
 		{"udp", lbox_socket_udp},
 		{NULL, NULL}
 	};
-	tarantool_lua_register_type(L, socketlib_name, lbox_socket_meta);
+	luaL_register_type(L, socketlib_name, lbox_socket_meta);
 	luaL_register(L, socketlib_name, socketlib);
 	lua_pushstring(L, "SHUT_RD");
 	lua_pushnumber(L, SHUT_RD);

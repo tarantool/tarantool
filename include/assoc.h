@@ -27,6 +27,9 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 #if !MH_SOURCE
 #define MH_UNDEF
@@ -50,3 +53,6 @@ struct mh_i32ptr_node_t {
 #define mh_eq_key(a, b, arg) ((a) == (b->key))
 #include <mhash.h>
 
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */

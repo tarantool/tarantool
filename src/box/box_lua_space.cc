@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "box_lua_space.h"
+#include "lua/utils.h"
 
 extern "C" {
 #include <lua.h>
