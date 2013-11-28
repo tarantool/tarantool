@@ -31,10 +31,10 @@ class State(object):
         if token == 'setopt':
             option = lexer.get_token()
             if not option:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for setopt: expected option name")
             value = lexer.get_token()
             if not value:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for setopt: expected option value")
             return self.options(option, value)
         token_store.append(token)
         token = lexer.get_token()
@@ -42,7 +42,7 @@ class State(object):
             stype = token_store.popleft()
             sname = lexer.get_token()
             if not sname:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for server: expected name")
             options = {}
             temp = lexer.get_token()
             if not temp:
@@ -58,13 +58,13 @@ class State(object):
                     options[k] = v
                     lexer.get_token()
             else:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for server: expected 'with', got " + repr(temp))
             return self.server(stype, sname, options)
         elif token == 'connection':
             ctype = token_store.popleft()
             cname = [lexer.get_token()]
             if not cname[0]:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for connection: expected name")
             cargs = None
             temp = lexer.get_token()
             if temp == 'to':
@@ -78,7 +78,7 @@ class State(object):
                         continue
                     cname.append(a)
             elif temp:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException("Wrong token for server: expected 'to' or ',', got " + repr(temp))
             return self.connection(ctype, cname, cargs)
         elif token == 'filter':
             ftype = token_store.popleft()
@@ -87,24 +87,28 @@ class State(object):
             temp = lexer.get_token()
             if temp:
                 ref = temp
+                if not temp:
+                    raise LuaPreprocessorException("Wrong token for filter: expected filter1")
                 if lexer.get_token() != 'to':
-                    raise LuaPreprocessorException() #TODO
+                    raise LuaPreprocessorException("Wrong token for filter: expected 'to', got {0}".format(repr(temp)))
                 temp = lexer.get_token()
                 if not temp:
-                    raise LuaPreprocessorException() #TODO
+                    raise LuaPreprocessorException("Wrong token for filter: expected filter2")
                 ret = temp
             return self.filter(ftype, ref, ret)
         else:
-            raise LuaPreprocessorException() #TODO
+            raise LuaPreprocessorException("Wrong command: "+repr(lexer.instream.getvalue()))
 
     def options(self, key, value):
         if key == 'delimiter':
             self.delimiter = value[1:-1]
         else:
-            raise LuaPreprocessorException() #TODO
+            raise LuaPreprocessorException("Wrong option: "+repr(key))
 
     def server(self, ctype, sname, opts):
         if ctype == 'create':
+            if sname in self.suite_ini['servers']:
+                raise LuaPreprocessorException('Server {0} already exists'.format(repr(sname)))
             temp = self.tarantool_server()
             if 'configuration' in opts:
                 temp.config = opts['configuration'][1:-1]
@@ -123,15 +127,17 @@ class State(object):
             if temp.need_init:
                 temp.init()
         elif ctype == 'start':
-            if not (sname in self.suite_ini['servers']):
-                raise LuaPreprocessprException() #TODO
+            if sname not in self.suite_ini['servers']:
+                raise LuaPreprocessprException('Can\'t start nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].start(silent=True)
             self.suite_ini['connections'][sname] = [self.suite_ini['servers'][sname].admin, sname]
             try:
                 self.suite_ini['connections'][sname][0]('print()', silent=True)
             except socket.error as e:
-                LuaPreprocessorException() #TODO
+                LuaPreprocessorException('Can\'t start server '+repr(sname))
         elif ctype == 'stop':
+            if sname not in self.suite_ini['servers']:
+                raise LuaPreprocessorException('Can\'t stop nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].stop()
             for cname in [k for k, v in self.suite_ini['connections'].iteritems() if v[1] == 'sname']:
                 self.suite_ini['connections'][cname].disconnect()
@@ -139,8 +145,8 @@ class State(object):
         elif ctype == 'deploy':
             pass
         elif ctype == 'reconfigure':
-            if not (sname in self.suite_ini['servers']):
-                raise LuaPreprocessorException() #TODO
+            if sname not in self.suite_ini['servers']:
+                raise LuaPreprocessorException('Can\'t reconfigure nonexistent server '+repr(sname))
             temp = self.suite_ini['servers'][sname]
             if 'configuration' in opts:
                 temp.reconfigure(opts['configuration'][1:-1], silent = True)
@@ -157,32 +163,32 @@ class State(object):
                     temp.restart()
         elif ctype == 'cleanup':
             if sname not in self.suite_ini['servers']:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException('Can\'t cleanup nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].cleanup()
         else:
-            raise LuaPreprocessorException() #TODO
+            raise LuaPreprocessorException('Unknown command for server: '+repr(ctype))
 
     def connection(self, ctype, cname, sname):
         if ctype == 'create':
             if sname not in self.suite_ini['servers']:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException('Can\'t create connection to nonexistent server '+repr(sname))
             if cname[0] in self.suite_ini['connections']:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException('Connection {0} already exists'.format(repr(cname)))
             self.suite_ini['connections'][cname[0]] = [AdminConnection('localhost',
                     self.suite_ini['servers'][sname].port), sname]
             self.suite_ini['connections'][cname[0]][0].connect()
         elif ctype == 'drop':
             if cname[0] not in self.suite_ini['connections']:
-                raise LuaPreprocessorException() #TODO
+                raise LuaPreprocessorException('Can\'t drop nonexistent connection '+repr(cname))
             self.suite_ini['connections'][cname[0]][0].disconnect()
             self.suite_ini['connections'].pop(cname[0])
         elif ctype == 'set':
             for i in cname:
                 if not i in self.suite_ini['connections']:
-                    raise LuaPreprocessorException() #TODO
+                    raise LuaPreprocessorException('Can\'t set nonexistent connection '+repr(cname))
             self.curcon = [self.suite_ini['connections'][i][0] for i in cname]
         else:
-            raise LuaPreprocessorException() #TOD#O
+            raise LuaPreprocessorException('Unknown command for connection: '+repr(ctype))
 
     def filter(self, ctype, ref, ret):
         if ctype == 'push':
@@ -208,5 +214,6 @@ class State(object):
             for cname in [name for name, tup in self.suite_ini['connections'].iteritems() if tup[1] == 'sname']:
                 self.suite_ini['connections'][cname].disconnect()
                 self.suite_ini['connections'].pop(cname)
+        self.suite_ini['servers'] = {}
         self.suite_ini['servers']['default'] = a
 
