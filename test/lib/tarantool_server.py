@@ -81,8 +81,8 @@ class LuaTest(FuncTest):
             if line.find('--#') == 0:
                 rescom = cmd.getvalue().replace('\n\n', '\n')
                 if rescom:
-                    result = send_command(rescom)
                     sys.stdout.write(cmd.getvalue())
+                    result = send_command(rescom)
                     sys.stdout.write(result.replace("\r\n", "\n"))
                 sys.stdout.write(line)
                 ts(line)
@@ -93,9 +93,9 @@ class LuaTest(FuncTest):
                     cmd.write(line)
                 delim_len = -len(ts.delimiter) if len(ts.delimiter) else None
                 if line.endswith(ts.delimiter+'\n') and cmd.getvalue().strip()[:delim_len].strip():
+                    sys.stdout.write(cmd.getvalue())
                     rescom = cmd.getvalue()[:delim_len].replace('\n\n', '\n')
                     result = send_command(rescom)
-                    sys.stdout.write(cmd.getvalue())
                     sys.stdout.write(result.replace("\r\n", "\n"))
                     cmd.close()
                     cmd = None
@@ -449,9 +449,9 @@ class TarantoolServer(Server):
     def print_log(self, lines, stdout=None):
         if stdout is None:
             stdout = sys.stdout
+        stdout.write("\nLast {0} lines of Tarantool Log file:\n".format(lines))
         with open(os.path.join(self.vardir, 'tarantool.log'), 'r') as log:
-            iter_log = log.readlines()
-            for i in iter_log[-lines:]:
+            for i in log.readlines()[-lines:]:
                 stdout.write(i)
 
     def wait_until_started(self):

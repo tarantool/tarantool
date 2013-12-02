@@ -114,6 +114,7 @@ class Test:
         self.is_executed_ok = None
         self.is_equal_result = None
         self.is_valgrind_clean = True
+        self.is_terminated = False
 
     def passed(self):
         """Return true if this test was run successfully."""
@@ -144,10 +145,10 @@ class Test:
                 stdout_fileno = sys.stdout.stream.fileno()
                 temp = threading.Thread(target=self.execute, args=(server, ))
                 temp.start()
-                temp.join(30)
+                temp.join(self.suite_ini["timeout"])
                 if temp.is_alive():
                     temp._Thread__stop()
-                    save_stdout.write("[ Terminated ]")
+                    self.is_terminated = True
                 sys.stdout.flush()
             self.is_executed_ok = True
         except Exception as e:
@@ -170,12 +171,12 @@ class Test:
             self.is_valgrind_clean = \
             check_valgrind_log(server.valgrind_log) == False
 
-        if self.skip:
-            print "[ skip ]"
+        elif self.skip:
+            print "[ SKIP ]"
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
-            print "[ pass ]"
+            print "[ PASS ]"
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif (self.is_executed_ok and not self.is_equal_result and not
@@ -184,17 +185,15 @@ class Test:
             print "[ NEW ]"
         else:
             os.rename(self.tmp_result, self.reject)
-            print "[ fail ]"
+            print "[ FAIL ]" if not self.is_terminated else "[ TERMINATED ]"
 
             where = ""
             if not self.is_executed_ok:
                 self.print_diagnostics(self.reject, "Test failed! Last 10 lines of the result file:")
-                sys.stdout.write("Last 15 lines of log-file:\n")
                 server.print_log(15)
                 where = ": test execution aborted, reason '{0}'".format(diagnostics)
             elif not self.is_equal_result:
                 self.print_unidiff()
-                sys.stdout.write("Last 15 lines of log-file:\n")
                 server.print_log(15)
                 where = ": wrong test output"
             elif not self.is_valgrind_clean:
@@ -251,7 +250,7 @@ class TestSuite:
         self.tests = []
         self.ini = {}
         self.suite_path = suite_path
-        self.ini["core"] = "tarantool"  
+        self.ini["core"] = "tarantool"
 
         if os.access(suite_path, os.F_OK) == False:
             raise RuntimeError("Suite \"" + suite_path + \
@@ -270,6 +269,8 @@ class TestSuite:
             self.ini[i] = map(lambda x: os.path.join(suite_path, x),
                     dict.fromkeys(self.ini[i].split()) if i in self.ini else
                     dict())
+        for i in ["timeout"]:
+            self.ini[i] = int(self.ini[i]) if i in self.ini else 10
 
         try:
             self.server = Server(self.ini["core"])
@@ -326,7 +327,7 @@ class TestSuite:
                 if (test_name in self.ini["disabled"]
                     or not self.server.debug and test_name in self.ini["release_disabled"]
                     or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                    print "[ disabled ]"
+                    print "[ DISABLED ]"
                 else:
                     test.run(self.server)
                     if not test.passed():
