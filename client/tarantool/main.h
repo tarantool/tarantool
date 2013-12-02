@@ -1,5 +1,5 @@
-#ifndef TC_ADMIN_H_INCLUDED
-#define TC_ADMIN_H_INCLUDED
+#ifndef TC_MAIN_H_INCLUDED
+#define TC_MAIN_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,18 +29,28 @@
  * SUCH DAMAGE.
  */
 
-struct tc_admin {
-	const char *host;
-	int port;
-	int fd;
+#define TC_VERSION_MAJOR "0"
+#define TC_VERSION_MINOR "3"
+
+#define TC_DEFAULT_HOST "localhost"
+#define TC_DEFAULT_PORT 33013
+#define TC_DEFAULT_ADMIN_PORT 33015
+#define TC_DEFAULT_HISTORY_FILE ".tarantool_history"
+
+struct tarantool_client {
+	struct tbses admin;
+	struct tc_opt opt;
+	int pager_fd;
+	pid_t pager_pid;
 };
 
-int tc_admin_connect(struct tc_admin *a, const char *host, int port);
-int tc_admin_reconnect(struct tc_admin *a);
+void tc_error(char *fmt, ...);
 
-void tc_admin_close(struct tc_admin *a);
+static inline void
+tc_oom(void) {
+	tc_error("memory allocation failed");
+}
 
-int tc_admin_query(struct tc_admin *a, char *q);
-int tc_admin_reply(struct tc_admin *a, char **r, size_t *size);
+#define TC_ERRCMD "---\nunknown command. try typing help.\n...\n"
 
-#endif /* TC_ADMIN_H_INCLUDED */
+#endif /* TC_H_INCLUDED */

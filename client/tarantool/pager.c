@@ -1,5 +1,4 @@
-#ifndef TC_OPT_H_INCLUDED
-#define TC_OPT_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -27,54 +26,61 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
+*/
 
-#define TC_VERSION_MAJOR "0"
-#define TC_VERSION_MINOR "2"
+#include <lib/tarantool.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
-enum tc_opt_mode {
-	TC_OPT_USAGE,
-	TC_OPT_VERSION,
-#if 0
-	TC_OPT_RPL,
-	TC_OPT_WAL_CAT,
-	TC_OPT_WAL_PLAY,
-#endif
-	TC_OPT_CMD,
-	TC_OPT_INTERACTIVE
-};
+#include "client/tarantool/opt.h"
+#include "client/tarantool/main.h"
+#include "client/tarantool/pager.h"
 
-struct tc_opt {
-	enum tc_opt_mode mode;
-	const char *host;
-	int port;
-	int port_admin;
-	uint64_t lsn;
-	uint64_t lsn_from;
-	int lsn_from_set;
-	uint64_t lsn_to;
-	int lsn_to_set;
-	int space;
-	int space_set;
-	const char *format;
-	int raw;
-	int raw_with_headers;
-	int str_instead_int;
-	void *xlog_printer;
-	void *snap_printer;
-	const char *file;
-	char **cmdv;
-	int cmdc;
-	char **envp;
-	const char *delim;
-	size_t delim_len;
-	const char *pager;
-};
+extern struct tarantool_client tc;
 
-void tc_opt_usage(void);
-void tc_opt_version(void);
+void tc_pager_start() {
+	if (tc.pager_pid != 0)
+		tc_pager_kill();
+	if (tc.opt.pager == NULL) {
+		tc.pager_fd = fileno(stdout);
+		return;
+	}
+	int pipefd[2];
+	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
 
-enum tc_opt_mode
-tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp);
+	if (pipe(pipefd) < 0)
+		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
+	pid_t pid = fork();
+	if (pid < 0) {
+		tc_error("Failed to fork. Errno: %s", strerror(errno));
+	} else if (pid == 0) {
+		close(pipefd[1]);
+		dup2(pipefd[0], STDIN_FILENO);
+		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
+		tc_error("Can't start pager! Errno: %s", strerror(errno));
+	} else {
+		close(pipefd[0]);
+		tc.pager_fd = pipefd[1];
+		tc.pager_pid = pid;
+	}
+	return;
+}
 
-#endif /* TC_OPT_H_INCLUDED */
+void tc_pager_stop () {
+	if (tc.pager_pid != 0) {
+		close(tc.pager_fd);
+		tc.pager_fd = fileno(stdout);
+		waitpid(tc.pager_pid, NULL, 0);
+		tc.pager_pid = 0;
+	}
+	return;
+}
+
+void tc_pager_kill () {
+	if (tc.pager_pid != 0) {
+		kill(tc.pager_pid, SIGTERM);
+		tc_pager_stop();
+	}
+}

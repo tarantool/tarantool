@@ -26,57 +26,32 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <string.h>
-#include <stdint.h>
-#include <ctype.h>
 
+#include <lib/tarantool.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <errno.h>
 #include <wchar.h>
 
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#if 0
-#include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_queue.h>
-#include <connector/c/include/tarantool/tnt_utf8.h>
-#include <connector/c/include/tarantool/tnt_lex.h>
-#include <connector/c/include/tarantool/tnt_sql.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
-#endif
+#include <client/tarantool/opt.h>
+#include <client/tarantool/main.h>
+#include <client/tarantool/pager.h>
+#include <client/tarantool/query.h>
+#include <client/tarantool/cli.h>
+#include <client/tarantool/print.h>
+#include <client/tarantool/buf.h>
 
-#include "client/tarantool/tc_opt.h"
-#include "client/tarantool/tc_admin.h"
-#include "client/tarantool/tc.h"
-#include "client/tarantool/tc_pager.h"
-#include "client/tarantool/tc_query.h"
-#include "client/tarantool/tc_cli.h"
-#include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_buf.h"
-
-#define TC_DEFAULT_HISTORY_FILE ".tarantool_history"
-
-#define TC_ALLOCATION_ERROR "error: memory allocation failed for %zu bytes\n"
-#define TC_REALLOCATION_ERROR "error: memory reallocation failed for %zu bytes\n"
-
-extern struct tc tc;
+extern struct tarantool_client tc;
 
 static inline int tc_cli_error(char *e) {
-	if (e) {
+	if (e)
 		tc_printf("%s\n", e);
-		free(e);
-	}
 	return 1;
 }
 
@@ -87,10 +62,12 @@ static int tc_cli_reconnect(void) {
 		return 1;
 	}
 #endif
+#if 0
 	if (tc_admin_reconnect(&tc.admin) == -1) {
 		tc_printf("reconnect: admin console connection failed\n");
 		return 1;
 	}
+#endif
 	tc_printf("reconnected\n");
 	return 0;
 }
@@ -147,12 +124,14 @@ tc_cmd_usage(void)
 }
 #endif
 
-static int tc_cli_admin(char *cmd, int exit) {
-	char *e = NULL;
-	tc_query_admin_t cb = (exit) ? NULL : tc_query_admin_printer;
-	if (!exit) tc_pager_start();
-	if (tc_query_admin(cmd, cb, &e) == -1)
-		return tc_cli_error(e);
+static int
+tc_cli_admin(char *cmd, int exit)
+{
+	tc_query_t cb = (exit) ? NULL : tc_printer;
+	if (!exit)
+		tc_pager_start();
+	if (tc_query(cmd, cb) == -1)
+		return tc_cli_error("failed to send admin query");
 	return 0;
 }
 
@@ -384,7 +363,8 @@ int tc_cli_cmdv(void)
 	return rc;
 }
 
-static void tc_cli_init(void) {
+static void tc_cli_init(void)
+{
 	/* ignoring SIGPIPE for reconnection handling */
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
@@ -399,14 +379,14 @@ static char* tc_cli_readline_pipe() {
 	const size_t wcsize = sizeof(wchar_t);
 	char *str = (char *)malloc(size);
 	if (str == NULL)
-		tc_error(TC_ALLOCATION_ERROR, size);
+		tc_oom();
 	wchar_t c;
 	while ((c = getwchar())) {
 		if (size < (pos + wcsize)) {
 			size *= 2;
 			char *nd = (char *)realloc(str, size);
 			if (nd == NULL)
-				tc_error(TC_REALLOCATION_ERROR, size);
+				tc_oom();
 			str = nd;
 		}
 		if (c == '\r' || c == '\n' || c == WEOF) {
@@ -441,27 +421,28 @@ static int check_delim(char* str, size_t len, size_t sep_len) {
 
 int tc_cli(void)
 {
-	/* initializing cli */
+	/* initialize cli */
 	tc_cli_init();
 
-	/* loading history file */
+	/* load history file */
 	char *home = getenv("HOME");
 	char history[1024];
 	snprintf(history, sizeof(history), "%s/%s", home,
 		 TC_DEFAULT_HISTORY_FILE);
 	read_history(history);
 
-	/* setting prompt */
+	/* set prompt */
 	char prompt[128];
-	int prompt_len = snprintf(prompt, sizeof(prompt),
-				  "%s> ", tc.opt.host) - 2;
+	int prompt_len =
+		snprintf(prompt, sizeof(prompt), "%s> ", tc.opt.host) - 2;
 	char prompt_delim[128];
+
 	/* interactive mode */
 	char *part_cmd;
 	struct tc_buf cmd;
 	if (tc_buf_str(&cmd))
-		tc_error(TC_REALLOCATION_ERROR,
-			 cmd.size);
+		tc_oom();
+
 	while (1) {
 		if (isatty(STDIN_FILENO)) {
 			snprintf(prompt_delim, sizeof(prompt_delim),
@@ -475,26 +456,26 @@ int tc_cli(void)
 		}
 		if (!part_cmd)
 			break;
+
 		if (tc_buf_str_append(&cmd, part_cmd, strlen(part_cmd)))
-			tc_error(TC_REALLOCATION_ERROR,
-				 cmd.size);
-		int delim_exists = check_delim( cmd.data,
+			tc_oom();
+		int delim_exists =
+			check_delim(cmd.data,
 						cmd.used - 1,
 						tc.opt.delim_len);
-		if (tc_buf_str_append(&cmd, "\n", 1)) /* Append '\n' to the STR */
-			tc_error(TC_REALLOCATION_ERROR,
-				 cmd.size);
+		if (tc_buf_str_append(&cmd, "\n", 1))
+			tc_oom();
 		free(part_cmd);
-		if (!delim_exists && !feof(stdin)) /* If still without delimiter and not EOF */
+		if (!delim_exists && !feof(stdin))
 			continue;
-		tc_buf_str_delete(&cmd, 1); /* Delete last appended '\n' */
-		if (isatty(STDIN_FILENO)) /* Enable history on readline use only */
+		tc_buf_str_delete(&cmd, 1);
+		if (isatty(STDIN_FILENO))
 			add_history(cmd.data);
-		tc_buf_cmdfy(&cmd, tc.opt.delim_len); /* Create admin cmd from STR */
+		tc_buf_cmdfy(&cmd, tc.opt.delim_len);
 		if (delim_exists && tc_buf_str_isempty(&cmd))
 			goto next;
-		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
-						     cmd.used - 1);
+
+		enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data, cmd.used - 1);
 next:
 		tc_buf_clear(&cmd);
 		if (ret == TC_CLI_EXIT || feof(stdin)) {
@@ -503,100 +484,8 @@ next:
 		}
 	}
 
-	/* updating history file */
+	/* update history file */
 	write_history(history);
 	clear_history();
-	return 0;
-}
-
-#undef TC_ALLOCATION_ERROR
-#undef TC_REALLOCATION_ERROR
-
-#if 0
-struct tc_version {
-	int a, b, c;
-	int commit;
-};
-
-static int
-tc_versionof(struct tc_version *v, char *str)
-{
-	int rc = sscanf(str, "%d.%d.%d-%d", &v->a, &v->b, &v->c, &v->commit);
-	return rc == 4;
-}
-
-static int
-tc_versioncmp(struct tc_version *v, int a, int b, int c, int commit)
-{
-	int rc;
-	rc = v->a - a;
-	if (rc != 0)
-		return rc;
-	rc = v->b - b;
-	if (rc != 0)
-		return rc;
-	rc = v->c - c;
-	if (rc != 0)
-		return rc;
-	rc = v->commit - commit;
-	if (rc != 0)
-		return rc;
-	return 0;
-}
-#endif
-
-#if 0
-	if (tc_admin_query(&tc.admin, "box.info.version") == -1)
-		return -1;
-	char *message = NULL;
-	size_t size = 0;
-	int rc = tc_admin_reply(&tc.admin, &message, &size);
-	if (rc == -1 || size < 8) {
-		free(message);
-		return -1;
-	}
-	char *version = message + 7;
-	char *eol = strchr(version, '\n');
-	*eol = 0;
-	struct tc_version v;
-	rc = tc_versionof(&v, version);
-	if (rc == 0) {
-		free(message);
-		return -1;
-	}
-	free(message);
-
-	/* call motd for version >= 1.5.3-93 */
-	if (tc_versioncmp(&v, 1, 5, 3, 93) < 0)
-		return 0;
-	if (tc_admin_query(&tc.admin, "motd()") == -1)
-		return -1;
-	rc = tc_admin_reply(&tc.admin, &message, &size);
-	if (rc == -1 || size < 8) {
-		free(message);
-		return -1;
-	}
-	tc_printf("%s", message);
-	free(message);
-#endif
-
-int tc_cli_motd(void)
-{
-	/* call motd for version >= 1.5.3-93 */
-	if (tc_admin_query(&tc.admin, "motd()") == -1)
-		return -1;
-	char *message = NULL;
-	size_t size = 0;
-	int rc = tc_admin_reply(&tc.admin, &message, &size);
-	if (rc == -1 || size < 8) {
-		free(message);
-		return -1;
-	}
-	if (strcmp(message, "---\nunknown command. try typing help.\n...\n") == 0) {
-		free(message);
-		return 0;
-	}
-	tc_printf("%s", message);
-	free(message);
 	return 0;
 }

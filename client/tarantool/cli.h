@@ -1,5 +1,5 @@
-#ifndef TC_H_INCLUDED
-#define TC_H_INCLUDED
+#ifndef TC_CLI_H_INCLUDED
+#define TC_CLI_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,15 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+int tc_cli_cmdv(void);
+int tc_cli(void);
 
-struct tc {
-	struct tc_opt opt;
-	struct tc_admin admin;
-	struct tnt_stream *net;
-	int pager_fd;
-	pid_t pager_pid;
-};
-
-void tc_error(char *fmt, ...);
-
-#endif /* TC_H_INCLUDED */
+#endif /* TC_CLI_H_INCLUDED */
