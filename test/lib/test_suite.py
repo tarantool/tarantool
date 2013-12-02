@@ -1,15 +1,17 @@
 import os
 import re
 import sys
-import ConfigParser
-import collections
+import time
+import shutil
 import difflib
 import filecmp
-import shutil
-import time
+import threading
 import traceback
+import collections
+import ConfigParser
 
 from lib.server import Server
+
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -71,6 +73,9 @@ class FilteredStream:
         self.clear_all_filters()
         self.stream.close()
 
+    def flush(self):
+        self.stream.flush()
+
 
 def check_valgrind_log(path_to_log):
     """ Check that there were no warnings in the log."""
@@ -104,8 +109,7 @@ class Test:
         self.skip_cond = rg.sub('.skipcond', name)
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
-        self.reject = "{0}/test/{1}".format(self.args.builddir,
-                                            rg.sub('.reject', name))
+        self.reject = rg.sub('.reject', name)
         self.is_executed = False
         self.is_executed_ok = None
         self.is_equal_result = None
@@ -138,8 +142,13 @@ class Test:
             if not self.skip:
                 sys.stdout = FilteredStream(self.tmp_result)
                 stdout_fileno = sys.stdout.stream.fileno()
-                self.execute(server)
-                sys.stdout.stream.flush()
+                temp = threading.Thread(target=self.execute, args=(server, ))
+                temp.start()
+                temp.join(30)
+                if temp.is_alive():
+                    temp._Thread__stop()
+                    save_stdout.write("[ Terminated ]")
+                sys.stdout.flush()
             self.is_executed_ok = True
         except Exception as e:
             traceback.print_exc(e)
@@ -180,9 +189,13 @@ class Test:
             where = ""
             if not self.is_executed_ok:
                 self.print_diagnostics(self.reject, "Test failed! Last 10 lines of the result file:")
+                sys.stdout.write("Last 15 lines of log-file:\n")
+                server.print_log(15)
                 where = ": test execution aborted, reason '{0}'".format(diagnostics)
             elif not self.is_equal_result:
                 self.print_unidiff()
+                sys.stdout.write("Last 15 lines of log-file:\n")
+                server.print_log(15)
                 where = ": wrong test output"
             elif not self.is_valgrind_clean:
                 os.remove(self.reject)
@@ -238,7 +251,7 @@ class TestSuite:
         self.tests = []
         self.ini = {}
         self.suite_path = suite_path
-        self.ini["core"] = "tarantool"
+        self.ini["core"] = "tarantool"  
 
         if os.access(suite_path, os.F_OK) == False:
             raise RuntimeError("Suite \"" + suite_path + \

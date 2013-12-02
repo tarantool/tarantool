@@ -132,7 +132,7 @@ class State(object):
             self.suite_ini['servers'][sname].start(silent=True)
             self.suite_ini['connections'][sname] = [self.suite_ini['servers'][sname].admin, sname]
             try:
-                self.suite_ini['connections'][sname][0]('print()', silent=True)
+                self.suite_ini['connections'][sname][0]('print(\'Started? I\'t seems to me, that yep\')', silent=True)
             except socket.error as e:
                 LuaPreprocessorException('Can\'t start server '+repr(sname))
         elif ctype == 'stop':

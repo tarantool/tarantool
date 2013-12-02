@@ -446,6 +446,14 @@ class TarantoolServer(Server):
             pass
         return pid
 
+    def print_log(self, lines, stdout=None):
+        if stdout is None:
+            stdout = sys.stdout
+        with open(os.path.join(self.vardir, 'tarantool.log'), 'r') as log:
+            iter_log = log.readlines()
+            for i in iter_log[-lines:]:
+                stdout.write(i)
+
     def wait_until_started(self):
         """Wait until the server is started and accepting connections"""
 
