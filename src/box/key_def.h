@@ -31,7 +31,7 @@
 #include "tarantool/util.h"
 #include "rlist.h"
 #include <exception.h>
-#include <lib/msgpuck/msgpuck.h>
+#include "msgpuck/msgpuck.h"
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,

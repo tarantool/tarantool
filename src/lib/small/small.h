@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
-#include "lib/small/mempool.h"
+#include "small/mempool.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#include <lib/bitset/iterator.h>
-#include <lib/bitset/expr.h>
+#include "bitset/iterator.h"
+#include "bitset/expr.h"
 #include "page.h"
 
 #include <assert.h>

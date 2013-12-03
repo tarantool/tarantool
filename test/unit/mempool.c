@@ -1,4 +1,4 @@
-#include "lib/small/mempool.h"
+#include "small/mempool.h"
 #include "unit.h"
 #include <stdio.h>
 #include <stdlib.h>

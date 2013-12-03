@@ -26,10 +26,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lib/small/mempool.h"
+#include "small/mempool.h"
 #include <stdlib.h>
 #include <string.h>
-#include "lib/small/slab_cache.h"
+#include "small/slab_cache.h"
 
 static inline int
 mslab_cmp(struct mslab *lhs, struct mslab *rhs)

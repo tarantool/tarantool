@@ -1,4 +1,4 @@
-#include <lib/bit/bit.h>
+#include <bit/bit.h>
 
 #include <stdio.h>
 #include <inttypes.h>

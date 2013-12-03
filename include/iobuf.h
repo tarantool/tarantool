@@ -32,7 +32,7 @@
 #include <stdbool.h>
 #include "tarantool/util.h"
 #include "third_party/queue.h"
-#include "lib/small/region.h"
+#include "small/region.h"
 
 struct ev_io;
 

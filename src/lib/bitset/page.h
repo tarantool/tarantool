@@ -37,7 +37,7 @@
  * @internal
  */
 
-#include <lib/bitset/bitset.h>
+#include "bitset/bitset.h"
 
 #include <stdlib.h>
 #if defined(DEBUG)

@@ -36,7 +36,7 @@
  */
 
 #include "index.h"
-#include <lib/bitset/index.h>
+#include "bitset/index.h"
 
 struct bitset_index;
 struct bitset_expr;

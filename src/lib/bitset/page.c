@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
-#include <lib/bitset/bitset.h>
 #include "page.h"
+#include "bitset/bitset.h"
 
 extern inline size_t
 bitset_page_alloc_size(void *(*realloc_arg)(void *ptr, size_t size));

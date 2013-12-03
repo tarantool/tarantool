@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include <lib/bit/bit.h>
+#include "bit/bit.h"
 
 extern inline bool
 bit_test(const void *data, size_t pos);

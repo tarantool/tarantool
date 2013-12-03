@@ -1,4 +1,4 @@
-#include "lib/small/slab_cache.h"
+#include "small/slab_cache.h"
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>

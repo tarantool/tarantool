@@ -111,8 +111,8 @@
  * @see iterator.h
  */
 
-#include <lib/bitset/bitset.h>
-#include <lib/bitset/iterator.h>
+#include "bitset/bitset.h"
+#include "bitset/iterator.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -41,7 +41,7 @@
  * container grows automatically.
  */
 
-#include "tarantool/config.h"
+#include "bit/bit.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -57,7 +57,6 @@
 #include <third_party/rb.h>
 /** @endcond */
 
-#include <lib/bit/bit.h>
 
 #if defined(__cplusplus)
 extern "C" {

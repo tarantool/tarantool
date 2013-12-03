@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <limits.h>
 
-#include <lib/bitset/index.h>
+#include <bitset/index.h>
 #include "unit.h"
 
 enum { NUMS_SIZE = 1 << 16 };

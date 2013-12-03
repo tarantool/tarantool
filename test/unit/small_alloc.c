@@ -1,4 +1,4 @@
-#include "lib/small/small.h"
+#include "small/small.h"
 #include "unit.h"
 #include <stdio.h>
 #include <stdlib.h>

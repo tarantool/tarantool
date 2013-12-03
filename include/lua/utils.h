@@ -31,7 +31,7 @@
 
 #include <stdint.h>
 
-#include <lib/msgpuck/msgpuck.h> /* enum mp_type */
+#include "msgpuck/msgpuck.h" /* enum mp_type */
 
 #if defined(__cplusplus)
 extern "C" {

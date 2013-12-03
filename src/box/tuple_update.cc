@@ -34,7 +34,7 @@
 #include <rope.h>
 #include <exception.h>
 #include <pickle.h>
-#include <lib/msgpuck/msgpuck.h>
+#include "msgpuck/msgpuck.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each

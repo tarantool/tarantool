@@ -35,7 +35,7 @@
 #include "tuple.h"
 #include "exception.h"
 #include "pickle.h"
-#include <lib/bitset/index.h>
+#include "bitset/index.h"
 
 static inline struct tuple *
 value_to_tuple(size_t value);

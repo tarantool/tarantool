@@ -1,4 +1,4 @@
-#include "lib/small/region.h"
+#include "small/region.h"
 #include "unit.h"
 #include <stdio.h>
 

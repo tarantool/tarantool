@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <lib/bitset/iterator.h>
+#include <bitset/iterator.h>
 #include "unit.h"
 
 enum { NUMS_SIZE = 1 << 16 };

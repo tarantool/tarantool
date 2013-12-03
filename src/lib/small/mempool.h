@@ -31,7 +31,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include "lib/small/slab_cache.h"
+#include "small/slab_cache.h"
 #define RB_COMPACT 1
 #include "third_party/rb.h"
 

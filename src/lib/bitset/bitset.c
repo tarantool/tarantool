@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include <lib/bitset/bitset.h>
+#include "bitset/bitset.h"
 #include "page.h"
 
 #include <stddef.h>

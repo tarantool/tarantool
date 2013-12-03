@@ -46,8 +46,8 @@
  * @see expr.h
  */
 
-#include <lib/bitset/bitset.h>
-#include <lib/bitset/expr.h>
+#include "bitset/bitset.h"
+#include "bitset/expr.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -40,7 +40,7 @@ extern "C" {
 
 #include <tbuf.h>
 #include <fiber.h>
-#include <lib/small/region.h>
+#include "small/region.h"
 
 static void
 luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *buf);

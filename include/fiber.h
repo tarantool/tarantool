@@ -37,7 +37,7 @@
 #include <coro.h>
 #include <tarantool/util.h>
 #include "third_party/queue.h"
-#include "lib/small/region.h"
+#include "small/region.h"
 
 #if defined(__cplusplus)
 #include "exception.h"

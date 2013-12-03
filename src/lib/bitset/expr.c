@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include <lib/bitset/expr.h>
+#include "bitset/expr.h"
 
 #include <stdlib.h>
 #include <string.h>

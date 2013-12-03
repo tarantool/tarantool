@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include <lib/bitset/bitset.h>
+#include <bitset/bitset.h>
 
 #include "unit.h"
 

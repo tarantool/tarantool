@@ -45,7 +45,7 @@ extern "C" {
 #include <lj_cdata.h>
 #include <lj_cconv.h>
 #include <arpa/inet.h>
-#include <lib/bit/bit.h>
+#include "bit/bit.h"
 } /* extern "C" */
 
 #include "pickle.h"

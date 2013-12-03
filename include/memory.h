@@ -28,8 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lib/small/region.h"
-#include "lib/small/small.h"
+#include "small/region.h"
+#include "small/small.h"
 /**
  * Define the global components of Tarantool memory subsystem:
  * slab caches, allocators, arenas.

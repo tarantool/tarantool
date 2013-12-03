@@ -64,7 +64,7 @@ extern "C" {
 #include <sys/types.h>
 #include <stdio.h>
 #include "tarantool/plugin.h"
-#include <lib/small/region.h>
+#include "small/region.h"
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>

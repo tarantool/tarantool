@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lib/small/small.h"
+#include "small/small.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
