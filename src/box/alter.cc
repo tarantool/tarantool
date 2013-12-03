@@ -179,24 +179,14 @@ AlterSpaceOp::destroy(AlterSpaceOp *op)
  * A trigger installed on transaction commit/rollback events of
  * the transaction which initiated the alter.
  */
-struct txn_alter_trigger {
-	struct trigger trigger;
-	struct alter_space *alter;
-};
-
-struct txn_alter_trigger *
-txn_alter_trigger(struct trigger *trigger)
-{
-	return (struct txn_alter_trigger *) trigger;
-}
-
-struct txn_alter_trigger *
+struct trigger *
 txn_alter_trigger_new(trigger_f run, struct alter_space *alter)
 {
-	struct txn_alter_trigger *trigger = (struct txn_alter_trigger *)
+	struct trigger *trigger = (struct trigger *)
 		region_alloc0(&fiber->gc, sizeof(*trigger));
-	trigger->trigger.run = run;
-	trigger->alter = alter;
+	trigger->run = run;
+	trigger->data = alter;
+	trigger->destroy = NULL;
 	return trigger;
 }
 
@@ -256,7 +246,7 @@ alter_space_add_op(struct alter_space *alter, AlterSpaceOp *op)
 static void
 alter_space_commit(struct trigger *trigger, void * /* event */)
 {
-	struct alter_space *alter = txn_alter_trigger(trigger)->alter;
+	struct alter_space *alter = (struct alter_space *) trigger->data;
 #if 0
 	/*
 	 * Clear the lock first - should there be an
@@ -327,7 +317,7 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 static void
 alter_space_rollback(struct trigger *trigger, void * /* event */)
 {
-	struct alter_space *alter = txn_alter_trigger(trigger)->alter;
+	struct alter_space *alter = (struct alter_space *) trigger->data;
 #if 0
 	/* Clear the lock, first thing. */
 		op->rollback(alter);
@@ -434,12 +424,12 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * finish or rollback the DDL depending on the results of
 	 * writing to WAL.
 	 */
-	struct txn_alter_trigger *on_commit =
+	struct trigger *on_commit =
 		txn_alter_trigger_new(alter_space_commit, alter);
-	trigger_set(&txn->on_commit, &on_commit->trigger);
-	struct txn_alter_trigger *on_rollback =
+	trigger_set(&txn->on_commit, on_commit);
+	struct trigger *on_rollback =
 		txn_alter_trigger_new(alter_space_rollback, alter);
-	trigger_set(&txn->on_rollback, &on_rollback->trigger);
+	trigger_set(&txn->on_rollback, on_rollback);
 }
 
 /* }}}  */
@@ -619,24 +609,13 @@ ModifyIndex::~ModifyIndex()
  *
  * The trigger is removed when alter operation commits/rolls back.
  */
-struct add2index_trigger {
-	struct trigger trigger;
-	Index *new_index;
-};
-
-struct add2index_trigger *
-add2index_trigger(struct trigger *trigger)
-{
-	return (struct add2index_trigger *) trigger;
-}
-
-struct add2index_trigger *
+struct trigger *
 add2index_trigger_new(trigger_f run, Index *new_index)
 {
-	struct add2index_trigger *trigger = (struct add2index_trigger *)
+	struct trigger *trigger = (struct trigger *)
 		region_alloc0(&fiber->gc, sizeof(*trigger));
-	trigger->trigger.run = run;
-	trigger->new_index = new_index;
+	trigger->run = run;
+	trigger->data = new_index;
 	return trigger;
 }
 
@@ -645,7 +624,7 @@ class AddIndex: public AlterSpaceOp {
 public:
 	/** New index key_def. */
 	struct key_def *new_key_def;
-	struct add2index_trigger *on_replace;
+	struct trigger *on_replace;
 	virtual void prepare(struct alter_space *alter);
 	virtual void alter_def(struct alter_space *alter);
 	virtual void alter(struct alter_space *alter);
@@ -706,7 +685,7 @@ static void
 on_rollback_in_old_space(struct trigger *trigger, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	Index *new_index = add2index_trigger(trigger)->new_index;
+	Index *new_index = (Index *) trigger->data;
 	/* Remove the failed tuple from the new index. */
 	new_index->replace(txn->new_tuple, txn->old_tuple, DUP_INSERT);
 }
@@ -719,14 +698,14 @@ static void
 on_replace_in_old_space(struct trigger *trigger, void *event)
 {
 	struct txn *txn = (struct txn *) event;
-	Index *new_index = add2index_trigger(trigger)->new_index;
+	Index *new_index = (Index *) trigger->data;
 	/*
 	 * First set rollback trigger, then do replace, since
 	 * creating the trigger may fail.
 	 */
-	struct add2index_trigger *on_rollback =
+	struct trigger *on_rollback =
 		add2index_trigger_new(on_rollback_in_old_space, new_index);
-	trigger_set(&txn->on_rollback, &on_rollback->trigger);
+	trigger_set(&txn->on_rollback, on_rollback);
 	/* Put the tuple into thew new index. */
 	(void) new_index->replace(txn->old_tuple, txn->new_tuple,
 				  DUP_INSERT);
@@ -834,7 +813,7 @@ AddIndex::alter(struct alter_space *alter)
 	}
 	on_replace = add2index_trigger_new(on_replace_in_old_space,
 					   new_index);
-	trigger_set(&alter->old_space->on_replace, &on_replace->trigger);
+	trigger_set(&alter->old_space->on_replace, on_replace);
 }
 
 AddIndex::~AddIndex()
@@ -845,7 +824,7 @@ AddIndex::~AddIndex()
 	 * from the list, wherever it is.
 	 */
 	if (on_replace)
-		trigger_clear(&on_replace->trigger);
+		trigger_clear(on_replace);
 	if (new_key_def)
 		key_def_delete(new_key_def);
 }
@@ -866,7 +845,8 @@ on_drop_space(struct trigger * /* trigger */, void *event)
 	space_delete(space);
 }
 
-static struct trigger drop_space_trigger =  { rlist_nil, on_drop_space };
+static struct trigger drop_space_trigger =
+	{ rlist_nil, on_drop_space, NULL, NULL };
 
 /**
  * A trigger which is invoked on replace in a data dictionary
@@ -1061,11 +1041,11 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 }
 
 struct trigger alter_space_on_replace_space = {
-	rlist_nil, on_replace_dd_space
+	rlist_nil, on_replace_dd_space, NULL, NULL
 };
 
 struct trigger alter_space_on_replace_index = {
-	rlist_nil, on_replace_dd_index
+	rlist_nil, on_replace_dd_index, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */

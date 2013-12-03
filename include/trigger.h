@@ -34,24 +34,44 @@
  * on an event.
  */
 typedef void (*trigger_f)(struct trigger *trigger, void *event);
+typedef void (*trigger_f0)(struct trigger *trigger);
 
 struct trigger
 {
 	struct rlist link;
 	trigger_f run;
+	/**
+	 * Lua ref in case the trigger is used in Lua,
+	 * or other trigger context.
+	 */
+	void *data;
+	/**
+	 * Cleanup function, called when the trigger is removed
+	 * or the object containing the trigger is destroyed.
+	 */
+	trigger_f0 destroy;
 };
 
 static inline void
 trigger_run(struct rlist *list, void *event)
 {
-	struct trigger *trigger;
-	rlist_foreach_entry(trigger, list, link)
+	struct trigger *trigger, *tmp;
+	rlist_foreach_entry_safe(trigger, list, link, tmp)
 		trigger->run(trigger, event);
 }
 
 static inline void
 trigger_set(struct rlist *list, struct trigger *trigger)
 {
+	/*
+	 * New triggers are pushed to the beginning of the list.
+	 * This ensures that they are not fired right away if
+	 * pushed from within a trigger. This also ensures that
+	 * the trigger which was set first is fired last.
+	 * Alter space code depends on this order.
+	 * @todo in future, allow triggers to be pushed
+	 * to an arbitrary position on the list.
+	 */
 	rlist_add_entry(list, trigger, link);
 }
 

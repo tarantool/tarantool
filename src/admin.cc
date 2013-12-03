@@ -80,10 +80,9 @@ admin_handler(va_list ap)
 	struct sockaddr_in *addr = va_arg(ap, struct sockaddr_in *);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	lua_State *L = lua_newthread(tarantool_L);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	LuarefGuard coro_guard(tarantool_L);
 
 	auto scoped_guard = make_scoped_guard([&] {
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		evio_close(&coio);
 		iobuf_delete(iobuf);
 		session_destroy(fiber->sid);

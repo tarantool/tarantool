@@ -1244,15 +1244,7 @@ box_lua_execute(const struct request *request, struct txn *txn,
 {
 	(void) txn;
 	lua_State *L = lua_newthread(tarantool_L);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-
-	auto scoped_guard = make_scoped_guard([=] {
-		/*
-		 * Allow the used coro to be garbage collected.
-		 * @todo: cache and reuse it instead.
-		 */
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	});
+	LuarefGuard coro_ref(tarantool_L);
 
 	/* proc name */
 	int oc = box_lua_find(L, request->c.procname,

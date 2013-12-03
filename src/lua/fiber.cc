@@ -409,28 +409,18 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 	 * collected when detached.
 	 */
 	lua_pushthread(L);
-	int coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	LuarefGuard coro_guard(L);
 	/*
 	 * Lua coroutine.resume() returns true/false for
 	 * completion status plus whatever the coroutine main
 	 * function returns. Follow this style here.
 	 */
-	auto cleanup = [=] {
-		/*
-		 * If the coroutine has detached itself, collect
-		 * its resources here.
-		 */
-		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
-	};
-
 	try {
 		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 		/* push completion status */
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
 		lua_insert(L, 1);
-
-		cleanup();
 	} catch (const FiberCancelException &e) {
 		if (box_lua_fiber_get_coro(L, fiber)) {
 			struct fiber *caller = box_lua_fiber_get_caller(L);
@@ -444,7 +434,6 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		 * scheduled, and cancel() is synchronous.
 		 */
 
-		cleanup();
 		throw;
 	} catch (const Exception &e) {
 		/* pop any possible garbage */
@@ -456,8 +445,6 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 
 		/* Always log the error. */
 		e.log();
-
-		cleanup();
 	}
 	/*
 	 * L stack contains nothing but call results.
@@ -575,20 +562,14 @@ lbox_fiber_resume(struct lua_State *L)
 static void
 box_lua_fiber_run_detached(va_list ap)
 {
-	int coro_ref = va_arg(ap, int);
+	LuarefGuard coro_guard(va_arg(ap, int));
 	struct lua_State *L = va_arg(ap, struct lua_State *);
-	auto cleanup = [=] {
-		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
-	};
 	try {
 		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
-		cleanup();
 	} catch (const FiberCancelException &e) {
-		cleanup();
 		throw;
 	} catch (const Exception &e) {
 		e.log();
-		cleanup();
 	}
 }
 

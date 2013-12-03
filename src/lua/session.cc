@@ -118,9 +118,9 @@ lbox_session_run_trigger(struct trigger *trg, void * /* event */)
 }
 
 static struct lbox_session_trigger on_connect =
-	{ { rlist_nil, lbox_session_run_trigger }, LUA_NOREF};
+	{ { rlist_nil, lbox_session_run_trigger, NULL, NULL }, LUA_NOREF};
 static struct lbox_session_trigger on_disconnect =
-	{ { rlist_nil, lbox_session_run_trigger }, LUA_NOREF};
+	{ { rlist_nil, lbox_session_run_trigger, NULL, NULL }, LUA_NOREF};
 
 static int
 lbox_session_set_trigger(struct lua_State *L,
