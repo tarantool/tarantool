@@ -32,4 +32,5 @@
 void tc_pager_start();
 void tc_pager_stop();
 void tc_pager_kill();
+
 #endif /* TC_PAGER_H_INCLUDED */

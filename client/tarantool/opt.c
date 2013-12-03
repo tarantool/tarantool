@@ -42,7 +42,7 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("port"), " <port number>", "server port"),
 #endif
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
-		    gopt_longs("admin-port"), " <port number>", "server admin port"),
+		    gopt_longs("admin-port"), " <port number>", "server admin console port"),
 #if 0
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 		    gopt_longs("cat"), " <file name>", "print xlog or snapshot file content"),
@@ -118,10 +118,10 @@ tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 	if (gopt_arg(tc_options, 'p', &arg))
 		opt->port = atoi(arg);
 
-	/* server admin port */
-	opt->port_admin = TC_DEFAULT_ADMIN_PORT;
+	/* server admin console port */
+	opt->port_console = TC_DEFAULT_ADMIN_PORT;
 	if (gopt_arg(tc_options, 'a', &arg))
-		opt->port_admin = atoi(arg);
+		opt->port_console = atoi(arg);
 
 #if 0
 	/* space */
@@ -163,9 +163,9 @@ tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 #endif
 
 	/* set delimiter on start */
-	opt->delim = "";
+	opt->delim = NULL;
 	opt->delim_len = 0;
-	if (gopt_arg(tc_options, 'D', &opt->delim))
+	if (gopt_arg(tc_options, 'D', (const char**)&opt->delim))
 		opt->delim_len = strlen(opt->delim);
 
 #if 0
@@ -199,7 +199,12 @@ tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 	} else {
 		opt->mode = TC_OPT_INTERACTIVE;
 	}
-	opt->pager = getenv("PAGER");
+
+	char *pager = getenv("PAGER");
+	if (pager)
+		opt->pager = tc_strdup(pager);
+	else
+		opt->pager = NULL;
 	opt->envp  = envp;
 done:
 	gopt_free(tc_options);

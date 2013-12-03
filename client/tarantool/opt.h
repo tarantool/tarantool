@@ -45,7 +45,7 @@ struct tc_opt {
 	enum tc_opt_mode mode;
 	const char *host;
 	int port;
-	int port_admin;
+	int port_console;
 	uint64_t lsn;
 	uint64_t lsn_from;
 	int lsn_from_set;
@@ -63,9 +63,9 @@ struct tc_opt {
 	char **cmdv;
 	int cmdc;
 	char **envp;
-	const char *delim;
+	char *delim;
 	size_t delim_len;
-	const char *pager;
+	char *pager;
 };
 
 void tc_opt_usage(void);

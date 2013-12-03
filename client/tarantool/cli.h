@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-int tc_cli_cmdv(void);
 int tc_cli(void);
+int tc_clicmdv(void);
 
 #endif /* TC_CLI_H_INCLUDED */

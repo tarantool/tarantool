@@ -39,7 +39,6 @@ tc_query(char *q, void *cb) {
 	return tc_exec(q, (tc_query_t)cb, NULL);
 }
 
-
 #if 0
 typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
 

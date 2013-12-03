@@ -38,7 +38,7 @@
 #define TC_DEFAULT_HISTORY_FILE ".tarantool_history"
 
 struct tarantool_client {
-	struct tbses admin;
+	struct tbses console;
 	struct tc_opt opt;
 	int pager_fd;
 	pid_t pager_pid;
@@ -49,6 +49,22 @@ void tc_error(char *fmt, ...);
 static inline void
 tc_oom(void) {
 	tc_error("memory allocation failed");
+}
+
+static inline void*
+tc_malloc(size_t size) {
+	void *p = malloc(size);
+	if (p == NULL)
+		tc_oom();
+	return p;
+}
+
+static inline char*
+tc_strdup(char *sz) {
+	char *p = strdup(sz);
+	if (p == NULL)
+		tc_oom();
+	return p;
 }
 
 #define TC_ERRCMD "---\nunknown command. try typing help.\n...\n"

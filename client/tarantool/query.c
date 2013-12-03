@@ -48,12 +48,12 @@ int tc_printer(char *reply, size_t size, void *ctx)
 
 int tc_exec(char *q, tc_query_t cb, void *ctx)
 {
-	int rc = tb_conwrite(&tc.admin, q, strlen(q));
+	int rc = tb_conwrite(&tc.console, q, strlen(q));
 	if (rc == -1)
 		return -1;
 	size_t size;
 	char *reply;
-	rc = tb_conread(&tc.admin, &reply, &size);
+	rc = tb_conread(&tc.console, &reply, &size);
 	if (rc == -1)
 		return -1;
 	rc = 0;

@@ -49,15 +49,19 @@ tc_init(void)
 {
 	memset(&tc, 0, sizeof(tc));
 	setlocale(LC_ALL, "");
+	if (tc.opt.pager)
+		free(tc.opt.pager);
+	if (tc.opt.delim)
+		free(tc.opt.delim);
 	tc.pager_fd = fileno(stdout);
 	tc.pager_pid = 0;
-	tb_sesinit(&tc.admin);
+	tb_sesinit(&tc.console);
 }
 
 static void
 tc_shutdown(void)
 {
-	tb_sesclose(&tc.admin);
+	tb_sesclose(&tc.console);
 	tc_pager_kill();
 }
 
@@ -86,7 +90,7 @@ tc_motd(void)
 {
 	int rc = tc_query("motd()", tc_motdof);
 	if (rc == -1)
-		tc_error("%s\n", "failed to send admin query");
+		tc_error("%s\n", "failed to send console query");
 }
 
 static int
@@ -104,26 +108,26 @@ tc_primaryport()
 {
 	int rc = tc_query("box.cfg.primary_port", tc_primaryportof);
 	if (rc == -1)
-		tc_error("%s\n", "failed to send admin query");
+		tc_error("%s\n", "failed to send console query");
 	if (rc > 0)
 		return rc;
 	rc = tc_query("lua box.cfg.primary_port", tc_primaryportof);
 	if (rc == -1)
-		tc_error("%s\n", "failed to send admin query");
+		tc_error("%s\n", "failed to send console query");
 	return rc;
 }
 
 static void
 tc_connect(void)
 {
-	tb_sesset(&tc.admin, TB_HOST, tc.opt.host);
-	tb_sesset(&tc.admin, TB_PORT, tc.opt.port_admin);
-	tb_sesset(&tc.admin, TB_SENDBUF, 0);
-	tb_sesset(&tc.admin, TB_READBUF, 0);
+	tb_sesset(&tc.console, TB_HOST, tc.opt.host);
+	tb_sesset(&tc.console, TB_PORT, tc.opt.port_console);
+	tb_sesset(&tc.console, TB_SENDBUF, 0);
+	tb_sesset(&tc.console, TB_READBUF, 0);
 
-	int rc = tb_sesconnect(&tc.admin);
+	int rc = tb_sesconnect(&tc.console);
 	if (rc == -1)
-		tc_error("admin console connection failed");
+		tc_error("console connection failed");
 
 	if (tc.opt.port == 0)
 		tc.opt.port = tc_primaryport();
@@ -176,7 +180,7 @@ int main(int argc, char *argv[], char *envp[])
 #endif
 	case TC_OPT_CMD:
 		tc_connect();
-		rc = tc_cli_cmdv();
+		rc = tc_clicmdv();
 		break;
 	case TC_OPT_INTERACTIVE:
 		tc_connect();

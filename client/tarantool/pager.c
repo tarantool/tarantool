@@ -40,7 +40,8 @@
 
 extern struct tarantool_client tc;
 
-void tc_pager_start() {
+void tc_pager_start()
+{
 	if (tc.pager_pid != 0)
 		tc_pager_kill();
 	if (tc.opt.pager == NULL) {
@@ -49,9 +50,9 @@ void tc_pager_start() {
 	}
 	int pipefd[2];
 	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
-
 	if (pipe(pipefd) < 0)
 		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
+
 	pid_t pid = fork();
 	if (pid < 0) {
 		tc_error("Failed to fork. Errno: %s", strerror(errno));
@@ -65,20 +66,20 @@ void tc_pager_start() {
 		tc.pager_fd = pipefd[1];
 		tc.pager_pid = pid;
 	}
-	return;
 }
 
-void tc_pager_stop () {
+void tc_pager_stop()
+{
 	if (tc.pager_pid != 0) {
 		close(tc.pager_fd);
 		tc.pager_fd = fileno(stdout);
 		waitpid(tc.pager_pid, NULL, 0);
 		tc.pager_pid = 0;
 	}
-	return;
 }
 
-void tc_pager_kill () {
+void tc_pager_kill()
+{
 	if (tc.pager_pid != 0) {
 		kill(tc.pager_pid, SIGTERM);
 		tc_pager_stop();
