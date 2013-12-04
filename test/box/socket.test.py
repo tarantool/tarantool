@@ -40,7 +40,6 @@ admin("s:connect('127.0.0.1', '30303')")
 admin("s:error()")
 
 admin("s:connect('127.0.0.1', '30303', 0.01)")
-
 # connection refused
 admin("s:error()")
 
@@ -563,7 +562,7 @@ admin("iotest()")
 admin("iotest()")
 admin("iotest()")
 # Due to delays in event loop the value can be not updated
-admin("wait_cout = 100 while replies ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end")
+admin("wait_cout = 100 while reps ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end")
 admin("reps")
 
 # Bug #43: incorrect box:shutdown() arg handling
@@ -588,7 +587,6 @@ end
 
 box.fiber.wrap(server)
 """
-
 admin("test_listen_done = false")
 admin(test.replace('\n', ' '))
 # Due to delays in event loop the value can be not updated
@@ -612,3 +610,4 @@ s.connect(('127.0.0.1', 8181))
 data = s.recv(1024)
 s.close()
 print data
+admin("ms:close()")
