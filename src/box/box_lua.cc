@@ -426,6 +426,7 @@ static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	int argc = lua_gettop(L);
+	(void) argc;
 	struct tuple *tuple = lua_checktuple(L, 1);
 
 	struct tuple_iterator it;
