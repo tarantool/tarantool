@@ -359,7 +359,7 @@ done:
 static int
 waldir_processof(struct ts_spaces *s, struct tnt_dir *wal_dir, int i)
 {
-	int rc;
+	int rc = 0;
 	if (i < wal_dir->count) {
 		rc = xlog_process(s, wal_dir->path, wal_dir->files[i].lsn,
 		                  tss.last_snap_lsn, &tss.last_xlog_lsn);
