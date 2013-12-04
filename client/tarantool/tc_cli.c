@@ -464,8 +464,7 @@ int tc_cli(void)
 				tc_buf_free(&cmd);
 				break;
 			}
-		}
-		else {
+		} else {
 			enum tc_cli_cmd_ret ret = tc_cli_cmd(cmd.data,
 						     cmd.used - 1);
 			if (isatty(STDIN_FILENO))
@@ -476,7 +475,7 @@ int tc_cli(void)
 				break;
 			}
 		}
-}
+	}
 
 	/* updating history file */
 	write_history(history);
