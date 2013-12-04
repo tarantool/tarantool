@@ -358,6 +358,7 @@ sfree_delayed(void *ptr)
 		return sfree(ptr);
 	struct slab_item *item = (struct slab_item *)ptr;
 	struct slab *slab = slab_header(item);
+	(void) slab;
 	assert(valid_item(slab, item));
 	SLIST_INSERT_HEAD(&free_delayed, item, next);
 	arena.delayed_free_count++;

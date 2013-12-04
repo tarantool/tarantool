@@ -107,9 +107,10 @@ static int get_admin_port(void)
 	}
 	struct tnt_tuple *tu = TNT_ILIST_TUPLE(&it);
 	tnt_iter(&ifl, tu);
-	if (!tnt_next(&ifl)) { goto end; }
+	if (!tnt_next(&ifl)) {
+		tc_error("Can't get admin port from primary port");
+	}
 	int port = *((uint32_t* )TNT_IFIELD_DATA(&ifl));
-end:
 	tnt_iter_free(&ifl);
 	tnt_iter_free(&it);
 	tnt_iter_free(&i);
