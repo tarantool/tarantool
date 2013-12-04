@@ -77,7 +77,55 @@ snapshot exists, skip.
 </para>
 
 <para>
-For an explanation of tarantar's design see <link xlink:href="https://github.com/tarantool/tarantool/wiki/Tarantar">the Tarantool wiki</link>.
+<bridgehead renderas="sect4">Why tarantar?</bridgehead>
+To recapitulate the idea of a snapshot and a write-ahead log:
+Tarantool's database is entirely in memory; however, it has a
+complete and up-to-date on-disk backup.  This consists of snapshot
+files (extension .snap) which are copies of the database as of the
+time the snapshot was taken, and write-ahead-log files (extension
+.xlog) which contain records of insert/update/delete operations that
+are written when the operations occur. If the tarantool_box server
+goes down and later restarts, it will recover the database by
+reading the snapshot and then re-applying the write-ahead-log records.
+</para>
+
+<para>
+The approach is reliable. But if the snapshot gets old and the
+number of write-ahead-log records get huge, then recovery would
+take too long and .xlog files would take too much space.
+So periodically one should make new snapshots -- if a .snap file
+is up to date, then the .xlog files are unnecessary and can be
+archived.
+</para>
+
+<para>
+To take a snapshot with the tarantool client, one can say
+SAVE SNAPSHOT. SAVE SNAPSHOT will copy every tuple from
+the in-memory database to the .snap file. However, this
+is not always the ideal method.
+</para>
+
+<para>
+Taking snapshots with tarantar, instead of with SAVE SNAPSHOT,
+can be better because:
+<itemizedlist>
+  <listitem><para>tarantar can work even if the tarantool_box server is down
+  because it works from the existing .xnap and .xlog files,
+   rather than from an in-memory database.</para></listitem>
+   <listitem><para>tarantar saves memory when constructing its own in-memory
+  index to the rows by making SHA-1 hashes for primary keys
+  that contain strings or that are multi-column and longer
+   than 20 bytes</para></listitem>
+   <listitem><para>tarantar can be made to limit its memory usage so that
+  it does not interfere with resource use by other processes
+   including other Tarantool-related processes.</para></listitem>
+   <listitem><para>
+  tarantar can be made to run periodically as a daemon</para></listitem>
+</itemizedlist>
+</para>
+
+<para>
+For more explanation of tarantar's design see <link xlink:href="https://github.com/tarantool/tarantool/wiki/Tarantar">the Tarantool wiki</link>.
 </para>
 
 </section>
