@@ -21,6 +21,7 @@
 <xi:include href="limitations.xml"/>
 <xi:include href="client-reference.xml"/>
 <xi:include href="lua-tutorial.xml"/>
+<xi:include href="plugins.xml"/>
 <!--
 <xi:include href="faq.xml"/>
 -->
