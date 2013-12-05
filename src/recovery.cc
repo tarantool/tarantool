@@ -1201,7 +1201,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			 * filesystem cache, otherwise the limit is
 			 * not really enforced.
 			 */
-			fdatasync(fileno(l->f));
+			if (bytes > recovery_state->snap_io_rate_limit)
+				fdatasync(fileno(l->f));
 		}
 		while (bytes >= recovery_state->snap_io_rate_limit) {
 			ev_now_update();
