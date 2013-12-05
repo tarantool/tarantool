@@ -8,7 +8,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  python-daemon,
  python-pexpect,
  libncurses5-dev,
- binutils-dev | libiberty-dev,
+ binutils-dev (< 2.23) | libiberty-dev,
  libmysqlclient-dev,
  libpq-dev
 Section: database
