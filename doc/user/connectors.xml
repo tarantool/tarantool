@@ -246,7 +246,7 @@ int main()
     If the row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
     </para>
 <programlisting language="python">
-#!/usr/bin/python
+#!/usr/bin/python2
 from box_connection import BoxConnection
 
 c = BoxConnection("127.0.0.1", 33013)
