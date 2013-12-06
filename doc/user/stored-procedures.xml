@@ -2149,6 +2149,16 @@ event.
         is not connected.</simpara></listitem>
     </varlistentry>
 
+    <varlistentry>
+        <term>
+           <emphasis role="lua">box.session.storage</emphasis>
+        </term>
+        <listitem><simpara>A virtual table that is local for each session.
+        It can be used to store session-specific values. The lifetime is the
+        same as the session's (until disconnect).
+        </simpara></listitem>
+    </varlistentry>
+
 </variablelist>
     <para>
 This module also makes it possible to define triggers on connect

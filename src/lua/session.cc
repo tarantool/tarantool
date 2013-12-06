@@ -40,6 +40,7 @@ extern "C" {
 #include "sio.h"
 
 static const char *sessionlib_name = "box.session";
+extern lua_State *root_L;
 
 /**
  * Return a unique monotonic session
@@ -175,10 +176,26 @@ lbox_session_on_disconnect(struct lua_State *L)
 	return lbox_session_set_trigger(L, &on_disconnect);
 }
 
-static const struct luaL_reg lbox_session_meta [] = {
-	{"id", lbox_session_id},
-	{NULL, NULL}
-};
+void
+session_storage_cleanup(int sid)
+{
+	static int ref = LUA_REFNIL;
+
+	int top = lua_gettop(root_L);
+
+	if (ref == LUA_REFNIL) {
+		lua_getfield(root_L, LUA_GLOBALSINDEX, "box");
+		lua_getfield(root_L, -1, "session");
+		lua_getmetatable(root_L, -1);
+		lua_getfield(root_L, -1, "aggregate_storage");
+		ref = luaL_ref(root_L, LUA_REGISTRYINDEX);
+	}
+	lua_rawgeti(root_L, LUA_REGISTRYINDEX, ref);
+
+	lua_pushnil(root_L);
+	lua_rawseti(root_L, -2, sid);
+	lua_settop(root_L, top);
+}
 
 static const struct luaL_reg sessionlib[] = {
 	{"id", lbox_session_id},
