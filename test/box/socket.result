@@ -936,7 +936,7 @@ iotest()
 ---
 - 12
 ...
-wait_cout = 100 while replies ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end
+wait_cout = 100 while reps ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end
 ---
 ...
 reps
@@ -955,3 +955,6 @@ wait_cout = 100 while not test_listen_done and wait_cout > 0 do box.fiber.sleep(
 Hello world
 Hello world
 Hello world
+ms:close()
+---
+...
