@@ -778,6 +778,55 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
     </tgroup>
   </table>
 
+  <table frame='all' pgwide='1'>
+    <title>Hot Standby</title>
+    <tgroup cols='6' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="6" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Required?</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>local_hot_standby</entry>
+          <entry>boolean</entry>
+          <entry>false</entry>
+          <entry>no</entry>
+          <entry>no</entry>
+          <entry>
+            <anchor xml:id="local_hot_standby" xreflabel="local_hot_standby"/>
+          If local_hot_standby=true, the expectation is that there will be two
+          instances of the server using the same configuration file.
+          The first one to start will be the "primary" instance.
+          The second one to start will be the "standby" instance.
+          The standby instance will initialize and will try to connect on primary_port
+          and secondary_port and admin_port, but will fail because the
+          primary instance has already taken them.
+          So the standby instance goes into a loop, reading the write
+          ahead log which the primary instance is writing (so the
+          two instances are always in synch), and trying to connect on the
+          ports. If the primary instance goes down for any reason,
+          the ports will become free so the standby instance will
+          succeed in connecting, and will become the primary instance.
+          Thus there is no noticeable downtime if the primary instance goes down.
+          If local_hot_standby=true, then replication_source should be an
+          empty string and wal_mode should not be equal to "none".
+          </entry>
+        </row>
+      </tbody>
+    </tgroup>
+  </table>
+  
 </section>
 </chapter>
 

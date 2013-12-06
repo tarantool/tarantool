@@ -8,20 +8,47 @@
 <title>Data persistence</title>
 <para>
 To maintain data persistence, Tarantool writes each data change
-request (INSERT, UPDATE, DELETE) into a write-ahead log. WAL
-files have extension <filename>.xlog</filename> and are stored in <olink
-targetptr="wal_dir"/>. A new WAL file is created for every <olink
-targetptr="rows_per_wal"/> records.  Each INSERT, UPDATE or DELETE
+request (INSERT, UPDATE, DELETE) into a write-ahead log (WAL)
+file in the <olink targetptr="wal_dir"/> directory.
+A new WAL file is created for every <olink
+targetptr="rows_per_wal"/> records.  Each data change request
 gets assigned a continuously growing 64-bit log sequence number.
-The name of the log file is based on the log sequence
-number of the first record this file contains.
+The name of the WAL file is based on the log sequence
+number of the first record in the file, plus an extension <filename>.xlog</filename>.
 </para>
 
 <para>Apart from a log sequence number and the data change request
 (its format is the same as in the binary protocol and is described
 in <link
-xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
+xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
 each WAL record contains a checksum and a UNIX time stamp.
+For example this is what the WAL file looks like after the first INSERT
+statement ("INSERT INTO t0 VALUES (1)") for the introductory sandbox exercise
+<olink
+targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>.
+On the left are the hexadecimal bytes that one would see with
+<programlisting><prompt>$ </prompt><userinput>hexdump work_dir/00000000000000000002.xlog</userinput></programlisting>
+and on the right are comments.
+<programlisting>
+Hex dump of WAL file        Comment
+--------------------        -------
+58 4c 4f 47 0a              File header: "XLOG\n"
+30 2e 31 31 0a 0a           File header: "0.11\n\n" = version
+ed ab 0b ba                 Magic row marker always = 0xba0babed for version 0.11
+10 2a 1b 5e                 Record header: crc32 checksum of header fields
+02 00 00 00 00 00 00 00     Record header: 2 = (64-bit int) log sequence number
+99 c8 f1 d9 32 a8 d4 41     Record header: (double) unix time-since-epoch for transaction
+1d 00 00 00                 Record header: 29 = length of rest of record, non-inclusive
+60 45 94 cd                 Record header: crc32 checksum of data fields
+fe ff                       Tag = XLOG which is #defined as 65534
+02 00 99 f9 7f 00 00 01     Session cookie, comes from struct sockaddr_in *addr
+0d 00 00 00                 Data change request code = insert which is #defined as 13
+00 00                       Space number = 0
+02 00 00 00                 Flags = BOX_ADD which is defined as 2
+01 00 00 00                 Tuple: Count of fields in tuple = 1
+04                          Tuple: field[0] length = 4 because value is 4 bytes long
+01 00 00 00                 Tuple: field[0] value = 1
+</programlisting>
 </para>
 
 <para>
@@ -59,7 +86,7 @@ example:
     latest to oldest, up to the first failed change. All rolled back
     requests are aborted with <olink targetptr="ER_WAL_IO"/>
     error. No new change is applied while rollback is in progress.
-    When the rollback procedure is finished, the servers restarts
+    When the rollback procedure is finished, the server restarts
     the processing pipeline.
     </para></listitem>
 </orderedlist>
@@ -78,20 +105,20 @@ using asynchronous (yet reliable) messaging; the transaction
 processor thread, not being blocked on WAL tasks, continues to
 handle requests quickly even at high volumes of disk I/O. A
 response to a request is sent as soon as it is ready, even if
-there were earlier incomplete requests on the same connection.  In
+there were earlier incomplete requests on the same connection. In
 particular, SELECT performance, even for SELECTs running on a
 connection packed with UPDATEs and DELETEs, remains unaffected by
 disk load.
 </para>
 
 <para>
-WAL writer employs a number of durability modes, as defined
+The WAL writer employs a number of durability modes, as defined
 in configuration variable <olink targetptr="wal_mode"/>. It is
 possible to turn the write ahead log completely off, by setting
 <olink targetptr="wal_mode"/> to <emphasis>none</emphasis>.
 Even without the write ahead log it's still possible to take a
-persistent copy of the entire data set with
-<olink targetptr="box.snapshot"/>.
+persistent copy of the entire data set with the
+<olink targetptr="box.snapshot"/> statement.
 </para>
 
 

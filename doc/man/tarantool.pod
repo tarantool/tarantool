@@ -1,66 +1,78 @@
 =head1 NAME
 
-tarantool - readline SQL-client for L<tarantool>.
+tarantool - readline-based client for L<tarantool>.
 
 =head1 SYNOPSIS
 
-    tarantool [OPTIONS]
+    tarantool [OPTIONS] [QUERY]
 
 =head1 Command-line options
 
 =over
 
-=item -h <host>, --host <host>
+=item -h, --host <host name>
 
-Define server address.
+Server address.
 
-=item -p <port>, --port <port>
+=item -p, --port <port number>
 
-Define server port.
+Server port.
 
-=item -a <port>, --admin-port <port>
+=item -a, --admin-port <port number>
 
-Define server admin port.
+Server admin port.
 
-=item -C <file>, --cat <file>
+=item -C, --cat <file name>
 
-Output xlog file or snapshot content. Filename '-' stands for stdin.
+Print xlog or snapshot file content.
 
-=item -P <file>, --play <file>
+=item -P, --play <file name>
 
 Replay xlog file to the specified server.
 
-=item -R <lsn>, --rpl <lsn>
+=item -S, --space <space number>
 
-Act as replica for the specified server.
+Filter by space number.
 
-=item -S <space>, --space <space>
-
-Filter xlog file records by space number.
-
-=item -F <lsn>, --from <lsn>
+=item -F, --from <log serial number>
 
 Start xlog file from the specified lsn.
 
-=item -T <lsn>, --to <lsn>
+=item -T, --to <log serial number>
 
 Stop on specified xlog lsn.
 
-=item -M <name>, --format <name>
+=item -M, --format <name>
 
-Cat output format (default: tarantool).
+Cat output format (tarantool, raw).
 
 =item -H, --header
 
-Add file header to the 'raw' output format..
+Add file header for the raw output.
 
-=item --help
+=item -R, --rpl <log serial number>
 
-Display helpscreen and exits.
+Act as replica for the specified server.
 
-=item -v, --version
+=item -B, --bin
 
-Display version and exits.
+Print STR in lua printer instead of NUM32 and NUM64,
+except arithmetic update arguments.
+
+=item -D, --delim <delim>
+
+If you use --cat, then it will add delim to end of
+every line of your Lua file. when used at CLI start
+of client, then it's replacement of setopt
+delim='<delim>' command.
+
+=item -?, --help
+
+Display this help and exit.
+
+=item -V, --version
+
+Display version information and exit.
 
 =back
 
