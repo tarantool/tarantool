@@ -17,9 +17,6 @@ pkg_add -r python27
 3. Install necessary python modules:
 -------------
 
-cd /usr/ports/misc/py-pexpect
-sudo make install
-
 cd /usr/ports/devel/py-yaml
 sudo make install
 

@@ -316,7 +316,7 @@ and a reasonable choice is <computeroutput><option>-DENABLE_CLIENT=true</option>
 	This step is optional.</para>
 <para>Say:<programlisting><command>python --version</command></programlisting>
 ... You should see that the python version is between 2.6 and 3.</para>
-<para>On Ubuntu you can get modules from the repository:<programlisting><command>sudo apt-get install</command> python-daemon python-yaml python-argparse python-pexpect</programlisting></para>
+<para>On Ubuntu you can get modules from the repository:<programlisting><command>sudo apt-get install</command> python-daemon python-yaml python-argparse</programlisting></para>
 <para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
 <para>But in general it is best to set up the modules by getting
 	a tarball and doing the setup with <computeroutput>python setup.py</computeroutput>, thus:
@@ -326,13 +326,6 @@ and a reasonable choice is <computeroutput><option>-DENABLE_CLIENT=true</option>
 <command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
 <command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
 <command>cd</command> PyYAML-3.10
-<command>sudo python</command> setup.py install
-# python module for spawning child applications (pexpect):
-# (If wget fails, check the  <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> web site to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz
-<command>tar</command> <option>-xzvf</option> pexpect-u-2.5.1.tar.
-<command>cd</command> pexpect-u-2.5.1
 <command>sudo python</command> setup.py install
 # python module for assisting programs to turn themselves into daemons (daemon):
 # (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site to see what the current version is.)
