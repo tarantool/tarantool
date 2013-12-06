@@ -37,7 +37,7 @@
 #include <client/tarantool/pager.h>
 #include <client/tarantool/cli.h>
 #include <client/tarantool/print.h>
-/*#include <client/tarantool/store.h>*/
+#include <client/tarantool/store.h>
 #include <client/tarantool/query.h>
 /*#include <client/tarantool/print_snap.h>*/
 /*#include <client/tarantool/print_xlog.h>*/
@@ -165,13 +165,13 @@ int main(int argc, char *argv[], char *envp[])
 	case TC_OPT_VERSION:
 		tc_opt_version();
 		break;
+	case TC_OPT_WAL_CAT:
+		rc = tc_store_cat();
+		break;
 #if 0
 	case TC_OPT_RPL:
 		tc_connect();
 		rc = tc_store_remote();
-		break;
-	case TC_OPT_WAL_CAT:
-		rc = tc_store_cat();
 		break;
 	case TC_OPT_WAL_PLAY:
 		tc_connect();

@@ -43,11 +43,12 @@ static const void *tc_options_def = gopt_start(
 #endif
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
 		    gopt_longs("admin-port"), " <port number>", "server admin console port"),
-#if 0
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 		    gopt_longs("cat"), " <file name>", "print xlog or snapshot file content"),
+#if 0
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file name>", "replay xlog file to the specified server"),
+#endif
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
 		    gopt_longs("space"), " <space number>", "filter by space number"),
 	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
@@ -56,6 +57,7 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("to"), " <log serial number>", "stop on specified xlog lsn"),
 	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
 		    gopt_longs("format"), " <name>", "cat output format (tarantool, raw)"),
+#if 0
 	gopt_option('H', 0, gopt_shorts('H'),
 		    gopt_longs("header"), NULL, "add file headers for the raw output"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
@@ -63,12 +65,12 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('B', 0, gopt_shorts('B'),
 		    gopt_longs("bin"), NULL, "print STR in lua printer instead"
 		    " of NUM32 and NUM64, except arithmetic update arguments"),
+#endif
 	gopt_option('D', GOPT_ARG, gopt_shorts('D'),
 		    gopt_longs("delim"), " <delim>",
 		    "if you use --cat, then it will add delim to an end of every line of your "
 		    "Lua file, when used at CLI start of client, then it's replacement of "
 		    "setopt delim='<delim>' command"),
-#endif
 	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),

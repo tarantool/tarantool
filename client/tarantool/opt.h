@@ -32,9 +32,9 @@
 enum tc_opt_mode {
 	TC_OPT_USAGE,
 	TC_OPT_VERSION,
+	TC_OPT_WAL_CAT,
 #if 0
 	TC_OPT_RPL,
-	TC_OPT_WAL_CAT,
 	TC_OPT_WAL_PLAY,
 #endif
 	TC_OPT_CMD,

@@ -7,7 +7,7 @@ if (NOT READLINE_FOUND)
 endif()
 
 set(cli "tarantool")
-set(cli_sources main.c opt.c query.c print.c buf.c cli.c pager.c)
+set(cli_sources main.c opt.c query.c print.c buf.c cli.c pager.c store.c)
 set(cli_libs gopt ${READLINE_LIBRARIES} tb)
 
 include_directories(${READLINE_INCLUDE_DIR})
