@@ -44,6 +44,7 @@ extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;
 extern char *custom_proc_title;
 int reload_cfg();
+extern char status[];
 void show_cfg(struct tbuf *out);
 int snapshot(void);
 const char *tarantool_version(void);
@@ -57,10 +58,8 @@ uint32_t tarantool_version_id(void);
 double tarantool_uptime(void);
 void tarantool_free(void);
 
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-void title(const char *fmt, ...);
+void __attribute__((format (printf, 2, 3)))
+title(const char *role, const char *fmt, ...);
 
 #if defined(__cplusplus)
 } /* extern "C" */

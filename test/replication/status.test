@@ -1,0 +1,28 @@
+# encoding: tarantool
+import os
+import time
+import re
+from lib.tarantool_server import TarantoolServer
+
+# replica server
+replica = TarantoolServer()
+replica.deploy("replication/cfg/replica.cfg",
+               replica.find_exe(self.args.builddir),
+               os.path.join(self.args.vardir, "replica"))
+
+replica.get_param("lsn")
+
+status = replica.admin.execute_no_reconnect("lua box.info.status", True)
+print(re.search(r'replica/.*/(connecting|connected)\n', status) != None)
+
+server.stop()
+status = replica.admin.execute_no_reconnect("lua box.info.status", True)
+print(re.search(r'replica/.*/(connecting|failed)\n', status) != None)
+
+# Cleanup.
+replica.stop()
+replica.cleanup(True)
+
+server.deploy(self.suite_ini["config"])
+
+# vim: syntax=python

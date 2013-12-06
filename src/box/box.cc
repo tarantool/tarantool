@@ -55,8 +55,6 @@ static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
 box_process_func box_process_ro = process_ro;
 
-static char status[64] = "unknown";
-
 static int stat_base;
 
 /** The snapshot row metadata repeats the structure of REPLACE request. */
@@ -153,17 +151,9 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 					       conf->replication_source);
 		}
 
-		snprintf(status, sizeof(status), "replica/%s%s",
-			 conf->replication_source, custom_proc_title);
-		title("replica/%s%s", conf->replication_source,
-		      custom_proc_title);
 	} else {
 		box_process = process_rw;
-
-		snprintf(status, sizeof(status), "primary%s",
-			 custom_proc_title);
-		title("primary%s", custom_proc_title);
-
+		title("primary", NULL);
 		say_info("I am primary");
 	}
 }
@@ -279,7 +269,7 @@ box_free(void)
 void
 box_init()
 {
-	title("loading");
+	title("loading", NULL);
 
 	tuple_format_init();
 	schema_init();
@@ -298,14 +288,11 @@ box_init()
 	space_end_recover();
 
 	stat_cleanup(stat_base, requests_MAX);
-	title("orphan");
-
+	title("orphan", NULL);
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
-		snprintf(status, sizeof(status), "hot_standby%s",
-			 custom_proc_title);
-		title("hot_standby%s", custom_proc_title);
+		title("hot_standby", NULL);
 	}
 }
 

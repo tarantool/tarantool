@@ -341,12 +341,10 @@ replica_connect(const char *replication_source)
 static void
 spawner_init(int sock)
 {
-	char name[FIBER_NAME_MAX];
 	struct sigaction sa;
 
-	snprintf(name, sizeof(name), "spawner%s", custom_proc_title);
-	fiber_set_name(fiber, name);
-	set_proc_title(name);
+	title("spawner", NULL);
+	fiber_set_name(fiber, status);
 
 	/* init replicator process context */
 	spawner.sock = sock;
@@ -677,7 +675,6 @@ replication_relay_send_snapshot(int client_sock)
 static void
 replication_relay_loop(int client_sock)
 {
-	char name[FIBER_NAME_MAX];
 	struct sigaction sa;
 	int64_t lsn;
 
@@ -688,9 +685,8 @@ replication_relay_loop(int client_sock)
 	struct sockaddr_in peer;
 	socklen_t addrlen = sizeof(peer);
 	getpeername(client_sock, ((struct sockaddr*)&peer), &addrlen);
-	snprintf(name, sizeof(name), "relay/%s", sio_strfaddr(&peer));
-	fiber_set_name(fiber, name);
-	set_proc_title("%s%s", name, custom_proc_title);
+	title("relay", "%s", sio_strfaddr(&peer));
+	fiber_set_name(fiber, status);
 
 	/* init signals */
 	memset(&sa, 0, sizeof(sa));

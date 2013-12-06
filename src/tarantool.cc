@@ -77,6 +77,7 @@ static pid_t master_pid;
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
 char *custom_proc_title;
+char status[64] = "unknown";
 char **main_argv;
 int main_argc;
 static void *main_opt = NULL;
@@ -90,6 +91,13 @@ uint32_t snapshot_version = 0;
 
 extern const void *opt_def;
 
+/* defined in third_party/proctitle.c */
+extern "C" {
+char **init_set_proc_title(int argc, char **argv);
+void free_proc_title(int argc, char **argv);
+void set_proc_title(const char *format, ...);
+} /* extern "C" */
+
 static int
 core_check_config(struct tarantool_cfg *conf)
 {
@@ -102,14 +110,26 @@ core_check_config(struct tarantool_cfg *conf)
 }
 
 void
-title(const char *fmt, ...)
+title(const char *role, const char *fmt, ...)
 {
+	(void) role;
+
 	va_list ap;
 	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
+	char *statusptr = status, *statusend = status + sizeof(status);
+	statusptr += snprintf(statusptr, statusend - statusptr, "%s", role);
+	bufptr += snprintf(bufptr, bufend - bufptr, "%s%s", role,
+			    custom_proc_title);
 
-	va_start(ap, fmt);
-	bufptr += vsnprintf(bufptr, bufend - bufptr, fmt, ap);
-	va_end(ap);
+	if (fmt != NULL) {
+		const char *s = statusptr;
+		statusptr += snprintf(statusptr, statusend - statusptr, "/");
+		va_start(ap, fmt);
+		statusptr += vsnprintf(statusptr, statusend - statusptr,
+				       fmt, ap);
+		va_end(ap);
+		bufptr += snprintf(bufptr, bufend - bufptr, "%s", s);
+	}
 
 	int ports[] = { cfg.primary_port, cfg.secondary_port,
 			cfg.admin_port, cfg.replication_port };
@@ -346,8 +366,8 @@ snapshot(void)
 
 	salloc_protect();
 
-	fiber_set_name(fiber, "dumper");
-	set_proc_title("dumper (%" PRIu32 ")", getppid());
+	title("dumper", "%" PRIu32, getppid());
+	fiber_set_name(fiber, status);
 
 	/*
 	 * Safety: make sure we don't double-write

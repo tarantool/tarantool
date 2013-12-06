@@ -65,12 +65,15 @@ wait_lsn_clear(struct wait_lsn *wait_lsn)
 struct wal_writer;
 struct wal_watcher;
 
+enum { REMOTE_SOURCE_MAXLEN = 32 };
+
 /** Master connection */
 struct remote {
 	struct sockaddr_in addr;
 	struct fiber *reader;
 	uint64_t cookie;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+	char source[REMOTE_SOURCE_MAXLEN];
 };
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MAX };
