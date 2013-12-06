@@ -151,6 +151,7 @@ void _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 		  mh_arg_t arg);
 void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 					       mh_arg_t arg);
+size_t _mh(memsize)(struct _mh(t) *h);
 void _mh(dump)(struct _mh(t) *h);
 
 #define put_slot(h, node, arg) \
@@ -377,7 +378,7 @@ _mh(new)()
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
-	h->b = (mh_int_t *) calloc(h->n_buckets / 16 + 1, sizeof(unsigned));
+	h->b = (mh_int_t *) calloc(h->n_buckets / 16 + 1, sizeof(mh_int_t));
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
 }
@@ -399,6 +400,22 @@ _mh(delete)(struct _mh(t) *h)
 	free(h->b);
 	free(h->p);
 	free(h);
+}
+
+/** Calculate hash size. */
+size_t
+_mh(memsize)(struct _mh(t) *h)
+{
+    size_t sz = 2 * sizeof(struct _mh(t));
+
+    sz += h->n_buckets * sizeof(mh_node_t);
+    sz += (h->n_buckets / 16 + 1) * sizeof(mh_int_t);
+    if (h->resize_position) {
+	    h = h->shadow;
+	    sz += h->n_buckets * sizeof(mh_node_t);
+	    sz += (h->n_buckets / 16 + 1) * sizeof(mh_int_t);
+    }
+    return sz;
 }
 
 void
@@ -467,7 +484,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	s->p = (mh_node_t *) malloc(s->n_buckets * sizeof(mh_node_t));
 	if (s->p == NULL)
 		return -1;
-	s->b = (mh_int_t *) calloc(s->n_buckets / 16 + 1, sizeof(unsigned));
+	s->b = (mh_int_t *) calloc(s->n_buckets / 16 + 1, sizeof(mh_int_t));
 	if (s->b == NULL) {
 		free(s->p);
 		s->p = NULL;

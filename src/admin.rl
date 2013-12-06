@@ -55,6 +55,7 @@ extern "C" {
 #include "lua/init.h"
 #include "session.h"
 #include "scoped_guard.h"
+#include "box/space.h"
 
 static const char *help =
 	"available commands:" CRLF
@@ -63,6 +64,7 @@ static const char *help =
 	" - show info" CRLF
 	" - show fiber" CRLF
 	" - show configuration" CRLF
+	" - show index" CRLF
 	" - show slab" CRLF
 	" - show palloc" CRLF
 	" - show stat" CRLF
@@ -83,6 +85,8 @@ static const char *unknown_command = "unknown command. try typing help." CRLF;
 
 struct salloc_stat_admin_cb_ctx {
 	int64_t total_used;
+	int64_t total_used_real;
+	int64_t total_alloc_real;
 	struct tbuf *out;
 };
 
@@ -92,16 +96,20 @@ salloc_stat_admin_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 	struct salloc_stat_admin_cb_ctx *ctx = (struct salloc_stat_admin_cb_ctx *) cb_ctx;
 
 	tbuf_printf(ctx->out,
-		    "     - { item_size: %- 5i, slabs: %- 3i, items: %- 11" PRIi64
-		    ", bytes_used: %- 12" PRIi64
-		    ", bytes_free: %- 12" PRIi64 " }" CRLF,
+		    "     - { item_size: %6i, slabs: %6i, items: %11" PRIi64
+		    ", bytes_used: %12" PRIi64 ", waste: %5.2f%%"
+		    ", bytes_free: %12" PRIi64 " }" CRLF,
 		    (int)cstat->item_size,
 		    (int)cstat->slabs,
 		    cstat->items,
 		    cstat->bytes_used,
+		    (double)(cstat->bytes_alloc_real - cstat->bytes_used_real)*100 /
+		    (cstat->bytes_alloc_real + 0.001),
 		    cstat->bytes_free);
 
 	ctx->total_used += cstat->bytes_used;
+	ctx->total_alloc_real += cstat->bytes_alloc_real;
+	ctx->total_used_real += cstat->bytes_used_real;
 	return 0;
 }
 
@@ -112,6 +120,8 @@ show_slab(struct tbuf *out)
 	struct slab_arena_stats astat;
 
 	cb_ctx.total_used = 0;
+	cb_ctx.total_used_real = 0;
+	cb_ctx.total_alloc_real = 0;
 	cb_ctx.out = out;
 
 	tbuf_printf(out, "slab statistics:\n  classes:" CRLF);
@@ -122,6 +132,11 @@ show_slab(struct tbuf *out)
 		(double)cb_ctx.total_used / astat.size * 100);
 	tbuf_printf(out, "  arena_used: %.2f%%" CRLF,
 		(double)astat.used / astat.size * 100);
+	tbuf_printf(out, "  waste: %.2f%%" CRLF,
+		    (double)(cb_ctx.total_alloc_real - cb_ctx.total_used_real) / (cb_ctx.total_alloc_real + 0.001) * 100);
+	tbuf_printf(out, "  bytes_waste: %12" PRIi64 CRLF,
+		    (int64_t)((double)cb_ctx.total_used*(cb_ctx.total_alloc_real - cb_ctx.total_used_real) /
+			      (cb_ctx.total_alloc_real + 0.001)));
 }
 
 static void
@@ -150,6 +165,32 @@ fail(struct tbuf *out, struct tbuf *err)
 	start(out);
 	tbuf_printf(out, "fail:%.*s" CRLF, err->size, (char *)err->data);
 	end(out);
+}
+
+static void
+index_info(struct tbuf *out)
+{
+	tbuf_printf(out, "index:" CRLF);
+	struct space_stat *stat = space_stat();
+	int sp_i = 0;
+	int64_t total_size = 0;
+	while (stat[sp_i].n >= 0) {
+		tbuf_printf(out, "  - space: %" PRIi32 CRLF, stat[sp_i].n);
+		int64_t sp_size = 0;
+		int i;
+		for (i = 0; stat[sp_i].index[i].n >= 0; ++i)
+			sp_size += stat[sp_i].index[i].memsize;
+
+		tbuf_printf(out, "    memsize: %15" PRIi64 CRLF, sp_size);
+		total_size += sp_size;
+		tbuf_printf(out, "    index: " CRLF);
+		for (i = 0; stat[sp_i].index[i].n >= 0; ++i) {
+			tbuf_printf(out, "      - { n: %3d, keys: %15" PRIi64 ", memsize: %15" PRIi64 " }" CRLF,
+				    stat[sp_i].index[i].n, stat[sp_i].index[i].keys, stat[sp_i].index[i].memsize);
+		}
+		++sp_i;
+	}
+	tbuf_printf(out, "memsize:     %15" PRIi64 CRLF, total_size);
 }
 
 static void
@@ -278,6 +319,7 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 		eol = "\n" | "\r\n";
 		show = "sh"("o"("w")?)?;
 		info = "in"("f"("o")?)?;
+		index = ("ind"("e"("x")?)? | "idx");
 		check = "ch"("e"("c"("k")?)?)?;
 		configuration = "co"("n"("f"("i"("g"("u"("r"("a"("t"("i"("o"("n")?)?)?)?)?)?)?)?)?)?)?;
 		fiber = "fi"("b"("e"("r")?)?)?;
@@ -309,6 +351,7 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 			    exit			%{return -1;}					|
 			    lua  " "+ string		%lua						|
 			    show " "+ info		%{start(out); tarantool_info(out); end(out);}	|
+			    show " "+ index		%{start(out); index_info(out); end(out);}	|
 			    show " "+ fiber		%{start(out); fiber_info(out); end(out);}	|
 			    show " "+ configuration 	%show_configuration				|
 			    show " "+ slab		%{start(out); show_slab(out); end(out);}	|

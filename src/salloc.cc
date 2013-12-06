@@ -75,6 +75,8 @@ struct slab {
 	uint32_t magic;
 	size_t used;
 	size_t items;
+	size_t used_real;
+	size_t alloc_real;
 	struct item_slist_head free;
 	struct slab_cache *cache;
 	void *brk;
@@ -396,6 +398,8 @@ salloc(size_t size, const char *what)
 	if (fully_formatted(slab) && SLIST_EMPTY(&slab->free))
 		TAILQ_REMOVE(&cache->free_slabs, slab, cache_free_link);
 
+	slab->used_real += size + sizeof(red_zone);
+	slab->alloc_real += cache->item_size + sizeof(red_zone);
 	slab->used += cache->item_size + sizeof(red_zone);
 	slab->items += 1;
 
@@ -475,6 +479,8 @@ salloc_stat(salloc_stat_cb cb, struct slab_arena_stats *astat, void *cb_ctx)
 				st.bytes_free -= sizeof(struct slab);
 				st.bytes_used += sizeof(struct slab);
 				st.bytes_used += slab->used;
+				st.bytes_alloc_real += slab->alloc_real + sizeof(struct slab);
+				st.bytes_used_real += slab->used_real + sizeof(struct slab);
 			}
 			st.item_size = slab_caches[i].item_size;
 

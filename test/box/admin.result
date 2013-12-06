@@ -17,6 +17,7 @@ available commands:
  - show info
  - show fiber
  - show configuration
+ - show index
  - show slab
  - show palloc
  - show stat
