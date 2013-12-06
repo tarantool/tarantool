@@ -299,12 +299,10 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 static void
 spawner_init(int sock)
 {
-	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 
-	snprintf(name, sizeof(name), "spawner%s", custom_proc_title);
-	fiber_set_name(fiber, name);
-	set_proc_title(name);
+	title("spawner", NULL);
+	fiber_set_name(fiber, status);
 
 	/* init replicator process context */
 	spawner.sock = sock;
@@ -609,7 +607,6 @@ shutdown_handler:
 static void
 replication_relay_loop(int client_sock)
 {
-	char name[FIBER_NAME_MAXLEN];
 	struct sigaction sa;
 	int64_t lsn;
 	ssize_t r;
@@ -621,9 +618,8 @@ replication_relay_loop(int client_sock)
 	struct sockaddr_in peer;
 	socklen_t addrlen = sizeof(peer);
 	getpeername(client_sock, ((struct sockaddr*)&peer), &addrlen);
-	snprintf(name, sizeof(name), "relay/%s", sio_strfaddr(&peer));
-	fiber_set_name(fiber, name);
-	set_proc_title("%s%s", name, custom_proc_title);
+	title("relay", "%s", sio_strfaddr(&peer));
+	fiber_set_name(fiber, status);
 
 	/* init signals */
 	memset(&sa, 0, sizeof(sa));
