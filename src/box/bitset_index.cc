@@ -113,6 +113,12 @@ BitsetIndex::size() const
 	return bitset_index_size(&index);
 }
 
+size_t
+BitsetIndex::memsize() const
+{
+	return 0;
+}
+
 struct iterator *
 BitsetIndex::allocIterator() const
 {

@@ -196,6 +196,12 @@ HashIndex::size() const
 	return mh_size(hash);
 }
 
+size_t
+HashIndex::memsize() const
+{
+        return mh_index_memsize(hash);
+}
+
 struct tuple *
 HashIndex::random(uint32_t rnd) const
 {

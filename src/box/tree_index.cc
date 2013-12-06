@@ -202,6 +202,12 @@ TreeIndex::size() const
 	return tree.size;
 }
 
+size_t
+TreeIndex::memsize() const
+{
+        return tree.size * (8 + sizeof(struct tuple *));
+}
+
 struct tuple *
 TreeIndex::min() const
 {

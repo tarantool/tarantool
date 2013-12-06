@@ -50,6 +50,8 @@ public:
 	virtual void initIterator(struct iterator *iterator,
 				  enum iterator_type type,
 				  const char *key, uint32_t part_count) const;
+	virtual size_t memsize() const;
+
 protected:
 	struct mh_index_t *hash;
 };
