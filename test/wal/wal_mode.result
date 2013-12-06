@@ -2,15 +2,10 @@ box.cfg.wal_mode
 ---
 - none
 ...
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
----
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
-...
-space = box.space[0]
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
 ---
 ...
 space:insert(1)
@@ -25,19 +20,19 @@ space:insert(3)
 ---
 - [3]
 ...
-space:select(0, 1)
+space.index['primary']:select(1)
 ---
 - [1]
 ...
-space:select(0, 2)
+space.index['primary']:select(2)
 ---
 - [2]
 ...
-space:select(0, 3)
+space.index['primary']:select(3)
 ---
 - [3]
 ...
-space:select(0, 4)
+space.index['primary']:select(4)
 ---
 ...
 box.snapshot()

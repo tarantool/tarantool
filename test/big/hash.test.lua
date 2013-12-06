@@ -6,11 +6,8 @@ dofile('utils.lua')
 -------------------------------------------------------------------------------
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------
-
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-
-hash = box.space[0]
+hash = box.schema.create_space('tweedledum')
+hash:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
 
 -- Insert valid fields
 hash:insert(0, 'value1 v1.0', 'value2 v1.0')
@@ -38,16 +35,16 @@ hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash:select(0, 0)
-hash:select(0, 1)
-hash:select(0, 2)
-hash:select(0, 3)
-hash:select(0, 4)
-hash:select(0, 5)
+hash.index['primary']:select(0)
+hash.index['primary']:select(1)
+hash.index['primary']:select(2)
+hash.index['primary']:select(3)
+hash.index['primary']:select(4)
+hash.index['primary']:select(5)
 
 -- select by invalid keys
-hash:select(0, 'invalid key')
-hash:select(0, 1, 2)
+hash.index['primary']:select('invalid key')
+hash.index['primary']:select(1, 2)
 
 -------------------------------------------------------------------------------
 -- 32-bit hash delete fields test
@@ -73,8 +70,6 @@ hash:truncate()
 -------------------------------------------------------------------------------
 -- 64-bit hash inset fields tests
 -------------------------------------------------------------------------------
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-hash = box.space[0]
 
 -- Insert valid fields
 hash:insert(0ULL, 'value1 v1.0', 'value2 v1.0')
@@ -109,24 +104,24 @@ hash:replace('invalid key', 'value1 v1.0', 'value2 v1.0')
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash:select(0, 0ULL)
-hash:select(0, 1ULL)
-hash:select(0, 2ULL)
-hash:select(0, 3ULL)
-hash:select(0, 4ULL)
-hash:select(0, 5ULL)
+hash.index['primary']:select(0ULL)
+hash.index['primary']:select(1ULL)
+hash.index['primary']:select(2ULL)
+hash.index['primary']:select(3ULL)
+hash.index['primary']:select(4ULL)
+hash.index['primary']:select(5ULL)
 
 -- select by valid NUM keys
-hash:select(0, 0)
-hash:select(0, 1)
-hash:select(0, 2)
-hash:select(0, 3)
-hash:select(0, 4)
-hash:select(0, 5)
+hash.index['primary']:select(0)
+hash.index['primary']:select(1)
+hash.index['primary']:select(2)
+hash.index['primary']:select(3)
+hash.index['primary']:select(4)
+hash.index['primary']:select(5)
 
 -- select by invalid keys
-hash:select(0, 'invalid key')
-hash:select(0, '00000001', '00000002')
+hash.index['primary']:select('invalid key')
+hash.index['primary']:select('00000001', '00000002')
 
 -------------------------------------------------------------------------------
 -- 64-bit hash delete fields test
@@ -164,8 +159,8 @@ hash:truncate()
 -------------------------------------------------------------------------------
 -- String hash inset fields tests
 -------------------------------------------------------------------------------
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
-hash = box.space[0]
+hash.index['primary']:drop()
+hash:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
 
 -- Insert valid fields
 hash:insert('key 0', 'value1 v1.0', 'value2 v1.0')
@@ -187,15 +182,15 @@ hash:replace('key 2', 'value1 v1.43', 'value2 1.92')
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash:select(0, 'key 0')
-hash:select(0, 'key 1')
-hash:select(0, 'key 2')
-hash:select(0, 'key 3')
-hash:select(0, 'key 4')
-hash:select(0, 'key 5')
+hash.index['primary']:select('key 0')
+hash.index['primary']:select('key 1')
+hash.index['primary']:select('key 2')
+hash.index['primary']:select('key 3')
+hash.index['primary']:select('key 4')
+hash.index['primary']:select('key 5')
 
 -- select by invalid keys
-hash:select(0, 'key 1', 'key 2')
+hash.index['primary']:select('key 1', 'key 2')
 
 -------------------------------------------------------------------------------
 -- String hash delete fields test
@@ -216,11 +211,11 @@ hash:truncate()
 ------------------------
 -- hash::replace tests
 ------------------------
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-box.replace(box.schema.INDEX_ID, 0, 1, 'field1', 'hash', 1, 1, 1, 'num')
-box.replace(box.schema.INDEX_ID, 0, 2, 'field2', 'hash', 1, 1, 2, 'num')
-box.replace(box.schema.INDEX_ID, 0, 3, 'field3', 'hash', 1, 1, 3, 'num')
-hash = box.space[0]
+hash.index['primary']:drop()
+hash:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
+hash:create_index('field1', 'hash', {parts = {1, 'num'}, unique = true })
+hash:create_index('field2', 'hash', {parts = {2, 'num'}, unique = true })
+hash:create_index('field3', 'hash', {parts = {3, 'num'}, unique = true })
 
 hash:insert(0, 0, 0, 0)
 hash:insert(1, 1, 1, 1)
@@ -230,67 +225,68 @@ hash:insert(2, 2, 2, 2)
 hash:replace_if_exists(1, 1, 1, 1)
 hash:replace_if_exists(1, 10, 10, 10)
 hash:replace_if_exists(1, 1, 1, 1)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(0, 1)
-hash:select(1, 1)
-hash:select(2, 1)
-hash:select(3, 1)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['primary']:select(1)
+hash.index['field1']:select(1)
+hash.index['field2']:select(1)
+hash.index['field3']:select(1)
 
 -- OK
 hash:insert(10, 10, 10, 10)
 hash:delete(10)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
 
 -- TupleFound (primary key)
 hash:insert(1, 10, 10, 10)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(0, 1)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['primary']:select(1)
 
 -- TupleNotFound (primary key)
 hash:replace_if_exists(10, 10, 10, 10)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
 
 -- TupleFound (key --1)
 hash:insert(10, 0, 10, 10)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(1, 0)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['field1']:select(0)
 
 -- TupleFound (key --1)
 hash:replace_if_exists(2, 0, 10, 10)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(1, 0)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['field1']:select(0)
 
 -- TupleFound (key --3)
 hash:insert(10, 10, 10, 0)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(3, 0)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['field3']:select(0)
 
 -- TupleFound (key --3)
 hash:replace_if_exists(2, 10, 10, 0)
-hash:select(0, 10)
-hash:select(1, 10)
-hash:select(2, 10)
-hash:select(3, 10)
-hash:select(3, 0)
+hash.index['primary']:select(10)
+hash.index['field1']:select(10)
+hash.index['field2']:select(10)
+hash.index['field3']:select(10)
+hash.index['field3']:select(0)
+
 hash:drop()

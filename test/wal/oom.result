@@ -1,14 +1,9 @@
 --# stop server default
 --# start server default
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
----
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
-...
-space = box.space[0]
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
 ---
 ...
 --# setopt delimiter ';'
@@ -55,23 +50,23 @@ space:len()
 ---
 - 6378
 ...
-space:select(0, 0)
+space.index['primary']:select(0)
 ---
 - [0, 'test']
 ...
-space:select(0, 5)
+space.index['primary']:select(5)
 ---
 - [5, 'testtesttesttesttesttest']
 ...
-space:select(0, 9)
+space.index['primary']:select(9)
 ---
 - [9, 'testtesttesttesttesttesttesttesttesttest']
 ...
-space:select(0, 11)
+space.index['primary']:select(11)
 ---
 - [11, 'testtesttesttesttesttesttesttesttesttesttesttest']
 ...
-space:select(0, 15)
+space.index['primary']:select(15)
 ---
 - [15, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
 ...
@@ -153,7 +148,7 @@ space:insert(0, 'test')
 ---
 - [0, 'test']
 ...
-space:select(0, 0)
+space.index['primary']:select(0)
 ---
 - [0, 'test']
 ...
