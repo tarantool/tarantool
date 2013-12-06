@@ -10,7 +10,6 @@ import socket
 import signal
 import shlex
 import shutil
-import pexpect
 import traceback
 import subprocess
 import ConfigParser

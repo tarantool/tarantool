@@ -69,7 +69,6 @@ simplest way to setup and start the server, but it requires a few
 additional Python modules:
  * daemon
  * pyyaml
- * pexpect
 
 Once all prerequisites are installed, try:
 
