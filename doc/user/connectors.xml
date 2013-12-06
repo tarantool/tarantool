@@ -118,7 +118,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
   <section xml:id="connector-c">
     <title>C</title>
     <para>
-    Here is a complete C program that inserts ['A','BB'] into space[0] via the C API for the
+    Here is a complete C program that inserts [99999,'BB'] into space[0] via the C API for the
     binary protocol. To compile, paste the code into a file named example.c and say <code>
     gcc -o example example.c -I/<replaceable>tarantool-directory</replaceable>/connector/c/include</code>
     where tarantool-directory = the directory that contains
@@ -126,7 +126,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
     (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
-    space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
     To run, say <code>./example</code>.
     The program will format a buffer for sending an INSERT request, then open a socket connection
     with the tarantool_box server at localhost:33013, then send the request, then check if the
@@ -136,6 +136,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
 <programlisting language="cpp">
 #include &lt;arpa/inet.h&gt;
 #include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
 #include &lt;tp.h&gt;                                                /* the usual Tarantool include */
 
 int main()
@@ -143,19 +144,20 @@ int main()
   struct tp request;                                           /* area for sending to server */
   struct tp reply;                                             /* area for getting server reply */
   int fd;                                                      /* file descriptor for socket */
+  int pk_field_value = 99999;
   struct sockaddr_in tt;                                       /* the usual socket address info */
   tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
   tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
   tp_tuple(&amp;request);                                          /* begin appending body */
-  tp_sz(&amp;request,"");                                          /* append field[0] */
-  tp_sz(&amp;request,"BB");                                        /* append field[1] */
+  tp_field(&amp;request, (char*) &amp;pk_field_value, 4);              /* append field[0] */
+  tp_sz(&amp;request, "BB");                                       /* append field[1] */
   if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket, abort if failure */
     exit(1);
   memset(&amp;tt, 0, sizeof(tt));                                  /* connect to localhost:33013 */
   tt.sin_family = AF_INET;
   tt.sin_addr.s_addr = inet_addr("127.0.0.1");
   tt.sin_port = htons(33013);
-  if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt;= 0)   /* connect, abort if failure */
+  if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt; 0)    /* connect, abort if failure */
     exit(1);
   int rc = write(fd, tp_buf(&amp;request), tp_used(&amp;request));     /* send the INSERT request */
   if (rc != tp_used(&amp;request))                                 /* abort if send failed */
@@ -184,6 +186,7 @@ int main()
   tp_free(&amp;reply);
   close(fd);
   printf("Insert succeeded\n");                                /* congratulate self */
+  exit(0);
 }
 </programlisting>
     <para>
@@ -217,16 +220,127 @@ int main()
   <section xml:id="connector-perl">
     <title>Perl</title>
     <para>
-       The Perl driver requires a schema definition.
-       Please refer to CPAN module <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
+     The most commonly used Perl driver is <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool</link>.
+     It is not supplied as part of the Tarantool repository; it must be installed separately.
+     The most common way to install it is with <link xlink:href='https://en.wikipedia.org/wiki/Cpan'>CPAN, the Comprehensive Perl Archive Network</link>.
+     DR::Tarantool requires other modules which should be installed first.
+     For example, on Ubuntu, the installation could look like this:
+      <programlisting>
+sudo cpan install AnyEvent
+sudo cpan install Devel::GlobalDestruction
+sudo cpan install Coro
+sudo cpan install Test::Pod
+sudo cpan install Test::Spelling
+sudo cpan install PAR::Dist
+sudo cpan install DR::Tarantool
+      </programlisting>
+     </para>
+    <para>
+    Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
+    Before trying to run, check that the server
+    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
+    The program will connect using an application-specific definition of the space.
+    The program will open a socket connection
+    with the tarantool_box server at localhost:33013, then send an INSERT request,
+    then &mdash; if all is well &mdash; end without displaying any messages.
+    If tarantool_box is not running on localhost with primary port = 33013, the program will print
+    <quote>Connection refused</quote>.
+    </para>
+    <para>
+     <programlisting language="perl">
+#!/usr/bin/perl
+use DR::Tarantool ':constant', 'tarantool';
+use DR::Tarantool ':all';
+
+my $tnt = tarantool
+  host    =&gt; '127.0.0.1',                      # look for tarantool_box on localhost
+  port    =&gt; 33013,                            # assume tarantool_box primary port = default
+  spaces  =&gt; {
+    0 =&gt; {                                     # definition of space[0] ...
+      name =&gt; 't0',                            #   space[0] name = 't0'
+      default_type =&gt; 'STR',                   #   space[0] field type is 'STR' if undefined
+      fields =&gt; [ {                            #   definition of space[0].fields ...
+          name =&gt; 'k0', type =&gt; 'NUM' } ],     #     space[0].field[0] name='k0',type='NUM'
+      indexes =&gt; {                             #   definition of space[0] indexes ...
+        0 =&gt; {
+          name =&gt; 'k0', fields =&gt; 'k0' } } } };
+
+$tnt-&gt;insert('t0' => [ 99999, 'BB' ]);         # INSERT INTO t0 VALUES (99999,'BB')
+     </programlisting>
+    </para>
+    <para>
+       The example program only shows one command and does not show all that's necessary for
+       good practice. For that, please see
+       <link xlink:href='http://search.cpan.org/~unera/DR-Tarantool/'>DR::Tarantool CPAN repository</link>.
     </para>
   </section>
 
   <section xml:id="connector-php">
     <title>PHP</title>
+    
     <para>
-       Please see <link
-       xlink:href="https://github.com/tarantool/tarantool-php/"><filename>tarantool-php</filename></link> project at GitHub.
+    The PHP driver is <link xlink:href='https://github.com/tarantool/tarantool-php'>tarantool-php</link>.
+    It is not supplied as part of the Tarantool repository; it must be installed separately.
+    It can be installed with git.
+    It requires other modules which should be installed first.
+    For example, on Ubuntu, the installation could look like this:
+    <programlisting>
+sudo apt-get install php5-cli
+sudo apt-get install php5-dev
+sudo apt-get install php-pear
+cd ~
+git clone https://github.com/tarantool/tarantool-php.git
+cd tarantool-php
+phpize
+./configure
+make
+make install
+    </programlisting>
+    </para>    
+    <para>
+    At this point there is a file named <filename>~/tarantool-php/modules/tarantool.so</filename>.
+    PHP will only find it if the PHP initialization file <filename>php.ini</filename> contains a line like
+    <code>extension=./tarantool.so</code>.
+    So copy <filename>tarantool.so</filename> to the working directory and tell PHP where
+    to find the <filename>php.ini</filename> file that contains that line ...
+    <programlisting>
+cd ~
+cp ./tarantool-php/modules/tarantool.so .
+export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
+   </programlisting>
+    </para>
+    <para>
+    Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
+    Before trying to run, check that the server
+    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (33013) and
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    To run, paste the code into a file named example.php and say <code>php example.php</code>.
+    The program will open a socket connection
+    with the tarantool_box server at localhost:33013, then send an INSERT request,
+    then &mdash; if all is well &mdash; print "Insert succeeded".
+    If the tuple already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
+    </para>
+    <para>
+    <programlisting>
+&lt;?php
+$tarantool = new Tarantool("localhost", 33013, 33015);
+try {
+  $tarantool-&gt;insert(0, array(99999, "BB"), TARANTOOL_FLAGS_ADD);
+  print "Insert succeeded\n";
+  }
+catch (Exception $e) {
+  echo "Exception: ", $e-&gt;getMessage(), "\n";
+  }
+?&gt;
+    </programlisting>
+    </para>
+    <para>
+    The example program only shows one command and does not show all that's necessary for
+    good practice. For that, please see
+    <link
+    xlink:href="https://github.com/tarantool/tarantool-php/"><filename>tarantool-php</filename></link> project at GitHub.
     </para>
   </section>
 
