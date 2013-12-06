@@ -20,7 +20,8 @@ class UnitTest(Test):
         self.skip_cond = name + ".skipcond"
         self.tmp_result = os.path.join(self.args.vardir,
                                        os.path.basename(self.result))
-        self.reject = "{0}/test/{1}".format(self.args.builddir, name + ".reject")
+        self.reject = os.path.join(os.path.abspath(os.curdir),
+                name.replace(".test", ".reject"))
 
     def execute(self, server):
         diagnostics = "unknown"
