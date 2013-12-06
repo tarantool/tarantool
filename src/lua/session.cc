@@ -118,6 +118,28 @@ lbox_session_on_disconnect(struct lua_State *L)
 }
 
 void
+session_storage_cleanup(int sid)
+{
+	static int ref = LUA_REFNIL;
+	struct lua_State *L = tarantool_L;
+
+	int top = lua_gettop(L);
+
+	if (ref == LUA_REFNIL) {
+		lua_getfield(L, LUA_GLOBALSINDEX, "box");
+		lua_getfield(L, -1, "session");
+		lua_getmetatable(L, -1);
+		lua_getfield(L, -1, "aggregate_storage");
+		ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+
+	lua_pushnil(L);
+	lua_rawseti(L, -2, sid);
+	lua_settop(L, top);
+}
+
+void
 tarantool_lua_session_init(struct lua_State *L)
 {
 	static const struct luaL_reg sessionlib[] = {

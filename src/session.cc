@@ -87,6 +87,7 @@ session_destroy(uint32_t sid)
 	} catch (...) {
 		/* catch all. */
 	}
+	session_storage_cleanup(sid);
 	struct mh_i32ptr_node_t node = { sid, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
 }

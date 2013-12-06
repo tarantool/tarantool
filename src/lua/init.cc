@@ -80,7 +80,8 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[];
-static const char *lua_sources[] = { uuid_lua, NULL };
+extern char session_lua[];
+static const char *lua_sources[] = { uuid_lua, session_lua, NULL };
 
 /*
  * {{{ box Lua library: common functions

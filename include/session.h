@@ -93,3 +93,6 @@ session_init();
 
 void
 session_free();
+
+void
+session_storage_cleanup(int sid);

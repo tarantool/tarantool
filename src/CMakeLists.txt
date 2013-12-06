@@ -21,6 +21,7 @@ endif()
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
+lua_source(lua_sources lua/session.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
