@@ -269,7 +269,7 @@ luamp_decode(struct lua_State *L, const char **data)
 	{
 		uint64_t val = mp_decode_uint(data);
 #if defined(LUAJIT)
-		if (val <= UINT32_MAX) {
+		if (val <= INT32_MAX) {
 			lua_pushinteger(L, val);
 		} else {
 			*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
