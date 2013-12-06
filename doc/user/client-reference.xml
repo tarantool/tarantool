@@ -137,7 +137,7 @@ Option is one of the following (in alphabetical order by the long form of the op
           long form: <code>--po[rt] [=] <replaceable>port-number</replaceable></code>.
     Effect: Client will look for the server on the port designated by port-number.
     Example: <code>--port = 33013</code>
-    Notes: This is the <quote>read/write data</quote> port. The default value is 33013.
+    Notes: This is the <quote>primary port</quote> also known as the <quote>read/write data</quote> port. The default value is 33013.
     </para></listitem>
   </varlistentry>
   <varlistentry>
@@ -287,7 +287,7 @@ a newline (line feed).
     Syntax: <code>LUA <replaceable>token</replaceable> [<replaceable>token</replaceable>...]</code>.
     Effect: The client tells the server to execute the tokens as Lua statements.
     Example:  <code>LUA "hello".." world"</code>.
-    Notes: The client sends to the server's read/write data port.
+    Notes: The client sends to the server's administrative port.
     </para></listitem>
   </varlistentry>
   <varlistentry>
