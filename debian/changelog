@@ -1,3 +1,11 @@
+tarantool (1.5.1.302.gd906190-1) unstable; urgency=low
+
+  * New Debian snapshot.
+   - box.session.storage,
+   - bugfixes
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 09 Dec 2013 16:23:49 +0400
+
 tarantool (1.5.1.218.g1a69fd6-1) unstable; urgency=low
 
   * New Debian snapshot
