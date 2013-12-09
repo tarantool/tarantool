@@ -494,9 +494,9 @@ int tc_cli(void)
 		enum tc_cli_cmd_ret ret;
 		if (delim_exists && tc_buf_str_isempty(&cmd)) {
 			tc_buf_clear(&cmd);
-		        if (feof(stdin)) {
+			if (feof(stdin)) {
 				tc_buf_free(&cmd);
-			        break;
+				break;
 			}
 		} else {
 			ret = tc_cli_cmd(cmd.data, cmd.used - 1);
