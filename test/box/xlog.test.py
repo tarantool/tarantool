@@ -1,8 +1,7 @@
-# encoding: utf-8
-#
 import os
-from os.path import abspath
 import shutil
+
+from os.path import abspath
 
 # cleanup vardir
 server.stop()
@@ -40,7 +39,7 @@ admin("box.space[0]:insert(3, 'third tuple')")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"
 
-server.stop(silent=False)
+server.stop()
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress has been successfully renamed"

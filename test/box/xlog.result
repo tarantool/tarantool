@@ -17,7 +17,6 @@ box.space[0]:insert(3, 'third tuple')
 - [3, 'third tuple']
 ...
 00000000000000000004.xlog.inprogress exists
-Stopping the server...
 00000000000000000004.xlog.inprogress has been successfully renamed
 
 # An inprogress xlog file with one record must be renamed during recovery.
