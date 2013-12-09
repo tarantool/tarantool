@@ -1898,32 +1898,29 @@ error: 'Iterator type is not supported'
 
 <section xml:id="sp-box-fiber">
     <title>Package <code>box.fiber</code></title>
-    <para>Functions in this package allow you to create, run and
-    manage existing <emphasis>fibers</emphasis>.
+    <para>Functions in this package allow for creating, running and
+    managing <emphasis>fibers</emphasis>.
     </para>
     <para>
-A fiber is an independent execution thread implemented
-using a mechanism of cooperative multitasking.
+A fiber is a set of instructions which are executed
+with cooperative multitasking. Fibers managed by the
+box.fiber library are associated with a user-supplied function
+called the <emphasis>fiber function</emphasis>.
 
 A fiber has three possible states: running, suspended or dead.
-When a fiber is created with <code>box.fiber.create()</code>,
-it is suspended.
+When a fiber is created with <code>box.fiber.create()</code>, it is suspended.
 When a fiber is started with <code>box.fiber.resume()</code>, it is running.
-When a fiber's control is yielded back to the caller with
-<code>box.fiber.yield()</code>, it is suspended.
-When a fiber ends (due to <code>return</code> or by reaching the
-end of the fiber function), it is dead.
+When a fiber yields control with <code>box.fiber.yield()</code>, it is suspended.
+When a fiber ends (because the fiber function ends), it is dead.
     </para>
     <para>
 A fiber can also be attached or detached.
 An attached fiber is a child of the creator,
 and is running only if the creator has called
 <code>box.fiber.resume()</code>. A detached fiber is a child of
-Tarantool internal <quote>sched</quote> fiber, and gets
+the Tarantool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
-    </para>
-    <para>
 To detach, a running fiber must invoke <code>box.fiber.detach()</code>.
 A detached fiber loses connection with its parent forever.
     </para>
@@ -1935,22 +1932,14 @@ which is a string. If there is more than one fiber with the given
 name, the first fiber that matches is returned.
     </para>
     <para>
-Once fiber function is done or calls <code>return</code>,
-the fiber is considered dead. Its carcass is put into
-a fiber pool, and can be reused when another fiber is
-created.
-    </para>
-    <para>
 A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
 However, <code>box.fiber.cancel()</code> is advisory &mdash; it works
 only if the runaway fiber calls <code>box.fiber.testcancel()</code>
 once in a while. Most <code>box.*</code> hooks, such as <code>box.delete()</code>
 or <code>box.update()</code>, do call <code>box.fiber.testcancel()</code>.
-<code>box.select()</code> doesn't.
-    </para>
-    <para>
+<code>box.select()</code> does not.
 In practice, a runaway fiber can only become unresponsive
-if it does a lot of computations and doesn't check
+if it does many computations and does not check
 whether it's been canceled.
 <!--
 In addition to the advisory cancellation, configuration parameter
@@ -1968,9 +1957,11 @@ sends an asynchronous wakeup event to the fiber,
 and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>Like all Lua objects, dead fibers are
-    garbage collected: the garbage collector frees pool allocator
+    garbage collected. The garbage collector frees pool allocator
     memory owned by the fiber, resets all fiber data, and returns
-    the fiber to the fiber pool.</para>
+    the fiber (now called a fiber carcass) to the fiber pool.
+    The carcass can be reused when another fiber is created.
+    </para>
 <variablelist xml:id="box.fiber">
     <varlistentry>
         <term>
@@ -1999,10 +1990,8 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
-            Create a fiber for a <code>function</code>.
+            Create a fiber for a <code>function</code>. There will be an error if the function does not exist or if a recursion limit is hit.
         </simpara>
-        <bridgehead renderas="sect4">Errors</bridgehead>
-        <simpara>Can hit a recursion limit.</simpara>
         </listitem>
     </varlistentry>
 
@@ -2016,19 +2005,17 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield(...)">box.fiber.yield(...) </emphasis>
+         <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield([arguments])">box.fiber.yield(...) </emphasis>
         </term>
-        <listitem><para>
-        Yield control to the calling fiber, if the fiber
-        is attached, or to sched otherwise.
-        </para>
-        <para>
-        If the fiber is attached, whatever arguments are passed
-        to this call, are passed on to the calling fiber.
+        <listitem><simpara>
+        If the fiber is attached, yield control to the calling fiber if the fiber
+        is attached; otherwise, yield to sched.
+        If the fiber is attached, arguments passed
+        to box.fiber.yield are passed on to the calling fiber.
         If the fiber is detached, <code>box.fiber.yield()</code>
-        returns back everything passed into it after temporarily
+        arguments passed to box.fiber.yield are returned after temporarily
         yielding control back to the scheduler.
-        </para></listitem>
+        </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -2067,11 +2054,11 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(fiber)</emphasis>
         </term>
         <listitem><simpara>
-            Returns the status of the fiber. If no argument is
-            provided, the current fiber's status is returned. The
-            status can be either <quote>dead</quote>,
-            <quote>suspended</quote>, <quote>attached</quote>
-            or <quote>running</quote>.
+         Returns the status of <code>fiber</code>. If no argument is
+         provided, the current fiber's status is returned. The
+         status can be one of: <quote>dead</quote>,
+         <quote>suspended</quote>, <quote>attached</quote>
+         or <quote>running</quote>.
         </simpara></listitem>
     </varlistentry>
 
@@ -2096,6 +2083,62 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </simpara></listitem>
     </varlistentry>
 </variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead>
+Make the function which will be associated with the fiber.
+When this function gets invoked, it will immediately "detach"
+so it will be running independently of the caller, and then
+will enter an infinite loop ("while 0 == 0" is an infinite
+loop). Each iteration of the loop adds 1 to a global variable
+named gvar, then goes to sleep for 2 seconds,
+then yields. The sleep causes an implicit box.fiber.yield().<programlisting>
+<prompt>localhost&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua function function_x ()</userinput>
+<prompt>        -&gt;</prompt><userinput>   box.fiber.detach()</userinput>
+<prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
+<prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
+<prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
+<prompt>        -&gt;</prompt><userinput>     box.fiber.sleep(2)</userinput>
+<prompt>        -&gt;</prompt><userinput>     end</userinput>
+<prompt>        -&gt;</prompt><userinput>   end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
+Make the fiber and associate the function with it.
+ Get the id of the fiber (fid), to be used in later displays.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua fiber_of_x = box.fiber.create(function_x)</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua fid = box.fiber.id(fiber_of_x)</userinput>
+---
+...</programlisting>
+"Resume" the fiber. This causes invocation of the function.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.fiber.resume(fiber_of_x)</userinput>
+---
+...</programlisting>
+Pause for a while, while the detached function runs. Then ...
+Display the fiber id, the fiber status, and gvar  (gvar will have
+gone up a bit depending how long the pause lasted). The status is
+suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+---
+fiber=104. suspended. gvar=9
+...</programlisting>
+Pause for a while, while the detached function runs. Then ...
+Cancel the fiber. Then, once again ...
+Display the fiber id, the fiber status, and gvar (gvar will have
+gone up a bit more depending how long  pause lasted). This time
+the status is dead because the cancel worked.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.fiber.cancel(fiber_of_x)</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+---
+fiber=104. dead. gvar=22
+...</programlisting>
+</para>
+
 </section>
 
 <!--   end of lib -->
