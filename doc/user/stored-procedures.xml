@@ -2145,68 +2145,76 @@ fiber=104. dead. gvar=22
 
 <section xml:id="sp-box-session">
     <title>Package <code>box.session</code></title>
-    <para>Learn session state, set on-connect and
-    on-disconnect triggers.
-    </para>
     <para>
-A session is an object associated with each client connection.
-Through this module, it's possible to query session state,
-as well as set a Lua chunk executed on a connect or disconnect
-event.
+     Query session state, write to a session-specific temporary
+     record, or set up triggers which will fire when a session
+     starts or ends. A <emphasis>session</emphasis> is an object associated with each client connection.
     </para>
 <variablelist>
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.id() </emphasis>
         </term>
-        <listitem><simpara>Return a unique monotonic identifier of
-        the current session. The identifier can be used to check
-        whether or not a session is alive. 0 means there is no
-        session (e.g. a procedure is running in a detached
-        fiber).
+        <listitem><simpara>Return the unique numeric identifier
+        (ID) for the current session. The result can be 0 meaning
+        there is no session (for example because a function is
+        running in a detached fiber).
         </simpara></listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.fd(id) </emphasis>
-        </term>
-        <listitem><simpara>Return an integer file descriptor
-        associated with the connected client.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.exists(id) </emphasis>
         </term>
-        <listitem><simpara>Return true if a session is alive,
-        false otherwise.</simpara></listitem>
+        <listitem><simpara>If the specified session exists, return true (1).
+        otherwise return false (0).</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.peer(id) </emphasis>
         </term>
-        <listitem><simpara>Return the host address and port for the session
-        peer, for example "127.0.0.1:55457", or "0.0.0.0:0" if the session
-        is not connected.</simpara></listitem>
+        <listitem><simpara>If the specified session exists, return the host
+        address and port of the session peer, for example "127.0.0.1:55457".
+        Otherwise return "0.0.0.0:0". The command is executed on the server,
+        so the "local name" is the server's host and administrative port,
+        and the "peer name" is the client's host and port.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.storage</emphasis>
         </term>
-        <listitem><simpara>A virtual table that is local for each session.
-        It can be used to store session-specific values. The lifetime is the
-        same as the session's (until disconnect).
+        <listitem><simpara>A Lua table that can hold arbitrary
+        unordered session-specific names and values, which will last until
+        the session ends.
         </simpara></listitem>
     </varlistentry>
-
 </variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.session.peer(box.session.id())</userinput>
+---
+ - 127.0.0.1:45129
+...
+<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.random_memorandum = "Don't forget to buy eggs."</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.radius_of_mars = 3396</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua for k,v in pairs(box.session.storage) do print(k,' ',v) end</userinput>
+---
+radius_of_mars 3396
+random_memorandum Don't forget to buy eggs.
+...</programlisting>
+</para>
+
     <para>
-This module also makes it possible to define triggers on connect
-and disconnect events. Please see <olink targetptr="sp-box-session-triggers">
-the triggers chapter</olink> for details.
+See <olink targetptr="sp-box-session-triggers">the triggers chapter</olink>
+for instructions about defining triggers for connect and disconnect events
+ with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
     </para>
 </section>
 
@@ -2214,6 +2222,19 @@ the triggers chapter</olink> for details.
 
 <section xml:id="sp-box-ipc">
     <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
+    <para>
+    Send and receive messages between different procedures of a session.
+    </para>
+    <para>
+    Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
+    called <code>channel</code> for examples in this section.
+    Call the other box.ipc() routines, passing <code>channel</code>, to send messages, receive messages, or check ipc status.
+    Message exchange is synchronous.
+    The channel is garbage collected when no one is using it, as with any
+    other Lua object.
+    Object-oriented and functional APIs are equivalent, so <code>channel:put(message)</code>
+    is the same as <code>box.ipc.channel.put(channel, message)</code>. 
+    </para>
 <variablelist xml:id="box.ipc">
     <simpara>
     </simpara>
@@ -2221,19 +2242,11 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel(capacity)</emphasis></term>
         <listitem>
             <simpara>
-                Create a new communication channel with
-                predefined capacity. The channel can be used
-                to synchronously exchange messages between
-                stored procedures. The channel is garbage
-                collected when no one is using it, just like any
-                other Lua object. Channels can be worked with
-                using functional or object-oriented syntax. For
-                example, the following two lines are equivalent:
+                Create a new communication channel. The capacity should be
+                a positive integer as great as the maximum number of slots
+                (spaces for get or put or broadcast messages)
+                that might be pending at any given time.
             </simpara>
-<programlisting>
-    channel:put(message)
-    box.ipc.channel.put(channel, message)
-</programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
@@ -2241,12 +2254,12 @@ the triggers chapter</olink> for details.
         <listitem>
             <simpara>
                 Send a message using a channel. If the channel is full,
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>
+                <code>box.ipc.channel.put()</code>
                 blocks until there is a free slot in the channel.
-                If <emphasis role="lua">timeout</emphasis> is provided,
+                If <code>timeout</code> is provided,
                 and the channel doesn't become empty for the duration
                 of the timeout,
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>
+                <code>box.ipc.channel.put()</code>
                 returns false. Otherwise it returns true.
             </simpara>
         </listitem>
@@ -2256,12 +2269,12 @@ the triggers chapter</olink> for details.
         <listitem>
             <simpara>
                 Fetch a message from a channel. If the channel is empty,
-                <emphasis role="lua">box.ipc.channel.get()</emphasis>
+                <code>box.ipc.channel.get()</code>
                 blocks until there is a message.
-                If <emphasis role="lua">timeout</emphasis> is provided,
+                If <code>timeout</code> is provided,
                 and there are no new messages for the duration
                 of the timeout,
-                <emphasis role="lua">box.ipc.channel.get()</emphasis>
+                <code>box.ipc.channel.get()</code>
                 returns error.
             </simpara>
         </listitem>
@@ -2270,10 +2283,10 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-                If the channel is empty, is equivalent to
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>.
-                Otherwise sends the message to all readers of the
-                channel.
+             If the channel is empty, <code>box.ipc.channel.broadcast()</code> is equivalent to
+             <code>box.ipc.channel.put()</code>.
+              Otherwise, <code>box.ipc.channel.broadcast()</code> sends the message to all readers of the
+              channel.
             </simpara>
         </listitem>
     </varlistentry>
@@ -2281,7 +2294,7 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.is_empty(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is empty (has no messages).
+                Return true if the specified channel is empty (has no messages).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2289,7 +2302,7 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.is_full(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is full (has no room for a new message).
+                Return true if the specified channel is full (has no room for a new message).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2297,8 +2310,10 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.has_readers(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is empty and has readers waiting
-                for a message.
+                Return true if the specified channel is empty and has readers waiting
+                for a message (because they have issued <code>box.ipc.channel.get()</code> and then
+                blocked).
+                Otherwise return false.
             </simpara>
         </listitem>
     </varlistentry>
@@ -2306,9 +2321,14 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.has_writers(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is full and has writers waiting
-                for empty room.
+                Return true if the specified channel is full and has writers waiting
+                (because they have issued <code>box.ipc.channel.put()</code> and then blocked
+                due to lack of room). Otherwise return false.
             </simpara>
+        </listitem>
+    </varlistentry>
+</variablelist>
+<para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 local channel = box.ipc.channel(10)
 function consumer_fiber()
@@ -2343,12 +2363,12 @@ function producer_fiber()
 
         ...
         if channel:has_readers() then
-            # there are some fibers that wait data
+            # there are some fibers that wait are waiting for data
         end
         ...
 
         if channel:has_writers() then
-            # there are some fibers that wait readers
+            # there are some fibers that are waiting for readers
         end
         channel:put(task)
     end
@@ -2366,9 +2386,7 @@ function producer2_fiber()
     end
 end
 </programlisting>
-        </listitem>
-    </varlistentry>
-</variablelist>
+</para>
 </section>
 
 <!--   end of lib -->
