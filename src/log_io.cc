@@ -98,7 +98,7 @@ static ssize_t
 scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 {
 	ssize_t result = -1;
-	size_t i = 0, size = 1024;
+	size_t i = 0, size = 1000;
 	ssize_t ext_len = strlen(dir->filename_ext);
 	int64_t *lsn = (int64_t *) region_alloc(&fiber->gc,
 						sizeof(int64_t) * size);

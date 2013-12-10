@@ -26,6 +26,10 @@ target_link_libraries(mempool.test small)
 add_executable(small_alloc.test small_alloc.c)
 target_link_libraries(small_alloc.test small)
 add_executable(lf_lifo.test lf_lifo.c)
+add_executable(slab_arena.test slab_arena.c)
+target_link_libraries(slab_arena.test small)
+add_executable(arena_mt.test arena_mt.c)
+target_link_libraries(arena_mt.test small)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

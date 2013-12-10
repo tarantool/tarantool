@@ -149,7 +149,7 @@ void
 mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 			  uint32_t objsize, uint8_t order)
 {
-	assert(order <= SLAB_ORDER_LAST);
+	assert(order <= cache->order_max);
 	pool->cache = cache;
 	slab_list_create(&pool->slabs);
 	mslab_tree_new(&pool->free_slabs);
@@ -157,7 +157,7 @@ mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 	pool->objsize = objsize;
 	pool->slab_order = order;
 	/* Account for slab meta. */
-	size_t slab_size = slab_order_size(pool->slab_order) -
+	size_t slab_size = slab_order_size(pool->cache, pool->slab_order) -
 		mslab_sizeof();
 	/* Calculate how many objects will actually fit in a slab. */
 	/*
@@ -225,7 +225,7 @@ void
 mempool_free(struct mempool *pool, void *obj)
 {
 	struct mslab *slab = (struct mslab *)
-		slab_from_ptr(obj, pool->slab_order);
+		slab_from_ptr(pool->cache, obj, pool->slab_order);
 	pool->slabs.stats.used -= pool->objsize;
 	mslab_free(pool, slab, obj);
 }
@@ -238,7 +238,7 @@ mempool_stats(struct mempool *pool, struct mempool_stats *stats)
 	/* Number of objects. */
 	stats->objcount = pool->slabs.stats.used/pool->objsize;
 	/* Size of the slab. */
-	stats->slabsize = slab_order_size(pool->slab_order);
+	stats->slabsize = slab_order_size(pool->cache, pool->slab_order);
 	/* The number of slabs. */
 	stats->slabcount = pool->slabs.stats.total/stats->slabsize;
 	/* How much memory is used for slabs. */

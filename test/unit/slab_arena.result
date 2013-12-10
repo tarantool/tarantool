@@ -1,0 +1,25 @@
+arena->prealloc = 0
+arena->maxalloc = 0
+arena->used = 0
+arena->slab_size = 65536
+arena->prealloc = 65536
+arena->maxalloc = 65536
+arena->used = 0
+arena->slab_size = 65536
+arena->prealloc = 65536
+arena->maxalloc = 65536
+arena->used = 65536
+arena->slab_size = 65536
+going beyond the limit: (nil)
+arena->prealloc = 65536
+arena->maxalloc = 65536
+arena->used = 65536
+arena->slab_size = 65536
+arena->prealloc = 65536
+arena->maxalloc = 65536
+arena->used = 65536
+arena->slab_size = 65536
+arena->prealloc = 2097152
+arena->maxalloc = 4194304
+arena->used = 0
+arena->slab_size = 65536

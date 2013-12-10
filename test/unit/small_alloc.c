@@ -12,6 +12,7 @@ enum {
 	ITERATIONS_MAX = 5000,
 };
 
+struct slab_arena arena;
 struct slab_cache cache;
 struct small_alloc alloc;
 /* Streak type - allocating or freeing */
@@ -92,7 +93,9 @@ int main()
 
 	srand(seed);
 
-	slab_cache_create(&cache);
+	slab_arena_create(&arena, 0, UINT_MAX, 4000000,
+			  MAP_PRIVATE);
+	slab_cache_create(&cache, &arena, 0);
 
 	small_alloc_basic();
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 struct slab_cache cache;
+struct slab_arena arena;
 
 void
 region_basic()
@@ -74,8 +75,9 @@ region_test_truncate()
 
 int main()
 {
-
-	slab_cache_create(&cache);
+	slab_arena_create(&arena, 0, UINT_MAX,
+			  4000000, MAP_PRIVATE);
+	slab_cache_create(&cache, &arena, 0);
 
 	region_basic();
 	region_test_truncate();

@@ -33,34 +33,11 @@
 #include <stddef.h>
 #include <assert.h>
 #include "rlist.h"
+#include "slab_arena.h"
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
-#endif
-
-enum {
-	/*
-	 * Slabs of "order" from 0 to 8 have size which is a power
-	 * of 2. They are obtained either using mmap(), or by
-	 * splitting an mmapped() slab of higher order (buddy
-	 * system).  Memory address of such slab is aligned to
-	 * slab size.
-	 */
-	SLAB_ORDER_LAST = 10,
-	/*
-	 * The last "order" contains huge slabs, allocated with
-	 * malloc(). This order is provided to make life of
-	 * slab_cache user easier, so that one doesn't have to
-	 * worry about allocation sizes larger than SLAB_MAX_SIZE.
-	 */
-	SLAB_HUGE = SLAB_ORDER_LAST + 1,
-	/** Binary logarithm of SLAB_MIN_SIZE. */
-	SLAB_MIN_SIZE_LB = 12,
-	/** Minimal size of an ordered slab, 4096 */
-	SLAB_MIN_SIZE = 1 << SLAB_MIN_SIZE_LB,
-	/** Maximal size of an ordered slab, 1M */
-	SLAB_MAX_SIZE = SLAB_MIN_SIZE << SLAB_ORDER_LAST
-};
+#endif /* defined(__cplusplus) */
 
 struct slab {
 	/*
@@ -88,6 +65,8 @@ struct slab {
 	 * Only used for buddy slabs. If the buddy of the current
 	 * free slab is also free, both slabs are merged and
 	 * a free slab of the higher order emerges.
+	 * Value of 0 means the slab is free. Otherwise
+	 * slab->in_use is set to slab->order + 1.
 	 */
 	uint8_t in_use;
 };
@@ -135,28 +114,56 @@ slab_list_create(struct slab_list *list)
 	small_stats_reset(&list->stats);
 }
 
+/*
+ * A binary logarithmic distance between the smallest and
+ * the largest slab in the cache can't be that big, really.
+ */
+enum { ORDER_MAX = 16 };
+
 struct slab_cache {
-	/**
-	 * Slabs are ordered by size, which is a multiple of two.
-	 * orders[0] contains slabs of size SLAB_MIN_SIZE
-	 * (order 0). orders[1] contains slabs of
-	 * 2 * SLAB_MIN_SIZE, and so on. The list only contains
-	 * unused slabs - a used slab is removed from the
-	 * slab_cache list and its next_in_list link may
-	 * be reused for some other purpose.
-	 * Note, that SLAB_HUGE slabs are not accounted
-	 * here, since they are never reused.
-         */
-	struct slab_list orders[SLAB_ORDER_LAST + 1];
+	/* The source of allocations for this cache. */
+	struct slab_arena *arena;
+	/*
+	 * Min size of the slab in the cache maintained
+	 * using the buddy system. The logarithmic distance
+	 * between order0_size and arena->slab_max_size
+	 * defines the number of "orders" of slab cache.
+	 * This distance can't be more than ORDER_MAX.
+	 */
+	size_t order0_size;
+	/*
+	 * Binary logarithm of order0_size, useful in pointer
+	 * arithmetics.
+	 */
+	uint8_t order0_size_lb;
+	/*
+	 * Slabs of order in range [0, order_max) have size
+	 * which is a power of 2. Slabs in the next order are
+	 * double the size of the previous order.  Slabs of the
+	 * previous order are obtained by splitting a slab of the
+	 * next order, and so on until order is order_max
+	 * Slabs of order order_max are obtained directly
+	 * from slab_arena. This system is also known as buddy
+	 * system.
+	 */
+	uint8_t order_max;
 	/** All allocated slabs used in the cache.
 	 * The stats reflect the total used/allocated
 	 * memory in the cache.
 	 */
 	struct slab_list allocated;
+	/**
+	 * Lists of unused slabs, for each slab order.
+	 *
+	 * A used slab is removed from the list and its
+	 * next_in_list link may be reused for some other purpose.
+         */
+	struct slab_list orders[ORDER_MAX+1];
 };
 
 void
-slab_cache_create(struct slab_cache *cache);
+slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
+		  size_t order0_size);
 
 void
 slab_cache_destroy(struct slab_cache *cache);
@@ -171,22 +178,16 @@ void
 slab_put(struct slab_cache *cache, struct slab *slab);
 
 struct slab *
-slab_from_ptr(void *ptr, uint8_t order);
-
-/** Align a size. Alignment must be a power of 2 */
-static inline size_t
-slab_size_align(size_t size, size_t alignment)
-{
-	return (size + alignment - 1) & ~(alignment - 1);
-}
+slab_from_ptr(struct slab_cache *cache, void *ptr, uint8_t order);
 
 /* Aligned size of slab meta. */
 static inline size_t
 slab_sizeof()
 {
-	return slab_size_align(sizeof(struct slab), sizeof(intptr_t));
+	return small_align(sizeof(struct slab), sizeof(intptr_t));
 }
 
+/** Useful size of a slab. */
 static inline size_t
 slab_size(struct slab *slab)
 {
@@ -198,34 +199,35 @@ slab_cache_check(struct slab_cache *cache);
 
 /**
  * Find the nearest power of 2 size capable of containing
- * a chunk of the given size. Adjust for SLAB_MIN_SIZE and
- * SLAB_MAX_SIZE.
+ * a chunk of the given size. Adjust for cache->order0_size
+ * and arena->slab_size.
  */
 static inline uint8_t
-slab_order(size_t size)
+slab_order(struct slab_cache *cache, size_t size)
 {
 	assert(size <= UINT32_MAX);
-	if (size <= SLAB_MIN_SIZE)
+	if (size <= cache->order0_size)
 		return 0;
-	if (size > SLAB_MAX_SIZE)
-		return SLAB_HUGE;
+	if (size > cache->arena->slab_size)
+		return cache->order_max + 1;
 
 	return (uint8_t) (CHAR_BIT * sizeof(uint32_t) -
 			  __builtin_clz((uint32_t) size - 1) -
-			  SLAB_MIN_SIZE_LB);
+			  cache->order0_size_lb);
 }
 
 /** Convert slab order to the mmap()ed size. */
 static inline intptr_t
-slab_order_size(uint8_t order)
+slab_order_size(struct slab_cache *cache, uint8_t order)
 {
-	assert(order <= SLAB_ORDER_LAST);
-	return 1 << (order + SLAB_MIN_SIZE_LB);
+	assert(order <= cache->order_max);
+	intptr_t size = 1;
+	return size << (order + cache->order0_size_lb);
 }
 
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 } /* extern "C" */
-#endif
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_SMALL_SLAB_CACHE_H */
