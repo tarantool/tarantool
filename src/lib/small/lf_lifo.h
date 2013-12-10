@@ -72,7 +72,7 @@ lf_lifo_init(struct lf_lifo *head)
 	head->next = NULL;
 }
 
-struct lf_lifo *
+static inline struct lf_lifo *
 lf_lifo_push(struct lf_lifo *head, void *elem)
 {
 	assert(lf_lifo(elem) == elem); /* Aligned address. */
@@ -89,7 +89,7 @@ lf_lifo_push(struct lf_lifo *head, void *elem)
 	} while (true);
 }
 
-void *
+static inline void *
 lf_lifo_pop(struct lf_lifo *head)
 {
 	do {
@@ -109,6 +109,12 @@ lf_lifo_pop(struct lf_lifo *head)
 		if (atomic_cas(&head->next, tail, newhead) == tail)
 			return elem;
 	} while (true);
+}
+
+static inline bool
+lf_lifo_is_empty(struct lf_lifo *head)
+{
+	return head->next == NULL;
 }
 
 #endif /* INCLUDES_TARANTOOL_LF_LIFO_H */

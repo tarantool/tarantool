@@ -1,2 +1,37 @@
 small - a collection of Specialized Memory ALLocators
 for small allocations.
+
+The library provides the following facilities:
+
+slab_arena
+----------
+
+Defines an API with two methods: map() and unmap().
+Map returns a memory area. Unmap returns this area to the arena.
+All objects returned by arena have the same size, defined in
+initialization-time constant SLAB_MAX_SIZE.
+By default, SLAB_MAX_SIZE is 4M. All objects returned by arena
+are aligned by SLAB_MAX_SIZE: (ptr & (SLAB_MAX_SIZE - 1)) is
+always 0. SLAB_MAX_SIZE therefore must be a power of 2. Limiting
+SLAB_MAX_SIZE is important to avoid internal fragmentation.
+Multiple arenas can exist, an object must be returned to the same
+arena in which it was allocated.
+
+There is a number of different implementations of slab_arena
+API:
+
+- huge_arena: this implementation maps at initialization
+  time a huge region of memory, and then uses this region to
+  produce objects. Can be configured to use shared or private
+  mappings.
+- grow_arena - mmaps() each individual block. Thus can incur
+  fragmentation of the address space, but actually
+  returns objects to the OS on unmap.
+
+Use of instances of slab_arena is thread-safe: multiple
+threads can use the same arena.
+  
+slab_cache
+----------
+
+

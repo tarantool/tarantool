@@ -45,7 +45,7 @@ extern "C" {
  * Good for allocating tons of small objects of the same size.
  * Stores all objects in order-of-virtual-page-size memory blocks,
  * called slabs. Each object can be freed if necessary. There is
- * (practically) no allocation overhead.  Internal fragmentation
+ * (practically) no allocation overhead. Internal fragmentation
  * may occur if lots of objects are allocated, and then many of
  * them are freed in reverse-to-allocation order.
  *
@@ -149,7 +149,10 @@ struct mempool
 	/**
 	 * Mempool slabs are ordered (@sa slab_cache.h for
 	 * definition of "ordered"). The order is calculated
-	 * when the pool is initialized.
+	 * when the pool is initialized or is set explicitly.
+	 * The latter is necessary for 'small' allocator,
+	 * which needs to quickly find mempool containing
+	 * an allocated object when the object is freed.
 	 */
 	uint8_t slab_order;
 	/** How many objects can fit in a slab. */
@@ -251,7 +254,6 @@ mempool_total(struct mempool *pool)
 static inline void *
 mempool_alloc(struct mempool *pool)
 {
-
 	void *ptr = mempool_alloc_nothrow(pool);
 	if (ptr == NULL)
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
