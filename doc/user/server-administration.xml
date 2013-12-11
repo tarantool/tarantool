@@ -24,6 +24,483 @@
 </para>
 </section>
 
+<section xml:id="utility-tarantool">
+
+<title>Utility <code>tarantool</code> &mdash; the main client</title>
+
+<para>
+This section shows all legal syntax for the tarantool command-line client, with short notes and examples.
+Other client programs may have similar options and statement syntaxes.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Conventions used in this section</bridgehead>
+
+Tokens are character sequences which are treated as syntactic units within statements.
+
+Square brackets <code>[</code> and <code>]</code> enclose optional syntax.
+Three dots in a row <code>...</code> mean the preceding tokens may be repeated.
+A vertical bar <code>|</code> means the preceding and following tokens are mutually exclusive alternatives.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Options when starting client from the command line</bridgehead>
+
+General form: <code>tarantool [<replaceable>option</replaceable>...] [<replaceable>statement</replaceable>]</code>.
+
+Statement will be described in a later part of this section.
+Option is one of the following (in alphabetical order by the long form of the option):
+</para>
+
+<variablelist>
+  <varlistentry>
+    <term xml:id="utility-tarantool-admin-port" xreflabel="utility-tarantool-admin-port">--admin-port</term>
+    <listitem><para>
+    Syntax: short form: <code>-a <replaceable>port-number</replaceable></code>
+    long form: <code>--a[dmin-port] [=] <replaceable>port-number</replaceable></code>.
+    Effect: Client will look for the server on the port designated by port-number.
+    Notes: This is the <quote>administrative</quote> port. The default value is 33015.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-bin" xreflabel="utility-tarantool-bin">--bin</term>
+    <listitem><para>
+    Syntax: short form: <code>-B</code>
+    long form: <code>--b[in]</code>.
+    Effect: When displaying with the Lua printer, treat values with
+    type NUM as if they are type STR, unless they are arguments
+    in updates used for arithmetic.
+    Example: <code>--bin</code>
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-cat" xreflabel="utility-tarantool-cat">--cat</term>
+    <listitem><para>
+    Syntax: short form: <code>-C <replaceable>file-name</replaceable></code>
+          long form: <code>--c[at] <replaceable>file-name</replaceable></code>.
+    Effect: Client will print the contents of the write-ahead log or snapshot designated by file-name.
+    Example: <code>--cat /tarantool_user/work_dir/00000000000000000018.xlog</code>
+    Notes: The client stops after displaying the contents. There is also a way to use --cat for Lua statements.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-delim" xreflabel="utility-tarantool-delim">--delim</term>
+    <listitem><para>
+    Syntax: short form: <code>-D <replaceable>delimiter</replaceable></code>
+          long form: <code>--d[elim] <replaceable>delimiter</replaceable></code>.
+    Effect: If --cat is used, then put delimiter at end of each line
+          of a Lua file. If --cat is not used, then require that
+          all statements end with delimiter.
+           Example: <code>--delim = '!'</code>
+    Notes: See also the SETOPT DELIMITER statement.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-format" xreflabel="utility-tarantool-format">--format</term>
+    <listitem><para>
+     Syntax: short form: <code>-M tarantool|raw</code>
+     long form: <code>--fo[rmat] tarantool|raw</code>.
+    Effect: set format for output from --cat
+    Example: <code>--format tarantool</code>
+    Notes: The default format is tarantool.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-from" xreflabel="utility-tarantool-from">--from</term>
+    <listitem><para>
+    Syntax: short form: <code>-F <replaceable>log-sequence-number</replaceable></code>
+          long form: <code>--fr[om] <replaceable>log-sequence-number</replaceable></code>.
+    Effect: Play only what has a a log sequence number greater than or equal to log-sequence-number.
+    Example: <code>--from 55</code>
+    Notes: See also --play and --to.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-header" xreflabel="utility-tarantool-header">--header</term>
+    <listitem><para>
+    Syntax: short form: <code>-H</code>
+    long form: <code>--hea[der]</code>.
+    Effect: Add a header if --format=raw.
+    Example: <code>--header</code>
+    Notes: The default is 'no header'.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-help" xreflabel="utility-tarantool-help">--help</term>
+    <listitem><para>
+    Syntax: short form: <code>-?</code>
+    long form: <code>--hel[p]</code>.
+    Effect: Client displays a help message including a list of options.
+    Example: <code>--help</code>
+    Notes: The client stops after displaying the help.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-host" xreflabel="utility-tarantool-host">--host</term>
+    <listitem><para>
+    Syntax: short form: <code>-h <replaceable>host-name</replaceable></code>
+          long form: <code>--ho[st] [=] <replaceable>host-name</replaceable></code>.
+    Effect: Client will look for the server on the computer designated by host-name.
+    Example: <code>--host =  127.0.0.1</code>
+    Notes: The default value is localhost.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-play" xreflabel="utility-tarantool-play">--play</term>
+    <listitem><para>
+    Syntax: short form: <code>-P <replaceable>file-name</replaceable></code>
+          long form: <code>--pl[ay] f<replaceable>file-name</replaceable></code>.
+    Effect: Client will tell server to replay the write-ahead log designated by file-name.
+    Example: <code>--play /tarantool_user/work_dir/00000000000000000018.xlog</code>
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-port" xreflabel="utility-tarantool-port">--port</term>
+    <listitem><para>
+    Syntax: short form: <code>-p <replaceable>port-number</replaceable></code>
+          long form: <code>--po[rt] [=] <replaceable>port-number</replaceable></code>.
+    Effect: Client will look for the server on the port designated by port-number.
+    Example: <code>--port = 33013</code>
+    Notes: This is the <quote>primary port</quote> also known as the <quote>read/write data</quote> port. The default value is 33013.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-rpl" xreflabel="utility-tarantool-rpl">--rpl</term>
+    <listitem><para>
+    Syntax: short form: <code>-R <replaceable>server-name</replaceable></code>
+          long form: <code>--rpl <replaceable>server-name</replaceable></code>.
+    Effect: Act as a replica for the server specified by server-name.
+    Example: <code>--rpl = wombat</code>
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-space" xreflabel="utility-tarantool-space">--space</term>
+    <listitem><para>
+    Syntax: short form: <code>-S <replaceable>space-number</replaceable></code>
+          Long form: <code>--s[pace] <replaceable>space-number</replaceable></code>.
+    Effect: Play only what is applicable to the space designated by space-number.
+    Example: <code>--space 0</code>
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-to" xreflabel="utility-tarantool-to">--to</term>
+    <listitem><para>
+    Syntax: short form: <code>-T <replaceable>log-sequence-number</replaceable></code>
+          long form: <code>--t[o] <replaceable>log-sequence-number</replaceable></code>.
+    Effect: Play only what has a log sequence number less than or equal to log-sequence-number.
+    Example: <code>--to 66</code>
+    Notes: See also --play and --from.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-version" xreflabel="utility-tarantool-version">--version</term>
+    <listitem><para>
+    Syntax: short form: <code>-V</code>
+    long form: <code>--v[ersion]</code>.
+    Effect: Client displays version information.
+    Example: <code>--version</code>
+    Notes: The client stops after displaying the version.
+    </para></listitem>
+  </varlistentry>
+</variablelist>
+
+<para>
+<bridgehead renderas="sect4">Tokens for use within statements</bridgehead>
+</para>
+<para>
+Keywords are: Character sequences containing only letters of the English alphabet.
+              Examples: SELECT, INTO, FIBER.
+              Notes: Keywords are case insensitive so SELECT and Select are the same thing.
+</para>
+<para>
+Tuple set identifiers are: Lower case letter 't' followed by one or more digits.
+                           Examples: t0, t55.
+</para>
+<para>
+Field identifiers are: Lower case letter 'k' followed by one or more digits.
+                       Examples: k0, k55.
+</para>
+<para>
+Procedure identifiers are: Any sequence of letters, digits, or underscores which is
+                           legal according to the rules for Lua identifiers.
+</para>
+<para>
+String literals are: Any sequence of zero or more characters enclosed in single quotes.
+                     Examples: 'Hello, world', 'A'.
+</para>
+<para>
+Numeric literals are: Character sequences containing only digits, optionally preceded by + or -.
+                      Examples: 55, -.
+                      Notes: Tarantool NUM data type is unsigned, so -1 is understood as a large unsigned number.
+</para>
+<para>
+Single-byte tokens are: * or , or ( or ).
+                      Examples: * , ( ).
+</para>
+<para>
+Tokens must be separated from each other by one or more spaces, except that
+spaces are not necessary around single-byte tokens or string literals.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Statements in alphabetical order</bridgehead>
+Although an initial statement may be entered on the tarantool command line,
+generally they are entered following the prompt in interactive mode while
+tarantool is running. (A prompt will be the name of the host and a greater-than
+sign, for example <code>localhost&gt;</code>). The end-of-statement marker is
+a newline (line feed).
+</para>
+
+<variablelist>
+  <varlistentry>
+    <term xml:id="utility-tarantool-call" xreflabel="utility-tarantool-call">CALL</term>
+    <listitem><para>
+    Syntax: <code>CALL <replaceable>procedure-identifier</replaceable> ()</code>.
+    Effect: The client tells the server to execute the procedure identified by procedure-identifier.
+    Example: <code>CALL proc50()</code>.
+    Notes: The client sends to the server's read/write data port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-delete" xreflabel="utility-tarantool-delete">DELETE</term>
+    <listitem><para>
+    Syntax: <code>DELETE FROM <replaceable>tuple-set-name</replaceable> WHERE <replaceable>field-name</replaceable> = <replaceable>literal</replaceable></code>.
+    Effect: Client tells server to delete the tuple identified by the WHERE clause.
+    Example:  <code>DELETE FROM t0 WHERE k0='a'</code>.
+    Notes: field-name must identify the primary key. The client sends to the server's read/write data port after converting from SQL to binary protocol.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-exit" xreflabel="utility-tarantool-exit">EXIT</term>
+    <listitem><para>
+    Syntax: <code>E[XIT]</code>.
+    Effect: The tarantool program stops.
+    Example:  <code>EXIT</code>.
+    Notes: The QUIT statement does the same thing. The client sends nothing to the server.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-help2" xreflabel="utility-tarantool-help2">HELP</term>
+    <listitem><para>
+    Syntax: <code>H[ELP]</code>.
+    Effect: Client displays a message including a list of possible statements.
+    Example:  <code>HELP</code>.
+    Notes: The client sends nothing to the server.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-insert" xreflabel="utility-tarantool-insert">INSERT</term>
+    <listitem><para>
+    Syntax: <code>INSERT [INTO] <replaceable>tuple-set-identifier</replaceable> VALUES (<replaceable>literal</replaceable> [,<replaceable>literal</replaceable>...])</code>.
+    Effect: The client tells the server to add the tuple consisting of the literal values.
+    Example:  <code>INSERT INTO t0 VALUES ('a',0)</code>.
+    Notes: The client sends to the server's read/write data port after converting from SQL to binary protocol.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-loadfile" xreflabel="utility-tarantool-loadfile">LOADFILE</term>
+    <listitem><para>
+    Syntax: <code>LOADFILE <replaceable>string-literal</replaceable></code>.
+    Effect: The client loads instructions from the file identified by string-literal.
+    Example:  <code>LOADFILE '/home/tarantool_user/file5.txt'</code>.
+    </para></listitem>
+  </varlistentry>  
+  <varlistentry>
+    <term xml:id="utility-tarantool-lua" xreflabel="utility-tarantool-lua">LUA</term>
+    <listitem><para>
+    Syntax: <code>LUA <replaceable>token</replaceable> [<replaceable>token</replaceable>...]</code>.
+    Effect: The client tells the server to execute the tokens as Lua statements.
+    Example:  <code>LUA "hello".." world"</code>.
+    Notes: The client sends to the server's administrative port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-notee" xreflabel="utility-tarantool-notee">NOTEE</term>
+    <listitem><para>
+    Syntax: <code>NOTEE</code>.
+    Effect: The client ceases to write to a file, thus canceling the effect of the TEE statement.
+    Example:  <code>NOTEE</code>.
+    Notes: The client sends nothing to the server.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-ping" xreflabel="utility-tarantool-ping">PING</term>
+    <listitem><para>
+    Syntax: <code>PING</code>.
+    Effect: The client sends a ping to the server.
+    Example:  <code>PING</code>.
+    Notes: The client sends to the server's read/write data port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-quit" xreflabel="utility-tarantool-quit">QUIT</term>
+    <listitem><para>
+    Syntax: <code>Q[UIT]</code>.
+    Effect: The client stops.  This statement is handled entirely by the client.
+    Example:  <code>QUIT</code>.
+    Notes: The EXIT statement does the same thing. The client sends nothing to the server.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-reload" xreflabel="utility-tarantool-reload">RELOAD</term>
+    <listitem><para>
+    Syntax: <code>RELOAD CONFIGURATION</code>.
+    Effect: The client tells the server to re-read the configuration file.
+    Example:  <code>RELOAD CONFIGURATION</code>.
+    Notes: The client sends to the server's administrative port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-replace" xreflabel="utility-tarantool-replace">REPLACE</term>
+    <listitem><para>
+    Syntax; <code>REPLACE [INTO] <replaceable>tuple-set-identifier</replaceable> VALUES  (<replaceable>literal</replaceable> [,<replaceable>literal</replaceable>...])</code>.
+    Effect: The client tells the server to add the tuple consisting of the literal values.
+    Example:  <code>REPLACE INTO t0 VALUES ('a',0)</code>.
+    Notes: REPLACE and INSERT are the same, except that INSERT will return an error if a tuple already exists with the same primary key.
+           The client sends to the server's read/write data port after converting from SQL to binary protocol.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-save" xreflabel="utility-tarantool-save">SAVE</term>
+    <listitem><para>
+    Syntax: <code>SAVE COREDUMP | SNAPSHOT</code>.
+    Effect: The client tells the server to save the designated object.
+    Example:  <code>SAVE SNAPSHOT</code>.
+    Notes: The client sends to the server's administrative port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-select" xreflabel="utility-tarantool-select">SELECT</term>
+    <listitem><para>
+    Syntax: <code>SELECT * FROM <replaceable>tuple-set-identifier</replaceable> WHERE <replaceable>field-identifier</replaceable> = <replaceable>literal</replaceable> [AND|OR <replaceable>field-identifier</replaceable> = <replaceable>literal</replaceable>...] [LIMIT <replaceable>numeric-literal</replaceable> [,<replaceable>numeric-literal</replaceable>]</code>].
+    Effect: Client tells server to find the tuple or tuples identified in the WHERE clause.
+    Example:  <code>SELECT * FROM t0 WHERE k0 = 5 AND k1 = 7 LIMIT 1</code>.
+    Notes: The client sends to the server's read/write data port.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-set" xreflabel="utility-tarantool-set">SET</term>
+    <listitem><para>
+    Syntax: <code>SET INJECTION <replaceable>name-token</replaceable> <replaceable>state-token</replaceable></code>.
+    Effect: In normal mode: error.
+    Notes: This statement is only available in debug mode.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-setopt" xreflabel="utility-tarantool-setopt">SETOPT</term>
+    <listitem><para>
+    Syntax: <code>SETOPT DELIMITER = <replaceable>string-literal</replaceable></code>.
+          The string must be a value in single quotes.
+    Effect: string becomes end-of-statement delimiter, so newline alone is not treated as end of statement.
+    Example:  <code>SETOPT DELIMITER = '!'</code>.
+    Notes: The client sends nothing to the server.
+    </para>
+    <para>
+    Syntax: <code>SETOPT PAGER = <replaceable>string-literal</replaceable></code>.
+          The string must be a value in single quotes.
+    Effect: string becomes the pager that will be invoked for subsequent commands;
+            usually the values are '/usr/bin/less' or '/bin/more' for the common
+            Linux pagers.
+    Example: <code>SETOPT PAGER = '/usr/bin/less'</code>.
+    Notes: The client sends nothing to the server.
+    </para>
+   </listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-show" xreflabel="utility-tarantool-show">SHOW</term>
+    <listitem><para>
+    Syntax: <code>SHOW CONFIGURATION | FIBER | INFO | INJECTIONS | PALLOC | PLUGINS | SLAB | STAT</code>.
+    Effect: The client asks the server for information about environment or statistics.
+    Example:  <code>SHOW INFO</code>.
+    Notes: The client sends to the server's administrative port.
+         SHOW INJECTIONS is only available in debug mode.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-tee" xreflabel="utility-tarantool-tee">TEE</term>
+    <listitem><para>
+    Syntax: <code>TEE <replaceable>string-literal</replaceable></code>.
+    Effect: The client begins logging in the file identified by string-literal.
+    Example:  <code>TEE '/home/tarantool_user/log.txt'</code>.
+    Notes: TEE may also be set up via an option on the command line. The client sends nothing to the server.
+    </para></listitem>
+  </varlistentry>
+  <varlistentry>
+    <term xml:id="utility-tarantool-update" xreflabel="utility-tarantool-update">UPDATE</term>
+    <listitem><para>
+     Syntax: <code>UPDATE <replaceable>tuple-set-identifier</replaceable> SET <replaceable>field-identifier</replaceable> = <replaceable>literal</replaceable> [,<replaceable>field-identifier</replaceable> = <replaceable>literal</replaceable>...] WHERE <replaceable>field-identifier</replaceable> = <replaceable>literal</replaceable></code>.
+    Effect: Client tells server to change the tuple identified in the WHERE clause.
+    Example:  <code>UPDATE t1 SET k1= 'K', k2 = 7 WHERE k0 = 0</code>.
+    Notes: The client sends to the server's read/write data port after converting from SQL to binary protocol.
+    </para></listitem>
+  </varlistentry>
+</variablelist>
+
+<para>
+For a condensed Backus-Naur Form [BNF] description of some of the statements, see
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
+    and
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link>.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Modes</bridgehead>
+Depending how one combines the tarantool client's options, there are in effect three modes of operation:
+<quote>interactive</quote>, <quote>print and play</quote>, or <quote>replication</quote> mode.
+</para>
+<para>
+In <emphasis>interactive</emphasis> mode, one types statements and gets results.
+One can specify a statement file when starting
+(<code>tarantool &lt; file_name</code>)
+or one can specify a statement file with the LOADFILE statement:
+(<code>LOADFILE file_name</code>), but typically the statements
+are typed in by the user following prompts.
+Here is an example of an interactive-mode tarantool client session:
+
+<programlisting>
+<prompt>$ </prompt>tarantool
+localhost&gt; <userinput>INSERT INTO t0 VALUES ('X-1',100)</userinput>
+Insert OK, 1 rows affected
+localhost&gt; <userinput>INSERT INTO t0 VALUES ('X-2',200,'On Order')</userinput>
+Insert OK, 1 rows affected
+localhost&gt; <userinput>INSERT INTO t0 VALUES ('X-3',300,'')</userinput>
+Insert OK, 1 rows affected
+localhost&gt; <userinput>UPDATE t0 SET k1 = 300 WHERE k0 = 'X-1'</userinput>
+Update OK, 1 rows affected
+localhost&gt; <userinput>DELETE FROM t0 WHERE k0 = 'X-2'</userinput>
+Delete OK, 1 rows affected
+localhost&gt; <userinput>SELECT * FROM t0 WHERE k0 = 'X-1'</userinput>
+Select OK, 1 rows affected
+['X-1', 300]
+localhost&gt; <userinput>EXIT</userinput>
+<prompt>$ </prompt>
+</programlisting>
+
+</para>
+<para>
+In <emphasis>print and play</emphasis> mode,
+one uses --cat and --play and --from and --to and --space options
+to print write-ahead-log contents, or to send write-ahead-log
+contents to the server.
+Here is an example of a print-and-play-mode tarantool client session:
+<programlisting>
+<prompt>$ </prompt>tarantool --cat /home/user1/tarantool_test/work_dir/00000000000000000005.xlog --from 22 --to 26
+Insert, lsn: 22, time: 1385327353.345869, len: 33, space: 0, cookie: 127.0.0.1:44787 ['X-1', 100]
+Insert, lsn: 23, time: 1385327353.346745, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-2', 200, 8243105135088135759]
+Insert, lsn: 24, time: 1385327353.347352, len: 34, space: 0, cookie: 127.0.0.1:44787 ['X-3', 300, '']
+Update, lsn: 25, time: 1385327353.348209, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-1']
+Delete, lsn: 26, time: 1385327353.348879, len: 28, space: 0, cookie: 127.0.0.1:44787 ['X-2']
+<prompt>$ </prompt>
+</programlisting>
+</para>
+<para>
+In <emphasis>replication</emphasis> mode,
+one connects as a replica, and then writes
+a binary log to a file.
+</para>
+
+</section>
+
 <section xml:id="tarantar">
 <title>Utility <code>tarantar</code></title>
 <para>

@@ -37,7 +37,7 @@ a runnning tarantool_box server, and a running tarantool client.
 <para>
 <bridgehead renderas="sect4">Delimiter</bridgehead>
 We'll be making functions which go over one line. We don't want the client to send to the server after every line.
-So we <link linkend="client-reference-delim">declare a delimiter</link>.
+So we <link linkend="utility-tarantool-delim">declare a delimiter</link>.
 This means <quote>Do not send to the server until you see an exclamation mark.</quote>
 
 <programlisting>
@@ -56,7 +56,7 @@ lua function string_function()
   return "hello world"
   end!
 </programlisting>
-The word <link linkend="client-reference-lua">LUA</link>
+The word <link linkend="utility-tarantool-lua">LUA</link>
 is a Tarantool keyword that means <quote>we're about to go into Lua.</quote>
 The function name is string_function.
 The function has one executable statement, <code>return "hello world"</code>.
@@ -69,7 +69,7 @@ To confirm that the function works, we can say
 <programlisting>
 call string_function()!
 </programlisting>
-The word <link linkend="client-reference-call">CALL</link> is a Tarantool keyword that means <quote>invoke the Lua function.</quote>
+The word <link linkend="utility-tarantool-call">CALL</link> is a Tarantool keyword that means <quote>invoke the Lua function.</quote>
 The effect is that the string which the function returns will end up on the screen.
 </para>
 
@@ -323,7 +323,7 @@ field will be 1. The second field will be a random 10-letter string.
 Once again the string_function() can be invoked from main_function() which can be invoked with
 call main_function(). But main_function() won't tell the whole story, because it does not
 return t, it only puts t into the database. To confirm that something got inserted, we'll
-use a <link linkend="client-reference-select">SELECT statement</link>.
+use a <link linkend="utility-tarantool-select">SELECT statement</link>.
 
 <programlisting>
 call main_function()!
