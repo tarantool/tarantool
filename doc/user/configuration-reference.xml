@@ -682,15 +682,6 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           default.</entry>
         </row>
 
-        <row>
-          <entry>backlog</entry>
-          <entry>integer</entry>
-          <entry>1024</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>The size of the listen backlog.</entry>
-       </row>
-
       </tbody>
     </tgroup>
   </table>
