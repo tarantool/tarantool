@@ -46,7 +46,6 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = false;
 	c->io_collect_interval = 0;
-	c->backlog = 0;
 	c->readahead = 0;
 	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 0;
@@ -90,7 +89,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->logger = NULL;
 	c->logger_nonblock = true;
 	c->io_collect_interval = 0;
-	c->backlog = 1024;
 	c->readahead = 16320;
 	c->snap_io_rate_limit = 0;
 	c->rows_per_wal = 500000;
@@ -170,9 +168,6 @@ static NameAtom _name__logger_nonblock[] = {
 };
 static NameAtom _name__io_collect_interval[] = {
 	{ "io_collect_interval", -1, NULL }
-};
-static NameAtom _name__backlog[] = {
-	{ "backlog", -1, NULL }
 };
 static NameAtom _name__readahead[] = {
 	{ "readahead", -1, NULL }
@@ -510,20 +505,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_WRONGRANGE;
 		c->io_collect_interval = dbl;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__backlog) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->backlog != i32)
-			return CNF_RDONLY;
-		c->backlog = i32;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__readahead) ) {
 		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
@@ -843,7 +824,6 @@ typedef enum IteratorState {
 	S_name__logger,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
-	S_name__backlog,
 	S_name__readahead,
 	S_name__snap_io_rate_limit,
 	S_name__rows_per_wal,
@@ -1070,17 +1050,6 @@ again:
 			}
 			sprintf(*v, "%g", c->io_collect_interval);
 			snprintf(buf, PRINTBUFLEN-1, "io_collect_interval");
-			i->state = S_name__backlog;
-			return buf;
-		case S_name__backlog:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->backlog);
-			snprintf(buf, PRINTBUFLEN-1, "backlog");
 			i->state = S_name__readahead;
 			return buf;
 		case S_name__readahead:
@@ -1294,7 +1263,6 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 		return CNF_NOMEMORY;
 	dst->logger_nonblock = src->logger_nonblock;
 	dst->io_collect_interval = src->io_collect_interval;
-	dst->backlog = src->backlog;
 	dst->readahead = src->readahead;
 	dst->snap_io_rate_limit = src->snap_io_rate_limit;
 	dst->rows_per_wal = src->rows_per_wal;
@@ -1348,6 +1316,8 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->custom_proc_title);
 	if (c->replication_source != NULL)
 		free(c->replication_source);
+	if (c->replication_protocol != NULL)
+		free(c->replication_protocol);
 }
 
 /************** Compare config  **************/
@@ -1461,11 +1431,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 			return diff;
 		}
-	}
-	if (c1->backlog != c2->backlog) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->backlog");
-
-		return diff;
 	}
 	if (!only_check_rdonly) {
 		if (c1->readahead != c2->readahead) {

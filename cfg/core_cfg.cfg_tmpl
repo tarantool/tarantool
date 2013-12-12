@@ -59,9 +59,6 @@ logger_nonblock=true, ro
 # delay between loop iterations
 io_collect_interval=0.0
 
-# size of listen backlog
-backlog=1024, ro
-
 # network io readahead
 readahead=16320
 

@@ -90,9 +90,6 @@ typedef struct tarantool_cfg {
 	/* delay between loop iterations */
 	double	io_collect_interval;
 
-	/* size of listen backlog */
-	int32_t	backlog;
-
 	/* network io readahead */
 	int32_t	readahead;
 
