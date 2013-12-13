@@ -26,13 +26,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "lua/plugin.h"
+
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 } /* extern "C" */
-#include "tarantool/plugin.h"
 
+#include "tarantool/plugin.h"
 #include "lua/utils.h"
 
 static int

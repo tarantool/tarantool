@@ -29,18 +29,13 @@
 
 #include "lua/errinj.h"
 
+#include "errinj.h"
+
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 } /* extern "C" */
-
-#include <say.h>
-#include <string.h>
-#include <errinj.h>
-#include <recovery.h>
-#include "tarantool.h"
-#include "box/box.h"
 
 static int
 lbox_errinj_set(struct lua_State *L)

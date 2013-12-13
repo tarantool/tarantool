@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+#include "lua/ipc.h"
 #include <stdlib.h>
 
 extern "C" {
@@ -36,7 +37,6 @@ extern "C" {
 } /* extern "C" */
 
 #include "ipc.h"
-#include "lua/ipc.h"
 #include "lua/utils.h"
 
 static const char channel_lib[]   = "box.ipc.channel";

@@ -78,11 +78,22 @@ box_check_config(struct tarantool_cfg *conf);
  */
 int
 box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
+
+/** Non zero if snapshot is in progress. */
+extern int snapshot_pid;
+/** Incremented with each next snapshot. */
+extern uint32_t snapshot_version;
+
 /**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
-void box_snapshot(struct log_io *, struct fio_batch *batch);
+int box_snapshot(void);
+
+/** Basic initialization of the storage dir. */
+void
+box_init_storage(const char *dirname);
+
 /**
  * Spit out some basic module status (master/slave, etc.
  */

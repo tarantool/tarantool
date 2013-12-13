@@ -38,7 +38,6 @@ extern "C" {
 struct tarantool_cfg;
 struct tbuf;
 
-extern int snapshot_pid;
 extern struct tarantool_cfg cfg;
 extern const char *cfg_filename;
 extern char *cfg_filename_fullpath;
@@ -46,7 +45,6 @@ extern char *custom_proc_title;
 int reload_cfg();
 extern char status[];
 void show_cfg(struct tbuf *out);
-int snapshot(void);
 const char *tarantool_version(void);
 /**
  * Get version (defined in PACKAGE_VERSION), packed into uint32_t
@@ -56,7 +54,6 @@ const char *tarantool_version(void);
 uint32_t tarantool_version_id(void);
 
 double tarantool_uptime(void);
-void tarantool_free(void);
 
 void __attribute__((format (printf, 2, 3)))
 title(const char *role, const char *fmt, ...);

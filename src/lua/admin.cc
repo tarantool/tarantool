@@ -34,15 +34,8 @@ extern "C" {
 #include "lualib.h"
 }
 
-#include <string.h>
-#include <say.h>
-#include <errinj.h>
-#include "salloc.h"
-#include "tbuf.h"
-#include "fiber.h"
-#include "tarantool.h"
+#include "tarantool/util.h"
 #include "box/box.h"
-#include "lua/utils.h"
 
 static int
 lbox_save_coredump(struct lua_State *L __attribute__((unused)))
@@ -55,7 +48,7 @@ lbox_save_coredump(struct lua_State *L __attribute__((unused)))
 static int
 lbox_save_snapshot(struct lua_State *L)
 {
-	int ret = snapshot();
+	int ret = box_snapshot();
 	if (ret == 0) {
 		lua_pushstring(L, "ok");
 		return 1;

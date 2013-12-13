@@ -26,32 +26,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "lua/fiber.h"
+
+#include "fiber.h"
 #include "lua/utils.h"
-#include "tarantool.h"
-#include "box/box.h"
-#include "tbuf.h"
 
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <lj_obj.h>
-#include <lj_ctype.h>
-#include <lj_cdata.h>
-#include <lj_cconv.h>
-#include <lj_state.h>
 } /* extern "C" */
 
-#include "lua/fiber.h"
-#include "fiber.h"
-
-#include <sys/types.h>
-#include <ctype.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <dlfcn.h>
-#include <dirent.h>
-#include <stdio.h>
 /*
  * }}}
  */

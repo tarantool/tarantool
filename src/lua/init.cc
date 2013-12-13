@@ -37,11 +37,7 @@ extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <lj_obj.h>
-#include <lj_ctype.h>
 #include <lj_cdata.h>
-#include <lj_cconv.h>
-#include <lj_state.h>
 } /* extern "C" */
 
 
@@ -60,9 +56,6 @@ extern "C" {
 #include "lua/msgpack.h"
 
 #include <ctype.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <stdio.h>
 #include "tarantool/plugin.h"
 #include "small/region.h"
 
