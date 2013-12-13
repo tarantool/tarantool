@@ -70,8 +70,10 @@ slab_assert(struct slab_cache *cache, struct slab *slab)
 	assert(slab->order <= cache->order_max + 1);
 	if (slab->order <= cache->order_max) {
 		size_t size = slab_order_size(cache, slab->order);
+		(void) size;
 		assert(slab->size == size);
 		intptr_t addr = (intptr_t) slab;
+		(void) addr;
 		assert(addr == (addr & ~(size - 1)));
 	}
 }
