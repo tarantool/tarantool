@@ -33,16 +33,11 @@
 #include <stdlib.h>
 
 #include <fiber.h>
-#include <salloc.h>
-#include <say.h>
-#include <stat.h>
 #include <tarantool.h>
 #include <tarantool/config.h>
 #include "lua/init.h"
-#include <recovery.h>
 #include <tbuf.h>
 #include "tarantool/util.h"
-#include <errinj.h>
 #include "coio_buf.h"
 
 extern "C" {
@@ -51,7 +46,6 @@ extern "C" {
 #include <lualib.h>
 }
 
-#include "box/box.h"
 #include "lua/utils.h"
 #include "session.h"
 #include "scoped_guard.h"
