@@ -33,6 +33,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * Provide wrappers around gcc built-ins for now.
  * These built-ins work with all numeric types - may not
@@ -83,7 +87,7 @@ lf_lifo_push(struct lf_lifo *head, void *elem)
 		 * Sic: add 1 thus let ABA value overflow, *then*
 		 * coerce to unsigned short
 		 */
-		void *newhead = elem + aba_value(tail + 1);
+		void *newhead = (char *) elem + aba_value((char *) tail + 1);
 		if (atomic_cas(&head->next, tail, newhead) == tail)
 			return head;
 	} while (true);
@@ -104,7 +108,7 @@ lf_lifo_pop(struct lf_lifo *head)
 		 * regardless of the exact sequence of push/pop
 		 * operations.
 		 */
-		void *newhead = ((void *) lf_lifo(elem->next) +
+		void *newhead = ((char *) lf_lifo(elem->next) +
 				 aba_value(tail));
 		if (atomic_cas(&head->next, tail, newhead) == tail)
 			return elem;
@@ -116,5 +120,9 @@ lf_lifo_is_empty(struct lf_lifo *head)
 {
 	return head->next == NULL;
 }
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_LF_LIFO_H */

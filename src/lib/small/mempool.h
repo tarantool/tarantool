@@ -35,9 +35,9 @@
 #define RB_COMPACT 1
 #include "third_party/rb.h"
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
 /**
  * Pool allocator.
@@ -115,7 +115,7 @@ struct mslab {
 static inline size_t
 mslab_sizeof()
 {
-	return slab_size_align(sizeof(struct mslab), sizeof(intptr_t));
+	return small_align(sizeof(struct mslab), sizeof(intptr_t));
 }
 
 typedef rb_tree(struct mslab) mslab_tree_t;
@@ -210,7 +210,7 @@ mempool_create(struct mempool *pool, struct slab_cache *cache,
 	 * @note: this asserts that slab_size_min is less than
 	 * SLAB_ORDER_MAX.
 	 */
-	uint8_t order = slab_order(slab_size_min);
+	uint8_t order = slab_order(cache, slab_size_min);
 	return mempool_create_with_order(pool, cache, objsize, order);
 }
 
@@ -267,6 +267,6 @@ mempool_alloc0(struct mempool *pool)
 	return memset(mempool_alloc(pool), 0, pool->objsize);
 }
 
-#endif /* __cplusplus */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_SMALL_MEMPOOL_H */

@@ -36,7 +36,7 @@
  */
 
 /* thread - runtime memory. */
-extern __thread struct slab_cache *slabc_runtime;
+extern struct slab_cache *slabc_runtime;
 
 void
 memory_init();

@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 static const uint32_t slab_magic = 0xeec0ffee;
 
@@ -50,27 +51,29 @@ static const uint32_t slab_magic = 0xeec0ffee;
  * of the slab itself.
  */
 struct slab *
-slab_from_ptr(void *ptr, uint8_t order)
+slab_from_ptr(struct slab_cache *cache, void *ptr, uint8_t order)
 {
-	assert(order <= SLAB_ORDER_LAST);
+	assert(order <= cache->order_max);
 	intptr_t addr = (intptr_t) ptr;
 	/** All memory mapped slabs are slab->size aligned. */
 	struct slab *slab = (struct slab *)
-		(addr & ~(slab_order_size(order) - 1));
+		(addr & ~(slab_order_size(cache, order) - 1));
 	assert(slab->magic == slab_magic && slab->order == order);
 	return slab;
 }
 
 static inline void
-slab_assert(struct slab *slab)
+slab_assert(struct slab_cache *cache, struct slab *slab)
 {
 	(void) slab;
 	assert(slab->magic == slab_magic);
-	assert(slab->order <= SLAB_HUGE);
-	assert(slab->order == SLAB_HUGE ||
-	       (((intptr_t) slab & ~(slab_order_size(slab->order) - 1)) ==
-		(intptr_t) slab &&
-	       slab->size == slab_order_size(slab->order)));
+	assert(slab->order <= cache->order_max + 1);
+	if (slab->order <= cache->order_max) {
+		size_t size = slab_order_size(cache, slab->order);
+		assert(slab->size == size);
+		intptr_t addr = (intptr_t) slab;
+		assert(addr == (addr & ~(size - 1)));
+	}
 }
 
 /** Mark a slab as free. */
@@ -109,71 +112,21 @@ slab_poison(struct slab *slab)
 static inline void
 slab_create(struct slab *slab, uint8_t order, size_t size)
 {
-	assert(order <= SLAB_HUGE);
 	slab->magic = slab_magic;
 	slab->order = order;
 	slab->in_use = 0;
 	slab->size = size;
 }
 
-static inline void
-munmap_checked(void *addr, size_t length)
-{
-	if (munmap(addr, length)) {
-		char buf[64];
-		strerror_r(errno, buf, sizeof(buf));
-		fprintf(stderr, "Error in munmap(): %s\n", buf);
-		assert(false);
-	}
-}
-
 static inline struct slab *
-slab_mmap(uint8_t order)
+slab_buddy(struct slab_cache *cache, struct slab *slab)
 {
-	assert(order <= SLAB_ORDER_LAST);
+	assert(slab->order <= cache->order_max);
 
-	size_t size = slab_order_size(order);
-	/*
-	 * mmap twice the requested amount to be able to align
-	 * the mapped address.
-	 * @todo all mappings except the first are likely to
-	 * be aligned already. Find out if trying to map
-	 * optimistically exactly the requested amount and fall
-	 * back to doulbe-size mapping is a viable strategy.
-         */
-	void *map = mmap(NULL, 2 * size,
-			 PROT_READ | PROT_WRITE, MAP_PRIVATE |
-			 MAP_ANONYMOUS, -1, 0);
-	if (map == MAP_FAILED)
-		return NULL;
-
-	/* Align the mapped address around slab size. */
-	size_t offset = (intptr_t) map & (size - 1);
-
-	if (offset != 0) {
-		/* Unmap unaligned prefix and postfix. */
-		munmap_checked(map, size - offset);
-		map += size - offset;
-		munmap_checked(map + size, offset);
-	} else {
-		/* The address is returned aligned. */
-		munmap_checked(map + size, size);
-	}
-	struct slab *slab = map;
-	slab_create(slab, order, size);
-	return slab;
-}
-
-static inline struct slab *
-slab_buddy(struct slab *slab)
-{
-	assert(slab->order <= SLAB_ORDER_LAST);
-
-	if (slab->order == SLAB_ORDER_LAST)
+	if (slab->order == cache->order_max)
 		return NULL;
 	/* The buddy address has its respective bit negated. */
-	return (void *) ((intptr_t) slab ^ slab_order_size(slab->order));
-
+	return (void *)((intptr_t) slab ^ slab_order_size(cache, slab->order));
 }
 
 static inline struct slab *
@@ -182,10 +135,10 @@ slab_split(struct slab_cache *cache, struct slab *slab)
 	assert(slab->order > 0);
 
 	uint8_t new_order = slab->order - 1;
-	size_t new_size = slab_order_size(new_order);
+	size_t new_size = slab_order_size(cache, new_order);
 
 	slab_create(slab, new_order, new_size);
-	struct slab *buddy = slab_buddy(slab);
+	struct slab *buddy = slab_buddy(cache, slab);
 	slab_create(buddy, new_order, new_size);
 	slab_list_add(&cache->orders[buddy->order], buddy, next_in_list);
 	return slab;
@@ -194,21 +147,38 @@ slab_split(struct slab_cache *cache, struct slab *slab)
 static inline struct slab *
 slab_merge(struct slab_cache *cache, struct slab *slab, struct slab *buddy)
 {
-	assert(slab_buddy(slab) == buddy);
+	assert(slab_buddy(cache, slab) == buddy);
 	struct slab *merged = slab > buddy ? buddy : slab;
 	/** Remove the buddy from the free list. */
 	slab_list_del(&cache->orders[buddy->order], buddy, next_in_list);
 	merged->order++;
-	merged->size = slab_order_size(merged->order);
+	merged->size = slab_order_size(cache, merged->order);
 	return merged;
 }
 
 void
-slab_cache_create(struct slab_cache *cache)
+slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
+		  size_t order0_size)
 {
-	for (uint8_t i = 0; i <= SLAB_ORDER_LAST; i++)
-		slab_list_create(&cache->orders[i]);
+	cache->arena = arena;
+
+	if (order0_size < sysconf(_SC_PAGESIZE))
+		order0_size = sysconf(_SC_PAGESIZE);
+
+	cache->order0_size = small_round(order0_size);
+
+	if (cache->order0_size > arena->slab_size)
+		cache->order0_size = arena->slab_size;
+
+	cache->order0_size_lb = small_lb(cache->order0_size);
+
+	cache->order_max = (small_lb(arena->slab_size) -
+			    cache->order0_size_lb);
+	assert(cache->order_max < ORDER_MAX);
+
 	slab_list_create(&cache->allocated);
+	for (uint8_t i = 0; i <= cache->order_max; i++)
+		slab_list_create(&cache->orders[i]);
 }
 
 void
@@ -222,36 +192,32 @@ slab_cache_destroy(struct slab_cache *cache)
          */
 	struct slab *slab, *tmp;
 	rlist_foreach_entry_safe(slab, slabs, next_in_cache, tmp) {
-		if (slab->order == SLAB_HUGE)
+		if (slab->order == cache->order_max + 1)
 			free(slab);
-		else {
-			/*
-			 * Don't trust slab->size or slab->order,
-			 * it is wrong if the slab header was
-			 * reformatted for a smaller order.
-		         */
-			munmap_checked(slab, slab_order_size(SLAB_ORDER_LAST));
-		}
+		else
+			slab_unmap(cache->arena, slab);
 	}
 }
 
 struct slab *
 slab_get_with_order(struct slab_cache *cache, uint8_t order)
 {
-	assert(order <= SLAB_ORDER_LAST);
+	assert(order <= cache->order_max);
 	struct slab *slab;
 	/* Search for the first available slab. If a slab
 	 * of a bigger size is found, it can be split.
-	 * If SLAB_ORDER_LAST is reached and there are no
-	 * free slabs, allocate a new one.
+	 * If cache->order_max is reached and there are no
+	 * free slabs, allocate a new one on arena.
 	 */
 	struct slab_list *list= &cache->orders[order];
 
 	for ( ; rlist_empty(&list->slabs); list++) {
-		if (list == cache->orders + SLAB_ORDER_LAST) {
-			slab = slab_mmap(SLAB_ORDER_LAST);
+		if (list == cache->orders + cache->order_max) {
+			slab = slab_map(cache->arena);
 			if (slab == NULL)
 				return NULL;
+			slab_create(slab, cache->order_max,
+				    cache->arena->slab_size);
 			slab_poison(slab);
 			slab_list_add(&cache->allocated, slab,
 				      next_in_cache);
@@ -278,7 +244,7 @@ slab_get_with_order(struct slab_cache *cache, uint8_t order)
 		cache->orders[slab->order].stats.total += slab->size;
 	}
 	slab_set_used(cache, slab);
-	slab_assert(slab);
+	slab_assert(cache, slab);
 	return slab;
 }
 
@@ -293,9 +259,9 @@ struct slab *
 slab_get(struct slab_cache *cache, size_t size)
 {
 	size += slab_sizeof();
-	uint8_t order = slab_order(size);
+	uint8_t order = slab_order(cache, size);
 
-	if (order == SLAB_HUGE) {
+	if (order == cache->order_max + 1) {
 		struct slab *slab = (struct slab *) malloc(size);
 		if (slab == NULL)
 			return NULL;
@@ -311,8 +277,8 @@ slab_get(struct slab_cache *cache, size_t size)
 void
 slab_put(struct slab_cache *cache, struct slab *slab)
 {
-	slab_assert(slab);
-	if (slab->order == SLAB_HUGE) {
+	slab_assert(cache, slab);
+	if (slab->order == cache->order_max + 1) {
 		/*
 		 * Free a huge slab right away, we have no
 		 * further business to do with it.
@@ -324,7 +290,7 @@ slab_put(struct slab_cache *cache, struct slab *slab)
 	}
 	/* An "ordered" slab is returned to the cache. */
 	slab_set_free(cache, slab);
-	struct slab *buddy = slab_buddy(slab);
+	struct slab *buddy = slab_buddy(cache, slab);
 	/*
 	 * The buddy slab could also have been split into a pair
 	 * of smaller slabs, the first of which happens to be
@@ -342,7 +308,7 @@ slab_put(struct slab_cache *cache, struct slab *slab)
 		cache->orders[slab->order].stats.total -= slab->size;
 		do {
 			slab = slab_merge(cache, slab, buddy);
-			buddy = slab_buddy(slab);
+			buddy = slab_buddy(cache, slab);
 		} while (buddy && buddy->order == slab->order &&
 			 slab_is_free(buddy));
 		cache->orders[slab->order].stats.total += slab->size;
@@ -371,15 +337,15 @@ slab_cache_check(struct slab_cache *cache)
 				slab_magic, slab->magic);
 			dont_panic = false;
 		}
-		if (slab->order == SLAB_HUGE) {
+		if (slab->order == cache->order_max + 1) {
 			huge += slab->size;
 			used += slab->size;
 			total += slab->size;
 		} else {
-			if (slab->size != slab_order_size(slab->order)) {
+			if (slab->size != slab_order_size(cache, slab->order)) {
 				fprintf(stderr, "%s: incorrect slab size,"
 					" expected %zu, got %zu", __func__,
-					slab_order_size(slab->order),
+					slab_order_size(cache, slab->order),
 					slab->size);
 				dont_panic = false;
 			}
@@ -388,7 +354,7 @@ slab_cache_check(struct slab_cache *cache)
 			 * and split into smaller slabs, don't
 			 * trust slab->size.
 			 */
-			total += slab_order_size(SLAB_ORDER_LAST);
+			total += slab_order_size(cache, cache->order_max);
 		}
 	}
 
@@ -401,25 +367,25 @@ slab_cache_check(struct slab_cache *cache)
 	}
 
 	for (struct slab_list *list = cache->orders;
-	     list <= cache->orders + SLAB_ORDER_LAST;
+	     list <= cache->orders + cache->order_max;
 	     list++) {
 
-		uint8_t order = slab_order_size(list - cache->orders);
+		uint8_t order = slab_order_size(cache, list - cache->orders);
 		ordered += list->stats.total;
 	        used += list->stats.used;
 
-		if (list->stats.total % slab_order_size(order)) {
+		if (list->stats.total % slab_order_size(cache, order)) {
 			fprintf(stderr, "%s: incorrect order statistics, the"
 				" total %zu is not multiple of slab size %zu\n",
 				__func__, list->stats.total,
-				slab_order_size(order));
+				slab_order_size(cache, order));
 			dont_panic = false;
 		}
-		if (list->stats.used % slab_order_size(order)) {
+		if (list->stats.used % slab_order_size(cache, order)) {
 			fprintf(stderr, "%s: incorrect order statistics, the"
 				" used %zu is not multiple of slab size %zu\n",
 				__func__, list->stats.used,
-				slab_order_size(order));
+				slab_order_size(cache, order));
 			dont_panic = false;
 		}
 	}

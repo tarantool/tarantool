@@ -30,10 +30,11 @@
  */
 #include <stdint.h>
 #include "small/mempool.h"
+#include "small/slab_arena.h"
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
-#endif
+#endif /* defined(__cplusplus) */
 
 /**
  * Small object allocator.
@@ -117,6 +118,7 @@ typedef rb_tree(struct factor_pool) factor_tree_t;
 
 /** A slab allocator for a wide range of object sizes. */
 struct small_alloc {
+	struct slab_cache *cache;
 	uint32_t step_pool_objsize_max;
 	/**
 	 * All slabs in all pools must be of the same order,
@@ -137,7 +139,6 @@ struct small_alloc {
 	 * each pool differs from its neighbor by a factor.
 	 */
 	factor_tree_t factor_pools;
-	struct slab_cache *cache;
 	/**
 	 * The factor used for factored pools. Must be > 1.
 	 * Is provided during initialization.
@@ -204,7 +205,7 @@ small_stats(struct small_alloc *alloc,
 	    struct small_stats *totals,
 	    mempool_stats_cb cb, void *cb_ctx);
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 } /* extern "C" */
 #include "exception.h"
 
@@ -224,6 +225,6 @@ smalloc0(struct small_alloc *alloc, size_t size)
 	return memset(smalloc(alloc, size), 0, size);
 }
 
-#endif
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_SMALL_SMALL_H */

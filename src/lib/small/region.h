@@ -123,7 +123,7 @@ struct rslab
 static inline size_t
 rslab_sizeof()
 {
-	return slab_size_align(sizeof(struct rslab), sizeof(intptr_t));
+	return small_align(sizeof(struct rslab), sizeof(intptr_t));
 }
 
 static inline void *

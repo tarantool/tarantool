@@ -12,6 +12,7 @@ enum {
 	ITERATIONS_MAX = 500,
 };
 
+struct slab_arena arena;
 struct slab_cache cache;
 struct mempool pool;
 int objsize;
@@ -99,7 +100,9 @@ int main()
 	if (objsize < OBJSIZE_MIN)
 		objsize = OBJSIZE_MIN;
 
-	slab_cache_create(&cache);
+	slab_arena_create(&arena, 0, UINT_MAX,
+			  4000000, MAP_PRIVATE);
+	slab_cache_create(&cache, &arena, 0);
 
 	mempool_basic();
 
