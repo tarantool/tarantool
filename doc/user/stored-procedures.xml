@@ -477,44 +477,40 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.update">box.update(space_no, key, format, ...)</emphasis>
+         <emphasis role="lua" xml:id="box.update">box.update(space_no, key, format, {field_no, value}...)</emphasis>
         </term>
         <listitem>
             <para>
-                Update a tuple identified by a primary
-                <code>key</code>. If a key is multipart,
-                it is passed in as a Lua table. Update arguments follow,
-                described by <code>format</code>.
-                The format and arguments are passed to
+                Update a tuple.
+                The <code>space_no</code> and <code>key</code> arguments
+                identify the tuple; if a key is multipart then it is
+                passed as a Lua table.
+                The <code>format</code> argument is a sequence of
+                pairs of characters, where the first character in each pair
+                is the operation specifier, and the second character in
+                each pair is the operation argument.
+                The <code>{field_no, value}</code> arguments are the
+                field numbers of affected fields and applicable values.
+                For some operations the field number can be -1, meaning
+                the last field in the tuple.
+                There must be a pair of {field_no, value} arguments
+                for each character pair in the format argument.
+                The format and {field_no, value} arguments are passed to
                 <code>box.pack()</code> and the result is sent
                 to <code>box.process()</code>.
-                A correct <code>format</code> is a sequence of
-                pairs: update operation, operation arguments. A
-                single character of format describes either an
-                operation which needs to take place or operation
-                argument. A format specifier also works as a
-                placeholder for the number of a field, which needs
-                to be updated, or for an argument value.
-                For example:
-                <simplelist>
-                    <member><code>+p=p</code> &mdash; add a value
-                    to one field and assign another,
-                    </member>
-                    <member><code>:p</code> &mdash; splice a
-                    field: start at offset, cut length bytes, and add a
-                    string.</member>
-                    <member><code>#p</code> &mdash; delete a
-                    field.</member>
-                    <member><code>!p</code> &mdash; insert a field
-                    (before the one specified).</member>
-                </simplelist>
-                Possible format specifiers are: <quote>+</quote>
+                Possible operation specifiers are: <quote>+</quote>
                 for addition, <quote>-</quote> for subtraction,
                 <quote>&amp;</quote> for bitwise AND,
                 <quote>|</quote> for bitwise OR, <quote>^</quote>
                 for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice and <quote>p</quote> for
-                operation argument.
+                for string splice, <quote>!</quote> for insertion.
+                Possible operation arguments are: <quote>p</quote>.
+                Thus in the instruction <code>lua box.update(0,44,'+p=p',1,55,3,'x')</code>
+                the space number is 0, the primary-key value is 44,
+                the format is '+p=p' meaning "add a value to a field
+                and then assign a value to a field", the first affected field
+                is field 1 and the value which will be added to it is 55, the second affected field
+                is field 3 and the value which will be assigned to it is 'x'.
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 Returns the updated tuple.
                 <bridgehead renderas="sect4">Example</bridgehead>

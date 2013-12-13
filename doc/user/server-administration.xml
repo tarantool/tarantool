@@ -60,6 +60,7 @@ Option is one of the following (in alphabetical order by the long form of the op
     long form: <code>--a[dmin-port] [=] <replaceable>port-number</replaceable></code>.
     Effect: Client will look for the server on the port designated by port-number.
     Notes: This is the <quote>administrative</quote> port. The default value is 33015.
+    If --port is specified then there is no need to specify --admin-port, the client will discover it.
     </para></listitem>
   </varlistentry>
   <varlistentry>
@@ -162,6 +163,7 @@ Option is one of the following (in alphabetical order by the long form of the op
     Effect: Client will look for the server on the port designated by port-number.
     Example: <code>--port = 33013</code>
     Notes: This is the <quote>primary port</quote> also known as the <quote>read/write data</quote> port. The default value is 33013.
+    If --admin-port is specified then there is no need to specify --port, the client will discover it.
     </para></listitem>
   </varlistentry>
   <varlistentry>
@@ -315,15 +317,6 @@ a newline (line feed).
     </para></listitem>
   </varlistentry>
   <varlistentry>
-    <term xml:id="utility-tarantool-notee" xreflabel="utility-tarantool-notee">NOTEE</term>
-    <listitem><para>
-    Syntax: <code>NOTEE</code>.
-    Effect: The client ceases to write to a file, thus canceling the effect of the TEE statement.
-    Example:  <code>NOTEE</code>.
-    Notes: The client sends nothing to the server.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
     <term xml:id="utility-tarantool-ping" xreflabel="utility-tarantool-ping">PING</term>
     <listitem><para>
     Syntax: <code>PING</code>.
@@ -414,15 +407,6 @@ a newline (line feed).
     Example:  <code>SHOW INFO</code>.
     Notes: The client sends to the server's administrative port.
          SHOW INJECTIONS is only available in debug mode.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-tee" xreflabel="utility-tarantool-tee">TEE</term>
-    <listitem><para>
-    Syntax: <code>TEE <replaceable>string-literal</replaceable></code>.
-    Effect: The client begins logging in the file identified by string-literal.
-    Example:  <code>TEE '/home/tarantool_user/log.txt'</code>.
-    Notes: TEE may also be set up via an option on the command line. The client sends nothing to the server.
     </para></listitem>
   </varlistentry>
   <varlistentry>
