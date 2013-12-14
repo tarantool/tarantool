@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include "small/mempool.h"
 #include "small/slab_arena.h"
+#include "lifo.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -89,6 +90,10 @@ enum {
 	FACTOR_POOL_MAX = 256,
 };
 
+enum small_opt {
+	SMALL_DELAYED_FREE_MODE
+};
+
 /**
  * A mempool to store objects sized within one multiple of
  * alloc_factor. Is a member of the red-black tree which
@@ -140,12 +145,20 @@ struct small_alloc {
 	 */
 	factor_tree_t factor_pools;
 	/**
+	 * List of objects to be freed if delayed free mode.
+	 */
+	struct lifo delayed;
+	/**
 	 * The factor used for factored pools. Must be > 1.
 	 * Is provided during initialization.
 	 */
 	float factor;
 	/** All slabs in all mempools have the same order. */
 	uint8_t slab_order;
+	/**
+	 * If true, smfree_delayed puts items to delayed list.
+	 */
+	bool is_delayed_free_mode;
 };
 
 /** Initialize a small memory allocator. */
@@ -153,6 +166,13 @@ void
 small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 		   uint32_t objsize_min, uint32_t objsize_max,
 		   float alloc_factor);
+
+/**
+ * Enter or leave delayed mode - in delayed mode smfree_delayed()
+ * doesn't free chunks but puts them into a pool.
+ */
+void
+small_alloc_setopt(struct small_alloc *alloc, enum small_opt opt, bool val);
 
 /** Destroy the allocator and all allocated memory. */
 void
@@ -169,6 +189,15 @@ smalloc_nothrow(struct small_alloc *alloc, size_t size);
 /** Free memory chunk allocated by the small allocator. */
 void
 smfree(struct small_alloc *alloc, void *ptr);
+
+
+/**
+ * Free memory chunk allocated by the small allocator
+ * if not in snapshot mode, otherwise put to the delayed
+ * free list.
+ */
+void
+smfree_delayed(struct small_alloc *alloc, void *ptr);
 
 /**
  * @brief Return an unique index associated with a chunk allocated
@@ -194,6 +223,9 @@ smfree(struct small_alloc *alloc, void *ptr);
 size_t
 small_ptr_compress(struct small_alloc *alloc, void *ptr);
 
+/**
+ * Perform the opposite action of small_ptr_compress().
+ */
 void *
 small_ptr_decompress(struct small_alloc *alloc, size_t val);
 

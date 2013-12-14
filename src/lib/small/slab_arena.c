@@ -182,3 +182,10 @@ slab_unmap(struct slab_arena *arena, void *ptr)
 	if (ptr)
 		lf_lifo_push(&arena->cache, ptr);
 }
+
+void
+slab_arena_mprotect(struct slab_arena *arena)
+{
+	if (arena->arena)
+		mprotect(arena->arena, arena->prealloc, PROT_READ);
+}

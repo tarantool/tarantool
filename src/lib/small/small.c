@@ -146,7 +146,41 @@ small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 	alloc->factor_pool_next = alloc->factor_pool_cache;
 	factor_tree_new(&alloc->factor_pools);
 	(void) factor_pool_create(alloc, NULL, objsize_max);
+
+	alloc->is_delayed_free_mode = false;
 }
+
+void
+small_alloc_setopt(struct small_alloc *alloc, enum small_opt opt, bool val)
+{
+	switch (opt) {
+	case SMALL_DELAYED_FREE_MODE:
+		/* Delayed mode is only usable if the arena is shared. */
+		if (alloc->cache->arena->flags & MAP_SHARED)
+			alloc->is_delayed_free_mode = val;
+		break;
+	default:
+		assert(false);
+		break;
+	}
+}
+
+static inline void
+smfree_batch(struct small_alloc *alloc)
+{
+	if (alloc->is_delayed_free_mode || lifo_is_empty(&alloc->delayed))
+		return;
+
+	const int BATCH = 100;
+
+	for (int i = 0; i < BATCH; i++) {
+		void *item = lifo_pop(&alloc->delayed);
+		if (item == NULL)
+			break;
+		smfree(alloc, item);
+	}
+}
+
 
 /**
  * Allocate a small object.
@@ -165,6 +199,8 @@ small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 void *
 smalloc_nothrow(struct small_alloc *alloc, size_t size)
 {
+	smfree_batch(alloc);
+
 	struct mempool *pool;
 	if (size <= alloc->step_pool_objsize_max) {
 		/* Allocate in a stepped pool. */
@@ -224,6 +260,14 @@ smfree(struct small_alloc *alloc, void *ptr)
 		factor_tree_remove(&alloc->factor_pools, factor_pool);
 		alloc->factor_pool_next = factor_pool;
 	}
+}
+
+void
+smfree_delayed(struct small_alloc *alloc, void *ptr)
+{
+	assert(alloc->is_delayed_free_mode);
+	if (ptr)
+		lifo_push(&alloc->delayed, ptr);
 }
 
 /** Simplify iteration over small allocator mempools. */

@@ -96,21 +96,26 @@ struct slab_arena {
 	int flags;
 };
 
-/**
- * Initialize an arena.
- */
+/** Initialize an arena.  */
 void
 slab_arena_create(struct slab_arena *arena, size_t slab_size,
 		  size_t prealloc, size_t maxalloc, int flags);
 
+/** Destroy an arena. */
 void
 slab_arena_destroy(struct slab_arena *arena);
 
+/** Get a slab. */
 void *
 slab_map(struct slab_arena *arena);
 
+/** Put a slab into cache. */
 void
 slab_unmap(struct slab_arena *arena, void *ptr);
+
+/** mprotect() the preallocated arena. */
+void
+slab_arena_mprotect(struct slab_arena *arena);
 
 /** Align a size. Alignment must be a power of 2 */
 static inline size_t
