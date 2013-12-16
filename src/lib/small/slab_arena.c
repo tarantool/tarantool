@@ -35,6 +35,10 @@
 #include <assert.h>
 #include <limits.h>
 
+#if defined(__FreeBSD__)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 void
 munmap_checked(void *addr, size_t size)
 {

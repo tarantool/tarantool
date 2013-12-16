@@ -43,14 +43,14 @@ extern "C" {
 	#include <lauxlib.h>
 	#include <lualib.h>
 }
-#include <tarantool/plugin.h>
+#include <plugin.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <coeio.h>
-#include <tarantool_ev.h>
+#include "third_party/tarantool_ev.h"
 
 
 #include <lua/utils.h>

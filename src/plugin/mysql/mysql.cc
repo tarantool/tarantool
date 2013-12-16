@@ -44,7 +44,7 @@ extern "C" {
 #include <errno.h>
 #include <string.h>
 #include <coeio.h>
-#include <tarantool_ev.h>
+#include "third_party/tarantool_ev.h"
 
 
 #include <lua/utils.h>
@@ -52,7 +52,7 @@ extern "C" {
 #include <mysql.h>
 #include <scoped_guard.h>
 
-#include <tarantool/plugin.h>
+#include <plugin.h>
 
 
 /**
