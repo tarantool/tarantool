@@ -31,7 +31,7 @@
 
 #include <assert.h>
 #include "fiber.h"
-#include "rlist.h"
+#include "salad/rlist.h"
 
 /** Mutex of cooperative multitasking environment. */
 

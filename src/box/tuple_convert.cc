@@ -30,12 +30,6 @@
 #include "iobuf.h"
 #include "tbuf.h"
 
-extern "C" {
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-} /* extern "C" */
-
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {

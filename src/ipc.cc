@@ -29,7 +29,7 @@
 #include "ipc.h"
 #include "fiber.h"
 #include <stdlib.h>
-#include <rlist.h>
+#include "salad/rlist.h"
 
 struct ipc_channel {
 	struct rlist readers, writers, bcast;

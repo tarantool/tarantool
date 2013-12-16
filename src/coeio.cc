@@ -29,7 +29,6 @@
 #include "coeio.h"
 #include "fiber.h"
 #include "exception.h"
-#include <rlist.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

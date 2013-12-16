@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "rlist.h"
+#include "salad/rlist.h"
 /**
  * Type of the callback which may be invoked
  * on an event.

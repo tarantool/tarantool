@@ -1711,7 +1711,7 @@ schema_lua_init(struct lua_State *L)
 }
 
 void
-mod_lua_init(struct lua_State *L)
+box_lua_init(struct lua_State *L)
 {
 	/* box, box.tuple */
 	luaL_register_type(L, tuplelib_name, lbox_tuple_meta);

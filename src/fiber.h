@@ -42,7 +42,7 @@
 #if defined(__cplusplus)
 #include "exception.h"
 #endif /* defined(__cplusplus) */
-#include "rlist.h"
+#include "salad/rlist.h"
 
 #define FIBER_NAME_MAX REGION_NAME_MAX
 #define FIBER_READING_INBOX (1 << 0)

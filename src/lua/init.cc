@@ -340,7 +340,7 @@ tarantool_lua_init()
 			      *s, lua_tostring(L, -1));
 	}
 
-	mod_lua_init(L);
+	box_lua_init(L);
 
 	/* init after internal luas are processed */
 	tarantool_plugin_init(L);

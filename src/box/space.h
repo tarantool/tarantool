@@ -30,7 +30,7 @@
  */
 #include "index.h"
 #include "key_def.h"
-#include "rlist.h"
+#include "salad/rlist.h"
 #include <exception.h>
 
 typedef void (*space_f)(struct space *space);

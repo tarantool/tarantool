@@ -70,10 +70,8 @@ set (common_sources
      fio.c
      plugin.c
      crc32.c
-     rope.c
      tbuf.c
      opts.c
-     rlist.c
      cpu_feature.c
      lua/fiber.cc
      lua/trigger.cc
@@ -102,7 +100,7 @@ set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
 
-set (common_libraries cfg core small)
+set (common_libraries cfg core small salad)
 
 list(APPEND common_libraries
     ${LIBEV_LIBRARIES}

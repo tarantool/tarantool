@@ -39,7 +39,6 @@
 #include <tarantool_ev.h>
 #include <tarantool_eio.h>
 #include <coro.h>
-#include <rlist.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>

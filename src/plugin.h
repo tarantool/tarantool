@@ -36,7 +36,7 @@ extern "C" {
 #define PLUGIN_API_VERSION		1
 
 #include <stddef.h>
-#include "rlist.h"
+#include "salad/rlist.h"
 
 struct lua_State;
 struct tbuf;

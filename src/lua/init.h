@@ -43,12 +43,12 @@ struct tbuf;
  * No return value, panics if error.
  */
 extern void
-mod_lua_init(struct lua_State *L);
+box_lua_init(struct lua_State *L);
 
 /**
  * Create an instance of Lua interpreter and load it with
  * Tarantool modules.  Creates a Lua state, imports global
- * Tarantool modules, then calls mod_lua_init(), which performs
+ * Tarantool modules, then calls box_lua_init(), which performs
  * module-specific imports. The created state can be freed as any
  * other, with lua_close().
  *

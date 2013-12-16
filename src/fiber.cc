@@ -35,7 +35,6 @@
 #include "say.h"
 #include "stat.h"
 #include "assoc.h"
-#include "rlist.h"
 #include "memory.h"
 
 enum { FIBER_CALL_STACK = 16 };

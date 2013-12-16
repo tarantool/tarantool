@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
-#include "rlist.h"
+#include "salad/rlist.h"
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
 

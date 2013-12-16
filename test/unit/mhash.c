@@ -13,7 +13,7 @@ struct mh_i32_node_t {
 #define mh_arg_t void *
 #define mh_hash(a, arg) (a->key)
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
-#include "mhash.h"
+#include "salad/mhash.h"
 
 #define mh_name _i32_collision
 struct mh_i32_collision_node_t {
@@ -25,7 +25,7 @@ struct mh_i32_collision_node_t {
 #define mh_hash(a, arg) 42
 #define mh_eq(a, b, arg) ((a->key) == (b->key))
 
-#include "mhash.h"
+#include "salad/mhash.h"
 
 #undef MH_SOURCE
 

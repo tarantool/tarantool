@@ -32,7 +32,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <assert.h>
-#include "rlist.h"
+#include "salad/rlist.h"
 #include "slab_arena.h"
 
 #if defined(__cplusplus)

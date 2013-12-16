@@ -39,7 +39,7 @@ extern "C" {
 #include "space.h"
 #include "schema.h"
 #include <trigger.h>
-#include <rlist.h>
+#include "salad/rlist.h"
 #include <scoped_guard.h>
 #include "box_lua.h"
 #include "txn.h"
