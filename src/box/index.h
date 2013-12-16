@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "tarantool/util.h"
+#include "trivia/util.h"
 
 #include "object.h"
 #include "key_def.h"

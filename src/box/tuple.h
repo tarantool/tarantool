@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include "key_def.h" /* for enum field_type */
 #include <pickle.h>
 

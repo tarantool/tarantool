@@ -29,7 +29,7 @@
 
 #include "lua/errinj.h"
 
-#include "errinj.h"
+#include <errinj.h>
 
 extern "C" {
 #include <lua.h>

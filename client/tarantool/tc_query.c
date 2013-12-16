@@ -32,7 +32,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <include/errcode.h>
+#include "errcode.h"
 
 #if 0
 #include <connector/c/include/tarantool/tnt.h>

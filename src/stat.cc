@@ -28,7 +28,7 @@
  */
 #include "stat.h"
 
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include <tarantool_ev.h>
 #include <tbuf.h>
 #include <say.h>

@@ -36,9 +36,9 @@ extern "C" {
 #include <lualib.h>
 }
 
-#include "fiber.h"
-#include "session.h"
-#include "sio.h"
+#include <fiber.h>
+#include <session.h>
+#include <sio.h>
 
 static const char *sessionlib_name = "box.session";
 

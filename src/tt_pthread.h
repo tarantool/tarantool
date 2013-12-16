@@ -29,11 +29,11 @@
  * SUCH DAMAGE.
  */
 
-#include "tarantool/config.h"
+#include "trivia/config.h"
+#include "trivia/util.h"
 
 #include <pthread.h>
-#include "tarantool/util.h"
-#include <say.h>
+#include "say.h"
 
 /**
  * Assert on any pthread* error in debug mode. In release,

@@ -28,21 +28,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/config.h"
+#include "trivia/config.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <tarantool_ev.h>
-#include <coro.h>
-#include <tarantool/util.h>
+#include "third_party/tarantool_ev.h"
+#include "coro.h"
+#include "trivia/util.h"
 #include "third_party/queue.h"
 #include "small/region.h"
 
 #if defined(__cplusplus)
 #include "exception.h"
 #endif /* defined(__cplusplus) */
-#include <rlist.h>
+#include "rlist.h"
 
 #define FIBER_NAME_MAX REGION_NAME_MAX
 #define FIBER_READING_INBOX (1 << 0)

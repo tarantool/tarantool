@@ -30,7 +30,7 @@
  */
 #include <stdint.h>
 
-#include "tarantool/util.h"
+#include "trivia/util.h"
 
 struct errcode_record {
 	const char *errstr;
@@ -154,6 +154,5 @@ static inline const char *tnt_errcode_desc(uint32_t errcode)
 
 	return tnt_error_codes[errcode].errdesc;
 }
-
 
 #endif /* TARANTOOL_ERRCODE_H_INCLUDED */

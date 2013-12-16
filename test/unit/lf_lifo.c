@@ -1,7 +1,10 @@
 #include "small/lf_lifo.h"
-#include "tarantool/config.h"
 #include "unit.h"
 #include <sys/mman.h>
+
+#if defined(__FreeBSD__)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 static void *
 mmap_aligned(size_t size)

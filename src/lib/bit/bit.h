@@ -33,7 +33,7 @@
  * @file
  * @brief Bit manipulation library
  */
-#include "tarantool/config.h"
+#include "trivia/config.h"
 
 #include <stddef.h>
 #include <stdint.h>

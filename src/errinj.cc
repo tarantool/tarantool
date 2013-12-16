@@ -31,8 +31,8 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "tarantool/config.h"
-#include "tarantool/util.h"
+#include "trivia/config.h"
+#include "trivia/util.h"
 #include "say.h"
 #include "tbuf.h"
 #include "errinj.h"

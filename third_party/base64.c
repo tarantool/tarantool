@@ -33,7 +33,6 @@
  * http://sourceforge.net/projects/libb64
  */
 
-
 /* {{{ encode */
 
 enum base64_encodestep { step_A, step_B, step_C };

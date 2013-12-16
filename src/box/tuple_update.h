@@ -30,7 +30,7 @@
  */
 
 #include <stddef.h>
-#include "tarantool/util.h"
+#include "trivia/util.h"
 
 enum {
 	/** A limit on how many operations a single UPDATE can have. */

@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdbool.h>
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include "tarantool_ev.h"
 
 extern const uint32_t xlog_format;

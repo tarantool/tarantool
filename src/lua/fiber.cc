@@ -28,7 +28,7 @@
  */
 #include "lua/fiber.h"
 
-#include "fiber.h"
+#include <fiber.h>
 #include "lua/utils.h"
 
 extern "C" {

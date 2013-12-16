@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ERRINJ_H_INCLUDED
-#define TARANTOOL_ERRINJ_H_INCLUDED
+#ifndef TARANTOOL_H_INCLUDED
+#define TARANTOOL_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,50 +28,38 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "exception.h"
-#include "tarantool/util.h"
+#include <stdbool.h>
+#include "trivia/util.h"
 
-struct errinj {
-	const char *name;
-	bool state;
-};
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-/**
- * list of error injection handles.
- */
-#define ERRINJ_LIST(_) \
-	_(ERRINJ_TESTING, false) \
-	_(ERRINJ_WAL_IO, false) \
-	_(ERRINJ_WAL_ROTATE, false) \
-	_(ERRINJ_INDEX_ALLOC, false)
-
-ENUM0(errinj_enum, ERRINJ_LIST);
-extern struct errinj errinjs[];
-
-bool errinj_get(int id);
-
-void errinj_set(int id, bool state);
-int errinj_set_byname(char *name, bool state);
-
+struct tarantool_cfg;
 struct tbuf;
-void errinj_info(struct tbuf *out);
 
-typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
-int errinj_foreach(errinj_cb cb, void *cb_ctx);
+extern struct tarantool_cfg cfg;
+extern const char *cfg_filename;
+extern char *cfg_filename_fullpath;
+extern char *custom_proc_title;
+int reload_cfg();
+extern char status[];
+void show_cfg(struct tbuf *out);
+const char *tarantool_version(void);
+/**
+ * Get version (defined in PACKAGE_VERSION), packed into uint32_t
+ * The highest byte or result means major version, next - minor,
+ * middle - patch, last - revision.
+ */
+uint32_t tarantool_version_id(void);
 
-#ifdef NDEBUG
-#  define ERROR_INJECT(ID, CODE)
-#else
-#  define ERROR_INJECT(ID, CODE) \
-	do { \
-		if (errinj_get(ID) == true) \
-			CODE; \
-	} while (0)
-#endif
+double tarantool_uptime(void);
 
-#define ERROR_INJECT_EXCEPTION(ID) \
-	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
+void __attribute__((format (printf, 2, 3)))
+title(const char *role, const char *fmt, ...);
 
-#define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
-#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */
+#endif /* TARANTOOL_H_INCLUDED */

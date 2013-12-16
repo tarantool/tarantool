@@ -34,7 +34,7 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "tarantool/plugin.h"
+#include <plugin.h>
 #include "lua/utils.h"
 
 static int

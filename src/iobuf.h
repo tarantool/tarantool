@@ -30,7 +30,7 @@
  */
 #include <sys/uio.h>
 #include <stdbool.h>
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include "third_party/queue.h"
 #include "small/region.h"
 

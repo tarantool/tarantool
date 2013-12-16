@@ -1,4 +1,4 @@
-#include <errcode.h>
+#include "errcode.h"
 
 #define ERRCODE_RECORD_MEMBER(s, f, d) {	\
 	.errstr = #s,				\

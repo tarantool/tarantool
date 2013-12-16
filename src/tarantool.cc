@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "tarantool.h"
-#include "tarantool/config.h"
+#include "trivia/config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@
 #include <say.h>
 #include <stat.h>
 #include <limits.h>
-#include "tarantool/util.h"
+#include "trivia/util.h"
 extern "C" {
 #include <cfg/warning.h>
 #include <cfg/tarantool_box_cfg.h>

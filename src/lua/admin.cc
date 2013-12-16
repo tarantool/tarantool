@@ -34,7 +34,7 @@ extern "C" {
 #include "lualib.h"
 }
 
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include "box/box.h"
 
 static int

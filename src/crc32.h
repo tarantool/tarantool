@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
+#ifndef TARANTOOL_CRC32_H_INCLUDED
+#define TARANTOOL_CRC32_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,42 +28,25 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "tarantool/util.h"
+#include <sys/types.h>
+#include "trivia/util.h"
 
-/**
- * Check replication configuration.
- *
- * @param config  config file to check.
- *
- * @return 0 on success, -1 on error
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+typedef uint32_t (*crc32_func)(uint32_t crc, const unsigned char *buf, unsigned int len);
+
+/*
+ * Pointer to an architecture-specific implementation of
+ * CRC32 calculation method.
  */
-int
-replication_check_config(struct tarantool_cfg *config);
+extern crc32_func crc32_calc;
 
-/**
- * Pre-fork replication spawner process.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_prefork();
+void crc32_init();
 
-/**
- * Initialize replication module.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_init(const char *bind_ipaddr, int replication_port);
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
-/** Connect to a master and perform an initial handshake.
- * Raises an exception on error.
- *
- * @return A connected socket
- */
-int
-replica_connect(const char *replication_source);
-
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
-
+#endif /* TARANTOOL_CRC32_H_INCLUDED */

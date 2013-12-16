@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/config.h"
+#include "trivia/config.h"
 #include <sys/types.h>
 #include <errno.h>
 #include <stdlib.h>

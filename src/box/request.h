@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/util.h"
+#include "trivia/util.h"
 #include <stdbool.h>
 
 struct txn;

@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/config.h"
+#include "trivia/config.h"
 #include <stddef.h>
 
 #include <third_party/gopt/gopt.h>

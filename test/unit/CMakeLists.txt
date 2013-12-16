@@ -1,6 +1,9 @@
 file(GLOB all_sources *.c *.m *.mm)
 set_source_files_compile_flags(${all_sources})
 
+include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_BINARY_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 add_executable(rlist.test rlist.c test.c ${CMAKE_SOURCE_DIR}/src/rlist.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)

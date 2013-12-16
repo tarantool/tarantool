@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COEIO_H_INCLUDED
-#define TARANTOOL_COEIO_H_INCLUDED
+#ifndef TARANTOOL_REPLICATION_H_INCLUDED
+#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,36 +28,42 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include "tarantool/config.h"
-#include "tarantool/util.h"
-
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <tarantool_ev.h>
-#include <tarantool_eio.h>
-#include <coro.h>
-#include <rlist.h>
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
-#define ERESOLVE -1
+#include <tarantool.h>
+#include "trivia/util.h"
 
 /**
- * Asynchronous IO Tasks (libeio wrapper)
+ * Check replication configuration.
  *
- * Yield the current fiber until a created task is complete.
+ * @param config  config file to check.
+ *
+ * @return 0 on success, -1 on error
  */
+int
+replication_check_config(struct tarantool_cfg *config);
 
-void coeio_init(void);
-ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
+/**
+ * Pre-fork replication spawner process.
+ *
+ * @return None. Panics and exits on error.
+ */
+void
+replication_prefork();
 
-struct addrinfo *
-coeio_resolve(int socktype, const char *host, const char *port,
-              ev_tstamp timeout);
+/**
+ * Initialize replication module.
+ *
+ * @return None. Panics and exits on error.
+ */
+void
+replication_init(const char *bind_ipaddr, int replication_port);
 
-#endif /* TARANTOOL_COEIO_H_INCLUDED */
+/** Connect to a master and perform an initial handshake.
+ * Raises an exception on error.
+ *
+ * @return A connected socket
+ */
+int
+replica_connect(const char *replication_source);
+
+#endif // TARANTOOL_REPLICATION_H_INCLUDED
+

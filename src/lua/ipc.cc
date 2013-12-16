@@ -36,7 +36,7 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "ipc.h"
+#include <ipc.h>
 #include "lua/utils.h"
 
 static const char channel_lib[]   = "box.ipc.channel";

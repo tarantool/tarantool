@@ -36,11 +36,6 @@
  * provisions above, a recipient may use your version of this file under
  * either the BSD or the GPL.
  */
-
-#ifndef _WIN32
-# include "tarantool/config.h"
-#endif
-
 #include "eio.h"
 #include "ecb.h"
 

@@ -32,12 +32,12 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#include <fiber.h>
-#include <tarantool.h>
-#include <tarantool/config.h>
+#include "fiber.h"
+#include "tarantool.h"
 #include "lua/init.h"
-#include <tbuf.h>
-#include "tarantool/util.h"
+#include "tbuf.h"
+#include "trivia/config.h"
+#include "trivia/util.h"
 #include "coio_buf.h"
 
 extern "C" {

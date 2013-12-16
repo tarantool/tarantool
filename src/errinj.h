@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_CRC32_H_INCLUDED
-#define TARANTOOL_CRC32_H_INCLUDED
+#ifndef TARANTOOL_ERRINJ_H_INCLUDED
+#define TARANTOOL_ERRINJ_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,25 +28,50 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <sys/types.h>
-#include "tarantool/util.h"
+#include "exception.h"
+#include "trivia/util.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+struct errinj {
+	const char *name;
+	bool state;
+};
 
-typedef uint32_t (*crc32_func)(uint32_t crc, const unsigned char *buf, unsigned int len);
-
-/*
- * Pointer to an architecture-specific implementation of
- * CRC32 calculation method.
+/**
+ * list of error injection handles.
  */
-extern crc32_func crc32_calc;
+#define ERRINJ_LIST(_) \
+	_(ERRINJ_TESTING, false) \
+	_(ERRINJ_WAL_IO, false) \
+	_(ERRINJ_WAL_ROTATE, false) \
+	_(ERRINJ_INDEX_ALLOC, false)
 
-void crc32_init();
+ENUM0(errinj_enum, ERRINJ_LIST);
+extern struct errinj errinjs[];
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
+bool errinj_get(int id);
 
-#endif /* TARANTOOL_CRC32_H_INCLUDED */
+void errinj_set(int id, bool state);
+int errinj_set_byname(char *name, bool state);
+
+struct tbuf;
+void errinj_info(struct tbuf *out);
+
+typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
+int errinj_foreach(errinj_cb cb, void *cb_ctx);
+
+#ifdef NDEBUG
+#  define ERROR_INJECT(ID, CODE)
+#else
+#  define ERROR_INJECT(ID, CODE) \
+	do { \
+		if (errinj_get(ID) == true) \
+			CODE; \
+	} while (0)
+#endif
+
+#define ERROR_INJECT_EXCEPTION(ID) \
+	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
+
+#define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
+
+#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */

@@ -28,7 +28,7 @@
  */
 #include "coro.h"
 
-#include "tarantool/config.h"
+#include "trivia/config.h"
 #include "exception.h"
 #include <unistd.h>
 #include <string.h>

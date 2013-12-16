@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_H_INCLUDED
-#define TARANTOOL_H_INCLUDED
+#ifndef TARANTOOL_COEIO_H_INCLUDED
+#define TARANTOOL_COEIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,38 +28,36 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include "trivia/config.h"
+#include "trivia/util.h"
+
 #include <stdbool.h>
-#include "tarantool/util.h"
+#include <stdint.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <tarantool_ev.h>
+#include <tarantool_eio.h>
+#include <coro.h>
+#include <rlist.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
-struct tarantool_cfg;
-struct tbuf;
+#define ERESOLVE -1
 
-extern struct tarantool_cfg cfg;
-extern const char *cfg_filename;
-extern char *cfg_filename_fullpath;
-extern char *custom_proc_title;
-int reload_cfg();
-extern char status[];
-void show_cfg(struct tbuf *out);
-const char *tarantool_version(void);
 /**
- * Get version (defined in PACKAGE_VERSION), packed into uint32_t
- * The highest byte or result means major version, next - minor,
- * middle - patch, last - revision.
+ * Asynchronous IO Tasks (libeio wrapper)
+ *
+ * Yield the current fiber until a created task is complete.
  */
-uint32_t tarantool_version_id(void);
 
-double tarantool_uptime(void);
+void coeio_init(void);
+ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
 
-void __attribute__((format (printf, 2, 3)))
-title(const char *role, const char *fmt, ...);
+struct addrinfo *
+coeio_resolve(int socktype, const char *host, const char *port,
+              ev_tstamp timeout);
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_H_INCLUDED */
+#endif /* TARANTOOL_COEIO_H_INCLUDED */

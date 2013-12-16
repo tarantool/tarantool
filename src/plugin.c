@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tarantool/plugin.h"
+#include "plugin.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>

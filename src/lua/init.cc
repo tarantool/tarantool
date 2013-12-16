@@ -41,7 +41,7 @@ extern "C" {
 } /* extern "C" */
 
 
-#include "fiber.h"
+#include <fiber.h>
 #include "lua/fiber.h"
 #include "lua/admin.h"
 #include "lua/errinj.h"
@@ -56,7 +56,7 @@ extern "C" {
 #include "lua/msgpack.h"
 
 #include <ctype.h>
-#include "tarantool/plugin.h"
+#include <plugin.h>
 #include "small/region.h"
 
 extern "C" {
