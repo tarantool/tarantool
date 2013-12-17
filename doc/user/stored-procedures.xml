@@ -2671,6 +2671,46 @@ end
     </varlistentry>
 
 </variablelist>
+
+
+ <bridgehead renderas="sect4">Example showing use of box.socket over the Internet</bridgehead>
+ <para>
+ In this example a connection is made over the internet between the Tarantool server
+ and <link xlink:href="http://mail.ru">mail.ru</link>,
+ then an HTTP "get" message is sent, and a response is received: "HTTP/1.0 200 OK".
+ This is not a useful way to communicate with this particular site,
+ but shows that the system works.
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>lua sock = box.socket.tcp()</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput>lua type(s)</userinput>
+---
+ - userdata
+...
+<prompt>localhost&gt;</prompt> <userinput>lua sock:connect('mail.ru', 80)</userinput>
+---
+ - fd 22, aka 192.168.1.72:49488, peer of 94.100.180.199:80
+...
+<prompt>localhost&gt;</prompt> <userinput>lua sock:error()</userinput>
+---
+ - 0
+ - Success
+...
+<prompt>localhost&gt;</prompt> <userinput>lua sock:send('GET / HTTP/1.0\n\n')</userinput>
+---
+ - 16
+...
+<prompt>localhost&gt;</prompt> <userinput>lua sock:recv(17)</userinput>
+---
+ - HTTP/1.0 200 OK
+...
+ <prompt>localhost&gt;</prompt> <userinput>lua sock:close()</userinput>
+---
+...
+</programlisting>
+</para>
+
 </section>
 
 <section xml:id="sp-box-net-box">
