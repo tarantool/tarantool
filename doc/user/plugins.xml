@@ -19,7 +19,7 @@ two plugins that have already been created: the "SQL DBMS plugins" for
 MySQL and PostgreSQL.
 </para>
 
-<para>
+<para xml:id="plugin-sql-dbms-plugins">
 <bridgehead renderas="sect4">SQL DBMS Plugins</bridgehead>
 To call another DBMS from Tarantool, the essential requirements are:
 another DBMS, and Tarantool.
@@ -44,16 +44,22 @@ can work on both SQL and Tarantool inside the same Lua routine.
 </para>
 
 <para>
+The connection method is
+<code>box.net.sql.connect('mysql'|'postgresql', <replaceable>host</replaceable>, <replaceable>port</replaceable>, <replaceable>user</replaceable>, <replaceable>password</replaceable>, <replaceable>database</replaceable>)</code>.
+The methods for select/insert/etc. are the same as the ones in <olink targetptr="sp-box-net-box">the box.net library</olink>.
+</para>
+
+<para xml:id="plugin-mysql-example">
 <bridgehead renderas="sect4">MySQL Example</bridgehead>
 This example assumes that MySQL 5.5 or MySQL 5.6 has been installed
-(recent MariaDB versions should also work), and the mysqld server has
-been started on the local host 127.0.0.1.
+(recent MariaDB versions should also work).
 </para>
 
 <para>
 The example was run on a Linux machine where the base directory
 had a copy of the Tarantool source on ~/tarantool-stable, and
-a copy of MySQL on ~/mysql-5.5. The mysqld server is already running.
+a copy of MySQL on ~/mysql-5.5. The mysqld server is already running
+on the local host 127.0.0.1.
 </para>
 
 <programlisting>
@@ -93,7 +99,6 @@ Bye
 <prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
 <prompt>$ </prompt><userinput>cmake . -DWITH_MYSQL=on -DMYSQL_INCLUDE_DIR=~/mysql-5.5/include -DMYSQL_LIBRARIES=~/mysql-5.5/lib/libmysqlclient.so -DENABLE_CLIENT=true</userinput>
 ...
--- PostgreSQL client not found, box.net.sql(pg) disabled
 -- Found MySQL includes: ~/mysql-5.5/include/mysql.h
 -- Found MySQL library: ~/mysql-5.5/lib/libmysqlclient.so
 -- box.net.sql(mysql) INC=~/mysql-5.5/include
@@ -161,9 +166,133 @@ plugins:
 Call OK, 0 rows affected
 
 # Observe the result. It contains "MySQL row".
-# So this is the row that was inserted with the mysql client.
+# So this is the row that was inserted into the MySQL database.
 # And now it's been selected with the Tarantool client.
 </programlisting>
+
+<para xml:id="plugin-postgresql-example">
+<bridgehead renderas="sect4">PostgreSQL Example</bridgehead>
+This example assumes that a recent version of PostgreSQL has been installed.
+The PostgreSQL library library and include files are also necessary.
+On Ubuntu they can be installed with <programlisting><prompt>$ </prompt><userinput>sudo apt-get install libpq-dev</userinput></programlisting>
+If that works, then cmake will find the necessary files without requiring any special user input.
+However, because not all platforms are alike, for this example the assumption is
+that the user must check that the appropriate PostgreSQL files are present and
+must explicitly state where they are when building Tarantool from source.
+</para>
+
+<para>
+The example was run on a Linux machine where the base directory
+had a copy of the Tarantool source on ~/tarantool-stable, and
+a copy of PostgreSQL on /usr. The postgres server is already running
+on the local host 127.0.0.1.
+</para>
+
+<programlisting>
+# Check that the include subdirectory exists by looking for /usr/include/postgresql/libpq-fe-h.
+<prompt>$ </prompt><userinput>[ -f /usr/include/postgresql/libpq-fe.h ] &amp;&amp; echo "OK" || echo "Error"</userinput>
+OK
+
+# Check that the library subdirectory exists and has the necessary .so file.
+<prompt>$ </prompt><userinput>[ -f /usr/lib/libpq.so ] &amp;&amp; echo "OK" || echo "Error"</userinput>
+OK
+
+# Check that the psql client can connect using some factory defaults:
+# port = 5432, user = 'postgres', user password = 'postgres', database = 'postgres'.
+# These can be changed, provided one changes them in all places.
+# Insert a row in database postgres, and quit.
+<prompt>$ </prompt><userinput>~psql -h 127.0.0.1 -p 5432 -U postgres -d postgres</userinput>
+Password for user postgres: 
+psql (9.3.0, server 9.3.2)
+SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
+Type "help" for help.
+
+<prompt>postgres=#</prompt> <userinput>CREATE TABLE test (s1 INT, s2 VARCHAR(50));</userinput>
+CREATE TABLE
+<prompt>postgres=#</prompt> <userinput>INSERT INTO test VALUES (1,'PostgreSQL row');</userinput>
+INSERT 0 1
+<prompt>postgres=#</prompt> <userinput>\q</userinput>
+<prompt>$ </prompt>
+
+# Build the Tarantool server. Make certain that "cmake" gets the right
+# paths for the PostgreSQL include directory and the PostgreSQL libpq
+# library which were checked earlier.
+<prompt>$ </prompt><userinput>cd ~/tarantool-stable</userinput>
+<prompt>$ </prompt><userinput>make clean</userinput>
+<prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
+<prompt>$ </prompt><userinput>cmake . -DWITH_POSTGRESQL=on -DPostgreSQL_LIBRARY=/usr/lib/libpq.so -DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql -DENABLE_CLIENT=true</userinput>
+...
+-- Found PostgreSQL: /usr/lib/libpq.so 
+-- box.net.sql(pg): INC=/usr/include/postgresql;/usr/include/postgresql
+-- box.net.sql(pg): LIBS=pq
+...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: ~/tarantool-stable
+<prompt>$ </prompt><userinput>make</userinput>
+...
+[ 49%] Built target core
+[ 50%] Building CXX object src/plugin/pg/CMakeFiles/pg.dir/pg.cc.o
+Linking CXX shared library libpg.so
+[ 50%] Built target pg
+...
+[100%] Built target xlog
+[100%] Built target man
+<prompt>$ </prompt>
+
+# Before starting Tarantool server, tell it where the PostgreSQL plugin is.
+<prompt>$ </prompt><userinput>export TARANTOOL_PLUGIN_DIR=~/tarantool-stable/src/plugin/pg</userinput>
+<prompt>$ </prompt>
+
+# Start the Tarantool server.
+# Run it in the background but let the initial display be in the foreground.
+# So it's possible to see the message that the plugin was loaded.
+<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool_box&amp;</userinput>
+2013-12-06 13:01:51.518 [23978] 1/sched C> version 1.5.1-290-g45b93e7
+2013-12-06 13:01:51.520 [23978] 1/sched I> Loading plugin: ~/tarantool-stable/src/plugin/pg/libpg.so
+2013-12-06 13:01:51.527 [23978] 1/sched I> Plugin 'postgresql' was loaded, version: 1
+...
+2013-12-06 13:01:51.531 [23978] 1/sched C> entering event loop
+
+# Type 'Enter' and then start the Tarantool client.
+<prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
+<prompt>localhost&gt; </prompt>
+
+# Say <quote>show plugins</quote>. Since all has gone well, this is certain to work.
+<prompt>localhost&gt; </prompt> <userinput>show plugins</userinput>
+---
+plugins:
+  - { name: "postgresql", version: 1 }
+...
+
+# Create a Lua function that will connect to the PostgreSQL server,
+# retrieve one row, and display the row.
+# For explanations of the statement types used here, read the
+# Lua tutorial in the Tarantool user manual.
+<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
+<prompt>localhost&gt; </prompt><userinput>lua function postgresql_select ()</userinput>
+        <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect('pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')</userinput>
+        <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
+        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt>-&gt; </prompt><userinput>  end!</userinput>
+---
+...
+<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = ''!</userinput>
+<prompt>localhost&gt; </prompt>
+
+# Execute the Lua function.
+<prompt>localhost&gt; </prompt><userinput>CALL postgresql_select()</userinput>
+2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
+Call OK, 0 rows affected
+
+
+# Observe the result. It contains "PostgreSQL row".
+# So this is the row that was inserted into the PostgreSQL database.
+# And now it's been selected with the Tarantool client.
+</programlisting>
+
 
 </appendix>
 

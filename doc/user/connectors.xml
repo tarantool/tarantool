@@ -20,6 +20,9 @@ The Tarantool API exists so that a client program can send a request packet
 to the server, and receive a response. Here is an example of a what the client
  would send for <command>INSERT INTO t0 VALUES ('A','BB')</command>. The BNF description of the components
 is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
+ A third-party contribution written in Lua for unpacking Tarantool messages is in file 
+ <link xlink:href="https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua" xlink:title="tarantool.dis.lua">Tnt-dissector</link>.
+
 </para>
                 <informaltable frame='topbot'>
                 <tgroup cols='5' align='left' colsep='1' rowsep='1'>
@@ -347,33 +350,31 @@ catch (Exception $e) {
   <section xml:id="connector-python">
     <title>Python</title>
     <para>
-    Here is a complete Python program that inserts ['A','BB'] into space[0] via the high-level Python API.
-    To prepare, paste the code into a file named example.py and say:<code>
-    export PYTHONPATH=<replaceable>tarantool-directory</replaceable>/test/lib</code>
-    where <replaceable>tarantool-directory</replaceable>/test/lib = the directory that contains
-    the necessary file <filename>box_connection.py</filename>. This will be
-    the directory where Tarantool Python library files were placed at installation time
-    for a source download.
-
+    Here is a complete Python program that inserts [99999,'BB'] into space[0] via the high-level Python API.
+    To prepare, paste the code into a file named example.py and install tarantool-python with either
+    <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
+    or
+    <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
     Before trying to run, check that the server (tarantool_box) is running on localhost (127.0.0.1) and its primary port
     is the default (33013) and space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
     To run, say <code>python example.py</code>.
-    The program will connect to the server, send the request, and display <quote>Insert OK, 1 row affected</quote> if all went well.
-    If the row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
+    The program will connect to the server, will send the request, and will not throw an exception if all went well.
+    If the row already exists, the program will throw DatabaseException(“Duplicate key exists in unique index 0”).
     </para>
 <programlisting language="python">
 #!/usr/bin/python
-from box_connection import BoxConnection
+from tarantool import Connection
 
-c = BoxConnection("127.0.0.1", 33013)
-result = c.execute("INSERT INTO t0 VALUES ('A','BB')")
+c = Connection("127.0.0.1", 33013)
+result = c.insert(0,(99999,'BB'))
 print result
 </programlisting>
     <para>
        The example program only shows one command and does not show all that's necessary for
        good practice. For that, please see
-       <link xlink:href="https://github.com/mailru/tarantool-python"><filename>http://github.com/mailru/tarantool-python</filename></link> and
-       <link xlink:href="https://github.com/zlobspb/txtarantool"><filename>https://github.com/zlobspb/txtarantool</filename></link>.
+       <link xlink:href="http://tarantool-python.readthedocs.org/en/latest/"><filename>http://tarantool-python.readthedocs.org/en/latest/</filename></link>.
+       For an example of a Python API for <link xlink:href="https://github.com/tarantool/queue">Queue managers on Tarantool</link>, see 
+       <link xlink:href="https://github.com/tarantool/tarantool-queue-python"><filename>https://github.com/tarantool/tarantool-queue-python</filename></link>.
     </para>
   </section>
 
