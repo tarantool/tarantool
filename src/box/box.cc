@@ -49,7 +49,6 @@ extern "C" {
 #include "request.h"
 #include "txn.h"
 #include "fiber.h"
-#include "salloc.h"
 
 static void process_replica(struct port *port, struct request *request);
 static void process_ro(struct port *port, struct request *request);
@@ -59,7 +58,6 @@ box_process_func box_process_ro = process_ro;
 
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
-uint32_t snapshot_version = 0;
 
 
 /** The snapshot row metadata repeats the structure of REPLACE request. */
@@ -300,7 +298,7 @@ void
 box_free(void)
 {
 	schema_free();
-	tuple_format_free();
+	tuple_free();
 	recovery_free();
 }
 
@@ -309,7 +307,8 @@ box_init()
 {
 	title("loading", NULL);
 
-	tuple_format_init();
+	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
+		   cfg.slab_alloc_factor);
 	schema_init();
 
 	/* recovery initialization */
@@ -391,13 +390,14 @@ box_snapshot(void)
 	if (p > 0) {
 		snapshot_pid = p;
 		/* increment snapshot version */
-		snapshot_version++;
+		tuple_begin_snapshot();
 		int status = wait_for_child(p);
+		tuple_end_snapshot();
 		snapshot_pid = 0;
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
-	salloc_protect();
+	slab_arena_mprotect(&tuple_arena);
 
 	title("dumper", "%" PRIu32, getppid());
 	fiber_set_name(fiber, status);
@@ -415,9 +415,9 @@ box_snapshot(void)
 void
 box_init_storage(const char *dirname)
 {
-		struct log_dir dir = snap_dir;
-		dir.dirname = (char *) dirname;
-		init_storage(&dir, NULL);
+	struct log_dir dir = snap_dir;
+	dir.dirname = (char *) dirname;
+	init_storage(&dir, NULL);
 }
 
 void

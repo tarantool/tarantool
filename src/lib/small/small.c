@@ -262,14 +262,6 @@ smfree(struct small_alloc *alloc, void *ptr)
 	}
 }
 
-void
-smfree_delayed(struct small_alloc *alloc, void *ptr)
-{
-	assert(alloc->is_delayed_free_mode);
-	if (ptr)
-		lifo_push(&alloc->delayed, ptr);
-}
-
 /** Simplify iteration over small allocator mempools. */
 struct mempool_iterator
 {
@@ -331,6 +323,7 @@ small_stats(struct small_alloc *alloc,
 		mempool_stats(pool, &stats);
 		totals->used += stats.totals.used;
 		totals->total += stats.totals.total;
-		cb(cb_ctx, &stats);
+		if (cb(&stats, cb_ctx))
+			break;
 	}
 }

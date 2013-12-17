@@ -35,11 +35,14 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include <salloc.h>
+#include "box/tuple.h"
+#include "small/small.h"
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
+extern "C" {
+
 static int
-salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
+small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
@@ -47,50 +50,52 @@ salloc_stat_lua_cb(const struct slab_cache_stats *cstat, void *cb_ctx)
 	 * Create a Lua table for every slab class. A class is
 	 * defined by its item size.
 	 */
-	lua_pushnumber(L, cstat->item_size);
+	lua_pushnumber(L, stats->objsize);
 	lua_newtable(L);
 
 	lua_pushstring(L, "slabs");
-	luaL_pushnumber64(L, cstat->slabs);
+	luaL_pushnumber64(L, stats->slabcount);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "items");
-	luaL_pushnumber64(L, cstat->items);
+	luaL_pushnumber64(L, stats->objcount);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_used");
-	luaL_pushnumber64(L, cstat->bytes_used);
+	luaL_pushnumber64(L, stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "bytes_free");
-	luaL_pushnumber64(L, cstat->bytes_free);
+	luaL_pushnumber64(L, stats->totals.total - stats->totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "item_size");
-	luaL_pushnumber64(L, cstat->item_size);
+	luaL_pushnumber64(L, stats->objsize);
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);
 	return 0;
 }
 
+} /* extern "C" */
+
 static int
 lbox_slab_info(struct lua_State *L)
 {
-	struct slab_arena_stats astat;
+	struct small_stats totals;
 
 	lua_newtable(L);
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
-	salloc_stat(salloc_stat_lua_cb, &astat, L);
+	small_stats(&talloc, &totals, small_stats_lua_cb, L);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
-	luaL_pushnumber64(L, astat.used);
+	luaL_pushnumber64(L, totals.used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_size");
-	luaL_pushnumber64(L, astat.size);
+	luaL_pushnumber64(L, totals.total);
 	lua_settable(L, -3);
 	return 1;
 }
@@ -98,7 +103,7 @@ lbox_slab_info(struct lua_State *L)
 static int
 lbox_slab_check(struct lua_State *L __attribute__((unused)))
 {
-	slab_validate();
+	slab_cache_check(talloc.cache);
 	return 0;
 }
 

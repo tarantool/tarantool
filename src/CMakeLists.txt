@@ -48,7 +48,6 @@ set (common_sources
      coeio.cc
      iobuf.cc
      coio_buf.cc
-     salloc.cc
      pickle.cc
      coro.cc
      stat.cc

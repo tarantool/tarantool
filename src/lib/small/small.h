@@ -190,14 +190,19 @@ smalloc_nothrow(struct small_alloc *alloc, size_t size);
 void
 smfree(struct small_alloc *alloc, void *ptr);
 
-
 /**
  * Free memory chunk allocated by the small allocator
  * if not in snapshot mode, otherwise put to the delayed
  * free list.
  */
-void
-smfree_delayed(struct small_alloc *alloc, void *ptr);
+static inline void
+smfree_delayed(struct small_alloc *alloc, void *ptr)
+{
+	if (alloc->is_delayed_free_mode && ptr)
+		lifo_push(&alloc->delayed, ptr);
+	else
+		smfree(alloc, ptr);
+}
 
 /**
  * @brief Return an unique index associated with a chunk allocated
@@ -229,8 +234,8 @@ small_ptr_compress(struct small_alloc *alloc, void *ptr);
 void *
 small_ptr_decompress(struct small_alloc *alloc, size_t val);
 
-typedef void (*mempool_stats_cb)(void *cb_ctx,
-				 struct mempool_stats *stats);
+typedef int (*mempool_stats_cb)(const struct mempool_stats *stats,
+				void *cb_ctx);
 
 void
 small_stats(struct small_alloc *alloc,
@@ -242,19 +247,19 @@ small_stats(struct small_alloc *alloc,
 #include "exception.h"
 
 static inline void *
-smalloc(struct small_alloc *alloc, size_t size)
+smalloc(struct small_alloc *alloc, size_t size, const char *where)
 {
 	void *ptr = smalloc_nothrow(alloc, size);
 	if (ptr == NULL)
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  size, "small object allocator", "new slab");
+			  size, "slab allocator", where);
 	return ptr;
 }
 
 static inline void *
-smalloc0(struct small_alloc *alloc, size_t size)
+smalloc0(struct small_alloc *alloc, size_t size, const char *where)
 {
-	return memset(smalloc(alloc, size), 0, size);
+	return memset(smalloc(alloc, size, where), 0, size);
 }
 
 #endif /* defined(__cplusplus) */

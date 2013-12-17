@@ -54,7 +54,6 @@
 #include "mutex.h"
 #include <crc32.h>
 #include "memory.h"
-#include <salloc.h>
 #include <say.h>
 #include <stat.h>
 #include <limits.h>
@@ -780,10 +779,6 @@ main(int argc, char **argv)
 	replication_prefork();
 	iobuf_init_readahead(cfg.readahead);
 	coeio_init();
-	if (!salloc_init(cfg.slab_alloc_arena * (1 << 30) /* GB */,
-		    cfg.slab_alloc_minimal, cfg.slab_alloc_factor))
-		panic("can't initialize slab allocator");
-
 	signal_init();
 
 	try {

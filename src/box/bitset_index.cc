@@ -31,7 +31,6 @@
 
 #include <string.h>
 
-#include "salloc.h"
 #include "tuple.h"
 #include "exception.h"
 #include "pickle.h"
@@ -44,10 +43,10 @@ static inline size_t
 tuple_to_value(struct tuple *tuple)
 {
 	/*
-	 * @todo salloc_index_to_ptr is broken
+	 * @todo small_ptr_compress() is broken
 	 * https://github.com/tarantool/tarantool/issues/49
 	 */
-	/* size_t value = salloc_ptr_to_index(tuple); */
+	/* size_t value = small_ptr_compress(tuple); */
 	size_t value = (intptr_t) tuple >> 2;
 	assert(value_to_tuple(value) == tuple);
 	return value;

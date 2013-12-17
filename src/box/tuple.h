@@ -36,6 +36,9 @@ enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 
 struct tbuf;
 
+extern struct small_alloc talloc;
+extern struct slab_arena tuple_arena;
+
 /**
  * @brief In-memory tuple format
  */
@@ -94,7 +97,6 @@ extern struct tuple_format **tuple_formats;
  * to any space and is stored in memory.
  */
 extern struct tuple_format *tuple_format_ber;
-
 
 static inline uint32_t
 tuple_format_id(struct tuple_format *format)
@@ -448,10 +450,17 @@ tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf);
 
 /** Initialize tuple library */
 void
-tuple_format_init();
+tuple_init(float slab_alloc_arena, uint32_t slab_alloc_minimal,
+	   float alloc_factor);
 
 /** Cleanup tuple library */
 void
-tuple_format_free();
+tuple_free();
+
+void
+tuple_begin_snapshot();
+
+void
+tuple_end_snapshot();
 #endif /* TARANTOOL_BOX_TUPLE_H_INCLUDED */
 

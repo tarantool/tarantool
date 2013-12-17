@@ -28,7 +28,7 @@
  */
 #include "tuple.h"
 
-#include <salloc.h>
+#include "small/small.h"
 #include "tbuf.h"
 
 #include "key_def.h"
@@ -42,7 +42,12 @@ struct tuple_format *tuple_format_ber;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size, formats_capacity;
-extern int snapshot_pid;
+
+uint32_t snapshot_version;
+
+struct slab_arena tuple_arena;
+static struct slab_cache tuple_slab_cache;
+struct small_alloc talloc;
 
 /** Extract all available type info from keys. */
 void
@@ -241,14 +246,13 @@ tuple_init_field_map(struct tuple_format *format, struct tuple *tuple, uint32_t 
  * after the snapshot has finished, otherwise it'll write bad data
  * to the snapshot file).
  */
-extern uint32_t snapshot_version;
 
 /** Allocate a tuple */
 struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	char *ptr = (char *) salloc(total, "tuple");
+	char *ptr = (char *) smalloc(&talloc, total, "tuple");
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
@@ -273,10 +277,10 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	if (snapshot_pid == 0 || tuple->version == snapshot_version)
-		sfree(ptr);
+	if (tuple->version == snapshot_version)
+		smfree(&talloc, ptr);
 	else
-		sfree_delayed(ptr);
+		smfree_delayed(&talloc, ptr);
 }
 
 /**
@@ -520,15 +524,36 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_format_init()
+tuple_init(float arena_prealloc, uint32_t objsize_min,
+	   float alloc_factor)
 {
 	tuple_format_ber = tuple_format_new(&rlist_nil);
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_ber, 1);
+
+	int flags;
+	if (access("/proc/user_beancounters", F_OK) == 0) {
+		say_warn("Disable shared arena since running under OpenVZ "
+		    "(https://bugzilla.openvz.org/show_bug.cgi?id=2805)");
+		flags = MAP_PRIVATE;
+        } else {
+		flags = MAP_SHARED;
+	}
+	size_t slab_size = 4*1024*1024;
+	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
+
+	slab_arena_create(&tuple_arena, slab_size,
+			  prealloc, prealloc, flags);
+	slab_cache_create(&tuple_slab_cache, &tuple_arena,
+			  slab_size);
+	small_alloc_create(&talloc, &tuple_slab_cache,
+			   objsize_min,
+			   (slab_size  - mslab_sizeof())/4,
+			  alloc_factor);
 }
 
 void
-tuple_format_free()
+tuple_free()
 {
 	/* Clear recycled ids. */
 	while (recycled_format_ids != FORMAT_ID_NIL) {
@@ -542,4 +567,17 @@ tuple_format_free()
 	     format++)
 		free(*format); /* ignore the reference count. */
 	free(tuple_formats);
+}
+
+void
+tuple_begin_snapshot()
+{
+	snapshot_version++;
+	small_alloc_setopt(&talloc, SMALL_DELAYED_FREE_MODE, true);
+}
+
+void
+tuple_end_snapshot()
+{
+	small_alloc_setopt(&talloc, SMALL_DELAYED_FREE_MODE, false);
 }
