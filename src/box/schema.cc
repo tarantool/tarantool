@@ -31,7 +31,7 @@
 #include "tuple.h"
 #include "assoc.h"
 #include "lua/utils.h"
-#include "box_lua_space.h"
+#include "lua/space.h"
 #include "key_def.h"
 #include "alter.h"
 #include "scoped_guard.h"

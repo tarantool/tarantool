@@ -33,7 +33,7 @@
 #include "space.h"
 #include "schema.h"
 #include "port.h"
-#include "box_lua.h"
+#include "lua/call.h"
 #include <errinj.h>
 #include <pickle.h>
 #include <fiber.h>
@@ -287,7 +287,7 @@ request_create(struct request *request, uint32_t type, const char *data,
 			tnt_raise(IllegalParams, "can't unpack request");
 		break;
 	case CALL:
-		request->execute = box_lua_execute;
+		request->execute = box_lua_call;
 		request->flags |= (pick_u32(reqpos, reqend) &
 				   BOX_ALLOWED_REQUEST_FLAGS);
 		s = *reqpos;

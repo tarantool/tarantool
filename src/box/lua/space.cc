@@ -26,7 +26,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box_lua_space.h"
+#include "box/lua/space.h"
+#include "box/lua/tuple.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
 
@@ -36,13 +37,10 @@ extern "C" {
 	#include <lualib.h>
 } /* extern "C" */
 
-#include "space.h"
-#include "schema.h"
-#include <trigger.h>
-#include "salad/rlist.h"
-#include <scoped_guard.h>
-#include "box_lua.h"
-#include "txn.h"
+#include "box/space.h"
+#include "box/schema.h"
+#include "box/tuple.h"
+#include "box/txn.h"
 
 /**
  * Trigger function for all spaces
@@ -261,4 +259,39 @@ box_lua_space_delete(struct lua_State *L, uint32_t id)
 	lua_pushnil(L);
 	lua_rawseti(L, -2, id);
 	lua_pop(L, 2); /* box, space */
+}
+
+
+void
+box_lua_space_init(struct lua_State *L)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	lua_newtable(L);
+	lua_setfield(L, -2, "schema");
+	lua_getfield(L, -1, "schema");
+	lua_pushnumber(L, SC_SCHEMA_ID);
+	lua_setfield(L, -2, "SCHEMA_ID");
+	lua_pushnumber(L, SC_SPACE_ID);
+	lua_setfield(L, -2, "SPACE_ID");
+	lua_pushnumber(L, SC_INDEX_ID);
+	lua_setfield(L, -2, "INDEX_ID");
+	lua_pushnumber(L, SC_SYSTEM_ID_MIN);
+	lua_setfield(L, -2, "SYSTEM_ID_MIN");
+	lua_pushnumber(L, SC_SYSTEM_ID_MAX);
+	lua_setfield(L, -2, "SYSTEM_ID_MAX");
+	lua_pushnumber(L, BOX_INDEX_MAX);
+	lua_setfield(L, -2, "INDEX_MAX");
+	lua_pushnumber(L, BOX_SPACE_MAX);
+	lua_setfield(L, -2, "SPACE_MAX");
+	lua_pushnumber(L, BOX_FIELD_MAX);
+	lua_setfield(L, -2, "FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_FIELD_MAX);
+	lua_setfield(L, -2, "INDEX_FIELD_MAX");
+	lua_pushnumber(L, BOX_INDEX_PART_MAX);
+	lua_setfield(L, -2, "INDEX_PART_MAX");
+	lua_pushnumber(L, BOX_NAME_MAX);
+	lua_setfield(L, -2, "NAME_MAX");
+	lua_pushnumber(L, FORMAT_ID_MAX);
+	lua_setfield(L, -2, "FORMAT_ID_MAX");
+	lua_pop(L, 2); /* box, schema */
 }

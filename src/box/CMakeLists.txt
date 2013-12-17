@@ -33,7 +33,9 @@ tarantool_module("box"
     txn.cc
     box.cc
     ${lua_sources}
-    box_lua.cc
-    box_lua_space.cc)
+    lua/call.cc
+    lua/tuple.cc
+    lua/index.cc
+    lua/space.cc)
 
 target_link_libraries(tarantool_box bitset msgpuck)

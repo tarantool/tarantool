@@ -42,7 +42,7 @@ extern "C" {
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"
-#include "box_lua.h"
+#include "lua/call.h"
 #include "schema.h"
 #include "space.h"
 #include "port.h"

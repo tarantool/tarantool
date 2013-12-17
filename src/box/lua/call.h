@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_H
-#define INCLUDES_TARANTOOL_MOD_BOX_LUA_H
+#ifndef INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H
+#define INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +28,17 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "request.h"
 
-struct lua_State;
 struct txn;
-struct tuple;
+struct request;
+struct port;
 
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_execute(const struct request *request, struct txn *txn,
-		struct port *port);
+box_lua_call(const struct request *request, struct txn *txn,
+	     struct port *port);
 
-
-/**
- * Push tuple on lua stack
- */
-void
-lbox_pushtuple(struct lua_State *L, struct tuple *tuple);
-
-
-struct tuple *lua_istuple(struct lua_State *L, int narg);
-#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_H */
+#endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */
