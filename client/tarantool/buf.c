@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <ctype.h>
 
-#include "client/tarantool/tc_buf.h"
+#include "client/tarantool/buf.h"
 
 /* Strip trailing ws from (char*) */
 size_t strip_end_ws(char *str) {

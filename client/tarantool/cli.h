@@ -1,5 +1,5 @@
-#ifndef TC_QUERY_H_INCLUDED
-#define TC_QUERY_H_INCLUDED
+#ifndef TC_CLI_H_INCLUDED
+#define TC_CLI_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,25 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+int tc_cli(void);
+int tc_clicmdv(void);
 
-typedef int (*tc_query_admin_t)(char *r, char **e);
-
-#if 0
-typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
-
-char *tc_query_type(uint32_t type);
-
-int tc_query_printer(struct tnt_reply *r, void *ptr, char **e);
-int tc_query_foreach(tc_query_t cb, void *cba, char **e);
-int tc_query(char *q, char **e);
-#endif
-
-int tc_query_admin_printer(char *r, char **e);
-int tc_query_admin(char *q, tc_query_admin_t cb, char **e);
-
-struct tnt_reply;
-
-char *tc_query_error(char *fmt, ...);
-char *tc_query_op(struct tnt_reply *r);
-
-#endif /* TC_QUERY_H_INCLUDED */
+#endif /* TC_CLI_H_INCLUDED */

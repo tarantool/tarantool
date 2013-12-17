@@ -1,5 +1,5 @@
-#ifndef TC_OPT_H_INCLUDED
-#define TC_OPT_H_INCLUDED
+#ifndef TC_QUERY_H_INCLUDED
+#define TC_QUERY_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,52 +29,29 @@
  * SUCH DAMAGE.
  */
 
-#define TC_VERSION_MAJOR "0"
-#define TC_VERSION_MINOR "2"
+typedef int (*tc_query_t)(char *reply, size_t size, void *ctx);
 
-enum tc_opt_mode {
-	TC_OPT_USAGE,
-	TC_OPT_VERSION,
+int tc_printer(char *r, size_t size, void *ctx);
+int tc_exec(char *q, tc_query_t cb, void *ctx);
+
+static inline int
+tc_query(char *q, void *cb) {
+	return tc_exec(q, (tc_query_t)cb, NULL);
+}
+
 #if 0
-	TC_OPT_RPL,
-	TC_OPT_WAL_CAT,
-	TC_OPT_WAL_PLAY,
+typedef int (*tc_query_t)(struct tnt_reply *r, void *ptr, char **e);
+
+char *tc_query_type(uint32_t type);
+
+int tc_query_printer(struct tnt_reply *r, void *ptr, char **e);
+int tc_query_foreach(tc_query_t cb, void *cba, char **e);
+int tc_query(char *q, char **e);
+
+struct tnt_reply;
+
+char *tc_query_error(char *fmt, ...);
+char *tc_query_op(struct tnt_reply *r);
 #endif
-	TC_OPT_CMD,
-	TC_OPT_INTERACTIVE
-};
 
-struct tc_opt {
-	enum tc_opt_mode mode;
-	const char *host;
-	int port;
-	int port_admin;
-	uint64_t lsn;
-	uint64_t lsn_from;
-	int lsn_from_set;
-	uint64_t lsn_to;
-	int lsn_to_set;
-	int space;
-	int space_set;
-	const char *format;
-	int raw;
-	int raw_with_headers;
-	int str_instead_int;
-	void *xlog_printer;
-	void *snap_printer;
-	const char *file;
-	char **cmdv;
-	int cmdc;
-	char **envp;
-	const char *delim;
-	size_t delim_len;
-	const char *pager;
-};
-
-void tc_opt_usage(void);
-void tc_opt_version(void);
-
-enum tc_opt_mode
-tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp);
-
-#endif /* TC_OPT_H_INCLUDED */
+#endif /* TC_QUERY_H_INCLUDED */

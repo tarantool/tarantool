@@ -26,17 +26,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
+#include <lib/tarantool.h>
 
 #include <third_party/gopt/gopt.h>
 
-#include "client/tarantool/tc_opt.h"
-
-
-#define TC_DEFAULT_HOST "localhost"
+#include <client/tarantool/opt.h>
+#include <client/tarantool/main.h>
 
 /* supported cli options */
 static const void *tc_options_def = gopt_start(
@@ -47,12 +42,13 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("port"), " <port number>", "server port"),
 #endif
 	gopt_option('a', GOPT_ARG, gopt_shorts('a'),
-		    gopt_longs("admin-port"), " <port number>", "server admin port"),
-#if 0
+		    gopt_longs("admin-port"), " <port number>", "server admin console port"),
 	gopt_option('C', GOPT_ARG, gopt_shorts('C'),
 		    gopt_longs("cat"), " <file name>", "print xlog or snapshot file content"),
+#if 0
 	gopt_option('P', GOPT_ARG, gopt_shorts('P'),
 		    gopt_longs("play"), " <file name>", "replay xlog file to the specified server"),
+#endif
 	gopt_option('S', GOPT_ARG, gopt_shorts('S'),
 		    gopt_longs("space"), " <space number>", "filter by space number"),
 	gopt_option('F', GOPT_ARG, gopt_shorts('F'),
@@ -61,6 +57,7 @@ static const void *tc_options_def = gopt_start(
 		    gopt_longs("to"), " <log serial number>", "stop on specified xlog lsn"),
 	gopt_option('M', GOPT_ARG, gopt_shorts('M'),
 		    gopt_longs("format"), " <name>", "cat output format (tarantool, raw)"),
+#if 0
 	gopt_option('H', 0, gopt_shorts('H'),
 		    gopt_longs("header"), NULL, "add file headers for the raw output"),
 	gopt_option('R', GOPT_ARG, gopt_shorts('R'),
@@ -68,12 +65,12 @@ static const void *tc_options_def = gopt_start(
 	gopt_option('B', 0, gopt_shorts('B'),
 		    gopt_longs("bin"), NULL, "print STR in lua printer instead"
 		    " of NUM32 and NUM64, except arithmetic update arguments"),
+#endif
 	gopt_option('D', GOPT_ARG, gopt_shorts('D'),
 		    gopt_longs("delim"), " <delim>",
 		    "if you use --cat, then it will add delim to an end of every line of your "
 		    "Lua file, when used at CLI start of client, then it's replacement of "
 		    "setopt delim='<delim>' command"),
-#endif
 	gopt_option('?', 0, gopt_shorts('?'), gopt_longs("help"),
 		    NULL, "display this help and exit"),
 	gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
@@ -96,7 +93,8 @@ void tc_opt_version(void)
 	exit(0);
 }
 
-enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
+enum tc_opt_mode
+tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp)
 {
 	/* usage */
 	void *tc_options = gopt_sort(&argc, (const char**)argv, tc_options_def);
@@ -116,19 +114,16 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **e
 	if (opt->host == NULL)
 		opt->host = TC_DEFAULT_HOST;
 
-#if 0
 	/* server port */
 	const char *arg = NULL;
-	opt->port = 0;
+	opt->port = TC_DEFAULT_PORT;
 	if (gopt_arg(tc_options, 'p', &arg))
 		opt->port = atoi(arg);
-#endif
 
-	const char *arg = NULL;
-	/* server admin port */
-	opt->port_admin = 0;
+	/* server admin console port */
+	opt->port_console = TC_DEFAULT_ADMIN_PORT;
 	if (gopt_arg(tc_options, 'a', &arg))
-		opt->port_admin = atoi(arg);
+		opt->port_console = atoi(arg);
 
 #if 0
 	/* space */
@@ -169,13 +164,13 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **e
 		opt->str_instead_int = 1;
 #endif
 
-#if 0
 	/* set delimiter on start */
-	opt->delim = "";
+	opt->delim = NULL;
 	opt->delim_len = 0;
-	if (gopt_arg(tc_options, 'D', &opt->delim))
+	if (gopt_arg(tc_options, 'D', (const char**)&opt->delim))
 		opt->delim_len = strlen(opt->delim);
 
+#if 0
 	/* replica mode */
 	if (gopt_arg(tc_options, 'R', &arg)) {
 		opt->mode = TC_OPT_RPL;
@@ -206,7 +201,12 @@ enum tc_opt_mode tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **e
 	} else {
 		opt->mode = TC_OPT_INTERACTIVE;
 	}
-	opt->pager = getenv("PAGER");
+
+	char *pager = getenv("PAGER");
+	if (pager)
+		opt->pager = tc_strdup(pager);
+	else
+		opt->pager = NULL;
 	opt->envp  = envp;
 done:
 	gopt_free(tc_options);

@@ -13,3 +13,6 @@
 [submodule "src/lib/msgpuck"]
 	path = src/lib/msgpuck
 	url = https://github.com/tarantool/msgpuck.git
+[submodule "connector/c/tb"]
+	path = connector/c/tb
+	url = https://github.com/tarantool/tarantool-c

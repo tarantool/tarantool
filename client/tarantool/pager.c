@@ -1,3 +1,4 @@
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -25,30 +26,62 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-#define TC_BUF_INIT_SIZE 4096
-#define TC_BUF_MULTIPLIER 2
+*/
 
-size_t strip_end_ws(char *str);
+#include <lib/tarantool.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
-struct tc_buf {
-	size_t size;
-	size_t used;
-	char *data;
-};
+#include "client/tarantool/opt.h"
+#include "client/tarantool/main.h"
+#include "client/tarantool/pager.h"
 
-int tc_buf(struct tc_buf *buf);
-void *tc_buf_realloc(void *data, size_t size);
-int tc_buf_append(struct tc_buf *buf, void *str, size_t len);
-size_t tc_buf_delete(struct tc_buf *buf, size_t num);
-int tc_buf_isempty(struct tc_buf *buf);
-void tc_buf_clear(struct tc_buf *buf);
-void tc_buf_free(struct tc_buf *buf);
+extern struct tarantool_client tc;
 
-int tc_buf_str(struct tc_buf *buf);
-int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len);
-size_t tc_buf_str_delete(struct tc_buf *buf, size_t num);
-int tc_buf_str_stripws(struct tc_buf *buf);
-int tc_buf_str_isempty(struct tc_buf *buf);
+void tc_pager_start()
+{
+	if (tc.pager_pid != 0)
+		tc_pager_kill();
+	if (tc.opt.pager == NULL) {
+		tc.pager_fd = fileno(stdout);
+		return;
+	}
+	int pipefd[2];
+	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
+	if (pipe(pipefd) < 0)
+		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
 
-void tc_buf_cmdfy(struct tc_buf *buf, size_t num);
+	pid_t pid = fork();
+	if (pid < 0) {
+		tc_error("Failed to fork. Errno: %s", strerror(errno));
+	} else if (pid == 0) {
+		close(pipefd[1]);
+		dup2(pipefd[0], STDIN_FILENO);
+		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
+		tc_error("Can't start pager! Errno: %s", strerror(errno));
+	} else {
+		close(pipefd[0]);
+		tc.pager_fd = pipefd[1];
+		tc.pager_pid = pid;
+	}
+}
+
+void tc_pager_stop()
+{
+	if (tc.pager_pid != 0) {
+		close(tc.pager_fd);
+		tc.pager_fd = fileno(stdout);
+		waitpid(tc.pager_pid, NULL, 0);
+		tc.pager_pid = 0;
+	}
+}
+
+void tc_pager_kill()
+{
+	if (tc.pager_pid != 0) {
+		kill(tc.pager_pid, SIGTERM);
+		tc_pager_stop();
+	}
+}

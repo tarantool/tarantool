@@ -348,7 +348,7 @@ include (cmake/rpm.cmake)
 
 add_subdirectory(cfg)
 # Disable connector_c for 1.6
-# add_subdirectory(connector)
+add_subdirectory(connector)
 add_subdirectory(src)
 add_subdirectory(extra)
 add_subdirectory(client)

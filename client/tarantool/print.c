@@ -25,34 +25,21 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <string.h>
+*/
+
+#include <lib/tarantool.h>
 #include <ctype.h>
 #include <wctype.h>
-
 #include <unistd.h>
 #include <errno.h>
 
-#if 0
-#include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
-#endif
+#include <client/tarantool/opt.h>
+#include <client/tarantool/main.h>
+#include <client/tarantool/print.h>
+#include <client/tarantool/query.h>
 
-#include "client/tarantool/tc_opt.h"
-#include "client/tarantool/tc_admin.h"
-#include "client/tarantool/tc.h"
-#include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_query.h"
+extern struct tarantool_client tc;
 
-extern struct tc tc;
-
-/*##################### Base printing functions #####################*/
 void tc_print_buf(char *buf, size_t size) {
 	printf("%-.*s", (int)size, buf);
 	fflush(stdout);

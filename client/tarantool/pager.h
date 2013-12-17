@@ -1,5 +1,5 @@
-#ifndef TC_CLI_H_INCLUDED
-#define TC_CLI_H_INCLUDED
+#ifndef TC_PAGER_H_INCLUDED
+#define TC_PAGER_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,8 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-int tc_cli_cmdv(void);
-int tc_cli(void);
-int tc_cli_motd(void);
 
-#endif /* TC_CLI_H_INCLUDED */
+void tc_pager_start();
+void tc_pager_stop();
+void tc_pager_kill();
+
+#endif /* TC_PAGER_H_INCLUDED */

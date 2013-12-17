@@ -1,5 +1,5 @@
-#ifndef TC_ADMIN_H_INCLUDED
-#define TC_ADMIN_H_INCLUDED
+#ifndef TC_OPT_H_INCLUDED
+#define TC_OPT_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,18 +29,49 @@
  * SUCH DAMAGE.
  */
 
-struct tc_admin {
-	const char *host;
-	int port;
-	int fd;
+enum tc_opt_mode {
+	TC_OPT_USAGE,
+	TC_OPT_VERSION,
+	TC_OPT_WAL_CAT,
+#if 0
+	TC_OPT_RPL,
+	TC_OPT_WAL_PLAY,
+#endif
+	TC_OPT_CMD,
+	TC_OPT_INTERACTIVE
 };
 
-int tc_admin_connect(struct tc_admin *a, const char *host, int port);
-int tc_admin_reconnect(struct tc_admin *a);
+struct tc_opt {
+	enum tc_opt_mode mode;
+	const char *host;
+	int port;
+	int port_console;
+	uint64_t lsn;
+	uint64_t lsn_from;
+	int lsn_from_set;
+	uint64_t lsn_to;
+	int lsn_to_set;
+	int space;
+	int space_set;
+	const char *format;
+	int raw;
+	int raw_with_headers;
+	int str_instead_int;
+	void *xlog_printer;
+	void *snap_printer;
+	const char *file;
+	char **cmdv;
+	int cmdc;
+	char **envp;
+	char *delim;
+	size_t delim_len;
+	char *pager;
+};
 
-void tc_admin_close(struct tc_admin *a);
+void tc_opt_usage(void);
+void tc_opt_version(void);
 
-int tc_admin_query(struct tc_admin *a, char *q);
-int tc_admin_reply(struct tc_admin *a, char **r, size_t *size);
+enum tc_opt_mode
+tc_opt_init(struct tc_opt *opt, int argc, char **argv, char **envp);
 
-#endif /* TC_ADMIN_H_INCLUDED */
+#endif /* TC_OPT_H_INCLUDED */

@@ -26,32 +26,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <stdint.h>
 
-#include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_sql.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_snapshot.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
+#include <lib/tarantool.h>
 
-#include "client/tarantool/tc_opt.h"
-#include "client/tarantool/tc_admin.h"
-#include "client/tarantool/tc.h"
-#include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_print_xlog.h"
-#include "client/tarantool/tc_print_snap.h"
-#include "client/tarantool/tc_query.h"
-#include "client/tarantool/tc_store.h"
+#include <client/tarantool/opt.h>
+#include <client/tarantool/main.h>
+#include <client/tarantool/print.h>
+#include <client/tarantool/query.h>
+#include <client/tarantool/store.h>
 
-extern struct tc tc;
+struct tarantool_client tc;
 
-typedef int (*tc_iter_t)(struct tnt_iter *i);
+typedef int (*tc_iter_t)(struct tbfile *f);
 
 static int tc_store_error(char *fmt, ...) {
 	char msg[256];
@@ -63,126 +49,64 @@ static int tc_store_error(char *fmt, ...) {
 	return -1;
 }
 
-static int tc_store_foreach(struct tnt_iter *i, tc_iter_t cb) {
-	while (tnt_next(i)) {
-		if (cb(i) == -1) {
-			tnt_iter_free(i);
+static int tc_store_foreach(struct tbfile *f, tc_iter_t cb)
+{
+	int rc;
+	while ((rc = tb_filenext(f)) > 0) {
+		if (cb(f) == -1)
 			return -1;
-		}
 	}
-	int rc = 0;
-	if (i->status == TNT_ITER_FAIL)
-		rc = tc_store_error("parsing failed");
+	if (rc < 0)
+		tc_store_error("parsing error: %s", tb_fileerror(f, rc));
 	return rc;
 }
 
-static void tc_store_print(struct tnt_log_header_v11 *hdr,
-		         struct tnt_request *r)
+static int
+tc_store_foreach_xlog(tc_iter_t cb)
 {
-	tc_printf("%s lsn: %"PRIu64", time: %f, len: %"PRIu32"\n",
-		  tc_query_type(r->h.type),
-		  hdr->lsn,
-		  hdr->tm,
-		  hdr->len);
-	switch (r->h.type) {
-	case TNT_OP_INSERT:
-		tc_print_tuple(&r->r.insert.t);
-		break;
-	case TNT_OP_DELETE:
-		tc_print_tuple(&r->r.del.t);
-		break;
-	case TNT_OP_DELETE_1_3:
-		tc_print_tuple(&r->r.del_1_3.t);
-		break;
-	case TNT_OP_UPDATE:
-		tc_print_tuple(&r->r.update.t);
-		break;
-	case TNT_OP_CALL:
-		tc_print_tuple(&r->r.call.t);
-		break;
-	}
+	struct tbfile f;
+	int rc = tb_fileopen(&f, (char*)tc.opt.file);
+	if (rc < 0)
+		return 1;
+	rc = tc_store_foreach(&f, cb);
+	tb_fileclose(&f);
+	return rc;
 }
 
-static int tc_store_check_skip(struct tnt_iter *i, struct tnt_request *r) {
-	struct tnt_stream_xlog *s =
-		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
+static int
+tc_store_check_skip(struct tbfile *f)
+{
+#if 0
 	if (tc.opt.space_set) {
-		if (r->h.type == TNT_OP_CALL)
+		if (f->h.type == TNT_OP_CALL)
 			return 1;
 		uint32_t ns = *(uint32_t*)&r->r;
 		if (ns != tc.opt.space)
 			return 1;
 	}
+#endif
 	if (tc.opt.lsn_from_set) {
-		if (s->log.current.hdr.lsn < tc.opt.lsn_from)
+		if (f->h.lsn < tc.opt.lsn_from)
 			return 1;
 	}
 	if (tc.opt.lsn_to_set) {
-		if (s->log.current.hdr.lsn > tc.opt.lsn_to)
+		if (f->h.lsn > tc.opt.lsn_to)
 			return 1;
 	}
 	return 0;
 }
 
-static int tc_store_xlog_printer(struct tnt_iter *i) {
-	struct tnt_request *r = TNT_IREQUEST_PTR(i);
-	if (tc_store_check_skip(i, r))
+static int tc_store_xlog_printer(struct tbfile *f)
+{
+	if (tc_store_check_skip(f))
 		return 0;
-	struct tnt_stream_xlog *s =
-		TNT_SXLOG_CAST(TNT_IREQUEST_STREAM(i));
-	((tc_printerf_xlog_t)tc.opt.xlog_printer)(&s->log.current, r);
+	/*((tc_printerf_xlog_t)tc.opt.xlog_printer)(&s->log.current, r);*/
 	return 0;
-}
-
-static int tc_store_snap_printer(struct tnt_iter *i) {
-	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
-	struct tnt_stream_snapshot *ss =
-		TNT_SSNAPSHOT_CAST(TNT_ISTORAGE_STREAM(i));
-	if (tc.opt.space_set) {
-		if (ss->log.current.row_snap.space != tc.opt.space)
-			return 0;
-	}
-	((tc_printerf_snap_t)tc.opt.snap_printer)(&ss->log.current, tu);
-	return 0;
-}
-
-static int tc_store_foreach_request(struct tnt_stream *s, tc_iter_t cb) {
-	struct tnt_iter i;
-	tnt_iter_request(&i, s);
-	int rc = tc_store_foreach(&i, cb);
-	tnt_iter_free(&i);
-	return rc;
-}
-
-static int tc_store_foreach_xlog(tc_iter_t cb) {
-	struct tnt_stream s;
-	tnt_xlog(&s);
-	if (tnt_xlog_open(&s, (char*)tc.opt.file) == -1) {
-		tnt_stream_free(&s);
-		return 1;
-	}
-	int rc = tc_store_foreach_request(&s, cb);
-	tnt_stream_free(&s);
-	return rc;
-}
-
-static int tc_store_foreach_snap(tc_iter_t cb) {
-	struct tnt_stream s;
-	tnt_snapshot(&s);
-	if (tnt_snapshot_open(&s, (char*)tc.opt.file) == -1) {
-		tnt_stream_free(&s);
-		return 1;
-	}
-	struct tnt_iter i;
-	tnt_iter_storage(&i, &s);
-	int rc = tc_store_foreach(&i, cb);
-	tnt_iter_free(&i);
-	tnt_stream_free(&s);
-	return rc;
 }
 
 int tc_store_cat(void)
 {
+#if 0
 	enum tnt_log_type type = tnt_log_guess((char*)tc.opt.file);
 	if (type == TNT_LOG_NONE)
 		return 1;
@@ -194,27 +118,20 @@ int tc_store_cat(void)
 		fputs(TNT_LOG_VERSION, stdout);
 		fputs("\n", stdout);
 	}
-	int rc;
+#endif
 
-	switch (type) {
-	case TNT_LOG_SNAPSHOT:
-		rc = tc_store_foreach_snap(tc_store_snap_printer);
-		break;
-	case TNT_LOG_XLOG:
-		rc = tc_store_foreach_xlog(tc_store_xlog_printer);
-		break;
-	case TNT_LOG_NONE:
-		rc = 1;
-		break;
-	default:
-		return -1;
-	}
+	int rc = tc_store_foreach_xlog(tc_store_xlog_printer);
+
+#if 0
 	if (rc == 0 && print_headers) {
 		fwrite(&tnt_log_marker_eof_v11,
 		       sizeof(tnt_log_marker_eof_v11), 1, stdout);
-	}
+#endif
+
 	return rc;
 }
+
+#if 0
 static int
 tc_store_snap_resender(struct tnt_iter *i) {
 	struct tnt_tuple *tu = TNT_ISTORAGE_TUPLE(i);
@@ -304,3 +221,4 @@ done:
 	tnt_stream_free(&s);
 	return rc;
 }
+#endif

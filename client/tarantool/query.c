@@ -1,3 +1,4 @@
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -25,31 +26,44 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-#include <stdint.h>
+*/
+
+#include <lib/tarantool.h>
 
 #include "errcode.h"
+#include <client/tarantool/opt.h>
+#include <client/tarantool/main.h>
+#include <client/tarantool/print.h>
+#include <client/tarantool/query.h>
+
+extern struct tarantool_client tc;
+
+int tc_printer(char *reply, size_t size, void *ctx)
+{
+	(void)ctx;
+	(void)size;
+	tc_printf("%s", reply);
+	return 0;
+}
+
+int tc_exec(char *q, tc_query_t cb, void *ctx)
+{
+	int rc = tb_conwrite(&tc.console, q, strlen(q));
+	if (rc == -1)
+		return -1;
+	size_t size;
+	char *reply;
+	rc = tb_conread(&tc.console, &reply, &size);
+	if (rc == -1)
+		return -1;
+	rc = 0;
+	if (cb && reply)
+		rc = cb(reply, size, ctx);
+	free(reply);
+	return rc;
+}
 
 #if 0
-#include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_sql.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
-#endif
-
-#include "client/tarantool/tc_opt.h"
-#include "client/tarantool/tc_admin.h"
-#include "client/tarantool/tc.h"
-#include "client/tarantool/tc_print.h"
-#include "client/tarantool/tc_query.h"
-
-extern struct tc tc;
-
 char *tc_query_error(char *fmt, ...) {
 	char msg[256];
 	va_list args;
@@ -62,7 +76,6 @@ char *tc_query_error(char *fmt, ...) {
 	return ptr;
 }
 
-#if 0
 char *tc_query_type(uint32_t type) {
 	switch (type) {
 	case TNT_OP_PING:   return "Ping";
@@ -134,32 +147,3 @@ int tc_query(char *q, char **e) {
 }
 #endif
 
-int tc_query_admin_printer(char *r, char **e) {
-	(void)e;
-	tc_printf("%s", r);
-	return 0;
-}
-
-int tc_query_admin(char *q, tc_query_admin_t cb, char **e)
-{
-	if (tc_admin_query(&tc.admin, q) == -1) {
-		*e = tc_query_error("failed to send admin query");
-		return -1;
-	}
-	if (cb == NULL)
-		return 0;
-	char *reply = NULL;
-	size_t reply_size = 0;
-	if (tc_admin_reply(&tc.admin, &reply, &reply_size) == -1) {
-		*e = tc_query_error("failed to recv admin reply");
-		return -1;
-	}
-	if (cb && reply) {
-		if (cb(reply, e) == -1) {
-			free(reply);
-			return -1;
-		}
-	}
-	free(reply);
-	return 0;
-}

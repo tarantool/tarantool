@@ -1,5 +1,3 @@
-#ifndef TC_PAGER_H_INCLUDED
-#define TC_PAGER_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,7 +27,29 @@
  * SUCH DAMAGE.
  */
 
-void tc_pager_start();
-void tc_pager_stop();
-void tc_pager_kill();
-#endif /* TC_PAGER_H_INCLUDED */
+#define TC_BUF_INIT_SIZE 4096
+#define TC_BUF_MULTIPLIER 2
+
+size_t strip_end_ws(char *str);
+
+struct tc_buf {
+	size_t size;
+	size_t used;
+	char *data;
+};
+
+int tc_buf(struct tc_buf *buf);
+void *tc_buf_realloc(void *data, size_t size);
+int tc_buf_append(struct tc_buf *buf, void *str, size_t len);
+size_t tc_buf_delete(struct tc_buf *buf, size_t num);
+int tc_buf_isempty(struct tc_buf *buf);
+void tc_buf_clear(struct tc_buf *buf);
+void tc_buf_free(struct tc_buf *buf);
+
+int tc_buf_str(struct tc_buf *buf);
+int tc_buf_str_append(struct tc_buf *buf, char *str, size_t len);
+size_t tc_buf_str_delete(struct tc_buf *buf, size_t num);
+int tc_buf_str_stripws(struct tc_buf *buf);
+int tc_buf_str_isempty(struct tc_buf *buf);
+
+void tc_buf_cmdfy(struct tc_buf *buf, size_t num);
