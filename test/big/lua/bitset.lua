@@ -2,37 +2,39 @@ local SPACE_NO = 0
 local INDEX_NO = 1
 
 function create_space()
-    box.insert(box.schema.SPACE_ID, SPACE_NO, 0, 'tweedledum')
-    box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-    box.insert(box.schema.INDEX_ID, 0, INDEX_NO, 'bitset', 'bitset', 0, 1, 1, 'num')
+    local space = box.schema.create_space('tweedledum')
+    space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
+    space:create_index('bitset', 'bitset', {parts = {1, 'num'}, unique = false })
 end
 
 function fill(...)
+    local space = box.space['tweedledum']
 	local nums = table.generate(arithmetic(...));
 	table.shuffle(nums);
 	for _k, v in ipairs(nums) do
-		box.insert(SPACE_NO, v, v);
+		space:insert(v, v);
 	end
 end
 
 function delete(...)
+    local space = box.space['tweedledum']
 	local nums = table.generate(arithmetic(...));
 	table.shuffle(nums);
 	for _k, v in ipairs(nums) do
-		box.delete(SPACE_NO, v);
+		space:delete(v);
 	end
 end
 
 function clear()
-	box.space[SPACE_NO]:truncate()
+    box.space['tweedledum']:truncate()
 end
 
 function drop_space()
-	box.space[SPACE_NO]:drop()
+    box.space['tweedledum']:drop()
 end
 
 function dump(...)
-	return iterate(SPACE_NO, INDEX_NO, 1, 2, ...);
+	return iterate('tweedledum', 'bitset', 1, 2, ...);
 end
 
 function test_insert_delete(n)

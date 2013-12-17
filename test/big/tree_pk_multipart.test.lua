@@ -1,11 +1,9 @@
 --
 -- Insert test
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 3, 0, 'str', 1, 'str', 2, 'num')
-
-space = box.space[0]
+space:create_index('primary', 'tree', {parts = {0, 'str', 1, 'str', 2, 'num'}, unique = true })
 
 space:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
 space:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
@@ -34,42 +32,42 @@ space:insert('Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time 
 --
 
 -- Select by one entry
-space:select(0, 'Vincent', 'Jules', 0)
-space:select(0, 'Jules', 'Vincent', 0)
-space:select(0, 'Vincent', 'Jules', 1)
-space:select(0, 'Jules', 'Vincent', 1)
-space:select(0, 'Vincent', 'Jules', 2)
-space:select(0, 'Jules', 'Vincent', 2)
-space:select(0, 'Vincent', 'Jules', 3)
-space:select(0, 'Jules', 'Vincent', 3)
-space:select(0, 'Vincent', 'Jules', 4)
-space:select(0, 'Jules', 'Vincent', 4)
-space:select(0, 'Vincent', 'Jules', 5)
-space:select(0, 'Jules', 'Vincent', 5)
-space:select(0, 'Vincent', 'Jules', 6)
+space.index['primary']:select('Vincent', 'Jules', 0)
+space.index['primary']:select('Jules', 'Vincent', 0)
+space.index['primary']:select('Vincent', 'Jules', 1)
+space.index['primary']:select('Jules', 'Vincent', 1)
+space.index['primary']:select('Vincent', 'Jules', 2)
+space.index['primary']:select('Jules', 'Vincent', 2)
+space.index['primary']:select('Vincent', 'Jules', 3)
+space.index['primary']:select('Jules', 'Vincent', 3)
+space.index['primary']:select('Vincent', 'Jules', 4)
+space.index['primary']:select('Jules', 'Vincent', 4)
+space.index['primary']:select('Vincent', 'Jules', 5)
+space.index['primary']:select('Jules', 'Vincent', 5)
+space.index['primary']:select('Vincent', 'Jules', 6)
 
-space:select(0, 'The Wolf!', 'Vincent', 0)
-space:select(0, 'Vincent', 'The Wolf!', 0)
-space:select(0, 'The Wolf!', 'Vincent', 1)
-space:select(0, 'Vincent', 'The Wolf!', 1)
-space:select(0, 'The Wolf!', 'Vincent', 2)
-space:select(0, 'The Wolf!', 'Vincent', 3)
-space:select(0, 'Vincent', 'The Wolf!', 2)
+space.index['primary']:select('The Wolf!', 'Vincent', 0)
+space.index['primary']:select('Vincent', 'The Wolf!', 0)
+space.index['primary']:select('The Wolf!', 'Vincent', 1)
+space.index['primary']:select('Vincent', 'The Wolf!', 1)
+space.index['primary']:select('The Wolf!', 'Vincent', 2)
+space.index['primary']:select('The Wolf!', 'Vincent', 3)
+space.index['primary']:select('Vincent', 'The Wolf!', 2)
 
 -- Select all messages from Vincent to Jules
-space:select(0, 'Vincent', 'Jules')
+space.index['primary']:select('Vincent', 'Jules')
 
 -- Select all messages from Jules to Vincent
-space:select(0, 'Jules', 'Vincent')
+space.index['primary']:select('Jules', 'Vincent')
 
 -- Select all messages from Vincent to The Wolf
-space:select(0, 'Vincent', 'The Wolf!')
+space.index['primary']:select('Vincent', 'The Wolf!')
 
 -- Select all messages from The Wolf to Vincent
-space:select(0, 'The Wolf!', 'Vincent')
+space.index['primary']:select('The Wolf!', 'Vincent')
 
 -- Select all Vincent messages
-space:select(0, 'Vincent')
+space.index['primary']:select('Vincent')
 
 --
 -- Delete test
@@ -83,9 +81,9 @@ space:delete('Vincent', 'The Wolf!', 0)
 space:update({'Vincent', 'The Wolf!', 1}, '=p=p', 0, 'Updated', 4, 'New')
 space:update({'Updated', 'The Wolf!', 1}, '=p#p', 0, 'Vincent', 4, 1)
 -- Checking Vincent's last messages
-space:select(0, 'Vincent', 'The Wolf!')
+space.index['primary']:select('Vincent', 'The Wolf!')
 -- Checking The Wolf's last messages
-space:select(0, 'The Wolf!', 'Vincent')
+space.index['primary']:select('The Wolf!', 'Vincent')
 
 -- try to delete nonexistent message
 space:delete('Vincent', 'The Wolf!', 3)
@@ -101,9 +99,9 @@ space:update({'The Wolf!', 'Vincent', 1}, '=p', 3, '<ooops>')
 space:update({'Vincent', 'The Wolf!', 1}, '=p', 3, '<ooops>')
 
 -- Checking Vincent's last messages
-space:select(0, 'Vincent', 'The Wolf!')
+space.index['primary']:select('Vincent', 'The Wolf!')
 -- Checking The Wolf's last messages
-space:select(0, 'The Wolf!', 'Vincent')
+space.index['primary']:select('The Wolf!', 'Vincent')
 
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 3}, '=p', 3, '<ooops>')
@@ -118,9 +116,9 @@ space:len()
 -- A test case for Bug#1051006 Tree iterators return garbage
 --if an index is modified between calls
 --
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
-box.replace(box.schema.INDEX_ID, 0, 1, 'second', 'tree', 1, 2, 1, 'str', 2, 'str')
-space = box.space[0]
+space.index['primary']:drop()
+space:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
+space:create_index('second', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
 
 space:insert('a', 'a', 'a')
 space:insert('d', 'd', 'd')
@@ -131,7 +129,7 @@ space:insert('c', 'c', 'c')
 t = {}
 --# setopt delimiter ';'
 for i = 1, 2 do
-    k,v = space.index[1]:next(k)
+    k,v = space.index['second']:next(k)
     table.insert(t, v)
 end;
 --# setopt delimiter ''
@@ -150,21 +148,19 @@ v
 t = {}
 --# setopt delimiter ';'
 for i = 1, 3 do
-    k,v = space.index[1]:next(k)
+    k,v = space.index['second']:next(k)
     table.insert(t, v)
 end;
 --# setopt delimiter ''
 t
 space:drop()
-
+space = nil
 -- Bug #1082356
 -- Space #19, https://bugs.launchpad.net/tarantool/+bug/1082356
 
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 0, 'num', 2, 'num')
-
-space = box.space[0]
+space:create_index('primary', 'tree', {parts = {0, 'num', 2, 'num'}, unique = true })
 
 space:insert(1, 1)
 space:replace_if_exists(1, 1)

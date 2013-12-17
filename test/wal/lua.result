@@ -1,16 +1,10 @@
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum')
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
+space:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
 ---
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'str']
 ...
-box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'tree', 0, 1, 1, 'num')
----
-- [0, 1, 'secondary', 'tree', 0, 1, 1, 'num']
-...
-space = box.space[0]
+space:create_index('secondary', 'tree', {parts = {1, 'num'}, unique = false })
 ---
 ...
 -- A test case for Bug#1042738
@@ -43,7 +37,7 @@ space:truncate()
 for i = 1, 100000, 1 do space:insert(tostring(i),i) end
 ---
 ...
-local t1 = {space:select(1)}
+local t1 = {space.index['secondary']:select()}
 ---
 - error: stack overflow
 ...
@@ -54,13 +48,11 @@ space:drop()
 -- A test case for https://github.com/tarantool/tarantool/issues/65
 -- Space does not exist error on repetitive access to space 0 in Lua
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum', {id=0})
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
 ---
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 --# setopt delimiter ';'
 function mktuple(n)
@@ -72,8 +64,7 @@ function mktuple(n)
     assert(t[0] == 1, "tuple check")
     assert(t[n-1] == n, "tuple check")
     return string.format("count %u len %u", #t, t:bsize())
-end
-;
+end;
 ---
 ...
 --# setopt delimiter ''
@@ -84,4 +75,7 @@ mktuple(5000)
 mktuple(100000)
 ---
 - count 100000 len 368553
+...
+space:drop()
+---
 ...

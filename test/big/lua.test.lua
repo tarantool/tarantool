@@ -1,19 +1,17 @@
-
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
-box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 1, 2, 1, 'str', 2, 'str')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
+space:create_index('minmax', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
 
 space:insert('brave', 'new', 'world')
-space.index[1]:min()
-space.index[1]:max()
-space:select(1, 'new', 'world')
+space.index['minmax']:min()
+space.index['minmax']:max()
+space.index['minmax']:select('new', 'world')
 
 -- A test case for Bug #904208
 -- "assert failed, when key cardinality is greater than index cardinality"
 --  https://bugs.launchpad.net/tarantool/+bug/904208
 
-space:select(1, 'new', 'world', 'order')
+space.index['minmax']:select('new', 'world', 'order')
 space:delete('brave')
 
 -- A test case for Bug #902091
@@ -21,13 +19,13 @@ space:delete('brave')
 -- https://bugs.launchpad.net/tarantool/+bug/902091
 
 space:insert('item 1', 'alabama', 'song')
-space:select(1, 'alabama')
+space.index['minmax']:select('alabama')
 space:insert('item 2', 'california', 'dreaming ')
 space:insert('item 3', 'california', 'uber alles')
 space:insert('item 4', 'georgia', 'on my mind')
-iter, tuple = space.index[1]:next('california')
+iter, tuple = space.index['minmax']:next('california')
 tuple
-_, tuple = space.index[1]:next(iter)
+_, tuple = space.index['minmax']:next(iter)
 tuple
 space:delete('item 1')
 space:delete('item 2')
@@ -45,16 +43,15 @@ space:drop()
 --
 -- Check range scan over multipart keys
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-box.insert(box.schema.INDEX_ID, 0, 1, 'minmax', 'tree', 0, 2, 1, 'str', 2, 'str')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
+space:create_index('minmax', 'tree', {parts = {1, 'str', 2, 'str'}, unique = false })
 
 space:insert(1234567, 'new', 'world')
 space:insert(0, 'of', 'puppets')
 space:insert(00000001ULL, 'of', 'might', 'and', 'magic')
-space:select_range(1, 2, 'of')
-space:select_reverse_range(1, 2, 'of')
+space.index['minmax']:select_range(2, 'of')
+space.index['minmax']:select_reverse_range(2, 'of')
 space:truncate()
 
 --
@@ -62,18 +59,17 @@ space:truncate()
 --
 
 space:insert(2^51, 'hello', 'world')
-space:select(0, 2^51)
+space.index['primary']:select(2^51)
 space:drop()
 
 --
 -- Lua 64bit numbers support
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
 
 space:insert(tonumber64('18446744073709551615'), 'magic')
-tuple = space:select(0, tonumber64('18446744073709551615'))
+tuple = space.index['primary']:select(tonumber64('18446744073709551615'))
 num = tuple[0]
 num
 type(num) == 'cdata'
@@ -82,8 +78,8 @@ num = tuple[0]
 num == tonumber64('18446744073709551615')
 space:delete(18446744073709551615ULL)
 space:insert(125ULL, 'magic')
-tuple = space:select(0, 125)
-tuple2 = space:select(0, 125LL)
+tuple = space.index['primary']:select(125)
+tuple2 = space.index['primary']:select(125LL)
 num = tuple[0]
 num2 = tuple2[0]
 num, num2
@@ -109,10 +105,9 @@ space:drop()
 --
 -- lua select_reverse_range() testing
 -- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-box.insert(box.schema.INDEX_ID, 0, 1, 'range', 'tree', 1, 2, 1, 'num', 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
+space:create_index('range', 'tree', {parts = {1, 'num', 0, 'num'}, unique = true })
 
 space:insert(0, 0)
 space:insert(1, 0)
@@ -124,18 +119,17 @@ space:insert(6, 0)
 space:insert(7, 0)
 space:insert(8, 0)
 space:insert(9, 0)
-space:select_range(1, 10)
-space:select_reverse_range(1, 10)
-space:select_reverse_range(1, 4)
+space.index['range']:select_range(10)
+space.index['range']:select_reverse_range(10)
+space.index['range']:select_reverse_range(4)
 space:drop()
 
 --
 -- Tests for box.index iterators
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'str')
-box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 1, 2, 1, 'str', 2, 'str')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
+space:create_index('i1', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
 
 pid = 1
 tid = 999
@@ -149,7 +143,7 @@ for sid = 1, 2 do
 end;
 --# setopt delimiter ''
 
-index = space.index[1]
+index = space.index['i1']
 
 t = {}
 for k, v in index.next, index, 'sid_1' do table.insert(t, v) end
@@ -170,42 +164,40 @@ t = {}
 for k, v in index.prev_equal, index, 'sid_2' do table.insert(t, v) end
 t
 t = {}
+index = nil
 space:drop()
 
 --
 -- Tests for lua idx:count()
 --
 -- https://blueprints.launchpad.net/tarantool/+spec/lua-builtin-size-of-subtree
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-box.insert(box.schema.INDEX_ID, 0, 1, 'i1', 'tree', 0, 2, 1, 'num', 2, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
+space:create_index('i1', 'tree', {parts = {1, 'num', 2, 'num'}, unique = false })
 space:insert(1, 1, 1)
 space:insert(2, 2, 0)
 space:insert(3, 2, 1)
 space:insert(4, 3, 0)
 space:insert(5, 3, 1)
 space:insert(6, 3, 2)
-space.index[1]:count(1)
-space.index[1]:count(2)
-space.index[1]:count(2, 1)
-space.index[1]:count(2, 2)
-space.index[1]:count(3)
-space.index[1]:count(3, 3)
+space.index['i1']:count(1)
+space.index['i1']:count(2)
+space.index['i1']:count(2, 1)
+space.index['i1']:count(2, 2)
+space.index['i1']:count(3)
+space.index['i1']:count(3, 3)
 -- Returns total number of records
 -- https://github.com/tarantool/tarantool/issues/46
-space.index[1]:count()
+space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
-space.index[1]:count(function() end)
+space.index['i1']:count(function() end)
 space:drop()
 
 --
 -- Tests for lua tuple:transform()
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'str')
-space = box.space[0]
-
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
 t = space:insert('1', '2', '3', '4', '5', '6', '7')
 t:transform(7, 0, '8', '9', '100')
 t:transform(0, 1)
@@ -270,9 +262,8 @@ space:drop()
 --  https://bugs.launchpad.net/tarantool/+bug/1006354
 --  lua box.auto_increment() testing
 
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
 dofile('push.lua')
 
 push_collection(space, 0, 1038784, 'hello')
@@ -305,45 +296,43 @@ space:drop()
 -- Truncate hangs when primary key is not in linear or starts at the first field
 -- https://bugs.launchpad.net/tarantool/+bug/1042798
 --
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 2, 2, 'num', 1, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {2, 'num', 1, 'num'}, unique = true })
 
 -- Print key fields in pk
-space.index[0].key_field
+space.index['primary'].key_field
 space:insert(1, 2, 3, 4)
 space:insert(10, 20, 30, 40)
 space:insert(20, 30, 40, 50)
-space:select(0)
+space.index['primary']:select()
 
 -- Truncate must not hang
 space:truncate()
 
 -- Empty result
-space:select(0)
+space.index['primary']:select()
 space:drop()
     
 --
 -- index:random test
 -- 
 dofile('index_random_test.lua')
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'tree', 1, 1, 0, 'num')
-box.insert(box.schema.INDEX_ID, 0, 1, 'secondary', 'hash', 1, 1, 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
+space:create_index('secondary', 'hash', {parts = {0, 'num'}, unique = true })
 -------------------------------------------------------------------------------
 -- TreeIndex::random()
 -------------------------------------------------------------------------------
 
-index_random_test(space, 0)
+index_random_test(space, 'primary')
 
 -------------------------------------------------------------------------------
 -- HashIndex::random()
 -------------------------------------------------------------------------------
 
-index_random_test(space, 1)
+index_random_test(space, 'secondary')
 
 space:drop()
 space = nil
 
--- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 syntax=lua
+-- vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

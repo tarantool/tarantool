@@ -1,8 +1,7 @@
 --# stop server default
 --# start server default
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
-space = box.space[0]
+space = box.schema.create_space('tweedledum')
+space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
 --# setopt delimiter ';'
 i = 1;
 while true do
@@ -23,11 +22,11 @@ while true do
 end;
 --# setopt delimiter ''
 space:len()
-space:select(0, 0)
-space:select(0, 5)
-space:select(0, 9)
-space:select(0, 11)
-space:select(0, 15)
+space.index['primary']:select(0)
+space.index['primary']:select(5)
+space.index['primary']:select(9)
+space.index['primary']:select(11)
+space.index['primary']:select(15)
 -- check that iterators work
 i = 0
 t = {}
@@ -43,5 +42,5 @@ end;
 t
 space:truncate()
 space:insert(0, 'test')
-space:select(0, 0)
+space.index['primary']:select(0)
 space:drop()
