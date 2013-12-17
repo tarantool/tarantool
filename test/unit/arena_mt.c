@@ -16,7 +16,7 @@ int FILL = SLAB_MIN_SIZE/sizeof(pthread_t);
 void *
 run(void *p __attribute__((unused)))
 {
-	unsigned int seed = pthread_self();
+	unsigned int seed = (unsigned int) pthread_self();
 	int iterations = rand_r(&seed) % ITERATIONS;
 	pthread_t **slabs = slab_map(&arena);
 	for (int i = 0; i < iterations; i++) {
@@ -27,7 +27,7 @@ run(void *p __attribute__((unused)))
 				slabs[osc][fill] = pthread_self();
 			}
 		}
-		pthread_yield();
+		sched_yield();
 		for (int osc = 0; osc  < oscillation; osc++) {
 			for (int fill = 0; fill < FILL; fill+= 100) {
 				fail_unless(slabs[osc][fill] ==

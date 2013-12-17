@@ -2,7 +2,7 @@
 #include "unit.h"
 #include <sys/mman.h>
 
-#if defined(__FreeBSD__)
+#if !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 

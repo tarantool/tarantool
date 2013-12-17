@@ -35,7 +35,7 @@
 #include <assert.h>
 #include <limits.h>
 
-#if defined(__FreeBSD__)
+#if !defined(MAP_ANONYMOUS)
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
