@@ -477,44 +477,40 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.update">box.update(space_no, key, format, ...)</emphasis>
+         <emphasis role="lua" xml:id="box.update">box.update(space_no, key, format, {field_no, value}...)</emphasis>
         </term>
         <listitem>
             <para>
-                Update a tuple identified by a primary
-                <code>key</code>. If a key is multipart,
-                it is passed in as a Lua table. Update arguments follow,
-                described by <code>format</code>.
-                The format and arguments are passed to
+                Update a tuple.
+                The <code>space_no</code> and <code>key</code> arguments
+                identify the tuple; if a key is multipart then it is
+                passed as a Lua table.
+                The <code>format</code> argument is a sequence of
+                pairs of characters, where the first character in each pair
+                is the operation specifier, and the second character in
+                each pair is the operation argument.
+                The <code>{field_no, value}</code> arguments are the
+                field numbers of affected fields and applicable values.
+                For some operations the field number can be -1, meaning
+                the last field in the tuple.
+                There must be a pair of {field_no, value} arguments
+                for each character pair in the format argument.
+                The format and {field_no, value} arguments are passed to
                 <code>box.pack()</code> and the result is sent
                 to <code>box.process()</code>.
-                A correct <code>format</code> is a sequence of
-                pairs: update operation, operation arguments. A
-                single character of format describes either an
-                operation which needs to take place or operation
-                argument. A format specifier also works as a
-                placeholder for the number of a field, which needs
-                to be updated, or for an argument value.
-                For example:
-                <simplelist>
-                    <member><code>+p=p</code> &mdash; add a value
-                    to one field and assign another,
-                    </member>
-                    <member><code>:p</code> &mdash; splice a
-                    field: start at offset, cut length bytes, and add a
-                    string.</member>
-                    <member><code>#p</code> &mdash; delete specified
-                    number of fields.</member>
-                    <member><code>!p</code> &mdash; insert a field
-                    (before the one specified).</member>
-                </simplelist>
-                Possible format specifiers are: <quote>+</quote>
+                Possible operation specifiers are: <quote>+</quote>
                 for addition, <quote>-</quote> for subtraction,
                 <quote>&amp;</quote> for bitwise AND,
                 <quote>|</quote> for bitwise OR, <quote>^</quote>
                 for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice and <quote>p</quote> for
-                operation argument.
+                for string splice, <quote>!</quote> for insertion.
+                Possible operation arguments are: <quote>p</quote>.
+                Thus in the instruction <code>lua box.update(0,44,'+p=p',1,55,3,'x')</code>
+                the space number is 0, the primary-key value is 44,
+                the format is '+p=p' meaning "add a value to a field
+                and then assign a value to a field", the first affected field
+                is field 1 and the value which will be added to it is 55, the second affected field
+                is field 3 and the value which will be assigned to it is 'x'.
                 <bridgehead renderas="sect4">Returns</bridgehead>
                 Returns the updated tuple.
                 <bridgehead renderas="sect4">Example</bridgehead>
@@ -1315,7 +1311,7 @@ localhost&gt; <userinput>lua t:transform(1,2,'x')</userinput>
              then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:slice(1,3)</userinput>
@@ -1898,32 +1894,29 @@ error: 'Iterator type is not supported'
 
 <section xml:id="sp-box-fiber">
     <title>Package <code>box.fiber</code></title>
-    <para>Functions in this package allow you to create, run and
-    manage existing <emphasis>fibers</emphasis>.
+    <para>Functions in this package allow for creating, running and
+    managing <emphasis>fibers</emphasis>.
     </para>
     <para>
-A fiber is an independent execution thread implemented
-using a mechanism of cooperative multitasking.
+A fiber is a set of instructions which are executed
+with cooperative multitasking. Fibers managed by the
+box.fiber library are associated with a user-supplied function
+called the <emphasis>fiber function</emphasis>.
 
 A fiber has three possible states: running, suspended or dead.
-When a fiber is created with <code>box.fiber.create()</code>,
-it is suspended.
+When a fiber is created with <code>box.fiber.create()</code>, it is suspended.
 When a fiber is started with <code>box.fiber.resume()</code>, it is running.
-When a fiber's control is yielded back to the caller with
-<code>box.fiber.yield()</code>, it is suspended.
-When a fiber ends (due to <code>return</code> or by reaching the
-end of the fiber function), it is dead.
+When a fiber yields control with <code>box.fiber.yield()</code>, it is suspended.
+When a fiber ends (because the fiber function ends), it is dead.
     </para>
     <para>
 A fiber can also be attached or detached.
 An attached fiber is a child of the creator,
 and is running only if the creator has called
 <code>box.fiber.resume()</code>. A detached fiber is a child of
-Tarantool internal <quote>sched</quote> fiber, and gets
+the Tarantool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
-    </para>
-    <para>
 To detach, a running fiber must invoke <code>box.fiber.detach()</code>.
 A detached fiber loses connection with its parent forever.
     </para>
@@ -1935,22 +1928,14 @@ which is a string. If there is more than one fiber with the given
 name, the first fiber that matches is returned.
     </para>
     <para>
-Once fiber function is done or calls <code>return</code>,
-the fiber is considered dead. Its carcass is put into
-a fiber pool, and can be reused when another fiber is
-created.
-    </para>
-    <para>
 A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
 However, <code>box.fiber.cancel()</code> is advisory &mdash; it works
 only if the runaway fiber calls <code>box.fiber.testcancel()</code>
 once in a while. Most <code>box.*</code> hooks, such as <code>box.delete()</code>
 or <code>box.update()</code>, do call <code>box.fiber.testcancel()</code>.
-<code>box.select()</code> doesn't.
-    </para>
-    <para>
+<code>box.select()</code> does not.
 In practice, a runaway fiber can only become unresponsive
-if it does a lot of computations and doesn't check
+if it does many computations and does not check
 whether it's been canceled.
 <!--
 In addition to the advisory cancellation, configuration parameter
@@ -1968,9 +1953,11 @@ sends an asynchronous wakeup event to the fiber,
 and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>Like all Lua objects, dead fibers are
-    garbage collected: the garbage collector frees pool allocator
+    garbage collected. The garbage collector frees pool allocator
     memory owned by the fiber, resets all fiber data, and returns
-    the fiber to the fiber pool.</para>
+    the fiber (now called a fiber carcass) to the fiber pool.
+    The carcass can be reused when another fiber is created.
+    </para>
 <variablelist xml:id="box.fiber">
     <varlistentry>
         <term>
@@ -1999,10 +1986,8 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(function) </emphasis>
         </term>
         <listitem><simpara>
-            Create a fiber for a <code>function</code>.
+            Create a fiber for a <code>function</code>. There will be an error if the function does not exist or if a recursion limit is hit.
         </simpara>
-        <bridgehead renderas="sect4">Errors</bridgehead>
-        <simpara>Can hit a recursion limit.</simpara>
         </listitem>
     </varlistentry>
 
@@ -2016,19 +2001,17 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield(...)">box.fiber.yield(...) </emphasis>
+         <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield([arguments])">box.fiber.yield(...) </emphasis>
         </term>
-        <listitem><para>
-        Yield control to the calling fiber, if the fiber
-        is attached, or to sched otherwise.
-        </para>
-        <para>
-        If the fiber is attached, whatever arguments are passed
-        to this call, are passed on to the calling fiber.
+        <listitem><simpara>
+        If the fiber is attached, yield control to the calling fiber if the fiber
+        is attached; otherwise, yield to sched.
+        If the fiber is attached, arguments passed
+        to box.fiber.yield are passed on to the calling fiber.
         If the fiber is detached, <code>box.fiber.yield()</code>
-        returns back everything passed into it after temporarily
+        arguments passed to box.fiber.yield are returned after temporarily
         yielding control back to the scheduler.
-        </para></listitem>
+        </simpara></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -2067,11 +2050,11 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
             <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(fiber)</emphasis>
         </term>
         <listitem><simpara>
-            Returns the status of the fiber. If no argument is
-            provided, the current fiber's status is returned. The
-            status can be either <quote>dead</quote>,
-            <quote>suspended</quote>, <quote>attached</quote>
-            or <quote>running</quote>.
+         Returns the status of <code>fiber</code>. If no argument is
+         provided, the current fiber's status is returned. The
+         status can be one of: <quote>dead</quote>,
+         <quote>suspended</quote>, <quote>attached</quote>
+         or <quote>running</quote>.
         </simpara></listitem>
     </varlistentry>
 
@@ -2096,74 +2079,138 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         </simpara></listitem>
     </varlistentry>
 </variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead>
+Make the function which will be associated with the fiber.
+When this function gets invoked, it will immediately "detach"
+so it will be running independently of the caller, and then
+will enter an infinite loop ("while 0 == 0" is an infinite
+loop). Each iteration of the loop adds 1 to a global variable
+named gvar, then goes to sleep for 2 seconds,
+then yields. The sleep causes an implicit box.fiber.yield().<programlisting>
+<prompt>localhost&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua function function_x ()</userinput>
+<prompt>        -&gt;</prompt><userinput>   box.fiber.detach()</userinput>
+<prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
+<prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
+<prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
+<prompt>        -&gt;</prompt><userinput>     box.fiber.sleep(2)</userinput>
+<prompt>        -&gt;</prompt><userinput>     end</userinput>
+<prompt>        -&gt;</prompt><userinput>   end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
+Make the fiber and associate the function with it.
+ Get the id of the fiber (fid), to be used in later displays.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua fiber_of_x = box.fiber.create(function_x)</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua fid = box.fiber.id(fiber_of_x)</userinput>
+---
+...</programlisting>
+"Resume" the fiber. This causes invocation of the function.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.fiber.resume(fiber_of_x)</userinput>
+---
+...</programlisting>
+Pause for a while, while the detached function runs. Then ...
+Display the fiber id, the fiber status, and gvar  (gvar will have
+gone up a bit depending how long the pause lasted). The status is
+suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+---
+fiber=104. suspended. gvar=9
+...</programlisting>
+Pause for a while, while the detached function runs. Then ...
+Cancel the fiber. Then, once again ...
+Display the fiber id, the fiber status, and gvar (gvar will have
+gone up a bit more depending how long  pause lasted). This time
+the status is dead because the cancel worked.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.fiber.cancel(fiber_of_x)</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+---
+fiber=104. dead. gvar=22
+...</programlisting>
+</para>
+
 </section>
 
 <!--   end of lib -->
 
 <section xml:id="sp-box-session">
     <title>Package <code>box.session</code></title>
-    <para>Learn session state, set on-connect and
-    on-disconnect triggers.
-    </para>
     <para>
-A session is an object associated with each client connection.
-Through this module, it's possible to query session state,
-as well as set a Lua chunk executed on a connect or disconnect
-event.
+     Query session state, write to a session-specific temporary
+     record, or set up triggers which will fire when a session
+     starts or ends. A <emphasis>session</emphasis> is an object associated with each client connection.
     </para>
 <variablelist>
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.id() </emphasis>
         </term>
-        <listitem><simpara>Return a unique monotonic identifier of
-        the current session. The identifier can be used to check
-        whether or not a session is alive. 0 means there is no
-        session (e.g. a procedure is running in a detached
-        fiber).
+        <listitem><simpara>Return the unique numeric identifier
+        (ID) for the current session. The result can be 0 meaning
+        there is no session (for example because a function is
+        running in a detached fiber).
         </simpara></listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.fd(id) </emphasis>
-        </term>
-        <listitem><simpara>Return an integer file descriptor
-        associated with the connected client.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.exists(id) </emphasis>
         </term>
-        <listitem><simpara>Return true if a session is alive,
-        false otherwise.</simpara></listitem>
+        <listitem><simpara>If the specified session exists, return true (1).
+        otherwise return false (0).</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.peer(id) </emphasis>
         </term>
-        <listitem><simpara>Return the host address and port for the session
-        peer, for example "127.0.0.1:55457", or "0.0.0.0:0" if the session
-        is not connected.</simpara></listitem>
+        <listitem><simpara>If the specified session exists, return the host
+        address and port of the session peer, for example "127.0.0.1:55457".
+        Otherwise return "0.0.0.0:0". The command is executed on the server,
+        so the "local name" is the server's host and administrative port,
+        and the "peer name" is the client's host and port.</simpara></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.storage</emphasis>
         </term>
-        <listitem><simpara>A virtual table that is local for each session.
-        It can be used to store session-specific values. The lifetime is the
-        same as the session's (until disconnect).
+        <listitem><simpara>A Lua table that can hold arbitrary
+        unordered session-specific names and values, which will last until
+        the session ends.
         </simpara></listitem>
     </varlistentry>
-
 </variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua box.session.peer(box.session.id())</userinput>
+---
+ - 127.0.0.1:45129
+...
+<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.random_memorandum = "Don't forget to buy eggs."</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.radius_of_mars = 3396</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> lua for k,v in pairs(box.session.storage) do print(k,' ',v) end</userinput>
+---
+radius_of_mars 3396
+random_memorandum Don't forget to buy eggs.
+...</programlisting>
+</para>
+
     <para>
-This module also makes it possible to define triggers on connect
-and disconnect events. Please see <olink targetptr="sp-box-session-triggers">
-the triggers chapter</olink> for details.
+See <olink targetptr="sp-box-session-triggers">the triggers chapter</olink>
+for instructions about defining triggers for connect and disconnect events
+ with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
     </para>
 </section>
 
@@ -2171,6 +2218,19 @@ the triggers chapter</olink> for details.
 
 <section xml:id="sp-box-ipc">
     <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
+    <para>
+    Send and receive messages between different procedures of a session.
+    </para>
+    <para>
+    Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
+    called <code>channel</code> for examples in this section.
+    Call the other box.ipc() routines, passing <code>channel</code>, to send messages, receive messages, or check ipc status.
+    Message exchange is synchronous.
+    The channel is garbage collected when no one is using it, as with any
+    other Lua object.
+    Object-oriented and functional APIs are equivalent, so <code>channel:put(message)</code>
+    is the same as <code>box.ipc.channel.put(channel, message)</code>. 
+    </para>
 <variablelist xml:id="box.ipc">
     <simpara>
     </simpara>
@@ -2178,19 +2238,11 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel(capacity)</emphasis></term>
         <listitem>
             <simpara>
-                Create a new communication channel with
-                predefined capacity. The channel can be used
-                to synchronously exchange messages between
-                stored procedures. The channel is garbage
-                collected when no one is using it, just like any
-                other Lua object. Channels can be worked with
-                using functional or object-oriented syntax. For
-                example, the following two lines are equivalent:
+                Create a new communication channel. The capacity should be
+                a positive integer as great as the maximum number of slots
+                (spaces for get or put or broadcast messages)
+                that might be pending at any given time.
             </simpara>
-<programlisting>
-    channel:put(message)
-    box.ipc.channel.put(channel, message)
-</programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
@@ -2198,12 +2250,12 @@ the triggers chapter</olink> for details.
         <listitem>
             <simpara>
                 Send a message using a channel. If the channel is full,
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>
+                <code>box.ipc.channel.put()</code>
                 blocks until there is a free slot in the channel.
-                If <emphasis role="lua">timeout</emphasis> is provided,
+                If <code>timeout</code> is provided,
                 and the channel doesn't become empty for the duration
                 of the timeout,
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>
+                <code>box.ipc.channel.put()</code>
                 returns false. Otherwise it returns true.
             </simpara>
         </listitem>
@@ -2213,12 +2265,12 @@ the triggers chapter</olink> for details.
         <listitem>
             <simpara>
                 Fetch a message from a channel. If the channel is empty,
-                <emphasis role="lua">box.ipc.channel.get()</emphasis>
+                <code>box.ipc.channel.get()</code>
                 blocks until there is a message.
-                If <emphasis role="lua">timeout</emphasis> is provided,
+                If <code>timeout</code> is provided,
                 and there are no new messages for the duration
                 of the timeout,
-                <emphasis role="lua">box.ipc.channel.get()</emphasis>
+                <code>box.ipc.channel.get()</code>
                 returns error.
             </simpara>
         </listitem>
@@ -2227,10 +2279,10 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-                If the channel is empty, is equivalent to
-                <emphasis role="lua">box.ipc.channel.put()</emphasis>.
-                Otherwise sends the message to all readers of the
-                channel.
+             If the channel is empty, <code>box.ipc.channel.broadcast()</code> is equivalent to
+             <code>box.ipc.channel.put()</code>.
+              Otherwise, <code>box.ipc.channel.broadcast()</code> sends the message to all readers of the
+              channel.
             </simpara>
         </listitem>
     </varlistentry>
@@ -2238,7 +2290,7 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.is_empty(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is empty (has no messages).
+                Return true if the specified channel is empty (has no messages).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2246,7 +2298,7 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.is_full(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is full (has no room for a new message).
+                Return true if the specified channel is full (has no room for a new message).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2254,8 +2306,10 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.has_readers(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is empty and has readers waiting
-                for a message.
+                Return true if the specified channel is empty and has readers waiting
+                for a message (because they have issued <code>box.ipc.channel.get()</code> and then
+                blocked).
+                Otherwise return false.
             </simpara>
         </listitem>
     </varlistentry>
@@ -2263,9 +2317,14 @@ the triggers chapter</olink> for details.
         <term><emphasis role="lua">box.ipc.channel.has_writers(channel)</emphasis></term>
         <listitem>
             <simpara>
-                Check if the channel is full and has writers waiting
-                for empty room.
+                Return true if the specified channel is full and has writers waiting
+                (because they have issued <code>box.ipc.channel.put()</code> and then blocked
+                due to lack of room). Otherwise return false.
             </simpara>
+        </listitem>
+    </varlistentry>
+</variablelist>
+<para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 local channel = box.ipc.channel(10)
 function consumer_fiber()
@@ -2300,12 +2359,12 @@ function producer_fiber()
 
         ...
         if channel:has_readers() then
-            # there are some fibers that wait data
+            # there are some fibers that wait are waiting for data
         end
         ...
 
         if channel:has_writers() then
-            # there are some fibers that wait readers
+            # there are some fibers that are waiting for readers
         end
         channel:put(task)
     end
@@ -2323,9 +2382,7 @@ function producer2_fiber()
     end
 end
 </programlisting>
-        </listitem>
-    </varlistentry>
-</variablelist>
+</para>
 </section>
 
 <!--   end of lib -->
@@ -2619,75 +2676,41 @@ end
 <section xml:id="sp-box-net-box">
     <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
     <simpara>
-        Library <code>box.net</code> contains connectors
-        to remote database systems, such as MariaDB or PostgreSQL.
-        The first supported system is Tarantool itself.
+        The <code>box.net</code> library contains connectors to remote database systems.
+        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
+        &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
+        In this section the subject is the built-in variant, <code>box.net.box</code>.
+        This is for connecting to tarantool_box servers via a network.
     </simpara>
 <variablelist xml:id="box.net.box">
     <simpara>
-        The basic object provided by <code>box.net.box</code>
-        library is a connection. A connection is created by
-        calling <code>box.net.box.new()</code>. To
-        execute remote requests, simply invoke methods of the
-        connection object, a physical connection is established
-        upon request and is re-established if necessary.
-        When done, issue <code>conn:close()</code>. Connection
-        objects are garbage collected just like any other objects
-        in Lua, so an explicit destruction is not mandatory.
-        However, since <code>close()</code> is a system call, it
-        is a good programming practice to close a connection
-        explicitly when it is no longer needed, to avoid lengthy
-        stalls of the garbage collector.
+        Call <code>box.net.box.new()</code> to connect and get a connection object,
+        which will be called <code>conn</code> for examples in this section.
+        Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
+        to execute requests on the remote box.
+        Call <code>box.net.box.close(conn)</code> to disconnect.
+        Object-oriented and functional APIs are equivalent, so
+        <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
     </simpara>
+
     <simpara>
-        The library also provides a pre-created connection object
-        to the local server, <code>box.net.self</code>.  This
-        connection is always <quote>established</quote>.  The
-        purpose of this object is to make polymorphic use of the
-        <code>box.net.box</code> API easier. There is an
-        important difference, however, between the embedded
-        connection and a remote one. With the embedded connection,
-        requests which do not modify data do not yield. When using
-        a remote connection, it is important to keep in mind that
-        any request can yield, and local database state may
-        have changed by the time it returns.
-    </simpara>
-    <simpara>
-        All <code>box.net.box</code> methods are fiber-safe.  It's
+        All <code>box.net.box</code> methods are fiber-safe, that is, it is
         safe to share and use the same connection object across
-        multiple concurrent fibers.  In fact, it's perhaps the
-        best programming practice with Tarantool: when multiple
+        multiple concurrent fibers. In fact, it's perhaps the
+        best programming practice with Tarantool. When multiple
         fibers use the same connection, all requests are pipelined
-        through the same network socket, but each fiber gets a
-        correct response back. Reducing the number of active sockets
+        through the same network socket, but each fiber gets back a
+        correct response. Reducing the number of active sockets
         lowers the overhead of system calls and increases the
-        overall server performance. There are, however cases, when
-        a single connection is not enough: when it's necessary to
-        prioritize requests, use different authentication ids,
-        etc.
-    </simpara>
-    <simpara>
-        All remote calls support execution timeouts. A specialized
-        wrapper, <code>box.net.box.timeout()</code> allows setting
-        a timeout. Using a wrapper object makes the remote
-        connection API compatible with the local one, removing
-        the need for a separate <code>timeout</code> argument, ignored
-        by the local version. Once sent, a
-        request can not be revoked from the remote server even if
-        a timeout expires: the expired timeout only aborts the
-        wait for the remote server response.
-        <code>box.net.box.timeout()</code>,
-    </simpara>
-    <simpara>
-        Object-oriented and functional APIs are equivalent:
-        <code>conn:close()</code> is identical to
-        <code>box.net.box.close(conn)</code>.
+        overall server performance. There are, however, cases when
+        a single connection is not enough &mdash; for example when it's necessary to
+        prioritize requests or to use different authentication ids.
     </simpara>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.net.box.new">
-            conn = box.net.box.new(host, port [, reconnect_interval])</emphasis>
+             conn = box.net.box.new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, <replaceable>reconnect_interval</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -2697,155 +2720,220 @@ end
                 a disconnect. The argument
                 <code>reconnect_interval</code> (in seconds) is
                 responsible for the amount of time the server
-                sleeps between failing attempts to reconnect. The
-                returned object supports methods for making remote
-                calls, such as select, update or delete.
+                sleeps between failing attempts to reconnect.
+                The returned <code>conn</code> object supports methods for making remote
+                requests, such as select, update or delete.
+                Example: <code>conn = box.net.box.new('localhost', 33013)</code>.
+            </para>
+            <para>
+               For the local tarantool_box server there is a pre-created always-established
+               connection object named <code>box.net.self</code>.
+               Its purpose is to make polymorphic use of the
+               <code>box.net.box</code> API easier. Therefore
+               <code>conn = box.net.box.new('localhost', 33013)</code> can
+               be replaced by <code>conn = box.net.box.self</code>.
+               However, there is an important difference between the embedded
+               connection and a remote one. With the embedded connection,
+               requests which do not modify data do not yield. When using
+               a remote connection, any request can yield, and local database state may
+               have changed by the time it returns.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.ping">
-            conn:ping()</emphasis></term>
+        conn:ping()</emphasis></term>
         <listitem>
             <para>
                 Execute a PING command.
                 Returns <code>true</code> on success,
-                <code>false</code> on error.
+                 <code>false</code> on error. Example: <code>self:ping()</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.close">
-            conn:close()</emphasis></term>
+        conn:close()</emphasis></term>
         <listitem>
             <para>
-                Close a connection. The connection is also
-                closed when it's garbage collected. It's still
-                recommended to close connections explicitly,
-                to spare the garbage collector from heavy work
-                such as closing the socket.
+            Close a connection. Example: <code>conn:close()</code>.
+            </para>
+            <para>
+             Connection objects are garbage collected just like any other objects
+             in Lua, so an explicit destruction is not mandatory.
+             However, since <code>close()</code> is a system call, it
+             is good programming practice to close a connection
+             explicitly when it is no longer needed, to avoid lengthy
+             stalls of the garbage collector.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.select">
-            conn:select(space_no, index_no, ...)</emphasis></term>
+         conn:select(<replaceable>space_no</replaceable>, <replaceable>index_no</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code
-                xlink:href="#box.select">box.select(...)</code>.
-                Please note, that unlike a local
-                <code>box.select()</code> any call to a remote
-                server yields, thus local data may change while
-                remote <code>select()</code> is running.
+             <code>conn:select(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.select">box.select(...)</code>.
+                Please note this difference: a local <code>box.select()</code> does not yield,
+                but a remote <code>conn:select()</code> call does yield,
+                so local data may change while a remote <code>conn:select()</code> is running.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.select_limit">
-            conn:select_limit(space_no, index_no, offset, limit, ...)</emphasis></term>
+         conn:select_limit(<replaceable>space_no</replaceable>, <replaceable>index_no</replaceable>, <replaceable>offset</replaceable>, <replaceable>limit</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code
-                xlink:href="#box.select_limit">box.select_limit(...)</code>
+             <code>conn:select_limit(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.select_limit">box.select_limit(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.select_range">
-            conn:select_range(space_no, index_no, limit, key, ...)</emphasis></term>
+         conn:select_range(<replaceable>space_no</replaceable>, <replaceable>index_no</replaceable>, <replaceable>limit</replaceable>, <replaceable>key</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code
-                xlink:href="#box.select_range">box.select_range(...)</code>.
+             <code>conn:select_range(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.select_range">box.select_range(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.insert">conn:insert(space_no, ...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.insert">
+         conn:insert(<replaceable>space_no</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code xlink:href="#box.insert">box.insert(...)</code>.
+             <code>conn:insert(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.insert">box.insert(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.replace">conn:replace(space_no, ...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.replace">
+         conn:replace(<replaceable>space_no</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code xlink:href="#box.replace">box.replace(...)</code>.
+             <code>conn:replace(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.replace">box.replace(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.update">conn:update(...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.update">
+         conn:update(<replaceable>space_no</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-                See <code
-                xlink:href="#box.update">box.update(...)</code>.
+             <code>conn:update(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.update">box.update(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.delete">conn:delete(space_no, key)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.delete">
+         conn:delete(<replaceable>space_no</replaceable>, <replaceable>key</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                See <code xlink:href="#box.delete">box.delete(...)</code>.
+             <code>conn:delete(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.delete">box.delete(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.call">conn:call(proc_name, ...)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.call">
+         conn:call(<replaceable>proc_name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
         <listitem>
-            <para>Call a remote stored procedure, such as
-            <code>box.select_reverse_range()</code>.
+            <para>
+            <code>conn:call('proc','1','2','3')</code> is the remote-call equivalent of <code>CALL proc('1','2','3')</code>.
+            That is, box.net.box.call is a remote stored-procedure call.
             Please keep in mind that the call is using
             the binary protocol to pack procedure arguments,
-            and since the latter is type-agnostic it's recommended
-            to pass all arguments of remote stored procedure as
-            strings, for example:
-<programlisting>
-    conn:call("box.select_reverse_range", "1", "4", "10", "Smith")
-</programlisting>
+            and the binary protocol is type agnostic, so it's recommended
+            to pass all arguments of remote stored procedure calls as
+             strings. Example: <code>conn:call("box.select_reverse_range", "1", "4", "10", "Smith")</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.timeout">conn:timeout(timeout)</emphasis></term>
+        <term><emphasis role="lua" xml:id="box.net.box.timeout">
+         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                Returns a closure which is identical to the
-                invoked function, except for the added timeout
-                functionality.
-<programlisting>
--- wait for 'update' until it is finished
-local tuple = conn:update('1', 'key', ...)
-
--- send update but don't bother to wait for results
-local other = conn:timeout(0):update('1', 'arg1', ...)
-</programlisting>
-            </para>
+             <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
+              Example: <code>conn:timeout(0):update('1', 'arg1', 15)</code>.
+             </para>
+             <para>
+              All remote calls support execution timeouts.
+              Using a wrapper object makes the remote
+              connection API compatible with the local one, removing
+              the need for a separate <code>timeout</code> argument, which
+              the local version would ignore. Once a request is sent,
+              it cannot be revoked from the remote server even if
+              a timeout expires: the timeout expiration only aborts the
+              wait for the remote server response, not the request itself.
+             </para>
         </listitem>
     </varlistentry>
 </variablelist>
 
- <bridgehead renderas="sect4">Example</bridgehead>
- <programlisting>
--- connect to the local server
-local self = box.net.box.new('127.0.0.1', box.info.primary_port)
-self:insert("1", "Hello", "World")
+ <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
+ <para>
+ This example will work with the sandbox configuration described in the preface.
+ That is, there is a space[0] with a numeric primary key.
+ Assume that the database is nearly empty.
+ Assume that the tarantool_box server is running on localhost 127.0.0.1:33013.
+<programlisting><prompt>localhost&gt;</prompt> <userinput> setopt delimiter = '!'</userinput>
+<prompt>localhost&gt;</prompt> <userinput> lua function example()</userinput>
+<prompt>        -&gt;</prompt> <userinput>   if self:ping() then</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print("self:ping() succeeded (not surprising since self is a pre-established connection).")</userinput>
+<prompt>        -&gt;</prompt> <userinput>     end</userinput>
+<prompt>        -&gt;</prompt> <userinput>   if box.cfg.primary_port == 33013 then</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is 33013 (the default)')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   else</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is not 33013, so connect will fail')</userinput>
+<prompt>        -&gt;</prompt> <userinput>     end</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn = box.net.box.new('127.0.0.1', 33013)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:delete(0,800)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:delete done on space[0].')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:insert(0,800,'data')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:insert done on space[0], index 0. primary key value = 800.')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   wtuple = conn:select(0,0,800)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:select done on space[0], index 0. number of fields = ', #wtuple)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:delete(0,800)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:delete done on space[0].')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:replace(0,800,'New data','Extra data')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:replace done on space[0].')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:timeout(0):update(0,800,'=p=p=p',1, 'Field#1', 2,'Field#2', 3,'Field#3')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:update done on space[0], timed out after waiting 0 seconds for a return')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:close()</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:close done')</userinput>
+<prompt>        -&gt;</prompt> <userinput> end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput> setopt delimiter = ''!</userinput>
+<prompt>localhost&gt;</prompt> <userinput> lua example()</userinput>
+---
+self:ping() succeeded (not surprising since self is a pre-established connection).
+The local server primary port number is 33013 (the default)
+conn:delete done on space[0].
+conn:insert done on space[0], index 0. primary key value = 800.
+conn:select done on space[0], index 0. number of fields = 2
+conn:delete done on space[0].
+conn:replace done on space[0].
+conn:update done on space[0], timed out after waiting 0 seconds for a return
+conn:close done
+...
+<prompt>localhost&gt;</prompt> <userinput> select * from t0 where k0 = 800 # Prove that the update succeeded.</userinput>
+Select OK, 1 rows affected
+[800, 'Field#1', 'Field#2', 'Field#3']
 </programlisting>
+</para>
 </section>
 
 <section xml:id="sp-box-cfg">

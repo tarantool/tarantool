@@ -392,6 +392,12 @@ These example scripts assume that the intent is to download from the master bran
 the server and the client (but not the documentation), and run tests after build.
 </para>
 
+<para>
+To build with SUSE 13.1, the steps are as described above, except that the appropriate YaST2 package names are:
+binutils-devel, libuuid-devel, cmake, ncurses-devel, lynx, jing, libxml2-devel, docbook_5, saxon, libxslt-devel.
+The python connector can be installed with <code>sudo easy_install pip</code> and <code>sudo pip install tarantool</code>.
+</para>
+
 </section>
 <section xml:id="getting-started-start-stop">
 <title>Starting Tarantool and making your first database</title>
