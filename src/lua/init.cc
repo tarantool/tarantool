@@ -48,7 +48,6 @@ extern "C" {
 #include "lua/ipc.h"
 #include "lua/socket.h"
 #include "lua/info.h"
-#include "lua/slab.h"
 #include "lua/stat.h"
 #include "lua/session.h"
 #include "lua/cjson.h"
@@ -324,7 +323,6 @@ tarantool_lua_init()
 	tarantool_lua_cjson_init(L);
 	tarantool_lua_yaml_init(L);
 	tarantool_lua_info_init(L);
-	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_socket_init(L);

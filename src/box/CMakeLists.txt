@@ -35,6 +35,7 @@ tarantool_module("box"
     ${lua_sources}
     lua/call.cc
     lua/tuple.cc
+    lua/slab.cc
     lua/index.cc
     lua/space.cc)
 

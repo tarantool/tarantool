@@ -79,7 +79,6 @@ set (common_sources
      lua/info.cc
      lua/stat.cc
      lua/errinj.cc
-     lua/slab.cc
      lua/plugin.cc
      lua/ipc.cc
      lua/socket.cc

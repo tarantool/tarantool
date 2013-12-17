@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/slab.h"
+#include "box/lua/slab.h"
 #include "lua/utils.h"
 
 extern "C" {
@@ -104,7 +104,7 @@ lbox_slab_check(struct lua_State *L __attribute__((unused)))
 
 /** Initialize box.slab package. */
 void
-tarantool_lua_slab_init(struct lua_State *L)
+box_lua_slab_init(struct lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "slab");

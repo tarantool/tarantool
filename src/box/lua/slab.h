@@ -30,6 +30,6 @@
  */
 
 struct lua_State;
-void tarantool_lua_slab_init(struct lua_State *L);
+void box_lua_slab_init(struct lua_State *L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_SLAB_H */

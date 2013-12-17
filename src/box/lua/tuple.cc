@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/tuple.h"
+#include "box/lua/slab.h"
 #include "box/tuple.h"
 #include "box/tuple_update.h"
 #include "fiber.h"
@@ -633,5 +634,7 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_settable(L, -3);
 	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	assert(tuple_totable_mt_ref != 0);
+
+	box_lua_slab_init(L);
 }
 
