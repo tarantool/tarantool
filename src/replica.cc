@@ -95,7 +95,6 @@ pull_from_remote(va_list ap)
 	struct ev_io coio;
 	struct iobuf *iobuf = NULL;
 	bool warning_said = false;
-	int reconnect_sleep = 0;
 	const int reconnect_delay = 1;
 
 	coio_init(&coio);
@@ -143,11 +142,10 @@ pull_from_remote(va_list ap)
 				warning_said = true;
 			}
 			evio_close(&coio);
-			reconnect_sleep = 1;
 		}
 
 		/* Put fiber_sleep() out of catch block.
-		 * 
+		 *
 		 * This is done to avoid situation, when two or more
 		 * fibers yield's inside their try/catch blocks and
 		 * throws an exceptions. Seems like exception unwinder
@@ -159,10 +157,8 @@ pull_from_remote(va_list ap)
 		 *
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
-		if (reconnect_sleep) {
+		if (! evio_is_active(&coio))
 			fiber_sleep(reconnect_delay);
-			reconnect_sleep = 0;
-		}
 	}
 }
 
