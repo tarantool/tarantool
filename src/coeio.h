@@ -36,9 +36,9 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
-#include <tarantool_ev.h>
-#include <tarantool_eio.h>
 #include <coro.h>
+#include "third_party/tarantool_ev.h"
+#include "third_party/tarantool_eio.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
