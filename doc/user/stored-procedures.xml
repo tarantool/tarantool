@@ -1049,9 +1049,9 @@ localhost&gt; <userinput>lua box.dostring('local f = function(key) t=box.select(
                 request errors (for example: unique key exception).
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>lua box.raise(box.error.ER_WAL_IO, 'Wal I/O error')</userinput>
+<programlisting>localhost&gt; <userinput>lua box.raise(box.error.ER_WAL_IO, 'WAL I/O error')</userinput>
 ---
-error: 'Wal I/O error'
+error: 'WAL I/O error'
 ...
 </programlisting>
         </listitem>

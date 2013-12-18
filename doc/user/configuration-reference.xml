@@ -548,7 +548,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
         <entry>Do not flush the write ahead log to disk more often
           than once in wal_fsync_delay seconds. By default the
           delay is zero, which means there is no flushing after writes
-          (the meaning of wait_fsync_delay=0 meay change in later versions).
+          (the meaning of wal_fsync_delay=0 may change in later versions).
           Setting the delay may be necessary to increase write
           throughput, but may lead to several last updates being
           lost in case of a power failure. Such failure, however,

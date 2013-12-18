@@ -31,7 +31,7 @@ in with the tarantool client while reading along.
 We are going to use the "tarantool_sandbox" that was created in section
 <olink targetptr="getting-started-start-stop">Starting Tarantool and making your first database</olink>.
 So there is a single space, and a numeric primary key,
-a runnning tarantool_box server, and a running tarantool client.
+a running tarantool_box server, and a running tarantool client.
 </para>
 
 <para>
@@ -311,7 +311,7 @@ lua function main_function()
   end!
 </programlisting>
 The new line here is box.replace(0,t). The first parameter is 0, because the
-insertion is going to be to space[0]. The second parmeter is the tuple value.
+insertion is going to be to space[0]. The second parameter is the tuple value.
 To be perfectly correct we could have said box.insert(0,t) here, rather than
 box.replace(0,t), but "replace" means <quote>insert even if there is already a tuple
 whose primary-key value is a duplicate</quote>, and that makes it easier to re-run

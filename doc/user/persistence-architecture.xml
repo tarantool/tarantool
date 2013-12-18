@@ -37,7 +37,7 @@ Hex dump of WAL file        Comment
 ed ab 0b ba                 Magic row marker always = 0xba0babed for version 0.11
 10 2a 1b 5e                 Record header: crc32 checksum of header fields
 02 00 00 00 00 00 00 00     Record header: 2 = (64-bit int) log sequence number
-99 c8 f1 d9 32 a8 d4 41     Record header: (double) unix time-since-epoch for transaction
+99 c8 f1 d9 32 a8 d4 41     Record header: (double) UNIX time-since-epoch for transaction
 1d 00 00 00                 Record header: 29 = length of rest of record, non-inclusive
 60 45 94 cd                 Record header: crc32 checksum of data fields
 fe ff                       Tag = XLOG which is #defined as 65534

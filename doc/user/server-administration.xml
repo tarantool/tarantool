@@ -571,7 +571,7 @@ Taking snapshots with tarantar, instead of with SAVE SNAPSHOT,
 can be better because:
 <itemizedlist>
   <listitem><para>tarantar can work even if the tarantool_box server is down
-  because it works from the existing .xnap and .xlog files,
+  because it works from the existing .snap and .xlog files,
    rather than from an in-memory database.</para></listitem>
    <listitem><para>tarantar saves memory when constructing its own in-memory
   index to the rows by making SHA-1 hashes for primary keys
@@ -720,21 +720,21 @@ tarantool_deploy.sh: done
   <section xml:id="rpm-based-distros">
     <title>Fedora, RHEL, CentOS</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 
   <section xml:id="FreeBSD">
     <title>FreeBSD</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 
   <section xml:id="mac-os-x">
     <title>Mac OS X</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 
