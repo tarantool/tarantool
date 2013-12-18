@@ -222,15 +222,6 @@ mempool_alloc_nothrow(struct mempool *pool)
 }
 
 void
-mempool_free(struct mempool *pool, void *obj)
-{
-	struct mslab *slab = (struct mslab *)
-		slab_from_ptr(pool->cache, obj, pool->slab_order);
-	pool->slabs.stats.used -= pool->objsize;
-	mslab_free(pool, slab, obj);
-}
-
-void
 mempool_stats(struct mempool *pool, struct mempool_stats *stats)
 {
 	/* Object size. */

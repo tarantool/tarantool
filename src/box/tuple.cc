@@ -277,7 +277,7 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	if (tuple->version == snapshot_version)
+	if (!talloc.is_delayed_free_mode || tuple->version == snapshot_version)
 		smfree(&talloc, ptr);
 	else
 		smfree_delayed(&talloc, ptr);

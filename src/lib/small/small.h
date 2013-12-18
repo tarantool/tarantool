@@ -186,9 +186,34 @@ small_alloc_destroy(struct small_alloc *alloc);
 void *
 smalloc_nothrow(struct small_alloc *alloc, size_t size);
 
-/** Free memory chunk allocated by the small allocator. */
 void
-smfree(struct small_alloc *alloc, void *ptr);
+small_recycle_pool(struct small_alloc *alloc, struct mempool *pool);
+
+/** Free memory chunk allocated by the small allocator. */
+/**
+ * Free a small objects.
+ *
+ * This boils down to finding the object's mempool and delegating
+ * to mempool_free().
+ *
+ * If the pool becomes completely empty, and it's a factored pool,
+ * and the factored pool's cache is empty, put back the empty
+ * factored pool into the factored pool cache.
+ */
+static inline void
+smfree(struct small_alloc *alloc, void *ptr)
+{
+	struct mslab *slab = (struct mslab *)
+		slab_from_ptr(alloc->cache, ptr, alloc->slab_order);
+	struct mempool *pool = slab->pool;
+	mempool_free(pool, ptr);
+	/*
+	 * Don't keep around empty factored pools
+	 * if the allocator is out of them.
+	 */
+	if (mempool_used(pool) == 0)
+		small_recycle_pool(alloc, pool);
+}
 
 /**
  * Free memory chunk allocated by the small allocator

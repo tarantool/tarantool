@@ -225,12 +225,22 @@ mempool_destroy(struct mempool *pool);
 void *
 mempool_alloc_nothrow(struct mempool *pool);
 
+void
+mslab_free(struct mempool *pool, struct mslab *slab, void *ptr);
+
 /**
  * Free a single object.
  * @pre the object is allocated in this pool.
  */
-void
-mempool_free(struct mempool *pool, void *ptr);
+static inline void
+mempool_free(struct mempool *pool, void *ptr)
+{
+	struct mslab *slab = (struct mslab *)
+		slab_from_ptr(pool->cache, ptr, pool->slab_order);
+	pool->slabs.stats.used -= pool->objsize;
+	mslab_free(pool, slab, ptr);
+}
+
 
 /** How much memory is used by this pool. */
 static inline size_t
