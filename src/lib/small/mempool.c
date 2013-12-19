@@ -54,7 +54,7 @@ mslab_create(struct mslab *slab, struct mempool *pool)
 }
 
 /** Beginning of object data in the slab. */
-void *
+static inline void *
 mslab_offset(struct mslab *slab)
 {
 	return (char *) slab + mslab_sizeof() +

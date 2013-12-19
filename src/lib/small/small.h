@@ -206,7 +206,8 @@ smfree(struct small_alloc *alloc, void *ptr)
 	struct mslab *slab = (struct mslab *)
 		slab_from_ptr(alloc->cache, ptr, alloc->slab_order);
 	struct mempool *pool = slab->pool;
-	mempool_free(pool, ptr);
+	pool->slabs.stats.used -= pool->objsize;
+	mslab_free(pool, slab, ptr);
 	/*
 	 * Don't keep around empty factored pools
 	 * if the allocator is out of them.
