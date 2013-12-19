@@ -108,17 +108,17 @@ f = nil
 ftest = function() box.fiber.sleep(0.01 * math.random() ) return true end
 
 --# setopt delimiter ';'
-result = {}
 for i = 1, 10 do
-    for i = 1, 300 do
+    result = {}
+    for j = 1, 300 do
         box.fiber.resume(box.fiber.create(function()
             box.fiber.detach()
             table.insert(result, ftest())
         end))
     end
+    while #result < 300 do box.fiber.sleep(0.01) end
 end;
 --# setopt delimiter ''
-while #result < 3000 do box.fiber.sleep(0.01) end
 #result
 
 --# setopt delimiter ''
