@@ -12,7 +12,6 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
-Conflicts: tarantool-dbg (<< 1.5.2)
 Standards-Version: 3.9.4
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
@@ -31,6 +30,7 @@ Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-common
+Conflicts: tarantool-dbg (<< 1.5.2)
 Suggests: tarantool-dbg, tarantool-client, libdr-tarantool-perl
 Description: In-memory database with Lua application server
  Tarantool is an in-memory database and Lua application server.
