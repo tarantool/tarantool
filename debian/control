@@ -12,6 +12,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
+Conflicts: tarantool-dbg (<< 1.5.2)
 Standards-Version: 3.9.4
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
