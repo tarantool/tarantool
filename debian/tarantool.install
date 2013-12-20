@@ -1,2 +1,2 @@
 usr/bin/tarantool_box
-client/tarantar/tarantar /usr/bin/
+usr/bin/tarantar
