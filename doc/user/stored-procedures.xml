@@ -32,8 +32,7 @@
     </para>
 </blockquote>
 <para>
-    Procedures can be invoked from the administrative
-    console and using the binary protocol, for example:
+    Procedures can be defined and invoked interactively, for example::
     <programlisting><computeroutput>localhost> <userinput>lua function f1() return 'hello' end</userinput>
 ---
 ...
@@ -42,21 +41,26 @@ Call OK, 1 rows affected
 ['hello']
 </computeroutput>
 </programlisting>
-    In the language of the administrative console
-    <olink targetptr="lua-command" /> evaluates an arbitrary
-    Lua chunk. CALL is an SQL standard statement, so its syntax
-    was adopted by Tarantool command line client
-    to invoke the CALL command of the binary protocol.
+    In the above example, the word <olink targetptr="lua-command"><emphasis>lua</emphasis></olink>
+    is a signal to send the request, via the <olink targetptr="admin_port">administrative port</olink>,
+    using the text protocol, for evaluation as a chunk of Lua code.
+    The word <link linkend="utility-tarantool-call"><emphasis>call</emphasis></link>
+    is a signal to send the request, via the <olink targetptr="primary_port">primary port</olink>,
+    using the binary protocol, for execution of a previously-defined procedure. 
+    (CALL is an SQL standard statement so its syntax
+    was adopted by the Tarantool command-line client.)
 </para>
 <para>
-    In the example above, "<code>lua function f1() return 'hello' end</code>" defines a Lua procedure
-    using the text protocol of the administrative port,
-    and "<code>call f1()</code>" invokes the procedure using the Tarantool client-side SQL
-    parser plus the binary protocol on the <olink targetptr="primary_port" />.
-    Since it's possible to execute any Lua chunk in the
-    administrative console, the newly created <code
-    language="Lua">function f1()</code>
-    can be invoked there too:
+    Thus, "<code>lua function f1() return 'hello' end</code>" sends over
+    the administrative port as text, and causes definition of the procedure.
+    Then "<code>call f1()</code>" uses the client-side SQL parser to convert
+    to binary, sends over the primary port as binary, and causes execution of
+    the procedure.
+</para>
+<para>
+    Since it's possible to execute any Lua chunk via the
+    administrative port, one can say <code language="Lua">lua f1()</code>
+    to invoke the function, instead of <code>call f1()</code> ...
     <programlisting><computeroutput>localhost> <userinput>lua f1()</userinput>
 ---
  - hello
@@ -65,7 +69,7 @@ localhost> <userinput>lua 1+2</userinput>
 ---
  - 3
 ...
-localhost> <userinput>lua "hello".." world"</userinput>
+localhost> <userinput>lua 'hello'..' world'</userinput>
 ---
  - hello world
 ...
@@ -74,7 +78,8 @@ localhost> <userinput>lua "hello".." world"</userinput>
   <para>
     Lua procedures could also be called at the time of initialization
     using a dedicated <filename xml:id="init.lua" xreflabel="init.lua">init.lua</filename> script,
-    located in <olink targetptr="script_dir" />.
+    located in 
+     <olink targetptr="script_dir"><filename>script_dir</filename></olink>.
 
     An example of such a script is given below:
     <programlisting>
@@ -130,25 +135,28 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
     There is a single global instance of the Lua interpreter, which is
     shared across all connections. Anything prefixed with
     <code>lua </code> on the administrative console is sent
-    directly to this interpreter. Any change of the interpreter
-    state is immediately available to all client connections.
+    directly to this interpreter. Any changes of the interpreter
+    state, including global variable values, have immediate
+    effect on all client connections.
   </para>
   <para>
-    Each connection, however, is using its own Lua
-    <emphasis>coroutine</emphasis> &mdash; a mechanism akin to
-    Tarantool <emphasis>fibers</emphasis>. A coroutine has an
-    own execution stack and a Lua <emphasis>closure</emphasis>
-    &mdash; set of local variables and definitions.
+    However, each connection uses its own Lua
+    <emphasis>coroutine</emphasis> &mdash; a mechanism akin to a
+    Tarantool <emphasis>fiber</emphasis>. A coroutine has its
+    own execution stack and its own set of local variables and
+    definitions, as described in the 
+    <link xlink:href="http://www.lua.org/pil/6.1.html">
+    <emphasis>closure</emphasis> section</link> of the Lua manual. 
   </para>
   <para>
      The interpreter environment is not restricted when
      <olink targetptr="init.lua"/> is loaded. But before the
-     server starts accepting requests, the standard Lua APIs, such
-     as for file I/O, process control and module management are
-     unset, to avoid possible trivial security attacks.
+     server starts accepting requests, it disables access to
+     some of the standard Lua APIs for file I/O, process control,
+     and module management. This prevents trivial security attacks.
   </para>
   <para>
-    In the binary protocol, it's only possible to <emphasis
+    With the binary protocol, it's only possible to <emphasis
     role="strong">call</emphasis> existing
     procedures, but not <emphasis role="strong">define</emphasis>
     or <emphasis role="strong">alter</emphasis> them. The
@@ -157,7 +165,7 @@ expirationd.run_task("exprd space 0", 0, is_expired, purge,
     arguments. Currently, Tarantool tuples are type-agnostic,
     thus each field of the tuple is passed into the procedure
     as an argument of type <quote>string</quote>. For example:
-<programlisting><computeroutput>kostja@atlas:~$ cat arg.lua
+<programlisting><computeroutput>kostja@atlas:~<prompt>$</prompt> <userinput>cat arg.lua</userinput>
 function f1(a)
     local s = a
     if type(a) == 'string' then
@@ -168,7 +176,7 @@ function f1(a)
     end
     return type(a), s
 end
-kostja@atlas:~$ tarantool
+kostja@atlas:~<prompt>$</prompt> <userinput>tarantool</userinput>
 localhost> <userinput>lua dofile('arg.lua')</userinput>
 ---
 ...
@@ -197,8 +205,8 @@ Call OK, 2 rows affected
     a 4-byte blob, not as a Lua <quote>number</quote> type.
     </para>
     <para>In addition to conventional method invocation,
-    Lua provides object-oriented syntax. Access to the latter is
-    available on the administrative console only:
+    Lua provides object-oriented syntax. Use of object-oriented
+    syntax is possible on the administrative port only:
     <programlisting><computeroutput>localhost> <userinput>lua box.space[0]:truncate()</userinput>
 ---
 ...
@@ -221,15 +229,15 @@ error: 1:15 expected '('
   <para>
     When a function in Lua terminates with an error, the error
     is sent to the client as <olink targetptr="ER_PROC_LUA" />
-    return code, with the original error message preserved.
+    return code, along with the original error message.
     Similarly, an error which has occurred inside Tarantool (observed on the
     client as an error code), when it happens during execution of a
     Lua procedure, produces a genuine Lua error:
-<programlisting><computeroutput>localhost> <userinput>lua function f1() error("oops") end</userinput>
+<programlisting><computeroutput>localhost> <userinput>lua function f1() error('oops') end</userinput>
 ---
 ...
 localhost> <userinput>call f1()</userinput>
-Call ERROR, Lua error: [string "function f1() error("oops") end"]:1: oops (ER_PROC_LUA)
+Call ERROR, Lua error: [string "function f1() error('oops') end"]:1: oops (ER_PROC_LUA)
 localhost> <userinput>call box.insert('99', 1, 'test')</userinput>
 Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
 localhost> <userinput>lua pcall(box.insert, 99, 1, 'test')</userinput>
@@ -240,12 +248,11 @@ localhost> <userinput>lua pcall(box.insert, 99, 1, 'test')</userinput>
 </computeroutput></programlisting>
   </para>
   <para>
-    It's possible not only to invoke trivial Lua code, but call
-    into Tarantool storage functionality, using the
-    <code>box</code>
-    Lua library. The contents of the library can be
+    As well as executing Lua chunks or defining their own functions,
+    users can exploit the Tarantool server's storage functionality
+    with the <code>box</code> Lua library. The contents of <code>box</code> can be
     inspected at runtime:
-<programlisting><computeroutput>localhost> <userinput>lua for k, v in pairs(box) do print(k, ": ", type(v)) end</userinput>
+<programlisting><computeroutput>localhost> <userinput>lua for k, v in pairs(box) do print(k, ': ', type(v)) end</userinput>
 ---
 fiber: table
 space: table
@@ -261,20 +268,21 @@ unpack: function
 replace: function
 select_range: function
 pack: function
+tuple: table
+socket: table
 ...</computeroutput></programlisting>
-    As is shown in the listing, the <code>box</code> package contains:
+    As is shown in the partial listing above, the <code>box</code> package contains:
     <itemizedlist>
         <listitem><para>
             high-level functions, such as
-            <code>process(), update(), select(), select_range(), insert(),
-                replace(), delete()</code>, to manipulate
+            <code>update(), process(),  delete(), insert(), select(),  
+                replace(), select_range()</code>, to manipulate
                 tuples and access spaces from Lua.
         </para></listitem>
         <listitem><para>
-            libraries, such as <code>cfg, space, fiber, index, tuple</code>,
-            to access server configuration, create, resume and
-            interrupt fibers, inspect contents of spaces, indexes
-            and tuples, send and receive data over the network.
+            libraries of functions, such as <code>fiber, space, cfg, socket</code>,
+            to create or resume or interrupt fibers, inspect contents of spaces, access server configuration,
+            and send or receive data over a network.
         </para></listitem>
     </itemizedlist>
   </para>
@@ -284,29 +292,30 @@ pack: function
     <varlistentry>
         <term xml:id="tonumber64" xreflabel="tonumber64"> <emphasis role="lua">tonumber64(value)</emphasis></term>
         <listitem>
-            <para>Convert a given string or a Lua number to a
-            64-bit integer. The returned value supports all
-            arithmetic operations, but uses
-            64-bit integer arithmetic, rather than floating-point
-            arithmetic as in the built-in number type.
+            <para>Convert a string or a Lua number to a
+            64-bit integer. The result can be used in arithmetic,
+            and the arithmetic will be 64-bit integer arithmetic
+            rather than floating-point arithmetic. (Operations on
+            an unconverted Lua number use floating-point arithmetic.)
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>lua tonumber64('123456789'), tonumber64(123456789)</userinput>
+localhost> <userinput>lua 123456789012345, tonumber64(123456789012345)</userinput>
 ---
- - 123456789
- - 123456789
+ - 1.2345678901234e+14
+ - 123456789012345
 ...
-localhost> <userinput>lua i=tonumber64(1)</userinput>
+localhost> <userinput>lua i = tonumber64('1000000000')</userinput>
 ---
 ...
-localhost> <userinput>lua type(i), type(i*2),  type(i/2), i, i*2, i/2</userinput>
+localhost> <userinput>lua type(i), i/2, i-2, i*2, i+2, i%2, i^2</userinput>
 ---
  - cdata
- - cdata
- - cdata
- - 1
- - 2
+ - 500000000
+ - 999999998
+ - 2000000000
+ - 1000000002
  - 0
+ - 1000000000000000000
 ...
 </programlisting>
             </para>
@@ -338,18 +347,17 @@ localhost> <userinput>lua type(i), type(i*2),  type(i/2), i, i*2, i/2</userinput
                 and other convenience wrappers
                 invoke <code>box.process()</code> with
                 correctly packed arguments.
-                <bridgehead renderas="sect4">Parameters</bridgehead>
-                <simplelist>
-                    <member><code>op</code> &mdash; number, any
+               </para>
+               <para>
+               Parameters: (1) <code>op</code> &mdash; number, any
                     Tarantool command code, except 22 (CALL). See
                     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>.
-                    </member>
-                    <member><code>request</code> &mdash; command
-                    arguments packed in binary format.</member>
-                </simplelist>
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                This function returns zero or more tuples. In Lua, a
+                (2) <code>request</code> &mdash; command
+                    arguments packed in binary format.
+                </para>
+                <para>
+                Returns: This function returns zero or more tuples. In Lua, a
                 tuple is represented by a
                 <emphasis>userdata</emphasis> object of type
                 <code xlink:href="#box.tuple">box.tuple</code>. If
@@ -357,8 +365,9 @@ localhost> <userinput>lua type(i), type(i*2),  type(i/2), i, i*2, i/2</userinput
                 console, returned tuples are printed out in YAML
                 format.  When called from the binary
                 protocol, the binary format is used.
-                <bridgehead renderas="sect4">Errors</bridgehead>
-                Any server error produced by the executed
+               </para>
+               <para>
+               Possible Errors: Any server error produced by the executed
                 command.
             </para>
             <para>
@@ -384,20 +393,19 @@ localhost> <userinput>lua type(i), type(i*2),  type(i/2), i, i*2, i/2</userinput
             <para>
                 Search for a tuple or tuples in the given space. A
                 wrapper around <code>box.process()</code>.
-                <bridgehead renderas="sect4">Parameters</bridgehead>
-                <simplelist>
-                    <member><code>space_no</code> &mdash; space id,
-                    </member>
-                    <member><code>index_no</code> &mdash; index number in the
-                        space, to be used for match</member>
-                    <member><code>...</code>&mdash; index key,
+               </para>
+               <para>
+                Parameters: (1) <code>space_no</code> &mdash; space id,
+               (2) <code>index_no</code> &mdash; index number in the
+                        space, to be used for matching,
+               (3) <code>...</code>&mdash; index key,
                     possibly multipart.
-                    </member>
-                </simplelist>
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Returns zero or more tuples.
-                <bridgehead renderas="sect4">Errors</bridgehead>
-                Same as in <code>box.process()</code>. Any error
+                </para>
+                <para>
+                Returns: this function returns zero or more tuples.
+               </para>
+               <para>
+               Possible Errors: Same as in <code>box.process()</code>. Any error
                 results in a Lua exception.
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
@@ -432,9 +440,10 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
                 <code>box.insert()</code> returns an error.
                 This function is a
                 wrapper around <code>box.process()</code>.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Returns the inserted tuple.
-	    </para>
+               </para>
+               <para>
+                Returns: this function returns the inserted tuple.
+               </para>
 	</listitem>
     </varlistentry>
 
@@ -469,8 +478,9 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
                 <code>box.replace()</code> replaces the existing
                 tuple with a new one. This function is a
                 wrapper around <code>box.process()</code>.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Returns the inserted tuple.
+            </para>
+            <para>
+            Returns: this function returns the inserted tuple.
             </para>
         </listitem>
     </varlistentry>
@@ -511,8 +521,11 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
                 and then assign a value to a field", the first affected field
                 is field 1 and the value which will be added to it is 55, the second affected field
                 is field 3 and the value which will be assigned to it is 'x'.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Returns the updated tuple.
+               </para>
+               <para>
+               Returns: This function returns the updated tuple.
+              </para>
+              <para>
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 #Assume that the initial state of the database is ...
@@ -585,8 +598,9 @@ lua box.update(0, 999, ':p', 1, box.pack('ppp', 1, 1, '!'))
         </term>
         <listitem><para>
             Delete a tuple identified by a primary key.
-            <bridgehead renderas="sect4">Returns</bridgehead>
-            Returns the deleted tuple.
+           </para>
+           <para>
+            Returns: this function returns the deleted tuple.
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 localhost> <userinput>call box.delete(0, 'test')</userinput>
@@ -620,7 +634,7 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the start of the index.
             This is a simple wrapper around <code xlink:href="#box.space.select_range">box.space[space_no]:select_range(index_no, ...)</code>.
-            BITSET index does not support this call.
+            This call does not work with a BITSET index.
         </para>
         <para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -689,7 +703,7 @@ localhost> <userinput>lua box.select_range(4, 1, 2, '1')</userinput>
             the index.
             </para>
             <para>
-            For TREE indexes, this returns tuples in sorted order.
+            For TREE indexes, this returns tuples in descending sorted order.
             For other index types this call is not supported.
             If <code>key</code> is <code>nil</code> or unspecified,
             the selection starts from the end of the index.
@@ -746,7 +760,8 @@ localhost> <userinput>lua box.select_reverse_range(4, 1, 2, '1')</userinput>
             To use Tarantool binary protocol primitives from Lua,
             it's necessary to convert Lua variables to binary
             format. This helper function is prototyped after Perl
-            'pack'. It takes a format and a list of arguments, and
+            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
+            'pack'</link>. It takes a format and a list of arguments, and
             returns a binary string with all arguments packed
             according to the format.
             <bridgehead renderas="sect4">Format specifiers</bridgehead>
@@ -815,31 +830,34 @@ localhost> <userinput>lua box.select_reverse_range(4, 1, 2, '1')</userinput>
                 describe operation arguments.
                 </member>
             </simplelist>
-        <bridgehead renderas="sect4">Errors</bridgehead>
-        Unknown format specifier.
+           </para>
+           <para>
+        Possible Errors: Unknown format specifier.
+       </para>
+       <para>
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 localhost> <userinput>lua box.insert(0, 0, 'hello world')</userinput>
 ---
  - 0: {'hello world'}
 ...
-localhost> <userinput>lua box.update(0, 0, "=p", 1, 'bye world')</userinput>
+localhost> <userinput>lua box.update(0, 0, '=p', 1, 'bye world')</userinput>
 ---
  - 0: {'bye world'}
 ...
-localhost> <userinput>lua box.update(0, 0, ":p", 1, box.pack('ppp', 0, 3, 'hello'))</userinput>
+localhost> <userinput>lua box.update(0, 0, ':p', 1, box.pack('ppp', 0, 3, 'hello'))</userinput>
 ---
  - 0: {'hello world'}
 ...
-localhost> <userinput>lua box.update(0, 0, "=p", 1, 4)</userinput>
+localhost> <userinput>lua box.update(0, 0, '=p', 1, 4)</userinput>
 ---
  - 0: {4}
 ...
-localhost> <userinput>lua box.update(0, 0, "+p", 1, 4)</userinput>
+localhost> <userinput>lua box.update(0, 0, '+p', 1, 4)</userinput>
 ---
  - 0: {8}
 ...
-localhost> <userinput>lua box.update(0, 0, "^p", 1, 4)</userinput>
+localhost> <userinput>lua box.update(0, 0, '^p', 1, 4)</userinput>
 ---
  - 0: {12}
 ...
@@ -852,7 +870,7 @@ localhost> <userinput>lua box.update(0, 0, "^p", 1, 4)</userinput>
         <listitem><para>
             Counterpart to <code>box.pack()</code>.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>lua tuple=box.replace(2, 0)</userinput>
+<programlisting>localhost> <userinput>lua tuple = box.replace(2, 0)</userinput>
 ---
 ...
 localhost> <userinput>lua string.len(tuple[0])</userinput>
@@ -976,7 +994,7 @@ localhost&gt; <userinput>lua box.dostring('local f = function(key) t=box.select(
         </term>
         <listitem>
             <para>
-                Returns current system time (in seconds) as a 64-bit
+                Returns current system time (in microseconds since the epoch) as a 64-bit
                 integer. The time is taken from the event loop clock.
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost&gt; <userinput>lua box.time(),box.time64()</userinput>
@@ -1040,12 +1058,12 @@ localhost&gt; <userinput>lua box.dostring('local f = function(key) t=box.select(
                 client as <constant>ER_PROC_LUA</constant>. This function
                 makes it possible to emulate any kind of native exception,
                 such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</link>
-                file in the source tree.
+                 etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h"><filename>errcode.h</filename></link>
+                in the source tree.
                 Lua constants which correspond to Tarantool errors
-                are defined in <code>box.error</code> module. The error
+                are defined in the <code>box.error</code> module. The error
                 message can be arbitrary.
-                Throws client error. Lua procedure can emulate any
+                Lua procedures can use <code>box.raise()</code> to emulate
                 request errors (for example: unique key exception).
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -1067,11 +1085,11 @@ error: 'WAL I/O error'
                 NUM or NUM64 primary key index of type TREE.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>lua box.auto_increment(0, "I am a duplicate")</userinput>
+<programlisting>localhost> <userinput>lua box.auto_increment(0, 'I am a duplicate')</userinput>
 ---
  - 1: {'I am a duplicate'}
 ...
-localhost> <userinput>lua box.auto_increment(0, "I am a duplicate")</userinput>
+localhost> <userinput>lua box.auto_increment(0, 'I am a duplicate')</userinput>
 ---
  - 2: {'I am a duplicate'}
 ...
@@ -1129,7 +1147,7 @@ localhost> <userinput>lua box.counter.dec(0, 'top.mail.ru')</userinput>
 <section xml:id="sp-box-tuple">
     <title>Package <code>box.tuple</code></title>
 <variablelist xml:id="box.tuple" xreflabel="box.tuple">
-    <para>This package provides read-only access for the <code>box.tuple</code> userdata
+    <para>The <code>box.tuple</code> package provides read-only access for the <code>box.tuple</code> userdata
     type. It allows, for a single tuple: selective retrieval of the
     field contents, retrieval of information about size,
     iteration over all the fields, and conversion to a Lua table.
@@ -1149,10 +1167,10 @@ localhost> <userinput>lua box.counter.dec(0, 'top.mail.ru')</userinput>
                 Saying <code>lua t</code> returns the entire tuple t.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua x=box.insert(0,'a',tonumber('1'),tonumber64('2')):totable()</userinput>
+            <programlisting>localhost&gt; <userinput>lua x = box.insert(0,'a',tonumber('1'),tonumber64('2')):totable()</userinput>
 ---
 ...
-localhost> <userinput>lua t=box.tuple.new({'abc','def','ghi','abc'})</userinput>
+localhost> <userinput>lua t = box.tuple.new({'abc','def','ghi','abc'})</userinput>
 ---
 ...
 localhost> <userinput>lua t</userinput>
@@ -1175,7 +1193,7 @@ localhost> <userinput>lua t</userinput>
                 and then the number of fields in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua #t</userinput>
@@ -1203,7 +1221,7 @@ localhost&gt; <userinput>lua #t</userinput>
              so bsize() returns  3*(1+3).
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'aaa','bbb','ccc'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'aaa','bbb','ccc'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:bsize()</userinput>
@@ -1225,7 +1243,7 @@ localhost&gt; <userinput>lua t:bsize()</userinput>
                 and then the second field in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t[1]</userinput>
@@ -1253,7 +1271,7 @@ localhost&gt; <userinput>lua t[1]</userinput>
               are returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'a','b','c','a'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'a','b','c','a'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:find('a')</userinput>
@@ -1286,7 +1304,7 @@ localhost&gt; <userinput>lua t:findall(1,'a')</userinput>
              but one new one is added, then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+            <programlisting>localhost&gt; lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
 ---
 ...
 localhost&gt; <userinput>lua t:transform(1,2,'x')</userinput>
@@ -1311,7 +1329,7 @@ localhost&gt; <userinput>lua t:transform(1,2,'x')</userinput>
              then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:slice(1,3)</userinput>
@@ -1334,7 +1352,7 @@ localhost&gt; <userinput>lua t:slice(1,3)</userinput>
              then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:unpack()</userinput>
@@ -1360,7 +1378,7 @@ localhost&gt; <userinput>lua t:unpack()</userinput>
             and then all its fields are selected using a Lua for-end loop.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; lua t=box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+<programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua for k,v in t:pairs() do print(v) end</userinput>
@@ -1382,8 +1400,8 @@ Field#5
 
 <variablelist xml:id="box.cjson" xreflabel="box.cjson">
     <para>
-        This package provides JSON manipulation routines.
-        It's based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
+        The <code>box.cjson</code> package provides JSON manipulation routines.
+        It is based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
         Lua-CJSON package by Mark Pulford</link>.
 
         For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
@@ -1442,37 +1460,36 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
 <section xml:id="sp-box-space">
     <title>Package <code>box.space</code></title>
 <variablelist xml:id="box.space" xreflabel="box.space">
-    <para>This package is a container for all
-    configured spaces. A space object provides access to space
+    <para>The <code>box.space</code> package provides access to space
     attributes, such as id, whether or not a space is
     enabled, space cardinality, and estimated number of rows. It also
     contains object-oriented versions of <code>box</code>
     functions. For example, instead of <code>box.insert(0, ...)</code>
     one can write <code>box.space[0]:insert(...)</code>.
     Package source code is available in file <filename
-    xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/box.lua">src/box/lua/box.lua</filename></para>
+    xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/box.lua">src/box/lua/box.lua</filename>.</para>
     <para>A list of all <code>space</code> members follows.</para>
     <varlistentry>
         <term><emphasis role="lua">space.n</emphasis></term>
-        <listitem><simpara>Ordinal space number, <code>box.space[i].n == i</code></simpara></listitem>
+        <listitem><para>Ordinal space number, <code>box.space[i].n == i</code></para></listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">space.enabled</emphasis></term>
-        <listitem><simpara>
+        <listitem><para>
             Whether or not this space is enabled in the
             configuration file.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">space.cardinality</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             A limit on tuple field count for tuples in this space.
             This limit can be set in the configuration file. Value 0
             stands for <quote>unlimited</quote>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1499,11 +1516,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             <emphasis role="lua">space:select(index_no, ...)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:select(<replaceable>index_number...</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.select">box.select(<replaceable>space_number</replaceable>,<replaceable>index_number...</replaceable>)</code>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1513,11 +1530,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             </emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:select_range(<replaceable>index_number...</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.select_range">box.select_range(<replaceable>space_number</replaceable>,<replaceable>index_number...</replaceable>)</code>.
-        </simpara>
+        </para>
         </listitem>
     </varlistentry>
 
@@ -1529,11 +1546,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             space:select_reverse_range(limit, key)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:select_reverse_range(<replaceable>index_number...</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.select_range">box.select_reverse_range(<replaceable>space_number</replaceable>,<replaceable>index_number...</replaceable>)</code>.
-        </simpara>
+        </para>
         </listitem>
     </varlistentry>
     <varlistentry>
@@ -1541,11 +1558,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             <emphasis role="lua">space:insert(...)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:insert(<replaceable>key</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.insert">box.insert(<replaceable>space_number</replaceable>,<replaceable>key</replaceable>)</code>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1553,11 +1570,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             <emphasis role="lua">space:replace(...)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:replace(<replaceable>key</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.replace">box.replace(<replaceable>space_number</replaceable>,<replaceable>key</replaceable>)</code>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1565,11 +1582,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             <emphasis role="lua">space:delete(key)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:delete(<replaceable>key</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.delete">box.delete(<replaceable>space_number</replaceable>,<replaceable>key</replaceable>)</code>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1577,11 +1594,11 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             <emphasis role="lua">space:update(key, format, ...)</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
         <code>lua box.space[<replaceable>space_number</replaceable>]:update(<replaceable>key</replaceable>)</code>
         is the object-oriented equivalent of
         <code xlink:href="#box.update">box.update(<replaceable>space_number</replaceable>,<replaceable>key</replaceable>)</code>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1624,10 +1641,10 @@ localhost&gt; <userinput>lua box.space[0]:len()</userinput>
             <emphasis role="lua">space:pairs()</emphasis>
         </term>
         <listitem>
-        <simpara>
+        <para>
             A helper function to iterate over all space tuples,
             Lua style.
-        </simpara>
+        </para>
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</userinput>
@@ -1647,37 +1664,37 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
     <title>Package <code >box.index</code></title>
 <variablelist xml:id="box.index" xreflabel="box.index">
     <para>
-        This package implements methods of type <code>box.index</code>.
+        The <code>box.index</code> package provides read-only access for index definitions and index keys.
         Indexes are contained in <code
         xlink:href="#box.space">box.space[i].index[]</code> array
         within each space object. They provide an API for
         ordered iteration over tuples. This API is a direct
-        binding to corresponding methods of index objects in the
+        binding to corresponding methods of index objects of type <code>box.index</code> in the
         storage engine.
     </para>
     <varlistentry>
         <term><emphasis role="lua">index.unique</emphasis></term>
-        <listitem><simpara>
+        <listitem><para>
             Boolean, true if the index is unique.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">index.type</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             A string for index type, either 'TREE', 'HASH', or 'BITSET'.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">index.key_field[]</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             An array describing index key fields.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1686,7 +1703,12 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
         </term>
         <listitem><para>
             The underlying userdata which does all the magic.
-        <bridgehead renderas="sect4">Example</bridgehead>
+           </para></listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost&gt; <userinput>lua box.space[0].index[0].unique,box.space[0].index[0].type,box.space[0].index[0].key_field[0],box.space[0].index[0].idx</userinput>
 ---
  - true
@@ -1694,8 +1716,7 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
  - table: 0x41d03518
  - index 0 in space 0
 ...
-</programlisting>
-        </para></listitem>
+</programlisting></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1704,7 +1725,7 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
             index:iterator(type, ...)</emphasis>
         </term>
         <listitem>
-            <simpara>
+            <para>
                 This method provides iteration support within an
                 index. Parameter <code>type</code> is used to
                 identify the semantics of iteration. Different
@@ -1715,7 +1736,7 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
                 can return all tuples in ascending or descending
                 order, starting from the specified key. Other
                 index types, however, do not support ordering.
-            </simpara>
+            </para>
             <para xml:id="iterator-consistency">
                 To understand consistency of tuples
                 returned by an iterator, it's essential to know
@@ -1734,18 +1755,18 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
                 content of the database.
             </para>
             <para>
-                <bridgehead renderas="sect4">Parameters</bridgehead>
-                <simplelist>
-                        <member><code>type</code> &mdash; iteration strategy as defined in tables below.</member>
-                </simplelist>
-
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                    This method returns an iterator closure, i.e.
+                Parameters:
+                <code>type</code> &mdash; iteration strategy as defined in tables below.
+            </para>
+            <para>
+               Returns: this method returns an iterator closure, i.e.
                     a <code>function</code> which can be used to
                     get the next value on each invocation.
-                <bridgehead renderas="sect4">Errors</bridgehead>
+            </para>
+            <para>
+               Possible Errors:
                     Selected iteration type is not supported in
-                    the subject index type or supplied parameters
+                    the subject index type, or supplied parameters
                     do not match iteration type.
             </para>
 
@@ -1781,15 +1802,15 @@ localhost> <userinput>INSERT INTO t0 VALUES (5, 2, 1)</userinput>
 Insert OK, 1 rows affected
 localhost> <userinput>INSERT INTO t0 VALUES (6, 2, 2)</userinput>
 Insert OK, 1 rows affected
-localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), " ", it(), " ", it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), ' ', it(), ' ', it());</userinput>
 ---
 1: {1, 0} 2: {1, 1} 3: {1, 2}
 ...
-localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), " ", it(), " ", it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), ' ', it(), ' ', it());</userinput>
 ---
 3: {1, 2} nil nil
 ...
-localhost> <userinput>lua i = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), " ", it(), " ", it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), ' ', it(), ' ', it());</userinput>
 ---
 5: {2, 1} 6: {2, 2} nil
 ...
@@ -1880,7 +1901,7 @@ error: 'Iterator type is not supported'
            tuple, a key, or one or more key parts. Returns the number of matched
            tuples.
         <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>lua box.space[0].index[0]:count("Alpha")</userinput>
+<programlisting>localhost&gt; <userinput>lua box.space[0].index[0]:count('Alpha')</userinput>
 ---
  - 1
 ...
@@ -1894,8 +1915,7 @@ error: 'Iterator type is not supported'
 
 <section xml:id="sp-box-fiber">
     <title>Package <code>box.fiber</code></title>
-    <para>Functions in this package allow for creating, running and
-    managing <emphasis>fibers</emphasis>.
+    <para>The <code>box.fiber</code> package allows for creating, running and managing <emphasis>fibers</emphasis>.
     </para>
     <para>
 A fiber is a set of instructions which are executed
@@ -1917,7 +1937,7 @@ and is running only if the creator has called
 the Tarantool internal <quote>sched</quote> fiber, and gets
 scheduled only if there is a libev event associated
 with it.
-To detach, a running fiber must invoke <code>box.fiber.detach()</code>.
+To detach, a running fiber should invoke <code>box.fiber.wrap()</code>.
 A detached fiber loses connection with its parent forever.
     </para>
     <para>
@@ -1963,31 +1983,31 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         <term>
             <emphasis role="lua" xml:id="box.fiber.id">box.fiber.id(fiber) </emphasis>
         </term>
-        <listitem><simpara>Return a numeric id of the fiber.</simpara></listitem>
+        <listitem><para>Return a numeric id of the fiber.</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.self">box.fiber.self() </emphasis>
         </term>
-        <listitem><simpara>Return <code>box.fiber</code> userdata
-        object for the currently scheduled fiber.</simpara></listitem>
+        <listitem><para>Return <code>box.fiber</code> userdata
+        object for the currently scheduled fiber.</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.find">box.fiber.find(id) </emphasis>
         </term>
-        <listitem><simpara>Locate a fiber userdata object by id.</simpara></listitem>
+        <listitem><para>Locate a fiber userdata object by id.</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(function) </emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             Create a fiber for a <code>function</code>. There will be an error if the function does not exist or if a recursion limit is hit.
-        </simpara>
+        </para>
         </listitem>
     </varlistentry>
 
@@ -1995,15 +2015,15 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         <term>
             <emphasis role="lua" xml:id="box.fiber.resume">box.fiber.resume(fiber, ...) </emphasis>
         </term>
-        <listitem><simpara>Resume a created
-        or suspended fiber.</simpara></listitem>
+        <listitem><para>Resume a created
+        or suspended fiber.</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
          <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield([arguments])">box.fiber.yield(...) </emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
         If the fiber is attached, yield control to the calling fiber if the fiber
         is attached; otherwise, yield to sched.
         If the fiber is attached, arguments passed
@@ -2011,87 +2031,86 @@ and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs
         If the fiber is detached, <code>box.fiber.yield()</code>
         arguments passed to box.fiber.yield are returned after temporarily
         yielding control back to the scheduler.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.detach">box.fiber.detach()</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
         Detach the current fiber. This is a cancellation point. This is a yield point.
-        </simpara></listitem>
+        It is usually more convenient to use <code>box.fiber.wrap()</code> for detaching.
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.wrap">box.fiber.wrap(function, ...)</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             This is a quick way to create and start a detached
             fiber. The fiber function is passed in the first
             argument, the function arguments follow. The fiber is
             created, detached, and resumed immediately.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.sleep">box.fiber.sleep(time)</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
     Yield to the sched fiber and sleep <code>time</code> seconds.
     Only the current fiber can be made to sleep.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(fiber)</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
          Returns the status of <code>fiber</code>. If no argument is
          provided, the current fiber's status is returned. The
          status can be one of: <quote>dead</quote>,
          <quote>suspended</quote>, <quote>attached</quote>
          or <quote>running</quote>.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.cancel">box.fiber.cancel(fiber)</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
         Cancel a <code>fiber</code>.
         Running and suspended fibers can be canceled.
         Returns an error if the subject fiber does not permit cancel.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.fiber.testcancel">box.fiber.testcancel()</emphasis>
         </term>
-        <listitem><simpara>
+        <listitem><para>
             Check if the current fiber has been canceled and
             throw an exception if this is the case.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 </variablelist>
 
 <para>
 <bridgehead renderas="sect4">Example</bridgehead>
 Make the function which will be associated with the fiber.
-When this function gets invoked, it will immediately "detach"
-so it will be running independently of the caller, and then
-will enter an infinite loop ("while 0 == 0" is an infinite
-loop). Each iteration of the loop adds 1 to a global variable
-named gvar, then goes to sleep for 2 seconds,
-then yields. The sleep causes an implicit box.fiber.yield().<programlisting>
+This function contains an infinite loop
+("while 0 == 0" is always true).
+Each iteration of the loop adds 1 to a global variable
+named gvar, then goes to sleep for 2 seconds.
+The sleep causes an implicit box.fiber.yield().<programlisting>
 <prompt>localhost&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
 <prompt>localhost&gt;</prompt><userinput> lua function function_x ()</userinput>
-<prompt>        -&gt;</prompt><userinput>   box.fiber.detach()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
 <prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
@@ -2101,35 +2120,36 @@ then yields. The sleep causes an implicit box.fiber.yield().<programlisting>
 ---
 ...
 <prompt>localhost&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
-Make the fiber and associate the function with it.
- Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> lua fiber_of_x = box.fiber.create(function_x)</userinput>
+Make a fiber, associate function_x with the fiber,
+and start function_x. It will immediately "detach"
+so it will be running independently of the caller.
+<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua fiber_of_x = box.fiber.wrap(function_x)</userinput>
+---
+...</programlisting>
+
+Get the id of the fiber (fid), to be used in later displays.<programlisting>
+<prompt>localhost&gt;</prompt><userinput> lua fid = box.fiber.wrap(function_x)</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> lua fid = box.fiber.id(fiber_of_x)</userinput>
----
-...</programlisting>
-"Resume" the fiber. This causes invocation of the function.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> lua box.fiber.resume(fiber_of_x)</userinput>
----
-...</programlisting>
+</programlisting>
 Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua print('fiber=',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
 ---
 fiber=104. suspended. gvar=9
 ...</programlisting>
 Pause for a while, while the detached function runs. Then ...
 Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
-gone up a bit more depending how long  pause lasted). This time
+gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
 <prompt>localhost&gt;</prompt><userinput> lua box.fiber.cancel(fiber_of_x)</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> lua print("fiber=",fid,". ",box.fiber.status(fiber_of_x),". gvar=",gvar)</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua print('fiber=',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
 ---
 fiber=104. dead. gvar=22
 ...</programlisting>
@@ -2142,49 +2162,50 @@ fiber=104. dead. gvar=22
 <section xml:id="sp-box-session">
     <title>Package <code>box.session</code></title>
     <para>
-     Query session state, write to a session-specific temporary
-     record, or set up triggers which will fire when a session
-     starts or ends. A <emphasis>session</emphasis> is an object associated with each client connection.
+    The <code>box.session</code> package allows querying the session state,
+    writing to a session-specific temporary record, or settubg up triggers
+    which will fire when a session starts or ends.
+    A <emphasis>session</emphasis> is an object associated with each client connection.
     </para>
 <variablelist>
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.id() </emphasis>
         </term>
-        <listitem><simpara>Return the unique numeric identifier
+        <listitem><para>Return the unique numeric identifier
         (ID) for the current session. The result can be 0 meaning
         there is no session (for example because a function is
         running in a detached fiber).
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
             <emphasis role="lua">box.session.exists(id) </emphasis>
         </term>
-        <listitem><simpara>If the specified session exists, return true (1).
-        otherwise return false (0).</simpara></listitem>
+        <listitem><para>If the specified session exists, return true (1).
+        otherwise return false (0).</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.peer(id) </emphasis>
         </term>
-        <listitem><simpara>If the specified session exists, return the host
+        <listitem><para>If the specified session exists, return the host
         address and port of the session peer, for example "127.0.0.1:55457".
         Otherwise return "0.0.0.0:0". The command is executed on the server,
         so the "local name" is the server's host and administrative port,
-        and the "peer name" is the client's host and port.</simpara></listitem>
+        and the "peer name" is the client's host and port.</para></listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
            <emphasis role="lua">box.session.storage</emphasis>
         </term>
-        <listitem><simpara>A Lua table that can hold arbitrary
+        <listitem><para>A Lua table that can hold arbitrary
         unordered session-specific names and values, which will last until
         the session ends.
-        </simpara></listitem>
+        </para></listitem>
     </varlistentry>
 </variablelist>
 
@@ -2219,7 +2240,7 @@ for instructions about defining triggers for connect and disconnect events
 <section xml:id="sp-box-ipc">
     <title>Package <code>box.ipc</code> &mdash; inter procedure communication</title>
     <para>
-    Send and receive messages between different procedures of a session.
+    The <code>box.ipc</code> package allows sending and receiving messages between different procedures of a session.
     </para>
     <para>
     Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
@@ -2232,23 +2253,23 @@ for instructions about defining triggers for connect and disconnect events
     is the same as <code>box.ipc.channel.put(channel, message)</code>. 
     </para>
 <variablelist xml:id="box.ipc">
-    <simpara>
-    </simpara>
+    <para>
+    </para>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel(capacity)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Create a new communication channel. The capacity should be
                 a positive integer as great as the maximum number of slots
                 (spaces for get or put or broadcast messages)
                 that might be pending at any given time.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.put(channel, message, timeout)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Send a message using a channel. If the channel is full,
                 <code>box.ipc.channel.put()</code>
                 blocks until there is a free slot in the channel.
@@ -2257,13 +2278,13 @@ for instructions about defining triggers for connect and disconnect events
                 of the timeout,
                 <code>box.ipc.channel.put()</code>
                 returns false. Otherwise it returns true.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.get(channel, timeout)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Fetch a message from a channel. If the channel is empty,
                 <code>box.ipc.channel.get()</code>
                 blocks until there is a message.
@@ -2272,55 +2293,55 @@ for instructions about defining triggers for connect and disconnect events
                 of the timeout,
                 <code>box.ipc.channel.get()</code>
                 returns error.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
              If the channel is empty, <code>box.ipc.channel.broadcast()</code> is equivalent to
              <code>box.ipc.channel.put()</code>.
               Otherwise, <code>box.ipc.channel.broadcast()</code> sends the message to all readers of the
               channel.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.is_empty(channel)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Return true if the specified channel is empty (has no messages).
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.is_full(channel)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Return true if the specified channel is full (has no room for a new message).
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.has_readers(channel)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Return true if the specified channel is empty and has readers waiting
                 for a message (because they have issued <code>box.ipc.channel.get()</code> and then
                 blocked).
                 Otherwise return false.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term><emphasis role="lua">box.ipc.channel.has_writers(channel)</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                 Return true if the specified channel is full and has writers waiting
                 (because they have issued <code>box.ipc.channel.put()</code> and then blocked
                 due to lack of room). Otherwise return false.
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
 </variablelist>
@@ -2359,7 +2380,7 @@ function producer_fiber()
 
         ...
         if channel:has_readers() then
-            # there are some fibers that wait are waiting for data
+            # there are some fibers that are waiting for data
         end
         ...
 
@@ -2390,16 +2411,15 @@ end
 <section xml:id="sp-box-socket">
     <title>Package <code>box.socket</code> &mdash; TCP and UDP sockets</title>
 <variablelist xml:id="box.socket">
-    <simpara>
-      BSD sockets is a mechanism to exchange data with a local or
-      remote host in connection-oriented (TCP) or datagram-oriented
-      (UDP) mode.
+    <para>
+      The <code>box.socket</code> package allows exchanging data via BSD sockets
+      with a local or remote host in connection-oriented (TCP) or datagram-oriented (UDP) mode.
       Semantics of the calls in the <code>box.socket</code> API closely follow
       semantics of the corresponding POSIX calls. Function names
       and signatures are mostly compatible with
       <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       Similarly to luasocket, <code>box.socket</code> doesn't throw exceptions
       on errors. On success, most calls return a socket object.
       On error, a multiple return of <code>nil, status, errno, errstr</code>
@@ -2415,46 +2435,45 @@ end
       success returns the number of bytes sent, and the <code>status</code> is, again,
       <code>nil</code>. On error or timeout <code>0</code> is returned,
       followed by status, error number and message.
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       The last error can be retrieved from the socket using
       <code>socket:error()</code>. Any call except <code>error()</code> clears
       the last error first (but may set a new one).
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       Calls which require a socket address and in POSIX expect
       <code>struct sockaddr_in</code>, in <code>box.socket</code>
       simply accept host name and port as additional arguments.
       Name resolution is done automatically. If it fails,
       status is set to <code>"error"</code>, errno is set to <code>-1</code>
       and error string is set to <code>"Host name resolution failed"</code>.
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       All calls that can take time block the calling fiber
       and can get it preempted. The implementation, however, uses
       non-blocking cooperative I/O, so Tarantool continues processing
       queries while a call is blocked.
       A timeout can be provided for any socket call which can take
       a long time.
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       As with all other <code>box</code> libraries, the API can be used
       in procedural style (e.g. <code>box.socket.close(socket)</code>) as well
       as in object-oriented style (<code>socket:close()</code>).
-    </simpara>
-    <simpara>
+    </para>
+    <para>
       A closed socket should not be used any more. Alternatively, the
       socket will be closed when its userdata is garbage collected
       by Lua.
-    </simpara>
+    </para>
 
     <varlistentry>
         <term><emphasis role="lua">box.socket.tcp()</emphasis></term>
         <listitem>
             <para>
                 Create a new TCP socket.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                A new socket or <code>nil</code>.
+                Returns a new socket or <code>nil</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2464,8 +2483,7 @@ end
         <listitem>
             <para>
                 Create a new UDP socket.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                A new socket or <code>nil</code>.
+                Returns a new socket or <code>nil</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2478,7 +2496,8 @@ end
                 addresses, as well as domain names. If multiple addresses
                 correspond to a domain, tries them all until successfully
                 connected.
-                <bridgehead renderas="sect4">Returns</bridgehead>
+               </para>
+               <para>
                 Returns a connected socket on success,
                 <code>nil, status, errno, errstr</code> on error or timeout.
             </para>
@@ -2490,8 +2509,9 @@ end
         <listitem>
             <para>
              Send data over a connected socket.
-             <bridgehead renderas="sect4">Returns</bridgehead>
-             The number of bytes sent. On success, this is exactly
+            </para>
+            <para>
+             Returns the number of bytes sent. On success, this is exactly
              the length of <code>data</code>. In case of error or timeout,
              returns the number of bytes sent before error,
              followed by <code>status, errno, errstr</code>.
@@ -2506,8 +2526,9 @@ end
               Read <code>size</code> bytes from a connected socket.
               An internal read-ahead buffer is used to reduce the cost
               of this call.
-             <bridgehead renderas="sect4">Returns</bridgehead>
-              A string of the requested length on success.
+             </para>
+             <para>
+              Returns a string of the requested length on success.
               On error or timeout, returns an empty string, followed
               by <code>status, errno, errstr</code>.
               If there was some data read before a timeout occurred, it
@@ -2520,26 +2541,27 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:readline([limit], [separator list], [timeout])</emphasis></term>
+        <term><emphasis role="lua">socket:readline([limit] [, separator list] [, timeout])</emphasis></term>
         <listitem>
             <para>
                 Read a line from a connected socket.
             </para>
             <para>
                 <code>socket:readline()</code> with no arguments reads data from a socket
-                until '\n' or eof.
-                If a limit is set, the call reads data until a separator is found,
-                or the limit is reached. By default, there is no limit.
-                Instead of the default separator, a Lua table can be used
-                with one or multiple separators. Then the data is read
-                until the first matching separator is found.
+                until '\n' (line feed) or eof (end of transmission).
             </para>
             <para>
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                A Lua string with data in case of success
-                or an empty string in case of error. When
-                multiple separators were provided in a separator
-                table, the matched separator is returned as the third argument.
+             Parameters: (1) <code>limit</code> &mdash; maximum number of bytes to read. The function reads
+             until a separator is seen, or until (limit) bytes have been read. The default is "no limit".
+             (2) <code>separator list</code> &mdash; a Lua table containing one or more separators.
+             The function reads until one of the separators is seen. The default is a Lua table containing '\n'.
+              (3) <code>timeout</code> &mdash; number of seconds to wait before returning an error.
+            </para>
+            <para>
+                Returns:
+                A Lua string with data if success,
+                an empty string if error. If multiple separators were passed in <code>separator list</code>,
+                the separator which matched is also shown, as the third part of the return.
                 <table>
                     <title><code>readline()</code> returns</title>
                     <tgroup cols="2" align="left" colsep="1" rowsep="1">
@@ -2576,10 +2598,11 @@ end
                 can be used to accept new connections, after it's
                 been put in listen mode.
                 The timeout is used for name resolution only. If host
-                name is an IP address, the call never yields and
+                name is an IP address, <code>socket:bind</code> never yields and
                 the timeout is unused.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Socket object on success, <code>nil, status, errno, errstr</code> on error.
+               </para>
+               <para>
+               Returns a socket object on success, <code>nil, status, errno, errstr</code> on error.
             </para>
         </listitem>
     </varlistentry>
@@ -2591,8 +2614,9 @@ end
                 Start listening for incoming connections. The listen
                 backlog, on Linux, is taken from <filename>/proc/sys/net/core/somaxconn</filename>,
                 whereas on BSD it is set to <constant>SOMAXCONN</constant>.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Socket on success, <code>nil, "error", errno, errstr</code> on error.
+               </para>
+               <para>
+               Returns a socket object on success, <code>nil, "error", errno, errstr</code> on error.
             </para>
         </listitem>
     </varlistentry>
@@ -2603,8 +2627,9 @@ end
             <para>
                 Wait for a new client connection and create a connected
                 socket.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                <code>peer_socket, nil, peer_host, peer_port</code> on success.
+               </para>
+               <para>
+               Returns <code>peer_socket, nil, peer_host, peer_port</code> on success.
                 <code>nil, status, errno, errstr</code> on error.
             </para>
         </listitem>
@@ -2615,8 +2640,9 @@ end
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                The number of bytes sent on success, <code>0, status, errno, errstr</code>
+               </para>
+               <para>
+               Returns the number of bytes sent on success, <code>0, status, errno, errstr</code>
                 on error or timeout.
             </para>
         </listitem>
@@ -2627,8 +2653,9 @@ end
         <listitem>
             <para>
                 Receive a message on a UDP socket.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Message, <code>nil</code>, client address, client port on success,
+               </para>
+               <para>
+                Returns Message, <code>nil</code>, client address, client port on success,
                 <code>"", status, errno, errstr</code> on error or timeout.
             </para>
         </listitem>
@@ -2642,8 +2669,9 @@ end
                 Shutdown a reading, writing or both ends of a socket.
                 Accepts box.socket.SHUT_RD, box.socket.SHUT_WR
                 and box.socket.SHUT_RDWR.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                Socket on success, <code>nil, "error", errno, errstr</code> on error.
+               </para>
+               <para>
+               Returns Socket on success, <code>nil, "error", errno, errstr</code> on error.
             </para>
         </listitem>
     </varlistentry>
@@ -2663,8 +2691,9 @@ end
         <listitem>
             <para>
                 Retrieve the last error that occurred on a socket.
-                <bridgehead renderas="sect4">Returns</bridgehead>
-                <code>errno, errstr</code>. <code>0, "Success"</code>
+               </para>
+               <para>
+                Returns <code>errno, errstr</code>. <code>0, "Success"</code>
                 if there is no error.
             </para>
         </listitem>
@@ -2715,15 +2744,15 @@ end
 
 <section xml:id="sp-box-net-box">
     <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
-    <simpara>
-        The <code>box.net</code> library contains connectors to remote database systems.
+    <para>
+        The <code>box.net</code> package contains connectors to remote database systems.
         One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
         &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
         In this section the subject is the built-in variant, <code>box.net.box</code>.
         This is for connecting to tarantool_box servers via a network.
-    </simpara>
+    </para>
 <variablelist xml:id="box.net.box">
-    <simpara>
+    <para>
         Call <code>box.net.box.new()</code> to connect and get a connection object,
         which will be called <code>conn</code> for examples in this section.
         Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
@@ -2731,9 +2760,9 @@ end
         Call <code>box.net.box.close(conn)</code> to disconnect.
         Object-oriented and functional APIs are equivalent, so
         <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
-    </simpara>
+    </para>
 
-    <simpara>
+    <para>
         All <code>box.net.box</code> methods are fiber-safe, that is, it is
         safe to share and use the same connection object across
         multiple concurrent fibers. In fact, it's perhaps the
@@ -2745,7 +2774,7 @@ end
         overall server performance. There are, however, cases when
         a single connection is not enough &mdash; for example when it's necessary to
         prioritize requests or to use different authentication ids.
-    </simpara>
+    </para>
 
     <varlistentry>
         <term>
@@ -2931,7 +2960,7 @@ end
 <programlisting><prompt>localhost&gt;</prompt> <userinput> setopt delimiter = '!'</userinput>
 <prompt>localhost&gt;</prompt> <userinput> lua function example()</userinput>
 <prompt>        -&gt;</prompt> <userinput>   if self:ping() then</userinput>
-<prompt>        -&gt;</prompt> <userinput>     print("self:ping() succeeded (not surprising since self is a pre-established connection).")</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('self:ping() succeeded (not surprising since self is a pre-established connection).')</userinput>
 <prompt>        -&gt;</prompt> <userinput>     end</userinput>
 <prompt>        -&gt;</prompt> <userinput>   if box.cfg.primary_port == 33013 then</userinput>
 <prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is 33013 (the default)')</userinput>
@@ -2988,7 +3017,7 @@ Select OK, 1 rows affected
     <varlistentry>
         <term><emphasis role="lua">box.cfg</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>lua for k, v in pairs(box.cfg) do print(k, " = ", v) end</userinput>
+localhost> <userinput>lua for k, v in pairs(box.cfg) do print(k, ' = ', v) end</userinput>
 ---
 io_collect_interval = 0
 pid_file = box.pid
@@ -3015,24 +3044,24 @@ logger = cat - >> tarantool.log
             <emphasis role="lua">box.info()</emphasis>
         </term>
         <listitem>
-            <simpara>
+            <para>
             Since box.info contents are dynamic, it's not
             possible to iterate over keys with the Lua
             <emphasis>pairs()</emphasis> function. For this
             purpose, <emphasis>box.info()</emphasis> builds and
             returns a Lua table with all keys and values provided
             in the package.
-            </simpara>
+            </para>
 
        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>lua for k,v in pairs(box.info()) do print(k, ": ", v) end</userinput>
+localhost> <userinput>lua for k, v in pairs(box.info()) do print(k, ': ', v) end</userinput>
 ---
-version: 1.4.7-92-g4ba95ca
+version: 1.5.2-17-g99249b5
 status: primary
 pid: 1747
 lsn: 1712
 recovery_last_update: 1306964594.980
-recovery_lag: 0.000
+recovery_lag: 0
 uptime: 39
 build: table: 0x419cb880
 logger_pid: 1748
