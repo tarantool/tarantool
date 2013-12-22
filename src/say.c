@@ -45,7 +45,8 @@ int sayfd = STDERR_FILENO;
 pid_t logger_pid;
 static bool booting = true;
 static const char *binary_filename;
-static int *log_level;
+static int log_level_default = S_INFO;
+static int *log_level = &log_level_default;
 
 static void
 sayf(int level, const char *filename, int line, const char *error,
@@ -75,15 +76,15 @@ level_to_char(int level)
 }
 
 void
-say_init(const char *argv0, int *level)
+say_init(const char *argv0)
 {
 	binary_filename = strdup(argv0);
-	log_level = level;
 }
 
 void
-say_logger_init(char *logger, int nonblock)
+say_logger_init(char *logger, int *level, int nonblock)
 {
+	log_level = level;
 	int pipefd[2];
 	pid_t pid;
 	char cmd[] = { "/bin/sh" };
