@@ -777,7 +777,7 @@ main(int argc, char **argv)
 	ev_default_loop(EVFLAG_AUTO);
 	fiber_init();
 	replication_prefork();
-	iobuf_init_readahead(cfg.readahead);
+	iobuf_init(cfg.readahead);
 	coeio_init();
 	signal_init();
 

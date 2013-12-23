@@ -88,7 +88,7 @@ admin_handler(va_list ap)
 	 * a remote client: it's used in Lua
 	 * stored procedures.
 	 */
-	session_create(coio.fd, *(uint64_t *) addr);
+	(void) session_create(coio.fd, *(uint64_t *) addr);
 
 	for (;;) {
 		if (admin_dispatch(&coio, iobuf, L) < 0)

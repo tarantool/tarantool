@@ -30,6 +30,8 @@
 #include "coio_buf.h"
 #include "memory.h"
 
+struct mempool iobuf_pool;
+
 /* {{{ struct ibuf */
 
 /** Initialize an input buffer. */
@@ -274,7 +276,7 @@ iobuf_new(const char *name)
 {
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
-		iobuf = (struct iobuf *) malloc(sizeof(struct iobuf));
+		iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);
 		region_create(&iobuf->pool, slabc_runtime);
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, &iobuf->pool);
@@ -341,5 +343,12 @@ iobuf_gc(struct iobuf *iobuf)
 }
 
 int cfg_readahead;
+
+void
+iobuf_init(int readahead)
+{
+	mempool_create(&iobuf_pool, slabc_runtime, sizeof(struct iobuf));
+	cfg_readahead =  readahead;
+}
 
 /* struct iobuf }}} */

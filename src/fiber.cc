@@ -47,6 +47,7 @@ static __thread uint32_t last_used_fid;
 static __thread struct mh_i32ptr_t *fiber_registry;
 static __thread struct rlist fibers, zombie_fibers, ready_fibers;
 static __thread ev_async ready_async;
+static struct mempool fiber_pool;
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -426,7 +427,8 @@ fiber_new(const char *name, void (*f) (va_list))
 		fiber = rlist_first_entry(&zombie_fibers, struct fiber, link);
 		rlist_move_entry(&fibers, fiber, link);
 	} else {
-		fiber = (struct fiber *) calloc(1, sizeof(*fiber));
+		fiber = (struct fiber *) mempool_alloc(&fiber_pool);
+		memset(fiber, 0, sizeof(*fiber));
 
 		tarantool_coro_create(&fiber->coro, fiber_loop, NULL);
 
@@ -484,6 +486,7 @@ fiber_destroy_all()
 void
 fiber_init(void)
 {
+	mempool_create(&fiber_pool, slabc_runtime, sizeof(struct fiber));
 	rlist_create(&fibers);
 	rlist_create(&ready_fibers);
 	rlist_create(&zombie_fibers);

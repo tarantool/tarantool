@@ -41,6 +41,7 @@
 #include "evio.h"
 #include "session.h"
 #include "scoped_guard.h"
+#include "memory.h"
 
 static struct iproto_header dummy_header = { 0, 0, 0 };
 const uint32_t msg_ping = 0xff00;
@@ -283,6 +284,8 @@ struct iproto_session
 SLIST_HEAD(, iproto_session) iproto_session_cache =
 	SLIST_HEAD_INITIALIZER(iproto_session_cache);
 
+static struct mempool iproto_session_pool;
+
 /**
  * A session is idle when the client is gone
  * and there are no outstanding requests in the request queue.
@@ -334,7 +337,8 @@ iproto_session_create(const char *name, int fd, struct sockaddr_in *addr,
 {
 	struct iproto_session *session;
 	if (SLIST_EMPTY(&iproto_session_cache)) {
-		session = (struct iproto_session *) malloc(sizeof(*session));
+		session = (struct iproto_session *)
+			mempool_alloc(&iproto_session_pool);
 		session->input.data = session->output.data = session;
 	} else {
 		session = SLIST_FIRST(&iproto_session_cache);
@@ -791,5 +795,7 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 	}
 	iproto_queue_init(&request_queue, IPROTO_REQUEST_QUEUE_SIZE,
 			  iproto_queue_handler);
+	mempool_create(&iproto_session_pool, slabc_runtime,
+		       sizeof(struct iproto_session));
 }
 

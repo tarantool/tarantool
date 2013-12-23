@@ -35,6 +35,7 @@
 #include <sys/mman.h>
 
 #include "third_party/valgrind/memcheck.h"
+#include "memory.h"
 
 void
 tarantool_coro_create(struct tarantool_coro *coro,
@@ -45,17 +46,18 @@ tarantool_coro_create(struct tarantool_coro *coro,
 	memset(coro, 0, sizeof(*coro));
 
 	/* TODO: guard pages */
-	coro->stack_size = page * 16;
-	coro->stack = mmap(0, coro->stack_size, PROT_READ | PROT_WRITE | PROT_EXEC,
-			   MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	coro->stack_size = page * 16 - slab_sizeof();
+	coro->stack = (char *) slab_get(slabc_runtime, coro->stack_size)
+					+ slab_sizeof();
 
-	if (coro->stack == MAP_FAILED) {
+	if (coro->stack == NULL) {
 		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
 			  sizeof(coro->stack_size),
 			  "mmap", "coro stack");
 	}
 
-	(void) VALGRIND_STACK_REGISTER(coro->stack, (char *) coro->stack + coro->stack_size);
+	(void) VALGRIND_STACK_REGISTER(coro->stack, (char *)
+				       coro->stack + coro->stack_size);
 
 	coro_create(&coro->ctx, f, data, coro->stack, coro->stack_size);
 }
@@ -63,6 +65,8 @@ tarantool_coro_create(struct tarantool_coro *coro,
 void
 tarantool_coro_destroy(struct tarantool_coro *coro)
 {
-	if (coro->stack != NULL && coro->stack != MAP_FAILED)
-		munmap(coro->stack, coro->stack_size);
+	if (coro->stack != NULL) {
+		slab_put(slabc_runtime, (struct slab *)
+			 ((char *) coro->stack - slab_sizeof()));
+	}
 }

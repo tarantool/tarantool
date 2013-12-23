@@ -240,11 +240,8 @@ iobuf_is_idle(struct iobuf *iobuf)
  */
 extern int cfg_readahead;
 
-static inline void
-iobuf_init_readahead(int readahead)
-{
-	cfg_readahead =  readahead;
-}
+void
+iobuf_init(int readahead);
 
 /* }}} */
 
