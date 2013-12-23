@@ -15,11 +15,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 188 bytes in slab allocator for tuple
+- error: Failed to allocate 313 bytes in slab allocator for tuple
 ...
 space:len();
 ---
-- 42
+- 73
 ...
 i = 1;
 ---
@@ -29,11 +29,11 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 188 bytes in slab allocator for tuple
+- error: Failed to allocate 314 bytes in slab allocator for tuple
 ...
 space:len();
 ---
-- 84
+- 146
 ...
 i = 1;
 ---
@@ -43,12 +43,12 @@ while true do
     i = i + 1
 end;
 ---
-- error: Failed to allocate 188 bytes in slab allocator for tuple
+- error: Failed to allocate 314 bytes in slab allocator for tuple
 ...
 --# setopt delimiter ''
 space:len()
 ---
-- 126
+- 219
 ...
 space.index['primary']:select(0)
 ---
@@ -132,14 +132,14 @@ t
   - [39, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
   - [40, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
   - [41, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
-  - [42, 'test']
-  - [43, 'testtest']
-  - [44, 'testtesttest']
-  - [45, 'testtesttesttest']
-  - [46, 'testtesttesttesttest']
-  - [47, 'testtesttesttesttesttest']
-  - [48, 'testtesttesttesttesttesttest']
-  - [49, 'testtesttesttesttesttesttesttest']
+  - [42, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [43, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [44, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [45, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [46, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [47, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [48, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
+  - [49, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
 ...
 space:truncate()
 ---

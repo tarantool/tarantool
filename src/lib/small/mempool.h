@@ -118,6 +118,18 @@ mslab_sizeof()
 	return small_align(sizeof(struct mslab), sizeof(intptr_t));
 }
 
+/**
+ * Calculate the maximal size of an object for which it makes
+ * sense to create a memory pool given the size of the slab.
+ */
+static inline uint32_t
+mempool_objsize_max(uint32_t slab_size)
+{
+	/* Fit at least 4 objects in a slab, aligned by pointer size. */
+	return ((slab_size - mslab_sizeof() - MEMPOOL_MAP_SIZEOF)/4) &
+		 ~(sizeof(intptr_t) - 1);
+}
+
 typedef rb_tree(struct mslab) mslab_tree_t;
 
 /** A memory pool. */

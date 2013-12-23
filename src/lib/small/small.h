@@ -153,6 +153,7 @@ struct small_alloc {
 	 * Is provided during initialization.
 	 */
 	float factor;
+	uint32_t objsize_max;
 	/** All slabs in all mempools have the same order. */
 	uint8_t slab_order;
 	/**
@@ -164,8 +165,7 @@ struct small_alloc {
 /** Initialize a small memory allocator. */
 void
 small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
-		   uint32_t objsize_min, uint32_t objsize_max,
-		   float alloc_factor);
+		   uint32_t objsize_min, float alloc_factor);
 
 /**
  * Enter or leave delayed mode - in delayed mode smfree_delayed()

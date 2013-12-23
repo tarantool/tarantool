@@ -61,6 +61,7 @@ factor_pool_create(struct small_alloc *alloc,
 		   size_t size)
 {
 	assert(size > alloc->step_pool_objsize_max);
+	assert(size <= alloc->objsize_max);
 
 	if (alloc->factor_pool_next == NULL) {
 		/**
@@ -82,6 +83,8 @@ factor_pool_create(struct small_alloc *alloc,
 				      sizeof(intptr_t));
 		assert(objsize > alloc->step_pool_objsize_max);
 	} while (objsize < size);
+	if (objsize > alloc->objsize_max)
+		objsize = alloc->objsize_max;
 	struct factor_pool *pool = alloc->factor_pool_next;
 	alloc->factor_pool_next= pool->next;
 	mempool_create_with_order(&pool->pool, alloc->cache,
@@ -94,21 +97,16 @@ factor_pool_create(struct small_alloc *alloc,
 /** Initialize the small allocator. */
 void
 small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
-		   uint32_t objsize_min, uint32_t objsize_max,
-		   float alloc_factor)
+		   uint32_t objsize_min, float alloc_factor)
 {
 	alloc->cache = cache;
 	/* Align sizes. */
 	objsize_min = small_align(objsize_min, sizeof(intptr_t));
-	objsize_max = small_align(objsize_max, sizeof(intptr_t));
-	assert(objsize_max > objsize_min + STEP_POOL_MAX * STEP_SIZE);
-	/*
-	 * Make sure at least 4 largest objects can fit in a slab.
-	 * This asserts if objsize_max is too large to fit in an
-	 * ordered slab nicely.
-	 */
-	alloc->slab_order = slab_order(alloc->cache,
-				       objsize_max * 4 + mslab_sizeof());
+	alloc->slab_order = cache->order_max;
+	/* Make sure at least 4 largest objects can fit in a slab. */
+	alloc->objsize_max =
+		mempool_objsize_max(slab_order_size(cache, alloc->slab_order));
+	assert(alloc->objsize_max > objsize_min + STEP_POOL_MAX * STEP_SIZE);
 
 	struct mempool *step_pool;
 	for (step_pool = alloc->step_pools;
@@ -145,7 +143,7 @@ small_alloc_create(struct small_alloc *alloc, struct slab_cache *cache,
 	factor_pool->next = NULL;
 	alloc->factor_pool_next = alloc->factor_pool_cache;
 	factor_tree_new(&alloc->factor_pools);
-	(void) factor_pool_create(alloc, NULL, objsize_max);
+	(void) factor_pool_create(alloc, NULL, alloc->objsize_max);
 
 	alloc->is_delayed_free_mode = false;
 }

@@ -539,17 +539,15 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
         } else {
 		flags = MAP_SHARED;
 	}
-	size_t slab_size = 4*1024*1024;
+	uint32_t slab_size = 4*1024*1024;
 	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
 
-	slab_arena_create(&tuple_arena, slab_size,
-			  prealloc, prealloc, flags);
+	slab_arena_create(&tuple_arena, prealloc, prealloc,
+			  slab_size, flags);
 	slab_cache_create(&tuple_slab_cache, &tuple_arena,
 			  slab_size);
 	small_alloc_create(&talloc, &tuple_slab_cache,
-			   objsize_min,
-			   (slab_size  - mslab_sizeof())/4,
-			  alloc_factor);
+			   objsize_min, alloc_factor);
 }
 
 void

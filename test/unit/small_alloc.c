@@ -74,8 +74,7 @@ small_alloc_basic()
 	int i;
 	header();
 
-	small_alloc_create(&alloc, &cache, OBJSIZE_MIN, OBJSIZE_MAX,
-			   1.3);
+	small_alloc_create(&alloc, &cache, OBJSIZE_MIN, 1.3);
 
 	for (i = 0; i < ITERATIONS_MAX; i++) {
 		basic_alloc_streak();
