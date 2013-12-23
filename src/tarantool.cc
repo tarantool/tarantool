@@ -593,6 +593,7 @@ main(int argc, char **argv)
 	__libc_stack_end = (void*) &argv;
 #endif
 
+	say_init(argv[0]);
 	crc32_init();
 	stat_init();
 	memory_init();
@@ -607,7 +608,6 @@ main(int argc, char **argv)
 
 	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 	main_opt = opt;
-	say_init(argv[0], &cfg.log_level);
 
 	if (gopt(opt, 'V')) {
 		printf("Tarantool %s\n", tarantool_version());
@@ -769,7 +769,7 @@ main(int argc, char **argv)
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
 
-	say_logger_init(cfg.logger, cfg.logger_nonblock);
+	say_logger_init(cfg.logger, &cfg.log_level, cfg.logger_nonblock);
 
 	/* main core cleanup routine */
 	atexit(tarantool_free);
