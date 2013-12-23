@@ -157,7 +157,7 @@ mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 	pool->objsize = objsize;
 	pool->slab_order = order;
 	/* Account for slab meta. */
-	size_t slab_size = slab_order_size(pool->cache, pool->slab_order) -
+	uint32_t slab_size = slab_order_size(pool->cache, pool->slab_order) -
 		mslab_sizeof();
 	/* Calculate how many objects will actually fit in a slab. */
 	/*
@@ -169,10 +169,10 @@ mempool_create_with_order(struct mempool *pool, struct slab_cache *cache,
 	 * X * objsize + X/8 = slab_size
 	 * X = (8 * slab_size)/(8 * objsize + 1)
 	 */
-	size_t objcount = (CHAR_BIT * slab_size)/(CHAR_BIT * objsize + 1);
+	uint32_t objcount = (CHAR_BIT * slab_size)/(CHAR_BIT * objsize + 1);
 	/* How many elements of slab->map can map objcount. */
 	assert(objcount);
-	size_t mapsize = (objcount + MEMPOOL_MAP_BIT - 1)/MEMPOOL_MAP_BIT;
+	uint32_t mapsize = (objcount + MEMPOOL_MAP_BIT - 1)/MEMPOOL_MAP_BIT;
 	/* Adjust the result of integer division, which may be too large. */
 	while (objcount * objsize + mapsize * MEMPOOL_MAP_SIZEOF > slab_size) {
 		objcount--;

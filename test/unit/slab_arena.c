@@ -9,7 +9,7 @@ void
 slab_arena_print(struct slab_arena *arena)
 {
 	printf("arena->prealloc = %zu\narena->maxalloc = %zu\n"
-	       "arena->used = %zu\narena->slab_size = %zu\n",
+	       "arena->used = %zu\narena->slab_size = %u\n",
 	       arena->prealloc, arena->maxalloc,
 	       arena->used, arena->slab_size);
 }

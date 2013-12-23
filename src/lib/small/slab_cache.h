@@ -130,7 +130,7 @@ struct slab_cache {
 	 * defines the number of "orders" of slab cache.
 	 * This distance can't be more than ORDER_MAX.
 	 */
-	size_t order0_size;
+	uint32_t order0_size;
 	/*
 	 * Binary logarithm of order0_size, useful in pointer
 	 * arithmetics.
@@ -163,7 +163,7 @@ struct slab_cache {
 
 void
 slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
-		  size_t order0_size);
+		  uint32_t order0_size);
 
 void
 slab_cache_destroy(struct slab_cache *cache);
@@ -181,14 +181,14 @@ struct slab *
 slab_from_ptr(struct slab_cache *cache, void *ptr, uint8_t order);
 
 /* Aligned size of slab meta. */
-static inline size_t
+static inline uint32_t
 slab_sizeof()
 {
 	return small_align(sizeof(struct slab), sizeof(intptr_t));
 }
 
 /** Useful size of a slab. */
-static inline size_t
+static inline uint32_t
 slab_size(struct slab *slab)
 {
 	return slab->size - slab_sizeof();

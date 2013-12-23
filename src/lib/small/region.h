@@ -120,7 +120,7 @@ struct rslab
 	uint32_t used;
 };
 
-static inline size_t
+static inline uint32_t
 rslab_sizeof()
 {
 	return small_align(sizeof(struct rslab), sizeof(intptr_t));
@@ -133,7 +133,7 @@ rslab_data(struct rslab *slab)
 }
 
 /** How much memory is available in a given block? */
-static inline size_t
+static inline uint32_t
 rslab_unused(struct rslab *slab)
 {
 	return slab->slab.size - rslab_sizeof() - slab->used;

@@ -112,7 +112,7 @@ struct mslab {
 	mbitmap_t map[0];
 };
 
-static inline size_t
+static inline uint32_t
 mslab_sizeof()
 {
 	return small_align(sizeof(struct mslab), sizeof(intptr_t));

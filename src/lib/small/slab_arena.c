@@ -105,7 +105,7 @@ pow2round(size_t size)
 void
 slab_arena_create(struct slab_arena *arena,
 		  size_t prealloc, size_t maxalloc,
-		size_t slab_size, int flags)
+		  uint32_t slab_size, int flags)
 {
 	assert(flags & (MAP_PRIVATE | MAP_SHARED));
 	lf_lifo_init(&arena->cache);

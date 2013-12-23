@@ -70,7 +70,7 @@ struct slab_arena {
 	 * Typical value is 4Mb, which makes it possible to
 	 * allocate objects of size up to ~1MB.
 	 */
-	size_t slab_size;
+	uint32_t slab_size;
 	/**
 	 * How much memory is preallocated during initialization
 	 * of slab_arena.
@@ -98,8 +98,8 @@ struct slab_arena {
 
 /** Initialize an arena.  */
 void
-slab_arena_create(struct slab_arena *arena, size_t slab_size,
-		  size_t prealloc, size_t maxalloc, int flags);
+slab_arena_create(struct slab_arena *arena, size_t prealloc,
+		  size_t maxalloc, uint32_t slab_size, int flags);
 
 /** Destroy an arena. */
 void

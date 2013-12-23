@@ -160,7 +160,7 @@ slab_merge(struct slab_cache *cache, struct slab *slab, struct slab *buddy)
 
 void
 slab_cache_create(struct slab_cache *cache, struct slab_arena *arena,
-		  size_t order0_size)
+		  uint32_t order0_size)
 {
 	cache->arena = arena;
 
