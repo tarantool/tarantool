@@ -1,329 +1,149 @@
 #!/usr/bin/env python
-#
-# This script is used to build www.tarantool.org
-#
 import os
-import re
 import sys
 import yaml
+import shlex
 import jinja2
-import markdown
-import argparse
-import fnmatch
-import glob
 import shutil
-import datetime
+import fnmatch
+import subprocess
+
+from markdown import markdown
+
+mdext = [
+        'codehilite',
+        'fenced_code',
+        'footnotes',
+    ]
 
 
-default_lang = {
-    'source-encoding': 'utf-8',
-    'output-encoding': 'utf-8',
-    'suffix': '.html' }
-
-
-class Config(object):
-
+class MockConfig(object):
     def __init__(self):
-        self.source_path = '.'
-        self.config_file = '_config'
-        self.ignore_file = '_ignore'
-        self.corpus_dir = '.'
-        self.layout_dir = '_layout'
-        self.output_dir = 'www'
-        self.abs_output_path = None
-        self.config = {}
-
-    def __getitem__(self, key):
-        return self.config[key]
-
-    @property
-    def config_path(self):
-        return os.path.join(self.source_path, self.config_file)
-    @property
-    def corpus_path(self):
-        return os.path.join(self.source_path, self.corpus_dir)
-    @property
-    def layout_path(self):
-        return os.path.join(self.source_path, self.layout_dir)
-    @property
-    def output_path(self):
-        if self.abs_output_path:
-            return self.abs_output_path
-        return os.path.join(self.source_path, self.output_dir)
-
-    @output_path.setter
-    def output_path(self, value):
-        self.abs_output_path = value
-
-    def check(self, key, config):
-        if config and key in config:
-            value = config[key]
-            print 'set %s to %s' % (key, value)
-            setattr(self, key, value)
-            del config[key]
-
-    def load(self):
-        f = open(self.config_path)
-        config = yaml.load(f)
-        f.close()
-        self.check('layout_dir', config)
-        self.check('output_dir', config)
-        self.config = config
-        #print config
-
-    def check_ignore_dir(self, path, name, ignore_list):
-        if fnmatch.fnmatch(name, '_*'):
-            return True
-        pathname = os.path.normpath(os.path.join(path, name))
-        if pathname in ignore_list:
-            return True
-        return False
-
-    def check_ignore_file(self, path, name, ignore_list):
-        if fnmatch.fnmatch(name, '_*'):
-            return True
-        if fnmatch.fnmatch(name, '*~'):
-            return True
-        pathname = os.path.normpath(os.path.join(path, name))
-        if pathname in ignore_list:
-            return True
-        return False
-
-    def load_ignore_file(self, path, ignore_list):
-        try:
-            f = open(os.path.join(path, self.ignore_file))
-            words = f.read().split()
-            f.close()
-            for word in words:
-                pattern = os.path.normpath(os.path.join(path, word))
-                names = glob.glob(pattern)
-                ignore_list.extend(names)
-        except:
-            pass
-
-    def get_corpus(self):
-        list = []
-        ignore_list = [ os.path.normpath(self.output_path) ]
-        root = self.corpus_path
-        walker = os.walk(root)
-        for curdir, subdirs, files in walker:
-            self.load_ignore_file(curdir, ignore_list)
-            for s in subdirs[:]:
-                if self.check_ignore_dir(curdir, s, ignore_list):
-                    subdirs.remove(s)
-            for f in files:
-                if not self.check_ignore_file(curdir, f, ignore_list):
-                    dir = curdir.replace(root, '')
-                    list.append(os.path.normpath(os.path.join(dir, f)))
-        #print list
-        return list
+        self.output_path = '../www-data/'
+        self.layout_dir  = '_layout/'
+        self.text_dir    = '_text/'
+        self.doc         = 'doc/{branch}'
+        self.doc_mpage   = 'mpage/'
+        self.doc_opage   = 'user_guide.html'
+        self.doc_css     = '../user/tnt.css'
 
 
-class Scanner(object):
-
-    HEAD_OPEN = r'{%'
-    HEAD_CLOSE = r'%}'
-
-    WS = re.compile(r'\s+')
-    WORD = re.compile(r'\w+')
-    BODY = re.compile(r'.*?(?=\s*^\s*%s)' % re.escape(HEAD_OPEN), re.M | re.S)
-
-    def __init__(self, name, config):
-        f = open(os.path.join(config.source_path, name))
-        self.data = f.read()
-        f.close()
-        self.name = name
-        self.pos = 0
-        self.token = None
-
-    def __iter__(self):
-        return self
-
-    def match(self, cre):
-        m = cre.match(self.data, self.pos)
-        if m:
-            self.pos = m.end()
-            self.token = m.group()
-            return True
-        return False
-
-    def match_str(self, str):
-        if self.data.startswith(str, self.pos):
-            self.pos += len(str)
-            self.token = str
-            return True
-        return False
-
-    def read_tags(self):
-        tags = []
-        if self.match_str(self.HEAD_OPEN):
-            self.match(self.WS)
-            while self.match(self.WORD):
-                tags.append(self.token)
-                self.match(self.WS)
-            if not self.match_str(self.HEAD_CLOSE):
-                print self.data[self.pos:]
-                raise RuntimeError()
-        return tags
-
-    def read_text(self):
-        self.match(self.WS)
-        if self.match(self.BODY):
-            text = self.token
-        else:
-            text = self.data[self.pos:]
-            self.pos = len(self.data)
-        return text
-
-    def next(self):
-        self.match(self.WS)
-        if self.pos == len(self.data):
-            raise StopIteration
-        return self.name, self.read_tags(), self.read_text()
-
-
-@jinja2.contextfilter
-def langselect(context, data):
-    if isinstance(data, dict):
-        lang = context['pagelang']
-        if lang in data:
-            data = data[lang]
-        else:
-            data = data['en']
-    return data
-
-
-def make_environ(path):
-    env = jinja2.Environment(loader = jinja2.FileSystemLoader(path))
-    env.filters['langselect'] = langselect
-    env.globals['date'] = datetime.datetime.today()
-    return env
-
-
-class BaseHandler(object):
-
+class Loader(object):
     def __init__(self, config):
         self.config = config
+        self.texts = {}
+        self.load_texts()
+        self.environ = self.make_environ(config.layout_dir, self.texts)
 
-    def enter(self, entry):
-        pass
+    def load_texts(self):
+        for i in os.listdir(self.config.text_dir):
+            i = os.path.join(self.config.text_dir, i)
+            with open(i, 'r') as f:
+                self.texts.update(yaml.load(f.read()))
+        for l, i in self.texts.iteritems():
+            if isinstance(i, dict):
+                for j, k in i.iteritems():
+                    i[j] = markdown(k, extensions=mdext)
+            elif isinstance(i, basestring):
+                self.texts[l] = markdown(i, extensions=mdext)
+            else:
+                raise Exception("hi")
 
-    def render(self, entry):
-        pass
-
-
-class PageHandler(BaseHandler):
-
-    def __init__(self, config):
-        super(PageHandler, self).__init__(config)
-        self.environ = make_environ(config.layout_path)
+    def make_environ(self, path, texts):
+        env = jinja2.Environment(loader = jinja2.FileSystemLoader(path))
+        env.globals.update(texts)
+        return env
 
     def write(self, name, data):
         print 'Writing %s' % name
-        f = open(os.path.join(self.config.output_path, name), 'w')
-        f.write(data)
-        f.close
+        with open(os.path.join(self.config.output_path, name), 'w') as f:
+            f.write(data)
 
-    def render(self, entry):
-        name, tags, text = entry
-        if len(tags) < 2:
-            raise StandardError('missing template name for page entry')
-        layout = tags[1]
-        lang = tags[2] if tags and len(tags) > 2 else Nil
-        if lang and lang in self.config['languages']:
-            langdesc = self.config['languages'][lang]
-        else:
-            langdesc = default_lang
-        text = unicode(text, langdesc['source-encoding'])
-        text = markdown.markdown(text, ['tables'])
-        filename = name + langdesc['suffix']
-        template = self.environ.get_template(layout, globals=self.config.config)
-        page = template.render(
-            content=text,
-            filename=filename,
-            pagename=name,
-            pagelang=lang)
-        self.write(filename, page.encode(langdesc['output-encoding']))
+    def render(self, name):
+        filename = name + '.html'
+        template = self.environ.get_template(name)
+        page = template.render()
+        self.write(filename, page)
 
+    def render_pages(self):
+        for name in self.texts:
+            self.render(name)
 
-class DataHandler(BaseHandler):
-    pass
+    def gener_docs_header(self, branch, one_page):
+        assert(branch=='master' or branch=='stable')
+        header = """
+<div id="headwrap" class="columnlist">
+    <div id="headl" class="column">{0}</div>
+    <div id="headr" class="column">{1}</div>
+</div>
+    """
+        lheader = """
+### [Home](/) -> [Documentation](/doc/) """
+        rheader = """
+### [{bn}][{b}{o}] / [{bno}][{bo}{o}]
 
+[mpdf]: /doc/master/user_guide.pdf
+[mtxt]: /doc/master/user_guide.txt
+[mopa]: /doc/master/user_guide.html
+[mmpa]: /doc/master/mpage/index.html
 
-class TextHandler(BaseHandler):
+[spdf]: /doc/stable/user_guide.pdf
+[stxt]: /doc/stable/user_guide.txt
+[sopa]: /doc/stable/user_guide.html
+[smpa]: /doc/stable/mpage/index.html """
 
-    def enter(self, entry):
-        name, tags, text = entry
-        if len(tags) < 2:
-            raise StandardError('missing item name for text entry')
-        item = tags[1]
-        lang = tags[2] if tags and len(tags) > 2 else 'en'
-        if lang and lang in self.config['languages']:
-            langdesc = self.config['languages'][lang]
-        else:
-            langdesc = default_lang
-        text = unicode(text, langdesc['source-encoding'])
-        text = markdown.markdown(text)
-        self.config.config.setdefault(item, {})[lang] = text;
+        env = {
+            'b'    : branch[0],
+            'bn'   : branch.capitalize(),
+            'bo'   : 'm' if branch[0] == 's' else 's',
+            'bno'  : ('master' if branch == 'stable' else 'stable').capitalize(),
+            'o'    : 'mpa' if one_page else 'opa',
+            'opage': 'Multiple pages' if one_page else 'One page',
+        }
 
+        return header.format(markdown(lheader), markdown(rheader.format(**env), extensions=mdext))
 
-class PostHandler(TextHandler):
-    pass
-
-
-class Renderer(object):
-
-    def __init__(self, config):
-        self.handlers = { 'page': PageHandler(config),
-                          'data': DataHandler(config),
-                          'text': TextHandler(config),
-                          'post': PostHandler(config) }
-
-    def get_handler(self, tags):
-        entry_type = tags[0] if tags and len(tags) > 0 else 'page'
-        if entry_type not in self.handlers:
-            raise ValueError('bad entry type %s' % entry_type)
-        return self.handlers[entry_type]
-
-    def enter_entry(self, entry):
-        handler = self.get_handler(entry[1])
-        handler.enter(entry);
-
-    def render_entry(self, entry):
-        handler = self.get_handler(entry[1])
-        handler.render(entry);
-
-    def render(self, entries):
-        for entry in entries:
-            self.enter_entry(entry)
-        for entry in entries:
-            self.render_entry(entry)
-
-
-def parse_args(config):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config-file')
-    parser.add_argument('--source-path')
-    parser.add_argument('--output-path')
-    parser.parse_args(namespace = config)
-
-def load_entries(config):
-    entries = []
-    corpus = config.get_corpus()
-    for name in corpus:
-        scanner = Scanner(name, config)
-        for entry in iter(scanner):
-            entries.append(entry)
-        print 'Loaded content file "%s"' % name
-    return entries
-
-def main():
-    config = Config()
-    parse_args(config)
-    config.load()
-    renderer = Renderer(config)
-    entries = load_entries(config)
-    renderer.render(entries)
+    def render_docs(self):
+        proc = subprocess.Popen(shlex.split('git rev-parse --abbrev-ref HEAD'), stdout=subprocess.PIPE)
+        branch = proc.communicate()[0].strip()
+        docs_template = self.environ.get_template('documentation')
+        # ==========================================
+        doc_mpath = os.path.join(self.config.doc, self.config.doc_mpage).format(branch=branch)
+        doc_mpath_out = os.path.join(self.config.output_path, doc_mpath)
+        header = self.gener_docs_header(branch, False)
+        if os.path.exists(doc_mpath):
+            if not os.path.exists(doc_mpath_out):
+                os.makedirs(doc_mpath_out)
+            for i in os.listdir(doc_mpath):
+                document = os.path.join(doc_mpath, i)
+                env = {'documentation': {'main'  : open(document).read(),
+                                         'header': header},
+                       'docs': 'True'}
+                data = docs_template.render(env)
+                self.write(document, data)
+            shutil.copy(self.config.doc_css, doc_mpath_out)
+        # ===========================================
+        doc_opath = self.config.doc.format(branch=branch)
+        doc_opage = os.path.join(doc_opath, self.config.doc_opage)
+        doc_opath_out = os.path.join(self.config.output_path, doc_opath)
+        if os.path.exists(doc_opage) and os.path.isfile(doc_opage):
+            if not os.path.exists(doc_opath_out):
+                os.makedirs(doc_opath_out)
+            env = {'documentation': {'main'  : open(doc_opage).read(),
+                                     'header': header},
+                   'docs': 'True'}
+            data = docs_template.render(env)
+            self.write(doc_opage, data)
+            shutil.copy(self.config.doc_css, doc_opath_out)
+        # ===========================================
 
 if __name__ == '__main__':
-    main()
+    loader = Loader(MockConfig())
+    if len(sys.argv) == 1 or sys.argv[1] == 'site':
+        loader.render_pages()
+        exit(0)
+    elif sys.argv[1] == 'docs':
+        loader.render_docs()
+        exit(0)
+    else:
+        exit(1)

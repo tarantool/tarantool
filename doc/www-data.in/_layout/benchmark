@@ -1,5 +1,9 @@
 {% extends "base" %}
 {% set title = "Tarantool: a benchmark" %}
 {% block content %}
-    {{ benchmark | langselect }}
-{% endblock content%}
+    <div id="blurb">
+      {{ benchmark.blurb }}
+      <div class="clear"></div>
+    </div>
+    {{ benchmark.main }}
+{% endblock content %}

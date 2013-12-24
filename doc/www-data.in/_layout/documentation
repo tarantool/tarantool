@@ -1,0 +1,8 @@
+{% extends "base" %}
+{% set title = "Tarantool: documentation" %}
+{% block header %}
+    {{ documentation.header }}
+{% endblock header %}
+{% block content %}
+    {{ documentation.main }}
+{% endblock content %}

@@ -1,2 +1,9 @@
 {% extends "base" %}
 {% set title = "Tarantool: getting support" %}
+{% block content %}
+    <div id="blurb">
+      {{ support.blurb }}
+      <div class="clear"></div>
+    </div>
+    {{ support.main }}
+{% endblock content %}

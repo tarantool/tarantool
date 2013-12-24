@@ -13,7 +13,7 @@
  */
 
 html {
-    font-size: 120%; /* 1 */
+    font-size: 100%; /* 1 */
     overflow-y: scroll; /* 2 */
     -webkit-text-size-adjust: 100%; /* 3 */
     -ms-text-size-adjust: 100%; /* 3 */
@@ -54,17 +54,17 @@ a:active {
 a:hover {
     outline: 0;
     background-color: rgba(0,0,0,0.1);
-	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    -moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    -webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 a.imglink:hover {
     border : 0;
     background-color: inherit;
-	-moz-box-shadow: none;
-	-webkit-box-shadow: none;
-	box-shadow: none;
+    -moz-box-shadow: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
 }
 
 a:visited {
@@ -87,7 +87,7 @@ h1 {
  * Addresses style set to 'bolder' in FF3+, S4/5, Chrome
  */
 
-b, strong { 
+b, strong {
     font-weight: bold;
 }
 
@@ -118,9 +118,9 @@ pre {
     text-decoration: none;
     outline: 0;
     background-color: rgba(0,0,0,0.1);
-	-moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	-webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-	box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    -moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    -webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 /*
@@ -208,7 +208,7 @@ img {
    Tables
    ========================================================================== */
 
-/* 
+/*
  * Remove most spacing between table cells
  */
 
@@ -224,7 +224,7 @@ table {
 
 /*
  * Top-level page sections:
- * body > #wrapper > #header #content #footer
+ * body > #wrapper > #header #content
  */
 
 #wrapper {
@@ -233,7 +233,7 @@ table {
     padding: 0;
 }
 
-#header, #footer, #content {
+#header, #content {
     margin: 0 auto;
     padding: 0;
     overflow: hidden;
@@ -244,7 +244,7 @@ table {
    margin-bottom: 5px;
 }
 /*
- * http://sonspring.com/journal/clearing-floats 
+ * http://sonspring.com/journal/clearing-floats
  */
 
 .clear {
@@ -265,19 +265,10 @@ table {
     margin-left: auto;
     margin-right: auto;
     padding: 0 10px 0 0;
-	-moz-border-radius: 3px;
-	-webkit-border-radius: 3px;
-	border-radius: 3px;
-	
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    border-radius: 3px;
     clear: both;
-}
-
-.lwrap {
-    float: left;
-}
-
-.rwrap {
-    float: right;
 }
 
 .span_1, .span_2, .span_3, .span_4, .span_5, .span_6,
@@ -333,7 +324,7 @@ html, body, #wrapper {
     height: 100%;
 }
 
-#wrapper, #header, #content, #footer {
+#wrapper, #header, #content{
     background-color: #fff;
 }
 
@@ -341,34 +332,28 @@ html, body, #wrapper {
     padding-bottom: 5px;
 }
 
-#footer img {
-    vertical-align: middle;
-}
-
-#footer {
-    text-align: right;
-    padding-top: 16px
-}
-
 #blurb {
-    margin: 40px auto;
+    margin: 20px auto;
 }
 
 #blurb h1 {
     font-size: 2em;
     line-height: 1;
     text-align: center;
+    margin: 15px;
 }
 
 #blurb h2 {
     font-size: 1.2em;
     font-weight: normal;
     line-height: 1;
-    text-align: center
+    text-align: center;
+    margin: 5px;
 }
 
 #blurb h3 {
-    text-align: center
+    text-align: center;
+    margin: 5px;
 }
 
 /* =============================================================================
@@ -393,7 +378,7 @@ html, body, #wrapper {
     height: 100%;
 }
 .b-tabs__list{
-	padding: 0px;
+    padding: 0px;
     list-style: none;
     border: 1px solid #b2b2b2;
     border-bottom: 0;
@@ -433,7 +418,7 @@ html, body, #wrapper {
     margin: 0 auto;
 }
 .b-tabs__buttons{
-	padding: 0;
+    padding: 0;
     right: 20px;
     border: 2px solid #b2b2b2;
     -webkit-border-radius: 5px;
@@ -465,5 +450,6 @@ html, body, #wrapper {
 }
 
 h3 {
-	text-align:center;
+    text-align:center;
 }
+

@@ -4,7 +4,9 @@
 <title>{{ title }}</title>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="shortcut icon" href="favicon.ico" />
-<link rel="stylesheet" type="text/css" href="global.css" />
+{% if not docs %}
+    <link rel="stylesheet" type="text/css" href="/global.css" />
+{% endif %}
 {% include "script" ignore missing %}
 </head>
 <body id="tarantool">
@@ -12,26 +14,14 @@
 <div id="wrapper">
   <div id="header">
     {% block header %}
-    <p class='lwrap'><a id="home_link" href="index{{ languages[pagelang].suffix | e }}">{{ home_tag | langselect | e }}</a></p>
-<!--    <p class='rwrap'><a id="lang_link" href="{{ pagename + lang_ext | langselect | e }}">{{ lang_tag | langselect | e }}</a></p> -->
+    <p class='lwrap'><a id="home_link" href="index.html">{{ home_tag | e }}</a></p>
     {% endblock header %}
   </div>
 
   <div id="content">
     {% block content %}
-    <div class="grid">
-        {{ content }}
-    </div>
     {% endblock content %}
   </div>
-
-  <div id="footer">
-    {% block footer %}
-    <p class='lwrap'>Last modified: {{ date.strftime('%Y-%m-%d') }}</p>
-    <p class='rwrap'>Sponsored by <a class='imglink' href="http://api.mail.ru"><img src="mail-logo.png" alt="Mail.Ru" /></a></p>
-    {% endblock footer %}
-  </div>
-
 </div>
 </body>
 </html>

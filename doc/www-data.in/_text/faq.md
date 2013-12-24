@@ -1,0 +1,71 @@
+faq:
+    blurb: |
+        # Tarantool
+        ## An in-memory NoSQL database
+        ### [Overview][ovw] &nbsp; [Documentation][doc] &nbsp; [Download][dow] &nbsp; [Support][sup]
+
+        [ovw]: intro.html
+        [doc]: doc/stable/mpage/index.html
+        [dow]: download.html
+        [sup]: support.html
+
+    main: |
+        ## Frequently Asked Questions
+
+        **Q. Why Tarantool?**
+
+        A. Tarantool is a result of a long trial and error process within Mail.Ru.
+           It's the Nth generation of a family of custom in-memory data servers,
+           developed for various web applications. Besides, when Tarantool
+           development started (2008) there were no stable and sufficiently
+           functional open source alternative.
+
+        ** Q. Why Lua?**
+
+        A. Lua is a ligthweight, fast, extensible multi-paradigm language. Lua also
+           happens to be very easy to embed. Lua coroutines relate very closely to
+           Tarantool fibers, and Lua architecture works well with Tarantool internals.
+           Lua is the first, but, hopefully, not the last stored program language for Tarantool.
+
+        **Q. What's the key advantage of Tarantool?**
+
+        A. Tarantool provides a fairly rich core feature set (HASH, TREE BITSET
+           indexes, secondary indexes, composite indexes, asynchronous replication,
+           hot standby, data durability) along with support for Lua stored procedures.
+           These two properties make it possible to code fast, atomic and reliable
+           in-memory data servers which handle non-trivial application-specific logic.
+           The win over traditional SQL servers is in performance: low-overhead,
+           lock-free architecture means Tarantool can serve an order of magnitude
+           more requests per second, on comparable hardware. The win over NoSQL
+           alternatives is in flexibility: Lua allows flexible processing of
+           data stored in a compact, denormalized format.
+
+        **Q. What are your development plans?**
+
+        A. They are standard. Performance. Better support for transactions.
+           Master-master replication, automatic sharding.
+
+        **Q. Who is developing Tarantool?**
+
+        A. There is a small engineering team employed by Mail.ru -- check out
+           our commit logs on github. The development is fully open, and most
+           of the connectors authors and maintainers in different distributions
+           are from the community.
+
+        **Q. How serious is Mail.Ru about Tarantool?**
+
+        A. Tarantool is an open source project, distributed under a BSD license,
+           and as such does not depend on any one sponsor. However, it is currently
+           and integral part of Mail.Ru backbone, so it gets a lot of support from Mail.ru.
+
+        **Q. Why is Tarantool primary port number 33013?**
+
+        A. It's a prime number which is easy to remember, because 3313, 3301, 313, 13 and 3 are also prime numbers.
+
+        **Q. My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?**
+
+        A. If the ratio of arena_used to items_used >> 1, that indicates that there is
+           fragmentation accumulated by the slab allocator. Imagine there are a lot of
+           small tuples stored in the system initially, and later on each tuple becomes
+           bigger and doesn't fit into its old slab size. The old slabs are never
+           relinquished by the allocator. Currently this can be solved only by a server restart.
