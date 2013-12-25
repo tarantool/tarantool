@@ -39,6 +39,12 @@
  * 0 sid is reserved to mean 'no session'.
  */
 
+struct session {
+	uint32_t id;
+	int fd;
+	uint64_t cookie;
+};
+
 /**
  * Create a session.
  * Invokes a Lua trigger box.session.on_connect if it is
@@ -50,7 +56,7 @@
  * @exception tnt_Exception or lua error if session
  * trigger fails or runs out of resources.
  */
-uint32_t
+struct session *
 session_create(int fd, uint64_t cookie);
 
 /**
@@ -63,7 +69,7 @@ session_create(int fd, uint64_t cookie);
  * @exception none
  */
 void
-session_destroy(uint32_t sid);
+session_destroy(struct session *);
 
 
 /**

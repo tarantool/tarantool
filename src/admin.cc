@@ -79,7 +79,7 @@ admin_handler(va_list ap)
 	auto scoped_guard = make_scoped_guard([&] {
 		evio_close(&coio);
 		iobuf_delete(iobuf);
-		session_destroy(fiber->sid);
+		session_destroy(fiber->session);
 	});
 
 	/*

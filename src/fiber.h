@@ -84,15 +84,15 @@ struct fiber {
 	/** Fiber id. */
 	uint32_t fid;
 	/**
-	 * Session id of the session the fiber is running
+	 * The logical user session the fiber is running
 	 * on behalf of. The concept of an associated session
 	 * is similar to the concept of controlling tty
 	 * in a UNIX process. When a fiber is created,
-	 * its sid is 0. If it's running a request on behalf
-	 * of a user connection, it's sid is changed to module-
-	 * generated identifier of the session.
+	 * it has no session. If it's running a request on behalf
+	 * of a user connection, it's session is changed
+	 * to represent this connection.
 	 */
-	uint32_t sid;
+	struct session *session;
 
 	struct rlist link;
 	struct rlist state;
@@ -163,14 +163,11 @@ void fiber_sleep(ev_tstamp s);
 struct tbuf;
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
-/**
- * Attach this fiber to a session identified by sid and to a cookie.
- */
+/** Set or clear this fiber's session. */
 static inline void
-fiber_set_sid(struct fiber *f, uint32_t sid, uint64_t cookie)
+fiber_set_session(struct fiber *f, struct session *session)
 {
-	f->sid = sid;
-	f->cookie = cookie;
+	f->session = session;
 }
 
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);

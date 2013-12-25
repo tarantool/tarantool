@@ -53,7 +53,7 @@ static const char *sessionlib_name = "box.session";
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, fiber->sid);
+	lua_pushnumber(L, fiber->session ? fiber->session->id : 0);
 	return 1;
 }
 
@@ -72,6 +72,21 @@ lbox_session_exists(struct lua_State *L)
 }
 
 /**
+ * Check whether or not a session exists.
+ */
+static int
+lbox_session_fd(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "session.fd(sid): bad arguments");
+
+	uint32_t sid = luaL_checkint(L, -1);
+	lua_pushnumber(L, session_fd(sid));
+	return 1;
+}
+
+
+/**
  * Pretty print peer name.
  */
 static int
@@ -81,7 +96,7 @@ lbox_session_peer(struct lua_State *L)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
 	uint32_t sid = lua_gettop(L) == 1 ?
-		luaL_checkint(L, -1) : fiber->sid;
+		luaL_checkint(L, -1) : fiber->session->id;
 
 	int fd = session_fd(sid);
 	struct sockaddr_in addr;
@@ -144,6 +159,7 @@ tarantool_lua_session_init(struct lua_State *L)
 {
 	static const struct luaL_reg sessionlib[] = {
 		{"id", lbox_session_id},
+		{"fd", lbox_session_fd},
 		{"exists", lbox_session_exists},
 		{"peer", lbox_session_peer},
 		{"on_connect", lbox_session_on_connect},

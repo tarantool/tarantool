@@ -358,6 +358,7 @@ fiber_zombificate()
 		fiber_wakeup(fiber->waiter);
 	rlist_del(&fiber->state);
 	fiber->waiter = NULL;
+	fiber->session = NULL;
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
 	unregister_fid(fiber);
@@ -445,7 +446,7 @@ fiber_new(const char *name, void (*f) (va_list))
 	if (++last_used_fid < 100)
 		last_used_fid = 100;
 	fiber->fid = last_used_fid;
-	fiber->sid = 0;
+	fiber->session = NULL;
 	fiber->flags = 0;
 	fiber->waiter = NULL;
 	fiber_set_name(fiber, name);

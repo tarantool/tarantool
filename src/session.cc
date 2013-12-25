@@ -28,6 +28,7 @@
  */
 #include "session.h"
 #include "fiber.h"
+#include "memory.h"
 
 #include "assoc.h"
 #include "trigger.h"
@@ -38,24 +39,31 @@ uint32_t sid_max;
 
 static struct mh_i32ptr_t *session_registry;
 
+struct mempool session_pool;
+
 RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
 
-uint32_t
+struct session *
 session_create(int fd, uint64_t cookie)
 {
+	struct session *session = (struct session *)
+		mempool_alloc(&session_pool);
 	/* Return the next sid rolling over the reserved value of 0. */
 	while (++sid_max == 0)
 		;
 
-	uint32_t sid = sid_max;
+	session->id = sid_max;
+	session->fd =  fd;
+	session->cookie = cookie;
 	struct mh_i32ptr_node_t node;
-	node.key = sid;
-	node.val = (void *) (intptr_t) fd;
+	node.key = session->id;
+	node.val = session;
 
 	mh_int_t k = mh_i32ptr_put(session_registry, &node, NULL, NULL);
 
 	if (k == mh_end(session_registry)) {
+		mempool_free(&session_pool, session);
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
 			  "session hash", "new session");
 	}
@@ -63,22 +71,24 @@ session_create(int fd, uint64_t cookie)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_sid(fiber, sid, cookie);
+	fiber_set_session(fiber, session);
 	try {
 		trigger_run(&session_on_connect, NULL);
 	} catch (const Exception& e) {
-		fiber_set_sid(fiber, 0, 0);
+		fiber_set_session(fiber, NULL);
 		mh_i32ptr_remove(session_registry, &node, NULL);
+		mempool_free(&session_pool, session);
 		throw;
 	}
-	return sid;
+	return session;
 }
 
 void
-session_destroy(uint32_t sid)
+session_destroy(struct session *session)
 {
-	if (sid == 0) /* no-op for a dead session. */
+	if (session == NULL) /* no-op for a dead session. */
 		return;
+	fiber_set_session(fiber, session);
 
 	try {
 		trigger_run(&session_on_disconnect, NULL);
@@ -87,17 +97,21 @@ session_destroy(uint32_t sid)
 	} catch (...) {
 		/* catch all. */
 	}
-	session_storage_cleanup(sid);
-	struct mh_i32ptr_node_t node = { sid, NULL };
+	session_storage_cleanup(session->id);
+	struct mh_i32ptr_node_t node = { session->id, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
+	mempool_free(&session_pool, session);
 }
 
 int
 session_fd(uint32_t sid)
 {
 	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
-	return k == mh_end(session_registry) ?
-		-1 : (intptr_t) mh_i32ptr_node(session_registry, k)->val;
+	if (k == mh_end(session_registry))
+		return -1;
+	struct session *session = (struct session *)
+		mh_i32ptr_node(session_registry, k)->val;
+	return session->fd;
 }
 
 void
@@ -106,6 +120,7 @@ session_init()
 	session_registry = mh_i32ptr_new();
 	if (session_registry == NULL)
 		panic("out of memory");
+	mempool_create(&session_pool, slabc_runtime, sizeof(struct session));
 }
 
 void
