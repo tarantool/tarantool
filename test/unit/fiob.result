@@ -1,0 +1,31 @@
+1..30
+ok 1 - tempdir is created
+ok 2 - malloc
+ok 3 - common open
+ok 4 - Hello world is written (12 bytes)
+ok 5 - current position
+ok 6 - set new position
+ok 7 - current position 0
+ok 8 - Hello world is read (12 bytes)
+ok 9 - data
+ok 10 - set new position
+ok 11 - Hello world is read (12 bytes)
+ok 12 - data
+ok 13 - set new position
+ok 14 - set new position
+ok 15 - data is read
+ok 16 - data is read
+ok 17 - fclose
+ok 18 - reopened file
+ok 19 - move pos at finish
+ok 20 - file size
+ok 21 - fclose
+ok 22 - common open: O_EXCL
+ok 23 - common open
+ok 24 - Hello world is written (12 bytes)
+ok 25 - move pos
+ok 26 - Hello world is written (12 bytes)
+ok 27 - move pos
+ok 28 - read 11 bytes
+ok 29 - content was read
+ok 30 - fclose

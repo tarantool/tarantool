@@ -119,6 +119,7 @@ set (common_sources
      lua/lua_socket.cc
      lua/session.cc
      lua/cjson.cc
+     fiob.c
      ${lua_sources}
 )
 

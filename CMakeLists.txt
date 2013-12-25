@@ -78,6 +78,8 @@ check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 
+check_function_exists(funopen HAVE_FUNOPEN)
+
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
 # which we use to determine the end (or beginning, actually) of

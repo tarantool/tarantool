@@ -61,6 +61,12 @@
 #ifndef HAVE_FDATASYNC
 	#define fdatasync fsync
 #endif
+
+/*
+ * Defined if this platform has BSD specific funopen()
+ */
+#cmakedefine HAVE_FUNOPEN 1
+
 /*
  * Defined if this platform has GNU specific memmem().
  */
