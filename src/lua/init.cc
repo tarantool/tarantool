@@ -176,7 +176,7 @@ lbox_print(struct lua_State *L)
 			tbuf_append(out, "\t", 1);
 		}
 	}
-	say_info("%s", tbuf_str(out));
+	say_info("%.*s", out->size, tbuf_str(out));
 	return 0;
 }
 
