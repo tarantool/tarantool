@@ -101,18 +101,16 @@ Description: Tarantool in-memory database - client debugging symbols
  This package provides debugging symbols for the command line
  client.
 
-#
-## Disable client for 1.6
-#
-# Package: libtarantool-dev
-# Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
-# Priority: optional
-# Section: libdevel
-# Depends: ${shlibs:Depends}, ${misc:Depends},
-#  libtarantool1 (= ${binary:Version}),
-#  libtarantoolnet1 (= ${binary:Version}),
-#  libtarantoolsql1 (= ${binary:Version}),
-#  libtarantoolrpl1 (= ${binary:Version})
-# Description: Tarantool in-memory database - development headers
-#  Tarantool is an in-memory database and Lua application server.
-#  This package provides headers for libtarantool* libraries.
+Package: libtarantool-dev
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts:
+ libtarantool1 (<< 1.5.2),
+ libtarantoolnet1 (<< 1.5.2),
+ libtarantoolsql1 (<< 1.5.2),
+ libtarantoolrpl1 (<< 1.5.2)
+Description: Tarantool in-memory database - development headers
+ Tarantool is an in-memory database and Lua application server.
+ This package provides headers for tarantool client.
