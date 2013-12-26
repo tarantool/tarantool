@@ -1,13 +1,4 @@
 intro:
-    blurb: |
-        # Tarantool
-        ## An in-memory NoSQL database
-        ### Overview &nbsp; [Documentation][doc] &nbsp; [Download][dow] &nbsp; [Support][sup]
-
-        [doc]: doc/stable/mpage/index.html
-        [dow]: download.html
-        [sup]: support.html
-
     main: |
         ## What is Tarantool?
 

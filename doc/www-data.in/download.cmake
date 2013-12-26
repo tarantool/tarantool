@@ -1,13 +1,4 @@
-download:
-    blurb: |
-        # Tarantool
-        ## An in-memory NoSQL database
-        ### [Overview][ovw] &nbsp; [Documentation][doc] &nbsp; Download &nbsp; [Support][sup]
-
-        [ovw]: intro.html
-        [doc]: doc/stable/mpage/index.html
-        [sup]: support.html
-    
+download:   
     main: |
         # All downloads
 

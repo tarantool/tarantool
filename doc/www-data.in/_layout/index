@@ -1,10 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool -- an in-memory NoSQL database" %}
-
 {% block content %}
-    <div id="blurb">
-      {{ index.blurb }}
-      <div class="clear"></div>
-    </div>
     {{ index.main }}
 {% endblock content %}

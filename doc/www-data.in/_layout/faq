@@ -1,9 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool: Frequently Asked Questions" %}
 {% block content %}
-    <div id="blurb">
-      {{ faq.blurb }}
-      <div class="clear"></div>
-    </div>
     {{ faq.main }}
 {% endblock content%}

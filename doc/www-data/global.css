@@ -224,16 +224,11 @@ table {
 
 /*
  * Top-level page sections:
- * body > #wrapper > #header #content
+ * body > #header #content
  */
 
-#wrapper {
-    width: 768px;
-    margin: 0 auto;
-    padding: 0;
-}
-
 #header, #content {
+    width: 100%;
     margin: 0 auto;
     padding: 0;
     overflow: hidden;
@@ -320,11 +315,13 @@ table {
    Custom styles
    ========================================================================== */
 
-html, body, #wrapper {
+html, body{
     height: 100%;
+    width: 768px;
+    margin: auto;
 }
 
-#wrapper, #header, #content{
+#header, #content{
     background-color: #fff;
 }
 
@@ -354,6 +351,16 @@ html, body, #wrapper {
 #blurb h3 {
     text-align: center;
     margin: 5px;
+}
+
+body#tarantool.index #header #blurb h1 a.index,
+body#tarantool.intro #header #blurb h3 a.intro,
+body#tarantool.documentation #header #blurb h3 a.documentation,
+body#tarantool.download #header #blurb h3 a.download,
+body#tarantool.support #header #blurb h3 a.support {
+    pointer-events: none;
+    cursor: default;
+    text-decoration: none;
 }
 
 /* =============================================================================
@@ -452,4 +459,3 @@ html, body, #wrapper {
 h3 {
     text-align:center;
 }
-

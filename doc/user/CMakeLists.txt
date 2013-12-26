@@ -1,36 +1,18 @@
 
-# ================= GET BRANCH NAME
-if    (EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    execute_process(
-        COMMAND git rev-parse --abbrev-ref HEAD
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        OUTPUT_VARIABLE GIT_BRANCH
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
+execute_process(
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
-    if (GIT_BRANCH STREQUAL "")
-        message (FATAL_ERROR "Failed to retrive git branch.")
-    endif (GIT_BRANCH STREQUAL "")
-
-    if (GIT_BRANCH STREQUAL "stable" OR GIT_BRANCH STREQUAL "master")
-        set (GIT_BRANCH "${GIT_BRANCH}/")
-    else ()
-        set (GIT_BRANCH "")
-    endif (GIT_BRANCH STREQUAL "stable" OR GIT_BRANCH STREQUAL "master")
-else  (EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    set (GIT_BRANCH "")
-endif (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if (NOT GIT_BRANCH STREQUAL "")
+    set (GIT_BRANCH "${GIT_BRANCH}/")
+endif (NOT GIT_BRANCH STREQUAL "")
 
 set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}user_guide.html")
-set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}mpage")
+set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}mpage/")
 set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/user/tnt-html-chunk.xsl.cmake"
-    "${PROJECT_BINARY_DIR}/doc/user/tnt-html-chunk.xsl")
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/user/tnt-html.xsl.cmake"
-    "${PROJECT_BINARY_DIR}/doc/user/tnt-html.xsl")
 
 if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")
     message (FATAL_ERROR "xmllint is missing")
@@ -61,6 +43,7 @@ add_custom_target(doc-check ALL
 #
 add_custom_command(OUTPUT ${PATH_USERGUIDE_HTML_CHUNK}
     COMMAND ${XSLTPROC} --nonet --xinclude
+        --stringparam base.dir "${PATH_USERGUIDE_HTML_CHUNK}"
         ${CMAKE_SOURCE_DIR}/doc/user/tnt-html-chunk.xsl
         ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
 
@@ -123,7 +106,8 @@ add_custom_target(html-saxon-chunk
         -x org.apache.xml.resolver.tools.ResolvingXMLReader
         -y org.apache.xml.resolver.tools.ResolvingXMLReader
         -r org.apache.xml.resolver.tools.CatalogResolver
-        -u user.xml tnt-html-chunk.xsl)
+        -u user.xml tnt-html-chunk.xsl
+        base.dir="${PATH_USERGUIDE_HTML_CHUNK}")
 
 
 add_custom_target(pdf-saxon

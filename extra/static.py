@@ -6,6 +6,7 @@ import shlex
 import jinja2
 import shutil
 import fnmatch
+import argparse
 import subprocess
 
 from markdown import markdown
@@ -26,6 +27,7 @@ class MockConfig(object):
         self.doc_mpage   = 'mpage/'
         self.doc_opage   = 'user_guide.html'
         self.doc_css     = '../user/tnt.css'
+        self.target      = '' 
 
 
 class Loader(object):
@@ -36,6 +38,12 @@ class Loader(object):
         self.environ = self.make_environ(config.layout_dir, self.texts)
 
     def load_texts(self):
+        proc = subprocess.Popen(shlex.split('git rev-parse --abbrev-ref HEAD'), stdout=subprocess.PIPE)
+        branch = proc.communicate()[0].strip()
+        args ={
+                'docpage': os.path.join(self.config.doc, self.config.doc_mpage, 'index.html').format(branch = branch),
+                'branch' : branch
+            }
         for i in os.listdir(self.config.text_dir):
             i = os.path.join(self.config.text_dir, i)
             with open(i, 'r') as f:
@@ -43,9 +51,9 @@ class Loader(object):
         for l, i in self.texts.iteritems():
             if isinstance(i, dict):
                 for j, k in i.iteritems():
-                    i[j] = markdown(k, extensions=mdext)
+                    i[j] = markdown(k.format(**args), extensions=mdext)
             elif isinstance(i, basestring):
-                self.texts[l] = markdown(i, extensions=mdext)
+                self.texts[l] = markdown(i.format(**args), extensions=mdext)
             else:
                 raise Exception("hi")
 
@@ -62,7 +70,7 @@ class Loader(object):
     def render(self, name):
         filename = name + '.html'
         template = self.environ.get_template(name)
-        page = template.render()
+        page = template.render({'page_name': name})
         self.write(filename, page)
 
     def render_pages(self):
@@ -70,7 +78,6 @@ class Loader(object):
             self.render(name)
 
     def gener_docs_header(self, branch, one_page):
-        assert(branch=='master' or branch=='stable')
         header = """
 <div id="headwrap" class="columnlist">
     <div id="headl" class="column">{0}</div>
@@ -78,30 +85,31 @@ class Loader(object):
 </div>
     """
         lheader = """
-### [Home](/) -> [Documentation](/doc/) """
+### [Home](/) -> [Documentation][{co}]
+
+[opa]: /doc/{branch1}/user_guide.html
+[mpa]: /doc/{branch1}/mpage/index.html """
         rheader = """
-### [{bn}][{b}{o}] / [{bno}][{bo}{o}]
+### [{bn}][{o}1] / [{bno}][mpa2]
 
-[mpdf]: /doc/master/user_guide.pdf
-[mtxt]: /doc/master/user_guide.txt
-[mopa]: /doc/master/user_guide.html
-[mmpa]: /doc/master/mpage/index.html
+[opa1]: /doc/{branch1}/user_guide.html
+[mpa1]: /doc/{branch1}/mpage/index.html
 
-[spdf]: /doc/stable/user_guide.pdf
-[stxt]: /doc/stable/user_guide.txt
-[sopa]: /doc/stable/user_guide.html
-[smpa]: /doc/stable/mpage/index.html """
+[opa2]: /doc/{branch2}/user_guide.html
+[mpa2]: /doc/{branch2}/mpage/index.html """
 
         env = {
-            'b'    : branch[0],
-            'bn'   : branch.capitalize(),
-            'bo'   : 'm' if branch[0] == 's' else 's',
-            'bno'  : ('master' if branch == 'stable' else 'stable').capitalize(),
-            'o'    : 'mpa' if one_page else 'opa',
-            'opage': 'Multiple pages' if one_page else 'One page',
+            'bn'      : branch.capitalize(),
+            'bno'     : ('master' if branch != 'master' else 'stable').capitalize(),
+            'branch1' : branch,
+            'branch2' : ('master' if branch != 'master' else 'stable'),
+            'o'        : 'mpa' if one_page else 'opa',
+            'co'       : 'opa' if one_page else 'mpa',
         }
+        lheader = markdown(lheader.format(**env), extensions=mdext)
+        rheader = markdown(rheader.format(**env), extensions=mdext)
 
-        return header.format(markdown(lheader), markdown(rheader.format(**env), extensions=mdext))
+        return header.format(lheader, rheader)
 
     def render_docs(self):
         proc = subprocess.Popen(shlex.split('git rev-parse --abbrev-ref HEAD'), stdout=subprocess.PIPE)
@@ -109,7 +117,9 @@ class Loader(object):
         docs_template = self.environ.get_template('documentation')
         # ==========================================
         doc_mpath = os.path.join(self.config.doc, self.config.doc_mpage).format(branch=branch)
+        doc_mpage_out = doc_mpath
         doc_mpath_out = os.path.join(self.config.output_path, doc_mpath)
+        doc_mpath = os.path.join(self.config.input, doc_mpath)
         header = self.gener_docs_header(branch, False)
         if os.path.exists(doc_mpath):
             if not os.path.exists(doc_mpath_out):
@@ -120,12 +130,15 @@ class Loader(object):
                                          'header': header},
                        'docs': 'True'}
                 data = docs_template.render(env)
-                self.write(document, data)
+                self.write(os.path.join(doc_mpage_out, i), data)
             shutil.copy(self.config.doc_css, doc_mpath_out)
         # ===========================================
         doc_opath = self.config.doc.format(branch=branch)
-        doc_opage = os.path.join(doc_opath, self.config.doc_opage)
         doc_opath_out = os.path.join(self.config.output_path, doc_opath)
+        doc_opage_out = os.path.join(doc_opath, self.config.doc_opage)
+        doc_opath = os.path.join(self.config.input, doc_opath)
+        doc_opage = os.path.join(doc_opath, self.config.doc_opage)
+        header = self.gener_docs_header(branch, True)
         if os.path.exists(doc_opage) and os.path.isfile(doc_opage):
             if not os.path.exists(doc_opath_out):
                 os.makedirs(doc_opath_out)
@@ -133,16 +146,32 @@ class Loader(object):
                                      'header': header},
                    'docs': 'True'}
             data = docs_template.render(env)
-            self.write(doc_opage, data)
+            self.write(doc_opage_out, data)
             shutil.copy(self.config.doc_css, doc_opath_out)
         # ===========================================
 
+def parseArgs():
+    cfg = MockConfig()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', help='Folder with _text, _layout and doc catalogs', default='./', dest='input')
+    parser.add_argument('--output', help='Folder for output (dafault is www-data)', default='../www-data', dest='output')
+    parser.add_argument('--target', choices=['docs', 'site', ''], default='', dest='target')
+    args = parser.parse_args()
+    cfg.ouput_path = args.output
+    cfg.layout_dir = os.path.join(args.input, cfg.layout_dir)
+    cfg.text_dir = os.path.join(args.input, cfg.text_dir)
+    cfg.doc_css = os.path.join(args.input, cfg.doc_css)
+    cfg.input = args.input
+    cfg.target = args.target
+    return cfg
+
 if __name__ == '__main__':
-    loader = Loader(MockConfig())
-    if len(sys.argv) == 1 or sys.argv[1] == 'site':
+    cfg = parseArgs()
+    loader = Loader(cfg)
+    if not cfg.target or cfg.target == 'site':
         loader.render_pages()
         exit(0)
-    elif sys.argv[1] == 'docs':
+    elif cfg.target == 'docs':
         loader.render_docs()
         exit(0)
     else:

@@ -1,9 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool: downloads" %}
 {% block content %}
-    <div id="blurb">
-      {{ download.blurb }}
-      <div class="clear"></div>
-    </div>
     {{ download.main }}
 {% endblock content %}

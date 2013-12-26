@@ -8,7 +8,6 @@
   <xsl:import href="http://docbook.sourceforge.net/release/xsl-ns/current/html/highlight.xsl"/>
   <xsl:param name="highlight.source" select="1"/>
   <xsl:param name="highlight.xslthl.config">file:////usr/share/xml/docbook/stylesheet/docbook-xsl-ns/highlighting/xslthl-config.xml</xsl:param>
-  <xsl:param name="base.dir">@PATH_USERGUIDE_HTML_CHUNK@/</xsl:param>
   <xsl:param name="use.id.as.filename" select="1"></xsl:param>
 
   <xsl:param name="generate.toc">
