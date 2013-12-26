@@ -16,4 +16,4 @@ if (ENABLE_DOC)
 endif()
 
 
-add_subdirectory(www-data.in EXCLUDE_FROM_ALL)
+add_subdirectory(www-data.in)
