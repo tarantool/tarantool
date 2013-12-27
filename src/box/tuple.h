@@ -168,7 +168,7 @@ tuple_alloc(struct tuple_format *format, size_t size);
  * Throws an exception if tuple format is incorrect.
  */
 struct tuple *
-tuple_new(struct tuple_format *format, const char **data, const char *end);
+tuple_new(struct tuple_format *format, const char *data, const char *end);
 
 /**
  * Change tuple reference counter. If it has reached zero, free the tuple.

@@ -390,7 +390,7 @@ tuple_update(struct tuple_format *format,
 
 	/* Allocate a new tuple. */
 	assert(mp_typeof(*new_data) == MP_ARRAY);
-	struct tuple *new_tuple = tuple_new(format, &new_data,
+	struct tuple *new_tuple = tuple_new(format, new_data,
 					    new_data + new_size);
 
 	try {
@@ -403,12 +403,12 @@ tuple_update(struct tuple_format *format,
 }
 
 struct tuple *
-tuple_new(struct tuple_format *format, const char **data, const char *end)
+tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	size_t tuple_len = end - *data;
-	assert(mp_typeof(**data) == MP_ARRAY);
+	size_t tuple_len = end - data;
+	assert(mp_typeof(*data) == MP_ARRAY);
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
-	memcpy(new_tuple->data, end - tuple_len, tuple_len);
+	memcpy(new_tuple->data, data, tuple_len);
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (...) {

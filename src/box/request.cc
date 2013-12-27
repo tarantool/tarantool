@@ -88,8 +88,7 @@ execute_replace(const struct request *request, struct txn *txn,
 	txn_add_redo(txn, request->type, request->data, request->len);
 
 	struct space *space = space_find(request->r.space_no);
-	const char *tuple = request->r.tuple;
-	struct tuple *new_tuple = tuple_new(space->format, &tuple,
+	struct tuple *new_tuple = tuple_new(space->format, request->r.tuple,
 					    request->r.tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);

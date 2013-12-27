@@ -607,7 +607,7 @@ lua_totuple(struct lua_State *L, int first, int last)
 	const char *data = b->data;
 	if (unlikely(mp_typeof(*data) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	struct tuple *tuple = tuple_new(tuple_format_ber, &data, tbuf_end(b));
+	struct tuple *tuple = tuple_new(tuple_format_ber, data, tbuf_end(b));
 	return tuple;
 }
 
