@@ -377,15 +377,6 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/src/trivia/config.h.cmake"
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
     )
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"
-    "${PROJECT_BINARY_DIR}/doc/tnt.ent"
-    )
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/www-data.in/download.cmake"
-    "${PROJECT_BINARY_DIR}/doc/www-data.in/download"
-    )
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")

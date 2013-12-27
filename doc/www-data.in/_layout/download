@@ -1,2 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool: downloads" %}
+{% block content %}
+    {{ download.main }}
+{% endblock content %}
