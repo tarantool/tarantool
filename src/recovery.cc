@@ -1028,7 +1028,7 @@ static struct wal_write_request *
 wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 		struct wal_write_request *req, struct wal_write_request *end)
 {
-	int rows_written = fio_batch_write(batch, fileno(wal->f));
+	int rows_written = fio_batch_writef(batch, wal->f);
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
 		req->res = 0;
@@ -1147,9 +1147,9 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 /* {{{ SAVE SNAPSHOT and tarantool_box --cat */
 
 static void
-snap_write_batch(struct fio_batch *batch, int fd)
+snap_write_batch(struct fio_batch *batch, FILE *f)
 {
-	int rows_written = fio_batch_write(batch, fd);
+	int rows_written = fio_batch_writef(batch, f);
 	if (rows_written != batch->rows) {
 		say_error("partial write: %d out of %d rows",
 			  rows_written, batch->rows);
@@ -1184,7 +1184,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	if (fio_batch_is_full(batch) ||
 	    bytes > recovery_state->snap_io_rate_limit) {
 
-		snap_write_batch(batch, fileno(l->f));
+		snap_write_batch(batch, l->f);
 		fio_batch_start(batch, INT_MAX);
 		prelease_after(fiber->gc_pool, 128 * 1024);
 		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
@@ -1247,10 +1247,11 @@ snapshot_save(struct recovery_state *r,
 	say_info("saving snapshot `%s'",
 		 format_filename(r->snap_dir, r->confirmed_lsn,
 				 NONE));
-	f(snap, batch);
+	if (f)
+		f(snap, batch);
 
 	if (batch->rows)
-		snap_write_batch(batch, fileno(snap->f));
+		snap_write_batch(batch, snap->f);
 
 	free(batch);
 	log_io_close(&snap);

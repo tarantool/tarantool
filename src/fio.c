@@ -234,3 +234,25 @@ fio_batch_write(struct fio_batch *batch, int fd)
 		errno = EAGAIN;
 	return iov - batch->iov;
 }
+
+int
+fio_batch_writef(struct fio_batch *batch, FILE *f)
+{
+	size_t i;
+	size_t wrdone;
+	size_t bytes_written = 0;
+	for (i = 0; i < batch->rows; i++) {
+		wrdone += fwrite(batch->iov[ i ].iov_base,
+			batch->iov[ i ].iov_len, 1, f);
+
+		if (wrdone <= i) {
+			say_warn("fio_batch_write: partial write,"
+				 " wrote %jd out of %jd bytes",
+				 (intmax_t) bytes_written, (intmax_t) batch->bytes);
+			return wrdone;
+		}
+		bytes_written += batch->iov[ i ].iov_len;
+	}
+
+	return batch->rows;
+}

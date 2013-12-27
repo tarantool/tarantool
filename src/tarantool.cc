@@ -685,13 +685,6 @@ initialize_minimal()
 	coeio_init();
 }
 
-/** Callback of snapshot_save() when doing --init-storage */
-void
-init_storage(struct log_io * /* l */, struct fio_batch * /* batch */)
-{
-	/* Nothing. */
-}
-
 int
 main(int argc, char **argv)
 {
@@ -863,7 +856,7 @@ main(int argc, char **argv)
 		initialize_minimal();
 		box_init(true);
 		set_lsn(recovery_state, 1);
-		snapshot_save(recovery_state, init_storage);
+		snapshot_save(recovery_state, NULL);
 		exit(EXIT_SUCCESS);
 	}
 

@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <stdbool.h>
 #include <sys/uio.h>
+#include <stdio.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -191,6 +192,12 @@ fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len);
  */
 int
 fio_batch_write(struct fio_batch *batch, int fd);
+
+/**
+ * The same as fio_batch_write but uses FILE instead fd
+ */
+int
+fio_batch_writef(struct fio_batch *batch, FILE *f);
 
 #if defined(__cplusplus)
 } /* extern "C" */
