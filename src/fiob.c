@@ -323,6 +323,7 @@ fiob_open(const char *path, const char *mode)
 		goto error;
 
 
+
 	f->io.read	= fiob_read;
 	f->io.write	= fiob_write;
 	f->io.seek	= fiob_seek;
@@ -338,6 +339,9 @@ fiob_open(const char *path, const char *mode)
 
 	if (!file)
 		goto error;
+
+	/* HACK!!!!! TODO: fix it */
+	file->_fileno = f->fd;
 
 	return file;
 
