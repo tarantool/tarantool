@@ -33,6 +33,8 @@ class AdminConnection(TarantoolConnection):
     def execute_no_reconnect(self, command, silent):
         if not command:
             return
+        if not silent:
+            sys.stdout.write(command + ADMIN_SEPARATOR)
         cmd = command.replace('\n', ' ') + ADMIN_SEPARATOR
         self.socket.sendall(cmd)
 
@@ -52,6 +54,5 @@ class AdminConnection(TarantoolConnection):
             yaml.load(res)
         finally:
             if not silent:
-                sys.stdout.write(command + ADMIN_SEPARATOR)
                 sys.stdout.write(res.replace("\r\n", "\n"))
         return res

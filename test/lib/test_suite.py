@@ -1,15 +1,19 @@
 import os
 import re
 import sys
-import ConfigParser
-import collections
+import time
+import shutil
 import difflib
 import filecmp
-import shutil
-import time
+import threading
 import traceback
+import collections
+import ConfigParser
 
 from lib.server import Server
+from lib.colorer import Colorer
+
+color_stdout = Colorer()
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -71,6 +75,9 @@ class FilteredStream:
         self.clear_all_filters()
         self.stream.close()
 
+    def flush(self):
+        self.stream.flush()
+
 
 def check_valgrind_log(path_to_log):
     """ Check that there were no warnings in the log."""
@@ -82,7 +89,7 @@ def print_tail_n(filename, num_lines):
     with open(filename, "r+") as logfile:
         tail_n = collections.deque(logfile, num_lines)
         for line in tail_n:
-            sys.stdout.write(line)
+            color_stdout.write(line, fgcolor='lblue')
 
 
 class Test:
@@ -109,6 +116,7 @@ class Test:
         self.is_executed_ok = None
         self.is_equal_result = None
         self.is_valgrind_clean = True
+        self.is_terminated = False
 
     def passed(self):
         """Return true if this test was run successfully."""
@@ -137,8 +145,13 @@ class Test:
             if not self.skip:
                 sys.stdout = FilteredStream(self.tmp_result)
                 stdout_fileno = sys.stdout.stream.fileno()
-                self.execute(server)
-                sys.stdout.stream.flush()
+                temp = threading.Thread(target=self.execute, args=(server, ))
+                temp.start()
+                temp.join(self.suite_ini["timeout"])
+                if temp.is_alive():
+                    temp._Thread__stop()
+                    self.is_terminated = True
+                sys.stdout.flush()
             self.is_executed_ok = True
         except Exception as e:
             traceback.print_exc(e)
@@ -160,28 +173,30 @@ class Test:
             self.is_valgrind_clean = \
             check_valgrind_log(server.valgrind_log) == False
 
-        if self.skip:
-            print "[ skip ]"
+        elif self.skip:
+            color_stdout("[ skip ]\n", fgcolor='grey')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
-            print "[ pass ]"
+            color_stdout("[ pass ]\n", fgcolor='green')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif (self.is_executed_ok and not self.is_equal_result and not
               os.path.isfile(self.result)):
             os.rename(self.tmp_result, self.result)
-            print "[ NEW ]"
+            color_stdout("[ NEW ]\n", fgcolor='lblue')
         else:
             os.rename(self.tmp_result, self.reject)
-            print "[ fail ]"
+            color_stdout("[ FAIL ]\n" if not self.is_terminated else "[ TERMINATED ]\n", fgcolor='red')
 
             where = ""
             if not self.is_executed_ok:
                 self.print_diagnostics(self.reject, "Test failed! Last 10 lines of the result file:")
+                server.print_log(15)
                 where = ": test execution aborted, reason '{0}'".format(diagnostics)
             elif not self.is_equal_result:
                 self.print_unidiff()
+                server.print_log(15)
                 where = ": wrong test output"
             elif not self.is_valgrind_clean:
                 os.remove(self.reject)
@@ -195,7 +210,7 @@ class Test:
         """Print 10 lines of client program output leading to test
         failure. Used to diagnose a failure of the client program"""
 
-        print message
+        color_stdout(message, color='lred')
         print_tail_n(logfile, 10)
 
     def print_unidiff(self):
@@ -203,7 +218,7 @@ class Test:
         to establish the cause of a failure when .test differs
         from .result."""
 
-        print "Test failed! Result content mismatch:"
+        color_stdout("\nTest failed! Result content mismatch:\n", fgcolor='lred')
         with open(self.result, "r") as result:
             with open(self.reject, "r") as reject:
                 result_time = time.ctime(os.stat(self.result).st_mtime)
@@ -214,8 +229,8 @@ class Test:
                                             self.reject,
                                             result_time,
                                             reject_time)
-                for line in diff:
-                    sys.stdout.write(line)
+
+                color_stdout.writeout_unidiff(diff)
 
 class TestSuite:
     """Each test suite contains a number of related tests files,
@@ -256,6 +271,8 @@ class TestSuite:
             self.ini[i] = map(lambda x: os.path.join(suite_path, x),
                     dict.fromkeys(self.ini[i].split()) if i in self.ini else
                     dict())
+        for i in ["timeout"]:
+            self.ini[i] = int(self.ini[i]) if i in self.ini else 10
 
         try:
             self.server = Server(self.ini["core"])
@@ -265,10 +282,11 @@ class TestSuite:
             raise RuntimeError("Unknown server: core = {0}".format(
                                self.ini["core"]))
 
-        print "Collecting tests in \"" + suite_path + "\": " +\
-            self.ini["description"] + "."
+        color_stdout("Collecting tests in ", fgcolor='lmagenta')
+        color_stdout(repr(suite_path), fgcolor='green')
+        color_stdout(": ", self.ini["description"], ".\n", fgcolor='lmagenta')
         self.server.find_tests(self, suite_path)
-        print "Found " + str(len(self.tests)) + " tests."
+        color_stdout("Found ", str(len(self.tests)), " tests.\n", fgcolor='green')
 
     def run_all(self):
         """For each file in the test suite, run client program
@@ -292,45 +310,46 @@ class TestSuite:
             shutil.copy(i, self.args.vardir)
 
         if self.args.start_and_exit:
-            print "  Start and exit requested, exiting..."
+            color_stdout("    Start and exit requested, exiting...\n", fgcolor='yellow')
             exit(0)
 
         longsep = '='*70
         shortsep = '-'*60
-        print longsep
-        print "TEST".ljust(48), "RESULT"
-        print shortsep
+        color_stdout(longsep, "\n", fgcolor='blue')
+        color_stdout("TEST".ljust(48), fgcolor='lblue')
+        color_stdout("RESULT\n", fgcolor='green')
+        color_stdout(shortsep, "\n", fgcolor='blue')
         failed_tests = []
         try:
             for test in self.tests:
-                sys.stdout.write(test.name.ljust(48))
+                color_stdout(test.name.ljust(48), fgcolor='lblue')
                 # for better diagnostics in case of a long-running test
-                sys.stdout.flush()
 
                 test_name = os.path.basename(test.name)
 
                 if (test_name in self.ini["disabled"]
                     or not self.server.debug and test_name in self.ini["release_disabled"]
                     or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                    print "[ disabled ]"
+                    color_stdout("[ disabled ]\n", fgcolor='grey')
                 else:
                     test.run(self.server)
                     if not test.passed():
                         failed_tests.append(test.name)
         except (KeyboardInterrupt) as e:
-            print '\n',
+            color_stdout('\n')
             raise
         finally:
-            print shortsep
+            color_stdout(shortsep, "\n", fgcolor='blue')
             self.server.stop(silent=False)
             self.server.cleanup()
 
         if failed_tests:
-            print "Failed {0} tests: {1}.".format(len(failed_tests),
-                                                ", ".join(failed_tests))
+            color_stdout("Failed {0} tests: {1}.".format(len(failed_tests),
+                                                ", ".join(failed_tests)),
+                                                fgcolor='red')
 
         if self.args.valgrind and check_valgrind_log(self.server.valgrind_log):
-            print "  Error! There were warnings/errors in valgrind log file:"
+            color_stdout("  Error! There were warnings/errors in valgrind log file:", fgcolor='red')
             print_tail_n(self.server.valgrind_log, 20)
             return ['valgrind error in ' + self.suite_path]
         return failed_tests

@@ -72,6 +72,9 @@ class BoxConnection(TarantoolConnection):
             return "You have an error in your SQL syntax\n"
         statement.sort = self.sort
  
+        if not silent:
+            print command
+
         response = None
         request = statement.pack(self.py_con)
         with warnings.catch_warnings():
@@ -79,7 +82,6 @@ class BoxConnection(TarantoolConnection):
             response = self.py_con._send_request(request, False)
 
         if not silent:
-            print command
             print statement.unpack(response)
 
         return statement.unpack(response)
