@@ -29,9 +29,6 @@ box.stat()
   UPDATE:
     total: 0
     rps: 0
-  DELETE_1_3:
-    total: 0
-    rps: 0
 ...
 --# stop server default
 --# start server default
@@ -51,9 +48,6 @@ box.stat()
     total: 0
     rps: 0
   UPDATE:
-    total: 0
-    rps: 0
-  DELETE_1_3:
     total: 0
     rps: 0
 ...

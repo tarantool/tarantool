@@ -65,7 +65,6 @@ struct port;
         _(REPLACE, 13)				\
 	_(SELECT, 17)				\
 	_(UPDATE, 19)				\
-	_(DELETE_1_3, 20)			\
 	_(DELETE, 21)				\
 	_(CALL, 22)
 

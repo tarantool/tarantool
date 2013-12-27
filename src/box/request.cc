@@ -207,8 +207,7 @@ static bool
 request_check_type(uint32_t type)
 {
 	return (type != REPLACE && type != SELECT &&
-		type != UPDATE && type != DELETE_1_3 &&
-		type != DELETE && type != CALL);
+		type != UPDATE && type != DELETE && type != CALL);
 }
 
 const char *
@@ -272,7 +271,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 		/* Do not parse the tail, tuple_update will do it */
 		request->u.expr_end = reqend;
 		break;
-	case DELETE_1_3:
 	case DELETE:
 		request->execute = execute_delete;
 		request->d.space_no = pick_u32(reqpos, reqend);

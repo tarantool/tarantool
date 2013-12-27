@@ -52,7 +52,6 @@ t;
   - REPLACE
   - CALL
   - UPDATE
-  - DELETE_1_3
   - total
   - rps
   - total
