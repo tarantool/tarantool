@@ -13,7 +13,7 @@ add_subdirectory(man)
 if (ENABLE_DOC)
     add_subdirectory(user)
     add_subdirectory(developer)
+    add_subdirectory(www-data.in)
 endif()
 
 
-add_subdirectory(www-data.in)
