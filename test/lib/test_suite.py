@@ -174,11 +174,11 @@ class Test:
             check_valgrind_log(server.valgrind_log) == False
 
         elif self.skip:
-            color_stdout("[ SKIP ]\n", fgcolor='grey')
+            color_stdout("[ skip ]\n", fgcolor='grey')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
-            color_stdout("[ PASS ]\n", fgcolor='green')
+            color_stdout("[ pass ]\n", fgcolor='green')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif (self.is_executed_ok and not self.is_equal_result and not
@@ -330,7 +330,7 @@ class TestSuite:
                 if (test_name in self.ini["disabled"]
                     or not self.server.debug and test_name in self.ini["release_disabled"]
                     or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                    color_stdout("[ DISABLED ]\n", fgcolor='grey')
+                    color_stdout("[ disabled ]\n", fgcolor='grey')
                 else:
                     test.run(self.server)
                     if not test.passed():
