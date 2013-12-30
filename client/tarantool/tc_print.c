@@ -67,7 +67,7 @@ void tc_printf(char *fmt, ...) {
 	if (stat == -1)
 		tc_error("Can't write into pager - %d", errno);
 	va_end(args);
-	if (!str)
+	if (str)
 		free(str);
 	return;
 }
