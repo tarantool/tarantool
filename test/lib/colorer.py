@@ -8,6 +8,69 @@ class Singleton(type):
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
 
+class CSchema(object):
+    objects = {}
+
+    def __init__(self):
+        self.main_objects = {
+            'diff_mark': {},
+            'diff_in':   {},
+            'diff_out':  {},
+            'test_pass': {},
+            'test_fail': {},
+            'test_new':  {},
+            'test_skip': {},
+            'test_disa': {},
+            'error':     {},
+            'lerror':    {},
+            'tail':      {},
+            'ts_text':   {},
+            'path':      {},
+            'info':      {},
+            'separator': {},
+            't_name':    {},
+            'serv_text': {},
+            'version':   {},
+            'tr_text':   {},
+        }
+        self.main_objects.update(self.objects)
+
+class SchemaAscetic(CSchema):
+    objects = {
+        'diff_mark': {'fgcolor': 'magenta'},
+        'diff_in':   {'fgcolor': 'green'},
+        'diff_out':  {'fgcolor': 'red'},
+        'test_pass': {'fgcolor': 'green'},
+        'test_fail': {'fgcolor': 'red'},
+        'test_new':  {'fgcolor': 'lblue'},
+        'test_skip': {'fgcolor': 'grey'},
+        'test_disa': {'fgcolor': 'grey'},
+        'error':     {'fgcolor': 'red'},
+    }
+
+class SchemaPretty(CSchema):
+    objects = {
+        'diff_mark': {'fgcolor': 'magenta'},
+        'diff_in':   {'fgcolor': 'blue'},
+        'diff_out':  {'fgcolor': 'red'},
+        'test_pass': {'fgcolor': 'green'},
+        'test_fail': {'fgcolor': 'red'},
+        'test_new':  {'fgcolor': 'lblue'},
+        'test_skip': {'fgcolor': 'grey'},
+        'test_disa': {'fgcolor': 'grey'},
+        'error':     {'fgcolor': 'red'},
+        'lerror':    {'fgcolor': 'lred'},
+        'tail':      {'fgcolor': 'lblue'},
+        'ts_text':   {'fgcolor': 'lmagenta'},
+        'path':      {'fgcolor': 'green',  'bold':True},
+        'info':      {'fgcolor': 'yellow', 'bold':True},
+        'separator': {'fgcolor': 'blue'},
+        't_name':    {'fgcolor': 'lblue'},
+        'serv_text': {'fgcolor': 'lmagenta'},
+        'version':   {'fgcolor': 'yellow', 'bold':True},
+        'tr_text':   {'fgcolor': 'green'},
+    }
+
 class Colorer(object):
     """
     Colorer/Styler based on VT220+ specifications (Not full). Based on:
@@ -32,7 +95,7 @@ class Colorer(object):
         "lmagenta" : '1;35',
         "lcyan"    : '1;36',
         "white"    : '1;37',
-        }
+    }
     bgcolor = {
         "black"    : '0;40',
         "red"      : '0;41',
@@ -66,6 +129,15 @@ class Colorer(object):
         self.stdout = sys.stdout
         self.is_term = self.stdout.isatty()
         self.colors = int(os.popen('tput colors').read()) if self.is_term else None
+        print os.getenv('TT_SCHEMA')
+        schema = os.getenv('TT_SCHEMA', 'ascetic')
+        if schema == 'ascetic':
+            self.schema = SchemaAscetic()
+        elif schema == 'pretty':
+            self.schema = SchemaPretty()
+        else:
+            self.schema = CSchema()
+        self.schema = self.schema.main_objects
 
     def set_stdout(self):
         sys.stdout = self
@@ -75,6 +147,8 @@ class Colorer(object):
 
     def write(self, *args, **kwargs):
         flags = []
+        if 'schema' in kwargs:
+            kwargs.update(self.schema[kwargs['schema']])
         for i in self.attributes:
             if i in kwargs and kwargs[i] == True:
                 flags.append(self.attributes[i])
@@ -95,11 +169,11 @@ class Colorer(object):
     def writeout_unidiff(self, diff):
         for i in diff:
             if i.startswith('+'):
-                self.write(i, fgcolor='blue')
+                self.write(i, schema='diff_in')
             elif i.startswith('-'):
-                self.write(i, fgcolor='red')
+                self.write(i, schema='diff_out')
             elif i.startswith('@'):
-                self.write(i, fgcolor='magenta')
+                self.write(i, schema='diff_mark')
 
     def flush(self):
         return self.stdout.flush()

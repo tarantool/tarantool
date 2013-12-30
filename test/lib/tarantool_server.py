@@ -165,8 +165,8 @@ class TarantoolServer(Server):
         builddir = os.path.join(builddir, "src/box")
         path = builddir + os.pathsep + os.environ["PATH"]
         if not silent:
-            color_stdout("Looking for server binary in ", fgcolor='lmagenta')
-            color_stdout(path+" ...\n", fgcolor='green')
+            color_stdout("Looking for server binary in ", schema='serv_text')
+            color_stdout(path+" ...\n", schema='path')
         for _dir in path.split(os.pathsep):
             exe = os.path.join(_dir, self.default_bin_name)
             if os.access(exe, os.X_OK):
@@ -186,15 +186,15 @@ class TarantoolServer(Server):
         self.valgrind_log = os.path.abspath(os.path.join(self.vardir, self.valgrind_log))
 
         if not silent:
-            color_stdout("Installing the server ...\n", fgcolor='lmagenta')
-            color_stdout("    Found executable at ", fgcolor='lmagenta')
-            color_stdout(self.binary+'\n', fgcolor='green', bold=True)
-            color_stdout("    Creating and populating working directory in ", fgcolor='lmagenta')
-            color_stdout(self.vardir+' ...\n', fgcolor='green', bold=True)
+            color_stdout("Installing the server ...\n", schema='serv_text')
+            color_stdout("    Found executable at ", schema='serv_text')
+            color_stdout(self.binary+'\n', schema='path')
+            color_stdout("    Creating and populating working directory in ", schema='serv_text')
+            color_stdout(self.vardir+' ...\n', schema='path')
 
         if os.access(self.vardir, os.F_OK):
             if not silent:
-                color_stdout("    Found old vardir, deleting ...\n", fgcolor='lmagenta')
+                color_stdout("    Found old vardir, deleting ...\n", schema='serv_text')
             self.kill_old_server()
             self.cleanup()
         else:
@@ -257,7 +257,7 @@ class TarantoolServer(Server):
                 stderr = subprocess.STDOUT, stdout = subprocess.PIPE)
         retcode = _init.wait()
         if retcode:
-            sys.stderr.write("tarantool_box --init-storage error: \n%s\n" %  _init.stdout.read())
+            color_stdout("tarantool_box --init-storage error: \n%s\n" %  _init.stdout.read(), schema='error')
             raise subprocess.CalledProcessError(retcode, cmd)
 
     def get_param(self, param):
@@ -305,23 +305,23 @@ class TarantoolServer(Server):
 
         if self.is_started:
             if not silent:
-                color_stdout("The server is already started.\n", fgcolor='lred')
+                color_stdout("The server is already started.\n", schema='lerror')
             return
 
         if not silent:
-            color_stdout("Starting the server ...\n", fgcolor='lmagenta')
+            color_stdout("Starting the server ...\n", schema='serv_text')
             version = self.version()
-            color_stdout("Starting ", fgcolor='lmagenta')
-            color_stdout(os.path.basename(self.binary), " \n", fgcolor='green')
-            color_stdout(version, "\n", fgcolor='grey')
+            color_stdout("Starting ", schema='serv_text')
+            color_stdout(os.path.basename(self.binary), " \n", schema='path')
+            color_stdout(version, "\n", schema='version')
 
         check_port(self.port)
         args = self.prepare_args()
 
         if self.gdb:
             args = prepare_gdb(self.binary, args)
-            color_stdout("You started the server in gdb mode.\n", fgcolor='yellow', bold=True)
-            color_stdout("To attach, use `screen -r tnt-gdb`\n", fgcolor='yellow', bold=True)
+            color_stdout("You started the server in gdb mode.\n", schema='info')
+            color_stdout("To attach, use `screen -r tnt-gdb`\n", schema='info')
         elif self.valgrind:
             args = prepare_valgrind([self.binary] + args, self.valgrind_log,
                                     os.path.abspath(os.path.join(self.vardir,
@@ -347,11 +347,11 @@ class TarantoolServer(Server):
         start up."""
         if not self.is_started:
             if not silent:
-                color_stdout("The server is not started.\n", fgcolor='red')
+                color_stdout("The server is not started.\n", schema='lerror')
             return
 
         if not silent:
-            color_stdout("Stopping the server ...\n", fgcolor='lmagenta')
+            color_stdout("Stopping the server ...\n", schema='serv_text')
 
         if self.process == None:
             self.kill_old_server()
@@ -429,7 +429,7 @@ class TarantoolServer(Server):
             return # Nothing to do
 
         if not silent:
-            color_stdout("    Found old server, pid {0}, killing ...".format(pid), fgcolor='yellow')
+            color_stdout("    Found old server, pid {0}, killing ...".format(pid), schema='info')
 
         try:
             os.kill(pid, signal.SIGTERM)
@@ -452,10 +452,10 @@ class TarantoolServer(Server):
         return pid
 
     def print_log(self, lines):
-        color_stdout.write("\nLast {0} lines of Tarantool Log file:\n".format(lines), fgcolor='lred')
+        color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
         with open(os.path.join(self.vardir, 'tarantool.log'), 'r') as log:
             for i in log.readlines()[-lines:]:
-                color_stdout.write(i, fgcolor='grey')
+                color_stdout(i, schema='log')
 
     def wait_until_started(self):
         """Wait until the server is started and accepting connections"""

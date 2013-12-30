@@ -126,5 +126,3 @@ admin("#box.space[0]")
 # cleanup
 server.stop()
 server.deploy()
-
-# vim: syntax=python
