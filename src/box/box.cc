@@ -28,6 +28,7 @@
  */
 #include "box/box.h"
 #include <arpa/inet.h>
+#include <sys/wait.h>
 
 extern "C" {
 #include <cfg/warning.h>
