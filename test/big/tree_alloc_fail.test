@@ -1,0 +1,50 @@
+# encoding: tarantool
+#
+import sys
+
+# Check a failed realloc in tree.
+exec admin "lua s = box.space[28]"
+
+exec admin "lua for i = 1,10 do s:insert(i, i, 'test' .. i) end"
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+exec admin "lua for t in s.index[0]:iterator(box.index.ALL) do print(t); end"
+
+exec admin "set injection ERRINJ_TREE_ALLOC on"
+
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+exec admin "lua for i = 501,1000 do s:insert(i, i) end"
+exec admin "lua s:delete(1)"
+exec admin "lua for t in s.index[0]:iterator(box.index.ALL) do print(t) end"
+
+# reserve memory for iterator in index. last insert may increase tree depth
+exec admin "set injection ERRINJ_TREE_ALLOC off"
+exec admin "lua s:select(0, 1)"
+exec admin "set injection ERRINJ_TREE_ALLOC on"
+
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+
+exec admin "lua for i = 1001,1500 do s:insert(i, i) end"
+exec admin "lua s:delete(2)"
+exec admin "lua s.index[0]:iterator(box.index.ALL)"
+
+# reserve memory for iterator in index. last insert may increase tree depth
+#  (if rebalance was not initiated)
+exec admin "set injection ERRINJ_TREE_ALLOC off"
+exec admin "lua s:select(0, 1)"
+exec admin "set injection ERRINJ_TREE_ALLOC on"
+
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+exec admin "lua for i = 1501,2000 do s:insert(i, i) end"
+exec admin "lua s:delete(3)"
+exec admin "lua s.index[0]:iterator(box.index.ALL)"
+
+exec admin "set injection ERRINJ_TREE_ALLOC off"
+
+exec admin "lua for i = 2001,2500 do s:insert(i, i) end"
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+exec admin "lua s:delete(8)"
+exec admin "lua for i = 1,10 do print(s:select(0, i)) end"
+exec admin "lua for i = 2001,2010 do print(s:select(0, i)) end"
+exec admin "lua s:truncate()"
+
+# vim: syntax=python

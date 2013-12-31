@@ -43,18 +43,4 @@ exec admin "set injection ERRINJ_WAL_ROTATE on"
 exec admin "lua box.space[0]:truncate()"
 exec admin "set injection ERRINJ_WAL_ROTATE off"
 exec admin "lua box.space[0]:truncate()"
-
-# Check a failed realloc in tree.
-server.stop()
-server.deploy("box/tarantool_tree_alloc.cfg")
-exec admin "lua for i = 1,10 do box.space[0]:insert(i, i, 'testtesttest') end"
-exec admin "set injection ERRINJ_TREE_ALLOC on"
-exec admin "lua for i = 11,1000 do box.space[0]:insert(i, i) end"
-exec admin "lua box.space[0].index[0]:iterator(box.index.ALL)"
-exec admin "set injection ERRINJ_TREE_ALLOC off"
-exec admin "lua for i = 1,10 do print(box.space[0]:select(0, i)) end"
-exec admin "lua box.space[0]:truncate()"
-server.stop()
-server.deploy(self.suite_ini["config"])
-
 # vim: syntax=python

@@ -281,8 +281,8 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		sptree_index_fold(&new_node, new_tuple);
 
 		/* Try to optimistically replace the new_tuple. */
-		int tree_res =  sptree_index_replace(&tree, &new_node,
-						     (void **) &p_dup_node);
+		int tree_res = sptree_index_replace(&tree, &new_node,
+						    (void **) &p_dup_node);
 
 		if (tree_res) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, tree_res,
@@ -393,8 +393,7 @@ TreeIndex::beginBuild()
 	size_t sz = tree.max_size * sizeof(struct sptree_index_node);
 	tree.members = malloc(sz);
 	if (tree.members == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sz, "TreeIndex", "begin build");
+		panic("malloc(): failed to allocate %" PRI_SZ " bytes", sz);
 	}
 }
 
@@ -407,8 +406,8 @@ TreeIndex::buildNext(struct tuple *tuple)
 		size_t sz = tree.max_size * sizeof(struct sptree_index_node);
 		tree.members = realloc(tree.members, sz);
 		if (tree.members == NULL) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  sz, "TreeIndex", "begin build");
+			panic("malloc(): failed to allocate %" PRI_SZ " bytes",
+			      sz);
 		}
 	}
 
@@ -434,8 +433,7 @@ TreeIndex::endBuild()
 			  sptree_index_node_compare,
 			  this);
 	if (tree_res) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  tree_res, "TreeIndex", "init tree");
+		panic("tree_init: failed to allocate %d bytes", tree_res);
 	}
 }
 
@@ -455,8 +453,8 @@ TreeIndex::build(Index *pk)
 		size_t sz = estimated_tuples * sizeof(struct sptree_index_node);
 		nodes = malloc(sz);
 		if (nodes == NULL) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  sz, "TreeIndex", "build");
+			panic("malloc(): failed to allocate %" PRI_SZ " bytes",
+			      sz);
 		}
 	}
 
@@ -485,7 +483,6 @@ TreeIndex::build(Index *pk)
 					     : sptree_index_node_compare_dup,
 			  this);
 	if (tree_res) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  tree_res, "TreeIndex", "init tree");
+		panic("tree_init: failed to allocate %d bytes", tree_res);
 	}
 }
