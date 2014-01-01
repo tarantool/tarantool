@@ -132,7 +132,7 @@ class Options:
         """Check the arguments for correctness."""
         check_error = False
         if self.args.gdb and self.args.valgrind:
-            color_stdout("Error: option --gdb is not compatible with option --valgrind", fgcolor='red')
+            color_stdout("Error: option --gdb is not compatible with option --valgrind", schema='error')
             check_error = True
         if check_error:
             exit(-1)
@@ -169,7 +169,7 @@ def main():
     failed_tests = []
 
     try:
-        color_stdout("Started {}\n".format(" ".join(sys.argv)), fgcolor='green')
+        color_stdout("Started {}\n".format(" ".join(sys.argv)), schema='tr_text')
         suite_names = []
         if options.args.suites != []:
             suite_names = options.args.suites
@@ -183,7 +183,7 @@ def main():
         for suite in suites:
             failed_tests.extend(suite.run_all())
     except RuntimeError as e:
-        color_stdout("\nFatal error: {0}. Execution aborted.\n".format(e), fgcolor='red')
+        color_stdout("\nFatal error: {0}. Execution aborted.\n".format(e), schema='error')
         if options.args.gdb:
             time.sleep(100)
         return (-1)
@@ -191,9 +191,9 @@ def main():
         os.chdir(oldcwd)
 
     if failed_tests and options.args.is_force:
-        color_stdout("\n===== {0} tests failed:".format(len(failed_tests))+"\n", fgcolor="red")
+        color_stdout("\n===== {0} tests failed:".format(len(failed_tests))+"\n", schema='error')
         for test in failed_tests:
-             color_stdout("----- "+test+"\n", fgcolor="yellow")
+             color_stdout("----- "+test+"\n", schema='info')
 
     return (-1 if failed_tests else 0)
 
