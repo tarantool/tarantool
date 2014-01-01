@@ -1,2 +1,6 @@
 {% extends "base" %}
 {% set title = "Tarantool: an introduction" %}
+{% block content %}
+    {{ intro.main }}
+{% endblock content %}
+

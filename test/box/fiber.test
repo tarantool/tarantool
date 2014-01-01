@@ -97,6 +97,6 @@ for i in xrange(1, 10):
 
     exec admin "lua for i = 1, 300 do box.fiber.resume(box.fiber.create(function() box.fiber.detach() table.insert( result, ftest() ) end )) end"
 
-exec admin "lua while #result < 300 do box.fiber.sleep(0.01) end"
+    exec admin "lua while #result < 300 do box.fiber.sleep(0.01) end"
 exec admin "lua #result"
 

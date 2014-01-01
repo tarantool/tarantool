@@ -177,6 +177,7 @@ public:
 	virtual struct tuple *replace(struct tuple *old_tuple,
 				      struct tuple *new_tuple,
 				      enum dup_replace_mode mode) = 0;
+	virtual size_t memsize() const = 0;
 	/**
 	 * Create a structure to represent an iterator. Must be
 	 * initialized separately.

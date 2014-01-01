@@ -12,6 +12,8 @@ struct ts {
 	uint64_t to_lsn;
 	struct slab_cache sc;
 	struct region ra;
+	const char* snap_dir;
+	const char* wal_dir;
 };
 
 void ts_oomcheck(void);

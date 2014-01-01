@@ -22,7 +22,7 @@ void tc_pager_start() {
 		return;
 	}
 	int pipefd[2];
-	const char *const argv[] = {"/bin/bash", "-c", tc.opt.pager, NULL};
+	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
 
 	if (pipe(pipefd) < 0)
 		tc_error("Failed to open pipe. Errno: %s", strerror(errno));

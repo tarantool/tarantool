@@ -62,7 +62,7 @@ static const char *lua_sources[] = { box_lua, box_net_lua, misc_lua, sql_lua, NU
  * Lua coroutines (lua_newthread()) to have multiple
  * procedures running at the same time.
  */
-static lua_State *root_L;
+lua_State *root_L;
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -452,6 +452,7 @@ static int
 lbox_tuple_unpack(struct lua_State *L)
 {
 	int argc = lua_gettop(L);
+	(void) argc;
 	struct tuple *tuple = lua_checktuple(L, 1);
 
 	struct tuple_iterator it;

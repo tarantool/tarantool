@@ -4,7 +4,7 @@
 %tnt;
 ]>
 <book xmlns="http://docbook.org/ns/docbook" version="5.0"
-      xmlns:xi="http://www.w3.org/2001/XInclude" 
+      xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="tarantool-user-guide">
 <title>Tarantool User Guide, version &tnt_version;</title>
@@ -19,7 +19,8 @@
 <xi:include href="proctitle.xml"/>
 <xi:include href="errcode.xml"/>
 <xi:include href="limitations.xml"/>
-<xi:include href="client-reference.xml"/>
+<xi:include href="lua-tutorial.xml"/>
+<xi:include href="plugins.xml"/>
 <!--
 <xi:include href="faq.xml"/>
 -->

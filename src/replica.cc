@@ -36,6 +36,7 @@
 #include "fiber.h"
 #include "pickle.h"
 #include "coio_buf.h"
+#include "tarantool.h"
 
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
@@ -103,11 +104,15 @@ pull_from_remote(va_list ap)
 		try {
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
+				title("replica", "%s/%s", r->remote->source,
+				      "connecting");
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber));
 				remote_connect(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;
+				title("replica", "%s/%s", r->remote->source,
+				      "connected");
 			}
 			err = "can't read row";
 			uint32_t rowlen;
@@ -123,10 +128,12 @@ pull_from_remote(va_list ap)
 			iobuf_gc(iobuf);
 			fiber_gc();
 		} catch (const FiberCancelException& e) {
+			title("replica", "%s/%s", r->remote->source, "failed");
 			iobuf_delete(iobuf);
 			evio_close(&coio);
 			throw;
 		} catch (const Exception& e) {
+			title("replica", "%s/%s", r->remote->source, "failed");
 			e.log();
 			if (! warning_said) {
 				if (err != NULL)
@@ -135,8 +142,23 @@ pull_from_remote(va_list ap)
 				warning_said = true;
 			}
 			evio_close(&coio);
-			fiber_sleep(reconnect_delay);
 		}
+
+		/* Put fiber_sleep() out of catch block.
+		 *
+		 * This is done to avoid situation, when two or more
+		 * fibers yield's inside their try/catch blocks and
+		 * throws an exceptions. Seems like exception unwinder
+		 * stores some global state while being inside a catch
+		 * block.
+		 *
+		 * This could lead to incorrect exception processing
+		 * and crash the server.
+		 *
+		 * See: https://github.com/tarantool/tarantool/issues/136
+		*/
+		if (! evio_is_active(&coio))
+			fiber_sleep(reconnect_delay);
 	}
 }
 
@@ -190,6 +212,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 	remote.addr.sin_port = htons(port);
 	memcpy(&remote.cookie, &remote.addr, MIN(sizeof(remote.cookie), sizeof(remote.addr)));
 	remote.reader = f;
+	snprintf(remote.source, sizeof(remote.source), "%s", addr);
 	r->remote = &remote;
 	fiber_call(f, r);
 }

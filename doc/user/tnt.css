@@ -20,14 +20,55 @@
   font-weight: bold;
 }
 
+body {
+    min-width: 768px;
+    max-width: 1024px;
+    margin: auto;
+}
+
 .book {
-    width: 768px;
     margin: 2pt auto;
     /*font-family: Verdana, Arial, Helvetica, sans-serif; */
-    font-size: 120%
+    font-size: 100%
 }
 
 .book h1 {
-    margin: 80pt auto;
     font-size: 150%
+}
+
+pre {
+    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    text-decoration: none;
+    outline: 0;
+    padding: 5px;
+    background-color: rgba(0,0,0,0.1);
+    -moz-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    -webkit-box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+div#header {
+    display: flex;
+}
+
+div#content {
+    border-top:    1px dotted black;
+}
+
+div#headwrap {
+    width: 100%;
+}
+div.column {
+    display: inline-block;
+}
+div#headl {
+    float: left;
+    width: 30%;
+}
+div#headr {
+    float: right;
+    width: 69%;
+    text-align: right
 }

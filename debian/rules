@@ -26,8 +26,9 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE := /usr/lib/tarantool/plugins
-DEB_INSTALL_DOCS_ALL := -XTODO -XAUTHORS
+DEB_SHLIBDEPS_INCLUDE 		:= /usr/lib/tarantool/plugins
+DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
+DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool_box
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
@@ -51,10 +52,12 @@ clean::
 	rm -f doc/tnt.ent
 	rm -f www-data.in/download
 
-install/tarantool-dbg::
-	rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
+# install/tarantool-dbg::
+#         rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
 
 install/tarantool::
+	pod2man -c 'tarantar' \
+		debian/tarantar.pod > build-area/tarantar.1
 #         make -C build-area test-force || /bin/true
 
 

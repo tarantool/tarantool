@@ -49,6 +49,8 @@ struct slab_cache_stats {
 	int64_t items;
 	int64_t bytes_used;
 	int64_t bytes_free;
+	int64_t bytes_used_real;
+	int64_t bytes_alloc_real;
 };
 
 /** Statistics on utilization of the slab allocator. */

@@ -209,8 +209,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	struct recovery_state *r = recovery_state;
 	recovery_update_mode(r, "none", 0);
 
-	if (rows_per_wal <= 1)
-		panic("unacceptable value of 'rows_per_wal'");
+	assert(rows_per_wal > 1);
 
 	r->row_handler = row_handler;
 	r->row_handler_param = row_handler_param;
@@ -1202,7 +1201,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			 * filesystem cache, otherwise the limit is
 			 * not really enforced.
 			 */
-			fdatasync(fileno(l->f));
+			if (bytes > recovery_state->snap_io_rate_limit)
+				fdatasync(fileno(l->f));
 		}
 		while (bytes >= recovery_state->snap_io_rate_limit) {
 			ev_now_update();

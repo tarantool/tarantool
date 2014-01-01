@@ -1,66 +1,199 @@
 =head1 NAME
 
-tarantool - readline SQL-client for L<tarantool>.
+tarantool - readline-based client for L<tarantool>.
 
 =head1 SYNOPSIS
 
-    tarantool [OPTIONS]
+    tarantool [OPTIONS] [QUERY]
 
 =head1 Command-line options
 
 =over
 
-=item -h <host>, --host <host>
+=item -h, --host <host name>
 
-Define server address.
+Server address.
 
-=item -p <port>, --port <port>
+=item -p, --port <port number>
 
-Define server port.
+Server port.
 
-=item -a <port>, --admin-port <port>
+=item -a, --admin-port <port number>
 
-Define server admin port.
+Server admin port.
 
-=item -C <file>, --cat <file>
+=item -C, --cat <file name>
 
-Output xlog file or snapshot content. Filename '-' stands for stdin.
+Print xlog or snapshot file content.
 
-=item -P <file>, --play <file>
+=item -P, --play <file name>
 
 Replay xlog file to the specified server.
 
-=item -R <lsn>, --rpl <lsn>
+=item -S, --space <space number>
 
-Act as replica for the specified server.
+Filter by space number.
 
-=item -S <space>, --space <space>
-
-Filter xlog file records by space number.
-
-=item -F <lsn>, --from <lsn>
+=item -F, --from <log serial number>
 
 Start xlog file from the specified lsn.
 
-=item -T <lsn>, --to <lsn>
+=item -T, --to <log serial number>
 
 Stop on specified xlog lsn.
 
-=item -M <name>, --format <name>
+=item -M, --format <name>
 
-Cat output format (default: tarantool).
+Cat output format (tarantool, raw).
 
 =item -H, --header
 
-Add file header to the 'raw' output format..
+Add file header for the raw output.
 
-=item --help
+=item -R, --rpl <log serial number>
 
-Display helpscreen and exits.
+Act as replica for the specified server.
 
-=item -v, --version
+=item -B, --bin
 
-Display version and exits.
+Print STR in lua printer instead of NUM32 and NUM64,
+except arithmetic update arguments.
+
+=item -D, --delim <delim>
+
+If you use --cat, then it will add delim to end of
+every line of your Lua file. when used at CLI start
+of client, then it's replacement of setopt
+delim='<delim>' command.
+
+=item -?, --help
+
+Display this help and exit.
+
+=item -V, --version
+
+Display version information and exit.
 
 =back
+
+=head1 DESCRIPTION
+ 
+Statements in alphabetical order
+
+Although an initial statement may be entered on the tarantool command line, generally they are entered following the prompt in interactive mode while tarantool is running. (A prompt will be the name of the host and a greater-than sign, for example localhost>). The end-of-statement marker is a newline (line feed).
+
+=over
+
+=item CALL
+
+Syntax: CALL procedure-identifier (). Effect: The client tells the server to execute the procedure identified by procedure-identifier. Example: CALL proc50(). Notes: The client sends to the server's read/write data port. 
+
+=item DELETE
+
+Syntax: DELETE FROM tuple-set-name WHERE field-name = literal. Effect: Client tells server to delete the tuple identified by the WHERE clause. Example: DELETE FROM t0 WHERE k0='a'. Notes: field-name must identify the primary key. The client sends to the server's read/write data port after converting from SQL to binary protocol. 
+
+=item EXIT
+
+Syntax: E[XIT]. Effect: The tarantool program stops. Example: EXIT. Notes: The QUIT statement does the same thing. The client sends nothing to the server. 
+
+=item HELP
+
+Syntax: H[ELP]. Effect: Client displays a message including a list of possible statements. Example: HELP. Notes: The client sends nothing to the server. 
+
+=item INSERT
+
+Syntax: INSERT [INTO] tuple-set-identifier VALUES (literal [,literal...]). Effect: The client tells the server to add the tuple consisting of the literal values. Example: INSERT INTO t0 VALUES ('a',0). Notes: The client sends to the server's read/write data port after converting from SQL to binary protocol. 
+
+=item LOADFILE
+
+Syntax: LOADFILE string-literal. Effect: The client loads instructions from the file identified by string-literal. Example: LOADFILE '/home/tarantool_user/file5.txt'. 
+
+=item LUA
+
+Syntax: LUA token [token...]. Effect: The client tells the server to execute the tokens as Lua statements. Example: LUA "hello".." world". Notes: The client sends to the server's administrative port. 
+
+=item PING
+
+Syntax: PING. Effect: The client sends a ping to the server. Example: PING. Notes: The client sends to the server's read/write data port. 
+
+=item QUIT
+
+Syntax: Q[UIT]. Effect: The client stops. This statement is handled entirely by the client. Example: QUIT. Notes: The EXIT statement does the same thing. The client sends nothing to the server. 
+
+=item RELOAD
+
+Syntax: RELOAD CONFIGURATION. Effect: The client tells the server to re-read the configuration file. Example: RELOAD CONFIGURATION. Notes: The client sends to the server's administrative port. 
+
+=item REPLACE
+
+Syntax; REPLACE [INTO] tuple-set-identifier VALUES (literal [,literal...]). Effect: The client tells the server to add the tuple consisting of the literal values. Example: REPLACE INTO t0 VALUES ('a',0). Notes: REPLACE and INSERT are the same, except that INSERT will return an error if a tuple already exists with the same primary key. The client sends to the server's read/write data port after converting from SQL to binary protocol. 
+
+=item SAVE
+
+Syntax: SAVE COREDUMP | SNAPSHOT. Effect: The client tells the server to save the designated object. Example: SAVE SNAPSHOT. Notes: The client sends to the server's administrative port. 
+
+=item SELECT
+
+Syntax: SELECT * FROM tuple-set-identifier WHERE field-identifier = literal [AND|OR field-identifier = literal...] [LIMIT numeric-literal [,numeric-literal]]. Effect: Client tells server to find the tuple or tuples identified in the WHERE clause. Example: SELECT * FROM t0 WHERE k0 = 5 AND k1 = 7 LIMIT 1. Notes: The client sends to the server's read/write data port. 
+
+=item SET
+
+Syntax: SET INJECTION name-token state-token. Effect: In normal mode: error. Notes: This statement is only available in debug mode. 
+
+=item SETOPT
+
+Syntax: SETOPT DELIMITER = string-literal. The string must be a value in single quotes. Effect: string becomes end-of-statement delimiter, so newline alone is not treated as end of statement. Example: SETOPT DELIMITER = '!'. Notes: The client sends nothing to the server.
+
+Syntax: SETOPT PAGER = string-literal. The string must be a value in single quotes. Effect: string becomes the pager that will be invoked for subsequent commands; usually the values are '/usr/bin/less' or '/bin/more' for the common Linux pagers. Example: SETOPT PAGER = '/usr/bin/less'. Notes: The client sends nothing to the server. 
+
+=item SHOW
+
+Syntax: SHOW CONFIGURATION | FIBER | INFO | INJECTIONS | PALLOC | PLUGINS | SLAB | STAT. Effect: The client asks the server for information about environment or statistics. Example: SHOW INFO. Notes: The client sends to the server's administrative port. SHOW INJECTIONS is only available in debug mode. 
+
+=item UPDATE
+
+Syntax: UPDATE tuple-set-identifier SET field-identifier = literal [,field-identifier = literal...] WHERE field-identifier = literal. Effect: Client tells server to change the tuple identified in the WHERE clause. Example: UPDATE t1 SET k1= 'K', k2 = 7 WHERE k0 = 0. Notes: The client sends to the server's read/write data port after converting from SQL to binary protocol. 
+
+For a condensed Backus-Naur Form [BNF] description of some of the statements, see doc/box-protocol.txt and doc/sql.txt.
+
+
+
+=back
+
+=head1 EXAMPLES
+
+
+Depending how one combines the tarantool client's options, there are in effect three modes of operation: "interactive", "print and play", or "replication" mode.
+
+In interactive mode, one types statements and gets results. One can specify a statement file when starting (tarantool < file_name) or one can specify a statement file with the LOADFILE statement: (LOADFILE file_name), but typically the statements are typed in by the user following prompts. Here is an example of an interactive-mode tarantool client session:
+
+ $ tarantool
+ localhost> INSERT INTO t0 VALUES ('X-1',100)
+ Insert OK, 1 rows affected
+ localhost> INSERT INTO t0 VALUES ('X-2',200,'On Order')
+ Insert OK, 1 rows affected
+ localhost> INSERT INTO t0 VALUES ('X-3',300,'')
+ Insert OK, 1 rows affected
+ localhost> UPDATE t0 SET k1 = 300 WHERE k0 = 'X-1'
+ Update OK, 1 rows affected
+ localhost> DELETE FROM t0 WHERE k0 = 'X-2'
+ Delete OK, 1 rows affected
+ localhost> SELECT * FROM t0 WHERE k0 = 'X-1'
+ Select OK, 1 rows affected
+ ['X-1', 300]
+ localhost> EXIT
+ $ 
+
+In print and play mode, one uses --cat and --play and --from and --to and --space options to print write-ahead-log contents, or to send write-ahead-log contents to the server. Here is an example of a print-and-play-mode tarantool client session:
+
+ $ tarantool --cat /home/user1/tarantool_test/work_dir/00000000000000000005.xlog --from 22 --to 26
+ Insert, lsn: 22, time: 1385327353.345869, len: 33, space: 0, cookie: 127.0.0.1:44787 ['X-1', 100]
+ Insert, lsn: 23, time: 1385327353.346745, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-2', 200, 8243105135088135759]
+ Insert, lsn: 24, time: 1385327353.347352, len: 34, space: 0, cookie: 127.0.0.1:44787 ['X-3', 300, '']
+ Update, lsn: 25, time: 1385327353.348209, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-1']
+ Delete, lsn: 26, time: 1385327353.348879, len: 28, space: 0, cookie: 127.0.0.1:44787 ['X-2']
+ $ 
+
+In replication mode, one connects as a replica, and then writes a binary log to a file. 
+
 

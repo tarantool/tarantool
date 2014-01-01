@@ -57,6 +57,7 @@ public:
 				  const char *key, uint32_t part_count) const;
 
 	virtual void reserve(uint32_t n_tuples);
+	virtual size_t memsize() const;
 
 protected:
 	struct mh_index_t *hash;

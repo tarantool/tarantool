@@ -95,7 +95,7 @@ add_custom_target(tags COMMAND ctags -R -f tags
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "5")
-set (CPACK_PACKAGE_VERSION_PATCH "1")
+set (CPACK_PACKAGE_VERSION_PATCH "2")
 
 set (PACKAGE_VERSION "")
 
@@ -202,10 +202,11 @@ if (ENABLE_BACKTRACE)
     endif()
     # Use GNU bfd if present.
     check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
+    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
     set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
     check_include_file(bfd.h HAVE_BFD_H)
     set(CMAKE_REQUIRED_DEFINITIONS)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H)
+    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
         set (HAVE_BFD True)
     endif()
 endif()
@@ -356,15 +357,6 @@ set(TARANTOOL_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 configure_file(
     "${PROJECT_SOURCE_DIR}/include/tarantool/config.h.cmake"
     "${PROJECT_BINARY_DIR}/include/tarantool/config.h"
-    )
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"
-    "${PROJECT_BINARY_DIR}/doc/tnt.ent"
-    )
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/www-data.in/download.cmake"
-    "${PROJECT_BINARY_DIR}/doc/www-data.in/download"
     )
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")

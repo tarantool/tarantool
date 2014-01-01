@@ -270,13 +270,14 @@ fail: can't save snapshot, errno 17 (File exists)
       </term>
       <listitem><para>
 <programlisting>
-localhost> show info
+<prompt>localhost&gt;</prompt> <userinput>show info</userinput>
 ---
 info:
-  version: "1.4.5-128-ga91962c"
+  version: "1.5.2-8-g54a279d"
   uptime: 441524
   pid: 12315
   logger_pid: 12316
+  snapshot_pid: 0
   lsn: 15481913304
   recovery_lag: 0.000
   recovery_last_update: 1306964594.980
@@ -304,6 +305,15 @@ info:
       </para>
 
       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="show-index" xreflabel="SHOW INDEX">
+       <emphasis role="tntadmin">show index</emphasis>
+     </term>
+     <listitem><para>
+     Show the number of keys and the amount of memory used by each each index.
+     </para></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -347,6 +357,11 @@ statistics:
           <emphasis role="strong">arena_used</emphasis> contains
           the % of <olink targetptr="slab_alloc_arena"/> that is
           already distributed to the slab allocator.
+        </para>
+        <para>
+          <emphasis role="strong">bytes_waste</emphasis> contains
+          the amount of memory wasted by the slab allocator due to
+          internal fragmentation.
         </para>
         <para>
         </para>

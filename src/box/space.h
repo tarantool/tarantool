@@ -246,4 +246,20 @@ index_find(struct space *sp, uint32_t index_no)
 	return idx;
 }
 
+#define SPACE_STAT_MAX 256
+
+struct index_stat {
+	int32_t n;
+	int64_t keys;
+	int64_t memsize;
+};
+
+struct space_stat {
+	int32_t n;
+	struct index_stat index[SPACE_STAT_MAX];
+};
+
+struct space_stat *
+space_stat();
+
 #endif /* TARANTOOL_BOX_SPACE_H_INCLUDED */

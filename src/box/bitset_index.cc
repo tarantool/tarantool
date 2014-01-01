@@ -38,20 +38,28 @@
 #include "pickle.h"
 #include <lib/bitset/index.h>
 
+static inline struct tuple *
+value_to_tuple(size_t value);
+
 static inline size_t
 tuple_to_value(struct tuple *tuple)
 {
-	size_t value = salloc_ptr_to_index(tuple);
-	assert(salloc_ptr_from_index(value) == tuple);
+	/*
+	 * A workaround for #49: salloc_index_to_ptr is broken
+	 * https://github.com/tarantool/tarantool/issues/49
+	 */
+	/* size_t value = salloc_ptr_to_index(tuple); */
+	size_t value = (intptr_t) tuple >> 2;
+	assert(value_to_tuple(value) == tuple);
 	return value;
 }
 
 static inline struct tuple *
 value_to_tuple(size_t value)
 {
-	return (struct tuple *) salloc_ptr_from_index(value);
+	/* return (struct tuple *) salloc_ptr_from_index(value); */
+	return (struct tuple *) (value << 2);
 }
-
 struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
 	struct bitset_iterator bitset_it;
@@ -136,6 +144,12 @@ size_t
 BitsetIndex::size() const
 {
 	return bitset_index_size(&index);
+}
+
+size_t
+BitsetIndex::memsize() const
+{
+	return 0;
 }
 
 struct tuple *

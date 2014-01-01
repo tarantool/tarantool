@@ -1,0 +1,4 @@
+tarantool source: outdated-autotools-helper-file third_party/libeio/config.guess 2012-02-10
+tarantool source: outdated-autotools-helper-file third_party/libeio/config.sub 2012-02-10
+tarantool source: outdated-autotools-helper-file third_party/libev/config.guess 2008-01-23
+tarantool source: outdated-autotools-helper-file third_party/libev/config.sub 2008-01-16

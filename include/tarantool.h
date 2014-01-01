@@ -45,6 +45,7 @@ extern char *cfg_filename_fullpath;
 extern bool booting;
 extern char *binary_filename;
 extern char *custom_proc_title;
+extern char status[];
 int reload_cfg(struct tbuf *out);
 void show_cfg(struct tbuf *out);
 int snapshot(void);
@@ -52,10 +53,8 @@ const char *tarantool_version(void);
 double tarantool_uptime(void);
 void tarantool_free(void);
 
-char **init_set_proc_title(int argc, char **argv);
-void free_proc_title(int argc, char **argv);
-void set_proc_title(const char *format, ...);
-void title(const char *fmt, ...);
+void __attribute__((format (printf, 2, 3)))
+title(const char *role, const char *fmt, ...);
 
 #define DEFAULT_CFG_FILENAME "tarantool.cfg"
 #define DEFAULT_CFG SYSCONF_DIR "/" DEFAULT_CFG_FILENAME
