@@ -37,7 +37,13 @@
 /**
  * Instantiate sptree definitions
  */
+#ifdef NDEBUG
 SPTREE_DEF(index, realloc, qsort_arg);
+#else
+void *
+realloc_inject(void *ptr, size_t size);
+SPTREE_DEF(index, realloc_inject, qsort_arg);
+#endif
 
 class TreeIndex: public Index {
 public:

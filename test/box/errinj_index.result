@@ -1,0 +1,238 @@
+s = box.schema.create_space('tweedledum')
+---
+...
+s:create_index('primary', 'tree', { parts = { 0, 'num' }})
+---
+...
+-- Check a failed realloc in tree.
+for i = 1,10 do s:insert(i, i, 'test' .. i) end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:select(0, i)) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for t in s.index[0]:iterator(box.index.ALL) do table.insert(res, t) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:select(0, i)) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 501,1000 do s:insert(i, i) end
+---
+- error: Failed to allocate 1024 bytes in TreeIndex for replace
+...
+s:delete(1)
+---
+- [1, 1, 'test1']
+...
+res = {}
+---
+...
+for t in s.index[0]:iterator(box.index.ALL) do table.insert(res, t) end
+---
+- error: Failed to allocate 196 bytes in TreeIndex for init iterator
+...
+res
+---
+- []
+...
+-- reserve memory for iterator in index. last insert may increase tree depth
+box.errinj.set("ERRINJ_TREE_ALLOC", false)
+---
+- ok
+...
+s:select(0, 1)
+---
+...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:select(0, i))) end
+---
+...
+res
+---
+- - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 1001,1500 do s:insert(i, i) end
+---
+- error: Failed to allocate 1024 bytes in TreeIndex for replace
+...
+s:delete(2)
+---
+- [2, 2, 'test2']
+...
+s.index[0]:iterator(box.index.ALL)
+---
+- error: Failed to allocate 200 bytes in TreeIndex for init iterator
+...
+-- reserve memory for iterator in index. last insert may increase tree depth
+-- (if rebalance was not initiated)
+box.errinj.set("ERRINJ_TREE_ALLOC", false)
+---
+- ok
+...
+s:select(0, 1)
+---
+...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:select(0, i))) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 1501,2000 do s:insert(i, i) end
+---
+- error: Failed to allocate 1024 bytes in TreeIndex for replace
+...
+s:delete(3)
+---
+- [3, 3, 'test3']
+...
+s.index[0]:iterator(box.index.ALL)
+---
+- error: Failed to allocate 200 bytes in TreeIndex for init iterator
+...
+box.errinj.set("ERRINJ_TREE_ALLOC", false)
+---
+- ok
+...
+for i = 2001,2500 do s:insert(i, i) end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:select(0, i))) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+s:delete(8)
+---
+- [8, 8, 'test8']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:select(0, i))) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 2001,2010 do table.insert(res, (s:select(0, i))) end
+---
+...
+res
+---
+- - [2001, 2001]
+  - [2002, 2002]
+  - [2003, 2003]
+  - [2004, 2004]
+  - [2005, 2005]
+  - [2006, 2006]
+  - [2007, 2007]
+  - [2008, 2008]
+  - [2009, 2009]
+  - [2010, 2010]
+...
+s:drop()
+---
+...
