@@ -544,17 +544,12 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
-		uint32_t bsize = pick_u32(&s, end);
-		const char *tend = s + bsize;
-		if (tend > end)
-			tnt_raise(IllegalParams, "incorrect packet length");
-
 		const char *t = s;
-		if (unlikely(!mp_check(&s, tend)))
+		if (unlikely(!mp_check(&s, end)))
 			tnt_raise(ClientError, ER_INVALID_MSGPACK);
 		if (unlikely(mp_typeof(*t) != MP_ARRAY))
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-		struct tuple *tuple = tuple_new(tuple_format_ber, t, tend);
+		struct tuple *tuple = tuple_new(tuple_format_ber, t, s);
 		lbox_pushtuple(L, tuple);
 	}
 	return s;

@@ -391,12 +391,6 @@ tuple_update(struct tuple_format *new_format,
 	     const struct tuple *old_tuple,
 	     const char *expr, const char *expr_end);
 
-/** Tuple length when adding to iov. */
-static inline size_t tuple_len(struct tuple *tuple)
-{
-	return tuple->bsize + sizeof(tuple->bsize);
-}
-
 /**
  * @brief Compare two tuples using field by field using key definition
  * @param tuple_a tuple

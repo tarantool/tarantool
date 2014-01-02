@@ -276,7 +276,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         box.raise(code, body)
                     end
 
-            -- boc.unpack('R') unpacks response body for us (tuple)
+            -- box.unpack('R') unpacks response body for us (tuple)
                     return box.unpack('R', body)
                 end
             else

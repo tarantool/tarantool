@@ -33,7 +33,7 @@
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
-	obuf_dup(buf, &tuple->bsize, tuple_len(tuple));
+	obuf_dup(buf, tuple->data, tuple->bsize);
 }
 
 void
