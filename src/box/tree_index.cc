@@ -30,6 +30,7 @@
 #include "tuple.h"
 #include "space.h"
 #include "exception.h"
+#include "errinj.h"
 
 /* {{{ Utilities. *************************************************/
 
@@ -79,6 +80,16 @@ sptree_index_node_compare_with_key(const void *key, const void *node,
 	return -tuple_compare_with_key(tuple, key_data->key,
 				       key_data->part_count, key_def);
 }
+
+#ifndef NDEBUG
+void *
+realloc_inject(void *ptr, size_t size)
+{
+	if (size)
+		ERROR_INJECT(ERRINJ_TREE_ALLOC, return 0);
+	return realloc(ptr, size);
+}
+#endif
 
 /* {{{ TreeIndex Iterators ****************************************/
 
@@ -252,7 +263,12 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		void *p_dup_node = &dup_tuple;
 
 		/* Try to optimistically replace the new_tuple. */
+		int tree_res =
 		sptree_index_replace(&tree, &new_tuple, &p_dup_node);
+		if (tree_res) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, tree_res,
+				  "TreeIndex", "replace");
+		}
 
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
@@ -306,12 +322,19 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 	it->key_data.key = key;
 	it->key_data.part_count = part_count;
 
-	if (iterator_type_is_reverse(type))
-		sptree_index_iterator_reverse_init_set(&tree, &it->iter,
-						       &it->key_data);
-	else
-		sptree_index_iterator_init_set(&tree, &it->iter,
-					       &it->key_data);
+	if (iterator_type_is_reverse(type)) {
+		int r = sptree_index_iterator_reverse_init_set(&tree,
+				&it->iter, &it->key_data);
+		if (r)
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  r, "TreeIndex", "init iterator");
+	} else {
+		int r = sptree_index_iterator_init_set(&tree,
+				&it->iter, &it->key_data);
+		if (r)
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  r, "TreeIndex", "init iterator");
+	}
 
 	switch (type) {
 	case ITER_EQ:
@@ -386,11 +409,15 @@ TreeIndex::endBuild()
 	void *nodes = tree.members;
 
 	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
+	int tree_res =
 	sptree_index_init(&tree, sizeof(struct tuple *),
 			  nodes, n_tuples, estimated_tuples,
 			  sptree_index_node_compare_with_key,
 			  key_def->is_unique ? sptree_index_node_compare
 					     : sptree_index_node_compare_dup,
 			  key_def);
+	if (tree_res) {
+		panic("tree_init: failed to allocate %d bytes", tree_res);
+	}
 }
 

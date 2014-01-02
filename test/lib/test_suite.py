@@ -35,7 +35,7 @@ def check_libs():
         try:
             __import__(mod_name)
         except ImportError:
-            sys.stderr.write("\n\nNo %s library found\n" % mod_name)
+            color_stdout("\n\nNo %s library found\n" % mod_name, schema='error')
             sys.exit(1)
 
 
@@ -89,7 +89,7 @@ def print_tail_n(filename, num_lines):
     with open(filename, "r+") as logfile:
         tail_n = collections.deque(logfile, num_lines)
         for line in tail_n:
-            color_stdout.write(line, fgcolor='lblue')
+            color_stdout(line, schema='tail')
 
 
 class Test:
@@ -174,20 +174,20 @@ class Test:
             check_valgrind_log(server.valgrind_log) == False
 
         elif self.skip:
-            color_stdout("[ skip ]\n", fgcolor='grey')
+            color_stdout("[ skip ]\n", schema='test_skip')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
-            color_stdout("[ pass ]\n", fgcolor='green')
+            color_stdout("[ pass ]\n", schema='test_pass')
             if os.path.exists(self.tmp_result):
                 os.remove(self.tmp_result)
         elif (self.is_executed_ok and not self.is_equal_result and not
               os.path.isfile(self.result)):
             os.rename(self.tmp_result, self.result)
-            color_stdout("[ NEW ]\n", fgcolor='lblue')
+            color_stdout("[ new ]\n", schema='test_new')
         else:
             os.rename(self.tmp_result, self.reject)
-            color_stdout("[ FAIL ]\n" if not self.is_terminated else "[ TERMINATED ]\n", fgcolor='red')
+            color_stdout("[ fail ]\n", schema='test_fail')
 
             where = ""
             if not self.is_executed_ok:
@@ -210,7 +210,7 @@ class Test:
         """Print 10 lines of client program output leading to test
         failure. Used to diagnose a failure of the client program"""
 
-        color_stdout(message, color='lred')
+        color_stdout(message, schema='error')
         print_tail_n(logfile, 10)
 
     def print_unidiff(self):
@@ -218,7 +218,7 @@ class Test:
         to establish the cause of a failure when .test differs
         from .result."""
 
-        color_stdout("\nTest failed! Result content mismatch:\n", fgcolor='lred')
+        color_stdout("\nTest failed! Result content mismatch:\n", schema='error')
         with open(self.result, "r") as result:
             with open(self.reject, "r") as reject:
                 result_time = time.ctime(os.stat(self.result).st_mtime)
@@ -282,11 +282,11 @@ class TestSuite:
             raise RuntimeError("Unknown server: core = {0}".format(
                                self.ini["core"]))
 
-        color_stdout("Collecting tests in ", fgcolor='lmagenta')
-        color_stdout(repr(suite_path), fgcolor='green')
-        color_stdout(": ", self.ini["description"], ".\n", fgcolor='lmagenta')
+        color_stdout("Collecting tests in ", schema='ts_text')
+        color_stdout(repr(suite_path), schema='path')
+        color_stdout(": ", self.ini["description"], ".\n", schema='ts_text')
         self.server.find_tests(self, suite_path)
-        color_stdout("Found ", str(len(self.tests)), " tests.\n", fgcolor='green')
+        color_stdout("Found ", str(len(self.tests)), " tests.\n", schema='path')
 
     def run_all(self):
         """For each file in the test suite, run client program
@@ -310,19 +310,19 @@ class TestSuite:
             shutil.copy(i, self.args.vardir)
 
         if self.args.start_and_exit:
-            color_stdout("    Start and exit requested, exiting...\n", fgcolor='yellow')
+            color_stdout("    Start and exit requested, exiting...\n", schema='info')
             exit(0)
 
         longsep = '='*70
         shortsep = '-'*60
-        color_stdout(longsep, "\n", fgcolor='blue')
-        color_stdout("TEST".ljust(48), fgcolor='lblue')
-        color_stdout("RESULT\n", fgcolor='green')
-        color_stdout(shortsep, "\n", fgcolor='blue')
+        color_stdout(longsep, "\n", schema='separator')
+        color_stdout("TEST".ljust(48), schema='t_name')
+        color_stdout("RESULT\n", schema='test_pass')
+        color_stdout(shortsep, "\n", schema='separator')
         failed_tests = []
         try:
             for test in self.tests:
-                color_stdout(test.name.ljust(48), fgcolor='lblue')
+                color_stdout(test.name.ljust(48), schema='t_name')
                 # for better diagnostics in case of a long-running test
 
                 test_name = os.path.basename(test.name)
@@ -330,7 +330,7 @@ class TestSuite:
                 if (test_name in self.ini["disabled"]
                     or not self.server.debug and test_name in self.ini["release_disabled"]
                     or self.args.valgrind and test_name in self.ini["valgrind_disabled"]):
-                    color_stdout("[ disabled ]\n", fgcolor='grey')
+                    color_stdout("[ disabled ]\n", schema='t_name')
                 else:
                     test.run(self.server)
                     if not test.passed():
@@ -339,17 +339,17 @@ class TestSuite:
             color_stdout('\n')
             raise
         finally:
-            color_stdout(shortsep, "\n", fgcolor='blue')
+            color_stdout(shortsep, "\n", schema='separator')
             self.server.stop(silent=False)
             self.server.cleanup()
 
         if failed_tests:
             color_stdout("Failed {0} tests: {1}.".format(len(failed_tests),
                                                 ", ".join(failed_tests)),
-                                                fgcolor='red')
+                                                schema='error')
 
         if self.args.valgrind and check_valgrind_log(self.server.valgrind_log):
-            color_stdout("  Error! There were warnings/errors in valgrind log file:", fgcolor='red')
+            color_stdout("  Error! There were warnings/errors in valgrind log file:", schema='error')
             print_tail_n(self.server.valgrind_log, 20)
             return ['valgrind error in ' + self.suite_path]
         return failed_tests
