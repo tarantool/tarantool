@@ -41,32 +41,15 @@ struct port;
 					 BOX_ADD | \
 					 BOX_REPLACE)
 
-/**
-    deprecated request ids:
-        _(INSERT, 1)
-        _(DELETE, 2)
-        _(SET_FIELD, 3)
-        _(ARITH, 5)
-        _(SET_FIELD, 6)
-        _(ARITH, 7)
-        _(SELECT, 4)
-        _(DELETE, 8)
-        _(UPDATE_FIELDS, 9)
-        _(INSERT,10)
-        _(JUBOX_ALIVE, 11)
-        _(SELECT_LIMIT, 12)
-        _(SELECT_OLD, 14)
-        _(SELECT_LIMIT, 15)
-        _(UPDATE_FIELDS_OLD, 16)
-
-    DO NOT use these ids!
- */
 #define REQUESTS(_)				\
-        _(REPLACE, 13)				\
-	_(SELECT, 17)				\
-	_(UPDATE, 19)				\
-	_(DELETE, 21)				\
-	_(CALL, 22)
+	_(SELECT, 1)				\
+        _(INSERT, 2)				\
+        _(REPLACE, 3)				\
+	_(UPDATE, 4)				\
+	_(DELETE, 5)				\
+	_(CALL, 6)
+
+#define BOX_REQUEST_LAST CALL
 
 ENUM(requests, REQUESTS);
 extern const char *requests_strs[];

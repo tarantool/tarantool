@@ -206,8 +206,7 @@ execute_delete(const struct request *request, struct txn *txn,
 static bool
 request_check_type(uint32_t type)
 {
-	return (type != REPLACE && type != SELECT &&
-		type != UPDATE && type != DELETE && type != CALL);
+	return type < 1 || type > BOX_REQUEST_LAST;
 }
 
 const char *
@@ -238,6 +237,7 @@ request_create(struct request *request, uint32_t type, const char *data,
 	const char *s;
 
 	switch (request->type) {
+	case INSERT:
 	case REPLACE:
 		request->execute = execute_replace;
 		request->r.space_no = pick_u32(reqpos, reqend);

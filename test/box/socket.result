@@ -899,7 +899,7 @@ ping
 s:close()
 ---
 ...
- replies = 0 function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			replies = replies + 1 		end 	end) ) 	return s:send(box.pack('iii', 65280, 0, 1)) end 
+ replies = 0 function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			replies = replies + 1 		end 	end) ) 	return s:send(box.pack('iii', box.net.PING, 0, 1)) end 
 ---
 ...
 bug1160869()
@@ -921,7 +921,7 @@ replies
 ---
 - 3
 ...
- s = nil syncno = 0 reps = 0 function iostart() 	if s ~= nil then 		return 	end 	s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			reps = reps + 1 		end 	end)) end  function iotest() 	iostart() 	syncno = syncno + 1 	return s:send(box.pack('iii', 65280, 0, syncno)) end 
+ s = nil syncno = 0 reps = 0 function iostart() 	if s ~= nil then 		return 	end 	s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(12) 			reps = reps + 1 		end 	end)) end  function iotest() 	iostart() 	syncno = syncno + 1 	return s:send(box.pack('iii', box.net.PING, 0, syncno)) end 
 ---
 ...
 iotest()

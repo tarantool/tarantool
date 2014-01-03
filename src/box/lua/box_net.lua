@@ -1,6 +1,15 @@
 -- box_net.lua (internal file)
 
 box.net = {
+
+    PING = 0,
+    SELECT = 1,
+    INSERT = 2,
+    REPLACE = 3,
+    UPDATE = 4,
+    DELETE = 5,
+    CALL = 6,
+
 --
 -- The idea of box.net.box implementation is that
 -- most calls are simply wrappers around 'process'
@@ -11,7 +20,7 @@ box.net = {
     box = {
         delete = function(self, space, ...)
             local key_part_count = select('#', ...)
-            return self:process(21,
+            return self:process(box.net.DELETE,
                     box.pack('iiV',
                         space,
                         box.flags.BOX_RETURN_TUPLE,  -- flags
@@ -20,7 +29,7 @@ box.net = {
 
         replace = function(self, space, ...)
             local field_count = select('#', ...)
-            return self:process(13,
+            return self:process(box.net.REPLACE,
                     box.pack('iiV',
                         space,
                         box.flags.BOX_RETURN_TUPLE,  -- flags
@@ -30,7 +39,7 @@ box.net = {
         -- insert a tuple (produces an error if the tuple already exists)
         insert = function(self, space, ...)
             local field_count = select('#', ...)
-            return self:process(13,
+            return self:process(box.net.INSERT,
                    box.pack('iiV',
                         space,
                         bit.bor(box.flags.BOX_RETURN_TUPLE,
@@ -41,7 +50,7 @@ box.net = {
         -- update a tuple
         update = function(self, space, key, format, ...)
             local op_count = bit.rshift(select('#', ...), 1)
-            return self:process(19,
+            return self:process(box.net.UPDATE,
                    box.pack('iiVi'..format,
                         space,
                         box.flags.BOX_RETURN_TUPLE,
@@ -52,7 +61,7 @@ box.net = {
 
         select_limit = function(self, space, index, offset, limit, ...)
             local key_part_count = select('#', ...)
-            return self:process(17,
+            return self:process(box.net.SELECT,
                    box.pack('iiiiiV',
                          space,
                          index,
@@ -64,7 +73,7 @@ box.net = {
 
         select = function(self, space, index, ...)
             local key_part_count = select('#', ...)
-            return self:process(17,
+            return self:process(box.net.SELECT,
                     box.pack('iiiiiV',
                          space,
                          index,
@@ -76,13 +85,13 @@ box.net = {
 
 
         ping = function(self)
-            return self:process(65280, '')
+            return self:process(box.net.PING, '')
         end,
 
         call    = function(self, proc_name, ...)
             assert(type(proc_name) == 'string')
             local count = select('#', ...)
-            return self:process(22,
+            return self:process(box.net.CALL,
                 box.pack('ipV',
                     0,                      -- flags
                     proc_name,
@@ -258,7 +267,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- timeout
             if res == nil then
-                if op == 65280 then
+                if op == box.net.PING then
                     return false
                 else
                     return nil
@@ -267,7 +276,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- results { status, response } received
             if res[1] then
-                if op == 65280 then
+                if op == box.net.PING then
                     return true
                 else
                     local rop, blen, sync, code, body =

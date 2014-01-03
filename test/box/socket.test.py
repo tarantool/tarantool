@@ -521,7 +521,7 @@ function bug1160869()
 			replies = replies + 1
 		end
 	end) )
-	return s:send(box.pack('iii', 65280, 0, 1))
+	return s:send(box.pack('iii', box.net.PING, 0, 1))
 end
 """
 admin(test.replace('\n', ' '))
@@ -554,7 +554,7 @@ end
 function iotest()
 	iostart()
 	syncno = syncno + 1
-	return s:send(box.pack('iii', 65280, 0, syncno))
+	return s:send(box.pack('iii', box.net.PING, 0, syncno))
 end
 """
 admin(test.replace('\n', ' '))

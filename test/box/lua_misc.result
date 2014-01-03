@@ -50,6 +50,7 @@ t;
 - - DELETE
   - SELECT
   - REPLACE
+  - INSERT
   - CALL
   - UPDATE
   - total

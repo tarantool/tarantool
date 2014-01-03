@@ -44,7 +44,7 @@
 #include "memory.h"
 
 static struct iproto_header dummy_header = { 0, 0, 0 };
-const uint32_t msg_ping = 0xff00;
+const uint32_t msg_ping = 0;
 
 /* {{{ iproto_queue */
 
@@ -594,29 +594,6 @@ restart:
 /* }}} */
 
 /* {{{ iproto_process_* functions */
-
-/** Stack a reply to 'ping' packet. */
-static inline void
-iproto_reply_ping(struct obuf *out, struct iproto_header *req)
-{
-	struct iproto_header reply = *req;
-	reply.len = 0;
-	obuf_dup(out, &reply, sizeof(reply));
-}
-
-/** Send an error packet back. */
-static inline void
-iproto_reply_error(struct obuf *out, struct iproto_header *req,
-		   const ClientError& e)
-{
-	struct iproto_header reply = *req;
-	int errmsg_len = strlen(e.errmsg()) + 1;
-	uint32_t ret_code = tnt_errcode_val(e.errcode());
-	reply.len = sizeof(ret_code) + errmsg_len;;
-	obuf_dup(out, &reply, sizeof(reply));
-	obuf_dup(out, &ret_code, sizeof(ret_code));
-	obuf_dup(out, e.errmsg(), errmsg_len);
-}
 
 /** Stack a reply to a single request to the fiber's io vector. */
 static inline void

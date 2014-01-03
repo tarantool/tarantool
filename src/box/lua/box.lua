@@ -7,7 +7,7 @@ box.flags = { BOX_RETURN_TUPLE = 0x01, BOX_ADD = 0x02, BOX_REPLACE = 0x04 }
 --
 function box.select_limit(space, index, offset, limit, ...)
     local key_part_count = select('#', ...)
-    return box.process(17,
+    return box.process(box.net.SELECT,
         box.pack('iiiiiV',
             space,
             index,
@@ -48,7 +48,7 @@ end
 --
 function box.delete(space, ...)
     local key_part_count = select('#', ...)
-    return box.process(21,
+    return box.process(box.net.DELETE,
         box.pack('iiV',
             space,
             box.flags.BOX_RETURN_TUPLE,  -- flags
@@ -58,7 +58,7 @@ end
 -- insert or replace a tuple
 function box.replace(space, ...)
     local field_count = select('#', ...)
-    return box.process(13,
+    return box.process(box.net.REPLACE,
         box.pack('iiV',
             space,
             box.flags.BOX_RETURN_TUPLE,  -- flags
@@ -68,7 +68,7 @@ end
 --replace if tuple already presented func
 function box.replace_if_exists(space, ...)
     local field_count = select('#', ...)
-        return box.process(13,
+        return box.process(box.net.REPLACE,
             box.pack('iiV',
                 space,
                 bit.bor(box.flags.BOX_RETURN_TUPLE, box.flags.BOX_REPLACE),
@@ -78,7 +78,7 @@ end;
 -- insert a tuple (produces an error if the tuple already exists)
 function box.insert(space, ...)
     local field_count = select('#', ...)
-    return box.process(13,
+    return box.process(box.net.INSERT,
         box.pack('iiV',
             space,
             bit.bor(box.flags.BOX_RETURN_TUPLE,
@@ -89,7 +89,7 @@ end
 --
 function box.update(space, key, format, ...)
     local op_count = bit.rshift(select('#', ...), 1)
-    return box.process(19,
+    return box.process(box.net.UPDATE,
         box.pack('iiVi'..format,
             space,
             box.flags.BOX_RETURN_TUPLE,

@@ -21,6 +21,9 @@ box.stat()
     total: 0
     rps: 0
   REPLACE:
+    total: 0
+    rps: 0
+  INSERT:
     total: 12
     rps: 2
   CALL:
@@ -42,6 +45,9 @@ box.stat()
     total: 0
     rps: 0
   REPLACE:
+    total: 0
+    rps: 0
+  INSERT:
     total: 0
     rps: 0
   CALL:

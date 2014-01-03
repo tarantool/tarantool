@@ -39,6 +39,15 @@ enum {
 	IPROTO_BODY_LEN_MAX = 2147483648UL
 };
 
+enum iproto_key {
+	IPROTO_LEN = 0,
+	IPROTO_CODE = 1,
+	IPROTO_SYNC = 2,
+	IPROTO_SPACE = 3,
+	IPROTO_INDEX = 4,
+	IPROTO_TUPLE = 5
+};
+
 /*
  * struct iproto_header and struct iproto_reply_header
  * share common prefix {msg_code, len, sync}
@@ -102,6 +111,29 @@ iproto_port_init(struct iproto_port *port, struct obuf *buf,
 	port->reply.hdr = *req;
 	port->reply.found = 0;
 	port->reply.ret_code = 0;
+}
+
+/** Stack a reply to 'ping' packet. */
+static inline void
+iproto_reply_ping(struct obuf *out, struct iproto_header *req)
+{
+	struct iproto_header reply = *req;
+	reply.len = 0;
+	obuf_dup(out, &reply, sizeof(reply));
+}
+
+/** Send an error packet back. */
+static inline void
+iproto_reply_error(struct obuf *out, struct iproto_header *req,
+		   const ClientError& e)
+{
+	struct iproto_header reply = *req;
+	int errmsg_len = strlen(e.errmsg()) + 1;
+	uint32_t ret_code = tnt_errcode_val(e.errcode());
+	reply.len = sizeof(ret_code) + errmsg_len;;
+	obuf_dup(out, &reply, sizeof(reply));
+	obuf_dup(out, &ret_code, sizeof(ret_code));
+	obuf_dup(out, e.errmsg(), errmsg_len);
 }
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

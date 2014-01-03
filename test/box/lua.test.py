@@ -41,14 +41,14 @@ admin("box.unpack('+p', box.pack('=p', 1, '666'))")
 # Test the low-level box.process() call, which takes a binary packet
 # and passes it to box for execution.
 # insert:
-admin("box.process(13, box.pack('iip', 0, 1, {1, 'testing', 'lua rocks'}))")
+admin("box.process(box.net.REPLACE, box.pack('iip', 0, 1, {1, 'testing', 'lua rocks'}))")
 # select:
-admin("box.process(17, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
+admin("box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
 # delete:
-admin("box.process(21, box.pack('iip', 0, 1, {1}))")
+admin("box.process(box.net.DELETE, box.pack('iip', 0, 1, {1}))")
 # check delete:
-admin("box.process(17, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
-admin("box.process(22, box.pack('iii', 0, 0, 0))")
+admin("box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
+admin("box.process(box.net.CALL, box.pack('iii', 0, 0, 0))")
 sql("call box.process('abc', 'def')")
 sql("call box.pack(1953719668)")
 sql("call box.pack('p', 'this string is 45 characters long 1234567890 ')")
