@@ -182,3 +182,17 @@ a;
 msgpack.decode(msgpack.encode(a));
 
 --# setopt delimiter ''
+-- Test  aliases, loads and dumps
+a = { 1, 2, 3 }
+msgpack.decode(msgpack.dumps(a))
+msgpack.loads(msgpack.encode(a))
+-- Test msgpack.next
+dump = msgpack.dumps({1, 2, 3})..msgpack.dumps({4, 5, 6})
+dump:len()
+a, offset = msgpack.next(dump)
+a
+offset
+a, offset = msgpack.next(dump, offset)
+a
+offset
+a, offset = msgpack.next(dump, offset)

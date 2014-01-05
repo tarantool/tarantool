@@ -243,7 +243,6 @@ box.net.box.new = function(host, port, reconnect_timeout)
             self.processing[sync] = box.ipc.channel(1)
             request = box.pack('iiia', op, string.len(request), sync, request)
 
-
             if timeout ~= nil then
                 timeout = tonumber(timeout)
                 if not self.processing.wch:put(request, timeout) then
@@ -264,7 +263,6 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end
             self.processing[sync] = nil
 
-
             -- timeout
             if res == nil then
                 if op == box.net.PING then
@@ -274,19 +272,25 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 end
             end
 
+            local function totuples(t)
+                res = {}
+                for k, v in pairs(t) do
+                    table.insert(res, box.tuple.new(v))
+                end
+                return res
+            end
+
             -- results { status, response } received
             if res[1] then
                 if op == box.net.PING then
                     return true
                 else
-                    local rop, blen, sync, code, body =
-                        box.unpack('iiiia', res[2])
+                    local code = res[2]
+                    local body = msgpack.decode(res[3])
                     if code ~= 0 then
-                        box.raise(code, body)
+                        box.raise(code, body[11])
                     end
-
-            -- box.unpack('R') unpacks response body for us (tuple)
-                    return box.unpack('R', body)
+                    return unpack(totuples(body[10]))
                 end
             else
                 error(res[2])
@@ -321,18 +325,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
             if self.s == nil then
                 return
             end
-            local res = { self.s:recv(12) }
-            if res[4] ~= nil then
-                self:fatal("Can't read socket: %s", res[3])
-                return
-            end
-            local header = res[1]
-            if string.len(header) ~= 12 then
-                self:fatal("Unexpected eof while reading header")
-                return
-            end
-
-            local op, blen, sync = box.unpack('iii', header)
+            local blen = self.s:recv(5)
+            blen = msgpack.decode(blen)
 
             local body = ''
             if blen > 0 then
@@ -347,7 +341,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return
                 end
             end
-            return sync, header .. body
+            return body
         end,
 
         rfiber = function(self)
@@ -364,13 +358,16 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 self.processing.rch:put(true, 0)
 
                 while not self.closed do
-                    local sync, resp = self:read_response()
+                    local resp = self:read_response()
+                    header, offset = msgpack.next(resp);
+                    code = header[0]
+                    sync = header[1]
                     if sync == nil then
                         break
                     end
 
                     if self.processing[sync] ~= nil then
-                        self.processing[sync]:put({true, resp}, 0)
+                        self.processing[sync]:put({true, code, resp:sub(offset)}, 0)
                     else
                         print("Unexpected response ", sync)
                     end

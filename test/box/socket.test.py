@@ -517,7 +517,7 @@ function bug1160869()
 	box.fiber.resume( box.fiber.create(function()
 		box.fiber.detach()
 		while true do
-			s:recv(12)
+			s:recv(18)
 			replies = replies + 1
 		end
 	end) )
@@ -545,7 +545,7 @@ function iostart()
 	box.fiber.resume( box.fiber.create(function()
 		box.fiber.detach()
 		while true do
-			s:recv(12)
+			s:recv(18)
 			reps = reps + 1
 		end
 	end))

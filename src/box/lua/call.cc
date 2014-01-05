@@ -76,8 +76,7 @@ port_lua(struct port *port) { return (struct port_lua *) port; }
  */
 
 static void
-port_lua_add_tuple(struct port *port, struct tuple *tuple,
-		   uint32_t flags __attribute__((unused)))
+port_lua_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
 	try {
@@ -107,7 +106,7 @@ port_add_lua_ret(struct port *port, struct lua_State *L, int index)
 {
 	struct tuple *tuple = lua_totuple(L, index, index);
 	TupleGuard guard(tuple);
-	port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
+	port_add_tuple(port, tuple);
 }
 
 /**

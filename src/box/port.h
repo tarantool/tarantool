@@ -55,7 +55,7 @@ struct port;
 
 struct port_vtab
 {
-	void (*add_tuple)(struct port *port, struct tuple *tuple, uint32_t flags);
+	void (*add_tuple)(struct port *port, struct tuple *tuple);
 	/** Must be called in the end of execution of a single request. */
 	void (*eof)(struct port *port);
 };
@@ -72,9 +72,9 @@ port_eof(struct port *port)
 }
 
 static inline void
-port_add_tuple(struct port *port, struct tuple *tuple, uint32_t flags)
+port_add_tuple(struct port *port, struct tuple *tuple)
 {
-	(port->vtab->add_tuple)(port, tuple, flags);
+	(port->vtab->add_tuple)(port, tuple);
 }
 
 /** Reused in port_lua */

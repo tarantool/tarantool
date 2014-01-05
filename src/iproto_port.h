@@ -33,43 +33,14 @@
 #include "box/port.h"
 #include "box/tuple.h"
 #include "iobuf.h"
+#include "msgpuck/msgpuck.h"
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648UL
 };
 
-enum iproto_key {
-	IPROTO_LEN = 0,
-	IPROTO_CODE = 1,
-	IPROTO_SYNC = 2,
-	IPROTO_SPACE = 3,
-	IPROTO_INDEX = 4,
-	IPROTO_TUPLE = 5
-};
-
-/*
- * struct iproto_header and struct iproto_reply_header
- * share common prefix {msg_code, len, sync}
- */
-
-struct iproto_header {
-	uint32_t msg_code;
-	uint32_t len;
-	uint32_t sync;
-} __attribute__((packed));
-
-struct iproto_reply_header {
-	struct iproto_header hdr;
-	uint32_t ret_code;
-	uint32_t found;
-}  __attribute__((packed));
-
-static inline struct iproto_header *
-iproto(const char *pos)
-{
-	return (struct iproto_header *) pos;
-}
+enum { MSG_PING = 0 };
 
 /**
  * struct iproto_port users need to be careful to:
@@ -95,7 +66,8 @@ struct iproto_port
 	/** Output buffer. */
 	struct obuf *buf;
 	/** Reply header. */
-	struct iproto_reply_header reply;
+	uint32_t sync;
+	uint32_t found;
 	/** A pointer in the reply buffer where the reply starts. */
 	struct obuf_svp svp;
 };
@@ -104,36 +76,21 @@ extern struct port_vtab iproto_port_vtab;
 
 static inline void
 iproto_port_init(struct iproto_port *port, struct obuf *buf,
-		 struct iproto_header *req)
+		 uint32_t sync)
 {
 	port->vtab = &iproto_port_vtab;
 	port->buf = buf;
-	port->reply.hdr = *req;
-	port->reply.found = 0;
-	port->reply.ret_code = 0;
+	port->sync = sync;
+	port->found = 0;
 }
 
 /** Stack a reply to 'ping' packet. */
-static inline void
-iproto_reply_ping(struct obuf *out, struct iproto_header *req)
-{
-	struct iproto_header reply = *req;
-	reply.len = 0;
-	obuf_dup(out, &reply, sizeof(reply));
-}
+void
+iproto_reply_ping(struct obuf *out, uint32_t sync);
 
 /** Send an error packet back. */
-static inline void
-iproto_reply_error(struct obuf *out, struct iproto_header *req,
-		   const ClientError& e)
-{
-	struct iproto_header reply = *req;
-	int errmsg_len = strlen(e.errmsg()) + 1;
-	uint32_t ret_code = tnt_errcode_val(e.errcode());
-	reply.len = sizeof(ret_code) + errmsg_len;;
-	obuf_dup(out, &reply, sizeof(reply));
-	obuf_dup(out, &ret_code, sizeof(ret_code));
-	obuf_dup(out, e.errmsg(), errmsg_len);
-}
+void
+iproto_reply_error(struct obuf *out, const ClientError &e,
+		   uint32_t sync);
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

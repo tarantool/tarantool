@@ -1,4 +1,4 @@
-Tarantool IPROTO protocol.
+; Tarantool IPROTO protocol.
 ;
 ; The latest version of this document can be found in
 ; tarantool source tree, doc/box-protocol.txt
@@ -9,206 +9,169 @@ Tarantool IPROTO protocol.
 ;   multiple requests via the same connection
 ; - response format that supports zero-copy writes
 ;
-; The atoms of representation in the protocol include:
+; For data structuring and encoding, the protocol uses msgpack
+; data format, see http://msgpack.org
 ;
-; int8 - a single 8-bit byte (i.e. an octet)
+; Since msgpack uses a variying representation for compound
+; data structures, such as arrays and maps, the exact byte
+; sequence mandated by msgpack format is omitted in this spec.
+; Instead, to specify that some contents is part of a msgpack
+; map {} (curly braces) will be used, of a msgpack array - []
+; (square brackets), to define a single key/value pair
+; in a map - a semicolon.
+; If a piece of data is sent as a msgpack int, "" will be used,
+; integers will be denoted without quotes.
+; For example, a reply to ping command in this notation looks
+; like:
+; { len: 0, code: 0, sync: uint }
+; The binary layout of reply, according to msgpack speck is:
+; 0x83, 0, 0, 1, 0, 3, 0xce, int8, uint8, uint8, uint8
+
+; The structure of requests and responses is described below.
 ;
-; int32 - a 32-bit integer in little-endian format (Intel x86)
-;
-; int64 - a 64-bit integer in little-endian format (Intel x86)
-;
-; msgpack - a valid msgpack sequence for everything else, see
-; http://msgpack.org
-;
-; All requests and responses utilize the same basic structure:
+; All requests and responses utilize the same basic structure
 
 <packet> ::= <request> | <response>
 
-<request> ::= <header><request_body>
+<request> ::= <len><header><body>
+<response> ::= <len><header><body>
 
-; If <return_code> is non-zero, the rest of server
-; response is an error message.
+; <len> is the length of the packet, in message pack format.
+; Implementor note: for simplicity of the implementation,
+; the server never "compresses" the packet length, i.e.
+; it is always passed as MessagePack 32-bit unsigned int,
+; 0xce b4 b3 b2 b1 (5 bytes)
 ;
-
-<response> ::= <header><response_body>
-
-;
-; <header> has a fixed structure of three 4-byte integers (12 bytes):
-
-<header> ::= <type><body_length><request_id>
-
-; <type> represents a request type, a single server command,
-; such as PING, SELECT, UPDATE, DELETE, INSERT, etc.
-; <type> is replicated intact in the response header.
-; The currently supported types are:
-; - 13    -- <insert>
-; - 17    -- <select>
-; - 19    -- <update>
-; - 21    -- <delete>
-; - 22    -- <call>
-; - 65280 -- <ping>
-; This list is sparse since a number of old commands
-; were deprecated and removed.
-
-<type> ::= <int32>
+<len> ::= message pack unsigned int
 
 ;
-; <body_length> tells the sender or receiver the length of data
-; that follows the header. If there is no data, <body_length> is 0.
-; However, <request_body> is always present.
-;
-; The only exception is <ping>: its request body is empty, and
-; so is response. In other words, <ping> request packet
-; consists solely of a 12-byte header (65280, 0, 0)
-; and gets the same 12-byte header in response.
+; Both <header> and <body> are message pack maps:
 
-<body_length> ::= <int32>
+<header> ::= { (<key> : <value>)+ }
+<body> ::= { (<key> : <value>)+ }
+
+; They only differ in the allowed set of keys and values,
+; and the key defines the type of value that follows.
+; If a key is missing, and expects an integer value,
+; the missing value is always assumed to be 0. If the
+; missing key assumes a string value, the string is assumed
+; to be empty.
+
+<key> ::= <header_key> | <body_key>
+
+<header_key> ::= <code> | <sync>
 
 ;
-; <request_id> is a unique request identifier set by the client,
+; <code> is request code or response code
+;
+
+<code> ::= 0 ; value is <uint32>
+
+; Value of <code> key in request can be:
+; 0  -- <ping>
+; 1  -- <select>
+; 2  -- <insert>
+; 3  -- <replace>
+; 4  -- <update>
+; 5  -- <delete>
+; 6  -- <call>
+
+; Value of <code> in response is:
+; 0  -- OK
+; anything else (32-bit int) - Tarantool error code
+; If response <code> is 0 (success), response body contains zero or
+; more tuples, otherwise it carries an error message that corresponds
+; to the return code.
+
+; <sync> is a unique request identifier, preserved in the response,
 ; The identifier is necessary to allow request multiplexing --
 ; i.e. sending multiple requests through the same connection
 ; before fetching a response to any of them.
 ; The value of the identifier currently bears no meaning to the
-; server. Similarly to request <type>, it's simply copied to the
-; response header as-is.
-; Consequently, <request_id> can be 0 or two requests
+; server. Consequently, <sync> can be 0 or two requests
 ; can have an identical id.
 
-<request_id> ::= <int32>
+<sync> ::= 1 ; value is <uint32>
 
-; <request_body> holds actual command data.
-; Its format and interpretation are defined by the value of
-; request <type>.
+<body_key> ::= <request_key> | <response_key>
 
-<request_body> ::= <select_request_body> |
-                   <insert_request_body> |
-                   <update_request_body> |
-                   <delete_request_body> |
-                   <call_request_body>
+; Different request types allow different keys in the body:
 
-;
-; <response_body> carries command reply
-; If <return_code> is 0 (success), it contains zero or more
-; tuples, otherwise it carries an error message that corresponds 
-; the return code.
-; 
+<request_key> ::= <select> | <replace> | <delete> | <update> | <call>
 
-<response_body> ::= <return_code><text> |
-                    <0><count><fq_tuple>*
-
-; <select_request_body> (required <header> <type> is 17):
-;
 ; Specify which space to query, which index in the space
 ; to use, offset in the resulting tuple set (set to 0 for no offset),
-; a limit (set to 4294967295 for no limit), and one or several
-; keys to use in lookup. When more than one key is given, they
-; specify a disjunctive search condition (key1 or key2 or ...).
-;
-; Note, that <tuple> is mandatory, and tuple <count>
-; must be non-zero.
-;
+; a limit (set to 4294967295 for no limit), and a key to use in lookup.
 
-<select_request_body> ::= <space_no><index_no>
-                          <offset><limit><count><tuple>+
+; Find tuples matching the search pattern
+<select> ::= <space> | <index> | <iterator> | <offset> | <limit> | <tuple>
 
-; Space number is a non-negative integer, starting from 0.
-; All spaces are defined in the server configuration file,
-; and then referred to by numeric id.
+; Insert a tuple into the space or replace an existing one.
 
-<space_no> ::= <int32>
+<replace> ::= <space> | <index> | <tuple>
 
-; Tarantool supports HASH and TREE indexes. Indexes are
-; enumerated similarly to spaces, starting from 0.
-; Each space has at least index #0, which defines
-; the primary key.
+; Insert is similar to replace, but will return a duplicate key
+; error if such tuple already exists.
+<insert> ::= <space> | <index> | <tuple>
 
-<index_no> ::= <int32>
+; Delete a tuple
+<delete_key> ::= <space> | <index> | <tuple>
 
-; offset in the result set
+; Update a tuple
+<udpate> ::= <space> | <index> | <tuple> | <ops>
 
-<offset> ::= <int32>
+; Call a stored function
+<call> ::= <name> | <tuple>
 
-; limit for the result set
+; As can be seen from the grammar some requests have common keys,
+; whereas other keys can be present only in a body of a single
+; request type.
 
-<limit> ::= <int32>
 
-; key count in the conjunctive set. Tarantool will
-; consequently return tuples that match the first key,
-; then the second, and so on. If a tuple matches
-; more than one key, it's returned twice. <limit> 
-; thus limits the total number of returned tuples,
-; which are not necessarily distinct.
+; <space> Space to use in the request
+; The find the numeric space id by space name, one
+; must first query "_space" system space.
+<space> ::= 2 ; value is <uint32>
 
-<count> ::= <int32>
+; <index> Index to use in the request
+; Similarly to space, to find the  numeric index id
+; by index name, one must query the "_index" system space.
 
-;
-; A tuple that represents a search key simply lists all key
-; fields, preceded with key cardinality (number of list
-; elements). Each key in <select_request_body> can have a
-; different cardinality.
+<index> ::= 3 ; value is <uint32>
 
-<tuple> ::= <message_pack_array>
+; <tuple> defines the actual argument of the operation
+; When present in <select> or <update> it defines a (maybe compound)
+; search key, whereas in <replace> it defines the tuple which
+; will be inserted into the database.
+; In <call> it defines call arguments.
+; When request body allows <tuple> as a key, it must always
+; be present, since otherwise the request is meaningless.
 
-;
-; See http://msgpack.org/ for <message_pack_array> definition
-;
+<tuple> ::= 4 ; value is an arbitrary msgpack array
 
-<select_response_body> ::= <count><fq_tuple>*
+; Only in select, offset in the result set, expects <uint32> value
 
-;
-; Tuples returned by the server (we call them "fully qualified")
-; are always preceded with calculated information:
-; total size of the tuple and number of fields in it.
-; This is how the tuple is stored on server side.
-; While this information can be often derived from body length,
-; it allows the recipient to simplify memory allocation and tuple
-; decoding. Certain requests, such as
-; <select>, can return more than one tuple. In that case
-; fully qualified tuples are also used to identify tuple
-; boundaries: in Tarantool, tuples have variable cardinality.
-;
+; Offset in the result set, <select> only
 
-<fq_tuple> ::= <size><tuple>
+<offset> ::= 5 ; value is <uint32>
 
-; length of the variable part of the tuple (all tuple fields)
-<size> ::= <int32>
+; Limit in the result set, <select> only
 
-;
-; It is not possible to insert more than one tuple at a time.
-; Thus <insert_request_body> (<header> <type> = 13) simply
-; holds one tuple, and which space to put it into.
-;
+<limit> ::= 6 ; value is <uint32>
 
-<insert_request_body> ::= <space_no><flags><tuple>
+; Iterator type to use in search, <select> only
 
-; Flag BOX_RETURN_TUPLE (0x01) indicates
-; that it is required to return the inserted tuple back:
-; Flag BOX_ADD (0x02) requests that no tuple with the same primary
-; key exists in the space. I.e. it turns INSERT into INSERT,
-; without this flag INSERT behaves like REPLACE: replaces
-; an existing tuple if it is found.
-; Flag BOX_REPLACE (0x04) requests that a tuple with the same
-; primary key is present in the space.
+<iterator> ::= 7 ; the only supported value for now is 0
 
-<flags> ::= <int32>
+; Name of the function to call,
+<name> ::= 8 ; value is "string"
 
-;
-; A tuple may already exist. In that case INSERT
-; returns 0 for tuple count in response. If BOX_RETURN_TUPLE
-; is set, the inserted tuple will be sent back:
+; Result set, array of tuples, present only if there is no error
+; (code = ER_OK)
 
-<insert_response_body> ::= <count> | <count><fq_tuple>
+<ops> ::= 9 ; expects <op_list> as value
 
-; <update> request, <type> = 19 is similar to <insert>:
-; - <space_no>: same as in <select> or <insert>
-; - <flags>, <tuple>: same as in <insert>
-; Index number for tuple lookup does not need to be provided,
-; since only primary key updates are allowed.
-; - <count> specifies possibly zero operation count
-;
-
-<update_request_body> ::= <space_no><flags><tuple><count><operation>+
+<op_list> ::= [ (<operation>)+ ]
 
 ;
 ; Operations are optional and exist solely to allow
@@ -265,62 +228,23 @@ Tarantool IPROTO protocol.
 
 <op_arg_splice> ::= <message_pack_array(3)> # <offset><length><string>
 
-<offset> ::= <message_pack_uint>
-<length> ::= <message_pack_uint>
-<string> ::= <message_pack_str>
 
-;
+; The server always returns a tuple or tuples, when found, on success,
+; I.e. on success, response <body> contains <set> key.
+; For select/update/delete, it's the tuple that matched
+; the search criterion. For <replace>, it's the inserted tuple.
+; For <call>, it's whatever the called function returns.
 
-<update_response_body> ::= <insert_response_body>
+<response_key> = <data> | <error>
 
-;
-; <delete>, request <type> = 21
-; Similarly to updates, <delete> always uses the
-; primary key.
-;
+; Set of tuples in the response
+<data> ::= 10 ; value is a message pack array of tuples
 
-<delete_request_body> ::= <space_no><flags><tuple>
+; Error message, present in the response only if there is an error
+<error> ::= 11 ; value is a message pack string
 
-;
-; <delete> returns the number of deleted tuples.
-; Currently it's always either 0 or 1.
-; If BOX_RETURN_TUPLE is specified, and there is an old
-; tuple, (count > 0), DELETE returns the deleted tuple.
-;
-
-<delete_response_body> ::= <count> | <count><fq_tuple>
-
-;
-; CALL request body contains <flags>, <proc_name>
-; the number of procedure args, and the arguments themselves,
-; which are passed into the procedure as Lua strings.
-;
-<call_request_body> ::= <flags><proc_name><tuple>
-
-;
-; <proc_name> is a valid Lua identifier, something like
-; 'type', or 'box.process'.
-;
-
-<proc_name> ::= <field>
-
-;
-; In case of an error, <call_response_body> always contains
-; <return_code>. If it's not 0, it is followed by an
-; error message. Otherwise, the response, just like in case of
-; SELECT, is a sequence of <fq_tuple>s.
-<call_response_body> ::= <select_response_body>
-
-;
-; The server response, in addition to response header and body,
-; contains a return code. It's a 4-byte integer, which has
-; a lower 1-byte completion status part, and a higher 3-byte
-; error code part.
-;
-
-<return_code> ::= <int32>
-
-; The completion status is complementary:
+; The error <code> consists of the actual error code
+; and request completion status, which is complementary:
 ; it can be deduced from the error code. There are only
 ; 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
@@ -377,6 +301,6 @@ Tarantool IPROTO protocol.
 ;
 ; Convenience macros which define hexadecimal constants for
 ; <int32> return codes (completion status + code) can be found
-; in include/iproto.h.
-;
+; in include/errcode.h.
+
 ; vim: syntax=bnf

@@ -70,11 +70,11 @@ struct box_snap_row {
 } __attribute__((packed));
 
 void
-port_send_tuple(struct port *port, struct txn *txn, uint32_t flags)
+port_send_tuple(struct port *port, struct txn *txn)
 {
 	struct tuple *tuple;
 	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
-		port_add_tuple(port, tuple, flags);
+		port_add_tuple(port, tuple);
 }
 
 static void
@@ -86,7 +86,7 @@ process_rw(struct port *port, struct request *request)
 		stat_collect(stat_base, request->type, 1);
 		request->execute(request, txn, port);
 		txn_commit(txn);
-		port_send_tuple(port, txn, request->flags);
+		port_send_tuple(port, txn);
 		port_eof(port);
 		txn_finish(txn);
 	} catch (const Exception& e) {

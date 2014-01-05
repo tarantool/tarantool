@@ -167,7 +167,7 @@ execute_select(const struct request *request, struct txn *txn,
 				continue;
 			}
 
-			port_add_tuple(port, tuple, BOX_RETURN_TUPLE);
+			port_add_tuple(port, tuple);
 
 			if (limit == ++found)
 				break;

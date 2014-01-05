@@ -43,8 +43,24 @@
 #include "scoped_guard.h"
 #include "memory.h"
 
+/*
+ * struct iproto_header and struct iproto_reply_header
+ * share common prefix {msg_code, len, sync}
+ */
+
+struct iproto_header {
+	uint32_t msg_code;
+	uint32_t len;
+	uint32_t sync;
+} __attribute__((packed));
+
+static inline struct iproto_header *
+iproto(const char *pos)
+{
+	return (struct iproto_header *) pos;
+}
+
 static struct iproto_header dummy_header = { 0, 0, 0 };
-const uint32_t msg_ping = 0;
 
 /* {{{ iproto_queue */
 
@@ -600,20 +616,20 @@ static inline void
 iproto_reply(struct iproto_port *port, box_process_func callback,
 	     struct obuf *out, struct iproto_header *header)
 {
-	if (header->msg_code == msg_ping)
-		return iproto_reply_ping(out, header);
+	if (header->msg_code == MSG_PING)
+		return iproto_reply_ping(out, header->sync);
 
 	/* Make request body point to iproto data */
 	char *body = (char *) &header[1];
-	iproto_port_init(port, out, header);
+	iproto_port_init(port, out, header->sync);
 	try {
 		struct request request;
 		request_create(&request, header->msg_code, body, header->len);
 		callback((struct port *) port, &request);
 	} catch (const ClientError& e) {
-		if (port->reply.found)
+		if (port->found)
 			obuf_rollback_to_svp(out, &port->svp);
-		iproto_reply_error(out, header, e);
+		iproto_reply_error(out, e, header->sync);
 	}
 }
 
@@ -657,7 +673,7 @@ iproto_process_connect(struct iproto_request *request)
 	try {              /* connect. */
 		con->session = session_create(fd, con->cookie);
 	} catch (const ClientError& e) {
-		iproto_reply_error(&iobuf->out, request->header, e);
+		iproto_reply_error(&iobuf->out, e, request->header->sync);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
 		} catch (const Exception& e) {

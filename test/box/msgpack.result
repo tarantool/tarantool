@@ -419,3 +419,58 @@ msgpack.decode(msgpack.encode(a));
                                 - null
 ...
 --# setopt delimiter ''
+-- Test  aliases, loads and dumps
+a = { 1, 2, 3 }
+---
+...
+msgpack.decode(msgpack.dumps(a))
+---
+- - 1
+  - 2
+  - 3
+...
+msgpack.loads(msgpack.encode(a))
+---
+- - 1
+  - 2
+  - 3
+...
+-- Test msgpack.next
+dump = msgpack.dumps({1, 2, 3})..msgpack.dumps({4, 5, 6})
+---
+...
+dump:len()
+---
+- 8
+...
+a, offset = msgpack.next(dump)
+---
+...
+a
+---
+- - 1
+  - 2
+  - 3
+...
+offset
+---
+- 5
+...
+a, offset = msgpack.next(dump, offset)
+---
+...
+a
+---
+- - 4
+  - 5
+  - 6
+...
+offset
+---
+- 9
+...
+a, offset = msgpack.next(dump, offset)
+---
+- error: '[string "a, offset = msgpack.next(dump, offset) "]:1: msgpack.next: offset
+    is out of bounds'
+...
