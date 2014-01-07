@@ -28,20 +28,6 @@
  */
 #include "iproto_port.h"
 
-enum iproto_key {
-	IPROTO_CODE = 0,
-	IPROTO_SYNC,
-	IPROTO_SPACE,
-	IPROTO_INDEX,
-	IPROTO_TUPLE,
-	IPROTO_OFFSET,
-	IPROTO_LIMIT,
-	IPROTO_ITERATOR,
-	IPROTO_NAME,
-	IPROTO_OPS,
-	IPROTO_DATA,
-	IPROTO_ERROR,
-};
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
 struct iproto_header_bin {
