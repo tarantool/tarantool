@@ -32,6 +32,7 @@ class CSchema(object):
             'serv_text': {},
             'version':   {},
             'tr_text':   {},
+            'log':       {},
         }
         self.main_objects.update(self.objects)
 
@@ -69,6 +70,7 @@ class SchemaPretty(CSchema):
         'serv_text': {'fgcolor': 'lmagenta'},
         'version':   {'fgcolor': 'yellow', 'bold':True},
         'tr_text':   {'fgcolor': 'green'},
+        'log':       {'fgcolor': 'grey'}
     }
 
 class Colorer(object):
