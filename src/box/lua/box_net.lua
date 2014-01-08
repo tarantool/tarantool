@@ -241,7 +241,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
             self.processing[sync] = box.ipc.channel(1)
-            request = box.pack('iiia', op, string.len(request), sync, request)
+            local header = msgpack.encode({[0] = op, [1] = sync})
+            request = msgpack.encode(header:len() + request:len())..
+                      header..request
 
             if timeout ~= nil then
                 timeout = tonumber(timeout)
@@ -288,9 +290,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     local code = res[2]
                     local body = msgpack.decode(res[3])
                     if code ~= 0 then
-                        box.raise(code, body[11])
+                        box.raise(code, body[36])
                     end
-                    return unpack(totuples(body[10]))
+                    return unpack(totuples(body[35]))
                 end
             else
                 error(res[2])

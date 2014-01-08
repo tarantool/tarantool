@@ -511,17 +511,22 @@ admin("s:close()")
 #
 test="""
 replies = 0
+packet = msgpack.encode({[0] = 0, [1] = 0})
+packet = msgpack.encode(packet:len())..packet
 function bug1160869()
 	local s = box.socket.tcp()
 	s:connect('127.0.0.1', box.cfg.primary_port)
 	box.fiber.resume( box.fiber.create(function()
 		box.fiber.detach()
 		while true do
-			s:recv(18)
+			_, status =  s:recv(18)
+            if status == "eof" then
+                error("unexpected eof")
+            end
 			replies = replies + 1
 		end
 	end) )
-	return s:send(box.pack('iii', box.net.PING, 0, 1))
+	return s:send(packet))
 end
 """
 admin(test.replace('\n', ' '))
@@ -536,6 +541,8 @@ test="""
 s = nil
 syncno = 0
 reps = 0
+packet = msgpack.encode({[0] = 0, [1] = 0})
+packet = msgpack.encode(packet:len())..packet
 function iostart()
 	if s ~= nil then
 		return
@@ -546,6 +553,9 @@ function iostart()
 		box.fiber.detach()
 		while true do
 			s:recv(18)
+            if status == "eof" then
+                error("unexpected eof")
+            end
 			reps = reps + 1
 		end
 	end))
@@ -554,7 +564,9 @@ end
 function iotest()
 	iostart()
 	syncno = syncno + 1
-	return s:send(box.pack('iii', box.net.PING, 0, syncno))
+    packet = msgpack.encode({[0] = 0, [1] = syncno})
+    packet = msgpack.encode(packet:len())..packet
+	return s:send(packet)
 end
 """
 admin(test.replace('\n', ' '))

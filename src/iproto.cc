@@ -453,10 +453,9 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 static inline void
 mp_decode_imap(const char **pos, const char *end, uint32_t *keys)
 {
-	assert(*pos < end);
 	unsigned char c = (unsigned char) **pos;
 	/* Only a small map can be here. */
-	if (mp_type_hint[c] != MP_MAP || mp_parser_hint[c] > end - *pos) {
+	if (mp_type_hint[c] != MP_MAP || *pos + mp_parser_hint[c] >= end) {
 error:
 		tnt_raise(IllegalParams, "Invalid MsgPack - iproto header");
 	}
@@ -466,23 +465,24 @@ error:
 			goto error;
 
 		c = (unsigned char) **pos;
-		if (mp_type_hint[c] != MP_UINT || mp_parser_hint[c] != 1 ||
+		if (mp_type_hint[c] != MP_UINT || mp_parser_hint[c] != 0 ||
 		    c > IPROTO_SYNC) {
 			mp_check(pos, end);
 			mp_check(pos, end);
 			continue;
 		}
 
+		unsigned char key = c;
 		*pos += 1;
 		if (*pos >= end)
 			goto error;
 
 		c = (unsigned char) **pos;
 		if (mp_type_hint[c] != MP_UINT ||
-		    mp_parser_hint[c] + *pos >= end) {
+		    *pos + mp_parser_hint[c] >= end) {
 			goto error;
 		}
-		keys[c] = mp_decode_uint(pos);
+		keys[key] = mp_decode_uint(pos);
 	}
 }
 
@@ -490,24 +490,24 @@ error:
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
-	while (con->parse_size) {
+	while (true) {
 		const char *reqstart = in->end - con->parse_size;
+		const char *pos = reqstart;
 		/* Read request length. */
-		unsigned char c = (unsigned char) *reqstart;
+		unsigned char c = (unsigned char) *pos;
 		if (mp_type_hint[c] != MP_UINT) {
 			tnt_raise(IllegalParams,
 				  "Invalid MsgPack - packet length");
 		}
-		if (mp_parser_hint[c] + reqstart >= in->end)
+		if (pos + mp_parser_hint[c] >= in->end)
 			break;
-		const char *pos = reqstart;
 		uint32_t len = mp_decode_uint(&pos);
 		iproto_validate_header(len);
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
 		/* Parse request header. */
-		uint32_t header[2];
+		uint32_t header[2] = { 0, 0 };
 		mp_decode_imap(&pos, reqend, header);
 
 		struct iproto_request *ireq =
@@ -521,6 +521,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		con->parse_size -= reqend - reqstart;
 		/* request length and header can be discarded. */
 		in->pos += pos - reqstart;
+		if (con->parse_size == 0)
+			break;
 	}
 }
 
