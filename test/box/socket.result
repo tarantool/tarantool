@@ -899,32 +899,27 @@ ping
 s:close()
 ---
 ...
- replies = 0 packet = msgpack.encode({[0] = 0, [1] = 0}) packet = msgpack.encode(packet:len())..packet function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			_, status =  s:recv(18)             if status == "eof" then                 error("unexpected eof")             end 			replies = replies + 1 		end 	end) ) 	return s:send(packet)) end 
+ replies = 0 packet = msgpack.encode({[0] = 0, [1] = 0}) packet = msgpack.encode(packet:len())..packet function bug1160869() 	local s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			_, status =  s:recv(18)             if status == "eof" then                 error("unexpected eof")             end 			replies = replies + 1 		end 	end) ) 	return s:send(packet) end 
 ---
-- error: '[string " replies = 0 packet = msgpack.encode({[0] = 0..."]:1: ''end'' expected
-    near '')'''
 ...
 bug1160869()
 ---
-- error: '[string "return bug1160869()"]:1: attempt to call global ''bug1160869''
-    (a nil value)'
+- 6
 ...
 bug1160869()
 ---
-- error: '[string "return bug1160869()"]:1: attempt to call global ''bug1160869''
-    (a nil value)'
+- 6
 ...
 bug1160869()
 ---
-- error: '[string "return bug1160869()"]:1: attempt to call global ''bug1160869''
-    (a nil value)'
+- 6
 ...
 wait_cout = 100 while replies ~= 3 and wait_cout > 0 do box.fiber.sleep(0.001) wait_cout = wait_cout - 1 end
 ---
 ...
 replies
 ---
-- null
+- 3
 ...
  s = nil syncno = 0 reps = 0 packet = msgpack.encode({[0] = 0, [1] = 0}) packet = msgpack.encode(packet:len())..packet function iostart() 	if s ~= nil then 		return 	end 	s = box.socket.tcp() 	s:connect('127.0.0.1', box.cfg.primary_port) 	box.fiber.resume( box.fiber.create(function() 		box.fiber.detach() 		while true do 			s:recv(18)             if status == "eof" then                 error("unexpected eof")             end 			reps = reps + 1 		end 	end)) end  function iotest() 	iostart() 	syncno = syncno + 1     packet = msgpack.encode({[0] = 0, [1] = syncno})     packet = msgpack.encode(packet:len())..packet 	return s:send(packet) end 
 ---

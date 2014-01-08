@@ -526,7 +526,7 @@ function bug1160869()
 			replies = replies + 1
 		end
 	end) )
-	return s:send(packet))
+	return s:send(packet)
 end
 """
 admin(test.replace('\n', ' '))
