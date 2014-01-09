@@ -114,23 +114,14 @@ process_ro(struct port *port, struct request *request)
 }
 
 static int
-recover_row(void *param __attribute__((unused)), const char *row, uint32_t rowlen)
+recover_row(void *param __attribute__((unused)), const struct log_row *row)
 {
-	/* drop wal header */
-	if (rowlen < sizeof(struct row_header)) {
-		say_error("incorrect row header: expected %zd, got %zd bytes",
-			  sizeof(struct row_header), (size_t) rowlen);
-		return -1;
-	}
-
 	try {
-		const char *end = row + rowlen;
-		row += sizeof(struct row_header);
-		(void) pick_u16(&row, end); /* drop tag - unused. */
-		(void) pick_u64(&row, end); /* drop cookie */
-		uint16_t op = pick_u16(&row, end);
+		const char *data = row->data;
+		const char *end = data + row->len;
+		uint16_t op = pick_u16(&data, end);
 		struct request request;
-		request_create(&request, op, row, end - row);
+		request_create(&request, op, data, end - data);
 		process_rw(&null_port, &request);
 	} catch (const Exception& e) {
 		e.log();

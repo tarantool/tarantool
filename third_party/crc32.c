@@ -736,7 +736,7 @@ multitable_crc32c(uint32_t crc32c,
 
 uint32_t
 crc32c(uint32_t crc32c,
-    const unsigned char *buffer,
+    const char *buffer,
     unsigned int length)
 {
 	if (length < 4) {

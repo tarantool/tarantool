@@ -41,7 +41,7 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-typedef int (row_handler)(void *, const char *, uint32_t);
+typedef int (row_handler)(void *, const struct log_row *row);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.

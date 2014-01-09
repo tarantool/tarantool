@@ -35,7 +35,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-typedef uint32_t (*crc32_func)(uint32_t crc, const unsigned char *buf, unsigned int len);
+typedef uint32_t (*crc32_func)(uint32_t crc, const char *buf, unsigned int len);
 
 /*
  * Pointer to an architecture-specific implementation of

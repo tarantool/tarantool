@@ -41,28 +41,27 @@
 #include "tarantool.h"
 
 static void
-remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
+remote_apply_row(struct recovery_state *r, const struct log_row *row);
 
-static const char *
-remote_read_row(struct ev_io *coio, struct iobuf *iobuf, uint32_t *rowlen)
+static const struct log_row *
+remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 {
 	struct ibuf *in = &iobuf->in;
-	ssize_t to_read = sizeof(struct row_header) - ibuf_size(in);
+	ssize_t to_read = sizeof(struct log_row) - ibuf_size(in);
 
 	if (to_read > 0) {
 		ibuf_reserve(in, cfg_readahead);
 		coio_breadn(coio, in, to_read);
 	}
 
-	ssize_t request_len = row_header(in->pos)->len
-		+ sizeof(struct row_header);
+	ssize_t request_len = ((const struct log_row *) in->pos)->len +
+			sizeof(struct log_row);
 	to_read = request_len - ibuf_size(in);
 
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	const char *row = in->pos;
-	*rowlen = request_len;
+	const struct log_row *row = (const struct log_row *) in->pos;
 	in->pos += request_len;
 	return row;
 }
@@ -120,15 +119,14 @@ pull_from_remote(va_list ap)
 				      "connected");
 			}
 			err = "can't read row";
-			uint32_t rowlen;
-			const char *row = remote_read_row(&coio, iobuf, &rowlen);
+			const struct log_row *row = remote_read_row(&coio, iobuf);
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now() - row_header(row)->tm;
+			r->remote->recovery_lag = ev_now() - row->tm;
 			r->remote->recovery_last_update_tstamp = ev_now();
 
-			remote_apply_row(r, row, rowlen);
+			remote_apply_row(r, row);
 
 			iobuf_gc(iobuf);
 			fiber_gc();
@@ -168,16 +166,14 @@ pull_from_remote(va_list ap)
 }
 
 static void
-remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlen)
+remote_apply_row(struct recovery_state *r, const struct log_row *row)
 {
-	int64_t lsn = row_header(row)->lsn;
+	assert(row->tag == WAL);
 
-	assert(*(uint16_t*)(row + sizeof(struct row_header)) == WAL);
-
-	if (r->row_handler(r->row_handler_param, row, rowlen) < 0)
+	if (r->row_handler(r->row_handler_param, row) < 0)
 		panic("replication failure: can't apply row");
 
-	set_lsn(r, lsn);
+	set_lsn(r, row->lsn);
 }
 
 void

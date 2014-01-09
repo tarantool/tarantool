@@ -383,10 +383,9 @@ recover_snap(struct recovery_state *r, const char *replication_source)
 
 	log_io_cursor_open(&i, snap);
 
-	const char *row;
-	uint32_t rowlen;
-	while ((row = log_io_cursor_next(&i, &rowlen))) {
-		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
+	const struct log_row *row;
+	while ((row = log_io_cursor_next(&i))) {
+		if (r->row_handler(r->row_handler_param, row) < 0) {
 			say_error("can't apply row");
 			if (snap->dir->panic_if_error)
 				break;
@@ -424,11 +423,9 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	log_io_cursor_open(&i, l);
 
-	const char *row;
-	uint32_t rowlen;
-	while ((row = log_io_cursor_next(&i, &rowlen))) {
-		int64_t lsn = row_header(row)->lsn;
-		if (lsn <= r->confirmed_lsn) {
+	const struct log_row *row;
+	while ((row = log_io_cursor_next(&i))) {
+		if (row->lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
 		}
@@ -436,12 +433,12 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(r->row_handler_param, row, rowlen) < 0) {
+		if (r->row_handler(r->row_handler_param, row) < 0) {
 			say_error("can't apply row");
 			if (l->dir->panic_if_error)
 				goto end;
 		}
-		set_lsn(r, lsn);
+		set_lsn(r, row->lsn);
 	}
 	res = i.eof_read ? LOG_EOF : 1;
 end:
@@ -773,7 +770,7 @@ struct wal_write_request {
 	/* Auxiliary. */
 	int res;
 	struct fiber *fiber;
-	struct wal_row row;
+	struct log_row row;
 };
 
 /* Context of the WAL writer thread. */
@@ -1097,9 +1094,9 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
 	while (req != NULL && ! fio_batch_is_full(batch)) {
-		struct wal_row *row = &req->row;
-		row_header_sign(&row->header);
-		fio_batch_add(batch, row, wal_row_size(row));
+		struct log_row *row = &req->row;
+		log_row_sign(row);
+		fio_batch_add(batch, row, log_row_size(row));
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -1131,7 +1128,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 
 	while (req) {
 		if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
-				   req->row.header.lsn) != 0)
+				   req->row.lsn) != 0)
 			break;
 		struct wal_write_request *batch_end;
 		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
@@ -1205,7 +1202,7 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 
 	req->fiber = fiber;
 	req->res = -1;
-	wal_row_fill(&req->row, lsn, cookie, (const char *) &op,
+	log_row_fill(&req->row, lsn, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
@@ -1248,16 +1245,15 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct wal_row *row = (struct wal_row *) region_alloc(&fiber->gc,
-				     sizeof(struct wal_row) +
-				     data_len + metadata_len);
+	struct log_row *row = (struct log_row *) region_alloc(&fiber->gc,
+		sizeof(*row) + data_len + metadata_len);
 
-	wal_row_fill(row, ++rows, snapshot_cookie, metadata,
+	log_row_fill(row, ++rows, snapshot_cookie, metadata,
 		     metadata_len, data, data_len);
-	row_header_sign(&row->header);
+	log_row_sign(row);
 
-	fio_batch_add(batch, row, wal_row_size(row));
-	bytes += wal_row_size(row);
+	fio_batch_add(batch, row, log_row_size(row));
+	bytes += log_row_size(row);
 
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);

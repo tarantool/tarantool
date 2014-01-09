@@ -42,27 +42,27 @@ const char inprogress_suffix[] = ".inprogress";
 const char v12[] = "0.12\n";
 
 void
-row_header_sign(struct row_header *header)
+log_row_sign(struct log_row *header)
 {
-	header->data_crc32c = crc32_calc(0, (const unsigned char *) header + sizeof(struct
-						  row_header), header->len);
-	header->header_crc32c = crc32_calc(0, (const unsigned char *) &header->lsn,
-					   sizeof(struct row_header) -
-					   sizeof(header->header_crc32c));
+	header->data_crc32c = crc32_calc(0, header->data, header->len);
+	header->header_crc32c = crc32_calc(0, header->header, sizeof(*header) -
+					   offsetof(struct log_row, header));
 }
 
 void
-wal_row_fill(struct wal_row *row, int64_t lsn, uint64_t cookie,
-	     const char *metadata, size_t metadata_len, const char
-	     *data, size_t data_len)
+log_row_fill(struct log_row *row, int64_t lsn, uint64_t cookie,
+	     const char *metadata, size_t metadata_len, const char *data,
+	     size_t data_len)
 {
 	row->marker = row_marker;
 	row->tag  = WAL; /* unused. */
 	row->cookie = cookie;
+	row->lsn = lsn;
+	row->tm = ev_now();
+	row->len = metadata_len + data_len;
+
 	memcpy(row->data, metadata, metadata_len);
 	memcpy(row->data + metadata_len, data, data_len);
-	row_header_fill(&row->header, lsn, metadata_len + data_len +
-			sizeof(row->tag) + sizeof(row->cookie));
 }
 
 struct log_dir snap_dir = {
@@ -221,21 +221,20 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
-static const char ROW_EOF[] = "";
+static struct log_row ROW_EOF;
 
-const char *
-row_reader(FILE *f, uint32_t *rowlen)
+static const struct log_row *
+row_reader(FILE *f)
 {
-	struct row_header m;
+	struct log_row m;
 
 	uint32_t header_crc, data_crc;
 
-	if (fread(&m, sizeof(m), 1, f) != 1)
-		return ROW_EOF;
+	if (fread(&m.header_crc32c, sizeof(m) - sizeof(log_magic_t), 1, f) != 1)
+		return &ROW_EOF;
 
-	/* header crc32c calculated on <lsn, tm, len, data_crc32c> */
-	header_crc = crc32_calc(0, (unsigned char *) &m + offsetof(struct row_header, lsn),
-				sizeof(m) - offsetof(struct row_header, lsn));
+	header_crc = crc32_calc(0, m.header, sizeof(struct log_row) -
+				offsetof(struct log_row, header));
 
 	if (m.header_crc32c != header_crc) {
 		say_error("header crc32c mismatch");
@@ -245,17 +244,16 @@ row_reader(FILE *f, uint32_t *rowlen)
 	memcpy(row, &m, sizeof(m));
 
 	if (fread(row + sizeof(m), m.len, 1, f) != 1)
-		return ROW_EOF;
+		return &ROW_EOF;
 
-	data_crc = crc32_calc(0, (unsigned char *) row + sizeof(m), m.len);
+	data_crc = crc32_calc(0, row + sizeof(m), m.len);
 	if (m.data_crc32c != data_crc) {
 		say_error("data crc32c mismatch");
 		return NULL;
 	}
 
 	say_debug("read row v11 success lsn:%lld", (long long) m.lsn);
-	*rowlen = m.len + sizeof(m);
-	return row;
+	return (const struct log_row *) row;
 }
 
 void
@@ -289,11 +287,11 @@ log_io_cursor_close(struct log_io_cursor *i)
  * @param i	iterator object, encapsulating log specifics.
  *
  */
-const char *
-log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen)
+const struct log_row *
+log_io_cursor_next(struct log_io_cursor *i)
 {
 	struct log_io *l = i->log;
-	const char *row;
+	const struct log_row *row;
 	log_magic_t magic;
 	off_t marker_offset = 0;
 
@@ -332,8 +330,8 @@ restart:
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
-	row = row_reader(l->f, rowlen);
-	if (row == ROW_EOF)
+	row = row_reader(l->f);
+	if (row == &ROW_EOF)
 		goto eof;
 
 	if (row == NULL) {

@@ -621,10 +621,10 @@ replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
 
 /** Send a single row to the client. */
 static int
-replication_relay_send_row(void *param, const char *row, uint32_t rowlen)
+replication_relay_send_row(void *param, const struct log_row *row)
 {
 	int client_sock = (int) (intptr_t) param;
-	ssize_t bytes, len = rowlen;
+	ssize_t bytes, len = log_row_size(row);
 	while (len > 0) {
 		bytes = write(client_sock, row, len);
 		if (bytes < 0) {

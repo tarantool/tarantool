@@ -50,7 +50,7 @@ bool sse42_enabled_cpu();
  * @pre 	true == cpu_has (cpuf_sse4_2)
  * @return	CRC32 value
  */
-uint32_t crc32c_hw(uint32_t crc, const unsigned char *buf, unsigned int len);
+uint32_t crc32c_hw(uint32_t crc, const char *buf, unsigned int len);
 #endif
 
 #endif /* TARANTOOL_CPU_FEATURES_H */

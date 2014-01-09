@@ -111,52 +111,38 @@ log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
 void
 log_io_cursor_close(struct log_io_cursor *i);
 
-const char *
-log_io_cursor_next(struct log_io_cursor *i, uint32_t *rowlen);
+const struct log_row *
+log_io_cursor_next(struct log_io_cursor *i);
 
 typedef uint32_t log_magic_t;
 
-struct row_header {
-	uint32_t header_crc32c;
+struct log_row {
+	log_magic_t marker;
+	uint32_t header_crc32c; /* calculated for the header block */
+	/* {{{ header block */
+	char header[0]; /* start of the header */
 	int64_t lsn;
 	double tm;
 	uint32_t len;
-	uint32_t data_crc32c;
-} __attribute__((packed));
-
-static inline struct row_header *row_header(const char *t)
-{
-	return (struct row_header *)t;
-}
-
-static inline void
-row_header_fill(struct row_header *header, int64_t lsn, size_t data_len)
-{
-	header->lsn = lsn;
-	header->tm = ev_now();
-	header->len = data_len;
-}
-
-void
-row_header_sign(struct row_header *header);
-
-struct wal_row {
-	log_magic_t marker;
-	struct row_header header;
 	uint16_t tag;
 	uint64_t cookie;
-	uint8_t data[];
+	uint32_t data_crc32c; /* calculated for data */
+	/* }}} */
+	char data[0];   /* start of the data */
 } __attribute__((packed));
 
 void
-wal_row_fill(struct wal_row *row, int64_t lsn, uint64_t cookie,
-	     const char *metadata, size_t metadata_len,
-	     const char *data, size_t data_len);
+log_row_sign(struct log_row *row);
+
+void
+log_row_fill(struct log_row *row, int64_t lsn, uint64_t cookie,
+	     const char *metadata, size_t metadata_len, const char *data,
+	     size_t data_len);
 
 static inline size_t
-wal_row_size(struct wal_row *row)
+log_row_size(const struct log_row *row)
 {
-	return sizeof(row->marker) + sizeof(struct row_header) + row->header.len;
+	return sizeof(struct log_row) + row->len;
 }
 
 int

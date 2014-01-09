@@ -68,7 +68,7 @@ crc32c_hw_byte(uint32_t crc, unsigned char const *data, unsigned int length)
 
 
 uint32_t
-crc32c_hw(uint32_t crc, const unsigned char *buf, unsigned int len)
+crc32c_hw(uint32_t crc, const char *buf, unsigned int len)
 {
 	unsigned int iquotient = len / SCALE_F;
 	unsigned int iremainder = len % SCALE_F;
