@@ -482,15 +482,7 @@ hash:insert(2, 2, 2, 2)
 - [2, 2, 2, 2]
 ...
 -- OK
-hash:replace_if_exists(1, 1, 1, 1)
----
-- [1, 1, 1, 1]
-...
-hash:replace_if_exists(1, 10, 10, 10)
----
-- [1, 10, 10, 10]
-...
-hash:replace_if_exists(1, 1, 1, 1)
+hash:replace(1, 1, 1, 1)
 ---
 - [1, 1, 1, 1]
 ...
@@ -565,59 +557,68 @@ hash.index['primary']:select(1)
 - [1, 1, 1, 1]
 ...
 -- TupleNotFound (primary key)
-hash:replace_if_exists(10, 10, 10, 10)
+hash:replace(10, 10, 10, 10)
 ---
-- error: Tuple doesn't exist in index 0
+- [10, 10, 10, 10]
 ...
 hash.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 -- TupleFound (key --1)
 hash:insert(10, 0, 10, 10)
 ---
-- error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 0
 ...
 hash.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(0)
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key --1)
-hash:replace_if_exists(2, 0, 10, 10)
----
-- error: Duplicate key exists in unique index 1
-...
+-- hash:replace_if_exists(2, 0, 10, 10)
 hash.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(0)
 ---
@@ -626,40 +627,45 @@ hash.index['field1']:select(0)
 -- TupleFound (key --3)
 hash:insert(10, 10, 10, 0)
 ---
-- error: Duplicate key exists in unique index 3
+- error: Duplicate key exists in unique index 0
 ...
 hash.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(0)
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key --3)
-hash:replace_if_exists(2, 10, 10, 0)
----
-- error: Duplicate key exists in unique index 3
-...
+-- hash:replace_if_exists(2, 10, 10, 0)
 hash.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 hash.index['field3']:select(0)
 ---

@@ -471,7 +471,7 @@ space:insert(1, 1)
 ---
 - error: Tuple field count 2 is less than required by a defined index (expected 3)
 ...
-space:replace_if_exists(1, 1)
+space:replace(1, 1)
 ---
 - error: Tuple field count 2 is less than required by a defined index (expected 3)
 ...

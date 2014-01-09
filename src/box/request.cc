@@ -73,11 +73,9 @@ read_tuple(const char **reqpos, const char *reqend)
 }
 
 enum dup_replace_mode
-dup_replace_mode(uint32_t flags)
+dup_replace_mode(uint32_t op)
 {
-	return flags & BOX_ADD ? DUP_INSERT :
-		flags & BOX_REPLACE ?
-		DUP_REPLACE : DUP_REPLACE_OR_INSERT;
+	return op == INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
 static void
@@ -92,7 +90,7 @@ execute_replace(const struct request *request, struct txn *txn,
 					    request->r.tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	enum dup_replace_mode mode = dup_replace_mode(request->flags);
+	enum dup_replace_mode mode = dup_replace_mode(request->type);
 	txn_replace(txn, space, NULL, new_tuple, mode);
 }
 
@@ -230,7 +228,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 	request->type = type;
 	request->data = data;
 	request->len = len;
-	request->flags = 0;
 
 	const char **reqpos = &data;
 	const char *reqend = data + len;
@@ -241,8 +238,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 	case REPLACE:
 		request->execute = execute_replace;
 		request->r.space_no = pick_u32(reqpos, reqend);
-		request->flags |= (pick_u32(reqpos, reqend) &
-				   BOX_ALLOWED_REQUEST_FLAGS);
 		request->r.tuple = read_tuple(reqpos, reqend);
 		if (unlikely(*reqpos != reqend))
 			tnt_raise(IllegalParams, "can't unpack request");
@@ -263,8 +258,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 	case UPDATE:
 		request->execute = execute_update;
 		request->u.space_no = pick_u32(reqpos, reqend);
-		request->flags |= (pick_u32(reqpos, reqend) &
-				   BOX_ALLOWED_REQUEST_FLAGS);
 		request->u.key = read_tuple(reqpos, reqend);
 		request->u.key_end = *reqpos;
 		request->u.expr = *reqpos;
@@ -274,10 +267,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 	case DELETE:
 		request->execute = execute_delete;
 		request->d.space_no = pick_u32(reqpos, reqend);
-		if (type == DELETE) {
-			request->flags |= pick_u32(reqpos, reqend) &
-				BOX_ALLOWED_REQUEST_FLAGS;
-		}
 		request->d.key = read_tuple(reqpos, reqend);
 		request->d.key_end = *reqpos;
 		if (unlikely(*reqpos != reqend))
@@ -285,8 +274,6 @@ request_create(struct request *request, uint32_t type, const char *data,
 		break;
 	case CALL:
 		request->execute = box_lua_call;
-		request->flags |= (pick_u32(reqpos, reqend) &
-				   BOX_ALLOWED_REQUEST_FLAGS);
 		s = *reqpos;
 		if (unlikely(!mp_check(reqpos, reqend)))
 			tnt_raise(ClientError, ER_INVALID_MSGPACK);

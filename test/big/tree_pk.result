@@ -294,15 +294,15 @@ s0:insert(2, 2, 2, 2)
 - [2, 2, 2, 2]
 ...
 -- OK
-s0:replace_if_exists(1, 1, 1, 1)
+s0:replace(1, 1, 1, 1)
 ---
 - [1, 1, 1, 1]
 ...
-s0:replace_if_exists(1, 10, 10, 10)
+s0:replace(1, 10, 10, 10)
 ---
 - [1, 10, 10, 10]
 ...
-s0:replace_if_exists(1, 1, 1, 1)
+s0:replace(1, 1, 1, 1)
 ---
 - [1, 1, 1, 1]
 ...
@@ -377,59 +377,71 @@ s0.index['primary']:select(1)
 - [1, 1, 1, 1]
 ...
 -- TupleNotFound (primary key)
-s0:replace_if_exists(10, 10, 10, 10)
+s0:replace(10, 10, 10, 10)
 ---
-- error: Tuple doesn't exist in index 0
+- [10, 10, 10, 10]
 ...
 s0.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 -- TupleFound (key #1)
 s0:insert(10, 0, 10, 10)
 ---
-- error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 0
 ...
 s0.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(0)
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key #1)
-s0:replace_if_exists(2, 0, 10, 10)
+s0:replace(2, 0, 10, 10)
 ---
 - error: Duplicate key exists in unique index 1
 ...
 s0.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(0)
 ---
@@ -438,40 +450,48 @@ s0.index['i1']:select(0)
 -- TupleFound (key #3)
 s0:insert(10, 10, 10, 0)
 ---
-- error: Duplicate key exists in unique index 3
+- error: Duplicate key exists in unique index 0
 ...
 s0.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(0)
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key #3)
-s0:replace_if_exists(2, 10, 10, 0)
+s0:replace(2, 10, 10, 0)
 ---
-- error: Duplicate key exists in unique index 3
+- error: Duplicate key exists in unique index 1
 ...
 s0.index['primary']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i1']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i2']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(10)
 ---
+- [10, 10, 10, 10]
 ...
 s0.index['i3']:select(0)
 ---
@@ -490,7 +510,7 @@ s0:insert(6, 6, 0, 6)
 ---
 - [6, 6, 0, 6]
 ...
-s0:replace_if_exists(5, 5, 0, 5)
+s0:replace(5, 5, 0, 5)
 ---
 - [5, 5, 0, 5]
 ...

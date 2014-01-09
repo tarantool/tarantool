@@ -216,7 +216,6 @@ function box.schema.space.bless(space)
     space_mt.insert = function(space, ...) return box.insert(space.n, ...) end
     space_mt.update = function(space, ...) return box.update(space.n, ...) end
     space_mt.replace = function(space, ...) return box.replace(space.n, ...) end
-    space_mt.replace_if_exists = function(space, ...) return box.replace_if_exists(space.n, ...) end
     space_mt.delete = function(space, ...) return box.delete(space.n, ...) end
     space_mt.auto_increment = function(space, ...) return box.auto_increment(space.n, ...) end
     space_mt.truncate = function(space)

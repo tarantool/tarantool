@@ -24,7 +24,6 @@ t
   - errinj
   - error
   - fiber
-  - flags
   - index
   - info
   - insert
@@ -36,7 +35,6 @@ t
   - process
   - raise
   - replace
-  - replace_if_exists
   - schema
   - select
   - select_limit
@@ -165,7 +163,7 @@ box.unpack('+p', box.pack('=p', 1, '666'))
 ---
 - error: 'box.unpack(''+p''): unexpected opcode: offset 0, expected ''+'',found ''='''
 ...
-box.process(box.net.REPLACE, box.pack('iip', 0, 1, {1, 'testing', 'lua rocks'}))
+box.process(box.net.REPLACE, box.pack('ip', 0, {1, 'testing', 'lua rocks'}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
@@ -173,14 +171,14 @@ box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.DELETE, box.pack('iip', 0, 1, {1}))
+box.process(box.net.DELETE, box.pack('ip', 0, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
 box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))
 ---
 ...
-box.process(box.net.CALL, box.pack('iii', 0, 0, 0))
+box.process(box.net.CALL, box.pack('ii', 0, 0))
 ---
 - error: box.process(CALL, ...) is not allowed
 ...
@@ -314,7 +312,7 @@ box.select(0, 1)
 ...
 box.select(0)
 ---
-- error: '[string "-- box.lua (internal file)..."]:11: box.pack: expected 32-bit int'
+- error: '[string "-- box.lua (internal file)..."]:9: box.pack: expected 32-bit int'
 ...
 call box.replace(0, 1684234849, 'hello', 'world')
 ---

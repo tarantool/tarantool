@@ -10,6 +10,7 @@ check_libs()
 from tarantool.request import (
         RequestPing,
         RequestInsert,
+        RequestReplace,
         RequestSelect,
         RequestCall,
         RequestUpdate,
@@ -96,12 +97,10 @@ class StatementPing(Statement):
 class StatementInsert(Statement):
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0x03 # ADD + RET
         self.value_list = value_list
 
     def pack(self, connection):
-        return RequestInsert(connection, self.space_no, self.value_list,
-                self.flags)
+        return RequestInsert(connection, self.space_no, self.value_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -111,12 +110,10 @@ class StatementInsert(Statement):
 class StatementReplace(Statement):
     def __init__(self, table_name, value_list):
         self.space_no = table_name
-        self.flags = 0x05 # REPLACE + RET
         self.value_list = value_list
 
     def pack(self, connection):
-        return RequestInsert(connection, self.space_no, self.value_list,
-                self.flags)
+        return RequestReplace(connection, self.space_no, self.value_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -126,7 +123,6 @@ class StatementReplace(Statement):
 class StatementUpdate(Statement):
     def __init__(self, table_name, update_list, where):
         self.space_no = table_name
-        self.flags = 0
         self.key_no = where[0]
         if self.key_no != 0:
             raise RuntimeError("UPDATE can only be made by the"
@@ -135,8 +131,7 @@ class StatementUpdate(Statement):
         self.update_list = [(pair[0], '=', pair[1]) for pair in update_list]
 
     def pack(self, connection):
-        return RequestUpdate(connection, self.space_no, self.value_list,
-                self.update_list, True)
+        return RequestUpdate(connection, self.space_no, self.value_list, self.update_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -146,7 +141,6 @@ class StatementUpdate(Statement):
 class StatementDelete(Statement):
     def __init__(self, table_name, where):
         self.space_no = table_name
-        self.flags = 0
         key_no = where[0]
         if key_no != 0:
             raise RuntimeError("DELETE can only be made by the "
@@ -154,7 +148,7 @@ class StatementDelete(Statement):
         self.value_list = where[1]
 
     def pack(self, connection):
-        return RequestDelete(connection, self.space_no, self.value_list, True)
+        return RequestDelete(connection, self.space_no, self.value_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -197,4 +191,4 @@ class StatementCall(StatementSelect):
         self.value_list = value_list
 
     def pack(self, connection):
-        return RequestCall(connection, self.proc_name, self.value_list, True)
+        return RequestCall(connection, self.proc_name, self.value_list)

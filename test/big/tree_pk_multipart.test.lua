@@ -163,7 +163,7 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', 'tree', {parts = {0, 'num', 2, 'num'}, unique = true })
 
 space:insert(1, 1)
-space:replace_if_exists(1, 1)
+space:replace(1, 1)
 
 space:drop()
 

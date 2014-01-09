@@ -21,42 +21,28 @@ box.net = {
         delete = function(self, space, ...)
             local key_part_count = select('#', ...)
             return self:process(box.net.DELETE,
-                    box.pack('iiV',
-                        space,
-                        box.flags.BOX_RETURN_TUPLE,  -- flags
+                    box.pack('iV', space,
                         key_part_count, ...))
         end,
 
         replace = function(self, space, ...)
             local field_count = select('#', ...)
             return self:process(box.net.REPLACE,
-                    box.pack('iiV',
-                        space,
-                        box.flags.BOX_RETURN_TUPLE,  -- flags
-                        field_count, ...))
+                    box.pack('iV', space, field_count, ...))
         end,
 
         -- insert a tuple (produces an error if the tuple already exists)
         insert = function(self, space, ...)
             local field_count = select('#', ...)
             return self:process(box.net.INSERT,
-                   box.pack('iiV',
-                        space,
-                        bit.bor(box.flags.BOX_RETURN_TUPLE,
-                                box.flags.BOX_ADD),  -- flags
-                        field_count, ...))
+                   box.pack('iV', space, field_count, ...))
         end,
 
         -- update a tuple
         update = function(self, space, key, format, ...)
             local op_count = bit.rshift(select('#', ...), 1)
             return self:process(box.net.UPDATE,
-                   box.pack('iiVi'..format,
-                        space,
-                        box.flags.BOX_RETURN_TUPLE,
-                        1, key,
-                        op_count,
-                        ...))
+                   box.pack('iVi'..format, space, 1, key, op_count, ...))
         end,
 
         select_limit = function(self, space, index, offset, limit, ...)
@@ -92,11 +78,7 @@ box.net = {
             assert(type(proc_name) == 'string')
             local count = select('#', ...)
             return self:process(box.net.CALL,
-                box.pack('ipV',
-                    0,                      -- flags
-                    proc_name,
-                    count,
-                    ...))
+                box.pack('pV', proc_name, count, ...))
         end,
 
         select_range = function(self, sno, ino, limit, ...)

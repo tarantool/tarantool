@@ -65,7 +65,6 @@ int snapshot_pid = 0; /* snapshot processes pid */
 struct box_snap_row {
 	uint16_t op;
 	uint32_t space;
-	uint32_t flags;
 	char data[];
 } __attribute__((packed));
 
@@ -330,9 +329,8 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
-	header.op = REPLACE;
+	header.op = INSERT;
 	header.space = n;
-	header.flags = BOX_ADD;
 	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }
