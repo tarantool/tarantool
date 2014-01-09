@@ -11,8 +11,8 @@ ping
 select * from t0
 ---
 - error:
-    errcode: ER_EXACT_MATCH
-    errmsg: Invalid key part count in an exact match (expected 1, got 0)
+    errcode: ER_KEY_FIELD_TYPE
+    errmsg: Supplied key type of part 0 does not match index part type: expected NUM
 ...
 insert into t0 values (1, 'I am a tuple')
 ---

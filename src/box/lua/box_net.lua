@@ -48,24 +48,22 @@ box.net = {
         select_limit = function(self, space, index, offset, limit, ...)
             local key_part_count = select('#', ...)
             return self:process(box.net.SELECT,
-                   box.pack('iiiiiV',
+                   box.pack('iiiiV',
                          space,
                          index,
                          offset,
                          limit,
-                         1, -- key count
                          key_part_count, ...))
         end,
 
         select = function(self, space, index, ...)
             local key_part_count = select('#', ...)
             return self:process(box.net.SELECT,
-                    box.pack('iiiiiV',
+                    box.pack('iiiiV',
                          space,
                          index,
                          0, -- offset
                          4294967295, -- limit
-                         1, -- key count
                          key_part_count, ...))
         end,
 

@@ -43,11 +43,11 @@ admin("box.unpack('+p', box.pack('=p', 1, '666'))")
 # insert:
 admin("box.process(box.net.REPLACE, box.pack('ip', 0, {1, 'testing', 'lua rocks'}))")
 # select:
-admin("box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
+admin("box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))")
 # delete:
 admin("box.process(box.net.DELETE, box.pack('ip', 0, {1}))")
 # check delete:
-admin("box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))")
+admin("box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))")
 admin("box.process(box.net.CALL, box.pack('ii', 0, 0))")
 sql("call box.process('abc', 'def')")
 sql("call box.pack(1953719668)")

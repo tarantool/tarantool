@@ -167,7 +167,7 @@ box.process(box.net.REPLACE, box.pack('ip', 0, {1, 'testing', 'lua rocks'}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))
+box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
@@ -175,7 +175,7 @@ box.process(box.net.DELETE, box.pack('ip', 0, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.SELECT, box.pack('iiiiip', 0, 0, 0, 2^31, 1, {1}))
+box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
 ---
 ...
 box.process(box.net.CALL, box.pack('ii', 0, 0))

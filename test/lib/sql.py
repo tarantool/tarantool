@@ -149,23 +149,11 @@ class sql(runtime.Parser):
         _context = self.Context(_parent, self._scanner, 'opt_where', [])
         _token = self._peek('WHERE', 'LIMIT', 'END', context=_context)
         if _token != 'WHERE':
-            return None
+            return (0, None)
         else: # == 'WHERE'
             WHERE = self._scan('WHERE', context=_context)
-            disjunction = self.disjunction(_context)
-            return disjunction
-
-    def disjunction(self, _parent=None):
-        _context = self.Context(_parent, self._scanner, 'disjunction', [])
-        predicate = self.predicate(_context)
-        disjunction = [predicate]
-        if self._peek('OR', 'LIMIT', 'END', context=_context) == 'OR':
-            while 1:
-                OR = self._scan('OR', context=_context)
-                predicate = self.predicate(_context)
-                disjunction.append(predicate)
-                if self._peek('OR', 'LIMIT', 'END', context=_context) != 'OR': break
-        return disjunction
+            predicate = self.predicate(_context)
+            return predicate
 
     def opt_limit(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'opt_limit', [])

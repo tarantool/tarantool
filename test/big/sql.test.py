@@ -18,14 +18,14 @@ sql("insert into t0 values ('Roe', 'Richard')")
 sql("insert into t0 values ('Woe', 'Richard')")
 sql("insert into t0 values ('Major', 'Tomas')")
 sql("insert into t0 values ('Kytes', 'Tomas')")
-sql("select * from t0 where k1='Richard' or k1='Tomas' or k1='Tomas' limit 5")
+sql("select * from t0 where k1='Richard' limit 2")
 
 print """#
 # A test case for Bug#729879
 # "Zero limit is treated the same as no limit"
 # https://bugs.launchpad.net/tarantool/+bug/729879
 #"""
-sql("select * from t0 where k1='Richard' or k1='Tomas' limit 0")
+sql("select * from t0 where k1='Richard' limit 0")
 admin("box.space[0]:truncate()")
 
 print """#

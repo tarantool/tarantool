@@ -59,12 +59,9 @@ parser sql:
     rule opt_simple_where:   {{ return None }}
                       | WHERE predicate
                       {{ return predicate }}
-    rule opt_where:   {{ return None }}
-                      | WHERE disjunction
-                      {{ return disjunction }}
-    rule disjunction: predicate {{ disjunction = [predicate] }}
-                      [(OR predicate {{ disjunction.append(predicate) }})+]
-                      {{ return disjunction }}
+    rule opt_where:   {{ return (0, None) }}
+                      | WHERE predicate 
+                      {{ return predicate }}
     rule opt_limit:   {{ return 0xffffffff }}
                       | LIMIT NUM {{ return int(NUM) }}
     rule value_list:  '\(' {{ value_list = [] }}

@@ -158,25 +158,13 @@ class StatementDelete(Statement):
 class StatementSelect(Statement):
     def __init__(self, table_name, where, limit):
         self.space_no = table_name
-        self.index_no = None
-        self.key_list = []
-        if not where:
-            self.index_no = 0
-            self.key_list = [[]]
-        else:
-            for (index_no, key) in where:
-                self.key_list.append([key, ])
-                if self.index_no == None:
-                    self.index_no = index_no
-                elif self.index_no != index_no:
-                    raise RuntimeError("All key values in a disjunction must "
-                            "refer to the same index")
+        (self.index_no, self.key) = where
         self.offset = 0
         self.limit = limit
 
     def pack(self, connection):
         return RequestSelect(connection, self.space_no, self.index_no,
-                self.key_list , self.offset, self.limit)
+                self.key, self.offset, self.limit)
 
     def unpack(self, response):
         if response.return_code:

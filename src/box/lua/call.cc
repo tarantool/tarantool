@@ -307,10 +307,9 @@ box_lua_call(const struct request *request, struct txn *txn,
 	LuarefGuard coro_ref(tarantool_L);
 
 	/* proc name */
-	int oc = box_lua_find(L, request->c.procname,
-			 request->c.procname + request->c.procname_len);
+	int oc = box_lua_find(L, request->key, request->key_end);
 	/* Push the rest of args (a tuple). */
-	const char *args = request->c.args;
+	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "call: out of stack");
 

@@ -6,12 +6,11 @@
 function box.select_limit(space, index, offset, limit, ...)
     local key_part_count = select('#', ...)
     return box.process(box.net.SELECT,
-        box.pack('iiiiiV',
+        box.pack('iiiiV',
             space,
             index,
             offset,
             limit,
-            1, -- key count
             key_part_count, ...))
 end
 
