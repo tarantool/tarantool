@@ -1,0 +1,283 @@
+insert into t32 values (1, 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t32 values (2, 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t32 values (3, 'tuple 3')
+Insert OK, 1 row affected
+select * from t32 where k0 = 1
+Found 1 tuple:
+[1, 'tuple']
+select * from t32 where k0 = 2
+Found 1 tuple:
+[2, 'tuple 2']
+select * from t32 where k0 = 3
+Found 1 tuple:
+[3, 'tuple 3']
+delete from t32 where k0 = 1
+Delete OK, 1 row affected
+delete from t32 where k0 = 2
+Delete OK, 1 row affected
+delete from t32 where k0 = 3
+Delete OK, 1 row affected
+insert into t32 VALUES('xxxxxxx')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t32 VALUES('')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t32 VALUES('12')
+An error occurred: ER_KEY_FIELD_TYPE, 'Supplied key field type does not match index type: expected NUM'
+insert into t33 values ('identifier', 'tuple')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+insert into t33 values ('second', 'tuple 2')
+Insert OK, 1 row affected
+save snapshot
+---
+ok
+...
+call box.select_range('33', '0', '100', 'second')
+Found 1 tuple:
+['second', 'tuple 2']
+call box.select_range('33', '0', '100', 'identifier')
+Found 2 tuples:
+['identifier', 'tuple']
+['second', 'tuple 2']
+insert into t33 values ('third', 'tuple 3')
+Insert OK, 1 row affected
+select * from t33 where k0 = 'identifier'
+Found 1 tuple:
+['identifier', 'tuple']
+select * from t33 where k0 = 'second'
+Found 1 tuple:
+['second', 'tuple 2']
+select * from t33 where k0 = 'third'
+Found 1 tuple:
+['third', 'tuple 3']
+delete from t33 where k0 = 'identifier'
+Delete OK, 1 row affected
+delete from t33 where k0 = 'second'
+Delete OK, 1 row affected
+delete from t33 where k0 = 'third'
+Delete OK, 1 row affected
+insert into t32 values (1, 'tuple')
+Insert OK, 1 row affected
+insert into t33 values (1, 'tuple')
+Insert OK, 1 row affected
+insert into t33 values (2, 'tuple')
+Insert OK, 1 row affected
+lua  function box.crossjoin(space0, space1, limit)   space0 = tonumber(space0)   space1 = tonumber(space1)   limit = tonumber(limit)   local result = {}   for k0, v0 in box.space[space0]:pairs() do     for k1, v1 in box.space[space1]:pairs() do       if limit <= 0 then         return unpack(result)       end       newtuple = {v0:unpack()}       for _, v in v1:pairs() do table.insert(newtuple, v) end       table.insert(result, newtuple)       limit = limit - 1     end   end   return unpack(result) end
+---
+...
+call box.crossjoin('33', '33', '0')
+No match
+call box.crossjoin('33', '33', '5')
+Found 4 tuples:
+[1, 'tuple', 1, 'tuple']
+[1, 'tuple', 2, 'tuple']
+[2, 'tuple', 1, 'tuple']
+[2, 'tuple', 2, 'tuple']
+call box.crossjoin('33', '33', '10000')
+Found 4 tuples:
+[1, 'tuple', 1, 'tuple']
+[1, 'tuple', 2, 'tuple']
+[2, 'tuple', 1, 'tuple']
+[2, 'tuple', 2, 'tuple']
+call box.crossjoin('33', '32', '10000')
+Found 2 tuples:
+[1, 'tuple', 1, 'tuple']
+[2, 'tuple', 1, 'tuple']
+lua box.space[33]:truncate()
+---
+...
+insert into t32 values (200, 'select me!')
+Insert OK, 1 row affected
+select * from t32 where k0 = 200
+Found 1 tuple:
+[200, 'select me!']
+select * from t32 where k0 = 199
+No match
+select * from t32 where k0 = 201
+No match
+insert into t34 values ('abcd')
+Insert OK, 1 row affected
+insert into t34 values ('abcda')
+Insert OK, 1 row affected
+insert into t34 values ('abcda_')
+Insert OK, 1 row affected
+insert into t34 values ('abcdb')
+Insert OK, 1 row affected
+insert into t34 values ('abcdb_')
+Insert OK, 1 row affected
+insert into t34 values ('abcdb__')
+Insert OK, 1 row affected
+insert into t34 values ('abcdb___')
+Insert OK, 1 row affected
+insert into t34 values ('abcdc')
+Insert OK, 1 row affected
+insert into t34 values ('abcdc_')
+Insert OK, 1 row affected
+lua box.space[34].index[0]:select_range(3, 'abcdb')
+---
+ - 'abcdb': {}
+ - 'abcdb_': {}
+ - 'abcdb__': {}
+...
+lua box.space[34]:truncate()
+---
+...
+lua box.space[35]:truncate()
+---
+...
+insert into t35 values (0, 0, 0, 0)
+Insert OK, 1 row affected
+insert into t35 values (1, 1, 1, 1)
+Insert OK, 1 row affected
+insert into t35 values (2, 2, 2, 2)
+Insert OK, 1 row affected
+replace into t35 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+replace into t35 values (1, 10, 10, 10)
+Replace OK, 1 row affected
+replace into t35 values (1, 1, 1, 1)
+Replace OK, 1 row affected
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t35 WHERE k1 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t35 WHERE k2 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+select * from t35 WHERE k3 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+insert into t35 values (10, 10, 10, 10)
+Insert OK, 1 row affected
+delete from t35 WHERE k0 = 10
+Delete OK, 1 row affected
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+insert into t35 values (1, 10, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 0'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k0 = 1
+Found 1 tuple:
+[1, 1, 1, 1]
+replace into t35 values (10, 10, 10, 10)
+An error occurred: ER_TUPLE_NOT_FOUND, 'Tuple doesn't exist in index 0'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+insert into t35 values (10, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t35 values (2, 0, 10, 10)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 1'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k1 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+insert into t35 values (10, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+replace into t35 values (2, 10, 10, 0)
+An error occurred: ER_TUPLE_FOUND, 'Duplicate key exists in unique index 3'
+select * from t35 WHERE k0 = 10
+No match
+select * from t35 WHERE k1 = 10
+No match
+select * from t35 WHERE k2 = 10
+No match
+select * from t35 WHERE k3 = 10
+No match
+select * from t35 WHERE k3 = 0
+Found 1 tuple:
+[0, 0, 0, 0]
+insert into t35 values (4, 4, 0, 4)
+Insert OK, 1 row affected
+insert into t35 values (5, 5, 0, 5)
+Insert OK, 1 row affected
+insert into t35 values (6, 6, 0, 6)
+Insert OK, 1 row affected
+replace into t35 values (5, 5, 0, 5)
+Replace OK, 1 row affected
+select * from t35 WHERE k2 = 0
+Found 4 tuples:
+[0, 0, 0, 0]
+[4, 4, 0, 4]
+[5, 5, 0, 5]
+[6, 6, 0, 6]
+delete from t35 WHERE k0 = 5
+Delete OK, 1 row affected
+select * from t35 WHERE k2 = 0
+Found 3 tuples:
+[0, 0, 0, 0]
+[4, 4, 0, 4]
+[6, 6, 0, 6]
+lua box.space[35]:truncate()
+---
+...

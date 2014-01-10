@@ -1,0 +1,181 @@
+# encoding: tarantool
+#
+# integer keys
+exec sql "insert into t32 values (1, 'tuple')"
+exec admin "save snapshot"
+exec sql "insert into t32 values (2, 'tuple 2')"
+exec admin "save snapshot"
+
+exec sql "insert into t32 values (3, 'tuple 3')"
+exec sql "select * from t32 where k0 = 1"
+exec sql "select * from t32 where k0 = 2"
+exec sql "select * from t32 where k0 = 3"
+
+# Cleanup
+exec sql "delete from t32 where k0 = 1"
+exec sql "delete from t32 where k0 = 2"
+exec sql "delete from t32 where k0 = 3"
+
+# Test incorrect keys - supplied key field type does not match index type
+# https://bugs.launchpad.net/tarantool/+bug/1072624
+exec sql "insert into t32 VALUES('xxxxxxx')"
+exec sql "insert into t32 VALUES('')"
+exec sql "insert into t32 VALUES('12')"
+
+# string keys
+exec sql "insert into t33 values ('identifier', 'tuple')"
+exec admin "save snapshot"
+exec sql "insert into t33 values ('second', 'tuple 2')"
+exec admin "save snapshot"
+exec sql "call box.select_range('33', '0', '100', 'second')"
+exec sql "call box.select_range('33', '0', '100', 'identifier')"
+
+exec sql "insert into t33 values ('third', 'tuple 3')"
+exec sql "select * from t33 where k0 = 'identifier'"
+exec sql "select * from t33 where k0 = 'second'"
+exec sql "select * from t33 where k0 = 'third'"
+
+# Cleanup
+exec sql "delete from t33 where k0 = 'identifier'"
+exec sql "delete from t33 where k0 = 'second'"
+exec sql "delete from t33 where k0 = 'third'"
+lua = """
+function box.crossjoin(space0, space1, limit)
+  space0 = tonumber(space0)
+  space1 = tonumber(space1)
+  limit = tonumber(limit)
+  local result = {}
+  for k0, v0 in box.space[space0]:pairs() do
+    for k1, v1 in box.space[space1]:pairs() do
+      if limit <= 0 then
+        return unpack(result)
+      end
+      newtuple = {v0:unpack()}
+      for _, v in v1:pairs() do table.insert(newtuple, v) end
+      table.insert(result, newtuple)
+      limit = limit - 1
+    end
+  end
+  return unpack(result)
+end"""
+exec sql "insert into t32 values (1, 'tuple')"
+exec sql "insert into t33 values (1, 'tuple')"
+exec sql "insert into t33 values (2, 'tuple')"
+exec admin "lua " + lua.replace('\n', ' ')
+exec sql "call box.crossjoin('33', '33', '0')"
+exec sql "call box.crossjoin('33', '33', '5')"
+exec sql "call box.crossjoin('33', '33', '10000')"
+exec sql "call box.crossjoin('33', '32', '10000')"
+exec admin "lua box.space[33]:truncate()"
+
+# Bug #922520 - select missing keys
+exec sql "insert into t32 values (200, 'select me!')"
+exec sql "select * from t32 where k0 = 200"
+exec sql "select * from t32 where k0 = 199"
+exec sql "select * from t32 where k0 = 201"
+
+# Test partially specified keys in TREE indexes
+exec sql "insert into t34 values ('abcd')"
+exec sql "insert into t34 values ('abcda')"
+exec sql "insert into t34 values ('abcda_')"
+exec sql "insert into t34 values ('abcdb')"
+exec sql "insert into t34 values ('abcdb_')"
+exec sql "insert into t34 values ('abcdb__')"
+exec sql "insert into t34 values ('abcdb___')"
+exec sql "insert into t34 values ('abcdc')"
+exec sql "insert into t34 values ('abcdc_')"
+exec admin "lua box.space[34].index[0]:select_range(3, 'abcdb')"
+exec admin "lua box.space[34]:truncate()"
+
+#
+# tree::replace tests
+#
+
+exec admin "lua box.space[35]:truncate()"
+
+exec sql "insert into t35 values (0, 0, 0, 0)"
+exec sql "insert into t35 values (1, 1, 1, 1)"
+exec sql "insert into t35 values (2, 2, 2, 2)"
+
+# OK
+exec sql "replace into t35 values (1, 1, 1, 1)"
+exec sql "replace into t35 values (1, 10, 10, 10)"
+exec sql "replace into t35 values (1, 1, 1, 1)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k0 = 1"
+exec sql "select * from t35 WHERE k1 = 1"
+exec sql "select * from t35 WHERE k2 = 1"
+exec sql "select * from t35 WHERE k3 = 1"
+
+# OK
+exec sql "insert into t35 values (10, 10, 10, 10)"
+exec sql "delete from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+
+
+# TupleFound (primary key)
+exec sql "insert into t35 values (1, 10, 10, 10)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k0 = 1"
+
+# TupleNotFound (primary key)
+exec sql "replace into t35 values (10, 10, 10, 10)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+
+# TupleFound (key #1)
+exec sql "insert into t35 values (10, 0, 10, 10)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k1 = 0"
+
+# TupleFound (key #1)
+exec sql "replace into t35 values (2, 0, 10, 10)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k1 = 0"
+
+# TupleFound (key #3)
+exec sql "insert into t35 values (10, 10, 10, 0)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k3 = 0"
+
+# TupleFound (key #3)
+exec sql "replace into t35 values (2, 10, 10, 0)"
+exec sql "select * from t35 WHERE k0 = 10"
+exec sql "select * from t35 WHERE k1 = 10"
+exec sql "select * from t35 WHERE k2 = 10"
+exec sql "select * from t35 WHERE k3 = 10"
+exec sql "select * from t35 WHERE k3 = 0"
+
+sql.sort = True
+# Non-Uniq test (key #2)
+exec sql "insert into t35 values (4, 4, 0, 4)"
+exec sql "insert into t35 values (5, 5, 0, 5)"
+exec sql "insert into t35 values (6, 6, 0, 6)"
+exec sql "replace into t35 values (5, 5, 0, 5)"
+exec sql "select * from t35 WHERE k2 = 0"
+exec sql "delete from t35 WHERE k0 = 5"
+exec sql "select * from t35 WHERE k2 = 0"
+sql.sort = False
+
+exec admin "lua box.space[35]:truncate()"
+

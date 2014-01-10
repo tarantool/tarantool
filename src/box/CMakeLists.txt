@@ -23,6 +23,7 @@ tarantool_module("box"
     index.cc
     hash_index.cc
     tree_index.cc
+    avl_tree_index.cc
     bitset_index.cc
     space.cc
     port.cc

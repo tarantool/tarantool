@@ -1,0 +1,8 @@
+	*** simple_check ***
+-1 12
+-1 0 1 2 4 6 8 9 10 11 12 
+12 11 10 9 8 6 4 2 1 0 -1 
+	*** simple_check: done ***
+ 	*** compare_with_sptree_check ***
+	*** compare_with_sptree_check: done ***
+ 

@@ -47,9 +47,10 @@ field_type_maxlen(enum field_type type)
 }
 
 #define INDEX_TYPE(_)                                               \
-	_(HASH,    0)       /* HASH Index  */                       \
-	_(TREE,    1)       /* TREE Index  */                       \
-	_(BITSET,  2)       /* BITSET Index  */                     \
+	_(HASH,    0)       /* HASH Index     */                    \
+	_(TREE,    1)       /* TREE Index     */                    \
+	_(AVLTREE, 2)       /* AVL TREE Index */                    \
+	_(BITSET,  3)       /* BITSET Index   */                    \
 
 ENUM(index_type, INDEX_TYPE);
 extern const char *index_type_strs[];
