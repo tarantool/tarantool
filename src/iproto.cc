@@ -688,7 +688,7 @@ iproto_process_request(struct iproto_request *ireq)
 
 	struct obuf *out = &iobuf->out;
 
-	if (ireq->code == MSG_PING)
+	if (ireq->code == IPROTO_PING)
 		return iproto_reply_ping(out, ireq->sync);
 
 	/* Make request body point to iproto data */

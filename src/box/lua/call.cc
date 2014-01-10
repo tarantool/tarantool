@@ -178,7 +178,7 @@ lbox_process(lua_State *L)
 	uint32_t op = lua_tointeger(L, 1); /* Get the first arg. */
 	size_t sz;
 	const char *req = luaL_checklstring(L, 2, &sz); /* Second arg. */
-	if (op == CALL) {
+	if (op == IPROTO_CALL) {
 		/*
 		 * We should not be doing a CALL from within a CALL.
 		 * To invoke one stored procedure from another, one must

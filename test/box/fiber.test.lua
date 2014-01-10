@@ -13,8 +13,8 @@ space:delete(1)
 space:insert(1, 'testing', 'lua rocks')
 space:delete(1)
 -- check delete
-box.process(box.net.SELECT, box.pack('iiiiip', space.n, 0, 0, 2^31, 1, {1}))
-box.process(box.net.CALL, box.pack('iii', space.n, 0, 0))
+box.process(box.net.box.SELECT, box.pack('iiiip', space.n, 0, 0, 2^31, {1}))
+box.process(box.net.box.CALL, box.pack('iii', space.n, 0, 0))
 
 space:insert(1, 'test box delete')
 space:delete(1)

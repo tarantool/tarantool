@@ -34,30 +34,7 @@
 #include "box/tuple.h"
 #include "iobuf.h"
 #include "msgpuck/msgpuck.h"
-
-enum {
-	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648UL
-};
-
-enum iproto_key {
-	IPROTO_CODE = 0,
-	IPROTO_SYNC = 1,
-	/* Leave a gap for other keys in the header. */
-	IPROTO_SPACE = 16,
-	IPROTO_INDEX = 17,
-	IPROTO_LIMIT = 18,
-	IPROTO_OFFSET = 19,
-	IPROTO_ITERATOR = 20,
-	/* Leave a gap for other integer values in the body */
-	IPROTO_TUPLE = 32,
-	IPROTO_NAME = 33,
-	IPROTO_OPS = 34,
-	IPROTO_DATA = 35,
-	IPROTO_ERROR = 36,
-};
-
-enum { MSG_PING = 0 };
+#include "iproto_constants.h"
 
 /**
  * struct iproto_port users need to be careful to:

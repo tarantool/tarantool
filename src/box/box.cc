@@ -97,7 +97,7 @@ process_rw(struct port *port, struct request *request)
 static void
 process_replica(struct port *port, struct request *request)
 {
-	if (!request_is_select(request->type)) {
+	if (!iproto_request_is_select(request->type)) {
 		tnt_raise(ClientError, ER_NONMASTER,
 			  cfg.replication_source);
 	}
@@ -107,7 +107,7 @@ process_replica(struct port *port, struct request *request)
 static void
 process_ro(struct port *port, struct request *request)
 {
-	if (!request_is_select(request->type))
+	if (!iproto_request_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, request);
 }
@@ -308,14 +308,15 @@ box_init()
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
-	stat_base = stat_register(requests_strs, requests_MAX);
+	stat_base = stat_register(iproto_request_type_strs,
+				  IPROTO_REQUEST_MAX);
 
 	recover_snap(recovery_state, cfg.replication_source);
 	space_end_recover_snapshot();
 	recover_existing_wals(recovery_state);
 	space_end_recover();
 
-	stat_cleanup(stat_base, requests_MAX);
+	stat_cleanup(stat_base, IPROTO_REQUEST_MAX);
 	title("orphan", NULL);
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
@@ -329,7 +330,7 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
-	header.op = INSERT;
+	header.op = IPROTO_INSERT;
 	header.space = n;
 	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);

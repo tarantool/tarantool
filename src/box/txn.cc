@@ -94,7 +94,7 @@ txn_commit(struct txn *txn)
 
 		if (stop - start > cfg.too_long_threshold) {
 			say_warn("too long %s: %.3f sec",
-				request_name(txn->op), stop - start);
+				 iproto_request_name(txn->op), stop - start);
 		}
 
 		confirm_lsn(recovery_state, lsn, res == 0);

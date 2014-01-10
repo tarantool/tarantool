@@ -2,14 +2,6 @@
 
 box.net = {
 
-    PING = 0,
-    SELECT = 1,
-    INSERT = 2,
-    REPLACE = 3,
-    UPDATE = 4,
-    DELETE = 5,
-    CALL = 6,
-
 --
 -- The idea of box.net.box implementation is that
 -- most calls are simply wrappers around 'process'
@@ -18,36 +10,57 @@ box.net = {
 -- routes requests to a remote.
 --
     box = {
+        PING = 0,
+        SELECT = 1,
+        INSERT = 2,
+        REPLACE = 3,
+        UPDATE = 4,
+        DELETE = 5,
+        CALL = 6,
+
+        CODE = 0x00,
+        SYNC = 0x01,
+        SPACE_ID = 0x10,
+        INDEX_ID = 0x11,
+        LIMIT = 0x12,
+        OFFSET = 0x13,
+        ITERATOR = 0x14,
+        KEY = 0x20,
+        TUPLE = 0x21,
+        FUNCTION_NAME = 0x22,
+        DATA = 0x30,
+        ERROR = 0x31,
+
         delete = function(self, space, ...)
             local key_part_count = select('#', ...)
-            return self:process(box.net.DELETE,
+            return self:process(box.net.box.DELETE,
                     box.pack('iV', space,
                         key_part_count, ...))
         end,
 
         replace = function(self, space, ...)
             local field_count = select('#', ...)
-            return self:process(box.net.REPLACE,
+            return self:process(box.net.box.REPLACE,
                     box.pack('iV', space, field_count, ...))
         end,
 
         -- insert a tuple (produces an error if the tuple already exists)
         insert = function(self, space, ...)
             local field_count = select('#', ...)
-            return self:process(box.net.INSERT,
+            return self:process(box.net.box.INSERT,
                    box.pack('iV', space, field_count, ...))
         end,
 
         -- update a tuple
         update = function(self, space, key, format, ...)
             local op_count = bit.rshift(select('#', ...), 1)
-            return self:process(box.net.UPDATE,
+            return self:process(box.net.box.UPDATE,
                    box.pack('iVi'..format, space, 1, key, op_count, ...))
         end,
 
         select_limit = function(self, space, index, offset, limit, ...)
             local key_part_count = select('#', ...)
-            return self:process(box.net.SELECT,
+            return self:process(box.net.box.SELECT,
                    box.pack('iiiiV',
                          space,
                          index,
@@ -58,7 +71,7 @@ box.net = {
 
         select = function(self, space, index, ...)
             local key_part_count = select('#', ...)
-            return self:process(box.net.SELECT,
+            return self:process(box.net.box.SELECT,
                     box.pack('iiiiV',
                          space,
                          index,
@@ -69,13 +82,13 @@ box.net = {
 
 
         ping = function(self)
-            return self:process(box.net.PING, '')
+            return self:process(box.net.box.PING, '')
         end,
 
         call    = function(self, proc_name, ...)
             assert(type(proc_name) == 'string')
             local count = select('#', ...)
-            return self:process(box.net.CALL,
+            return self:process(box.net.box.CALL,
                 box.pack('pV', proc_name, count, ...))
         end,
 
@@ -221,7 +234,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
             self.processing[sync] = box.ipc.channel(1)
-            local header = msgpack.encode({[0] = op, [1] = sync})
+            local header = msgpack.encode({[box.net.box.CODE] = op, [box.net.box.SYNC] = sync})
             request = msgpack.encode(header:len() + request:len())..
                       header..request
 
@@ -247,7 +260,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- timeout
             if res == nil then
-                if op == box.net.PING then
+                if op == box.net.box.PING then
                     return false
                 else
                     return nil
@@ -264,15 +277,15 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- results { status, response } received
             if res[1] then
-                if op == box.net.PING then
+                if op == box.net.box.PING then
                     return true
                 else
                     local code = res[2]
                     local body = msgpack.decode(res[3])
                     if code ~= 0 then
-                        box.raise(code, body[36])
+                        box.raise(code, body[box.net.box.ERROR])
                     end
-                    return unpack(totuples(body[35]))
+                    return unpack(totuples(body[box.net.box.DATA]))
                 end
             else
                 error(res[2])
@@ -342,8 +355,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 while not self.closed do
                     local resp = self:read_response()
                     header, offset = msgpack.next(resp);
-                    code = header[0]
-                    sync = header[1]
+                    code = header[box.net.box.CODE]
+                    sync = header[box.net.box.SYNC]
                     if sync == nil then
                         break
                     end

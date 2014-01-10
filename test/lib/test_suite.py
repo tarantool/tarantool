@@ -34,8 +34,9 @@ def check_libs():
     for (mod_name, _mod_dir) in deps:
         try:
             __import__(mod_name)
-        except ImportError:
+        except ImportError as e:
             color_stdout("\n\nNo %s library found\n" % mod_name, schema='error')
+            print(e)
             sys.exit(1)
 
 

@@ -40,8 +40,6 @@
 #include <scoped_guard.h>
 #include <third_party/base64.h>
 
-STRS(requests, REQUESTS);
-
 static const char *
 read_tuple(const char **reqpos, const char *reqend)
 {
@@ -75,7 +73,7 @@ read_tuple(const char **reqpos, const char *reqend)
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
 {
-	return op == INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
+	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
 static void
@@ -181,33 +179,21 @@ execute_delete(const struct request *request, struct txn *txn,
 	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 }
 
-/** To collects stats, we need a valid request type.
- * We must collect stats before execute.
- * Check request type here for now.
- */
-static bool
+void
 request_check_type(uint32_t type)
 {
-	return type < 1 || type > BOX_REQUEST_LAST;
-}
-
-const char *
-request_name(uint32_t type)
-{
-	if (request_check_type(type))
-		return "unsupported";
-	return requests_strs[type];
+	if (type < IPROTO_SELECT || type >= IPROTO_REQUEST_MAX) {
+		say_error("Unsupported request = %u", (unsigned) type);
+		tnt_raise(IllegalParams, "unsupported command code, "
+			  "check the error log");
+	}
 }
 
 void
 request_create(struct request *request, uint32_t type,
 	       const char *data, uint32_t len)
 {
-	if (request_check_type(type)) {
-		say_error("Unsupported request = %" PRIi32 "", type);
-		tnt_raise(IllegalParams, "unsupported command code, "
-			  "check the error log");
-	}
+	request_check_type(type);
 	memset(request, 0, sizeof(*request));
 	request->type = type;
 	request->data = data;
@@ -218,7 +204,7 @@ request_create(struct request *request, uint32_t type,
 	const char *s;
 
 	switch (request->type) {
-	case SELECT:
+	case IPROTO_SELECT:
 		request->execute = execute_select;
 		request->space_no = pick_u32(reqpos, reqend);
 		request->index_no = pick_u32(reqpos, reqend);
@@ -228,14 +214,14 @@ request_create(struct request *request, uint32_t type,
 		/* Do not parse the tail, execute_select will do it */
 		*reqpos = request->key_end = reqend;
 		break;
-	case INSERT:
-	case REPLACE:
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
 		request->execute = execute_replace;
 		request->space_no = pick_u32(reqpos, reqend);
 		request->tuple = read_tuple(reqpos, reqend);
 		request->tuple_end = *reqpos;
 		break;
-	case UPDATE:
+	case IPROTO_UPDATE:
 		request->execute = execute_update;
 		request->space_no = pick_u32(reqpos, reqend);
 		request->key = read_tuple(reqpos, reqend);
@@ -244,13 +230,13 @@ request_create(struct request *request, uint32_t type,
 		request->tuple_end = *reqpos = reqend;
 		/* Do not parse the tail, tuple_update will do it */
 		break;
-	case DELETE:
+	case IPROTO_DELETE:
 		request->execute = execute_delete;
 		request->space_no = pick_u32(reqpos, reqend);
 		request->key = read_tuple(reqpos, reqend);
 		request->key_end = *reqpos;
 		break;
-	case CALL:
+	case IPROTO_CALL:
 		request->execute = box_lua_call;
 		s = *reqpos;
 		if (unlikely(!mp_check(reqpos, reqend)))

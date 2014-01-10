@@ -97,8 +97,7 @@ iproto_port(struct port *port)
 	return (struct iproto_port *) port;
 }
 
-const uint32_t SVP_SIZE = sizeof(iproto_header_bin)
-	+ sizeof(iproto_body_bin);
+enum { SVP_SIZE = sizeof(iproto_header_bin) + sizeof(iproto_body_bin) };
 
 static inline void
 iproto_port_eof(struct port *ptr)

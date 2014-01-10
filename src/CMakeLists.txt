@@ -57,6 +57,7 @@ set (common_sources
      replica.cc
      replica.1.5.cc
      iproto.cc
+     iproto_constants.c
      iproto_port.cc
      session.cc
      object.cc

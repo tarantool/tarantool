@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_REQUEST_H_INCLUDED
-#define TARANTOOL_BOX_REQUEST_H_INCLUDED
+#ifndef TARANTOOL_IPROTO_CONSTANTS_H_INCLUDED
+#define TARANTOOL_IPROTO_CONSTANTS_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,33 +29,59 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "iproto_constants.h"
+#include <stdint.h>
 
-struct txn;
-struct port;
-
-struct request
-{
-	uint32_t type;
-	uint32_t space_no;
-	uint32_t index_no;
-	uint32_t offset;
-	uint32_t limit;
-	/* Search key or proc name. */
-	const char *key;
-	const char *key_end;
-	/* Insert/replace tuple or proc argument or update operations. */
-	const char *tuple;
-	const char *tuple_end;
-
-	const char *data;
-	uint32_t len;
-
-	void (*execute)(const struct request *, struct txn *, struct port *);
+enum {
+	/** Maximal iproto package body length (2GiB) */
+	IPROTO_BODY_LEN_MAX = 2147483648UL
 };
 
-void
-request_create(struct request *request, uint32_t type, const char *data,
-	       uint32_t len);
+enum iproto_key {
+	IPROTO_CODE = 0x00,
+	IPROTO_SYNC = 0x01,
+	/* Leave a gap for other keys in the header. */
+	IPROTO_SPACE_ID = 0x10,
+	IPROTO_INDEX_ID = 0x11,
+	IPROTO_LIMIT = 0x12,
+	IPROTO_OFFSET = 0x13,
+	IPROTO_ITERATOR = 0x14,
+	/* Leave a gap between integer values and other keys */
+	IPROTO_KEY = 0x20,
+	IPROTO_TUPLE = 0x21,
+	IPROTO_FUNCTION_NAME = 0x22,
+	/* Leave a gap between request keys and response keys */
+	IPROTO_DATA = 0x30,
+	IPROTO_ERROR = 0x31,
+	IPROTO_KEY_MAX
+};
 
-#endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */
+extern unsigned char iproto_key_type[IPROTO_KEY_MAX];
+
+enum iproto_request_type {
+	IPROTO_PING = 0,
+	IPROTO_SELECT = 1,
+	IPROTO_INSERT = 2,
+	IPROTO_REPLACE = 3,
+	IPROTO_UPDATE = 4,
+	IPROTO_DELETE = 5,
+	IPROTO_CALL = 6,
+	IPROTO_REQUEST_MAX
+};
+
+extern const char *iproto_request_type_strs[];
+
+static inline const char *
+iproto_request_name(uint32_t type)
+{
+	if (type >= IPROTO_REQUEST_MAX)
+		return "unknown";
+	return iproto_request_type_strs[type];
+}
+
+static inline bool
+iproto_request_is_select(uint32_t type)
+{
+	return type <= IPROTO_SELECT || type == IPROTO_CALL;
+}
+
+#endif /* TARANTOOL_IPROTO_CONSTANTS_H_INCLUDED */

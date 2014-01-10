@@ -163,22 +163,22 @@ box.unpack('+p', box.pack('=p', 1, '666'))
 ---
 - error: 'box.unpack(''+p''): unexpected opcode: offset 0, expected ''+'',found ''='''
 ...
-box.process(box.net.REPLACE, box.pack('ip', 0, {1, 'testing', 'lua rocks'}))
+box.process(box.net.box.REPLACE, box.pack('ip', 0, {1, 'testing', 'lua rocks'}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
+box.process(box.net.box.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.DELETE, box.pack('ip', 0, {1}))
+box.process(box.net.box.DELETE, box.pack('ip', 0, {1}))
 ---
 - [1, 'testing', 'lua rocks']
 ...
-box.process(box.net.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
+box.process(box.net.box.SELECT, box.pack('iiiip', 0, 0, 0, 2^31, {1}))
 ---
 ...
-box.process(box.net.CALL, box.pack('ii', 0, 0))
+box.process(box.net.box.CALL, box.pack('ii', 0, 0))
 ---
 - error: box.process(CALL, ...) is not allowed
 ...
