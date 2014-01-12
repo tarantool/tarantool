@@ -629,9 +629,6 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_pushstring(L, "_serializer_compact");
 	lua_pushboolean(L, true);
 	lua_settable(L, -3);
-	lua_pushstring(L, "_serializer_type");
-	lua_pushstring(L, "array");
-	lua_settable(L, -3);
 	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	assert(tuple_totable_mt_ref != 0);
 

@@ -289,16 +289,12 @@ test({1, 2, 3, 4, 5, [10] = 10 })
 ...
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
 ---
-- - 1
-  - 2
-  - 3
-  - 4
-  - 5
-  - null
-  - null
-  - null
-  - null
-  - 10
+- 2: 2
+  5: 5
+  3: 3
+  1: 1
+  10: 10
+  4: 4
 ...
 test({1, 2, 3, 4, 5, [100] = 100 })
 ---
@@ -316,7 +312,7 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
 --------------------------------------------------------------------------------
 -- Test serializer flags
 --------------------------------------------------------------------------------
-t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "array"})
+t1 = {[1] = 1, [100] = 100}
 ---
 ...
 t2 = msgpack.decode(msgpack.encode(t1))
@@ -324,13 +320,9 @@ t2 = msgpack.decode(msgpack.encode(t1))
 ...
 #t2
 ---
-- 100
+- 1
 ...
-getmetatable(t2)._serializer_type
----
-- array
-...
-t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "map"})
+t1 = {[1] = 1, [100] = 100}
 ---
 ...
 t2 = msgpack.decode(msgpack.encode(t1))
@@ -340,10 +332,6 @@ t2
 ---
 - 100: 100
   1: 1
-...
-getmetatable(t2)._serializer_type
----
-- map
 ...
 --------------------------------------------------------------------------------
 -- Test resursive tables

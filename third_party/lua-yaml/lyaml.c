@@ -518,7 +518,7 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
    yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
    yaml_emitter_emit(&dumper->emitter, &ev);
 
-   for (i = 0; i < field->max; i++) {
+   for (i = 0; i < field->size; i++) {
       lua_rawgeti(dumper->L, -1, i + 1);
       if (!dump_node(dumper) || dumper->error)
          return 0;

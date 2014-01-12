@@ -2266,6 +2266,5 @@ box.tuple.new({1, 2, 3}):totable()
 ...
 getmetatable(box.tuple.new({1, 2, 3}):totable())
 ---
-- _serializer_type: array
-  _serializer_compact: true
+- _serializer_compact: true
 ...

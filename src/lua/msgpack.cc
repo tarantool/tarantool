@@ -229,8 +229,8 @@ luamp_encode_r(struct lua_State *L, struct tbuf *b, int level)
 		/* Array */
 		if (level >= LUA_MP_MAXNESTING)
 			return luamp_encode_nil(b); /* Limit nested arrays */
-		luamp_encode_array(b, field.max);
-		for (uint32_t i = 0; i < field.max; i++) {
+		luamp_encode_array(b, field.size);
+		for (uint32_t i = 0; i < field.size; i++) {
 			lua_rawgeti(L, index, i + 1);
 			luamp_encode_r(L, b, level + 1);
 			lua_pop(L, 1);
@@ -324,13 +324,10 @@ luamp_decode(struct lua_State *L, const char **data)
 		return;
 	case MP_ARRAY:
 	{
-		bool maybe_map = false;
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
 		for (uint32_t i = 0; i < size; i++) {
 			luamp_decode(L, data);
-			if (lua_type(L, -1) == LUA_TNIL)
-				maybe_map = true;
 			lua_rawseti(L, -2, i + 1);
 		}
 		if (luaL_getn(L, -1) != size) {
@@ -342,26 +339,14 @@ luamp_decode(struct lua_State *L, const char **data)
 			lua_pushlightuserdata(L, NULL);
 			lua_rawset(L, -3);
 		}
-
-		if (maybe_map) {
-			/* Add a serializer hint to disambiguate */
-			lua_newtable(L);
-			lua_pushstring(L, "_serializer_type");
-			lua_pushstring(L, "array");
-			lua_settable(L, -3);
-			lua_setmetatable(L, -2);
-		}
 		return;
 	}
 	case MP_MAP:
 	{
-		bool maybe_array = true;
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
 		for (uint32_t i = 0; i < size; i++) {
 			luamp_decode(L, data);
-			if (lua_type(L, -1) != LUA_TNUMBER)
-				maybe_array = false;
 			luamp_decode(L, data);
 			if (lua_type(L, -1) == LUA_TNIL) {
 				/*
@@ -372,15 +357,6 @@ luamp_decode(struct lua_State *L, const char **data)
 				lua_pushlightuserdata(L, NULL);
 			}
 			lua_settable(L, -3);
-		}
-
-		if (maybe_array) {
-			/* Add a serializer hint to disambiguate  */
-			lua_newtable(L);
-			lua_pushstring(L, "_serializer_type");
-			lua_pushstring(L, "map");
-			lua_settable(L, -3);
-			lua_setmetatable(L, -2);
 		}
 		return;
 	}

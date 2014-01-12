@@ -157,15 +157,13 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
 -- Test serializer flags
 --------------------------------------------------------------------------------
 
-t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "array"})
+t1 = {[1] = 1, [100] = 100}
 t2 = msgpack.decode(msgpack.encode(t1))
 #t2
-getmetatable(t2)._serializer_type
 
-t1 = setmetatable({[1] = 1, [100] = 100}, {_serializer_type = "map"})
+t1 = {[1] = 1, [100] = 100}
 t2 = msgpack.decode(msgpack.encode(t1))
 t2
-getmetatable(t2)._serializer_type
 
 --------------------------------------------------------------------------------
 -- Test resursive tables

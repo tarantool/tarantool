@@ -85,90 +85,47 @@ static void
 lua_field_inspect_table(struct lua_State *L, int idx, struct luaL_field *field)
 {
 	assert(lua_istable(L, idx));
-	bool userdefined = false;
 
 	/* Calculate absolute value in the stack. */
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
 
 	uint32_t size = 0;
-	uint32_t max = 0;
 	field->type = MP_ARRAY;
 
 	/* Calculate size and check that table can represent an array */
-	lua_pushnil(L);  /* first key */
-	for (uint32_t i = 0; lua_next(L, idx) != 0; i++) {
-		lua_pop(L, 1); /* value */
-		++size;
-		if (field->type != MP_ARRAY)
-			continue;
-
-		if (lua_type(L, -1) != LUA_TNUMBER) {
+	lua_pushnil(L);
+	while (lua_next(L, idx)) {
+		size++;
+		lua_pop(L, 1); /* pop the value */
+		if (lua_type(L, -1) != LUA_TNUMBER ||
+		    lua_tointeger(L, -1) != size) {
 			field->type = MP_MAP;
-			continue;
+			/* Finish size calculation */
+			while (lua_next(L, idx)) {
+				size++;
+				lua_pop(L, 1);
+			}
+			break;
 		}
-
-		uint32_t key = lua_tointeger(L, -1);
-		if (key > max)
-			max = key;
 	}
 
-	/* Always handle zero-indexed arrays as a map */
-	lua_rawgeti(L, idx, 0);
-	if (!lua_isnil(L, -1))
-		field->type = MP_MAP;
-	lua_pop(L, 1);
+	/* Complete the calculation of the compound size. */
+
+	field->size = size;
 
 	if (lua_getmetatable(L, idx)) {
-		lua_pushliteral(L, "_serializer_type");
-		lua_rawget(L, -2);
-		if (lua_isstring(L, -1)) {
-			const char *s = lua_tostring(L, -1);
-			if (!strcmp(s, "arr") || !strcmp(s, "array") ||
-			    !strcmp(s, "seq") || !strcmp(s, "sequence")) {
-				if (field->type != MP_ARRAY)
-					luaL_error(L, "the table cannot be "
-						   "encoded as an array");
-			} else if (!strcmp(s, "map") || !strcmp(s, "mapping")) {
-				/* map */
-				field->type = MP_MAP;
-			} else {
-				luaL_error(L, "Unknown '_serializer_type': %u",
-					   s);
-				return;
-			}
-			userdefined = true;
-		}
-
-		lua_pop(L, 1); /* pop value */
-
 		lua_pushliteral(L, "_serializer_compact");
 		lua_rawget(L, -2);
 		if (lua_isboolean(L, -1) && lua_toboolean(L, -1))
 			field->compact = true;
-
-		lua_pop(L, 1); /* pop value and metatable */
-
-		lua_pop(L, 1); /* pop metatable */
-	}
-
-	if (!userdefined) {
-		enum { DENSITY_FACTOR = 10 };
-		if (field->type == MP_ARRAY && size < max / DENSITY_FACTOR)
-			field->type = MP_MAP;
-	}
-
-	if (field->type == MP_ARRAY) {
-		field->max = max;
-	} else {
-		field->size = size;
+		lua_pop(L, 2); /* pop value and metatable */
 	}
 }
 
 void
 luaL_tofield(struct lua_State *L, int index, struct luaL_field *field)
 {
-	memset(field, 0, sizeof(*field));
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
 
@@ -281,6 +238,8 @@ luaL_tofield(struct lua_State *L, int index, struct luaL_field *field)
 	}
 	case LUA_TLIGHTUSERDATA:
 	case LUA_TUSERDATA:
+		field->sval.data = NULL;
+		field->sval.len = 0;
 		if (lua_touserdata(L, index) == NULL) {
 			field->type = MP_NIL;
 			return;

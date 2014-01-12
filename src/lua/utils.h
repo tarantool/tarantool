@@ -87,8 +87,8 @@ struct luaL_field {
 		double dval;
 		float fval;
 		bool bval;
-		uint32_t max;        /* MP_ARRAY */
-		uint32_t size;       /* MP_MAP */
+		/* Array or map. */
+		uint32_t size;
 	};
 	enum mp_type type;
 	bool compact;                /* a flag used by YAML serializer */
@@ -119,8 +119,6 @@ struct luaL_field {
  * By default all LUA_TTABLEs (including empty ones) are handled as ARRAYs.
  * If a table has other than numeric indexes or is too
  * sparse, then it is handled as a map. The user can force MAP or
- * ARRAY serialization by setting * "_serializer_type" = "map" | "array"
- * in the table's metatable.
  *
  * YAML also supports a special "_serializer_compact" = true | false
  * flag that controls block vs flow output ([1,2,3] vs - 1\n - 2\n - 3\n).
@@ -128,23 +126,6 @@ struct luaL_field {
  *
  * MAP and ARRAY members are not saved to lua_field structure and should be
  * processed manually.
- *
- * Use the following code for arrays:
- * field.max; // the maximal index of the array
- * for (uint32_t i = 0; i < field.max; i++) {
- *	lua_rawgeti(L, index, i + 1);
- *	handle_value(L, -1)
- *	lua_pop(L, 1);
- * }
- *
- * Use the following code for maps:
- * field.size; // the number of members in the map
- * lua_pushnil(L);
- * while (lua_next(L, index) != 0) {
- *	handle_key(L, -2)
- *	handle_value(L, -1)
- *	lua_pop(L, 1);
- * }
  *
  * @param L stack
  * @param index stack index
