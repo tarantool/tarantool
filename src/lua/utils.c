@@ -233,6 +233,7 @@ luaL_tofield(struct lua_State *L, int index, struct luaL_field *field)
 		return;
 	case LUA_TTABLE:
 	{
+		field->compact = false;
 		lua_field_inspect_table(L, index, field);
 		return;
 	}
