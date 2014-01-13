@@ -9,6 +9,8 @@ error injections:
     state: off
   - name: ERRINJ_INDEX_ALLOC
     state: off
+  - name: ERRINJ_TREE_ALLOC
+    state: off
 ...
 set injection some-injection on
 ---

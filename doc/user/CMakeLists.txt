@@ -1,4 +1,19 @@
 
+execute_process(
+    COMMAND git rev-parse --abbrev-ref HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if (NOT GIT_BRANCH STREQUAL "")
+    set (GIT_BRANCH "${GIT_BRANCH}/")
+endif (NOT GIT_BRANCH STREQUAL "")
+
+set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}user_guide.html")
+set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}mpage/")
+set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
+
 if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")
     message (FATAL_ERROR "xmllint is missing")
 endif()
@@ -10,9 +25,6 @@ endif()
 if (LYNX STREQUAL "LYNX-NOTFOUND")
     message (FATAL_ERROR "lynx is missing")
 endif()
-
-set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data/tarantool_user_guide.html")
-set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
 
 # XMLLINT is not able to validate SCHEMATRON constraints, and
 # therefore is not a good validation tool for DocBook 5.  However,
@@ -29,10 +41,15 @@ add_custom_target(doc-check ALL
 #
 # xsltproc-based documentation generation (default)
 #
+add_custom_command(OUTPUT ${PATH_USERGUIDE_HTML_CHUNK}
+    COMMAND ${XSLTPROC} --nonet --xinclude
+        --stringparam base.dir "${PATH_USERGUIDE_HTML_CHUNK}"
+        ${CMAKE_SOURCE_DIR}/doc/user/tnt-html-chunk.xsl
+        ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
+
 add_custom_command(OUTPUT ${PATH_USERGUIDE_HTML}
-    COMMAND ${XSLTPROC} --nonet
-        --stringparam collect.xref.targets "all"
-        --xinclude -o ${PATH_USERGUIDE_HTML}
+    COMMAND ${XSLTPROC} --nonet --xinclude
+        -o ${PATH_USERGUIDE_HTML}
         ${CMAKE_SOURCE_DIR}/doc/user/tnt-html.xsl
         ${CMAKE_SOURCE_DIR}/doc/user/user.xml)
 
@@ -41,13 +58,16 @@ add_custom_command(OUTPUT ${PATH_USERGUIDE_TXT}
     COMMAND ${LYNX} -dump ${PATH_USERGUIDE_HTML} > ${PATH_USERGUIDE_TXT})
 
 add_custom_target(html DEPENDS ${PATH_USERGUIDE_HTML})
+add_custom_target(html-chunk DEPENDS ${PATH_USERGUIDE_HTML_CHUNK})
 add_custom_target(txt  DEPENDS ${PATH_USERGUIDE_TXT})
 
 add_custom_target(doc-autogen ALL
-    DEPENDS ${PATH_USERGUIDE_HTML} ${PATH_USERGUIDE_TXT})
+    DEPENDS html-saxon html-saxon-chunk)
 
 install (FILES ${PATH_USERGUIDE_HTML}
                ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
+
+install (DIRECTORY ${PATH_USERGUIDE_HTML_CHUNK} DESTINATION share/doc/tarantool)
 
 add_custom_target(pdf
     COMMAND ${XSLTPROC} --nonet
@@ -76,6 +96,19 @@ add_custom_target(html-saxon
         -y org.apache.xml.resolver.tools.ResolvingXMLReader
         -r org.apache.xml.resolver.tools.CatalogResolver
         -u -o ${PATH_USERGUIDE_HTML} user.xml tnt-html.xsl)
+
+add_custom_target(html-saxon-chunk
+    COMMAND java -cp "/usr/share/java/saxon.jar:/usr/share/java/xml-resolver.jar:/usr/share/java/docbook-xsl-saxon.jar:/usr/share/java/xercesImpl.jar:/etc/xml/resolver:/usr/share/java/xslthl.jar:/usr/share/java/xml-commons-resolver-1.1.jar"
+        -Djavax.xml.parsers.DocumentBuilderFactory=org.apache.xerces.jaxp.DocumentBuilderFactoryImpl
+        -Djavax.xml.parsers.SAXParserFactory=org.apache.xerces.jaxp.SAXParserFactoryImpl
+        -Dorg.apache.xerces.xni.parser.XMLParserConfiguration=org.apache.xerces.parsers.XIncludeParserConfiguration
+        com.icl.saxon.StyleSheet
+        -x org.apache.xml.resolver.tools.ResolvingXMLReader
+        -y org.apache.xml.resolver.tools.ResolvingXMLReader
+        -r org.apache.xml.resolver.tools.CatalogResolver
+        -u user.xml tnt-html-chunk.xsl
+        base.dir="${PATH_USERGUIDE_HTML_CHUNK}")
+
 
 add_custom_target(pdf-saxon
     COMMAND java -cp "/usr/share/java/saxon.jar:/usr/share/java/xml-commons-resolver-1.1.jar:/usr/share/java/docbook-xsl-saxon.jar:/usr/share/java/xercesImpl.jar:/etc/xml/resolver:/usr/share/java/xslthl.jar"
