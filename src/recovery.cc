@@ -1028,7 +1028,7 @@ static struct wal_write_request *
 wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 		struct wal_write_request *req, struct wal_write_request *end)
 {
-	int rows_written = fio_batch_writef(batch, wal->f);
+	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
 		req->res = 0;
