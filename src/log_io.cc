@@ -614,7 +614,7 @@ log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	assert(lsn != 0);
 
 	const char *filename = format_filename(dir, lsn, suffix);
-	FILE *f = fopen(filename, "r");
+	FILE *f = fiob_open(filename, "r");
 	return log_io_open(dir, LOG_READ, filename, suffix, f);
 }
 
@@ -645,9 +645,7 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
-
-	/** TODO: use here dir->open_wflags */
-	f = fiob_open(filename, "wx");
+	f = fiob_open_flags(filename, dir->open_wflags, "wxd");
 
 	if (!f)
 		goto error;

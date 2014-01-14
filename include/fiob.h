@@ -37,7 +37,7 @@
 
 
 
-#define O_DIRECT_BSIZE		( 4096 * 50 )
+#define O_DIRECT_BSIZE		( 4096 * 256 )
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -47,15 +47,23 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 
+
+
+/** open file. The same as fiob_open but receives additional open (2) flags */
+FILE *fiob_open_flags(const char *path, int flags, const char *mode);
+
+
 /** open file. The same as fopen (3) but allows additional options:
 
 'x' - O_EXCL flag
 'd' - O_DIRECT flag
 
 */
-
-FILE *fiob_open(const char *path, const char *mode);
-
+static inline FILE *
+fiob_open(const char *path, const char *mode)
+{
+	return fiob_open_flags(path, 0, mode);
+}
 
 #if defined(__cplusplus)
 }	/* extern "C" */

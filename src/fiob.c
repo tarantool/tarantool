@@ -193,7 +193,7 @@ fiob_write(void *cookie, const char *buf, size_t len)
 }
 
 #ifdef HAVE_FUNOPEN
-fpos_t
+static fpos_t
 fiob_seek(void *cookie, fpos_t pos, int whence)
 {
 	struct fiob *f = (struct fiob *)cookie;
@@ -203,7 +203,7 @@ fiob_seek(void *cookie, fpos_t pos, int whence)
 	return lseek(f->fd, pos, whence);
 }
 #else
-int
+static int
 fiob_seek(void *cookie, off64_t *pos, int whence)
 {
 	struct fiob *f = (struct fiob *)cookie;
@@ -245,11 +245,10 @@ fiob_close(void *cookie)
 	return res;
 }
 
-
+/** open file. The same as fiob_open but receives additional open (2) flags */
 FILE *
-fiob_open(const char *path, const char *mode)
+fiob_open_flags(const char *path, int flags, const char *mode)
 {
-	int flags = 0;
 	int omode = 0666;
 
 	size_t bsize = 0;
@@ -300,6 +299,8 @@ fiob_open(const char *path, const char *mode)
 			errno = ENOMEM;
 			return NULL;
 		}
+		/* for valgrind */
+		memset(buf, 0, bsize);
 	}
 
 	struct fiob *f = (struct fiob *)calloc(1, sizeof(struct fiob));
@@ -340,8 +341,11 @@ fiob_open(const char *path, const char *mode)
 	if (!file)
 		goto error;
 
-	/* HACK!!!!! TODO: fix it */
-	file->_fileno = f->fd;
+	#ifdef TARGET_OS_LINUX
+		file->_fileno = f->fd;
+	#else
+		file->_file = f->fd;
+	#endif
 
 	return file;
 
@@ -359,3 +363,4 @@ error: {
 	}
 	return NULL;
 }
+

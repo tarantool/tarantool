@@ -22,7 +22,7 @@
 
 
 
-#define PLAN		30
+#define PLAN		29
 
 #define ITEMS		7
 
@@ -31,9 +31,9 @@ const char *
 catfile(const char *a, const char *b)
 {
 	size_t la = strlen(a);
-	size_t lb = strlen(b);
 
-	char *r = malloc(la + lb + 1 + 2);
+	static char r[4096];
+
 	strcpy(r, a);
 
 	if (a[la - 1] == '/' && b[0] == '/') {
@@ -77,11 +77,10 @@ main(void)
 {
 	plan(PLAN);
 
-	const char *td = mkdtemp(strdup("/tmp/fiob.XXXXXX"));
+	char *td = mkdtemp(strdup("/tmp/fiob.XXXXXX"));
 	isnt(td, NULL, "tempdir is created");
 
-	char *buf = malloc(4096);
-	isnt(buf, NULL, "malloc");
+	static char buf[4096];
 
 	{
 
@@ -145,8 +144,9 @@ main(void)
 
 
 
-	free(buf);
 	if (fork() == 0)
 		execl("/bin/rm", "/bin/rm", "-fr", td);
+
+	free(td);
 	return check_plan();
 }
