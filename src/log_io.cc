@@ -645,7 +645,11 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
-	f = fiob_open_flags(filename, dir->open_wflags, "wxd");
+	if (dir == &snap_dir) {
+		f = fiob_open_flags(filename, dir->open_wflags, "wxd");
+	} else {
+		f = fiob_open_flags(filename, dir->open_wflags, "wx");
+	}
 
 	if (!f)
 		goto error;

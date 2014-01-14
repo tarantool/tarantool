@@ -121,9 +121,13 @@ fiob_flushb(struct fiob *f)
 		return -1;
 
 	assert(cur + f->bfill >= size);
+
 	if (fiob_writef(f, f->buf, f->bsize) < 0)
 		return -1;
-	lseek(f->fd, cur + f->bfill, SEEK_SET);
+
+	if (lseek(f->fd, cur + f->bfill, SEEK_SET) == (off_t)-1)
+		return -1;
+
 	int res = ftruncate(f->fd, cur + f->bfill);
 	f->bfill = 0;
 	return res;
@@ -149,44 +153,41 @@ fiob_write(void *cookie, const char *buf, size_t len)
 			return len;
 		}
 
-		/* data is longer than buffer */
-		if (f->bfill < f->bsize) {
-			memcpy(f->buf + f->bfill, buf,
-				len - (f->bsize - f->bfill));
-			wrdone = fiob_writef(f, f->buf, f->bsize);
 
+		/* buffer is full */
+		if (f->bfill >= f->bsize) {
+			wrdone = fiob_writef(f, f->buf, f->bsize);
 			if (wrdone < 0)
 				return wrdone;
 
-			if (wrdone < f->bsize) {
-				if (wrdone <= f->bfill) {
-					f->bfill -= wrdone;
-					memcpy(f->buf,
-						f->buf + wrdone,
-						f->bfill - wrdone);
-					return fiob_write(cookie, buf, len);
-				}
-				wrdone -= f->bfill;
-			}
-			wrdone -= f->bfill;
 			f->bfill = 0;
-			buf += wrdone;
-			len -= wrdone;
-
-			if (len > 0) {
-				wrdone += fiob_write(cookie, buf, len);
-			}
-			return wrdone;
+			return fiob_write(cookie, buf, len);
 		}
+
+		/* data is longer than buffer */
+		memcpy(f->buf + f->bfill, buf, f->bsize - f->bfill);
 
 		wrdone = fiob_writef(f, f->buf, f->bsize);
+
+
+
 		if (wrdone < 0)
 			return wrdone;
-		if (wrdone < f->bsize) {
-			f->bfill = f->bsize - wrdone;
-			memcpy(f->buf, f->buf + wrdone, f->bfill);
+
+		wrdone -= f->bfill;
+
+		f->bfill = 0;
+		buf += wrdone;
+		len -= wrdone;
+
+
+		if (len > 0) {
+			ssize_t wrtail = fiob_write(cookie, buf, len);
+			if (wrtail < 0)
+				return wrtail;
+			wrdone += wrtail;
 		}
-		return fiob_write(cookie, buf, len);
+		return wrdone;
 	}
 
 	return fiob_writef(f, buf, len);

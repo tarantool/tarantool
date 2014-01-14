@@ -83,7 +83,7 @@ void box_lua_load_cfg(struct lua_State *L);
  * Iterate over all spaces and save them to the
  * snapshot file.
  */
-void box_snapshot(struct log_io *, struct fio_batch *batch);
+void box_snapshot(struct log_io *);
 /**
  * Spit out some basic module status (master/slave, etc.
  */

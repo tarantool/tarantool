@@ -22,7 +22,7 @@
 
 
 
-#define PLAN		29
+#define PLAN		47
 
 #define ITEMS		7
 
@@ -139,6 +139,69 @@ main(void)
 		is(done, 11, "read 11 bytes");
 		is(memcmp(buf, "ello, world", 11), 0, "content was read");
 
+		is(fclose(f), 0, "fclose");
+	}
+
+	{
+		FILE *f = fiob_open(catfile(td, "tm"), "wxd");
+		isnt(f, NULL, "open big file");
+		size_t done = fwrite("Hello, world\n", 1, 13, f);
+		is(done, 13, "Hello world is written (%zu bytes)", done);
+
+		size_t i;
+
+		for (i = 0; i < 1000000; i++) {
+			done += fwrite("Hello, world\n", 1, 13, f);
+		}
+		is(done, 13 + 13 * 1000000, "all bytes were written");
+		is(fclose(f), 0, "fclose");
+
+		f = fopen(catfile(td, "tm"), "r");
+		isnt(f, NULL, "reopen file for reading");
+		done = 0;
+		for (i = 0; i < 1000000 + 1; i++) {
+			buf[0] = 0;
+			fgets(buf, 4096, f);
+			if (strcmp(buf, "Hello, world\n") == 0)
+				done++;
+		}
+		is(done, 1000000 + 1, "all records were written properly");
+
+		is(fgets(buf, 4096, f), NULL, "eof");
+		isnt(feof(f), 0, "feof");
+		is(fclose(f), 0, "fclose");
+	}
+	{
+		FILE *f = fiob_open(catfile(td, "tm"), "w+d");
+		setvbuf(f, NULL, _IONBF, 0);
+		isnt(f, NULL, "open big file");
+		size_t done = fwrite("Hello, world\n", 1, 13, f);
+		is(done, 13, "Hello world is written (%zu bytes)", done);
+
+		size_t i;
+
+		for (i = 0; i < 1000000; i++) {
+			done += fwrite("Hello, world\n", 1, 13, f);
+		}
+		is(done, 13 + 13 * 1000000, "all bytes were written");
+		is(fclose(f), 0, "fclose");
+
+		f = fopen(catfile(td, "tm"), "r");
+		isnt(f, NULL, "reopen file for reading");
+		done = 0;
+		for (i = 0; i < 1000000 + 1; i++) {
+			memset(buf, 0, 4096);
+			fgets(buf, 4096, f);
+			if (strcmp(buf, "Hello, world\n") == 0)
+				done++;
+			else
+				fprintf(stderr, "#   wrong line %zu: %s",
+					i, buf);
+		}
+		is(done, 1000000 + 1, "all records were written properly");
+
+		is(fgets(buf, 4096, f), NULL, "eof");
+		isnt(feof(f), 0, "feof");
 		is(fclose(f), 0, "fclose");
 	}
 

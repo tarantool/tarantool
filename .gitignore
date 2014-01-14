@@ -62,6 +62,7 @@ test/connector_c/xlog
 test/lib/*.pyc
 test/lib/*/*.pyc
 test/unit/*.test
+test/unit/fiob
 test/var
 third_party/luajit/src/luajit
 third_party/luajit/lib/vmdef.lua

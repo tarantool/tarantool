@@ -145,11 +145,10 @@ void recovery_stop_remote(struct recovery_state *r);
 
 struct fio_batch;
 
-void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
+void snapshot_write_row(struct log_io *i,
 			const char *metadata, size_t metadata_size,
 			const char *data, size_t data_size);
-void snapshot_save(struct recovery_state *r,
-		   void (*loop) (struct log_io *, struct fio_batch *));
+void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));
 
 #if defined(__cplusplus)
 } /* extern "C" */
