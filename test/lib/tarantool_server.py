@@ -129,6 +129,7 @@ class TarantoolServer(Server):
         Server.__init__(self, core)
         self.default_bin_name = "tarantool_box"
         self.default_config_name = "tarantool.cfg"
+        self.default_log_name = "tarantool.log"
         self.default_init_lua_name = "init.lua"
         # append additional cleanup patterns
         self.re_vardir_cleanup += ['*.snap',
@@ -176,7 +177,7 @@ class TarantoolServer(Server):
     def install(self, binary=None, vardir=None, mem=None, silent=True):
         """Install server instance: create necessary directories and files.
         The server working directory is taken from 'vardir',
-        specified in the program options."""
+        /specified in the program options."""
 
         if vardir != None: self.vardir = vardir
         if binary != None: self.binary = os.path.abspath(binary)
@@ -303,6 +304,9 @@ class TarantoolServer(Server):
         if valgrind != None: self.valgrind = valgrind
         self.debug = self.test_debug()
 
+        self.log_path = os.path.join(self.vardir, 'tarantool.log')
+        self.log_pos  = 0
+
         if self.is_started:
             if not silent:
                 color_stdout("The server is already started.\n", schema='lerror')
@@ -314,6 +318,11 @@ class TarantoolServer(Server):
             color_stdout("Starting ", schema='serv_text')
             color_stdout(os.path.basename(self.binary), " \n", schema='path')
             color_stdout(version, "\n", schema='version')
+
+        if os.path.exists(self.log_path) and os.path.exists(self.log_path):
+            with open(self.log_path, 'r') as f:
+                f.seek(0, os.SEEK_END)
+                self.log_pos = f.tell()
 
         check_port(self.port)
         args = self.prepare_args()
@@ -454,8 +463,7 @@ class TarantoolServer(Server):
     def print_log(self, lines):
         color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
         with open(os.path.join(self.vardir, 'tarantool.log'), 'r') as log:
-            for i in log.readlines()[-lines:]:
-                color_stdout(i, schema='log')
+            return log.readlines()[-lines:]
 
     def wait_until_started(self):
         """Wait until the server is started and accepting connections"""
@@ -474,6 +482,25 @@ class TarantoolServer(Server):
                 sock.close()
             except socket.error as e:
                 time.sleep(0.001)
+
+        while True:
+            try:
+                open(self.log_path, 'r')
+                break
+            except IOError:
+                pass
+
+        with open(self.log_path, 'r') as f:
+            f.seek(self.log_pos, os.SEEK_SET)
+            cur_pos = self.log_pos
+            while True:
+                log_str = f.readline()
+                if not log_str:
+                    f.seek(cur_pos, os.SEEK_SET)
+                    continue
+                if log_str.find("entering the event loop\n") != -1:
+                    return True
+                cur_pos = f.tell()
 
     def wait_until_stopped(self, pid):
         """Wait until the server is stoped and has closed sockets"""

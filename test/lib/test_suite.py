@@ -146,12 +146,7 @@ class Test:
             if not self.skip:
                 sys.stdout = FilteredStream(self.tmp_result)
                 stdout_fileno = sys.stdout.stream.fileno()
-                temp = threading.Thread(target=self.execute, args=(server, ))
-                temp.start()
-                temp.join(self.suite_ini["timeout"])
-                if temp.is_alive():
-                    temp._Thread__stop()
-                    self.is_terminated = True
+                self.execute(server)
                 sys.stdout.flush()
             self.is_executed_ok = True
         except Exception as e:
