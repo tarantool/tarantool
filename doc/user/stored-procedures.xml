@@ -233,11 +233,11 @@ error: 1:15 expected '('
     Similarly, an error which has occurred inside Tarantool (observed on the
     client as an error code), when it happens during execution of a
     Lua procedure, produces a genuine Lua error:
-<programlisting><computeroutput>localhost> <userinput>lua function f1() error('oops') end</userinput>
+<programlisting><computeroutput>localhost> <userinput>lua function f()error('!') end</userinput>
 ---
 ...
-localhost> <userinput>call f1()</userinput>
-Call ERROR, Lua error: [string "function f1() error('oops') end"]:1: oops (ER_PROC_LUA)
+localhost> <userinput>call f()</userinput>
+Call ERROR, Lua error: [string "function f()error('!') end"]:1: ! (ER_PROC_LUA)
 localhost> <userinput>call box.insert('99', 1, 'test')</userinput>
 Call ERROR, Space 99 is disabled (ER_SPACE_DISABLED)
 localhost> <userinput>lua pcall(box.insert, 99, 1, 'test')</userinput>
@@ -534,8 +534,10 @@ localhost> <userinput>lua box.select(5, 1, 'firstname', 'lastname')</userinput>
 
 #In the following update ...
 #  The first argument is 0, that is, the affected space is space[0]
-#  The second argument is 999, that is, the affected tuple is identified by primary key value = 999
-#  The third argument is '=p', that is, there is one operation, assignment to a field
+#  The second argument is 999, that is, the affected tuple is identified by
+#    primary key value = 999
+#  The third argument is '=p', that is, there is one operation, assignment
+#    to a field
 #  The fourth argument is 1, that is, the affected field is field[1]
 #  The fifth argument is 'B', that is, field[1] contents change to 'B'
 #  Therefore, after the following update, field[0] = 999 and field[1] = 'B'.
@@ -545,27 +547,33 @@ lua box.update(0, 999, '=p', 1, 'B')
 #  the key is passed as a Lua table (inside braces). This is unnecessary
 #  when the primary key has only one field, but would be necessary if the
 #  primary key had more than one field.
-#  Therefore, after the following update, field[0] = 999 and field[1] = 'B' (no change).
+#  Therefore, after the following update, field[0] = 999 and field[1] = 'B'
+#    (no change).
 lua box.update(0, {999}, '=p', 1, 'B')
 
 #In the following update, the arguments are the same, except that ...
 #   The fourth argument is 2, that is the affected field is field[2].
 #   It is okay that, until now, field[2] has not existed. It gets added.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B', field[2] = 1.
+#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
+#     field[2] = 1.
 lua box.update(0, 999, '=p', 2, 1)
 
 #In the following update, the arguments are the same, except that ...
-#   The third argument is '+p', that is, the operation is addition rather than assignment.
+#   The third argument is '+p', that is, the operation is addition rather
+#     than assignment.
 #   Since field[2] previously contained 10, this means we're adding 1 to 1.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B', field[2] = 2.
+#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
+#     field[2] = 2.
 lua box.update(0, 999, '+p', 2, 1)
 
 #In the following update ...
 #   The idea is to modify two fields at once.
-#   The third argument is '|p=p', that is, there are two operations, OR and assignment.
+#   The third argument is '|p=p', that is, there are two operations, OR and
+#     assignment.
 #   The fourth and fifth arguments mean that field[2] gets ORed with 1.
 #   The fifth and sixth arguments mean that field[1] gets assigned 'C'.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'C', field[2] = 3.
+#   Therefore, after the following update, field[0] = 999, field[1] = 'C',
+#     field[2] = 3.
 lua box.update(0, 999, '|p=p', 2, 1, 1, 'C')
 
 #In the following update ...
@@ -576,14 +584,15 @@ lua box.update(0, 999, '|p=p', 2, 1, 1, 'C')
 lua box.update(0, 999, '#p-p', 1, 0, 1, 3)
 
 #In the following update ...
-#   We're making a long string so that the splice will work in the next example.
+#   We're making a long string so that splice will work in the next example.
 #   Therefore, after the following update, field[0[ = 999, field[1] = 'XYZ'.
 lua box.update(0, 999, '=p', 1, 'XYZ')
 
 #In the following update ...
 #   The third argument is ':p', that is, this is the example of splice.
 #   The fifth argument is actually four arguments packed together ...
-#      a filler, an offset, the number of bytes to cut (1), and the string to add ('!')
+#      a filler, an offset, the number of bytes to cut (1), and the string
+#      to add ('!')
 #   Therefore, after the following update, field[0[ = 999, field[1] = 'X!Z'.
 lua box.update(0, 999, ':p', 1, box.pack('ppp', 1, 1, '!'))
 
@@ -870,43 +879,51 @@ localhost> <userinput>lua box.update(0, 0, '^p', 1, 4)</userinput>
         <listitem><para>
             Counterpart to <code>box.pack()</code>.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>lua tuple = box.replace(2, 0)</userinput>
+<programlisting>localhost> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+localhost> <userinput>lua tuple = box.replace(2, 0)!</userinput>
 ---
 ...
-localhost> <userinput>lua string.len(tuple[0])</userinput>
+localhost> <userinput>lua string.len(tuple[0])!</userinput>
 ---
  - 4
 ...
-localhost> <userinput>lua box.unpack('i', tuple[0])</userinput>
+localhost> <userinput>lua box.unpack('i', tuple[0])!</userinput>
 ---
  - 0
 ...
-localhost> <userinput>lua box.unpack('bsil', box.pack('bsil', 255, 65535, 4294967295, tonumber64('18446744073709551615')))</userinput>
+localhost> <userinput>lua box.unpack('bsi', box.pack('bsi', 255, 65535, 4294967295))!</userinput>
 ---
  - 255
  - 65535
  - 4294967295
- - 18446744073709551615
 ...
-localhost> <userinput>lua num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, 'string', tonumber64('666666666666666')))</userinput>
+localhost> <userinput>lua box.unpack('ls', box.pack('ls',</userinput>
+         > <userinput>    tonumber64('18446744073709551615'), 65535))!</userinput>
+---
+ - 18446744073709551615
+ - 65535
+...
+localhost> <userinput>lua num, str, num64 = box.unpack('ppp', box.pack('ppp', 666, </userinput>
+         > <userinput>    'string',tonumber64('666666666666666')))!</userinput>
 ---
 ...
-localhost> <userinput>lua print(box.unpack('i', num));</userinput>
+localhost> <userinput>lua print(box.unpack('i', num));!</userinput>
 ---
 666
 ...
-localhost> <userinput>lua print(str);</userinput>
+localhost> <userinput>lua print(str);!</userinput>
 ---
 string
 ...
-localhost> <userinput>lua print(box.unpack('l', num64))</userinput>
+localhost> <userinput>lua print(box.unpack('l', num64))!</userinput>
 ---
 666666666666666
 ...
-localhost> <userinput>lua box.unpack('=p', box.pack('=p', 1, '666'))</userinput>
+localhost> <userinput>lua box.unpack('=p', box.pack('=p', 1, '666'))!</userinput>
 ---
  - 1
  - 666
+localhost> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
 </programlisting>
         </para></listitem>
     </varlistentry>
@@ -959,10 +976,16 @@ localhost&gt; <userinput>lua box.dostring('return ...', 'hello', 'world')</useri
  - hello
  - world
 ...
-localhost&gt; <userinput>lua box.dostring('local f = function(key) t=box.select(0, 0, key); if t ~= nil then return t[0] else return nil end end return f(...)', 0)</userinput>
+localhost&gt; <userinput>setopt delimiter='!' #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+localhost&gt; <userinput>lua box.dostring('local f = function(key)</userinput>
+        -&gt; <userinput>                  t=box.select(0, 0, key);</userinput>
+        -&gt; <userinput>                  if t ~= nil then return t[0] else return nil end</userinput>
+        -&gt; <userinput>                  end</userinput>
+        -&gt; <userinput>                  return f(...)', 0)!</userinput>
 ---
  - nil
 ...
+localhost&gt; <userinput>setopt delimiter=''!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1193,7 +1216,7 @@ localhost> <userinput>lua t</userinput>
                 and then the number of fields in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua #t</userinput>
@@ -1243,12 +1266,12 @@ localhost&gt; <userinput>lua t:bsize()</userinput>
                 and then the second field in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t[1]</userinput>
 ---
- - Field#2
+ - Fld#2
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1304,12 +1327,12 @@ localhost&gt; <userinput>lua t:findall(1,'a')</userinput>
              but one new one is added, then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})
+            <programlisting>localhost&gt; lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
 ---
 ...
 localhost&gt; <userinput>lua t:transform(1,2,'x')</userinput>
 ---
- - 'Field#1': {'x', 'Field#4', 'Field#5'}
+ - 'Fld#1': {'x', 'Fld#4', 'Fld#5'}
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1329,13 +1352,13 @@ localhost&gt; <userinput>lua t:transform(1,2,'x')</userinput>
              then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:slice(1,3)</userinput>
 ---
- - Field#2
- - Field#3
+ - Fld#2
+ - Fld#3
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1352,16 +1375,16 @@ localhost&gt; <userinput>lua t:slice(1,3)</userinput>
              then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
+            <programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua t:unpack()</userinput>
 ---
- - Field#1
- - Field#2
- - Field#3
- - Field#4
- - Field#5
+ - Fld#1
+ - Fld#2
+ - Fld#3
+ - Fld#4
+ - Fld#5
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1378,16 +1401,16 @@ localhost&gt; <userinput>lua t:unpack()</userinput>
             and then all its fields are selected using a Lua for-end loop.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Field#1','Field#2','Field#3','Field#4','Field#5'})</userinput>
+<programlisting>localhost&gt; <userinput>lua t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>lua for k,v in t:pairs() do print(v) end</userinput>
 ---
-Field#1
-Field#2
-Field#3
-Field#4
-Field#5
+Fld#1
+Fld#2
+Fld#3
+Fld#4
+Fld#5
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1501,10 +1524,9 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
             of type <code xlink:href="#box.index">box.index</code> with
             methods to search tuples and iterate over them in predefined order.
         <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>lua box.space[0].n, box.space[0].enabled, box.space[0].cardinality, box.space[0].index[0].type</userinput>
+<programlisting>localhost&gt; <userinput>lua box.space[0].n,box.space[0].cardinality,box.space[0].index[0].type</userinput>
 ---
  - 0
- - true
  - 0
  - HASH
 ...
@@ -1709,14 +1731,16 @@ localhost> <userinput>lua for k,v in box.space[0]:pairs() do print(v) end</useri
     <varlistentry>
         <term></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>lua box.space[0].index[0].unique,box.space[0].index[0].type,box.space[0].index[0].key_field[0],box.space[0].index[0].idx</userinput>
+<programlisting>localhost&gt; <userinput>lua box.space[0].index[0].unique, box.space[0].index[0].type</userinput>
 ---
  - true
  - HASH
+...
+localhost&gt; <userinput>lua box.space[0].index[0].key_field[0], box.space[0].index[0].idx</userinput>
+---
  - table: 0x41d03518
  - index 0 in space 0
-...
-</programlisting></listitem>
+...</programlisting></listitem>
     </varlistentry>
 
     <varlistentry>
@@ -1802,19 +1826,31 @@ localhost> <userinput>INSERT INTO t0 VALUES (5, 2, 1)</userinput>
 Insert OK, 1 rows affected
 localhost> <userinput>INSERT INTO t0 VALUES (6, 2, 2)</userinput>
 Insert OK, 1 rows affected
-localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1); print(it(), ' ', it(), ' ', it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1);</userinput>
+---
+...
+localhost> <userinput>lua print(it(), ' ', it(), ' ', it());</userinput>
 ---
 1: {1, 0} 2: {1, 1} 3: {1, 2}
 ...
-localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2); print(it(), ' ', it(), ' ', it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.EQ, 1, 2);</userinput>
+---
+...
+localhost> <userinput>lua print(it(), ' ', it(), ' ', it());</userinput>
 ---
 3: {1, 2} nil nil
 ...
-localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.GE, 2, 1);  print(it(), ' ', it(), ' ', it());</userinput>
+localhost> <userinput>lua it = box.space[0].index[1]:iterator(box.index.GE, 2, 1);</userinput>
+---
+...
+localhost> <userinput>lua print(it(), ' ', it(), ' ', it());</userinput>
 ---
 5: {2, 1} 6: {2, 2} nil
 ...
-localhost> <userinput>lua for v in box.space[0].index[1]:iterator(box.index.ALL) do print(v) end</userinput>
+localhost> <userinput>lua v = box.space[0].index[1]:iterator(box.index.ALL)</userinput>
+---
+...
+localhost> <userinput>lua for v in v do print(v) end</userinput>
 ---
 1: {1, 0}
 2: {1, 1}
@@ -2137,7 +2173,7 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> lua print('fiber=',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua print('#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
 ---
 fiber=104. suspended. gvar=9
 ...</programlisting>
@@ -2149,7 +2185,7 @@ the status is dead because the cancel worked.<programlisting>
 <prompt>localhost&gt;</prompt><userinput> lua box.fiber.cancel(fiber_of_x)</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> lua print('fiber=',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua print('#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
 ---
 fiber=104. dead. gvar=22
 ...</programlisting>
@@ -2215,7 +2251,7 @@ fiber=104. dead. gvar=22
 ---
  - 127.0.0.1:45129
 ...
-<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.random_memorandum = "Don't forget to buy eggs."</userinput>
+<prompt>localhost&gt;</prompt><userinput> lua box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
 ---
 ...
 <prompt>localhost&gt;</prompt><userinput> lua box.session.storage.radius_of_mars = 3396</userinput>
@@ -2224,7 +2260,7 @@ fiber=104. dead. gvar=22
 <prompt>localhost&gt;</prompt><userinput> lua for k,v in pairs(box.session.storage) do print(k,' ',v) end</userinput>
 ---
 radius_of_mars 3396
-random_memorandum Don't forget to buy eggs.
+random_memorandum Don't forget the eggs.
 ...</programlisting>
 </para>
 
@@ -2959,27 +2995,32 @@ end
  Assume that the tarantool_box server is running on localhost 127.0.0.1:33013.
 <programlisting><prompt>localhost&gt;</prompt> <userinput> setopt delimiter = '!'</userinput>
 <prompt>localhost&gt;</prompt> <userinput> lua function example()</userinput>
-<prompt>        -&gt;</prompt> <userinput>   if self:ping() then</userinput>
-<prompt>        -&gt;</prompt> <userinput>     print('self:ping() succeeded (not surprising since self is a pre-established connection).')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   if box.net.self:ping() then</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('self:ping() succeeded')</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt> <userinput>     end</userinput>
 <prompt>        -&gt;</prompt> <userinput>   if box.cfg.primary_port == 33013 then</userinput>
-<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is 33013 (the default)')</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number = 33013 = default')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   else</userinput>
-<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is not 33013, so connect will fail')</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('The local server primary port number is not 33013')</userinput>
+<prompt>        -&gt;</prompt> <userinput>     print('  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt> <userinput>     end</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn = box.net.box.new('127.0.0.1', 33013)</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn:delete(0,800)</userinput>
 <prompt>        -&gt;</prompt> <userinput>   print('conn:delete done on space[0].')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn:insert(0,800,'data')</userinput>
-<prompt>        -&gt;</prompt> <userinput>   print('conn:insert done on space[0], index 0. primary key value = 800.')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:insert done on space[0], index 0')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('  primary key value = 800.')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   wtuple = conn:select(0,0,800)</userinput>
-<prompt>        -&gt;</prompt> <userinput>   print('conn:select done on space[0], index 0. number of fields = ', #wtuple)</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:select done on space[0], index 0.')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('  number of fields = ', #wtuple)</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn:delete(0,800)</userinput>
 <prompt>        -&gt;</prompt> <userinput>   print('conn:delete done on space[0].')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn:replace(0,800,'New data','Extra data')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   print('conn:replace done on space[0].')</userinput>
-<prompt>        -&gt;</prompt> <userinput>   conn:timeout(0):update(0,800,'=p=p=p',1, 'Field#1', 2,'Field#2', 3,'Field#3')</userinput>
-<prompt>        -&gt;</prompt> <userinput>   print('conn:update done on space[0], timed out after waiting 0 seconds for a return')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   conn:timeout(0):update(0,800,'=p=p',1,'Fld#1',2,'Fld#2')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('conn:update done on space[0]')</userinput>
+<prompt>        -&gt;</prompt> <userinput>   print('  timed out after waiting 0 seconds for a return')</userinput>
 <prompt>        -&gt;</prompt> <userinput>   conn:close()</userinput>
 <prompt>        -&gt;</prompt> <userinput>   print('conn:close done')</userinput>
 <prompt>        -&gt;</prompt> <userinput> end!</userinput>
@@ -2988,19 +3029,23 @@ end
 <prompt>localhost&gt;</prompt> <userinput> setopt delimiter = ''!</userinput>
 <prompt>localhost&gt;</prompt> <userinput> lua example()</userinput>
 ---
-self:ping() succeeded (not surprising since self is a pre-established connection).
-The local server primary port number is 33013 (the default)
+self:ping() succeeded
+  (no surprise -- self connection is pre-established)
+The local server primary port number = 33013 = default
 conn:delete done on space[0].
-conn:insert done on space[0], index 0. primary key value = 800.
-conn:select done on space[0], index 0. number of fields = 2
+conn:insert done on space[0], index 0.
+  primary key value = 800.
+conn:select done on space[0], index 0.
+  number of fields = 2
 conn:delete done on space[0].
 conn:replace done on space[0].
-conn:update done on space[0], timed out after waiting 0 seconds for a return
+conn:update done on space[0], 
+  timed out after waiting 0 seconds for a return
 conn:close done
 ...
 <prompt>localhost&gt;</prompt> <userinput> select * from t0 where k0 = 800 # Prove that the update succeeded.</userinput>
 Select OK, 1 rows affected
-[800, 'Field#1', 'Field#2', 'Field#3']
+[800, 'Fld#1', 'Fld#2']
 </programlisting>
 </para>
 </section>
@@ -3118,10 +3163,15 @@ localhost> <userinput>lua box.info.snapshot_pid</userinput>
 ...
 localhost> <userinput>lua for k, v in pairs(box.info.build) do print(k .. ': ', v) end</userinput>
 ---
-flags:  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DCORO_ASM -fno-omit-frame-pointer -fno-stack-protector -fexceptions -funwind-tables -fgnu89-inline -pthread  -Wno-sign-compare -Wno-strict-aliasing -std=gnu99 -Wall -Wextra -Werror
+flags:  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DCORO_ASM -fno-omit-frame-pointer
+        -fno-stack-protector -fexceptions -funwind-tables -fgnu89-inline
+         -pthread  -Wno-sign-compare -Wno-strict-aliasing -std=gnu99
+         -Wall -Wextra -Werror
 target: Linux-x86_64-Debug
 compiler: /usr/bin/gcc
-options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF -DENABLE_GCOV=OFF -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=OFF
+options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
+         -DENABLE_GCOV=OFF -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON
+         -DENABLE_CLIENT=OFF
 ...
 </programlisting>
         </listitem>
@@ -3187,7 +3237,7 @@ localhost> <userinput>lua for k, v in pairs(box.stat().DELETE) do print(k, ': ',
 total: 23210
 rps: 22
 ...
-localhost> <userinput>lua for k, v in pairs(box.stat.DELETE) do print(k, ': ', v) end -- the same</userinput>
+localhost> <userinput>lua for k, v in pairs(box.stat.DELETE) do print(k, ': ', v) end</userinput>
 ---
 total: 23210
 rps: 22

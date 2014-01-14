@@ -377,7 +377,7 @@ lua function main_function()
   end_time = os.clock()
   end!
 call main_function()!
-lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!
+lua print('insert done in ' .. end_time - start_time .. ' seconds')!
 </programlisting>
 
 The Lua os.clock() function will return the number of seconds since the start.
@@ -401,7 +401,7 @@ the statement that created main_function(), and the statement that invokes main_
 
 
 <programlisting>
-#NB: If you have already said "setopt delimiter = '!'", do not say it again -- skip this statement.
+#Skip the following statement if you have already said "setopt delimiter = '!'"
 setopt delimiter = '!'
 
 lua function string_function()
@@ -426,7 +426,7 @@ lua function main_function()
   end_time = os.clock()
   end!
 call main_function()!
-lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!
+lua print('insert done in ' .. end_time - start_time .. ' seconds')!
 </programlisting>
 
 The screen now looks like this:
@@ -459,9 +459,9 @@ localhost&gt; <userinput>lua function main_function()</userinput>
 ...
 localhost&gt; <userinput>call main_function()!</userinput>
 Call OK, 0 rows affected
-localhost&gt; <userinput>lua print('inserted 1 million tuples in ' .. end_time - start_time .. ' seconds')!</userinput>
+localhost&gt; <userinput>lua print('insert done in ' .. end_time - start_time .. ' seconds')!</userinput>
 ---
-inserted 1 million tuples in 41.66 seconds
+insert done in 41.66 seconds
 ...
 localhost&gt;
 </programlisting>
