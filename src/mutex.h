@@ -77,18 +77,18 @@ mutex_destroy(struct mutex *m)
 static inline bool
 mutex_lock_timeout(struct mutex *m, ev_tstamp timeout)
 {
-	rlist_add_tail_entry(&m->queue, fiber, state);
+	rlist_add_tail_entry(&m->queue, fiber_self(), state);
 	ev_tstamp start = timeout;
 	while (timeout > 0) {
 		struct fiber *f = rlist_first_entry(&m->queue,
 						    struct fiber, state);
-		if (f == fiber)
+		if (f == fiber_self())
 			break;
 
 		fiber_yield_timeout(timeout);
 		timeout -= ev_now() - start;
 		if (timeout <= 0) {
-			rlist_del_entry(fiber, state);
+			rlist_del_entry(fiber_self(), state);
 			errno = ETIMEDOUT;
 			return true;
 		}
@@ -130,7 +130,7 @@ mutex_unlock(struct mutex *m)
 {
 	struct fiber *f;
 	f = rlist_first_entry(&m->queue, struct fiber, state);
-	assert(f == fiber);
+	assert(f == fiber_self());
 	rlist_del_entry(f, state);
 	if (!rlist_empty(&m->queue)) {
 		f = rlist_first_entry(&m->queue, struct fiber, state);

@@ -166,7 +166,7 @@ public:
 template <typename T> T *
 AlterSpaceOp::create()
 {
-	return new (region_alloc0(&fiber->gc, sizeof(T))) T;
+	return new (region_alloc0(&fiber_self()->gc, sizeof(T))) T;
 }
 
 void
@@ -183,7 +183,7 @@ struct trigger *
 txn_alter_trigger_new(trigger_f run, struct alter_space *alter)
 {
 	struct trigger *trigger = (struct trigger *)
-		region_alloc0(&fiber->gc, sizeof(*trigger));
+		region_alloc0(&fiber_self()->gc, sizeof(*trigger));
 	trigger->run = run;
 	trigger->data = alter;
 	trigger->destroy = NULL;
@@ -207,7 +207,7 @@ struct alter_space *
 alter_space_new()
 {
 	struct alter_space *alter = (struct alter_space *)
-		region_alloc0(&fiber->gc, sizeof(*alter));
+		region_alloc0(&fiber_self()->gc, sizeof(*alter));
 	rlist_create(&alter->ops);
 	return alter;
 }
@@ -613,7 +613,7 @@ struct trigger *
 add2index_trigger_new(trigger_f run, Index *new_index)
 {
 	struct trigger *trigger = (struct trigger *)
-		region_alloc0(&fiber->gc, sizeof(*trigger));
+		region_alloc0(&fiber_self()->gc, sizeof(*trigger));
 	trigger->run = run;
 	trigger->data = new_index;
 	return trigger;
@@ -794,7 +794,7 @@ AddIndex::alter(struct alter_space *alter)
 	/* Build the new index. */
 	struct tuple *tuple;
 	struct tuple_format *format = alter->new_space->format;
-	char *field_map = ((char *) region_alloc(&fiber->gc,
+	char *field_map = ((char *) region_alloc(&fiber_self()->gc,
 					   format->field_map_size) +
 			   format->field_map_size);
 	while ((tuple = it->next(it))) {

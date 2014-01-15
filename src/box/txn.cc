@@ -74,7 +74,7 @@ struct txn *
 txn_begin()
 {
 	struct txn *txn = (struct txn *)
-		region_alloc0(&fiber->gc, sizeof(*txn));
+		region_alloc0(&fiber_self()->gc, sizeof(*txn));
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
 	return txn;
@@ -88,7 +88,7 @@ txn_commit(struct txn *txn)
 		int64_t lsn = next_lsn(recovery_state);
 
 		ev_tstamp start = ev_now(), stop;
-		int res = wal_write(recovery_state, lsn, fiber->cookie,
+		int res = wal_write(recovery_state, lsn, fiber_self()->cookie,
 				    txn->op, txn->data, txn->len);
 		stop = ev_now();
 

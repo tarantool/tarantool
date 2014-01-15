@@ -71,11 +71,11 @@ session_create(int fd, uint64_t cookie)
 	 * Run the trigger *after* setting the current
 	 * fiber sid.
 	 */
-	fiber_set_session(fiber, session);
+	fiber_set_session(fiber_self(), session);
 	try {
 		trigger_run(&session_on_connect, NULL);
 	} catch (const Exception& e) {
-		fiber_set_session(fiber, NULL);
+		fiber_set_session(fiber_self(), NULL);
 		mh_i32ptr_remove(session_registry, &node, NULL);
 		mempool_free(&session_pool, session);
 		throw;
@@ -88,7 +88,7 @@ session_destroy(struct session *session)
 {
 	if (session == NULL) /* no-op for a dead session. */
 		return;
-	fiber_set_session(fiber, session);
+	fiber_set_session(fiber_self(), session);
 
 	try {
 		trigger_run(&session_on_disconnect, NULL);

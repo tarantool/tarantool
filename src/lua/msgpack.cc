@@ -374,8 +374,8 @@ lua_msgpack_encode(lua_State *L)
 	if (index != 1)
 		luaL_error(L, "msgpack.encode: a Lua object expected");
 
-	RegionGuard region_guard(&fiber->gc);
-	struct tbuf *buf = tbuf_new(&fiber->gc);
+	RegionGuard region_guard(&fiber_self()->gc);
+	struct tbuf *buf = tbuf_new(&fiber_self()->gc);
 	luamp_encode_r(L, buf, 0);
 	lua_pushlstring(L, buf->data, buf->size);
 	return 1;
