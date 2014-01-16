@@ -81,6 +81,7 @@ tc_printer_xlog_tarantool(struct tnt_log_row *row,
 		tc_print_tuple(&r->r.insert.t);
 		break;
 	case TNT_OP_DELETE:
+	case TNT_OP_DELETE_1_3:
 		tc_print_tuple(&r->r.del.t);
 		break;
 	case TNT_OP_UPDATE:
@@ -104,6 +105,7 @@ tc_printer_xlog_lua(struct tnt_log_row *row,
 		tc_print_lua_fields(&r->r.insert.t);
 		break;
 	case TNT_OP_DELETE:
+	case TNT_OP_DELETE_1_3:
 		tc_printf("delete(");
 		tc_printf("%"PRIu32", ", r->r.del.h.ns);
 		tc_print_lua_tuple(&r->r.del.t);
