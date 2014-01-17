@@ -1,23 +1,28 @@
 .tntadmin {
-  font-family: monospace;
-  font-weight: bold;
-  text-transform: uppercase;
-  color: green;
+    font-family: monospace;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: green;
 }
 
 .lua {
-  font-family: monospace;
-  font-weight: bold;
+    font-family: monospace;
+    font-weight: bold;
 }
 
-.hl-keyword {
-  color: green;
-  font-weight: bold;
+strong.hl-keyword {
+    color: green !important;
+    font-weight: bold;
 }
 
-.hl-comment{
-  color: blue;
-  font-weight: bold;
+em.hl-comment {
+    color: #3366FF !important;
+    font-weight: normal;
+}
+
+strong.hl-string em {
+    color: red !important;
+    font-weight: bold;
 }
 
 body {
@@ -28,7 +33,6 @@ body {
 
 .book {
     margin: 2pt auto;
-    /*font-family: Verdana, Arial, Helvetica, sans-serif; */
     font-size: 100%
 }
 
