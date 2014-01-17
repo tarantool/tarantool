@@ -165,8 +165,8 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 static int
 lbox_print(struct lua_State *L)
 {
-	RegionGuard region_guard(&fiber_self()->gc);
-	struct tbuf *out = tbuf_new(&fiber_self()->gc);
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *out = tbuf_new(&fiber()->gc);
 	/* serialize arguments of 'print' Lua built-in to tbuf */
 	int top = lua_gettop(L);
 	for (int i = 1; i <= top; i++) {
@@ -357,8 +357,8 @@ tarantool_lua_init()
 static int
 tarantool_lua_dostring(struct lua_State *L, const char *str)
 {
-	RegionGuard region_guard(&fiber_self()->gc);
-	struct tbuf *buf = tbuf_new(&fiber_self()->gc);
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *buf = tbuf_new(&fiber()->gc);
 	tbuf_printf(buf, "%s%s", "return ", str);
 	int r = luaL_loadstring(L, tbuf_str(buf));
 	if (r) {

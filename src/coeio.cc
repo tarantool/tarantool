@@ -186,7 +186,7 @@ ssize_t
 coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 {
 	struct coeio_task task;
-	task.fiber = fiber_self();
+	task.fiber = fiber();
 	task.func = func;
 	task.result = -1;
 	task.complete = 0;

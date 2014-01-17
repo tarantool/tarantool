@@ -53,7 +53,7 @@ static const char *sessionlib_name = "box.session";
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, fiber_self()->session ? fiber_self()->session->id : 0);
+	lua_pushnumber(L, fiber()->session ? fiber()->session->id : 0);
 	return 1;
 }
 
@@ -96,7 +96,7 @@ lbox_session_peer(struct lua_State *L)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
 	uint32_t sid = lua_gettop(L) == 1 ?
-		luaL_checkint(L, -1) : fiber_self()->session->id;
+		luaL_checkint(L, -1) : fiber()->session->id;
 
 	int fd = session_fd(sid);
 	struct sockaddr_in addr;

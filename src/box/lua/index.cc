@@ -227,12 +227,12 @@ lbox_create_iterator(struct lua_State *L)
 			luaL_error(L, "unknown iterator type: %d", type);
 	}
 
-	RegionGuard region_guard(&fiber_self()->gc);
+	RegionGuard region_guard(&fiber()->gc);
 
 	/* What else do we have on the stack? */
 	if (argc > 2 && (lua_type(L, 3) != LUA_TNIL)) {
 		/* Single or multi- part key. */
-		struct tbuf *b = tbuf_new(&fiber_self()->gc);
+		struct tbuf *b = tbuf_new(&fiber()->gc);
 		luamp_encodestack(L, b, 3, argc);
 		key = b->data;
 		assert(b->size > 0);
@@ -330,8 +330,8 @@ lbox_index_count(struct lua_State *L)
 		return 1;
 	}
 
-	RegionGuard region_guard(&fiber_self()->gc);
-	struct tbuf *b = tbuf_new(&fiber_self()->gc);
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *b = tbuf_new(&fiber()->gc);
 
 	/* Single or multi- part key. */
 	luamp_encodestack(L, b, 2, argc);

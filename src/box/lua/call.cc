@@ -95,7 +95,7 @@ static struct port *
 port_lua_create(struct lua_State *L)
 {
 	struct port_lua *port = (struct port_lua *)
-			region_alloc(&fiber_self()->gc, sizeof(struct port_lua));
+			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
 	return (struct port *) port;
@@ -189,7 +189,7 @@ lbox_process(lua_State *L)
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
 
-	size_t allocated_size = region_used(&fiber_self()->gc);
+	size_t allocated_size = region_used(&fiber()->gc);
 	struct port *port_lua = port_lua_create(L);
 	try {
 		struct request request;
@@ -200,9 +200,9 @@ lbox_process(lua_State *L)
 		 * This only works as long as port_lua doesn't
 		 * use fiber->cleanup and fiber->gc.
 		 */
-		region_truncate(&fiber_self()->gc, allocated_size);
+		region_truncate(&fiber()->gc, allocated_size);
 	} catch (const Exception &e) {
-		region_truncate(&fiber_self()->gc, allocated_size);
+		region_truncate(&fiber()->gc, allocated_size);
 		throw;
 	}
 	return lua_gettop(L) - top;
@@ -395,8 +395,8 @@ lbox_pack(struct lua_State *L)
 	size_t size;
 	const char *str;
 
-	RegionGuard region_guard(&fiber_self()->gc);
-	struct tbuf *b = tbuf_new(&fiber_self()->gc);
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *b = tbuf_new(&fiber()->gc);
 
 	struct luaL_field field;
 	double dbl;

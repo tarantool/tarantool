@@ -108,12 +108,12 @@ struct fiber {
 	uint64_t cookie;
 };
 
-extern __thread struct fiber *fiber_self_ptr;
+extern __thread struct fiber *fiber_ptr;
 
 static inline struct fiber *
-fiber_self(void)
+fiber(void)
 {
-	return fiber_self_ptr;
+	return fiber_ptr;
 }
 
 void fiber_init(void);

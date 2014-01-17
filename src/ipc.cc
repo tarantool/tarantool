@@ -114,14 +114,14 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 
 		/* try to be in FIFO order */
 		if (first_try) {
-			rlist_add_tail_entry(&ch->readers, fiber_self(), state);
+			rlist_add_tail_entry(&ch->readers, fiber(), state);
 			first_try = false;
 		} else {
-			rlist_add_entry(&ch->readers, fiber_self(), state);
+			rlist_add_entry(&ch->readers, fiber(), state);
 		}
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield_timeout(timeout);
-		rlist_del_entry(fiber_self(), state);
+		rlist_del_entry(fiber(), state);
 
 		/* broadcast messsage wakes us up */
 		if (!rlist_empty(&ch->bcast)) {
@@ -173,15 +173,15 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 
 		/* try to be in FIFO order */
 		if (first_try) {
-			rlist_add_tail_entry(&ch->writers, fiber_self(), state);
+			rlist_add_tail_entry(&ch->writers, fiber(), state);
 			first_try = false;
 		} else {
-			rlist_add_entry(&ch->writers, fiber_self(), state);
+			rlist_add_entry(&ch->writers, fiber(), state);
 		}
 
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield_timeout(timeout);
-		rlist_del_entry(fiber_self(), state);
+		rlist_del_entry(fiber(), state);
 
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
@@ -251,11 +251,11 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 		f = rlist_first_entry(&ch->readers, struct fiber, state);
 
 		ch->bcast_msg = data;
-		rlist_add_tail_entry(&ch->bcast, fiber_self(), state);
+		rlist_add_tail_entry(&ch->bcast, fiber(), state);
 		fiber_wakeup(f);
 		bool cancellable = fiber_setcancellable(true);
 		fiber_yield();
-		rlist_del_entry(fiber_self(), state);
+		rlist_del_entry(fiber(), state);
 		fiber_testcancel();
 		fiber_setcancellable(cancellable);
 		/* if any other reader was added don't wake it up */

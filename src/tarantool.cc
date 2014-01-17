@@ -798,7 +798,7 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script();
-		region_free(&fiber_self()->gc);
+		region_free(&fiber()->gc);
 		say_crit("log level %i", cfg.log_level);
 		say_crit("entering the event loop");
 		if (cfg.io_collect_interval > 0)
