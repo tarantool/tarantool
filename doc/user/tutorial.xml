@@ -283,13 +283,73 @@ ones unless you intend to work on the documentation.
 </para>
 
 <para>
-2. Pick a default directory.
+2. Set up python modules for running the test suite or creating documentation.
+ This step is optional. Python modules are not necessary for building Tarantool
+ itself, unless one intends to use the -DENABLE_DOC option in step 6 or the
+ "Run the test suite" option in step 8.</para>
+<para>Say:<programlisting><command>python --version</command></programlisting>
+... You should see that the python version is between 2.6 and 3.</para>
+<para>On Ubuntu you can get modules from the repository:
+<programlisting>
+# For test suite
+<command>sudo apt-get install</command> python-daemon python-yaml python-argparse python-pexpect
+# For documentation
+<command>sudo apt-get install</command> python-jinja2 python-markdown
+</programlisting></para>
+<para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
+<para>But in general it is best to set up the modules by getting
+ a tarball and doing the setup with <computeroutput>python setup.py</computeroutput>, thus:
+<programlisting># python module for parsing YAML (pyYAML): For test suite:
+# (If wget fails, check the <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
+<command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
+<command>cd</command> PyYAML-3.10
+<command>sudo python</command> setup.py install
+# python module for spawning child applications (pexpect): For test suite:
+# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz
+<command>tar</command> <option>-xzvf</option> pexpect-u-2.5.1.tar.
+<command>cd</command> pexpect-u-2.5.1
+<command>sudo python</command> setup.py install
+# python module for helping programs become daemons (daemon): For test suite:
+# (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz
+<command>tar</command> <option>-xzvf</option> daemon-1.0.tar.gz
+<command>cd</command> daemon-1.0
+<command>sudo python</command> setup.py install
+# python module for template engine (jinja2): For documentation:
+# (If wget fails, check the <citetitle xlink:href="https://pypi.python.org/pypi/Jinja2" xlink:title="Python Jinja2">python-jinja2</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> https://pypi.python.org/packages/source/J/Jinja2/Jinja2-2.7.2.tar.gz
+<command>tar</command> <option>-xzvf</option> Jinja2-2.7.2.tar.gz
+<command>cd</command> Jinja2-2.7.2
+<command>sudo python</command> setup.py install
+# python module for text-to-html conversion (markdown): For documentation:
+# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/Markdown/" xlink:title="Python implementation of Markdown">python-markdown</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> https://pypi.python.org/packages/source/M/Markdown/Markdown-2.3.1.tar.gz
+<command>tar</command> <option>-xzvf</option> Markdown-2.3.1.tar.gz
+<command>cd</command> Markdown-2.3.1
+<command>sudo python</command> setup.py install
+</programlisting>
+</para>
+
+<para>
+3. Pick a default directory.
 This can be anywhere. We'll assume that your default directory is <quote>~</quote>, and therefore
 the tarantool download will go inside it, as <computeroutput><filename>~/tarantool</filename></computeroutput>.
 </para>
 
 <para>
-3. Use <productname>git</productname> to download from github.com.<programlisting>
+4. Use <productname>git</productname> to download from github.com.<programlisting>
 <command>cd</command> ~
 <command>git clone</command> <option>-b stable</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
 The optional argument <quote>-b stable</quote> causes download from the stable branch instead of the master branch,
@@ -297,7 +357,7 @@ and the optional last word on the line, <quote>tarantool</quote>, means download
 </para>
 
 <para>
-4. Use <productname>git</productname> again so that third-party contributions will be seen as well.
+5. Use <productname>git</productname> again so that third-party contributions will be seen as well.
 This step is only necessary once, the first time you do a download.
 There is an alternative -- say <quote><computeroutput><command>git clone</command> --recursive</computeroutput></quote> in step 3 --
 but we prefer this method because it works with older versions of <productname>git</productname>.<programlisting><command>cd</command> ~/tarantool
@@ -307,7 +367,7 @@ but we prefer this method because it works with older versions of <productname>g
 </para>
 
 <para>
-5. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
+6. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
 <command>make clean</command>         # unnecessary, added for good luck
 <command>rm CMakeCache.txt</command>  # unnecessary, added for good luck
 <command>cmake .</command>            # Start build with build type=Debug, no client, no doc</programlisting>
@@ -327,43 +387,8 @@ and a reasonable choice is <computeroutput><option>-DENABLE_CLIENT=true</option>
 </para>
 
 <para>
-	6. Use make to complete the build.<programlisting><command>make</command></programlisting>
+	7. Use make to complete the build.<programlisting><command>make</command></programlisting>
 	It's possible to say <quote><computeroutput><command>make install</command></computeroutput></quote> too, but that's not generally done.
-</para>
-
-<para>
-7. Set up python modules for running the test suite.
-	This step is optional.</para>
-<para>Say:<programlisting><command>python --version</command></programlisting>
-... You should see that the python version is between 2.6 and 3.</para>
-<para>On Ubuntu you can get modules from the repository:<programlisting><command>sudo apt-get install</command> python-daemon python-yaml python-argparse python-pexpect</programlisting></para>
-<para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
-<para>But in general it is best to set up the modules by getting
-	a tarball and doing the setup with <computeroutput>python setup.py</computeroutput>, thus:
-<programlisting># python module for parsing YAML (pyYAML):
-# (If wget fails, check the <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle>web site
-# to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
-<command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
-<command>cd</command> PyYAML-3.10
-<command>sudo python</command> setup.py install
-# python module for spawning child applications (pexpect):
-# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle>web site
-# to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz
-<command>tar</command> <option>-xzvf</option> pexpect-u-2.5.1.tar.
-<command>cd</command> pexpect-u-2.5.1
-<command>sudo python</command> setup.py install
-# python module for assisting programs to turn themselves into daemons (daemon):
-# (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle>web site
-# to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz
-<command>tar</command> <option>-xzvf</option> daemon-1.0.tar.gz
-<command>cd</command> daemon-1.0
-<command>sudo python</command> setup.py install</programlisting>
 </para>
 
 <para>
