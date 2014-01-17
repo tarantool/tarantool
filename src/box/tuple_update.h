@@ -38,18 +38,18 @@ enum {
 };
 
 /** UPDATE operation codes. */
-#define UPDATE_OP_CODES(_)			\
-	_(UPDATE_OP_SET, 0)			\
-	_(UPDATE_OP_ADD, 1)			\
-	_(UPDATE_OP_AND, 2)			\
-	_(UPDATE_OP_XOR, 3)			\
-	_(UPDATE_OP_OR, 4)			\
-	_(UPDATE_OP_SPLICE, 5)			\
-	_(UPDATE_OP_DELETE, 6)			\
-	_(UPDATE_OP_INSERT, 7)			\
-	_(UPDATE_OP_SUBTRACT, 8)
-
-ENUM(update_op_codes, UPDATE_OP_CODES);
+enum tuple_update_op {
+	UPDATE_OP_SET = 0,
+	UPDATE_OP_ADD,
+	UPDATE_OP_AND,
+	UPDATE_OP_XOR,
+	UPDATE_OP_OR,
+	UPDATE_OP_SPLICE,
+	UPDATE_OP_DELETE,
+	UPDATE_OP_INSERT,
+	UPDATE_OP_SUBTRACT,
+	UPDATE_OP_MAX
+};
 
 typedef void *(*region_alloc_func)(void *, size_t);
 

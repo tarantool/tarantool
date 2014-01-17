@@ -440,15 +440,13 @@ admin("box.replace(0, 1, 'field string value')")
 admin("box.update(0, 1, '=p=p=p', 1, 'new field string value', 2, 42, 3, 0xdeadbeef)")
 
 print """
-# test update's arith opearations
+# test multiple update opearations on the same field
 """
 admin("box.update(0, 1, '+p&p|p^p', 2, 16, 3, 0xffff0000, 3, 0x0000a0a0, 3, 0xffff00aa)")
 
 print """
 # test update splice operation
 """
-admin("ops_list = {}")
-admin("table.insert(ops_list, box.upd.splice(1, 0, 3, 'the newest'))")
 admin("box.update(0, 1, ':p', 1, box.pack('ppp', 0, 3, 'the newest'))")
 
 print """

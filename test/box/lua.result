@@ -1406,26 +1406,18 @@ box.update(0, 1, '=p=p=p', 1, 'new field string value', 2, 42, 3, 0xdeadbeef)
 - [1, 'new field string value', 42, 3735928559]
 ...
 
-# test update's arith opearations
+# test multiple update opearations on the same field
 
 box.update(0, 1, '+p&p|p^p', 2, 16, 3, 0xffff0000, 3, 0x0000a0a0, 3, 0xffff00aa)
 ---
-- [1, 'new field string value', 58, 559063050]
+- error: 'Field 3 UPDATE error: double update of the same field'
 ...
 
 # test update splice operation
 
-ops_list = {}
----
-...
-table.insert(ops_list, box.upd.splice(1, 0, 3, 'the newest'))
----
-- error: '[string "return table.insert(ops_list, box.upd.splice(..."]:1: attempt to
-    index field ''upd'' (a nil value)'
-...
 box.update(0, 1, ':p', 1, box.pack('ppp', 0, 3, 'the newest'))
 ---
-- [1, 'the newest field string value', 58, 559063050]
+- [1, 'the newest field string value', 42, 3735928559]
 ...
 
 # test update delete operations

@@ -39,7 +39,7 @@
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
  * working with a single field. There also are operations which
- * add or remove fields. More than one operation on the same field
+ * add or remove fields. Only one operation on the same field
  * is allowed.
  *
  * Supported field change operations are: SET, ADD, bitwise AND,
@@ -68,10 +68,7 @@
  * the request, and data is copied from the old tuple to the new
  * one only once.
  *
- * There are two special cases in this general scheme, which
- * are handled as follows:
- *
- * 1) As long as INSERT, DELETE, PUSH and POP change the relative
+ * As long as INSERT, DELETE, PUSH and POP change the relative
  * field order, an auxiliary data structure is necessary to look
  * up fields in the "old" tuple by field number. Such field
  * index is built on demand, using "rope" data structure.
@@ -88,17 +85,7 @@
  * it disappears from the rope and all subsequent operations
  * on this field number instead affect the field following the
  * one.
- *
- * 2) Multiple operations can occur on the same field, and not all
- * operations, by design, can work correctly "in place".
- * For example, SET(4, "aaaaaa") followed by SPLICE(4, 0, 5, 0, * ""),
- * results in zero increase of total tuple length, but requires
- * space to store SET results. To make sure we never go beyond
- * allocated memory, the main loop may allocate a temporary buffer
- * to store intermediate operation results.
  */
-
-STRS(update_op_codes, UPDATE_OP_CODES);
 
 /** Update internal state */
 struct tuple_update
@@ -138,35 +125,31 @@ union update_op_arg {
 struct update_field;
 struct update_op;
 
-typedef void (*init_op_func)(struct tuple_update *update, struct update_op *op);
-typedef void (*do_op_func)(union update_op_arg *arg, const char *in, char *out);
+typedef void (*do_op_func)(struct tuple_update *update, struct update_op *op);
+typedef void (*store_op_func)(union update_op_arg *arg, const char *in, char *out);
 
 /** A set of functions and properties to initialize and do an op. */
 struct update_op_meta {
-	init_op_func init_op;
 	do_op_func do_op;
-	bool works_in_place;
+	store_op_func store;
 };
 
 /** A single UPDATE operation. */
 struct update_op {
-	STAILQ_ENTRY(update_op) next;
 	struct update_op_meta *meta;
 	union update_op_arg arg;
 	uint32_t field_no;
-	uint32_t max_field_len;
+	uint32_t field_len;
 	uint8_t opcode;
 };
-
-STAILQ_HEAD(op_list, update_op);
 
 /**
  * We can have more than one operation on the same field.
  * A descriptor of one changed field.
  */
 struct update_field {
-	/** UPDATE operations against the first field in the range. */
-	struct op_list ops;
+	/** UPDATE operation against the first field in the range. */
+	struct update_op *op;
 	/** Points at start of field *data* in the old tuple. */
 	const char *old;
 	/** End of the old field. */
@@ -183,7 +166,7 @@ static void
 update_field_init(struct update_field *field,
 		  const char *old, uint32_t old_len, uint32_t tail_len)
 {
-	STAILQ_INIT(&field->ops);
+	field->op = NULL;
 	field->old = old;
 	field->tail = old + old_len;
 	field->tail_len = tail_len;
@@ -192,8 +175,7 @@ update_field_init(struct update_field *field,
 static inline uint32_t
 update_field_len(struct update_field *f)
 {
-	struct update_op *last = STAILQ_LAST(&f->ops, update_op, next);
-	return last ? last->max_field_len : f->tail - f->old;
+	return f->op ? f->op->field_len : f->tail - f->old;
 }
 
 static inline void
@@ -212,57 +194,23 @@ op_adjust_field_no(struct update_op *op, uint32_t field_max)
 		op_check_field_no(op->field_no, field_max);
 }
 
+/* {{{ store_op */
 
 static void
-do_update_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
+store_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
 		 char *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
 
 static void
-do_update_op_add(struct op_arith_arg *arg, const char *in, char *out)
+store_op_arith(struct op_arith_arg *arg, const char *in __attribute__((unused)), char *out)
 {
-	if (mp_typeof(*in) != MP_UINT)
-		tnt_raise(IllegalParams, "field must be uint");
-	uint64_t val = mp_decode_uint(&in);
-	mp_encode_uint(out, val + arg->val);
+	mp_encode_uint(out, arg->val);
 }
 
 static void
-do_update_op_subtract(struct op_arith_arg *arg, const char *in, char *out)
-{
-	if (mp_typeof(*in) != MP_UINT)
-		tnt_raise(IllegalParams, "field must be uint");
-	mp_encode_uint(out, mp_decode_uint(&in) - arg->val);
-}
-
-static void
-do_update_op_and(struct op_arith_arg *arg, const char *in, char *out)
-{
-	if (mp_typeof(*in) != MP_UINT)
-		tnt_raise(IllegalParams, "field must be uint");
-	mp_encode_uint(out, mp_decode_uint(&in) & arg->val);
-}
-
-static void
-do_update_op_xor(struct op_arith_arg *arg, const char *in, char *out)
-{
-	if (mp_typeof(*in) != MP_UINT)
-		tnt_raise(IllegalParams, "field must be uint");
-	mp_encode_uint(out, mp_decode_uint(&in) ^ arg->val);
-}
-
-static void
-do_update_op_or(struct op_arith_arg *arg, const char *in, char *out)
-{
-	if (mp_typeof(*in) != MP_UINT)
-		tnt_raise(IllegalParams, "field must be uint");
-	mp_encode_uint(out, mp_decode_uint(&in) | arg->val);
-}
-
-static void
-do_update_op_splice(struct op_splice_arg *arg, const char *in, char *out)
+store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
 {
 	if (mp_typeof(*in) != MP_STR)
 		tnt_raise(IllegalParams, "field must be str");
@@ -308,15 +256,19 @@ do_update_op_splice(struct op_splice_arg *arg, const char *in, char *out)
 }
 
 static void
-do_update_op_insert(struct op_set_arg *arg,
+store_op_insert(struct op_set_arg *arg,
 		    const char *in __attribute__((unused)),
 		    char *out)
 {
 	memcpy(out, arg->value, arg->length);
 }
 
+/* }}} */
+
+/* {{{ do_op */
+
 static void
-init_update_op_insert(struct tuple_update *update, struct update_op *op)
+do_op_insert(struct tuple_update *update, struct update_op *op)
 {
 	op_adjust_field_no(op, rope_size(update->rope));
 	struct update_field *field = (struct update_field *)
@@ -326,22 +278,21 @@ init_update_op_insert(struct tuple_update *update, struct update_op *op)
 }
 
 static void
-init_update_op_set(struct tuple_update *update, struct update_op *op)
+do_op_set(struct tuple_update *update, struct update_op *op)
 {
 	if (op->field_no < rope_size(update->rope)) {
 		struct update_field *field = (struct update_field *)
 				rope_extract(update->rope, op->field_no);
-		/* Skip all previous ops. */
-		STAILQ_INIT(&field->ops);
-		STAILQ_INSERT_TAIL(&field->ops, op, next);
-		op->max_field_len = op->arg.set.length;
+		/* Ignore the previous op, if any. */
+		field->op = op;
+		op->field_len = op->arg.set.length;
 	} else {
-		init_update_op_insert(update, op);
+		do_op_insert(update, op);
 	}
 }
 
 static void
-init_update_op_delete(struct tuple_update *update, struct update_op *op)
+do_op_delete(struct tuple_update *update, struct update_op *op)
 {
 	op_adjust_field_no(op, rope_size(update->rope) - 1);
 
@@ -364,7 +315,7 @@ init_update_op_delete(struct tuple_update *update, struct update_op *op)
 }
 
 static void
-init_update_op_arith(struct tuple_update *update, struct update_op *op)
+do_op_arith(struct tuple_update *update, struct update_op *op)
 {
 	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
 
@@ -377,12 +328,28 @@ init_update_op_arith(struct tuple_update *update, struct update_op *op)
 	if (mp_typeof(*value) != MP_UINT)
 		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
 	arg->val = mp_decode_uint(&value);
-	STAILQ_INSERT_TAIL(&field->ops, op, next);
-	op->max_field_len = mp_sizeof_uint(UINT64_MAX);
+	if (field->op) {
+		tnt_raise(ClientError, ER_UPDATE_FIELD,
+			  op->field_no, "double update of the same field");
+	}
+	field->op = op;
+	const char *old = field->old;
+	if (mp_typeof(*old) != MP_UINT)
+		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
+	uint64_t val = mp_decode_uint(&old);
+	switch (op->opcode) {
+	case UPDATE_OP_ADD: arg->val += val; break;
+	case UPDATE_OP_AND: arg->val &= val; break;
+	case UPDATE_OP_XOR: arg->val ^= val; break;
+	case UPDATE_OP_OR:  arg->val |= val;
+	case UPDATE_OP_SUBTRACT:
+	default:            arg->val = val - arg->val; break;
+	}
+	op->field_len = mp_sizeof_uint(arg->val);
 }
 
 static void
-init_update_op_splice(struct tuple_update *update, struct update_op *op)
+do_op_splice(struct tuple_update *update, struct update_op *op)
 {
 	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
 	struct update_field *field = (struct update_field *)
@@ -432,22 +399,28 @@ init_update_op_splice(struct tuple_update *update, struct update_op *op)
 		tnt_raise(IllegalParams, "field splice format error");
 
 	/* Record the new field length (maximal). */
-	op->max_field_len = mp_sizeof_str(update_field_len(field) +
-					  arg->paste_length);
-	STAILQ_INSERT_TAIL(&field->ops, op, next);
+	op->field_len = mp_sizeof_str(update_field_len(field) +
+				      arg->paste_length);
+	if (field->op) {
+		tnt_raise(ClientError, ER_UPDATE_FIELD,
+			  op->field_no, "double update of the same field");
+	}
+	field->op = op;
 }
 
-static struct update_op_meta update_op_meta[update_op_codes_MAX] = {
-	{ init_update_op_set, (do_op_func) do_update_op_set, true },
-	{ init_update_op_arith, (do_op_func) do_update_op_add, true },
-	{ init_update_op_arith, (do_op_func) do_update_op_and, true },
-	{ init_update_op_arith, (do_op_func) do_update_op_xor, true },
-	{ init_update_op_arith, (do_op_func) do_update_op_or, true },
-	{ init_update_op_splice, (do_op_func) do_update_op_splice, false },
-	{ init_update_op_delete, (do_op_func) NULL, true },
-	{ init_update_op_insert, (do_op_func) do_update_op_insert, true },
-	{ init_update_op_arith, (do_op_func) do_update_op_subtract, true },
+static struct update_op_meta update_op_meta[] = {
+	{ do_op_set, (store_op_func) store_op_set },
+	{ do_op_arith, (store_op_func) store_op_arith},
+	{ do_op_arith, (store_op_func) store_op_arith},
+	{ do_op_arith, (store_op_func) store_op_arith},
+	{ do_op_arith, (store_op_func) store_op_arith},
+	{ do_op_splice, (store_op_func) store_op_splice },
+	{ do_op_delete, (store_op_func) NULL },
+	{ do_op_insert, (store_op_func) store_op_insert },
+	{ do_op_arith, (store_op_func) store_op_arith},
 };
+
+/* }}} */
 
 /** Split a range of fields in two, allocating update_field
  * context for the new range.
@@ -516,34 +489,32 @@ update_create_rope(struct tuple_update *update,
 
 	rope_append(update->rope, first, field_count);
 	for (uint32_t i = 0; i < update->op_count; i++) {
-		update->ops[i].meta->init_op(update, &update->ops[i]);
+		update->ops[i].meta->do_op(update, &update->ops[i]);
 	}
 }
 
 static uint32_t
-update_calc_max_tuple_length(struct tuple_update *update)
+update_calc_tuple_length(struct tuple_update *update)
 {
+	uint32_t res = mp_sizeof_array(rope_size(update->rope));
 	struct rope_iter it;
 	struct rope_node *node;
 
 	rope_iter_create(&it, update->rope);
-	uint32_t max_tuple_size = 0;
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
 		struct update_field *field =
 				(struct update_field *) rope_leaf_data(node);
 		uint32_t field_len = update_field_len(field);
-		max_tuple_size += (field_len + field->tail_len);
+		res += field_len + field->tail_len;
 	}
 
-	max_tuple_size += mp_sizeof_array(rope_size(update->rope));
-	return max_tuple_size;
+	return res;
 }
 
 static uint32_t
-do_update_ops(struct tuple_update *update, char *buffer, char *buffer_end)
+update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 {
 	char *new_data = buffer;
-	char *new_data_end = buffer_end;
 	new_data = mp_encode_array(new_data, rope_size(update->rope));
 
 	uint32_t total_field_count = 0;
@@ -559,51 +530,22 @@ do_update_ops(struct tuple_update *update, char *buffer, char *buffer_end)
 		uint32_t field_len = update_field_len(field);
 
 		const char *old_field = field->old;
-		char *new_field = (STAILQ_EMPTY(&field->ops) ?
-					   (char *) old_field : new_data);
-		struct update_op *op;
-		STAILQ_FOREACH(op, &field->ops, next) {
-			/*
-			 * Pre-allocate a temporary buffer when the
-			 * subject operation requires it, i.e.:
-			 * - op overwrites data while reading it thus
-			 *   can't work with in == out (SPLICE)
-			 * - op result doesn't fit into the new tuple
-			 *   (can happen when a big SET is then
-			 *   shrunk by a SPLICE).
-			 */
-			if ((old_field == new_field &&
-			     !op->meta->works_in_place) ||
-			    /*
-			     * Sic: this predicate must function even if
-			     * new_field != new_data.
-			     */
-			    new_data + op->max_field_len > new_data_end) {
-				/*
-				 * Since we don't know which of the two
-				 * conditions above got us here, simply
-				 * palloc a *new* buffer of sufficient
-				 * size.
-				 */
-				new_field = (char *) update->alloc(
-					update->alloc_ctx, op->max_field_len);
-			}
-			assert(op->meta != NULL);
-			op->meta->do_op(&op->arg, old_field, new_field);
+		char *new_field = field->op ? new_data : (char *) old_field;
+		struct update_op *op = field->op;
+		if (op) {
+			op->meta->store(&op->arg, old_field, new_field);
 			/* Next op uses previous op output as its input. */
 			old_field = new_field;
 		}
 		/*
 		 * Make sure op results end up in the tuple, copy
 		 * tail_len from the old tuple.
-		*/
+		 */
 		const char *f = new_field;
 		mp_next(&f);
 		field_len = f - new_field;
 		if (new_field != new_data)
 			memcpy(new_data, new_field, field_len);
-
-		f = new_data;
 
 		new_data += field_len;
 		assert(field->tail_len == 0 || field_count > 1);
@@ -641,7 +583,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		op->field_no = pick_u32(&expr, expr_end);
 		op->opcode = pick_u8(&expr, expr_end);
 
-		if (op->opcode >= update_op_codes_MAX)
+		if (op->opcode >= UPDATE_OP_MAX)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->meta = &update_op_meta[op->opcode];
 
@@ -662,7 +604,7 @@ const char *
 tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_new_size)
+		     uint32_t *p_tuple_len)
 {
 	struct tuple_update *update = (struct tuple_update *)
 			alloc(alloc_ctx, sizeof(*update));
@@ -673,14 +615,11 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 
 	update_read_ops(update, expr, expr_end);
 	update_create_rope(update, old_data, old_data_end);
-	uint32_t max_tuple_size = update_calc_max_tuple_length(update);
+	uint32_t tuple_len = update_calc_tuple_length(update);
 
-	char *buffer = (char *) alloc(alloc_ctx, max_tuple_size);
-	char *buffer_end = buffer + max_tuple_size;
+	char *buffer = (char *) alloc(alloc_ctx, tuple_len);
 
-	uint32_t real_tuple_size = do_update_ops(update, buffer, buffer_end);
-
-	*p_new_size = real_tuple_size;
+	*p_tuple_len = update_write_tuple(update, buffer, buffer + tuple_len);
 
 	return buffer;
 }
