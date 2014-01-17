@@ -111,7 +111,7 @@ pull_from_remote(va_list ap)
 				title("replica", "%s/%s", r->remote->source,
 				      "connecting");
 				if (iobuf == NULL)
-					iobuf = iobuf_new(fiber_name(fiber));
+					iobuf = iobuf_new(fiber_name(fiber()));
 				remote_connect(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;

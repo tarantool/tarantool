@@ -54,7 +54,7 @@ static int
 admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 {
 	struct ibuf *in = &iobuf->in;
-	struct tbuf *out = tbuf_new(&fiber->gc);
+	struct tbuf *out = tbuf_new(&fiber()->gc);
 	char *eol;
 	while ((eol = (char *) memchr(in->pos, '\n', in->end - in->pos)) == NULL) {
 		if (coio_bread(coio, in, 1) <= 0)
@@ -79,7 +79,7 @@ admin_handler(va_list ap)
 	auto scoped_guard = make_scoped_guard([&] {
 		evio_close(&coio);
 		iobuf_delete(iobuf);
-		session_destroy(fiber->session);
+		session_destroy(fiber()->session);
 	});
 
 	/*

@@ -187,7 +187,7 @@ static inline void
 iproto_cache_fiber(struct iproto_queue *i_queue)
 {
 	fiber_gc();
-	rlist_add_entry(&i_queue->fiber_cache, fiber, state);
+	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
 	fiber_yield();
 }
 
@@ -655,7 +655,7 @@ iproto_queue_handler(va_list ap)
 restart:
 	while (iproto_dequeue_request(i_queue, &request)) {
 
-		fiber_set_session(fiber, request.connection->session);
+		fiber_set_session(fiber(), request.connection->session);
 		request.process(&request);
 	}
 	iproto_cache_fiber(&request_queue);

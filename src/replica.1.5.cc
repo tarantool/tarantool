@@ -105,7 +105,7 @@ pull_from_remote_1_5(va_list ap)
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
 				if (iobuf == NULL)
-					iobuf = iobuf_new(fiber_name(fiber));
+					iobuf = iobuf_new(fiber_name(fiber()));
 				remote_connect_1_5(&coio, &r->remote->addr,
 					       r->confirmed_lsn + 1, &err);
 				warning_said = false;

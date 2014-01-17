@@ -255,12 +255,12 @@ lbox_tuple_transform(struct lua_State *L)
 		return 1;
 	}
 
-	RegionGuard region_guard(&fiber->gc);
+	RegionGuard region_guard(&fiber()->gc);
 
 	/*
 	 * Prepare UPDATE expression
 	 */
-	struct tbuf *b = tbuf_new(&fiber->gc);
+	struct tbuf *b = tbuf_new(&fiber()->gc);
 	tbuf_append(b, (char *) &op_cnt, sizeof(op_cnt));
 	if (field_count > 0) {
 		tbuf_ensure(b, sizeof(uint32_t) + 1 + 9);
@@ -297,7 +297,7 @@ lbox_tuple_transform(struct lua_State *L)
 	/* Execute tuple_update */
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       tuple_update_region_alloc,
-					       &fiber->gc,
+					       &fiber()->gc,
 					       tuple, tbuf_str(b), tbuf_end(b));
 	lbox_pushtuple(L, new_tuple);
 	return 1;
@@ -595,8 +595,8 @@ static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 struct tuple*
 lua_totuple(struct lua_State *L, int first, int last)
 {
-	RegionGuard region_guard(&fiber->gc);
-	struct tbuf *b = tbuf_new(&fiber->gc);
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *b = tbuf_new(&fiber()->gc);
 	try {
 		luamp_encodestack(L, b, first, last);
 	} catch (const Exception &e) {

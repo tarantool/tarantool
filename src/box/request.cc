@@ -115,7 +115,7 @@ execute_update(const struct request *request, struct txn *txn,
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
 					       region_alloc_cb,
-					       &fiber->gc,
+					       &fiber()->gc,
 					       old_tuple, request->tuple,
 					       request->tuple_end);
 	TupleGuard guard(new_tuple);

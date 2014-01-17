@@ -114,7 +114,7 @@ void
 wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
 {
 	assert(wait_lsn->waiter == NULL);
-	wait_lsn->waiter = fiber;
+	wait_lsn->waiter = fiber();
 	wait_lsn->lsn = lsn;
 }
 
@@ -579,7 +579,7 @@ recover_current_wal:
 		result = -1;
 	}
 
-	region_free(&fiber->gc);
+	region_free(&fiber()->gc);
 	return result;
 }
 
@@ -603,7 +603,7 @@ recover_existing_wals(struct recovery_state *r)
 		panic("recover failed");
 	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
 out:
-	region_free(&fiber->gc);
+	region_free(&fiber()->gc);
 }
 
 void
@@ -1197,10 +1197,10 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req = (struct wal_write_request *)
-		region_alloc(&fiber->gc, sizeof(struct wal_write_request) +
+		region_alloc(&fiber()->gc, sizeof(struct wal_write_request) +
 			     sizeof(op) + row_len);
 
-	req->fiber = fiber;
+	req->fiber = fiber();
 	req->res = -1;
 	log_row_fill(&req->row, lsn, cookie, (const char *) &op,
 		     sizeof(op), row, row_len);
@@ -1245,7 +1245,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 
-	struct log_row *row = (struct log_row *) region_alloc(&fiber->gc,
+	struct log_row *row = (struct log_row *) region_alloc(&fiber()->gc,
 		sizeof(*row) + data_len + metadata_len);
 
 	log_row_fill(row, ++rows, snapshot_cookie, metadata,
@@ -1263,7 +1263,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 
 		snap_write_batch(batch, fileno(l->f));
 		fio_batch_start(batch, INT_MAX);
-		region_free_after(&fiber->gc, 128 * 1024);
+		region_free_after(&fiber()->gc, 128 * 1024);
 		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
 			if (last == 0) {
 				/*
