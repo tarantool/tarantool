@@ -53,6 +53,7 @@ char *tc_query_type(uint32_t type) {
 	case TNT_OP_PING:   return "Ping";
 	case TNT_OP_INSERT: return "Insert";
 	case TNT_OP_DELETE: return "Delete";
+	case TNT_OP_DELETE_1_3: return "Delete_1_3";
 	case TNT_OP_UPDATE: return "Update";
 	case TNT_OP_SELECT: return "Select";
 	case TNT_OP_CALL:   return "Call";
