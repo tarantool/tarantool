@@ -22,7 +22,7 @@ function fifo_push(name, val)
     elseif bottom == top then
         bottom = bottom + 1
     end
-    return box.update(0, name, '=p=p=p', 1, top, 2, bottom, top, val)
+    return box.update(0, name, {'=', 1, top}, {'=', 2, bottom}, {'=', top, val})
 end
 function fifo_top(name)
     fifo = find_or_create_fifo(name)

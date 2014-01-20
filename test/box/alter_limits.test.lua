@@ -49,7 +49,7 @@ s:insert(0)
 s:select(0)
 s:select_range(0, 0, 0)
 s:delete(0)
-s:update(0, "=p", 0, 0)
+s:update(0, {"=", 0, 0})
 s:replace(0)
 s.index[0]
 s:truncate()
@@ -86,19 +86,19 @@ s:insert(1, 2)
 s:insert(1, 2, 3)
 s:select(0)
 -- increase arity -- error
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {"=", 1, 3})
 s:select(0)
 -- decrease arity - error
-box.space['_space']:update(s.n, "=p", 1, 1)
+box.space['_space']:update(s.n, {"=", 1, 1})
 -- remove arity - ok
-box.space['_space']:update(s.n, "=p", 1, 0)
+box.space['_space']:update(s.n, {"=", 1, 0})
 s:select(0)
 -- increase arity - error
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {"=", 1, 3})
 s:truncate()
 s:select(0)
 -- set arity of an empty space
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {"=", 1, 3})
 s:select(0)
 -- arity actually works
 s:insert(3, 4)
@@ -261,7 +261,7 @@ s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select()
-box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+box.space['_index']:update({s.n, s.index.year.id}, {"=", 7, 'num'})
 -- ambiguous field type
 s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
 -- create index on a non-existing field

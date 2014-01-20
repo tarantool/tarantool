@@ -57,7 +57,7 @@ box.schema.space.drop = function(space_id)
 end
 box.schema.space.rename = function(space_id, space_name)
     local _space = box.space[box.schema.SPACE_ID]
-    _space:update(space_id, "=p", 2, space_name)
+    _space:update(space_id, {"=", 2, space_name})
 end
 
 box.schema.index = {}
@@ -96,19 +96,17 @@ box.schema.index.drop = function(space_id, index_id)
 end
 box.schema.index.rename = function(space_id, index_id, name)
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, "=p", 2, name)
+    _index:update({space_id, index_id}, {"=", 2, name})
 end
 box.schema.index.alter = function(space_id, index_id, options)
     if options == nil then
         return
     end
-    local ops = ""
-    local args = {}
-    local function add_op(op, opno)
-        if op then
-            ops = ops.."=p"
-            table.insert(args, opno)
-            table.insert(args, op)
+    local ops = {}
+    local function add_op(value, field_no)
+        if value then
+            op = {'=', field_no, value}
+            table.insert(ops, op)
         end
     end
     add_op(options.id, 1)
@@ -118,7 +116,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         add_op(options.unique and 1 or 0, 4)
     end
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, ops, unpack(args))
+    _index:update({space_id, index_id}, unpack(ops))
 end
 
 function box.schema.space.bless(space)

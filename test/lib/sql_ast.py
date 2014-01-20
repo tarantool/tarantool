@@ -128,7 +128,7 @@ class StatementUpdate(Statement):
             raise RuntimeError("UPDATE can only be made by the"
                     " primary key (#0)")
         self.value_list = where[1]
-        self.update_list = [(pair[0], '=', pair[1]) for pair in update_list]
+        self.update_list = update_list
 
     def pack(self, connection):
         return RequestUpdate(connection, self.space_no, self.value_list, self.update_list)

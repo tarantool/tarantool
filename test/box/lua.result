@@ -355,7 +355,7 @@ call box.insert(0, 1953719668, 'old', 1684234849)
     errcode: ER_TUPLE_FOUND
     errmsg: Duplicate key exists in unique index 0
 ...
-call box.update(0, 1953719668, '=p=p', 0, 1936941424, 1, 'new')
+box.update(0, 1953719668, {'=', 0, 1936941424}, {'=', 1, 'new'})
 ---
 - [1936941424, 'new', 1684234849]
 ...
@@ -367,22 +367,22 @@ call box.select_range(0, 0, 1, 1936941424)
 ---
 - [1936941424, 'new', 1684234849]
 ...
-call box.update(0, 1234567890, '+p', 2, 1)
+box.update(0, 1234567890, {'+', 2, 1})
 ---
 ...
-call box.update(0, 1936941424, '+p', 2, 1)
+box.update(0, 1936941424, {'+', 2, 1})
 ---
 - [1936941424, 'new', 1684234850]
 ...
-call box.update(0, 1936941424, '-p', 2, 1)
+box.update(0, 1936941424, {'-', 2, 1})
 ---
 - [1936941424, 'new', 1684234849]
 ...
-call box.update(0, 1936941424, '-p', 2, 1)
+box.update(0, 1936941424, {'-', 2, 1})
 ---
 - [1936941424, 'new', 1684234848]
 ...
-box.update(0, 1936941424, '+p', 2, 1)
+box.update(0, 1936941424, {'+', 2, 1})
 ---
 - [1936941424, 'new', 1684234849]
 ...
@@ -628,7 +628,7 @@ box.space[0]:insert(1953719668, 'hello world')
 ---
 - [1953719668, 'hello world']
 ...
-box.space[0]:update(1953719668, '=p', 1, 'bye, world')
+box.space[0]:update(1953719668, {'=', 1, 'bye, world'})
 ---
 - [1953719668, 'bye, world']
 ...
@@ -938,22 +938,21 @@ box.space[0]:replace(1953719668, 'something to splice')
 ---
 - [1953719668, 'something to splice']
 ...
-box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 0, 4, 'no'))
+box.space[0]:update(1953719668, {':', 1, 0, 4, 'no'})
 ---
 - [1953719668, 'nothing to splice']
 ...
-box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 0, 2, 'every'))
+box.space[0]:update(1953719668, {':', 1, 0, 2, 'every'})
 ---
 - [1953719668, 'everything to splice']
 ...
-box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 100, 2, 'every'))
+box.space[0]:update(1953719668, {':', 1, 100, 2, 'every'})
 ---
 - [1953719668, 'everything to spliceevery']
 ...
-box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', -100, 2, 'every'))
+box.space[0]:update(1953719668, {':', 1, -100, 2, 'every'})
 ---
-- error: 'Argument type in operation on field 1 does not match field type: expected
-    a UINT'
+- error: 'Field SPLICE error: offset is out of bound'
 ...
 box.space[0]:truncate()
 ---
@@ -1272,23 +1271,23 @@ call box.insert(0, 1000001, 1000002, 1000003, 1000004, 1000005)
 ---
 - [1000001, 1000002, 1000003, 1000004, 1000005]
 ...
-call box.update(0, 1000001, '#p', 0, 1)
+box.update(0, 1000001, {'#', 0, 1})
 ---
 - [1000002, 1000003, 1000004, 1000005]
 ...
-call box.update(0, 1000002, '#p', 0, 1)
+box.update(0, 1000002, {'#', 0, 1})
 ---
 - [1000003, 1000004, 1000005]
 ...
-call box.update(0, 1000003, '#p', 0, 1)
+box.update(0, 1000003, {'#', 0, 1})
 ---
 - [1000004, 1000005]
 ...
-call box.update(0, 1000004, '#p', 0, 1)
+box.update(0, 1000004, {'#', 0, 1})
 ---
 - [1000005]
 ...
-box.update(0, 1000005, '#p', 0, 1)
+box.update(0, 1000005, {'#', 0, 1})
 ---
 - error: Tuple field count 0 is less than required by a defined index (expected 1)
 ...
@@ -1299,32 +1298,32 @@ box.insert(0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
 ---
 - [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 ...
-box.update(0, 0, '#p', 42, 1)
+box.update(0, 0, {'#', 42, 1})
 ---
 - error: Field 42 was not found in the tuple
 ...
-box.update(0, 0, '#p', 3, 'abirvalg')
+box.update(0, 0, {'#', 3, 'abirvalg'})
 ---
 - error: 'Argument type in operation on field 3 does not match field type: expected
-    a NUM'
+    a UINT'
 ...
-box.update(0, 0, '#p#p#p', 1, 1, 3, 2, 5, 1)
+box.update(0, 0, {'#', 1, 1}, {'#', 3, 2}, {'#', 5, 1})
 ---
 - [0, 2, 3, 6, 7, 9, 10, 11, 12, 13, 14, 15]
 ...
-box.update(0, 0, '#p', 3, 3)
+box.update(0, 0, {'#', 3, 3})
 ---
 - [0, 2, 3, 10, 11, 12, 13, 14, 15]
 ...
-box.update(0, 0, '#p', 4, 123456)
+box.update(0, 0, {'#', 4, 123456})
 ---
 - [0, 2, 3, 10]
 ...
-box.update(0, 0, '#p', 2, 4294967295)
+box.update(0, 0, {'#', 2, 4294967295})
 ---
 - [0, 2]
 ...
-box.update(0, 0, '#p', 1, 0)
+box.update(0, 0, {'#', 1, 0})
 ---
 - error: 'Field 1 UPDATE error: cannot delete 0 fields'
 ...
@@ -1338,15 +1337,15 @@ box.insert(0, 1, 3, 6, 9)
 ---
 - [1, 3, 6, 9]
 ...
-box.update(0, 1, '!p', 1, 2)
+box.update(0, 1, {'!', 1, 2})
 ---
 - [1, 2, 3, 6, 9]
 ...
-box.update(0, 1, '!p!p!p!p', 3, 4, 3, 5, 4, 7, 4, 8)
+box.update(0, 1, {'!', 3, 4}, {'!', 3, 5}, {'!', 4, 7}, {'!', 4, 8})
 ---
 - [1, 2, 3, 5, 8, 7, 4, 6, 9]
 ...
-box.update(0, 1, '!p!p!p', 9, 10, 9, 11, 9, 12)
+box.update(0, 1, {'!', 9, 10}, {'!', 9, 11}, {'!', 9, 12})
 ---
 - [1, 2, 3, 5, 8, 7, 4, 6, 9, 12, 11, 10]
 ...
@@ -1357,7 +1356,7 @@ box.insert(0, 1, 'tuple')
 ---
 - [1, 'tuple']
 ...
-box.update(0, 1, '#p!p=p', 1, 1, 1, 'inserted tuple', 2, 'set tuple')
+box.update(0, 1, {'#', 1, 1}, {'!', 1, 'inserted tuple'}, {'=', 2, 'set tuple'})
 ---
 - [1, 'inserted tuple', 'set tuple']
 ...
@@ -1368,13 +1367,13 @@ box.insert(0, 1, 'tuple')
 ---
 - [1, 'tuple']
 ...
-box.update(0, 1, '=p!p#p', 1, 'set tuple', 1, 'inerted tuple', 2, 1)
+box.update(0, 1, {'=', 1, 'set tuple'}, {'!', 1, 'inserted tuple'}, {'#', 2, 1})
 ---
-- [1, 'inerted tuple']
+- [1, 'inserted tuple']
 ...
-box.update(0, 1, '!p!p', 0, 3, 0, 2)
+box.update(0, 1, {'!', 0, 3}, {'!', 0, 2})
 ---
-- [2, 3, 1, 'inerted tuple']
+- [2, 3, 1, 'inserted tuple']
 ...
 box.space[0]:truncate()
 ---
@@ -1401,35 +1400,35 @@ box.replace(0, 1, 'field string value')
 ---
 - [1, 'field string value']
 ...
-box.update(0, 1, '=p=p=p', 1, 'new field string value', 2, 42, 3, 0xdeadbeef)
+box.update(0, 1, {'=', 1, 'new field string value'}, {'=', 2, 42}, {'=', 3, 0xdeadbeef})
 ---
 - [1, 'new field string value', 42, 3735928559]
 ...
 
 # test multiple update opearations on the same field
 
-box.update(0, 1, '+p&p|p^p', 2, 16, 3, 0xffff0000, 3, 0x0000a0a0, 3, 0xffff00aa)
+box.update(0, 1, {'+', 2, 16}, {'&', 3, 0xffff0000}, {'|', 3, 0x0000a0a0}, {'^', 3, 0xffff00aa})
 ---
 - error: 'Field 3 UPDATE error: double update of the same field'
 ...
 
 # test update splice operation
 
-box.update(0, 1, ':p', 1, box.pack('ppp', 0, 3, 'the newest'))
+box.update(0, 1, {':', 1, 0, 3, 'the newest'})
 ---
 - [1, 'the newest field string value', 42, 3735928559]
 ...
 
 # test update delete operations
 
-box.update(0, 1, '#p#p', 3, 1, 2, 1)
+box.update(0, 1, {'#', 3, 1}, {'#', 2, 1})
 ---
 - [1, 'the newest field string value']
 ...
 
 # test update insert operations
 
-box.update(0, 1, '!p!p!p!p', 1, 1, 1, 2, 1, 3, 1, 4)
+box.update(0, 1, {'!', 1, 1}, {'!', 1, 2}, {'!', 1, 3}, {'!', 1, 4})
 ---
 - [1, 4, 3, 2, 1, 'the newest field string value']
 ...
@@ -1948,43 +1947,43 @@ box.insert(0, 1684234849)
 ---
 - [1684234849]
 ...
-box.update(0, 1684234849, '#p', 1, 1)
+box.update(0, 1684234849, {'#', 1, 1})
 ---
 - error: Field 1 was not found in the tuple
 ...
-box.update(0, 1684234849, '=p', -1, 'push1')
+box.update(0, 1684234849, {'=', -1, 'push1'})
 ---
 - [1684234849, 'push1']
 ...
-box.update(0, 1684234849, '=p', -1, 'push2')
+box.update(0, 1684234849, {'=', -1, 'push2'})
 ---
 - [1684234849, 'push1', 'push2']
 ...
-box.update(0, 1684234849, '=p', -1, 'push3')
+box.update(0, 1684234849, {'=', -1, 'push3'})
 ---
 - [1684234849, 'push1', 'push2', 'push3']
 ...
-box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap1')
+box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap1'})
 ---
 - [1684234849, 'push2', 'push3', 'swap1']
 ...
-box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap2')
+box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap2'})
 ---
 - [1684234849, 'push3', 'swap1', 'swap2']
 ...
-box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap3')
+box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap3'})
 ---
 - [1684234849, 'swap1', 'swap2', 'swap3']
 ...
-box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop1')
+box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop1'})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop1']
 ...
-box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop2')
+box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop2'})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop2']
 ...
-box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop3')
+box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop3'})
 ---
 - [1684234849, 'swap1', 'swap2', 'noop3']
 ...

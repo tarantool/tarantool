@@ -28,6 +28,7 @@
  */
 
 #include "tuple_update.h"
+#include <stdio.h>
 
 #include "third_party/queue.h"
 
@@ -114,6 +115,11 @@ struct op_splice_arg {
 	int32_t cut_length;    /** cut this many bytes. */
 	const char *paste; /** paste what? */
 	uint32_t paste_length;  /** paste this many bytes. */
+
+	/** Offset of the tail in the old field */
+	int32_t tail_offset;
+	/** Size of the tail. */
+	int32_t tail_length;
 };
 
 union update_op_arg {
@@ -125,21 +131,25 @@ union update_op_arg {
 struct update_field;
 struct update_op;
 
-typedef void (*do_op_func)(struct tuple_update *update, struct update_op *op);
+typedef void (*do_op_func)(struct tuple_update *update, struct update_op *op,
+			   const char **expr);
 typedef void (*store_op_func)(union update_op_arg *arg, const char *in, char *out);
 
 /** A set of functions and properties to initialize and do an op. */
 struct update_op_meta {
 	do_op_func do_op;
 	store_op_func store;
+	/* Argument count */
+	uint32_t args;
 };
 
 /** A single UPDATE operation. */
 struct update_op {
-	struct update_op_meta *meta;
+	const struct update_op_meta *meta;
 	union update_op_arg arg;
+	/* Subject field no. */
 	uint32_t field_no;
-	uint32_t field_len;
+	uint32_t new_field_len;
 	uint8_t opcode;
 };
 
@@ -173,9 +183,16 @@ update_field_init(struct update_field *field,
 }
 
 static inline uint32_t
-update_field_len(struct update_field *f)
+mp_read_int(const char **expr, const char *where)
 {
-	return f->op ? f->op->field_len : f->tail - f->old;
+	uint32_t field_no;
+	if (mp_typeof(**expr) == MP_UINT)
+		field_no = mp_decode_uint(expr);
+	else if (mp_typeof(**expr) == MP_INT)
+		field_no = (int32_t) mp_decode_int(expr);
+	else
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, where);
+	return field_no;
 }
 
 static inline void
@@ -194,27 +211,122 @@ op_adjust_field_no(struct update_op *op, uint32_t field_max)
 		op_check_field_no(op->field_no, field_max);
 }
 
-/* {{{ store_op */
+static inline void
+op_set_read(struct update_op *op, const char **expr)
+{
+	op->arg.set.value = *expr;
+	mp_next(expr);
+	op->arg.set.length = *expr - op->arg.set.value;
+}
+
+/* {{{ do_op */
 
 static void
-store_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
-		 char *out)
+do_op_insert(struct tuple_update *update, struct update_op *op,
+	     const char **expr)
 {
-	memcpy(out, arg->value, arg->length);
+	op_adjust_field_no(op, rope_size(update->rope));
+	op_set_read(op, expr);
+	struct update_field *field = (struct update_field *)
+		update->alloc(update->alloc_ctx, sizeof(*field));
+	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
+	rope_insert(update->rope, op->field_no, field, 1);
 }
 
 static void
-store_op_arith(struct op_arith_arg *arg, const char *in __attribute__((unused)), char *out)
+do_op_set(struct tuple_update *update, struct update_op *op,
+	  const char **expr)
 {
-	mp_encode_uint(out, arg->val);
+	if (op->field_no < rope_size(update->rope)) {
+		struct update_field *field = (struct update_field *)
+				rope_extract(update->rope, op->field_no);
+		/* Ignore the previous op, if any. */
+		field->op = op;
+		op_set_read(op, expr);
+		op->new_field_len = op->arg.set.length;
+	} else {
+		do_op_insert(update, op, expr);
+	}
 }
 
 static void
-store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
+do_op_delete(struct tuple_update *update, struct update_op *op,
+	     const char **expr)
 {
+	op_adjust_field_no(op, rope_size(update->rope) - 1);
+	if (mp_typeof(**expr) != MP_UINT)
+		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
+	uint32_t delete_count = mp_decode_uint(expr);
+
+	if ((uint64_t) op->field_no + delete_count > rope_size(update->rope))
+		delete_count = rope_size(update->rope) - op->field_no;
+
+	if (delete_count == 0)
+		tnt_raise(ClientError, ER_UPDATE_FIELD,
+			  op->field_no, "cannot delete 0 fields");
+
+	for (uint32_t u = 0; u < delete_count; u++)
+		rope_erase(update->rope, op->field_no);
+}
+
+static void
+do_op_arith(struct tuple_update *update, struct update_op *op,
+	    const char **expr)
+{
+	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
+
+	struct update_field *field = (struct update_field *)
+			rope_extract(update->rope, op->field_no);
+
+	/* TODO: signed int & float support */
+	struct op_arith_arg *arg = &op->arg.arith;
+
+	arg->val = mp_read_int(expr, "expected an argument of arithmetic operation (integer)");
+	if (field->op) {
+		tnt_raise(ClientError, ER_UPDATE_FIELD,
+			  op->field_no, "double update of the same field");
+	}
+	field->op = op;
+	const char *old = field->old;
+	if (mp_typeof(*old) != MP_UINT)
+		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
+	uint64_t val = mp_decode_uint(&old);
+	switch (op->opcode) {
+	case '+': arg->val += val; break;
+	case '&': arg->val &= val; break;
+	case '^': arg->val ^= val; break;
+	case '|': arg->val |= val;
+	case '-':
+	default:  arg->val = val - arg->val; break;
+	}
+	op->new_field_len = mp_sizeof_uint(arg->val);
+}
+
+static void
+do_op_splice(struct tuple_update *update, struct update_op *op,
+	     const char **expr)
+{
+	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
+	struct update_field *field = (struct update_field *)
+			rope_extract(update->rope, op->field_no);
+	if (field->op) {
+		tnt_raise(ClientError, ER_UPDATE_FIELD,
+			  op->field_no, "double update of the same field");
+	}
+
+	struct op_splice_arg *arg = &op->arg.splice;
+
+	arg->offset = mp_read_int(expr, "expected splice offset (integer)");
+
+	arg->cut_length = mp_read_int(expr, "expected splice cut length (integer)"); /* cut length */
+
+	if (mp_typeof(**expr) != MP_STR)
+		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "STR");
+	arg->paste = mp_decode_str(expr, &arg->paste_length); /* value */
+
+	const char *in = field->old;
 	if (mp_typeof(*in) != MP_STR)
-		tnt_raise(IllegalParams, "field must be str");
-
+		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "STR");
 	uint32_t str_len;
 	in = mp_decode_str(&in, &str_len);
 
@@ -241,18 +353,47 @@ store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
 	assert(arg->offset <= str_len);
 
 	/* Fill tail part */
-	uint32_t tail_offset = arg->offset + arg->cut_length;
-	uint32_t tail_length = str_len - tail_offset;
+	arg->tail_offset = arg->offset + arg->cut_length;
+	arg->tail_length = str_len - arg->tail_offset;
 
-	uint32_t new_str_len = arg->offset + arg->paste_length + tail_length;
+
+	/* Record the new field length (maximal). */
+	op->new_field_len = mp_sizeof_str(arg->offset + arg->paste_length +
+					  arg->tail_length);
+	field->op = op;
+}
+
+/* }}} */
+
+/* {{{ store_op */
+
+static void
+store_op_set(struct op_set_arg *arg, const char *in __attribute__((unused)),
+		 char *out)
+{
+	memcpy(out, arg->value, arg->length);
+}
+
+static void
+store_op_arith(struct op_arith_arg *arg, const char *in __attribute__((unused)), char *out)
+{
+	mp_encode_uint(out, arg->val);
+}
+
+static void
+store_op_splice(struct op_splice_arg *arg, const char *in, char *out)
+{
+	uint32_t new_str_len = arg->offset + arg->paste_length
+		+ arg->tail_length;
+
+	(void) mp_decode_strl(&in);
 
 	out = mp_encode_strl(out, new_str_len);
 	memcpy(out, in, arg->offset);               /* copy field head. */
 	out = out + arg->offset;
 	memcpy(out, arg->paste, arg->paste_length); /* copy the paste */
 	out = out + arg->paste_length;
-	memcpy(out, in + tail_offset, tail_length); /* copy tail */
-	assert(arg->paste_length + tail_length + arg->offset == new_str_len);
+	memcpy(out, in + arg->tail_offset, arg->tail_length); /* copy tail */
 }
 
 static void
@@ -263,162 +404,16 @@ store_op_insert(struct op_set_arg *arg,
 	memcpy(out, arg->value, arg->length);
 }
 
-/* }}} */
-
-/* {{{ do_op */
-
-static void
-do_op_insert(struct tuple_update *update, struct update_op *op)
-{
-	op_adjust_field_no(op, rope_size(update->rope));
-	struct update_field *field = (struct update_field *)
-		update->alloc(update->alloc_ctx, sizeof(*field));
-	update_field_init(field, op->arg.set.value, op->arg.set.length, 0);
-	rope_insert(update->rope, op->field_no, field, 1);
-}
-
-static void
-do_op_set(struct tuple_update *update, struct update_op *op)
-{
-	if (op->field_no < rope_size(update->rope)) {
-		struct update_field *field = (struct update_field *)
-				rope_extract(update->rope, op->field_no);
-		/* Ignore the previous op, if any. */
-		field->op = op;
-		op->field_len = op->arg.set.length;
-	} else {
-		do_op_insert(update, op);
-	}
-}
-
-static void
-do_op_delete(struct tuple_update *update, struct update_op *op)
-{
-	op_adjust_field_no(op, rope_size(update->rope) - 1);
-
-	/* Check the operand type, if present. */
-	const char *k = op->arg.set.value;
-	if (mp_typeof(*k) != MP_UINT)
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "NUM");
-	uint64_t delete_count = mp_decode_uint(&k);
-
-	if (op->field_no + delete_count > rope_size(update->rope))
-		delete_count = rope_size(update->rope) - op->field_no;
-	assert(delete_count <= UINT32_MAX);
-
-	if (delete_count == 0)
-		tnt_raise(ClientError, ER_UPDATE_FIELD,
-			  op->field_no, "cannot delete 0 fields");
-
-	for (uint32_t u = 0; u < (uint32_t) delete_count; u++)
-		rope_erase(update->rope, op->field_no);
-}
-
-static void
-do_op_arith(struct tuple_update *update, struct update_op *op)
-{
-	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
-
-	struct update_field *field = (struct update_field *)
-			rope_extract(update->rope, op->field_no);
-	struct op_arith_arg *arg = &op->arg.arith;
-
-	const char *value = op->arg.set.value;
-	/* TODO: signed int & float support */
-	if (mp_typeof(*value) != MP_UINT)
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
-	arg->val = mp_decode_uint(&value);
-	if (field->op) {
-		tnt_raise(ClientError, ER_UPDATE_FIELD,
-			  op->field_no, "double update of the same field");
-	}
-	field->op = op;
-	const char *old = field->old;
-	if (mp_typeof(*old) != MP_UINT)
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
-	uint64_t val = mp_decode_uint(&old);
-	switch (op->opcode) {
-	case UPDATE_OP_ADD: arg->val += val; break;
-	case UPDATE_OP_AND: arg->val &= val; break;
-	case UPDATE_OP_XOR: arg->val ^= val; break;
-	case UPDATE_OP_OR:  arg->val |= val;
-	case UPDATE_OP_SUBTRACT:
-	default:            arg->val = val - arg->val; break;
-	}
-	op->field_len = mp_sizeof_uint(arg->val);
-}
-
-static void
-do_op_splice(struct tuple_update *update, struct update_op *op)
-{
-	op_check_field_no(op->field_no, rope_size(update->rope) - 1);
-	struct update_field *field = (struct update_field *)
-			rope_extract(update->rope, op->field_no);
-
-	struct op_splice_arg *arg = &op->arg.splice;
-	const char *value = op->arg.set.value;
-	const char *end = value + op->arg.set.length;
-
-	if (mp_typeof(*value) == MP_STR) {
-		/*
-		 * Backward compatible solution for
-		 * box.update(space, key, ':p', field_no,
-		 *    box.pack('ppp', offset, cut_length, past})
-		 */
-		uint32_t len;
-		value = mp_decode_str(&value, &len);
-	} else {
-		/*
-		 * box.update(space, key, ':p', field_no,
-		 *    {offset, cut_length, paste})
-		 */
-		uint32_t size;
-		if (mp_typeof(*value) != MP_ARRAY ||
-		    (size = mp_decode_array(&value)) != 3) {
-			tnt_raise(IllegalParams, "Please use "
-				  "{offset, cut_length, paste} as "
-				  "third argument");
-		}
-	}
-
-	/* TODO: signed int & float support */
-	if (unlikely(mp_typeof(*value) != MP_UINT))
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
-	arg->offset = mp_decode_uint(&value);
-
-	if (unlikely(mp_typeof(*value) != MP_UINT))
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "UINT");
-	arg->cut_length = mp_decode_uint(&value); /* cut length */
-
-	if (unlikely(mp_typeof(*value) != MP_STR))
-		tnt_raise(ClientError, ER_ARG_TYPE, op->field_no, "STR");
-	arg->paste = mp_decode_str(&value, &arg->paste_length); /* value */
-
-	/* Check that the operands are fully read. */
-	if (value != end)
-		tnt_raise(IllegalParams, "field splice format error");
-
-	/* Record the new field length (maximal). */
-	op->field_len = mp_sizeof_str(update_field_len(field) +
-				      arg->paste_length);
-	if (field->op) {
-		tnt_raise(ClientError, ER_UPDATE_FIELD,
-			  op->field_no, "double update of the same field");
-	}
-	field->op = op;
-}
-
-static struct update_op_meta update_op_meta[] = {
-	{ do_op_set, (store_op_func) store_op_set },
-	{ do_op_arith, (store_op_func) store_op_arith},
-	{ do_op_arith, (store_op_func) store_op_arith},
-	{ do_op_arith, (store_op_func) store_op_arith},
-	{ do_op_arith, (store_op_func) store_op_arith},
-	{ do_op_splice, (store_op_func) store_op_splice },
-	{ do_op_delete, (store_op_func) NULL },
-	{ do_op_insert, (store_op_func) store_op_insert },
-	{ do_op_arith, (store_op_func) store_op_arith},
-};
+static const struct update_op_meta op_set =
+	{ do_op_set, (store_op_func) store_op_set, 3 };
+static const struct update_op_meta op_insert =
+	{ do_op_insert, (store_op_func) store_op_insert, 3 };
+static const struct update_op_meta op_arith =
+	{ do_op_arith, (store_op_func) store_op_arith, 3 };
+static const struct update_op_meta op_splice =
+	{ do_op_splice, (store_op_func) store_op_splice, 5 };
+static const struct update_op_meta op_delete =
+	{ do_op_delete, (store_op_func) NULL, 3 };
 
 /* }}} */
 
@@ -462,8 +457,8 @@ region_alloc_free_stub(void *ctx, void *mem)
 }
 
 /**
- * We found a tuple to do the update on. Prepare and optimize
- * the operations.
+ * We found a tuple to do the update on. Prepare a rope
+ * to perform operations on.
  */
 void
 update_create_rope(struct tuple_update *update,
@@ -488,9 +483,6 @@ update_create_rope(struct tuple_update *update,
 			  end - field - field_len);
 
 	rope_append(update->rope, first, field_count);
-	for (uint32_t i = 0; i < update->op_count; i++) {
-		update->ops[i].meta->do_op(update, &update->ops[i]);
-	}
 }
 
 static uint32_t
@@ -504,7 +496,8 @@ update_calc_tuple_length(struct tuple_update *update)
 	for (node = rope_iter_start(&it); node; node = rope_iter_next(&it)) {
 		struct update_field *field =
 				(struct update_field *) rope_leaf_data(node);
-		uint32_t field_len = update_field_len(field);
+		uint32_t field_len = (field->op ? field->op->new_field_len :
+				      field->tail - field->old);
 		res += field_len + field->tail_len;
 	}
 
@@ -527,27 +520,17 @@ update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 		struct update_field *field = (struct update_field *)
 				rope_leaf_data(node);
 		uint32_t field_count = rope_leaf_size(node);
-		uint32_t field_len = update_field_len(field);
-
 		const char *old_field = field->old;
-		char *new_field = field->op ? new_data : (char *) old_field;
 		struct update_op *op = field->op;
 		if (op) {
-			op->meta->store(&op->arg, old_field, new_field);
-			/* Next op uses previous op output as its input. */
-			old_field = new_field;
+			op->meta->store(&op->arg, old_field, new_data);
+			new_data += op->new_field_len;
+		} else {
+			uint32_t field_len = field->tail - field->old;
+			memcpy(new_data, old_field, field_len);
+			new_data += field_len;
 		}
-		/*
-		 * Make sure op results end up in the tuple, copy
-		 * tail_len from the old tuple.
-		 */
-		const char *f = new_field;
-		mp_next(&f);
-		field_len = f - new_field;
-		if (new_field != new_data)
-			memcpy(new_data, new_field, field_len);
-
-		new_data += field_len;
+		/* Copy tail_len from the old tuple. */
 		assert(field->tail_len == 0 || field_count > 1);
 		if (field_count > 1) {
 			memcpy(new_data, field->tail, field->tail_len);
@@ -566,7 +549,7 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		const char *expr_end)
 {
 	/* number of operations */
-	update->op_count = pick_u32(&expr, expr_end);
+	update->op_count = mp_decode_array(&expr);
 
 	if (update->op_count > BOX_UPDATE_OP_CNT_MAX)
 		tnt_raise(IllegalParams, "too many operations for update");
@@ -580,19 +563,42 @@ update_read_ops(struct tuple_update *update, const char *expr,
 	struct update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
 		/* Read operation */
-		op->field_no = pick_u32(&expr, expr_end);
-		op->opcode = pick_u8(&expr, expr_end);
+		uint32_t args, len;
+		args = mp_decode_array(&expr);
+		if (args < 1)
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "expected an update operation (array)");
+		if (mp_typeof(*expr) != MP_STR)
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "expected an update operation name (string)");
 
-		if (op->opcode >= UPDATE_OP_MAX)
+		op->opcode = *mp_decode_str(&expr, &len);
+
+		switch (op->opcode) {
+		case '=':
+			op->meta = &op_set;
+			break;
+		case '+':
+		case '-':
+		case '&':
+		case '|':
+		case '^':
+			op->meta = &op_arith;
+			break;
+		case ':':
+			op->meta = &op_splice;
+			break;
+		case '#':
+			op->meta = &op_delete;
+			break;
+		case '!':
+			op->meta = &op_insert;
+			break;
+		default:
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
-		op->meta = &update_op_meta[op->opcode];
-
-		/* Read MP value with type checking */
-		op->arg.set.value = expr;
-		/* test that arg is valid MsgPack */
-		if (unlikely(!mp_check(&expr, expr_end)))
-			tnt_raise(ClientError, ER_INVALID_MSGPACK);
-		op->arg.set.length = expr - op->arg.set.value;
+		}
+		if (args != op->meta->args)
+			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
+		op->field_no = mp_read_int(&expr, "expected a field no (integer)");
+		op->meta->do_op(update, op, &expr);
 	}
 
 	/* Check the remainder length, the request must be fully read. */
@@ -613,8 +619,8 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 	update->alloc = alloc;
 	update->alloc_ctx = alloc_ctx;
 
-	update_read_ops(update, expr, expr_end);
 	update_create_rope(update, old_data, old_data_end);
+	update_read_ops(update, expr, expr_end);
 	uint32_t tuple_len = update_calc_tuple_length(update);
 
 	char *buffer = (char *) alloc(alloc_ctx, tuple_len);

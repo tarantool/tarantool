@@ -21,8 +21,8 @@ tuple
 type(tuple)
 #tuple
 
-space:update(123, '=p', 1, 'test1-updated')
-remote:update(space.n, 123, '=p', 2, 'test2-updated')
+space:update(123, {'=', 1, 'test1-updated'})
+remote:update(space.n, 123, {'=', 2, 'test2-updated'})
 
 space:insert(123, 'test1', 'test2')
 remote:insert(space.n, 123, 'test1', 'test2')

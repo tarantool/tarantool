@@ -64,11 +64,9 @@ function box.insert(space, ...)
 end
 
 --
-function box.update(space, key, format, ...)
-    local op_count = bit.rshift(select('#', ...), 1)
+function box.update(space, key, ...)
     return box.process(box.net.box.UPDATE,
-        box.pack('iVi'..format,
-            space, 1, key, op_count, ...))
+        box.pack('iVa', space, 1, key, msgpack.encode({...})))
 end
 
 function box.dostring(s, ...)

@@ -72,11 +72,11 @@ type(tuple)
 ---
 - 3
 ...
-space:update(123, '=p', 1, 'test1-updated')
+space:update(123, {'=', 1, 'test1-updated'})
 ---
 - [123, 'test1-updated', 'test2']
 ...
-remote:update(space.n, 123, '=p', 2, 'test2-updated')
+remote:update(space.n, 123, {'=', 2, 'test2-updated'})
 ---
 - [123, 'test1-updated', 'test2-updated']
 ...
@@ -222,11 +222,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:408: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:407: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:413: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:412: box.net.box: connection
     was closed'
 ...
 space:drop()

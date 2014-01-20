@@ -91,14 +91,14 @@ sql("call box.delete(0, 1684234849)")
 sql("call box.insert(0, 1953719668, 'old', 1684234849)")
 # test that insert produces a duplicate key error
 sql("call box.insert(0, 1953719668, 'old', 1684234849)")
-sql("call box.update(0, 1953719668, '=p=p', 0, 1936941424, 1, 'new')")
+admin("box.update(0, 1953719668, {'=', 0, 1936941424}, {'=', 1, 'new'})")
 sql("call box.select(0, 0, 1936941424)")
 sql("call box.select_range(0, 0, 1, 1936941424)")
-sql("call box.update(0, 1234567890, '+p', 2, 1)")
-sql("call box.update(0, 1936941424, '+p', 2, 1)")
-sql("call box.update(0, 1936941424, '-p', 2, 1)")
-sql("call box.update(0, 1936941424, '-p', 2, 1)")
-admin("box.update(0, 1936941424, '+p', 2, 1)")
+admin("box.update(0, 1234567890, {'+', 2, 1})")
+admin("box.update(0, 1936941424, {'+', 2, 1})")
+admin("box.update(0, 1936941424, {'-', 2, 1})")
+admin("box.update(0, 1936941424, {'-', 2, 1})")
+admin("box.update(0, 1936941424, {'+', 2, 1})")
 sql("call box.select(0, 0, 1936941424)")
 admin("function field_x(space, key, field_index) return (box.select(space, 0, key))[field_index] end")
 sql("call field_x(0, 1936941424, 0)")
@@ -155,7 +155,7 @@ admin("box.delete(0, 1684234849)")
 admin("#box.space[0].index[0].idx")
 admin("#box.index.bind(0,0)")
 admin("box.space[0]:insert(1953719668, 'hello world')")
-admin("box.space[0]:update(1953719668, '=p', 1, 'bye, world')")
+admin("box.space[0]:update(1953719668, {'=', 1, 'bye, world'})")
 admin("box.space[0]:delete(1953719668)")
 # test tuple iterators
 admin("t=box.space[0]:insert(1953719668)")
@@ -264,11 +264,11 @@ print """#
 #
 #"""
 admin("box.space[0]:replace(1953719668, 'something to splice')")
-admin("box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 0, 4, 'no'))")
-admin("box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 0, 2, 'every'))")
+admin("box.space[0]:update(1953719668, {':', 1, 0, 4, 'no'})")
+admin("box.space[0]:update(1953719668, {':', 1, 0, 2, 'every'})")
 # check an incorrect offset
-admin("box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', 100, 2, 'every'))")
-admin("box.space[0]:update(1953719668, ':p', 1, box.pack('ppp', -100, 2, 'every'))")
+admin("box.space[0]:update(1953719668, {':', 1, 100, 2, 'every'})")
+admin("box.space[0]:update(1953719668, {':', 1, -100, 2, 'every'})")
 admin("box.space[0]:truncate()")
 admin("box.space[0]:insert(1953719668, 'hello', 'october', '20th'):unpack()")
 admin("box.space[0]:truncate()")
@@ -391,38 +391,38 @@ admin("string.byte(box.pack('p', tonumber64(123)))")
 # test delete field
 admin("box.space[0]:truncate()")
 sql("call box.insert(0, 1000001, 1000002, 1000003, 1000004, 1000005)")
-sql("call box.update(0, 1000001, '#p', 0, 1)")
-sql("call box.update(0, 1000002, '#p', 0, 1)")
-sql("call box.update(0, 1000003, '#p', 0, 1)")
-sql("call box.update(0, 1000004, '#p', 0, 1)")
-admin("box.update(0, 1000005, '#p', 0, 1)")
+admin("box.update(0, 1000001, {'#', 0, 1})")
+admin("box.update(0, 1000002, {'#', 0, 1})")
+admin("box.update(0, 1000003, {'#', 0, 1})")
+admin("box.update(0, 1000004, {'#', 0, 1})")
+admin("box.update(0, 1000005, {'#', 0, 1})")
 admin("box.space[0]:truncate()")
 
 # test delete multiple fields
 admin("box.insert(0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)")
-admin("box.update(0, 0, '#p', 42, 1)")
-admin("box.update(0, 0, '#p', 3, 'abirvalg')")
-admin("box.update(0, 0, '#p#p#p', 1, 1, 3, 2, 5, 1)")
-admin("box.update(0, 0, '#p', 3, 3)")
-admin("box.update(0, 0, '#p', 4, 123456)")
-admin("box.update(0, 0, '#p', 2, 4294967295)")
-admin("box.update(0, 0, '#p', 1, 0)")
+admin("box.update(0, 0, {'#', 42, 1})")
+admin("box.update(0, 0, {'#', 3, 'abirvalg'})")
+admin("box.update(0, 0, {'#', 1, 1}, {'#', 3, 2}, {'#', 5, 1})")
+admin("box.update(0, 0, {'#', 3, 3})")
+admin("box.update(0, 0, {'#', 4, 123456})")
+admin("box.update(0, 0, {'#', 2, 4294967295})")
+admin("box.update(0, 0, {'#', 1, 0})")
 admin("box.space[0]:truncate()")
 
 print """
 # test box.update: INSERT field
 """
 admin("box.insert(0, 1, 3, 6, 9)")
-admin("box.update(0, 1, '!p', 1, 2)")
-admin("box.update(0, 1, '!p!p!p!p', 3, 4, 3, 5, 4, 7, 4, 8)")
-admin("box.update(0, 1, '!p!p!p', 9, 10, 9, 11, 9, 12)")
+admin("box.update(0, 1, {'!', 1, 2})")
+admin("box.update(0, 1, {'!', 3, 4}, {'!', 3, 5}, {'!', 4, 7}, {'!', 4, 8})")
+admin("box.update(0, 1, {'!', 9, 10}, {'!', 9, 11}, {'!', 9, 12})")
 admin("box.space[0]:truncate()")
 admin("box.insert(0, 1, 'tuple')")
-admin("box.update(0, 1, '#p!p=p', 1, 1, 1, 'inserted tuple', 2, 'set tuple')")
+admin("box.update(0, 1, {'#', 1, 1}, {'!', 1, 'inserted tuple'}, {'=', 2, 'set tuple'})")
 admin("box.space[0]:truncate()")
 admin("box.insert(0, 1, 'tuple')")
-admin("box.update(0, 1, '=p!p#p', 1, 'set tuple', 1, 'inerted tuple', 2, 1)")
-admin("box.update(0, 1, '!p!p', 0, 3, 0, 2)")
+admin("box.update(0, 1, {'=', 1, 'set tuple'}, {'!', 1, 'inserted tuple'}, {'#', 2, 1})")
+admin("box.update(0, 1, {'!', 0, 3}, {'!', 0, 2})")
 admin("box.space[0]:truncate()")
 print """
 # Test for Bug #955226
@@ -437,27 +437,27 @@ print """
 # test update's assign opearations
 """
 admin("box.replace(0, 1, 'field string value')")
-admin("box.update(0, 1, '=p=p=p', 1, 'new field string value', 2, 42, 3, 0xdeadbeef)")
+admin("box.update(0, 1, {'=', 1, 'new field string value'}, {'=', 2, 42}, {'=', 3, 0xdeadbeef})")
 
 print """
 # test multiple update opearations on the same field
 """
-admin("box.update(0, 1, '+p&p|p^p', 2, 16, 3, 0xffff0000, 3, 0x0000a0a0, 3, 0xffff00aa)")
+admin("box.update(0, 1, {'+', 2, 16}, {'&', 3, 0xffff0000}, {'|', 3, 0x0000a0a0}, {'^', 3, 0xffff00aa})")
 
 print """
 # test update splice operation
 """
-admin("box.update(0, 1, ':p', 1, box.pack('ppp', 0, 3, 'the newest'))")
+admin("box.update(0, 1, {':', 1, 0, 3, 'the newest'})")
 
 print """
 # test update delete operations
 """
-admin("box.update(0, 1, '#p#p', 3, 1, 2, 1)")
+admin("box.update(0, 1, {'#', 3, 1}, {'#', 2, 1})")
 
 print """
 # test update insert operations
 """
-admin("box.update(0, 1, '!p!p!p!p', 1, 1, 1, 2, 1, 3, 1, 4)")
+admin("box.update(0, 1, {'!', 1, 1}, {'!', 1, 2}, {'!', 1, 3}, {'!', 1, 4})")
 
 admin("box.space[0]:truncate()")
 
@@ -641,16 +641,16 @@ admin("box.dostring('return ...', 1, 2, 3)")
 
 print """# box.update: push/pop fields"""
 admin("box.insert(0, 1684234849)")
-admin("box.update(0, 1684234849, '#p', 1, 1)")
-admin("box.update(0, 1684234849, '=p', -1, 'push1')")
-admin("box.update(0, 1684234849, '=p', -1, 'push2')")
-admin("box.update(0, 1684234849, '=p', -1, 'push3')")
-admin("box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap1')")
-admin("box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap2')")
-admin("box.update(0, 1684234849, '#p=p', 1, 1, -1, 'swap3')")
-admin("box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop1')")
-admin("box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop2')")
-admin("box.update(0, 1684234849, '#p=p', -1, 1, -1, 'noop3')")
+admin("box.update(0, 1684234849, {'#', 1, 1})")
+admin("box.update(0, 1684234849, {'=', -1, 'push1'})")
+admin("box.update(0, 1684234849, {'=', -1, 'push2'})")
+admin("box.update(0, 1684234849, {'=', -1, 'push3'})")
+admin("box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap1'})")
+admin("box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap2'})")
+admin("box.update(0, 1684234849, {'#', 1, 1}, {'=', -1, 'swap3'})")
+admin("box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop1'})")
+admin("box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop2'})")
+admin("box.update(0, 1684234849, {'#', -1, 1}, {'=', -1, 'noop3'})")
 admin("box.space[0]:truncate()")
 
 print """# A test case for Bug#1043804 lua error() -> server crash"""

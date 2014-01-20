@@ -52,10 +52,9 @@ box.net = {
         end,
 
         -- update a tuple
-        update = function(self, space, key, format, ...)
-            local op_count = bit.rshift(select('#', ...), 1)
+        update = function(self, space, key, ...)
             return self:process(box.net.box.UPDATE,
-                   box.pack('iVi'..format, space, 1, key, op_count, ...))
+                box.pack('iVa', space, 1, key, msgpack.encode({...})))
         end,
 
         select_limit = function(self, space, index, offset, limit, ...)

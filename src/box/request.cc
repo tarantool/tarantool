@@ -61,7 +61,7 @@ read_tuple(const char **reqpos, const char *reqend)
 					base64_buf, base64_buflen);
 		write(STDERR_FILENO, base64_buf, len);
 		free(base64_buf);
-		tnt_raise(ClientError, ER_INVALID_MSGPACK);
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "tuple");
 	}
 
 	if (unlikely(mp_typeof(*tuple) != MP_ARRAY))
@@ -240,7 +240,7 @@ request_create(struct request *request, uint32_t type,
 		request->execute = box_lua_call;
 		s = *reqpos;
 		if (unlikely(!mp_check(reqpos, reqend)))
-			tnt_raise(ClientError, ER_INVALID_MSGPACK);
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "function arguments");
 		if (unlikely(mp_typeof(*s) != MP_STR))
 			tnt_raise(ClientError, ER_ARG_TYPE, 0, "STR");
 		uint32_t namelen;

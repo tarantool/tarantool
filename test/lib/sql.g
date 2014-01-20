@@ -67,8 +67,8 @@ parser sql:
     rule value_list:  '\(' {{ value_list = [] }}
                          [expr {{ value_list = [expr] }} [("," expr {{ value_list.append(expr) }} )+]]
                       '\)' {{ return value_list }}
-    rule update_list: predicate {{ update_list = [predicate] }}
-                      [(',' predicate {{ update_list.append(predicate) }})+]
+    rule update_list: predicate {{ update_list = [('=', predicate[0], predicate[1])] }}
+                      [(',' predicate {{ update_list.append(("=", predicate[0], predicate[1])) }})+]
                       {{ return update_list }}
     rule expr:        constant {{ return constant }}
     rule constant:    NUM {{ return int(NUM) }} | STR {{ return STR[1:-1] }}

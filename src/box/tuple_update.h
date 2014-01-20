@@ -37,20 +37,6 @@ enum {
 	BOX_UPDATE_OP_CNT_MAX = 4000,
 };
 
-/** UPDATE operation codes. */
-enum tuple_update_op {
-	UPDATE_OP_SET = 0,
-	UPDATE_OP_ADD,
-	UPDATE_OP_AND,
-	UPDATE_OP_XOR,
-	UPDATE_OP_OR,
-	UPDATE_OP_SPLICE,
-	UPDATE_OP_DELETE,
-	UPDATE_OP_INSERT,
-	UPDATE_OP_SUBTRACT,
-	UPDATE_OP_MAX
-};
-
 typedef void *(*region_alloc_func)(void *, size_t);
 
 const char *

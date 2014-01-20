@@ -32,8 +32,8 @@ _space:delete(_index.n)
 --
 -- Can't change properties of a space
 --
-_space:update(_space.n, '+p', 0, 1)
-_space:update(_space.n, '+p', 0, 2)
+_space:update(_space.n, {'+', 0, 1})
+_space:update(_space.n, {'+', 0, 2})
 --
 -- Create a space
 --
