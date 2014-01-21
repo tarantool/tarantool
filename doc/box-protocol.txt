@@ -1,7 +1,8 @@
 ; Tarantool IPROTO protocol.
+; ======================
 ;
 ; The latest version of this document can be found in
-; tarantool source tree, doc/box-protocol.txt
+; Tarantool source tree, doc/box-protocol.txt
 ;
 ; IPROTO is a binary request/response protocol that features a
 ; complete access to Tarantool functionality, including:
@@ -12,7 +13,7 @@
 ; For data structuring and encoding, the protocol uses msgpack
 ; data format, see http://msgpack.org
 ;
-; Since msgpack uses a variying representation for compound
+; Since msgpack uses a variable representation for compound
 ; data structures, such as arrays and maps, the exact byte
 ; sequence mandated by msgpack format is omitted in this spec.
 ; This spec therefore only defines the expected **schema**
@@ -49,14 +50,14 @@
 <error>         ::= 0x31
 
 ;
-; The constants define the value of the map.
+; The value of the constant defines the type of value of the map.
+; For example, for <error> key (0x31), the expected value is a 
+; MessagePack string with error message.
 ; All requests and responses utilize the same basic structure
 
 <packet> ::= <request> | <response>
-
 <request> ::= <len><header><body>
 <response> ::= <len><header><body>
-
 ; <len> is the length of the packet, in message pack format.
 ;
 ; Implementor note: for simplicity of the implementation,
@@ -65,7 +66,6 @@
 ; 0xce b4 b3 b2 b1 (5 bytes)
 ;
 <len> ::= MessagePack Int (unsigned)
-
 ;
 ; Both <header> and <body> are message pack maps:
 
@@ -73,7 +73,7 @@
 <body> ::= { (<key> : <value>)+ }
 
 ; They only differ in the allowed set of keys and values,
-; and the key defines the type of value that follows.
+; The key defines the type of value that follows.
 ; If a key is missing, and expects an integer value,
 ; the missing value is always assumed to be 0. If the
 ; missing key assumes a string value, the string is assumed
@@ -82,11 +82,12 @@
 <key> ::= <header_key> | <body_key>
 
 <header_key> ::= <code> | <sync>
-
 ;
 ; <code> is request code or response code
-;
 
+;
+; Request packet structure
+; -----------------------------------
 ; Value for <code> key in request can be:
 ; 0  -- <ping>
 ; 1  -- <select>
@@ -95,13 +96,6 @@
 ; 4  -- <update>
 ; 5  -- <delete>
 ; 6  -- <call>
-
-; Value of <code> key in response is:
-; 0  -- SUCCESS
-; !0 -- Tarantool error code
-; If response <code> is 0 (success), response body contains zero or
-; more tuples, otherwise it carries an error message that corresponds
-; to the return code.
 
 ; <sync> is a unique request identifier, preserved in the response,
 ; The identifier is necessary to allow request multiplexing --
@@ -117,15 +111,10 @@
 
 <request_key> ::= <select> | <replace> | <delete> | <update> | <call>
 
-; Specify which space to query, which index in the space
-; to use, offset in the resulting tuple set (set to 0 for no offset),
-; a limit (set to 4294967295 for no limit), and a key to use in lookup.
-
 ; Find tuples matching the search pattern
 <select> ::= <space_id> | <index_id> | <iterator> | <offset> | <limit> | <key>
 
 ; Insert a tuple into the space or replace an existing one.
-
 <replace> ::= <space_id> | <index_id> | <tuple>
 
 ; Insert is similar to replace, but will return a duplicate key
@@ -143,17 +132,19 @@
 
 ; As can be seen from the grammar some requests have common keys,
 ; whereas other keys can be present only in a body of a single
-; request type.
+; request type. 
 
-
-; <space_id> Space to use in the request
+; <space_id> space to use in the request
 ; The find the numeric space id by space name, one
 ; must first query "_space" system space.
+; Id of _space system space is defined in box.schema.SPACE_ID
+; (global Lua variable set in package "box")
 
-; <index_id> Index to use in the request
-; Similarly to space, to find the  numeric index id
+; <index_id> index id of the index to use in the request
+; Similarly to space, to find the numeric index id
 ; by index name, one must query the "_index" system space.
-
+; Id of _index system space is defined in box.schema.INDEX_ID
+; (global Lua variable set in  package "box").
 ; <tuple> defines the actual argument of the operation
 ; in <replace> it defines the tuple which will be inserted
 ; into the database.
@@ -161,8 +152,8 @@
 ; When request body allows <tuple> as a key, it must always
 ; be present, since otherwise the request is meaningless.
 
-; <offset> in the result set, expects <uint32> value
-; <limit> limit in the result set, expects a <uint32> value
+; <offset> specifies offset in the result set, expects <uint32> value
+; <limit> specifies limit in the result set, expects a <uint32> value
 ; <iterator> specifies the iterator type to use in search
 ; <function_name> is used to give call path for a Lua function
 
@@ -175,7 +166,7 @@
 <field_no> ::= <int32>
 
 ;
-; <op> is a 1-byte string carrying operation code:
+; <op> is a 1-byte ASCII string carrying operation code:
 
 ; "=" - assign operation argument to field <field_no>;
 ;       will extend the tuple if <field_no> == <max_field_no> + 1
@@ -192,21 +183,26 @@
 ; "^" - bitwise XOR of argument and field <field_no>
 ; "|" - bitwise OR of argument and field <field_no>
 
-; Finally there is an operation that expects offset, cut and string
-; arguments
+; Finally there is an operation that expects offset, cut length and
+; string paste arguments
 ; ":" - implementation of Perl 'splice' command
 
 ;
 ; It's an error to specify an argument of a type that
 ; differs from expected type.
 ;
-<op_arg> ::= <field> | <op_arg_splice>
+; Response packet structure
+; ----------------------------------------
 
-<op_arg_splice> ::= <message_pack_array(3)> # <offset><length><string>
+; Value of <code> key in response is:
+; 0  -- SUCCESS
+; !0 -- Tarantool error code
+; If response <code> is 0 (success), response body contains zero or
+; more tuples, otherwise it carries an error message that corresponds
+; to the return code.
 
-
-; The server always returns a tuple or tuples, when found,
-; on success.
+; On success, the server always returns a tuple or tuples, 
+; when found.
 ; I.e. on success, response <body> contains <set> key.
 ; For select/update/delete, it's the tuple that matched
 ; the search criterion. For <replace>, it's the inserted tuple.
