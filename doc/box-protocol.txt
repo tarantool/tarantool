@@ -19,7 +19,7 @@
 ; of message pack streams.
 ;
 ; To specify that a message pack map is expected in the stream,
-; the contents of the map is put into "{}" (curly braces.
+; the contents of the map is put into "{}" (curly braces).
 ;
 ; To specify that a message pack array is expected in the stream,
 ; the contents of the array is put into "[]" (square brackets).
