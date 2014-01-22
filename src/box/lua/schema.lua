@@ -106,21 +106,56 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options == nil then
         return
     end
-    local ops = {}
-    local function add_op(value, field_no)
-        if value then
-            op = {'=', field_no, value}
-            table.insert(ops, op)
-        end
+    if box.space[space_id] == nil then
+        box.raise(box.error.ER_NO_SUCH_SPACE,
+                  "Space "..space_id.." does not exist")
     end
-    add_op(options.id, 1)
-    add_op(options.name, 2)
-    add_op(options.type, 3)
-    if options.unique ~= nil then
-        add_op(options.unique and 1 or 0, 4)
+    if box.space[space_id].index[index_id] == nil then
+        box.raise(box.error.ER_NO_SUCH_INDEX,
+                  "Index "..index_id.." not found in space"..space_id)
+    end
+    if type(space_id) == "string" then
+        space_id = box.space[space_id].n
+    end
+    if type(index_id) == "string" then
+        index_id = box.space[space_id].index[index_id].id
     end
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, unpack(ops))
+    if options.unique ~= nil then
+        options.unique = options.unique and 1 or 0
+    end
+    if options.id ~= nil then
+        if options.parts ~= nil then
+            error("Don't know how to update both id and parts")
+        end
+        ops = {}
+        local function add_op(value, field_no)
+            if value then
+                table.insert(ops, {'=', field_no, value})
+            end
+        end
+        add_op(options.id, 1)
+        add_op(options.name, 2)
+        add_op(options.type, 3)
+        add_op(options.unique, 4)
+        _index:update({space_id, index_id}, unpack(ops))
+        return
+    end
+    local tuple = _index:select(0, {space_id, index_id})
+    if options.name == nil then
+        options.name = tuple[2]
+    end
+    if options.type == nil then
+        options.type = tuple[3]
+    end
+    if options.unique == nil then
+        options.unique = tuple[4]
+    end
+    if options.parts == nil then
+        options.parts = {tuple:slice(6)} -- not part count
+    end
+    _index:replace{space_id, index_id, options.name, options.type,
+                   options.unique, #options.parts/2, unpack(options.parts)}
 end
 
 function box.schema.space.bless(space)
