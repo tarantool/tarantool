@@ -39,7 +39,7 @@ from tarantool import Schema
 class BoxConnection(TarantoolConnection):
     def __init__(self, host, port):
         super(BoxConnection, self).__init__(host, port)
-        self.py_con = tnt_connection(host, port, connect_now=False)
+        self.py_con = tnt_connection(host, port, connect_now=False, socket_timeout=100)
         self.py_con.error = False
         self.sort = False
 
