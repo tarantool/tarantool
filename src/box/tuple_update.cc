@@ -510,6 +510,8 @@ update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 	char *new_data = buffer;
 	new_data = mp_encode_array(new_data, rope_size(update->rope));
 
+	(void) buffer_end;
+
 	uint32_t total_field_count = 0;
 
 	struct rope_iter it;
