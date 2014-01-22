@@ -3,7 +3,7 @@
 --
 space = box.schema.create_space('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-space:create_index('primary', 'tree', {parts = {0, 'str', 1, 'str', 2, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'str', 1, 'str', 2, 'num'}, unique = true })
 
 space:insert('Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?')
 space:insert('Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?')
@@ -117,8 +117,8 @@ space:len()
 --if an index is modified between calls
 --
 space.index['primary']:drop()
-space:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
-space:create_index('second', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true })
+space:create_index('second', { type  = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
 
 space:insert('a', 'a', 'a')
 space:insert('d', 'd', 'd')
@@ -160,7 +160,7 @@ space = nil
 
 space = box.schema.create_space('tweedledum')
 -- Multipart primary key (sender nickname, receiver nickname, message id)
-space:create_index('primary', 'tree', {parts = {0, 'num', 2, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'num', 2, 'num'}, unique = true })
 
 space:insert(1, 1)
 space:replace(1, 1)

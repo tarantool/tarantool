@@ -2,7 +2,7 @@ import os
 import sys
 
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
+admin("space:create_index('primary', { type = 'hash' })")
 
 # Test Lua from admin console. Whenever producing output,
 # make sure it's a valid YAML.

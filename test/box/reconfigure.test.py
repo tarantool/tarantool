@@ -30,7 +30,7 @@ print """#
 # configuration'
 #"""
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
+admin("space:create_index('primary', { type = 'hash'})")
 admin("box.insert(0, 1, 'tuple')")
 admin("")
 admin("box.snapshot()")

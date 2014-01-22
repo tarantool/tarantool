@@ -3,7 +3,7 @@
 --# start server default
 
 space = box.schema.create_space('tweedledum', { id = 0 })
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 
 
 -- check stat_cleanup

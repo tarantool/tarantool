@@ -1,6 +1,6 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
-space:create_index('minmax', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
+space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
 
 space:insert('brave', 'new', 'world')
 space.index['minmax']:min()
@@ -44,8 +44,8 @@ space:drop()
 -- Check range scan over multipart keys
 --
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
-space:create_index('minmax', 'tree', {parts = {1, 'str', 2, 'str'}, unique = false })
+space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
+space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = false })
 
 space:insert(1234567, 'new', 'world')
 space:insert(0, 'of', 'puppets')
@@ -66,7 +66,7 @@ space:drop()
 -- Lua 64bit numbers support
 --
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type  = 'tree', parts = {0, 'num'}, unique = true })
 
 space:insert(tonumber64('18446744073709551615'), 'magic')
 tuple = space.index['primary']:select(tonumber64('18446744073709551615'))
@@ -106,8 +106,8 @@ space:drop()
 -- lua select_reverse_range() testing
 -- https://blueprints.launchpad.net/tarantool/+spec/backward-tree-index-iterator
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
-space:create_index('range', 'tree', {parts = {1, 'num', 0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('range', { type = 'tree', parts = {1, 'num', 0, 'num'}, unique = true })
 
 space:insert(0, 0)
 space:insert(1, 0)
@@ -128,8 +128,8 @@ space:drop()
 -- Tests for box.index iterators
 --
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
-space:create_index('i1', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true })
+space:create_index('i1', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
 
 pid = 1
 tid = 999
@@ -172,8 +172,8 @@ space:drop()
 --
 -- https://blueprints.launchpad.net/tarantool/+spec/lua-builtin-size-of-subtree
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'hash', {parts = {0, 'num'}, unique = true })
-space:create_index('i1', 'tree', {parts = {1, 'num', 2, 'num'}, unique = false })
+space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
+space:create_index('i1', { type = 'tree', parts = {1, 'num', 2, 'num'}, unique = false })
 space:insert(1, 1, 1)
 space:insert(2, 2, 0)
 space:insert(3, 2, 1)
@@ -197,7 +197,7 @@ space:drop()
 -- Tests for lua tuple:transform()
 --
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'hash', {parts = {0, 'str'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
 t = space:insert('1', '2', '3', '4', '5', '6', '7')
 t:transform(7, 0, '8', '9', '100')
 t:transform(0, 1)
@@ -263,7 +263,7 @@ space:drop()
 --  lua box.auto_increment() testing
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
 dofile('push.lua')
 
 push_collection(space, 0, 1038784, 'hello')
@@ -297,7 +297,7 @@ space:drop()
 -- https://bugs.launchpad.net/tarantool/+bug/1042798
 --
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {2, 'num', 1, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
 
 -- Print key fields in pk
 space.index['primary'].key_field
@@ -318,8 +318,8 @@ space:drop()
 -- 
 dofile('index_random_test.lua')
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
-space:create_index('secondary', 'hash', {parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('secondary', { type = 'hash', parts = {0, 'num'}, unique = true })
 -------------------------------------------------------------------------------
 -- TreeIndex::random()
 -------------------------------------------------------------------------------

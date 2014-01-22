@@ -6,7 +6,7 @@ from lib.tarantool_server import TarantoolServer
 master = server
 
 master.admin('space = box.schema.create_space(\'test\', {id =  42})')
-master.admin('space:create_index(\'primary\', \'hash\', {parts = { 0, \'num\' } })')
+master.admin('space:create_index(\'primary\', { type = \'hash\', parts = { 0, \'num\' } })')
 
 master.admin('for k = 1, 9 do space:insert(k, k*k) end')
 

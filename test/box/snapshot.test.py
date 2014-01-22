@@ -4,7 +4,7 @@ import time
 from signal import SIGUSR1
 
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
+admin("space:create_index('primary', { type = 'hash' })")
 
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/686411

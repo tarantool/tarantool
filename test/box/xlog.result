@@ -5,7 +5,7 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
 00000000000000000002.xlog.inprogress exists
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 ---
 ...
 00000000000000000002.xlog.inprogress has been successfully renamed

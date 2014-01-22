@@ -13,7 +13,7 @@ sql.set_schema({
 })
 
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
+admin("space:create_index('primary', { type = 'hash' })")
 sql("ping")
 # xxx: bug -- currently selects no rows
 sql("select * from t0")

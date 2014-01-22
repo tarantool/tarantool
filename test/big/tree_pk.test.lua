@@ -1,7 +1,7 @@
 dofile('utils.lua')
 
 s0 = box.schema.create_space('tweedledum')
-s0:create_index('primary', 'tree', {parts = {0, 'num'}, unique = true })
+s0:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
 
 -- integer keys
 s0:insert(1, 'tuple')
@@ -26,10 +26,10 @@ s0:insert('')
 s0:insert('12')
 
 s1 = box.schema.create_space('tweedledee')
-s1:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
+s1:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true })
 
 s2 = box.schema.create_space('alice')
-s2:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true })
+s2:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true })
 
 -- string keys
 s1:insert('identifier', 'tuple')
@@ -107,9 +107,9 @@ s2 = nil
 --
 s0:truncate()
 
-s0:create_index('i1', 'tree', {parts = {1, 'num'}, unique = true })
-s0:create_index('i2', 'tree', {parts = {2, 'num'}, unique = false })
-s0:create_index('i3', 'tree', {parts = {3, 'num'}, unique = true })
+s0:create_index('i1', { type = 'tree', parts = {1, 'num'}, unique = true })
+s0:create_index('i2', { type = 'tree', parts = {2, 'num'}, unique = false })
+s0:create_index('i3', { type = 'tree', parts = {3, 'num'}, unique = true })
 
 s0:insert(0, 0, 0, 0)
 s0:insert(1, 1, 1, 1)

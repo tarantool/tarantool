@@ -3,17 +3,17 @@ dofile('utils.lua')
 # Tree single-part unique
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'tree', {parts = {0, 'str'}, unique = true})
+space:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true})
 -- Tree single-part non-unique
-space:create_index('i1', 'tree', {parts = {1, 'str'}, unique = false})
+space:create_index('i1', { type = 'tree', parts = {1, 'str'}, unique = false})
 -- Tree multi-part unique
-space:create_index('i2', 'tree', {parts = {1, 'str', 2, 'str'}, unique = true})
+space:create_index('i2', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true})
 -- Tree multi-part non-unique
-space:create_index('i3', 'tree', {parts = {2, 'str', 3, 'str'}, unique = false })
+space:create_index('i3', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = false })
 -- Hash single-part unique
-space:create_index('i4', 'hash', {parts = {0, 'str'}, unique = true})
+space:create_index('i4', { type = 'hash', parts = {0, 'str'}, unique = true})
 -- Hash multi-part unique
-space:create_index('i5', 'hash', {parts = {1, 'str', 2, 'str'}, unique = true})
+space:create_index('i5', { type = 'hash', parts = {1, 'str', 2, 'str'}, unique = true})
 
 space:insert('pid_001', 'sid_001', 'tid_998', 'a')
 space:insert('pid_002', 'sid_001', 'tid_997', 'a')

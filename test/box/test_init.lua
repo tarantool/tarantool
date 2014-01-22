@@ -23,7 +23,7 @@ local function do_insert()
 end
 
 space = box.schema.create_space('tweedledum', { id = 0 })
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 
 fiber = box.fiber.create(do_insert)
 box.fiber.resume(fiber)

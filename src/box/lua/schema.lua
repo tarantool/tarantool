@@ -62,17 +62,21 @@ end
 
 box.schema.index = {}
 
-box.schema.index.create = function(space_id, name, index_type, options)
+box.schema.index.create = function(space_id, name, options)
     local _index = box.space[box.schema.INDEX_ID]
     if options == nil then
-        options = { parts = { 0, 'num' } }
+        options = {}
+    end
+    if options.type == nil then
+        options.type = "tree"
     end
     if options.parts == nil then
-        options.parts = {}
+        options.parts = { 0, "num" }
     end
     if options.unique == nil then
         options.unique = true
     end
+    local index_type = options.type
     local unique = options.unique and 1 or 0
     local part_count = bit.rshift(#options.parts, 1)
     local parts = options.parts

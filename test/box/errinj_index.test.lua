@@ -1,5 +1,5 @@
 s = box.schema.create_space('tweedledum')
-s:create_index('primary', 'tree', { parts = { 0, 'num' }})
+s:create_index('primary')
 
 -- Check a failed realloc in tree.
 

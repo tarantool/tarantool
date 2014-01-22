@@ -1,5 +1,5 @@
 ts = box.schema.create_space('test_space')
-ts:create_index('primary', 'hash')
+ts:create_index('primary', { type = 'hash' })
 
 type(ts.on_replace)
 ts.on_replace()

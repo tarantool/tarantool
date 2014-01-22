@@ -1,7 +1,7 @@
 space = box.schema.create_space('test', {id =  42})
 ---
 ...
-space:create_index('primary', 'hash', {parts = { 0, 'num' } })
+space:create_index('primary', { type = 'hash', parts = { 0, 'num' } })
 ---
 ...
 for k = 1, 9 do space:insert(k, k*k) end

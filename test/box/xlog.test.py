@@ -20,7 +20,7 @@ admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
 
-admin("space:create_index('primary', 'hash', { parts = { 0, 'num' }})")
+admin("space:create_index('primary', { type = 'hash' })")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"

@@ -1,5 +1,5 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 
 box.session.exists(box.session.id())
 box.session.exists()

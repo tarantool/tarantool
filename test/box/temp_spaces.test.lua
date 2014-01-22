@@ -15,7 +15,7 @@ s.temporary
 s:drop()
 
 s = box.schema.create_space('t', { temporary = true })
-s:create_index('primary', 'hash')
+s:create_index('primary', { type = 'hash' })
 
 s:insert(1, 2, 3)
 s:select(0, 1)
