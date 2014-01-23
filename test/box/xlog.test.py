@@ -34,7 +34,7 @@ server.start()
 wal_inprogress = os.path.join(vardir, "00000000000000000004.xlog.inprogress")
 wal = os.path.join(vardir, "00000000000000000004.xlog")
 
-admin("box.space[0]:insert(3, 'third tuple')")
+admin("box.space[0]:insert{3, 'third tuple'}")
 
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"
@@ -119,8 +119,8 @@ shutil.copy(abspath("box/dup_key1.xlog"),
 shutil.copy(abspath("box/dup_key2.xlog"),
            os.path.join(vardir, "00000000000000000004.xlog"))
 server.start()
-admin("box.space[0]:select(0, 1)")
-admin("box.space[0]:select(0, 2)")
+admin("box.space[0]:select{1}")
+admin("box.space[0]:select{2}")
 admin("#box.space[0]")
 
 # cleanup

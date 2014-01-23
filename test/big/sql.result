@@ -126,7 +126,7 @@ insert into t0 values ('key3', 'part1', 'part2_b')
 ---
 - ['key3', 'part1', 'part2_b']
 ...
-s:select(1)
+s.index[1]:select{}
 ---
 - ['key1', 'part1', 'part2']
 - ['key2', 'part1', 'part2_a']
@@ -300,7 +300,7 @@ delete from t0 where k0=41234567
 ---
 - [41234567, 'part1_a', 'part2_a']
 ...
-s:select(0)
+s:select{}
 ---
 ...
 s:truncate()
@@ -550,7 +550,7 @@ insert into t0 values(3, 'Creature ')
 ---
 - [3, 'Creature ']
 ...
-s:select(1)
+s.index[1]:select{}
 ---
 - [1, 'Aardvark ']
 - [2, 'Bilimbi']

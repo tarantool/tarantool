@@ -8,76 +8,76 @@ _index = box.space[box.schema.INDEX_ID]
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
 --
-_space:insert(_space.n, 5, 'test')
+_space:insert{_space.n, 5, 'test'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
 --
 -- Bad space id
 --
-_space:insert('hello', 'world', 'test')
+_space:insert{'hello', 'world', 'test'}
 ---
 - error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 --
 -- Can't create a space which has wrong arity - arity must be NUM
 --
-_space:insert(_space.n, 'world', 'test')
+_space:insert{_space.n, 'world', 'test'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
 --
 -- There is already a tuple for the system space
 --
-_space:insert(_space.n, 0, '_space')
+_space:insert{_space.n, 0, '_space'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace(_space.n, 0, '_space')
+_space:replace{_space.n, 0, '_space'}
 ---
 - [280, 0, '_space']
 ...
-_space:insert(_index.n, 0, '_index')
+_space:insert{_index.n, 0, '_index'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace(_index.n, 0, '_index')
+_space:replace{_index.n, 0, '_index'}
 ---
 - [288, 0, '_index']
 ...
 --
 -- Can't change properties of a space
 --
-_space:replace(_space.n, 0, '_space')
+_space:replace{_space.n, 0, '_space'}
 ---
 - [280, 0, '_space']
 ...
 --
 -- Can't drop a system space
 --
-_space:delete(_space.n)
+_space:delete{_space.n}
 ---
 - error: 'Can''t drop space 280: the space has indexes'
 ...
-_space:delete(_index.n)
+_space:delete{_index.n}
 ---
 - error: 'Can''t drop space 288: the space has indexes'
 ...
 --
 -- Can't change properties of a space
 --
-_space:update(_space.n, {'+', 0, 1})
+_space:update(_space.n, {{'+', 0, 1}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
-_space:update(_space.n, {'+', 0, 2})
+_space:update(_space.n, {{'+', 0, 2}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
 --
 -- Create a space
 --
-t = box.auto_increment(_space.n, 0, 'hello')
+t = _space:auto_increment{0, 'hello'}
 ---
 ...
 -- Check that a space exists
@@ -99,27 +99,27 @@ space.index[0]
 --
 -- check dml - the space has no indexes yet, but must not crash on DML
 --
-space:select(0, 0)
+space:select{0}
 ---
 - error: 'No index #0 is defined in space 289'
 ...
-space:insert(0, 0)
+space:insert{0, 0}
 ---
 - error: 'No index #0 is defined in space 289'
 ...
-space:replace(0, 0)
+space:replace{0, 0}
 ---
 - error: 'No index #0 is defined in space 289'
 ...
-space:update(0, '+p', 0, 1)
+space:update(0, {{'+', 0, 1}})
 ---
 - error: 'No index #0 is defined in space 289'
 ...
-space:delete(0)
+space:delete{0}
 ---
 - error: 'No index #0 is defined in space 289'
 ...
-t = _space:delete(space.n)
+t = _space:delete{space.n}
 ---
 ...
 space_deleted = box.space[t[0]]
@@ -129,27 +129,27 @@ space_deleted
 ---
 - null
 ...
-space:replace(0)
+space:replace{0}
 ---
 - error: Space 289 does not exist
 ...
-_index:insert(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')
+_index:insert{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_index:replace(_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num')
+_index:replace{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
 - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
-_index:insert(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
+_index:insert{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_index:replace(_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num')
+_index:replace{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
 - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
 ...
-_index:select(0)
+_index:select{}
 ---
 - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
 - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
@@ -158,19 +158,19 @@ _index:select(0)
 - [288, 1, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
 ...
 -- modify indexes of a system space
-_index:delete(_index.n, 0)
+_index:delete{_index.n, 0}
 ---
 - error: Can't drop the primary key in a system space, space id 288
 ...
-_space:insert(1000, 0, 'hello')
+_space:insert{1000, 0, 'hello'}
 ---
 - [1000, 0, 'hello']
 ...
-_index:insert(1000, 0, 'primary', 'tree', 1, 1, 0, 'num')
+_index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
 - [1000, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
-box.space[1000]:insert(0, 'hello, world')
+box.space[1000]:insert{0, 'hello, world'}
 ---
 - [0, 'hello, world']
 ...
@@ -195,7 +195,7 @@ box.snapshot()
 ...
 --# stop server default
 --# start server default
-box.space['_space']:insert(1000, 0, 'test')
+box.space['_space']:insert{1000, 0, 'test'}
 ---
 - [1000, 0, 'test']
 ...
@@ -203,7 +203,7 @@ box.space[1000].n
 ---
 - 1000
 ...
-box.space['_space']:delete(1000)
+box.space['_space']:delete{1000}
 ---
 - [1000, 0, 'test']
 ...

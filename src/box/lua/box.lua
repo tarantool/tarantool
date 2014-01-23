@@ -64,9 +64,9 @@ function box.insert(space, ...)
 end
 
 --
-function box.update(space, key, ...)
+function box.update(space, key, ops)
     return box.process(box.net.box.UPDATE,
-        box.pack('iVa', space, 1, key, msgpack.encode({...})))
+        box.pack('iVa', space, 1, key, msgpack.encode(ops)))
 end
 
 function box.dostring(s, ...)

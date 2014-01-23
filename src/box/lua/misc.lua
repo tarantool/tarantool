@@ -16,7 +16,7 @@ function box.counter.inc(space, ...)
 
     local tuple
     while true do
-        tuple = box.update(space, key, {'+', cnt_index, 1})
+        tuple = box.update(space, key, {{'+', cnt_index, 1}})
         if tuple ~= nil then break end
         local data = {...}
         table.insert(data, 1)
@@ -42,7 +42,7 @@ function box.counter.dec(space, ...)
         box.delete(space, ...)
         return 0
     else
-        tuple = box.update(space, key, {'-', cnt_index, 1})
+        tuple = box.update(space, key, {{'-', cnt_index, 1}})
         return tuple[cnt_index]
     end
 end

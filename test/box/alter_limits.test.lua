@@ -45,12 +45,11 @@ s.name
 s:drop()
 -- space with no indexes - test update, delete, select, truncate
 s = box.schema.create_space('tweedledum')
-s:insert(0)
-s:select(0)
-s:select_range(0, 0, 0)
-s:delete(0)
-s:update(0, {"=", 0, 0})
-s:replace(0)
+s:insert{0}
+s:select{}
+s:delete{0}
+s:update(0, {{"=", 0, 0}})
+s:insert{0}
 s.index[0]
 s:truncate()
 s.enabled
@@ -69,8 +68,8 @@ box.space['tweedledum']
 s:rename(string.rep('t', box.schema.NAME_MAX * 2))
 s.name
 -- access to a renamed space
-s:insert(0)
-s:delete(0)
+s:insert{0}
+s:delete{0}
 -- cleanup
 s:drop()
 -- create a space with reserved id (ok, but warns in the log)
@@ -81,31 +80,31 @@ s = box.schema.create_space('test', { arity = 2 })
 s.arity
 s:create_index('primary')
 -- arity actually works
-s:insert(1)
-s:insert(1, 2)
-s:insert(1, 2, 3)
-s:select(0)
+s:insert{1}
+s:insert{1, 2}
+s:insert{1, 2, 3}
+s:select{}
 -- increase arity -- error
-box.space['_space']:update(s.n, {"=", 1, 3})
-s:select(0)
+box.space['_space']:update(s.n, {{"=", 1, 3}})
+s:select{}
 -- decrease arity - error
-box.space['_space']:update(s.n, {"=", 1, 1})
+box.space['_space']:update(s.n, {{"=", 1, 1}})
 -- remove arity - ok
-box.space['_space']:update(s.n, {"=", 1, 0})
-s:select(0)
+box.space['_space']:update(s.n, {{"=", 1, 0}})
+s:select{}
 -- increase arity - error
-box.space['_space']:update(s.n, {"=", 1, 3})
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 s:truncate()
-s:select(0)
+s:select{}
 -- set arity of an empty space
-box.space['_space']:update(s.n, {"=", 1, 3})
-s:select(0)
+box.space['_space']:update(s.n, {{"=", 1, 3}})
+s:select{}
 -- arity actually works
-s:insert(3, 4)
-s:insert(3, 4, 5)
-s:insert(3, 4, 5, 6)
-s:insert(7, 8, 9)
-s:select(0)
+s:insert{3, 4}
+s:insert{3, 4, 5}
+s:insert{3, 4, 5, 6}
+s:insert{7, 8, 9}
+s:select{}
 -- check transition of space from enabled to disabled on
 -- deletion of the primary key
 s.enabled
@@ -248,32 +247,32 @@ s:drop()
 -- ----------------------------------------------------------------
 s = box.schema.create_space('full')
 s:create_index('primary', { type = 'tree', parts =  { 0, 'str' }})
-s:insert('No such movie', 999)
-s:insert('Barbara', 2012)
-s:insert('Cloud Atlas', 2012)
-s:insert('Almanya - Willkommen in Deutschland', 2011)
-s:insert('Halt auf freier Strecke', 2011)
-s:insert('Homevideo', 2011)
-s:insert('Die Fremde', 2010)
+s:insert{'No such movie', 999}
+s:insert{'Barbara', 2012}
+s:insert{'Cloud Atlas', 2012}
+s:insert{'Almanya - Willkommen in Deutschland', 2011}
+s:insert{'Halt auf freier Strecke', 2011}
+s:insert{'Homevideo', 2011}
+s:insert{'Die Fremde', 2010}
 -- create index with data
 s:create_index('year', { type = 'tree', unique=false, parts = { 1, 'num'} })
-s.index.primary:select()
+s.index.primary:select{}
 -- a duplicate in the created index
 s:create_index('nodups', { type = 'tree', unique=true, parts = { 1, 'num'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
-s.index.primary:select()
-box.space['_index']:update({s.n, s.index.year.id}, {"=", 7, 'num'})
+s.index.primary:select{}
+box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
 -- ambiguous field type
 s:create_index('str', { type = 'tree', unique =  false, parts = { 1, 'str'}})
 -- create index on a non-existing field
 s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 2, 'str'}})
 s.index.year:drop()
-s:insert('Der Baader Meinhof Komplex', '2009 ')
+s:insert{'Der Baader Meinhof Komplex', '2009 '}
 -- create an index on a field with a wrong type
 s:create_index('year', { type = 'tree', unique = false, parts = { 1, 'num'}})
 -- a field is missing
-s:replace('Der Baader Meinhof Komplex')
+s:replace{'Der Baader Meinhof Komplex'}
 s:create_index('year', { type = 'tree', unique = false, parts = { 1, 'num'}})
 s:drop()
 -- unique -> non-unique transition
@@ -282,16 +281,16 @@ s = box.schema.create_space('test')
 s:create_index('primary', { unique = false })
 -- create primary key
 s:create_index('primary', { type = 'hash' })
-s:insert(1, 1)
+s:insert{1, 1}
 s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'num'}})
-s:insert(2, 1)
-s.index.secondary:alter({ unique = true })
-s:delete(2)
-s.index.secondary:alter({ unique = true })
-s:insert(2, 1)
-s:insert(2, 2)
-s.index.secondary:alter({ unique = false})
-s:insert(3, 2)
+s:insert{2, 1}
+s.index.secondary:alter{ unique = true }
+s:delete{2}
+s.index.secondary:alter{ unique = true }
+s:insert{2, 1}
+s:insert{2, 2}
+s.index.secondary:alter{ unique = false}
+s:insert{3, 2}
 s:drop()
 -- ----------------------------------------------------------------
 -- SPACE CACHE: what happens to a space cache when an object is gone
@@ -303,7 +302,7 @@ s1.index.primary.id
 primary = s1.index.primary
 s.index.primary:drop()
 primary.id
-primary:select()
+primary:select{}
 s:drop()
 -- @todo: add a test case for dangling iterator (currently no checks
 -- for a dangling iterator in the code
@@ -321,11 +320,11 @@ s_full = box.schema.create_space('s_full')
 s_full:create_index('primary')
 s_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 
-s_full:insert(1, 1, 'a')
-s_full:insert(2, 2, 'b')
-s_full:insert(3, 3, 'c')
-s_full:insert(4, 4, 'd')
-s_full:insert(5, 5, 'e')
+s_full:insert{1, 1, 'a'}
+s_full:insert{2, 2, 'b'}
+s_full:insert{3, 3, 'c'}
+s_full:insert{4, 4, 'd'}
+s_full:insert{5, 5, 'e'}
 
 s_nil = box.schema.create_space('s_nil')
 
@@ -336,10 +335,10 @@ box.snapshot()
 s_drop:drop()
 
 s_nil:create_index('primary', { type = 'hash'})
-s_nil:insert(1,2,3,4,5,6);
-s_nil:insert(7, 8, 9, 10, 11,12)
+s_nil:insert{1,2,3,4,5,6}
+s_nil:insert{7, 8, 9, 10, 11,12}
 s_nil:create_index('secondary', { type = 'tree', unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
-s_nil:insert(13, 14, 15, 16, 17)
+s_nil:insert{13, 14, 15, 16, 17}
 
 r_empty = box.schema.create_space('r_empty')
 r_empty:create_index('primary')
@@ -349,16 +348,16 @@ r_full = box.schema.create_space('r_full')
 r_full:create_index('primary', { type = 'tree', unique = true, parts = {0, 'num'}})
 r_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 
-r_full:insert(1, 1, 'a')
-r_full:insert(2, 2, 'b')
-r_full:insert(3, 3, 'c')
-r_full:insert(4, 4, 'd')
-r_full:insert(5, 5, 'e')
+r_full:insert{1, 1, 'a'}
+r_full:insert{2, 2, 'b'}
+r_full:insert{3, 3, 'c'}
+r_full:insert{4, 4, 'd'}
+r_full:insert{5, 5, 'e'}
 
 s_full:create_index('multikey', { type = 'tree', unique = true, parts = { 1, 'num', 2, 'str'}})
-s_full:insert(6, 6, 'f')
-s_full:insert(7, 7, 'g')
-s_full:insert(8, 8, 'h')
+s_full:insert{6, 6, 'f'}
+s_full:insert{7, 7, 'g'}
+s_full:insert{8, 8, 'h'}
 
 r_disabled = box.schema.create_space('r_disabled')
 

@@ -20,7 +20,7 @@ do
     function _insert(_begin, _end)
         a = {}
         for i = _begin, _end do
-            table.insert(a, box.insert(0, i, 'the tuple '..i))
+            table.insert(a, box.space[0]:insert{i, 'the tuple '..i})
         end
         return unpack(a)
     end
@@ -28,7 +28,7 @@ do
     function _select(_begin, _end)
         a = {}
         for i = _begin, _end do
-            table.insert(a, box.select(0, 0, i))
+            table.insert(a, box.space[0]:select{i})
         end
         return unpack(a)
     end
@@ -55,22 +55,20 @@ a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
 
-box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+space = box.schema.create_space('tweedledum', { id = 0 })
+space:create_index('primary', { type = 'hash' })
 
 _insert(1, 10)
 _select(1, 10)
 
 --# set connection replica
-_wait_lsn(12)
+_wait_lsn(10)
 _select(1, 10)
 
 --# stop server default
 box.fiber.sleep(0.2)
 
 --# set connection hot_standby
-box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
 
 _insert(11, 20)
 _select(11, 20)

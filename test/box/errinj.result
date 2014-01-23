@@ -25,14 +25,14 @@ box.errinj.set("some-injection") -- check error
 ---
 - 'error: can''t find error injection ''some-injection'''
 ...
-space:select(0,222444)
+space:select{222444}
 ---
 ...
 box.errinj.set("ERRINJ_TESTING", true)
 ---
 - ok
 ...
-space:select(0,222444)
+space:select{222444}
 ---
 - error: Error injection 'ERRINJ_TESTING'
 ...
@@ -45,18 +45,18 @@ box.errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-space:insert(1)
+space:insert{1}
 ---
 - error: Failed to write to disk
 ...
-space:select(0,1)
+space:select{1}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-space:insert(1)
+space:insert{1}
 ---
 - [1]
 ...
@@ -64,15 +64,15 @@ box.errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-space:update(1, {'=', 0, 2})
+space:update(1, {{'=', 0, 2}})
 ---
 - error: Failed to write to disk
 ...
-space:select(0,1)
+space:select{1}
 ---
 - [1]
 ...
-space:select(0,2)
+space:select{2}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
@@ -87,18 +87,18 @@ box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-space:insert(1)
+space:insert{1}
 ---
 - error: Failed to write to disk
 ...
-space:select(0,1)
+space:select{1}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-space:insert(1)
+space:insert{1}
 ---
 - [1]
 ...
@@ -106,29 +106,29 @@ box.errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-space:update(1, {'=', 0, 2})
+space:update(1, {{'=', 0, 2}})
 ---
 - error: Failed to write to disk
 ...
-space:select(0,1)
+space:select{1}
 ---
 - [1]
 ...
-space:select(0,2)
+space:select{2}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-space:update(1, {'=', 0, 2})
+space:update(1, {{'=', 0, 2}})
 ---
 - [2]
 ...
-space:select(0,1)
+space:select{1}
 ---
 ...
-space:select(0,2)
+space:select{2}
 ---
 - [2]
 ...
@@ -166,11 +166,11 @@ s_withdata = box.schema.create_space('withdata')
 s_withdata:create_index('primary', { type = 'tree' })
 ---
 ...
-s_withdata:insert(1, 2, 3, 4, 5)
+s_withdata:insert{1, 2, 3, 4, 5}
 ---
 - [1, 2, 3, 4, 5]
 ...
-s_withdata:insert(4, 5, 6, 7, 8)
+s_withdata:insert{4, 5, 6, 7, 8}
 ---
 - [4, 5, 6, 7, 8]
 ...
@@ -193,7 +193,7 @@ s_disabled.enabled
 ---
 - false
 ...
-s_disabled:insert(0)
+s_disabled:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
@@ -243,7 +243,7 @@ s_disabled.enabled
 ---
 - true
 ...
-s_disabled:insert(0)
+s_disabled:insert{0}
 ---
 - [0]
 ...

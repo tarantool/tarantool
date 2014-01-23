@@ -123,28 +123,23 @@ s:drop()
 s = box.schema.create_space('tweedledum')
 ---
 ...
-s:insert(0)
+s:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:select(0)
+s:select{}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:select_range(0, 0, 0)
----
-- error: '[string "-- schema.lua (internal file)..."]:248: attempt to index a nil
-    value'
-...
-s:delete(0)
+s:delete{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:update(0, {"=", 0, 0})
+s:update(0, {{"=", 0, 0}})
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:replace(0)
+s:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
@@ -199,11 +194,11 @@ s.name
 - tweedledee
 ...
 -- access to a renamed space
-s:insert(0)
+s:insert{0}
 ---
 - [0]
 ...
-s:delete(0)
+s:delete{0}
 ---
 - [0]
 ...
@@ -233,82 +228,82 @@ s:create_index('primary')
 ---
 ...
 -- arity actually works
-s:insert(1)
+s:insert{1}
 ---
 - error: Tuple field count 1 does not match space 512 arity 2
 ...
-s:insert(1, 2)
+s:insert{1, 2}
 ---
 - [1, 2]
 ...
-s:insert(1, 2, 3)
+s:insert{1, 2, 3}
 ---
 - error: Tuple field count 3 does not match space 512 arity 2
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- increase arity -- error
-box.space['_space']:update(s.n, {"=", 1, 3})
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- decrease arity - error
-box.space['_space']:update(s.n, {"=", 1, 1})
+box.space['_space']:update(s.n, {{"=", 1, 1}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 -- remove arity - ok
-box.space['_space']:update(s.n, {"=", 1, 0})
+box.space['_space']:update(s.n, {{"=", 1, 0}})
 ---
 - [512, 0, 'test', '']
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- increase arity - error
-box.space['_space']:update(s.n, {"=", 1, 3})
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 s:truncate()
 ---
 ...
-s:select(0)
+s:select{}
 ---
 ...
 -- set arity of an empty space
-box.space['_space']:update(s.n, {"=", 1, 3})
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - [512, 3, 'test', '']
 ...
-s:select(0)
+s:select{}
 ---
 ...
 -- arity actually works
-s:insert(3, 4)
+s:insert{3, 4}
 ---
 - error: Tuple field count 2 does not match space 512 arity 3
 ...
-s:insert(3, 4, 5)
+s:insert{3, 4, 5}
 ---
 - [3, 4, 5]
 ...
-s:insert(3, 4, 5, 6)
+s:insert{3, 4, 5, 6}
 ---
 - error: Tuple field count 4 does not match space 512 arity 3
 ...
-s:insert(7, 8, 9)
+s:insert{7, 8, 9}
 ---
 - [7, 8, 9]
 ...
-s:select(0)
+s:select{}
 ---
 - [3, 4, 5]
 - [7, 8, 9]
@@ -698,31 +693,31 @@ s = box.schema.create_space('full')
 s:create_index('primary', { type = 'tree', parts =  { 0, 'str' }})
 ---
 ...
-s:insert('No such movie', 999)
+s:insert{'No such movie', 999}
 ---
 - ['No such movie', 999]
 ...
-s:insert('Barbara', 2012)
+s:insert{'Barbara', 2012}
 ---
 - ['Barbara', 2012]
 ...
-s:insert('Cloud Atlas', 2012)
+s:insert{'Cloud Atlas', 2012}
 ---
 - ['Cloud Atlas', 2012]
 ...
-s:insert('Almanya - Willkommen in Deutschland', 2011)
+s:insert{'Almanya - Willkommen in Deutschland', 2011}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 ...
-s:insert('Halt auf freier Strecke', 2011)
+s:insert{'Halt auf freier Strecke', 2011}
 ---
 - ['Halt auf freier Strecke', 2011]
 ...
-s:insert('Homevideo', 2011)
+s:insert{'Homevideo', 2011}
 ---
 - ['Homevideo', 2011]
 ...
-s:insert('Die Fremde', 2010)
+s:insert{'Die Fremde', 2010}
 ---
 - ['Die Fremde', 2010]
 ...
@@ -730,7 +725,7 @@ s:insert('Die Fremde', 2010)
 s:create_index('year', { type = 'tree', unique=false, parts = { 1, 'num'} })
 ---
 ...
-s.index.primary:select()
+s.index.primary:select{}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 - ['Barbara', 2012]
@@ -750,7 +745,7 @@ s.index.year:alter({unique=true})
 ---
 - error: Duplicate key exists in unique index 1
 ...
-s.index.primary:select()
+s.index.primary:select{}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 - ['Barbara', 2012]
@@ -760,7 +755,7 @@ s.index.primary:select()
 - ['Homevideo', 2011]
 - ['No such movie', 999]
 ...
-box.space['_index']:update({s.n, s.index.year.id}, {"=", 7, 'num'})
+box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
 ---
 - [512, 1, 'year', 'tree', 0, 1, 1, 'num']
 ...
@@ -778,7 +773,7 @@ s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 2, 'str'
 s.index.year:drop()
 ---
 ...
-s:insert('Der Baader Meinhof Komplex', '2009 ')
+s:insert{'Der Baader Meinhof Komplex', '2009 '}
 ---
 - ['Der Baader Meinhof Komplex', '2009 ']
 ...
@@ -788,7 +783,7 @@ s:create_index('year', { type = 'tree', unique = false, parts = { 1, 'num'}})
 - error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -- a field is missing
-s:replace('Der Baader Meinhof Komplex')
+s:replace{'Der Baader Meinhof Komplex'}
 ---
 - ['Der Baader Meinhof Komplex']
 ...
@@ -812,40 +807,40 @@ s:create_index('primary', { unique = false })
 s:create_index('primary', { type = 'hash' })
 ---
 ...
-s:insert(1, 1)
+s:insert{1, 1}
 ---
 - [1, 1]
 ...
 s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'num'}})
 ---
 ...
-s:insert(2, 1)
+s:insert{2, 1}
 ---
 - [2, 1]
 ...
-s.index.secondary:alter({ unique = true })
+s.index.secondary:alter{ unique = true }
 ---
 - error: Duplicate key exists in unique index 1
 ...
-s:delete(2)
+s:delete{2}
 ---
 - [2, 1]
 ...
-s.index.secondary:alter({ unique = true })
+s.index.secondary:alter{ unique = true }
 ---
 ...
-s:insert(2, 1)
+s:insert{2, 1}
 ---
 - error: Duplicate key exists in unique index 1
 ...
-s:insert(2, 2)
+s:insert{2, 2}
 ---
 - [2, 2]
 ...
-s.index.secondary:alter({ unique = false})
+s.index.secondary:alter{ unique = false}
 ---
 ...
-s:insert(3, 2)
+s:insert{3, 2}
 ---
 - [3, 2]
 ...
@@ -878,7 +873,7 @@ primary.id
 ---
 - 0
 ...
-primary:select()
+primary:select{}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
@@ -911,23 +906,23 @@ s_full:create_index('primary')
 s_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
-s_full:insert(1, 1, 'a')
+s_full:insert{1, 1, 'a'}
 ---
 - [1, 1, 'a']
 ...
-s_full:insert(2, 2, 'b')
+s_full:insert{2, 2, 'b'}
 ---
 - [2, 2, 'b']
 ...
-s_full:insert(3, 3, 'c')
+s_full:insert{3, 3, 'c'}
 ---
 - [3, 3, 'c']
 ...
-s_full:insert(4, 4, 'd')
+s_full:insert{4, 4, 'd'}
 ---
 - [4, 4, 'd']
 ...
-s_full:insert(5, 5, 'e')
+s_full:insert{5, 5, 'e'}
 ---
 - [5, 5, 'e']
 ...
@@ -947,18 +942,18 @@ s_drop:drop()
 s_nil:create_index('primary', { type = 'hash'})
 ---
 ...
-s_nil:insert(1,2,3,4,5,6);
+s_nil:insert{1,2,3,4,5,6}
 ---
 - [1, 2, 3, 4, 5, 6]
 ...
-s_nil:insert(7, 8, 9, 10, 11,12)
+s_nil:insert{7, 8, 9, 10, 11,12}
 ---
 - [7, 8, 9, 10, 11, 12]
 ...
 s_nil:create_index('secondary', { type = 'tree', unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
 ---
 ...
-s_nil:insert(13, 14, 15, 16, 17)
+s_nil:insert{13, 14, 15, 16, 17}
 ---
 - [13, 14, 15, 16, 17]
 ...
@@ -980,38 +975,38 @@ r_full:create_index('primary', { type = 'tree', unique = true, parts = {0, 'num'
 r_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
-r_full:insert(1, 1, 'a')
+r_full:insert{1, 1, 'a'}
 ---
 - [1, 1, 'a']
 ...
-r_full:insert(2, 2, 'b')
+r_full:insert{2, 2, 'b'}
 ---
 - [2, 2, 'b']
 ...
-r_full:insert(3, 3, 'c')
+r_full:insert{3, 3, 'c'}
 ---
 - [3, 3, 'c']
 ...
-r_full:insert(4, 4, 'd')
+r_full:insert{4, 4, 'd'}
 ---
 - [4, 4, 'd']
 ...
-r_full:insert(5, 5, 'e')
+r_full:insert{5, 5, 'e'}
 ---
 - [5, 5, 'e']
 ...
 s_full:create_index('multikey', { type = 'tree', unique = true, parts = { 1, 'num', 2, 'str'}})
 ---
 ...
-s_full:insert(6, 6, 'f')
+s_full:insert{6, 6, 'f'}
 ---
 - [6, 6, 'f']
 ...
-s_full:insert(7, 7, 'g')
+s_full:insert{7, 7, 'g'}
 ---
 - [7, 7, 'g']
 ...
-s_full:insert(8, 8, 'h')
+s_full:insert{8, 8, 'h'}
 ---
 - [8, 8, 'h']
 ...

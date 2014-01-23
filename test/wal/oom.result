@@ -11,7 +11,7 @@ i = 1;
 ---
 ...
 while true do
-    space:insert(space:len(), string.rep('test', i))
+    space:insert{space:len(), string.rep('test', i)}
     i = i + 1
 end;
 ---
@@ -25,7 +25,7 @@ i = 1;
 ---
 ...
 while true do
-    space:insert(space:len(), string.rep('test', i))
+    space:insert{space:len(), string.rep('test', i)}
     i = i + 1
 end;
 ---
@@ -39,7 +39,7 @@ i = 1;
 ---
 ...
 while true do
-    space:insert(space:len(), string.rep('test', i))
+    space:insert{space:len(), string.rep('test', i)}
     i = i + 1
 end;
 ---
@@ -50,23 +50,23 @@ space:len()
 ---
 - 219
 ...
-space.index['primary']:select(0)
+space.index['primary']:select{0}
 ---
 - [0, 'test']
 ...
-space.index['primary']:select(5)
+space.index['primary']:select{5}
 ---
 - [5, 'testtesttesttesttesttest']
 ...
-space.index['primary']:select(9)
+space.index['primary']:select{9}
 ---
 - [9, 'testtesttesttesttesttesttesttesttesttest']
 ...
-space.index['primary']:select(11)
+space.index['primary']:select{11}
 ---
 - [11, 'testtesttesttesttesttesttesttesttesttesttesttest']
 ...
-space.index['primary']:select(15)
+space.index['primary']:select{15}
 ---
 - [15, 'testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest']
 ...
@@ -144,11 +144,11 @@ t
 space:truncate()
 ---
 ...
-space:insert(0, 'test')
+space:insert{0, 'test'}
 ---
 - [0, 'test']
 ...
-space.index['primary']:select(0)
+space.index['primary']:select{0}
 ---
 - [0, 'test']
 ...

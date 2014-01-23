@@ -32,7 +32,7 @@ box.fiber.resume(fiber)
 -- Test insert from start-up script
 --
 
-space:insert(2, 4, 8, 16)
+space:insert{2, 4, 8, 16}
 
 --
 -- A test case for https://github.com/tarantool/tarantool/issues/53

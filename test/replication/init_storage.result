@@ -1,56 +1,24 @@
 space = box.schema.create_space('test', {id =  42})
 ---
 ...
-space:create_index('primary', { type = 'hash', parts = { 0, 'num' } })
+space:create_index('primary', { type = 'hash'})
 ---
 ...
-for k = 1, 9 do space:insert(k, k*k) end
+for k = 1, 9 do space:insert{k, k*k} end
 ---
 ...
 -------------------------------------------------------------
-replica test 1 (must be failed)
+replica test 1 (no such space)
 -------------------------------------------------------------
-box.select(42, 0, 1)
+box.space.test
 ---
-- error: Space 42 does not exist
-...
-box.select(42, 0, 2)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 3)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 4)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 5)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 6)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 7)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 8)
----
-- error: Space 42 does not exist
-...
-box.select(42, 0, 9)
----
-- error: Space 42 does not exist
+- null
 ...
 box.snapshot()
 ---
 - ok
 ...
-for k = 10, 19 do box.insert(42, k, k*k*k) end
+for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
 ---
 ...
 -------------------------------------------------------------
@@ -59,79 +27,79 @@ replica test 2 (must be ok)
 space = box.space.test
 ---
 ...
-space:select(0, 1)
+space:select{1}
 ---
 - [1, 1]
 ...
-space:select(0, 2)
+space:select{2}
 ---
 - [2, 4]
 ...
-space:select(0, 3)
+space:select{3}
 ---
 - [3, 9]
 ...
-space:select(0, 4)
+space:select{4}
 ---
 - [4, 16]
 ...
-space:select(0, 5)
+space:select{5}
 ---
 - [5, 25]
 ...
-space:select(0, 6)
+space:select{6}
 ---
 - [6, 36]
 ...
-space:select(0, 7)
+space:select{7}
 ---
 - [7, 49]
 ...
-space:select(0, 8)
+space:select{8}
 ---
 - [8, 64]
 ...
-space:select(0, 9)
+space:select{9}
 ---
 - [9, 81]
 ...
-space:select(0, 10)
+space:select{10}
 ---
 - [10, 1000]
 ...
-space:select(0, 11)
+space:select{11}
 ---
 - [11, 1331]
 ...
-space:select(0, 12)
+space:select{12}
 ---
 - [12, 1728]
 ...
-space:select(0, 13)
+space:select{13}
 ---
 - [13, 2197]
 ...
-space:select(0, 14)
+space:select{14}
 ---
 - [14, 2744]
 ...
-space:select(0, 15)
+space:select{15}
 ---
 - [15, 3375]
 ...
-space:select(0, 16)
+space:select{16}
 ---
 - [16, 4096]
 ...
-space:select(0, 17)
+space:select{17}
 ---
 - [17, 4913]
 ...
-space:select(0, 18)
+space:select{18}
 ---
 - [18, 5832]
 ...
-space:select(0, 19)
+space:select{19}
 ---
 - [19, 6859]
 ...

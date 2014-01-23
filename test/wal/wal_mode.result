@@ -8,15 +8,15 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 ---
 ...
-space:insert(1)
+space:insert{1}
 ---
 - [1]
 ...
-space:insert(2)
+space:insert{2}
 ---
 - [2]
 ...
-space:insert(3)
+space:insert{3}
 ---
 - [3]
 ...

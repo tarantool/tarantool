@@ -2,42 +2,41 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
 space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
 
-space:insert('brave', 'new', 'world')
+space:insert{'brave', 'new', 'world'}
 space.index['minmax']:min()
 space.index['minmax']:max()
-space.index['minmax']:select('new', 'world')
+space.index['minmax']:select{'new', 'world'}
 
 -- A test case for Bug #904208
 -- "assert failed, when key cardinality is greater than index cardinality"
 --  https://bugs.launchpad.net/tarantool/+bug/904208
 
-space.index['minmax']:select('new', 'world', 'order')
-space:delete('brave')
+space.index['minmax']:select{'new', 'world', 'order'}
+space:delete{'brave'}
 
 -- A test case for Bug #902091
 -- "Positioned iteration over a multipart index doesn't work"
 -- https://bugs.launchpad.net/tarantool/+bug/902091
 
-space:insert('item 1', 'alabama', 'song')
-space.index['minmax']:select('alabama')
-space:insert('item 2', 'california', 'dreaming ')
-space:insert('item 3', 'california', 'uber alles')
-space:insert('item 4', 'georgia', 'on my mind')
-iter, tuple = space.index['minmax']:next('california')
-tuple
-_, tuple = space.index['minmax']:next(iter)
-tuple
-space:delete('item 1')
-space:delete('item 2')
-space:delete('item 3')
-space:delete('item 4')
+space:insert{'item 1', 'alabama', 'song'}
+space.index['minmax']:select{'alabama'}
+space:insert{'item 2', 'california', 'dreaming '}
+space:insert{'item 3', 'california', 'uber alles'}
+space:insert{'item 4', 'georgia', 'on my mind'}
+iter, state = space.index['minmax']:iterator(box.index.GE, 'california')
+iter()
+iter()
+space:delete{'item 1'}
+space:delete{'item 2'}
+space:delete{'item 3'}
+space:delete{'item 4'}
 space:truncate()
 
 --
 -- Test that we print index number in error ER_INDEX_VIOLATION
 --
-space:insert('1', 'hello', 'world')
-space:insert('2', 'hello', 'world')
+space:insert{'1', 'hello', 'world'}
+space:insert{'2', 'hello', 'world'}
 space:drop()
 
 --
@@ -47,9 +46,9 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
 space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = false })
 
-space:insert(1234567, 'new', 'world')
-space:insert(0, 'of', 'puppets')
-space:insert(00000001ULL, 'of', 'might', 'and', 'magic')
+space:insert{1234567, 'new', 'world'}
+space:insert{0, 'of', 'puppets'}
+space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
 space.index['minmax']:select_range(2, 'of')
 space.index['minmax']:select_reverse_range(2, 'of')
 space:truncate()
@@ -58,8 +57,8 @@ space:truncate()
 -- A test case for Bug#1060967: truncation of 64-bit numbers
 --
 
-space:insert(2^51, 'hello', 'world')
-space.index['primary']:select(2^51)
+space:insert{2^51, 'hello', 'world'}
+space.index['primary']:select{2^51}
 space:drop()
 
 --
@@ -68,18 +67,18 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type  = 'tree', parts = {0, 'num'}, unique = true })
 
-space:insert(tonumber64('18446744073709551615'), 'magic')
-tuple = space.index['primary']:select(tonumber64('18446744073709551615'))
+space:insert{tonumber64('18446744073709551615'), 'magic'}
+tuple = space.index['primary']:select{tonumber64('18446744073709551615')}
 num = tuple[0]
 num
 type(num) == 'cdata'
 num == tonumber64('18446744073709551615')
 num = tuple[0]
 num == tonumber64('18446744073709551615')
-space:delete(18446744073709551615ULL)
-space:insert(125ULL, 'magic')
-tuple = space.index['primary']:select(125)
-tuple2 = space.index['primary']:select(125LL)
+space:delete{18446744073709551615ULL}
+space:insert{125ULL, 'magic'}
+tuple = space.index['primary']:select{125}
+tuple2 = space.index['primary']:select{125LL}
 num = tuple[0]
 num2 = tuple2[0]
 num, num2
@@ -93,10 +92,10 @@ space:truncate()
 -- Tests for lua box.auto_increment with NUM keys
 --
 -- lua box.auto_increment() with NUM keys testing
-box.auto_increment(space.n, 'a')
-space:insert(tonumber64(5))
-box.auto_increment(space.n, 'b')
-box.auto_increment(space.n, 'c')
+space:auto_increment{'a'}
+space:insert{tonumber64(5)}
+space:auto_increment{'b'}
+space:auto_increment{'c'}
 
 space:drop()
 
@@ -109,16 +108,16 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
 space:create_index('range', { type = 'tree', parts = {1, 'num', 0, 'num'}, unique = true })
 
-space:insert(0, 0)
-space:insert(1, 0)
-space:insert(2, 0)
-space:insert(3, 0)
-space:insert(4, 0)
-space:insert(5, 0)
-space:insert(6, 0)
-space:insert(7, 0)
-space:insert(8, 0)
-space:insert(9, 0)
+space:insert{0, 0}
+space:insert{1, 0}
+space:insert{2, 0}
+space:insert{3, 0}
+space:insert{4, 0}
+space:insert{5, 0}
+space:insert{6, 0}
+space:insert{7, 0}
+space:insert{8, 0}
+space:insert{9, 0}
 space.index['range']:select_range(10)
 space.index['range']:select_reverse_range(10)
 space.index['range']:select_reverse_range(4)
@@ -136,7 +135,7 @@ tid = 999
 --# setopt delimiter ';'
 for sid = 1, 2 do
     for i = 1, 3 do
-        space:insert('pid_'..pid, 'sid_'..sid, 'tid_'..tid)
+        space:insert{'pid_'..pid, 'sid_'..sid, 'tid_'..tid}
         pid = pid + 1
         tid = tid - 1
     end
@@ -146,22 +145,22 @@ end;
 index = space.index['i1']
 
 t = {}
-for k, v in index.next, index, 'sid_1' do table.insert(t, v) end
+for v in index:iterator(box.index.GE, 'sid_1') do table.insert(t, v) end
 t
 t = {}
-for k, v in index.prev, index, 'sid_2' do table.insert(t, v) end
+for v in index:iterator(box.index.LE, 'sid_2') do table.insert(t, v) end
 t
 t = {}
-for k, v in index.next_equal, index, 'sid_1' do table.insert(t, v) end
+for v in index:iterator(box.index.EQ, 'sid_1') do table.insert(t, v) end
 t
 t = {}
-for k, v in index.prev_equal, index, 'sid_1' do table.insert(t, v) end
+for v in index:iterator(box.index.REQ, 'sid_1') do table.insert(t, v) end
 t
 t = {}
-for k, v in index.next_equal, index, 'sid_2' do table.insert(t, v) end
+for v in index:iterator(box.index.EQ, 'sid_2') do table.insert(t, v) end
 t
 t = {}
-for k, v in index.prev_equal, index, 'sid_2' do table.insert(t, v) end
+for v in index:iterator(box.index.REQ, 'sid_2') do table.insert(t, v) end
 t
 t = {}
 index = nil
@@ -174,12 +173,12 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
 space:create_index('i1', { type = 'tree', parts = {1, 'num', 2, 'num'}, unique = false })
-space:insert(1, 1, 1)
-space:insert(2, 2, 0)
-space:insert(3, 2, 1)
-space:insert(4, 3, 0)
-space:insert(5, 3, 1)
-space:insert(6, 3, 2)
+space:insert{1, 1, 1}
+space:insert{2, 2, 0}
+space:insert{3, 2, 1}
+space:insert{4, 3, 0}
+space:insert{5, 3, 1}
+space:insert{6, 3, 2}
 space.index['i1']:count(1)
 space.index['i1']:count(2)
 space.index['i1']:count(2, 1)
@@ -198,7 +197,7 @@ space:drop()
 --
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
-t = space:insert('1', '2', '3', '4', '5', '6', '7')
+t = space:insert{'1', '2', '3', '4', '5', '6', '7'}
 t:transform(7, 0, '8', '9', '100')
 t:transform(0, 1)
 t:transform(1, 4)
@@ -234,7 +233,7 @@ t = nil
 --
 -- First space for hash_str tests
 
-t = space:insert('A', '2', '3', '4', '3', '2', '5', '6', '3', '7')
+t = space:insert{'A', '2', '3', '4', '3', '2', '5', '6', '3', '7'}
 t:find('2')
 t:find('4')
 t:find('5')
@@ -250,7 +249,7 @@ t:find(2, '2')
 t:find(89, '2')
 t:findall(4, '3')
 
-t = space:insert('Z', '2', 2, 3, tonumber64(2))
+t = space:insert{'Z', '2', 2, 3, tonumber64(2)}
 t:find(2)
 t:findall(tonumber64(2))
 t:find('2')
@@ -285,11 +284,11 @@ push_collection(space, 5, 1038784, 'hey')
 -- Tests for lua box.auto_increment
 --
 space:truncate()
-box.auto_increment(space.n, 'a')
-space:insert(5)
-box.auto_increment(space.n, 'b')
-box.auto_increment(space.n, 'c')
-space:auto_increment('d')
+space:auto_increment{'a'}
+space:insert{5}
+space:auto_increment{'b'}
+space:auto_increment{'c'}
+space:auto_increment{'d'}
 space:drop()
 
 -- A test case for Bug #1042798
@@ -301,16 +300,16 @@ space:create_index('primary', { type = 'tree', parts = {2, 'num', 1, 'num'}, uni
 
 -- Print key fields in pk
 space.index['primary'].key_field
-space:insert(1, 2, 3, 4)
-space:insert(10, 20, 30, 40)
-space:insert(20, 30, 40, 50)
-space.index['primary']:select()
+space:insert{1, 2, 3, 4}
+space:insert{10, 20, 30, 40}
+space:insert{20, 30, 40, 50}
+space.index['primary']:select{}
 
 -- Truncate must not hang
 space:truncate()
 
 -- Empty result
-space.index['primary']:select()
+space.index['primary']:select{}
 space:drop()
     
 --

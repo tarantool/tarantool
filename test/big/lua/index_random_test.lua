@@ -1,38 +1,38 @@
 function index_random_test(space, index_no)
-	local COUNT = 128; -- enough to resize both sptree and mhash
+	local COUNT = 128 -- enough to resize both sptree and mhash
 	-- clear the space
-	space:truncate();
+	space:truncate()
 	-- randomize
 	math.randomseed(box.time())
 	-- insert values into the index
-	for k=1,COUNT,1 do space:insert(k);  end
+	for k=1,COUNT,1 do space:insert{k}  end
 	-- delete some values from the index
 	for i=1,COUNT/2,1 do
-		local k = math.random(COUNT);
-		local tuple = space:delete(k);
-		if tuple ~= nil then COUNT = COUNT - 1; end
+		local k = math.random(COUNT)
+		local tuple = space:delete{k}
+		if tuple ~= nil then COUNT = COUNT - 1 end
 	end
 
 	local rnd_start = math.random(4294967296)
 	-- try to get all values from the index using index.random
 	local tuples = {}
-	local found = 0;
+	local found = 0
 	while found < COUNT do
 		local rnd = math.random(4294967296)
 		if rnd == rnd_start then
-			error('too many iterations');
-			return nil;
+			error('too many iterations')
+			return nil
 		end
 
 		local tuple = space.index[index_no]:random(rnd)
 		if tuple == nil then
-			error('nil returned');
-			return nil;
+			error('nil returned')
+			return nil
 		end
 
-		local k = tuple[0];
+		local k = tuple[0]
 		if tuples[k] == nil then
-			found = found + 1;
+			found = found + 1
 		end
 		tuples[k] = 1
 	end

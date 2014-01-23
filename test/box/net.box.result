@@ -23,15 +23,15 @@ box.net.box.ping(remote)
 ---
 - true
 ...
-space:insert(123, 'test1', 'test2')
+space:insert{123, 'test1', 'test2'}
 ---
 - [123, 'test1', 'test2']
 ...
-space:select(0, 123)
+space:select{123}
 ---
 - [123, 'test1', 'test2']
 ...
-tuple = remote:select(space.n, 0, 123)
+tuple = remote:select(space.n, {123})
 ---
 ...
 remote:call('box.select', space.n, 0, 123)
@@ -72,15 +72,15 @@ type(tuple)
 ---
 - 3
 ...
-space:update(123, {'=', 1, 'test1-updated'})
+space:update(123, {{'=', 1, 'test1-updated'}})
 ---
 - [123, 'test1-updated', 'test2']
 ...
-remote:update(space.n, 123, {'=', 2, 'test2-updated'})
+remote:update(space.n, 123, {{'=', 2, 'test2-updated'}})
 ---
 - [123, 'test1-updated', 'test2-updated']
 ...
-space:insert(123, 'test1', 'test2')
+space:insert{123, 'test1', 'test2'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
@@ -92,15 +92,15 @@ remote:insert(space.n, 345, 'test1', 'test2')
 ---
 - [345, 'test1', 'test2']
 ...
-remote:select(space.n, 0, 345)
+remote:select(space.n, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:call('box.select', space.n, 0, 345)
+remote:call('box.select', space.n, 0, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-space:select(0, 345)
+space:select{345}
 ---
 - [345, 'test1', 'test2']
 ...
@@ -108,7 +108,7 @@ remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-space:select(0, 345)
+space:select{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
@@ -126,15 +126,15 @@ remote:select_range(space.n, 0, 1000)
 - [123, 'test1-updated', 'test2-updated']
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-space:select(0, 345)
+space:select{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select(space.n, 0, 345)
+remote:select(space.n, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:timeout(0.5):select(space.n, 0, 345)
+remote:timeout(0.5):select(space.n, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
@@ -222,11 +222,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:407: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:406: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:412: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:411: box.net.box: connection
     was closed'
 ...
 space:drop()

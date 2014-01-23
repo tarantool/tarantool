@@ -15,16 +15,16 @@ space:create_index('i4', { type = 'hash', parts = {0, 'str'}, unique = true})
 -- Hash multi-part unique
 space:create_index('i5', { type = 'hash', parts = {1, 'str', 2, 'str'}, unique = true})
 
-space:insert('pid_001', 'sid_001', 'tid_998', 'a')
-space:insert('pid_002', 'sid_001', 'tid_997', 'a')
-space:insert('pid_003', 'sid_002', 'tid_997', 'b')
-space:insert('pid_005', 'sid_002', 'tid_996', 'b')
-space:insert('pid_007', 'sid_003', 'tid_996', 'a')
-space:insert('pid_011', 'sid_004', 'tid_996', 'c')
-space:insert('pid_013', 'sid_005', 'tid_996', 'b')
-space:insert('pid_017', 'sid_006', 'tid_996', 'a')
-space:insert('pid_019', 'sid_005', 'tid_995', 'a')
-space:insert('pid_023', 'sid_005', 'tid_994', 'a')
+space:insert{'pid_001', 'sid_001', 'tid_998', 'a'}
+space:insert{'pid_002', 'sid_001', 'tid_997', 'a'}
+space:insert{'pid_003', 'sid_002', 'tid_997', 'b'}
+space:insert{'pid_005', 'sid_002', 'tid_996', 'b'}
+space:insert{'pid_007', 'sid_003', 'tid_996', 'a'}
+space:insert{'pid_011', 'sid_004', 'tid_996', 'c'}
+space:insert{'pid_013', 'sid_005', 'tid_996', 'b'}
+space:insert{'pid_017', 'sid_006', 'tid_996', 'a'}
+space:insert{'pid_019', 'sid_005', 'tid_995', 'a'}
+space:insert{'pid_023', 'sid_005', 'tid_994', 'a'}
 
 -------------------------------------------------------------------------------
 -- Iterator: tree single-part unique

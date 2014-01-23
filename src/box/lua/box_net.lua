@@ -52,9 +52,9 @@ box.net = {
         end,
 
         -- update a tuple
-        update = function(self, space, key, ...)
+        update = function(self, space, key, ops)
             return self:process(box.net.box.UPDATE,
-                box.pack('iVa', space, 1, key, msgpack.encode({...})))
+                box.pack('iVa', space, 1, key, msgpack.encode(ops)))
         end,
 
         select_limit = function(self, space, index, offset, limit, ...)
@@ -68,15 +68,14 @@ box.net = {
                          key_part_count, ...))
         end,
 
-        select = function(self, space, index, ...)
-            local key_part_count = select('#', ...)
+        select = function(self, space, key)
             return self:process(box.net.box.SELECT,
                     box.pack('iiiiV',
                          space,
-                         index,
+                         0,
                          0, -- offset
                          4294967295, -- limit
-                         key_part_count, ...))
+                         1, key))
         end,
 
 
