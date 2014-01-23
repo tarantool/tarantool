@@ -229,3 +229,81 @@ tfbr2 - 43
 tfbr  - 44
 tfbr2 - 45
 ...
+lua ch = box.ipc.channel(1)
+---
+...
+lua ch:is_closed()
+---
+ - false
+...
+lua passed = false
+---
+...
+lua type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+---
+ - userdata
+...
+lua ch:close()
+---
+...
+lua passed
+---
+ - true
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:put(10)
+---
+ - false
+...
+lua ch:is_closed()
+---
+ - true
+...
+lua ch = box.ipc.channel(1)
+---
+...
+lua ch:put(true)
+---
+ - true
+...
+lua ch:is_closed()
+---
+ - false
+...
+lua passed = false
+---
+...
+lua type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+---
+ - userdata
+...
+lua ch:close()
+---
+...
+lua passed
+---
+ - true
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:put(10)
+---
+ - false
+...
+lua ch:is_closed()
+---
+ - true
+...

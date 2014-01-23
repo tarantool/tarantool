@@ -39,7 +39,14 @@ extern "C" {
 #include "ipc.h"
 #include "lua/init.h"
 
+
+
+
+
 static const char channel_lib[]   = "box.ipc.channel";
+
+
+#define BROADCAST_MASK	(((size_t)1) << (CHAR_BIT * sizeof(size_t) - 1))
 
 /******************** channel ***************************/
 
@@ -131,35 +138,17 @@ lbox_ipc_channel_put(struct lua_State *L)
 	}
 	ch = lbox_check_channel(L, -top);
 
-	lua_getmetatable(L, -top);
-
-	lua_pushstring(L, "rid");
-	lua_gettable(L, -2);
-
-	lua_Integer rid = lua_tointeger(L, -1);
-	if (rid < 0x7FFFFFFF)
-		rid++;
-	else
-		rid = 1;
-
-	lua_pushstring(L, "rid");	/* update object id */
-	lua_pushnumber(L, rid);
-	lua_settable(L, -4);
-
-	lua_pushnumber(L, rid);
 	lua_pushvalue(L, 2);
-	lua_settable(L, -4);
+	size_t vref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 
 	int retval;
-	if (ipc_channel_put_timeout(ch, (void *)rid, timeout) == 0) {
+	if (ipc_channel_put_timeout(ch, (void *)vref, timeout) == 0) {
 		retval = 1;
 	} else {
 		/* put timeout */
+		luaL_unref(L, LUA_REGISTRYINDEX, vref);
 		retval = 0;
-		lua_pushnumber(L, rid);
-		lua_pushnil(L);
-		lua_settable(L, -4);
 	}
 
 	lua_settop(L, top);
@@ -188,30 +177,20 @@ lbox_ipc_channel_get(struct lua_State *L)
 
 	struct ipc_channel *ch = lbox_check_channel(L, 1);
 
-	lua_Integer rid = (lua_Integer)ipc_channel_get_timeout(ch, timeout);
+	size_t vref = (size_t)ipc_channel_get_timeout(ch, timeout);
 
-	if (!rid) {
+
+	if (!vref) {
 		lua_pushnil(L);
 		return 1;
 	}
-
-	lua_getmetatable(L, 1);
-
-	lua_pushstring(L, "broadcast_message");
-	lua_gettable(L, -2);
-
-	if (lua_isnil(L, -1)) {	/* common messages */
-		lua_pop(L, 1);		/* nil */
-
-		lua_pushnumber(L, rid);		/* extract and delete value */
-		lua_gettable(L, -2);
-
-		lua_pushnumber(L, rid);
-		lua_pushnil(L);
-		lua_settable(L, -4);
+	if (vref & BROADCAST_MASK) {
+		vref &= ~BROADCAST_MASK;
+		lua_rawgeti(L, LUA_REGISTRYINDEX, vref);
+		return 1;
 	}
-
-	lua_remove(L, -2);	/* cleanup stack (metatable) */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, vref);
+	luaL_unref(L, LUA_REGISTRYINDEX, vref);
 	return 1;
 }
 
@@ -223,30 +202,17 @@ lbox_ipc_channel_broadcast(struct lua_State *L)
 	if (lua_gettop(L) != 2)
 		luaL_error(L, "usage: channel:broadcast(variable)");
 
-	ch = lbox_check_channel(L, -2);
+	ch = lbox_check_channel(L, 1);
 
 	if (!ipc_channel_has_readers(ch))
 		return lbox_ipc_channel_put(L);
 
-	lua_getmetatable(L, -2);			/* 3 */
 
-	lua_pushstring(L, "broadcast_message");		/* 4 */
-
-	/* save old value */
-	lua_pushstring(L, "broadcast_message");
-	lua_gettable(L, 3);				/* 5 */
-
-	lua_pushstring(L, "broadcast_message");		/* save object */
 	lua_pushvalue(L, 2);
-	lua_settable(L, 3);
-
-	int count = ipc_channel_broadcast(ch, (void *)1);
-
-	lua_settable(L, 3);
-
-	lua_pop(L, 1);		/* stack cleanup */
+	size_t vref = luaL_ref(L, LUA_REGISTRYINDEX);
+	int count = ipc_channel_broadcast(ch, (void *)(vref | BROADCAST_MASK));
+	luaL_unref(L, LUA_REGISTRYINDEX, vref);
 	lua_pushnumber(L, count);
-
 	return 1;
 }
 
@@ -270,6 +236,29 @@ lbox_ipc_channel_has_writers(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_ipc_channel_close(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:close()");
+	struct ipc_channel *ch = lbox_check_channel(L, 1);
+	ipc_channel_close(ch);
+	return 0;
+}
+
+static int
+lbox_ipc_channel_is_closed(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "usage: channel:is_closed()");
+	struct ipc_channel *ch = lbox_check_channel(L, 1);
+	if (ipc_channel_is_closed(ch))
+		lua_pushboolean(L, 1);
+	else
+		lua_pushboolean(L, 0);
+	return 1;
+}
+
 void
 tarantool_lua_ipc_init(struct lua_State *L)
 {
@@ -282,6 +271,8 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{"broadcast",	lbox_ipc_channel_broadcast},
 		{"has_readers",	lbox_ipc_channel_has_readers},
 		{"has_writers",	lbox_ipc_channel_has_writers},
+		{"close",	lbox_ipc_channel_close},
+		{"is_closed",	lbox_ipc_channel_is_closed},
 		{NULL, NULL}
 	};
 	tarantool_lua_register_type(L, channel_lib, channel_meta);

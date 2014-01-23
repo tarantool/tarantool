@@ -2246,7 +2246,18 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.put(channel, message, timeout)</emphasis></term>
+        <term><emphasis role="lua">channel:close()</emphasis></term>
+        <listitem>
+            <simpara>
+		Close channel. All waiters at the channel will be
+		woke up.
+		All following operation <code>channel:put()</code>
+		or <code>channel:get()</code> will do nothing.
+            </simpara>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">channel:put(message, timeout)</emphasis></term>
         <listitem>
             <simpara>
                 Send a message using a channel. If the channel is full,
@@ -2261,7 +2272,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.get(channel, timeout)</emphasis></term>
+        <term><emphasis role="lua">channel:get(timeout)</emphasis></term>
         <listitem>
             <simpara>
                 Fetch a message from a channel. If the channel is empty,
@@ -2276,50 +2287,68 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.broadcast(channel, message, timeout)</emphasis></term>
+        <term><emphasis role="lua">channel:broadcast(message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-             If the channel is empty, <code>box.ipc.channel.broadcast()</code> is equivalent to
-             <code>box.ipc.channel.put()</code>.
-              Otherwise, <code>box.ipc.channel.broadcast()</code> sends the message to all readers of the
-              channel.
+             If the channel is empty, <code>channel:broadcast()</code> is
+             equivalent to
+             <code>channel:put()</code>.
+	     Otherwise, <code>channel:broadcast()</code> sends
+	     the message to all readers of the
+             channel.
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.is_empty(channel)</emphasis></term>
+        <term><emphasis role="lua">channel:is_empty()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is empty (has no messages).
+                Return true if the specified channel is empty
+                (has no messages).
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.is_full(channel)</emphasis></term>
+        <term><emphasis role="lua">channel:is_full()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is full (has no room for a new message).
+                Return true if the specified channel is full
+                (has no room for a new message).
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.has_readers(channel)</emphasis></term>
+        <term><emphasis role="lua">channel:has_readers()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is empty and has readers waiting
-                for a message (because they have issued <code>box.ipc.channel.get()</code> and then
+                Return true if the specified channel is empty and
+                has readers waiting
+                for a message (because they have issued
+                <code>channel:get()</code> and then
                 blocked).
                 Otherwise return false.
             </simpara>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.has_writers(channel)</emphasis></term>
+        <term><emphasis role="lua">channel:has_writers()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is full and has writers waiting
-                (because they have issued <code>box.ipc.channel.put()</code> and then blocked
+                Return true if the specified channel is full
+                and has writers waiting
+                (because they have issued <code>channel:put()</code>
+                and then blocked
                 due to lack of room). Otherwise return false.
+            </simpara>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">channel:is_closed()</emphasis></term>
+        <listitem>
+            <simpara>
+                Return true if the specified channel is already
+                closed.
+                Otherwise return false.
             </simpara>
         </listitem>
     </varlistentry>

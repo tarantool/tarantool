@@ -165,4 +165,17 @@ ipc_channel_has_readers(struct ipc_channel *ch);
 bool
 ipc_channel_has_writers(struct ipc_channel *ch);
 
+
+/**
+ * @brief close the channel. Wake up readers and writers (if they are exists)
+ */
+void
+ipc_channel_close(struct ipc_channel *ch);
+
+/**
+ * @brief return true if the channel is closed
+ */
+bool
+ipc_channel_is_closed(struct ipc_channel *ch);
+
 #endif /* TARANTOOL_IPC_H_INCLUDED */
