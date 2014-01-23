@@ -223,6 +223,8 @@ s:drop()
 -- modify index
 s = box.schema.create_space('test')
 s:create_index('primary', { type = 'hash' })
+-- correct error on misuse of alter
+s.index.primary.alter({unique=false})
 s.index.primary:alter({unique=false})
 -- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})

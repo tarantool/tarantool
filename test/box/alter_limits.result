@@ -133,7 +133,7 @@ s:select(0)
 ...
 s:select_range(0, 0, 0)
 ---
-- error: '[string "-- schema.lua (internal file)..."]:245: attempt to index a nil
+- error: '[string "-- schema.lua (internal file)..."]:248: attempt to index a nil
     value'
 ...
 s:delete(0)
@@ -607,6 +607,11 @@ s = box.schema.create_space('test')
 ...
 s:create_index('primary', { type = 'hash' })
 ---
+...
+-- correct error on misuse of alter
+s.index.primary.alter({unique=false})
+---
+- error: 'Usage: index:alter{opts}'
 ...
 s.index.primary:alter({unique=false})
 ---

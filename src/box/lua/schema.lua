@@ -103,8 +103,8 @@ box.schema.index.rename = function(space_id, index_id, name)
     _index:update({space_id, index_id}, {"=", 2, name})
 end
 box.schema.index.alter = function(space_id, index_id, options)
-    if options == nil then
-        return
+    if space_id == nil or index_id == nil then
+        box.raise(box.error.ER_PROC_LUA, "Usage: index:alter{opts}")
     end
     if box.space[space_id] == nil then
         box.raise(box.error.ER_NO_SUCH_SPACE,
@@ -113,6 +113,9 @@ box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id].index[index_id] == nil then
         box.raise(box.error.ER_NO_SUCH_INDEX,
                   "Index "..index_id.." not found in space"..space_id)
+    end
+    if options == nil then
+        return
     end
     if type(space_id) == "string" then
         space_id = box.space[space_id].n

@@ -1526,13 +1526,11 @@ floor(1.1)
 
 # clean-up after tests
 
-box.insert(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+space = box.schema.create_space('tweedledum', { id = 0 })
 ---
-- [0, 0, 'tweedledum']
 ...
-box.insert(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+box.space.tweedledum:create_index('primary', { type = 'hash'})
 ---
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 
 # Test box.tuple:slice()
