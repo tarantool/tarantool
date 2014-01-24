@@ -1,94 +1,46 @@
 print('box.session.storage')
----
-...
+
+
 dump = function(data) return "'" .. box.cjson.encode(data) .. "'" end
----
-...
+
+
 type(box.session.id())
----
-- number
-...
 box.session.unknown_field
----
-- null
-...
+
 type(box.session.storage)
----
-- table
-...
 box.session.storage.abc = 'cde'
----
-...
 box.session.storage.abc
----
-- cde
-...
+
 all = getmetatable(box.session).aggregate_storage
----
-...
 dump(all)
----
-- '''[null,{"abc":"cde"}]'''
-...
+
 --# create connection second to default
 --# set connection second
+
 type(box.session.storage)
----
-- table
-...
 type(box.session.storage.abc)
----
-- nil
-...
 box.session.storage.abc = 'def'
----
-...
 box.session.storage.abc
----
-- def
-...
+
 --# set connection default
+
 box.session.storage.abc
----
-- cde
-...
+
 --# set connection second
 dump(all[box.session.id()])
----
-- '''{"abc":"def"}'''
-...
+
 --# set connection default
 dump(all[box.session.id()])
----
-- '''{"abc":"cde"}'''
-...
 tres1 = {}
----
-...
 tres2 = {}
----
-...
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
----
-...
+
 --# drop connection second
 box.fiber.sleep(.01)
----
-...
 for k,v in pairs(all) do table.insert(tres2, v.abc) end
----
-...
+
 table.sort(tres1)
----
-...
 table.sort(tres2)
----
-...
 dump(tres1)
----
-- '''["cde","def"]'''
-...
 dump(tres2)
----
-- '''["cde"]'''
-...
+
