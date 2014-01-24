@@ -266,7 +266,7 @@ select * from t0 where k1='part1_a'
 select * from t0 where k1='part_none'
 ---
 ...
-call box.select(0, 1, 'part1', 'part2')
+box.space[0].index[1]:select{'part1', 'part2'}
 ---
 - [1234567, 'part1', 'part2']
 - [11234567, 'part1', 'part2']

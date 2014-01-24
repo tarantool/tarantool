@@ -208,7 +208,7 @@ function box.schema.space.bless(space)
         return unpack(range)
     end
     index_mt.select = function(index, key)
-        return box.select(index.n, index.id, key)
+        return box.select_limit(index.n, index.id, 0, 4294967295, key)
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -223,7 +223,7 @@ function box.schema.space.bless(space)
     local space_mt = {}
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
-    space_mt.select = function(space, key) return box.select(space.n, 0, key) end
+    space_mt.select = function(space, key) return box.select_limit(space.n, 0, 0, 4294967295, key) end
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
     end
@@ -233,11 +233,11 @@ function box.schema.space.bless(space)
     space_mt.select_limit = function(space, ino, offset, limit, ...)
         return box.select_limit(space.n, ino, offset, limit, ...)
     end
-    space_mt.insert = function(space, tuple) return box.insert(space.n, unpack(tuple)) end
+    space_mt.insert = function(space, tuple) return box.insert(space.n, tuple) end
     space_mt.update = function(space, key, ops) return box.update(space.n, key, ops) end
     space_mt.replace = function(space, tuple) return box.replace(space.n, tuple) end
-    space_mt.delete = function(space, key) return box.delete(space.n, unpack(key)) end
-    space_mt.auto_increment = function(space, tuple) return box.auto_increment(space.n, unpack(tuple)) end
+    space_mt.delete = function(space, key) return box.delete(space.n, key) end
+    space_mt.auto_increment = function(space, tuple) return box.auto_increment(space.n, tuple) end
     space_mt.truncate = function(space)
         local pk = space.index[0]
         if pk == nil then

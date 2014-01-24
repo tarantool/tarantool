@@ -15,13 +15,6 @@ function box.select_limit(space, index, offset, limit, ...)
 end
 
 --
---
---
-function box.select(space, index, ...)
-    return box.select_limit(space, index, 0, 4294967295, ...)
-end
-
---
 -- Select a range of tuples in a given namespace via a given
 -- index. If key is NULL, starts from the beginning, otherwise
 -- starts from the key.

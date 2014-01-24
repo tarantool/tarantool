@@ -83,11 +83,10 @@ box.net = {
             return self:process(box.net.box.PING, '')
         end,
 
-        call    = function(self, proc_name, ...)
+        call    = function(self, proc_name, tuple)
             assert(type(proc_name) == 'string')
-            local count = select('#', ...)
             return self:process(box.net.box.CALL,
-                box.pack('pV', proc_name, count, ...))
+                box.pack('pV', proc_name, 1, tuple))
         end,
 
         select_range = function(self, sno, ino, limit, ...)

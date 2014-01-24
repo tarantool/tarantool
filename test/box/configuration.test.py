@@ -18,16 +18,36 @@ admin("box.cfg.wal_fsync_delay")
 
 script_dir_path = os.path.join(vardir, "script_dir")
 os.mkdir(script_dir_path)
-shutil.copy("box/test_init.lua", os.path.join(script_dir_path, "init.lua"))
+shutil.copy("box/lua/test_init.lua", os.path.join(script_dir_path, "init.lua"))
 
 server.stop()
 server.deploy("box/tarantool_scriptdir.cfg")
 admin("print_config()")
 
+print """
+# Test bug #977898
+"""
+# Run a dummy insert to avoid race conditions under valgrind
+admin("box.space.tweedledum:insert{4, 8, 16}")
+
+print """
+# Test insert from init.lua
+"""
+admin("box.space.tweedledum:select{1}")
+admin("box.space.tweedledum:select(2)")
+admin("box.space.tweedledum:select(4)")
+
+print """
+# Test bug #1002272
+"""
+admin("floor(0.5)")
+admin("floor(0.9)")
+admin("floor(1.1)")
+
 # Test script_dir + require
 server.stop()
-shutil.copy("box/require_init.lua", os.path.join(script_dir_path, "init.lua"))
-shutil.copy("box/require_mod.lua", os.path.join(script_dir_path, "mod.lua"))
+shutil.copy("box/lua/require_init.lua", os.path.join(script_dir_path, "init.lua"))
+shutil.copy("box/lua/require_mod.lua", os.path.join(script_dir_path, "mod.lua"))
 server.deploy("box/tarantool_scriptdir.cfg")
 admin("string.gmatch(package_path, '([^;]*)')()")
 admin("string.gmatch(package_cpath, '([^;]*)')()")

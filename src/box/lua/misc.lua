@@ -10,20 +10,19 @@ box.counter = {}
 -- Create counter if not exists.
 -- Returns updated value of the counter.
 --
-function box.counter.inc(space, ...)
-    local key = {...}
+function box.counter.inc(spaceno, key)
     local cnt_index = #key
+    local s = box.space[spaceno]
 
     local tuple
     while true do
-        tuple = box.update(space, key, {{'+', cnt_index, 1}})
+        tuple = s:update(key, {{'+', cnt_index, 1}})
         if tuple ~= nil then break end
-        local data = {...}
+        local data = key
         table.insert(data, 1)
-        tuple = box.insert(space, unpack(data))
+        tuple = s:insert(data)
         if tuple ~= nil then break end
     end
-
     return tuple[cnt_index]
 end
 
@@ -32,17 +31,17 @@ end
 -- Delete counter if it decreased to zero.
 -- Returns updated value of the counter.
 --
-function box.counter.dec(space, ...)
-    local key = {...}
+function box.counter.dec(spaceno, key)
     local cnt_index = #key
+    local s = box.space[spaceno]
 
-    local tuple = box.select(space, 0, ...)
+    local tuple = s:select(key)
     if tuple == nil then return 0 end
     if tuple[cnt_index] == 1 then
-        box.delete(space, ...)
+        s:delete(key)
         return 0
     else
-        tuple = box.update(space, key, {{'-', cnt_index, 1}})
+        tuple = s:update(key, {{'-', cnt_index, 1}})
         return tuple[cnt_index]
     end
 end
@@ -51,13 +50,13 @@ end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the
 -- primary key and returns it back to the user
-function box.auto_increment(spaceno, ...)
+function box.auto_increment(spaceno, tuple)
     local max_tuple = box.space[spaceno].index[0].idx:max()
     local max = 0
     if max_tuple ~= nil then
         max = max_tuple[0]
     end
-    return box.insert(spaceno, max + 1, ...)
+    return box.insert(spaceno, max + 1, unpack(tuple))
 end
 
 -- This function automatically called by console client

@@ -2,39 +2,16 @@
 -- Test that some built-in functions were disabled by sandbox
 --
 os.execute
----
-- null
-...
 os.exit
----
-- null
-...
 os.rename
----
-- null
-...
 os.tmpname
----
-- null
-...
 os.remove
----
-- null
-...
 io
----
-- null
-...
 require
----
-- null
-...
 package
----
-- null
-...
 -- FFI can be mistakenly saved to the global variable by the one of our modules
+--
 ffi
----
-- null
-...
+-- A test case for Bug#908094
+-- Lua provides access to os.execute()
+os.execute('ls')

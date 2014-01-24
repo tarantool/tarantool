@@ -137,7 +137,6 @@ class TarantoolServer(Server):
                                    '*.inprogress',
                                    '*.cfg',
                                    '*.sup',
-                                   '*.lua',
                                    '*.pid']
         self.process = None
         self.config = None

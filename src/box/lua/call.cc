@@ -254,7 +254,7 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 					  name_end - name, name);
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
-		objstack = 1;
+		objstack = index;
 	}
 
 
@@ -269,9 +269,14 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	/* setting stack that it would contain only
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
-		lua_replace(L, 1);
-		if (objstack)
+		if (objstack == 0) {        /* no object, only a function */
+			lua_replace(L, 1);
+		} else if (objstack == 1) { /* just two values, swap them */
+			lua_insert(L, -2);
+		} else {		    /* long path */
+			lua_replace(L, 1);
 			lua_replace(L, 2);
+		}
 		lua_settop(L, 1 + objstack);
 	}
 	return 1 + objstack;

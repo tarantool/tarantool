@@ -14,7 +14,7 @@ parser sql:
     ignore:           '\\s+'
     token NUM:        '[+-]?[0-9]+'
     token ID:         '[a-z_]+[0-9]+' 
-    token PROC_ID:    '[a-z_][a-z0-9_.]*'
+    token PROC_ID:    '[a-z_][a-z0-9_.:]*'
     token STR:        '\'([^\']+|\\\\.)*\''
     token PING:       'ping'
     token INSERT:     'insert'
