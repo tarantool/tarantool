@@ -225,7 +225,7 @@ function box.schema.space.bless(space)
     space_mt.__newindex = index_mt.__newindex
     space_mt.select = function(space, key) return box.select(space.n, 0, key) end
     space_mt.select_range = function(space, ino, limit, ...)
-        return space.index[ino]:select_range(tonumber(limit), ...)
+        return space.index[ino]:select_range(limit, ...)
     end
     space_mt.select_reverse_range = function(space, ino, limit, ...)
         return space.index[ino]:select_reverse_range(limit, ...)

@@ -52,7 +52,6 @@ end
 -- inserts a tuple after getting the next value of the
 -- primary key and returns it back to the user
 function box.auto_increment(spaceno, ...)
-    spaceno = tonumber(spaceno)
     local max_tuple = box.space[spaceno].index[0].idx:max()
     local max = 0
     if max_tuple ~= nil then

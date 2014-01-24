@@ -191,7 +191,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
     if reconnect_timeout == nil then
         reconnect_timeout = 0
     else
-        reconnect_timeout = tonumber(reconnect_timeout)
+        reconnect_timeout = reconnect_timeout
     end
 
     local remote = {
@@ -237,7 +237,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                       header..request
 
             if timeout ~= nil then
-                timeout = tonumber(timeout)
+                timeout = timeout
                 if not self.processing.wch:put(request, timeout) then
                     self.processing[sync] = nil
                     return nil
