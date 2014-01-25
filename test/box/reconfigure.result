@@ -87,7 +87,7 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 space:create_index('primary', { type = 'hash'})
 ---
 ...
-box.insert(0, 1, 'tuple')
+space:insert{1, 'tuple'}
 ---
 - [1, 'tuple']
 ...
@@ -101,7 +101,7 @@ box.cfg.reload()
 
 '
 ...
-box.insert(0, 2, 'tuple2')
+space:insert{2, 'tuple2'}
 ---
 - [2, 'tuple2']
 ...
@@ -113,7 +113,7 @@ box.cfg.reload()
 ---
 - ok
 ...
-box.insert(0, 3, 'tuple3')
+space:insert{3, 'tuple3'}
 ---
 - [3, 'tuple3']
 ...
@@ -139,6 +139,6 @@ box.cfg.reload()
 ---
 - ok
 ...
-box.space[0]:drop()
+space:drop()
 ---
 ...

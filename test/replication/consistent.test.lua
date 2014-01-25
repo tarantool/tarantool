@@ -161,8 +161,8 @@ _print_lsn()
 _print_lsn()
 
 -- Test that a replica replies with master connection URL on update request
-box.insert(0, 0, 'replica is RO')
+box.space[0]:insert{0, 'replica is RO'}
 --# stop server replica
 --# cleanup server replica
 --# set connection default
-box.space[0]:drop();
+box.space[0]:drop()

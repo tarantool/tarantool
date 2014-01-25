@@ -93,7 +93,7 @@ box.stat()
     total: 0
     rps: 0
 ...
-box.insert(0, 1, 'tuple')
+space:insert{1, 'tuple'}
 ---
 - [1, 'tuple']
 ...
@@ -101,7 +101,7 @@ box.snapshot()
 ---
 - ok
 ...
-box.delete(0, 1)
+space:delete{1}
 ---
 - [1, 'tuple']
 ...
@@ -267,6 +267,6 @@ test_box_fiber_info();
 ---
 - box.fiber.info() is ok
 ...
-box.space[0]:drop();
+space:drop();
 ---
 ...

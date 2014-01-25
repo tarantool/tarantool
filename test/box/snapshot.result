@@ -11,7 +11,7 @@ space:create_index('primary', { type = 'hash' })
 # error that happens when saving snapshot is propagated
 # to the caller.
 
-box.insert(0, 1, 'first tuple')
+space:insert{1, 'first tuple'}
 ---
 - [1, 'first tuple']
 ...
@@ -23,7 +23,7 @@ box.snapshot()
 ---
 - error: can't save snapshot, errno 17 (File exists)
 ...
-box.insert(0, 2, 'second tuple')
+space:insert{2, 'second tuple'}
 ---
 - [2, 'second tuple']
 ...
@@ -32,11 +32,11 @@ box.snapshot()
 ---
 - error: can't save snapshot, errno 13 (Permission denied)
 ...
-box.delete(0, 1)
+space:delete{1}
 ---
 - [1, 'first tuple']
 ...
-box.delete(0, 2)
+space:delete{2}
 ---
 - [2, 'second tuple']
 ...
@@ -47,11 +47,11 @@ box.delete(0, 2)
 
 # Increment the lsn number, to make sure there is no such snapshot yet
 #
-box.insert(0, 1, 'Test tuple')
+space:insert{1, 'Test tuple'}
 ---
 - [1, 'Test tuple']
 ...
 Snapshot exists.
-box.space[0]:drop()
+space:drop()
 ---
 ...

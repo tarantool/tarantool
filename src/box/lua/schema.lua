@@ -207,8 +207,17 @@ function box.schema.space.bless(space)
         end
         return unpack(range)
     end
+    index_mt.select_limit = function(index, offset, limit, key)
+        return box.process(box.net.box.SELECT,
+                box.pack('iiiiV',
+                    index.n,
+                    index.id,
+                    offset,
+                    limit,
+                    1, key))
+    end
     index_mt.select = function(index, key)
-        return box.select_limit(index.n, index.id, 0, 4294967295, key)
+        return index:select_limit(0, 4294967295, key)
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -223,21 +232,54 @@ function box.schema.space.bless(space)
     local space_mt = {}
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
-    space_mt.select = function(space, key) return box.select_limit(space.n, 0, 0, 4294967295, key) end
+    space_mt.select = function(space, key)
+        return box.process(box.net.box.SELECT,
+                box.pack('iiiiV',
+                    space.n,
+                    0,
+                    0,
+                    4294967295,
+                    1, key))
+     end
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
     end
     space_mt.select_reverse_range = function(space, ino, limit, ...)
         return space.index[ino]:select_reverse_range(limit, ...)
     end
-    space_mt.select_limit = function(space, ino, offset, limit, ...)
-        return box.select_limit(space.n, ino, offset, limit, ...)
+    space_mt.insert = function(space, tuple)
+        return box.process(box.net.box.INSERT,
+            box.pack('iV', space.n, 1, tuple))
     end
-    space_mt.insert = function(space, tuple) return box.insert(space.n, tuple) end
-    space_mt.update = function(space, key, ops) return box.update(space.n, key, ops) end
-    space_mt.replace = function(space, tuple) return box.replace(space.n, tuple) end
-    space_mt.delete = function(space, key) return box.delete(space.n, key) end
-    space_mt.auto_increment = function(space, tuple) return box.auto_increment(space.n, tuple) end
+    space_mt.replace = function(space, tuple)
+        return box.process(box.net.box.REPLACE,
+            box.pack('iV', space.n, 1, tuple))
+    end
+    space_mt.update = function(space, key, ops)
+        return box.process(box.net.box.UPDATE,
+            box.pack('iVa', space.n, 1, key, msgpack.encode(ops)))
+    end
+--
+-- delete can be done only by the primary key, whose
+-- index is always 0. It doesn't accept compound keys
+--
+    space_mt.delete = function(space, key)
+        return box.process(box.net.box.DELETE,
+            box.pack('iV', space.n, 1, key))
+    end
+-- Assumes that spaceno has a TREE (NUM) primary key
+-- inserts a tuple after getting the next value of the
+-- primary key and returns it back to the user
+    space_mt.auto_increment = function(space, tuple)
+        local max_tuple = space.index[0].idx:max()
+        local max = 0
+        if max_tuple ~= nil then
+            max = max_tuple[0]
+        end
+        table.insert(tuple, 1, max + 1)
+        return space:insert(tuple)
+    end
+
     space_mt.truncate = function(space)
         local pk = space.index[0]
         if pk == nil then

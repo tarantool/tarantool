@@ -16,20 +16,17 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - auto_increment
-  - call_loadproc
+- - call_loadproc
   - cfg
   - cjson
   - coredump
   - counter
-  - delete
   - dostring
   - errinj
   - error
   - fiber
   - index
   - info
-  - insert
   - ipc
   - net
   - on_reload_configuration
@@ -37,9 +34,7 @@ t
   - plugin
   - process
   - raise
-  - replace
   - schema
-  - select_limit
   - select_range
   - select_reverse_range
   - session
@@ -52,7 +47,6 @@ t
   - time64
   - tuple
   - unpack
-  - update
   - uuid
   - uuid_hex
 ...

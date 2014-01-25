@@ -19,7 +19,7 @@ end
 
 local function do_insert()
     box.fiber.detach()
-    box.insert(0, 1, 2, 4, 8)
+    box.space[0]:insert{1, 2, 4, 8}
 end
 
 space = box.schema.create_space('tweedledum', { id = 0 })

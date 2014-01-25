@@ -1,10 +1,8 @@
-box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')
+s = box.schema.create_space('tweedledum', {id = 0})
 ---
-- [0, 0, 'tweedledum']
 ...
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')
+s:create_index('primary', {type = 'hash'})
 ---
-- [0, 0, 'primary', 'hash', 1, 1, 0, 'num']
 ...
 test 0 iteration
 insert into t0 values (0, 'tuple 0')
