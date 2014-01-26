@@ -40,6 +40,7 @@
 #include <scoped_guard.h>
 #include <third_party/base64.h>
 
+#if 0
 static const char *
 read_tuple(const char **reqpos, const char *reqend)
 {
@@ -69,6 +70,7 @@ read_tuple(const char **reqpos, const char *reqend)
 
 	return tuple;
 }
+#endif
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
@@ -83,7 +85,7 @@ execute_replace(const struct request *request, struct txn *txn,
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
 
-	struct space *space = space_find(request->space_no);
+	struct space *space = space_find(request->space_id);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
 	TupleGuard guard(new_tuple);
@@ -101,7 +103,7 @@ execute_update(const struct request *request, struct txn *txn,
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
 
-	struct space *space = space_find(request->space_no);
+	struct space *space = space_find(request->space_id);
 	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
 	const char *key = request->key;
@@ -130,8 +132,8 @@ execute_select(const struct request *request, struct txn *txn,
 	       struct port *port)
 {
 	(void) txn;
-	struct space *space = space_find(request->space_no);
-	Index *index = index_find(space, request->index_no);
+	struct space *space = space_find(request->space_id);
+	Index *index = index_find(space, request->index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);
 
@@ -164,7 +166,7 @@ execute_delete(const struct request *request, struct txn *txn,
 {
 	(void) port;
 	txn_add_redo(txn, request->type, request->data, request->len);
-	struct space *space = space_find(request->space_no);
+	struct space *space = space_find(request->space_id);
 
 	/* Try to find tuple by primary key */
 	Index *pk = index_find(space, 0);
@@ -194,65 +196,62 @@ request_create(struct request *request, uint32_t type,
 	       const char *data, uint32_t len)
 {
 	request_check_type(type);
+	static const request_execute_f execute_map[] = {
+		NULL, execute_select, execute_replace, execute_replace,
+		execute_update, execute_delete, box_lua_call
+	};
 	memset(request, 0, sizeof(*request));
 	request->type = type;
 	request->data = data;
 	request->len = len;
+	request->execute = execute_map[type];
 
-	const char **reqpos = &data;
-	const char *reqend = data + len;
-	const char *s;
+	const char *end = data + len;
 
-	switch (request->type) {
-	case IPROTO_SELECT:
-		request->execute = execute_select;
-		request->space_no = pick_u32(reqpos, reqend);
-		request->index_no = pick_u32(reqpos, reqend);
-		request->offset = pick_u32(reqpos, reqend);
-		request->limit = pick_u32(reqpos, reqend);
-		request->key = *reqpos;
-		/* Do not parse the tail, execute_select will do it */
-		*reqpos = request->key_end = reqend;
-		break;
-	case IPROTO_INSERT:
-	case IPROTO_REPLACE:
-		request->execute = execute_replace;
-		request->space_no = pick_u32(reqpos, reqend);
-		request->tuple = read_tuple(reqpos, reqend);
-		request->tuple_end = *reqpos;
-		break;
-	case IPROTO_UPDATE:
-		request->execute = execute_update;
-		request->space_no = pick_u32(reqpos, reqend);
-		request->key = read_tuple(reqpos, reqend);
-		request->key_end = *reqpos;
-		request->tuple = *reqpos;
-		request->tuple_end = *reqpos = reqend;
-		/* Do not parse the tail, tuple_update will do it */
-		break;
-	case IPROTO_DELETE:
-		request->execute = execute_delete;
-		request->space_no = pick_u32(reqpos, reqend);
-		request->key = read_tuple(reqpos, reqend);
-		request->key_end = *reqpos;
-		break;
-	case IPROTO_CALL:
-		request->execute = box_lua_call;
-		s = *reqpos;
-		if (unlikely(!mp_check(reqpos, reqend)))
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "function arguments");
-		if (unlikely(mp_typeof(*s) != MP_STR))
-			tnt_raise(ClientError, ER_ARG_TYPE, 0, "STR");
-		uint32_t namelen;
-		request->key = mp_decode_str(&s, &namelen);
-		request->key_end = request->key + namelen;
-		request->tuple = read_tuple(reqpos, reqend);
-		request->tuple_end = reqend;
-		break;
-	default:
-		assert(false);
-		break;
+	if (mp_typeof(*data) != MP_MAP || ! mp_check_map(data, end)) {
+error:
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
 	}
-	if (unlikely(*reqpos != reqend))
-		tnt_raise(IllegalParams, "can't unpack request");
+	uint32_t size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (! iproto_body_has_key(data, end)) {
+			mp_check(&data, end);
+			mp_check(&data, end);
+			continue;
+		}
+		unsigned char key = mp_decode_uint(&data);
+		const char *value = data;
+		if (! mp_check(&data, end))
+			goto error;
+		if (iproto_key_type[key] != mp_typeof(*value))
+			goto error;
+		switch (key) {
+		case IPROTO_SPACE_ID:
+			request->space_id = mp_decode_uint(&value);
+			break;
+		case IPROTO_INDEX_ID:
+			request->index_id = mp_decode_uint(&value);
+			break;
+		case IPROTO_OFFSET:
+			request->offset = mp_decode_uint(&value);
+			break;
+		case IPROTO_LIMIT:
+			request->limit = mp_decode_uint(&value);
+			break;
+		case IPROTO_TUPLE:
+			request->tuple = value;
+			request->tuple_end = data;
+			break;
+		case IPROTO_KEY:
+		case IPROTO_FUNCTION_NAME:
+		default:
+			request->key = value;
+			request->key_end = data;
+			break;
+		}
+	}
+#ifndef NDEBUG
+	if (data != end)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet end");
+#endif
 }

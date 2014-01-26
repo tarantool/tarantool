@@ -7,8 +7,8 @@ remote:ping()
 box.net.box.ping(remote)
 space:insert{123, 'test1', 'test2'}
 space:select{123}
-tuple = remote:select(space.n, {{123}})
-remote:call('box.space.tweedledum:select', {{123}})
+tuple = remote:select(space.n, 123)
+remote:call('box.space.tweedledum:select', 123)
 
 slf, foo = box.call_loadproc('box.net.self:select')
 type(slf)
@@ -26,7 +26,7 @@ remote:insert(space.n, {123, 'test1', 'test2'})
 
 remote:insert(space.n, {345, 'test1', 'test2'})
 remote:select(space.n, {345})
-remote:call('box.space.tweedledum:select', {345})
+remote:call('box.space.tweedledum:select', 345)
 space:select{345}
 
 remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})

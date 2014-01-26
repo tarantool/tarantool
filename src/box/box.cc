@@ -64,7 +64,11 @@ int snapshot_pid = 0; /* snapshot processes pid */
 /** The snapshot row metadata repeats the structure of REPLACE request. */
 struct box_snap_row {
 	uint16_t op;
-	uint32_t space;
+	uint8_t m_body;
+	uint8_t k_space_id;
+	uint8_t m_space_id;
+	uint32_t v_space_id;
+	uint8_t k_tuple;
 	char data[];
 } __attribute__((packed));
 
@@ -331,7 +335,11 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 {
 	struct box_snap_row header;
 	header.op = IPROTO_INSERT;
-	header.space = n;
+	header.m_body = 0x82; /* map of two elements. */
+	header.k_space_id = IPROTO_SPACE_ID;
+	header.m_space_id = 0xce; /* uint32 */
+	header.v_space_id = mp_bswap_u32(n);
+	header.k_tuple = IPROTO_TUPLE;
 	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }

@@ -162,6 +162,13 @@ box.schema.index.alter = function(space_id, index_id, options)
                    options.unique, #options.parts/2, unpack(options.parts)}
 end
 
+local function keify(key)
+    if type(key) == "table" then
+        return key
+    end
+    return {key}
+end
+
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
@@ -209,12 +216,12 @@ function box.schema.space.bless(space)
     end
     index_mt.select_limit = function(index, offset, limit, key)
         return box.process(box.net.box.SELECT,
-                box.pack('iiiiV',
-                    index.n,
-                    index.id,
-                    offset,
-                    limit,
-                    1, key))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = index.n,
+                    [box.net.box.INDEX_ID] = index.id,
+                    [box.net.box.OFFSET] = offset,
+                    [box.net.box.LIMIT] = limit,
+                    [box.net.box.KEY] = keify(key)}))
     end
     index_mt.select = function(index, key)
         return index:select_limit(0, 4294967295, key)
@@ -234,12 +241,12 @@ function box.schema.space.bless(space)
     space_mt.__newindex = index_mt.__newindex
     space_mt.select = function(space, key)
         return box.process(box.net.box.SELECT,
-                box.pack('iiiiV',
-                    space.n,
-                    0,
-                    0,
-                    4294967295,
-                    1, key))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space.n,
+                    [box.net.box.INDEX_ID] = 0,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 4294967295,
+                    [box.net.box.KEY] = keify(key)}))
      end
     space_mt.select_range = function(space, ino, limit, ...)
         return space.index[ino]:select_range(limit, ...)
@@ -249,15 +256,25 @@ function box.schema.space.bless(space)
     end
     space_mt.insert = function(space, tuple)
         return box.process(box.net.box.INSERT,
-            box.pack('iV', space.n, 1, tuple))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space.n,
+                    [box.net.box.TUPLE] = tuple
+                    }))
     end
     space_mt.replace = function(space, tuple)
         return box.process(box.net.box.REPLACE,
-            box.pack('iV', space.n, 1, tuple))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space.n,
+                    [box.net.box.TUPLE] = tuple
+                    }))
     end
     space_mt.update = function(space, key, ops)
         return box.process(box.net.box.UPDATE,
-            box.pack('iVa', space.n, 1, key, msgpack.encode(ops)))
+            msgpack.encode({
+                [box.net.box.SPACE_ID] = space.n,
+                [box.net.box.KEY] = keify(key),
+                [box.net.box.TUPLE] = ops 
+            }))
     end
 --
 -- delete can be done only by the primary key, whose
@@ -265,7 +282,10 @@ function box.schema.space.bless(space)
 --
     space_mt.delete = function(space, key)
         return box.process(box.net.box.DELETE,
-            box.pack('iV', space.n, 1, key))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space.n,
+                    [box.net.box.KEY] = keify(key)
+                    }))
     end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the

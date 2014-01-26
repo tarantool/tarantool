@@ -32,6 +32,7 @@
 #include "salad/rlist.h"
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
+#include <limits.h>
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
@@ -210,7 +211,7 @@ void
 space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
 
 /** A helper table for key_mp_type_validate */
-extern const uint16_t key_mp_type[];
+extern const uint32_t key_mp_type[];
 
 /**
  * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
@@ -223,7 +224,7 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 	       int err, uint32_t field_no)
 {
 	assert(key_type < field_type_MAX);
-	assert((1U << mp_type) < 8 * sizeof(*key_mp_type));
+	assert(mp_type < CHAR_BIT * sizeof(*key_mp_type));
 
 	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
 		tnt_raise(ClientError, err, field_no,

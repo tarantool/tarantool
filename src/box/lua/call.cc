@@ -310,9 +310,11 @@ box_lua_call(const struct request *request, struct txn *txn,
 	(void) txn;
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
 
 	/* proc name */
-	int oc = box_lua_find(L, request->key, request->key_end);
+	int oc = box_lua_find(L, name, name + name_len);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

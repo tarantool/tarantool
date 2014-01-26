@@ -404,13 +404,10 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 
 	ssize_t to_read = 3; /* Smallest possible valid request. */
 
-	if (con->parse_size > 0) {
+	/* The type code is checked in iproto_enqueue_batch() */
+	if (con->parse_size) {
 		const char *pos = oldbuf->in.end - con->parse_size;
-		unsigned char c = (unsigned char) *pos;
-		/* Checked in iproto_enqueue_batch() */
-		assert(mp_type_hint[c] == MP_UINT);
-
-		if (mp_parser_hint[c] <= con->parse_size)
+		if (mp_check_uint(pos, oldbuf->in.end) <= 0)
 			to_read = mp_decode_uint(&pos);
 	}
 
@@ -451,37 +448,29 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 }
 
 static inline void
-mp_decode_imap(const char **pos, const char *end, uint32_t *keys)
+iproto_decode_header(const char **pos, const char *end, uint32_t *keys)
 {
-	unsigned char c = (unsigned char) **pos;
 	/* Only a small map can be here. */
-	if (mp_type_hint[c] != MP_MAP || *pos + mp_parser_hint[c] >= end) {
+	if (mp_typeof(**pos) != MP_MAP || mp_check_map(*pos, end) > 0) {
 error:
-		tnt_raise(IllegalParams, "Invalid MsgPack - iproto header");
+		tnt_raise(ClientError,
+			  ER_INVALID_MSGPACK, "packet header");
 	}
 	uint32_t size = mp_decode_map(pos);
 	for (int i = 0; i < size; i++) {
-		if (*pos >= end)
-			goto error;
 
-		c = (unsigned char) **pos;
-		if (mp_type_hint[c] != MP_UINT || mp_parser_hint[c] != 0 ||
-		    c > IPROTO_SYNC) {
+		if (! iproto_header_has_key(*pos, end)) {
 			mp_check(pos, end);
 			mp_check(pos, end);
 			continue;
 		}
 
-		unsigned char key = c;
-		*pos += 1;
-		if (*pos >= end)
+		unsigned char key = mp_decode_uint(pos);
+
+		if (mp_typeof(**pos) != MP_UINT ||
+		    mp_check_uint(*pos, end) > 0)
 			goto error;
 
-		c = (unsigned char) **pos;
-		if (mp_type_hint[c] != MP_UINT ||
-		    *pos + mp_parser_hint[c] >= end) {
-			goto error;
-		}
 		keys[key] = mp_decode_uint(pos);
 	}
 }
@@ -494,12 +483,11 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *reqstart = in->end - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
-		unsigned char c = (unsigned char) *pos;
-		if (mp_type_hint[c] != MP_UINT) {
+		if (mp_typeof(*pos) != MP_UINT) {
 			tnt_raise(IllegalParams,
 				  "Invalid MsgPack - packet length");
 		}
-		if (pos + mp_parser_hint[c] >= in->end)
+		if (mp_check_uint(pos, in->end) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
 		iproto_validate_header(len);
@@ -508,7 +496,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			break;
 		/* Parse request header. */
 		uint32_t header[2] = { 0, 0 };
-		mp_decode_imap(&pos, reqend, header);
+		iproto_decode_header(&pos, reqend, header);
 
 		struct iproto_request *ireq =
 			iproto_enqueue_request(&request_queue);
