@@ -450,15 +450,20 @@ int tc_cli(void)
 		if (isatty(STDIN_FILENO))
 			add_history(cmd.data);
 		tc_buf_cmdfy(&cmd, tc.opt.delim_len);
-		if (delim_exists && tc_buf_str_isempty(&cmd))
-			goto next;
-
-		enum tc_cliret ret = tc_clicmd(cmd.data, cmd.used - 1);
-next:
-		tc_buf_clear(&cmd);
-		if (ret == TC_CLI_EXIT || feof(stdin)) {
-			tc_buf_free(&cmd);
-			break;
+		enum tc_cliret ret;
+		if (delim_exists && tc_buf_str_isempty(&cmd)) {
+			tc_buf_clear(&cmd);
+			if (feof(stdin)) {
+				tc_buf_free(&cmd);
+				break;
+			}
+		} else {
+			ret = tc_clicmd(cmd.data, cmd.used - 1);
+			tc_buf_clear(&cmd);
+			if (ret == TC_CLI_EXIT || feof(stdin)) {
+				tc_buf_free(&cmd);
+				break;
+			}
 		}
 	}
 
