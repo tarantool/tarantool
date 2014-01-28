@@ -35,8 +35,6 @@ t
   - process
   - raise
   - schema
-  - select_range
-  - select_reverse_range
   - session
   - slab
   - snapshot
@@ -198,6 +196,7 @@ t;
   - 'box.error.ER_MODIFY_INDEX : 14'
   - 'box.error.ER_EXACT_MATCH : 19'
   - 'box.error.ER_SECONDARY : 7'
+  - 'box.error.ER_LAST_DROP : 15'
   - 'box.error.ER_UPDATE_FIELD : 29'
   - 'box.error.ER_FIBER_STACK : 30'
   - 'box.error.ER_UNKNOWN_UPDATE_OP : 28'
@@ -206,7 +205,7 @@ t;
   - 'box.error.ER_NO_SUCH_FIELD : 37'
   - 'box.error.ER_TUPLE_NOT_ARRAY : 22'
   - 'box.error.ER_NO_SUCH_SPACE : 36'
-  - 'box.error.ER_LAST_DROP : 15'
+  - 'box.error.ER_MORE_THAN_ONE_TUPLE : 41'
   - 'box.error.ER_ALTER_SPACE : 12'
   - 'box.error.ER_NO_SUCH_PROC : 33'
   - 'box.error.ER_SPACE_EXISTS : 10'

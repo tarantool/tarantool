@@ -31,23 +31,142 @@ space:select{123}
 ---
 - [123, 'test1', 'test2']
 ...
-tuple = remote:select(space.n, {123})
+tuple = remote:select(space.n, 123)
 ---
 ...
-remote:call('box.select', space.n, 0, 123)
----
-- [123, 'test1', 'test2']
-...
-slf, foo = box.call_loadproc('box.select')
+function test(...) return box.tuple.new({ 123, 456 }) end
 ---
 ...
-type(slf)
+f, a = box.call_loadproc('test')
+---
+...
+type(f)
 ---
 - function
 ...
-type(foo)
+type(a)
 ---
 - nil
+...
+remote:call('test')
+---
+- [123, 456]
+...
+function test(...) return box.tuple.new({ ... }) end
+---
+...
+remote:call('test', 123, 345, { 678, 910 })
+---
+- [123, 345, [678, 910]]
+...
+function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
+---
+...
+remote:call('test', 123, 345, { 678, 910 })
+---
+- [123, 345, [678, 910]]
+- [123, 345, [678, 910]]
+...
+test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
+---
+...
+remote:call('test:b')
+---
+- [123]
+...
+test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
+---
+...
+f, a = box.call_loadproc('test:b')
+---
+...
+type(f)
+---
+- function
+...
+type(a)
+---
+- table
+...
+a.a
+---
+- a
+...
+f, a = box.call_loadproc('test.b')
+---
+...
+type(f)
+---
+- function
+...
+type(a)
+---
+- nil
+...
+remote:call('test:b')
+---
+- ['a']
+...
+remote:call('test:b', 'b', 'c')
+---
+- ['a', 'b', 'c']
+...
+remote:call('test:b', 'b', 'c', 'd', 'e')
+---
+- ['a', 'b', 'c', 'd', 'e']
+...
+remote:call('test:b', 'b', { 'c', { d = 'e' } })
+---
+- ['a', 'b', ['c', {'d': 'e'}]]
+...
+test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
+---
+...
+f, a = box.call_loadproc('test.a:b')
+---
+...
+type(f)
+---
+- function
+...
+type(a)
+---
+- table
+...
+a.c
+---
+- 1
+...
+f, a = box.call_loadproc('test.a.b')
+---
+...
+type(f)
+---
+- function
+...
+type(a)
+---
+- nil
+...
+remote:call('test.a:b', 123)
+---
+- [1, 123]
+...
+box.space.tweedledum:select(123)
+---
+- [123, 'test1', 'test2']
+...
+box.space.tweedledum:select({123})
+---
+- [123, 'test1', 'test2']
+...
+remote:call('box.space.tweedledum:select', 123)
+---
+- [123, 'test1', 'test2']
+...
+remote:call('box.space.tweedledum:select', {123})
+---
+- [123, 'test1', 'test2']
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
@@ -84,11 +203,11 @@ space:insert{123, 'test1', 'test2'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-remote:insert(space.n, 123, 'test1', 'test2')
+remote:insert(space.n, {123, 'test1', 'test2'})
 ---
 - error: Duplicate key exists in unique index 0
 ...
-remote:insert(space.n, 345, 'test1', 'test2')
+remote:insert(space.n, {345, 'test1', 'test2'})
 ---
 - [345, 'test1', 'test2']
 ...
@@ -96,7 +215,7 @@ remote:select(space.n, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:call('box.select', space.n, 0, {345})
+remote:call('box.space.tweedledum:select', 345)
 ---
 - [345, 'test1', 'test2']
 ...
@@ -104,7 +223,7 @@ space:select{345}
 ---
 - [345, 'test1', 'test2']
 ...
-remote:replace(space.n, 345, 'test1-replaced', 'test2-replaced')
+remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
@@ -112,16 +231,18 @@ space:select{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select_limit(space.n, 0, 0, 1000, 345)
+-- remote:select_limit(space.n, 0, 0, 1000, 345)
+space:eselect({}, { iterator = 'GE', limit = 1000 })
 ---
-- [345, 'test1-replaced', 'test2-replaced']
+- - [123, 'test1-updated', 'test2-updated']
+  - [345, 'test1-replaced', 'test2-replaced']
 ...
-space:select_range(0, 1000)
+box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
 ---
-- [123, 'test1-updated', 'test2-updated']
-- [345, 'test1-replaced', 'test2-replaced']
+- - [123, 'test1-updated', 'test2-updated']
+  - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select_range(space.n, 0, 1000)
+remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 ---
 - [123, 'test1-updated', 'test2-updated']
 - [345, 'test1-replaced', 'test2-replaced']
@@ -222,11 +343,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:406: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:401: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:411: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:406: box.net.box: connection
     was closed'
 ...
 space:drop()

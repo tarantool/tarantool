@@ -125,15 +125,15 @@ space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
 ---
 - [1, 'of', 'might', 'and', 'magic']
 ...
-space.index['minmax']:select_range(2, 'of')
+space.index['minmax']:eselect('of', { limit = 2, iterator = 'GE' })
 ---
-- [1, 'of', 'might', 'and', 'magic']
-- [0, 'of', 'puppets']
+- - [1, 'of', 'might', 'and', 'magic']
+  - [0, 'of', 'puppets']
 ...
-space.index['minmax']:select_reverse_range(2, 'of')
+space.index['minmax']:eselect('of', { limit = 2, iterator = 'LE' })
 ---
-- [0, 'of', 'puppets']
-- [1, 'of', 'might', 'and', 'magic']
+- - [0, 'of', 'puppets']
+  - [1, 'of', 'might', 'and', 'magic']
 ...
 space:truncate()
 ---
@@ -311,38 +311,38 @@ space:insert{9, 0}
 ---
 - [9, 0]
 ...
-space.index['range']:select_range(10)
+space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
 ---
-- [0, 0]
-- [1, 0]
-- [2, 0]
-- [3, 0]
-- [4, 0]
-- [5, 0]
-- [6, 0]
-- [7, 0]
-- [8, 0]
-- [9, 0]
+- - [0, 0]
+  - [1, 0]
+  - [2, 0]
+  - [3, 0]
+  - [4, 0]
+  - [5, 0]
+  - [6, 0]
+  - [7, 0]
+  - [8, 0]
+  - [9, 0]
 ...
-space.index['range']:select_reverse_range(10)
+space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
 ---
-- [9, 0]
-- [8, 0]
-- [7, 0]
-- [6, 0]
-- [5, 0]
-- [4, 0]
-- [3, 0]
-- [2, 0]
-- [1, 0]
-- [0, 0]
+- - [9, 0]
+  - [8, 0]
+  - [7, 0]
+  - [6, 0]
+  - [5, 0]
+  - [4, 0]
+  - [3, 0]
+  - [2, 0]
+  - [1, 0]
+  - [0, 0]
 ...
-space.index['range']:select_reverse_range(4)
+space.index['range']:eselect({}, { limit = 4, iterator = 'LE' })
 ---
-- [9, 0]
-- [8, 0]
-- [7, 0]
-- [6, 0]
+- - [9, 0]
+  - [8, 0]
+  - [7, 0]
+  - [6, 0]
 ...
 space:drop()
 ---
