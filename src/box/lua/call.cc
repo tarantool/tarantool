@@ -274,8 +274,9 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		} else if (objstack == 1) { /* just two values, swap them */
 			lua_insert(L, -2);
 		} else {		    /* long path */
-			lua_replace(L, 1);
-			lua_replace(L, 2);
+			lua_insert(L, 1);
+			lua_insert(L, 2);
+			objstack = 1;
 		}
 		lua_settop(L, 1 + objstack);
 	}
