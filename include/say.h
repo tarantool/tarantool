@@ -40,6 +40,7 @@ extern "C" {
 
 enum say_level {
 	S_FATAL,		/* do not this value use directly */
+	S_SYSERROR,
 	S_ERROR,
 	S_CRIT,
 	S_WARN,
@@ -66,7 +67,7 @@ extern sayfunc_t _say __attribute__ ((format(FORMAT_PRINTF, 5, 6)));
 #define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
-#define say_syserror(...)		say(S_ERROR, strerror(errno), __VA_ARGS__)
+#define say_syserror(...)		say(S_SYSERROR, strerror(errno), __VA_ARGS__)
 #define say_error(...)			say(S_ERROR, NULL, __VA_ARGS__)
 #define say_crit(...)			say(S_CRIT, NULL, __VA_ARGS__)
 #define say_warn(...)			say(S_WARN, NULL, __VA_ARGS__)

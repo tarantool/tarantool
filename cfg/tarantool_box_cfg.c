@@ -80,7 +80,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->coredump = false;
 	c->admin_port = 0;
 	c->replication_port = 0;
-	c->log_level = 4;
+	c->log_level = 5;
 	c->slab_alloc_arena = 1;
 	c->slab_alloc_minimal = 64;
 	c->slab_alloc_factor = 2;
