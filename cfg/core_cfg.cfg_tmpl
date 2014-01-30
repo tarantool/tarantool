@@ -22,8 +22,8 @@ admin_port=0, ro
 # Replication clients should use this port (bind_ipaddr:replication_port).
 replication_port=0, ro
 
-# Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5
-log_level=4
+# Log verbosity, possible values: SYS_ERROR = 1, ERROR=2, CRIT=3, WARN=4, INFO=5(default), DEBUG=6
+log_level=5
 
 # Size of slab arena in GB
 slab_alloc_arena=1.0, ro

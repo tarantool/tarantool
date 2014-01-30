@@ -531,16 +531,19 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_ber, 1);
 
+	uint32_t slab_size = 4*1024*1024;
+	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
+
 	int flags;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
 		say_warn("Disable shared arena since running under OpenVZ "
 		    "(https://bugzilla.openvz.org/show_bug.cgi?id=2805)");
 		flags = MAP_PRIVATE;
         } else {
+		say_info("Mapping %zu bytes for a shared arena",
+			 prealloc);
 		flags = MAP_SHARED;
 	}
-	uint32_t slab_size = 4*1024*1024;
-	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
 
 	slab_arena_create(&tuple_arena, prealloc, prealloc,
 			  slab_size, flags);
