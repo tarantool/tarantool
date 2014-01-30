@@ -234,4 +234,3 @@ fio_batch_write(struct fio_batch *batch, int fd)
 		errno = EAGAIN;
 	return iov - batch->iov;
 }
-

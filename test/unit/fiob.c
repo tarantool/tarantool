@@ -208,7 +208,7 @@ main(void)
 
 
 	if (fork() == 0)
-		execl("/bin/rm", "/bin/rm", "-fr", td);
+		execl("/bin/rm", "/bin/rm", "-fr", td, NULL);
 
 	free(td);
 	return check_plan();

@@ -70,7 +70,7 @@ row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
 struct log_dir snap_dir = {
 	/* .panic_if_error = */ false,
 	/* .sync_is_async = */ false,
-	/* .open_wflags = */ 0,
+	/* .open_wflags = */ "wxd",
 	/* .filetype = */ "SNAP\n",
 	/* .filename_ext = */ ".snap",
 	/* .dirname = */ NULL
@@ -79,7 +79,7 @@ struct log_dir snap_dir = {
 struct log_dir wal_dir = {
 	/* .panic_if_error = */ false,
 	/* .sync_is_async = */ true,
-	/* .open_wflags = */ 0,
+	/* .open_wflags = */ "wx",
 	/* .filetype = */ "XLOG\n",
 	/* .filename_ext = */ ".xlog",
 	/* .dirname = */ NULL
@@ -446,7 +446,7 @@ log_io_close(struct log_io **lptr)
 		 * written file in case of a crash.
 		 * Do not sync if the file is opened with O_SYNC.
 		 */
-		if (! (l->dir->open_wflags & WAL_SYNC_FLAG))
+		if (! strchr(l->dir->open_wflags, 's'))
 			log_io_sync(l);
 		if (l->is_inprogress && inprogress_log_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
@@ -645,11 +645,7 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
-	if (dir == &snap_dir) {
-		f = fiob_open_flags(filename, dir->open_wflags, "wxd");
-	} else {
-		f = fiob_open_flags(filename, dir->open_wflags, "wx");
-	}
+	f = fiob_open(filename, dir->open_wflags);
 
 	if (!f)
 		goto error;

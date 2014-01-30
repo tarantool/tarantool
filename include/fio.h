@@ -36,7 +36,6 @@
 #include <sys/types.h>
 #include <stdbool.h>
 #include <sys/uio.h>
-#include <stdio.h>
 
 #if defined(__cplusplus)
 extern "C" {

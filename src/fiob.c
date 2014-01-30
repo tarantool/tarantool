@@ -24,7 +24,7 @@ struct fiob {
 	int fd;
 	size_t bsize;
 	size_t bfill;
-	char *buf;
+	void *buf;
 	char *path;
 	#ifdef HAVE_FUNOPEN
 		struct {
@@ -248,12 +248,13 @@ fiob_close(void *cookie)
 
 /** open file. The same as fiob_open but receives additional open (2) flags */
 FILE *
-fiob_open_flags(const char *path, int flags, const char *mode)
+fiob_open(const char *path, const char *mode)
 {
 	int omode = 0666;
+	int flags = 0;
 
 	size_t bsize = 0;
-	char *buf = NULL;
+	void *buf = NULL;
 
 	int um = umask(0722);
 	umask(um);
@@ -295,13 +296,18 @@ fiob_open_flags(const char *path, int flags, const char *mode)
 			flags |= O_DIRECT;
 		#endif
 		bsize = O_DIRECT_BSIZE;
-		buf = (char *)memalign(4096, bsize);
+		posix_memalign(&buf, 4096, bsize);
 		if (!buf) {
 			errno = ENOMEM;
 			return NULL;
 		}
 		/* for valgrind */
 		memset(buf, 0, bsize);
+	}
+
+	/* O_SYNC */
+	if (strchr(mode, 's')) {
+		flags |= WAL_SYNC_FLAG;
 	}
 
 	struct fiob *f = (struct fiob *)calloc(1, sizeof(struct fiob));

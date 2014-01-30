@@ -218,7 +218,9 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->snap_dir->dirname = strdup(snap_dirname);
 	r->wal_dir = &wal_dir;
 	r->wal_dir->dirname = strdup(wal_dirname);
-	r->wal_dir->open_wflags = r->wal_mode == WAL_FSYNC ? WAL_SYNC_FLAG : 0;
+	if (r->wal_mode == WAL_FSYNC) {
+		(void) strcat(r->wal_dir->open_wflags, "s");
+	}
 	r->rows_per_wal = rows_per_wal;
 	wait_lsn_clear(&r->wait_lsn);
 	r->flags = flags;
