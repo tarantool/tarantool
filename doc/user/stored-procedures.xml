@@ -1226,6 +1226,59 @@ localhost> <userinput>lua box.counter.dec(0, 'top.mail.ru')</userinput>
         </listitem>
     </varlistentry>
 </variablelist>
+
+<bridgehead renderas="sect4">Example showing use of the box functions</bridgehead>
+<para>
+This example will work with the sandbox configuration described in the preface. That is, there is a space[0] with a numeric primary key.
+The example function will: (1) select the tuple whose key value is 1000;
+(2) return an error if the tuple already exists and already has 3 fields;
+(3) Insert or replace the tuple with: field[0] = 1000, field[1] = a uuid, field[2] = number of seconds since 1970-01-01;
+(4) Get field[2] from what was replaced;
+(5) Format the value from field[2] as yyyy-mm-dd hh:mm:ss.ffff;
+(6) Return the formatted value.
+The function uses Tarantool box functions box.replace(), box.time(), box.select_limit(), box_uuid_hex().
+The function uses Lua functions
+<link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
+and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
+</para>
+<programlisting>
+setopt delimiter='!'
+lua function example()
+  local a, b, c, selected_tuple, replaced_tuple, time_field
+  selected_tuple = box.select_limit(0, 0, 0, 1, 1000)
+  if selected_tuple ~= nil then
+    if #selected_tuple == 3 then
+      box.raise(1,'This tuple already has 3 fields')
+    end
+  end
+  replaced_tuple = box.replace(0, 1000,  box.uuid_hex(), tostring(box.time()))
+  time_field = tonumber(replaced_tuple[2])
+  formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
+  c = time_field % 1
+  d = string.sub(c, 3, 6)
+  formatted_time_field = formatted_time_field .. '.' .. d
+  return formatted_time_field
+end!
+setopt delimiter=''!
+</programlisting>
+<para>
+... And here is what happens when one invokes the function:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>lua box.delete(0, 1000)</userinput>
+---
+ - 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}
+...
+<prompt>localhost&gt;</prompt> <userinput>lua example(1001)</userinput>
+---
+ - 2014-01-29 16:11:51.1582
+...
+<prompt>localhost&gt;</prompt> <userinput>lua example(1001)</userinput>
+---
+error: 'This tuple already has 3 fields'
+...
+</programlisting>
+</para>
+
 </section>
 
 <section xml:id="sp-box-tuple">
@@ -1532,6 +1585,46 @@ Fld#5
     </varlistentry>
 
 </variablelist>
+
+<bridgehead renderas="sect4">Example showing use of the box.tuple functions</bridgehead>
+<para>
+This function will illustrate how to convert tuples to/from
+Lua tables and lists of scalars:
+<programlisting>
+  scalars to tuple:     tuple = box.tuple.new({scalar1, scalar2, ... scalar_n})
+  tuple to Lua table:   lua_table = {tuple:unpack()}
+  tuple to scalars:     scalar1, scalar2, ... scalar_n = tuple:unpack()
+  Lua table to tuple:   tuple = box.tuple.new(lua_table)
+</programlisting>
+Then it will find the field that contains 'b',
+remove that field from the tuple,
+and display how many bytes remain in the tuple.
+The function uses Tarantool box.tuple functions new(), unpack(), find(), transform(), bsize().
+</para>
+<programlisting>
+setopt delimiter='!'
+lua function example()
+  local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
+  tuple1 = box.tuple.new({'a', 'b', 'c'})
+  luatable1 = {tuple1:unpack()}
+  scalar1, scalar2, scalar3 = tuple1:unpack()
+  tuple2 = box.tuple.new(luatable1)
+  field_number = tuple2:find('b')
+  tuple2 = tuple2:transform(field_number, 1)
+  print('tuple2 = ',tuple2, ' # of bytes = ', tuple2:bsize())
+end!
+setopt delimiter=''!
+</programlisting>
+<para>
+... And here is what happens when one invokes the function:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>lua example()</userinput>
+---
+tuple2 = 'a': {'c'} # of bytes = 4
+...
+</programlisting>
+</para>
+
 </section>
 
 <section xml:id="sp-box-cjson">
@@ -1841,6 +1934,61 @@ localhost> <userinput>lua for k, v in box.space[0]:pairs() do print(v) end</user
         </listitem>
     </varlistentry>
 </variablelist>
+
+<bridgehead renderas="sect4">Example showing use of the box.space functions</bridgehead>
+<para>
+This function will illustrate how to look at all the spaces,
+and for each display: whether the space is enabled, approximately
+how many tuples it contains, and the contents of its first two tuples.
+Warning: the way to traverse spaces will change in the next
+version of Tarantool.
+The function uses Tarantool box.space functions len() and pairs().
+The iteration through the spaces is coded as an infinite loop,
+but no worries -- it will be halted with an error message when
+the space number becomes greater than the maximum.
+</para>
+<programlisting>
+setopt delimiter='!'
+lua function example()
+  local space_number, tuple_number, tuple_count
+  space_number = 0
+  while 0 == 0 do
+    tuple_count = box.space[space_number]:len()
+    print('space_number ',space_number)
+    print('  enabled = ', box.space[space_number].enabled)
+    print('  approximate number of tuples  = ', tuple_count)
+    tuple_number = 1
+    for k, v in box.space[space_number]:pairs() do
+      print('    tuple#',tuple_number,' = ',v)
+      tuple_number = tuple_number + 1
+      if tuple_number &gt; 2 then break end
+    end
+    space_number = space_number + 1
+  end
+end!
+setopt delimiter=''!
+</programlisting>
+<para>
+... And here is what happens when one invokes the function:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>lua example()</userinput>
+---
+space_number 0
+  enabled = true
+  approximate number of tuples  = 4
+    tuple#1 = 0: {0, 1390945890}
+    tuple#2 = 1: {1, 'b'}
+space_number 1
+  enabled = true
+  approximate number of tuples  = 4
+    tuple#1 = 0: {0, 1390945890}
+    tuple#2 = 1: {1, 'b'}
+error: '[string "function example()   local space_number, tupl..."]:1:
+       attempt to index a nil value'
+...
+</programlisting>
+</para>
+
 </section>
 
 <section xml:id="sp-box-index">
