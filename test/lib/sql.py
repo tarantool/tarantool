@@ -19,7 +19,7 @@ class sqlScanner(runtime.Scanner):
         ('\\s+', re.compile('\\s+')),
         ('NUM', re.compile('[+-]?[0-9]+')),
         ('ID', re.compile('[a-z_]+[0-9]+')),
-        ('PROC_ID', re.compile('[a-z_][a-z0-9_.]*')),
+        ('PROC_ID', re.compile('[a-z_][a-z0-9_.:]*')),
         ('STR', re.compile("'([^']+|\\\\.)*'")),
         ('PING', re.compile('ping')),
         ('INSERT', re.compile('insert')),
@@ -184,12 +184,12 @@ class sql(runtime.Parser):
     def update_list(self, _parent=None):
         _context = self.Context(_parent, self._scanner, 'update_list', [])
         predicate = self.predicate(_context)
-        update_list = [predicate]
+        update_list = [('=', predicate[0], predicate[1])]
         if self._peek("','", 'WHERE', 'END', context=_context) == "','":
             while 1:
                 self._scan("','", context=_context)
                 predicate = self.predicate(_context)
-                update_list.append(predicate)
+                update_list.append(("=", predicate[0], predicate[1]))
                 if self._peek("','", 'WHERE', 'END', context=_context) != "','": break
         return update_list
 

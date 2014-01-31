@@ -3,7 +3,7 @@
 space = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 ---
 ...
 box.stat()
@@ -50,7 +50,7 @@ box.cfg()
   admin_port: 33015
   logger: cat - >> tarantool.log
   slab_alloc_arena: 0.1
-  log_level: 4
+  log_level: 5
   primary_port: 33013
   readahead: 16320
   too_long_threshold: 0.5
@@ -93,7 +93,7 @@ box.stat()
     total: 0
     rps: 0
 ...
-box.insert(0, 1, 'tuple')
+space:insert{1, 'tuple'}
 ---
 - [1, 'tuple']
 ...
@@ -101,7 +101,7 @@ box.snapshot()
 ---
 - ok
 ...
-box.delete(0, 1)
+space:delete{1}
 ---
 - [1, 'tuple']
 ...
@@ -267,6 +267,6 @@ test_box_fiber_info();
 ---
 - box.fiber.info() is ok
 ...
-box.space[0]:drop();
+space:drop();
 ---
 ...

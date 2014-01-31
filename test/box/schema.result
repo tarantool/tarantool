@@ -1,0 +1,83 @@
+space = box.schema.create_space('tweedledum', { id = 0 })
+---
+...
+space:create_index('primary', { type = 'hash' })
+---
+...
+t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
+---
+...
+t
+---
+- - 'temporary: false'
+  - 'n: 0'
+  - 'enabled: true'
+  - 'name: tweedledum'
+  - 'arity: 0'
+...
+box.space[300] = 1
+---
+...
+box.index.bind('abc', 'cde')
+---
+- error: 'bad argument #1 to ''?'' (number expected, got string)'
+...
+box.index.bind(1, 2)
+---
+- error: Space 1 does not exist
+...
+box.index.bind(0, 1)
+---
+- error: 'No index #1 is defined in space 0'
+...
+box.index.bind(0, 0)
+---
+- ' index 0'
+...
+#box.index.bind(0,0)
+---
+- 0
+...
+#box.space[0].index[0].idx
+---
+- 0
+...
+space:insert{1953719668}
+---
+- [1953719668]
+...
+space:insert{1684234849}
+---
+- [1684234849]
+...
+#box.index.bind(0,0)
+---
+- 2
+...
+#box.space[0].index[0].idx
+---
+- 2
+...
+space:delete{1953719668}
+---
+- [1953719668]
+...
+#box.index.bind(0,0)
+---
+- 1
+...
+space:delete{1684234849}
+---
+- [1684234849]
+...
+#box.space[0].index[0].idx
+---
+- 0
+...
+#box.index.bind(0,0)
+---
+- 0
+...
+space:drop()
+---
+...

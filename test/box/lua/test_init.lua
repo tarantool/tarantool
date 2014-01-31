@@ -19,11 +19,11 @@ end
 
 local function do_insert()
     box.fiber.detach()
-    box.insert(0, 1, 2, 4, 8)
+    box.space[0]:insert{1, 2, 4, 8}
 end
 
 space = box.schema.create_space('tweedledum', { id = 0 })
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 
 fiber = box.fiber.create(do_insert)
 box.fiber.resume(fiber)
@@ -32,7 +32,7 @@ box.fiber.resume(fiber)
 -- Test insert from start-up script
 --
 
-space:insert(2, 4, 8, 16)
+space:insert{2, 4, 8, 16}
 
 --
 -- A test case for https://github.com/tarantool/tarantool/issues/53

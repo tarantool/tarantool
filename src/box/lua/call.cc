@@ -254,7 +254,7 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 					  name_end - name, name);
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
-		objstack = 1;
+		objstack = index;
 	}
 
 
@@ -269,9 +269,15 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	/* setting stack that it would contain only
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
-		lua_replace(L, 1);
-		if (objstack)
-			lua_replace(L, 2);
+		if (objstack == 0) {        /* no object, only a function */
+			lua_replace(L, 1);
+		} else if (objstack == 1) { /* just two values, swap them */
+			lua_insert(L, -2);
+		} else {		    /* long path */
+			lua_insert(L, 1);
+			lua_insert(L, 2);
+			objstack = 1;
+		}
 		lua_settop(L, 1 + objstack);
 	}
 	return 1 + objstack;
@@ -305,9 +311,11 @@ box_lua_call(const struct request *request, struct txn *txn,
 	(void) txn;
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
+	const char *name = request->key;
+	uint32_t name_len = mp_decode_strl(&name);
 
 	/* proc name */
-	int oc = box_lua_find(L, request->key, request->key_end);
+	int oc = box_lua_find(L, name, name + name_len);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

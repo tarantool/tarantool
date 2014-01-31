@@ -35,14 +35,14 @@ s:drop()
 s = box.schema.create_space('t', { temporary = true })
 ---
 ...
-s:create_index('primary', 'hash')
+s:create_index('primary', { type = 'hash' })
 ---
 ...
-s:insert(1, 2, 3)
+s:insert{1, 2, 3}
 ---
 - [1, 2, 3]
 ...
-s:select(0, 1)
+s:select{1}
 ---
 - [1, 2, 3]
 ...
@@ -50,11 +50,11 @@ s:len()
 ---
 - 1
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})
 ---
 - [512, 0, 't', 'temporary']
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, '')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, ''}})
 ---
 - error: 'Can''t modify space 512: can not switch temporary flag on a non-empty space'
 ...
@@ -71,7 +71,7 @@ s.temporary
 ---
 - true
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'no-temporary'}})
 ---
 - [512, 0, 't', 'no-temporary']
 ...
@@ -79,7 +79,7 @@ s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, ',:asfda:temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, ',:asfda:temporary'}})
 ---
 - [512, 0, 't', ',:asfda:temporary']
 ...
@@ -87,7 +87,7 @@ s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'a,b,c,d,e')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'a,b,c,d,e'}})
 ---
 - [512, 0, 't', 'a,b,c,d,e']
 ...
@@ -95,7 +95,7 @@ s.temporary
 ---
 - false
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})
 ---
 - [512, 0, 't', 'temporary']
 ...
@@ -103,26 +103,26 @@ s.temporary
 ---
 - true
 ...
-s:select(0, 1)
+s:select{1}
 ---
 ...
-s:insert(1, 2, 3)
+s:insert{1, 2, 3}
 ---
 - [1, 2, 3]
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})
 ---
 - [512, 0, 't', 'temporary']
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'no-temporary'}})
 ---
 - error: 'Can''t modify space 512: can not switch temporary flag on a non-empty space'
 ...
-s:delete(1)
+s:delete{1}
 ---
 - [1, 2, 3]
 ...
-box.space[box.schema.SPACE_ID]:update(s.n, '=p', 3, 'no-temporary')
+box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'no-temporary'}})
 ---
 - [512, 0, 't', 'no-temporary']
 ...

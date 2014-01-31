@@ -123,28 +123,23 @@ s:drop()
 s = box.schema.create_space('tweedledum')
 ---
 ...
-s:insert(0)
+s:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:select(0)
+s:select{}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:select_range(0, 0, 0)
----
-- error: '[string "-- schema.lua (internal file)..."]:208: attempt to index a nil
-    value'
-...
-s:delete(0)
+s:delete{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:update(0, "=p", 0, 0)
+s:update(0, {{"=", 0, 0}})
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s:replace(0)
+s:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
@@ -161,7 +156,7 @@ s.enabled
 - false
 ...
 -- enabled/disabled transition
-s:create_index('primary', 'hash', { parts = { 0, 'num' } })
+s:create_index('primary', { type = 'hash' })
 ---
 ...
 s.enabled
@@ -199,11 +194,11 @@ s.name
 - tweedledee
 ...
 -- access to a renamed space
-s:insert(0)
+s:insert{0}
 ---
 - [0]
 ...
-s:delete(0)
+s:delete{0}
 ---
 - [0]
 ...
@@ -229,86 +224,86 @@ s.arity
 ---
 - 2
 ...
-s:create_index('primary', 'tree', { parts = { 0, 'num' } })
+s:create_index('primary')
 ---
 ...
 -- arity actually works
-s:insert(1)
+s:insert{1}
 ---
 - error: Tuple field count 1 does not match space 512 arity 2
 ...
-s:insert(1, 2)
+s:insert{1, 2}
 ---
 - [1, 2]
 ...
-s:insert(1, 2, 3)
+s:insert{1, 2, 3}
 ---
 - error: Tuple field count 3 does not match space 512 arity 2
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- increase arity -- error
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- decrease arity - error
-box.space['_space']:update(s.n, "=p", 1, 1)
+box.space['_space']:update(s.n, {{"=", 1, 1}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 -- remove arity - ok
-box.space['_space']:update(s.n, "=p", 1, 0)
+box.space['_space']:update(s.n, {{"=", 1, 0}})
 ---
 - [512, 0, 'test', '']
 ...
-s:select(0)
+s:select{}
 ---
 - [1, 2]
 ...
 -- increase arity - error
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 s:truncate()
 ---
 ...
-s:select(0)
+s:select{}
 ---
 ...
 -- set arity of an empty space
-box.space['_space']:update(s.n, "=p", 1, 3)
+box.space['_space']:update(s.n, {{"=", 1, 3}})
 ---
 - [512, 3, 'test', '']
 ...
-s:select(0)
+s:select{}
 ---
 ...
 -- arity actually works
-s:insert(3, 4)
+s:insert{3, 4}
 ---
 - error: Tuple field count 2 does not match space 512 arity 3
 ...
-s:insert(3, 4, 5)
+s:insert{3, 4, 5}
 ---
 - [3, 4, 5]
 ...
-s:insert(3, 4, 5, 6)
+s:insert{3, 4, 5, 6}
 ---
 - error: Tuple field count 4 does not match space 512 arity 3
 ...
-s:insert(7, 8, 9)
+s:insert{7, 8, 9}
 ---
 - [7, 8, 9]
 ...
-s:select(0)
+s:select{}
 ---
 - [3, 4, 5]
 - [7, 8, 9]
@@ -344,7 +339,7 @@ s = box.schema.create_space('test')
 ...
 --# setopt delimiter ';'
 for k=0, box.schema.INDEX_MAX + 1, 1 do
-    s:create_index('i'..k, 'hash', { parts = {0, 'num'} } )
+    s:create_index('i'..k, { type = 'hash' })
 end;
 ---
 - error: 'Can''t create or modify index 10 in space 512: index id too big'
@@ -356,67 +351,67 @@ for k, v in pairs (s.index) do if v.id ~= 0 then v:drop() end end
 ...
 -- test limits enforced in key_def_check:
 -- unknown index type
-s:create_index('test', 'nosuchtype', { parts = {0, 'num'} })
+s:create_index('test', { type = 'nosuchtype' })
 ---
 - error: Unsupported index type supplied for index 1 in space 512
 ...
 -- hash index is not unique
-s:create_index('test', 'hash', {parts = {0, 'num'}, unique = false })
+s:create_index('test', { type = 'hash', unique = false })
 ---
 - error: 'Can''t create or modify index 1 in space 512: HASH index must be unique'
 ...
 -- bitset index is unique
-s:create_index('test', 'bitset', {parts = {0, 'num'}, unique = true })
+s:create_index('test', { type = 'bitset', unique = true })
 ---
 - error: 'Can''t create or modify index 1 in space 512: BITSET can not be unique'
 ...
 -- bitset index is multipart
-s:create_index('test', 'bitset', {parts = {0, 'num', 1, 'num'}})
+s:create_index('test', { type = 'bitset', parts = {0, 'num', 1, 'num'}})
 ---
 - error: 'Can''t create or modify index 1 in space 512: BITSET index key can not be
     multipart'
 ...
 -- part count must be positive
-s:create_index('test', 'hash', {parts = {}})
+s:create_index('test', { type = 'hash', parts = {}})
 ---
 - error: 'Can''t create or modify index 1 in space 512: part count must be positive'
 ...
 -- part count must be positive
-s:create_index('test', 'hash', {parts = { 0 }})
+s:create_index('test', { type = 'hash', parts = { 0 }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: part count must be positive'
 ...
 -- unknown field type
-s:create_index('test', 'hash', {parts = { 0, 'nosuchtype' }})
+s:create_index('test', { type = 'hash', parts = { 0, 'nosuchtype' }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: unknown field type'
 ...
 -- bad field no
-s:create_index('test', 'hash', {parts = { 'qq', 'nosuchtype' }})
+s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 ---
 - error: 'Tuple field 6 type does not match one required by operation: expected NUM'
 ...
 -- big field no
-s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX, 'num' }})
+s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'num' }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: field no is too big'
 ...
-s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX - 1, 'num' }})
+s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX - 1, 'num' }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: field no is too big'
 ...
-s:create_index('test', 'hash', {parts = { box.schema.FIELD_MAX + 90, 'num' }})
+s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX + 90, 'num' }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: field no is too big'
 ...
-s:create_index('test', 'hash', {parts = { box.schema.INDEX_FIELD_MAX + 1, 'num' }})
+s:create_index('test', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX + 1, 'num' }})
 ---
 - error: 'Can''t create or modify index 1 in space 512: field no is too big'
 ...
-s:create_index('t1', 'hash', {parts = { box.schema.INDEX_FIELD_MAX, 'num' }})
+s:create_index('t1', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX, 'num' }})
 ---
 ...
-s:create_index('t2', 'hash', {parts = { box.schema.INDEX_FIELD_MAX - 1, 'num' }})
+s:create_index('t2', { type = 'hash', parts = { box.schema.INDEX_FIELD_MAX - 1, 'num' }})
 ---
 ...
 -- cleanup
@@ -427,7 +422,7 @@ s = box.schema.create_space('test')
 ---
 ...
 -- same part can't be indexed twice
-s:create_index('t1', 'hash', {parts = { 0, 'num', 0, 'str' }})
+s:create_index('t1', { type = 'hash', parts = { 0, 'num', 0, 'str' }})
 ---
 - error: 'Can''t create or modify index 0 in space 512: same key part is indexed twice'
 ...
@@ -446,7 +441,7 @@ end;
 ---
 - 512
 ...
-s:create_index('t1', 'hash', {parts = parts});
+s:create_index('t1', { type = 'hash', parts = parts});
 ---
 - error: 'Can''t create or modify index 0 in space 512: too many key parts'
 ...
@@ -463,7 +458,7 @@ end;
 ---
 - 510
 ...
-s:create_index('t1', 'hash', {parts = parts});
+s:create_index('t1', { type = 'hash', parts = parts});
 ---
 ...
 --# setopt delimiter ''
@@ -481,17 +476,17 @@ s:drop()
 s = box.schema.create_space('test')
 ---
 ...
-s:create_index('t1', 'hash', { parts = { 0, 'num' }})
+s:create_index('t1', { type = 'hash' })
 ---
 ...
 -- field type contradicts field type of another index
-s:create_index('t2', 'hash', { parts = { 0, 'str' }})
+s:create_index('t2', { type = 'hash', parts = { 0, 'str' }})
 ---
 - error: Ambiguous field type in index 1, key part 0. Requested type is STR but the
     field has previously been defined as NUM
 ...
 -- ok
-s:create_index('t2', 'hash', { parts = { 1, 'str' }})
+s:create_index('t2', { type = 'hash', parts = { 1, 'str' }})
 ---
 ...
 -- don't allow drop of the primary key in presence of other keys
@@ -507,7 +502,7 @@ s:drop()
 s = box.schema.create_space('test')
 ---
 ...
-s:create_index('primary', 'hash')
+s:create_index('primary', { type = 'hash' })
 ---
 ...
 -- space cache is updated correctly
@@ -605,8 +600,13 @@ s:drop()
 s = box.schema.create_space('test')
 ---
 ...
-s:create_index('primary', 'hash')
+s:create_index('primary', { type = 'hash' })
 ---
+...
+-- correct error on misuse of alter
+s.index.primary.alter({unique=false})
+---
+- error: 'Usage: index:alter{opts}'
 ...
 s.index.primary:alter({unique=false})
 ---
@@ -645,14 +645,14 @@ s.index.pk:rename('primary')
 - error: '[string "return s.index.pk:rename(''primary'') "]:1: attempt to index field
     ''pk'' (a nil value)'
 ...
-s:create_index('second', 'tree', { parts = {  1, 'str' } })
+s:create_index('second', { type = 'tree', parts = {  1, 'str' } })
 ---
 ...
 s.index.second.id
 ---
 - 1
 ...
-s:create_index('third', 'hash', { parts = {  2, 'num' } })
+s:create_index('third', { type = 'hash', parts = {  2, 'num' } })
 ---
 ...
 s.index.third:rename('second')
@@ -690,42 +690,42 @@ s:drop()
 s = box.schema.create_space('full')
 ---
 ...
-s:create_index('primary', 'tree', {parts =  { 0, 'str' }})
+s:create_index('primary', { type = 'tree', parts =  { 0, 'str' }})
 ---
 ...
-s:insert('No such movie', 999)
+s:insert{'No such movie', 999}
 ---
 - ['No such movie', 999]
 ...
-s:insert('Barbara', 2012)
+s:insert{'Barbara', 2012}
 ---
 - ['Barbara', 2012]
 ...
-s:insert('Cloud Atlas', 2012)
+s:insert{'Cloud Atlas', 2012}
 ---
 - ['Cloud Atlas', 2012]
 ...
-s:insert('Almanya - Willkommen in Deutschland', 2011)
+s:insert{'Almanya - Willkommen in Deutschland', 2011}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 ...
-s:insert('Halt auf freier Strecke', 2011)
+s:insert{'Halt auf freier Strecke', 2011}
 ---
 - ['Halt auf freier Strecke', 2011]
 ...
-s:insert('Homevideo', 2011)
+s:insert{'Homevideo', 2011}
 ---
 - ['Homevideo', 2011]
 ...
-s:insert('Die Fremde', 2010)
+s:insert{'Die Fremde', 2010}
 ---
 - ['Die Fremde', 2010]
 ...
 -- create index with data
-s:create_index('year', 'tree', { unique=false, parts = { 1, 'num'} })
+s:create_index('year', { type = 'tree', unique=false, parts = { 1, 'num'} })
 ---
 ...
-s.index.primary:select()
+s.index.primary:select{}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 - ['Barbara', 2012]
@@ -736,7 +736,7 @@ s.index.primary:select()
 - ['No such movie', 999]
 ...
 -- a duplicate in the created index
-s:create_index('nodups', 'tree', { unique=true, parts = { 1, 'num'} })
+s:create_index('nodups', { type = 'tree', unique=true, parts = { 1, 'num'} })
 ---
 - error: Duplicate key exists in unique index 2
 ...
@@ -745,7 +745,7 @@ s.index.year:alter({unique=true})
 ---
 - error: Duplicate key exists in unique index 1
 ...
-s.index.primary:select()
+s.index.primary:select{}
 ---
 - ['Almanya - Willkommen in Deutschland', 2011]
 - ['Barbara', 2012]
@@ -755,39 +755,39 @@ s.index.primary:select()
 - ['Homevideo', 2011]
 - ['No such movie', 999]
 ...
-box.space['_index']:update({s.n, s.index.year.id}, "=p", 7, 'num')
+box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
 ---
 - [512, 1, 'year', 'tree', 0, 1, 1, 'num']
 ...
 -- ambiguous field type
-s:create_index('str', 'tree', {unique =  false, parts = { 1, 'str'}})
+s:create_index('str', { type = 'tree', unique =  false, parts = { 1, 'str'}})
 ---
 - error: Ambiguous field type in index 2, key part 0. Requested type is STR but the
     field has previously been defined as NUM
 ...
 -- create index on a non-existing field
-s:create_index('nosuchfield', 'tree', {unique = true, parts = { 2, 'str'}})
+s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 2, 'str'}})
 ---
 - error: Tuple field count 2 is less than required by a defined index (expected 3)
 ...
 s.index.year:drop()
 ---
 ...
-s:insert('Der Baader Meinhof Komplex', '2009 ')
+s:insert{'Der Baader Meinhof Komplex', '2009 '}
 ---
 - ['Der Baader Meinhof Komplex', '2009 ']
 ...
 -- create an index on a field with a wrong type
-s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+s:create_index('year', { type = 'tree', unique = false, parts = { 1, 'num'}})
 ---
 - error: 'Tuple field 1 type does not match one required by operation: expected NUM'
 ...
 -- a field is missing
-s:replace('Der Baader Meinhof Komplex')
+s:replace{'Der Baader Meinhof Komplex'}
 ---
 - ['Der Baader Meinhof Komplex']
 ...
-s:create_index('year', 'tree', {unique = false, parts = { 1, 'num'}})
+s:create_index('year', { type = 'tree', unique = false, parts = { 1, 'num'}})
 ---
 - error: Tuple field count 1 is less than required by a defined index (expected 2)
 ...
@@ -799,48 +799,48 @@ s = box.schema.create_space('test')
 ---
 ...
 -- primary key must be unique
-s:create_index('primary', 'tree', { unique = false, parts = {0, 'num'}})
+s:create_index('primary', { unique = false })
 ---
 - error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
 ...
 -- create primary key
-s:create_index('primary', 'hash', { unique = true, parts = {0, 'num'}})
+s:create_index('primary', { type = 'hash' })
 ---
 ...
-s:insert(1, 1)
+s:insert{1, 1}
 ---
 - [1, 1]
 ...
-s:create_index('secondary', 'tree', { unique = false, parts = {1, 'num'}})
+s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'num'}})
 ---
 ...
-s:insert(2, 1)
----
-- [2, 1]
-...
-s.index.secondary:alter({ unique = true })
----
-- error: Duplicate key exists in unique index 1
-...
-s:delete(2)
+s:insert{2, 1}
 ---
 - [2, 1]
 ...
-s.index.secondary:alter({ unique = true })
----
-...
-s:insert(2, 1)
+s.index.secondary:alter{ unique = true }
 ---
 - error: Duplicate key exists in unique index 1
 ...
-s:insert(2, 2)
+s:delete{2}
+---
+- [2, 1]
+...
+s.index.secondary:alter{ unique = true }
+---
+...
+s:insert{2, 1}
+---
+- error: Duplicate key exists in unique index 1
+...
+s:insert{2, 2}
 ---
 - [2, 2]
 ...
-s.index.secondary:alter({ unique = false})
+s.index.secondary:alter{ unique = false}
 ---
 ...
-s:insert(3, 2)
+s:insert{3, 2}
 ---
 - [3, 2]
 ...
@@ -856,7 +856,7 @@ s = box.schema.create_space('test')
 s1 = s
 ---
 ...
-s:create_index('primary', 'tree')
+s:create_index('primary')
 ---
 ...
 s1.index.primary.id
@@ -873,7 +873,7 @@ primary.id
 ---
 - 0
 ...
-primary:select()
+primary:select{}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
@@ -891,38 +891,38 @@ s:drop()
 s_empty = box.schema.create_space('s_empty')
 ---
 ...
-s_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_empty:create_index('primary')
 ---
 ...
-s_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+s_empty:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
 s_full = box.schema.create_space('s_full')
 ---
 ...
-s_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+s_full:create_index('primary')
 ---
 ...
-s_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+s_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
-s_full:insert(1, 1, 'a')
+s_full:insert{1, 1, 'a'}
 ---
 - [1, 1, 'a']
 ...
-s_full:insert(2, 2, 'b')
+s_full:insert{2, 2, 'b'}
 ---
 - [2, 2, 'b']
 ...
-s_full:insert(3, 3, 'c')
+s_full:insert{3, 3, 'c'}
 ---
 - [3, 3, 'c']
 ...
-s_full:insert(4, 4, 'd')
+s_full:insert{4, 4, 'd'}
 ---
 - [4, 4, 'd']
 ...
-s_full:insert(5, 5, 'e')
+s_full:insert{5, 5, 'e'}
 ---
 - [5, 5, 'e']
 ...
@@ -939,74 +939,74 @@ box.snapshot()
 s_drop:drop()
 ---
 ...
-s_nil:create_index('primary', 'hash', {unique=true, parts = {0, 'num'}})
+s_nil:create_index('primary', { type = 'hash'})
 ---
 ...
-s_nil:insert(1,2,3,4,5,6);
+s_nil:insert{1,2,3,4,5,6}
 ---
 - [1, 2, 3, 4, 5, 6]
 ...
-s_nil:insert(7, 8, 9, 10, 11,12)
+s_nil:insert{7, 8, 9, 10, 11,12}
 ---
 - [7, 8, 9, 10, 11, 12]
 ...
-s_nil:create_index('secondary', 'tree', {unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
+s_nil:create_index('secondary', { type = 'tree', unique=false, parts = {1, 'num', 2, 'num', 3, 'num'}})
 ---
 ...
-s_nil:insert(13, 14, 15, 16, 17)
+s_nil:insert{13, 14, 15, 16, 17}
 ---
 - [13, 14, 15, 16, 17]
 ...
 r_empty = box.schema.create_space('r_empty')
 ---
 ...
-r_empty:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_empty:create_index('primary')
 ---
 ...
-r_empty:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+r_empty:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
 r_full = box.schema.create_space('r_full')
 ---
 ...
-r_full:create_index('primary', 'tree', {unique = true, parts = {0, 'num'}})
+r_full:create_index('primary', { type = 'tree', unique = true, parts = {0, 'num'}})
 ---
 ...
-r_full:create_index('secondary', 'hash', {unique = true, parts = {1, 'num'}})
+r_full:create_index('secondary', { type = 'hash', unique = true, parts = {1, 'num'}})
 ---
 ...
-r_full:insert(1, 1, 'a')
+r_full:insert{1, 1, 'a'}
 ---
 - [1, 1, 'a']
 ...
-r_full:insert(2, 2, 'b')
+r_full:insert{2, 2, 'b'}
 ---
 - [2, 2, 'b']
 ...
-r_full:insert(3, 3, 'c')
+r_full:insert{3, 3, 'c'}
 ---
 - [3, 3, 'c']
 ...
-r_full:insert(4, 4, 'd')
+r_full:insert{4, 4, 'd'}
 ---
 - [4, 4, 'd']
 ...
-r_full:insert(5, 5, 'e')
+r_full:insert{5, 5, 'e'}
 ---
 - [5, 5, 'e']
 ...
-s_full:create_index('multikey', 'tree', {unique = true, parts = { 1, 'num', 2, 'str'}})
+s_full:create_index('multikey', { type = 'tree', unique = true, parts = { 1, 'num', 2, 'str'}})
 ---
 ...
-s_full:insert(6, 6, 'f')
+s_full:insert{6, 6, 'f'}
 ---
 - [6, 6, 'f']
 ...
-s_full:insert(7, 7, 'g')
+s_full:insert{7, 7, 'g'}
 ---
 - [7, 7, 'g']
 ...
-s_full:insert(8, 8, 'h')
+s_full:insert{8, 8, 'h'}
 ---
 - [8, 8, 'h']
 ...

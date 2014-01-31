@@ -468,12 +468,17 @@ to print write-ahead-log contents, or to send write-ahead-log
 contents to the server.
 Here is an example of a print-and-play-mode tarantool client session:
 <programlisting>
-<prompt>$ </prompt>tarantool --cat /home/user1/tarantool_test/work_dir/00000000000000000005.xlog --from 22 --to 26
-Insert, lsn: 22, time: 1385327353.345869, len: 33, space: 0, cookie: 127.0.0.1:44787 ['X-1', 100]
-Insert, lsn: 23, time: 1385327353.346745, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-2', 200, 8243105135088135759]
-Insert, lsn: 24, time: 1385327353.347352, len: 34, space: 0, cookie: 127.0.0.1:44787 ['X-3', 300, '']
-Update, lsn: 25, time: 1385327353.348209, len: 42, space: 0, cookie: 127.0.0.1:44787 ['X-1']
-Delete, lsn: 26, time: 1385327353.348879, len: 28, space: 0, cookie: 127.0.0.1:44787 ['X-2']
+<prompt>$ </prompt>tarantool --cat 00000000000000000005.xlog --from 22 --to 26
+Insert, lsn: 22, time: 1385327353.345869, len: 33, space: 0,
+    cookie: 127.0.0.1:44787 ['X-1', 100]
+Insert, lsn: 23, time: 1385327353.346745, len: 42, space: 0,
+    cookie: 127.0.0.1:44787 ['X-2', 200, 8243105135088135759]
+Insert, lsn: 24, time: 1385327353.347352, len: 34, space: 0,
+    cookie: 127.0.0.1:44787 ['X-3', 300, '']
+Update, lsn: 25, time: 1385327353.348209, len: 42, space: 0,
+    cookie: 127.0.0.1:44787 ['X-1']
+Delete, lsn: 26, time: 1385327353.348879, len: 28, space: 0,
+    cookie: 127.0.0.1:44787 ['X-2']
 <prompt>$ </prompt>
 </programlisting>
 </para>
@@ -571,7 +576,7 @@ Taking snapshots with tarantar, instead of with SAVE SNAPSHOT,
 can be better because:
 <itemizedlist>
   <listitem><para>tarantar can work even if the tarantool_box server is down
-  because it works from the existing .xnap and .xlog files,
+  because it works from the existing .snap and .xlog files,
    rather than from an in-memory database.</para></listitem>
    <listitem><para>tarantar saves memory when constructing its own in-memory
   index to the rows by making SHA-1 hashes for primary keys
@@ -720,21 +725,21 @@ tarantool_deploy.sh: done
   <section xml:id="rpm-based-distros">
     <title>Fedora, RHEL, CentOS</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 
   <section xml:id="FreeBSD">
     <title>FreeBSD</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 
   <section xml:id="mac-os-x">
     <title>Mac OS X</title>
     <para>
-        tba
+        TBA
     </para>
   </section>
 

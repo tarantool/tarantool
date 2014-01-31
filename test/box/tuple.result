@@ -1,0 +1,391 @@
+-- box.tuple test
+-- Test box.tuple:slice()
+t=box.tuple.new{'0', '1', '2', '3', '4', '5', '6', '7'}
+---
+...
+t:slice(0)
+---
+- '0'
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-1)
+---
+- '7'
+...
+t:slice(1)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-1, -1)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(-1, 1)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(1, -1)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+...
+t:slice(1, 3)
+---
+- '1'
+- '2'
+...
+t:slice(7)
+---
+- '7'
+...
+t:slice(8)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(9)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(100500)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(9, -1)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(6, -1)
+---
+- '6'
+...
+t:slice(4, 4)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(6, 4)
+---
+- error: 'tuple.slice(): start must be less than end'
+...
+t:slice(0, 0)
+---
+- error: 'tuple.slice(): end > field count'
+...
+t:slice(9, 10)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(-7)
+---
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-8)
+---
+- '0'
+- '1'
+- '2'
+- '3'
+- '4'
+- '5'
+- '6'
+- '7'
+...
+t:slice(-9)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(-100500)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+t:slice(500, 700)
+---
+- error: 'tuple.slice(): start >= field count'
+...
+--  box.tuple.new test
+box.tuple.new()
+---
+- []
+...
+box.tuple.new(1)
+---
+- [1]
+...
+box.tuple.new('string')
+---
+- ['string']
+...
+box.tuple.new(tonumber64('18446744073709551615'))
+---
+- [18446744073709551615]
+...
+box.tuple.new{tonumber64('18446744073709551615'), 'string', 1}
+---
+- [18446744073709551615, 'string', 1]
+...
+--  A test case for Bug#1131108 'incorrect conversion from boolean lua value to tarantool tuple'
+function bug1075677() local range = {} table.insert(range, 1>0) return range end
+---
+...
+box.tuple.new(bug1075677())
+---
+- [true]
+...
+bug1075677=nil
+---
+...
+-- boolean values in a tuple
+box.tuple.new(false)
+---
+- [false]
+...
+box.tuple.new({false})
+---
+- [false]
+...
+-- tuple:bsize()
+t = box.tuple.new('abc')
+---
+...
+t
+---
+- ['abc']
+...
+t:bsize()
+---
+- 5
+...
+--
+-- Test cases for #106 box.tuple.new fails on multiple items
+--
+box.tuple.new()
+---
+- []
+...
+box.tuple.new{}
+---
+- []
+...
+box.tuple.new(1)
+---
+- [1]
+...
+box.tuple.new{1}
+---
+- [1]
+...
+box.tuple.new(1, 2, 3, 4, 5)
+---
+- [1, 2, 3, 4, 5]
+...
+box.tuple.new{1, 2, 3, 4, 5}
+---
+- [1, 2, 3, 4, 5]
+...
+box.tuple.new({'a', 'b'}, {'c', 'd'}, {'e', 'f'})
+---
+- [['a', b], ['c', 'd'], ['e', 'f']]
+...
+box.tuple.new{{'a', 'b'}, {'c', 'd'}, {'e', 'f'}}
+---
+- [['a', b], ['c', 'd'], ['e', 'f']]
+...
+box.tuple.new({1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6})
+---
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
+---
+- [[1, 2], 'x', 'y', 'z', {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})
+---
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
+---
+- ['x', 'y', 'z', [1, 2], {'c': 3, 'd': 4}, {'e': 5, 'f': 6}]
+...
+--
+-- A test case for #107 "box.tuple.unpack asserts on extra arguments"
+--
+t=box.tuple.new{'a','b','c'}
+---
+...
+t:unpack(5)
+---
+- a
+- b
+- c
+...
+t:unpack(1, 2, 3, 4, 5)
+---
+- a
+- b
+- c
+...
+--
+-- Check that tuple:totable correctly sets serializer hints
+--
+box.tuple.new{1, 2, 3}:totable()
+---
+- [1, 2, 3]
+...
+getmetatable(box.tuple.new{1, 2, 3}:totable())
+---
+- _serializer_compact: true
+...
+--  A test case for the key as an tuple
+space = box.schema.create_space('tweedledum')
+---
+...
+space:create_index('primary')
+---
+...
+space:truncate()
+---
+...
+t=space:insert{0, 777, '0', '1', '2', '3'}
+---
+...
+t
+---
+- [0, 777, '0', '1', '2', '3']
+...
+space:replace(t)
+---
+- [0, 777, '0', '1', '2', '3']
+...
+space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
+---
+- [777, ['a', 'b', 'c', ['d', 'e', [0, 777, '0', '1', '2', '3']]]]
+...
+--  A test case for tuple:totable() method
+t=space:select{777}:totable()
+---
+...
+t[2], t[3], t[4], t[5]
+---
+- - a
+  - b
+  - c
+  - - d
+    - e
+    - - 0
+      - 777
+      - '0'
+      - '1'
+      - '2'
+      - '3'
+- null
+- null
+- null
+...
+space:truncate()
+---
+...
+--  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'
+t=space:insert{0, 8989}
+---
+...
+t[nil]
+---
+- error: '[string "return t[nil] "]:1: bad argument #2 to ''__index'' (string expected,
+    got nil)'
+...
+# test tuple iterators
+---
+...
+t=space:insert{1953719668}
+---
+...
+t:next(1684234849)
+---
+- error: 'tuple.next(): bad arguments'
+...
+t:next(1)
+---
+- error: 'tuple.next(): bad arguments'
+...
+t:next(t)
+---
+- error: 'bad argument #2 to ''?'' (box.tuple.iterator expected, got userdata)'
+...
+t:next(t:next())
+---
+- error: 'tuple.next(): bad arguments'
+...
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+...
+t=space:replace{1953719668, 'another field'}
+---
+...
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+  - another field
+...
+t=space:replace{1953719668, 'another field', 'one more'}
+---
+...
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+---
+...
+ta
+---
+- - 1953719668
+  - another field
+  - one more
+...
+t=box.tuple.new({'a', 'b', 'c', 'd'})
+---
+...
+ta = {} for it,field in t:pairs() do table.insert(ta, field); end
+---
+...
+ta
+---
+- - a
+  - b
+  - c
+  - d
+...
+it, field = t:next()
+---
+...
+getmetatable(it)
+---
+- box.tuple.iterator
+...
+space:drop()
+---
+...

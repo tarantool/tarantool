@@ -2,15 +2,15 @@
 --# start server default
 
 space = box.schema.create_space('tweedledum', { id = 0 })
-space:create_index('primary', 'hash', { parts = { 0, 'num' }})
+space:create_index('primary', { type = 'hash' })
 
 box.stat()
 help()
 box.cfg()
 box.stat()
-box.insert(0, 1, 'tuple')
+space:insert{1, 'tuple'}
 box.snapshot()
-box.delete(0, 1)
+space:delete{1}
 
 --# setopt delimiter ';'
 function check_type(arg, typeof)
@@ -159,4 +159,4 @@ end;
 test_box_info();
 test_box_slab_info();
 test_box_fiber_info();
-box.space[0]:drop();
+space:drop();

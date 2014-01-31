@@ -1,0 +1,116 @@
+-- box.tuple test
+-- Test box.tuple:slice()
+t=box.tuple.new{'0', '1', '2', '3', '4', '5', '6', '7'}
+t:slice(0)
+t:slice(-1)
+t:slice(1)
+t:slice(-1, -1)
+t:slice(-1, 1)
+t:slice(1, -1)
+t:slice(1, 3)
+t:slice(7)
+t:slice(8)
+t:slice(9)
+t:slice(100500)
+t:slice(9, -1)
+t:slice(6, -1)
+t:slice(4, 4)
+t:slice(6, 4)
+t:slice(0, 0)
+t:slice(9, 10)
+t:slice(-7)
+t:slice(-8)
+t:slice(-9)
+t:slice(-100500)
+t:slice(500, 700)
+--  box.tuple.new test
+box.tuple.new()
+box.tuple.new(1)
+box.tuple.new('string')
+box.tuple.new(tonumber64('18446744073709551615'))
+box.tuple.new{tonumber64('18446744073709551615'), 'string', 1}
+--  A test case for Bug#1131108 'incorrect conversion from boolean lua value to tarantool tuple'
+
+function bug1075677() local range = {} table.insert(range, 1>0) return range end
+box.tuple.new(bug1075677())
+bug1075677=nil
+
+-- boolean values in a tuple
+box.tuple.new(false)
+box.tuple.new({false})
+
+-- tuple:bsize()
+
+t = box.tuple.new('abc')
+t
+t:bsize()
+
+--
+-- Test cases for #106 box.tuple.new fails on multiple items
+--
+box.tuple.new()
+box.tuple.new{}
+
+box.tuple.new(1)
+box.tuple.new{1}
+
+box.tuple.new(1, 2, 3, 4, 5)
+box.tuple.new{1, 2, 3, 4, 5}
+
+box.tuple.new({'a', 'b'}, {'c', 'd'}, {'e', 'f'})
+box.tuple.new{{'a', 'b'}, {'c', 'd'}, {'e', 'f'}}
+
+box.tuple.new({1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6})
+box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
+
+box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})
+box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
+
+--
+-- A test case for #107 "box.tuple.unpack asserts on extra arguments"
+--
+t=box.tuple.new{'a','b','c'}
+t:unpack(5)
+t:unpack(1, 2, 3, 4, 5)
+
+--
+-- Check that tuple:totable correctly sets serializer hints
+--
+box.tuple.new{1, 2, 3}:totable()
+getmetatable(box.tuple.new{1, 2, 3}:totable())
+
+--  A test case for the key as an tuple
+space = box.schema.create_space('tweedledum')
+space:create_index('primary')
+space:truncate()
+t=space:insert{0, 777, '0', '1', '2', '3'}
+t
+space:replace(t)
+space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
+--  A test case for tuple:totable() method
+t=space:select{777}:totable()
+t[2], t[3], t[4], t[5]
+space:truncate()
+--  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'
+t=space:insert{0, 8989}
+t[nil]
+# test tuple iterators
+t=space:insert{1953719668}
+t:next(1684234849)
+t:next(1)
+t:next(t)
+t:next(t:next())
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta
+t=space:replace{1953719668, 'another field'}
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta
+t=space:replace{1953719668, 'another field', 'one more'}
+ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta
+t=box.tuple.new({'a', 'b', 'c', 'd'})
+ta = {} for it,field in t:pairs() do table.insert(ta, field); end
+ta
+it, field = t:next()
+getmetatable(it)
+space:drop()

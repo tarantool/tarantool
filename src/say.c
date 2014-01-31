@@ -60,6 +60,8 @@ level_to_char(int level)
 	switch (level) {
 	case S_FATAL:
 		return 'F';
+	case S_SYSERROR:
+		return '!';
 	case S_ERROR:
 		return 'E';
 	case S_CRIT:

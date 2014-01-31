@@ -56,7 +56,7 @@ An automatic build system creates, tests and publishes packages for every push i
 Therefore if you looked at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link> you would see many files.
 Names of binary packages have the format <computeroutput><filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename></computeroutput>.
 Here is one example:
-<programlisting>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55             3664777</programlisting>
+<programlisting>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55    3664777</programlisting>
 which means <quote>Tarantool package, major version = 1, minor version number = 5, patch number 1,
 git revision id g8e8cd06, is a Linux x86 64-bit compressed tarball, pushed on
 September 26 2013, which contains 3.6 MB.</quote>
@@ -70,16 +70,21 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 <para>
 <programlisting>
 # DEBIAN commands for Tarantool stable binary download:
-# There is always an up-to-date Debian repository at <link xlink:href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</link>
-# The repository contains builds for Debian unstable "Sid", stable "Wheezy", forthcoming "Jessie", ...
+# There is always an up-to-date Debian repository at
+# <link xlink:href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</link>
+# The repository contains builds for Debian unstable "Sid", stable "Wheezy",
+# forthcoming "Jessie", ...
 # add the tarantool.org repository to your apt sources list:
-# ($release is an environment variable which will contain the Debian version code e.g. "Wheezy")
+# ($release is an environment variable which will contain the Debian version
+# code e.g. "Wheezy")
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/debian/ $release main" | <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/debian/ $release main" | <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
+<command>echo</command> "deb http://tarantool.org/dist/debian/ $release main" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
+<command>echo</command> "deb-src http://tarantool.org/dist/debian/ $release main" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
 <command>sudo apt-get install</command> tarantool tarantool-client
@@ -89,18 +94,24 @@ release=`lsb_release -c -s`
 <para>
 <programlisting>
 # UBUNTU commands for Tarantool stable binary download:
-# There is always an up-to-date Ubuntu repository at <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</link>
-# The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal", 13.04 "raring", 13.10 "saucy", ...
+# There is always an up-to-date Ubuntu repository at
+# <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</link>
+# The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
+# 13.04 "raring", 13.10 "saucy", ...
 # add the tarantool.org repository to your apt sources list:
-# ($release is an environment variable which will contain the Ubuntu version code e.g. "precise")
-# (if you want the version that comes with Ubuntu, start with the lines that follow the '# install' comment)
+# ($release is an environment variable which will contain the Ubuntu version
+# code e.g. "precise")
+# (if you want the version that comes with Ubuntu, start with the lines that
+# follow the '# install' comment)
 <command>cd</command> ~
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/ubuntu/ $release main" | <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/ubuntu/ $release main" | <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
+<command>echo</command> "deb http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
+<command>echo</command> "deb-src http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
 <command>sudo apt-get install</command> tarantool tarantool-client
@@ -110,15 +121,20 @@ release=`lsb_release -c -s`
 <para>
 <programlisting>
 # CENTOS commands for Tarantool stable binary download:
-# These instructions are applicable for CentOS version 5 or 6, and RHEL version 5 or 6
-# Pick the CentOS repository which fits your CentOS/RHEL version and your x86 platform:
+# These instructions are applicable for CentOS version 5 or 6,
+# and RHEL version 5 or 6
+# Pick the CentOS repository which fits your CentOS/RHEL version
+# and your x86 platform:
 # <link xlink:href="http://tarantool.org/dist/centos/5/os/i386">http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32</link>
 # <link xlink:href="http://tarantool.org/dist/centos/5/os/x86_64">http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64</link>
 # <link xlink:href="http://tarantool.org/dist/centos/6/os/i386">http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32</link>
 # <link xlink:href="http://tarantool.org/dist/centos/6/os/x86_64">http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64</link>
-# Add the following section to your yum repository list (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
-# (in the following instructions, $releasever i.e. CentOS release version must be either 5 or 6)
-# (in the following instructions, $basearch i.e. base architecture must be either i386 or x86_64)
+# Add the following section to your yum repository list
+# (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
+# (in the following instructions,
+#     $releasever i.e. CentOS release version must be either 5 or 6)
+# (in the following instructions,
+#     $basearch i.e. base architecture must be either i386 or x86_64)
 # [tarantool]
 # name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
 # baseurl=http://tarantool.org/dist/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
@@ -126,9 +142,11 @@ release=`lsb_release -c -s`
 # gpgcheck=0
 # For example, if you have CentOS version 6 and x86-64, you can
 # add the new section thus:
-<command>echo</command> "[tarantool]" | <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "[tarantool]" | \
+<command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "baseurl=http://tarantool.org/dist/centos/6/os/x86_64/" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "baseurl=http://tarantool.org/dist/centos/6/os/x86_64/" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 </programlisting>
@@ -137,7 +155,8 @@ release=`lsb_release -c -s`
 <para>
 <programlisting>
 # GENTOO commands for Tarantool stable binary download:
-# Tarantool is available from tarantool portage overlay. Use layman to add the overlay to your system:
+# Tarantool is available from tarantool portage overlay.
+# Use layman to add the overlay to your system:
 <command>layman</command> <option>-S</option>
 <command>layman</command> <option>-a</option> tarantool
 <command>emerge</command> <filename>dev-db/tarantool</filename> <option>-av</option>
@@ -148,11 +167,11 @@ release=`lsb_release -c -s`
 <programlisting>
 # ANY-LINUX commands for Tarantool stable binary download:
 # If you have a GNU/Linux distribution which is not one of the above,
-# or if you want to install on your own subdirectory without affecting /usr /etc etc.,
-# start your browser and go to
+# or if you want to install on your own subdirectory without affecting
+# /usr /etc etc., start your browser and go to
 # <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link> download page.
 # Look for words similar to "Other Linux distributions". You will want the
-# binary tarball (<filename>.tar.gz</filename>) file for your release architecture (32-bit or 64-bit).
+# right binary tarball (<filename>.tar.gz</filename>) file for your release architecture.
 # Click on either "32-bit" or "64-bit" depending on your release architecture.
 # This will cause a download of the latest stable tarball.
 # Suppose it is <filename>tarantool-1.5.1-133-g11edda1-linux-x86_64.tar.gz</filename>. Say:
@@ -182,7 +201,8 @@ release=`lsb_release -c -s`
 # This is actually a <quote><productname>homebrew</productname></quote> recipe
 # so it's not a true binary download, some source code is involved.
 # First upgrade Clang (the C compiler) to version 3.2 or later using
-# Command Line Tools for Xcode disk image version 4.6+ from Apple Developer web-site.
+# Command Line Tools for Xcode disk image version 4.6+ from
+# Apple Developer web-site.
 <command>brew install</command> --use-clang http://tarantool.org/dist/tarantool.rb
 # or
 <command>brew install</command> http://tarantool.org/dist/tarantool.rb
@@ -240,36 +260,96 @@ Here are names of tools and libraries which may have to be installed in advance,
 or the equivalent on other platforms. Different platforms may use slightly
 	different names. Do not worry about the <quote>optional, for build with -DENABLE_DOC</quote>
 ones unless you intend to work on the documentation.
-<programlisting>   binutils-dev or binutils-devel        # contains GNU bfd for printing stack traces
-   gcc or clang                          # see above
-   git                                   # see above
-   uuid-dev                              # optional, for box_uuid_* functions
-   cmake                                 # see above
-   libreadline-dev                       # optional, for build with -DENABLE_CLIENT
-   libncurses5-dev or ncurses-devel      # optional, for build with -DENABLE_CLIENT
-   xsltproc                              # optional, for build with -DENABLE_DOC
-   lynx                                  # optional, for build with -DENABLE_DOC
-   jing                                  # optional, for build with -DENABLE_DOC
-   libxml2-utils                         # optional, for build with -DENABLE_DOC
-   docbook5-xml                          # optional, for build with -DENABLE_DOC
-   docbook-xsl-ns                        # optional, for build with -DENABLE_DOC
-   w3c-sgml-lib                          # optional, for build with -DENABLE_DOC
-   libsaxon-java                         # optional, for build with -DENABLE_DOC
-   libxml-commons-resolver1.1-java       # optional, for build with -DENABLE_DOC
-   libxerces2-java                       # optional, for build with -DENABLE_DOC
-   libxslthl-java                        # optional, for build with -DENABLE_DOC
-   autoconf                              # optional, appears only in Mac OS scripts
-   zlib1g or zlib                        # optional, appears only in Mac OS scripts</programlisting>
+<programlisting> binutils-dev or binutils-devel        # contains GNU bfd for printing stack traces
+ gcc or clang                        # see above
+ git                                 # see above
+ uuid-dev                            # optional, for box_uuid_* functions
+ cmake                               # see above
+ libreadline-dev                     # optional, for build with -DENABLE_CLIENT
+ libncurses5-dev or ncurses-devel    # optional, for build with -DENABLE_CLIENT
+ xsltproc                            # optional, for build with -DENABLE_DOC
+ lynx                                # optional, for build with -DENABLE_DOC
+ jing                                # optional, for build with -DENABLE_DOC
+ libxml2-utils                       # optional, for build with -DENABLE_DOC
+ docbook5-xml                        # optional, for build with -DENABLE_DOC
+ docbook-xsl-ns                      # optional, for build with -DENABLE_DOC
+ w3c-sgml-lib                        # optional, for build with -DENABLE_DOC
+ libsaxon-java                       # optional, for build with -DENABLE_DOC
+ libxml-commons-resolver1.1-java     # optional, for build with -DENABLE_DOC
+ libxerces2-java                     # optional, for build with -DENABLE_DOC
+ libxslthl-java                      # optional, for build with -DENABLE_DOC
+ autoconf                            # optional, appears only in Mac OS scripts
+ zlib1g or zlib                      # optional, appears only in Mac OS scripts</programlisting>
 </para>
 
 <para>
-2. Pick a default directory.
+2. Set up python modules for running the test suite or creating documentation.
+ This step is optional. Python modules are not necessary for building Tarantool
+ itself, unless one intends to use the -DENABLE_DOC option in step 6 or the
+ "Run the test suite" option in step 8.</para>
+<para>Say:<programlisting><command>python --version</command></programlisting>
+... You should see that the python version is between 2.6 and 3.</para>
+<para>On Ubuntu you can get modules from the repository:
+<programlisting>
+# For test suite
+<command>sudo apt-get install</command> python-daemon python-yaml python-argparse python-pexpect
+# For documentation
+<command>sudo apt-get install</command> python-jinja2 python-markdown
+</programlisting></para>
+<para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
+<para>But in general it is best to set up the modules by getting
+ a tarball and doing the setup with <computeroutput>python setup.py</computeroutput>, thus:
+<programlisting># python module for parsing YAML (pyYAML): For test suite:
+# (If wget fails, check the <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
+<command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
+<command>cd</command> PyYAML-3.10
+<command>sudo python</command> setup.py install
+# python module for spawning child applications (pexpect): For test suite:
+# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz
+<command>tar</command> <option>-xzvf</option> pexpect-u-2.5.1.tar.
+<command>cd</command> pexpect-u-2.5.1
+<command>sudo python</command> setup.py install
+# python module for helping programs become daemons (daemon): For test suite:
+# (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz
+<command>tar</command> <option>-xzvf</option> daemon-1.0.tar.gz
+<command>cd</command> daemon-1.0
+<command>sudo python</command> setup.py install
+# python module for template engine (jinja2): For documentation:
+# (If wget fails, check the <citetitle xlink:href="https://pypi.python.org/pypi/Jinja2" xlink:title="Python Jinja2">python-jinja2</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> https://pypi.python.org/packages/source/J/Jinja2/Jinja2-2.7.2.tar.gz
+<command>tar</command> <option>-xzvf</option> Jinja2-2.7.2.tar.gz
+<command>cd</command> Jinja2-2.7.2
+<command>sudo python</command> setup.py install
+# python module for text-to-html conversion (markdown): For documentation:
+# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/Markdown/" xlink:title="Python implementation of Markdown">python-markdown</citetitle> web site
+# to see what the current version is.)
+<command>cd</command> ~
+<command>wget</command> https://pypi.python.org/packages/source/M/Markdown/Markdown-2.3.1.tar.gz
+<command>tar</command> <option>-xzvf</option> Markdown-2.3.1.tar.gz
+<command>cd</command> Markdown-2.3.1
+<command>sudo python</command> setup.py install
+</programlisting>
+</para>
+
+<para>
+3. Pick a default directory.
 This can be anywhere. We'll assume that your default directory is <quote>~</quote>, and therefore
 the tarantool download will go inside it, as <computeroutput><filename>~/tarantool</filename></computeroutput>.
 </para>
 
 <para>
-3. Use <productname>git</productname> to download from github.com.<programlisting>
+4. Use <productname>git</productname> to download from github.com.<programlisting>
 <command>cd</command> ~
 <command>git clone</command> <option>-b stable</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
 The optional argument <quote>-b stable</quote> causes download from the stable branch instead of the master branch,
@@ -277,7 +357,7 @@ and the optional last word on the line, <quote>tarantool</quote>, means download
 </para>
 
 <para>
-4. Use <productname>git</productname> again so that third-party contributions will be seen as well.
+5. Use <productname>git</productname> again so that third-party contributions will be seen as well.
 This step is only necessary once, the first time you do a download.
 There is an alternative -- say <quote><computeroutput><command>git clone</command> --recursive</computeroutput></quote> in step 3 --
 but we prefer this method because it works with older versions of <productname>git</productname>.<programlisting><command>cd</command> ~/tarantool
@@ -287,10 +367,10 @@ but we prefer this method because it works with older versions of <productname>g
 </para>
 
 <para>
-5. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
+6. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
 <command>make clean</command>         # unnecessary, added for good luck
 <command>rm CMakeCache.txt</command>  # unnecessary, added for good luck
-<command>cmake .</command>            # The command to initiate with build type=Debug, no client, no doc</programlisting>
+<command>cmake .</command>            # Start build with build type=Debug, no client, no doc</programlisting>
 
 The option for specifying build type is <option>-DCMAKE_BUILD_TYPE=</option><replaceable>type</replaceable> where
    type = {None | Debug | Release | RelWithDebInfo | MinSizeRel} and a reasonable
@@ -307,35 +387,9 @@ and a reasonable choice is <computeroutput><option>-DENABLE_CLIENT=true</option>
 </para>
 
 <para>
-	6. Use make to complete the build.<programlisting><command>make</command></programlisting>
+	7. Use make to complete the build.<programlisting><command>make</command></programlisting>
 	It's possible to say <quote><computeroutput><command>make install</command></computeroutput></quote> too, but that's not generally done.
 </para>
-
-<para>
-7. Set up python modules for running the test suite.
-	This step is optional.</para>
-<para>Say:<programlisting><command>python --version</command></programlisting>
-... You should see that the python version is between 2.6 and 3.</para>
-<para>On Ubuntu you can get modules from the repository:<programlisting><command>sudo apt-get install</command> python-daemon python-yaml python-argparse</programlisting></para>
-<para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
-<para>But in general it is best to set up the modules by getting
-	a tarball and doing the setup with <computeroutput>python setup.py</computeroutput>, thus:
-<programlisting># python module for parsing YAML (pyYAML):
-# (If wget fails, check the <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle> web site to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
-<command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
-<command>cd</command> PyYAML-3.10
-<command>sudo python</command> setup.py install
-# python module for assisting programs to turn themselves into daemons (daemon):
-# (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pypi.python.org/packages/source/d/daemon/daemon-1.0.tar.gz
-<command>tar</command> <option>-xzvf</option> daemon-1.0.tar.gz
-<command>cd</command> daemon-1.0
-<command>sudo python</command> setup.py install</programlisting>
-</para>
-
 
 <para>
 8. Run the test suite. This step is optional.
@@ -432,56 +486,60 @@ which make a minimal configuration file that will be suitable for day one.
 <command>echo</command> "space[0].index[0].unique = 1" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "space[0].index[0].key_field[0].fieldno = 0" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "space[0].index[0].key_field[0].type = \"NUM\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "logger = \"tee --append tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
+<command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "work_dir = \"work_dir\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-(With some downloads a tarantool.cfg file like this is already available in a test subdirectory.)
+# (With some downloads a tarantool.cfg file like this is already available
+# in a test subdirectory.)
 </programlisting>
 </para>
 
 <para>
 Initialize the storage area.
 You only have to do this once.<programlisting>
-<command>/usr/bin/tarantool_box --init-storage</command>            #if you downloaded a binary with apt-get or yum
-<command>~/tarantool/bin/tarantool_box --init-storage</command>     #if you downloaded and untarred a binary tarball to ~/tarantool
-<command>~/tarantool/src/box/tarantool_box --init-storage</command> #f you built from a source download </programlisting>
+#if you downloaded a binary with apt-get or yum, say this:
+  <command>/usr/bin/tarantool_box --init-storage</command>
+#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+  <command>~/tarantool/bin/tarantool_box --init-storage</command>
+#if you built from a source download, say this:
+  <command>~/tarantool/src/box/tarantool_box --init-storage</command></programlisting>
 </para>
 
 <para>
 Start the server.
 The server name is <computeroutput><filename>tarantool_box</filename></computeroutput>.<programlisting>
-<command>/usr/bin/tarantool_box</command>             #if you downloaded a binary with apt-get or yum
-<command>~/tarantool/bin/tarantool_box</command>     	#if you downloaded and untarred a binary tarball to ~/tarantool
-<command>~/tarantool/src/box/tarantool_box</command> 	#f you built from a source download</programlisting>
+#if you downloaded a binary with apt-get or yum, say this:
+  <command>/usr/bin/tarantool_box</command>
+#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+  <command>~/tarantool/bin/tarantool_box</command>
+#if you built from a source download, say this:
+  <command>~/tarantool/src/box/tarantool_box</command> </programlisting>
 </para>
 
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
 2013-10-18 20:20:36.806 [16560] 1/sched C&gt; version 1.5.1-141-ga794d35
-2013-10-18 20:20:36.830 [16560] 1/sched I&gt; Loading plugin: /usr/lib/tarantool/plugins/libmysql.so
-2013-10-18 20:20:37.016 [16560] 1/sched I&gt; Plugin 'mysql' was loaded, version: 1
-2013-10-18 20:20:37.016 [16560] 1/sched I&gt; Loading plugin: /usr/lib/tarantool/plugins/libpg.so
-2013-10-18 20:20:37.044 [16560] 1/sched I&gt; Plugin 'postgresql' was loaded, version: 1
-2013-10-18 20:20:37.044 [16560] 1/sched I&gt; space 0 successfully configured
-2013-10-18 20:20:37.044 [16560] 1/sched I&gt; recovery start
-2013-10-18 20:20:37.060 [16560] 1/sched I&gt; recover from `./00000000000000000001.snap'
-2013-10-18 20:20:37.060 [16560] 1/sched I&gt; snapshot recovered, confirmed lsn: 1
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; done `./00000000000000000002.xlog' confirmed_lsn: 2
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; WALs recovered, confirmed lsn: 2
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; building secondary indexes
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; bound to primary port 33013
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; I am primary
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; bound to secondary port 33014
-2013-10-18 20:20:37.070 [16560] 1/sched I&gt; bound to admin port 33015
-2013-10-18 20:20:37.071 [16560] 1/sched C&gt; log level 4
-2013-10-18 20:20:37.071 [16560] 1/sched C&gt; entering event loop</programlisting>
+2013-10-18 20:20:37.044 ... I&gt; space 0 successfully configured
+2013-10-18 20:20:37.044 ... I&gt; recovery start
+2013-10-18 20:20:37.060 ... I&gt; recover from `./00000000000000000001.snap'
+2013-10-18 20:20:37.060 ... I&gt; snapshot recovered, confirmed lsn: 1
+2013-10-18 20:20:37.070 ... I&gt; building secondary indexes
+2013-10-18 20:20:37.070 ... I&gt; bound to primary port 33013
+2013-10-18 20:20:37.070 ... I&gt; I am primary
+2013-10-18 20:20:37.070 ... I&gt; bound to secondary port 33014
+2013-10-18 20:20:37.070 ... I&gt; bound to admin port 33015
+2013-10-18 20:20:37.071 ... C&gt; log level 4
+2013-10-18 20:20:37.071 ... C&gt; entering event loop</programlisting>
 Now take the server down, with <programlisting><keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo></programlisting>
 </para>
 
 <para>
 Now start the server again. This time start it in the background.<programlisting>
-<command>/usr/bin/tarantool_box --background</command>             #if you downloaded a binary with apt-get or yum
-<command>~/tarantool/bin/tarantool_box --background</command>     	#if you downloaded and untarred a binary tarball to ~/tarantool
-<command>~/tarantool/src/box/tarantool_box --background</command> 	#f you built from a source download</programlisting>
+#if you downloaded a binary with apt-get or yum, say this:
+  <command>/usr/bin/tarantool_box --background</command>
+#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+  <command>~/tarantool/bin/tarantool_box --background</command>
+#if you built from a source download, say this:
+  <command>~/tarantool/src/box/tarantool_box --background</command></programlisting>
 </para>
 
 <para>
@@ -510,9 +568,12 @@ Tarantool instances on your operating system.
   
 <para>
 	Now that the server is up, you can start the client. The client name is tarantool.<programlisting>
-<command>/usr/bin/tarantool</command>                      #If you downloaded a binary with apt-get or yum:  
-<command>~/tarantool/bin/tarantool</command>               #If you downloaded and untarred a binary tarball to ~/tarantool:  
-<command>~/tarantool/client/tarantool/tarantool</command>  #If you built from a source download on ~tarantool</programlisting>
+#if you downloaded a binary with apt-get or yum, say this:
+  <command>/usr/bin/tarantool</command>
+#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+  <command>~/tarantool/bin/tarantool</command>
+#if you built from a source download on ~tarantool, say this:
+  <command>~/tarantool/client/tarantool/tarantool</command></programlisting>
    
 If all goes well, a prompt will appear:<programlisting><prompt>localhost&gt;</prompt></programlisting>
 The client is waiting for the user to type instructions.

@@ -34,8 +34,8 @@
 const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "\0"};
 STRS(index_type, ENUM_INDEX_TYPE);
 
-const uint16_t key_mp_type[] = {
-	/* [UNKNOWN] = */ UINT16_MAX,
+const uint32_t key_mp_type[] = {
+	/* [UNKNOWN] = */ UINT32_MAX,
 	/* [NUM]     = */ 1U << MP_UINT,
 	/* [_STR]    = */ 1U << MP_STR
 };

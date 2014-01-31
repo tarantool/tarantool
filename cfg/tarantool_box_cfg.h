@@ -49,7 +49,7 @@ typedef struct tarantool_cfg {
 	/* Replication clients should use this port (bind_ipaddr:replication_port). */
 	int32_t	replication_port;
 
-	/* Log verbosity, possible values: ERROR=1, CRIT=2, WARN=3, INFO=4(default), DEBUG=5 */
+	/* Log verbosity, possible values: SYS_ERROR = 1, ERROR=2, CRIT=3, WARN=4, INFO=5(default), DEBUG=6 */
 	int32_t	log_level;
 
 	/* Size of slab arena in GB */

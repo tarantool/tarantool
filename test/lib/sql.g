@@ -14,7 +14,7 @@ parser sql:
     ignore:           '\\s+'
     token NUM:        '[+-]?[0-9]+'
     token ID:         '[a-z_]+[0-9]+' 
-    token PROC_ID:    '[a-z_][a-z0-9_.]*'
+    token PROC_ID:    '[a-z_][a-z0-9_.:]*'
     token STR:        '\'([^\']+|\\\\.)*\''
     token PING:       'ping'
     token INSERT:     'insert'
@@ -67,8 +67,8 @@ parser sql:
     rule value_list:  '\(' {{ value_list = [] }}
                          [expr {{ value_list = [expr] }} [("," expr {{ value_list.append(expr) }} )+]]
                       '\)' {{ return value_list }}
-    rule update_list: predicate {{ update_list = [predicate] }}
-                      [(',' predicate {{ update_list.append(predicate) }})+]
+    rule update_list: predicate {{ update_list = [('=', predicate[0], predicate[1])] }}
+                      [(',' predicate {{ update_list.append(("=", predicate[0], predicate[1])) }})+]
                       {{ return update_list }}
     rule expr:        constant {{ return constant }}
     rule constant:    NUM {{ return int(NUM) }} | STR {{ return STR[1:-1] }}

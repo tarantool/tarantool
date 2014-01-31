@@ -40,8 +40,8 @@ schema = {
 master.sql.set_schema(schema)
 replica.sql.set_schema(schema)
 
-master.admin("box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum')")
-master.admin("box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num')")
+master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
+master.admin("s:create_index('primary', {type = 'hash'})")
 id = ID_BEGIN
 for i in range(REPEAT):
     print "test %d iteration" % i

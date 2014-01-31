@@ -164,22 +164,22 @@ luaL_tofield(struct lua_State *L, int index, struct luaL_field *field)
 		case CTID_CCHAR:
 		case CTID_INT8:
 			ival = *(int8_t *) cdata;
-			field->type = (ival > 0) ? MP_UINT : MP_INT;
+			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
 			return;
 		case CTID_INT16:
 			ival = *(int16_t *) cdata;
-			field->type = (ival > 0) ? MP_UINT : MP_INT;
+			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
 			return;
 		case CTID_INT32:
 			ival = *(int32_t *) cdata;
-			field->type = (ival > 0) ? MP_UINT : MP_INT;
+			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
 			return;
 		case CTID_INT64:
 			ival = *(int64_t *) cdata;
-			field->type = (ival > 0) ? MP_UINT : MP_INT;
+			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
 			return;
 		case CTID_UINT8:

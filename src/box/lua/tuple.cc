@@ -261,36 +261,18 @@ lbox_tuple_transform(struct lua_State *L)
 	 * Prepare UPDATE expression
 	 */
 	struct tbuf *b = tbuf_new(&fiber()->gc);
-	tbuf_append(b, (char *) &op_cnt, sizeof(op_cnt));
+	luamp_encode_array(b, op_cnt);
 	if (field_count > 0) {
-		tbuf_ensure(b, sizeof(uint32_t) + 1 + 9);
-
-		/* offset */
-		char *data = pack_u32(b->data + b->size, offset);
-
-		/* operation */
-		*data++ = UPDATE_OP_DELETE;
-
-		assert(data <= b->data + b->capacity);
-		b->size = data - b->data;
-
-		/* field: count */
+		luamp_encode_array(b, 3);
+		luamp_encode_str(b, "#", 1);
+		luamp_encode_uint(b, offset);
 		luamp_encode_uint(b, field_count);
 	}
 
 	for (int i = argc ; i > 3; i--) {
-		tbuf_ensure(b, sizeof(uint32_t) + 1 + 10);
-
-		/* offset */
-		char *data = pack_u32(b->data + b->size, offset);
-
-		/* operation */
-		*data++ = UPDATE_OP_INSERT;
-
-		assert(data <= b->data + b->capacity);
-		b->size = data - b->data;
-
-		/* field */
+		luamp_encode_array(b, 3);
+		luamp_encode_str(b, "!", 1);
+		luamp_encode_uint(b, offset);
 		luamp_encode(L, b, i);
 	}
 

@@ -1,5 +1,12 @@
 -- box_net.lua (internal file)
 
+local function keify(key)
+    if type(key) == "table" then
+        return key
+    end
+    return {key}
+end
+
 box.net = {
 
 --
@@ -31,85 +38,73 @@ box.net = {
         DATA = 0x30,
         ERROR = 0x31,
 
-        delete = function(self, space, ...)
-            local key_part_count = select('#', ...)
+        delete = function(self, space, key)
             return self:process(box.net.box.DELETE,
-                    box.pack('iV', space,
-                        key_part_count, ...))
+                    msgpack.encode({
+                        [box.net.box.SPACE_ID] = space,
+                        [box.net.box.KEY] = keify(key)
+                        }))
         end,
 
-        replace = function(self, space, ...)
-            local field_count = select('#', ...)
+        replace = function(self, space, tuple)
             return self:process(box.net.box.REPLACE,
-                    box.pack('iV', space, field_count, ...))
+                    msgpack.encode({
+                        [box.net.box.SPACE_ID] = space,
+                        [box.net.box.TUPLE] = tuple
+                        }))
         end,
 
         -- insert a tuple (produces an error if the tuple already exists)
-        insert = function(self, space, ...)
-            local field_count = select('#', ...)
+        insert = function(self, space, tuple)
             return self:process(box.net.box.INSERT,
-                   box.pack('iV', space, field_count, ...))
+                    msgpack.encode({
+                        [box.net.box.SPACE_ID] = space,
+                        [box.net.box.TUPLE] = tuple
+                        }))
         end,
 
         -- update a tuple
-        update = function(self, space, key, format, ...)
-            local op_count = bit.rshift(select('#', ...), 1)
+        update = function(self, space, key, ops)
             return self:process(box.net.box.UPDATE,
-                   box.pack('iVi'..format, space, 1, key, op_count, ...))
+                    msgpack.encode({
+                        [box.net.box.SPACE_ID] = space,
+                        [box.net.box.KEY] = keify(key),
+                        [box.net.box.TUPLE] = ops
+                        }))
         end,
 
-        select_limit = function(self, space, index, offset, limit, ...)
-            local key_part_count = select('#', ...)
+        select_limit = function(self, space, index, offset, limit, key)
             return self:process(box.net.box.SELECT,
-                   box.pack('iiiiV',
-                         space,
-                         index,
-                         offset,
-                         limit,
-                         key_part_count, ...))
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space,
+                    [box.net.box.INDEX_ID] = index,
+                    [box.net.box.OFFSET] = offset,
+                    [box.net.box.LIMIT] = limit,
+                    [box.net.box.KEY] = keify(key)}))
         end,
 
-        select = function(self, space, index, ...)
-            local key_part_count = select('#', ...)
-            return self:process(box.net.box.SELECT,
-                    box.pack('iiiiV',
-                         space,
-                         index,
-                         0, -- offset
-                         4294967295, -- limit
-                         key_part_count, ...))
+        select = function(self, space, key)
+            return self:select_limit(space, 0, 0, 4294967295, key)
         end,
-
 
         ping = function(self)
             return self:process(box.net.box.PING, '')
         end,
 
-        call    = function(self, proc_name, ...)
-            assert(type(proc_name) == 'string')
-            local count = select('#', ...)
+        call    = function(self, name, tuple)
+            assert(type(name) == 'string')
             return self:process(box.net.box.CALL,
-                box.pack('pV', proc_name, count, ...))
+                msgpack.encode({
+                    [box.net.box.FUNCTION_NAME] = name,
+                    [box.net.box.TUPLE] = keify(tuple)}))
         end,
 
-        select_range = function(self, sno, ino, limit, ...)
-            return self:call(
-                'box.select_range',
-                sno,
-                ino,
-                limit,
-                ...
-            )
+        select_range = function(self, sno, ino, limit, key)
+            return self:call('box.select_range', {sno, ino, limit, key})
         end,
 
-        select_reverse_range = function(self, sno, ino, limit, ...)
-            return self:call(
-                'box.select_reverse_range',
-                sno,
-                ino,
-                limit,
-                ...
-            )
+        select_reverse_range = function(self, sno, ino, limit, key)
+            return self:call('box.select_reverse_range', {sno, ino, limit, key})
         end,
 
         -- To make use of timeouts safe across multiple
@@ -159,12 +154,12 @@ box.net = {
 
         -- for compatibility with the networked version,
         -- implement call
-        call = function(self, proc_name, ...)
+        call = function(self, proc_name, tuple) 
             local proc = { box.call_loadproc(proc_name) }
             if #proc == 2 then
-                return proc[1](proc[2], ...)
+                return proc[1](proc[2], tuple)
             else
-                return proc[1](...)
+                return proc[1](tuple)
             end
         end,
 
@@ -193,7 +188,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
     if reconnect_timeout == nil then
         reconnect_timeout = 0
     else
-        reconnect_timeout = tonumber(reconnect_timeout)
+        reconnect_timeout = reconnect_timeout
     end
 
     local remote = {
@@ -239,7 +234,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                       header..request
 
             if timeout ~= nil then
-                timeout = tonumber(timeout)
+                timeout = timeout
                 if not self.processing.wch:put(request, timeout) then
                     self.processing[sync] = nil
                     return nil

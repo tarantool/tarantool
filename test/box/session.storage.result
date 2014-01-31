@@ -1,81 +1,94 @@
-lua dump = function(data) return "'" .. box.cjson.encode(data) .. "'" end
+print('box.session.storage')
 ---
 ...
-lua type(box.session.id())
----
- - number
-...
-lua box.session.unknown_field
----
- - nil
-...
-lua type(box.session.storage)
----
- - table
-...
-lua box.session.storage.abc = 'cde'
+dump = function(data) return "'" .. box.cjson.encode(data) .. "'" end
 ---
 ...
-lua box.session.storage.abc
+type(box.session.id())
 ---
- - cde
+- number
 ...
-lua all = getmetatable(box.session).aggregate_storage
+box.session.unknown_field
 ---
+- null
 ...
-lua type(box.session.storage)
+type(box.session.storage)
 ---
- - table
+- table
 ...
-lua type(box.session.storage.abc)
----
- - nil
-...
-lua box.session.storage.abc = 'def'
+box.session.storage.abc = 'cde'
 ---
 ...
-lua box.session.storage.abc
+box.session.storage.abc
 ---
- - def
+- cde
 ...
-lua box.session.storage.abc
----
- - cde
-...
-lua dump(all[box.session.id()])
----
- - '{"abc":"def"}'
-...
-lua dump(all[box.session.id()])
----
- - '{"abc":"cde"}'
-...
-lua tres1 = {}
+all = getmetatable(box.session).aggregate_storage
 ---
 ...
-lua tres2 = {}
+dump(all)
+---
+- '''[null,{"abc":"cde"}]'''
+...
+--# create connection second to default
+--# set connection second
+type(box.session.storage)
+---
+- table
+...
+type(box.session.storage.abc)
+---
+- nil
+...
+box.session.storage.abc = 'def'
 ---
 ...
-lua for k,v in pairs(all) do table.insert(tres1, v.abc) end
+box.session.storage.abc
+---
+- def
+...
+--# set connection default
+box.session.storage.abc
+---
+- cde
+...
+--# set connection second
+dump(all[box.session.id()])
+---
+- '''{"abc":"def"}'''
+...
+--# set connection default
+dump(all[box.session.id()])
+---
+- '''{"abc":"cde"}'''
+...
+tres1 = {}
 ---
 ...
-lua box.fiber.sleep(.01)
+tres2 = {}
 ---
 ...
-lua for k,v in pairs(all) do table.insert(tres2, v.abc) end
+for k,v in pairs(all) do table.insert(tres1, v.abc) end
 ---
 ...
-lua table.sort(tres1)
+--# drop connection second
+box.fiber.sleep(.01)
 ---
 ...
-lua table.sort(tres2)
+for k,v in pairs(all) do table.insert(tres2, v.abc) end
 ---
 ...
-lua dump(tres1)
+table.sort(tres1)
 ---
- - '["cde","def"]'
 ...
-lua dump(tres2)
+table.sort(tres2)
 ---
- - '["cde"]'
+...
+dump(tres1)
+---
+- '''["cde","def"]'''
+...
+dump(tres2)
+---
+- '''["cde"]'''
 ...

@@ -16,7 +16,7 @@ do
     function _insert(_begin, _end, msg)
         a = {}
         for i = _begin, _end do
-            table.insert(a, box.insert(0, i, msg..' - '..i))
+            table.insert(a, box.space[0]:insert{i, msg..' - '..i})
         end
         return unpack(a)
     end
@@ -26,7 +26,7 @@ do
             box.fiber.sleep(0.001)
         end
         for i = _begin, _end do
-            table.insert(a, box.select(0, 0, i))
+            table.insert(a, box.space[0]:select{i})
         end
         return unpack(a)
     end
@@ -40,8 +40,8 @@ a = box.net.box.new('127.0.0.1', 33113)
 a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
-box.replace(box.schema.SPACE_ID, 0, 0, 'tweedledum');
-box.replace(box.schema.INDEX_ID, 0, 0, 'primary', 'hash', 1, 1, 0, 'num');
+s = box.schema.create_space('tweedledum', {id = 0});
+s:create_index('primary', {type = 'hash'})
 _insert(1, 10, 'master')
 _select(1, 10)
 --# set connection replica
@@ -161,8 +161,8 @@ _print_lsn()
 _print_lsn()
 
 -- Test that a replica replies with master connection URL on update request
-box.insert(0, 0, 'replica is RO')
+box.space[0]:insert{0, 'replica is RO'}
 --# stop server replica
 --# cleanup server replica
 --# set connection default
-box.space[0]:drop();
+box.space[0]:drop()

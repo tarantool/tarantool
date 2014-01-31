@@ -70,7 +70,7 @@ SystemError::init(const char *format, va_list ap)
 void
 SystemError::log() const
 {
-	_say(S_ERROR, m_file, m_line, strerror(m_errnum), "SystemError %s",
+	_say(S_SYSERROR, m_file, m_line, strerror(m_errnum), "SystemError %s",
 	     m_errmsg);
 }
 

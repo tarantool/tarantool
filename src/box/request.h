@@ -34,11 +34,14 @@
 struct txn;
 struct port;
 
+typedef void (*request_execute_f)(const struct request *,
+				  struct txn *,
+				  struct port *);
 struct request
 {
 	uint32_t type;
-	uint32_t space_no;
-	uint32_t index_no;
+	uint32_t space_id;
+	uint32_t index_id;
 	uint32_t offset;
 	uint32_t limit;
 	/* Search key or proc name. */
@@ -50,8 +53,7 @@ struct request
 
 	const char *data;
 	uint32_t len;
-
-	void (*execute)(const struct request *, struct txn *, struct port *);
+	request_execute_f execute;
 };
 
 void

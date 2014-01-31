@@ -55,6 +55,29 @@ enum iproto_key {
 	IPROTO_KEY_MAX
 };
 
+#define bit(c) (1ULL<<IPROTO_##c)
+
+#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC))
+#define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
+			  bit(OFFSET) | bit(KEY) | bit(TUPLE) | \
+			  bit(FUNCTION_NAME))
+static inline bool
+iproto_header_has_key(const char *pos, const char *end)
+{
+	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
+	return key < IPROTO_KEY_MAX && IPROTO_HEAD_BMAP & (1ULL<<key);
+}
+
+static inline bool
+iproto_body_has_key(const char *pos, const char *end)
+{
+	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
+	return key < IPROTO_KEY_MAX && IPROTO_BODY_BMAP & (1ULL<<key);
+}
+
+#undef bit
+
+
 extern unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {

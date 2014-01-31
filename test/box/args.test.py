@@ -61,6 +61,7 @@ os.symlink(os.path.abspath("box/bug726778.cfg"), cfg)
 
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
 sys.stdout.push_filter(".*(P|p)lugin.*", "")
+sys.stdout.push_filter(".*shared.*", "")
 server.test_option("--config=bug726778.cfg --init-storage")
 sys.stdout.pop_filter()
 

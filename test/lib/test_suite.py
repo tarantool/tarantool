@@ -331,13 +331,15 @@ class TestSuite:
                     test.run(self.server)
                     if not test.passed():
                         failed_tests.append(test.name)
-        except (KeyboardInterrupt) as e:
-            color_stdout('\n')
-            raise
-        finally:
             color_stdout(shortsep, "\n", schema='separator')
             self.server.stop(silent=False)
             self.server.cleanup()
+        except (KeyboardInterrupt) as e:
+            color_stdout('\n')
+            color_stdout(shortsep, "\n", schema='separator')
+            self.server.stop(silent=False)
+            self.server.cleanup()
+            raise
 
         if failed_tests:
             color_stdout("Failed {0} tests: {1}.".format(len(failed_tests),
