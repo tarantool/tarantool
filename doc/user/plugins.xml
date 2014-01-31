@@ -175,7 +175,7 @@ Call OK, 0 rows affected
 <para xml:id="plugin-postgresql-example">
 <bridgehead renderas="sect4">PostgreSQL Example</bridgehead>
 This example assumes that a recent version of PostgreSQL has been installed.
-The PostgreSQL library library and include files are also necessary.
+The PostgreSQL library and include files are also necessary.
 On Ubuntu they can be installed with <programlisting><prompt>$ </prompt><userinput>sudo apt-get install libpq-dev</userinput></programlisting>
 If that works, then cmake will find the necessary files without requiring any special user input.
 However, because not all platforms are alike, for this example the assumption is

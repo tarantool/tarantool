@@ -153,7 +153,7 @@ so that, instead of returning a fixed literal 'Hello world", it returns a random
 lua function string_function()
   local random_number
   local random_string
-  random_number = math.random(65,90)
+  random_number = math.random(65, 90)
   random_string = string.char(random_number)
   return random_string
   end!
@@ -184,7 +184,7 @@ The screen now looks like this:
 localhost&gt; <userinput>lua function string_function()</userinput>
         -&gt;   <userinput>local random_number</userinput>
         -&gt;   <userinput>local random_string</userinput>
-        -&gt;   <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;   <userinput>random_number = math.random(65, 90)</userinput>
         -&gt;   <userinput>random_string = string.char(random_number)</userinput>
         -&gt;   <userinput>return random_string</userinput>
         -&gt;   <userinput>end!</userinput>
@@ -209,7 +209,7 @@ lua function string_function()
   local random_string
   random_string = ""
   for x = 1,10,1 do
-    random_number = math.random(65,90)
+    random_number = math.random(65, 90)
     random_string = random_string .. string.char(random_number)
     end
   return random_string
@@ -238,7 +238,7 @@ localhost&gt; <userinput>lua function string_function()</userinput>
         -&gt;   <userinput>local random_string</userinput>
         -&gt;   <userinput>random_string = ""</userinput>
         -&gt;   <userinput>for x = 1,10,1 do</userinput>
-        -&gt;     <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;     <userinput>random_number = math.random(65, 90)</userinput>
         -&gt;     <userinput>random_string = random_string .. string.char(random_number)</userinput>
         -&gt;     <userinput>end</userinput>
         -&gt;   <userinput>return random_string</userinput>
@@ -262,7 +262,7 @@ a function in Tarantool's library of Lua functions.
 lua function main_function()
   local string_value
   string_value = string_function()
-  t = box.tuple.new({1,string_value})
+  t = box.tuple.new({1, string_value})
   return t
   end!
 </programlisting>
@@ -286,7 +286,7 @@ The screen now looks like this:
 localhost&gt; <userinput>lua function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
-        -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
+        -&gt;   <userinput>t = box.tuple.new({1, string_value})</userinput>
         -&gt;   <userinput>return t</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
@@ -308,14 +308,14 @@ the first space that was defined in the configuration file, so it's like a datab
 lua function main_function()
   local string_value
   string_value = string_function()
-  t = box.tuple.new({1,string_value})
-  box.replace(0,t)
+  t = box.tuple.new({1, string_value})
+  box.replace(0, t)
   end!
 </programlisting>
-The new line here is box.replace(0,t). The first parameter is 0, because the
+The new line here is box.replace(0, t). The first parameter is 0, because the
 insertion is going to be to space[0]. The second parameter is the tuple value.
-To be perfectly correct we could have said box.insert(0,t) here, rather than
-box.replace(0,t), but "replace" means <quote>insert even if there is already a tuple
+To be perfectly correct we could have said box.insert(0, t) here, rather than
+box.replace(0, t), but "replace" means <quote>insert even if there is already a tuple
 whose primary-key value is a duplicate</quote>, and that makes it easier to re-run
 the exercise even if the sandbox database isn't empty.
 
@@ -344,8 +344,8 @@ The screen now looks like this:
 localhost&gt; <userinput>lua function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
-        -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
-        -&gt;   <userinput>box.replace(0,t)</userinput>
+        -&gt;   <userinput>t = box.tuple.new({1, string_value})</userinput>
+        -&gt;   <userinput>box.replace(0, t)</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
@@ -373,8 +373,8 @@ lua function main_function()
   start_time = os.clock()
   for i = 1,1000000,1 do
     string_value = string_function()
-    t = box.tuple.new({i,string_value})
-    box.replace(0,t)
+    t = box.tuple.new({i, string_value})
+    box.replace(0, t)
     end
   end_time = os.clock()
   end!
@@ -411,7 +411,7 @@ lua function string_function()
   local random_string
   random_string = ""
   for x = 1,10,1 do
-    random_number = math.random(65,90)
+    random_number = math.random(65, 90)
     random_string = random_string .. string.char(random_number)
     end
   return random_string
@@ -422,8 +422,8 @@ lua function main_function()
   start_time = os.clock()
   for i = 1,1000000,1 do
     string_value = string_function()
-    t = box.tuple.new({i,string_value})
-    box.replace(0,t)
+    t = box.tuple.new({i, string_value})
+    box.replace(0, t)
     end
   end_time = os.clock()
   end!
@@ -440,7 +440,7 @@ localhost&gt; <userinput>lua function string_function()</userinput>
         -&gt;   <userinput>local random_string</userinput>
         -&gt;   <userinput>random_string = ""</userinput>
         -&gt;   <userinput>for x = 1,10,1 do</userinput>
-        -&gt;     <userinput>random_number = math.random(65,90)</userinput>
+        -&gt;     <userinput>random_number = math.random(65, 90)</userinput>
         -&gt;     <userinput>random_string = random_string .. string.char(random_number)</userinput>
         -&gt;     <userinput>end</userinput>
         -&gt;   <userinput>return random_string</userinput>
@@ -452,8 +452,8 @@ localhost&gt; <userinput>lua function main_function()</userinput>
         -&gt;   <userinput>start_time = os.clock()</userinput>
         -&gt;   <userinput>for i = 1,1000000,1 do</userinput>
         -&gt;     <userinput>string_value = string_function()</userinput>
-        -&gt;     <userinput>t = box.tuple.new({i,string_value})</userinput>
-        -&gt;     <userinput>box.replace(0,t)</userinput>
+        -&gt;     <userinput>t = box.tuple.new({i, string_value})</userinput>
+        -&gt;     <userinput>box.replace(0, t)</userinput>
         -&gt;     <userinput>end</userinput>
         -&gt;   <userinput>end_time = os.clock()</userinput>
         -&gt;   <userinput>end!</userinput>
@@ -493,20 +493,8 @@ This is an exercise assignment: <quote>Assume that inside every tuple there
 is a string formatted as JSON. Inside that string there is a JSON numeric
 field. For each tuple, find the numeric field's value and add it to a
 'sum' variable. At end, return the 'sum' variable.</quote>
-</para>
-
-<para>
-The purpose of the exercise is to show one way to read and process tuples.
-This is harder than the first exercise because the function is useful.
-A function which is useful, and therefore is going to be used more than
-once by more than one person, has to be robust and understandable.
-So here is the function. It's best to start by looking at each line --
-there are only twelve lines so it will only take a few minutes to guess what they do.
-Then it will take somewhat longer to read the detailed
-comments about the function, and follow the links wherever necessary.
-Once again, to further enhance learning, type the statements
-in with the tarantool client while reading along. At the very end there
-is an example that shows how to make a few tuples and invoke the function.
+The purpose of the exercise is to get experience in one way
+to read and process tuples.
 </para>
 
 <programlisting language="lua">
@@ -528,22 +516,6 @@ SETOPT DELIMITER=''!
 </programlisting>
 
 <para>
-SPACES. There is one space after every comma (line 3, line 5). There is one space
-before and one space after every operator such as '<code>=</code>' or '<code>==</code>' or '<code>+</code>' (line 2,
-line 3, line 5, line 7, line 8). There are no spaces around parentheses.
-Each indentation is two spaces (actually Tarantool developers often use four
-spaces but we follow the unofficial <link xlink:href="http://lua-users.org/wiki/LuaStyleGuide">Lua Style Guide</link> here).
-Indentation starts within a function, and within every block that is introduced
-by "<code>for</code>" or "<code>if</code>", and ends when the block ends with "<code>end</code>" (lines 4 to 10, lines 6 to 9).
-</para>
-
-<para>
-COMMENTS. Every comment begins with "<code>--[[</code>" and ends with "<code>]]</code>". Although this example uses comments to
-indicate line numbers, the normal practice is to put comments when the
-meaning of the code would not be clear by merely looking at the code.
-</para>
-
-<para>
 LINE 1: WHY "LOCAL". This line declares all the variables that will be used
 in the function. Actually it's not necessary to declare all variables at the start,
 and in a long function it would be better to declare variables just before using
@@ -554,34 +526,11 @@ function.
 </para>
 
 <para>
-LINE 1: NAMES. Single-letter variable names like <code>'v</code>' are okay when they're
-strictly for use as an iterator -- '<code>v</code>' is going to be the thing that goes
-up in the "<code>for t in v do</code>" statement in line 4. Terse names like '<code>sum</code>'
-are okay for local variables when there's only one sum and the name is
-not an abbreviation. The prefix "is_" in the name "<code>is_valid_json</code>" is
-there because the variable will get a Boolean (true/false) value and
-will be true only for a string that "is valid [according to] JSON [format rules]".
-</para>
-
-<para>
-LINE 2: INITIALIZING. The only variable that needs initializing is <code>sum</code>, which
-must start at zero, so line 2 is "<code>sum = 0</code>". It's easier to do initialization
-on the declaration line, that is, we could have said "<code>local sum = 0</code>". We
-chose to put it on a separate line to make sure that it's visible.
-</para>
-
-<para>
 LINE 3: WHY INDEX ITERATOR". Our job is to go through all the rows and there are two ways
 to do it: with <olink targetptr="box.select_range">box.select_range()</olink> or with
 <olink targetptr="box.index.iterator">index[].iterator</olink>. We preferred
 index[].iterator because it works regardless of the index type, that is,
 it works with HASH, TREE, and BITSET indexes.
-</para>
-
-<para>
-LINE 3: MEANING. The value zero is hard-coded so this will only work for space[0]
-and index[0] -- we're making some hopeful assumptions here. The meaning is "variable <code>v</code> gets
-the iterator for the primary index of the first space".
 </para>
 
 <para>
@@ -602,7 +551,7 @@ will know what to do about it later.
 <para>
 LINE 5: MEANING. The function is <olink targetptr="box.cjson">box.cjson.decode</olink> which means decode a JSON
 string, and the parameter is <code>t[1]</code> which is a reference to a JSON string.
-Once again there's a bit of hard coding here, we're assuming that the second
+There's a bit of hard coding here, we're assuming that the second
 field in the tuple is where the JSON string was inserted. For example, we're assuming a tuple looks like <programlisting>field[0]: 444
 field[1]: '{"Hello": "world", "Quantity": 15}'
 </programlisting>meaning that the tuple's first field, the primary key field, is a number
@@ -611,13 +560,6 @@ entire statement means "decode <code>t[1]</code> (the tuple's second field) as a
 string; if there's an error set <code>is_valid_json = false</code>; if there's no error
 set <code>is_valid_json = true</code> and set <code>lua_table</code> = a Lua table which has the
 decoded string".
-</para>
-
-<para>
-LINE 6. This "<code>if</code>" statement means "if the <code>box.cjson.decode</code> function failed,
-don't execute the next indented lines", so <code>sum</code> will be unchanged if
-<code>box.cjson.decode</code> failed. Although "<code>if is_valid_json == true</code>" would be clearer, the
-usual style is to say "<code>if is_valid_json</code>" and let "<code>== true</code>" be assumed.
 </para>
 
 <para>
@@ -638,38 +580,7 @@ LINE 8: WHY "IF". Suppose that the JSON string is well formed but the
 JSON field is not a number, or is missing. In that case, the function
 would be aborted when there was an attempt to add it to the sum.
 By first checking <code>type(field_value) == "number"</code>, we avoid that abortion.
-Again, as in line 5, this is slightly paranoid -- anyone who knows
-that the database is in perfect shape can skip this kind of thing.
-Incidentally the "<code>if ... end</code>" statement is so short that it fits on
-a single line, which is acceptable but optional practice.
-</para>
-
-<para>
-LINE 8: MEANING. The meat, the whole reason for the function's existence,
-is in the words "<code>sum = sum + field_value</code>". This addition of <code>field_value</code>
-to <code>sum</code> will happen for every tuple, provided the field is there and is
-numeric.
-</para>
-
-<para>
-LINE 9. This "<code>end</code>" statement matches the "<code>if is_valid_json</code>" statement
-in line 6.
-</para>
-
-<para>
-LINE 10. This "<code>end</code>" statement matches the "<code>for t in v do</code>" statement
-in line 4. The effect is that another iteration of the loop will take
-place, unless there are no more tuples.
-</para>
-
-<para>
-LINE 11: This is after the end of the "<code>for t in v do</code>" loop. Return <code>sum</code> to the caller.
-This effectively ends the execution of the whole function, so all the
-local variables are destroyed and the function's caller gets the result.
-</para>
-
-<para>
-LINE 12: This "<code>end</code>" statement matches the start of the function.
+Anyone who knows that the database is in perfect shape can skip this kind of thing.
 </para>
 
 <para>
@@ -706,15 +617,9 @@ Invoke the function with either <code>CALL sum_json_field("Quantity")</code> or
 
 <para>
 It works. We'll just leave, as exercises for future improvement, the possibility
-that the "hard coding" assumptions could be removed, that there might have to be
+that some "hard coding" assumptions could be removed, that there might have to be
 an overflow check if some field values are huge, and that the function should
 contain a "yield" instruction if the count of tuples is huge.
-</para>
-
-<para>
-What has been shown is that a 12-line Lua function can scan a database and
-process JSON strings, in a way that's useful, robust, and -- now that
-this tutorial exercise is over -- understandable.
 </para>
 
 </section>
