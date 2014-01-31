@@ -732,7 +732,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           is given a value, Tarantool creates a child process,
           executes the command indicated by the value, and pipes its standard
           output to the standard input of the created process.
-          Example setting: <command>tee --append
+          Example setting: <command>tee -a
           tarantool.log</command> (this will duplicate log output
           to <filename>stdout</filename> and a log file).
           </entry>
