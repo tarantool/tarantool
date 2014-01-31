@@ -1246,10 +1246,11 @@ lbox_raise(lua_State *L)
  * A helper to find a Lua function by name and put it
  * on top of the stack.
  */
-static void
+static int
 box_lua_find(lua_State *L, const char *name, const char *name_end)
 {
 	int index = LUA_GLOBALSINDEX;
+	int objstack = 0;
 	const char *start = name, *end;
 
 	while ((end = (const char *) memchr(start, '.', name_end - start))) {
@@ -1262,6 +1263,22 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 		start = end + 1; /* next piece of a.b.c */
 		index = lua_gettop(L); /* top of the stack */
 	}
+
+	/* box.something:method */
+	if ((end = (const char *) memchr(start, ':', name_end - start))) {
+		lua_checkstack(L, 3);
+		lua_pushlstring(L, start, end - start);
+		lua_gettable(L, index);
+		if (! (lua_istable(L, -1) ||
+			lua_islightuserdata(L, -1) || lua_isuserdata(L, -1) ))
+				tnt_raise(ClientError, ER_NO_SUCH_PROC,
+					  name_end - name, name);
+		start = end + 1; /* next piece of a.b.c */
+		index = lua_gettop(L); /* top of the stack */
+		objstack = index;
+	}
+
+
 	lua_pushlstring(L, start, name_end - start);
 	lua_gettable(L, index);
 	if (! lua_isfunction(L, -1)) {
@@ -1273,9 +1290,18 @@ box_lua_find(lua_State *L, const char *name, const char *name_end)
 	/* setting stack that it would contain only
 	 * the function pointer. */
 	if (index != LUA_GLOBALSINDEX) {
-		lua_replace(L, 1);
-		lua_settop(L, 1);
+		if (objstack == 0) {        /* no object, only a function */
+			lua_replace(L, 1);
+		} else if (objstack == 1) { /* just two values, swap them */
+			lua_insert(L, -2);
+		} else {		    /* long path */
+			lua_insert(L, 1);
+			lua_insert(L, 2);
+			objstack = 1;
+		}
+		lua_settop(L, 1 + objstack);
 	}
+	return 1 + objstack;
 }
 
 
