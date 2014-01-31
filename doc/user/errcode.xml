@@ -80,7 +80,7 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/in
 
   <varlistentry>
     <term xml:id="ER_UPDATE_FIELD" xreflabel="ER_UPDATE_FIELD">ER_UPDATE_FIELD</term>
-    <listitem><para>A error occured during update of a field.
+    <listitem><para>An error occurred during update of a field.
     </para></listitem>
   </varlistentry>
 

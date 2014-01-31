@@ -30,7 +30,6 @@ Vendor: tarantool.org
 Group: Applications/Databases
 Provides: tarantool-client
 Obsoletes: tarantool-client
-Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description -n tarantool-client
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -45,9 +44,9 @@ Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
 #Requires: /sbin/ldconfig
+#Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 Provides: tarantool-dev
 Obsoletes: tarantool-dev
-Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description -n tarantool-dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
