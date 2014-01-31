@@ -269,8 +269,13 @@ function box.schema.space.bless(space)
 
     --
     index_mt.select = function(index, key)
-        local res = index:eselect(key, { offset = 0, limit = 4294967295 })
-        return unpack(res)
+        return box.process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = index.n,
+                    [box.net.box.INDEX_ID] = index.id,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 4294967295,
+                    [box.net.box.KEY] = keify(key)}))
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -295,13 +300,13 @@ function box.schema.space.bless(space)
     end
 
     space_mt.select = function(space, key)
-        if space.index[0] == nil then
-            box.raise(box.error.ER_NO_SUCH_INDEX,
-                string.format("No index #0 is defined in space %d", space.n)
-            )
-        end
-        local res = space.index[0]:eselect(key, { limit = 4294967295 })
-        return unpack(res)
+        return box.process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space.n,
+                    [box.net.box.INDEX_ID] = 0,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 4294967295,
+                    [box.net.box.KEY] = keify(key)}))
     end
     space_mt.insert = function(space, tuple)
         return box.process(box.net.box.INSERT,

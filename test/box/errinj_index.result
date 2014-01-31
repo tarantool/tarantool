@@ -46,6 +46,10 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
 res = {}
 ---
 ...
@@ -64,10 +68,6 @@ res
   - [8, 8, 'test8']
   - [9, 9, 'test9']
   - [10, 10, 'test10']
-...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
----
-- ok
 ...
 for i = 501,1000 do s:insert{i, i} end
 ---
@@ -96,6 +96,10 @@ box.errinj.set("ERRINJ_TREE_ALLOC", false)
 s:select{1}
 ---
 ...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
 res = {}
 ---
 ...
@@ -113,10 +117,6 @@ res
   - [8, 8, 'test8']
   - [9, 9, 'test9']
   - [10, 10, 'test10']
-...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
----
-- ok
 ...
 for i = 1001,1500 do s:insert{i, i} end
 ---
@@ -139,6 +139,10 @@ box.errinj.set("ERRINJ_TREE_ALLOC", false)
 s:select{1}
 ---
 ...
+box.errinj.set("ERRINJ_TREE_ALLOC", true)
+---
+- ok
+...
 res = {}
 ---
 ...
@@ -155,10 +159,6 @@ res
   - [8, 8, 'test8']
   - [9, 9, 'test9']
   - [10, 10, 'test10']
-...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
----
-- ok
 ...
 for i = 1501,2000 do s:insert{i, i} end
 ---

@@ -5,11 +5,9 @@ box.errinj.info()
 box.errinj.set("some-injection", true)
 box.errinj.set("some-injection") -- check error
 space:select{222444}
--- now select doesn't use request
--- TODO: drop the test or rewrite it using box.net.box
--- box.errinj.set("ERRINJ_TESTING", true)
--- space:select{222444}
--- box.errinj.set("ERRINJ_TESTING", false)
+box.errinj.set("ERRINJ_TESTING", true)
+space:select{222444}
+box.errinj.set("ERRINJ_TESTING", false)
 
 -- Check how well we handle a failed log write
 box.errinj.set("ERRINJ_WAL_IO", true)

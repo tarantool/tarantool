@@ -39,8 +39,7 @@ for i = 1, 100000, 1 do space:insert{tostring(i), i} end
 ...
 local t1 = {space.index['secondary']:select{}}
 ---
-- error: '[string "local t1 = {space.index[''secondary'']:select{}} "]:1: too many
-    results to unpack'
+- error: stack overflow
 ...
 space:drop()
 ---
