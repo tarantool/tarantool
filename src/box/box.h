@@ -64,7 +64,6 @@ typedef void (*box_process_func)(struct port *port, struct request *request);
 /** For read-write operations. */
 extern box_process_func box_process;
 /** For read-only port. */
-extern box_process_func box_process_ro;
 
 /*
  * Check storage-layer related options in the

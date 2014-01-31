@@ -9,7 +9,6 @@ do
     begin_lsn = box.info.lsn
 
     function _set_pri_lsn(_lsn)
-        a = {}
         begin_lsn = _lsn
     end
 
@@ -18,7 +17,7 @@ do
     end
 
     function _insert(_begin, _end)
-        a = {}
+        local a = {}
         for i = _begin, _end do
             table.insert(a, box.space[0]:insert{i, 'the tuple '..i})
         end
@@ -26,7 +25,7 @@ do
     end
 
     function _select(_begin, _end)
-        a = {}
+        local a = {}
         for i = _begin, _end do
             table.insert(a, box.space[0]:select{i})
         end
@@ -46,11 +45,11 @@ end;
 -- set begin lsn on master, replica and hot_standby.
 begin_lsn = box.info.lsn
 
-a = box.net.box.new('127.0.0.1', 33114)
+a = box.net.box.new('127.0.0.1', 33113)
 a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
-a = box.net.box.new('127.0.0.1', 33024)
+a = box.net.box.new('127.0.0.1', 33013)
 a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 

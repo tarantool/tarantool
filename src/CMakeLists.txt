@@ -55,7 +55,6 @@ set (common_sources
      recovery.cc
      admin.cc
      replica.cc
-     replica.1.5.cc
      iproto.cc
      iproto_constants.c
      iproto_port.cc

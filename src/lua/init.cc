@@ -616,6 +616,7 @@ load_init_script(va_list ap)
 	ev_break(EVBREAK_ALL);
 }
 
+#if 0
 /**
  * Unset functions in the Lua state which can be used to
  * execute external programs or otherwise introduce a breach
@@ -648,6 +649,7 @@ tarantool_lua_sandbox(struct lua_State *L)
 	if (result)
 		panic("%s", lua_tostring(L, -1));
 }
+#endif
 
 void
 tarantool_lua_load_init_script()
@@ -669,10 +671,12 @@ tarantool_lua_load_init_script()
 	 */
 	ev_run(0);
 
+#if 0
 	/* Outside the startup file require() or ffi are not
 	 * allowed.
 	*/
 	tarantool_lua_sandbox(tarantool_L);
+#endif
 }
 
 void

@@ -765,8 +765,7 @@ iproto_on_accept(struct evio_service *service, int fd,
  * with binary protocol handlers.
  */
 void
-iproto_init(const char *bind_ipaddr, int primary_port,
-	    int secondary_port)
+iproto_init(const char *bind_ipaddr, int primary_port)
 {
 	/* Run a primary server. */
 	if (primary_port != 0) {
@@ -779,14 +778,6 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 		evio_service_start(&primary);
 	}
 
-	/* Run a secondary server. */
-	if (secondary_port != 0) {
-		static struct evio_service secondary;
-		evio_service_init(&secondary, "secondary",
-				  bind_ipaddr, secondary_port,
-				  iproto_on_accept, &box_process_ro);
-		evio_service_start(&secondary);
-	}
 	iproto_queue_init(&request_queue, IPROTO_REQUEST_QUEUE_SIZE,
 			  iproto_queue_handler);
 	mempool_create(&iproto_connection_pool, slabc_runtime,

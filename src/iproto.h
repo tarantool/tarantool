@@ -29,6 +29,5 @@
  * SUCH DAMAGE.
  */
 void
-iproto_init(const char *bind_ipaddr, int primary_port,
-	    int secondary_port);
+iproto_init(const char *bind_ipaddr, int primary_port);
 #endif

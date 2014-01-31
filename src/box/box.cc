@@ -55,7 +55,6 @@ static void process_replica(struct port *port, struct request *request);
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
-box_process_func box_process_ro = process_ro;
 
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
@@ -141,13 +140,8 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 		box_process = process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		if (strcmp(conf->replication_protocol, "1.5") == 0) {
-			recovery_follow_remote_1_5(recovery_state,
-						   conf->replication_source);
-		} else {
-			recovery_follow_remote(recovery_state,
-					       conf->replication_source);
-		}
+		recovery_follow_remote(recovery_state,
+				       conf->replication_source);
 
 	} else {
 		box_process = process_rw;
@@ -182,14 +176,6 @@ box_check_config(struct tarantool_cfg *conf)
 		return -1;
 	}
 
-	if (strcmp(conf->replication_protocol, "1.5") != 0 &&
-	    strcmp(conf->replication_protocol, "1.6") != 0) {
-		out_warning(CNF_OK, "unknown replication protocol %s",
-			    conf->replication_protocol);
-		return -1;
-	}
-
-
 	/* check replication mode */
 	if (conf->replication_source != NULL) {
 		/* check replication port */
@@ -211,13 +197,6 @@ box_check_config(struct tarantool_cfg *conf)
 	if (conf->primary_port != 0 &&
 	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
 		out_warning(CNF_OK, "invalid primary port value: %i", conf->primary_port);
-		return -1;
-	}
-
-	/* check secondary port */
-	if (conf->secondary_port != 0 &&
-	    (conf->secondary_port <= 0 || conf->secondary_port >= USHRT_MAX)) {
-		out_warning(CNF_OK, "invalid secondary port value: %i", conf->primary_port);
 		return -1;
 	}
 
@@ -275,12 +254,7 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 			return -1;
 		}
 		if (recovery_state->remote) {
-			if (strcmp(new_conf->replication_protocol,
-				   "1.5") == 0) {
-				recovery_stop_remote_1_5(recovery_state);
-			} else {
-				recovery_stop_remote(recovery_state);
-			}
+			recovery_stop_remote(recovery_state);
 		}
 
 		box_enter_master_or_replica_mode(new_conf);

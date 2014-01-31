@@ -114,10 +114,9 @@ title(const char *role, const char *fmt, ...)
 		bufptr += snprintf(bufptr, bufend - bufptr, "%s", s);
 	}
 
-	int ports[] = { cfg.primary_port, cfg.secondary_port,
-			cfg.admin_port, cfg.replication_port };
+	int ports[] = { cfg.primary_port, cfg.admin_port, cfg.replication_port };
 	int *pptr = ports;
-	const char *names[] = { "pri", "sec", "adm", "rpl", NULL };
+	const char *names[] = { "pri", "adm", "rpl", NULL };
 	const char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -786,8 +785,7 @@ main(int argc, char **argv)
 		tarantool_lua_init();
 		box_init();
 		tarantool_lua_load_cfg(&cfg);
-		iproto_init(cfg.bind_ipaddr, cfg.primary_port,
-			    cfg.secondary_port);
+		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
 		replication_init(cfg.bind_ipaddr, cfg.replication_port);
 		session_init();

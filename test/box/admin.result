@@ -50,16 +50,14 @@ box.cfg()
   admin_port: 33015
   logger: cat - >> tarantool.log
   slab_alloc_arena: 0.1
-  log_level: 5
-  primary_port: 33013
-  readahead: 16320
-  too_long_threshold: 0.5
-  logger_nonblock: true
+  wal_dir: .
   rows_per_wal: 50
+  logger_nonblock: true
+  readahead: 16320
   snap_dir: .
   coredump: false
-  replication_protocol: 1.6
-  wal_dir: .
+  primary_port: 33013
+  too_long_threshold: 0.5
   snap_io_rate_limit: 0
   wal_mode: fsync_delay
   local_hot_standby: false
@@ -69,7 +67,7 @@ box.cfg()
   replication_port: 0
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  secondary_port: 33014
+  log_level: 5
   wal_dir_rescan_delay: 0.1
 ...
 box.stat()

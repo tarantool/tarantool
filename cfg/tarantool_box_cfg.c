@@ -55,11 +55,9 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->panic_on_snap_error = false;
 	c->panic_on_wal_error = false;
 	c->primary_port = 0;
-	c->secondary_port = 0;
 	c->too_long_threshold = 0;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
-	c->replication_protocol = NULL;
 }
 
 int
@@ -99,12 +97,9 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->panic_on_snap_error = true;
 	c->panic_on_wal_error = false;
 	c->primary_port = 0;
-	c->secondary_port = 0;
 	c->too_long_threshold = 0.5;
 	c->custom_proc_title = NULL;
 	c->replication_source = NULL;
-	c->replication_protocol = strdup("1.6");
-	if (c->replication_protocol == NULL) return CNF_NOMEMORY;
 	return 0;
 }
 
@@ -196,9 +191,6 @@ static NameAtom _name__panic_on_wal_error[] = {
 static NameAtom _name__primary_port[] = {
 	{ "primary_port", -1, NULL }
 };
-static NameAtom _name__secondary_port[] = {
-	{ "secondary_port", -1, NULL }
-};
 static NameAtom _name__too_long_threshold[] = {
 	{ "too_long_threshold", -1, NULL }
 };
@@ -207,9 +199,6 @@ static NameAtom _name__custom_proc_title[] = {
 };
 static NameAtom _name__replication_source[] = {
 	{ "replication_source", -1, NULL }
-};
-static NameAtom _name__replication_protocol[] = {
-	{ "replication_protocol", -1, NULL }
 };
 
 #define ARRAYALLOC(x,n,t,_chk_ro, __flags)  do {                    \
@@ -637,20 +626,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 			return CNF_RDONLY;
 		c->primary_port = i32;
 	}
-	else if ( cmpNameAtoms( opt->name, _name__secondary_port) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->secondary_port != i32)
-			return CNF_RDONLY;
-		c->secondary_port = i32;
-	}
 	else if ( cmpNameAtoms( opt->name, _name__too_long_threshold) ) {
 		if (opt->paramType != scalarType )
 			return CNF_WRONGTYPE;
@@ -681,18 +656,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (c->replication_source) free(c->replication_source);
 		c->replication_source = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->replication_source == NULL)
-			return CNF_NOMEMORY;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__replication_protocol) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		if (check_rdonly && ( (opt->paramValue.scalarval == NULL && c->replication_protocol == NULL) || confetti_strcmp(opt->paramValue.scalarval, c->replication_protocol) != 0))
-			return CNF_RDONLY;
-		if (c->replication_protocol) free(c->replication_protocol);
-		c->replication_protocol = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
-		if (opt->paramValue.scalarval && c->replication_protocol == NULL)
 			return CNF_NOMEMORY;
 	}
 	else {
@@ -833,11 +796,9 @@ typedef enum IteratorState {
 	S_name__panic_on_snap_error,
 	S_name__panic_on_wal_error,
 	S_name__primary_port,
-	S_name__secondary_port,
 	S_name__too_long_threshold,
 	S_name__custom_proc_title,
 	S_name__replication_source,
-	S_name__replication_protocol,
 	_S_Finished
 } IteratorState;
 
@@ -1148,17 +1109,6 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->primary_port);
 			snprintf(buf, PRINTBUFLEN-1, "primary_port");
-			i->state = S_name__secondary_port;
-			return buf;
-		case S_name__secondary_port:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->secondary_port);
-			snprintf(buf, PRINTBUFLEN-1, "secondary_port");
 			i->state = S_name__too_long_threshold;
 			return buf;
 		case S_name__too_long_threshold:
@@ -1190,16 +1140,6 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "replication_source");
-			i->state = S_name__replication_protocol;
-			return buf;
-		case S_name__replication_protocol:
-			*v = (c->replication_protocol) ? strdup(c->replication_protocol) : NULL;
-			if (*v == NULL && c->replication_protocol) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			snprintf(buf, PRINTBUFLEN-1, "replication_protocol");
 			i->state = _S_Finished;
 			return buf;
 		case _S_Finished:
@@ -1274,16 +1214,12 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	dst->panic_on_snap_error = src->panic_on_snap_error;
 	dst->panic_on_wal_error = src->panic_on_wal_error;
 	dst->primary_port = src->primary_port;
-	dst->secondary_port = src->secondary_port;
 	dst->too_long_threshold = src->too_long_threshold;
 	if (dst->custom_proc_title) free(dst->custom_proc_title);dst->custom_proc_title = src->custom_proc_title == NULL ? NULL : strdup(src->custom_proc_title);
 	if (src->custom_proc_title != NULL && dst->custom_proc_title == NULL)
 		return CNF_NOMEMORY;
 	if (dst->replication_source) free(dst->replication_source);dst->replication_source = src->replication_source == NULL ? NULL : strdup(src->replication_source);
 	if (src->replication_source != NULL && dst->replication_source == NULL)
-		return CNF_NOMEMORY;
-	if (dst->replication_protocol) free(dst->replication_protocol);dst->replication_protocol = src->replication_protocol == NULL ? NULL : strdup(src->replication_protocol);
-	if (src->replication_protocol != NULL && dst->replication_protocol == NULL)
 		return CNF_NOMEMORY;
 
 	return CNF_OK;
@@ -1316,8 +1252,6 @@ destroy_tarantool_cfg(tarantool_cfg* c) {
 		free(c->custom_proc_title);
 	if (c->replication_source != NULL)
 		free(c->replication_source);
-	if (c->replication_protocol != NULL)
-		free(c->replication_protocol);
 }
 
 /************** Compare config  **************/
@@ -1485,11 +1419,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 	}
-	if (c1->secondary_port != c2->secondary_port) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->secondary_port");
-
-		return diff;
-	}
 	if (!only_check_rdonly) {
 		if (c1->too_long_threshold != c2->too_long_threshold) {
 			snprintf(diff, PRINTBUFLEN - 1, "%s", "c->too_long_threshold");
@@ -1509,11 +1438,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 			return diff;
 }
 	}
-	if (confetti_strcmp(c1->replication_protocol, c2->replication_protocol) != 0) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_protocol");
-
-		return diff;
-}
 
 	return 0;
 }

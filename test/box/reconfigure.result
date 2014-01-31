@@ -12,8 +12,6 @@ box.cfg.reload()
 
     Could not accept read only ''primary_port'' option.
 
-    Could not accept read only ''secondary_port'' option.
-
     Could not accept read only ''admin_port'' option.
 
     Could not accept read only ''rows_per_wal'' option.

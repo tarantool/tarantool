@@ -136,9 +136,6 @@ typedef struct tarantool_cfg {
 	 */
 	int32_t	primary_port;
 
-	/* Secondary port (where only selects are accepted) */
-	int32_t	secondary_port;
-
 	/* Warn about requests which take longer to process, in seconds. */
 	double	too_long_threshold;
 
@@ -156,13 +153,6 @@ typedef struct tarantool_cfg {
 	 * only accepts reads.
 	 */
 	char*	replication_source;
-
-	/*
-	 * 1.6 (default) or 1.5 (old) replication mode
-	 * If 1.5 mode is enabled, the replica will successfully
-	 * connect to 1.5 master
-	 */
-	char*	replication_protocol;
 } tarantool_cfg;
 
 #ifndef CNF_FLAG_STRUCT_NEW
