@@ -4,7 +4,7 @@ sql.sort = True
 # Prepare spaces
 #
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
-admin("s:create_index('primary', { type = 'hash', parts = { 0, 'str'} })")
+admin("s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })")
 admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})")
 
 print """#
@@ -44,8 +44,11 @@ sql("insert into t0 values ('Spears', 'Britney')")
 sql("select * from t0 where k0='Spears'")
 sql("select * from t0 where k1='Anything'")
 sql("select * from t0 where k1='Britney'")
-sql("call box.select_range(0, 0, 100, 'Spears')")
-sql("call box.select_range(0, 1, 100, 'Britney')")
+
+admin("s.index[0]:eselect('Spears', { limit = 100, iterator = 'GE' })")
+admin("s.index[1]:eselect('Britney', { limit = 100, iterator = 'GE' })")
+
+
 sql("delete from t0 where k0='Spears'")
 # Cleanup
 admin("s:truncate()")
@@ -66,9 +69,9 @@ sql("select * from t0 where k0='key1'")
 sql("select * from t0 where k0='key2'")
 sql("select * from t0 where k0='key3'")
 sql("select * from t0 where k1='part1'")
-sql("call box.select_range(0, 1, 100, 'part1')")
-sql("call box.select_range(0, 0, 100, 'key2')")
-sql("call box.select_range(0, 1, 100, 'part1', 'part2_a')")
+admin("s.index[1]:eselect('part1', { limit = 100, iterator = 'GE' })")
+admin("s.index[0]:eselect('key2', { limit = 100, iterator = 'GE' })")
+admin("s.index[1]:eselect({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })")
 sql("select * from t0 where k0='key1'")
 sql("select * from t0 where k0='key2'")
 sql("select * from t0 where k0='key3'")

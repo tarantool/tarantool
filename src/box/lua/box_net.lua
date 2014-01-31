@@ -73,39 +73,26 @@ box.net = {
                         }))
         end,
 
-        select_limit = function(self, space, index, offset, limit, key)
-            return self:process(box.net.box.SELECT,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = space,
-                    [box.net.box.INDEX_ID] = index,
-                    [box.net.box.OFFSET] = offset,
-                    [box.net.box.LIMIT] = limit,
-                    [box.net.box.KEY] = keify(key)}))
-        end,
-
         select = function(self, space, key)
-            return self:select_limit(space, 0, 0, 4294967295, key)
+            return self:eselect(space, 0, key, { limit = 4294967295 })
         end,
 
         ping = function(self)
             return self:process(box.net.box.PING, '')
         end,
 
-        call    = function(self, name, tuple)
+        call    = function(self, name, ...)
             assert(type(name) == 'string')
             return self:process(box.net.box.CALL,
                 msgpack.encode({
                     [box.net.box.FUNCTION_NAME] = name,
-                    [box.net.box.TUPLE] = keify(tuple)}))
+                    [box.net.box.TUPLE] = {...}}))
         end,
 
-        select_range = function(self, sno, ino, limit, key)
-            return self:call('box.select_range', {sno, ino, limit, key})
+        eselect = function(self, sno, ino, key, opts)
+            return self:call('box.net.self:eselect', sno, ino, key, opts)
         end,
 
-        select_reverse_range = function(self, sno, ino, limit, key)
-            return self:call('box.select_reverse_range', {sno, ino, limit, key})
-        end,
 
         -- To make use of timeouts safe across multiple
         -- concurrent fibers do not store timeouts as
@@ -143,23 +130,31 @@ box.net = {
             return box.process(...)
         end,
 
-        select_range = function(self, sno, ino, limit, ...)
-            return box.space[sno].index[ino]:select_range(limit, ...)
-        end,
 
-        select_reverse_range = function(self, sno, ino, limit, ...)
-            return box.space[sno].index[ino]
-                :select_reverse_range(limit, ...)
+        eselect = function(self, sno, ino, key, opts)
+            local space = box.space[ sno ]
+            if space == nil then
+                box.raise(box.error.ER_NO_SUCH_SPACE,
+                    string.format("No such space #%s", tostring(sno)))
+            end
+            local index = space.index[ ino ]
+            if index == nil then
+                box.raise(box.error.ER_NO_SUCH_INDEX,
+                    string.format("No such index #%s in space #%s",
+                        tostring(sno), tostring(ino)))
+            end
+
+            return index:eselect(key, opts)
         end,
 
         -- for compatibility with the networked version,
         -- implement call
-        call = function(self, proc_name, tuple) 
+        call = function(self, proc_name, ...) 
             local proc = { box.call_loadproc(proc_name) }
             if #proc == 2 then
-                return proc[1](proc[2], tuple)
+                return proc[1](proc[2], ...)
             else
-                return proc[1](tuple)
+                return proc[1](...)
             end
         end,
 
@@ -397,6 +392,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 end
             end
         end,
+
+
+
 
         close = function(self)
             if self.closed then

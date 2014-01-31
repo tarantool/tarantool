@@ -1,7 +1,7 @@
 s = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
-s:create_index('primary', { type = 'hash', parts = { 0, 'str'} })
+s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })
 ---
 ...
 s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})
@@ -89,13 +89,13 @@ select * from t0 where k1='Britney'
 ---
 - ['Spears', 'Britney']
 ...
-call box.select_range(0, 0, 100, 'Spears')
+s.index[0]:eselect('Spears', { limit = 100, iterator = 'GE' })
 ---
-- ['Spears', 'Britney']
+- - ['Spears', 'Britney']
 ...
-call box.select_range(0, 1, 100, 'Britney')
+s.index[1]:eselect('Britney', { limit = 100, iterator = 'GE' })
 ---
-- ['Spears', 'Britney']
+- - ['Spears', 'Britney']
 ...
 delete from t0 where k0='Spears'
 ---
@@ -150,22 +150,21 @@ select * from t0 where k1='part1'
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range(0, 1, 100, 'part1')
+s.index[1]:eselect('part1', { limit = 100, iterator = 'GE' })
 ---
-- ['key1', 'part1', 'part2']
-- ['key2', 'part1', 'part2_a']
-- ['key3', 'part1', 'part2_b']
+- - ['key1', 'part1', 'part2']
+  - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range(0, 0, 100, 'key2')
+s.index[0]:eselect('key2', { limit = 100, iterator = 'GE' })
 ---
-- ['key1', 'part1', 'part2']
-- ['key2', 'part1', 'part2_a']
-- ['key3', 'part1', 'part2_b']
+- - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
 ...
-call box.select_range(0, 1, 100, 'part1', 'part2_a')
+s.index[1]:eselect({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })
 ---
-- ['key2', 'part1', 'part2_a']
-- ['key3', 'part1', 'part2_b']
+- - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
 ...
 select * from t0 where k0='key1'
 ---

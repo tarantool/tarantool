@@ -82,7 +82,9 @@ box.schema.index.create = function(space_id, name, options)
     local parts = options.parts
     local iid = 0
     -- max
-    local tuple = _index.index[0]:select_reverse_range(1, space_id)
+    local tuple = _index.index[0]
+        :eselect(space_id, { limit = 1, iterator = 'LE' })
+    tuple = tuple[1]
     if tuple then
         local id = tuple[0]
         if id == space_id then
@@ -163,6 +165,9 @@ box.schema.index.alter = function(space_id, index_id, options)
 end
 
 local function keify(key)
+    if key == nil then
+        return {}
+    end
     if type(key) == "table" then
         return key
     end
@@ -193,38 +198,84 @@ function box.schema.space.bless(space)
     index_mt.count = function(index, ...)
         return index.idx:count(...)
     end
+
+    -- eselect
+    index_mt.eselect = function(index, key, opts)
+        -- user can catch link to index
+        if box.space[ index.n ].index[ index.id ] == nil then
+            box.raise(box.error.ER_NO_SUCH_INDEX,
+                string.format("No index #0 is defined in space %d", index.n))
+        end
+
+        if opts == nil then
+            opts = {}
+        end
+
+        local iterator = opts.iterator
+
+        if iterator == nil then
+            iterator = box.index.EQ
+        end
+        if type(iterator) == 'string' then
+            if box.index[ iterator ] == nil then
+                error(string.format("Wrong iterator: %s", tostring(iterator)))
+            end
+            iterator = box.index[ iterator ]
+        end
+
+        local result = {}
+        local offset = 0
+        local skip = 0
+        local count = 0
+        if opts.offset ~= nil then
+            offset = tonumber(opts.offset)
+        end
+        local limit = opts.limit
+        local grep = opts.grep
+        local map = opts.map
+
+        if limit == 0 then
+            return result
+        end
+
+        for tuple in index:iterator(iterator, unpack(keify(key))) do
+            if grep == nil or grep(tuple) then
+                if skip < offset then
+                    skip = skip + 1
+                else
+                    if map == nil then
+                        table.insert(result, tuple)
+                    else
+                        table.insert(result, map(tuple))
+                    end
+                    count = count + 1
+
+                    if limit == nil then
+                        if count > 1 then
+                            box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+                                "More than one tuple found without 'limit'")
+                        end
+                    elseif count >= limit then
+                        break
+                    end
+                end
+            end
+        end
+        if limit == nil then
+            return unpack(result)
+        end
+        return result
+    end
+
     --
-    index_mt.select_range = function(index, limit, ...)
-        local range = {}
-        for v in index:iterator(box.index.GE, ...) do
-            if #range >= limit then
-                break
-            end
-            table.insert(range, v)
-        end
-        return unpack(range)
-    end
-    index_mt.select_reverse_range = function(index, limit, ...)
-        local range = {}
-        for v in index:iterator(box.index.LE, ...) do
-            if #range >= limit then
-                break
-            end
-            table.insert(range, v)
-        end
-        return unpack(range)
-    end
-    index_mt.select_limit = function(index, offset, limit, key)
+    index_mt.select = function(index, key)
         return box.process(box.net.box.SELECT,
                 msgpack.encode({
                     [box.net.box.SPACE_ID] = index.n,
                     [box.net.box.INDEX_ID] = index.id,
-                    [box.net.box.OFFSET] = offset,
-                    [box.net.box.LIMIT] = limit,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 4294967295,
                     [box.net.box.KEY] = keify(key)}))
-    end
-    index_mt.select = function(index, key)
-        return index:select_limit(0, 4294967295, key)
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -239,6 +290,15 @@ function box.schema.space.bless(space)
     local space_mt = {}
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
+
+    space_mt.eselect = function(space, key, opts)
+        if box.space[ space.n ].index[ 0 ] == nil then
+            box.raise(box.error.ER_NO_SUCH_INDEX,
+                string.format("No index #0 is defined in space %d", space.n))
+        end
+        return space.index[0]:eselect(key, opts)
+    end
+
     space_mt.select = function(space, key)
         return box.process(box.net.box.SELECT,
                 msgpack.encode({
@@ -247,12 +307,6 @@ function box.schema.space.bless(space)
                     [box.net.box.OFFSET] = 0,
                     [box.net.box.LIMIT] = 4294967295,
                     [box.net.box.KEY] = keify(key)}))
-     end
-    space_mt.select_range = function(space, ino, limit, ...)
-        return space.index[ino]:select_range(limit, ...)
-    end
-    space_mt.select_reverse_range = function(space, ino, limit, ...)
-        return space.index[ino]:select_reverse_range(limit, ...)
     end
     space_mt.insert = function(space, tuple)
         return box.process(box.net.box.INSERT,

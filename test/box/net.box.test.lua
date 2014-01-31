@@ -8,7 +8,51 @@ box.net.box.ping(remote)
 space:insert{123, 'test1', 'test2'}
 space:select{123}
 tuple = remote:select(space.n, 123)
+
+function test(...) return box.tuple.new({ 123, 456 }) end
+f, a = box.call_loadproc('test')
+type(f)
+type(a)
+
+remote:call('test')
+function test(...) return box.tuple.new({ ... }) end
+remote:call('test', 123, 345, { 678, 910 })
+function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
+remote:call('test', 123, 345, { 678, 910 })
+test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
+remote:call('test:b')
+test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
+f, a = box.call_loadproc('test:b')
+type(f)
+type(a)
+a.a
+f, a = box.call_loadproc('test.b')
+type(f)
+type(a)
+
+remote:call('test:b')
+remote:call('test:b', 'b', 'c')
+remote:call('test:b', 'b', 'c', 'd', 'e')
+remote:call('test:b', 'b', { 'c', { d = 'e' } })
+
+
+test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
+f, a = box.call_loadproc('test.a:b')
+type(f)
+type(a)
+a.c
+f, a = box.call_loadproc('test.a.b')
+type(f)
+type(a)
+
+remote:call('test.a:b', 123)
+
+
+
+box.space.tweedledum:select(123)
+box.space.tweedledum:select({123})
 remote:call('box.space.tweedledum:select', 123)
+remote:call('box.space.tweedledum:select', {123})
 
 slf, foo = box.call_loadproc('box.net.self:select')
 type(slf)
@@ -33,8 +77,9 @@ remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
 space:select{345}
 -- remote:select_limit(space.n, 0, 0, 1000, 345)
 
-space:select_range(0, 1000)
-remote:select_range(space.n, 0, 1000)
+space:eselect({}, { iterator = 'GE', limit = 1000 })
+box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
+remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 space:select{345}
 remote:select(space.n, {345})
 remote:timeout(0.5):select(space.n, {345})

@@ -36,8 +36,8 @@ s1:insert{'identifier', 'tuple'}
 box.snapshot()
 s1:insert{'second', 'tuple 2'}
 box.snapshot()
-s1.index['primary']:select_range(100, 'second')
-s1.index['primary']:select_range(100, 'identifier')
+s1.index['primary']:eselect('second', { limit = 100, iterator = 'GE' })
+s1.index['primary']:eselect('identifier', { limit = 100, iterator = 'GE' })
 
 s1:insert{'third', 'tuple 3'}
 s1.index['primary']:select{'identifier'}
@@ -96,7 +96,7 @@ s1:insert{'abcdb__'}
 s1:insert{'abcdb___'}
 s1:insert{'abcdc'}
 s1:insert{'abcdc_'}
-box.sort({s1.index['primary']:select_range(3, 'abcdb')})
+box.sort(s1.index['primary']:eselect('abcdb', { limit = 3, iterator = 'GE' }))
 s1:drop()
 s1 = nil
 s2:drop()
