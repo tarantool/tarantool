@@ -225,18 +225,14 @@ static int
 fiob_close(void *cookie)
 {
 	struct fiob *f = (struct fiob *)cookie;
-	int res = 0;
-	if (fiob_flushb(f) < 0)
-		res = -1;
 
+	int res = fiob_flushb(f);
 	int save_errno = errno;
 
-	if (close(f->fd) < 0) {
-		if (res < 0)
-			errno = save_errno;
+	if (close(f->fd) < 0 && res == 0) {
 		res = -1;
+		save_errno = errno;
 	}
-
 
 	free(f->buf);
 	free(f->path);
