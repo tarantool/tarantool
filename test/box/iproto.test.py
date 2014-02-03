@@ -17,8 +17,8 @@ print """
 # Test bug #899343 (server assertion failure on incorrect packet)
 """
 print "# send the package with invalid length"
-inval_request = struct.pack('<LLL', 1, 4294967290, 1)
-print s.send(inval_request)
+invalid_request = struct.pack('<LLL', 1, 4294967290, 1)
+print s.send(invalid_request)
 print "# check that is server alive"
 sql("ping")
 

@@ -63,11 +63,6 @@ extern "C" {
 #include <cfg/warning.h>
 } /* extern "C" */
 
-/**
- * tarantool start-up file
- */
-#define TARANTOOL_LUA_INIT_SCRIPT "init.lua"
-
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
@@ -293,21 +288,12 @@ tarantool_lua_init()
 	luaL_openlibs(L);
 	/*
 	 * Search for Lua modules, apart from the standard
-	 * locations, in the server script_dir and in the
-	 * system-wide Tarantool paths. This way 3 types
-	 * of packages become available for use: standard Lua
-	 * packages, Tarantool-specific Lua libs and
-	 * instance-specific Lua scripts.
+	 * locations in the system-wide Tarantool paths. This way
+	 * 2 types of packages become available for use: standard
+	 * Lua packages and Tarantool-specific Lua libs
 	 */
-
-	char path[PATH_MAX];
-
-	snprintf(path, sizeof(path), "%s/?.lua", cfg.script_dir);
-	tarantool_lua_setpath(L, "path", path, LUA_LIBPATH,
-	                      LUA_SYSPATH, NULL);
-	snprintf(path, sizeof(path), "%s/?.so", cfg.script_dir);
-	tarantool_lua_setpath(L, "cpath", path, LUA_LIBCPATH,
-	                      LUA_SYSCPATH, NULL);
+	tarantool_lua_setpath(L, "path", LUA_LIBPATH, LUA_SYSPATH, NULL);
+	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH, LUA_SYSCPATH, NULL);
 
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
@@ -583,17 +569,14 @@ static void
 load_init_script(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
+	const char *path = va_arg(ap, const char *);
 
 	/*
 	 * Return control to tarantool_lua_load_init_script.
-	 * tarantool_lua_load_init_script when will start an auxiliary event
+	 * tarantool_lua_load_init_script then will start an auxiliary event
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
-
-	char path[PATH_MAX + 1];
-	snprintf(path, PATH_MAX, "%s/%s",
-		 cfg.script_dir, TARANTOOL_LUA_INIT_SCRIPT);
 
 	if (access(path, F_OK) == 0) {
 		say_info("loading %s", path);
@@ -652,8 +635,10 @@ tarantool_lua_sandbox(struct lua_State *L)
 #endif
 
 void
-tarantool_lua_load_init_script()
+tarantool_lua_load_init_script(const char *path)
 {
+	if (path == NULL)
+		return;
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
 	 * box.insert, box.update, etc...), but box.fiber.yield() today,
@@ -661,9 +646,8 @@ tarantool_lua_load_init_script()
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_new(TARANTOOL_LUA_INIT_SCRIPT,
-					 load_init_script);
-	fiber_call(loader, tarantool_L);
+	struct fiber *loader = fiber_new(basename(path), load_init_script);
+	fiber_call(loader, tarantool_L, path);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule load_init_script fiber.

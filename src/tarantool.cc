@@ -73,6 +73,7 @@ extern "C" {
 static pid_t master_pid;
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
+char *shebang = NULL;
 char *custom_proc_title;
 char status[64] = "unknown";
 char **main_argv;
@@ -130,40 +131,38 @@ title(const char *role, const char *fmt, ...)
 static int
 load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 {
-	FILE *f;
-	int32_t n_accepted, n_skipped, n_ignored;
+	if (cfg_filename_fullpath != NULL) {
 
-	rewind(cfg_out);
+		FILE *f;
+		int32_t n_accepted, n_skipped, n_ignored;
 
-	if (cfg_filename_fullpath != NULL)
+		rewind(cfg_out);
+
 		f = fopen(cfg_filename_fullpath, "r");
-	else
-		f = fopen(cfg_filename, "r");
 
-	if (f == NULL) {
-		out_warning(CNF_OK, "can't open config `%s'", cfg_filename);
-		return -1;
+		if (f == NULL) {
+			out_warning(CNF_OK, "can't open config `%s'", cfg_filename);
+			return -1;
+		}
+
+		int syntax = parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
+							  &n_accepted,
+							  &n_skipped,
+							  &n_ignored);
+		fclose(f);
+
+		if (syntax != 0)
+			return -1;
+		if (n_accepted == 0) {
+			out_warning(CNF_OK, "empty configuration file '%s'", cfg_filename);
+			return -1;
+		}
+		if (n_skipped != 0)
+			return -1;
 	}
-
-	int syntax = parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
-						  &n_accepted,
-						  &n_skipped,
-						  &n_ignored);
-	fclose(f);
-
-	if (syntax != 0)
-		return -1;
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
 		return -1;
-
-	if (n_skipped != 0)
-		return -1;
-
-	if (n_accepted == 0) {
-		out_warning(CNF_OK, "empty configuration file '%s'", cfg_filename);
-		return -1;
-	}
 
 	if (replication_check_config(conf) != 0)
 		return -1;
@@ -549,6 +548,8 @@ tarantool_free(void)
 	box_free();
 	stat_free();
 
+	if (shebang)
+		free(shebang);
 	if (cfg_filename_fullpath)
 		free(cfg_filename_fullpath);
 	if (main_opt)
@@ -579,8 +580,6 @@ tarantool_free(void)
 int
 main(int argc, char **argv)
 {
-	const char *cfg_paramname = NULL;
-
 #ifndef HAVE_LIBC_STACK_END
 /*
  * GNU libc provides a way to get at the top of the stack. This
@@ -591,6 +590,23 @@ main(int argc, char **argv)
  */
 	__libc_stack_end = (void*) &argv;
 #endif
+	const char *argv0 = argv[0];
+
+	if (argc > 1 && access(argv[1], X_OK) == 0) {
+		/*
+		 * Support only #!/usr/bin/tarantol but not
+		 * #!/usr/bin/tarantool -a -b because:
+		 * - not all shells support it,
+		 * - those shells that do support it, do not
+		 *   split multiple options, so "-a -b" comes as
+		 *   a single value in argv[1].
+		 * - in case one uses #!/usr/bin/env tarantool
+		 *   such options (in shebang line) don't work
+		 */
+		argv++;
+		argc--;
+		shebang = abspath(argv[0]);
+	}
 
 	say_init(argv[0]);
 	crc32_init();
@@ -598,7 +614,9 @@ main(int argc, char **argv)
 	memory_init();
 
 #ifdef HAVE_BFD
-	symbols_load(argv[0]);
+	symbols_load(argv0);
+#else
+	(void) argv0;
 #endif
 
 	argv = init_set_proc_title(argc, argv);
@@ -639,26 +657,15 @@ main(int argc, char **argv)
 			cfg_filename = DEFAULT_CFG_FILENAME;
 		else if (access(DEFAULT_CFG, F_OK) == 0)
 			cfg_filename = DEFAULT_CFG;
-		else
-			panic("can't load config " "%s or %s", DEFAULT_CFG_FILENAME, DEFAULT_CFG);
 	}
+	if (cfg_filename != NULL)
+		cfg_filename_fullpath = abspath(cfg_filename);
 
 	cfg.log_level += gopt(opt, 'v');
 
 	if (argc != 1) {
 		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
 		exit(EX_USAGE);
-	}
-
-	if (cfg_filename[0] != '/') {
-		cfg_filename_fullpath = (char *) malloc(PATH_MAX);
-		if (getcwd(cfg_filename_fullpath, PATH_MAX - strlen(cfg_filename) - 1) == NULL) {
-			say_syserror("getcwd");
-			exit(EX_OSERR);
-		}
-
-		strcat(cfg_filename_fullpath, "/");
-		strcat(cfg_filename_fullpath, cfg_filename);
 	}
 
 	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
@@ -677,6 +684,8 @@ main(int argc, char **argv)
 	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
 		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
 	}
+
+	const char *cfg_paramname = NULL;
 
 	if (gopt_arg(opt, 'g', &cfg_paramname)) {
 		tarantool_cfg_iterator_t *i;
@@ -780,11 +789,14 @@ main(int argc, char **argv)
 	coeio_init();
 	signal_init();
 
+	bool start_loop = false;
 	try {
 		say_crit("version %s", tarantool_version());
+		say_crit("log level %i", cfg.log_level);
 		tarantool_lua_init();
 		box_init();
 		tarantool_lua_load_cfg(&cfg);
+		int events = ev_activecnt();
 		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
 		replication_init(cfg.bind_ipaddr, cfg.replication_port);
@@ -795,22 +807,24 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_load_init_script();
+		tarantool_lua_load_init_script(shebang);
+		start_loop = ev_activecnt() > events;
 		region_free(&fiber()->gc);
-		say_crit("log level %i", cfg.log_level);
-		say_crit("entering the event loop");
-		if (cfg.io_collect_interval > 0)
-			ev_set_io_collect_interval(cfg.io_collect_interval);
-		ev_now_update();
-		start_time = ev_now();
-		signal_start();
-		ev_loop(0);
+		if (start_loop) {
+			say_crit("entering the event loop");
+			if (cfg.io_collect_interval > 0)
+				ev_set_io_collect_interval(cfg.io_collect_interval);
+			ev_now_update();
+			start_time = ev_now();
+			signal_start();
+			ev_loop(0);
+		}
 	} catch (const Exception& e) {
 		e.log();
 		panic("%s", "fatal error, exiting the event loop");
 	}
-
-	say_crit("exiting the event loop");
+	if (start_loop)
+		say_crit("exiting the event loop");
 	/* freeing resources */
 	return 0;
 }

@@ -332,6 +332,26 @@ assert_fail(const char *assertion, const char *file, unsigned int line, const ch
 static struct symbol *symbols;
 static ssize_t symbol_count;
 
+/** Allocate and fill an absolute path to a file. */
+char *
+abspath(const char *filename)
+{
+	if (filename[0] == '/')
+		return strdup(filename);
+
+	char *abspath = (char *) malloc(PATH_MAX);
+	if (abspath == NULL)
+		return NULL;
+
+	if (getcwd(abspath, PATH_MAX - strlen(filename) - 1) == NULL)
+		say_syserror("getcwd");
+	else {
+		strcat(abspath, "/");
+	}
+	strcat(abspath, filename);
+	return abspath;
+}
+
 int
 compare_symbol(const void *_a, const void *_b)
 {
@@ -347,6 +367,7 @@ compare_symbol(const void *_a, const void *_b)
 void
 symbols_load(const char *name)
 {
+	char *path = find_path(name);
 	long storage_needed;
 	asymbol **symbol_table = NULL;
 	long number_of_symbols;
@@ -355,7 +376,7 @@ symbols_load(const char *name)
 	int j;
 
 	bfd_init();
-	h = bfd_openr (name, NULL);
+	h = bfd_openr(path, NULL);
 	if (h == NULL)
 		goto out;
 
@@ -435,7 +456,7 @@ symbols_load(const char *name)
 
 out:
 	if (symbol_count == 0)
-		say_warn("no symbols were loaded");
+		say_warn("no symbols found in %s", name);
 
 	if (symbol_table)
 		free(symbol_table);

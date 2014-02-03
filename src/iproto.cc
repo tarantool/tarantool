@@ -768,15 +768,16 @@ void
 iproto_init(const char *bind_ipaddr, int primary_port)
 {
 	/* Run a primary server. */
-	if (primary_port != 0) {
-		static struct evio_service primary;
-		evio_service_init(&primary, "primary",
-				  bind_ipaddr, primary_port,
-				  iproto_on_accept, &box_process);
-		evio_service_on_bind(&primary,
-				     box_leave_local_standby_mode, NULL);
-		evio_service_start(&primary);
-	}
+	if (primary_port == 0)
+		return;
+
+	static struct evio_service primary;
+	evio_service_init(&primary, "primary",
+			  bind_ipaddr, primary_port,
+			  iproto_on_accept, &box_process);
+	evio_service_on_bind(&primary,
+			     box_leave_local_standby_mode, NULL);
+	evio_service_start(&primary);
 
 	iproto_queue_init(&request_queue, IPROTO_REQUEST_QUEUE_SIZE,
 			  iproto_queue_handler);

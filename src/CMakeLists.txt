@@ -42,6 +42,7 @@ set (common_sources
      memory.cc
      fiber.cc
      util.cc
+     find_path.c
      sio.cc
      evio.cc
      coio.cc

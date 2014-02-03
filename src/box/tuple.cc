@@ -536,17 +536,20 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 
 	int flags;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
-		say_warn("Disable shared arena since running under OpenVZ "
+		say_warn("disable shared arena since running under OpenVZ "
 		    "(https://bugzilla.openvz.org/show_bug.cgi?id=2805)");
 		flags = MAP_PRIVATE;
         } else {
-		say_info("Mapping %zu bytes for a shared arena",
+		say_info("mapping %zu bytes for a shared arena...",
 			 prealloc);
 		flags = MAP_SHARED;
 	}
 
-	slab_arena_create(&tuple_arena, prealloc, prealloc,
-			  slab_size, flags);
+	if (slab_arena_create(&tuple_arena, prealloc, prealloc,
+			      slab_size, flags)) {
+		panic_syserror("failed to preallocate %zu bytes",
+			       prealloc);
+	}
 	slab_cache_create(&tuple_slab_cache, &tuple_arena,
 			  slab_size);
 	small_alloc_create(&talloc, &tuple_slab_cache,

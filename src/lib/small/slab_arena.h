@@ -97,7 +97,7 @@ struct slab_arena {
 };
 
 /** Initialize an arena.  */
-void
+int
 slab_arena_create(struct slab_arena *arena, size_t prealloc,
 		  size_t maxalloc, uint32_t slab_size, int flags);
 

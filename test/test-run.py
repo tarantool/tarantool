@@ -138,7 +138,7 @@ class Options:
             exit(-1)
 
 
-def setenv():
+def setenv(args):
     os.putenv("TARANTOOL_PLUGIN_DIR",
         string.join(
             (
@@ -148,14 +148,17 @@ def setenv():
             ':'
         )
     )
+    path = os.path.join(os.path.abspath(args.builddir), "src/box")
+    path = path + ":" + os.getenv("PATH")
+    os.environ["PATH"] = path
 
 #######################################################################
 # Program body
 #######################################################################
 
 def main():
-    setenv()
     options = Options()
+    setenv(options.args)
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
     # collections are supposed to reside

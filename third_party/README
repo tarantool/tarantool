@@ -6,7 +6,9 @@ cvs up
 How to update libev
 ===================
 
+Remove declaration and definition of ev_activecnt()
 cvs up
+Add ev_activecnt() back.
 
 How to update luajit
 ====================

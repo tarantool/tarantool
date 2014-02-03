@@ -101,6 +101,8 @@ admin_handler(va_list ap)
 void
 admin_init(const char *bind_ipaddr, int admin_port)
 {
+	if (admin_port == 0)
+		return;
 	static struct coio_service admin;
 	coio_service_init(&admin, "admin", bind_ipaddr,
 			  admin_port, admin_handler, NULL);

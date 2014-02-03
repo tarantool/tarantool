@@ -102,7 +102,7 @@ pow2round(size_t size)
 
 #define MAX(a, b) (a) > (b) ? (a) : (b)
 
-void
+int
 slab_arena_create(struct slab_arena *arena,
 		  size_t prealloc, size_t maxalloc,
 		  uint32_t slab_size, int flags)
@@ -140,6 +140,7 @@ slab_arena_create(struct slab_arena *arena,
 	} else {
 		arena->arena = NULL;
 	}
+	return arena->prealloc && !arena->arena ? -1 : 0;
 }
 
 void

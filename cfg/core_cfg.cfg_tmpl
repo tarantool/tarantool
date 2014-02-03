@@ -41,9 +41,6 @@ snap_dir=".", ro
 # WAL directory (where WALs get saved/read)
 wal_dir=".", ro
 
-# script directory (where init.lua is expected to be)
-script_dir=".", ro
-
 # name of pid file
 pid_file="tarantool.pid", ro
 
@@ -93,7 +90,7 @@ panic_on_wal_error=false, ro
 ## BOX
 
 # Primary port (where updates are accepted)
-primary_port=0, ro, required
+primary_port=0, ro
 
 # Warn about requests which take longer to process, in seconds.
 too_long_threshold=0.5

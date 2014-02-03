@@ -16,6 +16,8 @@ box.cfg.reload()
 
     Could not accept read only ''rows_per_wal'' option.
 
+    empty configuration file ''tarantool.cfg''.
+
 '
 ...
 box.cfg.too_long_threshold

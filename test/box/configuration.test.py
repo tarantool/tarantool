@@ -12,15 +12,18 @@ print """
 """
 # stop current server
 server.stop()
+
 server.deploy("box/tarantool_bug876541.cfg")
 # check values
 admin("box.cfg.wal_fsync_delay")
 
-script_dir_path = os.path.join(vardir, "script_dir")
-os.mkdir(script_dir_path)
-shutil.copy("box/lua/test_init.lua", os.path.join(script_dir_path, "init.lua"))
+script = os.path.join(vardir, "init.lua")
+shutil.copy("box/lua/test_init.lua", script)
+os.chmod(script, 0744)
 
 server.stop()
+old_binary = server.binary
+server.binary = script
 server.deploy("box/tarantool_scriptdir.cfg")
 admin("print_config()")
 
@@ -46,8 +49,9 @@ admin("floor(1.1)")
 
 # Test script_dir + require
 server.stop()
-shutil.copy("box/lua/require_init.lua", os.path.join(script_dir_path, "init.lua"))
-shutil.copy("box/lua/require_mod.lua", os.path.join(script_dir_path, "mod.lua"))
+shutil.copy("box/lua/require_init.lua", script)
+os.chmod(script, 0744)
+shutil.copy("box/lua/require_mod.lua", os.path.join(vardir, "mod.lua"))
 server.deploy("box/tarantool_scriptdir.cfg")
 admin("string.gmatch(package_path, '([^;]*)')()")
 admin("string.gmatch(package_cpath, '([^;]*)')()")
@@ -61,9 +65,13 @@ print """
 """
 # stop current server
 server.stop()
+
+# Restore the old binary
+server.binary = old_binary
 try:
     server.deploy("box/tarantool_bug_gh-99.cfg")
 except OSError as e:
+    print e
     print("ok")
 
 print """
@@ -78,6 +86,7 @@ sys.stdout.pop_filter()
 
 # restore default server
 server.stop()
-shutil.rmtree(script_dir_path, True)
+os.remove(script)
+os.remove(os.path.join(vardir, "mod.lua"))
 server.deploy(self.suite_ini["config"])
 

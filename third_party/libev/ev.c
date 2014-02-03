@@ -3210,6 +3210,12 @@ ev_unref (EV_P) EV_THROW
   --activecnt;
 }
 
+int
+ev_activecnt (EV_P) EV_THROW
+{
+  return activecnt;
+}
+
 void
 ev_now_update (EV_P) EV_THROW
 {
