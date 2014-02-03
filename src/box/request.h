@@ -34,9 +34,12 @@
 struct txn;
 struct port;
 
-typedef void (*request_execute_f)(const struct request *,
+typedef void (*request_execute_f)(struct request *,
 				  struct txn *,
 				  struct port *);
+
+typedef void (*request_fill_f)(struct request *);
+
 struct request
 {
 	uint32_t type;
@@ -54,6 +57,7 @@ struct request
 	const char *data;
 	uint32_t len;
 	request_execute_f execute;
+	request_fill_f fill;
 };
 
 void

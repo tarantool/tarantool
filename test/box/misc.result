@@ -16,7 +16,12 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - call_loadproc
+- - _delete
+  - _insert
+  - _replace
+  - _select
+  - _update
+  - call_loadproc
   - cfg
   - cjson
   - coredump

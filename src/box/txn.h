@@ -44,16 +44,14 @@ struct txn {
 	struct rlist on_rollback;
 
 	/* Redo info: binary packet */
-	const char *data;
-	uint32_t len;
-	uint16_t op;
+	struct request *request;
 };
 
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
 void txn_finish(struct txn *txn);
 void txn_rollback(struct txn *txn);
-void txn_add_redo(struct txn *txn, uint16_t op, const char *data, uint32_t len);
+void txn_add_redo(struct txn *txn, struct request *request);
 void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);

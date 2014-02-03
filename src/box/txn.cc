@@ -36,11 +36,9 @@
 #include "request.h" /* for request_name */
 
 void
-txn_add_redo(struct txn *txn, uint16_t op, const char *data, uint32_t len)
+txn_add_redo(struct txn *txn, struct request *request)
 {
-	txn->op = op;
-	txn->data = data;
-	txn->len = len;
+	txn->request = request;
 }
 
 void
@@ -49,7 +47,7 @@ txn_replace(struct txn *txn, struct space *space,
 	    enum dup_replace_mode mode)
 {
 	/* txn_add_undo() must be done after txn_add_redo() */
-	assert(txn->op != 0);
+	assert(txn->request->type != 0);
 	assert(old_tuple || new_tuple);
 	/*
 	 * Remember the old tuple only if we replaced it
@@ -87,14 +85,22 @@ txn_commit(struct txn *txn)
 	    !space_is_temporary(txn->space)) {
 		int64_t lsn = next_lsn(recovery_state);
 
+		if (txn->request->data == NULL &&
+		    recovery_state->wal_mode != WAL_NONE) {
+			/* Generate binary body for Lua requests */
+			assert(txn->request->fill != NULL);
+			txn->request->fill(txn->request);
+		}
+
 		ev_tstamp start = ev_now(), stop;
 		int res = wal_write(recovery_state, lsn, fiber()->cookie,
-				    txn->op, txn->data, txn->len);
+				    txn->request->type, txn->request->data,
+				    txn->request->len);
 		stop = ev_now();
 
 		if (stop - start > cfg.too_long_threshold) {
 			say_warn("too long %s: %.3f sec",
-				 iproto_request_name(txn->op), stop - start);
+				 iproto_request_name(txn->request->type), stop - start);
 		}
 
 		confirm_lsn(recovery_state, lsn, res == 0);
