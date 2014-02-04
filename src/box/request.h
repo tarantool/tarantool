@@ -61,7 +61,9 @@ struct request
 };
 
 void
-request_create(struct request *request, uint32_t type, const char *data,
-	       uint32_t len);
+request_create(struct request *request, uint32_t type);
+
+void
+request_decode(struct request *request, const char *data, uint32_t len);
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

@@ -193,7 +193,8 @@ lbox_process(lua_State *L)
 	struct port *port_lua = port_lua_create(L);
 	try {
 		struct request request;
-		request_create(&request, op, req, sz);
+		request_create(&request, op);
+		request_decode(&request, req, sz);
 		box_process(port_lua, &request);
 
 		/*
@@ -222,21 +223,19 @@ lbox_select(lua_State *L)
 	luamp_encode(L, buf, 3);
 
 	struct request request;
-	request_create(&request, IPROTO_SELECT, NULL, 0);
+	request_create(&request, IPROTO_SELECT);
 	request.space_id = lua_tointeger(L, 1);
 	request.index_id = lua_tointeger(L, 2);
 	request.limit = 4294967295;
 	request.key = buf->data;
 	request.key_end = buf->data + buf->size;
 
-	struct port *port_lua = port_lua_create(L);
-	box_process(port_lua, &request);
-
+	box_process(port_lua_create(L), &request);
 	return lua_gettop(L) - 3;
 }
 
 static int
-lbox_insert_replace(lua_State *L, enum iproto_request_type type)
+lbox_insert_or_replace(lua_State *L, enum iproto_request_type type)
 {
 	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE);
 	if (lua_gettop(L) < 2 || !lua_isnumber(L, 1))
@@ -249,26 +248,25 @@ lbox_insert_replace(lua_State *L, enum iproto_request_type type)
 	luamp_encode(L, buf, 2);
 
 	struct request request;
-	request_create(&request, type, NULL, 0);
+	request_create(&request, type);
 	request.space_id = lua_tointeger(L, 1);
 	request.tuple = buf->data;
 	request.tuple_end = buf->data + buf->size;
 
-	struct port *port_lua = port_lua_create(L);
-	box_process(port_lua, &request);
+	box_process(port_lua_create(L), &request);
 	return lua_gettop(L) - 2;
 }
 
 static int
 lbox_insert(lua_State *L)
 {
-	return lbox_insert_replace(L, IPROTO_INSERT);
+	return lbox_insert_or_replace(L, IPROTO_INSERT);
 }
 
 static int
 lbox_replace(lua_State *L)
 {
-	return lbox_insert_replace(L, IPROTO_REPLACE);
+	return lbox_insert_or_replace(L, IPROTO_REPLACE);
 }
 
 static int
@@ -287,7 +285,7 @@ lbox_update(lua_State *L)
 	luamp_encode(L, buf, 3);
 
 	struct request request;
-	request_create(&request, IPROTO_UPDATE, NULL, 0);
+	request_create(&request, IPROTO_UPDATE);
 	request.space_id = lua_tointeger(L, 1);
 	request.index_id = lua_tointeger(L, 2);
 	request.tuple = buf->data;
@@ -295,8 +293,7 @@ lbox_update(lua_State *L)
 	request.key = buf->data + tuple_len;
 	request.key_end = buf->data + buf->size;
 
-	struct port *port_lua = port_lua_create(L);
-	box_process(port_lua, &request);
+	box_process(port_lua_create(L), &request);
 	return lua_gettop(L) - 3;
 }
 
@@ -314,14 +311,13 @@ lbox_delete(lua_State *L)
 	luamp_encode(L, buf, 3);
 
 	struct request request;
-	request_create(&request, IPROTO_DELETE, NULL, 0);
+	request_create(&request, IPROTO_DELETE);
 	request.space_id = lua_tointeger(L, 1);
 	request.index_id = lua_tointeger(L, 2);
 	request.key = buf->data;
 	request.key_end = buf->data + buf->size;
 
-	struct port *port_lua = port_lua_create(L);
-	box_process(port_lua, &request);
+	box_process(port_lua_create(L), &request);
 	return lua_gettop(L) - 3;
 }
 

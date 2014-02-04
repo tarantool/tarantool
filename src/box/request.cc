@@ -275,8 +275,7 @@ request_check_type(uint32_t type)
 }
 
 void
-request_create(struct request *request, uint32_t type,
-	       const char *data, uint32_t len)
+request_create(struct request *request, uint32_t type)
 {
 	request_check_type(type);
 	static const request_execute_f execute_map[] = {
@@ -289,13 +288,14 @@ request_create(struct request *request, uint32_t type,
 	};
 	memset(request, 0, sizeof(*request));
 	request->type = type;
-	request->data = data;
-	request->len = len;
 	request->execute = execute_map[type];
 	request->fill = fill_map[type];
-	if (data == NULL)
-		return;
+}
 
+void
+request_decode(struct request *request, const char *data, uint32_t len)
+{
+	assert(request->type != 0);
 	const char *end = data + len;
 
 	if (mp_typeof(*data) != MP_MAP || ! mp_check_map(data, end)) {

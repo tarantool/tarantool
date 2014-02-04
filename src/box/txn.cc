@@ -83,31 +83,34 @@ txn_commit(struct txn *txn)
 {
 	if ((txn->old_tuple || txn->new_tuple) &&
 	    !space_is_temporary(txn->space)) {
+		struct request *request = txn->request;
 		int64_t lsn = next_lsn(recovery_state);
 
-		if (txn->request->data == NULL &&
-		    recovery_state->wal_mode != WAL_NONE) {
-			/* Generate binary body for Lua requests */
-			assert(txn->request->fill != NULL);
-			txn->request->fill(txn->request);
-		}
+		int res = 0;
+		if (recovery_state->wal_mode != WAL_NONE) {
+			if (request->data == NULL) {
+				/* Generate binary body for Lua requests */
+				assert(request->fill != NULL);
+				request->fill(request);
+			}
 
-		ev_tstamp start = ev_now(), stop;
-		int res = wal_write(recovery_state, lsn, fiber()->cookie,
-				    txn->request->type, txn->request->data,
-				    txn->request->len);
-		stop = ev_now();
+			ev_tstamp start = ev_now(), stop;
+			res = wal_write(recovery_state, lsn, fiber()->cookie,
+					request->type, request->data,
+					request->len);
+			stop = ev_now();
 
-		if (stop - start > cfg.too_long_threshold) {
-			say_warn("too long %s: %.3f sec",
-				 iproto_request_name(txn->request->type), stop - start);
+			if (stop - start > cfg.too_long_threshold) {
+				say_warn("too long %s: %.3f sec",
+					 iproto_request_name(request->type),
+					 stop - start);
+			}
 		}
 
 		confirm_lsn(recovery_state, lsn, res == 0);
 
 		if (res)
 			tnt_raise(LoggedError, ER_WAL_IO);
-
 	}
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
