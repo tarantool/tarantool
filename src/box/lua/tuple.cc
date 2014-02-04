@@ -35,6 +35,9 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 #include "third_party/lua-yaml/lyaml.h"
+extern "C" {
+#include <lj_obj.h>
+}
 
 /** {{{ box.tuple Lua library
  *
@@ -52,26 +55,39 @@ static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
 static int tuple_totable_mt_ref = 0; /* a precreated metable for totable() */
 
+extern char tuple_lua[]; /* Lua source */
+
+uint32_t CTID_CONST_STRUCT_TUPLE_REF;
 
 static inline struct tuple *
 lua_checktuple(struct lua_State *L, int narg)
 {
-	struct tuple *t = *(struct tuple **) luaL_checkudata(L, narg, tuplelib_name);
-	assert(t->refs);
-	return t;
+	struct tuple *tuple = lua_istuple(L, narg);
+	if (tuple == NULL)  {
+		luaL_error(L, "Invalid argument #%d (box.tuple expected, got %s)",
+		   narg, lua_typename(L, lua_type(L, narg)));
+	}
+
+	return tuple;
 }
 
 struct tuple *
 lua_istuple(struct lua_State *L, int narg)
 {
-	if (lua_getmetatable(L, narg) == 0)
+	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	uint32_t ctypeid;
+	void *data;
+
+	if (lua_type(L, narg) != LUA_TCDATA)
 		return NULL;
-	luaL_getmetatable(L, tuplelib_name);
-	struct tuple *tuple = 0;
-	if (lua_equal(L, -1, -2))
-		tuple = *(struct tuple **) lua_touserdata(L, narg);
-	lua_pop(L, 2);
-	return tuple;
+
+	data = luaL_checkcdata(L, narg, &ctypeid);
+	if (ctypeid != CTID_CONST_STRUCT_TUPLE_REF)
+		return NULL;
+
+	struct tuple *t = *(struct tuple **) data;
+	assert(t->refs);
+	return t;
 }
 
 static int
@@ -164,9 +180,8 @@ lbox_tuple_slice(struct lua_State *L)
 static void
 luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
 {
-	if (lua_type(L, idx) == LUA_TUSERDATA &&
-			lua_istuple(L, idx)) {
-		struct tuple *tuple = lua_checktuple(L, idx);
+	struct tuple *tuple = lua_istuple(L, idx);
+	if (tuple != NULL) {
 		tuple_to_tbuf(tuple, b);
 		return;
 	}
@@ -182,8 +197,7 @@ luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
 int
 luamp_encodestack(struct lua_State *L, struct tbuf *b, int first, int last)
 {
-	if (first == last && (lua_istable(L, first) ||
-	    (lua_isuserdata(L, first) && lua_istuple(L, first)))) {
+	if (first == last && (lua_istable(L, first) || lua_istuple(L, first))) {
 		/* New format */
 		luamp_encode(L, b, first);
 		return 1;
@@ -442,46 +456,17 @@ lbox_tuple_index(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_tuple_tostring(struct lua_State *L)
-{
-	/*
-	 * The method does next things:
-	 * 1. Calls :unpack
-	 * 2. Serializes the result using yaml
-	 * 3. Strips start and end of yaml document symbols
-	 */
-
-	/* unpack */
-	lbox_tuple_totable(L);
-
-	/* serialize */
-	lua_replace(L, 1);
-	yamlL_encode(L);
-
-	/* strip yaml tags */
-	size_t len;
-	const char *str = lua_tolstring(L, -1, &len);
-	assert(strlen(str) == len);
-	const char *s = index(str, '[');
-	const char *e = rindex(str, ']');
-	assert(s != NULL && e != NULL && s + 1 <= e);
-	lua_pushlstring(L, s, e - s + 1);
-	return 1;
-}
-
 void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
-		struct tuple **ptr = (struct tuple **)
-				lua_newuserdata(L, sizeof(*ptr));
-		luaL_getmetatable(L, tuplelib_name);
-		lua_setmetatable(L, -2);
+		assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+		struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
+			CTID_CONST_STRUCT_TUPLE_REF, sizeof(struct tuple *));
 		*ptr = tuple;
 		tuple_ref(tuple, 1);
 	} else {
-		lua_pushnil(L);
+		return lua_pushnil(L);
 	}
 }
 
@@ -535,23 +520,10 @@ lbox_tuple_pairs(struct lua_State *L)
 	return 3;
 }
 
-
-/** tuple:bsize()
- *
- */
-static int
-lbox_tuple_bsize(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	lua_pushnumber(L, tuple->bsize);
-	return 1;
-}
-
 static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
 	{"__len", lbox_tuple_len},
 	{"__index", lbox_tuple_index},
-	{"__tostring", lbox_tuple_tostring},
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},
@@ -560,7 +532,6 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 	{"findall", lbox_tuple_findall},
 	{"unpack", lbox_tuple_unpack},
 	{"totable", lbox_tuple_totable},
-	{"bsize", lbox_tuple_bsize},
 	{NULL, NULL}
 };
 
@@ -598,7 +569,10 @@ lua_totuple(struct lua_State *L, int first, int last)
 void
 box_lua_tuple_init(struct lua_State *L)
 {
-	luaL_register_type(L, tuplelib_name, lbox_tuple_meta);
+	/* export C functions to Lua */
+	luaL_newmetatable(L, tuplelib_name);
+	luaL_register(L, NULL, lbox_tuple_meta);
+	lua_setglobal(L, "cfuncs");
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
 	luaL_register(L, tuplelib_name, lbox_tuplelib);
@@ -613,6 +587,13 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_settable(L, -3);
 	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	assert(tuple_totable_mt_ref != 0);
+
+	if (luaL_dostring(L, tuple_lua))
+		panic("Error loading Lua source %.160s...: %s",
+		      tuple_lua, lua_tostring(L, -1));
+
+	/* Get CTypeIDs */
+	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
 
 	box_lua_slab_init(L);
 }

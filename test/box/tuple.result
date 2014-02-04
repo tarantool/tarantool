@@ -311,8 +311,7 @@ t=space:insert{0, 8989}
 ...
 t[nil]
 ---
-- error: '[string "return t[nil] "]:1: bad argument #2 to ''__index'' (string expected,
-    got nil)'
+- null
 ...
 # test tuple iterators
 ---
@@ -330,7 +329,7 @@ t:next(1)
 ...
 t:next(t)
 ---
-- error: 'bad argument #2 to ''?'' (box.tuple.iterator expected, got userdata)'
+- error: 'tuple.next(): bad arguments'
 ...
 t:next(t:next())
 ---

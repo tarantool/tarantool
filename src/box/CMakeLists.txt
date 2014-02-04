@@ -10,6 +10,7 @@ lua_source(lua_sources lua/box.lua)
 lua_source(lua_sources lua/box_net.lua)
 lua_source(lua_sources lua/misc.lua)
 lua_source(lua_sources lua/sql.lua)
+lua_source(lua_sources lua/tuple.lua)
 
 add_custom_target(box_generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box

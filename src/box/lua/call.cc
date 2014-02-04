@@ -140,9 +140,7 @@ port_add_lua_multret(struct port *port, struct lua_State *L)
 		 */
 		lua_pushnil(L);
 		int has_keys = lua_next(L, 1);
-		if (has_keys  &&
-		    (lua_istable(L, -1) || lua_isuserdata(L, -1))) {
-
+		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
 			do {
 				port_add_lua_ret(port, L, lua_gettop(L));
 				lua_pop(L, 1);

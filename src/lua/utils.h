@@ -74,6 +74,17 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size);
 void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
 
+/**
+* @brief Return CTypeID (FFI) of given СDATA type
+* @param L Lua State
+* @param ctypename С type name as string (e.g. "struct request" or "uint32_t")
+* @sa luaL_pushcdata
+* @sa luaL_checkcdata
+* @return CTypeID
+*/
+uint32_t
+luaL_ctypeid(struct lua_State *L, const char *ctypename);
+
 #endif /* defined(LUAJIT) */
 
 /** A single value on the Lua stack. */

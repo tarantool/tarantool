@@ -185,7 +185,7 @@ tuple
 ...
 type(tuple)
 ---
-- userdata
+- cdata
 ...
 #tuple
 ---

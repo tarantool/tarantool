@@ -79,6 +79,32 @@ luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 	*ctypeid = cd->ctypeid;
 	return (void *)cdataptr(cd);
 }
+
+uint32_t
+luaL_ctypeid(struct lua_State *L, const char *ctypename)
+{
+	int idx = lua_gettop(L);
+	/* This function calls ffi.typeof to determine CDataType */
+
+	/* Get ffi.typeof function */
+	luaL_loadstring(L, "return require('ffi').typeof");
+	lua_call(L, 0, 1);
+	/* FFI must exist */
+	assert(lua_gettop(L) == 1 && lua_isfunction(L, 1));
+	/* Push the first argument to ffi.typeof */
+	lua_pushstring(L, ctypename);
+	/* Call ffi.typeof() */
+	lua_call(L, 1, 1);
+	/* Returned type must be LUA_TCDATA with CTID_CTYPEID */
+	assert(lua_type(L, 1) == LUA_TCDATA);
+	GCcdata *cd = cdataV(L->base);
+	assert(cd->ctypeid == CTID_CTYPEID);
+
+	CTypeID ctypeid = *(CTypeID *)cdataptr(cd);
+	lua_settop(L, idx);
+	return ctypeid;
+}
+
 #endif /* defined(LUAJIT) */
 
 static void

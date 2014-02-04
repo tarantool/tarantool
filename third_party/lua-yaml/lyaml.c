@@ -555,20 +555,19 @@ dump_node(struct lua_yaml_dumper *dumper)
 	luaL_tofield(dumper->L, top, &field);
 
 	/* Unknown type on the stack, try to call 'totable' from metadata */
-	if (field.type == MP_EXT && lua_type(dumper->L, top) == LUA_TUSERDATA &&
-			lua_getmetatable(dumper->L, top)) {
+	int type = lua_type(dumper->L, top);
+	if (field.type == MP_EXT &&
+	    (type == LUA_TUSERDATA || type == LUA_TCDATA)) {
 		/* has metatable, try to call 'totable' and use return value */
-		lua_pushliteral(dumper->L, "totable");
-		lua_rawget(dumper->L, -2);
+		lua_getfield(dumper->L, top, "totable");
 		if (lua_isfunction(dumper->L, -1)) {
-			lua_pushvalue(dumper->L, -3); /* copy object itself */
+			lua_pushvalue(dumper->L, top); /* copy object itself */
 			lua_call(dumper->L, 1, 1);
-			lua_replace(dumper->L, -3);
+			lua_replace(dumper->L, top);
 			luaL_tofield(dumper->L, -1, &field);
 		} else {
 			lua_pop(dumper->L, 1); /* pop result */
 		}
-		lua_pop(dumper->L, 1);  /* pop metatable */
 	}
 
 	luaL_tofield(dumper->L, top, &field);
