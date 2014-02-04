@@ -38,7 +38,6 @@ struct port;
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(const struct request *request, struct txn *txn,
-	     struct port *port);
+box_lua_call(struct request *request, struct txn *txn, struct port *port);
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */

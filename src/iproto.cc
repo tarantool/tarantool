@@ -684,7 +684,8 @@ iproto_process_request(struct iproto_request *ireq)
 	iproto_port_init(&port, out, ireq->sync);
 	try {
 		struct request request;
-		request_create(&request, ireq->code, ireq->body, ireq->len);
+		request_create(&request, ireq->code);
+		request_decode(&request, ireq->body, ireq->len);
 		(*con->handler)((struct port *) &port, &request);
 	} catch (const ClientError &e) {
 		if (port.found)

@@ -79,11 +79,10 @@ dup_replace_mode(uint32_t op)
 }
 
 static void
-execute_replace(const struct request *request, struct txn *txn,
-		struct port *port)
+execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
-	txn_add_redo(txn, request->type, request->data, request->len);
+	txn_add_redo(txn, request);
 
 	struct space *space = space_find(request->space_id);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
@@ -95,11 +94,11 @@ execute_replace(const struct request *request, struct txn *txn,
 }
 
 static void
-execute_update(const struct request *request, struct txn *txn,
+execute_update(struct request *request, struct txn *txn,
 	       struct port *port)
 {
 	(void) port;
-	txn_add_redo(txn, request->type, request->data, request->len);
+	txn_add_redo(txn, request);
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
 
@@ -128,8 +127,7 @@ execute_update(const struct request *request, struct txn *txn,
 /** }}} */
 
 static void
-execute_select(const struct request *request, struct txn *txn,
-	       struct port *port)
+execute_select(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) txn;
 	struct space *space = space_find(request->space_id);
@@ -161,11 +159,10 @@ execute_select(const struct request *request, struct txn *txn,
 }
 
 static void
-execute_delete(const struct request *request, struct txn *txn,
-	       struct port *port)
+execute_delete(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
-	txn_add_redo(txn, request->type, request->data, request->len);
+	txn_add_redo(txn, request);
 	struct space *space = space_find(request->space_id);
 
 	/* Try to find tuple by primary key */
@@ -181,6 +178,92 @@ execute_delete(const struct request *request, struct txn *txn,
 	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
 }
 
+static void
+fill_replace(struct request *request)
+{
+	assert(request->data == NULL);
+	assert(request->type == IPROTO_INSERT ||
+	       request->type == IPROTO_REPLACE);
+	char *d;
+	uint32_t len = mp_sizeof_map(2) +
+		mp_sizeof_uint(IPROTO_SPACE_ID) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_uint(IPROTO_TUPLE) +
+		(request->tuple_end - request->tuple);
+
+	request->data = d = (char *) region_alloc(&fiber()->gc, len);
+	d = mp_encode_map(d, 2);
+	d = mp_encode_uint(d, IPROTO_SPACE_ID);
+	d = mp_encode_uint(d, request->space_id);
+	d = mp_encode_uint(d, IPROTO_TUPLE);
+	memcpy(d, request->tuple, (request->tuple_end - request->tuple));
+	d += (request->tuple_end - request->tuple);
+
+	request->len = (d - request->data);
+	assert(request->len <= len);
+}
+
+static void
+fill_update(struct request *request)
+{
+	assert(request->data == NULL);
+	assert(request->type == IPROTO_UPDATE);
+
+	char *d;
+	uint32_t len = mp_sizeof_map(4) +
+		mp_sizeof_uint(IPROTO_SPACE_ID) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_uint(IPROTO_INDEX_ID) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_uint(IPROTO_KEY) +
+		(request->key_end - request->key) +
+		mp_sizeof_uint(IPROTO_TUPLE) +
+		(request->tuple_end - request->tuple);
+
+	request->data = d = (char *) region_alloc(&fiber()->gc, len);
+	d = mp_encode_map(d, 4);
+	d = mp_encode_uint(d, IPROTO_SPACE_ID);
+	d = mp_encode_uint(d, request->space_id);
+	d = mp_encode_uint(d, IPROTO_INDEX_ID);
+	d = mp_encode_uint(d, request->index_id);
+	d = mp_encode_uint(d, IPROTO_KEY);
+	memcpy(d, request->key, (request->key_end - request->key));
+	d += (request->key_end - request->key);
+	d = mp_encode_uint(d, IPROTO_TUPLE);
+	memcpy(d, request->tuple, (request->tuple_end - request->tuple));
+	d += (request->tuple_end - request->tuple);
+
+	request->len = (d - request->data);
+	assert(request->len <= len);
+}
+
+static void
+fill_delete(struct request *request)
+{
+	assert(request->data == NULL);
+	assert(request->type == IPROTO_DELETE);
+
+	char *d;
+	uint32_t len = mp_sizeof_map(3) +
+		mp_sizeof_uint(IPROTO_SPACE_ID) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_uint(IPROTO_INDEX_ID) +
+		mp_sizeof_uint(UINT32_MAX) +
+		mp_sizeof_uint(IPROTO_KEY) +
+		(request->key_end - request->key);
+	request->data = d = (char *) region_alloc(&fiber()->gc, len);
+	d = mp_encode_map(d, 3);
+	d = mp_encode_uint(d, IPROTO_SPACE_ID);
+	d = mp_encode_uint(d, request->space_id);
+	d = mp_encode_uint(d, IPROTO_INDEX_ID);
+	d = mp_encode_uint(d, request->index_id);
+	d = mp_encode_uint(d, IPROTO_KEY);
+	memcpy(d, request->key, (request->key_end - request->key));
+	d += (request->key_end - request->key);
+	request->len = (d - request->data);
+	assert(request->len <= len);
+}
+
 void
 request_check_type(uint32_t type)
 {
@@ -192,20 +275,27 @@ request_check_type(uint32_t type)
 }
 
 void
-request_create(struct request *request, uint32_t type,
-	       const char *data, uint32_t len)
+request_create(struct request *request, uint32_t type)
 {
 	request_check_type(type);
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete, box_lua_call
 	};
+	static const request_fill_f fill_map[] = {
+		NULL, NULL, fill_replace, fill_replace,
+		fill_update, fill_delete, NULL
+	};
 	memset(request, 0, sizeof(*request));
 	request->type = type;
-	request->data = data;
-	request->len = len;
 	request->execute = execute_map[type];
+	request->fill = fill_map[type];
+}
 
+void
+request_decode(struct request *request, const char *data, uint32_t len)
+{
+	assert(request->type != 0);
 	const char *end = data + len;
 
 	if (mp_typeof(*data) != MP_MAP || ! mp_check_map(data, end)) {
