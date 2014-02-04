@@ -123,7 +123,8 @@ recover_row(void *param __attribute__((unused)), const struct log_row *row)
 		const char *end = data + row->len;
 		uint16_t op = pick_u16(&data, end);
 		struct request request;
-		request_create(&request, op, data, end - data);
+		request_create(&request, op);
+		request_decode(&request, data, end - data);
 		process_rw(&null_port, &request);
 	} catch (const Exception& e) {
 		e.log();

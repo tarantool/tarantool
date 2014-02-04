@@ -1193,11 +1193,9 @@ int
 wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 	  uint16_t op, const char *row, uint32_t row_len)
 {
+	assert(r->wal_mode != WAL_NONE);
 	say_debug("wal_write lsn=%" PRIi64, lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
-
-	if (r->wal_mode == WAL_NONE)
-		return 0;
 
 	struct wal_writer *writer = r->writer;
 

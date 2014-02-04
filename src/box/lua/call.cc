@@ -193,7 +193,8 @@ lbox_process(lua_State *L)
 	struct port *port_lua = port_lua_create(L);
 	try {
 		struct request request;
-		request_create(&request, op, req, sz);
+		request_create(&request, op);
+		request_decode(&request, req, sz);
 		box_process(port_lua, &request);
 
 		/*
@@ -206,6 +207,118 @@ lbox_process(lua_State *L)
 		throw;
 	}
 	return lua_gettop(L) - top;
+}
+
+static int
+lbox_select(lua_State *L)
+{
+	if (lua_gettop(L) < 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+		return luaL_error(L, "Usage index:select(key)");
+	}
+
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *buf = tbuf_new(&fiber()->gc);
+
+	lua_settop(L, 3); /* leave key on the top */
+	luamp_encode(L, buf, 3);
+
+	struct request request;
+	request_create(&request, IPROTO_SELECT);
+	request.space_id = lua_tointeger(L, 1);
+	request.index_id = lua_tointeger(L, 2);
+	request.limit = 4294967295;
+	request.key = buf->data;
+	request.key_end = buf->data + buf->size;
+
+	box_process(port_lua_create(L), &request);
+	return lua_gettop(L) - 3;
+}
+
+static int
+lbox_insert_or_replace(lua_State *L, enum iproto_request_type type)
+{
+	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE);
+	if (lua_gettop(L) < 2 || !lua_isnumber(L, 1))
+		return luaL_error(L, "Usage space:replace(tuple)");
+
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *buf = tbuf_new(&fiber()->gc);
+
+	lua_settop(L, 2); /* leave tuple on the top */
+	luamp_encode(L, buf, 2);
+
+	struct request request;
+	request_create(&request, type);
+	request.space_id = lua_tointeger(L, 1);
+	request.tuple = buf->data;
+	request.tuple_end = buf->data + buf->size;
+
+	box_process(port_lua_create(L), &request);
+	return lua_gettop(L) - 2;
+}
+
+static int
+lbox_insert(lua_State *L)
+{
+	return lbox_insert_or_replace(L, IPROTO_INSERT);
+}
+
+static int
+lbox_replace(lua_State *L)
+{
+	return lbox_insert_or_replace(L, IPROTO_REPLACE);
+}
+
+static int
+lbox_update(lua_State *L)
+{
+	if (lua_gettop(L) < 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
+		return luaL_error(L, "Usage index:update(key)");
+
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *buf = tbuf_new(&fiber()->gc);
+
+	lua_settop(L, 4); /* leave tuple on the top */
+	luamp_encode(L, buf, 4);
+	uint32_t tuple_len = buf->size;
+	lua_pop(L, 1); /* leave key on the top */
+	luamp_encode(L, buf, 3);
+
+	struct request request;
+	request_create(&request, IPROTO_UPDATE);
+	request.space_id = lua_tointeger(L, 1);
+	request.index_id = lua_tointeger(L, 2);
+	request.tuple = buf->data;
+	request.tuple_end = buf->data + tuple_len;
+	request.key = buf->data + tuple_len;
+	request.key_end = buf->data + buf->size;
+
+	box_process(port_lua_create(L), &request);
+	return lua_gettop(L) - 3;
+}
+
+static int
+lbox_delete(lua_State *L)
+{
+	if (lua_gettop(L) < 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
+		return luaL_error(L, "Usage index:delete(key)");
+
+
+	RegionGuard region_guard(&fiber()->gc);
+	struct tbuf *buf = tbuf_new(&fiber()->gc);
+
+	lua_settop(L, 3); /* leave key on the top */
+	luamp_encode(L, buf, 3);
+
+	struct request request;
+	request_create(&request, IPROTO_DELETE);
+	request.space_id = lua_tointeger(L, 1);
+	request.index_id = lua_tointeger(L, 2);
+	request.key = buf->data;
+	request.key_end = buf->data + buf->size;
+
+	box_process(port_lua_create(L), &request);
+	return lua_gettop(L) - 3;
 }
 
 static int
@@ -305,7 +418,7 @@ lbox_call_loadproc(struct lua_State *L)
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(const struct request *request, struct txn *txn,
+box_lua_call(struct request *request, struct txn *txn,
 	     struct port *port)
 {
 	(void) txn;
@@ -720,6 +833,11 @@ lbox_unpack(struct lua_State *L)
 
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
+	{"_select", lbox_select},
+	{"_insert", lbox_insert},
+	{"_replace", lbox_replace},
+	{"_update", lbox_update},
+	{"_delete", lbox_delete},
 	{"call_loadproc",  lbox_call_loadproc},
 	{"raise", lbox_raise},
 	{"pack", lbox_pack},

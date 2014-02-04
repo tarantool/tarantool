@@ -199,13 +199,18 @@ function box.schema.space.bless(space)
         return index.idx:count(...)
     end
 
+    local function check_index(space, index_id)
+        if space.index[index_id] == nil then
+            box.raise(box.error.ER_NO_SUCH_INDEX,
+                string.format("No index #%d is defined in space %d", index_id,
+                    space.n))
+        end
+    end
+
     -- eselect
     index_mt.eselect = function(index, key, opts)
         -- user can catch link to index
-        if box.space[ index.n ].index[ index.id ] == nil then
-            box.raise(box.error.ER_NO_SUCH_INDEX,
-                string.format("No index #0 is defined in space %d", index.n))
-        end
+        check_index(box.space[index.n], index.id)
 
         if opts == nil then
             opts = {}
@@ -269,13 +274,13 @@ function box.schema.space.bless(space)
 
     --
     index_mt.select = function(index, key)
-        return box.process(box.net.box.SELECT,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = index.n,
-                    [box.net.box.INDEX_ID] = index.id,
-                    [box.net.box.OFFSET] = 0,
-                    [box.net.box.LIMIT] = 4294967295,
-                    [box.net.box.KEY] = keify(key)}))
+        return box._select(index.n, index.id, keify(key))
+    end
+    index_mt.update = function(index, key, ops)
+        return box._update(index.n, index.id, keify(key), ops);
+    end
+    index_mt.delete = function(index, key)
+        return box._delete(index.n, index.id, keify(key));
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -292,54 +297,27 @@ function box.schema.space.bless(space)
     space_mt.__newindex = index_mt.__newindex
 
     space_mt.eselect = function(space, key, opts)
-        if box.space[ space.n ].index[ 0 ] == nil then
-            box.raise(box.error.ER_NO_SUCH_INDEX,
-                string.format("No index #0 is defined in space %d", space.n))
-        end
+        check_index(space, 0)
         return space.index[0]:eselect(key, opts)
     end
 
     space_mt.select = function(space, key)
-        return box.process(box.net.box.SELECT,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = space.n,
-                    [box.net.box.INDEX_ID] = 0,
-                    [box.net.box.OFFSET] = 0,
-                    [box.net.box.LIMIT] = 4294967295,
-                    [box.net.box.KEY] = keify(key)}))
+        check_index(space, 0)
+        return space.index[0]:select(key)
     end
     space_mt.insert = function(space, tuple)
-        return box.process(box.net.box.INSERT,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = space.n,
-                    [box.net.box.TUPLE] = tuple
-                    }))
+        return box._insert(space.n, tuple);
     end
     space_mt.replace = function(space, tuple)
-        return box.process(box.net.box.REPLACE,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = space.n,
-                    [box.net.box.TUPLE] = tuple
-                    }))
+        return box._replace(space.n, tuple);
     end
     space_mt.update = function(space, key, ops)
-        return box.process(box.net.box.UPDATE,
-            msgpack.encode({
-                [box.net.box.SPACE_ID] = space.n,
-                [box.net.box.KEY] = keify(key),
-                [box.net.box.TUPLE] = ops 
-            }))
+        check_index(space, 0)
+        return space.index[0]:update(key, ops)
     end
---
--- delete can be done only by the primary key, whose
--- index is always 0. It doesn't accept compound keys
---
     space_mt.delete = function(space, key)
-        return box.process(box.net.box.DELETE,
-                msgpack.encode({
-                    [box.net.box.SPACE_ID] = space.n,
-                    [box.net.box.KEY] = keify(key)
-                    }))
+        check_index(space, 0)
+        return space.index[0]:delete(key)
     end
 -- Assumes that spaceno has a TREE (NUM) primary key
 -- inserts a tuple after getting the next value of the
@@ -355,11 +333,8 @@ function box.schema.space.bless(space)
     end
 
     space_mt.truncate = function(space)
+        check_index(space, 0)
         local pk = space.index[0]
-        if pk == nil then
-            box.raise(box.error.ER_NO_SUCH_INDEX,
-                      "No index #0 is defined in space "..space.n);
-        end
         while #pk.idx > 0 do
             for t in pk:iterator() do
                 local key = {}
