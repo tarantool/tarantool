@@ -238,6 +238,8 @@ int ts_space_fillof(struct ts_spaces *s, int n, tarantool_cfg_space *cs)
 
 int ts_space_fill(struct ts_spaces *s, struct ts_options *opts)
 {
+	if (opts->cfg.space == NULL)
+		return 0;
 	int i = 0;
 	for (; opts->cfg.space[i]; i++) {
 		tarantool_cfg_space *cs = opts->cfg.space[i];
