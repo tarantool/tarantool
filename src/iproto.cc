@@ -781,7 +781,7 @@ iproto_init(const char *bind_ipaddr, int primary_port)
 
 	iproto_queue_init(&request_queue, IPROTO_REQUEST_QUEUE_SIZE,
 			  iproto_queue_handler);
-	mempool_create(&iproto_connection_pool, slabc_runtime,
+	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
 }
 

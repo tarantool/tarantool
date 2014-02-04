@@ -33,10 +33,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
+#include "tt_pthread.h"
 #include "third_party/tarantool_ev.h"
 #include "coro.h"
 #include "trivia/util.h"
 #include "third_party/queue.h"
+#include "small/mempool.h"
 #include "small/region.h"
 
 #if defined(__cplusplus)
@@ -108,13 +110,50 @@ struct fiber {
 	uint64_t cookie;
 };
 
-extern __thread struct fiber *fiber_ptr;
+enum { FIBER_CALL_STACK = 16 };
 
-static inline struct fiber *
-fiber(void)
-{
-	return fiber_ptr;
-}
+/**
+ * @brief An independent execution unit that can be managed by a separate OS
+ * thread. Each cord consists of fibers to implement cooperative multitasking
+ * model.
+ */
+struct cord {
+	/** The fiber that is currently being executed. */
+	struct fiber *fiber;
+	/** The "main" fiber of this cord, the scheduler. */
+	struct fiber sched;
+	/** Call stack - in case one fiber decides to call
+	 * another with fiber_call(). This is not used
+	 * currently, all fibers are called by the sched
+         */
+	struct fiber *stack[FIBER_CALL_STACK];
+	/** Stack pointer in fiber call stack. */
+	struct fiber **sp;
+	/**
+	 * Every new fiber gets a new monotonic id. Ids 1-100 are
+	 * reserved.
+         */
+	uint32_t max_fid;
+	/** A helper hash to map id -> fiber. */
+	struct mh_i32ptr_t *fiber_registry;
+	/** All fibers */
+	struct rlist fibers;
+	/** A cache of dead fibers for reuse */
+	struct rlist zombie_fibers;
+	/** Fibers, ready for execution */
+	struct rlist ready_fibers;
+	/** A watcher to have a single async event for all ready fibers. */
+	ev_async ready_async;
+	/** A memory cache for (struct fiber) */
+	struct mempool fiber_pool;
+	/** A runtime slab cache for general use in this cord. */
+	struct slab_cache slabc;
+};
+
+extern __thread struct cord *cord_ptr;
+
+#define cord() cord_ptr
+#define fiber() cord()->fiber
 
 void fiber_init(void);
 void fiber_free(void);

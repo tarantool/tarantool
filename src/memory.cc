@@ -28,27 +28,20 @@
  */
 #include "memory.h"
 
-static struct slab_arena runtime;
-struct slab_cache *slabc_runtime;
+struct slab_arena runtime;
 
 static const size_t SLAB_SIZE = 4194304;
 
 void
 memory_init()
 {
-	static struct slab_cache cache;
-
 	/* No limit on the runtime memory. */
 	slab_arena_create(&runtime, 0, SMALL_UNLIMITED,
 			  SLAB_SIZE, MAP_PRIVATE);
-
-	slabc_runtime = &cache;
-	slab_cache_create(slabc_runtime, &runtime, 0);
 }
 
 void
 memory_free()
 {
-	slab_cache_destroy(slabc_runtime);
 	slab_arena_destroy(&runtime);
 }

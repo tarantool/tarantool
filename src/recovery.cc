@@ -1074,14 +1074,19 @@ wal_opt_sync(struct log_io *wal, double sync_delay)
 {
 	static ev_tstamp last_sync = 0;
 
-	if (sync_delay > 0 && ev_now() - last_sync >= sync_delay) {
+	if (sync_delay <= 0)
+		return;
+
+	/* Don't use ev_now() since it requires a working event loop. */
+	ev_tstamp now = ev_time();
+	if (now - last_sync >= sync_delay) {
 		/*
 		 * XXX: in case of error, we don't really know how
 		 * many records were not written to disk: probably
 		 * way more than the last one.
 		 */
 		(void) log_io_sync(wal);
-		last_sync = ev_now();
+		last_sync = now;
 	}
 }
 

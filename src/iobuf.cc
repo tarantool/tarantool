@@ -28,7 +28,7 @@
  */
 #include "iobuf.h"
 #include "coio_buf.h"
-#include "memory.h"
+#include "fiber.h"
 
 struct mempool iobuf_pool;
 
@@ -277,7 +277,7 @@ iobuf_new(const char *name)
 	struct iobuf *iobuf;
 	if (SLIST_EMPTY(&iobuf_cache)) {
 		iobuf = (struct iobuf *) mempool_alloc(&iobuf_pool);
-		region_create(&iobuf->pool, slabc_runtime);
+		region_create(&iobuf->pool, &cord()->slabc);
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, &iobuf->pool);
 		obuf_create(&iobuf->out, &iobuf->pool);
@@ -347,7 +347,7 @@ int cfg_readahead;
 void
 iobuf_init(int readahead)
 {
-	mempool_create(&iobuf_pool, slabc_runtime, sizeof(struct iobuf));
+	mempool_create(&iobuf_pool, &cord()->slabc, sizeof(struct iobuf));
 	cfg_readahead =  readahead;
 }
 

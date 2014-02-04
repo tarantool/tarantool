@@ -120,7 +120,7 @@ session_init()
 	session_registry = mh_i32ptr_new();
 	if (session_registry == NULL)
 		panic("out of memory");
-	mempool_create(&session_pool, slabc_runtime, sizeof(struct session));
+	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 }
 
 void
