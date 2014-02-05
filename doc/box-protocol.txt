@@ -17,12 +17,12 @@
 ; data structures, such as arrays and maps, the exact byte
 ; sequence mandated by msgpack format is omitted in this spec.
 ; This spec therefore only defines the expected **schema**
-; of message pack streams.
+; of msgpack streams.
 ;
-; To specify that a message pack map is expected in the stream,
+; To specify that a msgpack map is expected in the stream,
 ; the contents of the map is put into "{}" (curly braces).
 ;
-; To specify that a message pack array is expected in the stream,
+; To specify that a msgpack array is expected in the stream,
 ; the contents of the array is put into "[]" (square brackets).
 ;
 ; A single key-value pair in a map is separated by a ":" (semicolon),
@@ -52,22 +52,22 @@
 ;
 ; The value of the constant defines the type of value of the map.
 ; For example, for <error> key (0x31), the expected value is a 
-; MessagePack string with error message.
+; msgpack string with error message.
 ; All requests and responses utilize the same basic structure
 
 <packet> ::= <request> | <response>
 <request> ::= <len><header><body>
 <response> ::= <len><header><body>
-; <len> is the length of the packet, in message pack format.
+; <len> is the length of the packet, in msgpack format.
 ;
 ; Implementor note: for simplicity of the implementation,
 ; the server never "compresses" the packet length, i.e.
-; it is always passed as MessagePack 32-bit unsigned int,
+; it is always passed as msgpack 32-bit unsigned int,
 ; 0xce b4 b3 b2 b1 (5 bytes)
 ;
-<len> ::= MessagePack Int (unsigned)
+<len> ::= msgpack Int (unsigned)
 ;
-; Both <header> and <body> are message pack maps:
+; Both <header> and <body> are msgpack maps:
 
 <header> ::= { (<key> : <value>)+ }
 <body> ::= { (<key> : <value>)+ }
@@ -135,7 +135,7 @@
 ; request type. 
 
 ; <space_id> space to use in the request
-; The find the numeric space id by space name, one
+; To find the numeric space id by space name, one
 ; must first query "_space" system space.
 ; Id of _space system space is defined in box.schema.SPACE_ID
 ; (global Lua variable set in package "box")
@@ -211,15 +211,15 @@
 <response_key> = <data> | <error>
 
 ; Set of tuples in the response
-<data> expects  a message pack array of tuples as value
+<data> expects  a msgpack array of tuples as value
 
 ; Error message is present in the response only if there is an error
-; <error> expects ass value a message pack string
+; <error> expects as value a msgpack string
 
 ; The error <code> consists of the actual error code
-; and request completion status, which is complementary:
-; it can be deduced from the error code. There are only
-; 3 completion status codes in use:
+; and request completion status (completion status is
+; complementary since it can be deduced from the error code)
+; There are only 3 completion status codes in use:
 ; 0  - success; The only possible error code with this status is
        0, ER_OK
 ; 1  - try again; An indicator of an intermittent error.
@@ -248,7 +248,7 @@
 ;                Duplicate key exists in a unique index
 ;
 ; Convenience macros which define hexadecimal constants for
-; <int32> return codes (completion status + code) can be found
+; <int32> return codes (completion status + code) can be found here:
 ; https://github.com/tarantool/tarantool/blob/master/src/errcode.h
 
 ; vim: syntax=bnf
