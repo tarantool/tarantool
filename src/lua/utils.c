@@ -41,6 +41,8 @@
 #include <lj_ctype.h>
 #include <lj_cdata.h>
 #include <lj_cconv.h>
+#include <lj_lib.h>
+#include <lj_tab.h>
 
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid, uint32_t size)
@@ -103,6 +105,36 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename)
 	CTypeID ctypeid = *(CTypeID *)cdataptr(cd);
 	lua_settop(L, idx);
 	return ctypeid;
+}
+
+int
+luaL_setcdatagc(struct lua_State *L, int idx)
+{
+	if (idx < 0)
+		idx = lua_gettop(L) + idx + 1;
+	/* extracted from luajit/src/lib_ffi.c */
+	TValue *o = L->base + idx - 1;
+	assert(o < L->top && tviscdata(o));
+	GCcdata *cd = cdataV(o);
+	TValue *fin = lj_lib_checkany(L, lua_gettop(L));
+	CTState *cts = ctype_cts(L);
+	GCtab *t = cts->finalizer;
+#if !defined(NDEBUG)
+	CType *ct = ctype_raw(cts, cd->ctypeid);
+	assert(ctype_isptr(ct->info) || ctype_isstruct(ct->info) ||
+	       ctype_isrefarray(ct->info));
+#endif /* !defined(NDEBUG) */
+	if (gcref(t->metatable)) {  /* Update finalizer table, if still enabled. */
+		copyTV(L, lj_tab_set(L, t, L->base + idx - 1), fin);
+		lj_gc_anybarriert(L, t);
+		if (!tvisnil(fin))
+			cd->marked |= LJ_GC_CDATA_FIN;
+		else
+		cd->marked &= ~LJ_GC_CDATA_FIN;
+	}
+	lua_pop(L, 1);
+
+	return 1;
 }
 
 #endif /* defined(LUAJIT) */

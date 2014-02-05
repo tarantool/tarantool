@@ -14,6 +14,8 @@ struct tuple
 } __attribute__((packed));
 ]])
 
+local builtin = ffi.C
+
 -- cfuncs table is set by C part
 local methods = {
     ["next"]        = cfuncs.next;
@@ -29,9 +31,11 @@ local methods = {
     end
 }
 
+local tuple_gc = cfuncs.__gc;
+
 local tuple_field = cfuncs.__index
 ffi.metatype('struct tuple', {
-    __gc = cfuncs.__gc;
+    __gc = tuple_gc;
     __len = cfuncs.__len;
     __tostring = function(tuple)
         return yaml.encode(methods.totable(tuple)):sub(5, -6)
@@ -46,3 +50,6 @@ ffi.metatype('struct tuple', {
 
 -- Remove the global variable
 cfuncs = nil
+
+-- export tuple_gc  */
+box.tuple._gc = tuple_gc;

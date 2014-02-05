@@ -75,6 +75,17 @@ void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid);
 
 /**
+ * @brief Sets finalizer function on a cdata object.
+ * Equivalent to call ffi.gc(obj, function).
+ * Finalizer function must be on the top of the stack.
+ * @param L Lua State
+ * @param idx object
+ * @return 1
+ */
+int
+luaL_setcdatagc(struct lua_State *L, int idx);
+
+/**
 * @brief Return CTypeID (FFI) of given СDATA type
 * @param L Lua State
 * @param ctypename С type name as string (e.g. "struct request" or "uint32_t")

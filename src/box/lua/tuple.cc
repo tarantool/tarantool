@@ -54,7 +54,6 @@ extern "C" {
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
 static int tuple_totable_mt_ref = 0; /* a precreated metable for totable() */
-static int ffi_gc_ref = 0; /* a function to set gc on tuple */
 
 extern char tuple_lua[]; /* Lua source */
 
@@ -463,13 +462,11 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 	if (tuple) {
 		assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
 		assert(ffi_gc_ref != 0);
-		lua_rawgeti(L, LUA_REGISTRYINDEX, ffi_gc_ref);
-		assert(lua_isfunction(L, -1));
 		struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
 			CTID_CONST_STRUCT_TUPLE_REF, sizeof(struct tuple *));
 		*ptr = tuple;
 		lua_pushcfunction(L, lbox_tuple_gc);
-		lua_call(L, 2, 1);
+		luaL_setcdatagc(L, -2);
 		tuple_ref(tuple, 1);
 	} else {
 		return lua_pushnil(L);
@@ -597,16 +594,10 @@ box_lua_tuple_init(struct lua_State *L)
 	if (luaL_dostring(L, tuple_lua))
 		panic("Error loading Lua source %.160s...: %s",
 		      tuple_lua, lua_tostring(L, -1));
+	assert(lua_gettop(L) == 0);
 
 	/* Get CTypeIDs */
 	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
 
-	luaL_loadstring(L, "return require('ffi').gc");
-	lua_call(L, 0, 1);
-	assert(lua_isfunction(L, -1));
-	ffi_gc_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	assert(ffi_gc_ref != 0);
-
 	box_lua_slab_init(L);
 }
-
