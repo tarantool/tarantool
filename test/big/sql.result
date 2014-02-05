@@ -555,19 +555,19 @@ s.index[1]:select{}
 - [2, 'Bilimbi']
 - [3, 'Creature ']
 ...
-s.index[0].idx:min()
+s.index[0]:min()
 ---
 - error: HASH does not support min()
 ...
-s.index[0].idx:max()
+s.index[0]:max()
 ---
 - error: HASH does not support max()
 ...
-s.index[1].idx:min()
+s.index[1]:min()
 ---
 - [1, 'Aardvark ']
 ...
-s.index[1].idx:max()
+s.index[1]:max()
 ---
 - [3, 'Creature ']
 ...

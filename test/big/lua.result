@@ -11,13 +11,17 @@ space:insert{'brave', 'new', 'world'}
 ---
 - ['brave', 'new', 'world']
 ...
+space:insert{'hello', 'old', 'world'}
+---
+- ['hello', 'old', 'world']
+...
 space.index['minmax']:min()
 ---
 - ['brave', 'new', 'world']
 ...
 space.index['minmax']:max()
 ---
-- ['brave', 'new', 'world']
+- ['hello', 'old', 'world']
 ...
 space.index['minmax']:select{'new', 'world'}
 ---
@@ -57,7 +61,7 @@ space:insert{'item 4', 'georgia', 'on my mind'}
 ---
 - ['item 4', 'georgia', 'on my mind']
 ...
-iter, state = space.index['minmax']:iterator(box.index.GE, 'california')
+iter, state = space.index['minmax']:iterator('california', { iterator =  box.index.GE })
 ---
 ...
 iter()
@@ -382,7 +386,7 @@ index = space.index['i1']
 t = {}
 ---
 ...
-for v in index:iterator(box.index.GE, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -397,7 +401,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator(box.index.LE, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -412,7 +416,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator(box.index.EQ, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -424,7 +428,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator(box.index.REQ, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -436,7 +440,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator(box.index.EQ, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -448,7 +452,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator(box.index.REQ, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -459,6 +463,10 @@ t
 ...
 t = {}
 ---
+...
+index:iterator('sid_t', { iterator = 'wrong_iterator_type' })
+---
+- error: 'unknown iterator type: ''wrong_iterator_type'''
 ...
 index = nil
 ---
@@ -507,15 +515,35 @@ space.index['i1']:count(1)
 ---
 - 1
 ...
+space.index['i1']:count(1)
+---
+- 1
+...
+space.index['i1']:count(2, { iterator = 'LE' })
+---
+- 3
+...
+space.index['i1']:count(2, { iterator = 'GE' })
+---
+- 5
+...
+space.index['i1']:count({2, 0}, { iterator = 'LE' })
+---
+- 2
+...
+space.index['i1']:count({2, 1}, { iterator = 'GE' })
+---
+- 4
+...
 space.index['i1']:count(2)
 ---
 - 2
 ...
-space.index['i1']:count(2, 1)
+space.index['i1']:count({2, 1})
 ---
 - 1
 ...
-space.index['i1']:count(2, 2)
+space.index['i1']:count({2, 2})
 ---
 - 0
 ...
@@ -523,7 +551,7 @@ space.index['i1']:count(3)
 ---
 - 3
 ...
-space.index['i1']:count(3, 3)
+space.index['i1']:count({3, 3})
 ---
 - 0
 ...

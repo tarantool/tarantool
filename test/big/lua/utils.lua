@@ -8,7 +8,7 @@ function space_field_types(space_no)
 	return types;
 end
 
-function iterate(space_no, index_no, f1, f2, ...)
+function iterate(space_no, index_no, f1, f2, iterator, ...)
 	local sorted = (box.space[space_no].index[index_no].type == "TREE");
 	local pkeys = {};
 	local tkeys = {};
@@ -22,7 +22,7 @@ function iterate(space_no, index_no, f1, f2, ...)
 			return f
 		end
 	end
-	for v in box.space[space_no].index[index_no]:iterator(...) do
+	for v in box.space[space_no].index[index_no]:iterator({...}, { iterator = iterator }) do
 		local pk = get_field(v, 0);
 		local tk = '$';
 		for f = f1, f2-1, 1 do tk = (tk..(get_field(v, f))..'$'); end;

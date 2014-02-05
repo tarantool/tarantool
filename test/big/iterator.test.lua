@@ -141,31 +141,24 @@ iterate('tweedledum', 'i3', 2, 4, box.index.LT, 'tid_996', 'to', 'many', 'keys')
 iterate('tweedledum', 'i4', 0, 1)
 iterate('tweedledum', 'i4', 0, 1, box.index.ALL)
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ)
-iterate('tweedledum', 'i4', 0, 1, box.index.GE)
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ, 'pid_003')
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ, 'pid_666')
-iterate('tweedledum', 'i4', 0, 1, box.index.GE, 'pid_001')
-iterate('tweedledum', 'i4', 0, 1, box.index.GE, 'pid_999')
 
 -------------------------------------------------------------------------------
 -- Iterator: hash multi-part unique
 -------------------------------------------------------------------------------
 
 iterate('tweedledum', 'i5', 1, 3, box.index.ALL)
-iterate('tweedledum', 'i5', 1, 3, box.index.EQ)
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005')
-iterate('tweedledum', 'i5', 1, 3, box.index.GE)
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995')
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_999')
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
-iterate('tweedledum', 'i5', 1, 3, box.index.GE, 'sid_005', 'tid_995')
-iterate('tweedledum', 'i5', 1, 3, box.index.GE, 'sid_005', 'tid_999')
 
 -------------------------------------------------------------------------------
 -- Iterator: various
 -------------------------------------------------------------------------------
 
-space.index['primary']:iterator(-666)
+space.index['primary']:iterator({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
-space.index['primary']:iterator(box.index.EQ, function() end)
+space.index['primary']:iterator(function() end, { iterator = box.index.EQ })
 space:drop()

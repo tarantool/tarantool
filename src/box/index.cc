@@ -67,8 +67,7 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 * - ITERA_ALL iterator type, all index types
 		 * - ITER_GE iterator in HASH index (legacy)
 		 */
-		if (key_def->type == TREE || type == ITER_ALL ||
-		    (key_def->type == HASH && type == ITER_GE))
+		if (key_def->type == TREE || type == ITER_ALL)
 			return;
 		/* Fall through. */
 	}

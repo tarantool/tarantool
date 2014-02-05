@@ -182,12 +182,26 @@ function box.schema.space.bless(space)
         return error('Attempt to modify a read-only table') end
     index_mt.__index = index_mt
     -- min and max
-    index_mt.min = function(index) return index.idx:min() end
-    index_mt.max = function(index) return index.idx:max() end
+    index_mt.min = function(index, key)
+        if index.type == 'HASH' then
+            box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
+        end
+        return unpack(
+            index:eselect(keify(key), { iterator = 'GE', limit = 1 })
+        )
+    end
+    index_mt.max = function(index, key)
+        if index.type == 'HASH' then
+            box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
+        end
+        return unpack(
+            index:eselect(keify(key), { iterator = 'LE', limit = 1 })
+        )
+    end
     index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
-    index_mt.iterator = function(index, ...)
-        return index.idx:iterator(...)
+    index_mt.iterator = function(index, key, opts)
+        return index.idx:iterator(key, opts)
     end
     --
     -- pairs
@@ -195,8 +209,20 @@ function box.schema.space.bless(space)
         return index.idx.next, index.idx, nil
     end
     -- index subtree size
-    index_mt.count = function(index, ...)
-        return index.idx:count(...)
+    index_mt.count = function(index, key, opts)
+        local count = 0
+        local iterator
+        
+        if opts and opts.iterator ~= nil then
+            iterator = opts.iterator
+        else
+            iterator = 'EQ'
+        end
+        
+        for tuple in index:iterator(key, { iterator = iterator }) do
+            count = count + 1
+        end
+        return count
     end
 
     local function check_index(space, index_id)
@@ -243,7 +269,7 @@ function box.schema.space.bless(space)
             return result
         end
 
-        for tuple in index:iterator(iterator, unpack(keify(key))) do
+        for tuple in index:iterator(keify(key), { iterator = iterator }) do
             if grep == nil or grep(tuple) then
                 if skip < offset then
                     skip = skip + 1
@@ -323,7 +349,7 @@ function box.schema.space.bless(space)
 -- inserts a tuple after getting the next value of the
 -- primary key and returns it back to the user
     space_mt.auto_increment = function(space, tuple)
-        local max_tuple = space.index[0].idx:max()
+        local max_tuple = space.index[0]:max()
         local max = 0
         if max_tuple ~= nil then
             max = max_tuple[0]

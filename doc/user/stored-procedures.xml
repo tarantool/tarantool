@@ -2194,7 +2194,7 @@ error: 'Iterator type is not supported'
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:min()</emphasis>
+            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:min([key])</emphasis>
         </term>
         <listitem>
             <para>
@@ -2219,7 +2219,7 @@ error: 'Iterator type is not supported'
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:max()</emphasis>
+            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:max([key])</emphasis>
         </term>
         <listitem>
             <para>
@@ -2272,7 +2272,7 @@ error: 'Iterator type is not supported'
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:count(<replaceable>key-value</replaceable>)</emphasis>
+            <emphasis role="lua">box.space[<replaceable>space-number</replaceable>].index[<replaceable>index-number</replaceable>]:count(<replaceable>key-value</replaceable>, options)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2290,6 +2290,11 @@ error: 'Iterator type is not supported'
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost&gt; <userinput>lua box.space[0].index[0]:count('Alpha!')</userinput>
+---
+ - 1
+...
+</programlisting>
+<programlisting>localhost&gt; <userinput>lua box.space[0].index[0]:count('Alpha!', { iterator = 'LE' })</userinput>
 ---
  - 1
 ...

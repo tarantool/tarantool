@@ -298,13 +298,6 @@ HashIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 
 	switch (type) {
-	case ITER_GE:
-		if (part_count != 0) {
-			it->h_pos = mh_index_find(hash, key, key_def);
-			it->base.next = hash_iterator_ge;
-			break;
-		}
-		/* Fall through. */
 	case ITER_ALL:
 		it->h_pos = mh_begin(hash);
 		it->base.next = hash_iterator_ge;
