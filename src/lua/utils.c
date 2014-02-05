@@ -92,17 +92,16 @@ luaL_ctypeid(struct lua_State *L, const char *ctypename)
 	luaL_loadstring(L, "return require('ffi').typeof");
 	lua_call(L, 0, 1);
 	/* FFI must exist */
-	assert(lua_gettop(L) == 1 && lua_isfunction(L, 1));
+	assert(lua_gettop(L) == idx + 1 && lua_isfunction(L, idx + 1));
 	/* Push the first argument to ffi.typeof */
 	lua_pushstring(L, ctypename);
 	/* Call ffi.typeof() */
 	lua_call(L, 1, 1);
 	/* Returned type must be LUA_TCDATA with CTID_CTYPEID */
-	assert(lua_type(L, 1) == LUA_TCDATA);
-	GCcdata *cd = cdataV(L->base);
-	assert(cd->ctypeid == CTID_CTYPEID);
+	uint32_t ctypetypeid;
+	CTypeID ctypeid = *(CTypeID *)luaL_checkcdata(L, idx + 1, &ctypetypeid);
+	assert(ctypetypeid == CTID_CTYPEID);
 
-	CTypeID ctypeid = *(CTypeID *)cdataptr(cd);
 	lua_settop(L, idx);
 	return ctypeid;
 }
