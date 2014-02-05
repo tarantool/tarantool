@@ -172,30 +172,37 @@ coio_accept(struct ev_io *coio, struct sockaddr_in *addr,
 {
 	ev_tstamp start, delay;
 	evio_timeout_init(&start, &delay, timeout);
-	while (true) {
-		/* Assume that there are waiting clients
-		 * available */
-		int fd = sio_accept(coio->fd, addr, &addrlen);
-		if (fd >= 0) {
-			evio_setsockopt_tcp(fd);
-			return fd;
+
+	{
+		auto scoped_guard = make_scoped_guard([=] {
+				ev_io_stop(coio);
+		});
+
+		while (true) {
+			/* Assume that there are waiting clients
+			 * available */
+			int fd = sio_accept(coio->fd, addr, &addrlen);
+			if (fd >= 0) {
+				evio_setsockopt_tcp(fd);
+				return fd;
+			}
+			/* The socket is not ready, yield */
+			if (! ev_is_active(coio)) {
+				ev_io_set(coio, coio->fd, EV_READ);
+				ev_io_start(coio);
+			}
+			/*
+			 * Yield control to other fibers until the
+			 * timeout is reached.
+			 */
+			bool is_timedout = coio_fiber_yield_timeout(coio, delay);
+			fiber_testcancel();
+			if (is_timedout) {
+				errno = ETIMEDOUT;
+				tnt_raise(SocketError, coio->fd, "accept");
+			}
+			evio_timeout_update(start, &delay);
 		}
-		/* The socket is not ready, yield */
-		if (! ev_is_active(coio)) {
-			ev_io_set(coio, coio->fd, EV_READ);
-			ev_io_start(coio);
-		}
-		/*
-		 * Yield control to other fibers until the
-		 * timeout is reached.
-		 */
-		bool is_timedout = coio_fiber_yield_timeout(coio, delay);
-		fiber_testcancel();
-		if (is_timedout) {
-			errno = ETIMEDOUT;
-			tnt_raise(SocketError, coio->fd, "accept");
-		}
-		evio_timeout_update(start, &delay);
 	}
 }
 
