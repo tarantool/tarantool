@@ -21,7 +21,6 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 import os
-import sql
 import sys
 import errno
 import ctypes
@@ -29,10 +28,9 @@ import socket
 import struct
 import warnings
 
-from test_suite import check_libs
+import sql
 from tarantool_connection import TarantoolConnection
 
-check_libs()
 from tarantool import Connection as tnt_connection
 from tarantool import Schema
 
@@ -50,7 +48,8 @@ class BoxConnection(TarantoolConnection):
         self.py_con.close()
 
     def reconnect(self):
-        self.disconnect()
+        if self.py_con.connected:
+            self.disconnect()
         self.connect()
 
     def set_schema(self, schemadict):
@@ -71,7 +70,7 @@ class BoxConnection(TarantoolConnection):
         if statement == None:
             return "You have an error in your SQL syntax\n"
         statement.sort = self.sort
- 
+
         if not silent:
             print command
 

@@ -3,7 +3,7 @@ import shutil
 
 from os.path import abspath
 
-# cleanup vardir
+# cleanup server.vardir
 server.stop()
 server.deploy()
 server.stop()
@@ -11,8 +11,8 @@ server.stop()
 print """
 # Inprogress xlog must be renamed before second insert.
 """
-wal_inprogress = os.path.join(vardir, "00000000000000000002.xlog.inprogress")
-wal = os.path.join(vardir, "00000000000000000002.xlog")
+wal_inprogress = os.path.join(server.vardir, "00000000000000000002.xlog.inprogress")
+wal = os.path.join(server.vardir, "00000000000000000002.xlog")
 
 server.start()
 
@@ -31,8 +31,8 @@ print """
 """
 server.start()
 
-wal_inprogress = os.path.join(vardir, "00000000000000000004.xlog.inprogress")
-wal = os.path.join(vardir, "00000000000000000004.xlog")
+wal_inprogress = os.path.join(server.vardir, "00000000000000000004.xlog.inprogress")
+wal = os.path.join(server.vardir, "00000000000000000004.xlog")
 
 admin("box.space[0]:insert{3, 'third tuple'}")
 
@@ -48,8 +48,8 @@ print """
 # An inprogress xlog file with one record must be renamed during recovery.
 """
 
-wal_inprogress = os.path.join(vardir, "00000000000000000005.xlog.inprogress")
-wal = os.path.join(vardir, "00000000000000000005.xlog")
+wal_inprogress = os.path.join(server.vardir, "00000000000000000005.xlog.inprogress")
+wal = os.path.join(server.vardir, "00000000000000000005.xlog")
 
 os.symlink(abspath("box/unfinished.xlog"), wal_inprogress)
 
@@ -63,8 +63,8 @@ print """
 # Empty (zero size) inprogress xlog must be deleted during recovery.
 """
 
-wal_inprogress = os.path.join(vardir, "00000000000000000006.xlog.inprogress")
-wal = os.path.join(vardir, "00000000000000000006.xlog")
+wal_inprogress = os.path.join(server.vardir, "00000000000000000006.xlog.inprogress")
+wal = os.path.join(server.vardir, "00000000000000000006.xlog")
 
 os.symlink(abspath("box/empty.xlog"), wal_inprogress)
 server.start()
@@ -112,12 +112,13 @@ A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
 panic_on_wal_error doens't work for duplicate key errors
 """
 server.stop()
-server.deploy("box/panic_on_wal_error.cfg")
+server.cfgfile_source = "box/panic_on_wal_error.cfg"
+server.deploy()
 server.stop()
 shutil.copy(abspath("box/dup_key1.xlog"),
-            os.path.join(vardir, "00000000000000000002.xlog"))
+            os.path.join(server.vardir, "00000000000000000002.xlog"))
 shutil.copy(abspath("box/dup_key2.xlog"),
-           os.path.join(vardir, "00000000000000000004.xlog"))
+           os.path.join(server.vardir, "00000000000000000004.xlog"))
 server.start()
 admin("box.space[0]:select{1}")
 admin("box.space[0]:select{2}")

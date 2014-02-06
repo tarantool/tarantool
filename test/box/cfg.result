@@ -1,3 +1,5 @@
+--# push filter 'primary_port: .*' to 'primary_port: <number>'
+--# push filter 'admin_port: .*' to 'admin_port: <number>'
 box.cfg.nosuchoption = 1
 ---
 - error: '[string "getmetatable(box.cfg).__newindex = function(t..."]:2: Attempt to
@@ -12,7 +14,7 @@ t
   - 'pid_file: box.pid'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
-  - 'admin_port: 33015'
+  - 'admin_port: <number>
   - 'logger: cat - >> tarantool.log'
   - 'readahead: 16320'
   - 'log_level: 5'
@@ -21,7 +23,7 @@ t
   - 'too_long_threshold: 0.5'
   - 'snap_dir: .'
   - 'coredump: false'
-  - 'primary_port: 33013'
+  - 'primary_port: <number>
   - 'panic_on_wal_error: false'
   - 'snap_io_rate_limit: 0'
   - 'wal_mode: fsync_delay'
@@ -48,7 +50,7 @@ t
   - 'pid_file: box.pid'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
-  - 'admin_port: 33015'
+  - 'admin_port: <number>
   - 'logger: cat - >> tarantool.log'
   - 'readahead: 16320'
   - 'log_level: 5'
@@ -57,7 +59,7 @@ t
   - 'too_long_threshold: 0.5'
   - 'snap_dir: .'
   - 'coredump: false'
-  - 'primary_port: 33013'
+  - 'primary_port: <number>
   - 'panic_on_wal_error: false'
   - 'snap_io_rate_limit: 0'
   - 'wal_mode: fsync_delay'
@@ -70,3 +72,4 @@ t
   - 'wal_dir: .'
   - 'wal_dir_rescan_delay: 0.1'
 ...
+--# clear filter

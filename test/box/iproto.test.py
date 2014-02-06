@@ -11,7 +11,7 @@ print """
 
 # opeing new connection to tarantool/box
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('localhost', server.primary_port))
+s.connect(('localhost', server.sql.port))
 
 print """
 # Test bug #899343 (server assertion failure on incorrect packet)

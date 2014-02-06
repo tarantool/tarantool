@@ -7,7 +7,7 @@ print """
 
 admin("function f1() nosuchfunction() end")
 admin("box.session.on_connect(f1)")
-con1 = BoxConnection('localhost', server.primary_port)
+con1 = BoxConnection('localhost', sql.port)
 con1("select * from t0 where k0=0")
 if not con1.check_connection():
     print "Connection is dead.\n"

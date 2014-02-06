@@ -6,6 +6,8 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 space:create_index('primary', { type = 'hash' })
 ---
 ...
+--# push filter 'primary_port: .*' to 'primary_port: <number>'
+--# push filter 'admin_port: .*' to 'admin_port: <number>'
 box.stat()
 ---
 - DELETE:
@@ -47,7 +49,7 @@ box.cfg()
   pid_file: box.pid
   slab_alloc_factor: 2
   slab_alloc_minimal: 64
-  admin_port: 33015
+  admin_port: <number>
   logger: cat - >> tarantool.log
   snap_io_rate_limit: 0
   log_level: 5
@@ -66,7 +68,7 @@ box.cfg()
   replication_port: 0
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  primary_port: 33013
+  primary_port: <number>
   wal_dir_rescan_delay: 0.1
 ...
 box.stat()
@@ -102,6 +104,7 @@ space:delete{1}
 ---
 - [1, 'tuple']
 ...
+--# clear filter
 --# setopt delimiter ';'
 function check_type(arg, typeof)
     return type(arg) == typeof

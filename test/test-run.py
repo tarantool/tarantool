@@ -34,6 +34,8 @@ import argparse
 
 from lib.colorer import Colorer
 from lib.test_suite import TestSuite
+from lib.tarantool_server import TarantoolServer
+from lib.unittest_server import UnittestServer
 
 color_stdout = Colorer()
 #
@@ -68,7 +70,7 @@ class Options:
                 metavar = "suite",
                 nargs="*",
                 default = [],
-                help = """List of tests suites to look for tests in. Default: "" -
+                help = """List of test suites to look for tests in. Default: "" -
                 means find all available.""")
 
         parser.add_argument(
@@ -114,16 +116,6 @@ class Options:
                 dest = "vardir",
                 default = "var",
                 help = """Path to data directory. Default: var.""")
-
-        parser.add_argument(
-                "--mem",
-                dest = "mem",
-                action = "store_true",
-                default = False,
-                help = """Run test suite in memory, using tmpfs or ramdisk.
-                Is used only if vardir is not an absolute path. In that case
-                vardir is sym-linked to /dev/shm/<vardir>.
-                Linux only. Default: false.""")
 
         self.args = parser.parse_args()
         self.check()
@@ -183,6 +175,9 @@ def main():
 
         suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
 
+        TarantoolServer.find_exe(options.args.builddir)
+        UnittestServer.find_exe(options.args.builddir)
+
         for suite in suites:
             failed_tests.extend(suite.run_all())
     except RuntimeError as e:
@@ -201,4 +196,4 @@ def main():
     return (-1 if failed_tests else 0)
 
 if __name__ == "__main__":
-  exit(main())
+    exit(main())
