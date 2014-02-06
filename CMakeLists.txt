@@ -143,7 +143,7 @@ include_directories("${PROJECT_SOURCE_DIR}/third_party")
 #
 # Specify Tarantool modules prefixes
 #
-set(MODULE_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/")
+set(MODULE_DIR "${CMAKE_INSTALL_LIBDIR}/tarantool/")
 set(MODULE_DIR "${MODULE_DIR}${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
 
 #
