@@ -32,6 +32,7 @@
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
+#include "libgen.h"
 
 extern "C" {
 #include <lua.h>
