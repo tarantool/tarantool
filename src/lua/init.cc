@@ -32,7 +32,9 @@
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
+#ifdef __FreeBSD__
 #include "libgen.h"
+#endif
 
 extern "C" {
 #include <lua.h>
@@ -636,7 +638,7 @@ tarantool_lua_sandbox(struct lua_State *L)
 #endif
 
 void
-tarantool_lua_load_init_script(const char *path)
+tarantool_lua_load_init_script(char *path)
 {
 	if (path == NULL)
 		return;
