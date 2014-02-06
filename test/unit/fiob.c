@@ -194,9 +194,9 @@ main(void)
 			fgets(buf, 4096, f);
 			if (strcmp(buf, "Hello, world\n") == 0)
 				done++;
-			else
-				fprintf(stderr, "#   wrong line %zu: %s",
-					i, buf);
+/*                         else */
+/*                                 fprintf(stderr, "#   wrong line %zu: %s", */
+/*                                         i, buf); */
 		}
 		is(done, 1000000 + 1, "all records were written properly");
 

@@ -109,26 +109,22 @@ fiob_flushb(struct fiob *f)
 	if (!f->buf || !f->bfill)
 		return 0;
 
-	off_t cur = lseek(f->fd, 0L, SEEK_CUR);
-	if (cur == (off_t)-1)
+
+	size_t tlen = f->bfill / 4096;
+	if (f->bfill % 4096)
+		tlen++;
+	tlen *= 4096;
+
+	if (fiob_writef(f, f->buf, tlen) < 0) {
 		return -1;
+	}
 
-	off_t size = lseek(f->fd, 0L, SEEK_END);
-	if (size == (off_t)-1)
+	off_t size = lseek(f->fd, (off_t)(f->bfill) - tlen, SEEK_CUR);
+	if (size == (off_t)-1) {
 		return -1;
+	}
+	int res = ftruncate(f->fd, size);
 
-	if (lseek(f->fd, cur, SEEK_SET) == (off_t)-1)
-		return -1;
-
-	assert(cur + f->bfill >= size);
-
-	if (fiob_writef(f, f->buf, f->bsize) < 0)
-		return -1;
-
-	if (lseek(f->fd, cur + f->bfill, SEEK_SET) == (off_t)-1)
-		return -1;
-
-	int res = ftruncate(f->fd, cur + f->bfill);
 	f->bfill = 0;
 	return res;
 }
@@ -143,54 +139,42 @@ fiob_write(void *cookie, const char *buf, size_t len)
 #endif
 {
 	struct fiob *f = (struct fiob *)cookie;
-	ssize_t wrdone;
 
-	if (f->buf) {
+	if (len == 0)
+		return 0;
+
+	if (!f->buf)
+		return fiob_writef(f, buf, len);
+
+
+	for (ssize_t wrdone = 0, wrote;;) {
 		/* append buffer */
-		if (f->bsize - f->bfill >= len) {
+		if (f->bsize - f->bfill > len) {
 			memcpy(f->buf + f->bfill, buf, len);
 			f->bfill += len;
-			return len;
+			return wrdone + len;
 		}
-
-
-		/* buffer is full */
-		if (f->bfill >= f->bsize) {
-			wrdone = fiob_writef(f, f->buf, f->bsize);
-			if (wrdone < 0)
-				return wrdone;
-
-			f->bfill = 0;
-			return fiob_write(cookie, buf, len);
-		}
-
 		/* data is longer than buffer */
-		memcpy(f->buf + f->bfill, buf, f->bsize - f->bfill);
 
-		wrdone = fiob_writef(f, f->buf, f->bsize);
+		if (f->bsize > f->bfill)
+			memcpy(f->buf + f->bfill, buf, f->bsize - f->bfill);
 
+		wrote = fiob_writef(f, f->buf, f->bsize);
+		if (wrote < 0)
+			return wrote;
 
-
-		if (wrdone < 0)
-			return wrdone;
-
-		wrdone -= f->bfill;
-
+		wrote  -= f->bfill;
+		wrdone += wrote;
 		f->bfill = 0;
-		buf += wrdone;
-		len -= wrdone;
+		buf += wrote;
+		len -= wrote;
 
 
-		if (len > 0) {
-			ssize_t wrtail = fiob_write(cookie, buf, len);
-			if (wrtail < 0)
-				return wrtail;
-			wrdone += wrtail;
-		}
+		if (len > 0)
+			continue;
 		return wrdone;
 	}
 
-	return fiob_writef(f, buf, len);
 }
 
 #ifdef HAVE_FUNOPEN
