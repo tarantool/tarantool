@@ -43,6 +43,7 @@ doc/tnt.ent
 doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/_text/download.md
+doc/www-data.in/doc
 extra/rpm.spec
 src/trivia/config.h
 install_manifest.txt
