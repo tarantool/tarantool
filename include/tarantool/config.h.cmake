@@ -120,7 +120,7 @@
 #define LUA_LIBPATH "@LUA_LIBPATH@"
 #define LUA_LIBCPATH "@LUA_LIBCPATH@"
 
-#define PLUGIN_DIR "@PLUGIN_DIR@"
+#define MODULE_DIR "@MODULE_DIR"
 
 /*
  * vim: syntax=c

@@ -1,7 +1,8 @@
 # encoding: tarantool
 
-exec admin "lua c = box.net.sql.connect('abcd')"
+server.stop()
+server.deploy(init_lua="box/net_sql.common.lua")
 
-exec admin "lua c = box.net.sql.connect('mysql')"
-exec admin "lua c = box.net.sql.connect('pg')"
+exec admin "lua type(box.net.sql)"
+exec admin "lua c = box.net.sql.connect('abcd')"
 

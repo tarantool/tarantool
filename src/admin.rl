@@ -68,7 +68,6 @@ static const char *help =
 	" - show slab" CRLF
 	" - show palloc" CRLF
 	" - show stat" CRLF
-	" - show plugins" CRLF
 	" - save coredump" CRLF
 	" - save snapshot" CRLF
 	" - lua command" CRLF
@@ -255,12 +254,6 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 	p = in->pos;
 
 	%%{
-	        action show_plugins {
-		    start(out);
-                    show_plugins_stat(out);
-		    end(out);
-                }
-
 		action show_configuration {
 			start(out);
 			show_cfg(out);
@@ -358,7 +351,6 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 			    show " "+ palloc		%{start(out); palloc_stat(out); end(out);}	|
 			    show " "+ stat		%{start(out); show_stat(out);end(out);}		|
 			    show " "+ injections	%show_injections                                |
-			    show " "+ plugins           %show_plugins                                   |
 			    set " "+ injection " "+ name " "+ state	%set_injection                  |
 			    save " "+ coredump		%{coredump(60); ok(out);}			|
 			    save " "+ snapshot		%save_snapshot					|

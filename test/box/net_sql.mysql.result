@@ -2,6 +2,10 @@ lua c = box.net.sql.connect('abcd')
 ---
 error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
 ...
+lua c = box.net.sql.connect('mysql')
+---
+error: '[string "-- sql.lua (internal file)..."]:64: Usage: box.net.sql.connect(''mysql'', host, port, user, password, db, ...)'
+...
 lua dump = function(v) return box.cjson.encode(v) end
 ---
 ...
