@@ -16,18 +16,19 @@ import traceback
 import subprocess
 import collections
 
-from lib.server import Server
-from lib.admin_connection import AdminConnection
-from lib.box_connection import BoxConnection
-
-from lib.preprocessor import State
-from lib.colorer import Colorer
-
-color_stdout = Colorer()
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+
+from lib.test import Test
+from lib.server import Server
+from lib.preprocessor import State
+from lib.box_connection import BoxConnection
+from lib.admin_connection import AdminConnection
+
+from lib.colorer import Colorer
+color_stdout = Colorer()
 
 def check_port(port, rais=True):
     try:
@@ -54,193 +55,6 @@ def find_in_path(name):
             return exe
     return ''
 
-def check_valgrind_log(path_to_log):
-    """ Check that there were no warnings in the log."""
-    return os.path.exists(path_to_log) and os.path.getsize(path_to_log) != 0
-
-def print_tail_n(filename, num_lines):
-    """Print N last lines of a file."""
-    with open(filename, "r+") as logfile:
-        tail_n = collections.deque(logfile, num_lines)
-        for line in tail_n:
-            color_stdout(line, schema='tail')
-
-
-class FilteredStream:
-    """Helper class to filter .result file output"""
-    def __init__(self, filename):
-        self.stream = open(filename, "w+")
-        self.filters = []
-
-    def write(self, fragment):
-        """Apply all filters, then write result to the undelrying stream.
-        Do line-oriented filtering: the fragment doesn't have to represent
-        just one line."""
-        fragment_stream = StringIO(fragment)
-        skipped = False
-        for line in fragment_stream:
-            original_len = len(line.strip())
-            for pattern, replacement in self.filters:
-                line = re.sub(pattern, replacement, line)
-                # don't write lines that are completely filtered out:
-                skipped = original_len and not line.strip()
-                if skipped:
-                    break
-            if not skipped:
-                self.stream.write(line)
-
-    def push_filter(self, pattern, replacement):
-        self.filters.append([pattern, replacement])
-
-    def pop_filter(self):
-        self.filters.pop()
-
-    def clear_all_filters(self):
-        self.filters = []
-
-    def close(self):
-        self.clear_all_filters()
-        self.stream.close()
-
-    def flush(self):
-        self.stream.flush()
-
-
-class Test:
-    """An individual test file. A test object can run itself
-    and remembers completion state of the run.
-
-    If file <test_name>.skipcond is exists it will be executed before
-    test and if it sets self.skip to True value the test will be skipped.
-    """
-
-    def __init__(self, name, args, suite_ini):
-        """Initialize test properties: path to test file, path to
-        temporary result file, path to the client program, test status."""
-        rg = re.compile('.test.*')
-        self.name = name
-        self.args = args
-        self.suite_ini = suite_ini
-        self.result = rg.sub('.result', name)
-        self.skip_cond = rg.sub('.skipcond', name)
-        self.tmp_result = os.path.join(self.args.vardir,
-                                       os.path.basename(self.result))
-        self.reject = rg.sub('.reject', name)
-        self.is_executed = False
-        self.is_executed_ok = None
-        self.is_equal_result = None
-        self.is_valgrind_clean = True
-        self.is_terminated = False
-
-    def passed(self):
-        """Return true if this test was run successfully."""
-        return self.is_executed and self.is_executed_ok and self.is_equal_result
-
-    def execute(self):
-        pass
-
-    def run(self, server):
-        """Execute the test assuming it's a python program.
-        If the test aborts, print its output to stdout, and raise
-        an exception. Else, comprare result and reject files.
-        If there is a difference, print it to stdout and raise an
-        exception. The exception is raised only if is_force flag is
-        not set."""
-        diagnostics = "unknown"
-        save_stdout = sys.stdout
-        try:
-            self.skip = False
-            if os.path.exists(self.skip_cond):
-                sys.stdout = FilteredStream(self.tmp_result)
-                stdout_fileno = sys.stdout.stream.fileno()
-                execfile(self.skip_cond, dict(locals(), **server.__dict__))
-                sys.stdout.close()
-                sys.stdout = save_stdout
-            if not self.skip:
-                sys.stdout = FilteredStream(self.tmp_result)
-                stdout_fileno = sys.stdout.stream.fileno()
-                self.execute(server)
-                sys.stdout.flush()
-            self.is_executed_ok = True
-        except Exception as e:
-            traceback.print_exc(e)
-            diagnostics = str(e)
-        finally:
-            if sys.stdout and sys.stdout != save_stdout:
-                sys.stdout.close()
-            sys.stdout = save_stdout
-        self.is_executed = True
-        sys.stdout.flush()
-
-        if not self.skip:
-            if self.is_executed_ok and os.path.isfile(self.result):
-                self.is_equal_result = filecmp.cmp(self.result, self.tmp_result)
-        else:
-            self.is_equal_result = 1
-
-        if self.args.valgrind:
-            self.is_valgrind_clean = (check_valgrind_log(server.valgrind_log) == False)
-
-        if self.skip:
-            color_stdout("[ skip ]\n", schema='test_skip')
-            if os.path.exists(self.tmp_result):
-                os.remove(self.tmp_result)
-        elif self.is_executed_ok and self.is_equal_result and self.is_valgrind_clean:
-            color_stdout("[ pass ]\n", schema='test_pass')
-            if os.path.exists(self.tmp_result):
-                os.remove(self.tmp_result)
-        elif (self.is_executed_ok and not self.is_equal_result and not
-              os.path.isfile(self.result)):
-            os.rename(self.tmp_result, self.result)
-            color_stdout("[ new ]\n", schema='test_new')
-        else:
-            os.rename(self.tmp_result, self.reject)
-            color_stdout("[ fail ]\n", schema='test_fail')
-
-            where = ""
-            if not self.is_executed_ok:
-                self.print_diagnostics(self.reject, "Test failed! Last 10 lines of the result file:\n")
-                server.print_log(15)
-                where = ": test execution aborted, reason '{0}'".format(diagnostics)
-            elif not self.is_equal_result:
-                self.print_unidiff()
-                server.print_log(15)
-                where = ": wrong test output"
-            elif not self.is_valgrind_clean:
-                os.remove(self.reject)
-                self.print_diagnostics(server.valgrind_log, "Test failed! Last 10 lines of valgrind.log:\n")
-                where = ": there were warnings in valgrind.log"
-
-            if not self.args.is_force:
-                raise RuntimeError("Failed to run test " + self.name + where)
-
-    def print_diagnostics(self, logfile, message):
-        """Print 10 lines of client program output leading to test
-        failure. Used to diagnose a failure of the client program"""
-
-        color_stdout(message, schema='error')
-        print_tail_n(logfile, 10)
-
-    def print_unidiff(self):
-        """Print a unified diff between .test and .result files. Used
-        to establish the cause of a failure when .test differs
-        from .result."""
-
-        color_stdout("\nTest failed! Result content mismatch:\n", schema='error')
-        with open(self.result, "r") as result:
-            with open(self.reject, "r") as reject:
-                result_time = time.ctime(os.stat(self.result).st_mtime)
-                reject_time = time.ctime(os.stat(self.reject).st_mtime)
-                diff = difflib.unified_diff(result.readlines(),
-                                            reject.readlines(),
-                                            self.result,
-                                            self.reject,
-                                            result_time,
-                                            reject_time)
-
-                color_stdout.writeout_unidiff(diff)
-
-
 
 class FuncTest(Test):
     def execute(self, server):
@@ -249,7 +63,7 @@ class FuncTest(Test):
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        ts = State(self.suite_ini, server._admin, TarantoolServer)
+        ts = State(self.suite_ini, server.admin, TarantoolServer)
         cmd = None
 
         def send_command(command):
@@ -294,7 +108,7 @@ class TarantoolConfig(object):
     def __init__(self, path):
         self.path = path
 
-    def parse(self, gen = False):
+    def parse(self):
         cfg = {}
         with open(self.path, 'r') as f:
             for line in f:
@@ -335,7 +149,7 @@ class TarantoolLog(object):
             while True:
                 if not (proc is None):
                     if not (proc.poll() is None):
-                        raise OSError("Can't start Tarantool");
+                        raise OSError("Can't start Tarantool")
                 log_str = f.readline()
                 if not log_str:
                     time.sleep(0.001)
@@ -375,7 +189,7 @@ class ValgrindMixin(Mixin):
 
     def prepare_args(self):
         if not find_in_path('valgrind'):
-            raise OSError((-1, '`valgrind` executables not found in PATH'))
+            raise OSError('`valgrind` executables not found in PATH')
         return  shlex.split("valgrind --log-file={log} --suppressions={sup} \
                 --gen-suppressions=all --leak-check=full \
                 --read-var-info=yes --quiet {bin}".format(log = self.valgrind_log,
@@ -397,9 +211,9 @@ class GdbMixin(Mixin):
 
     def prepare_args(self):
         if not find_in_path('screen'):
-            raise OSError((-1, '`screen` executables not found in PATH'))
+            raise OSError('`screen` executables not found in PATH')
         if not find_in_path('gdb'):
-            raise OSError((-1, '`gdb` executables not found in PATH'))
+            raise OSError('`gdb` executables not found in PATH')
         color_stdout('You started the server in gdb mode.\n', schema='info')
         color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
         return shlex.split("screen -dmS {0} gdb {1} -ex \
@@ -744,7 +558,7 @@ class TarantoolServer(Server):
             shutil.copy(self.shebang, self.init_lua)
             os.chmod(self.init_lua, 0777)
         elif self.init_lua_source:
-            shutil.copy(self.init_lua_sorce, self.init_lua)
+            shutil.copy(self.init_lua_source, self.init_lua)
         if self.lua_libs:
             for i in self.lua_libs:
                 source = os.path.join(self.testdir, i)
@@ -829,7 +643,7 @@ class TarantoolServer(Server):
         while True:
             temp = AdminConnection('localhost', self.conf['admin_port'])
             ans = yaml.load(temp.execute('box.info.status'))[0]
-            if ans in ('primary', 'hot_standby') or ans.startswith('replica'):
+            if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
                 return True
             else:
                 raise Exception("Strange output for `box.info.status`: %s" % (ans))

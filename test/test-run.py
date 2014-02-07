@@ -132,12 +132,9 @@ class Options:
 
 def setenv(args):
     os.putenv("TARANTOOL_PLUGIN_DIR",
-        string.join(
-            (
-                os.path.join(os.getcwd(), '../src/plugin/mysql'),
-                os.path.join(os.getcwd(), '../src/plugin/pg')
-            ),
-            ':'
+        ':'.join(
+            (os.path.join(os.getcwd(), '../src/plugin/mysql'),
+            os.path.join(os.getcwd(), '../src/plugin/pg'))
         )
     )
     path = os.path.join(os.path.abspath(args.builddir), "src/box")

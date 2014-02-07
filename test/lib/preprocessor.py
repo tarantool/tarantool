@@ -2,6 +2,7 @@ import os
 
 import sys
 import shlex
+import shutil
 import socket
 
 from collections import deque
@@ -134,7 +135,7 @@ class State(object):
             if 'need_init' in opts:
                 temp.need_init   = True if opts['need_init'] == 'True' else False
             if 'init' in opts:
-                temp.init_lua = params['init'][1:-1]
+                temp.init_lua = opts['init'][1:-1]
             if 'rpl_master' in opts:
                 temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
             elif 'hot_master' in opts:
@@ -149,7 +150,7 @@ class State(object):
             setattr(self.environ, sname, nmsp)
         elif ctype == 'start':
             if sname not in self.suite_ini['servers']:
-                raise LuaPreprocessprException('Can\'t start nonexistent server '+repr(sname))
+                raise LuaPreprocessorException('Can\'t start nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].start(silent=True)
             self.suite_ini['connections'][sname] = [self.suite_ini['servers'][sname].admin, sname]
             try:
@@ -180,9 +181,9 @@ class State(object):
                 if temp.init_lua != None:
                     var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
                     if os.path.exists(var_init_lua):
-                        os.path.remove(var_init_lua)
-                if 'init' in params:
-                    temp.init_lua = params['init'][1:-1]
+                        os.unlink(var_init_lua)
+                if 'init' in opts:
+                    temp.init_lua = opts['init'][1:-1]
                     var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
                     shutil.copy(temp.init_lua, var_init_lua)
                     temp.restart()

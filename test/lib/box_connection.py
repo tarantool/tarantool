@@ -56,7 +56,7 @@ class BoxConnection(TarantoolConnection):
         self.py_con.schema = Schema(schemadict)
 
     def check_connection(self):
-        rc = self.py_con._sys_recv(self.py_con._socket.fileno(), '', 0, socket.MSG_DONTWAIT)
+        rc = self.py_con._sys_recv(self.py_con._socket.fileno(), '  ', 1, socket.MSG_DONTWAIT | socket.MSG_PEEK)
         if ctypes.get_errno() == errno.EAGAIN:
             ctypes.set_errno(0)
             return True
