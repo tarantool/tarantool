@@ -580,7 +580,7 @@ function server()
 	end
 end
 
-box.fiber.wrap(server)
+fbr = box.fiber.wrap(server)
 """
 
 exec admin "lua " + test.replace('\n', ' ')
@@ -602,3 +602,32 @@ s.connect(('127.0.0.1', 8181))
 data = s.recv(1024)
 s.close()
 print data
+
+#cleanup
+exec admin "lua box.fiber.cancel(fbr)"
+exec admin "lua ms:close()"
+
+
+# GH-183 bug test. Tarantool must not crash after the code below:
+test="""
+a = '127.0.0.1'
+p = 12345
+function srv()
+	ms = box.socket.tcp()
+	ms:bind(a, p)
+	ms:listen()
+	ms:accept()
+end
+
+fbr = box.fiber.wrap(srv)
+
+box.socket.tcp():connect(a, p)
+box.socket.tcp():connect(a, p)
+"""
+
+exec admin "lua " + test.replace('\n', ' ')
+
+#cleanup
+exec admin "lua box.fiber.cancel(fbr)"
+exec admin "lua ms:close()"
+
