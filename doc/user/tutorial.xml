@@ -562,9 +562,9 @@ The client is waiting for the user to type instructions.
 </para>
 
 <para>
-To create the first space and the first index, try this:
-<prompt>localhost&gt; </prompt><userinput>s = box.schema.space.create('b')</userinput>
-<prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash'})</userinput>
+To create the first space and the first index, try this:<programlisting>
+<prompt>localhost&gt; </prompt><userinput>s = box.schema.space.create('space0')</userinput>
+<prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
 </para>
 
 <para>
@@ -579,10 +579,10 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-localhost&gt; s = box.schema.space.create('b')
+localhost&gt; s = box.schema.space.create('space0')
 ---
 ...
-localhost&gt; i = s:create_index('primary', {type = 'hash'})
+localhost&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
 ---
 ...
 localhost&gt; t = s:insert{1}
@@ -642,8 +642,8 @@ inserted and selected tuples with the Tarantool client.
   </para>
   <para>NAMES RATHER THAN NUMBERS.
     Spaces and indexes now have names as well as numbers.
-    Names are specified at create time
-    Number (also called <computeroutput>id</computeroutput>s) are usually assigned automatically.
+    Names are specified at create time.
+    Numbers (also called <computeroutput>id</computeroutput>s) are usually assigned automatically.
     Applications should use the names rather than the numbers.
   </para>
   <para>CHANGED TUPLE STORAGE = MSGPACK.
