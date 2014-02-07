@@ -270,12 +270,14 @@ box_free(void)
 	schema_free();
 	tuple_free();
 	recovery_free();
+	stat_free();
 }
 
 void
 box_init()
 {
 	title("loading", NULL);
+	stat_init();
 
 	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
 		   cfg.slab_alloc_factor);

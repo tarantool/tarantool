@@ -34,8 +34,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define EV_MULTIPLICITY 1
+#define EV_COMPAT3 0
+
 #if defined(ENABLE_BUNDLED_LIBEV)
-#define EV_MULTIPLICITY 0
 #define EV_STANDALONE 1
 #define EV_USE_SELECT 1
 #define EV_USE_POLL 1

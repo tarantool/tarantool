@@ -86,11 +86,13 @@ struct evio_service
 	struct ev_timer timer;
 	/** libev io object for the acceptor socket. */
 	struct ev_io ev;
+	ev_loop *loop;
 };
 
 /** Initialize the service. Don't bind to the port yet. */
 void
-evio_service_init(struct evio_service *service, const char *name,
+evio_service_init(ev_loop *loop,
+		  struct evio_service *service, const char *name,
 		  const char *host, int port,
 		  void (*on_accept)(struct evio_service *,
 				    int, struct sockaddr_in *),
@@ -118,7 +120,7 @@ void
 evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
-evio_close(struct ev_io *evio);
+evio_close(ev_loop *loop, struct ev_io *evio);
 
 static inline bool
 evio_is_active(struct ev_io *ev)
@@ -127,16 +129,17 @@ evio_is_active(struct ev_io *ev)
 }
 
 static inline void
-evio_timeout_init(ev_tstamp *start, ev_tstamp *delay, ev_tstamp timeout)
+evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
+		  ev_tstamp timeout)
 {
-	*start = ev_now();
+	*start = ev_now(loop);
 	*delay = timeout;
 }
 
 static inline void
-evio_timeout_update(ev_tstamp start, ev_tstamp *delay)
+evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 {
-	ev_tstamp elapsed = ev_now() - start;
+	ev_tstamp elapsed = ev_now(loop) - start;
 	*delay = (elapsed >= *delay) ? 0 : *delay - elapsed;
 }
 

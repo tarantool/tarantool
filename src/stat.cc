@@ -29,7 +29,7 @@
 #include "stat.h"
 
 #include "trivia/util.h"
-#include <tarantool_ev.h>
+#include "fiber.h"
 #include <tbuf.h>
 #include <say.h>
 
@@ -116,7 +116,7 @@ stat_foreach(stat_cb cb, void *cb_ctx)
 }
 
 void
-stat_age(ev_timer *timer, int events __attribute__((unused)))
+stat_age(ev_loop * /* loop */, ev_timer *timer, int /* events */)
 {
 	if (stats == NULL)
 		return;
@@ -130,7 +130,7 @@ stat_age(ev_timer *timer, int events __attribute__((unused)))
 		stats[i].value[0] = 0;
 	}
 
-	ev_timer_again(timer);
+	ev_timer_again(loop(), timer);
 }
 
 void
@@ -138,13 +138,13 @@ stat_init(void)
 {
 	ev_init(&timer, stat_age);
 	timer.repeat = 1.;
-	ev_timer_again(&timer);
+	ev_timer_again(loop(), &timer);
 }
 
 void
 stat_free(void)
 {
-	ev_timer_stop(&timer);
+	ev_timer_stop(loop(), &timer);
 	if (stats)
 		free(stats);
 }

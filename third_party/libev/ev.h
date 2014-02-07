@@ -735,7 +735,7 @@ EV_API_DECL void ev_resume  (EV_P) EV_THROW;
 
 /* feeds an event into a watcher as if the event actually occurred */
 /* accepts any ev_watcher type */
-EV_API_DECL int ev_activecnt      (EV_P_) EV_THROW;
+EV_API_DECL int ev_activecnt      (EV_P) EV_THROW;
 EV_API_DECL void ev_feed_event     (EV_P_ void *w, int revents) EV_THROW;
 EV_API_DECL void ev_feed_fd_event  (EV_P_ int fd, int revents) EV_THROW;
 #if EV_SIGNAL_ENABLE
