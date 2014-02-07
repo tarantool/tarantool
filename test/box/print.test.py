@@ -7,7 +7,7 @@ import re
 
 admin('print("Hello, world")')
 
-log = os.path.join(vardir, "tarantool.log")
+log = server.logfile
 f = open(log, "r")
 f.seek(0, 2)
 

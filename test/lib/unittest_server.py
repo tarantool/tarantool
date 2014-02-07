@@ -6,8 +6,8 @@ import traceback
 import subprocess
 from subprocess import Popen, PIPE
 
-from server import Server
-from test_suite import FilteredStream, Test
+from lib.server import Server
+from lib.tarantool_server import Test
 
 class UnitTest(Test):
     def execute(self, server):
@@ -17,22 +17,38 @@ class UnitTest(Test):
 
 class UnittestServer(Server):
     """A dummy server implementation for unit test suite"""
-    def __new__(cls, core="unittest"):
+    def __new__(cls, ini=None):
         return Server.__new__(cls)
 
-    def __init__(self, core="unittest"):
-        Server.__init__(self, core)
+    def __init__(self, _ini=None):
+        if _ini is None:
+            _ini = {}
+        ini = {
+            'config': None,
+            'core': 'tarantool',
+            'gdb': False,
+            'init_lua': None,
+            'lua_libs': [],
+            'random_ports': True,
+            'valgrind': False,
+            'vardir': None
+        }; ini.update(_ini)
+        core = ini['core']
+        Server.__init__(self, ini)
+        self.vardir = ini['vardir']
+        self.builddir = ini['builddir']
         self.debug = False
 
     def deploy(self, config=None, binary=None, vardir=None,
                mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               valgrind_sup=None, init_lua=None, silent=True, need_init=True):
+               init_lua=None, silent=True, need_init=True):
         self.vardir = vardir
         if not os.access(self.vardir, os.F_OK):
             os.makedirs(self.vardir)
 
-    def find_exe(self, builddir, silent=False):
-        self.builddir = builddir
+    @classmethod
+    def find_exe(cls, builddir):
+        cls.builddir = builddir
 
     def find_tests(self, test_suite, suite_path):
         def patterned(test, patterns):

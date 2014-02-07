@@ -3,6 +3,7 @@ import glob
 from lib.tarantool_server import TarantoolServer
 
 # master server
+cfgfile_bkp = server.cfgfile_source
 master = server
 
 master.admin("space = box.schema.create_space('test', {id =  42})")
@@ -17,11 +18,11 @@ print '-------------------------------------------------------------'
 print 'replica test 1 (no such space)'
 print '-------------------------------------------------------------'
 
-replica = TarantoolServer()
-replica.deploy("replication/cfg/replica.cfg",
-               replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"),
-               need_init=False)
+replica = TarantoolServer(server.ini)
+replica.cfgfile_source = 'replication/cfg/replica.cfg'
+replica.vardir = os.path.join(server.vardir, 'replica')
+replica.rpl_master = master
+replica.deploy()
 
 replica.admin('box.space.test')
 
@@ -36,11 +37,11 @@ print '-------------------------------------------------------------'
 print 'replica test 2 (must be ok)'
 print '-------------------------------------------------------------'
 
-replica = TarantoolServer()
-replica.deploy("replication/cfg/replica.cfg",
-               replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"),
-               need_init=False)
+replica = TarantoolServer(server.ini)
+replica.cfgfile_source = 'replication/cfg/replica.cfg'
+replica.vardir = os.path.join(server.vardir, 'replica')
+replica.rpl_master = master
+replica.deploy()
 
 replica.admin('space = box.space.test');
 replica.wait_lsn(lsn)
@@ -51,5 +52,6 @@ replica.stop()
 replica.cleanup(True)
 
 server.stop()
-server.deploy(self.suite_ini["config"])
+server.cfgfile_source = cfgfile_bkp
+server.deploy()
 

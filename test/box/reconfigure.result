@@ -6,15 +6,15 @@ box.cfg.reload()
 ---
 - error: 'Could not accept read only ''slab_alloc_arena'' option.
 
-    Could not accept read only ''pid_file'' option.
-
-    Could not accept read only ''logger'' option.
-
     Could not accept read only ''primary_port'' option.
 
     Could not accept read only ''admin_port'' option.
 
     Could not accept read only ''rows_per_wal'' option.
+
+    Could not accept read only ''pid_file'' option.
+
+    Could not accept read only ''logger'' option.
 
     empty configuration file ''tarantool.cfg''.
 

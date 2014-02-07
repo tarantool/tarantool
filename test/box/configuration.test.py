@@ -13,19 +13,23 @@ print """
 # stop current server
 server.stop()
 
-server.deploy("box/tarantool_bug876541.cfg")
+cfgfile_bkp = server.cfgfile_source
+server.cfgfile_source = "box/tarantool_bug876541.cfg"
+server.deploy()
 # check values
 admin("box.cfg.wal_fsync_delay")
 
-script = os.path.join(vardir, "init.lua")
-shutil.copy("box/lua/test_init.lua", script)
-os.chmod(script, 0744)
-
 server.stop()
 old_binary = server.binary
-server.binary = script
-server.deploy("box/tarantool_scriptdir.cfg")
+server.cfgfile_source = "box/tarantool_scriptdir.cfg"
+server.shebang = "box/lua/test_init.lua"
+server.deploy()
+os.chmod(server.init_lua, 0744)
+sys.stdout.push_filter("admin_port: .*", "admin_port: <number>")
+sys.stdout.push_filter("primary_port: .*", "primary_port: <number>")
 admin("print_config()")
+sys.stdout.pop_filter()
+sys.stdout.pop_filter()
 
 print """
 # Test bug #977898
@@ -49,10 +53,11 @@ admin("floor(1.1)")
 
 # Test script_dir + require
 server.stop()
-shutil.copy("box/lua/require_init.lua", script)
-os.chmod(script, 0744)
-shutil.copy("box/lua/require_mod.lua", os.path.join(vardir, "mod.lua"))
-server.deploy("box/tarantool_scriptdir.cfg")
+server.shebang = "box/lua/require_init.lua"
+server.lua_libs.append("box/lua/require_mod.lua")
+server.cfgfile_source = "box/tarantool_scriptdir.cfg"
+server.deploy()
+server.lua_libs.pop()
 admin("string.gmatch(package_path, '([^;]*)')()")
 admin("string.gmatch(package_cpath, '([^;]*)')()")
 admin("mod.test(10, 15)")
@@ -67,9 +72,10 @@ print """
 server.stop()
 
 # Restore the old binary
-server.binary = old_binary
+self.shebang=None
 try:
-    server.deploy("box/tarantool_bug_gh-99.cfg")
+    server.cfgfile_source="box/tarantool_bug_gh-99.cfg"
+    server.deploy()
 except OSError as e:
     print e
     print("ok")
@@ -85,8 +91,6 @@ server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bug_gh100.cf
 sys.stdout.pop_filter()
 
 # restore default server
-server.stop()
-os.remove(script)
-os.remove(os.path.join(vardir, "mod.lua"))
-server.deploy(self.suite_ini["config"])
-
+server.shebang = None
+server.cfgfile_source = cfgfile_bkp
+server.deploy()

@@ -91,7 +91,7 @@ replication_on_accept(struct evio_service *service __attribute__((unused)),
  * Invoked when spawner's end of the socketpair becomes ready.
  */
 static void
-replication_send_socket(ev_io *watcher, int events __attribute__((unused)));
+replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */);
 
 /** Replication spawner process */
 static struct spawner {
@@ -188,8 +188,8 @@ replication_prefork()
 		master_to_spawner_socket = sockpair[0];
 		sio_setfl(master_to_spawner_socket, O_NONBLOCK, 1);
 	} else {
-		ev_default_fork();
-		ev_loop(EVLOOP_NONBLOCK);
+		ev_loop_fork(loop());
+		ev_run(loop(), EVRUN_NOWAIT);
 		/* child process: spawner */
 		close(sockpair[0]);
 		/*
@@ -214,7 +214,7 @@ replication_init(const char *bind_ipaddr, int replication_port)
 
 	static struct evio_service replication;
 
-	evio_service_init(&replication, "replication", bind_ipaddr,
+	evio_service_init(loop(), &replication, "replication", bind_ipaddr,
 			  replication_port, replication_on_accept, NULL);
 
 	evio_service_start(&replication);
@@ -227,7 +227,7 @@ replication_init(const char *bind_ipaddr, int replication_port)
 
 /** Replication acceptor fiber handler. */
 static void
-replication_on_accept(struct evio_service *service __attribute__((unused)),
+replication_on_accept(struct evio_service *service,
 		      int fd,
 		      struct sockaddr_in *addr __attribute__((unused)))
 {
@@ -245,13 +245,13 @@ replication_on_accept(struct evio_service *service __attribute__((unused)),
 	}
 	io->data = (void *) (intptr_t) fd;
 	ev_io_init(io, replication_send_socket, master_to_spawner_socket, EV_WRITE);
-	ev_io_start(io);
+	ev_io_start(service->loop, io);
 }
 
 
 /** Send a file descriptor to the spawner. */
 static void
-replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
+replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */)
 {
 	int client_sock = (intptr_t) watcher->data;
 	struct msghdr msg;
@@ -282,7 +282,7 @@ replication_send_socket(ev_io *watcher, int events __attribute__((unused)))
 	if (sendmsg(master_to_spawner_socket, &msg, 0) < 0)
 		say_syserror("sendmsg");
 
-	ev_io_stop(watcher);
+	ev_io_stop(loop, watcher);
 	free(watcher);
 	/* Close client socket in the main process. */
 	close(client_sock);
@@ -513,8 +513,8 @@ spawner_create_replication_relay(int client_sock)
 	}
 
 	if (pid == 0) {
-		ev_default_fork();
-		ev_loop(EVLOOP_NONBLOCK);
+		ev_loop_fork(loop());
+		ev_run(loop(), EVRUN_NOWAIT);
 		close(spawner.sock);
 		replication_relay_loop(client_sock);
 	} else {
@@ -601,7 +601,7 @@ retry:
  * its socket, and we get an EOF.
  */
 static void
-replication_relay_recv(struct ev_io *w, int __attribute__((unused)) revents)
+replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__((unused)) revents)
 {
 	int client_sock = (int) (intptr_t) w->data;
 	uint8_t data;
@@ -728,9 +728,6 @@ replication_relay_loop(int client_sock)
 	}
 	sio_readn(client_sock, &lsn, sizeof(lsn));
 
-	/* init libev events handlers */
-	ev_default_loop(0);
-
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
@@ -739,7 +736,7 @@ replication_relay_loop(int client_sock)
 	struct ev_io sock_read_ev;
 	sock_read_ev.data = (void *)(intptr_t) client_sock;
 	ev_io_init(&sock_read_ev, replication_relay_recv, client_sock, EV_READ);
-	ev_io_start(&sock_read_ev);
+	ev_io_start(loop(), &sock_read_ev);
 
 	/* Initialize the recovery process */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
@@ -756,7 +753,7 @@ replication_relay_loop(int client_sock)
 		say_error("can't find WAL containing record with lsn: %" PRIi64, lsn);
 	recovery_follow_local(recovery_state, 0.1);
 
-	ev_loop(0);
+	ev_run(loop(), 0);
 
 	say_crit("exiting the relay loop");
 	exit(EXIT_SUCCESS);

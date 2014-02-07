@@ -86,7 +86,7 @@ mutex_lock_timeout(struct mutex *m, ev_tstamp timeout)
 			break;
 
 		fiber_yield_timeout(timeout);
-		timeout -= ev_now() - start;
+		timeout -= ev_now(loop()) - start;
 		if (timeout <= 0) {
 			rlist_del_entry(fiber(), state);
 			errno = ETIMEDOUT;

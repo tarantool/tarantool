@@ -674,24 +674,26 @@ struct wal_watcher {
 
 static struct wal_watcher wal_watcher;
 
-static void recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)));
+static void recovery_rescan_file(ev_loop *, ev_stat *w, int /* revents */);
 
 static void
-recovery_watch_file(struct wal_watcher *watcher, struct log_io *wal)
+recovery_watch_file(ev_loop *loop, struct wal_watcher *watcher,
+		    struct log_io *wal)
 {
 	strncpy(watcher->filename, wal->filename, PATH_MAX);
-	ev_stat_init(&watcher->stat, recovery_rescan_file, watcher->filename, 0.);
-	ev_stat_start(&watcher->stat);
+	ev_stat_init(&watcher->stat, recovery_rescan_file,
+		     watcher->filename, 0.);
+	ev_stat_start(loop, &watcher->stat);
 }
 
 static void
 recovery_stop_file(struct wal_watcher *watcher)
 {
-	ev_stat_stop(&watcher->stat);
+	ev_stat_stop(loop(), &watcher->stat);
 }
 
 static void
-recovery_rescan_dir(ev_timer *w, int revents __attribute__((unused)))
+recovery_rescan_dir(ev_loop * loop, ev_timer *w, int /* revents */)
 {
 	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
@@ -704,12 +706,12 @@ recovery_rescan_dir(ev_timer *w, int revents __attribute__((unused)))
 		if (save_current_wal != NULL)
 			recovery_stop_file(watcher);
 		if (r->current_wal != NULL)
-			recovery_watch_file(watcher, r->current_wal);
+			recovery_watch_file(loop, watcher, r->current_wal);
 	}
 }
 
 static void
-recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)))
+recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 {
 	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
@@ -723,7 +725,7 @@ recovery_rescan_file(ev_stat *w, int revents __attribute__((unused)))
 		log_io_close(&r->current_wal);
 		recovery_stop_file(watcher);
 		/* Don't wait for wal_dir_rescan_delay. */
-		recovery_rescan_dir(&watcher->dir_timer, 0);
+		recovery_rescan_dir(loop, &watcher->dir_timer, 0);
 	}
 }
 
@@ -732,19 +734,20 @@ recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
 {
 	assert(r->watcher == NULL);
 	assert(r->writer == NULL);
+	ev_loop *loop = loop();
 
 	struct wal_watcher  *watcher = r->watcher= &wal_watcher;
 
 	ev_timer_init(&watcher->dir_timer, recovery_rescan_dir,
 		      wal_dir_rescan_delay, wal_dir_rescan_delay);
 	watcher->dir_timer.data = watcher->stat.data = r;
-	ev_timer_start(&watcher->dir_timer);
+	ev_timer_start(loop, &watcher->dir_timer);
 	/*
 	 * recover() leaves the current wal open if it has no
 	 * EOF marker.
 	 */
 	if (r->current_wal != NULL)
-		recovery_watch_file(watcher, r->current_wal);
+		recovery_watch_file(loop, watcher, r->current_wal);
 }
 
 static void
@@ -752,9 +755,9 @@ recovery_stop_local(struct recovery_state *r)
 {
 	struct wal_watcher *watcher = r->watcher;
 	assert(ev_is_active(&watcher->dir_timer));
-	ev_timer_stop(&watcher->dir_timer);
+	ev_timer_stop(loop(), &watcher->dir_timer);
 	if (ev_is_active(&watcher->stat))
-		ev_stat_stop(&watcher->stat);
+		ev_stat_stop(loop(), &watcher->stat);
 
 	r->watcher = NULL;
 }
@@ -853,7 +856,7 @@ wal_schedule_queue(struct wal_fifo *queue)
 }
 
 static void
-wal_schedule(ev_async *watcher, int event __attribute__((unused)))
+wal_schedule(ev_loop * /* loop */, ev_async *watcher, int /* event */)
 {
 	struct wal_writer *writer = (struct wal_writer *) watcher->data;
 	struct wal_fifo commit = STAILQ_HEAD_INITIALIZER(commit);
@@ -953,7 +956,7 @@ wal_writer_start(struct recovery_state *r)
 	wal_writer_init(&wal_writer);
 	r->writer = &wal_writer;
 
-	ev_async_start(&wal_writer.write_event);
+	ev_async_start(loop(), &wal_writer.write_event);
 
 	/* II. Start the thread. */
 
@@ -983,7 +986,7 @@ wal_writer_stop(struct recovery_state *r)
 		panic_syserror("WAL writer: thread join failed");
 	}
 
-	ev_async_stop(&writer->write_event);
+	ev_async_stop(loop(), &writer->write_event);
 	wal_writer_destroy(writer);
 
 	r->writer = NULL;
@@ -1177,7 +1180,7 @@ wal_writer_thread(void *worker_args)
 			STAILQ_CONCAT(&rollback, &writer->input);
 			STAILQ_CONCAT(&writer->input, &rollback);
 		}
-		ev_async_send(&writer->write_event);
+		ev_async_send(loop(), &writer->write_event);
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 	if (r->current_wal != NULL)
@@ -1247,6 +1250,7 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 	static uint64_t bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
+	ev_loop *loop = loop();
 
 	struct log_row *row = (struct log_row *) region_alloc(&fiber()->gc,
 		sizeof(*row) + data_len + metadata_len);
@@ -1273,8 +1277,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 				 * Remember the time of first
 				 * write to disk.
 				 */
-				ev_now_update();
-				last = ev_now();
+				ev_now_update(loop);
+				last = ev_now(loop);
 			}
 			/**
 			 * If io rate limit is set, flush the
@@ -1285,12 +1289,12 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 				fdatasync(fileno(l->f));
 		}
 		while (bytes >= recovery_state->snap_io_rate_limit) {
-			ev_now_update();
+			ev_now_update(loop);
 			/*
 			 * How much time have passed since
 			 * last write?
 			 */
-			elapsed = ev_now() - last;
+			elapsed = ev_now(loop) - last;
 			/*
 			 * If last write was in less than
 			 * a second, sleep until the
@@ -1299,8 +1303,8 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 			if (elapsed < 1)
 				usleep(((1 - elapsed) * 1000000));
 
-			ev_now_update();
-			last = ev_now();
+			ev_now_update(loop);
+			last = ev_now(loop);
 			bytes -= recovery_state->snap_io_rate_limit;
 		}
 	}
