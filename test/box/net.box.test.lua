@@ -126,6 +126,12 @@ unpack(parallel)
 #parallel
 box.time() - pstart < 0.5
 
+
+
+box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+remote.rpc.box.space.tweedledum.index.primary:select(12345)
+
 remote:close()
 remote:close()
 remote:ping()

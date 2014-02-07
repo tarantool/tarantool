@@ -355,17 +355,29 @@ box.time() - pstart < 0.5
 ---
 - true
 ...
+box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+---
+- - [12345, 'test11', 'test2']
+...
+remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+---
+- - [12345, 'test11', 'test2']
+...
+remote.rpc.box.space.tweedledum.index.primary:select(12345)
+---
+- - [12345, 'test11', 'test2']
+...
 remote:close()
 ---
 - true
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:427: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:491: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:432: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:496: box.net.box: connection
     was closed'
 ...
 space:drop()
