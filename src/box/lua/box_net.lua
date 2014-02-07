@@ -373,9 +373,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
-                    header, offset = msgpack.next(resp);
-                    code = header[box.net.box.CODE]
-                    sync = header[box.net.box.SYNC]
+                    local header, offset = msgpack.next(resp);
+                    local code = header[box.net.box.CODE]
+                    local sync = header[box.net.box.SYNC]
                     if sync == nil then
                         break
                     end
@@ -421,9 +421,6 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 end
             end
         end,
-
-
-
 
         close = function(self)
             if self.closed then
