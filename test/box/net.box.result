@@ -48,21 +48,21 @@ type(a)
 ---
 - nil
 ...
-remote:call('test')
+unpack(remote:call('test'))
 ---
 - [123, 456]
 ...
 function test(...) return box.tuple.new({ ... }) end
 ---
 ...
-remote:call('test', 123, 345, { 678, 910 })
+unpack(remote:call('test', 123, 345, { 678, 910 }))
 ---
 - [123, 345, [678, 910]]
 ...
 function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
 ---
 ...
-remote:call('test', 123, 345, { 678, 910 })
+unpack(remote:call('test', 123, 345, { 678, 910 }))
 ---
 - [123, 345, [678, 910]]
 - [123, 345, [678, 910]]
@@ -70,7 +70,7 @@ remote:call('test', 123, 345, { 678, 910 })
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
 ---
 ...
-remote:call('test:b')
+unpack(remote:call('test:b'))
 ---
 - [123]
 ...
@@ -103,19 +103,19 @@ type(a)
 ---
 - nil
 ...
-remote:call('test:b')
+unpack(remote:call('test:b'))
 ---
 - ['a']
 ...
-remote:call('test:b', 'b', 'c')
+unpack(remote:call('test:b', 'b', 'c'))
 ---
 - ['a', 'b', 'c']
 ...
-remote:call('test:b', 'b', 'c', 'd', 'e')
+unpack(remote:call('test:b', 'b', 'c', 'd', 'e'))
 ---
 - ['a', 'b', 'c', 'd', 'e']
 ...
-remote:call('test:b', 'b', { 'c', { d = 'e' } })
+unpack(remote:call('test:b', 'b', { 'c', { d = 'e' } }))
 ---
 - ['a', 'b', ['c', {'d': 'e'}]]
 ...
@@ -148,7 +148,7 @@ type(a)
 ---
 - nil
 ...
-remote:call('test.a:b', 123)
+unpack(remote:call('test.a:b', 123))
 ---
 - [1, 123]
 ...
@@ -160,11 +160,11 @@ box.space.tweedledum:select({123})
 ---
 - [123, 'test1', 'test2']
 ...
-remote:call('box.space.tweedledum:select', 123)
+unpack(remote:call('box.space.tweedledum:select', 123))
 ---
 - [123, 'test1', 'test2']
 ...
-remote:call('box.space.tweedledum:select', {123})
+unpack(remote:call('box.space.tweedledum:select', {123}))
 ---
 - [123, 'test1', 'test2']
 ...
@@ -215,7 +215,7 @@ remote:select(space.n, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:call('box.space.tweedledum:select', 345)
+unpack(remote:call('box.space.tweedledum:select', 345))
 ---
 - [345, 'test1', 'test2']
 ...
@@ -231,7 +231,6 @@ space:select{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
--- remote:select_limit(space.n, 0, 0, 1000, 345)
 space:eselect({}, { iterator = 'GE', limit = 1000 })
 ---
 - - [123, 'test1-updated', 'test2-updated']
@@ -244,8 +243,8 @@ box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
 ...
 remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 ---
-- [123, 'test1-updated', 'test2-updated']
-- [345, 'test1-replaced', 'test2-replaced']
+- - [123, 'test1-updated', 'test2-updated']
+  - [345, 'test1-replaced', 'test2-replaced']
 ...
 space:select{345}
 ---
@@ -259,12 +258,31 @@ remote:timeout(0.5):select(space.n, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:call('box.fiber.sleep', .01)
+box.net.self:insert(space.n, {12345, 'test1', 'test2'})
+---
+- [12345, 'test1', 'test2']
+...
+box.net.self:replace(space.n, {12346, 'test1', 'test2'})
+---
+- [12346, 'test1', 'test2']
+...
+box.net.self:update(space.n, 12345, {{ '=', 1, 'test11' }})
+---
+- [12345, 'test11', 'test2']
+...
+box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
 ---
 ...
-remote:timeout(0.01):call('box.fiber.sleep', 10)
+box.net.self:delete(space.n, 12346)
 ---
-- null
+- [12346, 'test1', 'test2']
+...
+unpack(remote:call('box.fiber.sleep', .01))
+---
+...
+unpack(remote:timeout(0.01):call('box.fiber.sleep', 10))
+---
+- error: 'bad argument #1 to ''?'' (table expected, got nil)'
 ...
 --# setopt delimiter ';'
 pstart = box.time();
@@ -290,7 +308,7 @@ for i = 1, 20 do
                 box.fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
-                table.insert(parallel, s == so[0])
+                table.insert(parallel, s == so[1][0])
             end
         )
     )
@@ -343,11 +361,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:401: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:430: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:406: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:435: box.net.box: connection
     was closed'
 ...
 space:drop()

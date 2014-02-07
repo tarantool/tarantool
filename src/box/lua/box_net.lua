@@ -39,42 +39,63 @@ box.net = {
         ERROR = 0x31,
 
         delete = function(self, space, key)
-            return self:process(box.net.box.DELETE,
+            local t = self:process(box.net.box.DELETE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.KEY] = keify(key)
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         replace = function(self, space, tuple)
-            return self:process(box.net.box.REPLACE,
+            local t = self:process(box.net.box.REPLACE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.TUPLE] = tuple
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         -- insert a tuple (produces an error if the tuple already exists)
         insert = function(self, space, tuple)
-            return self:process(box.net.box.INSERT,
+            local t = self:process(box.net.box.INSERT,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.TUPLE] = tuple
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         -- update a tuple
         update = function(self, space, key, ops)
-            return self:process(box.net.box.UPDATE,
+            local t = self:process(box.net.box.UPDATE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.KEY] = keify(key),
                         [box.net.box.TUPLE] = ops
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         select = function(self, space, key)
-            return self:eselect(space, 0, key, { limit = 4294967295 })
+            -- unpack - is old behaviour
+            return unpack(self:eselect(space, 0, key, { limit = 4294967295 }))
         end,
 
         ping = function(self)
@@ -90,7 +111,15 @@ box.net = {
         end,
 
         eselect = function(self, sno, ino, key, opts)
-            return self:call('box.net.self:eselect', sno, ino, key, opts)
+            local res = self:call('box.net.self:eselect', sno, ino, key, opts)
+            if opts and opts.limit == nil then
+                if res[1] ~= nil then
+                    return res[1]
+                else
+                    return
+                end
+            end
+            return res
         end,
 
 
@@ -152,9 +181,9 @@ box.net = {
         call = function(self, proc_name, ...) 
             local proc = { box.call_loadproc(proc_name) }
             if #proc == 2 then
-                return proc[1](proc[2], ...)
+                return { proc[1](proc[2], ...) }
             else
-                return proc[1](...)
+                return { proc[1](...) }
             end
         end,
 
@@ -275,7 +304,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     if code ~= 0 then
                         box.raise(code, body[box.net.box.ERROR])
                     end
-                    return unpack(totuples(body[box.net.box.DATA]))
+                    return totuples(body[box.net.box.DATA])
                 end
             else
                 error(res[2])
