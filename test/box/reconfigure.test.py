@@ -2,7 +2,7 @@
 #
 admin("box.cfg.too_long_threshold")
 # bad1
-server.reconfigure("box/tarantool_bad1.cfg")
+server.reconfigure("box/tarantool_bad1.cfg", override=[''])
 admin("box.cfg.too_long_threshold")
 # good
 server.reconfigure("box/tarantool_good.cfg")

@@ -1,4 +1,4 @@
---# create server hot_standby with configuration='replication/cfg/hot_standby.cfg', need_init=False
+--# create server hot_standby with configuration='replication/cfg/hot_standby.cfg' with hot_master=default
 --# create server replica with configuration='replication/cfg/replica.cfg'
 --# start server hot_standby
 --# start server replica
@@ -19,7 +19,7 @@ do
     function _insert(_begin, _end)
         local a = {}
         for i = _begin, _end do
-            table.insert(a, box.space[0]:insert{i, 'the tuple '..i})
+            table.insert(a, box.space['tweedledum']:insert{i, 'the tuple '..i})
         end
         return unpack(a)
     end
@@ -27,7 +27,7 @@ do
     function _select(_begin, _end)
         local a = {}
         for i = _begin, _end do
-            table.insert(a, box.space[0]:select{i})
+            table.insert(a, box.space['tweedledum']:select{i})
         end
         return unpack(a)
     end
@@ -43,18 +43,14 @@ end;
 --# set connection default
 
 -- set begin lsn on master, replica and hot_standby.
+--# set variable replica_port to 'replica.primary_port'
 begin_lsn = box.info.lsn
 
-a = box.net.box.new('127.0.0.1', 33113)
+a = box.net.box.new('127.0.0.1', replica_port)
 unpack(a:call('_set_pri_lsn', box.info.lsn))
 a:close()
 
-a = box.net.box.new('127.0.0.1', 33013)
-unpack(a:call('_set_pri_lsn', box.info.lsn))
-a:close()
-
-
-space = box.schema.create_space('tweedledum', { id = 0 })
+space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
 _insert(1, 10)
@@ -67,8 +63,12 @@ _select(1, 10)
 --# stop server default
 box.fiber.sleep(0.2)
 
---# set connection hot_standby
+--# set variable hot_standby_port to 'hot_standby.primary_port'
+a = box.net.box.new('127.0.0.1', hot_standby_port)
+a:call('_set_pri_lsn', box.info.lsn)
+a:close()
 
+--# set connection hot_standby
 _insert(11, 20)
 _select(11, 20)
 
@@ -82,4 +82,4 @@ _select(11, 20)
 --# cleanup server replica
 --# start server default
 --# set connection default
-box.space[0]:drop()
+box.space['tweedledum']:drop()

@@ -131,7 +131,6 @@ class Colorer(object):
         self.stdout = sys.stdout
         self.is_term = self.stdout.isatty()
         self.colors = int(os.popen('tput colors').read()) if self.is_term else None
-        print os.getenv('TT_SCHEMA')
         schema = os.getenv('TT_SCHEMA', 'ascetic')
         if schema == 'ascetic':
             self.schema = SchemaAscetic()

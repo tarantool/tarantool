@@ -3,7 +3,7 @@ import os
 
 # mask BFD warnings: https://bugs.launchpad.net/tarantool/+bug/1018356
 sys.stdout.push_filter("unable to read unknown load command 0x2\d+", "")
-
+vardir = server.vardir
 server.test_option("--help")
 server.test_option("-h")
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")

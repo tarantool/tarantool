@@ -1,4 +1,4 @@
---# create server replica with configuration='replication/cfg/replica.cfg'
+--# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
 --# start server replica
 --# set connection default
 
@@ -32,10 +32,11 @@ do
 end;
 --# setopt delimiter ''
 --# set connection default
+--# set variable replica_port to 'replica.primary_port'
 
 -- set begin lsn on master and replica.
 begin_lsn = box.info.lsn
-a = box.net.box.new('127.0.0.1', 33113)
+a = box.net.box.new('127.0.0.1', replica_port)
 unpack(a:call('_set_pri_lsn', box.info.lsn))
 a:close()
 
@@ -60,7 +61,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration 'replication/cfg/replica_to_master.cfg'
+--# reconfigure server replica with configuration 'replication/cfg/replica_to_master.cfg', rpl_master=None
 --# set connection default
 _insert(11, 20, 'master')
 _select(11, 20)
@@ -78,7 +79,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
 _select(11, 20)
 --# set connection default
 -- Master LSN:
@@ -93,7 +94,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg'
+--# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg', rpl_master=None
 --# set connection default
 _insert(21, 30, 'master')
 _select(21, 30)
@@ -111,7 +112,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
 _select(21, 30)
 
 --# set connection default
@@ -127,7 +128,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg'
+--# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg', rpl_master=None
 --# set connection default
 _insert(31, 40, 'master')
 _select(31, 40)
@@ -145,7 +146,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg'
+--# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
 _select(31, 50)
 --# set connection default
 _insert(41, 60, 'master')

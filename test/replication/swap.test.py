@@ -17,12 +17,13 @@ def select_tuples(_server, begin, end, lsn):
 
 # master server
 master = server
-
+cfgfile_bkp = server.cfgfile_source
 # replica server
 replica = TarantoolServer()
-replica.deploy("replication/cfg/replica.cfg",
-               replica.find_exe(self.args.builddir),
-               os.path.join(self.args.vardir, "replica"))
+replica.rpl_master = master
+replica.cfgfile_source = "replication/cfg/replica.cfg"
+replica.vardir = os.path.join(server.vardir, 'replica')
+replica.deploy()
 
 schema = {
     0 : {
@@ -60,8 +61,10 @@ for i in range(REPEAT):
 
     print "swap servers"
     # reconfigure replica to master
+    replica.rpl_master = None
     replica.reconfigure("replication/cfg/replica_to_master.cfg", silent = False)
     # reconfigure master to replica
+    master.rpl_master = replica
     master.reconfigure("replication/cfg/master_to_replica.cfg", silent = False)
 
     # insert to replica
@@ -78,8 +81,10 @@ for i in range(REPEAT):
 
     print "rollback servers configuration"
     # reconfigure replica to master
+    master.rpl_master = None
     master.reconfigure("replication/cfg/master.cfg", silent = False)
     # reconfigure master to replica
+    replica.rpl_master = master
     replica.reconfigure("replication/cfg/replica.cfg", silent = False)
 
 
@@ -87,4 +92,5 @@ for i in range(REPEAT):
 replica.stop()
 replica.cleanup(True)
 server.stop()
-server.deploy(self.suite_ini["config"])
+server.cfgfile_source = cfgfile_bkp
+server.deploy()
