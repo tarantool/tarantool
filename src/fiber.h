@@ -135,6 +135,7 @@ struct cord {
 	 * reserved.
          */
 	uint32_t max_fid;
+	pthread_t id;
 	/** A helper hash to map id -> fiber. */
 	struct mh_i32ptr_t *fiber_registry;
 	/** All fibers */

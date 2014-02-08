@@ -42,6 +42,7 @@
 static struct cord main = { &main.sched };
 #pragma GCC diagnostic pop
 __thread struct cord *cord_ptr = &main;
+pthread_t main_thread_id;
 
 static void
 update_last_stack_frame(struct fiber *fiber)
@@ -463,7 +464,7 @@ fiber_new(const char *name, void (*f) (va_list))
 /**
  * Free as much memory as possible taken by the fiber.
  *
- * @note we don't release memory allocated for
+ * @todo release memory allocated for
  * struct fiber and some of its members.
  */
 void
@@ -480,10 +481,9 @@ fiber_destroy(struct fiber *f)
 }
 
 void
-fiber_destroy_all()
+fiber_destroy_all(struct cord *cord)
 {
 	struct fiber *f;
-	struct cord *cord = cord();
 	rlist_foreach_entry(f, &cord->fibers, link)
 		fiber_destroy(f);
 	rlist_foreach_entry(f, &cord->zombie_fibers, link)
@@ -491,11 +491,11 @@ fiber_destroy_all()
 }
 
 void
-fiber_init(void)
+cord_create(struct cord *cord)
 {
-	cord *cord = cord();
-
-	cord->loop = ev_default_loop(EVFLAG_AUTO);
+	cord->id = pthread_self();
+	cord->loop = cord->id == main_thread_id ?
+		ev_default_loop(EVFLAG_AUTO) : ev_loop_new(EVFLAG_AUTO);
 	slab_cache_create(&cord->slabc, &runtime, 0);
 	mempool_create(&cord->fiber_pool, &cord->slabc,
 		       sizeof(struct fiber));
@@ -516,17 +516,29 @@ fiber_init(void)
 }
 
 void
-fiber_free(void)
+cord_destroy(struct cord *cord)
 {
-	struct cord *cord = cord();
 	ev_async_stop(cord->loop, &cord->ready_async);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
-		fiber_destroy_all();
+		fiber_destroy_all(cord);
 		mh_i32ptr_delete(cord->fiber_registry);
 	}
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
+}
+
+void
+fiber_init(void)
+{
+	main_thread_id = pthread_self();
+	cord_create(cord());
+}
+
+void
+fiber_free(void)
+{
+	cord_destroy(cord());
 }
 
 int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
