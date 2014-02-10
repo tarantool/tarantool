@@ -23,7 +23,7 @@ def check_port(port):
 
 def prepare_gdb(binary, args):
     """Prepare server startup arguments to run under gdb."""
-    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args 
+    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args
     return args
 
 def prepare_valgrind(args, valgrind_log, valgrind_sup):
@@ -47,19 +47,32 @@ class Server(object):
     replication slaves. The server is started once at the beginning
     of each suite, and stopped at the end."""
 
-    def __new__(cls, core=None):
-        if core  == None:
-            return super(Server, cls).__new__(cls)
-        core = core.lower().strip()
+    @property
+    def vardir(self):
+        if not hasattr(self, '_vardir'):
+            raise ValueError("No vardir specified")
+        return self._vardir
+    @vardir.setter
+    def vardir(self, path):
+        if path == None:
+            return
+        self._vardir = os.path.abspath(path)
+
+
+    def __new__(cls, ini=None):
+        if ini == None or 'core' not in ini or ini['core'] is None:
+            return object.__new__(cls)
+        core = ini['core'].lower().strip()
         cls.mdlname = "lib.{0}_server".format(core.replace(' ', '_'))
         cls.clsname = "{0}Server".format(core.title().replace(' ', ''))
         corecls = __import__(cls.mdlname, fromlist=cls.clsname).__dict__[cls.clsname]
         return corecls.__new__(corecls, core)
 
-    def __init__(self, core):
-        self.core = core
-        self.vardir = None
+    def __init__(self, ini):
+        self.core = ini['core']
+        self.ini = ini
         self.re_vardir_cleanup = ['*.core.*', 'core']
+        self.vardir = ini['vardir']
 
     def prepare_args(self):
         return []
@@ -72,13 +85,9 @@ class Server(object):
             for f in glob.glob(os.path.join(self.vardir, re)):
                 os.remove(f)
 
-    def configure(self, config):
-        pass
     def install(self, binary=None, vardir=None, mem=None, silent=True):
         pass
     def init(self):
-        pass
-    def find_exe(self, builddir, silent=True):
         pass
     def start(self, silent=True):
         pass

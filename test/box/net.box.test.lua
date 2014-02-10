@@ -75,7 +75,6 @@ space:select{345}
 
 remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
 space:select{345}
--- remote:select_limit(space.n, 0, 0, 1000, 345)
 
 space:eselect({}, { iterator = 'GE', limit = 1000 })
 box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
@@ -83,6 +82,15 @@ remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 space:select{345}
 remote:select(space.n, {345})
 remote:timeout(0.5):select(space.n, {345})
+
+
+
+box.net.self:insert(space.n, {12345, 'test1', 'test2'})
+box.net.self:replace(space.n, {12346, 'test1', 'test2'})
+box.net.self:update(space.n, 12345, {{ '=', 1, 'test11' }})
+box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
+box.net.self:delete(space.n, 12346)
+
 
 remote:call('box.fiber.sleep', .01)
 remote:timeout(0.01):call('box.fiber.sleep', 10)
@@ -102,7 +110,7 @@ for i = 1, 20 do
                 box.fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
-                table.insert(parallel, s == so[0])
+                table.insert(parallel, s == so[1][0])
             end
         )
     )
@@ -114,9 +122,15 @@ for i = 1, 20 do
     box.fiber.sleep(0.1)
 end;
 --# setopt delimiter ''
-unpack(parallel)
+parallel
 #parallel
 box.time() - pstart < 0.5
+
+
+
+box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+remote.rpc.box.space.tweedledum.index.primary:select(12345)
 
 remote:close()
 remote:close()

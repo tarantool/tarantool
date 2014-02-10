@@ -68,12 +68,12 @@
 
   <para>
     As its key feature, Tarantool supports <emphasis
-    role="strong">Lua stored procedures</emphasis>, which
+    role="strong">Lua functions</emphasis>, which
     can access and modify data atomically.
-    Users can create, modify and drop Lua procedures at runtime.
+    Users can create, modify and drop Lua functions at runtime.
   </para>
   <para>
-    There is a role not only for Lua procedures, but also for Lua programs.
+    There is a role not only for Lua functions, but also for Lua programs.
     During startup, Lua programs can be used to define
     triggers and background tasks, or interact with networked peers.
     Unlike popular application development frameworks based on
@@ -89,8 +89,9 @@
   </para>
 
   <para>
-    Tarantool supports <emphasis role="strong">asynchronous replication
-    </emphasis>, locally or to a remote host. Replication does not
+    Tarantool supports
+    <emphasis role="strong">asynchronous replication</emphasis>,
+    locally or to a remote host. Replication does not
     cause blocking of writes to the master database.
     If the master becomes unavailable, a replica can assume the
     master role without requiring a restart.
@@ -99,7 +100,7 @@
   <para>
     Tarantool is <emphasis role="strong">in production today</emphasis>.
     Tarantool was created by and is actively used at
-    <citetitle xlink:href="http://api.mail.ru">Mail.Ru</citetitle>,
+    <citetitle xlink:href="https://en.wikipedia.org/wiki/Mail.ru">Mail.Ru</citetitle>,
     one of the leading Russian web content providers. At Mail.Ru
     the software serves the <quote>hottest</quote>
     data, such as online users and their sessions, online application

@@ -3,19 +3,26 @@
 macro(libev_build)
     set(ev_compile_flags)
     set(ev_link_libraries)
+# There are warnings in libev code which are impossible to selectively
+# turn off, see
+# http://gcc.gnu.org/bugzilla/show_bug.cgi?id=45977
+# http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod#COMPILER_WARNINGS
+# while this stand off is going on, the world is not a very happy
+# place:
+    set(ev_compile_flags "${ev_compile_flags} -w")
 
-    if (CC_HAS_WNO_UNUSED_RESULT)
-        set(ev_compile_flags "${ev_compile_flags} -Wno-unused-value")
-    endif()
-    if (CC_HAS_WNO_COMMENT)
-        set(ev_compile_flags "${ev_compile_flags} -Wno-comment")
-    endif()
-    if (CC_HAS_FNO_STRICT_ALIASING)
-        set(ev_compile_flags "${ev_compile_flags} -fno-strict-aliasing")
-    endif()
-    if (CC_HAS_WNO_PARENTHESES)
-        set(ev_compile_flags "${ev_compile_flags} -Wno-parentheses")
-    endif()
+#    if (CC_HAS_WNO_UNUSED_RESULT)
+#        set(ev_compile_flags "${ev_compile_flags} -Wno-unused-value")
+#    endif()
+#    if (CC_HAS_WNO_COMMENT)
+#        set(ev_compile_flags "${ev_compile_flags} -Wno-comment")
+#    endif()
+#    if (CC_HAS_FNO_STRICT_ALIASING)
+#        set(ev_compile_flags "${ev_compile_flags} -fno-strict-aliasing")
+#    endif()
+#    if (CC_HAS_WNO_PARENTHESES)
+#        set(ev_compile_flags "${ev_compile_flags} -Wno-parentheses")
+#    endif()
     set(ev_compile_flags "${ev_compile_flags} -DENABLE_BUNDLED_LIBEV=1")
 
     if (TARGET_OS_LINUX)

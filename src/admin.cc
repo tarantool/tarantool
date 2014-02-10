@@ -77,7 +77,7 @@ admin_handler(va_list ap)
 	LuarefGuard coro_guard(tarantool_L);
 
 	auto scoped_guard = make_scoped_guard([&] {
-		evio_close(&coio);
+		evio_close(loop(), &coio);
 		iobuf_delete(iobuf);
 		session_destroy(fiber()->session);
 	});

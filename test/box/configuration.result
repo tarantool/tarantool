@@ -13,7 +13,7 @@ print_config()
   pid_file: box.pid
   slab_alloc_factor: 2
   slab_alloc_minimal: 64
-  admin_port: 33015
+  admin_port: <number>
   logger: cat - >> tarantool.log
   snap_io_rate_limit: 0
   log_level: 5
@@ -32,7 +32,7 @@ print_config()
   replication_port: 0
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  primary_port: 33013
+  primary_port: <number>
   wal_dir_rescan_delay: 0.1
 ...
 
@@ -88,7 +88,7 @@ mod.test(10, 15)
 # Bug#99 Salloc initialization is not checked on startup
 #  (https://github.com/tarantool/tarantool/issues/99)
 
-Can't start tarantool
+Can't start Tarantool
 ok
 
 # Bug#100 Segmentation fault if rows_per_wal = 1

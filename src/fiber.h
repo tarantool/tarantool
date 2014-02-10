@@ -122,6 +122,7 @@ struct cord {
 	struct fiber *fiber;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
+	struct ev_loop *loop;
 	/** Call stack - in case one fiber decides to call
 	 * another with fiber_call(). This is not used
 	 * currently, all fibers are called by the sched
@@ -154,6 +155,7 @@ extern __thread struct cord *cord_ptr;
 
 #define cord() cord_ptr
 #define fiber() cord()->fiber
+#define loop() (cord()->loop)
 
 void fiber_init(void);
 void fiber_free(void);

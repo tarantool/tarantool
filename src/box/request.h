@@ -38,8 +38,6 @@ typedef void (*request_execute_f)(struct request *,
 				  struct txn *,
 				  struct port *);
 
-typedef void (*request_fill_f)(struct request *);
-
 struct request
 {
 	uint32_t type;
@@ -57,7 +55,6 @@ struct request
 	const char *data;
 	uint32_t len;
 	request_execute_f execute;
-	request_fill_f fill;
 };
 
 void
@@ -65,5 +62,8 @@ request_create(struct request *request, uint32_t type);
 
 void
 request_decode(struct request *request, const char *data, uint32_t len);
+
+void
+request_encode(struct request *request);
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

@@ -4,9 +4,9 @@ import sys
 import ctypes
 import struct
 
-from lib.test_suite import check_libs
-
+from lib.utils import check_libs
 check_libs()
+
 from tarantool.request import (
         RequestPing,
         RequestInsert,

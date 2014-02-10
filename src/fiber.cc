@@ -97,7 +97,7 @@ fiber_wakeup(struct fiber *f)
 	f->flags |= FIBER_READY;
 	struct cord *cord = cord();
 	if (rlist_empty(&cord->ready_fibers))
-		ev_async_send(&cord->ready_async);
+		ev_async_send(cord->loop, &cord->ready_async);
 	rlist_move_tail_entry(&cord->ready_fibers, f, state);
 }
 
@@ -217,7 +217,8 @@ struct fiber_watcher_data {
 };
 
 static void
-fiber_schedule_timeout(ev_timer *watcher, int revents)
+fiber_schedule_timeout(ev_loop * /* loop */,
+		       ev_timer *watcher, int revents)
 {
 	(void) revents;
 
@@ -239,9 +240,9 @@ fiber_yield_timeout(ev_tstamp delay)
 	ev_timer_init(&timer, fiber_schedule_timeout, delay, 0);
 	struct fiber_watcher_data state = { fiber(), false };
 	timer.data = &state;
-	ev_timer_start(&timer);
+	ev_timer_start(loop(), &timer);
 	fiber_yield();
-	ev_timer_stop(&timer);
+	ev_timer_stop(loop(), &timer);
 	return state.timed_out;
 }
 
@@ -269,7 +270,7 @@ fiber_sleep(ev_tstamp delay)
  * @return process return status
 */
 void
-fiber_schedule_child(ev_child *watcher, int event __attribute__((unused)))
+fiber_schedule_child(ev_loop * /* loop */, ev_child *watcher, int event)
 {
 	return fiber_schedule((ev_watcher *) watcher, event);
 }
@@ -281,9 +282,9 @@ wait_for_child(pid_t pid)
 	ev_init(&cw, fiber_schedule_child);
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber();
-	ev_child_start(&cw);
+	ev_child_start(loop(), &cw);
 	fiber_yield();
-	ev_child_stop(&cw);
+	ev_child_stop(loop(), &cw);
 	int status = cw.rstatus;
 	fiber_testcancel();
 	return status;
@@ -297,7 +298,7 @@ fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)))
 }
 
 static void
-fiber_ready_async(ev_async *watcher, int revents)
+fiber_ready_async(ev_loop * /* loop */, ev_async *watcher, int revents)
 {
 	(void) watcher;
 	(void) revents;
@@ -494,6 +495,7 @@ fiber_init(void)
 {
 	cord *cord = cord();
 
+	cord->loop = ev_default_loop(EVFLAG_AUTO);
 	slab_cache_create(&cord->slabc, &runtime, 0);
 	mempool_create(&cord->fiber_pool, &cord->slabc,
 		       sizeof(struct fiber));
@@ -510,20 +512,21 @@ fiber_init(void)
 	cord->max_fid = 100;
 
 	ev_async_init(&cord->ready_async, fiber_ready_async);
-	ev_async_start(&cord->ready_async);
+	ev_async_start(cord->loop, &cord->ready_async);
 }
 
 void
 fiber_free(void)
 {
 	struct cord *cord = cord();
-	ev_async_stop(&cord->ready_async);
+	ev_async_stop(cord->loop, &cord->ready_async);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
 		fiber_destroy_all();
 		mh_i32ptr_delete(cord->fiber_registry);
 	}
 	slab_cache_destroy(&cord->slabc);
+	ev_loop_destroy(cord->loop);
 }
 
 int fiber_stat(fiber_stat_cb cb, void *cb_ctx)

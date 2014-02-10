@@ -328,10 +328,6 @@ assert_fail(const char *assertion, const char *file, unsigned int line, const ch
 	abort();
 }
 
-#ifdef HAVE_BFD
-static struct symbol *symbols;
-static ssize_t symbol_count;
-
 /** Allocate and fill an absolute path to a file. */
 char *
 abspath(const char *filename)
@@ -351,6 +347,11 @@ abspath(const char *filename)
 	strcat(abspath, filename);
 	return abspath;
 }
+
+
+#ifdef HAVE_BFD
+static struct symbol *symbols;
+static ssize_t symbol_count;
 
 int
 compare_symbol(const void *_a, const void *_b)

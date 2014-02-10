@@ -1,11 +1,16 @@
 import os
+
 import sys
 import shlex
+import shutil
 import socket
 
 from collections import deque
 
 from lib.admin_connection import AdminConnection
+
+class Namespace(object):
+    pass
 
 class LuaPreprocessorException(Exception):
     def __init__(self, val):
@@ -20,6 +25,11 @@ class State(object):
         self.suite_ini = suite_ini
         self.curcon = [curcon]
         self.tarantool_server = server
+        self.environ = Namespace()
+        nmsp = Namespace()
+        setattr(nmsp, 'admin_port', self.suite_ini['servers']['default'].admin.port)
+        setattr(nmsp, 'primary_port', self.suite_ini['servers']['default'].sql.port)
+        setattr(self.environ, 'default', nmsp)
 
     def parse_preprocessor(self, string):
         token_store = deque()
@@ -96,6 +106,14 @@ class State(object):
                     raise LuaPreprocessorException("Wrong token for filter: expected filter2")
                 ret = temp
             return self.filter(ftype, ref, ret)
+        elif token == 'variable':
+            ftype = token_store.popleft()
+            ref = lexer.get_token()
+            temp = lexer.get_token()
+            if temp != 'to':
+                raise LuaPreprocessorException("Wrong token for filter: exptected 'to', got {0}".format(repr(temp)))
+            ret = lexer.get_token()
+            return self.variable(ftype, ref, ret)
         else:
             raise LuaPreprocessorException("Wrong command: "+repr(lexer.instream.getvalue()))
 
@@ -111,24 +129,28 @@ class State(object):
                 raise LuaPreprocessorException('Server {0} already exists'.format(repr(sname)))
             temp = self.tarantool_server()
             if 'configuration' in opts:
-                temp.config = opts['configuration'][1:-1]
+                temp.cfgfile_source = opts['configuration'][1:-1]
             else:
-                temp.cofnfig = self.suite_ini['config']
+                temp.cfgfile_source = self.suite_ini['config']
             if 'need_init' in opts:
-                temp.need_init = True if opts['need_init'] == 'True' else False
+                temp.need_init   = True if opts['need_init'] == 'True' else False
             if 'init' in opts:
-                temp.init_lua = params['init'][1:-1]
+                temp.init_lua = opts['init'][1:-1]
+            if 'rpl_master' in opts:
+                temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
+            elif 'hot_master' in opts:
+                temp.hot_master = (self.suite_ini['servers'][opts['hot_master']] if (not opts['hot_master'] == 'None') else None)
             temp.vardir = os.path.join(self.suite_ini['vardir'], sname)
-            temp.binary = temp.find_exe(self.suite_ini['builddir'])
+            temp.name = sname
             self.suite_ini['servers'][sname] = temp
-            temp.configure(temp.config)
-            temp.install(temp.binary,
-                    temp.vardir, temp.mem, True)
-            if temp.need_init:
-                temp.init()
+            self.suite_ini['servers'][sname].deploy(silent=True)
+            nmsp = Namespace()
+            setattr(nmsp, 'admin_port', temp.admin.port)
+            setattr(nmsp, 'primary_port', temp.sql.port)
+            setattr(self.environ, sname, nmsp)
         elif ctype == 'start':
             if sname not in self.suite_ini['servers']:
-                raise LuaPreprocessprException('Can\'t start nonexistent server '+repr(sname))
+                raise LuaPreprocessorException('Can\'t start nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].start(silent=True)
             self.suite_ini['connections'][sname] = [self.suite_ini['servers'][sname].admin, sname]
             try:
@@ -140,7 +162,7 @@ class State(object):
                 raise LuaPreprocessorException('Can\'t stop nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].stop()
             for cname in [k for k, v in self.suite_ini['connections'].iteritems() if v[1] == 'sname']:
-                self.suite_ini['connections'][cname].disconnect()
+                self.suite_ini['connections'][cname][0].disconnect()
                 self.suite_ini['connections'].pop(cname)
         elif ctype == 'deploy':
             pass
@@ -148,6 +170,10 @@ class State(object):
             if sname not in self.suite_ini['servers']:
                 raise LuaPreprocessorException('Can\'t reconfigure nonexistent server '+repr(sname))
             temp = self.suite_ini['servers'][sname]
+            if 'rpl_master' in opts:
+                temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
+            elif 'hot_master' in opts:
+                temp.hot_master = (self.suite_ini['servers'][opts['hot_master']] if (not opts['hot_master'] == 'None') else None)
             if 'configuration' in opts:
                 temp.reconfigure(opts['configuration'][1:-1], silent = True)
             else:
@@ -155,16 +181,21 @@ class State(object):
                 if temp.init_lua != None:
                     var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
                     if os.path.exists(var_init_lua):
-                        os.path.remove(var_init_lua)
-                if 'init' in params:
-                    temp.init_lua = params['init'][1:-1]
+                        os.unlink(var_init_lua)
+                if 'init' in opts:
+                    temp.init_lua = opts['init'][1:-1]
                     var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
                     shutil.copy(temp.init_lua, var_init_lua)
                     temp.restart()
+            nmsp = Namespace()
+            setattr(nmsp, 'admin_port', temp.admin.port)
+            setattr(nmsp, 'primary_port', temp.sql.port)
+            setattr(self.environ, sname, nmsp)
         elif ctype == 'cleanup':
             if sname not in self.suite_ini['servers']:
                 raise LuaPreprocessorException('Can\'t cleanup nonexistent server '+repr(sname))
             self.suite_ini['servers'][sname].cleanup()
+            delattr(self.environ, sname)
         else:
             raise LuaPreprocessorException('Unknown command for server: '+repr(ctype))
 
@@ -192,13 +223,19 @@ class State(object):
 
     def filter(self, ctype, ref, ret):
         if ctype == 'push':
-            sys.stdout.push_filter(ref[1:], ret[:-1])
+            sys.stdout.push_filter(ref[1:-1], ret[1:-1])
         elif ctype == 'pop':
             sys.stdout.pop_filter()
         elif ctype == 'clear':
             sys.stdout.clear_all_filters()
         else:
             raise LuaPreprocessorException("Wrong command for filters: " + repr(ctype))
+
+    def variable(self, ctype, ref, ret):
+        if ctype == 'set':
+            self.curcon[0](ref+'='+str(eval(ret[1:-1], {}, self.environ.__dict__)), silent=True)
+        else:
+            raise LuaPreprocessorException("Wrong command for variables: " + repr(ctype))
 
     def __call__(self, string):
         string = string[3:].strip()

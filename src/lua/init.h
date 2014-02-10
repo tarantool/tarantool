@@ -81,7 +81,7 @@ tarantool_lua_load_cfg(struct tarantool_cfg *cfg);
  * @param L is a Lua State.
  */
 void
-tarantool_lua_load_init_script(const char *path);
+tarantool_lua_load_init_script(char *path);
 
 void
 tarantool_lua(struct lua_State *L,

@@ -50,29 +50,29 @@ type(a)
 ...
 remote:call('test')
 ---
-- [123, 456]
+- - [123, 456]
 ...
 function test(...) return box.tuple.new({ ... }) end
 ---
 ...
 remote:call('test', 123, 345, { 678, 910 })
 ---
-- [123, 345, [678, 910]]
+- - [123, 345, [678, 910]]
 ...
 function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
 ---
 ...
 remote:call('test', 123, 345, { 678, 910 })
 ---
-- [123, 345, [678, 910]]
-- [123, 345, [678, 910]]
+- - [123, 345, [678, 910]]
+  - [123, 345, [678, 910]]
 ...
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
 ---
 ...
 remote:call('test:b')
 ---
-- [123]
+- - [123]
 ...
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 ---
@@ -105,19 +105,19 @@ type(a)
 ...
 remote:call('test:b')
 ---
-- ['a']
+- - ['a']
 ...
 remote:call('test:b', 'b', 'c')
 ---
-- ['a', 'b', 'c']
+- - ['a', 'b', 'c']
 ...
 remote:call('test:b', 'b', 'c', 'd', 'e')
 ---
-- ['a', 'b', 'c', 'd', 'e']
+- - ['a', 'b', 'c', 'd', 'e']
 ...
 remote:call('test:b', 'b', { 'c', { d = 'e' } })
 ---
-- ['a', 'b', ['c', {'d': 'e'}]]
+- - ['a', 'b', ['c', {'d': 'e'}]]
 ...
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
 ---
@@ -150,7 +150,7 @@ type(a)
 ...
 remote:call('test.a:b', 123)
 ---
-- [1, 123]
+- - [1, 123]
 ...
 box.space.tweedledum:select(123)
 ---
@@ -162,11 +162,11 @@ box.space.tweedledum:select({123})
 ...
 remote:call('box.space.tweedledum:select', 123)
 ---
-- [123, 'test1', 'test2']
+- - [123, 'test1', 'test2']
 ...
 remote:call('box.space.tweedledum:select', {123})
 ---
-- [123, 'test1', 'test2']
+- - [123, 'test1', 'test2']
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
@@ -217,7 +217,7 @@ remote:select(space.n, {345})
 ...
 remote:call('box.space.tweedledum:select', 345)
 ---
-- [345, 'test1', 'test2']
+- - [345, 'test1', 'test2']
 ...
 space:select{345}
 ---
@@ -231,7 +231,6 @@ space:select{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
--- remote:select_limit(space.n, 0, 0, 1000, 345)
 space:eselect({}, { iterator = 'GE', limit = 1000 })
 ---
 - - [123, 'test1-updated', 'test2-updated']
@@ -244,8 +243,8 @@ box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
 ...
 remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 ---
-- [123, 'test1-updated', 'test2-updated']
-- [345, 'test1-replaced', 'test2-replaced']
+- - [123, 'test1-updated', 'test2-updated']
+  - [345, 'test1-replaced', 'test2-replaced']
 ...
 space:select{345}
 ---
@@ -259,8 +258,28 @@ remote:timeout(0.5):select(space.n, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
+box.net.self:insert(space.n, {12345, 'test1', 'test2'})
+---
+- [12345, 'test1', 'test2']
+...
+box.net.self:replace(space.n, {12346, 'test1', 'test2'})
+---
+- [12346, 'test1', 'test2']
+...
+box.net.self:update(space.n, 12345, {{ '=', 1, 'test11' }})
+---
+- [12345, 'test11', 'test2']
+...
+box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
+---
+...
+box.net.self:delete(space.n, 12346)
+---
+- [12346, 'test1', 'test2']
+...
 remote:call('box.fiber.sleep', .01)
 ---
+- []
 ...
 remote:timeout(0.01):call('box.fiber.sleep', 10)
 ---
@@ -290,7 +309,7 @@ for i = 1, 20 do
                 box.fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
-                table.insert(parallel, s == so[0])
+                table.insert(parallel, s == so[1][0])
             end
         )
     )
@@ -306,28 +325,28 @@ end;
 ---
 ...
 --# setopt delimiter ''
-unpack(parallel)
+parallel
 ---
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
+- - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
 ...
 #parallel
 ---
@@ -337,17 +356,29 @@ box.time() - pstart < 0.5
 ---
 - true
 ...
+box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+---
+- - [12345, 'test11', 'test2']
+...
+remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+---
+- - [12345, 'test11', 'test2']
+...
+remote.rpc.box.space.tweedledum.index.primary:select(12345)
+---
+- - [12345, 'test11', 'test2']
+...
 remote:close()
 ---
 - true
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:401: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:491: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:406: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:496: box.net.box: connection
     was closed'
 ...
 space:drop()

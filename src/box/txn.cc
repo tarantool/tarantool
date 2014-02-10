@@ -88,17 +88,15 @@ txn_commit(struct txn *txn)
 
 		int res = 0;
 		if (recovery_state->wal_mode != WAL_NONE) {
-			if (request->data == NULL) {
-				/* Generate binary body for Lua requests */
-				assert(request->fill != NULL);
-				request->fill(request);
-			}
+			/* Generate binary body for Lua requests */
+			if (request->data == NULL)
+				request_encode(request);
 
-			ev_tstamp start = ev_now(), stop;
+			ev_tstamp start = ev_now(loop()), stop;
 			res = wal_write(recovery_state, lsn, fiber()->cookie,
 					request->type, request->data,
 					request->len);
-			stop = ev_now();
+			stop = ev_now(loop());
 
 			if (stop - start > cfg.too_long_threshold) {
 				say_warn("too long %s: %.3f sec",

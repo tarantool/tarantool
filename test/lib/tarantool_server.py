@@ -4,60 +4,57 @@ import sys
 import glob
 import time
 import yaml
-import errno
-import daemon
-import socket
-import signal
 import shlex
+import daemon
+import random
 import shutil
+import difflib
+import signal
+import socket
+import filecmp
 import traceback
 import subprocess
-import ConfigParser
+import collections
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+from lib.test import Test
 from lib.server import Server
+from lib.preprocessor import State
 from lib.box_connection import BoxConnection
-from lib.test_suite import FilteredStream, Test, check_libs
 from lib.admin_connection import AdminConnection
 
-from lib.preprocessor import State
 from lib.colorer import Colorer
-try:
-    import cStringIO as StringIO
-except ImportError:
-    import StringIO
-
-check_libs()
-import tarantool
 color_stdout = Colorer()
 
-def check_port(port):
-    """Check if the port we're connecting to is available"""
+def check_port(port, rais=True):
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", port))
-    except socket.error as e:
-        return
-    raise RuntimeError("The server is already running on port {0}".format(port))
+    except socket.error:
+        return True
+    if rais:
+        raise RuntimeError("The server is already running on port {0}".format(port))
+    return False
 
-def prepare_gdb(binary, args):
-    """Prepare server startup arguments to run under gdb."""
-    args = shlex.split('screen -dmS tnt-gdb gdb %s -ex \'b main\' -ex run' % binary) + args
-    return args
+def find_port(port):
+    while port < 65536:
+        if check_port(port, False):
+            return port
+        port += 1
+    return find_port(34000)
 
-def prepare_valgrind(args, valgrind_log, valgrind_sup):
-    "Prepare server startup arguments to run under valgrind."
-    args = [ "valgrind", "--log-file={0}".format(valgrind_log),
-             "--suppressions={0}".format(valgrind_sup),
-             "--gen-suppressions=all", "--show-reachable=yes", "--leak-check=full",
-             "--read-var-info=yes", "--quiet" ] + args
-    return args
+def find_in_path(name):
+    path = os.curdir + os.pathsep + os.environ["PATH"]
+    for _dir in path.split(os.pathsep):
+        exe = os.path.join(_dir, name)
+        if os.access(exe, os.X_OK):
+            return exe
+    return ''
 
-def check_tmpfs_exists():
-    return os.uname()[0] in 'Linux' and os.path.isdir("/dev/shm")
-
-def create_tmpfs_vardir(vardir):
-    os.makedirs(os.path.join("/dev/shm", vardir))
-    os.symlink(os.path.join("/dev/shm", vardir), vardir)
 
 class FuncTest(Test):
     def execute(self, server):
@@ -77,7 +74,7 @@ class LuaTest(FuncTest):
 
         for line in open(self.name, 'r'):
             if not cmd:
-                cmd = StringIO.StringIO()
+                cmd = StringIO()
             if line.find('--#') == 0:
                 rescom = cmd.getvalue().replace('\n\n', '\n')
                 if rescom:
@@ -107,171 +104,607 @@ class PythonTest(FuncTest):
         execfile(self.name, dict(locals(), **server.__dict__))
 
 
-class TarantoolConfigFile:
-    """ConfigParser can't read files without sections, work it around"""
-    def __init__(self, fp, section_name):
-        self.fp = fp
-        self.section_name = "[" + section_name + "]"
+class TarantoolConfig(object):
+    def __init__(self, path):
+        self.path = path
 
-    def readline(self):
-        if self.section_name:
-            section_name = self.section_name
-            self.section_name = None
-            return section_name
-        # tarantool.cfg puts string values in quote
-        return self.fp.readline().replace("\"", '')
+    def parse(self):
+        cfg = {}
+        with open(self.path, 'r') as f:
+            for line in f:
+                line = [part.strip() for part in line.split('=', 1)]
+                if not line or not line[0] or line[0][0] == '#':
+                    continue
+                if len(line) != 2:
+                    raise Exception("Bad cfg line: {line}. file: {file}".format(\
+                                    line = repr(line), file = repr(self.path)))
+                cfg[line[0]] = line[1]
+        return cfg
+
+    def generate(self, original):
+        with open(self.path, 'w') as f:
+            for el in original.iteritems():
+                f.write(' = '.join(el) + '\n')
+
+class TarantoolLog(object):
+    def __init__(self, path):
+        self.path = path
+        self.log_begin = 0
+
+    def positioning(self):
+        if os.path.exists(self.path):
+            with open(self.path, 'r') as f:
+                f.seek(0, os.SEEK_END)
+                self.log_begin = f.tell()
+
+    def seek_from(self, msg, proc=None):
+        while True:
+            if os.path.exists(self.path):
+                break
+            time.sleep(0.001)
+
+        with open(self.path, 'r') as f:
+            f.seek(self.log_begin, os.SEEK_SET)
+            cur_pos = self.log_begin
+            while True:
+                if not (proc is None):
+                    if not (proc.poll() is None):
+                        raise OSError("Can't start Tarantool")
+                log_str = f.readline()
+                if not log_str:
+                    time.sleep(0.001)
+                    f.seek(cur_pos, os.SEEK_SET)
+                    continue
+                if log_str.find(msg) != -1:
+                    return
+                cur_pos = f.tell()
+
+class Mixin(object):
+    pass
+
+class ValgrindMixin(Mixin):
+    default_valgr = {
+            "logfile":        "valgrind.log",
+            "suppress_path":        "share/",
+            "suppress_name": "tarantool.sup"}
+
+    @property
+    def valgrind_log(self):
+        return os.path.join(self.vardir, self.default_valgr['logfile'])
+
+    @property
+    def valgrind_sup(self):
+        if not hasattr(self, '_valgrind_sup') or not self._valgrind_sup:
+            return os.path.join(self.testdir,
+                                self.default_valgr['suppress_path'],
+                                self.default_valgr['suppress_name'])
+        return self._valgrind_sup
+    @valgrind_sup.setter
+    def valgrind_sup(self, val):
+        self._valgrind_sup = os.path.abspath(val)
+
+    @property
+    def valgrind_sup_output(self):
+        return os.path.join(self.vardir, self.default_valgr['suppress_name'])
+
+    def prepare_args(self):
+        if not find_in_path('valgrind'):
+            raise OSError('`valgrind` executables not found in PATH')
+        return  shlex.split("valgrind --log-file={log} --suppressions={sup} \
+                --gen-suppressions=all --leak-check=full \
+                --read-var-info=yes --quiet {bin}".format(log = self.valgrind_log,
+                                                        sup = self.valgrind_sup,
+                                                        bin = self.init_lua if self.shebang else self.binary))
+
+    def wait_stop(self):
+        return self.process.wait()
+
+class GdbMixin(Mixin):
+    default_gdb = {
+        "name": "tarantool-gdb"}
+
+    def start_and_exit(self):
+        color_stdout('You started the server in gdb mode.\n', schema='info')
+        color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
+        TarantoolServer.start_and_exit(self)
+
+
+    def prepare_args(self):
+        if not find_in_path('screen'):
+            raise OSError('`screen` executables not found in PATH')
+        if not find_in_path('gdb'):
+            raise OSError('`gdb` executables not found in PATH')
+        color_stdout('You started the server in gdb mode.\n', schema='info')
+        color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
+        return shlex.split("screen -dmS {0} gdb {1} -ex \
+                \'b main\' -ex \'run >> {2} 2>> {2}\'".format(self.default_gdb['name'],
+                                                       self.init_lua if self.shebang else self.binary,
+                                                       self.logfile))
+
+    def wait_stop(self):
+        self.kill_old_server()
+        self.process.wait()
 
 class TarantoolServer(Server):
-    def __new__(cls, core="tarantool"):
+    default_tarantool = {
+            "bin":       "tarantool_box",
+            "config":    "tarantool.cfg",
+            "logfile":   "tarantool.log",
+            "init":           "init.lua",
+            "pidfile":         "box.pid",
+            "name":            "default"}
+    generate_ports = [
+            'primary_port',
+            'secondary_port',
+            'admin_port',
+#            'replication_port',
+            ]
+    generated_props = [
+#            'replication_source'
+            ]
+#----------------------------------PROPERTIES----------------------------------#
+    @property
+    def debug(self):
+        return self.test_debug()
+    @property
+    def name(self):
+        if not hasattr(self, '_name') or not self._name:
+            return self.default_tarantool["name"]
+        return self._name
+    @name.setter
+    def name(self, val):
+        self._name = val
+
+    @property
+    def logfile(self):
+        if not hasattr(self, '_logfile') or not self._logfile:
+            return os.path.join(self.vardir, self.default_tarantool["logfile"])
+        return self._logfile
+    @logfile.setter
+    def logfile(self, val):
+        self._logfile = os.path.join(self.vardir, val)
+
+    @property
+    def pidfile(self):
+        if not hasattr(self, '_pidfile') or not self._pidfile:
+            return os.path.join(self.vardir, self.default_tarantool["pidfile"])
+        return self._pidfile
+    @pidfile.setter
+    def pidfile(self, val):
+        self._pidfile = os.path.join(self.vardir, val)
+
+    @property
+    def cfgfile(self):
+        if not hasattr(self, '_cfgfile') or not self._cfgfile:
+            return os.path.join(self.vardir, self.default_tarantool["config"])
+        return self._cfgfile
+    @cfgfile.setter
+    def cfgfile(self, val):
+        self._cfgfile = os.path.join(self.vardir, val)
+
+    @property
+    def cfgfile_source(self):
+        if not hasattr(self, '_cfgfile_source'):
+            raise ValueError("No config-file is specified")
+        return self._cfgfile_source
+    @cfgfile_source.setter
+    def cfgfile_source(self, path):
+        if path == None:
+            if hasattr(self, '_cfgfile_source'):
+                delattr(self, '_cfgfile_source')
+            return
+        self._cfgfile_source = os.path.abspath(path)
+
+    @property
+    def init_lua_source(self):
+        if not hasattr(self, '_init_lua_source'): self._init_lua_source = None
+        return self._init_lua_source
+    @init_lua_source.setter
+    def init_lua_source(self, val):
+        if val is None:
+            return
+        self._init_lua_source = os.path.abspath(val)
+
+    @property
+    def builddir(self):
+        if not hasattr(self, '_builddir'):
+            raise ValueError("No build-dir is specified")
+        return self._builddir
+    @builddir.setter
+    def builddir(self, val):
+        if val is None:
+            return
+        self._builddir = os.path.abspath(val)
+
+    @property
+    def init_lua(self):
+        return os.path.join(self.vardir, self.default_tarantool['init'])
+
+    @property
+    def logfile_pos(self):
+        if not hasattr(self, '_logfile_pos'): self._logfile_pos = None
+        return self._logfile_pos
+    @logfile_pos.setter
+    def logfile_pos(self, val):
+        self._logfile_pos = TarantoolLog(val)
+        self._logfile_pos.positioning()
+
+    @property
+    def shebang(self):
+        if not hasattr(self, '_shebang'): self._shebang = None
+        return self._shebang
+    @shebang.setter
+    def shebang(self, val):
+        if val is None:
+            if hasattr(self, '_shebang'):
+                delattr(self, '_shebang')
+            return
+        self._shebang = os.path.abspath(val)
+
+    @property
+    def _admin(self):
+        if not hasattr(self, 'admin'): self.admin = None
+        return self.admin
+    @_admin.setter
+    def _admin(self, port):
+        try:
+            int(port)
+        except ValueError as e:
+            raise ValueError("Bad port number: '%s'" % port)
+        if not hasattr(self, 'admin') or self.admin is None:
+            self.admin = AdminConnection('localhost', port)
+            return
+        if self.admin.port != port:
+            self.admin.port = port
+            self.admin.reconnect()
+
+    @property
+    def _sql(self):
+        if not hasattr(self, 'sql'): self.sql = None
+        return self.sql
+    @_sql.setter
+    def _sql(self, port):
+        try:
+            port = int(port)
+        except ValueError as e:
+            raise ValueError("Bad port number: '%s'" % port)
+        if not hasattr(self, 'sql') or self.sql is None:
+            self.sql = BoxConnection('localhost', port)
+            return
+        if self.sql.port != port:
+            self.sql.port = port
+            self.sql.reconnect()
+
+    @property
+    def _sql_ro(self):
+        if not hasattr(self, 'sql_ro'): self.sql_ro = None
+        return self.sql_ro
+    @_sql_ro.setter
+    def _sql_ro(self, port):
+        try:
+            port = int(port)
+        except ValueError as e:
+            raise ValueError("Bad port number: '%s'" % port)
+        if not hasattr(self, 'sql_ro') or self.sql_ro is None:
+            self.sql_ro = BoxConnection('localhost', port)
+            return
+        if self.sql_ro.port != port:
+            self.sql_ro.port = port
+            self.sql_ro.reconnect()
+
+    @property
+    def log_des(self):
+        if not hasattr(self, '_log_des'): self._log_des = open(self.logfile, 'a')
+        return self._log_des
+    @log_des.deleter
+    def log_des(self):
+        if not hasattr(self, '_log_des'): return
+        if not self._log_des.closed: self._log_des.closed()
+        delattr(self, _log_des)
+
+    @property
+    def rpl_master(self):
+        if not hasattr(self, '_rpl_master'): self._rpl_master = None
+        return self._rpl_master
+    @rpl_master.setter
+    def rpl_master(self, val):
+        if not isinstance(self, (TarantoolServer, None)):
+            raise ValueError('Replication master must be Tarantool'
+                    ' Server class, his derivation or None')
+        self._rpl_master = val
+
+    @property
+    def hot_master(self):
+        if not hasattr(self, '_hot_master'): self._hot_master = None
+        return self._hot_master
+    @hot_master.setter
+    def hot_master(self, val):
+        if not isinstance(self, (TarantoolServer, None)):
+            raise ValueError('Hot-standby master must be Tarantool'
+                    ' Server class, his derivation or None')
+        self._hot_master = val
+
+
+#------------------------------------------------------------------------------#
+
+    def __new__(cls, ini=None):
+        if ini is None:
+            ini = {'core': 'tarantool'}
+        if ('valgrind' in ini and ini['valgrind']) and ('gdb' in ini and ini['gdb']):
+            raise OSError('Can\'t run under valgrind and gdb simultaniously')
+        if 'valgrind' in ini and ini['valgrind']:
+            cls = type('ValgrindTarantooServer', (ValgrindMixin, TarantoolServer), {})
+        elif 'gdb' in ini and ini['gdb']:
+            cls = type('GdbTarantoolServer', (GdbMixin, TarantoolServer), {})
+
         return super(TarantoolServer, cls).__new__(cls)
 
-    def __init__(self, core="tarantool"):
-        Server.__init__(self, core)
-        self.default_bin_name = "tarantool_box"
-        self.default_config_name = "tarantool.cfg"
-        self.default_log_name = "tarantool.log"
-        self.default_init_lua_name = "init.lua"
-        # append additional cleanup patterns
-        self.re_vardir_cleanup += ['*.snap',
-                                   '*.xlog',
-                                   '*.inprogress',
-                                   '*.cfg',
-                                   '*.sup',
-                                   '*.pid']
-        self.process = None
-        self.config = None
-        self.vardir = None
-        self.valgrind_log = "valgrind.log"
-        self.valgrind_sup = os.path.join("share/", "%s.sup" % ('tarantool'))
-        self.init_lua = None
-        self.default_suppression_name = "valgrind.sup"
-        self.pidfile = None
-        self.port = None
-        self.binary = None
-        self.is_started = False
-        self.mem = False
-        self.start_and_exit = False
-        self.gdb = False
-        self.valgrind = False
-        self.installed = False
-        self.need_init = True
+    def __init__(self, _ini=None):
+        if _ini is None:
+            _ini = {}
+        ini = {
+            'config': None,
+            'core': 'tarantool',
+            'gdb': False,
+            'init_lua': None,
+            'lua_libs': [],
+            'random_ports': True,
+            'valgrind': False,
+            'vardir': None,
+            'start_and_exit': False
+        }; ini.update(_ini)
+        Server.__init__(self, ini)
+        self.generated_fields = self.generate_ports + self.generated_props
+        self.testdir = os.path.abspath(os.curdir)
+        self.re_vardir_cleanup += [
+            "*.snap", "*.xlog", "*.inprogress",
+            "*.cfg", "*.sup", "*.lua", "*.pid"]
+        self.name = "default"
+        self.conf = {}
+        self.status = None
+        #-----InitBasicVars-----#
+        self.cfgfile_source = ini['config']
+        self.core = ini['core']
+        self.gdb = ini['gdb']
+        self.init_lua_source = ini['init_lua']
+        self.lua_libs = ini['lua_libs']
+        self.random_ports = ini['random_ports']
+        self.valgrind = ini['valgrind']
+        self._start_and_exit = ini['start_and_exit']
 
     def __del__(self):
         self.stop()
 
-    def find_exe(self, builddir, silent=True):
-        "Locate server executable in the build dir or in the PATH."
-        self.builddir = builddir
+    @classmethod
+    def find_exe(cls, builddir, silent=True):
+        cls.builddir = os.path.abspath(builddir)
         builddir = os.path.join(builddir, "src/box")
         path = builddir + os.pathsep + os.environ["PATH"]
         if not silent:
             color_stdout("Looking for server binary in ", schema='serv_text')
-            color_stdout(path+" ...\n", schema='path')
+            color_stdout(path + ' ...\n', schema='path')
         for _dir in path.split(os.pathsep):
-            exe = os.path.join(_dir, self.default_bin_name)
+            exe = os.path.join(_dir, cls.default_tarantool["bin"])
             if os.access(exe, os.X_OK):
+                cls.binary = os.path.abspath(exe)
                 return exe
         raise RuntimeError("Can't find server executable in " + path)
 
-    def install(self, binary=None, vardir=None, mem=None, silent=True):
-        """Install server instance: create necessary directories and files.
-        The server working directory is taken from 'vardir',
-        /specified in the program options."""
-
-        if vardir != None: self.vardir = vardir
-        if binary != None: self.binary = os.path.abspath(binary)
-        if mem != None: self.mem = mem
-
-        self.pidfile = os.path.abspath(os.path.join(self.vardir, self.pidfile))
-        self.valgrind_log = os.path.abspath(os.path.join(self.vardir, self.valgrind_log))
-
+    def install(self, silent=True):
         if not silent:
-            color_stdout("Installing the server ...\n", schema='serv_text')
-            color_stdout("    Found executable at ", schema='serv_text')
-            color_stdout(self.binary+'\n', schema='path')
-            color_stdout("    Creating and populating working directory in ", schema='serv_text')
-            color_stdout(self.vardir+' ...\n', schema='path')
-
-        if os.access(self.vardir, os.F_OK):
+            color_stdout('Installing the server ...\n', schema='serv_text')
+            color_stdout('    Found executable at ', schema='serv_text')
+            color_stdout(self.binary + '\n', schema='path')
+            color_stdout('    Creating and populating working directory in ', schema='serv_text')
+            color_stdout(self.vardir + ' ...\n', schema='path')
+        if not os.path.exists(self.vardir):
+            os.makedirs(self.vardir)
+        else:
             if not silent:
-                color_stdout("    Found old vardir, deleting ...\n", schema='serv_text')
+                color_stdout('    Found old vardir, deleting ...\n', schema='serv_text')
             self.kill_old_server()
             self.cleanup()
+        self.copy_files()
+        self.configure()
+        return
+
+    def deploy(self, silent=True):
+        self.install(silent)
+        if not self._start_and_exit:
+            self.start(silent)
         else:
-            if (self.mem == True and check_tmpfs_exists() and
-                os.path.basename(self.vardir) == self.vardir):
-                create_tmpfs_vardir(self.vardir)
-            else:
-                os.makedirs(self.vardir)
+            self.start_and_exit()
 
-        shutil.copy(self.config,
-                    os.path.join(self.vardir, self.default_config_name))
-        shutil.copy(self.valgrind_sup,
-                    os.path.join(self.vardir, self.default_suppression_name))
+    def configure(self, config=None):
+        self.copy_config(config)
+        self.port   = self.conf['admin_port']
+        self._sql    = self.conf['primary_port']
+        self._sql_ro = self.conf['secondary_port']
+        self._admin  = self.conf['admin_port']
 
-        var_init_lua = os.path.join(self.vardir, self.default_init_lua_name)
-
-        if self.init_lua != None:
-            if os.path.exists(var_init_lua):
-                os.remove(var_init_lua)
-            shutil.copy(self.init_lua, var_init_lua)
-
-        self.installed = True
-
-
-    def configure(self, config):
-        def get_option(config, section, key):
-            if not config.has_option(section, key):
-                return None
-            value = config.get(section, key)
-            if value.isdigit():
-                value = int(value)
-            return value
-        self.config = os.path.abspath(config)
-        # now read the server config, we need some properties from it
-        with open(self.config) as fp:
-            dummy_section_name = "tarantool"
-            config = ConfigParser.ConfigParser()
-            config.readfp(TarantoolConfigFile(fp, dummy_section_name))
-
-            self.pidfile = get_option(config, dummy_section_name, "pid_file")
-            self.primary_port = get_option(config, dummy_section_name, "primary_port")
-            self.admin_port = get_option(config, dummy_section_name, "admin_port")
-
-        self.port = self.admin_port
-        self.admin = AdminConnection("localhost", self.admin_port)
-        self.sql = BoxConnection("localhost", self.primary_port)
-
-    def reconfigure(self, config, silent=False):
+    def reconfigure(self, config, silent=False, override=['all']):
         if config == None:
-            os.unlink(os.path.join(self.vardir, self.default_config_name))
+            os.unlink(self.cfgfile)
         else:
-            self.config = os.path.abspath(config)
-            shutil.copy(self.config, os.path.join(self.vardir, self.default_config_name))
+            self.cfgfile_source = config
+            self.copy_config(override=override)
         self.admin.execute("box.cfg.reload()", silent=silent)
 
-    def init(self):
-        # init storage
-        cmd = [self.binary, "--init-storage"]
-        _init = subprocess.Popen(cmd, cwd=self.vardir,
-                stderr = subprocess.STDOUT, stdout = subprocess.PIPE)
-        retcode = _init.wait()
-        if retcode:
-            color_stdout("tarantool_box --init-storage error: \n%s\n" %  _init.stdout.read(), schema='error')
-            raise subprocess.CalledProcessError(retcode, cmd)
+    def copy_config(self, rand=True, override = ['all']):
+        override_all = (True if 'all' in override else False)
 
-    def get_param(self, param):
-        if param:
-            data = yaml.load(self.admin("box.info." + param, silent=True))[0]
-        else:
-            data = yaml.load(self.admin("box.info", silent=True))
-        return data
+        port = random.randrange(34000, 65535)
+        for t in self.generate_ports:
+            if not t in self.conf:
+                self.conf[t] = find_port(port)
+                port += 1
+        if not self.hot_master is None:
+            self.conf['primary_port'] = self.hot_master.sql.port
+        if not self.rpl_master is None and 'replication_source' in self.generated_fields:
+            self.conf['replication_source'] = \
+                '127.0.0.1:'+str(self.rpl_master.conf['replication_port'])
+
+
+        basic = TarantoolConfig(self.cfgfile_source).parse()
+        addit = {}
+        for key in self.generated_fields:
+            if key in basic and (override_all or key in override):
+                addit[key] = str(self.conf[key])
+        basic.update(addit)
+        TarantoolConfig(self.cfgfile).generate(basic)
+
+    def copy_files(self):
+        if self.shebang:
+            shutil.copy(self.shebang, self.init_lua)
+            os.chmod(self.init_lua, 0777)
+        elif self.init_lua_source:
+            shutil.copy(self.init_lua_source, self.init_lua)
+        if self.lua_libs:
+            for i in self.lua_libs:
+                source = os.path.join(self.testdir, i)
+                shutil.copy(source, self.vardir)
+
+    def prepare_args(self):
+        return shlex.split(self.init_lua if self.shebang else self.binary)
+
+    def start_and_exit(self):
+        color_stdout('Starting the server {0} on ports {1} ...\n'.format(
+            os.path.basename(self.binary) if not self.shebang else self.shebang,
+            ', '.join([': '.join([str(j) for j in i]) for i in self.conf.items() if i[0].find('port') != -1])
+            ), schema='serv_text')
+        with daemon.DaemonContext():
+            self.start()
+            self.process.wait()
+
+    def start(self, silent=True):
+        if self.status == 'started':
+            if not silent:
+                color_stdout('The server is already started.\n', schema='lerror')
+            return
+        if not silent or self._start_and_exit:
+            color_stdout("Starting the server ...\n", schema='serv_text')
+            color_stdout("Starting ", schema='serv_text')
+            color_stdout((os.path.basename(self.binary) if not self.shebang else self.shebang) + " \n", schema='path')
+            color_stdout(self.version() + "\n", schema='version')
+
+        check_port(self.conf['admin_port'])
+
+        args = self.prepare_args()
+        self.logfile_pos = self.logfile
+        self.process = subprocess.Popen(args,
+                cwd = self.vardir,
+                stdout=self.log_des,
+                stderr=self.log_des)
+        self.wait_until_started()
+        self.status = 'started'
+
+    def wait_stop(self):
+        self.process.wait()
+
+    def stop(self, silent=True):
+        if self.status != 'started':
+            if not silent:
+                color_stdout('The server is not started.\n', schema='lerror')
+            return
+        if not silent:
+            color_stdout('Stopping the server ...\n', schema='serv_text')
+        self.process.terminate()
+        self.wait_stop()
+        self.status = None
+
+    def restart(self):
+        self.stop()
+        self.start()
+
+    def kill_old_server(self, silent=True):
+        pid = self.read_pidfile()
+        if pid == -1:
+            return False
+        if not silent:
+            color_stdout('    Found old server, pid {0}, killing ...'.format(pid), schema='info')
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        self.wait_until_stopped(pid)
+        return True
+
+    def wait_until_started(self):
+        """ Wait until server is started.
+
+        Server consists of two parts:
+        1) wait until server is listening on sockets
+        2) wait until server tells us his status
+
+        """
+
+        self.logfile_pos.seek_from('entering the event loop\n', self.process if not self.gdb else None)
+
+        while True:
+            temp = AdminConnection('localhost', self.conf['admin_port'])
+            ans = yaml.load(temp.execute('box.info.status'))[0]
+            if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
+                return True
+            else:
+                raise Exception("Strange output for `box.info.status`: %s" % (ans))
+
+    def wait_until_stopped(self, pid):
+        while True:
+            try:
+                time.sleep(0.01)
+                os.kill(pid, 0)
+                continue
+            except OSError as err:
+                break
+
+    def read_pidfile(self):
+        pid = -1
+        if os.path.exists(self.pidfile):
+            try:
+                with open(self.pidfile) as f:
+                    pid = int(f.read())
+            except:
+                pass
+        return pid
+
+    def print_log(self, lines):
+        color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
+        with open(self.logfile, 'r') as log:
+            return log.readlines()[-lines:]
+
+    def test_option_get(self, option_list_str, silent=False):
+        args = [self.binary] + shlex.split(option_list_str)
+        if not silent:
+            print " ".join([os.path.basename(self.binary)] + args[1:])
+        output = subprocess.Popen(args, cwd = self.vardir, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT).stdout.read()
+        return output
+
+    def test_option(self, option_list_str):
+        print self.test_option_get(option_list_str)
+
+    def test_debug(self):
+        if self.test_option_get("-V", True).find("-Debug"):
+            return True
+        return False
+
+    def find_tests(self, test_suite, suite_path):
+        def patterned(test, patterns):
+            return [test for i in patterns if test.name.find(i) != -1]
+
+        tests  = [PythonTest(k, test_suite.args, test_suite.ini) \
+                for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
+        tests += [LuaTest(k, test_suite.args, test_suite.ini)    \
+                for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
+        test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), tests), [])
+
+    def get_param(self, param = None):
+        if not param is None:
+            return yaml.load(self.admin("box.info." + param, silent=True))[0]
+        return yaml.load(self.admin("box.info", silent=True))
 
     def wait_lsn(self, lsn):
-        while True:
-            curr_lsn = int(self.get_param("lsn"))
-            if (curr_lsn >= lsn):
-                break
+        while (int(self.get_param("lsn")) < lsn):
             time.sleep(0.01)
 
     def version(self):
@@ -281,246 +714,3 @@ class TarantoolServer(Server):
         version = p.stdout.read().rstrip()
         p.wait()
         return version
-
-    def _start_and_exit(self, args, gdb=None, valgrind=None):
-        if gdb != None: self.gdb = gdb
-        if valgrind != None: self.valgrind = valgrind
-
-        if self.valgrind:
-            with daemon.DaemonContext(working_directory = self.vardir):
-                subprocess.check_call(args)
-        else:
-            if not self.gdb:
-                args.append("--background")
-            else:
-                raise RuntimeError("'--gdb' and '--start-and-exit' can't be defined together")
-            self.server = subprocess.Popen(args, cwd = self.vardir)
-            self.server.wait()
-
-    def start(self, start_and_exit=None, gdb=None, valgrind=None, silent=True):
-        if start_and_exit != None: self.start_and_exit = start_and_exit
-        if gdb != None: self.gdb = gdb
-        if valgrind != None: self.valgrind = valgrind
-        self.debug = self.test_debug()
-
-        self.log_path = os.path.join(self.vardir, 'tarantool.log')
-        self.log_pos  = 0
-
-        if self.is_started:
-            if not silent:
-                color_stdout("The server is already started.\n", schema='lerror')
-            return
-
-        if not silent:
-            color_stdout("Starting the server ...\n", schema='serv_text')
-            version = self.version()
-            color_stdout("Starting ", schema='serv_text')
-            color_stdout(os.path.basename(self.binary), " \n", schema='path')
-            color_stdout(version, "\n", schema='version')
-
-        if os.path.exists(self.log_path) and os.path.exists(self.log_path):
-            with open(self.log_path, 'r') as f:
-                f.seek(0, os.SEEK_END)
-                self.log_pos = f.tell()
-
-        check_port(self.port)
-        args = self.prepare_args()
-
-        if self.gdb:
-            args = prepare_gdb(self.binary, args)
-            color_stdout("You started the server in gdb mode.\n", schema='info')
-            color_stdout("To attach, use `screen -r tnt-gdb`\n", schema='info')
-        elif self.valgrind:
-            args = prepare_valgrind([self.binary] + args, self.valgrind_log,
-                                    os.path.abspath(os.path.join(self.vardir,
-                                    self.default_suppression_name)))
-        else:
-            args = [self.binary] + args
-
-        if self.start_and_exit:
-            self._start_and_exit(args)
-            return
-
-        self.process = subprocess.Popen(args, cwd = self.vardir)
-
-        # wait until the server is connected
-        self.wait_until_started()
-        # Set is_started flag, to nicely support cleanup during an exception.
-        self.is_started = True
-
-
-    def stop(self, silent=True):
-        """Stop server instance. Do nothing if the server is not started,
-        to properly shut down the server in case of an exception during
-        start up."""
-        if not self.is_started:
-            if not silent:
-                color_stdout("The server is not started.\n", schema='lerror')
-            return
-
-        if not silent:
-            color_stdout("Stopping the server ...\n", schema='serv_text')
-
-        if self.process == None:
-            self.kill_old_server()
-            return
-
-        # kill process
-        pid = self.read_pidfile()
-        if pid != -1:
-            os.kill(pid, signal.SIGTERM)
-
-#       self.process.terminate()
-        if self.gdb or self.valgrind:
-            while True:
-                if self.process.poll() != None:
-                    break
-                time.sleep(1)
-        else:
-            self.process.wait()
-
-        self.wait_until_stopped(pid)
-        # clean-up processs flags
-        self.is_started = False
-        self.process = None
-
-    def deploy(self, config=None, binary=None, vardir=None,
-               mem=None, start_and_exit=None, gdb=None, valgrind=None,
-               valgrind_sup=None, init_lua=None, silent=True, need_init=None):
-        if config != None: self.config = config
-        if binary != None: self.binary = binary
-        if vardir != None: self.vardir = vardir
-        if mem != None: self.mem = mem
-        if start_and_exit != None: self.start_and_exit = start_and_exit
-        if gdb != None: self.gdb = gdb
-        if valgrind != None: self.valgrind = valgrind
-        if need_init != None: self.need_init = need_init
-
-        if init_lua != None:
-            self.init_lua = os.path.abspath(init_lua)
-        else:
-            self.init_lua = None
-
-        self.configure(self.config)
-        self.install(self.binary, self.vardir, self.mem, silent)
-        if self.need_init:
-            self.init()
-        self.start(self.start_and_exit, self.gdb, self.valgrind, silent)
-
-    def restart(self):
-        self.stop(silent=True)
-        self.start(silent=True)
-
-    def test_option_get(self, show, option_list_str):
-        args = [self.binary] + option_list_str.split()
-        if show:
-            print " ".join([os.path.basename(self.binary)] + args[1:])
-        output = subprocess.Popen(args,
-                                  cwd = self.vardir,
-                                  stdout = subprocess.PIPE,
-                                  stderr = subprocess.STDOUT).stdout.read()
-        return output
-
-    def test_option(self, option_list_str):
-        print self.test_option_get(True, option_list_str)
-
-    def test_debug(self):
-        output = self.test_option_get(False, "-V")
-        if re.search("-Debug", output):
-            return True
-        return False
-
-    def kill_old_server(self, silent=True):
-        """Kill old server instance if it exists."""
-        pid = self.read_pidfile()
-        if pid == -1:
-            return # Nothing to do
-
-        if not silent:
-            color_stdout("    Found old server, pid {0}, killing ...".format(pid), schema='info')
-
-        try:
-            os.kill(pid, signal.SIGTERM)
-            while os.kill(pid, 0) != -1:
-                time.sleep(0.001)
-        except OSError:
-            pass
-
-    def read_pidfile(self):
-        if os.access(self.pidfile, os.F_OK) == False:
-            # file is inaccessible (not exist or permission denied)
-            return -1
-
-        pid = -1
-        try:
-            with open(self.pidfile) as f:
-                pid = int(f.read())
-        except:
-            pass
-        return pid
-
-    def print_log(self, lines):
-        color_stdout("\nLast {0} lines of Tarantool Log file:\n".format(lines), schema='error')
-        with open(os.path.join(self.vardir, 'tarantool.log'), 'r') as log:
-            return log.readlines()[-lines:]
-
-    def wait_until_started(self):
-        """Wait until the server is started and accepting connections"""
-
-        while self.read_pidfile() == -1:
-            time.sleep(0.001)
-
-        is_connected = False
-        while not is_connected and not self.gdb:
-            if self.process.poll():
-                raise OSError("Can't start tarantool");
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect(("localhost", self.port))
-                is_connected = True
-                sock.close()
-            except socket.error as e:
-                time.sleep(0.001)
-
-        while True:
-            try:
-                open(self.log_path, 'r')
-                break
-            except IOError:
-                pass
-
-        with open(self.log_path, 'r') as f:
-            f.seek(self.log_pos, os.SEEK_SET)
-            cur_pos = self.log_pos
-            while True:
-                log_str = f.readline()
-                if not log_str:
-                    f.seek(cur_pos, os.SEEK_SET)
-                    continue
-                if log_str.find("entering the event loop\n") != -1:
-                    return True
-                cur_pos = f.tell()
-
-    def wait_until_stopped(self, pid):
-        """Wait until the server is stoped and has closed sockets"""
-        while True:
-            try:
-                time.sleep(0.001)
-                os.kill(pid, 0)
-                continue
-            except OSError as err:
-                if err.errno == errno.ESRCH:
-                    break
-                raise
-
-    def find_tests(self, test_suite, suite_path):
-        def patterned(test, patterns):
-            answer = []
-            for i in patterns:
-                if test.name.find(i) != -1:
-                    answer.append(test)
-            return answer
-
-        tests  = [PythonTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
-        tests += [LuaTest(k, test_suite.args, test_suite.ini)    for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
-        test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), tests), [])
