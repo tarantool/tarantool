@@ -14,13 +14,13 @@ f, a = box.call_loadproc('test')
 type(f)
 type(a)
 
-unpack(remote:call('test'))
+remote:call('test')
 function test(...) return box.tuple.new({ ... }) end
-unpack(remote:call('test', 123, 345, { 678, 910 }))
+remote:call('test', 123, 345, { 678, 910 })
 function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
-unpack(remote:call('test', 123, 345, { 678, 910 }))
+remote:call('test', 123, 345, { 678, 910 })
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
-unpack(remote:call('test:b'))
+remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 f, a = box.call_loadproc('test:b')
 type(f)
@@ -30,10 +30,10 @@ f, a = box.call_loadproc('test.b')
 type(f)
 type(a)
 
-unpack(remote:call('test:b'))
-unpack(remote:call('test:b', 'b', 'c'))
-unpack(remote:call('test:b', 'b', 'c', 'd', 'e'))
-unpack(remote:call('test:b', 'b', { 'c', { d = 'e' } }))
+remote:call('test:b')
+remote:call('test:b', 'b', 'c')
+remote:call('test:b', 'b', 'c', 'd', 'e')
+remote:call('test:b', 'b', { 'c', { d = 'e' } })
 
 
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
@@ -45,14 +45,14 @@ f, a = box.call_loadproc('test.a.b')
 type(f)
 type(a)
 
-unpack(remote:call('test.a:b', 123))
+remote:call('test.a:b', 123)
 
 
 
 box.space.tweedledum:select(123)
 box.space.tweedledum:select({123})
-unpack(remote:call('box.space.tweedledum:select', 123))
-unpack(remote:call('box.space.tweedledum:select', {123}))
+remote:call('box.space.tweedledum:select', 123)
+remote:call('box.space.tweedledum:select', {123})
 
 slf, foo = box.call_loadproc('box.net.self:select')
 type(slf)
@@ -70,7 +70,7 @@ remote:insert(space.n, {123, 'test1', 'test2'})
 
 remote:insert(space.n, {345, 'test1', 'test2'})
 remote:select(space.n, {345})
-unpack(remote:call('box.space.tweedledum:select', 345))
+remote:call('box.space.tweedledum:select', 345)
 space:select{345}
 
 remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
@@ -92,8 +92,8 @@ box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
 box.net.self:delete(space.n, 12346)
 
 
-unpack(remote:call('box.fiber.sleep', .01))
-unpack(remote:timeout(0.01):call('box.fiber.sleep', 10))
+remote:call('box.fiber.sleep', .01)
+remote:timeout(0.01):call('box.fiber.sleep', 10)
 
 --# setopt delimiter ';'
 pstart = box.time();
@@ -122,7 +122,7 @@ for i = 1, 20 do
     box.fiber.sleep(0.1)
 end;
 --# setopt delimiter ''
-unpack(parallel)
+parallel
 #parallel
 box.time() - pstart < 0.5
 

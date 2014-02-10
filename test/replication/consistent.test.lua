@@ -37,7 +37,7 @@ end;
 -- set begin lsn on master and replica.
 begin_lsn = box.info.lsn
 a = box.net.box.new('127.0.0.1', replica_port)
-unpack(a:call('_set_pri_lsn', box.info.lsn))
+a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
 s = box.schema.create_space('tweedledum', {id = 0});

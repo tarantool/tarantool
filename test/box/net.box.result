@@ -48,31 +48,31 @@ type(a)
 ---
 - nil
 ...
-unpack(remote:call('test'))
+remote:call('test')
 ---
-- [123, 456]
+- - [123, 456]
 ...
 function test(...) return box.tuple.new({ ... }) end
 ---
 ...
-unpack(remote:call('test', 123, 345, { 678, 910 }))
+remote:call('test', 123, 345, { 678, 910 })
 ---
-- [123, 345, [678, 910]]
+- - [123, 345, [678, 910]]
 ...
 function test(...) return box.tuple.new({ ... }), box.tuple.new({ ... }) end
 ---
 ...
-unpack(remote:call('test', 123, 345, { 678, 910 }))
+remote:call('test', 123, 345, { 678, 910 })
 ---
-- [123, 345, [678, 910]]
-- [123, 345, [678, 910]]
+- - [123, 345, [678, 910]]
+  - [123, 345, [678, 910]]
 ...
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
 ---
 ...
-unpack(remote:call('test:b'))
+remote:call('test:b')
 ---
-- [123]
+- - [123]
 ...
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 ---
@@ -103,21 +103,21 @@ type(a)
 ---
 - nil
 ...
-unpack(remote:call('test:b'))
+remote:call('test:b')
 ---
-- ['a']
+- - ['a']
 ...
-unpack(remote:call('test:b', 'b', 'c'))
+remote:call('test:b', 'b', 'c')
 ---
-- ['a', 'b', 'c']
+- - ['a', 'b', 'c']
 ...
-unpack(remote:call('test:b', 'b', 'c', 'd', 'e'))
+remote:call('test:b', 'b', 'c', 'd', 'e')
 ---
-- ['a', 'b', 'c', 'd', 'e']
+- - ['a', 'b', 'c', 'd', 'e']
 ...
-unpack(remote:call('test:b', 'b', { 'c', { d = 'e' } }))
+remote:call('test:b', 'b', { 'c', { d = 'e' } })
 ---
-- ['a', 'b', ['c', {'d': 'e'}]]
+- - ['a', 'b', ['c', {'d': 'e'}]]
 ...
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
 ---
@@ -148,9 +148,9 @@ type(a)
 ---
 - nil
 ...
-unpack(remote:call('test.a:b', 123))
+remote:call('test.a:b', 123)
 ---
-- [1, 123]
+- - [1, 123]
 ...
 box.space.tweedledum:select(123)
 ---
@@ -160,13 +160,13 @@ box.space.tweedledum:select({123})
 ---
 - [123, 'test1', 'test2']
 ...
-unpack(remote:call('box.space.tweedledum:select', 123))
+remote:call('box.space.tweedledum:select', 123)
 ---
-- [123, 'test1', 'test2']
+- - [123, 'test1', 'test2']
 ...
-unpack(remote:call('box.space.tweedledum:select', {123}))
+remote:call('box.space.tweedledum:select', {123})
 ---
-- [123, 'test1', 'test2']
+- - [123, 'test1', 'test2']
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
@@ -215,9 +215,9 @@ remote:select(space.n, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-unpack(remote:call('box.space.tweedledum:select', 345))
+remote:call('box.space.tweedledum:select', 345)
 ---
-- [345, 'test1', 'test2']
+- - [345, 'test1', 'test2']
 ...
 space:select{345}
 ---
@@ -277,12 +277,13 @@ box.net.self:delete(space.n, 12346)
 ---
 - [12346, 'test1', 'test2']
 ...
-unpack(remote:call('box.fiber.sleep', .01))
+remote:call('box.fiber.sleep', .01)
 ---
+- []
 ...
-unpack(remote:timeout(0.01):call('box.fiber.sleep', 10))
+remote:timeout(0.01):call('box.fiber.sleep', 10)
 ---
-- error: 'bad argument #1 to ''?'' (table expected, got nil)'
+- null
 ...
 --# setopt delimiter ';'
 pstart = box.time();
@@ -324,28 +325,28 @@ end;
 ---
 ...
 --# setopt delimiter ''
-unpack(parallel)
+parallel
 ---
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
-- true
+- - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
+  - true
 ...
 #parallel
 ---
