@@ -32,10 +32,6 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
-#if EV_MULTIPLICITY
-#error libev with enabled EV_MULTIPLICITY is not supported yet
-#endif
-
 #define BIND_RETRY_DELAY 0.1
 
 /**
@@ -65,10 +61,10 @@ evio_pton(const char *addr, const char *port, struct sockaddr_storage *sa, sockl
 
 /** Note: this function does not throw. */
 void
-evio_close(struct ev_io *evio)
+evio_close(ev_loop *loop, struct ev_io *evio)
 {
 	/* Stop I/O events. Safe to do even if not started. */
-	ev_io_stop(evio);
+	ev_io_stop(loop, evio);
 	/* Close the socket. */
 	close(evio->fd);
 	/* Make sure evio_is_active() returns a proper value. */
@@ -185,8 +181,8 @@ evio_service_name(struct evio_service *service)
  * callback.
  */
 static void
-evio_service_accept_cb(ev_io *watcher,
-		       int revents __attribute__((unused)))
+evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
+		       int /* revents */)
 {
 	struct evio_service *service = (struct evio_service *) watcher->data;
 	int fd = -1;
@@ -247,7 +243,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 	}
 	/* Register the socket in the event loop. */
 	ev_io_set(&service->ev, fd, EV_READ);
-	ev_io_start(&service->ev);
+	ev_io_start(service->loop, &service->ev);
 	return 0;
 }
 
@@ -257,17 +253,18 @@ evio_service_bind_and_listen(struct evio_service *service)
  * is still in use, pause again.
  */
 static void
-evio_service_timer_cb(ev_timer *watcher, int revents __attribute__((unused)))
+evio_service_timer_cb(ev_loop *loop, ev_timer *watcher, int /* revents */)
 {
 	struct evio_service *service = (struct evio_service *) watcher->data;
 	assert(! ev_is_active(&service->ev));
 
 	if (evio_service_bind_and_listen(service) == 0)
-		ev_timer_stop(watcher);
+		ev_timer_stop(loop, watcher);
 }
 
 void
-evio_service_init(struct evio_service *service, const char *name,
+evio_service_init(ev_loop *loop,
+		  struct evio_service *service, const char *name,
 		  const char *host, int port,
 		  void (*on_accept)(struct evio_service *, int,
 				    struct sockaddr_in *),
@@ -276,6 +273,7 @@ evio_service_init(struct evio_service *service, const char *name,
 	memset(service, 0, sizeof(struct evio_service));
 	snprintf(service->name, sizeof(service->name), "%s", name);
 
+	service->loop = loop;
 	service->addr.sin_family = AF_INET;
 	service->addr.sin_port = htons(port);
 	if (strcmp(host, "INADDR_ANY") == 0) {
@@ -314,7 +312,7 @@ evio_service_start(struct evio_service *service)
 
 		ev_timer_set(&service->timer,
 			     BIND_RETRY_DELAY, BIND_RETRY_DELAY);
-		ev_timer_start(&service->timer);
+		ev_timer_start(service->loop, &service->timer);
 	}
 }
 
@@ -323,9 +321,9 @@ void
 evio_service_stop(struct evio_service *service)
 {
 	if (! ev_is_active(&service->ev)) {
-		ev_timer_stop(&service->timer);
+		ev_timer_stop(service->loop, &service->timer);
 	} else {
-		ev_io_stop(&service->ev);
+		ev_io_stop(service->loop, &service->ev);
 		close(service->ev.fd);
 	}
 }

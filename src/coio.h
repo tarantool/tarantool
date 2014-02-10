@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "evio.h"
+#include "fiber.h"
 
 /**
  * Co-operative I/O
@@ -68,6 +69,19 @@ coio_init(struct ev_io *coio);
 ssize_t
 coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
 		        ev_tstamp timeout);
+
+static inline void
+coio_timeout_init(ev_tstamp *start, ev_tstamp *delay,
+		  ev_tstamp timeout)
+{
+	return evio_timeout_init(loop(), start, delay, timeout);
+}
+
+static inline void
+coio_timeout_update(ev_tstamp start, ev_tstamp *delay)
+{
+	return evio_timeout_update(loop(), start, delay);
+}
 
 /**
  * Reat at least sz bytes, with readahead.

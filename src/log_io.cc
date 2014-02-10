@@ -58,7 +58,7 @@ log_row_fill(struct log_row *row, int64_t lsn, uint64_t cookie,
 	row->tag  = WAL; /* unused. */
 	row->cookie = cookie;
 	row->lsn = lsn;
-	row->tm = ev_now();
+	row->tm = ev_now(loop());
 	row->len = metadata_len + data_len;
 
 	memcpy(row->data, metadata, metadata_len);

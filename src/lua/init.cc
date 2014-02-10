@@ -121,7 +121,7 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 static int
 lbox_time(struct lua_State *L)
 {
-	lua_pushnumber(L, ev_now());
+	lua_pushnumber(L, ev_now(loop()));
 	return 1;
 }
 
@@ -129,7 +129,7 @@ lbox_time(struct lua_State *L)
 static int
 lbox_time64(struct lua_State *L)
 {
-	luaL_pushnumber64(L, (uint64_t) ( ev_now() * 1000000 + 0.5 ) );
+	luaL_pushnumber64(L, (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 ) );
 	return 1;
 }
 
@@ -599,7 +599,7 @@ load_init_script(va_list ap)
 	 * Lua script finished. Stop the auxiliary event loop and
 	 * return control back to tarantool_lua_load_init_script.
 	 */
-	ev_break(EVBREAK_ALL);
+	ev_break(loop(), EVBREAK_ALL);
 }
 
 #if 0
@@ -656,7 +656,7 @@ tarantool_lua_load_init_script(char *path)
 	 * Run an auxiliary event loop to re-schedule load_init_script fiber.
 	 * When this fiber finishes, it will call ev_break to stop the loop.
 	 */
-	ev_run(0);
+	ev_run(loop(), 0);
 
 #if 0
 	/* Outside the startup file require() or ffi are not

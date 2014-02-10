@@ -175,7 +175,7 @@ core_reload_config(const struct tarantool_cfg *old_conf,
 		   const struct tarantool_cfg *new_conf)
 {
 	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
-		ev_set_io_collect_interval(new_conf->io_collect_interval);
+		ev_set_io_collect_interval(loop(), new_conf->io_collect_interval);
 
 	return 0;
 }
@@ -290,18 +290,16 @@ static double start_time;
 double
 tarantool_uptime(void)
 {
-	return ev_now() - start_time;
+	return ev_now(loop()) - start_time;
 }
 
 /**
 * Create snapshot from signal handler (SIGUSR1)
 */
 static void
-sig_snapshot(struct ev_signal *w, int revents)
+sig_snapshot(ev_loop * /* loop */, struct ev_signal * /* w */,
+	     int /* revents */)
 {
-	(void) w;
-	(void) revents;
-
 	if (snapshot_pid) {
 		say_warn("Snapshot process is already running,"
 			" the signal is ignored");
@@ -311,13 +309,13 @@ sig_snapshot(struct ev_signal *w, int revents)
 }
 
 static void
-signal_cb(struct ev_signal *w, int revents)
+signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
 	(void) w;
 	(void) revents;
 
 	/* Terminate the main event loop */
-	ev_unloop(EV_A_ EVUNLOOP_ALL);
+	ev_break(loop, EVBREAK_ALL);
 }
 
 /** Try to log as much as possible before dumping a core.
@@ -394,14 +392,14 @@ signal_free(void)
 {
 	int i;
 	for (i = 0; i < ev_sig_count; i++)
-		ev_signal_stop(&ev_sigs[i]);
+		ev_signal_stop(loop(), &ev_sigs[i]);
 }
 
 static void
 signal_start(void)
 {
 	for (int i = 0; i < ev_sig_count; i++)
-		ev_signal_start(&ev_sigs[i]);
+		ev_signal_start(loop(), &ev_sigs[i]);
 }
 
 /** Make sure the child has a default signal disposition. */
@@ -546,7 +544,6 @@ tarantool_free(void)
 	signal_free();
 	tarantool_lua_free();
 	box_free();
-	stat_free();
 
 	if (shebang)
 		free(shebang);
@@ -564,7 +561,6 @@ tarantool_free(void)
 	session_free();
 	fiber_free();
 	memory_free();
-	ev_default_destroy();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
@@ -610,7 +606,6 @@ main(int argc, char **argv)
 
 	say_init(argv[0]);
 	crc32_init();
-	stat_init();
 	memory_init();
 
 #ifdef HAVE_BFD
@@ -782,7 +777,6 @@ main(int argc, char **argv)
 	/* main core cleanup routine */
 	atexit(tarantool_free);
 
-	ev_default_loop(EVFLAG_AUTO);
 	fiber_init();
 	replication_prefork();
 	iobuf_init(cfg.readahead);
@@ -796,7 +790,7 @@ main(int argc, char **argv)
 		tarantool_lua_init();
 		box_init();
 		tarantool_lua_load_cfg(&cfg);
-		int events = ev_activecnt();
+		int events = ev_activecnt(loop());
 		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
 		replication_init(cfg.bind_ipaddr, cfg.replication_port);
@@ -808,16 +802,16 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_load_init_script(shebang);
-		start_loop = ev_activecnt() > events;
+		start_loop = ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_crit("entering the event loop");
 			if (cfg.io_collect_interval > 0)
-				ev_set_io_collect_interval(cfg.io_collect_interval);
-			ev_now_update();
-			start_time = ev_now();
+				ev_set_io_collect_interval(loop(), cfg.io_collect_interval);
+			ev_now_update(loop());
+			start_time = ev_now(loop());
 			signal_start();
-			ev_loop(0);
+			ev_run(loop(), 0);
 		}
 	} catch (const Exception& e) {
 		e.log();
