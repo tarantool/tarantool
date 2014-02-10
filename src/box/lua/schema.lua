@@ -186,21 +186,40 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
         end
-        return unpack(
-            index:eselect(keify(key), { iterator = 'GE', limit = 1 })
-        )
+        local lst = index:eselect(keify(key), { iterator = 'GE', limit = 1 })
+        if lst[1] ~= nil then
+            return lst[1]
+        else
+            return
+        end
     end
     index_mt.max = function(index, key)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
         end
-        return unpack(
-            index:eselect(keify(key), { iterator = 'LE', limit = 1 })
-        )
+        local lst = index:eselect(keify(key), { iterator = 'LE', limit = 1 })
+        if lst[1] ~= nil then
+            return lst[1]
+        else
+            return
+        end
     end
     index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
     index_mt.iterator = function(index, key, opts)
+        if opts == nil then
+            opts = {}
+        elseif type(opts) ~= 'table' then
+            error("usage: index:iterator(key[, { option = value, ... })")
+        end
+
+        if type(opts.iterator) == 'string' then
+            if box.index[ opts.iterator ] == nil then
+                error("Wrong iterator type: " .. opts.iterator)
+            end
+            opts.iterator = box.index[ opts.iterator ]
+        end
+
         return index.idx:iterator(key, opts)
     end
     --
@@ -218,7 +237,13 @@ function box.schema.space.bless(space)
         else
             iterator = 'EQ'
         end
+
+        key = keify(key)
         
+        if #key == 0 then
+            return #index.idx
+        end
+
         for tuple in index:iterator(key, { iterator = iterator }) do
             count = count + 1
         end

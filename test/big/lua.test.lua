@@ -184,6 +184,7 @@ space:insert{3, 2, 1}
 space:insert{4, 3, 0}
 space:insert{5, 3, 1}
 space:insert{6, 3, 2}
+space.index['i1']:count()
 space.index['i1']:count(1)
 space.index['i1']:count(1)
 space.index['i1']:count(2, { iterator = 'LE' })

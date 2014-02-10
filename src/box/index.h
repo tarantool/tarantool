@@ -164,8 +164,6 @@ public:
 	virtual void buildNext(struct tuple *tuple);
 	virtual void endBuild();
 	virtual size_t size() const = 0;
-	virtual struct tuple *min() const;
-	virtual struct tuple *max() const;
 	virtual struct tuple *random(uint32_t rnd) const;
 	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const = 0;
 	virtual struct tuple *findByTuple(struct tuple *tuple) const;

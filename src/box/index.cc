@@ -147,24 +147,6 @@ Index::~Index()
 }
 
 struct tuple *
-Index::min() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "min()");
-	return NULL;
-}
-
-struct tuple *
-Index::max() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "max()");
-	return NULL;
-}
-
-struct tuple *
 Index::random(uint32_t rnd) const
 {
 	(void) rnd;

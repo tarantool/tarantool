@@ -212,34 +212,12 @@ lbox_create_iterator(struct lua_State *L)
 		lua_pushliteral(L, "iterator");
 		lua_gettable(L, 3);
 
-		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-		} else {
-			if (lua_isnumber(L, -1)) {
-				type = (enum iterator_type)lua_tointeger(L, -1);
-			} else if (lua_isstring(L, -1)) {
-				lua_getfield(L, LUA_GLOBALSINDEX, "box");
-				lua_getfield(L, -1, "index");
-				lua_pushvalue(L, -3);
-				lua_gettable(L, -2);
-
-				/* stack: itype, box, index, box.index[itype] */
-
-				if (lua_isnil(L, -1))
-					luaL_error(L,
-						"unknown iterator type: '%s'",
-						lua_tostring(L, -4));
-				type = (enum iterator_type)lua_tointeger(L, -1);
-				lua_pop(L, 3);
-
-			} else {
-				luaL_error(L,
-					"usage: index:iterator(key[, opts ])");
-			}
+		if (!lua_isnil(L, -1)) {
+			type = (enum iterator_type) luaL_checkint(L, -1);
 			if (type < ITER_ALL || type >= iterator_type_MAX)
 				luaL_error(L, "unknown iterator type: %d", type);
-			lua_pop(L, 1); /* type of iterator */
 		}
+		lua_pop(L, 1);
 	}
 
 
@@ -326,27 +304,6 @@ lbox_index_iterator(struct lua_State *L)
 }
 
 
-static const struct luaL_reg lbox_index_meta[] = {
-	{"__tostring", lbox_index_tostring},
-	{"__len", lbox_index_len},
-	{"part_count", lbox_index_part_count},
-	{"random", lbox_index_random},
-	{"next", lbox_index_next},
-	{"iterator", lbox_index_iterator},
-	{NULL, NULL}
-};
-
-static const struct luaL_reg indexlib [] = {
-	{"bind", lbox_index_bind},
-	{NULL, NULL}
-};
-
-static const struct luaL_reg lbox_iterator_meta[] = {
-	{"__gc", lbox_iterator_gc},
-	{NULL, NULL}
-};
-
-
 static void
 box_index_init_iterator_types(struct lua_State *L, int idx)
 {
@@ -363,6 +320,27 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 void
 box_lua_index_init(struct lua_State *L)
 {
+	static const struct luaL_reg lbox_index_meta[] = {
+		{"__tostring", lbox_index_tostring},
+		{"__len", lbox_index_len},
+		{"part_count", lbox_index_part_count},
+		{"random", lbox_index_random},
+		{"next", lbox_index_next},
+		{"iterator", lbox_index_iterator},
+		{NULL, NULL}
+	};
+
+	static const struct luaL_reg lbox_iterator_meta[] = {
+		{"__gc", lbox_iterator_gc},
+		{NULL, NULL}
+	};
+
+	static const struct luaL_reg indexlib [] = {
+		{"bind", lbox_index_bind},
+		{NULL, NULL}
+	};
+
+
 	/* box.index */
 	luaL_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);
