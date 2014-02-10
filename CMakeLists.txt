@@ -308,12 +308,15 @@ libcjson_build()
 add_dependencies(build_bundled_libs cjson)
 
 #
-# Third-Party misc
+# Third-Party
 #
 
 include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
+
+include(BuildSophia)
+sophia_build()
 
 option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 

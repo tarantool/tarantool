@@ -1,7 +1,7 @@
 # encoding: tarantool
 
 server.stop()
-server.deploy(init_lua="box/net_sql.common.lua")
+server.deploy(init_lua="module/net_sql.common.lua")
 
 exec admin "lua type(box.net.sql)"
 exec admin "lua c = box.net.sql.connect('abcd')"
