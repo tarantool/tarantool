@@ -375,8 +375,9 @@ box_snapshot(void)
 
 	slab_arena_mprotect(&tuple_arena);
 
+	cord_set_name("snap");
 	title("dumper", "%" PRIu32, getppid());
-	fiber_set_name(fiber(), status);
+	fiber_set_name(fiber(), "dumper");
 	/*
 	 * Safety: make sure we don't double-write
 	 * parent stdio buffers at exit().

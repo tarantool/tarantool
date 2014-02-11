@@ -39,6 +39,7 @@
 #include "bootstrap.h"
 
 #include "replication.h"
+#include "fiber.h"
 
 /*
  * Recovery subsystem
@@ -783,13 +784,14 @@ struct wal_writer
 {
 	struct wal_fifo input;
 	struct wal_fifo commit;
-	pthread_t thread;
+	struct cord cord;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	ev_async write_event;
 	struct fio_batch *batch;
 	bool is_shutdown;
 	bool is_rollback;
+	ev_loop *txn_loop;
 };
 
 static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
@@ -909,6 +911,7 @@ wal_writer_init(struct wal_writer *writer)
 
 	ev_async_init(&writer->write_event, wal_schedule);
 	writer->write_event.data = writer;
+	writer->txn_loop = loop();
 
 	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 
@@ -956,11 +959,11 @@ wal_writer_start(struct recovery_state *r)
 	wal_writer_init(&wal_writer);
 	r->writer = &wal_writer;
 
-	ev_async_start(loop(), &wal_writer.write_event);
+	ev_async_start(wal_writer.txn_loop, &wal_writer.write_event);
 
 	/* II. Start the thread. */
 
-	if (tt_pthread_create(&wal_writer.thread, NULL, wal_writer_thread, r)) {
+	if (cord_start(&wal_writer.cord, "wal", wal_writer_thread, r)) {
 		wal_writer_destroy(&wal_writer);
 		r->writer = NULL;
 		return -1;
@@ -980,13 +983,12 @@ wal_writer_stop(struct recovery_state *r)
 	writer->is_shutdown= true;
 	(void) tt_pthread_cond_signal(&writer->cond);
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-
-	if (tt_pthread_join(writer->thread, NULL) != 0) {
+	if (cord_join(&writer->cord)) {
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}
 
-	ev_async_stop(loop(), &writer->write_event);
+	ev_async_stop(writer->txn_loop, &writer->write_event);
 	wal_writer_destroy(writer);
 
 	r->writer = NULL;
@@ -1180,7 +1182,7 @@ wal_writer_thread(void *worker_args)
 			STAILQ_CONCAT(&rollback, &writer->input);
 			STAILQ_CONCAT(&writer->input, &rollback);
 		}
-		ev_async_send(loop(), &writer->write_event);
+		ev_async_send(writer->txn_loop, &writer->write_event);
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 	if (r->current_wal != NULL)

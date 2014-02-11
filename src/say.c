@@ -197,9 +197,15 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	p += strftime(buf + p, len - p, "%F %H:%M", &tm);
 	p += snprintf(buf + p, len - p, ":%06.3f",
 		      now - now_seconds + tm.tm_sec);
-
-	p += snprintf(buf + p, len - p, " [%i] %i/%s", getpid(),
-		      fiber()->fid, fiber_name(fiber()));
+	struct cord *cord = cord();
+	p += snprintf(buf + p, len - p, " [%i]", getpid());
+	if (cord) {
+		p += snprintf(buf + p, len - p, " %s", cord->name);
+		if (fiber() && fiber()->fid != 1) {
+			p += snprintf(buf + p, len - p, "/%i/%s",
+				      fiber()->fid, fiber_name(fiber()));
+		}
+	}
 
 	if (level == S_WARN || level == S_ERROR)
 		p += snprintf(buf + p, len - p, " %s:%i", filename, line);

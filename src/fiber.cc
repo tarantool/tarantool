@@ -37,11 +37,8 @@
 #include "assoc.h"
 #include "memory.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-static struct cord main = { &main.sched };
-#pragma GCC diagnostic pop
-__thread struct cord *cord_ptr = &main;
+static struct cord main_cord;
+__thread struct cord *cord_ptr = NULL;
 pthread_t main_thread_id;
 
 static void
@@ -279,6 +276,7 @@ fiber_schedule_child(ev_loop * /* loop */, ev_child *watcher, int event)
 int
 wait_for_child(pid_t pid)
 {
+	assert(cord() == &main_cord);
 	ev_child cw;
 	ev_init(&cw, fiber_schedule_child);
 	ev_child_set(&cw, pid, 0);
@@ -491,7 +489,7 @@ fiber_destroy_all(struct cord *cord)
 }
 
 void
-cord_create(struct cord *cord)
+cord_create(struct cord *cord, const char *name)
 {
 	cord->id = pthread_self();
 	cord->loop = cord->id == main_thread_id ?
@@ -505,6 +503,7 @@ cord_create(struct cord *cord)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	cord->sched.fid = 1;
+	cord->fiber = &cord->sched;
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 
@@ -513,6 +512,7 @@ cord_create(struct cord *cord)
 
 	ev_async_init(&cord->ready_async, fiber_ready_async);
 	ev_async_start(cord->loop, &cord->ready_async);
+	snprintf(cord->name, sizeof(cord->name), "%s", name);
 }
 
 void
@@ -528,11 +528,69 @@ cord_destroy(struct cord *cord)
 	ev_loop_destroy(cord->loop);
 }
 
+struct cord_thread_arg
+{
+	struct cord *cord;
+	const char *name;
+	void *(*f)(void *);
+	void *arg;
+	bool is_started;
+	pthread_mutex_t start_mutex;
+	pthread_cond_t start_cond;
+};
+
+void *cord_thread_func(void *p)
+{
+	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
+	struct cord *cord = cord() = ct_arg->cord;
+	cord_create(cord, ct_arg->name);
+	tt_pthread_mutex_lock(&ct_arg->start_mutex);
+	void *(*f)(void *) = ct_arg->f;
+	void *arg = ct_arg->arg;
+	ct_arg->is_started = true;
+	tt_pthread_cond_signal(&ct_arg->start_cond);
+	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
+	return f(arg);
+}
+
+int
+cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
+{
+	int res = -1;
+	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
+		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
+	tt_pthread_mutex_lock(&ct_arg.start_mutex);
+	if (tt_pthread_create(&cord->id, NULL, cord_thread_func, &ct_arg))
+		goto end;
+	res = 0;
+	while (! ct_arg.is_started)
+		tt_pthread_cond_wait(&ct_arg.start_cond, &ct_arg.start_mutex);
+end:
+	tt_pthread_mutex_unlock(&ct_arg.start_mutex);
+	tt_pthread_mutex_destroy(&ct_arg.start_mutex);
+	tt_pthread_cond_destroy(&ct_arg.start_cond);
+	return res;
+}
+
+int
+cord_join(struct cord *cord)
+{
+	int res = 0;
+	if (tt_pthread_join(cord->id, NULL)) {
+		/* We can't recover from this in any reasonable way. */
+		say_syserror("%s: thread join failed", cord->name);
+		res = -1;
+	}
+	cord_destroy(cord);
+	return res;
+}
+
 void
 fiber_init(void)
 {
 	main_thread_id = pthread_self();
-	cord_create(cord());
+	cord() = &main_cord;
+	cord_create(cord(), "main");
 }
 
 void

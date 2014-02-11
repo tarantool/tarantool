@@ -150,6 +150,7 @@ struct cord {
 	struct mempool fiber_pool;
 	/** A runtime slab cache for general use in this cord. */
 	struct slab_cache slabc;
+	char name[FIBER_NAME_MAX];
 };
 
 extern __thread struct cord *cord_ptr;
@@ -157,6 +158,20 @@ extern __thread struct cord *cord_ptr;
 #define cord() cord_ptr
 #define fiber() cord()->fiber
 #define loop() (cord()->loop)
+
+int
+cord_start(struct cord *cord, const char *name,
+	   void *(*f)(void *), void *arg);
+
+int
+cord_join(struct cord *cord);
+
+static inline void
+cord_set_name(const char *name)
+{
+	snprintf(cord()->name, FIBER_NAME_MAX, "%s", name);
+}
+
 
 void fiber_init(void);
 void fiber_free(void);

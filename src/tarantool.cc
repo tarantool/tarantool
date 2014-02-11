@@ -605,6 +605,7 @@ main(int argc, char **argv)
 	}
 
 	say_init(argv[0]);
+
 	crc32_init();
 	memory_init();
 
@@ -774,6 +775,9 @@ main(int argc, char **argv)
 
 	say_logger_init(cfg.logger, &cfg.log_level, cfg.logger_nonblock);
 
+	say_crit("version %s", tarantool_version());
+	say_crit("log level %i", cfg.log_level);
+
 	/* main core cleanup routine */
 	atexit(tarantool_free);
 
@@ -785,8 +789,6 @@ main(int argc, char **argv)
 
 	bool start_loop = false;
 	try {
-		say_crit("version %s", tarantool_version());
-		say_crit("log level %i", cfg.log_level);
 		tarantool_lua_init();
 		box_init();
 		tarantool_lua_load_cfg(&cfg);
