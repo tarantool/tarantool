@@ -841,34 +841,11 @@ iterate('tweedledum', 'i4', 0, 1, box.index.EQ)
 ---
 - error: Invalid key part count in an exact match (expected 1, got 0)
 ...
-iterate('tweedledum', 'i4', 0, 1, box.index.GE)
----
-- - $pid_001$
-  - $pid_002$
-  - $pid_003$
-  - $pid_005$
-  - $pid_007$
-  - $pid_011$
-  - $pid_013$
-  - $pid_017$
-  - $pid_019$
-  - $pid_023$
-...
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ, 'pid_003')
 ---
 - - $pid_003$
 ...
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ, 'pid_666')
----
-- []
-...
-iterate('tweedledum', 'i4', 0, 1, box.index.GE, 'pid_001')
----
-- - $pid_001$
-  - $pid_002$
-  - $pid_017$
-...
-iterate('tweedledum', 'i4', 0, 1, box.index.GE, 'pid_999')
 ---
 - []
 ...
@@ -888,26 +865,9 @@ iterate('tweedledum', 'i5', 1, 3, box.index.ALL)
   - $sid_005$tid_996$
   - $sid_006$tid_996$
 ...
-iterate('tweedledum', 'i5', 1, 3, box.index.EQ)
----
-- error: Invalid key part count in an exact match (expected 2, got 0)
-...
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005')
 ---
 - error: Invalid key part count in an exact match (expected 2, got 1)
-...
-iterate('tweedledum', 'i5', 1, 3, box.index.GE)
----
-- - $sid_001$tid_997$
-  - $sid_001$tid_998$
-  - $sid_002$tid_996$
-  - $sid_002$tid_997$
-  - $sid_003$tid_996$
-  - $sid_004$tid_996$
-  - $sid_005$tid_994$
-  - $sid_005$tid_995$
-  - $sid_005$tid_996$
-  - $sid_006$tid_996$
 ...
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995')
 ---
@@ -921,25 +881,15 @@ iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
 ---
 - error: Invalid key part count (expected [0..2], got 3)
 ...
-iterate('tweedledum', 'i5', 1, 3, box.index.GE, 'sid_005', 'tid_995')
----
-- - $sid_002$tid_996$
-  - $sid_004$tid_996$
-  - $sid_005$tid_995$
-...
-iterate('tweedledum', 'i5', 1, 3, box.index.GE, 'sid_005', 'tid_999')
----
-- []
-...
 -------------------------------------------------------------------------------
 -- Iterator: various
 -------------------------------------------------------------------------------
-space.index['primary']:iterator(-666)
+space.index['primary']:iterator({}, {iterator = -666 })
 ---
 - error: 'unknown iterator type: -666'
 ...
 -- Test cases for #123: box.index.count does not check arguments properly
-space.index['primary']:iterator(box.index.EQ, function() end)
+space.index['primary']:iterator(function() end, { iterator = box.index.EQ })
 ---
 - error: 'msgpack.encode: can not encode Lua type ''function'''
 ...

@@ -155,22 +155,6 @@ lbox_index_part_count(struct lua_State *L)
 }
 
 static int
-lbox_index_min(struct lua_State *L)
-{
-	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, index->min());
-	return 1;
-}
-
-static int
-lbox_index_max(struct lua_State *L)
-{
-	Index *index = lua_checkindex(L, 1);
-	lbox_pushtuple(L, index->max());
-	return 1;
-}
-
-static int
 lbox_index_random(struct lua_State *L)
 {
 	if (lua_gettop(L) != 2 || lua_isnil(L, 2))
@@ -213,7 +197,7 @@ static inline struct iterator *
 lbox_create_iterator(struct lua_State *L)
 {
 	Index *index = lua_checkindex(L, 1);
-	int argc = lua_gettop(L);
+	int top = lua_gettop(L);
 
 	/* Create a new iterator. */
 	enum iterator_type type = ITER_ALL;
@@ -221,19 +205,30 @@ lbox_create_iterator(struct lua_State *L)
 	const char *key = NULL;
 	size_t key_size = 0;
 
-	if (argc > 1 && lua_type(L, 2) != LUA_TNIL) {
-		type = (enum iterator_type) luaL_checkint(L, 2);
-		if (type < ITER_ALL || type >= iterator_type_MAX)
-			luaL_error(L, "unknown iterator type: %d", type);
+
+	if (top > 2 && !lua_isnil(L, 3)) {
+		if (!lua_istable(L, 3))
+			luaL_error(L, "usage: index:iterator(key[, opts ])");
+		lua_pushliteral(L, "iterator");
+		lua_gettable(L, 3);
+
+		if (!lua_isnil(L, -1)) {
+			type = (enum iterator_type) luaL_checkint(L, -1);
+			if (type < ITER_ALL || type >= iterator_type_MAX)
+				luaL_error(L, "unknown iterator type: %d", type);
+		}
+		lua_pop(L, 1);
 	}
+
 
 	RegionGuard region_guard(&fiber()->gc);
 
-	/* What else do we have on the stack? */
-	if (argc > 2 && (lua_type(L, 3) != LUA_TNIL)) {
-		/* Single or multi- part key. */
+	if (top > 1 && !lua_isnil(L, 2)) {
+		if (lua_istable(L, 2) && luaL_getn(L, 2) == 0)
+			goto create;
+
 		struct tbuf *b = tbuf_new(&fiber()->gc);
-		luamp_encodestack(L, b, 3, argc);
+		luamp_encodestack(L, b, 2, 2);
 		key = b->data;
 		assert(b->size > 0);
 		if (unlikely(mp_typeof(*key) != MP_ARRAY))
@@ -241,6 +236,8 @@ lbox_create_iterator(struct lua_State *L)
 		key_part_count = mp_decode_array(&key);
 		key_size = b->data + b->size - key;
 	}
+
+	create:
 
 	struct iterator *it = index->allocIterator();
 	lbox_pushiterator(L, index, it, type, key, key_size, key_part_count);
@@ -307,79 +304,6 @@ lbox_index_iterator(struct lua_State *L)
 }
 
 
-/**
- * Lua index subtree count function.
- * Iterate over an index, count the number of tuples which equal the
- * provided search criteria. The argument can either point to a
- * tuple, a key, or one or more key parts. Returns the number of matched
- * tuples.
- */
-static int
-lbox_index_count(struct lua_State *L)
-{
-	Index *index = lua_checkindex(L, 1);
-	int argc = lua_gettop(L);
-	if (argc == 0)
-		luaL_error(L, "index.count(): one or more arguments expected");
-
-	/* preparing single or multi-part key */
-	if (argc == 1 || (argc == 2 && lua_type(L, 2) == LUA_TNIL)) {
-		/* Nothing */
-		/* Return index size */
-		lua_pushnumber(L, index->size());
-		return 1;
-	}
-
-	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *b = tbuf_new(&fiber()->gc);
-
-	/* Single or multi- part key. */
-	luamp_encodestack(L, b, 2, argc);
-
-	const char *key = b->data;
-	if (unlikely(mp_typeof(*key) != MP_ARRAY))
-		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	uint32_t part_count = mp_decode_array(&key);
-	key_validate(index->key_def, ITER_EQ, key, part_count);
-
-	/* Prepare index iterator */
-	struct iterator *it = index->position();
-	index->initIterator(it, ITER_EQ, key, part_count);
-	/* Iterate over the index and count tuples. */
-	struct tuple *tuple;
-	uint32_t count = 0;
-	while ((tuple = it->next(it)) != NULL)
-		count++;
-
-	/* Return subtree size */
-	lua_pushnumber(L, count);
-	return 1;
-}
-
-static const struct luaL_reg lbox_index_meta[] = {
-	{"__tostring", lbox_index_tostring},
-	{"__len", lbox_index_len},
-	{"part_count", lbox_index_part_count},
-	{"min", lbox_index_min},
-	{"max", lbox_index_max},
-	{"random", lbox_index_random},
-	{"next", lbox_index_next},
-	{"iterator", lbox_index_iterator},
-	{"count", lbox_index_count},
-	{NULL, NULL}
-};
-
-static const struct luaL_reg indexlib [] = {
-	{"bind", lbox_index_bind},
-	{NULL, NULL}
-};
-
-static const struct luaL_reg lbox_iterator_meta[] = {
-	{"__gc", lbox_iterator_gc},
-	{NULL, NULL}
-};
-
-
 static void
 box_index_init_iterator_types(struct lua_State *L, int idx)
 {
@@ -396,6 +320,27 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 void
 box_lua_index_init(struct lua_State *L)
 {
+	static const struct luaL_reg lbox_index_meta[] = {
+		{"__tostring", lbox_index_tostring},
+		{"__len", lbox_index_len},
+		{"part_count", lbox_index_part_count},
+		{"random", lbox_index_random},
+		{"next", lbox_index_next},
+		{"iterator", lbox_index_iterator},
+		{NULL, NULL}
+	};
+
+	static const struct luaL_reg lbox_iterator_meta[] = {
+		{"__gc", lbox_iterator_gc},
+		{NULL, NULL}
+	};
+
+	static const struct luaL_reg indexlib [] = {
+		{"bind", lbox_index_bind},
+		{NULL, NULL}
+	};
+
+
 	/* box.index */
 	luaL_register_type(L, indexlib_name, lbox_index_meta);
 	luaL_register(L, "box.index", indexlib);

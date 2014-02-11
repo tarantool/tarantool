@@ -1,11 +1,68 @@
 -- box_net.lua (internal file)
 
+(function()
+
 local function keify(key)
+    if key == nil then
+        return {}
+    end
     if type(key) == "table" then
         return key
     end
     return {key}
 end
+
+
+local function sprintf(fmt, ...) return string.format(fmt, ...) end
+local function printf(fmt, ...) return print(sprintf(fmt, ...)) end
+local function errorf(fmt, ...) error(sprintf(fmt, ...)) end
+
+
+
+
+local function rpc_call(r, slf, ...)
+
+    local path = rawget(r, 'path')
+    local args = { slf, ... }
+    if type(slf) == 'table' then
+        if rawget(slf, 'path') ~= nil and rawget(slf, 'r') ~= nil then
+            path = slf.path .. ':' .. r.method
+            args = { ... }
+        end
+    end
+
+    
+    return r.r:call(path, unpack(args))
+end
+
+local function rpc_index(r, name)
+    local o = { r = rawget(r, 'r') }
+    local path = rawget(r, 'path')
+    if path == nil then
+        path = name
+    else
+        if type(name) == 'string' then
+            path = sprintf("%s.%s", path, name)
+        elseif type(name) == 'number' then
+            path = sprintf("%s[%s]", path, name)
+        else
+            errorf("Wrong path subitem: %s", tostring(name))
+        end
+    end
+    o.path = path
+    o.method = name
+
+    printf("path: %s", path)
+    setmetatable(o, {
+        __index = rpc_index,
+        __call  = rpc_call,
+    })
+
+    rawset(r, name, o)
+    return o
+end
+
+
 
 box.net = {
 
@@ -39,42 +96,63 @@ box.net = {
         ERROR = 0x31,
 
         delete = function(self, space, key)
-            return self:process(box.net.box.DELETE,
+            local t = self:process(box.net.box.DELETE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.KEY] = keify(key)
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         replace = function(self, space, tuple)
-            return self:process(box.net.box.REPLACE,
+            local t = self:process(box.net.box.REPLACE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.TUPLE] = tuple
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         -- insert a tuple (produces an error if the tuple already exists)
         insert = function(self, space, tuple)
-            return self:process(box.net.box.INSERT,
+            local t = self:process(box.net.box.INSERT,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.TUPLE] = tuple
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         -- update a tuple
         update = function(self, space, key, ops)
-            return self:process(box.net.box.UPDATE,
+            local t = self:process(box.net.box.UPDATE,
                     msgpack.encode({
                         [box.net.box.SPACE_ID] = space,
                         [box.net.box.KEY] = keify(key),
                         [box.net.box.TUPLE] = ops
                         }))
+            if t[1] ~= nil then
+                return t[1]
+            else
+                return
+            end
         end,
 
         select = function(self, space, key)
-            return self:eselect(space, 0, key, { limit = 4294967295 })
+            -- unpack - is old behaviour
+            return unpack(self:eselect(space, 0, key, { limit = 4294967295 }))
         end,
 
         ping = function(self)
@@ -90,7 +168,15 @@ box.net = {
         end,
 
         eselect = function(self, sno, ino, key, opts)
-            return self:call('box.net.self:eselect', sno, ino, key, opts)
+            local res = self:call('box.net.self:eselect', sno, ino, key, opts)
+            if opts and opts.limit == nil then
+                if res[1] ~= nil then
+                    return res[1]
+                else
+                    return
+                end
+            end
+            return res
         end,
 
 
@@ -114,8 +200,7 @@ box.net = {
                             end
                     end
 
-                    error(string.format('Can not find "box.net.box.%s" function',
-                            name))
+                    errorf('Can not find "box.net.box.%s" function', name)
                 end
             });
 
@@ -135,12 +220,12 @@ box.net = {
             local space = box.space[ sno ]
             if space == nil then
                 box.raise(box.error.ER_NO_SUCH_SPACE,
-                    string.format("No such space #%s", tostring(sno)))
+                    sprintf("No such space #%s", tostring(sno)))
             end
             local index = space.index[ ino ]
             if index == nil then
                 box.raise(box.error.ER_NO_SUCH_INDEX,
-                    string.format("No such index #%s in space #%s",
+                    sprintf("No such index #%s in space #%s",
                         tostring(sno), tostring(ino)))
             end
 
@@ -152,9 +237,9 @@ box.net = {
         call = function(self, proc_name, ...) 
             local proc = { box.call_loadproc(proc_name) }
             if #proc == 2 then
-                return proc[1](proc[2], ...)
+                return { proc[1](proc[2], ...) }
             else
-                return proc[1](...)
+                return { proc[1](...) }
             end
         end,
 
@@ -169,9 +254,15 @@ box.net = {
 
         close = function(self)
             return true
-        end
+        end,
+
     }
 }
+
+-- box.net.self rpc works like remote.rpc
+box.net.self.rpc = { r = box.net.self }
+setmetatable(box.net.self.rpc, { __index = rpc_index })
+
 
 --
 -- Make sure box.net.box.select(conn, ...) works
@@ -224,7 +315,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
             self.processing[sync] = box.ipc.channel(1)
-            local header = msgpack.encode({[box.net.box.CODE] = op, [box.net.box.SYNC] = sync})
+            local header = msgpack.encode{
+                    [box.net.box.CODE] = op, [box.net.box.SYNC] = sync
+            }
             request = msgpack.encode(header:len() + request:len())..
                       header..request
 
@@ -275,7 +368,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     if code ~= 0 then
                         box.raise(code, body[box.net.box.ERROR])
                     end
-                    return unpack(totuples(body[box.net.box.DATA]))
+                    return totuples(body[box.net.box.DATA])
                 end
             else
                 error(res[2])
@@ -344,9 +437,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
-                    header, offset = msgpack.next(resp);
-                    code = header[box.net.box.CODE]
-                    sync = header[box.net.box.SYNC]
+                    local header, offset = msgpack.next(resp);
+                    local code = header[box.net.box.CODE]
+                    local sync = header[box.net.box.SYNC]
                     if sync == nil then
                         break
                     end
@@ -384,7 +477,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
         end,
 
         fatal = function(self, message, ...)
-            message = string.format(message, ...)
+            message = sprintf(message, ...)
             self.s = nil
             for sync, ch in pairs(self.processing) do
                 if type(sync) == 'number' then
@@ -392,9 +485,6 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 end
             end
         end,
-
-
-
 
         close = function(self)
             if self.closed then
@@ -420,7 +510,12 @@ box.net.box.new = function(host, port, reconnect_timeout)
     remote.irfiber = box.fiber.wrap(remote.rfiber, remote)
     remote.iwfiber = box.fiber.wrap(remote.wfiber, remote)
 
+    remote.rpc = { r = remote }
+    setmetatable(remote.rpc, { __index = rpc_index })
+    
     return remote
+
 end
 
+end)()
 -- vim: set et ts=4 sts

@@ -127,7 +127,7 @@ space:insert{'b', 'b', 'b'}
 space:insert{'c', 'c', 'c'}
 
 t = {}
-iterator = space.index['second']:iterator(box.index.GE)
+iterator = space.index['second']:iterator(nil, { iterator = box.index.GE })
 --# setopt delimiter ';'
 for i = 1, 2 do
     v = iterator()

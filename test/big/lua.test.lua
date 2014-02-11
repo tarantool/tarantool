@@ -3,6 +3,7 @@ space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true
 space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
 
 space:insert{'brave', 'new', 'world'}
+space:insert{'hello', 'old', 'world'}
 space.index['minmax']:min()
 space.index['minmax']:max()
 space.index['minmax']:select{'new', 'world'}
@@ -23,7 +24,7 @@ space.index['minmax']:select{'alabama'}
 space:insert{'item 2', 'california', 'dreaming '}
 space:insert{'item 3', 'california', 'uber alles'}
 space:insert{'item 4', 'georgia', 'on my mind'}
-iter, state = space.index['minmax']:iterator(box.index.GE, 'california')
+iter, state = space.index['minmax']:iterator('california', { iterator =  box.index.GE })
 iter()
 iter()
 space:delete{'item 1'}
@@ -145,24 +146,28 @@ end;
 index = space.index['i1']
 
 t = {}
-for v in index:iterator(box.index.GE, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator(box.index.LE, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator(box.index.EQ, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator(box.index.REQ, 'sid_1') do table.insert(t, v) end
+for v in index:iterator('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator(box.index.EQ, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator(box.index.REQ, 'sid_2') do table.insert(t, v) end
+for v in index:iterator('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
 t
 t = {}
+
+
+index:iterator('sid_t', { iterator = 'wrong_iterator_type' })
+
 index = nil
 space:drop()
 
@@ -179,12 +184,19 @@ space:insert{3, 2, 1}
 space:insert{4, 3, 0}
 space:insert{5, 3, 1}
 space:insert{6, 3, 2}
+space.index['i1']:count()
 space.index['i1']:count(1)
+space.index['i1']:count(1)
+space.index['i1']:count(2, { iterator = 'LE' })
+space.index['i1']:count(2, { iterator = 'GE' })
+space.index['i1']:count({2, 0}, { iterator = 'LE' })
+space.index['i1']:count({2, 1}, { iterator = 'GE' })
+
 space.index['i1']:count(2)
-space.index['i1']:count(2, 1)
-space.index['i1']:count(2, 2)
+space.index['i1']:count({2, 1})
+space.index['i1']:count({2, 2})
 space.index['i1']:count(3)
-space.index['i1']:count(3, 3)
+space.index['i1']:count({3, 3})
 -- Returns total number of records
 -- https://github.com/tarantool/tarantool/issues/46
 space.index['i1']:count()

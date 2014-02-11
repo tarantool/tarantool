@@ -48,18 +48,18 @@ targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your
 <para>
 The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
 The repositories for the <quote>master</quote> release are at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
-Since this is the manual for the <quote>stable</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
+Since this is the manual for the <quote>master</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
 </para>
 
 <para>
-An automatic build system creates, tests and publishes packages for every push into the stable branch. 
-Therefore if you looked at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link> you would see many files.
+An automatic build system creates, tests and publishes packages for every push into the master branch. 
+Therefore if you looked at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link> you would see many files.
 Names of binary packages have the format <computeroutput><filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename></computeroutput>.
 Here is one example:
-<programlisting>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55    3664777</programlisting>
-which means <quote>Tarantool package, major version = 1, minor version number = 5, patch number 1,
-git revision id g8e8cd06, is a Linux x86 64-bit compressed tarball, pushed on
-September 26 2013, which contains 3.6 MB.</quote>
+<programlisting>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz     13-Dec-2013 16:55    4176905</programlisting>
+which means <quote>Tarantool package, major version = 1, minor version number = 6, patch number 1,
+git revision id g30fe8ae, is a Linux x86 64-bit compressed tarball, pushed on
+December 13 2013, which contains 4.1 MB.</quote>
 </para>
 
 <para>
@@ -69,9 +69,9 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 
 <para>
 <programlisting>
-# DEBIAN commands for Tarantool stable binary download:
+# DEBIAN commands for Tarantool master binary download:
 # There is always an up-to-date Debian repository at
-# <link xlink:href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</link>
+# <link xlink:href="http://tarantool.org/dist/master/debian">http://tarantool.org/dist/master/debian</link>
 # The repository contains builds for Debian unstable "Sid", stable "Wheezy",
 # forthcoming "Jessie", ...
 # add the tarantool.org repository to your apt sources list:
@@ -81,9 +81,9 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/debian/ $release main" | \
+<command>echo</command> "deb http://tarantool.org/dist/master/debian/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/debian/ $release main" | \
+<command>echo</command> "deb-src http://tarantool.org/dist/master/debian/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
@@ -93,9 +93,9 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
-# UBUNTU commands for Tarantool stable binary download:
+# UBUNTU commands for Tarantool master binary download:
 # There is always an up-to-date Ubuntu repository at
-# <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</link>
+# <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
 # The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
 # 13.04 "raring", 13.10 "saucy", ...
 # add the tarantool.org repository to your apt sources list:
@@ -108,9 +108,9 @@ release=`lsb_release -c -s`
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>echo</command> "deb http://tarantool.org/dist/master/ubuntu/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>echo</command> "deb-src http://tarantool.org/dist/master/ubuntu/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
@@ -120,15 +120,14 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
-# CENTOS commands for Tarantool stable binary download:
+# CENTOS commands for Tarantool master binary download:
 # These instructions are applicable for CentOS version 5 or 6,
 # and RHEL version 5 or 6
 # Pick the CentOS repository which fits your CentOS/RHEL version
 # and your x86 platform:
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/i386">http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/x86_64">http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/i386">http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/x86_64">http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/master/centos/5/os/i386">http://tarantool.org/dist/master/centos/5/os/i386 for version 5, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/master/centos/5/os/x86_64">http://tarantool.org/dist/master/centos/5/os/x86_64 for version 5, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/master/centos/6/os/x86_64">http://tarantool.org/dist/master/centos/6/os/x86_64 for version 6, x86-64</link>
 # Add the following section to your yum repository list
 # (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
 # (in the following instructions,
@@ -137,7 +136,7 @@ release=`lsb_release -c -s`
 #     $basearch i.e. base architecture must be either i386 or x86_64)
 # [tarantool]
 # name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
-# baseurl=http://tarantool.org/dist/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
+# baseurl=http://tarantool.org/dist/master/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
 # enabled=1
 # gpgcheck=0
 # For example, if you have CentOS version 6 and x86-64, you can
@@ -145,7 +144,7 @@ release=`lsb_release -c -s`
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "baseurl=http://tarantool.org/dist/centos/6/os/x86_64/" | \
+<command>echo</command> "baseurl=http://tarantool.org/dist/master/centos/6/os/x86_64/" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -154,7 +153,7 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
-# GENTOO commands for Tarantool stable binary download:
+# GENTOO commands for Tarantool master binary download:
 # Tarantool is available from tarantool portage overlay.
 # Use layman to add the overlay to your system:
 <command>layman</command> <option>-S</option>
@@ -165,47 +164,46 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
-# ANY-LINUX commands for Tarantool stable binary download:
+# ANY-LINUX commands for Tarantool master binary download:
 # If you have a GNU/Linux distribution which is not one of the above,
 # or if you want to install on your own subdirectory without affecting
 # /usr /etc etc., start your browser and go to
-# <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link> download page.
-# Look for words similar to "Other Linux distributions". You will want the
+# <link xlink:href="http://tarantool.org/dist/master">http://tarantool.org/dist/master</link> download page.
+# Look for a recent file whose name ends with "tar.gz". You will want the
 # right binary tarball (<filename>.tar.gz</filename>) file for your release architecture.
-# Click on either "32-bit" or "64-bit" depending on your release architecture.
-# This will cause a download of the latest stable tarball.
-# Suppose it is <filename>tarantool-1.5.1-133-g11edda1-linux-x86_64.tar.gz</filename>. Say:
-<command>tar</command> <option>zxvf</option> <filename>tarantool-1.5.1-133-g11edda1-linux-x86_64.tar.gz</filename>
-# You now have a directory named tarantool-1.5.1-133-g11edda1-linux-x86_64.
+# Click on either the one whose name ends with "linux-i686.tar.gz" or
+# the one whose name ends with "linux-x86_64.tar.gz" depending on your release architecture.
+# This will cause a download of the latest master tarball.
+# Suppose it is <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz</filename>. Say:
+<command>tar</command> <option>zxvf</option> <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz</filename>
+# You now have a directory named tarantool-1.6.1-9-g30fe8ae-linux-x86_64.
 # Let's move it to ~/tarantool, which is an easier name to remember.
-<command>mv</command> <filename>tarantool-1.5.1-133-g11edda1-linux-x86_64 ~/tarantool</filename>
+<command>mv</command> <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64 ~/tarantool</filename>
 # Within it there is a subdirectory <filename>/bin</filename> containing both server and client.
 </programlisting>
 </para>
 
 <para>
 <programlisting>
-# FREEBSD commands for Tarantool stable binary download:
+# FREEBSD commands for Tarantool master binary download:
 # With your browser go to the FreeBSD ports page
 # <link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
 # Enter the search term: tarantool
-# Choose the package you want ...
-# However, there is a known issue with the binary of Tarantool
-# version 1.5, see # <link xlink:href="https://github.com/tarantool/tarantool/issues/19">https://github.com/tarantool/tarantool/issues/19</link>.
+# Choose the package you want.
 </programlisting>
 </para>
 
 <para>
 <programlisting>
-# MAC OS X commands for Tarantool stable binary download:
+# MAC OS X commands for Tarantool master binary download:
 # This is actually a <quote><productname>homebrew</productname></quote> recipe
 # so it's not a true binary download, some source code is involved.
 # First upgrade Clang (the C compiler) to version 3.2 or later using
 # Command Line Tools for Xcode disk image version 4.6+ from
 # Apple Developer web-site.
-<command>brew install</command> --use-clang http://tarantool.org/dist/tarantool.rb
+<command>brew install</command> --use-clang http://tarantool.org/dist/master/tarantool.rb
 # or
-<command>brew install</command> http://tarantool.org/dist/tarantool.rb
+<command>brew install</command> http://tarantool.org/dist/master/tarantool.rb
 </programlisting>
 </para>
 
@@ -292,7 +290,7 @@ ones unless you intend to work on the documentation.
 <para>On Ubuntu you can get modules from the repository:
 <programlisting>
 # For test suite
-<command>sudo apt-get install</command> python-daemon python-yaml python-argparse python-pexpect
+<command>sudo apt-get install</command> python-daemon python-yaml python-argparse
 # For documentation
 <command>sudo apt-get install</command> python-jinja2 python-markdown
 </programlisting></para>
@@ -306,14 +304,6 @@ ones unless you intend to work on the documentation.
 <command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
 <command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
 <command>cd</command> PyYAML-3.10
-<command>sudo python</command> setup.py install
-# python module for spawning child applications (pexpect): For test suite:
-# (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/pexpect/" xlink:title="pure-Python pexpect implementation">python-pexpect</citetitle> web site
-# to see what the current version is.)
-<command>cd</command> ~
-<command>wget</command> http://pypi.python.org/packages/source/p/pexpect-u/pexpect-u-2.5.1.tar.gz
-<command>tar</command> <option>-xzvf</option> pexpect-u-2.5.1.tar.
-<command>cd</command> pexpect-u-2.5.1
 <command>sudo python</command> setup.py install
 # python module for helping programs become daemons (daemon): For test suite:
 # (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site
@@ -351,8 +341,8 @@ the tarantool download will go inside it, as <computeroutput><filename>~/taranto
 <para>
 4. Use <productname>git</productname> to download from github.com.<programlisting>
 <command>cd</command> ~
-<command>git clone</command> <option>-b stable</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
-The optional argument <quote>-b stable</quote> causes download from the stable branch instead of the master branch,
+<command>git clone</command> <option>-b master</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
+The optional argument <quote>-b master</quote> causes download from the stable branch instead of the stable branch,
 and the optional last word on the line, <quote>tarantool</quote>, means download is to <computeroutput>~/tarantool</computeroutput>.
 </para>
 
@@ -468,7 +458,7 @@ Here is how to create a simple test database after installing.
 </para>
 
 <para>
-2. Create a configuration file. The Tarantool server requires a configuration
+2. Create a configuration file. The Tarantool server can use a configuration
 file with some definitions of ports and database objects.
   The server, by default, looks for its configuration file in
   the current working directory and in <computeroutput><filename>etc/</filename></computeroutput>.
@@ -478,14 +468,8 @@ which make a minimal configuration file that will be suitable for day one.
 <command>echo</command> "slab_alloc_arena = 0.1" | <command>tee</command> tarantool.cfg
 <command>echo</command> "pid_file = \"box.pid\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "primary_port = 33013" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "secondary_port = 33014" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "admin_port = 33015" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "rows_per_wal = 50000" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "space[0].enabled = 1" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "space[0].index[0].type = \"HASH\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "space[0].index[0].unique = 1" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "space[0].index[0].key_field[0].fieldno = 0" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "space[0].index[0].key_field[0].type = \"NUM\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "work_dir = \"work_dir\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 # (With some downloads a tarantool.cfg file like this is already available
@@ -517,18 +501,16 @@ The server name is <computeroutput><filename>tarantool_box</filename></computero
 
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
-2013-10-18 20:20:36.806 [16560] 1/sched C&gt; version 1.5.1-141-ga794d35
-2013-10-18 20:20:37.044 ... I&gt; space 0 successfully configured
-2013-10-18 20:20:37.044 ... I&gt; recovery start
-2013-10-18 20:20:37.060 ... I&gt; recover from `./00000000000000000001.snap'
-2013-10-18 20:20:37.060 ... I&gt; snapshot recovered, confirmed lsn: 1
-2013-10-18 20:20:37.070 ... I&gt; building secondary indexes
-2013-10-18 20:20:37.070 ... I&gt; bound to primary port 33013
-2013-10-18 20:20:37.070 ... I&gt; I am primary
-2013-10-18 20:20:37.070 ... I&gt; bound to secondary port 33014
-2013-10-18 20:20:37.070 ... I&gt; bound to admin port 33015
-2013-10-18 20:20:37.071 ... C&gt; log level 4
-2013-10-18 20:20:37.071 ... C&gt; entering event loop</programlisting>
+2014-02-06 11:50:24.216 ... 1/sched C&gt; version 1.6.0-804-g3d5a625
+2014-02-06 11:50:24.216 ... 1/sched C&gt; log level 5
+2014-02-06 11:50:24.219 ... 1/sched I&gt; mapping 107374184 bytes for a shared arena...
+2014-02-06 11:50:24.219 ... 1/sched I&gt; recovery start
+2014-02-06 11:50:24.224 ... 1/sched I&gt; recover from `./00000000000000000001.snap'
+2014-02-06 11:50:24.230 ... 1/sched I&gt; snapshot recovered, confirmed lsn: 1
+2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 33013
+2014-02-06 11:50:24.232 ... 1/sched I&gt; I am primary
+2014-02-06 11:50:24.232 ... 1/sched I&gt; bound to admin port 33015
+2014-02-06 11:50:24.232 ... 1/sched C&gt; entering the event loop</programlisting>
 Now take the server down, with <programlisting><keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo></programlisting>
 </para>
 
@@ -580,32 +562,50 @@ The client is waiting for the user to type instructions.
 </para>
 
 <para>
-	To insert three <quote>tuples</quote> (our name for <quote>records</quote>) into the first <quote>space</quote> of the database
-(which is called t0), try this:<programlisting><prompt>localhost&gt; </prompt><userinput>INSERT INTO t0 VALUES (1)</userinput>
-<prompt>localhost&gt; </prompt><userinput>INSERT INTO t0 VALUES (2,'Music')</userinput>
-<prompt>localhost&gt; </prompt><userinput>INSERT INTO t0 VALUES (3,'length',93)</userinput>
+To create the first space and the first index, try this:<programlisting>
+<prompt>localhost&gt; </prompt><userinput>s = box.schema.space.create('space0')</userinput>
+<prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
+</para>
+
+<para>
+To insert three <quote>tuples</quote> (our name for <quote>records</quote>) into the first <quote>space</quote> of the database
+try this:<programlisting><prompt>localhost&gt; </prompt><userinput>t = s:insert({1})</userinput>
+<prompt>localhost&gt; </prompt><userinput>t = s:insert({2, 'Music'})</userinput>
+<prompt>localhost&gt; </prompt><userinput>t = s:insert({3, 'Length', 93})</userinput>
 </programlisting>
 
 
 To select a tuple from the first space of the database,
-using the first defined key (which is called k0), try this:<programlisting><prompt>localhost&gt; </prompt><userinput>SELECT * FROM t0 WHERE k0 = 3</userinput></programlisting>
+using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-localhost> INSERT INTO t0 VALUES (1)
-Insert OK, 1 rows affected
-localhost> INSERT INTO t0 VALUES (2,'Music')
-Insert OK, 1 rows affected
-localhost> INSERT INTO t0 VALUES (3,'Length',93)
-Insert OK, 1 rows affected
-localhost> SELECT * FROM t0 WHERE k0 = 3
-Select OK, 1 rows affected
-[3, 'Length', 93]
+localhost&gt; s = box.schema.space.create('space0')
+---
+...
+localhost&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+---
+...
+localhost&gt; t = s:insert{1}
+---
+...
+localhost&gt; t = s:insert{2, 'Music'}
+---
+...
+localhost&gt; t = s:insert{3, 'Length', 93}
+---
+...
+localhost&gt; s:select{3}
+---
+- [3, 'Length', 93]
+...
+
 localhost>&gt;</programlisting>
 </para>
 
 <para>
-You can repeat INSERT and SELECT indefinitely.
+You can repeat box.insert() and box.select() indefinitely.
 When the testing is over:
+To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop the client:  <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
 To stop the server: <computeroutput><command>sudo pkill</command> -f tarantool_box</computeroutput>.
 To destroy the test: <computeroutput><command>rm</command> -r ~/tarantool_sandbox</computeroutput>.
@@ -622,6 +622,125 @@ inserted and selected tuples with the Tarantool client.
 </sidebar>
 
 </section>
+
+<section xml:id="differences-from-older-versions">
+  <title>Differences between Tarantool 1.6 and older versions</title>
+
+  <para>
+    These major differences will affect people upgrading from a previous Tarantool version.
+  </para>
+
+  <para>LUA ALL THE WAY DOWN. 
+    All requests are now treated as Lua instructions or Lua function invocations.
+    There no longer is any need to precede them with "lua" or "call".
+    For example, replace<programlisting>
+    lua function lua_function() return 'hello world' end
+    call lua_function()</programlisting>
+    with<programlisting>
+    function lua_function() return 'hello world' end
+    lua_function()</programlisting>
+  </para>
+  <para>NAMES RATHER THAN NUMBERS.
+    Spaces and indexes now have names as well as numbers.
+    Names are specified at create time.
+    Numbers (also called <computeroutput>id</computeroutput>s) are usually assigned automatically.
+    Applications should use the names rather than the numbers.
+  </para>
+  <para>CHANGED TUPLE STORAGE = MSGPACK.
+    There is a new format (msgpack).
+    Snapshot and WAL files have msgpack format; incompatible with the old format.
+    Snapshot and WAL files have the same format (snapshots are  logs of inserts).
+  </para>
+  <para>CHANGED AUTHENTICATION.
+    There are new options for password-based authentication of individual users.
+    The old authentication method, "sandboxing" based on port, no longer exists.
+  </para>
+  <para>CHANGES IN CONFIGURATION.
+    All options in the configuration file are now optional.
+    The configuration file itself is now optional.
+    "backlog" no longer exists.
+    "script_dir" no longer exists, use #! instead (see below re "Tarantool = a shell script processor").
+  </para>
+  <para>CHANGES IN PORT CONFIGURATION.
+    "secondary_port" no longer exists; use "primary_port".
+    "replication_port" no longer exists; use "primary_port".
+    "memcached" no longer exists (memcached is not supported).
+    The admin port is Lua-only now, and the lua prefix is gone. 
+  </para>
+  <para>NEW PACKAGE = BOX.SCHEMA.
+    <computeroutput>box.schema</computeroutput> is a new package for space configuration.
+    Spaces are added/dropped with box.schema.create / box.schema.<replaceable>schema_name</replaceable>.drop.
+    Indexes are added/dropped with box.schema.create_index / box.schema.<replaceable>index_name</replaceable>.drop.
+    "space.estimated_rows" no longer exists.
+    "space.cardinality" is renamed to "space.field_count".
+    "space.temporary" means "not in snapshot or WAL, only definition exists".
+  </para>
+  <para>CHANGED FUNCTIONS IN BOX.SPACE.
+    Where X is any of insert | select | update | replace | delete " etc. ...
+    Old syntax box.space.name:X() no longer exists.
+    Old syntax box.X() no longer exists.
+    New syntax is
+    box.space.<replaceable>space_name</replaceable>:X<replaceable>Lua-table</replaceable>.
+    Example: box.space.t0:insert{0,'Hello'}
+    Minor properties of a space (for example the name) can be altered without rebuild.
+    All properties of an index can be altered without rebuild.
+    The "return tuple" option no longer exists (f a tuple is found, it's returned).
+  </para>
+  <para>CHANGED FUNCTIONS IN BOX.TUPLE.
+    There is a new, msgpack-based tuple update syntax.
+    An update of the same field more than once in a single update is no longer allowed.
+  </para>
+  <para>CHANGES FOR TYPES.
+    The NUM and NUM64 types are merged; both are now unsigned 64-bit.
+    Output format is now consistently YAML so it can always be used with print().
+  </para>
+  <para>NEW METADATA RETRIEVAL METHOD = SYSTEM SPACES.
+    The new system spaces contain metadata that can be retrieved with box.select.
+    The _space system space has information about existing spaces.
+    The _index system space has information about existing indexes.
+    Old syntax "show ..." no longer exists.
+    New syntax is box.space._space:select<replaceable>Lua-table</replaceable>
+    or other Lua functions.
+  </para>
+  <para>NEW TRIGGERS FOR REPLACE.
+    Triggers can now be defined for replace, not just for connect/disconnect.
+    Triggers can be disabled.
+  </para>
+  <para>CHANGED SERVER STARTUP BEHAVIOR.
+    At start, if neither of the ports is bound, and no fibers are started
+    by a script, the server exits as soon as the script finishes.
+    The server now automatically creates a snapshot file 
+    if it is missing. If it is a replica, it automaticaly 
+    connects to the master and downloads the snapshot file
+    from it.
+  </para>
+  <para>TARANTOOL = A SHELL SCRIPT PROCESSOR.
+    Instead of processing shell scripts with bash or Perl, use tarantool server.
+    For example, let the first line of a shell script be
+    <computeroutput>#!/usr/bin/tarantool_box</computeroutput>.
+    This will be a hint that Tarantool will be the script processor.
+    Since Tarantool includes Lua, the file's instructions can be Lua.
+  </para>
+  <para>PERFORMANCE ENHANCEMENTS WHICH DO NOT AFFECT SYNTAX OR CONFIGURATION.
+    On start, Tarantool uses multithreaded sorting to build tree indexes.
+    There is a new slab allocator for tuples, which is less susceptible to fragmeentation.
+    The new tuple storage with msgpack handles a wide value range in a compact way.
+    For the binary protocol, box request ids are renumbered to form a continuous space from 0 to 6.
+  </para>
+  <para>REMOVAL OF REDUNDANT FUNCTIONALITY.
+    The backward-compatible next_equal/next/prev_equal/next/prev
+    iteration functions no longer exist.
+    The ability to handle multiple keys for select no longer exists,
+    only one key per request is allowed.
+    The "SQL-like" syntax no longer exists -- invoke functions from the box package instead,
+    for example, replace
+    <computeroutput>SELECT * FROM t0 WHERE k0 = 2</computeroutput>
+    with
+    <computeroutput>box.space.t0:select{2}</computeroutput>.
+  </para>
+
+</section>
+
 
 </chapter>
 

@@ -52,6 +52,7 @@ a = box.net.box.new('127.0.0.1', replica_port)
 ...
 a:call('_set_pri_lsn', box.info.lsn)
 ---
+- []
 ...
 a:close()
 ---
@@ -116,6 +117,7 @@ a = box.net.box.new('127.0.0.1', hot_standby_port)
 ...
 a:call('_set_pri_lsn', box.info.lsn)
 ---
+- []
 ...
 a:close()
 ---

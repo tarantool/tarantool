@@ -67,8 +67,7 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 * - ITERA_ALL iterator type, all index types
 		 * - ITER_GE iterator in HASH index (legacy)
 		 */
-		if (key_def->type == TREE || type == ITER_ALL ||
-		    (key_def->type == HASH && type == ITER_GE))
+		if (key_def->type == TREE || type == ITER_ALL)
 			return;
 		/* Fall through. */
 	}
@@ -145,24 +144,6 @@ Index::~Index()
 	if (m_position != NULL)
 		m_position->free(m_position);
 	key_def_delete(key_def);
-}
-
-struct tuple *
-Index::min() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "min()");
-	return NULL;
-}
-
-struct tuple *
-Index::max() const
-{
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-		  index_type_strs[key_def->type],
-		  "max()");
-	return NULL;
 }
 
 struct tuple *

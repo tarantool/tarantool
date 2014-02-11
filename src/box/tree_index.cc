@@ -220,20 +220,6 @@ TreeIndex::memsize() const
 }
 
 struct tuple *
-TreeIndex::min() const
-{
-	void *node = sptree_index_first(&tree);
-	return sptree_index_unfold(node);
-}
-
-struct tuple *
-TreeIndex::max() const
-{
-	void *node = sptree_index_last(&tree);
-	return sptree_index_unfold(node);
-}
-
-struct tuple *
 TreeIndex::random(uint32_t rnd) const
 {
 	void *node = sptree_index_random(&tree, rnd);

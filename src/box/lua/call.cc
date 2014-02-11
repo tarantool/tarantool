@@ -86,14 +86,42 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple)
 	}
 }
 
-struct port_vtab port_lua_vtab = {
-	port_lua_add_tuple,
-	null_port_eof,
-};
 
 static struct port *
 port_lua_create(struct lua_State *L)
 {
+	static struct port_vtab port_lua_vtab = {
+		port_lua_add_tuple,
+		null_port_eof,
+	};
+	struct port_lua *port = (struct port_lua *)
+			region_alloc(&fiber()->gc, sizeof(struct port_lua));
+	port->vtab = &port_lua_vtab;
+	port->L = L;
+	return (struct port *) port;
+}
+
+static void
+port_lua_process_add_tuple(struct port *port, struct tuple *tuple)
+{
+	lua_State *L = port_lua(port)->L;
+	try {
+		int idx = luaL_getn(L, -1);	/* TODO: can be optimized */
+		lbox_pushtuple(L, tuple);
+		lua_rawseti(L, -2, idx + 1);
+
+	} catch (...) {
+		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+	}
+}
+
+static struct port *
+port_lua_process_create(struct lua_State *L)
+{
+	static struct port_vtab port_lua_vtab = {
+		port_lua_process_add_tuple,
+		null_port_eof,
+	};
 	struct port_lua *port = (struct port_lua *)
 			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
@@ -188,9 +216,10 @@ lbox_process(lua_State *L)
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
 	int top = lua_gettop(L); /* to know how much is added by rw_callback */
+	lua_newtable(L);
 
 	size_t allocated_size = region_used(&fiber()->gc);
-	struct port *port_lua = port_lua_create(L);
+	struct port *port_lua = port_lua_process_create(L);
 	try {
 		struct request request;
 		request_create(&request, op);
