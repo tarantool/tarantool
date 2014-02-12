@@ -59,6 +59,12 @@ t = nil
 ----------------
 -- # box.raise
 ----------------
+--# stop server default
+--# start server default
+-- do nothing - no exceptions were thrown before
+box.raise()
+---
+...
 1 + 1
 ---
 - 2
@@ -74,6 +80,17 @@ box.raise(0, 'the other test')
 box.raise(12, 345)
 ---
 - error: '345'
+...
+box.raise()
+---
+- error: '345'
+...
+box.raise()
+---
+- error: '345'
+...
+space = box.space.tweedledum
+---
 ...
 ----------------
 -- # box.stat

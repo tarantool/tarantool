@@ -184,7 +184,7 @@ lbox_call(struct lua_State *L, int nargs, int nreturns)
 {
 	try {
 		lua_call(L, nargs, nreturns);
-	} catch (const Exception &e) {
+	} catch (Exception *e) {
 		/* Let all well-behaved exceptions pass through. */
 		throw;
 	} catch (...) {

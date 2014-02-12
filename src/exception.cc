@@ -28,10 +28,46 @@
  */
 #include "exception.h"
 #include "say.h"
+#include "fiber.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+
+/* Statically allocate out-of-memory exception */
+static ClientError out_of_memory(__FILE__, __LINE__, ER_MEMORY_ISSUE, 0,
+			  "exception", "new");
+
+void*
+Exception::operator new(size_t size)
+{
+	/* Explicity call destructor for previous exception */
+	if (cord()->exc)
+		cord()->exc->~Exception();
+
+	/* Reuse memory allocated for exception */
+	if (cord()->exc_size < size) {
+		size_t new_size = cord()->exc_size > 0 ? cord()->exc_size : 512;
+		while (new_size < size)
+			new_size *= 2;
+		void *exc = realloc(cord()->exc, new_size);
+		if (exc == NULL)
+			throw &out_of_memory;
+		cord()->exc = (Exception *) exc;
+		cord()->exc_size = new_size;
+	}
+
+	return cord()->exc;
+}
+
+void
+Exception::operator delete(void*)
+{
+	/* Free memory allocated for exception */
+	free(cord()->exc);
+	cord()->exc = NULL;
+	cord()->exc_size = 0;
+}
 
 Exception::Exception(const char *file, unsigned line)
 	: m_file(file), m_line(line)

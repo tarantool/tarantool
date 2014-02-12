@@ -12,10 +12,20 @@ t = nil
 ----------------
 -- # box.raise
 ----------------
+
+--# stop server default
+--# start server default
+-- do nothing - no exceptions were thrown before
+box.raise()
+
 1 + 1
 box.raise(123, 'test')
 box.raise(0, 'the other test')
 box.raise(12, 345)
+box.raise()
+box.raise()
+
+space = box.space.tweedledum
 
 ----------------
 -- # box.stat

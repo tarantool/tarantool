@@ -332,7 +332,7 @@ lbox_socket_connect(struct lua_State *L)
 
 		/* set coio reader socket */
 		s->io_r.fd = s->io_w.fd;
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		freeaddrinfo(ai);
 		return bio_pushsockerror(L, s, errno);
 	}
@@ -389,12 +389,12 @@ lbox_socket_send(struct lua_State *L)
 		}
 
 		mutex_unlock(&s->io_w_mutex);
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		mutex_unlock(&s->io_w_mutex);
 
 		rc = bio_pushsenderror(L, s, 0, errno);
 		return rc;
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		mutex_unlock(&s->io_w_mutex);
 		throw;
 	}
@@ -457,12 +457,12 @@ lbox_socket_recv(struct lua_State *L)
 			nrd = coio_bread_timeout(&s->io_r, in, to_read,
 						 delay);
 			mutex_unlock(&s->io_r_mutex);
-		} catch (const SocketError& e) {
+		} catch (SocketError *e) {
 			mutex_unlock(&s->io_r_mutex);
 
 			rc = bio_pushrecverror(L, s, errno);
 			return rc;
-		} catch (const Exception& e) {
+		} catch (Exception *e) {
 			mutex_unlock(&s->io_r_mutex);
 			throw;
 		}
@@ -694,11 +694,11 @@ lbox_socket_readline(struct lua_State *L)
 		}
 
 		mutex_unlock(&s->io_r_mutex);
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		mutex_unlock(&s->io_r_mutex);
 		rc = bio_pushrecverror(L, s, errno);
 		return rc;
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		mutex_unlock(&s->io_r_mutex);
 		throw;
 	}
@@ -739,7 +739,7 @@ lbox_socket_bind(struct lua_State *L)
 	try {
 		evio_bind_addrinfo(&s->io_w, ai);
 		freeaddrinfo(ai);
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		/* case #2: error */
 		freeaddrinfo(ai);
 		return bio_pusherror(L, s, errno);
@@ -797,7 +797,7 @@ lbox_socket_accept(struct lua_State *L)
 		client->io_w.fd = coio_accept(&s->io_w, (struct sockaddr_in*)&addr,
 					     sizeof(addr), timeout);
 		client->io_r.fd = client->io_w.fd;
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		return bio_pusherror(L, s, errno);
 	}
 	/* get user host and port */
@@ -870,7 +870,7 @@ lbox_socket_sendto(struct lua_State *L)
 		if (a) {
 			freeaddrinfo(a);
 		}
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		/* case #2-3: error or timeout */
 		if (a) {
 			freeaddrinfo(a);
@@ -918,7 +918,7 @@ lbox_socket_recvfrom(struct lua_State *L)
 		nrd = coio_recvfrom_timeout(&s->io_w, in->pos, buf_size, 0,
 					    (struct sockaddr_in*)&addr,
 					    sizeof(addr), timeout);
-	} catch (const SocketError& e) {
+	} catch (SocketError *e) {
 		return bio_pushrecverror(L, s, errno);
 	}
 	if (nrd == 0) {

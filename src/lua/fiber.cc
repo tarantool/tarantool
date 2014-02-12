@@ -406,7 +406,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
 		lua_insert(L, 1);
-	} catch (const FiberCancelException &e) {
+	} catch (FiberCancelException *e) {
 		if (box_lua_fiber_get_coro(L, fiber())) {
 			struct fiber *caller = box_lua_fiber_get_caller(L);
 			fiber_wakeup(caller);
@@ -420,16 +420,16 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 		 */
 
 		throw;
-	} catch (const Exception &e) {
+	} catch (Exception *e) {
 		/* pop any possible garbage */
 		lua_settop(L, 0);
 		/* completion status */
 		lua_pushboolean(L, false);
 		/* error message */
-		lua_pushstring(L, e.errmsg());
+		lua_pushstring(L, e->errmsg());
 
 		/* Always log the error. */
-		e.log();
+		e->log();
 	}
 	/*
 	 * L stack contains nothing but call results.
@@ -551,10 +551,10 @@ box_lua_fiber_run_detached(va_list ap)
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	try {
 		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
-	} catch (const FiberCancelException &e) {
+	} catch (FiberCancelException *e) {
 		throw;
-	} catch (const Exception &e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 	}
 }
 

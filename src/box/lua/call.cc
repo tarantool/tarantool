@@ -231,7 +231,7 @@ lbox_process(lua_State *L)
 		 * use fiber->cleanup and fiber->gc.
 		 */
 		region_truncate(&fiber()->gc, allocated_size);
-	} catch (const Exception &e) {
+	} catch (Exception *e) {
 		region_truncate(&fiber()->gc, allocated_size);
 		throw;
 	}
@@ -338,7 +338,15 @@ lbox_delete(lua_State *L)
 static int
 lbox_raise(lua_State *L)
 {
-	if (lua_gettop(L) != 2)
+	if (lua_gettop(L) == 0) {
+		/* re-throw saved exceptions (if any) */
+		if (cord()->exc == NULL)
+			return 0;
+		throw cord()->exc;
+		return 0;
+	}
+
+	if (lua_gettop(L) < 2)
 		luaL_error(L, "box.raise(): bad arguments");
 	uint32_t code = lua_tointeger(L, 1);
 	if (!code)

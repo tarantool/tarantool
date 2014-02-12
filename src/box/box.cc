@@ -91,7 +91,7 @@ process_rw(struct port *port, struct request *request)
 		port_send_tuple(port, txn);
 		port_eof(port);
 		txn_finish(txn);
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		txn_rollback(txn);
 		throw;
 	}
@@ -126,8 +126,8 @@ recover_row(void *param __attribute__((unused)), const struct log_row *row)
 		request_create(&request, op);
 		request_decode(&request, data, end - data);
 		process_rw(&null_port, &request);
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		return -1;
 	}
 

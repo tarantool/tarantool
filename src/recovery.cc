@@ -176,7 +176,7 @@ recovery_wait_lsn(struct recovery_state *r, int64_t lsn)
 		try {
 			fiber_yield();
 			wait_lsn_clear(&r->wait_lsn);
-		} catch (const Exception& e) {
+		} catch (Exception *e) {
 			wait_lsn_clear(&r->wait_lsn);
 			throw;
 		}

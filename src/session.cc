@@ -74,7 +74,7 @@ session_create(int fd, uint64_t cookie)
 	fiber_set_session(fiber(), session);
 	try {
 		trigger_run(&session_on_connect, NULL);
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		fiber_set_session(fiber(), NULL);
 		mh_i32ptr_remove(session_registry, &node, NULL);
 		mempool_free(&session_pool, session);
@@ -92,8 +92,8 @@ session_destroy(struct session *session)
 
 	try {
 		trigger_run(&session_on_disconnect, NULL);
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 	} catch (...) {
 		/* catch all. */
 	}

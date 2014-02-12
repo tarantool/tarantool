@@ -395,7 +395,7 @@ tuple_update(struct tuple_format *format,
 
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
-	} catch (const Exception&) {
+	} catch (Exception *e) {
 		tuple_delete(new_tuple);
 		throw;
 	}

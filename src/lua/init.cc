@@ -197,7 +197,7 @@ lbox_pcall(struct lua_State *L)
 		lua_pushboolean(L, true);
 		/* move 'true' to stack start */
 		lua_insert(L, 1);
-	} catch (const ClientError& e) {
+	} catch (ClientError *e) {
 		/*
 		 * Note: FiberCancelException passes through this
 		 * catch and thus leaves garbage on coroutine
@@ -208,7 +208,7 @@ lbox_pcall(struct lua_State *L)
 		/* completion status */
 		lua_pushboolean(L, false);
 		/* error message */
-		lua_pushstring(L, e.errmsg());
+		lua_pushstring(L, e->errmsg());
 	}
 	return lua_gettop(L);
 }
@@ -359,11 +359,11 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	}
 	try {
 		lbox_call(L, 0, LUA_MULTRET);
-	} catch (const FiberCancelException& e) {
+	} catch (FiberCancelException *e) {
 		throw;
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		lua_settop(L, 0);
-		lua_pushstring(L, e.errmsg());
+		lua_pushstring(L, e->errmsg());
 		return 1;
 	}
 	return 0;

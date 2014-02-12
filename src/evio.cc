@@ -151,7 +151,7 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 				return; /* success. */
 			}
 			assert(errno == EADDRINUSE);
-		} catch (const SocketError& e) {
+		} catch (SocketError *e) {
 			if (ai->ai_next == NULL) {
 				close(fd);
 				throw;
@@ -202,10 +202,10 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 		 */
 		service->on_accept(service, fd, &addr);
 
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		if (fd >= 0)
 			close(fd);
-		e.log();
+		e->log();
 	}
 }
 
@@ -237,7 +237,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 		if (service->on_bind)
 			service->on_bind(service->on_bind_param);
 
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		close(fd);
 		throw;
 	}

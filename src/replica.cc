@@ -132,14 +132,14 @@ pull_from_remote(va_list ap)
 
 			iobuf_gc(iobuf);
 			fiber_gc();
-		} catch (const FiberCancelException& e) {
+		} catch (FiberCancelException *e) {
 			title("replica", "%s/%s", r->remote->source, "failed");
 			iobuf_delete(iobuf);
 			evio_close(loop, &coio);
 			throw;
-		} catch (const Exception& e) {
+		} catch (Exception *e) {
 			title("replica", "%s/%s", r->remote->source, "failed");
-			e.log();
+			e->log();
 			if (! warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
@@ -195,7 +195,7 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 
 	try {
 		f = fiber_new(name, pull_from_remote);
-	} catch (const Exception& ) {
+	} catch (Exception *e) {
 		return;
 	}
 

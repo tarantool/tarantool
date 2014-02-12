@@ -1118,6 +1118,8 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 message can be arbitrary.
                 Lua procedures can use <code>box.raise()</code> to emulate
                 request errors (for example: unique key exception).
+                When called without arguments this function re-throws last
+                thrown error.
             </para>
             <para>
               Parameters: <code>errcode-number</code> = number taken from the complete list of errors,

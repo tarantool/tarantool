@@ -94,7 +94,7 @@ ts_update(struct tnt_request *r, struct tnt_tuple *old)
 		memset(buf, 0, new_size);
 
 		tuple_update_execute(u, (char*)buf);
-	} catch (const Exception&) {
+	} catch (Exception *e) {
 		if (buf)
 			free(buf);
 		region_reset(&tss.ra);

@@ -259,7 +259,7 @@ BitsetIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 		}
 
 		bitset_expr_destroy(&expr);
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		bitset_expr_destroy(&expr);
 		throw;
 	}
