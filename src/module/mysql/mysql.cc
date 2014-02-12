@@ -27,10 +27,6 @@
  * SUCH DAMAGE.
  */
 
-
-#define PLUGIN_NAME			"mysql"
-#define PLUGIN_VERSION			1
-
 #include <stddef.h>
 
 extern "C" {
@@ -46,14 +42,11 @@ extern "C" {
 #include <coeio.h>
 #include "third_party/tarantool_ev.h"
 
-
+#include <lua/init.h>
 #include <lua/utils.h>
 #include <say.h>
 #include <mysql.h>
 #include <scoped_guard.h>
-
-#include <plugin.h>
-
 
 /**
  * gets MYSQL connector from lua stack (or object)
@@ -88,12 +81,12 @@ lua_check_mysql(struct lua_State *L, int index)
 static ssize_t
 connect_mysql(va_list ap)
 {
-	MYSQL *mysql		= va_arg(ap, typeof(mysql));
-	const char *host	= va_arg(ap, typeof(host));
-	const char *port	= va_arg(ap, typeof(port));
-	const char *user	= va_arg(ap, typeof(user));
-	const char *password	= va_arg(ap, typeof(password));
-	const char *db		= va_arg(ap, typeof(db));
+	MYSQL *mysql		= va_arg(ap, MYSQL*);
+	const char *host	= va_arg(ap, const char*);
+	const char *port	= va_arg(ap, const char*);
+	const char *user	= va_arg(ap, const char*);
+	const char *password	= va_arg(ap, const char*);
+	const char *db		= va_arg(ap, const char*);
 
 
 	int iport = 0;
@@ -140,9 +133,9 @@ self_field(struct lua_State *L, const char *name, int index)
 static ssize_t
 exec_mysql(va_list ap)
 {
-	MYSQL *mysql = va_arg(ap, typeof(mysql));
-	const char *sql = va_arg(ap, typeof(sql));
-	size_t len = va_arg(ap, typeof(len));
+	MYSQL *mysql = va_arg(ap, MYSQL*);
+	const char *sql = va_arg(ap, const char*);
+	size_t len = va_arg(ap, size_t);
 
 	int res = mysql_real_query(mysql, sql, len);
 	if (res == 0) {
@@ -157,9 +150,9 @@ exec_mysql(va_list ap)
 static ssize_t
 fetch_result(va_list ap)
 {
-	MYSQL *mysql = va_arg(ap, typeof(mysql));
-	MYSQL_RES **result = va_arg(ap, typeof(result));
-	int resno = va_arg(ap, typeof(resno));
+	MYSQL *mysql = va_arg(ap, MYSQL*);
+	MYSQL_RES **result = va_arg(ap, MYSQL_RES**);
+	int resno = va_arg(ap, int);
 	if (resno) {
 		if (mysql_next_result(mysql) > 0)
 			return -2;
@@ -384,7 +377,7 @@ lua_mysql_quote(struct lua_State *L)
 
 	size_t len;
 	const char *s = lua_tolstring(L, -1, &len);
-	char *sout = (typeof(sout))malloc(len * 2 + 1);
+	char *sout = (char*)malloc(len * 2 + 1);
 	if (!sout) {
 		luaL_error(L, "Can't allocate memory for variable");
 	}
@@ -465,9 +458,11 @@ lbox_net_mysql_connect(struct lua_State *L)
 	return 1;
 }
 
+extern "C" {
+	int LUA_API luaopen_box_net_mysql(lua_State*);
+}
 
-static void
-init(struct lua_State *L)
+int LUA_API luaopen_box_net_mysql(lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");	/* stack: box */
 
@@ -487,6 +482,5 @@ init(struct lua_State *L)
 
 	/* cleanup stack */
 	lua_pop(L, 4);
+	return 0;
 }
-
-DECLARE_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, init, NULL);

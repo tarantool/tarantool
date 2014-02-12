@@ -57,7 +57,6 @@ if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
   set(CMAKE_INSTALL_LIBDIR lib)
 endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
-set(PLUGIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugins")
 
 include(cmake/utils.cmake)
 
@@ -151,6 +150,13 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 include_directories("${PROJECT_SOURCE_DIR}")
+
+#
+# Specify Tarantool modules prefixes
+#
+set(MODULE_DIR "${CMAKE_INSTALL_LIBDIR}/tarantool/")
+set(MODULE_DIR "${MODULE_DIR}${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
+
 #
 # Specify prefixes
 #
@@ -177,12 +183,8 @@ endif()
 #
 # Specify Tarantool modules Lua prefixes
 #
-if (NOT DEFINED LUA_LIBPATH)
-    set (LUA_LIBPATH "")
-endif()
-if (NOT DEFINED LUA_LIBCPATH)
-    set (LUA_LIBCPATH "")
-endif()
+set (LUA_LIBPATH  "${LUA_LIBPATH};${MODULE_DIR}/?.lua")
+set (LUA_LIBCPATH "${LUA_LIBCPATH};${MODULE_DIR}/?.so")
 
 #
 # Now handle all configuration options.
@@ -388,7 +390,7 @@ message (STATUS "CXX_COMPILER: ${TARANTOOL_CXX_COMPILER}")
 message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
 message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
 message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
-message (STATUS "MODULES: ${TARANTOOL_MODULES}")
+message (STATUS "MODULE_DIR: ${MODULE_DIR}")
 message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
 message (STATUS "ENABLE_SSE2: ${ENABLE_SSE2}")
 message (STATUS "ENABLE_AVX: ${ENABLE_AVX}")

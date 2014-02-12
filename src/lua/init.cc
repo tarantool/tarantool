@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  */
 #include "lua/init.h"
-#include "lua/plugin.h"
 #include "lua/utils.h"
 #include "tarantool.h"
 #include "box/box.h"
@@ -58,7 +57,6 @@ extern "C" {
 #include "lua/msgpack.h"
 
 #include <ctype.h>
-#include <plugin.h>
 #include "small/region.h"
 
 extern "C" {
@@ -308,7 +306,6 @@ tarantool_lua_init()
 	tarantool_lua_errinj_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_admin_init(L);
-	tarantool_lua_plugin_init(L);
 	tarantool_lua_cjson_init(L);
 	tarantool_lua_yaml_init(L);
 	tarantool_lua_info_init(L);
@@ -328,9 +325,6 @@ tarantool_lua_init()
 	}
 
 	box_lua_init(L);
-
-	/* init after internal luas are processed */
-	tarantool_plugin_init(L);
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

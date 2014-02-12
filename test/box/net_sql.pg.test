@@ -1,0 +1,55 @@
+# encoding: tarantool
+import os
+import shutil
+
+module_path = os.path.join(vardir, "box/net")
+module_path_so = module_path + "/pg.so"
+os.makedirs(module_path)
+shutil.copy("../src/module/pg/pg.so", module_path_so)
+
+server.stop()
+server.deploy(init_lua="box/net_sql.pg.lua")
+
+exec admin "lua c = box.net.sql.connect('abcd')"
+exec admin "lua c = box.net.sql.connect('pg')"
+
+exec admin "lua dump = function(v) return box.cjson.encode(v) end"
+
+exec admin "lua connect = {}"
+exec admin "lua for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end"
+
+# postgresql
+exec admin "lua c = box.net.sql.connect('pg', unpack(connect))"
+exec admin "lua dump({c:execute('SELECT 123::text AS bla, 345')})"
+exec admin "lua dump({c:execute('SELECT -1 AS neg, NULL AS abc')})"
+exec admin "lua dump({c:execute('SELECT -1.1 AS neg, 1.2 AS pos')})"
+exec admin "lua dump({c:execute('SELECT ARRAY[1,2] AS neg, 1.2 AS pos')})"
+exec admin "lua dump({c:execute('SELECT ? AS val', 'abc')})"
+exec admin "lua dump({c:execute('SELECT ? AS val', 123)})"
+exec admin "lua dump({c:execute('SELECT ? AS val', true)})"
+exec admin "lua dump({c:execute('SELECT ? AS val', false)})"
+exec admin "lua dump({c:execute('SELECT ? AS val, ? AS num, ? AS str', false, 123, 'abc')})"
+exec admin "lua dump({c:execute('DROP TABLE IF EXISTS unknown_table')})"
+exec admin "lua dump({c:execute('SELECT * FROM (VALUES (1,2), (2,3)) t')})"
+exec admin "lua c:ping()"
+exec admin "lua dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})"
+exec admin "lua dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})"
+exec admin "lua dump({c:single('SELECT * FROM (VALUES (1,2)) t')})"
+exec admin "lua dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})"
+exec admin "lua c:execute('SELEC T')"
+
+exec admin "lua c = box.net.sql.connect('abcd')"
+
+
+exec admin "lua c:quote('abc\"cde\"def')"
+
+
+exec admin "lua c:begin_work()"
+exec admin "lua c:rollback()"
+exec admin "lua c:begin_work()"
+exec admin "lua c:commit()"
+
+exec admin "lua c:txn(function(dbi) dbi:single('SELECT 1') end)"
+
+os.unlink(module_path_so)
+os.removedirs(module_path)
