@@ -170,10 +170,10 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files sql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-%dir "/usr/lib/tarantool/1.5/box/net"
-"/usr/lib/tarantool/1.5/box/net/sql.lua"
+%dir "/usr/lib/tarantool/1.6"
+%dir "/usr/lib/tarantool/1.6/box"
+%dir "/usr/lib/tarantool/1.6/box/net"
+"/usr/lib/tarantool/1.6/box/net/sql.lua"
 
 %files client
 %defattr(-,root,root,-)
