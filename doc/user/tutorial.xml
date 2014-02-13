@@ -526,7 +526,7 @@ Now start the server again. This time start it in the background.<programlisting
 
 <para>
 If all went well, there is now an instance of the Tarantool server
-	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-a</option> | <command>grep</command> tarantool_box</programlisting>
+	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-A</option> | <command>grep</command> tarantool_box</programlisting>
 	or look at the log file:<programlisting><command>less</command> work_dir/tarantool.log</programlisting>
 </para>
 
@@ -563,7 +563,7 @@ The client is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first index, try this:<programlisting>
-<prompt>localhost&gt; </prompt><userinput>s = box.schema.space.create('space0')</userinput>
+<prompt>localhost&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
 <prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -579,7 +579,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-localhost&gt; s = box.schema.space.create('space0')
+localhost&gt; s = box.schema.create_space('space0')
 ---
 ...
 localhost&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
@@ -647,8 +647,11 @@ inserted and selected tuples with the Tarantool client.
     Applications should use the names rather than the numbers.
   </para>
   <para>CHANGED TUPLE STORAGE = MSGPACK.
-    There is a new format (msgpack).
-    Snapshot and WAL files have msgpack format; incompatible with the old format.
+    There is a new format
+    (<link xlink:href="https://en.wikipedia.org/wiki/MessagePack">msgpack</link>).
+    Snapshot and WAL files have
+     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">an implementation of the msgpack format</link>;
+    incompatible with the old format.
     Snapshot and WAL files have the same format (snapshots are  logs of inserts).
   </para>
   <para>CHANGED AUTHENTICATION.
@@ -667,10 +670,11 @@ inserted and selected tuples with the Tarantool client.
     "memcached" no longer exists (memcached is not supported).
     The admin port is Lua-only now, and the lua prefix is gone. 
   </para>
-  <para>NEW PACKAGE = BOX.SCHEMA.
+  <para>DATA DEFINITION WITH RUNTIME REQUESTS RATHER THAN A CONFIGURATION FILE.
     <computeroutput>box.schema</computeroutput> is a new package for space configuration.
-    Spaces are added/dropped with box.schema.create / box.schema.<replaceable>schema_name</replaceable>.drop.
-    Indexes are added/dropped with box.schema.create_index / box.schema.<replaceable>index_name</replaceable>.drop.
+    Spaces are added/dropped with box.schema.create_space / box.space.<replaceable>space_name</replaceable>.drop.
+    Indexes are added/dropped with box.space.<replaceable>space-name</replaceable>.create_index /
+    box.space.<replaceable>.space-name</replaceable>.index.<replaceable>index_name</replaceable>.drop.
     "space.estimated_rows" no longer exists.
     "space.cardinality" is renamed to "space.field_count".
     "space.temporary" means "not in snapshot or WAL, only definition exists".
@@ -714,11 +718,13 @@ inserted and selected tuples with the Tarantool client.
     connects to the master and downloads the snapshot file
     from it.
   </para>
-  <para>TARANTOOL = A SHELL SCRIPT PROCESSOR.
-    Instead of processing shell scripts with bash or Perl, use tarantool server.
+  <para>TARANTOOL = A SCRIPT PROCESSOR.
+    Instead of processing scripts with bash or Perl, use tarantool server.
     For example, let the first line of a shell script be
     <computeroutput>#!/usr/bin/tarantool_box</computeroutput>.
-    This will be a hint that Tarantool will be the script processor.
+    This will be a
+    (<link xlink:href="https://en.wikipedia.org/wiki/Shebang_%28Unix%29" xlink:title="wikipedia.org/Shebang">"Hashbang" hint</link>)
+    that Tarantool will be the script processor.
     Since Tarantool includes Lua, the file's instructions can be Lua.
   </para>
   <para>PERFORMANCE ENHANCEMENTS WHICH DO NOT AFFECT SYNTAX OR CONFIGURATION.
