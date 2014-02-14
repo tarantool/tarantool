@@ -342,7 +342,7 @@ lbox_raise(lua_State *L)
 		/* re-throw saved exceptions (if any) */
 		if (cord()->exc == NULL)
 			return 0;
-		throw cord()->exc;
+		cord()->exc->raise();
 		return 0;
 	}
 

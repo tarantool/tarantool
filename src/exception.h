@@ -37,6 +37,10 @@ class Exception: public Object {
 public:
 	void *operator new(size_t size);
 	void operator delete(void*);
+	virtual void raise()
+	{
+		throw this;
+	}
 
 	const char *
 	errmsg() const
@@ -45,6 +49,7 @@ public:
 	}
 
 	virtual void log() const = 0;
+	virtual ~Exception() {}
 
 protected:
 	Exception(const char *file, unsigned line);
@@ -62,6 +67,11 @@ protected:
 
 class SystemError: public Exception {
 public:
+
+	virtual void raise()
+	{
+		throw this;
+	}
 
 	int
 	errnum() const
@@ -87,6 +97,11 @@ private:
 
 class ClientError: public Exception {
 public:
+	virtual void raise()
+	{
+		throw this;
+	}
+
 	virtual void log() const;
 
 	int
