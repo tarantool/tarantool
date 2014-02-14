@@ -673,6 +673,12 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
+	/* A hack for cc/ld, see ffisyms.c */
+	if (time(NULL) == 0) {
+		/* never executed */
+		extern void *ffi_symbols[];
+		write(0, ffi_symbols, 0);
+	}
 }
 
 static void

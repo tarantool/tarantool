@@ -109,6 +109,7 @@ set (common_sources
      errcode.c
      errinj.cc
      fio.c
+     ffisyms.cc
      crc32.c
      rope.c
      ipc.cc
