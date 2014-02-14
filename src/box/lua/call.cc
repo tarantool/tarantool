@@ -340,9 +340,9 @@ lbox_raise(lua_State *L)
 {
 	if (lua_gettop(L) == 0) {
 		/* re-throw saved exceptions (if any) */
-		if (cord()->exc == NULL)
+		if (cord()->exception == NULL)
 			return 0;
-		cord()->exc->raise();
+		cord()->exception->raise();
 		return 0;
 	}
 

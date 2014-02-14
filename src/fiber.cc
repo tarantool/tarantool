@@ -527,8 +527,10 @@ cord_destroy(struct cord *cord)
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
 	/* Cleanup memory allocated for exceptions */
-	if (cord->exc)
-		delete cord->exc;
+	if (cord->exception && cord->exception != &out_of_memory) {
+		cord->exception->~Exception();
+		free(cord->exception);
+	}
 }
 
 struct cord_thread_arg

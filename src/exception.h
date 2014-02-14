@@ -33,12 +33,14 @@
 #include "errcode.h"
 #include "say.h"
 
+
 class Exception: public Object {
 public:
 	void *operator new(size_t size);
 	void operator delete(void*);
 	virtual void raise()
 	{
+		/* Throw the most specific type of exception */
 		throw this;
 	}
 
@@ -118,6 +120,8 @@ private:
 	/* client errno code */
 	int m_errcode;
 };
+
+extern ClientError out_of_memory;
 
 class LoggedError: public ClientError {
 public:

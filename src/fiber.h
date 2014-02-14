@@ -153,8 +153,8 @@ struct cord {
 	struct slab_cache slabc;
 	char name[FIBER_NAME_MAX];
 	/** Last thrown exception */
-	struct Exception *exc;
-	size_t exc_size;
+	struct Exception *exception;
+	size_t exception_size;
 };
 
 extern __thread struct cord *cord_ptr;

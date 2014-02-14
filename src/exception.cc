@@ -35,38 +35,42 @@
 #include <errno.h>
 
 /* Statically allocate out-of-memory exception */
-static ClientError out_of_memory(__FILE__, __LINE__, ER_MEMORY_ISSUE, 0,
+ClientError out_of_memory(__FILE__, __LINE__, ER_MEMORY_ISSUE, 0,
 			  "exception", "new");
 
-void*
+void *
 Exception::operator new(size_t size)
 {
-	/* Explicity call destructor for previous exception */
-	if (cord()->exc)
-		cord()->exc->~Exception();
+	struct cord *cord = cord();
 
-	/* Reuse memory allocated for exception */
-	if (cord()->exc_size < size) {
-		size_t new_size = cord()->exc_size > 0 ? cord()->exc_size : 512;
-		while (new_size < size)
-			new_size *= 2;
-		void *exc = realloc(cord()->exc, new_size);
-		if (exc == NULL)
-			throw &out_of_memory;
-		cord()->exc = (Exception *) exc;
-		cord()->exc_size = new_size;
+	if (cord->exception == &out_of_memory) {
+		assert(cord->exception_size == 0);
+		cord->exception = NULL;
 	}
-
-	return cord()->exc;
+	if (cord->exception) {
+		/* Explicitly call destructor for previous exception */
+		cord->exception->~Exception();
+		if (cord->exception_size >= size) {
+			/* Reuse memory allocated for exception */
+			return cord->exception;
+		}
+		free(cord->exception);
+	}
+	cord->exception = (ClientError *) malloc(size);
+	if (cord->exception) {
+		cord->exception_size = size;
+		return cord->exception;
+	}
+	cord->exception = &out_of_memory;
+	cord->exception_size = 0;
+	throw cord->exception;
 }
 
 void
-Exception::operator delete(void*)
+Exception::operator delete(void * /* ptr */)
 {
-	/* Free memory allocated for exception */
-	free(cord()->exc);
-	cord()->exc = NULL;
-	cord()->exc_size = 0;
+	/* Unsupported */
+	assert(false);
 }
 
 Exception::Exception(const char *file, unsigned line)
