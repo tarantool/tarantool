@@ -494,6 +494,9 @@ check_spaces(struct tarantool_cfg *conf)
 			case TREE:
 				/* extra check for tree index not needed */
 				break;
+			case AVLTREE:
+				/* extra check for tree index not needed */
+				break;
 			case BITSET:
 				/* check bitset index */
 				/* bitset index must has single-field key */

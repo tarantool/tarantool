@@ -21,7 +21,6 @@ available commands:
  - show slab
  - show palloc
  - show stat
- - show plugins
  - save coredump
  - save snapshot
  - lua command
@@ -38,7 +37,7 @@ configuration:
   coredump: "false"
   admin_port: "33015"
   replication_port: "0"
-  log_level: "4"
+  log_level: "5"
   slab_alloc_arena: "0.1"
   slab_alloc_minimal: "64"
   slab_alloc_factor: "2"

@@ -163,7 +163,10 @@ arena_init(struct arena *arena, size_t size)
 		    "(https://bugzilla.openvz.org/show_bug.cgi?id=2805)");
 		flags = MAP_PRIVATE | MAP_ANONYMOUS;
 		private_arena = true;
-        }
+        } else {
+		say_info("Mapping %zu bytes for a shared arena",
+			 arena->mmap_size);
+	}
 
 	arena->mmap_base = mmap(NULL, arena->mmap_size,
 				PROT_READ | PROT_WRITE, flags, -1, 0);

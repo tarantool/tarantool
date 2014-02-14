@@ -29,6 +29,7 @@
 #include "index.h"
 #include "hash_index.h"
 #include "tree_index.h"
+#include "avl_tree_index.h"
 #include "bitset_index.h"
 #include "tuple.h"
 #include "say.h"
@@ -71,7 +72,8 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 * - ITERA_ALL iterator type, all index types
 		 * - ITER_GE iterator in HASH index (legacy)
 		 */
-		if (key_def->type == TREE || type == ITER_ALL ||
+		if (key_def->type == TREE || key_def->type == AVLTREE ||
+		    type == ITER_ALL ||
 		    (key_def->type == HASH && type == ITER_GE))
 			return;
 		/* Fall through. */
@@ -82,7 +84,8 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 			  key_def->part_count, part_count);
 
 	/* Partial keys are allowed only for TREE index type. */
-	if (key_def->type != TREE && part_count < key_def->part_count) {
+	if (key_def->type != TREE && key_def->type != AVLTREE &&
+	    part_count < key_def->part_count) {
 		tnt_raise(ClientError, ER_EXACT_MATCH,
 			  key_def->part_count, part_count);
 	}
@@ -144,6 +147,8 @@ Index::factory(enum index_type type, struct key_def *key_def, struct space *spac
 		return new HashIndex(key_def, space);
 	case TREE:
 		return new TreeIndex(key_def, space);
+	case AVLTREE:
+		return new AvlTreeIndex(key_def, space);
 	case BITSET:
 		return new BitsetIndex(key_def, space);
 	default:

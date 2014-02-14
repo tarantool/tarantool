@@ -933,9 +933,25 @@ lua reps
 ---
  - 3
 ...
-lua  function server() 	ms = box.socket.tcp() 	ms:bind('127.0.0.1', 8181) 	ms:listen()  	while true do 		local s = ms:accept( .5 ) 		if s ~= 'timeout' then 			print("accepted connection ", s) 			s:send('Hello world') 			s:shutdown(box.socket.SHUT_RDWR) 		end 	end end  box.fiber.wrap(server) 
+lua  function server() 	ms = box.socket.tcp() 	ms:bind('127.0.0.1', 8181) 	ms:listen()  	while true do 		local s = ms:accept( .5 ) 		if s ~= 'timeout' then 			print("accepted connection ", s) 			s:send('Hello world') 			s:shutdown(box.socket.SHUT_RDWR) 		end 	end end  fbr = box.fiber.wrap(server) 
 ---
 ...
 Hello world
 Hello world
 Hello world
+lua box.fiber.cancel(fbr)
+---
+...
+lua ms:close()
+---
+...
+lua  a = '127.0.0.1' p = 12345 function srv() 	ms = box.socket.tcp() 	ms:bind(a, p) 	ms:listen() 	ms:accept() end  fbr = box.fiber.wrap(srv)  box.socket.tcp():connect(a, p) box.socket.tcp():connect(a, p) 
+---
+...
+lua box.fiber.cancel(fbr)
+---
+error: 'fiber.resume(): the fiber is dead'
+...
+lua ms:close()
+---
+...

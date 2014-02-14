@@ -142,8 +142,23 @@ pull_from_remote(va_list ap)
 				warning_said = true;
 			}
 			evio_close(&coio);
-			fiber_sleep(reconnect_delay);
 		}
+
+		/* Put fiber_sleep() out of catch block.
+		 *
+		 * This is done to avoid situation, when two or more
+		 * fibers yield's inside their try/catch blocks and
+		 * throws an exceptions. Seems like exception unwinder
+		 * stores some global state while being inside a catch
+		 * block.
+		 *
+		 * This could lead to incorrect exception processing
+		 * and crash the server.
+		 *
+		 * See: https://github.com/tarantool/tarantool/issues/136
+		*/
+		if (! evio_is_active(&coio))
+			fiber_sleep(reconnect_delay);
 	}
 }
 

@@ -1,5 +1,5 @@
 {% extends "base" %}
 {% set title = "Tarantool: Frequently Asked Questions" %}
 {% block content %}
-    {{ faq | langselect }}
+    {{ faq.main }}
 {% endblock content%}

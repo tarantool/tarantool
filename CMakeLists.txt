@@ -55,7 +55,6 @@ if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
   set(CMAKE_INSTALL_LIBDIR lib)
 endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
 
-set(PLUGIN_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/tarantool/plugins")
 
 include(cmake/utils.cmake)
 
@@ -97,7 +96,7 @@ add_custom_target(tags COMMAND ctags -R -f tags
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "5")
-set (CPACK_PACKAGE_VERSION_PATCH "2")
+set (CPACK_PACKAGE_VERSION_PATCH "3")
 
 set (PACKAGE_VERSION "")
 
@@ -142,6 +141,13 @@ include_directories("${PROJECT_SOURCE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories("${PROJECT_BINARY_DIR}/include")
 include_directories("${PROJECT_SOURCE_DIR}/third_party")
+
+#
+# Specify Tarantool modules prefixes
+#
+set(MODULE_DIR "${CMAKE_INSTALL_LIBDIR}/tarantool/")
+set(MODULE_DIR "${MODULE_DIR}${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
+
 #
 # Specify prefixes
 #
@@ -168,12 +174,8 @@ endif()
 #
 # Specify Tarantool modules Lua prefixes
 #
-if (NOT DEFINED LUA_LIBPATH)
-    set (LUA_LIBPATH "")
-endif()
-if (NOT DEFINED LUA_LIBCPATH)
-    set (LUA_LIBCPATH "")
-endif()
+set (LUA_LIBPATH  "${LUA_LIBPATH};${MODULE_DIR}/?.lua")
+set (LUA_LIBCPATH "${LUA_LIBCPATH};${MODULE_DIR}/?.so")
 
 #
 # Now handle all configuration options.
@@ -204,10 +206,11 @@ if (ENABLE_BACKTRACE)
     endif()
     # Use GNU bfd if present.
     check_library_exists (bfd bfd_init ""  HAVE_BFD_LIB)
+    check_library_exists (iberty cplus_demangle "" HAVE_IBERTY_LIB)
     set(CMAKE_REQUIRED_DEFINITIONS -DPACKAGE=${PACKAGE} -DPACKAGE_VERSION=${PACKAGE_VERSION})
     check_include_file(bfd.h HAVE_BFD_H)
     set(CMAKE_REQUIRED_DEFINITIONS)
-    if (HAVE_BFD_LIB AND HAVE_BFD_H)
+    if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
         set (HAVE_BFD True)
     endif()
 endif()
@@ -307,12 +310,15 @@ libcjson_build()
 add_dependencies(build_bundled_libs cjson)
 
 #
-# Third-Party misc
+# Third-Party
 #
 
 include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
+
+include(BuildSophia)
+sophia_build()
 
 option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 
@@ -359,15 +365,6 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/include/tarantool/config.h.cmake"
     "${PROJECT_BINARY_DIR}/include/tarantool/config.h"
     )
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/tnt.ent.cmake"
-    "${PROJECT_BINARY_DIR}/doc/tnt.ent"
-    )
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/doc/www-data.in/download.cmake"
-    "${PROJECT_BINARY_DIR}/doc/www-data.in/download"
-    )
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
@@ -378,7 +375,7 @@ message (STATUS "CXX_COMPILER: ${TARANTOOL_CXX_COMPILER}")
 message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
 message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
 message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
-message (STATUS "MODULES: ${TARANTOOL_MODULES}")
+message (STATUS "MODULE_DIR: ${MODULE_DIR}")
 message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
 message (STATUS "ENABLE_SSE2: ${ENABLE_SSE2}")
 message (STATUS "ENABLE_AVX: ${ENABLE_AVX}")

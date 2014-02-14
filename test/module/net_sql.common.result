@@ -1,0 +1,8 @@
+lua type(box.net.sql)
+---
+ - table
+...
+lua c = box.net.sql.connect('abcd')
+---
+error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
+...

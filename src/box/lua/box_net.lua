@@ -1,5 +1,11 @@
 -- box_net.lua (internal file)
 
+(function()
+
+local function sprintf(fmt, ...) return string.format(fmt, ...) end
+local function printf(fmt, ...)  print(sprintf(fmt, ...))       end
+local function errorf(fmt, ...)  error(sprintf(fmt, ...))       end
+
 box.net = {
 --
 -- The idea of box.net.box implementation is that
@@ -130,8 +136,7 @@ box.net = {
                             end
                     end
 
-                    error(string.format('Can not find "box.net.box.%s" function',
-                            name))
+                    errorf('Can not find "box.net.box.%s" function', name)
                 end
             });
 
@@ -197,6 +202,12 @@ box.net.box.new = function(host, port, reconnect_timeout)
         reconnect_timeout   = reconnect_timeout,
         closed              = false,
 
+        timeouted           = {},
+
+        title = function(self)
+            return sprintf('%s:%s', tostring(self.host), tostring(self.port))
+        end,
+
         processing = {
             last_sync = 0,
             next_sync = function(self)
@@ -255,6 +266,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- timeout
             if res == nil then
+                self.timeouted[ sync ] = true
                 if op == 65280 then
                     return false
                 else
@@ -277,7 +289,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return box.unpack('R', body)
                 end
             else
-                error(res[2])
+                errorf('%s: %s', self:title(), res[2])
             end
         end,
 
@@ -316,7 +328,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end
             local header = res[1]
             if string.len(header) ~= 12 then
-                self:fatal("Unexpected eof while reading header")
+                self:fatal("Unexpected eof while reading header from %s",
+                    self:title())
                 return
             end
 
@@ -331,7 +344,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 end
                 body = res[1]
                 if string.len(body) ~= blen then
-                    self:fatal("Unexpected eof while reading body")
+                    self:fatal("Unexpected eof while reading body from %s",
+                        self:title())
                     return
                 end
             end
@@ -360,7 +374,12 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     if self.processing[sync] ~= nil then
                         self.processing[sync]:put({true, resp}, 0)
                     else
-                        print("Unexpected response ", sync)
+                        if self.timeouted[ sync ] then
+                            printf("Timeouted response from %s", self:title())
+                        else
+                            printf("Unexpected response %s from %s",
+                                sync, self:title())
+                        end
                     end
                 end
 
@@ -390,21 +409,23 @@ box.net.box.new = function(host, port, reconnect_timeout)
         end,
 
         fatal = function(self, message, ...)
-            message = string.format(message, ...)
+            message = sprintf(message, ...)
             self.s = nil
             for sync, ch in pairs(self.processing) do
                 if type(sync) == 'number' then
                     ch:put({ false, message }, 0)
                 end
             end
+            self.timeouted = {}
         end,
 
         close = function(self)
             if self.closed then
-                error("box.net.box: already closed")
+                errorf("box.net.box: already closed (%s)", self:title())
             end
             self.closed = true
-            local message = 'box.net.box: connection was closed'
+            local message = sprintf('box.net.box: connection was closed (%s)',
+                self:title())
             self.process = function()
                 error(message)
             end
@@ -426,4 +447,5 @@ box.net.box.new = function(host, port, reconnect_timeout)
     return remote
 end
 
+end)()
 -- vim: set et ts=4 sts

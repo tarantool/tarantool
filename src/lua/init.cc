@@ -60,10 +60,7 @@ extern "C" {
 #include <dlfcn.h>
 #include <dirent.h>
 #include <stdio.h>
-#include "tarantool/plugin.h"
 #include "scoped_guard.h"
-
-static RLIST_HEAD(loaded_plugins);
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>
@@ -1186,126 +1183,6 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 	lua_pop(L, 1);
 }
 
-/**
- * show statistics for all loaded plugins
- */
-void
-show_plugins_stat(struct tbuf *out)
-{
-	tbuf_printf(out, "plugins:\n");
-	struct tarantool_plugin *p;
-	rlist_foreach_entry(p, &loaded_plugins, list) {
-		tbuf_printf(out,
-			"  - { name: \"%s\", version: %d",
-			p->name,
-			p->version
-		);
-		if (p->stat) {
-			tbuf_printf(out, ", stat: ");
-			p->stat(out);
-		}
-		tbuf_printf(out, " }\n");
-	}
-}
-
-static void
-tarantool_load_plugin(struct lua_State *L, const char *plugin)
-{
-	if (strstr(plugin, ".so") == NULL)
-		return;
-
-	say_info("Loading plugin: %s", plugin);
-
-	void *dl = dlopen(plugin, RTLD_NOW);
-	if (!dl) {
-		say_error("Can't load plugin %s: %s", plugin, dlerror());
-		return;
-	}
-
-	struct tarantool_plugin *p = (typeof(p))dlsym(dl, "plugin_meta");
-
-	if (!p) {
-		say_error("Can't find plugin metadata in plugin %s", plugin);
-		dlclose(dl);
-		return;
-	}
-
-	if (p->api_version != PLUGIN_API_VERSION) {
-		say_error("Plugin %s has api_version: %d but tarantool has: %d",
-			plugin,
-			p->api_version,
-			PLUGIN_API_VERSION);
-		return;
-	}
-
-	rlist_add_entry(&loaded_plugins, p, list);
-
-	if (p->init)
-		p->init(L);
-
-	say_info("Plugin '%s' was loaded, version: %d", p->name, p->version);
-}
-
-static void
-tarantool_plugins_dir(struct lua_State *L, const char *dir)
-{
-	if (!dir)
-		return;
-	if (!*dir)
-		return;
-	DIR *dh = opendir(dir);
-
-	if (!dh)
-		return;
-
-	struct dirent * dent;
-	while ((dent = readdir(dh)) != NULL) {
-		if (dent->d_type != DT_REG)
-			continue;
-		char *path;
-		asprintf(&path, "%s/%s", dir, dent->d_name);
-		if (!path) {
-			say_error("Can't allocate memory for %s plugin dir",
-				 dir);
-			continue;
-		}
-
-		tarantool_load_plugin(L, path);
-
-		free(path);
-	}
-
-	closedir(dh);
-}
-
-static void
-tarantool_plugins_init(struct lua_State *L)
-{
-	int top = lua_gettop(L);
-
-	char *plugins = getenv("TARANTOOL_PLUGIN_DIR");
-
-	if (plugins) {
-		plugins = strdup(plugins);
-		char *ptr = plugins;
-		for (;;) {
-			char *divider = strchr(ptr, ':');
-			if (divider == NULL) {
-				tarantool_plugins_dir(L, ptr);
-				break;
-			}
-			*divider = 0;
-			tarantool_plugins_dir(L, ptr);
-			ptr = divider + 1;
-		}
-		free(plugins);
-	}
-
-	tarantool_plugins_dir(L, PLUGIN_DIR);
-
-	lua_settop(L, top);
-}
-
 struct lua_State *
 tarantool_lua_init()
 {
@@ -1370,9 +1247,6 @@ tarantool_lua_init()
 	}
 
 	mod_lua_init(L);
-
-	/* init after internal luas are processed */
-	tarantool_plugins_init(L);
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

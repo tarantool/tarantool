@@ -4,7 +4,7 @@
 enable_tnt_compile_flags()
 
 if (NOT TARGET_OS_DARWIN)
-    add_subdirectory(plugin)
+    add_subdirectory(module)
 endif()
 
 include_directories(${LIBEV_INCLUDE_DIR})
