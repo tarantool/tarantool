@@ -1195,7 +1195,7 @@ snapshot_write_row(struct log_io *l,
 		if (bytes > recovery_state->snap_io_rate_limit)
 			fdatasync(fileno(l->f));
 	}
-	while (bytes >= recovery_state->snap_io_rate_limit) {
+	while (bytes > recovery_state->snap_io_rate_limit) {
 		ev_now_update();
 		/*
 		 * How much time have passed since

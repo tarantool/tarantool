@@ -26,16 +26,16 @@ struct fiob {
 	size_t bfill;
 	void *buf;
 	char *path;
-	#ifdef HAVE_FUNOPEN
-		struct {
-			int     (*read)(void *cookie, char *buf, int len);
-			int     (*write)(void *cookie, char *buf, int len);
-			fpos_t  (*seek)(void *cookie, fpos_t pos, int whence);
-			int     (*close)(void *cookie);
-		} io;
-	#else
-		cookie_io_functions_t io;
-	#endif
+#ifdef HAVE_FUNOPEN
+	struct {
+		int     (*read)(void *cookie, char *buf, int len);
+		int     (*write)(void *cookie, char *buf, int len);
+		fpos_t  (*seek)(void *cookie, fpos_t pos, int whence);
+		int     (*close)(void *cookie);
+	} io;
+#else
+	cookie_io_functions_t io;
+#endif
 };
 
 static ssize_t
@@ -80,26 +80,26 @@ static ssize_t
 fiob_writef(struct fiob *f, const char *buf, size_t count)
 {
 	int fd = f->fd;
-        ssize_t to_write = (ssize_t) count;
-        while (to_write > 0) {
-                ssize_t nwr = write(fd, buf, to_write);
-                if (nwr < 0) {
-                        if (errno == EINTR) {
-                                errno = 0;
-                                continue;
-                        }
-                        if (errno == EAGAIN || errno == EWOULDBLOCK)
-                                return count != to_write ? count - to_write : -1;
-                        say_syserror("write, [%s]", f->path);
-                        return -1; /* XXX: file position is unspecified */
-                }
-                if (nwr == 0)
-                        break;
+	ssize_t to_write = (ssize_t) count;
+	while (to_write > 0) {
+		ssize_t nwr = write(fd, buf, to_write);
+		if (nwr < 0) {
+			if (errno == EINTR) {
+				errno = 0;
+				continue;
+			}
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				return count != to_write ? count - to_write : -1;
+			say_syserror("write, [%s]", f->path);
+			return -1; /* XXX: file position is unspecified */
+		}
+		if (nwr == 0)
+			break;
 
-                buf += nwr;
-                to_write -= nwr;
-        }
-        return count - to_write;
+		buf += nwr;
+		to_write -= nwr;
+	}
+	return count - to_write;
 }
 
 
@@ -108,7 +108,6 @@ fiob_flushb(struct fiob *f)
 {
 	if (!f->buf || !f->bfill)
 		return 0;
-
 
 	size_t tlen = f->bfill / 4096;
 	if (f->bfill % 4096)
@@ -146,35 +145,35 @@ fiob_write(void *cookie, const char *buf, size_t len)
 	if (!f->buf)
 		return fiob_writef(f, buf, len);
 
+	ssize_t bytes_left = len;
+	ssize_t tocopy;
 
-	for (ssize_t wrdone = 0, wrote;;) {
-		/* append buffer */
-		if (f->bsize - f->bfill > len) {
-			memcpy(f->buf + f->bfill, buf, len);
-			f->bfill += len;
-			return wrdone + len;
-		}
-		/* data is longer than buffer */
+	if (f->bfill < f->bsize) {
+		ssize_t available_buf_size = f->bsize - f->bfill;
+		tocopy = available_buf_size > bytes_left ?
+			bytes_left : available_buf_size;
 
-		if (f->bsize > f->bfill)
-			memcpy(f->buf + f->bfill, buf, f->bsize - f->bfill);
-
-		wrote = fiob_writef(f, f->buf, f->bsize);
-		if (wrote < 0)
-			return wrote;
-
-		wrote  -= f->bfill;
-		wrdone += wrote;
-		f->bfill = 0;
-		buf += wrote;
-		len -= wrote;
-
-
-		if (len > 0)
-			continue;
-		return wrdone;
+		memcpy(f->buf + f->bfill, buf, tocopy);
+		bytes_left -= tocopy;
+		buf += tocopy;
+		f->bfill += tocopy;
 	}
-
+	while (bytes_left > 0) {
+		assert(f->bfill == f->bsize);
+		ssize_t res = fiob_writef(f, f->buf, f->bsize);
+		if (res < 0)
+			return res;
+		tocopy = f->bsize > bytes_left ? bytes_left : f->bsize;
+		/*
+		 * We must memcpy because O_DIRECT requires
+		 * an aligned chunk.
+		 */
+		memcpy(f->buf, buf, tocopy);
+		bytes_left -= tocopy;
+		buf += tocopy;
+		f->bfill = tocopy;
+	}
+	return len;
 }
 
 #ifdef HAVE_FUNOPEN
@@ -232,6 +231,7 @@ fiob_open(const char *path, const char *mode)
 {
 	int omode = 0666;
 	int flags = 0;
+	int save_errno;
 
 	size_t bsize = 0;
 	void *buf = NULL;
@@ -264,17 +264,16 @@ fiob_open(const char *path, const char *mode)
 	}
 
 	/* O_EXCL */
-	#ifdef O_EXCL
-	if (strchr(mode, 'x')) {
+#ifdef O_EXCL
+	if (strchr(mode, 'x'))
 		flags |= O_EXCL;
-	}
-	#endif
+#endif
 
 	/* O_DIRECT */
 	if (strchr(mode, 'd')) {
-		#ifdef O_DIRECT
-			flags |= O_DIRECT;
-		#endif
+#ifdef O_DIRECT
+		flags |= O_DIRECT;
+#endif
 		bsize = O_DIRECT_BSIZE;
 		posix_memalign(&buf, 4096, bsize);
 		if (!buf) {
@@ -318,36 +317,35 @@ fiob_open(const char *path, const char *mode)
 	f->io.close	= fiob_close;
 
 	FILE *file;
-	#ifdef HAVE_FUNOPEN
-		file = funopen(f,
-			f->io.read, f->io.write, f->io.seek, f->io.close);
-	#else
-		file = fopencookie(f, mode, f->io);
-	#endif
+#ifdef HAVE_FUNOPEN
+	file = funopen(f,
+		       f->io.read, f->io.write, f->io.seek, f->io.close);
+#else
+	file = fopencookie(f, mode, f->io);
+#endif
 
 	if (!file)
 		goto error;
 
-	#ifdef TARGET_OS_LINUX
-		file->_fileno = f->fd;
-	#else
-		file->_file = f->fd;
-	#endif
+#ifdef TARGET_OS_LINUX
+	file->_fileno = f->fd;
+#else
+	file->_file = f->fd;
+#endif
 
 	return file;
 
-error: {
-		int save_errno = errno;
-		say_syserror("Can't open '%s'", path);
-		if (f->fd > 0)
-			close(f->fd);
+error:
+	save_errno = errno;
+	say_syserror("Can't open '%s'", path);
+	if (f->fd > 0)
+		close(f->fd);
 
-		free(f->buf);
-		free(f->path);
-		free(f);
+	free(f->buf);
+	free(f->path);
+	free(f);
 
-		errno = save_errno;
-	}
+	errno = save_errno;
 	return NULL;
 }
 
