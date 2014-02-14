@@ -1,6 +1,12 @@
 --------------------------------------------------------------------------------
 -- Parameters parsing
 --------------------------------------------------------------------------------
+ffi = require('ffi')
+---
+...
+msgpackffi = require('msgpackffi')
+---
+...
 msgpack.encode()
 ---
 - error: 'msgpack.encode: a Lua object expected'
@@ -23,6 +29,10 @@ function deepcompare(a, b)
         return a == b
     end
 
+    if ffi.istype('bool', a) then a = (a == 1) end
+    if ffi.istype('bool', b) then b = (b == 1) end
+
+    if a == nil and b == nil then return true end
     if type(a) ~= type(b) then return false end
 
     if type(a) == "table" then
@@ -41,12 +51,34 @@ end;
 ---
 ...
 function test(x)
-    local x2 = msgpack.decode(msgpack.encode(x))
-    xstr = type(x) == "table" and "table" or tostring(x)
-    if deepcompare(x2, x) then
-        return string.format("%s ok", xstr)
+    local buf1 = msgpack.encode(x)
+    local buf2 = msgpackffi.encode(x)
+    local x1, offset1 = msgpack.next(buf1)
+    local x2, offset2 = msgpackffi.decode_unchecked(buf2)
+    local xstr
+    if type(x) == "table" then
+        xstr = "table"
+    elseif ffi.istype('float', x) then
+        xstr = string.format('%0.2f (ffi float)', tonumber(x))
+    elseif ffi.istype('double', x) then
+        xstr = string.format('%0.2f (ffi double)', tonumber(x))
+    elseif ffi.istype("bool", x) then
+        xstr = string.format("%s (ffi bool)", x == 1 and "true" or "false")
     else
-        return string.format("%s fail, got %s", xstr, x2)
+        xstr = tostring(x)
+    end
+    if #buf1 ~= #buf2 then
+        return string.format("%s fail, length mismatch", xstr)
+    elseif offset1 ~= #buf1 + 1 then
+        return string.format("%s fail, invalid offset", xstr)
+    elseif offset2 ~= #buf2 + 1 then
+        return string.format("%s fail, invalid offset (ffi)", xstr)
+    elseif not deepcompare(x1, x) then
+        return string.format("%s fail, invalid result %s", xstr, x1)
+    elseif not deepcompare(x2, x) then
+        return string.format("%s fail, invalid result (ffi) %s", xstr, x2)
+    else
+        return string.format("%s ok", xstr)
     end
 end;
 ---
@@ -228,12 +260,32 @@ test(1e100)
 ---
 - 1e+100 ok
 ...
+test(ffi.new('float', 123456))
+---
+- 123456.00 (ffi float) ok
+...
+test(ffi.new('double', 123456))
+---
+- 123456.00 (ffi double) ok
+...
+test(ffi.new('float', 12.121))
+---
+- 12.12 (ffi float) ok
+...
+test(ffi.new('double', 12.121))
+---
+- 12.12 (ffi double) ok
+...
 --------------------------------------------------------------------------------
 -- Test str, bool, nil encoding / decoding 
 --------------------------------------------------------------------------------
 test(nil)
 ---
 - nil ok
+...
+test(ffi.cast('void *', 0))
+---
+- 'cdata<void *>: NULL ok'
 ...
 test(false)
 ---
@@ -242,6 +294,14 @@ test(false)
 test(true)
 ---
 - true ok
+...
+test(ffi.new('bool', true))
+---
+- true (ffi bool) ok
+...
+test(ffi.new('bool', false))
+---
+- false (ffi bool) ok
 ...
 test("")
 ---
@@ -270,10 +330,6 @@ test({k1 = 'v1', k2 = 'v2', k3 = 'v3'})
 ---
 - table ok
 ...
-test({[0] = 1, 2, 3, 4, 5})
----
-- table ok
-...
 msgpack.decode(msgpack.encode({[0] = 1, 2, 3, 4, 5}))
 ---
 - 0: 1
@@ -283,10 +339,6 @@ msgpack.decode(msgpack.encode({[0] = 1, 2, 3, 4, 5}))
   4: 5
 ...
 -- test sparse / dense arrays
-test({1, 2, 3, 4, 5, [10] = 10 })
----
-- table ok
-...
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
 ---
 - 2: 2
@@ -296,10 +348,6 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
   10: 10
   4: 4
 ...
-test({1, 2, 3, 4, 5, [100] = 100 })
----
-- table ok
-...
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
 ---
 - 2: 2
@@ -308,6 +356,15 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
   1: 1
   100: 100
   4: 4
+...
+msgpackffi.decode_unchecked(msgpackffi.encode({1, 2, 3, 4, 5, [100] = 100}))
+---
+- - 1
+  - 2
+  - 3
+  - 4
+  - 5
+- 7
 ...
 --------------------------------------------------------------------------------
 -- Test serializer flags
@@ -406,6 +463,59 @@ msgpack.decode(msgpack.encode(a));
                                 - c
                                 - null
 ...
+msgpackffi.decode_unchecked(msgpackffi.encode(a));
+---
+- - 1
+  - 2
+  - 3
+  - - a
+    - b
+    - c
+    - - 1
+      - 2
+      - 3
+      - - a
+        - b
+        - c
+        - - 1
+          - 2
+          - 3
+          - - a
+            - b
+            - c
+            - - 1
+              - 2
+              - 3
+              - - a
+                - b
+                - c
+                - - 1
+                  - 2
+                  - 3
+                  - - a
+                    - b
+                    - c
+                    - - 1
+                      - 2
+                      - 3
+                      - - a
+                        - b
+                        - c
+                        - - 1
+                          - 2
+                          - 3
+                          - - a
+                            - b
+                            - c
+                            - - 1
+                              - 2
+                              - 3
+                              - - a
+                                - b
+                                - c
+                                - null
+- 90
+...
 --# setopt delimiter ''
 -- Test  aliases, loads and dumps
 a = { 1, 2, 3 }
@@ -461,4 +571,43 @@ a, offset = msgpack.next(dump, offset)
 ---
 - error: '[string "a, offset = msgpack.next(dump, offset) "]:1: msgpack.next: offset
     is out of bounds'
+...
+-- Test decode with offset
+dump = msgpackffi.encode({1, 2, 3})..msgpackffi.encode({4, 5, 6})
+---
+...
+dump:len()
+---
+- 8
+...
+a, offset = msgpackffi.decode_unchecked(dump)
+---
+...
+a
+---
+- - 1
+  - 2
+  - 3
+...
+offset
+---
+- 5
+...
+a, offset = msgpackffi.decode_unchecked(dump, offset)
+---
+...
+a
+---
+- - 4
+  - 5
+  - 6
+...
+offset
+---
+- 9
+...
+a, offset = msgpackffi.decode_unchecked(dump, offset)
+---
+- error: '[string "-- msgpackffi.lua (internal file)..."]:460: offset = 9 is out of
+    bounds [1..8]'
 ...
