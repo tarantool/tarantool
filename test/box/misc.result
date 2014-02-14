@@ -36,7 +36,6 @@ t
   - net
   - on_reload_configuration
   - pack
-  - plugin
   - process
   - raise
   - schema

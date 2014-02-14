@@ -4,7 +4,7 @@
 enable_tnt_compile_flags()
 
 if (NOT TARGET_OS_DARWIN)
-    add_subdirectory(plugin)
+    add_subdirectory(module)
 endif()
 
 include_directories(${LIBEV_INCLUDE_DIR})
@@ -68,7 +68,6 @@ set (common_sources
      assoc.c
      say.c
      fio.c
-     plugin.c
      crc32.c
      tbuf.c
      opts.c
@@ -79,7 +78,6 @@ set (common_sources
      lua/info.cc
      lua/stat.cc
      lua/errinj.cc
-     lua/plugin.cc
      lua/ipc.cc
      lua/socket.cc
      lua/session.cc

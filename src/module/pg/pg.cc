@@ -34,8 +34,6 @@ extern "C" {
 	#undef PACKAGE_VERSION
 }
 
-#define PLUGIN_VERSION			1
-#define PLUGIN_NAME			"postgresql"
 #include <stddef.h>
 
 extern "C" {
@@ -43,7 +41,6 @@ extern "C" {
 	#include <lauxlib.h>
 	#include <lualib.h>
 }
-#include <plugin.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,11 +49,9 @@ extern "C" {
 #include <coeio.h>
 #include "third_party/tarantool_ev.h"
 
-
-#include <lua/utils.h>
+#include <lua/init.h>
 #include <say.h>
 #include <scoped_guard.h>
-
 
 static PGconn *
 lua_check_pgconn(struct lua_State *L, int index)
@@ -85,14 +80,14 @@ lua_check_pgconn(struct lua_State *L, int index)
 static ssize_t
 pg_exec(va_list ap)
 {
-	PGconn *conn			= va_arg(ap, typeof(conn));
-	const char *sql			= va_arg(ap, typeof(sql));
-	int count			= va_arg(ap, typeof(count));
-	Oid *paramTypes			= va_arg(ap, typeof(paramTypes));
-	const char **paramValues	= va_arg(ap, typeof(paramValues));
-	const int *paramLengths		= va_arg(ap, typeof(paramLengths));
-	const int *paramFormats		= va_arg(ap, typeof(paramFormats));
-	PGresult **res			= va_arg(ap, typeof(res));
+	PGconn *conn			= va_arg(ap, PGconn*);
+	const char *sql			= va_arg(ap, const char*);
+	int count			= va_arg(ap, int);
+	Oid *paramTypes			= va_arg(ap, Oid*);
+	const char **paramValues	= va_arg(ap, const char**);
+	const int *paramLengths		= va_arg(ap, int*);
+	const int *paramFormats		= va_arg(ap, int*);
+	PGresult **res			= va_arg(ap, PGresult**);
 
 	*res = PQexecParams(conn, sql,
 		count, paramTypes, paramValues, paramLengths, paramFormats, 0);
@@ -323,8 +318,8 @@ pg_notice(void *arg, const char *message)
 static ssize_t
 pg_connect(va_list ap)
 {
-	const char *constr = va_arg(ap, typeof(constr));
-	PGconn **conn = va_arg(ap, typeof(conn));
+	const char *constr = va_arg(ap, const char*);
+	PGconn **conn = va_arg(ap, PGconn**);
 	*conn = PQconnectdb(constr);
 	if (*conn)
 		PQsetNoticeProcessor(*conn, pg_notice, NULL);
@@ -491,9 +486,11 @@ lbox_net_pg_connect(struct lua_State *L)
 	return 1;
 }
 
+extern "C" {
+	int LUA_API luaopen_box_net_pg(lua_State*);
+}
 
-static void
-init(struct lua_State *L)
+int LUA_API luaopen_box_net_pg(lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");	/* stack: box */
 
@@ -505,9 +502,6 @@ init(struct lua_State *L)
 
 	lua_pushstring(L, "connectors");
 	lua_rawget(L, -2);		/* stack: box.net.sql.connectors */
-
-
-
 
 	/* stack: box, box.net.sql.connectors */
 	lua_pushstring(L, "pg");
@@ -521,7 +515,5 @@ init(struct lua_State *L)
 
 	/* cleanup stack */
 	lua_pop(L, 4);
+	return 0;
 }
-
-
-DECLARE_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, init, NULL);

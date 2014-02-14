@@ -46,8 +46,8 @@
 #include "bit/bit.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[], sql_lua[];
-static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, sql_lua, NULL };
+extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[] ;
+static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, NULL };
 
 /*
  * Functions, exported in box_lua.h should have prefix

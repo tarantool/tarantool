@@ -74,11 +74,11 @@ floor(1.1)
 ...
 string.gmatch(package_path, '([^;]*)')()
 ---
-- ./?.lua
+- 
 ...
 string.gmatch(package_cpath, '([^;]*)')()
 ---
-- ./?.so
+- 
 ...
 mod.test(10, 15)
 ---

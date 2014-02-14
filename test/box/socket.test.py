@@ -597,7 +597,7 @@ function server()
 	end
 end
 
-box.fiber.wrap(server)
+fbr = box.fiber.wrap(server)
 """
 admin("test_listen_done = false")
 admin(test.replace('\n', ' '))
