@@ -16,7 +16,7 @@
 <para>
 The Tarantool API exists so that a client program can send a request packet
 to the server, and receive a response. Here is an example of a what the client
- would send for <command>INSERT INTO t0 VALUES ('A','BB')</command>. The BNF description of the components
+ would send for <command>box.space[513]:insert{'A', 'BB'}</command>. The BNF description of the components
 is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
  A third-party contribution written in Lua for unpacking Tarantool messages is in file 
  <link xlink:href="https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua" xlink:title="tarantool.dis.lua">Tnt-dissector</link>.
@@ -61,13 +61,6 @@ is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/
                           <entry>0</entry>
                         </row>
                         <row>
-                          <entry>space_no</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                        </row>
-                        <row>
                           <entry>flags</entry>
                           <entry>2</entry>
                           <entry>0</entry>
@@ -75,32 +68,26 @@ is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/
                           <entry>0</entry>
                         </row>
                         <row>
-                          <entry>cardinality</entry>
-                          <entry>2</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
+                          <entry>map-element count</entry>
+                          <entry>82</entry>
+                          <entry>10</entry>
                         </row>
                         <row>
-                          <entry>field[0] size</entry>
-                          <entry>1</entry>
-                          <entry namest="c1" nameend="c4"></entry>
+                          <entry>2-digit number: space id</entry>
+                          <entry>cd</entry>
+                          <entry>02</entry>
+                          <entry>03</entry>
                         </row>
                         <row>
-                          <entry>field[0] data</entry>
-                          <entry>65</entry>
-                          <entry namest="c2" nameend="c4"></entry>
+                          <entry>1-character string: field[0]</entry>
+                          <entry>a1</entry>
+                          <entry>41</entry>
                         </row>
                         <row>
-                          <entry>field[1] size</entry>
-                          <entry>2</entry>
-                          <entry namest="c2" nameend="c5"></entry>
-                        </row>
-                        <row>
-                          <entry>field[1] data</entry>
-                          <entry>66</entry>
-                          <entry>66</entry>
-                          <entry namest="c3" nameend="c4"></entry>
+                          <entry>2-character string: field[1]</entry>
+                          <entry>a2</entry>
+                          <entry>42</entry>
+                          <entry>42</entry>
                         </row>
                        </tbody>
                     </tgroup>

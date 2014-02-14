@@ -432,7 +432,7 @@ localhost> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
                          <entry>name</entry><entry>effect</entry><entry>type</entry><entry>default</entry>
                         </row>
                         <row>
-                         <entry>type</entry><entry>type of index</entry><entry>hash|tree|bitset</entry><entry>hash</entry>
+                         <entry>type</entry><entry>type of index</entry><entry>hash|tree|bitset</entry><entry>tree</entry>
                         </row>
                         <row>
                          <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last index's id, +1</entry>
@@ -951,12 +951,12 @@ localhost&gt; <userinput>box.space.space0:len()</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>for k, v in box.space.space0:pairs() do print(v) end</userinput>
+localhost> <userinput>tmp = ''; for k, v in box.space.space0:pairs() do tmp = tmp .. v[1] end</userinput>
 ---
-1: {'hello'}
-2: {'my     '}
-3: {'Lua    '}
-4: {'world'}
+...
+localhost> <userinput>tmp</userinput>
+---
+- Hello My Lua world
 ...
 </programlisting>
         </listitem>
