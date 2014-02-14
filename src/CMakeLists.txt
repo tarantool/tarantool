@@ -74,6 +74,7 @@ set (common_sources
      opts.c
      cpu_feature.c
      fiob.c
+     ffisyms.cc
      lua/fiber.cc
      lua/trigger.cc
      lua/admin.cc
