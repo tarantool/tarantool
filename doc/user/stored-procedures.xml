@@ -2249,10 +2249,10 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:close()</emphasis></term>
         <listitem>
             <simpara>
-		Close channel. All waiters at the channel will be
-		woke up.
-		All following operation <code>channel:put()</code>
-		or <code>channel:get()</code> will do nothing.
+               Close the channel. All waiters in the channel will be
+               woken up. All following <code>channel:put()</code>
+               or <code>channel:get()</code> operations will return
+               an error (nil).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2290,12 +2290,10 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:broadcast(message, timeout)</emphasis></term>
         <listitem>
             <simpara>
-             If the channel is empty, <code>channel:broadcast()</code> is
-             equivalent to
+             If the channel is empty, <code>channel:broadcast()</code> is equivalent to
              <code>channel:put()</code>.
-	     Otherwise, <code>channel:broadcast()</code> sends
-	     the message to all readers of the
-             channel.
+              Otherwise, <code>channel.broadcast()</code> sends the message to all readers of the
+              channel.
             </simpara>
         </listitem>
     </varlistentry>
@@ -2303,8 +2301,7 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:is_empty()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is empty
-                (has no messages).
+                Return true if the specified channel is empty (has no messages).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2312,8 +2309,7 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:is_full()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is full
-                (has no room for a new message).
+                Return true if the specified channel is full (has no room for a new message).
             </simpara>
         </listitem>
     </varlistentry>
@@ -2321,8 +2317,7 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:has_readers()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is empty and
-                has readers waiting
+                Return true if the specified channel is empty and has readers waiting
                 for a message (because they have issued
                 <code>channel:get()</code> and then
                 blocked).
@@ -2334,10 +2329,8 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:has_writers()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is full
-                and has writers waiting
-                (because they have issued <code>channel:put()</code>
-                and then blocked
+                Return true if the specified channel is full and has writers waiting
+                (because they have issued <code>channel:put()</code> and then blocked
                 due to lack of room). Otherwise return false.
             </simpara>
         </listitem>

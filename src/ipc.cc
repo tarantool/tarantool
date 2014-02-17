@@ -114,7 +114,6 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 	if (ch->closed)
 		return NULL;
 
-
 	struct fiber *f;
 	bool first_try = true;
 	ev_tstamp started = ev_now();
@@ -138,7 +137,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 			fiber_testcancel();
 			fiber_setcancellable(cancellable);
 			res = ch->bcast_msg;
-			goto EXIT;
+			goto exit;
 		}
 
 		fiber_testcancel();
@@ -147,14 +146,13 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		timeout -= ev_now() - started;
 		if (timeout <= 0) {
 			res = NULL;
-			goto EXIT;
+			goto exit;
 		}
 
 		if (ch->closed) {
 			res = NULL;
-			goto EXIT;
+			goto exit;
 		}
-
 	}
 
 	res = ch->item[ch->beg];
@@ -168,8 +166,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		fiber_wakeup(f);
 	}
 
-
-EXIT:
+exit:
 	if (ch->closed && ch->close) {
 		fiber_wakeup(ch->close);
 		ch->close = NULL;
@@ -183,7 +180,6 @@ ipc_channel_get(struct ipc_channel *ch)
 {
 	return ipc_channel_get_timeout(ch, TIMEOUT_INFINITY);
 }
-
 
 static void
 ipc_channel_close_waiter(struct ipc_channel *ch, struct fiber *f)
@@ -236,7 +232,6 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		return -1;
 	}
 
-
 	bool first_try = true;
 	int res;
 	unsigned i;
@@ -263,13 +258,13 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		if (timeout <= 0) {
 			errno = ETIMEDOUT;
 			res = -1;
-			goto EXIT;
+			goto exit;
 		}
 
 		if (ch->closed) {
 			errno = EBADF;
 			res = -1;
-			goto EXIT;
+			goto exit;
 		}
 	}
 
@@ -287,7 +282,7 @@ ipc_channel_put_timeout(struct ipc_channel *ch, void *data,
 		fiber_wakeup(f);
 	}
 	res = 0;
-EXIT:
+exit:
 	if (ch->closed && ch->close) {
 		int save_errno = errno;
 		fiber_wakeup(ch->close);
@@ -358,7 +353,6 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 			break;
 	}
 
-
 	if (ch->closed && ch->close) {
 		fiber_wakeup(ch->close);
 		ch->close = NULL;
@@ -366,5 +360,3 @@ ipc_channel_broadcast(struct ipc_channel *ch, void *data)
 
 	return cnt;
 }
-
-

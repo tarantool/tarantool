@@ -39,12 +39,7 @@ extern "C" {
 #include "ipc.h"
 #include "lua/init.h"
 
-
-
-
-
 static const char channel_lib[]   = "box.ipc.channel";
-
 
 #define BROADCAST_MASK	(((size_t)1) << (CHAR_BIT * sizeof(size_t) - 1))
 
@@ -141,12 +136,11 @@ lbox_ipc_channel_put(struct lua_State *L)
 	lua_pushvalue(L, 2);
 	size_t vref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-
 	int retval;
 	if (ipc_channel_put_timeout(ch, (void *)vref, timeout) == 0) {
 		retval = 1;
 	} else {
-		/* put timeout */
+		/* timed out or closed */
 		luaL_unref(L, LUA_REGISTRYINDEX, vref);
 		retval = 0;
 	}
@@ -179,8 +173,8 @@ lbox_ipc_channel_get(struct lua_State *L)
 
 	size_t vref = (size_t)ipc_channel_get_timeout(ch, timeout);
 
-
 	if (!vref) {
+		/* timed out or closed */
 		lua_pushnil(L);
 		return 1;
 	}
@@ -282,7 +276,6 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 
 	lua_pushstring(L, "ipc");
@@ -291,4 +284,3 @@ tarantool_lua_ipc_init(struct lua_State *L)
 	lua_settable(L, -3);
 	lua_pop(L, 1);
 }
-
