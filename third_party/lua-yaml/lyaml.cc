@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
@@ -42,6 +43,7 @@
 
 #include "yaml.h"
 #include "b64.h"
+} /* extern "C" */
 #include "lua/utils.h"
 
 /* configurable flags */
@@ -845,7 +847,7 @@ static int l_null(lua_State *L) {
    return 1;
 }
 
-LUALIB_API int luaopen_yaml(lua_State *L) {
+extern "C" int luaopen_yaml(lua_State *L) {
    const luaL_reg yamllib[] = {
       { "decode", l_load },
       { "encode", l_dump },
@@ -858,6 +860,6 @@ LUALIB_API int luaopen_yaml(lua_State *L) {
    return 1;
 }
 
-LUALIB_API int yamlL_encode(lua_State *L) {
+extern "C" int yamlL_encode(lua_State *L) {
 	return l_dump(L);
 }
