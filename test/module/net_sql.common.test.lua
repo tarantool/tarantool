@@ -1,13 +1,6 @@
 package.path  = "../../src/module/sql/?.lua"
----
-...
 package.cpath  = "?.so"
----
-...
+
 require("sql")
----
-- true
-...
 if type(box.net.sql) ~= "table" then error("net.sql load failed") end
----
-...
+

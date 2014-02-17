@@ -1,3 +1,14 @@
+package.path  = "../../src/module/sql/?.lua"
+package.cpath  = "?.so"
+
+require("sql")
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+
+os.execute("mkdir -p box/net/")
+os.execute("cp ../../src/module/mysql/mysql.so box/net/")
+
+require("box.net.mysql")
+
 c = box.net.sql.connect('abcd')
 function dump(v) return box.cjson.encode(v) end
 
@@ -24,3 +35,5 @@ c:begin_work()
 c:rollback()
 c:begin_work()
 c:commit()
+
+os.execute("rm -rf box/net/")

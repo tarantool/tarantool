@@ -1,3 +1,14 @@
+package.path  = "../../src/module/sql/?.lua"
+package.cpath  = "?.so"
+
+require("sql")
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+
+os.execute("mkdir -p box/net/")
+os.execute("cp ../../src/module/pg/pg.so box/net/")
+
+require("box.net.pg")
+
 c = box.net.sql.connect('abcd')
 dump = function(v) return box.cjson.encode(v) end
 
@@ -34,3 +45,5 @@ c:begin_work()
 c:commit()
 
 c:txn(function(dbi) dbi:single('SELECT 1') end)
+
+os.execute("rm -rf box/net/")
