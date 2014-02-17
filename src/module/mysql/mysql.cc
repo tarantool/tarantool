@@ -27,10 +27,6 @@
  * SUCH DAMAGE.
  */
 
-
-#define PLUGIN_NAME			"mysql"
-#define PLUGIN_VERSION			1
-
 #include <stddef.h>
 
 extern "C" {
@@ -46,14 +42,10 @@ extern "C" {
 #include <coeio.h>
 #include <tarantool_ev.h>
 
-
 #include <lua/init.h>
 #include <say.h>
 #include <mysql.h>
 #include <scoped_guard.h>
-
-#include <tarantool/plugin.h>
-
 
 /**
  * gets MYSQL connector from lua stack (or object)
@@ -465,9 +457,11 @@ lbox_net_mysql_connect(struct lua_State *L)
 	return 1;
 }
 
+extern "C" {
+	int LUA_API luaopen_box_net_mysql(lua_State*);
+}
 
-static void
-init(struct lua_State *L)
+int LUA_API luaopen_box_net_mysql(lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");	/* stack: box */
 
@@ -487,6 +481,5 @@ init(struct lua_State *L)
 
 	/* cleanup stack */
 	lua_pop(L, 4);
+	return 0;
 }
-
-DECLARE_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, init, NULL);

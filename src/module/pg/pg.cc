@@ -34,8 +34,6 @@ extern "C" {
 	#undef PACKAGE_VERSION
 }
 
-#define PLUGIN_VERSION			1
-#define PLUGIN_NAME			"postgresql"
 #include <stddef.h>
 
 extern "C" {
@@ -43,7 +41,6 @@ extern "C" {
 	#include <lauxlib.h>
 	#include <lualib.h>
 }
-#include <tarantool/plugin.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +48,6 @@ extern "C" {
 #include <string.h>
 #include <coeio.h>
 #include <tarantool_ev.h>
-
 
 #include <lua/init.h>
 #include <say.h>
@@ -491,9 +487,11 @@ lbox_net_pg_connect(struct lua_State *L)
 	return 1;
 }
 
+extern "C" {
+	int LUA_API luaopen_box_net_pg(lua_State*);
+}
 
-static void
-init(struct lua_State *L)
+int LUA_API luaopen_box_net_pg(lua_State *L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");	/* stack: box */
 
@@ -505,9 +503,6 @@ init(struct lua_State *L)
 
 	lua_pushstring(L, "connectors");
 	lua_rawget(L, -2);		/* stack: box.net.sql.connectors */
-
-
-
 
 	/* stack: box, box.net.sql.connectors */
 	lua_pushstring(L, "pg");
@@ -521,7 +516,5 @@ init(struct lua_State *L)
 
 	/* cleanup stack */
 	lua_pop(L, 4);
+	return 0;
 }
-
-
-DECLARE_PLUGIN(PLUGIN_NAME, PLUGIN_VERSION, init, NULL);

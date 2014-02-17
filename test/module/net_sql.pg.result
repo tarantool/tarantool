@@ -1,6 +1,10 @@
 lua c = box.net.sql.connect('abcd')
 ---
-error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
+...
+lua c = box.net.sql.connect('pg')
+---
+error: '../../src/module/sql/sql.lua:64: Usage: box.net.sql.connect(''pg'', host, port, user, password, db, ...)'
 ...
 lua dump = function(v) return box.cjson.encode(v) end
 ---
@@ -68,7 +72,7 @@ lua dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
-error: '[string "-- sql.lua (internal file)..."]:156: SQL request returned multiply rows'
+error: '../../src/module/sql/sql.lua:156: SQL request returned multiply rows'
 ...
 lua dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 ---
@@ -80,14 +84,14 @@ lua dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 lua c:execute('SELEC T')
 ---
-error: '[string "-- sql.lua (internal file)..."]:105: ERROR:  syntax error at or near "SELEC"
+error: '../../src/module/sql/sql.lua:105: ERROR:  syntax error at or near "SELEC"
 LINE 1: SELEC T
         ^
 '
 ...
 lua c = box.net.sql.connect('abcd')
 ---
-error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
 ...
 lua c:quote('abc"cde"def')
 ---

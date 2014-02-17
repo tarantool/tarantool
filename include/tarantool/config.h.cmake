@@ -61,6 +61,12 @@
 #ifndef HAVE_FDATASYNC
 	#define fdatasync fsync
 #endif
+
+/*
+ * Defined if this platform has BSD specific funopen()
+ */
+#cmakedefine HAVE_FUNOPEN 1
+
 /*
  * Defined if this platform has GNU specific memmem().
  */
@@ -120,7 +126,7 @@
 #define LUA_LIBPATH "@LUA_LIBPATH@"
 #define LUA_LIBCPATH "@LUA_LIBCPATH@"
 
-#define PLUGIN_DIR "@PLUGIN_DIR@"
+#define MODULE_DIR "@MODULE_DIR"
 
 /*
  * vim: syntax=c

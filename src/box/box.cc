@@ -355,7 +355,7 @@ box_init(bool init_storage)
 }
 
 static void
-snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
+snapshot_write_tuple(struct log_io *l,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
@@ -363,35 +363,28 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 	header.tuple_size = tuple->field_count;
 	header.data_size = tuple->bsize;
 
-	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
+	snapshot_write_row(l, (const char *) &header, sizeof(header),
 			   tuple->data, tuple->bsize);
 }
 
-
-struct snapshot_space_param {
-	struct log_io *l;
-	struct fio_batch *batch;
-};
 
 static void
 snapshot_space(struct space *sp, void *udata)
 {
 	struct tuple *tuple;
-	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
+	struct log_io *l = (struct log_io *)udata;
 	Index *pk = space_index(sp, 0);
 	struct iterator *it = pk->position();;
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
-		snapshot_write_tuple(ud->l, ud->batch, space_n(sp), tuple);
+		snapshot_write_tuple(l, space_n(sp), tuple);
 }
 
 void
-box_snapshot(struct log_io *l, struct fio_batch *batch)
+box_snapshot(struct log_io *l)
 {
-	struct snapshot_space_param ud = { l, batch };
-
-	space_foreach(snapshot_space, &ud);
+	space_foreach(snapshot_space, l);
 }
 
 void

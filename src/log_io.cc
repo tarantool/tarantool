@@ -35,6 +35,7 @@
 #include "crc32.h"
 #include "fio.h"
 #include "tarantool_eio.h"
+#include "fiob.h"
 
 const uint32_t default_version = 11;
 const log_magic_t row_marker_v11 = 0xba0babed;
@@ -69,7 +70,7 @@ row_v11_fill(struct row_v11 *row, int64_t lsn, uint16_t tag, uint64_t cookie,
 struct log_dir snap_dir = {
 	/* .panic_if_error = */ false,
 	/* .sync_is_async = */ false,
-	/* .open_wflags = */ 0,
+	/* .open_wflags = */ "wxd",
 	/* .filetype = */ "SNAP\n",
 	/* .filename_ext = */ ".snap",
 	/* .dirname = */ NULL
@@ -78,7 +79,7 @@ struct log_dir snap_dir = {
 struct log_dir wal_dir = {
 	/* .panic_if_error = */ false,
 	/* .sync_is_async = */ true,
-	/* .open_wflags = */ 0,
+	/* .open_wflags = */ "wx",
 	/* .filetype = */ "XLOG\n",
 	/* .filename_ext = */ ".xlog",
 	/* .dirname = */ NULL
@@ -438,14 +439,14 @@ log_io_close(struct log_io **lptr)
 	int r;
 
 	if (l->mode == LOG_WRITE) {
-		fio_write(fileno(l->f), &eof_marker_v11, sizeof(log_magic_t));
+		fwrite(&eof_marker_v11, 1, sizeof(log_magic_t), l->f);
 		/*
 		 * Sync the file before closing, since
 		 * otherwise we can end up with a partially
 		 * written file in case of a crash.
 		 * Do not sync if the file is opened with O_SYNC.
 		 */
-		if (! (l->dir->open_wflags & WAL_SYNC_FLAG))
+		if (! strchr(l->dir->open_wflags, 's'))
 			log_io_sync(l);
 		if (l->is_inprogress && inprogress_log_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
@@ -626,7 +627,6 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 {
 	char *filename;
 	FILE *f;
-	int fd;
 	assert(lsn != 0);
 
 	if (suffix == INPROGRESS) {
@@ -645,13 +645,11 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
+	f = fiob_open(filename, dir->open_wflags);
 
-	fd = open(filename,
-		      O_WRONLY | O_CREAT | O_EXCL | dir->open_wflags, 0664);
-	if (fd < 0)
+	if (!f)
 		goto error;
 	say_info("creating `%s'", filename);
-	f = fdopen(fd, "w");
 	return log_io_open(dir, LOG_WRITE, filename, suffix, f);
 error:
 	say_syserror("%s: failed to open `%s'", __func__, filename);

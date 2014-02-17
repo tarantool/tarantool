@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_PLUGIN_H_INCLUDED
-#define TARANTOOL_PLUGIN_H_INCLUDED
+#ifndef TARANTOOL_FIOB_H_INCLUDED
+#define TARANTOOL_FIOB_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,38 +28,27 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#define O_DIRECT_BSIZE		( 4096 * 256 )
 
-#define PLUGIN_API_VERSION		1
+#include <sys/types.h>
+#include <stdio.h>
 
-#include <rlist.h>
-#include <tbuf.h>
-#include <stddef.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
-struct lua_State;
+/**
+ * Open a file.
+ * The same as fopen (3) but allows additional options, which
+ * correspond to open (2) flags:
+ * 'x' - O_EXCL
+ * 's' - O_SYNC
+ * 'd' - O_DIRECT
+ */
+FILE *
+fiob_open(const char *path, const char *mode);
 
-typedef void(*plugin_init_cb)(struct lua_State *L);
-typedef void(*plugin_stat_cb)(struct tbuf *out);
-
-struct tarantool_plugin {
-        int api_version;
-        int version;
-        const char *name;
-        plugin_init_cb init;
-        plugin_stat_cb stat;
-        struct rlist list;
-};
-
-#define DECLARE_PLUGIN(name, version, init, stat)	        \
-	extern "C" {						\
-		struct tarantool_plugin plugin_meta = {		\
-			PLUGIN_API_VERSION,			\
-			version,				\
-			name,					\
-			init,                                 \
-			stat,                                 \
-			{ NULL, NULL }				\
-		};						\
-	}
-
-
-#endif /* TARANTOOL_PLUGIN_H_INCLUDED */
+#if defined(__cplusplus)
+}	/* extern "C" */
+#endif
+#endif	/* TARANTOOL_FIOB_H_INCLUDED */

@@ -1,6 +1,18 @@
 # encoding: tarantool
+import os
+import shutil
+
+module_path = os.path.join(vardir, "box/net")
+module_path_so = module_path + "/pg.so"
+os.makedirs(module_path)
+shutil.copy("../src/module/pg/pg.so", module_path_so)
+
+server.stop()
+server.deploy(init_lua="module/net_sql.pg.lua")
 
 exec admin "lua c = box.net.sql.connect('abcd')"
+exec admin "lua c = box.net.sql.connect('pg')"
+
 exec admin "lua dump = function(v) return box.cjson.encode(v) end"
 
 exec admin "lua connect = {}"
@@ -39,3 +51,5 @@ exec admin "lua c:commit()"
 
 exec admin "lua c:txn(function(dbi) dbi:single('SELECT 1') end)"
 
+os.unlink(module_path_so)
+os.removedirs(module_path)

@@ -1,0 +1,101 @@
+lua env = box.sophia.create()
+---
+...
+lua flags = bit.bor(box.sophia.SPO_RDWR, box.sophia.SPO_CREAT)
+---
+...
+lua env:ctl(box.sophia.SPDIR, flags, "./sophia")
+---
+ - 0
+...
+lua env:open()
+---
+ - 0
+...
+lua for key=1, 10 do print(env:set(tostring(key), tostring(key))) end
+---
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+...
+lua for key=1, 10 do print(env:get(tostring(key))) end
+---
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+...
+lua env:close()
+---
+ - 0
+...
+lua env = box.sophia.create()
+---
+...
+lua flags = bit.bor(box.sophia.SPO_RDWR)
+---
+...
+lua env:ctl(box.sophia.SPDIR, flags, "./sophia")
+---
+ - 0
+...
+lua env:open()
+---
+ - 0
+...
+lua for key=1, 10 do print(env:get(tostring(key))) end
+---
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+...
+lua for key=1, 10 do print(env:delete(tostring(key))) end
+---
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+...
+lua for key=1, 10 do print(env:get(tostring(key))) end
+---
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+...
+lua env:close()
+---
+ - 0
+...

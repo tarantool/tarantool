@@ -20,7 +20,7 @@ plan(int count)
 int
 check_plan(void)
 {
-	int res;
+	int res = 0;
 	if (tests_done != plan_test) {
 		fprintf(stderr,
 			"# Looks like you planned %d tests but ran %d.\n",
