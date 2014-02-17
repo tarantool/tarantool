@@ -560,19 +560,28 @@ dump_node(struct lua_yaml_dumper *dumper)
 	int type = lua_type(dumper->L, top);
 	if (field.type == MP_EXT &&
 	    (type == LUA_TUSERDATA || type == LUA_TCDATA)) {
-		/* has metatable, try to call 'totable' and use return value */
-		lua_getfield(dumper->L, top, "totable");
-		if (lua_isfunction(dumper->L, -1)) {
-			lua_pushvalue(dumper->L, top); /* copy object itself */
-			lua_call(dumper->L, 1, 1);
-			lua_replace(dumper->L, top);
-			luaL_tofield(dumper->L, -1, &field);
-		} else {
-			lua_pop(dumper->L, 1); /* pop result */
+		/* try to call 'totable' method on udata/cdata */
+		try {
+			/*
+			 * LuaJIT specific: lua_getfield raises exception on
+			 * cdata objects if field doesn't exist.
+			 */
+			lua_getfield(dumper->L, top, "totable");
+			if (lua_isfunction(dumper->L, -1)) {
+				/* copy object itself */
+				lua_pushvalue(dumper->L, top);
+				lua_call(dumper->L, 1, 1);
+				if (lua_istable(dumper->L, -1)) {
+					/* replace obj with the unpacked table*/
+					lua_replace(dumper->L, top);
+					luaL_tofield(dumper->L, -1, &field);
+				}
+			}
+		} catch (...) {
+			/* ignore lua_getfield exceptions */
 		}
+		lua_settop(dumper->L, top); /* remove temporary objects */
 	}
-
-	luaL_tofield(dumper->L, top, &field);
 
 	/* Still have unknown type on the stack,
 	 * try to call 'tostring' */

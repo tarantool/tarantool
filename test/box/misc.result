@@ -477,3 +477,105 @@ space:delete{1}
 space:drop()
 ---
 ...
+----------------
+-- # yaml encode/decode on cdata
+----------------
+ffi = require('ffi')
+---
+...
+ffi.new('uint8_t', 128)
+---
+- 128
+...
+ffi.new('int8_t', -128)
+---
+- -128
+...
+ffi.new('uint16_t', 128)
+---
+- 128
+...
+ffi.new('int16_t', -128)
+---
+- -128
+...
+ffi.new('uint32_t', 128)
+---
+- 128
+...
+ffi.new('int32_t', -128)
+---
+- -128
+...
+ffi.new('uint64_t', 128)
+---
+- 128
+...
+ffi.new('int64_t', -128)
+---
+- -128
+...
+ffi.new('char', 128)
+---
+- -128
+...
+ffi.new('char', -128)
+---
+- -128
+...
+ffi.new('bool', true)
+---
+- true
+...
+ffi.new('bool', false)
+---
+- false
+...
+ffi.new('float', 1.23456)
+---
+- 1.2345600128174
+...
+ffi.new('float', 1e10)
+---
+- 10000000000
+...
+ffi.new('double', 1.23456)
+---
+- 1.23456
+...
+ffi.new('double', 1e10)
+---
+- 10000000000
+...
+ffi.cast('void *', 0)
+---
+- null
+...
+ffi.cast('void *', 0xabcdef)
+---
+- 'cdata<void *>: 0x00abcdef'
+...
+ffi.cdef([[struct test { int a; }; ]])
+---
+...
+ffi.cast('struct test *', 0)
+---
+- 'cdata<struct test *>: NULL'
+...
+--# setopt delimiter ';'
+type(ffi.metatype('struct test', {
+    __index = {
+        totable = function(test)
+            return { 'yaml totable test = ' .. test.a }
+        end
+    }
+}));
+---
+- cdata
+...
+--# setopt delimiter ''
+-- custom totable function will be called by yaml.encode
+ffi.new('struct test', { a = 15 })
+---
+- - yaml totable test = 15
+...

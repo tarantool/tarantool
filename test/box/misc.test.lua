@@ -147,3 +147,47 @@ fifo_top(space, 1)
 space:delete{1}
 
 space:drop()
+
+----------------
+-- # yaml encode/decode on cdata
+----------------
+
+ffi = require('ffi')
+
+ffi.new('uint8_t', 128)
+ffi.new('int8_t', -128)
+ffi.new('uint16_t', 128)
+ffi.new('int16_t', -128)
+ffi.new('uint32_t', 128)
+ffi.new('int32_t', -128)
+ffi.new('uint64_t', 128)
+ffi.new('int64_t', -128)
+
+ffi.new('char', 128)
+ffi.new('char', -128)
+ffi.new('bool', true)
+ffi.new('bool', false)
+
+ffi.new('float', 1.23456)
+ffi.new('float', 1e10)
+ffi.new('double', 1.23456)
+ffi.new('double', 1e10)
+
+ffi.cast('void *', 0)
+ffi.cast('void *', 0xabcdef)
+
+ffi.cdef([[struct test { int a; }; ]])
+ffi.cast('struct test *', 0)
+
+--# setopt delimiter ';'
+type(ffi.metatype('struct test', {
+    __index = {
+        totable = function(test)
+            return { 'yaml totable test = ' .. test.a }
+        end
+    }
+}));
+
+--# setopt delimiter ''
+-- custom totable function will be called by yaml.encode
+ffi.new('struct test', { a = 15 })
