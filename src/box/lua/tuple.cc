@@ -461,7 +461,6 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
 	if (tuple) {
 		assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
-		assert(ffi_gc_ref != 0);
 		struct tuple **ptr = (struct tuple **) luaL_pushcdata(L,
 			CTID_CONST_STRUCT_TUPLE_REF, sizeof(struct tuple *));
 		*ptr = tuple;
