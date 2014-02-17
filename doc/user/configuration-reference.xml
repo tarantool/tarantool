@@ -513,7 +513,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
         </row>
 
         <row>
-        <entry>wal_fsync_delay</entry>
+        <entry xml:id="wal_fsync_delay" xreflabel="wal_fsync_delay">wal_fsync_delay</entry>
         <entry>float</entry>
         <entry>0</entry>
         <entry>no</entry>

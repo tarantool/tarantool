@@ -323,6 +323,44 @@ localhost> <userinput>lua type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</use
       A few functions may return multiple tuples.
       For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
     </para>
+
+    <para>
+     <table>
+      <title xml:id="complexity-factors">Complexity Factors that may affect data manipulation functions in the box library</title>
+      <tgroup cols="2" align="left" colsep="1" rowsep="1">
+      <thead>
+      <row><entry>Factor</entry><entry>Explanation</entry></row>
+      </thead>
+      <tbody>
+      <row><entry>Index size</entry>     <entry>The number of index keys is the same as the number
+                                         of tuples in the data set. For a TREE index, if
+                                         there are more keys then the lookup time will be
+                                         greater, although of course the effect is not linear.
+                                         For a HASH index, if there are more keys then there
+                                         is more RAM use, but the number of low-level steps
+                                         tends to remain constant.</entry></row>
+      <row><entry>Index type</entry>      <entry>Typically a HASH index is faster than a TREE index
+                                         if the number of tuples in the tuple set is greater than one.</entry></row>
+      <row><entry>Number of indexes accessed</entry><entry>Ordinarily only one index is accessed to retrieve
+                                         one tuple. But to update the tuple, there must be
+                                         N accesses if the tuple set has N different indexes.</entry></row>
+      <row><entry>Number of tuples accessed</entry><entry>A few requests, for example select_range, can retrieve
+                                         multiple tuples. This factor is usually less
+                                         important than the others.</entry></row>
+      <row><entry>WAL settings</entry>   <entry>The important settings for the write-ahead log are
+                                         wal_fsync_delay and  <olink targetptr="wal_mode"/>.
+                                         If the settings cause no writing or delayed writing,
+                                         this factor is unimportant. If the settings cause
+                                         every data-change request to wait for writing to
+                                         finish on a slow device, this factor is more
+                                         important than all the others.</entry></row>
+      </tbody>
+      </tgroup>                                   
+      </table>
+      In the discussion of each data-manipulation function there will be a note
+      about which Complexity Factors might affect the function's resource usage.
+     </para>
+      
 </section>
 
 <section xml:id="sp-box">
@@ -398,6 +436,9 @@ localhost> <userinput>lua type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</use
                Returns: (type = tuple) zero or more tuples.
             </para>
             <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
                Possible Errors: Same as in <code>box.process()</code>. Any error
                 results in a Lua exception.
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -436,6 +477,9 @@ localhost> <userinput>lua box.select(5, 1, 'first_name', 'last_name')</userinput
               Returns: (type = tuple) the inserted tuple.
             </para>
             <para>
+              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
               Possible errors: If a tuple with the same primary key already exists,
               <code>box.insert()</code> returns an error ER_TUPLE_FOUND.
             </para>
@@ -463,6 +507,9 @@ localhost> <userinput>lua box.select(5, 1, 'first_name', 'last_name')</userinput
             <para>
                Returns: (type = tuple) zero or more tuples.
             </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of tuples accessed.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -483,6 +530,9 @@ localhost> <userinput>lua box.select(5, 1, 'first_name', 'last_name')</userinput
             </para>
             <para>
             Returns: (type = tuple) the inserted tuple.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
             </para>
         </listitem>
     </varlistentry>
@@ -528,6 +578,9 @@ localhost> <userinput>lua box.select(5, 1, 'first_name', 'last_name')</userinput
                <para>
                Returns: (type = tuple) the updated tuple.
               </para>
+            <para>
+              Complexity Factors: Index size, Index type, number of indexes accessed, WAL settings.
+            </para>
               <para>
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
@@ -617,6 +670,9 @@ lua box.update(0, 999, ':p', 1, box.pack('ppp', 1, 1, '!'))
             </para>
             <para>
               Returns: (type = tuple) the deleted tuple.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 localhost> <userinput>call box.delete('0', 'test#1')</userinput>
@@ -655,6 +711,9 @@ Call ERROR, Illegal parameters, key is not u32 (ER_ILLEGAL_PARAMS)
               between two calls to <code>box.select_range()</code>.
               If <code>key</code> is <code>nil</code> or unspecified,
               the selection starts from the start of the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of tuples accessed.
             </para>
             <para>
               Possible errors:
@@ -734,6 +793,9 @@ localhost> <userinput>lua box.select_range(4, 1, 2, '1')</userinput>
               If <code>key</code> is <code>nil</code> or unspecified,
               the selection starts from the end of the index.
               For other index types this call is not supported.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of tuples accessed.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> <userinput>show configuration</userinput>
 ---
@@ -1152,6 +1214,9 @@ error: 'WAL I/O error'
                Returns: (type = tuple) the inserted tuple.
             </para>
             <para>
+              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
                Possible errors: index has wrong type or primary-key indexed field is not a number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -1183,6 +1248,9 @@ localhost> <userinput>lua box.auto_increment(0, 'Fld#3')</userinput>
             <para>
                Returns: (type = number) the new counter value.
             </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
+            </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> <userinput>lua box.counter.inc(0, 'top.mail.ru')</userinput>
 ---
@@ -1211,6 +1279,9 @@ localhost> <userinput>lua box.counter.inc(0, 'top.mail.ru')</userinput>
             </para>
             <para>
               Returns: (type = number) the new counter value.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>localhost> <userinput>lua box.counter.dec(0, 'top.mail.ru')</userinput>
@@ -2110,6 +2181,9 @@ localhost&gt; <userinput>lua box.space[0].index[0].idx:max()</userinput>
                     get the next value on each invocation.
             </para>
             <para>
+              Complexity Factors: Index size, Index type, Number of tuples accessed.
+            </para>
+            <para>
                Possible Errors:
                     Selected iteration type is not supported in
                     the subject index type, or supplied parameters
@@ -2202,6 +2276,9 @@ error: 'Iterator type is not supported'
               Returns: (type = tuple) the tuple for the first key in the index.
             </para>
             <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
               Possible errors: index is not of type 'TREE'.
             </para>
             <para>
@@ -2225,6 +2302,9 @@ error: 'Iterator type is not supported'
             </para>
             <para>
               Returns: (type = tuple) the tuple for the last key in the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
             </para>
             <para>
               Possible errors: index is not of type 'TREE'.
@@ -2256,6 +2336,9 @@ error: 'Iterator type is not supported'
             </para>
             <para>
               Returns: (type = tuple) the tuple for the random key in the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
