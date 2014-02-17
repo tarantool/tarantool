@@ -151,11 +151,10 @@ enum rpl_request_type {
 
 struct fio_batch;
 
-void snapshot_write_row(struct log_io *i, struct fio_batch *batch,
+void snapshot_write_row(struct log_io *i,
 			const char *metadata, size_t metadata_size,
 			const char *data, size_t data_size);
-void snapshot_save(struct recovery_state *r,
-		   void (*loop) (struct log_io *, struct fio_batch *));
+void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));
 
 void
 init_storage(struct log_dir *dir, const char *replication_source);

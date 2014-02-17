@@ -33,8 +33,17 @@
 #include "errcode.h"
 #include "say.h"
 
+
 class Exception: public Object {
 public:
+	void *operator new(size_t size);
+	void operator delete(void*);
+	virtual void raise()
+	{
+		/* Throw the most specific type of exception */
+		throw this;
+	}
+
 	const char *
 	errmsg() const
 	{
@@ -42,6 +51,7 @@ public:
 	}
 
 	virtual void log() const = 0;
+	virtual ~Exception() {}
 
 protected:
 	Exception(const char *file, unsigned line);
@@ -59,6 +69,11 @@ protected:
 
 class SystemError: public Exception {
 public:
+
+	virtual void raise()
+	{
+		throw this;
+	}
 
 	int
 	errnum() const
@@ -84,6 +99,11 @@ private:
 
 class ClientError: public Exception {
 public:
+	virtual void raise()
+	{
+		throw this;
+	}
+
 	virtual void log() const;
 
 	int
@@ -100,6 +120,8 @@ private:
 	/* client errno code */
 	int m_errcode;
 };
+
+extern ClientError out_of_memory;
 
 class LoggedError: public ClientError {
 public:
@@ -125,7 +147,7 @@ public:
 #define tnt_raise(...) tnt_raise0(__VA_ARGS__)
 #define tnt_raise0(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
-	throw class(__FILE__, __LINE__, ##__VA_ARGS__);			\
+	throw new class(__FILE__, __LINE__, ##__VA_ARGS__);		\
 } while (0)
 
 #endif /* TARANTOOL_EXCEPTION_H_INCLUDED */

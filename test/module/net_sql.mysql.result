@@ -1,0 +1,103 @@
+package.path  = "../../src/module/sql/?.lua"
+---
+...
+package.cpath  = "?.so"
+---
+...
+require("sql")
+---
+- true
+...
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+---
+...
+os.execute("mkdir -p box/net/")
+---
+- 0
+...
+os.execute("cp ../../src/module/mysql/mysql.so box/net/")
+---
+- 0
+...
+require("box.net.mysql")
+---
+- true
+...
+c = box.net.sql.connect('abcd')
+---
+- error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
+...
+function dump(v) return box.cjson.encode(v) end
+---
+...
+connect = {}
+---
+...
+for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
+---
+...
+-- mysql
+c = box.net.sql.connect('mysql', unpack(connect))
+---
+...
+for k, v in pairs(c) do print(k, ': ', type(v)) end
+---
+...
+c:execute('SEL ECT 1')
+---
+- error: '../../src/module/sql/sql.lua:105: You have an error in your SQL syntax;
+    check the manual that corresponds to your MySQL server version for the right syntax
+    to use near ''SEL ECT 1'' at line 1'
+...
+dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
+---
+- '[[{"bool2":0,"str":"abc","num":123,"bool1":1}],1]'
+...
+dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})
+---
+- '[{},0]'
+...
+dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})
+---
+- '[{},0]'
+...
+dump({c:execute('CALL p1')})
+---
+- '[[{"One":1},{"Three":3,"Two":2}],2]'
+...
+dump({c:execute('DROP PROCEDURE p1')})
+---
+- '[{},0]'
+...
+dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})
+---
+- '[[{"one":1},{"one":2}],2]'
+...
+dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
+---
+- '[[{"one":1},{"one":2},{"two":"abc"}],3]'
+...
+c:quote('test \"abc\" test')
+---
+- test \"abc\" test
+...
+c:begin_work()
+---
+- 0
+...
+c:rollback()
+---
+- 0
+...
+c:begin_work()
+---
+- 0
+...
+c:commit()
+---
+- 0
+...
+os.execute("rm -rf box/net/")
+---
+- 0
+...

@@ -1,0 +1,146 @@
+package.cpath  = "?.so"
+---
+...
+os.execute("mkdir -p box")
+---
+- 0
+...
+os.execute("cp ../../src/module/sophia/sophia.so box/")
+---
+- 0
+...
+sophia = require("box.sophia")
+---
+...
+env = sophia.create()
+---
+...
+flags = bit.bor(sophia.SPO_RDWR, sophia.SPO_CREAT)
+---
+...
+env:ctl(sophia.SPDIR, flags, "./sophia")
+---
+- 0
+...
+env:open()
+---
+- 0
+...
+t = {}
+---
+...
+for key=1, 10 do table.insert(t, env:set(tostring(key), tostring(key))) end
+---
+...
+t
+---
+- - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+...
+t = {}
+---
+...
+for key=1, 10 do table.insert(t, env:get(tostring(key))) end
+---
+...
+t
+---
+- - '1'
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  - '10'
+...
+t = {}
+---
+...
+env:close()
+---
+- 0
+...
+env = sophia.create()
+---
+...
+flags = bit.bor(sophia.SPO_RDWR)
+---
+...
+env:ctl(sophia.SPDIR, flags, "./sophia")
+---
+- 0
+...
+env:open()
+---
+- 0
+...
+t = {}
+---
+...
+for key=1, 10 do table.insert(t, env:get(tostring(key))) end
+---
+...
+t
+---
+- - '1'
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  - '6'
+  - '7'
+  - '8'
+  - '9'
+  - '10'
+...
+t = {}
+---
+...
+for key=1, 10 do table.insert(t, env:delete(tostring(key))) end
+---
+...
+t
+---
+- - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+...
+t = {}
+---
+...
+for key=1, 10 do table.insert(t, env:get(tostring(key))) end
+---
+...
+t
+---
+- []
+...
+t = {}
+---
+...
+env:close()
+---
+- 0
+...
+os.execute("rm -rf box/")
+---
+- 0
+...

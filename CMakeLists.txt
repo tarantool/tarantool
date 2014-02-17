@@ -88,6 +88,8 @@ if (HAVE_SENDFILE)
 endif()
 check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 
+check_function_exists(funopen HAVE_FUNOPEN)
+
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
 # which we use to determine the end (or beginning, actually) of
@@ -333,6 +335,9 @@ add_dependencies(build_bundled_libs yaml)
 include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
+
+include(BuildSophia)
+sophia_build()
 
 option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 

@@ -555,8 +555,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		 */
 		if (!ev_is_active(&con->input))
 			ev_feed_event(loop, &con->input, EV_READ);
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		iproto_connection_shutdown(con);
 	}
 }
@@ -593,7 +593,7 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 		nwr = sio_writev(fd, iov, iovcnt);
 
 		sio_add_to_iov(iov, svp->iov_len);
-	} catch (const Exception &) {
+	} catch (Exception *e) {
 		sio_add_to_iov(iov, svp->iov_len);
 		throw;
 	}
@@ -630,8 +630,8 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 		}
 		if (ev_is_active(&con->output))
 			ev_io_stop(loop, &con->output);
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		iproto_connection_shutdown(con);
 	}
 }
@@ -691,7 +691,7 @@ iproto_process_request(struct iproto_request *ireq)
 		request_create(&request, ireq->code);
 		request_decode(&request, ireq->body, ireq->len);
 		(*con->handler)((struct port *) &port, &request);
-	} catch (const ClientError &e) {
+	} catch (ClientError *e) {
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
 		iproto_reply_error(out, e, ireq->sync);
@@ -711,17 +711,17 @@ iproto_process_connect(struct iproto_request *request)
 	int fd = con->input.fd;
 	try {              /* connect. */
 		con->session = session_create(fd, con->cookie);
-	} catch (const ClientError& e) {
+	} catch (ClientError *e) {
 		iproto_reply_error(&iobuf->out, e, request->sync);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
-		} catch (const Exception& e) {
-			e.log();
+		} catch (Exception *e) {
+			e->log();
 		}
 		iproto_connection_shutdown(con);
 		return;
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		assert(con->session == NULL);
 		iproto_connection_shutdown(con);
 		return;

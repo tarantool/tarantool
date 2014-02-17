@@ -183,7 +183,7 @@ space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			index->replace(old_tuple, new_tuple, DUP_INSERT);
 		}
 		return old_tuple;
-	} catch (const Exception &e) {
+	} catch (Exception *e) {
 		/* Rollback all changes */
 		for (; i > 0; i--) {
 			Index *index = space->index[i-1];

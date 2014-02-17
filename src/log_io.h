@@ -53,8 +53,8 @@ struct log_dir {
 	 */
 	bool sync_is_async;
 
-	/* Additional flags to apply at open(2) to write. */
-	int  open_wflags;
+	/* Additional flags to apply at fopen(2) to write. */
+	char open_wflags[6];
 	const char *filetype;
 	const char *filename_ext;
 	char *dirname;

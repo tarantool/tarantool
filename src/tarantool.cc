@@ -815,10 +815,11 @@ main(int argc, char **argv)
 			signal_start();
 			ev_run(loop(), 0);
 		}
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		panic("%s", "fatal error, exiting the event loop");
 	}
+
 	if (start_loop)
 		say_crit("exiting the event loop");
 	/* freeing resources */

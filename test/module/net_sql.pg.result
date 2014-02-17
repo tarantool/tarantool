@@ -1,10 +1,31 @@
+package.path  = "../../src/module/sql/?.lua"
+---
+...
+package.cpath  = "?.so"
+---
+...
+require("sql")
+---
+- true
+...
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+---
+...
+os.execute("mkdir -p box/net/")
+---
+- 0
+...
+os.execute("cp ../../src/module/pg/pg.so box/net/")
+---
+- 0
+...
+require("box.net.pg")
+---
+- true
+...
 c = box.net.sql.connect('abcd')
 ---
-error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
-...
-c = box.net.sql.connect('pg')
----
-error: '../../src/module/sql/sql.lua:64: Usage: box.net.sql.connect(''pg'', host, port, user, password, db, ...)'
+- error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
 ...
 dump = function(v) return box.cjson.encode(v) end
 ---
@@ -73,7 +94,7 @@ dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ---
-error: '../../src/module/sql/sql.lua:156: SQL request returned multiply rows'
+- error: '../../src/module/sql/sql.lua:156: SQL request returned multiply rows'
 ...
 dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 ---
@@ -85,14 +106,12 @@ dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 ...
 c:execute('SELEC T')
 ---
-error: '../../src/module/sql/sql.lua:105: ERROR:  syntax error at or near "SELEC"
-LINE 1: SELEC T
-        ^
-'
+- error: "../../src/module/sql/sql.lua:105: ERROR:  syntax error at or near \"SELEC\"\nLINE
+    1: SELEC T\n        ^\n"
 ...
 c = box.net.sql.connect('abcd')
 ---
-error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
+- error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
 ...
 c:quote('abc\"cde\"def')
 ---
@@ -117,4 +136,8 @@ c:commit()
 c:txn(function(dbi) dbi:single('SELECT 1') end)
 ---
 - true
+...
+os.execute("rm -rf box/net/")
+---
+- 0
 ...

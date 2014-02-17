@@ -581,7 +581,7 @@ lua_totuple(struct lua_State *L, int first, int last)
 	struct tbuf *b = tbuf_new(&fiber()->gc);
 	try {
 		luamp_encodestack(L, b, first, last);
-	} catch (const Exception &e) {
+	} catch (Exception *e) {
 		throw;
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));

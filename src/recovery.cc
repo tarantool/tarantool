@@ -176,7 +176,7 @@ recovery_wait_lsn(struct recovery_state *r, int64_t lsn)
 		try {
 			fiber_yield();
 			wait_lsn_clear(&r->wait_lsn);
-		} catch (const Exception& e) {
+		} catch (Exception *e) {
 			wait_lsn_clear(&r->wait_lsn);
 			throw;
 		}
@@ -223,7 +223,9 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->snap_dir->dirname = strdup(snap_dirname);
 	r->wal_dir = &wal_dir;
 	r->wal_dir->dirname = strdup(wal_dirname);
-	r->wal_dir->open_wflags = r->wal_mode == WAL_FSYNC ? WAL_SYNC_FLAG : 0;
+	if (r->wal_mode == WAL_FSYNC) {
+		(void) strcat(r->wal_dir->open_wflags, "s");
+	}
 	r->rows_per_wal = rows_per_wal;
 	wait_lsn_clear(&r->wait_lsn);
 }
@@ -1232,19 +1234,8 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 
 /* {{{ SAVE SNAPSHOT and tarantool_box --cat */
 
-static void
-snap_write_batch(struct fio_batch *batch, int fd)
-{
-	int rows_written = fio_batch_write(batch, fd);
-	if (rows_written != batch->rows) {
-		say_error("partial write: %d out of %d rows",
-			  rows_written, batch->rows);
-		panic_syserror("fio_batch_write");
-	}
-}
-
 void
-snapshot_write_row(struct log_io *l, struct fio_batch *batch,
+snapshot_write_row(struct log_io *l,
 		   const char *metadata, size_t metadata_len,
 		   const char *data, size_t data_len)
 {
@@ -1261,70 +1252,66 @@ snapshot_write_row(struct log_io *l, struct fio_batch *batch,
 		     metadata_len, data, data_len);
 	log_row_sign(row);
 
-	fio_batch_add(batch, row, log_row_size(row));
-	bytes += log_row_size(row);
-
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
 
-	if (fio_batch_is_full(batch) ||
-	    bytes > recovery_state->snap_io_rate_limit) {
+	size_t written = fwrite(row, 1, log_row_size(row), l->f);
 
-		snap_write_batch(batch, fileno(l->f));
-		fio_batch_start(batch, INT_MAX);
-		region_free_after(&fiber()->gc, 128 * 1024);
-		if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
-			if (last == 0) {
-				/*
-				 * Remember the time of first
-				 * write to disk.
-				 */
-				ev_now_update(loop);
-				last = ev_now(loop);
-			}
-			/**
-			 * If io rate limit is set, flush the
-			 * filesystem cache, otherwise the limit is
-			 * not really enforced.
-			 */
-			if (bytes > recovery_state->snap_io_rate_limit)
-				fdatasync(fileno(l->f));
-		}
-		while (bytes >= recovery_state->snap_io_rate_limit) {
-			ev_now_update(loop);
-			/*
-			 * How much time have passed since
-			 * last write?
-			 */
-			elapsed = ev_now(loop) - last;
-			/*
-			 * If last write was in less than
-			 * a second, sleep until the
-			 * second is reached.
-			 */
-			if (elapsed < 1)
-				usleep(((1 - elapsed) * 1000000));
+	if (written != log_row_size(row)) {
+		say_error("Can't write row (%zu bytes)", log_row_size(row));
+		panic_syserror("snapshot_write_row");
+	}
 
+	bytes += written;
+
+	region_free_after(&fiber()->gc, 128 * 1024);
+
+	if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
+		if (last == 0) {
+			/*
+			 * Remember the time of first
+			 * write to disk.
+			 */
 			ev_now_update(loop);
 			last = ev_now(loop);
-			bytes -= recovery_state->snap_io_rate_limit;
 		}
+		/**
+		 * If io rate limit is set, flush the
+		 * filesystem cache, otherwise the limit is
+		 * not really enforced.
+		 */
+		if (bytes > recovery_state->snap_io_rate_limit)
+			fdatasync(fileno(l->f));
+	}
+	while (bytes > recovery_state->snap_io_rate_limit) {
+		ev_now_update(loop);
+		/*
+		 * How much time have passed since
+		 * last write?
+		 */
+		elapsed = ev_now(loop) - last;
+		/*
+		 * If last write was in less than
+		 * a second, sleep until the
+		 * second is reached.
+		 */
+		if (elapsed < 1)
+			usleep(((1 - elapsed) * 1000000));
+
+		ev_now_update(loop);
+		last = ev_now(loop);
+		bytes -= recovery_state->snap_io_rate_limit;
 	}
 }
 
 void
-snapshot_save(struct recovery_state *r,
-	      void (*f) (struct log_io *, struct fio_batch *))
+snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
 {
 	struct log_io *snap;
 	snap = log_io_open_for_write(r->snap_dir, r->confirmed_lsn,
 				     INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
-	struct fio_batch *batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
-	if (batch == NULL)
-		panic_syserror("fio_batch_alloc");
-	fio_batch_start(batch, INT_MAX);
 	/*
 	 * While saving a snapshot, snapshot name is set to
 	 * <lsn>.snap.inprogress. When done, the snapshot is
@@ -1333,12 +1320,9 @@ snapshot_save(struct recovery_state *r,
 	say_info("saving snapshot `%s'",
 		 format_filename(r->snap_dir, r->confirmed_lsn,
 				 NONE));
-	f(snap, batch);
+	if (f)
+		f(snap);
 
-	if (batch->rows)
-		snap_write_batch(batch, fileno(snap->f));
-
-	free(batch);
 	log_io_close(&snap);
 
 	say_info("done");

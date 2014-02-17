@@ -377,12 +377,12 @@ fiber_loop(void *data __attribute__((unused)))
 		       fiber()->fid != 0);
 		try {
 			fiber()->f(fiber()->f_data);
-		} catch (const FiberCancelException& e) {
+		} catch (FiberCancelException *e) {
 			say_info("fiber `%s' has been cancelled",
 				 fiber_name(fiber()));
 			say_info("fiber `%s': exiting", fiber_name(fiber()));
-		} catch (const Exception& e) {
-			e.log();
+		} catch (Exception *e) {
+			e->log();
 		} catch (...) {
 			/*
 			 * This can only happen in case of a bug
@@ -526,6 +526,11 @@ cord_destroy(struct cord *cord)
 	}
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
+	/* Cleanup memory allocated for exceptions */
+	if (cord->exception && cord->exception != &out_of_memory) {
+		cord->exception->~Exception();
+		free(cord->exception);
+	}
 }
 
 struct cord_thread_arg

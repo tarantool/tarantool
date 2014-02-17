@@ -91,7 +91,7 @@ process_rw(struct port *port, struct request *request)
 		port_send_tuple(port, txn);
 		port_eof(port);
 		txn_finish(txn);
-	} catch (const Exception& e) {
+	} catch (Exception *e) {
 		txn_rollback(txn);
 		throw;
 	}
@@ -126,8 +126,8 @@ recover_row(void *param __attribute__((unused)), const struct log_row *row)
 		request_create(&request, op);
 		request_decode(&request, data, end - data);
 		process_rw(&null_port, &request);
-	} catch (const Exception& e) {
-		e.log();
+	} catch (Exception *e) {
+		e->log();
 		return -1;
 	}
 
@@ -307,7 +307,7 @@ box_init()
 }
 
 static void
-snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
+snapshot_write_tuple(struct log_io *l,
 		     uint32_t n, struct tuple *tuple)
 {
 	struct box_snap_row header;
@@ -317,15 +317,10 @@ snapshot_write_tuple(struct log_io *l, struct fio_batch *batch,
 	header.m_space_id = 0xce; /* uint32 */
 	header.v_space_id = mp_bswap_u32(n);
 	header.k_tuple = IPROTO_TUPLE;
-	snapshot_write_row(l, batch, (const char *) &header, sizeof(header),
-			   tuple->data, tuple->bsize);
+	snapshot_write_row(l, (const char *) &header, sizeof(header),
+	                   tuple->data, tuple->bsize);
 }
 
-
-struct snapshot_space_param {
-	struct log_io *l;
-	struct fio_batch *batch;
-};
 
 static void
 snapshot_space(struct space *sp, void *udata)
@@ -333,7 +328,7 @@ snapshot_space(struct space *sp, void *udata)
 	if (space_is_temporary(sp))
 		return;
 	struct tuple *tuple;
-	struct snapshot_space_param *ud = (struct snapshot_space_param *) udata;
+	struct log_io *l = (struct log_io *)udata;
 	Index *pk = space_index(sp, 0);
 	if (pk == NULL)
 		return;
@@ -341,15 +336,13 @@ snapshot_space(struct space *sp, void *udata)
 	pk->initIterator(it, ITER_ALL, NULL, 0);
 
 	while ((tuple = it->next(it)))
-		snapshot_write_tuple(ud->l, ud->batch, space_id(sp), tuple);
+		snapshot_write_tuple(l, space_id(sp), tuple);
 }
 
 void
-box_snapshot_cb(struct log_io *l, struct fio_batch *batch)
+box_snapshot_cb(struct log_io *l)
 {
-	struct snapshot_space_param ud = { l, batch };
-
-	space_foreach(snapshot_space, &ud);
+	space_foreach(snapshot_space, l);
 }
 
 int

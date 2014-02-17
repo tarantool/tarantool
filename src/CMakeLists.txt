@@ -72,6 +72,7 @@ set (common_sources
      tbuf.c
      opts.c
      cpu_feature.c
+     fiob.c
      lua/fiber.cc
      lua/trigger.cc
      lua/admin.cc

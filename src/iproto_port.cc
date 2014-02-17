@@ -71,24 +71,23 @@ iproto_reply_ping(struct obuf *out, uint32_t sync)
 }
 
 void
-iproto_reply_error(struct obuf *out, const ClientError &e,
-		   uint32_t sync)
+iproto_reply_error(struct obuf *out, ClientError *e, uint32_t sync)
 {
-	uint32_t msg_len = strlen(e.errmsg());
+	uint32_t msg_len = strlen(e->errmsg());
 
 	struct iproto_header_bin header = iproto_header_bin;
 	struct iproto_body_bin body = iproto_error_bin;
 
 	uint32_t len = sizeof(header) - 5 + sizeof(body) + msg_len;
 	header.v_len = mp_bswap_u32(len);
-	header.v_code = mp_bswap_u32(tnt_errcode_val(e.errcode()));
+	header.v_code = mp_bswap_u32(tnt_errcode_val(e->errcode()));
 	header.v_sync = mp_bswap_u32(sync);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 
 	obuf_dup(out, &header, sizeof(header));
 	obuf_dup(out, &body, sizeof(body));
-	obuf_dup(out, e.errmsg(), msg_len);
+	obuf_dup(out, e->errmsg(), msg_len);
 }
 
 static inline struct iproto_port *
