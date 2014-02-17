@@ -38,6 +38,8 @@ ffi.metatype('struct tuple', {
     __gc = tuple_gc;
     __len = cfuncs.__len;
     __tostring = function(tuple)
+        -- Unpack tuple, call yaml.encode, remove yaml header and footer
+        -- 5 = '---\n\n' (header), -6 = '\n...\n' (footer)
         return yaml.encode(methods.totable(tuple)):sub(5, -6)
     end;
     __index = function(tuple, key)

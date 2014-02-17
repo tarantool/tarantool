@@ -574,6 +574,7 @@ box_lua_tuple_init(struct lua_State *L)
 	/* export C functions to Lua */
 	luaL_newmetatable(L, tuplelib_name);
 	luaL_register(L, NULL, lbox_tuple_meta);
+	/* save Lua/C functions to the global variable (cleaned by tuple.lua) */
 	lua_setglobal(L, "cfuncs");
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
