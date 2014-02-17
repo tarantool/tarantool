@@ -16,3 +16,6 @@
 [submodule "connector/c/tb"]
 	path = connector/c/tb
 	url = https://github.com/tarantool/tarantool-c
+[submodule "third_party/sophia"]
+	path = third_party/sophia
+	url = git://github.com/pmwkaa/sophia.git

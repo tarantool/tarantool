@@ -1,0 +1,48 @@
+1..47
+ok 1 - tempdir is created
+ok 2 - common open
+ok 3 - Hello world is written (12 bytes)
+ok 4 - current position
+ok 5 - set new position
+ok 6 - current position 0
+ok 7 - Hello world is read (12 bytes)
+ok 8 - data
+ok 9 - set new position
+ok 10 - Hello world is read (12 bytes)
+ok 11 - data
+ok 12 - set new position
+ok 13 - set new position
+ok 14 - data is read
+ok 15 - data is read
+ok 16 - fclose
+ok 17 - reopened file
+ok 18 - move pos at finish
+ok 19 - file size
+ok 20 - fclose
+ok 21 - common open: O_EXCL
+ok 22 - common open
+ok 23 - Hello world is written (12 bytes)
+ok 24 - move pos
+ok 25 - Hello world is written (12 bytes)
+ok 26 - move pos
+ok 27 - read 11 bytes
+ok 28 - content was read
+ok 29 - fclose
+ok 30 - open big file
+ok 31 - Hello world is written (13 bytes)
+ok 32 - all bytes were written
+ok 33 - fclose
+ok 34 - reopen file for reading
+ok 35 - all records were written properly
+ok 36 - eof
+ok 37 - feof
+ok 38 - fclose
+ok 39 - open big file
+ok 40 - Hello world is written (13 bytes)
+ok 41 - all bytes were written
+ok 42 - fclose
+ok 43 - reopen file for reading
+ok 44 - all records were written properly
+ok 45 - eof
+ok 46 - feof
+ok 47 - fclose

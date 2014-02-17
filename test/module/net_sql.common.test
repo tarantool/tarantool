@@ -1,5 +1,5 @@
 server.stop()
-server.deploy(init_lua="box/net_sql.common.lua")
+server.deploy(init_lua="module/net_sql.common.lua")
 
 admin("type(box.net.sql)")
 admin("c = box.net.sql.connect('abcd')")

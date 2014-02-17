@@ -8,7 +8,7 @@ os.makedirs(module_path)
 shutil.copy("../src/module/pg/pg.so", module_path_so)
 
 server.stop()
-server.deploy(init_lua="box/net_sql.pg.lua")
+server.deploy(init_lua="module/net_sql.pg.lua")
 
 exec admin "lua c = box.net.sql.connect('abcd')"
 exec admin "lua c = box.net.sql.connect('pg')"
