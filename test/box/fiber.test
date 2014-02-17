@@ -100,3 +100,10 @@ for i in xrange(1, 10):
     exec admin "lua while #result < 300 do box.fiber.sleep(0.01) end"
 exec admin "lua #result"
 
+exec admin "lua function testfun() while true do box.fiber.sleep(10) end end"
+exec admin "lua f = box.fiber.wrap(testfun)"
+exec admin "lua f:cancel()"
+exec admin "lua f:resume()"
+exec admin "lua fib_id = box.fiber.wrap(testfun):id()"
+exec admin "lua box.fiber.find(fib_id):cancel()"
+exec admin "lua box.fiber.find(fib_id)"
