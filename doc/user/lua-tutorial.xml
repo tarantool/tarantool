@@ -584,7 +584,7 @@ Anyone who knows that the database is in perfect shape can skip this kind of thi
 </para>
 
 <para>
-And the function is complete. Time to test it.
+And the function is complete. It's time to test it.
 Starting with an empty database, defined the same way as the
 sandbox database that was introduced in
 <olink
@@ -607,8 +607,8 @@ Therefore the real sum of the Quantity field in the JSON strings should be:
 <para>
 Invoke the function with either <code>CALL sum_json_field("Quantity")</code> or
 <code>lua sum_json_field("Quantity")</code>.
-<programlisting language="lua">
 <prompt>localhost&gt;</prompt> <userinput>lua sum_json_field("Quantity")</userinput>
+<programlisting>
 ---
  - 22
 ...
@@ -617,7 +617,7 @@ Invoke the function with either <code>CALL sum_json_field("Quantity")</code> or
 
 <para>
 It works. We'll just leave, as exercises for future improvement, the possibility
-that some "hard coding" assumptions could be removed, that there might have to be
+that the "hard coding" assumptions could be removed, that there might have to be
 an overflow check if some field values are huge, and that the function should
 contain a "yield" instruction if the count of tuples is huge.
 </para>
@@ -630,3 +630,4 @@ contain a "yield" instruction if the count of tuples is huge.
 vim: tw=66 syntax=docbk
 vim: spell spelllang=en_us
 -->
+

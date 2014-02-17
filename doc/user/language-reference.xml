@@ -22,7 +22,7 @@
     <listitem><para>
       Read/write data port, to handle INSERTs, UPDATEs,
       DELETEs, SELECTs and CALLs. This port speaks the
-      <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full data access.
+      <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full data access.
       </para>
       <para>
       The default value of the port is <literal>33013</literal>,
@@ -117,9 +117,9 @@
     A complete description of both, the binary protocol and
     the supported SQL, is maintained in annotated Backus-Naur
     form in the source tree: please see
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
     and
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
   </para>
   <section xml:id="memcached-protocol">
     <title>Memcached protocol</title>

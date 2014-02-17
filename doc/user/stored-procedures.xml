@@ -353,7 +353,7 @@ localhost> <userinput>lua type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</use
                <para>
                Parameters: <code>request-code</code> &mdash; (type = number), any
                     Tarantool command code, except 22 (CALL). See
-                    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">
+                    <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt">
                     <filename>doc/box-protocol.txt</filename></link>.
                     <code>request-string</code> &mdash; command
                     arguments packed in binary format.
@@ -1109,7 +1109,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 client as <constant>ER_PROC_LUA</constant>. This function
                 makes it possible to emulate any kind of native exception,
                 such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h"><filename>errcode.h</filename></link>
+                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/include/errcode.h"><filename>errcode.h</filename></link>
                 in the source tree.
                 Lua constants which correspond to Tarantool errors
                 are defined in the <code>box.error</code> module. The error
@@ -1714,7 +1714,7 @@ localhost&gt; <userinput>lua box.cjson.decode('{"hello": "world"}').hello</useri
       functions. For example, instead of <code>box.insert(0, ...)</code>
       one can write <code>box.space[0]:insert(...)</code>.
       Package source code is available in file <filename
-      xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/box.lua">src/box/lua/box.lua</filename>.
+      xlink:href="https://github.com/tarantool/tarantool/blob/stable/src/box/lua/box.lua">src/box/lua/box.lua</filename>.
     </para>
     <para>
        A list of all <code>space</code> members follows.

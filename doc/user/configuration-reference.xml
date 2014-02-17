@@ -205,15 +205,15 @@ Tarantool 1.4.0-69-g45551dd
     Tarantool maintains a set of all allowed configuration
     parameters in two template files, which are easy to maintain
     and extend:
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
+    <filename xlink:href="https://github.com/tarantool/tarantool/blob/stable/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
+    <filename xlink:href="https://github.com/tarantool/tarantool/blob/stable/src/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
     These files can always be used as a reference for any
     parameter in this manual.
   </para>
 
   <para>In addition, two working examples can be found in the source tree:
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/test/big/tarantool.cfg">test/big/tarantool.cfg</filename>.
+    <filename xlink:href="https://github.com/tarantool/tarantool/blob/stable/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
+    <filename xlink:href="https://github.com/tarantool/tarantool/blob/stable/test/big/tarantool.cfg">test/big/tarantool.cfg</filename>.
   </para>
 
   <table frame='all' pgwide='1'>
@@ -324,17 +324,6 @@ Tarantool 1.4.0-69-g45551dd
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.</entry>
-        </row>
-
-        <row>
-          <entry xml:id="secondary_port"
-            xreflabel="secondary_port">secondary_port</entry>
-          <entry>integer</entry>
-          <entry>none</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>Additional, read-only port. Normally set to
-          33014. Not used unless is set.</entry>
         </row>
 
         <row>
@@ -449,22 +438,6 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           stored in. A lower value  may result in less wasted
           memory depending on the total amount of memory available
           and the distribution of item sizes.</entry>
-        </row>
-
-        <row>
-          <entry>space</entry>
-          <entry>array of objects</entry>
-          <entry>none</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry><emphasis role="strong">no</emphasis></entry>
-          <entry>This is the main Tarantool parameter, describing
-          the data structure that users get access to via the
-          client/server protocol. It holds an array of
-          entries, and each entry describes a tuple set
-          and its indexes. Every entry is a composite object,
-          best seen as a C programming language "struct"
-          <footnote><xi:include href="space.xml"/></footnote>.
-          </entry>
         </row>
 
       </tbody>

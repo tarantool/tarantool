@@ -422,9 +422,9 @@ a newline (line feed).
 
 <para>
 For a condensed Backus-Naur Form [BNF] description of some of the statements, see
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
     and
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link>.
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/sql.txt"><filename>doc/sql.txt</filename></link>.
 </para>
 
 <para>
