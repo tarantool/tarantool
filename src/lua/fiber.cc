@@ -772,6 +772,8 @@ lbox_fiber_testcancel(struct lua_State *L)
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
+	{"cancel", lbox_fiber_cancel},
+	{"resume", lbox_fiber_resume},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };
