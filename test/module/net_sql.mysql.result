@@ -1,10 +1,10 @@
 lua c = box.net.sql.connect('abcd')
 ---
-error: '[string "-- sql.lua (internal file)..."]:29: Unknown driver ''abcd'''
+error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
 ...
 lua c = box.net.sql.connect('mysql')
 ---
-error: '[string "-- sql.lua (internal file)..."]:64: Usage: box.net.sql.connect(''mysql'', host, port, user, password, db, ...)'
+error: '../../src/module/sql/sql.lua:64: Usage: box.net.sql.connect(''mysql'', host, port, user, password, db, ...)'
 ...
 lua dump = function(v) return box.cjson.encode(v) end
 ---
@@ -33,7 +33,7 @@ port: string
 ...
 lua c:execute('SEL ECT 1')
 ---
-error: '[string "-- sql.lua (internal file)..."]:105: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''SEL ECT 1'' at line 1'
+error: '../../src/module/sql/sql.lua:105: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''SEL ECT 1'' at line 1'
 ...
 lua dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
 ---
