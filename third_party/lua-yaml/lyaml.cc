@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
@@ -42,6 +43,7 @@
 
 #include "yaml.h"
 #include "b64.h"
+} /* extern "C" */
 #include "lua/utils.h"
 
 /* configurable flags */
@@ -555,23 +557,31 @@ dump_node(struct lua_yaml_dumper *dumper)
 	luaL_tofield(dumper->L, top, &field);
 
 	/* Unknown type on the stack, try to call 'totable' from metadata */
-	if (field.type == MP_EXT && lua_type(dumper->L, top) == LUA_TUSERDATA &&
-			lua_getmetatable(dumper->L, top)) {
-		/* has metatable, try to call 'totable' and use return value */
-		lua_pushliteral(dumper->L, "totable");
-		lua_rawget(dumper->L, -2);
-		if (lua_isfunction(dumper->L, -1)) {
-			lua_pushvalue(dumper->L, -3); /* copy object itself */
-			lua_call(dumper->L, 1, 1);
-			lua_replace(dumper->L, -3);
-			luaL_tofield(dumper->L, -1, &field);
-		} else {
-			lua_pop(dumper->L, 1); /* pop result */
+	int type = lua_type(dumper->L, top);
+	if (field.type == MP_EXT &&
+	    (type == LUA_TUSERDATA || type == LUA_TCDATA)) {
+		/* try to call 'totable' method on udata/cdata */
+		try {
+			/*
+			 * LuaJIT specific: lua_getfield raises exception on
+			 * cdata objects if field doesn't exist.
+			 */
+			lua_getfield(dumper->L, top, "totable");
+			if (lua_isfunction(dumper->L, -1)) {
+				/* copy object itself */
+				lua_pushvalue(dumper->L, top);
+				lua_call(dumper->L, 1, 1);
+				if (lua_istable(dumper->L, -1)) {
+					/* replace obj with the unpacked table*/
+					lua_replace(dumper->L, top);
+					luaL_tofield(dumper->L, -1, &field);
+				}
+			}
+		} catch (...) {
+			/* ignore lua_getfield exceptions */
 		}
-		lua_pop(dumper->L, 1);  /* pop metatable */
+		lua_settop(dumper->L, top); /* remove temporary objects */
 	}
-
-	luaL_tofield(dumper->L, top, &field);
 
 	/* Still have unknown type on the stack,
 	 * try to call 'tostring' */
@@ -846,7 +856,7 @@ static int l_null(lua_State *L) {
    return 1;
 }
 
-LUALIB_API int luaopen_yaml(lua_State *L) {
+extern "C" int luaopen_yaml(lua_State *L) {
    const luaL_reg yamllib[] = {
       { "decode", l_load },
       { "encode", l_dump },
@@ -859,6 +869,6 @@ LUALIB_API int luaopen_yaml(lua_State *L) {
    return 1;
 }
 
-LUALIB_API int yamlL_encode(lua_State *L) {
+extern "C" int yamlL_encode(lua_State *L) {
 	return l_dump(L);
 }
