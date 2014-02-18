@@ -571,6 +571,13 @@ tarantool_free(void)
 		fclose(cfg_out);
 		free(cfg_log);
 	}
+
+	/* A hack for cc/ld, see ffisyms.c */
+	if (time(NULL) == 0) {
+		/* never executed */
+		extern void *ffi_symbols[];
+		write(0, ffi_symbols, 0);
+	}
 }
 
 int

@@ -2,6 +2,9 @@
 -- Parameters parsing
 --------------------------------------------------------------------------------
 
+ffi = require('ffi')
+msgpackffi = require('msgpackffi')
+
 msgpack.encode()
 msgpack.decode()
 
@@ -15,6 +18,10 @@ function deepcompare(a, b)
         return a == b
     end
 
+    if ffi.istype('bool', a) then a = (a == 1) end
+    if ffi.istype('bool', b) then b = (b == 1) end
+
+    if a == nil and b == nil then return true end
     if type(a) ~= type(b) then return false end
 
     if type(a) == "table" then
@@ -32,12 +39,34 @@ function deepcompare(a, b)
 end;
 
 function test(x)
-    local x2 = msgpack.decode(msgpack.encode(x))
-    xstr = type(x) == "table" and "table" or tostring(x)
-    if deepcompare(x2, x) then
-        return string.format("%s ok", xstr)
+    local buf1 = msgpack.encode(x)
+    local buf2 = msgpackffi.encode(x)
+    local x1, offset1 = msgpack.next(buf1)
+    local x2, offset2 = msgpackffi.decode_unchecked(buf2)
+    local xstr
+    if type(x) == "table" then
+        xstr = "table"
+    elseif ffi.istype('float', x) then
+        xstr = string.format('%0.2f (ffi float)', tonumber(x))
+    elseif ffi.istype('double', x) then
+        xstr = string.format('%0.2f (ffi double)', tonumber(x))
+    elseif ffi.istype("bool", x) then
+        xstr = string.format("%s (ffi bool)", x == 1 and "true" or "false")
     else
-        return string.format("%s fail, got %s", xstr, x2)
+        xstr = tostring(x)
+    end
+    if #buf1 ~= #buf2 then
+        return string.format("%s fail, length mismatch", xstr)
+    elseif offset1 ~= #buf1 + 1 then
+        return string.format("%s fail, invalid offset", xstr)
+    elseif offset2 ~= #buf2 + 1 then
+        return string.format("%s fail, invalid offset (ffi)", xstr)
+    elseif not deepcompare(x1, x) then
+        return string.format("%s fail, invalid result %s", xstr, x1)
+    elseif not deepcompare(x2, x) then
+        return string.format("%s fail, invalid result (ffi) %s", xstr, x2)
+    else
+        return string.format("%s ok", xstr)
     end
 end;
 
@@ -118,6 +147,10 @@ test(-3.14159265358979323846)
 
 test(-1e100)
 test(1e100)
+test(ffi.new('float', 123456))
+test(ffi.new('double', 123456))
+test(ffi.new('float', 12.121))
+test(ffi.new('double', 12.121))
 
 --------------------------------------------------------------------------------
 -- Test str, bool, nil encoding / decoding 
@@ -125,9 +158,14 @@ test(1e100)
 
 test(nil)
 
+test(ffi.cast('void *', 0))
+
 test(false)
 
 test(true)
+
+test(ffi.new('bool', true))
+test(ffi.new('bool', false))
 
 test("")
 test("abcde")
@@ -143,15 +181,14 @@ test({1, 2, 3})
 
 test({k1 = 'v1', k2 = 'v2', k3 = 'v3'})
 
-test({[0] = 1, 2, 3, 4, 5})
 msgpack.decode(msgpack.encode({[0] = 1, 2, 3, 4, 5}))
 
 -- test sparse / dense arrays
-test({1, 2, 3, 4, 5, [10] = 10 })
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
 
-test({1, 2, 3, 4, 5, [100] = 100 })
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
+
+msgpackffi.decode_unchecked(msgpackffi.encode({1, 2, 3, 4, 5, [100] = 100}))
 
 --------------------------------------------------------------------------------
 -- Test serializer flags
@@ -178,6 +215,7 @@ b[4] = a;
 
 a;
 msgpack.decode(msgpack.encode(a));
+msgpackffi.decode_unchecked(msgpackffi.encode(a));
 
 --# setopt delimiter ''
 -- Test  aliases, loads and dumps
@@ -195,4 +233,13 @@ a
 offset
 a, offset = msgpack.next(dump, offset)
 
-
+-- Test decode with offset
+dump = msgpackffi.encode({1, 2, 3})..msgpackffi.encode({4, 5, 6})
+dump:len()
+a, offset = msgpackffi.decode_unchecked(dump)
+a
+offset
+a, offset = msgpackffi.decode_unchecked(dump, offset)
+a
+offset
+a, offset = msgpackffi.decode_unchecked(dump, offset)
