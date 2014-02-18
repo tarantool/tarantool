@@ -299,3 +299,81 @@ buffer
   - - tfbr2
     - '45'
 ...
+ch = box.ipc.channel(1)
+---
+...
+ch:is_closed()
+---
+- false
+...
+passed = false
+---
+...
+type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+---
+- userdata
+...
+ch:close()
+---
+...
+passed
+---
+- true
+...
+ch:get()
+---
+- null
+...
+ch:get()
+---
+- null
+...
+ch:put(10)
+---
+- false
+...
+ch:is_closed()
+---
+- true
+...
+ch = box.ipc.channel(1)
+---
+...
+ch:put(true)
+---
+- true
+...
+ch:is_closed()
+---
+- false
+...
+passed = false
+---
+...
+type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+---
+- userdata
+...
+ch:close()
+---
+...
+passed
+---
+- true
+...
+ch:get()
+---
+- null
+...
+ch:get()
+---
+- null
+...
+ch:put(10)
+---
+- false
+...
+ch:is_closed()
+---
+- true
+...

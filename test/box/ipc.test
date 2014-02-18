@@ -1,0 +1,62 @@
+# encoding: tarantool
+# 
+import sys
+
+exec admin "lua ch = box.ipc.channel()"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua ch:get(.1)"
+exec admin "lua ch:put()"
+exec admin "lua ch:put('test')"
+exec admin "lua ch:get()"
+exec admin "lua ch:get('wrong timeout')"
+exec admin "lua ch:get(-10)"
+exec admin "lua ch:put(234)"
+exec admin "lua ch:put(345, .5)"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua buffer = {}"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() while true do table.insert(buffer, ch:get()) end end)"
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua for i = 1, 10 do print(i, ' ', ch:put(i, 0.1)) end"
+exec admin "lua ch:has_readers()"
+exec admin "lua ch:has_writers()"
+exec admin "lua box.fiber.cancel(tfbr)"
+
+exec admin "lua ch:has_readers()"
+exec admin "lua ch:has_writers()"
+exec admin "lua ch:put(box.info.pid)"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua ch:get(box.info.pid) == box.info.pid"
+exec admin "lua for i, v in pairs(buffer) do print(v) end"
+
+exec admin "lua ch:is_empty()"
+exec admin "lua ch:broadcast()"
+exec admin "lua ch:broadcast(123)"
+exec admin "lua ch:get()"
+
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua tfbr = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr  - ' .. tostring(v)) end end)"
+exec admin "lua box.fiber.resume(tfbr)"
+exec admin "lua tfbr2 = box.fiber.create(function() box.fiber.detach() while true do local v = ch:get() table.insert(buffer, 'tfbr2 - ' .. tostring(v)) end end)"
+exec admin "lua box.fiber.resume(tfbr2)"
+
+exec admin "lua buffer = {}"
+
+exec admin "lua for i, v in pairs(buffer) do print(v) end"
+exec admin "lua ch:is_full()"
+exec admin "lua ch:is_empty()"
+exec admin "lua ch:put(1)"
+exec admin "lua ch:put(2)"
+exec admin "lua ch:put(3)"
+exec admin "lua ch:put(4)"
+exec admin "lua ch:put(5)"
+exec admin "lua ch:broadcast('broadcast message!')"
+exec admin "lua for i = 35, 45 do print(ch:put(i)) end"
+
+
+exec admin "lua for i, v in pairs(buffer) do print(v) end"
+
+

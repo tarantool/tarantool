@@ -85,3 +85,26 @@ t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
 buffer
+
+ch = box.ipc.channel(1)
+ch:is_closed()
+passed = false
+type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+ch:close()
+passed
+ch:get()
+ch:get()
+ch:put(10)
+ch:is_closed()
+
+ch = box.ipc.channel(1)
+ch:put(true)
+ch:is_closed()
+passed = false
+type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+ch:close()
+passed
+ch:get()
+ch:get()
+ch:put(10)
+ch:is_closed()
