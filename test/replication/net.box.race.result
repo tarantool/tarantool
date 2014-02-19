@@ -1,0 +1,134 @@
+lua 1
+---
+ - 1
+...
+lua sl = {}
+---
+...
+lua res = {}
+---
+...
+lua count = 1000
+---
+...
+lua cf = true
+---
+...
+lua for i = 1, 10 do local s = box.socket.tcp():connect('localhost', port) table.insert(sl, s) end
+---
+...
+lua function pkt(sync) return box.pack('iii', 65280, 0, sync) end
+---
+...
+lua function sync(pkt) local c, bs, sync = box.unpack('iii', pkt) return sync end
+---
+...
+lua for i = 1, 10 do sl[i]:send(pkt(i)) end
+---
+...
+lua for i = 1, 10 do local d = sl[i]:recv(12) res[i] = sync(d) end
+---
+...
+lua #res, unpack(res)
+---
+ - 10
+ - 1
+ - 2
+ - 3
+ - 4
+ - 5
+ - 6
+ - 7
+ - 8
+ - 9
+ - 10
+...
+lua for i = 1, 10 do res[i] = true end
+---
+...
+lua for st = 1, 10 do local i = st box.fiber.wrap(function() for j = i * 1000000, (i + 1) * 1000000 - 1 do box.fiber.sleep(0.01 * math.random()) sl[i]:send(pkt(j)) if not cf then  break end end end) end
+---
+...
+lua for st = 1, 10 do local i = st box.fiber.wrap(function() while cf do count = count - 1 local d = sync(sl[i]:recv(12)) if d >= i * 1000000 and d < (i + 1) * 1000000 then res[i] = true else res[i] = false break end end end) end
+---
+...
+lua for i = 1, 100 do box.fiber.sleep(0.02) if count <= 0 then break end end
+---
+...
+lua count <= 0, #res, unpack(res)
+---
+ - true
+ - 10
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+...
+lua cf = false
+---
+...
+Log file found: True
+...
+
+lua bnb = {}
+---
+...
+lua bnbcount = 10000
+---
+...
+lua bnbres = {}
+---
+...
+lua for i = 1, 10 do bnb[i] = box.net.box.new('127.0.0.1', port) end
+---
+...
+lua for i = 1, 10 do bnbres[i] = bnb[i]:ping() end
+---
+...
+lua #bnbres, unpack(bnbres)
+---
+ - 10
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+...
+lua for st = 1, 10 do local i = st box.fiber.wrap(function() while bnbcount > 0 do bnbcount = bnbcount - 1 local r,e = pcall(function() bnb[i]:timeout(0.0001):ping() end) if r then bnbres[i] = true else bnbres[i] = false print(e) break end end end) end
+---
+...
+lua for i = 1, 100 do box.fiber.sleep(0.02) if bnbcount <= 0 then break end end
+---
+...
+lua bnbcount <= 0, #bnbres, unpack(bnbres)
+---
+ - true
+ - 10
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+...
+PASSED: There are some timed out responses
+...
+
+PASSED: There is no unexpected response
+...
+

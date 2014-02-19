@@ -1,0 +1,85 @@
+# encoding: tarantool
+import os
+import os.path
+import time
+import re
+from lib.tarantool_server import TarantoolServer
+
+
+exec admin "lua 1"
+
+replica = TarantoolServer()
+replica.deploy("replication/cfg/replica.cfg",
+        replica.find_exe(self.args.builddir),
+        os.path.join(self.args.vardir, "replica"))
+replica_admin = replica.admin
+
+
+
+exec admin silent "lua port = %s" % replica.primary_port
+
+
+# socket tests
+exec admin "lua sl = {}"
+exec admin "lua res = {}"
+exec admin "lua count = 1000"
+exec admin "lua cf = true"
+
+exec admin "lua for i = 1, 10 do local s = box.socket.tcp():connect('localhost', port) table.insert(sl, s) end"
+exec admin "lua function pkt(sync) return box.pack('iii', 65280, 0, sync) end"
+exec admin "lua function sync(pkt) local c, bs, sync = box.unpack('iii', pkt) return sync end"
+exec admin "lua for i = 1, 10 do sl[i]:send(pkt(i)) end"
+exec admin "lua for i = 1, 10 do local d = sl[i]:recv(12) res[i] = sync(d) end"
+exec admin "lua #res, unpack(res)"
+exec admin "lua for i = 1, 10 do res[i] = true end"
+
+# pinger
+exec admin "lua for st = 1, 10 do local i = st box.fiber.wrap(function() for j = i * 1000000, (i + 1) * 1000000 - 1 do box.fiber.sleep(0.01 * math.random()) sl[i]:send(pkt(j)) if not cf then  break end end end) end"
+
+# receiver
+exec admin "lua for st = 1, 10 do local i = st box.fiber.wrap(function() while cf do count = count - 1 local d = sync(sl[i]:recv(12)) if d >= i * 1000000 and d < (i + 1) * 1000000 then res[i] = true else res[i] = false break end end end) end"
+
+
+
+exec admin "lua for i = 1, 100 do box.fiber.sleep(0.02) if count <= 0 then break end end"
+exec admin "lua count <= 0, #res, unpack(res)"
+exec admin "lua cf = false"
+
+
+logfile = os.path.join(server.vardir, "tarantool.log")
+print("Log file found: %s\n...\n" % os.path.exists(logfile))
+lf = open(logfile, 'r')
+lf.seek(0, 2)
+
+# box.net.box tests
+exec admin "lua bnb = {}"
+exec admin "lua bnbcount = 10000"
+exec admin "lua bnbres = {}"
+exec admin "lua for i = 1, 10 do bnb[i] = box.net.box.new('127.0.0.1', port) end"
+exec admin "lua for i = 1, 10 do bnbres[i] = bnb[i]:ping() end"
+exec admin "lua #bnbres, unpack(bnbres)"
+exec admin "lua for st = 1, 10 do local i = st box.fiber.wrap(function() while bnbcount > 0 do bnbcount = bnbcount - 1 local r,e = pcall(function() bnb[i]:timeout(0.0001):ping() end) if r then bnbres[i] = true else bnbres[i] = false print(e) break end end end) end"
+
+
+
+exec admin "lua for i = 1, 100 do box.fiber.sleep(0.02) if bnbcount <= 0 then break end end"
+exec admin "lua bnbcount <= 0, #bnbres, unpack(bnbres)"
+
+
+log = lf.read()
+if re.search(r'Timed out', log, re.S) != None:
+    print("PASSED: There are some timed out responses\n...\n")
+else:
+    print("FATAL: There is no timed out response\n...\n")
+
+if not re.search(r'Unexpected response', log, re.S) != None:
+    print("PASSED: There is no unexpected response\n...\n")
+else:
+    print("FATAL: There are some unexpected responses\n...\n")
+
+
+replica.stop()
+replica.cleanup(True)
+
+
+# vim: syntax=python

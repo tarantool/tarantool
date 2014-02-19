@@ -289,6 +289,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return box.unpack('R', body)
                 end
             else
+                if op == 65280 then
+                    return false
+                end
                 errorf('%s: %s', self:title(), res[2])
             end
         end,
@@ -375,7 +378,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         self.processing[sync]:put({true, resp}, 0)
                     else
                         if self.timeouted[ sync ] then
-                            printf("Timeouted response from %s", self:title())
+                            self.timeouted[ sync ] = nil
+                            printf("Timed out response from %s", self:title())
                         else
                             printf("Unexpected response %s from %s",
                                 sync, self:title())

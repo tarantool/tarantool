@@ -82,3 +82,15 @@ exec admin "lua ch:get()"
 exec admin "lua ch:get()"
 exec admin "lua ch:put(10)"
 exec admin "lua ch:is_closed()"
+
+# race conditions
+exec admin "lua chs = {}"
+exec admin "lua count = 0"
+exec admin "lua res = { }"
+exec admin "lua for i = 1, 10 do table.insert(chs, box.ipc.channel()) end"
+exec admin "lua for i = 1, 10 do local no = i box.fiber.wrap(function() box.fiber.self():name('pusher') while true do  chs[no]:put({no}) box.fiber.sleep(0.001 * math.random()) end end) end"
+exec admin "lua for i = 1, 10 do local no = i box.fiber.wrap(function() box.fiber.self():name('receiver') while true do local r = chs[no]:get(math.random() * .001) if r ~= nil and r[1] == no then res[no] = true elseif r ~= nil then break end box.fiber.sleep(0.001 * math.random()) count = count + 1 end res[no] = false end) end"
+
+exec admin "lua for i = 1, 100 do box.fiber.sleep(0.01) if count > 2000 then break end end"
+exec admin "lua #res, unpack(res)"
+
