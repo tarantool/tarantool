@@ -45,7 +45,7 @@ static const char *
 read_tuple(const char **reqpos, const char *reqend)
 {
 	const char *tuple = *reqpos;
-	if (unlikely(!mp_check(reqpos, reqend))) {
+	if (unlikely(mp_check(reqpos, reqend))) {
 		say_error("\n"
 			  "********************************************\n"
 			  "* Found a corrupted tuple in a request!    *\n"
@@ -209,7 +209,7 @@ request_decode(struct request *request, const char *data, uint32_t len)
 	request->data = data;
 	request->len = len;
 
-	if (mp_typeof(*data) != MP_MAP || ! mp_check_map(data, end)) {
+	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet body");
 	}
@@ -222,7 +222,7 @@ error:
 		}
 		unsigned char key = mp_decode_uint(&data);
 		const char *value = data;
-		if (! mp_check(&data, end))
+		if (mp_check(&data, end))
 			goto error;
 		if (iproto_key_type[key] != mp_typeof(*value))
 			goto error;

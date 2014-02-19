@@ -273,3 +273,11 @@ space:drop()
 dofile("fiber.lua")
 -- print run fiber's test
 box_fiber_run_test()
+
+function testfun() while true do box.fiber.sleep(10) end end
+f = box.fiber.wrap(testfun)
+f:cancel()
+f:resume()
+fib_id = box.fiber.wrap(testfun):id()
+box.fiber.find(fib_id):cancel()
+box.fiber.find(fib_id)

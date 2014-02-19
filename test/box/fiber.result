@@ -811,3 +811,26 @@ box_fiber_run_test()
   - 'B: odd  5'
   - 'status: dead'
 ...
+function testfun() while true do box.fiber.sleep(10) end end
+---
+...
+f = box.fiber.wrap(testfun)
+---
+...
+f:cancel()
+---
+...
+f:resume()
+---
+- error: 'fiber.resume(): the fiber is dead'
+...
+fib_id = box.fiber.wrap(testfun):id()
+---
+...
+box.fiber.find(fib_id):cancel()
+---
+...
+box.fiber.find(fib_id)
+---
+- null
+...

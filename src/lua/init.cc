@@ -67,9 +67,9 @@ extern "C" {
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
-extern char uuid_lua[];
-extern char session_lua[];
-static const char *lua_sources[] = { uuid_lua, session_lua, NULL };
+extern char uuid_lua[], session_lua[], msgpackffi_lua[];
+static const char *lua_sources[] = { uuid_lua, session_lua, msgpackffi_lua,
+	NULL };
 
 /*
  * {{{ box Lua library: common functions

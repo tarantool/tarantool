@@ -10,6 +10,7 @@ os.execute("cp ../../src/module/mysql/mysql.so box/net/")
 require("box.net.mysql")
 
 c = box.net.sql.connect('abcd')
+c = box.net.sql.connect('mysql')
 function dump(v) return box.cjson.encode(v) end
 
 connect = {}

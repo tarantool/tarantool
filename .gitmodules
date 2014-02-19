@@ -18,4 +18,4 @@
 	url = https://github.com/tarantool/tarantool-c
 [submodule "third_party/sophia"]
 	path = third_party/sophia
-	url = git://github.com/pmwkaa/sophia.git
+	url = git://github.com/tarantool/sophia.git

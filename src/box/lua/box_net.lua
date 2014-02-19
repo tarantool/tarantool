@@ -282,6 +282,11 @@ box.net.box.new = function(host, port, reconnect_timeout)
         port                = port,
         reconnect_timeout   = reconnect_timeout,
         closed              = false,
+        timedout            = {},
+
+        title   = function(self)
+            return sprintf('%s:%s', tostring(self.host), tostring(self.port))
+        end,
 
         processing = {
             last_sync = 0,
@@ -343,6 +348,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- timeout
             if res == nil then
+                self.timedout[ sync ] = true
                 if op == box.net.box.PING then
                     return false
                 else
@@ -371,7 +377,10 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return totuples(body[box.net.box.DATA])
                 end
             else
-                error(res[2])
+                if op == 65280 then
+                    return false
+                end
+                errorf('%s: %s', self:title(), res[2])
             end
         end,
 
@@ -447,7 +456,13 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     if self.processing[sync] ~= nil then
                         self.processing[sync]:put({true, code, resp:sub(offset)}, 0)
                     else
-                        print("Unexpected response ", sync)
+                        if self.timedout[ sync ] then
+                            self.timedout[ sync ] = nil
+                            printf("Timed out response from %s", self:title())
+                        else
+                            printf("Unexpected response %s from %s",
+                                sync, self:title())
+                        end
                     end
                 end
 
@@ -484,6 +499,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     ch:put({ false, message }, 0)
                 end
             end
+            self.timedout = {}
         end,
 
         close = function(self)

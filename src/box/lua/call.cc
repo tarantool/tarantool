@@ -168,9 +168,7 @@ port_add_lua_multret(struct port *port, struct lua_State *L)
 		 */
 		lua_pushnil(L);
 		int has_keys = lua_next(L, 1);
-		if (has_keys  &&
-		    (lua_istable(L, -1) || lua_isuserdata(L, -1))) {
-
+		if (has_keys  && (lua_istable(L, -1) || lua_istuple(L, -1))) {
 			do {
 				port_add_lua_ret(port, L, lua_gettop(L));
 				lua_pop(L, 1);
@@ -686,7 +684,7 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
 		const char *t = s;
-		if (unlikely(!mp_check(&s, end)))
+		if (unlikely(mp_check(&s, end)))
 			tnt_raise(ClientError, ER_INVALID_MSGPACK);
 		if (unlikely(mp_typeof(*t) != MP_ARRAY))
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
@@ -784,7 +782,7 @@ lbox_unpack(struct lua_State *L)
 		case 'p':
 		{
 			const char *data = s;
-			if (unlikely(!mp_check(&s, end)))
+			if (unlikely(mp_check(&s, end)))
 				tnt_raise(ClientError, ER_INVALID_MSGPACK);
 			luamp_decode(L, &data);
 			assert(data == s);

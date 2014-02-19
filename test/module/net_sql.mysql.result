@@ -27,6 +27,11 @@ c = box.net.sql.connect('abcd')
 ---
 - error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
 ...
+c = box.net.sql.connect('mysql')
+---
+- error: '../../src/module/sql/sql.lua:64: Usage: box.net.sql.connect(''mysql'', host,
+    port, user, password, db, ...)'
+...
 function dump(v) return box.cjson.encode(v) end
 ---
 ...

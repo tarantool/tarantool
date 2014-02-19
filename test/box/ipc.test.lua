@@ -85,3 +85,73 @@ t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
 buffer
+
+ch = box.ipc.channel(1)
+ch:is_closed()
+passed = false
+type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+ch:close()
+passed
+ch:get()
+ch:get()
+ch:put(10)
+ch:is_closed()
+
+ch = box.ipc.channel(1)
+ch:put(true)
+ch:is_closed()
+passed = false
+type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+ch:close()
+passed
+ch:get()
+ch:get()
+ch:put(10)
+ch:is_closed()
+
+
+
+-- race conditions
+chs= {}
+count= 0
+res= { }
+--# setopt delimiter ';'
+for i = 1, 10 do table.insert(chs, box.ipc.channel()) end;
+
+
+for i = 1, 10 do
+    local no = i box.fiber.wrap(
+        function()
+            box.fiber.self():name('pusher')
+            while true do
+                chs[no]:put({no})
+                box.fiber.sleep(0.001 * math.random())
+            end
+        end
+    )
+end;
+
+for i = 1, 10 do
+    local no = i box.fiber.wrap(
+        function()
+            box.fiber.self():name('receiver')
+            while true do
+                local r = chs[no]:get(math.random() * .001)
+                if r ~= nil and r[1] == no then
+                    res[no] = true
+                elseif r ~= nil then
+                    break
+                end
+                box.fiber.sleep(0.001 * math.random())
+                count = count + 1
+            end
+            res[no] = false
+        end
+    )
+end;
+
+for i = 1, 100 do box.fiber.sleep(0.01) if count > 2000 then break end end;
+
+count > 2000, #res, res;
+
+--# setopt delimiter ''
