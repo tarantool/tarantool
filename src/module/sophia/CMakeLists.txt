@@ -5,6 +5,7 @@ string(REPLACE "-static" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REPLACE "-static-libgcc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 add_library(sophia SHARED sophia.cc)
+add_dependencies(sophia libsophia)
 set_target_properties(sophia PROPERTIES PREFIX "")
 target_link_libraries(sophia ${sophia_lib} -rdynamic)
 
