@@ -31,8 +31,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <third_party/qsort_arg.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -99,7 +97,7 @@ typedef struct avltree_node_pointers {
  *   void* avltree_NAME_iterator_reverse_next(avltree_NAME_iterator *i)
  */
 
-#define AVL_DEF(name, realloc)                                                            \
+#define AVL_DEF(name, realloc, qsort_arg)                                                 \
 typedef struct avl_##name {                                                               \
     void                    *members;                                                     \
     avltree_node_pointers    *lrpointers;                                                 \

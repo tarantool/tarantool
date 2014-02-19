@@ -33,15 +33,25 @@
 
 #include <avl_tree.h>
 
+#ifdef HAVE_OPENMP
+/* Using parallel openmp sort */
+#include <third_party/qsort_arg_mt.h>
+#define QSORT_ARG_FUNC qsort_arg_mt
+#else
+/* Using usual sort */
+#include <third_party/qsort_arg.h>
+#define QSORT_ARG_FUNC qsort_arg
+#endif
+
 /**
  * Instantiate sptree definitions
  */
 #ifdef NDEBUG
-AVL_DEF(index, realloc);
+AVL_DEF(index, realloc, QSORT_ARG_FUNC);
 #else
 void *
 realloc_avl_inject(void *ptr, size_t size);
-AVL_DEF(index, realloc_avl_inject);
+AVL_DEF(index, realloc_avl_inject, QSORT_ARG_FUNC);
 #endif
 
 class AvlTreeIndex: public Index {

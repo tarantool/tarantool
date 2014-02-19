@@ -6,13 +6,14 @@
 #include "unit.h"
 #include "avl_tree.h"
 #include "../third_party/sptree.h"
+#include "../third_party/qsort_arg.h"
 
 #ifndef MAX
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #endif //#ifndef MAX
 
 SPTREE_DEF(test, realloc);
-AVL_DEF(test, realloc);
+AVL_DEF(test, realloc, qsort_arg);
 
 static int
 node_comp(const void *p1, const void *p2, void* unused)

@@ -40,6 +40,22 @@ if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
 endif()
 
 #
+# Check for an omp support
+#
+set(CMAKE_REQUIRED_FLAGS "-fopenmp -Werror")
+check_cxx_source_compiles("int main(void) {
+#pragma omp parallel
+    {
+    }
+    return 0;
+}" HAVE_OPENMP)
+set(CMAKE_REQUIRED_FLAGS "")
+
+if (HAVE_OPENMP)
+    add_compile_flags("C;CXX" "-fopenmp")
+endif()
+
+#
 # Perform build type specific configuration.
 #
 if (CMAKE_COMPILER_IS_GNUCC)
