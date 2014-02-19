@@ -684,7 +684,7 @@ box_unpack_response(struct lua_State *L, const char *s, const char *end)
 	/* Unpack and push tuples. */
 	while (tuple_count--) {
 		const char *t = s;
-		if (unlikely(!mp_check(&s, end)))
+		if (unlikely(mp_check(&s, end)))
 			tnt_raise(ClientError, ER_INVALID_MSGPACK);
 		if (unlikely(mp_typeof(*t) != MP_ARRAY))
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
@@ -782,7 +782,7 @@ lbox_unpack(struct lua_State *L)
 		case 'p':
 		{
 			const char *data = s;
-			if (unlikely(!mp_check(&s, end)))
+			if (unlikely(mp_check(&s, end)))
 				tnt_raise(ClientError, ER_INVALID_MSGPACK);
 			luamp_decode(L, &data);
 			assert(data == s);

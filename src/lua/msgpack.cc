@@ -393,7 +393,7 @@ lua_msgpack_decode(lua_State *L)
 	const char *end = data + data_len;
 
 	const char *b = data;
-	if (!mp_check(&b, end) || b != end)
+	if (mp_check(&b, end) || b != end)
 		return luaL_error(L, "msgpack.decode: invalid MsgPack");
 
 	b = data;
@@ -416,7 +416,7 @@ lua_msgpack_next(lua_State *L)
 	const char *end = data + data_len;
 
 	const char *b = data + offset;
-	if (!mp_check(&b, end))
+	if (mp_check(&b, end))
 		return luaL_error(L, "msgpack.decode: invalid MsgPack");
 
 	b = data + offset;
