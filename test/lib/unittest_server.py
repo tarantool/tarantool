@@ -60,3 +60,6 @@ class UnittestServer(Server):
 
         test_suite.tests = [UnitTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test" )))]
         test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), test_suite.tests), [])
+
+    def print_log(self, lines):
+        pass
