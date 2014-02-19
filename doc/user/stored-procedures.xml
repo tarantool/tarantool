@@ -329,8 +329,8 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
      <title>Package <code>box.schema</code></title>
 <variablelist xml:id="box.schema" xreflabel="box.schema">
     <para>
-      The <code>box.schema</code> package has the data-definition
-      functions create(), alter(), drop().
+      The <code>box.schema</code> package has one data-definition
+      function: create_space().
     </para>
 
     <varlistentry>
@@ -968,6 +968,152 @@ localhost> <userinput>tmp</userinput>
 </programlisting>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:on_replace(<replaceable>function-name</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Create a "replace trigger". The <code>function-name</code> will be executed whenever a replace() or insert() happens to <code>space-name</code>.
+            </para>
+            <para>
+              Returns: nil.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+              The following series of requests will create a space, create an index,
+              create a function which increments a counter, create a trigger,
+              do two inserts, drop the space, and display the counter value -- which is 2,
+              because the function is executed once after each insert.
+<programlisting>s = box.schema.create_space('space53')
+s:create_index('primary', {parts = {0, 'NUM'}})
+function replace_trigger() replace_counter = replace_counter + 1 end
+s:on_replace(replace_trigger)
+replace_counter = 0
+t = s:insert{1, 'First replace'}
+t = s:insert{2, 'Second replace'}
+s:drop()
+replace_counter</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._schema</emphasis>
+        </term>
+        <listitem>
+            <para>
+              _schema ia a system tuple set. Its single tuple contains these fields:
+              'version', major-version-number, minor-version-number.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+              The following function will display all fields in all tuples of _schema.
+<programlisting>setopt delimiter='!'
+function example()
+  local ta = {}, i, line
+  for k, v in box.space._schema:pairs() do
+    i = 0
+    line = ''
+    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    table.insert(ta, line)
+  end
+  return ta
+end!
+setopt delimiter=''!</programlisting>
+              Here is what example() returns in a typical installation:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+---
+- - 'version 1 6 '
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._space</emphasis>
+        </term>
+        <listitem>
+            <para>
+              _space ia a system tuple set. Its tuples contain these fields:
+              space-n, space-arity, space-name.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+              The following function will display all fields in all tuples of _space.
+<programlisting>setopt delimiter='!'
+function example()
+  local ta = {}, i, line
+  for k, v in box.space._space:pairs() do
+    i = 0
+    line = ''
+    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    table.insert(ta, line)
+  end
+  return ta
+end!
+setopt delimiter=''!</programlisting>
+              Here is what example() returns in a typical installation:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+---
+- - '272 0 _schema '
+  - '280 0 _space '
+  - '288 0 _index '
+  - '512 0 a  '
+  - '513 3 c  '
+  - '514 0 d  '
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._index</emphasis>
+        </term>
+        <listitem>
+            <para>
+              _index ia a system tuple set. Its tuples contain these fields:
+              index-id index-number index-name index-type index-is-unique index-field-count
+              [tuple-field-no, tuple-field-type ...].
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+              The following function will display all fields in all tuples of _index.
+<programlisting>setopt delimiter='!'
+function example()
+  local ta = {}, i, line
+  for k, v in box.space._index:pairs() do
+    i = 0
+    line = ''
+    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    table.insert(ta, line)
+  end
+  return ta
+end!
+setopt delimiter=''!</programlisting>
+              Here is what example() returns in a typical installation:
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+---
+- - '272 0 primary tree 1 1 0 str '
+  - '280 0 primary tree 1 1 0 num '
+  - '288 0 primary tree 1 2 0 num 1 num '
+  - '512 0 womba tree 1 1 0 NUM '
+  - '512 1 #hash HASH 1 1 0 num '
+  - '512 2 #tree TREE 1 1 0 num '
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
 </variablelist>
 
 <bridgehead renderas="sect4">Example showing use of the box.space functions</bridgehead>
@@ -976,7 +1122,7 @@ This function will illustrate how to look at all the spaces,
 and for each display: approximately
 how many tuples it contains, and the first field of its first tuple.
 The function uses Tarantool box.space functions len() and pairs().
-The iteration through the spaces is coded as aa scan of the
+The iteration through the spaces is coded as a scan of the
 _space system tuple set, which contains metadata. The third field in
 _space contains the space name, so the key instruction "space_name = v[2]"
 means "space_name = the space_name field in the tuple of _space
