@@ -175,6 +175,8 @@ class Colorer(object):
                 self.write(i, schema='diff_out')
             elif i.startswith('@'):
                 self.write(i, schema='diff_mark')
+            else:
+                self.write(i)
 
     def flush(self):
         return self.stdout.flush()
