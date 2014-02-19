@@ -312,11 +312,16 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
       </tbody>
       </tgroup>                                   
       </table>
+    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store as a float
+    if the value contains a decimal point. Although Tarantool can store signed
+    numbers, Lua cannot, and therefore an indexed field should not contain signed numbers.
+    </para>  
+    <para>
       A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
       A  few functions may return multiple tuples;
-      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
       A scalar may be converted to a tuple with only one field.
       A Lua table may contain all of a tuple's fields except the "key" (the primary-key fields).
+      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
     </para>
 </section>
 
@@ -417,7 +422,9 @@ localhost> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
         </term>
         <listitem>
             <para>
-              Create an index.
+              Create an index. It is mandatory to create an index for a tuple set before trying to
+              insert tuples into it, or select tuples from it. The first created index, which will
+              be used as the primary-key index, must be unique.
             </para>
             <para>
               Parameters: <code>index-name</code>, which should not be a number and should not contain special characters;

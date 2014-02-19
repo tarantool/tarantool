@@ -41,7 +41,8 @@ A <emphasis>space<alt>the paradigm of tuples and spaces is
 derived from distributed computing</alt></emphasis> -- 'space0' in the example -- is a container.
 </para>
 <para>
-There is always at least one space. There can be many spaces.
+When Tarantool is being used to store data, there is always at least one space.
+There can be many spaces.
 Each space has a unique name specified by the user.
 Each space has a unique numeric identifier which can be specified the user but usually is assigned automatically by Tarantool.
 Spaces always contain one tuple set and one or more indexes.
@@ -97,7 +98,8 @@ and encloses the tuple inside square brackets. For example:
 An index -- 'primary' in the example -- is a group of key values and pointers.
 </para>
 <para>
-There is always at least one index in a space; there can be many.
+In order for a tuple set to be useful, there must always at least one index in a space.
+There can be many.
 As with spaces, the user can and should specify the index name, and
 let Tarantool come up with a unique numeric identifier (the "index id").
 In our example there is one index and its name is <quote>primary</quote>.
@@ -112,13 +114,13 @@ An index may have <emphasis>one of three types</emphasis>:
 HASH which is fastest and uses the least memory but must be unique,
 TREE which allows partial-key searching and ordered results,
 and BITSET which can be good for searches that contain '=' and 'AND' in the WHERE clause.
-The first index -- 'primary' -- is called the <emphasis><quote>primary key</quote> index</emphasis>
+The first index is called the <emphasis><quote>primary key</quote> index</emphasis>
 and it must be unique; all other indexes are called
 <quote>secondary</quote> indexes.
 </para>
 
 <para>
-An index definition should include at least one identifier of a tuple field and its expected type.
+An index definition may include identifiers of tuple fields and their expected types.
 Take our example, which has the request:
 <programlisting>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</programlisting>
 The effect is that, for all tuples in space0, field number 0
