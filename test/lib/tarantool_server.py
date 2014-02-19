@@ -4,17 +4,19 @@ import sys
 import glob
 import time
 import yaml
+import errno
 import shlex
 import daemon
 import random
 import shutil
-import difflib
 import signal
 import socket
+import difflib
 import filecmp
 import traceback
 import subprocess
 import collections
+
 
 try:
     from cStringIO import StringIO
@@ -639,14 +641,19 @@ class TarantoolServer(Server):
         """
 
         self.logfile_pos.seek_from('entering the event loop\n', self.process if not self.gdb else None)
-
         while True:
-            temp = AdminConnection('localhost', self.conf['admin_port'])
-            ans = yaml.load(temp.execute('box.info.status'))[0]
-            if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
-                return True
-            else:
-                raise Exception("Strange output for `box.info.status`: %s" % (ans))
+            try:
+                temp = AdminConnection('localhost', self.conf['admin_port'])
+                ans = yaml.load(temp.execute('box.info.status'))[0]
+                if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
+                    return True
+                else:
+                    raise Exception("Strange output for `box.info.status`: %s" % (ans))
+            except socket.error as e:
+                if e.errno == errno.ECONNREFUSED:
+                    time.sleep(0.1)
+                    continue
+                raise
 
     def wait_until_stopped(self, pid):
         while True:
