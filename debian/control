@@ -12,7 +12,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
