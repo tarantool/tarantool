@@ -99,6 +99,10 @@
  * Defined if this is a big-endian system.
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
+/*
+ * Defined if this platform supports openmp and it is enabled
+ */
+#cmakedefine HAVE_OPENMP 1
 
 /*
  * Set if compiler has __builtin_XXX methods.
