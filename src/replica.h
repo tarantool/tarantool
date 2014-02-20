@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
+#ifndef TARANTOOL_REPLICA_H_INCLUDED
+#define TARANTOOL_REPLICA_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,24 +28,33 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "trivia/util.h"
+#include <netinet/in.h>
+#include "tarantool_ev.h"
 
-/**
- * Pre-fork replication spawner process.
+enum { REMOTE_SOURCE_MAXLEN = 32 };
+
+/** Master connection */
+struct remote {
+	struct sockaddr_in addr;
+	struct fiber *reader;
+	uint64_t cookie;
+	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+	char source[REMOTE_SOURCE_MAXLEN];
+};
+
+/** Connect to a master and request a snapshot.
+ * Raises an exception on error.
  *
- * @return None. Panics and exits on error.
+ * @return A connected socket, ready too receive
+ * data.
  */
+int
+replica_bootstrap(const char *replication_source);
+
 void
-replication_prefork();
+recovery_follow_remote(struct recovery_state *r, const char *addr);
 
-/**
- * Subscribe a replica to updates.
- *
- * @return None. On error, closes the socket.
- */
 void
-subscribe(int fd, int64_t lsn);
+recovery_stop_remote(struct recovery_state *r);
 
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
-
+#endif /* TARANTOOL_REPLICA_H_INCLUDED */

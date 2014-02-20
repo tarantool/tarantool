@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include <netinet/in.h>
 
 #include "trivia/util.h"
 #include "tarantool_ev.h"
@@ -64,17 +63,7 @@ wait_lsn_clear(struct wait_lsn *wait_lsn)
 
 struct wal_writer;
 struct wal_watcher;
-
-enum { REMOTE_SOURCE_MAXLEN = 32 };
-
-/** Master connection */
-struct remote {
-	struct sockaddr_in addr;
-	struct fiber *reader;
-	uint64_t cookie;
-	ev_tstamp recovery_lag, recovery_last_update_tstamp;
-	char source[REMOTE_SOURCE_MAXLEN];
-};
+struct remote;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MAX };
 
@@ -132,22 +121,6 @@ int64_t next_lsn(struct recovery_state *r);
 void set_lsn(struct recovery_state *r, int64_t lsn);
 
 void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
-
-void recovery_follow_remote(struct recovery_state *r, const char *addr);
-void recovery_stop_remote(struct recovery_state *r);
-
-void recovery_follow_remote_1_5(struct recovery_state *r, const char *addr);
-void recovery_stop_remote_1_5(struct recovery_state *r);
-
-/**
- * The replication protocol is request/response. The
- * replica saends a request, and the master responds with
- * appropriate data.
- */
-enum rpl_request_type {
-	RPL_GET_WAL = 0,
-	RPL_GET_SNAPSHOT
-};
 
 struct fio_batch;
 

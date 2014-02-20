@@ -36,7 +36,8 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include <recovery.h>
+#include "replica.h"
+#include "recovery.h"
 #include "tarantool.h"
 #include "box/box.h"
 

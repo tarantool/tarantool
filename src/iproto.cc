@@ -43,10 +43,74 @@
 #include "scoped_guard.h"
 #include "memory.h"
 #include "msgpuck/msgpuck.h"
+#include "replication.h"
+
+class IprotoConnectionShutdown: public Exception
+{
+public:
+	IprotoConnectionShutdown(const char *file, int line)
+		:Exception(file, line) {}
+	virtual void log() const;
+};
+
+void
+IprotoConnectionShutdown::log() const
+{}
+
+/* {{{ iproto_request - declaration */
+
+struct iproto_connection;
+
+typedef void (*iproto_request_f)(struct iproto_request *);
+
+/**
+ * A single request from the client. All requests
+ * from all clients are queued into a single queue
+ * and processed in FIFO order.
+ */
+struct iproto_request
+{
+	struct iproto_connection *connection;
+	struct iobuf *iobuf;
+	struct session *session;
+	iproto_request_f process;
+	/* Request message code and sync. */
+	uint32_t header[2];
+	/* Box request, if this is a DML */
+	struct request request;
+};
+
+struct mempool iproto_request_pool;
+
+static struct iproto_request *
+iproto_request_new(struct iproto_connection *con,
+		   iproto_request_f process);
+
+static void
+iproto_process_connect(struct iproto_request *request);
+
+static void
+iproto_process_disconnect(struct iproto_request *request);
+
+static void
+iproto_process_dml(struct iproto_request *request);
+
+struct IprotoRequestGuard {
+	struct iproto_request *ireq;
+	IprotoRequestGuard(struct iproto_request *ireq_arg):ireq(ireq_arg) {}
+	~IprotoRequestGuard()
+	{ if (ireq) mempool_free(&iproto_request_pool, ireq); }
+	struct iproto_request *release()
+	{ struct iproto_request *tmp = ireq; ireq = NULL; return tmp; }
+};
+
+/* }}} */
 
 /* {{{ iproto_queue */
 
 struct iproto_request;
+
+enum { IPROTO_REQUEST_QUEUE_SIZE = 2048, };
 
 /**
  * Implementation of an input queue of the box request processor.
@@ -57,21 +121,12 @@ struct iproto_request;
  * requests in the queue. It leases a fiber from a pool
  * and runs the request in the fiber.
  *
- * @sa iproto_queue_schedule, iproto_handler, iproto_handshake
+ * @sa iproto_queue_schedule
  */
-
 struct iproto_queue
 {
-	/**
-	 * Ring buffer of fixed size, preallocated
-	 * during initialization.
-	 */
-	struct iproto_request *queue;
-	/**
-	 * Main function of the fiber invoked to handle
-	 * all outstanding tasks in this queue.
-	 */
-	void (*handler)(va_list);
+	/** Ring buffer of fixed size */
+	struct iproto_request *queue[IPROTO_REQUEST_QUEUE_SIZE];
 	/**
 	 * Cache of fibers which work on requests
 	 * in this queue.
@@ -88,33 +143,11 @@ struct iproto_queue
 	int size;
 };
 
-enum {
-	IPROTO_REQUEST_QUEUE_SIZE = 2048,
-};
-
-struct iproto_connection;
-
-typedef void (*iproto_request_f)(struct iproto_request *);
-
-/**
- * A single request from the client. All requests
- * from all clients are queued into a single queue
- * and processed in FIFO order.
- */
-struct iproto_request
+static inline bool
+iproto_queue_is_empty(struct iproto_queue *i_queue)
 {
-	struct iproto_connection *connection;
-	struct iobuf *iobuf;
-	iproto_request_f process;
-	/* Request message code. */
-	uint32_t code;
-	/* Request sync. */
-	uint32_t sync;
-	/* Position of request body in the input buffer. */
-	const char *body;
-	/* Length of the body */
-	uint32_t len;
-};
+	return i_queue->begin == i_queue->end;
+}
 
 /**
  * A single global queue for all requests in all connections. All
@@ -123,38 +156,15 @@ struct iproto_request
  * execute disconnect triggers. A few notes about these triggers:
  * - they need to be run in a fiber
  * - unlike an ordinary request failure, on_connect trigger
- *   failure must lead to connection shutdown.
- * - as long as on_connect trigger can be used for client
- *   authentication, it must be processed before any other request
- *   on this connection.
+ *   failure must lead to connection close.
+ * - on_connect trigger must be processed before any other
+ *   request on this connection.
  */
 static struct iproto_queue request_queue;
 
-static inline bool
-iproto_queue_is_empty(struct iproto_queue *i_queue)
-{
-	return i_queue->begin == i_queue->end;
-}
-
-static inline void
-iproto_request_init(struct iproto_request *ireq,
-		    struct iproto_connection *con,
-		    struct iobuf *iobuf,
-		    iproto_request_f process,
-		    uint32_t code, uint32_t sync,
-		    const char *body, uint32_t len)
-{
-	ireq->connection = con;
-	ireq->iobuf = iobuf;
-	ireq->process = process;
-	ireq->code = code;
-	ireq->sync = sync;
-	ireq->body = body;
-	ireq->len = len;
-}
-
-static inline struct iproto_request *
-iproto_enqueue_request(struct iproto_queue *i_queue)
+static void
+iproto_queue_push(struct iproto_queue *i_queue,
+		  struct iproto_request *request)
 {
 	/* If the queue is full, invoke the handler to work it off. */
 	if (i_queue->end == i_queue->size)
@@ -166,29 +176,40 @@ iproto_enqueue_request(struct iproto_queue *i_queue)
 	 */
 	if (iproto_queue_is_empty(i_queue))
 		ev_feed_event(loop(), &request_queue.watcher, EV_CUSTOM);
-	return i_queue->queue + i_queue->end++;
+	i_queue->queue[i_queue->end++] = request;
 }
 
-static inline bool
-iproto_dequeue_request(struct iproto_queue *i_queue,
-		       struct iproto_request *out)
+static struct iproto_request *
+iproto_queue_pop(struct iproto_queue *i_queue)
 {
 	if (i_queue->begin == i_queue->end)
-		return false;
-	struct iproto_request *request = i_queue->queue + i_queue->begin++;
+		return NULL;
+	struct iproto_request *request = i_queue->queue[i_queue->begin++];
 	if (i_queue->begin == i_queue->end)
 		i_queue->begin = i_queue->end = 0;
-	*out = *request;
-	return true;
+	return request;
 }
 
-/** Put the current fiber into a queue fiber cache. */
-static inline void
-iproto_cache_fiber(struct iproto_queue *i_queue)
+/**
+ * Main function of the fiber invoked to handle all outstanding
+ * tasks in a queue.
+ */
+static void
+iproto_queue_handler(va_list ap)
 {
+	struct iproto_queue *i_queue = va_arg(ap, struct iproto_queue *);
+	struct iproto_request *request;
+restart:
+	while ((request = iproto_queue_pop(i_queue))) {
+		IprotoRequestGuard guard(request);
+		fiber_set_session(fiber(), request->session);
+		request->process(request);
+	}
+	/** Put the current fiber into a queue fiber cache. */
 	fiber_gc();
 	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
 	fiber_yield();
+	goto restart;
 }
 
 /** Create fibers to handle all outstanding tasks. */
@@ -204,26 +225,22 @@ iproto_queue_schedule(ev_loop * /* loop */, struct ev_async *watcher,
 			f = rlist_shift_entry(&i_queue->fiber_cache,
 					      struct fiber, state);
 		else
-			f = fiber_new("iproto", i_queue->handler);
+			f = fiber_new("iproto", iproto_queue_handler);
 		fiber_call(f, i_queue);
 	}
 }
 
 static inline void
-iproto_queue_init(struct iproto_queue *i_queue,
-		  int size, void (*handler)(va_list))
+iproto_queue_init(struct iproto_queue *i_queue)
 {
-	i_queue->size = size;
+	i_queue->size = IPROTO_REQUEST_QUEUE_SIZE;
 	i_queue->begin = i_queue->end = 0;
-	i_queue->queue = (struct iproto_request *) calloc(size,
-				sizeof (struct iproto_request));
 	/**
 	 * Initialize an ev_async event which would start
 	 * workers for all outstanding tasks.
 	 */
 	ev_async_init(&i_queue->watcher, iproto_queue_schedule);
 	i_queue->watcher.data = i_queue;
-	i_queue->handler = handler;
 	rlist_create(&i_queue->fiber_cache);
 }
 
@@ -260,13 +277,14 @@ struct iproto_connection
 	 * Function of the request processor to handle
 	 * a single request.
 	 */
-	box_process_func *handler;
 	struct ev_io input;
 	struct ev_io output;
 	/** Logical session. */
 	struct session *session;
 	uint64_t cookie;
 	ev_loop *loop;
+	/* Pre-allocated disconnect request. */
+	struct iproto_request *disconnect;
 };
 
 static struct mempool iproto_connection_pool;
@@ -275,7 +293,7 @@ static struct mempool iproto_connection_pool;
  * A connection is idle when the client is gone
  * and there are no outstanding requests in the request queue.
  * An idle connection can be safely garbage collected.
- * Note: a connection only becomes idle after iproto_connection_shutdown(),
+ * Note: a connection only becomes idle after iproto_connection_close(),
  * which closes the fd.  This is why here the check is for
  * evio_is_active() (false if fd is closed), not ev_is_active()
  * (false if event is not started).
@@ -295,24 +313,13 @@ static void
 iproto_connection_on_output(ev_loop * /* loop */, struct ev_io *watcher,
 			    int /* revents */);
 
-static void
-iproto_process_request(struct iproto_request *request);
-
-static void
-iproto_process_connect(struct iproto_request *request);
-
-static void
-iproto_process_disconnect(struct iproto_request *request);
-
 static struct iproto_connection *
-iproto_connection_create(const char *name, int fd, struct sockaddr_in *addr,
-		      box_process_func *param)
+iproto_connection_new(const char *name, int fd, struct sockaddr_in *addr)
 {
 	struct iproto_connection *con = (struct iproto_connection *)
 		mempool_alloc(&iproto_connection_pool);
 	con->input.data = con->output.data = con;
 	con->loop = loop();
-	con->handler = param;
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
 	con->iobuf[0] = iobuf_new(name);
@@ -321,18 +328,22 @@ iproto_connection_create(const char *name, int fd, struct sockaddr_in *addr,
 	con->write_pos = obuf_create_svp(&con->iobuf[0]->out);
 	con->session = NULL;
 	con->cookie = *(uint64_t *) addr;
+	/* It may be very awkward to allocate at close. */
+	con->disconnect = iproto_request_new(con, iproto_process_disconnect);
 	return con;
 }
 
 /** Recycle a connection. Never throws. */
 static inline void
-iproto_connection_destroy(struct iproto_connection *con)
+iproto_connection_delete(struct iproto_connection *con)
 {
 	assert(iproto_connection_is_idle(con));
 	assert(!evio_is_active(&con->output));
 	session_destroy(con->session); /* Never throws. No-op if sid is 0. */
 	iobuf_delete(con->iobuf[0]);
 	iobuf_delete(con->iobuf[1]);
+	if (con->disconnect)
+		mempool_free(&iproto_request_pool, con->disconnect);
 	mempool_free(&iproto_connection_pool, con);
 }
 
@@ -341,7 +352,6 @@ iproto_connection_shutdown(struct iproto_connection *con)
 {
 	ev_io_stop(con->loop, &con->input);
 	ev_io_stop(con->loop, &con->output);
-	close(con->input.fd);
 	con->input.fd = con->output.fd = -1;
 	/*
 	 * Discard unparsed data, to recycle the con
@@ -357,11 +367,18 @@ iproto_connection_shutdown(struct iproto_connection *con)
 	 * twice.
 	 */
 	if (iproto_connection_is_idle(con)) {
-		struct iproto_request *ireq = iproto_enqueue_request(&request_queue);
-		iproto_request_init(ireq, con, con->iobuf[0],
-				    iproto_process_disconnect,
-				    0, 0, 0, 0);
+		struct iproto_request *ireq = con->disconnect;
+		con->disconnect = NULL;
+		iproto_queue_push(&request_queue, ireq);
 	}
+}
+
+static inline void
+iproto_connection_close(struct iproto_connection *con)
+{
+	int fd = con->input.fd;
+	iproto_connection_shutdown(con);
+	close(fd);
 }
 
 static inline void
@@ -449,6 +466,28 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	return newbuf;
 }
 
+
+int64_t
+subscribe_request_decode(const char *begin, const char *end)
+{
+	const char *pos = begin;
+	if (mp_check(&pos, end))
+		goto error;
+	if (mp_typeof(*begin) != MP_MAP)
+		goto error;
+	mp_decode_map(&begin);
+	/* Key */
+	if (mp_typeof(*begin) != MP_UINT)
+		goto error;
+	mp_decode_uint(&begin);
+	/* Value */
+	if (mp_typeof(*begin) != MP_UINT)
+		goto error;
+	return mp_decode_uint(&begin);
+error:
+	tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe request body");
+}
+
 static inline void
 iproto_decode_header(const char **pos, const char *end, uint32_t *keys)
 {
@@ -477,6 +516,29 @@ error:
 	}
 }
 
+static void
+iproto_process_admin(struct iproto_request *ireq,
+		     struct iproto_connection *con,
+		     const char *body, const char *end)
+{
+	switch (ireq->header[IPROTO_CODE]) {
+	case IPROTO_PING:
+		iproto_reply_ping(&ireq->iobuf->out,
+				  ireq->header[IPROTO_SYNC]);
+		break;
+	case IPROTO_SUBSCRIBE:
+		subscribe(con->input.fd,
+			  subscribe_request_decode(body, end));
+		tnt_raise(IprotoConnectionShutdown);
+	default:
+		tnt_raise(IllegalParams, "unknown request type %u",
+			  ireq->header[IPROTO_CODE]);
+	}
+	if (! ev_is_active(&con->output))
+		ev_feed_event(con->loop, &con->output, EV_WRITE);
+}
+
+
 /** Enqueue all requests which were read up. */
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
@@ -496,21 +558,31 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
-		/* Parse request header. */
-		uint32_t header[2] = { 0, 0 };
-		iproto_decode_header(&pos, reqend, header);
-
 		struct iproto_request *ireq =
-			iproto_enqueue_request(&request_queue);
-		iproto_request_init(ireq, con, con->iobuf[0],
-				    iproto_process_request,
-				    header[IPROTO_CODE], header[IPROTO_SYNC],
-				    pos, reqend - pos);
+			iproto_request_new(con, iproto_process_dml);
+		IprotoRequestGuard guard(ireq);
 
-		/* the request is parsed */
+		ireq->header[IPROTO_CODE] = ireq->header[IPROTO_SYNC] = 0;
+		iproto_decode_header(&pos, reqend, ireq->header);
+		/*
+		 * sic: in case of exception con->parse_size
+		 * as well as in->pos must not be advanced, to
+		 * stay in sync.
+		 */
+		if (iproto_request_is_dml(ireq->header[IPROTO_CODE])) {
+			request_create(&ireq->request,
+				       ireq->header[IPROTO_CODE]);
+			request_decode(&ireq->request, pos, reqend - pos);
+			iproto_queue_push(&request_queue, guard.release());
+			/* Request header can be discarded. */
+			in->pos += pos - reqstart;
+	        } else {
+			iproto_process_admin(ireq, con, pos, reqend);
+			/* Entire request can be discarded. */
+			in->pos += reqend - reqstart;
+		}
+		/* Request is parsed */
 		con->parse_size -= reqend - reqstart;
-		/* request length and header can be discarded. */
-		in->pos += pos - reqstart;
 		if (con->parse_size == 0)
 			break;
 	}
@@ -541,7 +613,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			return;
 		}
 		if (nrd == 0) {                 /* EOF */
-			iproto_connection_shutdown(con);
+			iproto_connection_close(con);
 			return;
 		}
 		/* Update the read position and connection state. */
@@ -555,9 +627,11 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		 */
 		if (!ev_is_active(&con->input))
 			ev_feed_event(loop, &con->input, EV_READ);
+	} catch (IprotoConnectionShutdown *e) {
+		iproto_connection_shutdown(con);
 	} catch (Exception *e) {
 		e->log();
-		iproto_connection_shutdown(con);
+		iproto_connection_close(con);
 	}
 }
 
@@ -593,7 +667,7 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 		nwr = sio_writev(fd, iov, iovcnt);
 
 		sio_add_to_iov(iov, svp->iov_len);
-	} catch (Exception *e) {
+	} catch (Exception *) {
 		sio_add_to_iov(iov, svp->iov_len);
 		throw;
 	}
@@ -632,24 +706,8 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 			ev_io_stop(loop, &con->output);
 	} catch (Exception *e) {
 		e->log();
-		iproto_connection_shutdown(con);
+		iproto_connection_close(con);
 	}
-}
-
-/** A handler to process all queued requests. */
-static void
-iproto_queue_handler(va_list ap)
-{
-	struct iproto_queue *i_queue = va_arg(ap, struct iproto_queue *);
-	struct iproto_request request;
-restart:
-	while (iproto_dequeue_request(i_queue, &request)) {
-
-		fiber_set_session(fiber(), request.connection->session);
-		request.process(&request);
-	}
-	iproto_cache_fiber(&request_queue);
-	goto restart;
 }
 
 /* }}} */
@@ -657,13 +715,13 @@ restart:
 /* {{{ iproto_process_* functions */
 
 static void
-iproto_process_request(struct iproto_request *ireq)
+iproto_process_dml(struct iproto_request *ireq)
 {
 	struct iobuf *iobuf = ireq->iobuf;
 	struct iproto_connection *con = ireq->connection;
 
 	auto scope_guard = make_scoped_guard([=]{
-		iobuf->in.pos += ireq->len;
+		iobuf->in.pos += ireq->request.len;
 
 		if (evio_is_active(&con->output)) {
 			if (! ev_is_active(&con->output))
@@ -671,7 +729,7 @@ iproto_process_request(struct iproto_request *ireq)
 					      &con->output,
 					      EV_WRITE);
 		} else if (iproto_connection_is_idle(con)) {
-			iproto_connection_destroy(con);
+			iproto_connection_delete(con);
 		}
 	});
 
@@ -680,22 +738,28 @@ iproto_process_request(struct iproto_request *ireq)
 
 	struct obuf *out = &iobuf->out;
 
-	if (ireq->code == IPROTO_PING)
-		return iproto_reply_ping(out, ireq->sync);
-
-	/* Make request body point to iproto data */
 	struct iproto_port port;
-	iproto_port_init(&port, out, ireq->sync);
+	iproto_port_init(&port, out, ireq->header[IPROTO_SYNC]);
 	try {
-		struct request request;
-		request_create(&request, ireq->code);
-		request_decode(&request, ireq->body, ireq->len);
-		(*con->handler)((struct port *) &port, &request);
+		box_process((struct port *) &port, &ireq->request);
 	} catch (ClientError *e) {
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
-		iproto_reply_error(out, e, ireq->sync);
+		iproto_reply_error(out, e, ireq->header[IPROTO_SYNC]);
 	}
+}
+
+static struct iproto_request *
+iproto_request_new(struct iproto_connection *con,
+		   iproto_request_f process)
+{
+	struct iproto_request *ireq =
+		(struct iproto_request *) mempool_alloc(&iproto_request_pool);
+	ireq->connection = con;
+	ireq->iobuf = con->iobuf[0];
+	ireq->session = con->session;
+	ireq->process = process;
+	return ireq;
 }
 
 /**
@@ -712,18 +776,18 @@ iproto_process_connect(struct iproto_request *request)
 	try {              /* connect. */
 		con->session = session_create(fd, con->cookie);
 	} catch (ClientError *e) {
-		iproto_reply_error(&iobuf->out, e, request->sync);
+		iproto_reply_error(&iobuf->out, e, request->header[IPROTO_SYNC]);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
 		} catch (Exception *e) {
 			e->log();
 		}
-		iproto_connection_shutdown(con);
+		iproto_connection_close(con);
 		return;
 	} catch (Exception *e) {
 		e->log();
 		assert(con->session == NULL);
-		iproto_connection_shutdown(con);
+		iproto_connection_close(con);
 		return;
 	}
 	/*
@@ -740,7 +804,7 @@ static void
 iproto_process_disconnect(struct iproto_request *request)
 {
 	/* Runs the trigger, which may yield. */
-	iproto_connection_destroy(request->connection);
+	iproto_connection_delete(request->connection);
 }
 
 /** }}} */
@@ -749,7 +813,7 @@ iproto_process_disconnect(struct iproto_request *request)
  * Create a connection context and start input.
  */
 static void
-iproto_on_accept(struct evio_service *service, int fd,
+iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr_in *addr)
 {
 	char name[SERVICE_NAME_MAXLEN];
@@ -757,18 +821,18 @@ iproto_on_accept(struct evio_service *service, int fd,
 
 	struct iproto_connection *con;
 
-	box_process_func *process_fun =
-		(box_process_func*) service->on_accept_param;
-	con = iproto_connection_create(name, fd, addr, process_fun);
-	struct iproto_request *ireq = iproto_enqueue_request(&request_queue);
-	iproto_request_init(ireq, con, con->iobuf[0],
-			    iproto_process_connect, 0, 0, 0, 0);
+	con = iproto_connection_new(name, fd, addr);
+	/*
+	 * Ignore request allocation failure - the queue size is
+	 * fixed so there is a limited number of requests in
+	 * use, all stored in just a few blocks of the memory pool.
+	 */
+	struct iproto_request *ireq =
+		iproto_request_new(con, iproto_process_connect);
+	iproto_queue_push(&request_queue, ireq);
 }
 
-/**
- * Initialize read-write and read-only ports
- * with binary protocol handlers.
- */
+/** Initialize a read-write port. */
 void
 iproto_init(const char *bind_ipaddr, int primary_port)
 {
@@ -779,14 +843,16 @@ iproto_init(const char *bind_ipaddr, int primary_port)
 	static struct evio_service primary;
 	evio_service_init(loop(), &primary, "primary",
 			  bind_ipaddr, primary_port,
-			  iproto_on_accept, &box_process);
+			  iproto_on_accept, NULL);
 	evio_service_on_bind(&primary,
 			     box_leave_local_standby_mode, NULL);
 	evio_service_start(&primary);
 
-	iproto_queue_init(&request_queue, IPROTO_REQUEST_QUEUE_SIZE,
-			  iproto_queue_handler);
+	mempool_create(&iproto_request_pool, &cord()->slabc,
+		       sizeof(struct iproto_request));
+	iproto_queue_init(&request_queue);
 	mempool_create(&iproto_connection_pool, &cord()->slabc,
 		       sizeof(struct iproto_connection));
 }
 
+/* vim: set foldmethod=marker */

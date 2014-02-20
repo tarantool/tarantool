@@ -511,7 +511,7 @@ admin("s:close()")
 #
 test="""
 replies = 0
-packet = msgpack.encode({[0] = 0, [1] = 0})
+packet = msgpack.encode({[0] = 64, [1] = 0})
 packet = msgpack.encode(packet:len())..packet
 function bug1160869()
 	local s = box.socket.tcp()
@@ -541,7 +541,7 @@ test="""
 s = nil
 syncno = 0
 reps = 0
-packet = msgpack.encode({[0] = 0, [1] = 0})
+packet = msgpack.encode({[0] = 64, [1] = 0})
 packet = msgpack.encode(packet:len())..packet
 function iostart()
 	if s ~= nil then
@@ -564,7 +564,7 @@ end
 function iotest()
 	iostart()
 	syncno = syncno + 1
-    packet = msgpack.encode({[0] = 0, [1] = syncno})
+    packet = msgpack.encode({[0] = 64, [1] = syncno})
     packet = msgpack.encode(packet:len())..packet
 	return s:send(packet)
 end

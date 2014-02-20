@@ -38,7 +38,7 @@
 #include "errinj.h"
 #include "bootstrap.h"
 
-#include "replication.h"
+#include "replica.h"
 #include "fiber.h"
 
 /*
@@ -316,11 +316,8 @@ init_storage_on_replica(struct log_dir *dir, const char *replication_source)
 	say_info("downloading snapshot from master %s...",
 		 replication_source);
 
-	int master = replica_connect(replication_source);
+	int master = replica_bootstrap(replication_source);
 	FDGuard guard_master(master);
-
-	uint32_t request = RPL_GET_SNAPSHOT;
-	sio_writen(master, &request, sizeof(request));
 
 	struct {
 		uint64_t lsn;
@@ -1232,7 +1229,7 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 
 /* }}} */
 
-/* {{{ SAVE SNAPSHOT and tarantool_box --cat */
+/* {{{ box.snapshot() */
 
 void
 snapshot_write_row(struct log_io *l,

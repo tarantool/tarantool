@@ -18,21 +18,20 @@ print_config()
   snap_io_rate_limit: 0
   log_level: 5
   logger_nonblock: true
-  readahead: 16320
   snap_dir: .
   coredump: false
-  wal_dir: .
-  too_long_threshold: 0.5
-  rows_per_wal: 50
-  wal_mode: fsync_delay
+  primary_port: <number>
   slab_alloc_arena: 0.1
+  wal_dir: .
+  wal_mode: fsync_delay
+  readahead: 16320
   panic_on_snap_error: true
   panic_on_wal_error: false
+  rows_per_wal: 50
   local_hot_standby: false
-  replication_port: 0
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  primary_port: <number>
+  too_long_threshold: 0.5
   wal_dir_rescan_delay: 0.1
 ...
 

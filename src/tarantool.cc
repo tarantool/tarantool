@@ -115,9 +115,9 @@ title(const char *role, const char *fmt, ...)
 		bufptr += snprintf(bufptr, bufend - bufptr, "%s", s);
 	}
 
-	int ports[] = { cfg.primary_port, cfg.admin_port, cfg.replication_port };
+	int ports[] = { cfg.primary_port, cfg.admin_port };
 	int *pptr = ports;
-	const char *names[] = { "pri", "adm", "rpl", NULL };
+	const char *names[] = { "pri", "adm", NULL };
 	const char **nptr = names;
 
 	for (; *nptr; nptr++, pptr++)
@@ -162,9 +162,6 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	}
 
 	if (check_cfg_tarantool_cfg(conf) != 0)
-		return -1;
-
-	if (replication_check_config(conf) != 0)
 		return -1;
 
 	return box_check_config(conf);
@@ -802,7 +799,6 @@ main(int argc, char **argv)
 		int events = ev_activecnt(loop());
 		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
 		admin_init(cfg.bind_ipaddr, cfg.admin_port);
-		replication_init(cfg.bind_ipaddr, cfg.replication_port);
 		session_init();
 		/*
 		 * Load user init script.  The script should have access

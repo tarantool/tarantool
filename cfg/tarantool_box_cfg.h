@@ -29,8 +29,8 @@ typedef struct tarantool_cfg {
 	confetti_bool_t	local_hot_standby;
 
 	/*
-	 * tarantool bind ip address, applies to master
-	 * and replication ports. INADDR_ANY is the default value.
+	 * tarantool bind ip address, applies to primary port.
+	 * INADDR_ANY is the default value.
 	 */
 	char*	bind_ipaddr;
 
@@ -45,9 +45,6 @@ typedef struct tarantool_cfg {
 	 * used for admin's connections
 	 */
 	int32_t	admin_port;
-
-	/* Replication clients should use this port (bind_ipaddr:replication_port). */
-	int32_t	replication_port;
 
 	/* Log verbosity, possible values: SYS_ERROR = 1, ERROR=2, CRIT=3, WARN=4, INFO=5(default), DEBUG=6 */
 	int32_t	log_level;

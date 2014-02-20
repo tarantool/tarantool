@@ -81,14 +81,16 @@ iproto_body_has_key(const char *pos, const char *end)
 extern unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {
-	IPROTO_PING = 0,
 	IPROTO_SELECT = 1,
 	IPROTO_INSERT = 2,
 	IPROTO_REPLACE = 3,
 	IPROTO_UPDATE = 4,
 	IPROTO_DELETE = 5,
 	IPROTO_CALL = 6,
-	IPROTO_REQUEST_MAX
+	IPROTO_DML_REQUEST_MAX = 7,
+	IPROTO_PING = 64,
+	IPROTO_AUTH = 65,
+	IPROTO_SUBSCRIBE = 66
 };
 
 extern const char *iproto_request_type_strs[];
@@ -96,7 +98,7 @@ extern const char *iproto_request_type_strs[];
 static inline const char *
 iproto_request_name(uint32_t type)
 {
-	if (type >= IPROTO_REQUEST_MAX)
+	if (type >= IPROTO_DML_REQUEST_MAX)
 		return "unknown";
 	return iproto_request_type_strs[type];
 }
@@ -105,6 +107,12 @@ static inline bool
 iproto_request_is_select(uint32_t type)
 {
 	return type <= IPROTO_SELECT || type == IPROTO_CALL;
+}
+
+static inline bool
+iproto_request_is_dml(uint32_t type)
+{
+	return type < IPROTO_DML_REQUEST_MAX;
 }
 
 #endif /* TARANTOOL_IPROTO_CONSTANTS_H_INCLUDED */

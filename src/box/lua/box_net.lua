@@ -52,7 +52,6 @@ local function rpc_index(r, name)
     o.path = path
     o.method = name
 
-    printf("path: %s", path)
     setmetatable(o, {
         __index = rpc_index,
         __call  = rpc_call,
@@ -74,7 +73,7 @@ box.net = {
 -- routes requests to a remote.
 --
     box = {
-        PING = 0,
+        PING = 64,
         SELECT = 1,
         INSERT = 2,
         REPLACE = 3,
