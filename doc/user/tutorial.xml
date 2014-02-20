@@ -714,7 +714,7 @@ inserted and selected tuples with the Tarantool client.
     At start, if neither of the ports is bound, and no fibers are started
     by a script, the server exits as soon as the script finishes.
     The server now automatically creates a snapshot file 
-    if it is missing. If it is a replica, it automaticaly 
+    if it is missing. If it is a replica, it automatically 
     connects to the master and downloads the snapshot file
     from it.
   </para>
@@ -729,7 +729,7 @@ inserted and selected tuples with the Tarantool client.
   </para>
   <para>PERFORMANCE ENHANCEMENTS WHICH DO NOT AFFECT SYNTAX OR CONFIGURATION.
     On start, Tarantool uses multithreaded sorting to build tree indexes.
-    There is a new slab allocator for tuples, which is less susceptible to fragmeentation.
+    There is a new slab allocator for tuples, which is less susceptible to fragmentation.
     The new tuple storage with msgpack handles a wide value range in a compact way.
     For the binary protocol, box request ids are renumbered to form a continuous space from 0 to 6.
   </para>

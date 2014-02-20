@@ -1005,7 +1005,7 @@ replace_counter</programlisting>
         </term>
         <listitem>
             <para>
-              _schema ia a system tuple set. Its single tuple contains these fields:
+              _schema is a system tuple set. Its single tuple contains these fields:
               'version', major-version-number, minor-version-number.
             </para>
             <para>
@@ -1040,7 +1040,7 @@ setopt delimiter=''!</programlisting>
         </term>
         <listitem>
             <para>
-              _space ia a system tuple set. Its tuples contain these fields:
+              _space is a system tuple set. Its tuples contain these fields:
               space-n, space-arity, space-name.
             </para>
             <para>
@@ -1080,7 +1080,7 @@ setopt delimiter=''!</programlisting>
         </term>
         <listitem>
             <para>
-              _index ia a system tuple set. Its tuples contain these fields:
+              _index is a system tuple set. Its tuples contain these fields:
               index-id index-number index-name index-type index-is-unique index-field-count
               [tuple-field-no, tuple-field-type ...].
             </para>
@@ -1157,8 +1157,6 @@ setopt delimiter=''!
 ... And here is what happens when one invokes the function:
 <programlisting>
 <prompt>localhost&gt;</prompt> <userinput>example()</userinput>
----
-localhost> example()
 ---
 - - _schema tuple_count =0
   - _space tuple_count =6. first field in first tuple = 272
@@ -1864,7 +1862,7 @@ localhost&gt; <userinput>t:findall(1, 'a')</userinput>
               but one new one is added, then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})
+            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
 localhost&gt; <userinput>t:transform(1,2,'x')</userinput>
@@ -2152,7 +2150,7 @@ localhost&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput
     <varlistentry>
         <term></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; localhost&gt; <userinput>box.space.space0.index.primary</userinput>
+<programlisting>localhost&gt; <userinput>box.space.space0.index.primary</userinput>
 ---
 - unique: true
   idx: ' index 0'
@@ -2371,7 +2369,7 @@ localhost> <userinput>box.space.space17:drop()</userinput>
             </para>
             <para>
               Parameters: <code>key-value</code> = the value which must match the key(s)
-              in the specified index. The type may be a list of field-values, or a tuple containg
+              in the specified index. The type may be a list of field-values, or a tuple containing
               only the field-values.
             </para>
             <para>

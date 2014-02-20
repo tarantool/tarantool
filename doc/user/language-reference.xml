@@ -87,7 +87,7 @@
     it is mandatory to pass the primary-key value.
     For the select() operation, either a primary-key value or a
     secondary-key value (possibly multi-part) may be passed.
-    All the data-manipulation functions operaton whole tuple(s),
+    All the data-manipulation functions operate on whole tuple(s),
     except update() -- for update() one only needs
     to list the fields that are actually changed.
   </para>
@@ -157,11 +157,11 @@
 - 1.6.0-805-g4a7e71d
 - 843301
 ...
-localhost> box.snapshot()
+localhost> <userinput>box.snapshot()</userinput>
 ---
 ok
 ...
-localhost> box.snapshot()
+localhost> <userinput>box.snapshot()</userinput>
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
@@ -169,13 +169,13 @@ fail: can't save snapshot, errno 17 (File exists)
       </para>
       <para>
         Taking a snapshot does not cause the server to start a new
-        write ahead log. Once a snapshot is taken, old WALs can be
+        write-ahead log. Once a snapshot is taken, old WALs can be
         deleted as long as all replicas are up to date. But the
         WAL which was current at the time <emphasis
         role="tntadmin">box.snapshot()</emphasis> started must be
         kept for recovery, since it still contains log records
-        written after the start of <emphasis role="tntadmin">save
-        snapshot</emphasis>.
+        written after the start of <emphasis role="tntadmin">
+        box.snapshot()</emphasis>.
       </para>
       <para>
         An alternative way to save a snapshot is to send the server
@@ -250,7 +250,7 @@ fail: can't save snapshot, errno 17 (File exists)
       <para>
         <emphasis role="strong">recovery_last_update</emphasis> is
         the wall clock time of the last change recorded in the
-        write ahead log. To convert it to human-readable time,
+        write-ahead log. To convert it to human-readable time,
         you can use <command>date -d@<replaceable>1306964594.980</replaceable></command>.
       </para>
       <para>
@@ -277,7 +277,7 @@ fail: can't save snapshot, errno 17 (File exists)
       <listitem><para>
       Show the average number of requests per second, and the
       total number of requests since startup, broken down by
-      request type."
+      request type.
 <programlisting>
 localhost&gt; <userinput>box.stat()</userinput>
 ---

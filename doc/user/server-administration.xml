@@ -336,7 +336,7 @@ a binary log to a file.
 The tarantar utility program will create new snapshots by reading existing
 snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="box.snapshot"/>,
 which creates new snapshots from the database. Since tarantar uses less
-memory than SAVE SNAPSHOT, it is especially appropriate for taking periodic
+memory than box.snapshot(), it is especially appropriate for taking periodic
 snapshots as a background task.
 </para>
 <para>
@@ -406,13 +406,13 @@ archived.
 
 <para>
 To take a snapshot with the tarantool client, one can say
-SAVE SNAPSHOT. SAVE SNAPSHOT will copy every tuple from
+box.snapshot(). box.snapshot() will copy every tuple from
 the in-memory database to the .snap file. However, this
 is not always the ideal method.
 </para>
 
 <para>
-Taking snapshots with tarantar, instead of with SAVE SNAPSHOT,
+Taking snapshots with tarantar, instead of with box.snapshot(),
 can be better because:
 <itemizedlist>
   <listitem><para>tarantar can work even if the tarantool_box server is down
