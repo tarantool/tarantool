@@ -1,3 +1,14 @@
+tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
+
+  * New Debian snapshot
+   + add sophia storage
+   + some fixes in box.net.box
+   + uses O_DIRECT options to create snapshots
+   + update documentation/manpagses
+   + memleak in tarantool client
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 19 Feb 2014 18:37:26 +0400
+
 tarantool (1.5.2.20.g5f5d924-1) unstable; urgency=low
 
   * Rebuild for Debian/unstable (tarantar binary).
