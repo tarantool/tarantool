@@ -41,7 +41,7 @@ doc/user/tarantool_user_guide.txt
 doc/tnt.ent
 doc/www-data/*.html
 doc/www-data/*.ru.html
-doc/www-data.in/download
+doc/www-data.in/_text/download.md
 extra/rpm.spec
 include/tarantool/config.h
 install_manifest.txt
