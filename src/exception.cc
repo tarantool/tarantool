@@ -143,13 +143,6 @@ ClientError::log() const
 	     m_errmsg);
 }
 
-IllegalParams::IllegalParams(const char *file, unsigned line, const char *msg)
-	: LoggedError(file, line, ER_ILLEGAL_PARAMS, msg)
-{
-	/* nothing */
-}
-
-
 ErrorInjection::ErrorInjection(const char *file, unsigned line, const char *msg)
 	: LoggedError(file, line, ER_INJECTION, msg)
 {

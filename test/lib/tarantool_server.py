@@ -237,12 +237,10 @@ class TarantoolServer(Server):
             "name":            "default"}
     generate_ports = [
             'primary_port',
-            'secondary_port',
             'admin_port',
-#            'replication_port',
             ]
     generated_props = [
-#            'replication_source'
+            'replication_source'
             ]
 #----------------------------------PROPERTIES----------------------------------#
     @property
@@ -378,23 +376,6 @@ class TarantoolServer(Server):
             self.sql.reconnect()
 
     @property
-    def _sql_ro(self):
-        if not hasattr(self, 'sql_ro'): self.sql_ro = None
-        return self.sql_ro
-    @_sql_ro.setter
-    def _sql_ro(self, port):
-        try:
-            port = int(port)
-        except ValueError as e:
-            raise ValueError("Bad port number: '%s'" % port)
-        if not hasattr(self, 'sql_ro') or self.sql_ro is None:
-            self.sql_ro = BoxConnection('localhost', port)
-            return
-        if self.sql_ro.port != port:
-            self.sql_ro.port = port
-            self.sql_ro.reconnect()
-
-    @property
     def log_des(self):
         if not hasattr(self, '_log_des'): self._log_des = open(self.logfile, 'a')
         return self._log_des
@@ -521,7 +502,6 @@ class TarantoolServer(Server):
         self.copy_config(config)
         self.port   = self.conf['admin_port']
         self._sql    = self.conf['primary_port']
-        self._sql_ro = self.conf['secondary_port']
         self._admin  = self.conf['admin_port']
 
     def reconfigure(self, config, silent=False, override=['all']):
@@ -544,13 +524,13 @@ class TarantoolServer(Server):
             self.conf['primary_port'] = self.hot_master.sql.port
         if not self.rpl_master is None and 'replication_source' in self.generated_fields:
             self.conf['replication_source'] = \
-                '127.0.0.1:'+str(self.rpl_master.conf['replication_port'])
+                '127.0.0.1:'+str(self.rpl_master.conf['primary_port'])
 
 
         basic = TarantoolConfig(self.cfgfile_source).parse()
         addit = {}
         for key in self.generated_fields:
-            if key in basic and (override_all or key in override):
+            if key in basic and (override_all or key in override) and key in self.conf:
                 addit[key] = str(self.conf[key])
         basic.update(addit)
         TarantoolConfig(self.cfgfile).generate(basic)

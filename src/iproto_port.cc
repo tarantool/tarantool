@@ -71,7 +71,7 @@ iproto_reply_ping(struct obuf *out, uint32_t sync)
 }
 
 void
-iproto_reply_error(struct obuf *out, ClientError *e, uint32_t sync)
+iproto_reply_error(struct obuf *out, const ClientError *e, uint32_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg());
 

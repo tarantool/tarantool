@@ -33,7 +33,6 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->bind_ipaddr = NULL;
 	c->coredump = false;
 	c->admin_port = 0;
-	c->replication_port = 0;
 	c->log_level = 0;
 	c->slab_alloc_arena = 0;
 	c->slab_alloc_minimal = 0;
@@ -69,7 +68,6 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	if (c->bind_ipaddr == NULL) return CNF_NOMEMORY;
 	c->coredump = false;
 	c->admin_port = 0;
-	c->replication_port = 0;
 	c->log_level = 5;
 	c->slab_alloc_arena = 1;
 	c->slab_alloc_minimal = 64;
@@ -121,9 +119,6 @@ static NameAtom _name__coredump[] = {
 };
 static NameAtom _name__admin_port[] = {
 	{ "admin_port", -1, NULL }
-};
-static NameAtom _name__replication_port[] = {
-	{ "replication_port", -1, NULL }
 };
 static NameAtom _name__log_level[] = {
 	{ "log_level", -1, NULL }
@@ -316,20 +311,6 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		if (check_rdonly && c->admin_port != i32)
 			return CNF_RDONLY;
 		c->admin_port = i32;
-	}
-	else if ( cmpNameAtoms( opt->name, _name__replication_port) ) {
-		if (opt->paramType != scalarType )
-			return CNF_WRONGTYPE;
-		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
-		errno = 0;
-		long int i32 = strtol(opt->paramValue.scalarval, NULL, 10);
-		if (i32 == 0 && errno == EINVAL)
-			return CNF_WRONGINT;
-		if ( (i32 == LONG_MIN || i32 == LONG_MAX) && errno == ERANGE)
-			return CNF_WRONGRANGE;
-		if (check_rdonly && c->replication_port != i32)
-			return CNF_RDONLY;
-		c->replication_port = i32;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__log_level) ) {
 		if (opt->paramType != scalarType )
@@ -756,7 +737,6 @@ typedef enum IteratorState {
 	S_name__bind_ipaddr,
 	S_name__coredump,
 	S_name__admin_port,
-	S_name__replication_port,
 	S_name__log_level,
 	S_name__slab_alloc_arena,
 	S_name__slab_alloc_minimal,
@@ -855,17 +835,6 @@ again:
 			}
 			sprintf(*v, "%"PRId32, c->admin_port);
 			snprintf(buf, PRINTBUFLEN-1, "admin_port");
-			i->state = S_name__replication_port;
-			return buf;
-		case S_name__replication_port:
-			*v = malloc(32);
-			if (*v == NULL) {
-				free(i);
-				out_warning(CNF_NOMEMORY, "No memory to output value");
-				return NULL;
-			}
-			sprintf(*v, "%"PRId32, c->replication_port);
-			snprintf(buf, PRINTBUFLEN-1, "replication_port");
 			i->state = S_name__log_level;
 			return buf;
 		case S_name__log_level:
@@ -1145,7 +1114,6 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 		return CNF_NOMEMORY;
 	dst->coredump = src->coredump;
 	dst->admin_port = src->admin_port;
-	dst->replication_port = src->replication_port;
 	dst->log_level = src->log_level;
 	dst->slab_alloc_arena = src->slab_alloc_arena;
 	dst->slab_alloc_minimal = src->slab_alloc_minimal;
@@ -1256,11 +1224,6 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 	}
 	if (c1->admin_port != c2->admin_port) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->admin_port");
-
-		return diff;
-	}
-	if (c1->replication_port != c2->replication_port) {
-		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->replication_port");
 
 		return diff;
 	}

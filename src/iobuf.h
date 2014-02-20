@@ -71,6 +71,7 @@ ibuf_reserve(struct ibuf *ibuf, size_t sz);
 static inline size_t
 ibuf_size(struct ibuf *ibuf)
 {
+	assert(ibuf->end >= ibuf->pos);
 	return ibuf->end - ibuf->pos;
 }
 

@@ -60,11 +60,9 @@ extern "C" {
  * with the spawner using a socketpair(2). Replication relays are
  * created by the spawner and handle one client connection each.
  *
- * The master process binds to replication_port and accepts
+ * The master process binds to the primary port and accepts
  * incoming connections. This is done in the master to be able to
- * correctly handle RELOAD CONFIGURATION, which happens in the
- * master, and, in future, perform authentication of replication
- * clients.
+ * correctly handle authentication of replication clients.
  *
  * Once a client socket is accepted, it is sent to the spawner
  * process, through the master's end of the socket pair.
@@ -79,12 +77,16 @@ extern "C" {
  */
 static int master_to_spawner_socket;
 
-/** Accept a new connection on the replication port: push the accepted socket
- * to the spawner.
+/**
+ * State of a replica. We only need one global instance
+ * since we fork() for every replica.
  */
-static void
-replication_on_accept(struct evio_service *service __attribute__((unused)),
-		      int fd, struct sockaddr_in *addr __attribute__((unused)));
+struct replica {
+	/** Replica connection */
+	int sock;
+	/** Initial lsn. */
+	int64_t lsn;
+} replica;
 
 /** Send a file descriptor to replication relay spawner.
  *
@@ -131,7 +133,7 @@ spawner_sigchld_handler(int signal __attribute__((unused)));
  * @return 0 on success, -1 on error
  */
 static int
-spawner_create_replication_relay(int client_sock);
+spawner_create_replication_relay();
 
 /** Shut down all relays when shutting down the spawner. */
 static void
@@ -139,7 +141,7 @@ spawner_shutdown_children();
 
 /** Initialize replication relay process. */
 static void
-replication_relay_loop(int client_sock);
+replication_relay_loop();
 
 /*
  * ------------------------------------------------------------------------
@@ -147,28 +149,10 @@ replication_relay_loop(int client_sock);
  * ------------------------------------------------------------------------
  */
 
-/** Check replication module configuration. */
-int
-replication_check_config(struct tarantool_cfg *config)
-{
-	if (config->replication_port < 0 ||
-	    config->replication_port >= USHRT_MAX) {
-		say_error("invalid replication port value: %" PRId32,
-			  config->replication_port);
-		return -1;
-	}
-
-	return 0;
-}
-
 /** Pre-fork replication spawner process. */
 void
 replication_prefork()
 {
-	if (cfg.replication_port == 0) {
-		/* replication is not needed, do nothing */
-		return;
-	}
 	int sockpair[2];
 	/*
 	 * Create UNIX sockets to communicate between the main and
@@ -201,51 +185,33 @@ replication_prefork()
 	}
 }
 
-/**
- * Create a fiber which accepts client connections and pushes them
- * to replication spawner.
- */
-
-void
-replication_init(const char *bind_ipaddr, int replication_port)
-{
-	if (replication_port == 0)
-		return;                        /* replication is not in use */
-
-	static struct evio_service replication;
-
-	evio_service_init(loop(), &replication, "replication", bind_ipaddr,
-			  replication_port, replication_on_accept, NULL);
-
-	evio_service_start(&replication);
-}
-
-
 /*-----------------------------------------------------------------------------*/
 /* replication accept/sender fibers                                            */
 /*-----------------------------------------------------------------------------*/
 
-/** Replication acceptor fiber handler. */
-static void
-replication_on_accept(struct evio_service *service,
-		      int fd,
-		      struct sockaddr_in *addr __attribute__((unused)))
-{
-	/*
-	 * Drop the O_NONBLOCK flag, which was possibly
-	 * inherited from the acceptor fd (happens on
-	 * Darwin).
-         */
-	sio_setfl(fd, O_NONBLOCK, 0);
+/** State of subscribe request - master process. */
+struct subscribe_request {
+	struct ev_io io;
+	int fd;
+	int64_t lsn;
+};
 
-	struct ev_io *io = (struct ev_io *) malloc(sizeof(struct ev_io));
-	if (io == NULL) {
+/** Replication acceptor fiber handler. */
+void
+subscribe(int fd, int64_t lsn)
+{
+	struct subscribe_request *request = (struct subscribe_request *)
+		malloc(sizeof(struct subscribe_request));
+	if (request == NULL) {
 		close(fd);
 		return;
 	}
-	io->data = (void *) (intptr_t) fd;
-	ev_io_init(io, replication_send_socket, master_to_spawner_socket, EV_WRITE);
-	ev_io_start(service->loop, io);
+	request->fd = fd;
+	request->io.data = request;
+	request->lsn = lsn;
+	ev_io_init(&request->io, replication_send_socket,
+		   master_to_spawner_socket, EV_WRITE);
+	ev_io_start(loop(), &request->io);
 }
 
 
@@ -253,21 +219,21 @@ replication_on_accept(struct evio_service *service,
 static void
 replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */)
 {
-	int client_sock = (intptr_t) watcher->data;
+	struct subscribe_request *request =
+		(struct subscribe_request *) watcher->data;
 	struct msghdr msg;
-	struct iovec iov[1];
+	struct iovec iov;
 	char control_buf[CMSG_SPACE(sizeof(int))];
 	struct cmsghdr *control_message = NULL;
-	int cmd_code = 0;
 
-	iov[0].iov_base = &cmd_code;
-	iov[0].iov_len = sizeof(cmd_code);
+	iov.iov_base = &request->lsn;
+	iov.iov_len = sizeof(request->lsn);
 
 	memset(&msg, 0, sizeof(msg));
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	msg.msg_iov = iov;
+	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = control_buf;
 	msg.msg_controllen = sizeof(control_buf);
@@ -276,61 +242,18 @@ replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */)
 	control_message->cmsg_len = CMSG_LEN(sizeof(int));
 	control_message->cmsg_level = SOL_SOCKET;
 	control_message->cmsg_type = SCM_RIGHTS;
-	*((int *) CMSG_DATA(control_message)) = client_sock;
+	*((int *) CMSG_DATA(control_message)) = request->fd;
 
 	/* Send the client socket to the spawner. */
 	if (sendmsg(master_to_spawner_socket, &msg, 0) < 0)
 		say_syserror("sendmsg");
 
 	ev_io_stop(loop, watcher);
-	free(watcher);
 	/* Close client socket in the main process. */
-	close(client_sock);
+	close(request->fd);
+	free(request);
 }
 
-
-void
-replication_handshake(int fd, const char *who)
-{
-	uint32_t greeting[3] = { xlog_format, tarantool_version_id(), 0};
-	uint32_t replica_greeting[3] = { 0 };
-	sio_writen(fd, greeting, sizeof(greeting));
-	sio_readn(fd, replica_greeting, sizeof(replica_greeting));
-	if (replica_greeting[0] != greeting[0]) {
-		say_error("unsupported %s xlog format %d",
-			  who, replica_greeting[0]);
-		panic("handshake failed");
-	}
-}
-
-int
-replica_connect(const char *replication_source)
-{
-	char ip_addr[32];
-	int port;
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-
-	int rc = sscanf(replication_source, "%31[^:]:%i",
-			ip_addr, &port);
-
-	assert(rc == 2);
-	(void)rc;
-
-	addr.sin_family = AF_INET;
-	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0)
-		panic_syserror("inet_aton: %s", ip_addr);
-
-	addr.sin_port = htons(port);
-
-	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	FDGuard guard(master);
-	sio_connect(master, &addr, sizeof(addr));
-
-	replication_handshake(master, "master");
-	guard.fd = -1;
-	return master;
-}
 
 /*--------------------------------------------------------------------------*
  * spawner process                                                          *
@@ -396,8 +319,6 @@ spawner_init(int sock)
 	spawner_main_loop();
 }
 
-
-
 static int
 spawner_unpack_cmsg(struct msghdr *msg)
 {
@@ -417,17 +338,15 @@ static void
 spawner_main_loop()
 {
 	struct msghdr msg;
-	struct iovec iov[1];
+	struct iovec iov;
 	char control_buf[CMSG_SPACE(sizeof(int))];
-	int cmd_code = 0;
-	int client_sock;
 
-	iov[0].iov_base = &cmd_code;
-	iov[0].iov_len = sizeof(cmd_code);
+	iov.iov_base = &replica.lsn;
+	iov.iov_len = sizeof(replica.lsn);
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	msg.msg_iov = iov;
+	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = control_buf;
 	msg.msg_controllen = sizeof(control_buf);
@@ -435,8 +354,8 @@ spawner_main_loop()
 	while (!spawner.killed) {
 		int msglen = recvmsg(spawner.sock, &msg, 0);
 		if (msglen > 0) {
-			client_sock = spawner_unpack_cmsg(&msg);
-			spawner_create_replication_relay(client_sock);
+			replica.sock = spawner_unpack_cmsg(&msg);
+			spawner_create_replication_relay();
 		} else if (msglen == 0) { /* orderly master shutdown */
 			say_info("Exiting: master shutdown");
 			break;
@@ -503,7 +422,7 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 
 /** Create replication client handler process. */
 static int
-spawner_create_replication_relay(int client_sock)
+spawner_create_replication_relay()
 {
 	pid_t pid = fork();
 
@@ -516,10 +435,10 @@ spawner_create_replication_relay(int client_sock)
 		ev_loop_fork(loop());
 		ev_run(loop(), EVRUN_NOWAIT);
 		close(spawner.sock);
-		replication_relay_loop(client_sock);
+		replication_relay_loop();
 	} else {
 		spawner.child_count++;
-		close(client_sock);
+		close(replica.sock);
 		say_info("created a replication relay: pid = %d", (int) pid);
 	}
 
@@ -603,10 +522,10 @@ retry:
 static void
 replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__((unused)) revents)
 {
-	int client_sock = (int) (intptr_t) w->data;
+	int replica_sock = (int) (intptr_t) w->data;
 	uint8_t data;
 
-	int rc = recv(client_sock, &data, sizeof(data), 0);
+	int rc = recv(replica_sock, &data, sizeof(data), 0);
 
 	if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
 		say_info("the client has closed its replication socket, exiting");
@@ -621,12 +540,11 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 
 /** Send a single row to the client. */
 static int
-replication_relay_send_row(void *param, const struct log_row *row)
+replication_relay_send_row(void * /* param */, const struct log_row *row)
 {
-	int client_sock = (int) (intptr_t) param;
 	ssize_t bytes, len = log_row_size(row);
 	while (len > 0) {
-		bytes = write(client_sock, row, len);
+		bytes = write(replica.sock, row, len);
 		if (bytes < 0) {
 			if (errno == EPIPE) {
 				/* socket closed on opposite site */
@@ -645,9 +563,9 @@ shutdown_handler:
 }
 
 static void
-replication_relay_send_snapshot(int client_sock)
+replication_relay_send_snapshot()
 {
-	FDGuard guard_replica(client_sock);
+	FDGuard guard_replica(replica.sock);
 	struct log_dir dir = snap_dir;
 	dir.dirname = cfg.snap_dir;
 	int64_t lsn = greatest_lsn(&dir);
@@ -665,18 +583,17 @@ replication_relay_send_snapshot(int client_sock)
 	uint64_t header[2];
 	header[0] = lsn;
 	header[1] = st.st_size;
-	sio_writen(client_sock, header, sizeof(header));
-	sio_sendfile(client_sock, snapshot, NULL, header[1]);
+	sio_writen(replica.sock, header, sizeof(header));
+	sio_sendfile(replica.sock, snapshot, NULL, header[1]);
 
 	exit(EXIT_SUCCESS);
 }
 
 /** The main loop of replication client service process. */
 static void
-replication_relay_loop(int client_sock)
+replication_relay_loop()
 {
 	struct sigaction sa;
-	int64_t lsn;
 
 	/* Set process title and fiber name.
 	 * Even though we use only the main fiber, the logger
@@ -684,7 +601,7 @@ replication_relay_loop(int client_sock)
 	 */
 	struct sockaddr_in peer;
 	socklen_t addrlen = sizeof(peer);
-	getpeername(client_sock, ((struct sockaddr*)&peer), &addrlen);
+	getpeername(replica.sock, ((struct sockaddr*)&peer), &addrlen);
 	title("relay", "%s", sio_strfaddr(&peer));
 	fiber_set_name(fiber(), status);
 
@@ -716,41 +633,33 @@ replication_relay_loop(int client_sock)
 		say_syserror("sigaction");
 	}
 
-	replication_handshake(client_sock, "replica");
-	uint32_t request;
-	sio_readn(client_sock, &request, sizeof(request));
-	if (request == RPL_GET_SNAPSHOT) {
-		replication_relay_send_snapshot(client_sock); /* exits */
-	}
-	if (request != RPL_GET_WAL) {
-		say_error("unknown replica request:  %d", request);
-		exit(EXIT_FAILURE);
-	}
-	sio_readn(client_sock, &lsn, sizeof(lsn));
-
+	if (replica.lsn == 0)
+		replication_relay_send_snapshot(); /* exits */
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
 	 * relay.
 	 */
 	struct ev_io sock_read_ev;
-	sock_read_ev.data = (void *)(intptr_t) client_sock;
-	ev_io_init(&sock_read_ev, replication_relay_recv, client_sock, EV_READ);
+	sock_read_ev.data = (void *)(intptr_t) replica.sock;
+	ev_io_init(&sock_read_ev, replication_relay_recv,
+		   replica.sock, EV_READ);
 	ev_io_start(loop(), &sock_read_ev);
 
 	/* Initialize the recovery process */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      replication_relay_send_row, (void *)(intptr_t) client_sock,
-		      INT32_MAX);
+		      replication_relay_send_row,
+		      NULL, INT32_MAX);
 	/*
 	 * Note that recovery starts with lsn _NEXT_ to
 	 * the confirmed one.
 	 */
-	recovery_state->lsn = recovery_state->confirmed_lsn = lsn - 1;
+	recovery_state->lsn = recovery_state->confirmed_lsn = replica.lsn - 1;
 	recover_existing_wals(recovery_state);
 	/* Found nothing. */
-	if (recovery_state->lsn == lsn - 1)
-		say_error("can't find WAL containing record with lsn: %" PRIi64, lsn);
+	if (recovery_state->lsn == replica.lsn - 1)
+		say_error("can't find WAL containing record with lsn: %" PRIi64,
+			  replica.lsn);
 	recovery_follow_local(recovery_state, 0.1);
 
 	ev_run(loop(), 0);

@@ -84,7 +84,7 @@ iproto_reply_ping(struct obuf *out, uint32_t sync);
 
 /** Send an error packet back. */
 void
-iproto_reply_error(struct obuf *out, ClientError *e,
+iproto_reply_error(struct obuf *out, const ClientError *e,
 		   uint32_t sync);
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

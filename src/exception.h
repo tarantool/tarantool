@@ -136,7 +136,11 @@ public:
 
 class IllegalParams: public LoggedError {
 public:
-	IllegalParams(const char *file, unsigned line, const char *msg);
+	template <typename ... Args>
+	IllegalParams(const char *file, unsigned line, const char *format,
+		      Args ... args)
+		:LoggedError(file, line, ER_ILLEGAL_PARAMS,
+			     format, args...) {}
 };
 
 class ErrorInjection: public LoggedError {

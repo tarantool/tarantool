@@ -374,11 +374,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:507: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:506: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:512: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:511: box.net.box: connection
     was closed'
 ...
 space:drop()

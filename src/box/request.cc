@@ -181,11 +181,8 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 void
 request_check_type(uint32_t type)
 {
-	if (type < IPROTO_SELECT || type >= IPROTO_REQUEST_MAX) {
-		say_error("Unsupported request = %u", (unsigned) type);
-		tnt_raise(IllegalParams, "unsupported command code, "
-			  "check the error log");
-	}
+	if (type < IPROTO_SELECT || type >= IPROTO_DML_REQUEST_MAX)
+		tnt_raise(IllegalParams, "unknown request type %u", type);
 }
 
 void

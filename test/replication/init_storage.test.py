@@ -3,7 +3,7 @@ import glob
 from lib.tarantool_server import TarantoolServer
 
 # master server
-cfgfile_bkp = server.cfgfile_source
+cfgfile_backup = server.cfgfile_source
 master = server
 
 master.admin("space = box.schema.create_space('test', {id =  42})")
@@ -52,6 +52,6 @@ replica.stop()
 replica.cleanup(True)
 
 server.stop()
-server.cfgfile_source = cfgfile_bkp
+server.cfgfile_source = cfgfile_backup
 server.deploy()
 

@@ -39,6 +39,9 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "tarantool.h"
+#include "iproto_constants.h"
+#include "msgpuck/msgpuck.h"
+#include "replica.h"
 
 static void
 remote_apply_row(struct recovery_state *r, const struct log_row *row);
@@ -66,6 +69,53 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
 	return row;
 }
 
+struct iproto_subscribe_request {
+	uint8_t v_len;                         /* length */
+	uint8_t m_header;                       /* MP_MAP */
+	uint8_t k_code;                         /* IPROTO_CODE */
+	uint8_t v_code;                        /* response status */
+	uint8_t m_body;                         /* MP_MAP */
+	uint8_t k_data;                         /* IPROTO_OFFSET */
+	uint8_t m_data;                         /* MP_UINT64 */
+	uint64_t lsn;                           /* lsn */
+} __attribute__((packed));
+
+static const struct iproto_subscribe_request iproto_subscribe_request = {
+	sizeof(struct iproto_subscribe_request) - 1,
+	0x81, IPROTO_CODE, IPROTO_SUBSCRIBE,
+	0x81, IPROTO_OFFSET, 0xcf, 0
+};
+
+int
+replica_bootstrap(const char *replication_source)
+{
+	char ip_addr[32];
+	int port;
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+
+	int rc = sscanf(replication_source, "%31[^:]:%i",
+			ip_addr, &port);
+
+	assert(rc == 2);
+	(void)rc;
+
+	addr.sin_family = AF_INET;
+	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0)
+		panic_syserror("inet_aton: %s", ip_addr);
+
+	addr.sin_port = htons(port);
+
+	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	FDGuard guard(master);
+	sio_connect(master, &addr, sizeof(addr));
+	sio_write(master, &iproto_subscribe_request,
+		  sizeof(iproto_subscribe_request));
+
+	guard.fd = -1;
+	return master;
+}
+
 static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       int64_t initial_lsn, const char **err)
@@ -75,18 +125,9 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
 
-	uint32_t greeting[3] = { xlog_format, tarantool_version_id(), 0 };
-	uint32_t master_greeting[3];
-	coio_write(coio, greeting, sizeof(greeting));
-	coio_readn(coio, master_greeting, sizeof(master_greeting));
-	if (master_greeting[0] != greeting[0])
-		tnt_raise(IllegalParams, "master has unknown log format");
-
-	struct send_request {
-		uint32_t request_type;
-		int64_t initial_lsn;
-	} __attribute__((packed)) send_request = { RPL_GET_WAL, initial_lsn };
-	coio_write(coio, &send_request, sizeof(send_request));
+	struct iproto_subscribe_request request = iproto_subscribe_request;
+	request.lsn = mp_bswap_u64(initial_lsn);
+	coio_write(coio, &request, sizeof(request));
 
 	say_crit("successfully connected to master");
 	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);

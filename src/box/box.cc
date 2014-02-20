@@ -37,6 +37,7 @@ extern "C" {
 
 #include <errcode.h>
 #include <recovery.h>
+#include "replica.h"
 #include <log_io.h>
 #include <pickle.h>
 #include <say.h>
@@ -290,14 +291,14 @@ box_init()
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
 	stat_base = stat_register(iproto_request_type_strs,
-				  IPROTO_REQUEST_MAX);
+				  IPROTO_DML_REQUEST_MAX);
 
 	recover_snap(recovery_state, cfg.replication_source);
 	space_end_recover_snapshot();
 	recover_existing_wals(recovery_state);
 	space_end_recover();
 
-	stat_cleanup(stat_base, IPROTO_REQUEST_MAX);
+	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 	title("orphan", NULL);
 	if (cfg.local_hot_standby) {
 		say_info("starting local hot standby");
