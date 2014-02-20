@@ -1,5 +1,5 @@
 --# create server hot_standby with configuration='replication/cfg/hot_standby.cfg' with hot_master=default
---# create server replica with configuration='replication/cfg/replica.cfg'
+--# create server replica with configuration='replication/cfg/replica.cfg' with rpl_master=default
 --# start server hot_standby
 --# start server replica
 --# setopt delimiter ';'

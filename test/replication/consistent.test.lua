@@ -161,7 +161,9 @@ _print_lsn()
 _print_lsn()
 
 -- Test that a replica replies with master connection URL on update request
+--# push filter '127.0.0.1:.*' to '127.0.0.1:<port>'
 box.space[0]:insert{0, 'replica is RO'}
+--# clear filter
 --# stop server replica
 --# cleanup server replica
 --# set connection default

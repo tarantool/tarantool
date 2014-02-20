@@ -482,10 +482,12 @@ _print_lsn()
 - 63
 ...
 -- Test that a replica replies with master connection URL on update request
+--# push filter '127.0.0.1:.*' to '127.0.0.1:<port>'
 box.space[0]:insert{0, 'replica is RO'}
 ---
-- error: 'Can''t modify data on a replication slave. My master is: 127.0.0.1:33017'
+- error: 'Can''t modify data on a replication slave. My master is: 127.0.0.1:<port>
 ...
+--# clear filter
 --# stop server replica
 --# cleanup server replica
 --# set connection default
