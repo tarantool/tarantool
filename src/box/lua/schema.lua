@@ -215,7 +215,7 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
         end
-        local lst = index:eselect(keify(key), { iterator = 'GE', limit = 1 })
+        local lst = index:eselect(key, { iterator = 'GE', limit = 1 })
         if lst[1] ~= nil then
             return lst[1]
         else
@@ -226,7 +226,7 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
         end
-        local lst = index:eselect(keify(key), { iterator = 'LE', limit = 1 })
+        local lst = index:eselect(key, { iterator = 'LE', limit = 1 })
         if lst[1] ~= nil then
             return lst[1]
         else
@@ -273,9 +273,7 @@ function box.schema.space.bless(space)
             iterator = 'EQ'
         end
 
-        key = keify(key)
-        
-        if #key == 0 then
+        if key == nil or type(key) == "table" and #key == 0 then
             return #index.idx
         end
 
@@ -329,7 +327,7 @@ function box.schema.space.bless(space)
             return result
         end
 
-        for tuple in index:iterator(keify(key), { iterator = iterator }) do
+        for tuple in index:iterator(key, { iterator = iterator }) do
             if grep == nil or grep(tuple) then
                 if skip < offset then
                     skip = skip + 1
@@ -353,7 +351,7 @@ function box.schema.space.bless(space)
             end
         end
         if limit == nil then
-            return unpack(result)
+            return result[1]
         end
         return result
     end
