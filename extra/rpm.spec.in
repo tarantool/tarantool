@@ -2,7 +2,7 @@
 %define _rpmdir @RPM_ROOT@
 
 # Require for libbfd (backtrace support)
-BuildRequires: binutils-devel postgresql-devel mysql-devel
+BuildRequires: binutils-devel
 BuildRoot: @RPM_BUILDROOT@
 
 Name: tarantool
