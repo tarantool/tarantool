@@ -206,7 +206,7 @@ tuple_format(const struct tuple *tuple)
  * @param tuple
  * @return the number of fields in tuple
  */
-static inline uint32_t
+extern "C" inline uint32_t
 tuple_arity(const struct tuple *tuple)
 {
 	const char *data = tuple->data;
@@ -220,7 +220,7 @@ tuple_arity(const struct tuple *tuple)
  * @pre field < tuple->field_count.
  * @returns field data if field exists or NULL
  */
-static inline const char *
+inline const char *
 tuple_field_old(const struct tuple_format *format,
 		const struct tuple *tuple, uint32_t i)
 {
@@ -261,7 +261,7 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-inline const char *
+extern "C" inline const char *
 tuple_field(const struct tuple *tuple, uint32_t i)
 {
 	return tuple_field_old(tuple_format(tuple), tuple, i);

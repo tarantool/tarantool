@@ -112,14 +112,6 @@ lbox_tuple_gc(struct lua_State *L)
 }
 
 static int
-lbox_tuple_len(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	lua_pushnumber(L, tuple_arity(tuple));
-	return 1;
-}
-
-static int
 lbox_tuple_slice(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
@@ -425,37 +417,6 @@ lbox_tuple_totable(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Implementation of tuple __index metamethod.
- *
- * Provides operator [] access to individual fields for integer
- * indexes, as well as searches and invokes metatable methods
- * for strings.
- */
-static int
-lbox_tuple_index(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	/* For integer indexes, implement [] operator */
-	if (lua_isnumber(L, 2)) {
-		int i = luaL_checkint(L, 2);
-		const char *field = tuple_field(tuple, i);
-		if (field == NULL) {
-			const char *data = tuple->data;
-			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-				   tuplelib_name, i, mp_decode_array(&data));
-		}
-		luamp_decode(L, &field);
-		return 1;
-	}
-
-	/* If we got a string, try to find a method for it. */
-	const char *sz = luaL_checkstring(L, 2);
-	lua_getmetatable(L, 1);
-	lua_getfield(L, -1, sz);
-	return 1;
-}
-
 void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
@@ -524,8 +485,6 @@ lbox_tuple_pairs(struct lua_State *L)
 
 static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
-	{"__len", lbox_tuple_len},
-	{"__index", lbox_tuple_index},
 	{"next", lbox_tuple_next},
 	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},

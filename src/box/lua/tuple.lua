@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 local yaml = require('yaml')
+local msgpackffi = require('msgpackffi')
 
 ffi.cdef([[
 struct tuple
@@ -12,6 +13,11 @@ struct tuple
     uint32_t _bsize;
     char data[0];
 } __attribute__((packed));
+
+uint32_t
+tuple_arity(const struct tuple *tuple);
+const char *
+tuple_field(const struct tuple *tuple, uint32_t i);
 ]])
 
 local builtin = ffi.C
@@ -33,10 +39,19 @@ local methods = {
 
 local tuple_gc = cfuncs.__gc;
 
-local tuple_field = cfuncs.__index
+local tuple_field = function(tuple, field_n)
+    local field = builtin.tuple_field(tuple, field_n)
+    if field == nil then
+        return nil
+    end
+    return msgpackffi.decode_unchecked(field)
+end
+
 ffi.metatype('struct tuple', {
     __gc = tuple_gc;
-    __len = cfuncs.__len;
+    __len = function(tuple)
+        return builtin.tuple_arity(tuple)
+    end;
     __tostring = function(tuple)
         -- Unpack tuple, call yaml.encode, remove yaml header and footer
         -- 5 = '---\n\n' (header), -6 = '\n...\n' (footer)
