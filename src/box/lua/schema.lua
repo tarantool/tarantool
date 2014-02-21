@@ -4,7 +4,17 @@ local ffi = require('ffi')
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
+
+    struct iterator {
+        struct tuple *(*next)(struct iterator *);
+        void (*free)(struct iterator *);
+    };
+    struct iterator *
+    boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
+                  const char *key);
 ]]
+local builtin = ffi.C
+local msgpackffi = require('msgpackffi')
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -174,6 +184,25 @@ local function keify(key)
     return {key}
 end
 
+local iterator_mt = {
+    __call = function(iterator)
+        local tuple = iterator.cdata.next(iterator.cdata)
+        if tuple ~= nil then
+            return box.tuple.bless(tuple)
+        else
+            return nil
+        end
+    end;
+    __tostring = function(iterator)
+        return string.format("iterator on space %d index %d",
+            iterator.index.n, iterator.index.id)
+    end;
+}
+
+local iterator_cdata_gc = function(iterator_cdata)
+    return iterator_cdata.free(iterator_cdata)
+end
+
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
@@ -207,25 +236,31 @@ function box.schema.space.bless(space)
     index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
     index_mt.iterator = function(index, key, opts)
-        if opts == nil then
-            opts = {}
-        elseif type(opts) ~= 'table' then
-            error("usage: index:iterator(key[, { option = value, ... })")
-        end
-
-        if type(opts.iterator) == 'string' then
-            if box.index[ opts.iterator ] == nil then
-                error("Wrong iterator type: " .. opts.iterator)
+        local pkey, pkey_end = msgpackffi.encode_tuple(key)
+        -- Use ALL for {} and nil keys and EQ for other keys
+        local itype = pkey + 1 < pkey_end and box.index.EQ or box.index.ALL
+        if opts then
+            if type(opts.iterator) == "number" then
+                itype = opts.iterator
+            elseif box.index[opts.iterator] then
+                itype = box.index[opts.iterator]
+            elseif opts.iterator ~= nil then
+                error("Wrong iterator type: "..tostring(opts.iterator))
             end
-            opts.iterator = box.index[ opts.iterator ]
         end
 
-        return index.idx:iterator(key, opts)
-    end
-    --
-    -- pairs
-    index_mt.pairs = function(index)
-        return index.idx.next, index.idx, nil
+        local keybuf = ffi.string(pkey, pkey_end - pkey)
+        local cdata = builtin.boxffi_index_iterator(index.n, index.id,
+            itype, keybuf);
+        if cdata == nil then
+            box.raise()
+        end
+
+        return setmetatable({
+            cdata = ffi.gc(cdata, iterator_cdata_gc);
+            keybuf = keybuf;
+            index = index;
+        }, iterator_mt)
     end
     -- index subtree size
     index_mt.count = function(index, key, opts)
@@ -382,7 +417,10 @@ function box.schema.space.bless(space)
         table.insert(tuple, 1, max + 1)
         return space:insert(tuple)
     end
-
+    space_mt.iterator = function(space, key)
+        check_index(space, 0)
+        return space.index[0]:iterator(key)
+    end
     space_mt.truncate = function(space)
         check_index(space, 0)
         local pk = space.index[0]
@@ -397,7 +435,6 @@ function box.schema.space.bless(space)
             end
         end
     end
-    space_mt.pairs = function(space) return space.index[0]:pairs() end
     space_mt.drop = function(space)
         return box.schema.space.drop(space.n)
     end

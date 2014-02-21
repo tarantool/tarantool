@@ -255,10 +255,10 @@ local function encode_r(buf, obj, level)
         if fun ~= nil then
             fun(buf, obj)
         else
-            error('unsupported FFI type: '..ffi.typeof(obj))
+            error("can not encode FFI type: '"..ffi.typeof(obj).."'")
         end
     else
-        error("Unsupported Lua type: "..type(obj))
+        error("can not encode Lua type: '"..type(obj).."'")
     end
 end
 
@@ -488,11 +488,13 @@ end
 
 local function encode_tuple(obj)
     tmpbuf:reset()
-    if type(obj) == "table" then
+    if obj == nil then
+        encode_fix(tmpbuf, 0x90, 0)  -- empty array
+    elseif type(obj) == "table" then
         encode_array(tmpbuf, #obj)
         local i
         for i=1,#obj,1 do
-            encode_r(tmpbuf, tuple[i], 1)
+            encode_r(tmpbuf, obj[i], 1)
         end
     else
         encode_fix(tmpbuf, 0x90, 1)  -- array of one element

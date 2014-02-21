@@ -466,7 +466,7 @@ t = {}
 ...
 index:iterator('sid_t', { iterator = 'wrong_iterator_type' })
 ---
-- error: '[string "-- schema.lua (internal file)..."]:218: Wrong iterator type: wrong_iterator_type'
+- error: '[string "-- schema.lua (internal file)..."]:248: Wrong iterator type: wrong_iterator_type'
 ...
 index = nil
 ---
@@ -568,7 +568,8 @@ space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['i1']:count(function() end)
 ---
-- error: 'msgpack.encode: can not encode Lua type ''function'''
+- error: '[string "-- msgpackffi.lua (internal file)..."]:261: can not encode Lua
+    type: ''function'''
 ...
 space:drop()
 ---

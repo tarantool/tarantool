@@ -886,12 +886,13 @@ iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
 -------------------------------------------------------------------------------
 space.index['primary']:iterator({}, {iterator = -666 })
 ---
-- error: 'unknown iterator type: -666'
+- error: Tree index does not support requested iterator type
 ...
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['primary']:iterator(function() end, { iterator = box.index.EQ })
 ---
-- error: 'msgpack.encode: can not encode Lua type ''function'''
+- error: '[string "-- msgpackffi.lua (internal file)..."]:261: can not encode Lua
+    type: ''function'''
 ...
 space:drop()
 ---

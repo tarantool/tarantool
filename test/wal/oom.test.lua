@@ -31,7 +31,7 @@ space.index['primary']:select{15}
 i = 0
 t = {}
 --# setopt delimiter ';'
-for k,v in space:pairs() do
+for v in space:iterator() do
     table.insert(t, v)
     i = i + 1
     if i == 50 then

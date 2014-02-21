@@ -175,7 +175,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end);
  *
  * @pre tuple->refs + count >= 0
  */
-void
+extern "C" void
 tuple_ref(struct tuple *tuple, int count);
 
 void

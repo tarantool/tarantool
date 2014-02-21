@@ -1,6 +1,7 @@
 #include <bit/bit.h>
 #include <lib/msgpuck/msgpuck.h>
 #include <box/tuple.h>
+#include <box/lua/index.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -15,5 +16,7 @@ void *ffi_symbols[] = {
 	(void *) tuple_field,
 	(void *) tuple_rewind,
 	(void *) tuple_seek,
-	(void *) tuple_next
+	(void *) tuple_next,
+	(void *) tuple_ref,
+	(void *) boxffi_index_iterator
 };

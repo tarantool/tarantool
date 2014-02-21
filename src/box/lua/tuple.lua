@@ -14,6 +14,8 @@ struct tuple
     char data[0];
 } __attribute__((packed));
 
+void
+tuple_ref(struct tuple *tuple, int count);
 uint32_t
 tuple_arity(const struct tuple *tuple);
 const char *
@@ -122,8 +124,18 @@ local methods = {
     end
 }
 
-local tuple_gc = cfuncs.__gc;
 local const_struct_tuple_ref_t = ffi.typeof('const struct tuple&')
+
+local tuple_gc = function(tuple)
+    builtin.tuple_ref(tuple, -1)
+end
+
+local tuple_bless = function(tuple)
+    -- update in-place, do not spent time calling tuple_ref
+    tuple._refs = tuple._refs + 1
+    return ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
+end
+
 local tuple_field = function(tuple, field_n)
     local field = builtin.tuple_field(tuple, field_n)
     if field == nil then
@@ -165,5 +177,5 @@ ffi.metatype(tuple_iterator_t, {
 -- Remove the global variable
 cfuncs = nil
 
--- export tuple_gc  */
-box.tuple._gc = tuple_gc;
+-- internal api for box.select and iterators
+box.tuple.bless = tuple_bless

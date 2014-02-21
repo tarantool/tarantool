@@ -28,9 +28,25 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stdint.h>
+
 struct lua_State;
+struct iterator;
 
 void
 box_lua_index_init(struct lua_State *L);
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+struct iterator *
+boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
+		      const char *key);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* INCLUDES_TARANTOOL_BOX_LUA_INDEX_H */
