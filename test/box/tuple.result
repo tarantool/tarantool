@@ -313,28 +313,108 @@ t[nil]
 ---
 - null
 ...
-# test tuple iterators
+--------------------------------------------------------------------------------
+-- test tuple:next
+--------------------------------------------------------------------------------
+t = box.tuple.new({'a', 'b', 'c'})
 ---
+...
+state, val = t:next()
+---
+...
+state, val
+---
+- 1
+- a
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- 2
+- b
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- 3
+- c
+...
+state, val = t:next(state)
+---
+...
+state, val
+---
+- null
+- null
+...
+t:next(nil)
+---
+- 1
+- a
+...
+t:next(0)
+---
+- 1
+- a
+...
+t:next(1)
+---
+- 2
+- b
+...
+t:next(2)
+---
+- 3
+- c
+...
+t:next(3)
+---
+- null
+...
+t:next(4)
+---
+- error: '[string "-- tuple.lua (internal file)..."]:64: error: invalid key to ''next'''
+...
+t:next(-1)
+---
+- error: '[string "-- tuple.lua (internal file)..."]:64: error: invalid key to ''next'''
+...
+t:next("fdsaf")
+---
+- error: '[string "-- tuple.lua (internal file)..."]:46: error: invalid key to ''next'''
+...
+box.tuple.new({'x', 'y', 'z'}):next()
+---
+- 1
+- x
 ...
 t=space:insert{1953719668}
 ---
 ...
 t:next(1684234849)
 ---
-- error: 'tuple.next(): bad arguments'
+- error: '[string "-- tuple.lua (internal file)..."]:64: error: invalid key to ''next'''
 ...
 t:next(1)
 ---
-- error: 'tuple.next(): bad arguments'
+- null
 ...
-t:next(t)
+t:next(nil)
 ---
-- error: 'tuple.next(): bad arguments'
+- 1
+- 1953719668
 ...
 t:next(t:next())
 ---
-- error: 'tuple.next(): bad arguments'
+- null
 ...
+--------------------------------------------------------------------------------
+-- test tuple:pairs
+--------------------------------------------------------------------------------
 ta = {} for k, v in t:pairs() do table.insert(ta, v) end
 ---
 ...
@@ -378,12 +458,129 @@ ta
   - c
   - d
 ...
-it, field = t:next()
+t = box.tuple.new({'a', 'b', 'c'})
 ---
 ...
-getmetatable(it)
+gen, init, state = t:pairs()
 ---
-- box.tuple.iterator
+...
+gen, init, state
+---
+- <tuple iterator>
+- ['a', 'b', 'c']
+- null
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 1
+- a
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 2
+- b
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- 3
+- c
+...
+state, val = gen(init, state)
+---
+...
+state, val
+---
+- null
+- null
+...
+r = {}
+---
+...
+for _state, val in t:pairs() do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs() do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs(1) do table.insert(r, val) end
+---
+...
+r
+---
+- - b
+  - c
+...
+r = {}
+---
+...
+for _state, val in t:pairs(3) do table.insert(r, val) end
+---
+...
+r
+---
+- []
+...
+r = {}
+---
+...
+for _state, val in t:pairs(10) do table.insert(r, val) end
+---
+- error: '[string "-- tuple.lua (internal file)..."]:64: error: invalid key to ''next'''
+...
+r
+---
+- []
+...
+r = {}
+---
+...
+for _state, val in t:pairs(nil) do table.insert(r, val) end
+---
+...
+r
+---
+- - a
+  - b
+  - c
+...
+t:pairs(nil)
+---
+- <tuple iterator>
+- ['a', 'b', 'c']
+- null
+...
+t:pairs("fdsaf")
+---
+- <tuple iterator>
+- ['a', 'b', 'c']
+- fdsaf
 ...
 space:drop()
 ---

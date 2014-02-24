@@ -433,60 +433,8 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 	}
 }
 
-/**
- * Sequential access to tuple fields. Since tuple is a list-like
- * structure, iterating over tuple fields is faster
- * than accessing fields using an index.
- */
-static int
-lbox_tuple_next(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	int argc = lua_gettop(L) - 1;
-
-	struct tuple_iterator *it = NULL;
-	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
-		it = (struct tuple_iterator *) lua_newuserdata(L, sizeof(*it));
-		assert(it != NULL);
-		luaL_getmetatable(L, tuple_iteratorlib_name);
-		lua_setmetatable(L, -2);
-		tuple_rewind(it, tuple);
-	} else if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
-		it = (struct tuple_iterator *)
-			luaL_checkudata(L, 2, tuple_iteratorlib_name);
-		assert(it != NULL);
-		lua_pushvalue(L, 2);
-	} else {
-		return luaL_error(L, "tuple.next(): bad arguments");
-	}
-
-	const char *field = tuple_next(it);
-	if (field == NULL) {
-		lua_pop(L, 1);
-		lua_pushnil(L);
-		return 1;
-	}
-
-	luamp_decode(L, &field);
-	return 2;
-}
-
-/** Iterator over tuple fields. Adapt lbox_tuple_next
- * to Lua iteration conventions.
- */
-static int
-lbox_tuple_pairs(struct lua_State *L)
-{
-	lua_pushcfunction(L, lbox_tuple_next);
-	lua_pushvalue(L, -2); /* tuple */
-	lua_pushnil(L);
-	return 3;
-}
-
 static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
-	{"next", lbox_tuple_next},
-	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{"find", lbox_tuple_find},

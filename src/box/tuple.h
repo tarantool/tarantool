@@ -324,7 +324,7 @@ struct tuple_iterator {
  * @param[out] it tuple iterator
  * @param[in]  tuple tuple
  */
-static inline void
+extern "C" inline void
 tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
 {
 	it->tuple = tuple;
@@ -339,7 +339,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
  * @retval field  if the iterator has the requested field
  * @retval NULL   otherwise (iteration is out of range)
  */
-const char *
+extern "C" const char *
 tuple_seek(struct tuple_iterator *it, uint32_t field_no);
 
 /**
@@ -347,7 +347,7 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no);
  * @param it tuple iterator
  * @return next field or NULL if the iteration is out of range
  */
-const char *
+extern "C" const char *
 tuple_next(struct tuple_iterator *it);
 
 /**

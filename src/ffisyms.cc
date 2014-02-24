@@ -12,5 +12,8 @@ void *ffi_symbols[] = {
 	(void *) mp_bswap_float,
 	(void *) mp_bswap_double,
 	(void *) tuple_arity,
-	(void *) tuple_field
+	(void *) tuple_field,
+	(void *) tuple_rewind,
+	(void *) tuple_seek,
+	(void *) tuple_next
 };

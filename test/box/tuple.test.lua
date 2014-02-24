@@ -94,12 +94,41 @@ space:truncate()
 --  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'
 t=space:insert{0, 8989}
 t[nil]
-# test tuple iterators
+
+--------------------------------------------------------------------------------
+-- test tuple:next
+--------------------------------------------------------------------------------
+
+t = box.tuple.new({'a', 'b', 'c'})
+state, val = t:next()
+state, val
+state, val = t:next(state)
+state, val
+state, val = t:next(state)
+state, val
+state, val = t:next(state)
+state, val
+t:next(nil)
+t:next(0)
+t:next(1)
+t:next(2)
+t:next(3)
+t:next(4)
+t:next(-1)
+t:next("fdsaf")
+
+box.tuple.new({'x', 'y', 'z'}):next()
+
 t=space:insert{1953719668}
 t:next(1684234849)
 t:next(1)
-t:next(t)
+t:next(nil)
 t:next(t:next())
+
+--------------------------------------------------------------------------------
+-- test tuple:pairs
+--------------------------------------------------------------------------------
+
 ta = {} for k, v in t:pairs() do table.insert(ta, v) end
 ta
 t=space:replace{1953719668, 'another field'}
@@ -111,6 +140,44 @@ ta
 t=box.tuple.new({'a', 'b', 'c', 'd'})
 ta = {} for it,field in t:pairs() do table.insert(ta, field); end
 ta
-it, field = t:next()
-getmetatable(it)
+
+t = box.tuple.new({'a', 'b', 'c'})
+gen, init, state = t:pairs()
+gen, init, state
+state, val = gen(init, state)
+state, val
+state, val = gen(init, state)
+state, val
+state, val = gen(init, state)
+state, val
+state, val = gen(init, state)
+state, val
+
+r = {}
+for _state, val in t:pairs() do table.insert(r, val) end
+r
+
+r = {}
+for _state, val in t:pairs() do table.insert(r, val) end
+r
+
+r = {}
+for _state, val in t:pairs(1) do table.insert(r, val) end
+r
+
+r = {}
+for _state, val in t:pairs(3) do table.insert(r, val) end
+r
+
+r = {}
+for _state, val in t:pairs(10) do table.insert(r, val) end
+r
+
+r = {}
+for _state, val in t:pairs(nil) do table.insert(r, val) end
+r
+
+t:pairs(nil)
+t:pairs("fdsaf")
+
 space:drop()
