@@ -53,7 +53,6 @@ extern "C" {
 
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
-static int tuple_totable_mt_ref = 0; /* a precreated metable for totable() */
 
 extern char tuple_lua[]; /* Lua source */
 
@@ -375,48 +374,6 @@ lbox_tuple_findall(struct lua_State *L)
 	return lbox_tuple_find_do(L, true);
 }
 
-static int
-lbox_tuple_unpack(struct lua_State *L)
-{
-	int argc = lua_gettop(L);
-	(void) argc;
-	struct tuple *tuple = lua_checktuple(L, 1);
-
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	const char *field;
-	while ((field = tuple_next(&it)))
-		luamp_decode(L, &field);
-
-	assert(lua_gettop(L) == argc + tuple_arity(tuple));
-	(void) argc;
-	return tuple_arity(tuple);
-}
-
-static int
-lbox_tuple_totable(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	lua_newtable(L);
-	int index = 1;
-
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	const char *field;
-	while ((field = tuple_next(&it))) {
-		lua_pushnumber(L, index++);
-		luamp_decode(L, &field);
-		lua_rawset(L, -3);
-	}
-
-	/* Hint serializer */
-	assert(tuple_totable_mt_ref != 0);
-	lua_rawgeti(L, LUA_REGISTRYINDEX, tuple_totable_mt_ref);
-	lua_setmetatable(L, -2);
-
-	return 1;
-}
-
 void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
@@ -439,8 +396,6 @@ static const struct luaL_reg lbox_tuple_meta[] = {
 	{"transform", lbox_tuple_transform},
 	{"find", lbox_tuple_find},
 	{"findall", lbox_tuple_findall},
-	{"unpack", lbox_tuple_unpack},
-	{"totable", lbox_tuple_totable},
 	{NULL, NULL}
 };
 
@@ -489,14 +444,6 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
-
-	/* Precreate a metatable for tuple_unpack */
-	lua_newtable(L);
-	lua_pushstring(L, "_serializer_compact");
-	lua_pushboolean(L, true);
-	lua_settable(L, -3);
-	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	assert(tuple_totable_mt_ref != 0);
 
 	if (luaL_dostring(L, tuple_lua))
 		panic("Error loading Lua source %.160s...: %s",

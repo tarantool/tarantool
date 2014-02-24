@@ -81,6 +81,30 @@ local function tuple_ipairs(tuple, pos)
     return it, tuple, pos
 end
 
+-- a precreated metatable for totable()
+local tuple_totable_mt = {
+    _serializer_compact = true;
+}
+
+local function tuple_totable(tuple)
+    -- use a precreated iterator for tuple_next
+    builtin.tuple_rewind(next_it, tuple)
+    local ret = {}
+    while true do
+        local field = builtin.tuple_next(next_it)
+        if field == nil then
+            break
+        end
+        local val = msgpackffi.decode_unchecked(field)
+        table.insert(ret, val)
+    end
+    return setmetatable(ret, tuple_totable_mt)
+end
+
+local function tuple_unpack(tuple)
+    return unpack(tuple_totable(tuple))
+end
+
 -- cfuncs table is set by C part
 
 local methods = {
@@ -91,8 +115,8 @@ local methods = {
     ["transform"]   = cfuncs.transform;
     ["find"]        = cfuncs.find;
     ["findall"]     = cfuncs.findall;
-    ["unpack"]      = cfuncs.unpack;
-    ["totable"]     = cfuncs.totable;
+    ["unpack"]      = tuple_unpack;
+    ["totable"]     = tuple_totable;
     ["bsize"]       = function(tuple)
         return tonumber(tuple._bsize)
     end
