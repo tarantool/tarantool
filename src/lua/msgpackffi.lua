@@ -358,10 +358,10 @@ end
 
 local function decode_array(data, size)
     assert (type(size) == "number")
-    local arr = { [size] = 0}
+    local arr = {}
     local i
     for i=1,size,1 do
-        arr[i] = decode_r(data)
+        table.insert(arr, decode_r(data))
     end
     return arr
 end
