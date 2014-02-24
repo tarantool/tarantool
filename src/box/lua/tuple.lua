@@ -44,7 +44,8 @@ local tuple_field = function(tuple, field_n)
     if field == nil then
         return nil
     end
-    return msgpackffi.decode_unchecked(field)
+    -- Use () to shrink stack to the first return value
+    return (msgpackffi.decode_unchecked(field))
 end
 
 ffi.metatype('struct tuple', {
