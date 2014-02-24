@@ -48,7 +48,6 @@ local function tuple_iterator_next(it, tuple, pos)
     local field
     if it.tuple == tuple and it.fieldno == pos then
         -- Sequential iteration
-        print('optimization')
         field = builtin.tuple_next(it)
     else
         -- Seek
