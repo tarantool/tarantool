@@ -37,6 +37,32 @@ It supports replication, online backup, stored procedures in Lua.
 This package provides a common sql interface to use with
 tarantool-pg-module or by tarantool-mysql-module.
 
+%package pg-module
+Summary: Tarantool common sql interface
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: tarantool-pg-module
+Obsoletes: tarantool-pg-module
+%description -n tarantool-pg-module
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides a PostgreSQL interface to use with
+tarantool-sql-module.
+
+%package mysql-module
+Summary: Tarantool common sql interface
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: tarantool-mysql-module
+Obsoletes: tarantool-mysql-module
+%description -n tarantool-mysql-module
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides a MySQL interface to use with
+tarantool-sql-module.
+
 # Tarantool sophia module
 
 %package sophia-module
@@ -189,6 +215,18 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %dir "/usr/lib/tarantool/1.6/box"
 %dir "/usr/lib/tarantool/1.6/box/net"
 "/usr/lib/tarantool/1.6/box/net/sql.lua"
+
+%files pg-module
+%defattr(-,root,root,-)
+%dir "/usr/lib/tarantool/1.5"
+%dir "/usr/lib/tarantool/1.5/box"
+"/usr/lib/tarantool/1.5/box/net/pg.so"
+
+%files mysql-module
+%defattr(-,root,root,-)
+%dir "/usr/lib/tarantool/1.5"
+%dir "/usr/lib/tarantool/1.5/box"
+"/usr/lib/tarantool/1.5/box/net/mysql.so"
 
 %files sophia-module
 %defattr(-,root,root,-)
