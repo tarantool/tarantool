@@ -218,15 +218,15 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files pg-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-"/usr/lib/tarantool/1.5/box/net/pg.so"
+%dir "/usr/lib/tarantool/1.6"
+%dir "/usr/lib/tarantool/1.6/box"
+"/usr/lib/tarantool/1.6/box/net/pg.so"
 
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-"/usr/lib/tarantool/1.5/box/net/mysql.so"
+%dir "/usr/lib/tarantool/1.6"
+%dir "/usr/lib/tarantool/1.6/box"
+"/usr/lib/tarantool/1.6/box/net/mysql.so"
 
 %files sophia-module
 %defattr(-,root,root,-)
