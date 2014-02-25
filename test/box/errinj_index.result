@@ -30,7 +30,7 @@ res
 res = {}
 ---
 ...
-for t in s.index[0]:iterator(box.index.ALL) do table.insert(res, t) end
+for t in s.index[0]:iterator() do table.insert(res, t) end
 ---
 ...
 res
@@ -80,7 +80,7 @@ s:delete{1}
 res = {}
 ---
 ...
-for t in s.index[0]:iterator(box.index.ALL) do table.insert(res, t) end
+for t in s.index[0]:iterator() do table.insert(res, t) end
 ---
 - error: Failed to allocate 196 bytes in TreeIndex for init iterator
 ...
@@ -126,7 +126,7 @@ s:delete{2}
 ---
 - [2, 2, 'test2']
 ...
-s.index[0]:iterator(box.index.ALL)
+s.index[0]:iterator()
 ---
 - error: Failed to allocate 200 bytes in TreeIndex for init iterator
 ...
@@ -168,7 +168,7 @@ s:delete{3}
 ---
 - [3, 3, 'test3']
 ...
-s.index[0]:iterator(box.index.ALL)
+s.index[0]:iterator()
 ---
 - error: Failed to allocate 200 bytes in TreeIndex for init iterator
 ...

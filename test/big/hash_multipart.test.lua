@@ -22,7 +22,7 @@ hash:insert{1, 'bar', 1, '', 5}
 --# setopt delimiter ';'
 function box.select_all()
     local result = {}
-    for k, v in hash:pairs() do
+    for v in hash:iterator() do
         table.insert(result, v)
     end
     return result

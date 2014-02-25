@@ -294,7 +294,7 @@ void
 TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			const char *key, uint32_t part_count) const
 {
-	assert(key != NULL || part_count == 0);
+	assert(part_count == 0 || key != NULL);
 	struct tree_iterator *it = tree_iterator(iterator);
 
 	if (part_count == 0) {
@@ -302,6 +302,9 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 		 * If no key is specified, downgrade equality
 		 * iterators to a full range.
 		 */
+		if (type < 0 || type > ITER_GT)
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  "Tree index", "requested iterator type");
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}

@@ -175,7 +175,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end);
  *
  * @pre tuple->refs + count >= 0
  */
-void
+extern "C" void
 tuple_ref(struct tuple *tuple, int count);
 
 void
@@ -206,7 +206,7 @@ tuple_format(const struct tuple *tuple)
  * @param tuple
  * @return the number of fields in tuple
  */
-static inline uint32_t
+extern "C" inline uint32_t
 tuple_arity(const struct tuple *tuple)
 {
 	const char *data = tuple->data;
@@ -220,7 +220,7 @@ tuple_arity(const struct tuple *tuple)
  * @pre field < tuple->field_count.
  * @returns field data if field exists or NULL
  */
-static inline const char *
+inline const char *
 tuple_field_old(const struct tuple_format *format,
 		const struct tuple *tuple, uint32_t i)
 {
@@ -261,7 +261,7 @@ tuple_field_old(const struct tuple_format *format,
  *        or NULL if field is out of range
  * @param len pointer where the len of the field will be stored
  */
-inline const char *
+extern "C" inline const char *
 tuple_field(const struct tuple *tuple, uint32_t i)
 {
 	return tuple_field_old(tuple_format(tuple), tuple, i);
@@ -324,7 +324,7 @@ struct tuple_iterator {
  * @param[out] it tuple iterator
  * @param[in]  tuple tuple
  */
-static inline void
+extern "C" inline void
 tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
 {
 	it->tuple = tuple;
@@ -339,7 +339,7 @@ tuple_rewind(struct tuple_iterator *it, const struct tuple *tuple)
  * @retval field  if the iterator has the requested field
  * @retval NULL   otherwise (iteration is out of range)
  */
-const char *
+extern "C" const char *
 tuple_seek(struct tuple_iterator *it, uint32_t field_no);
 
 /**
@@ -347,7 +347,7 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no);
  * @param it tuple iterator
  * @return next field or NULL if the iteration is out of range
  */
-const char *
+extern "C" const char *
 tuple_next(struct tuple_iterator *it);
 
 /**

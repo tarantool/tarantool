@@ -53,7 +53,6 @@ extern "C" {
 
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
-static int tuple_totable_mt_ref = 0; /* a precreated metable for totable() */
 
 extern char tuple_lua[]; /* Lua source */
 
@@ -109,14 +108,6 @@ lbox_tuple_gc(struct lua_State *L)
 	struct tuple *tuple = lua_checktuple(L, 1);
 	tuple_ref(tuple, -1);
 	return 0;
-}
-
-static int
-lbox_tuple_len(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	lua_pushnumber(L, tuple_arity(tuple));
-	return 1;
 }
 
 static int
@@ -383,79 +374,6 @@ lbox_tuple_findall(struct lua_State *L)
 	return lbox_tuple_find_do(L, true);
 }
 
-static int
-lbox_tuple_unpack(struct lua_State *L)
-{
-	int argc = lua_gettop(L);
-	(void) argc;
-	struct tuple *tuple = lua_checktuple(L, 1);
-
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	const char *field;
-	while ((field = tuple_next(&it)))
-		luamp_decode(L, &field);
-
-	assert(lua_gettop(L) == argc + tuple_arity(tuple));
-	(void) argc;
-	return tuple_arity(tuple);
-}
-
-static int
-lbox_tuple_totable(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	lua_newtable(L);
-	int index = 1;
-
-	struct tuple_iterator it;
-	tuple_rewind(&it, tuple);
-	const char *field;
-	while ((field = tuple_next(&it))) {
-		lua_pushnumber(L, index++);
-		luamp_decode(L, &field);
-		lua_rawset(L, -3);
-	}
-
-	/* Hint serializer */
-	assert(tuple_totable_mt_ref != 0);
-	lua_rawgeti(L, LUA_REGISTRYINDEX, tuple_totable_mt_ref);
-	lua_setmetatable(L, -2);
-
-	return 1;
-}
-
-/**
- * Implementation of tuple __index metamethod.
- *
- * Provides operator [] access to individual fields for integer
- * indexes, as well as searches and invokes metatable methods
- * for strings.
- */
-static int
-lbox_tuple_index(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	/* For integer indexes, implement [] operator */
-	if (lua_isnumber(L, 2)) {
-		int i = luaL_checkint(L, 2);
-		const char *field = tuple_field(tuple, i);
-		if (field == NULL) {
-			const char *data = tuple->data;
-			luaL_error(L, "%s: index %d is out of bounds (0..%d)",
-				   tuplelib_name, i, mp_decode_array(&data));
-		}
-		luamp_decode(L, &field);
-		return 1;
-	}
-
-	/* If we got a string, try to find a method for it. */
-	const char *sz = luaL_checkstring(L, 2);
-	lua_getmetatable(L, 1);
-	lua_getfield(L, -1, sz);
-	return 1;
-}
-
 void
 lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 {
@@ -472,68 +390,12 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 	}
 }
 
-/**
- * Sequential access to tuple fields. Since tuple is a list-like
- * structure, iterating over tuple fields is faster
- * than accessing fields using an index.
- */
-static int
-lbox_tuple_next(struct lua_State *L)
-{
-	struct tuple *tuple = lua_checktuple(L, 1);
-	int argc = lua_gettop(L) - 1;
-
-	struct tuple_iterator *it = NULL;
-	if (argc == 0 || (argc == 1 && lua_type(L, 2) == LUA_TNIL)) {
-		it = (struct tuple_iterator *) lua_newuserdata(L, sizeof(*it));
-		assert(it != NULL);
-		luaL_getmetatable(L, tuple_iteratorlib_name);
-		lua_setmetatable(L, -2);
-		tuple_rewind(it, tuple);
-	} else if (argc == 1 && lua_type(L, 2) == LUA_TUSERDATA) {
-		it = (struct tuple_iterator *)
-			luaL_checkudata(L, 2, tuple_iteratorlib_name);
-		assert(it != NULL);
-		lua_pushvalue(L, 2);
-	} else {
-		return luaL_error(L, "tuple.next(): bad arguments");
-	}
-
-	const char *field = tuple_next(it);
-	if (field == NULL) {
-		lua_pop(L, 1);
-		lua_pushnil(L);
-		return 1;
-	}
-
-	luamp_decode(L, &field);
-	return 2;
-}
-
-/** Iterator over tuple fields. Adapt lbox_tuple_next
- * to Lua iteration conventions.
- */
-static int
-lbox_tuple_pairs(struct lua_State *L)
-{
-	lua_pushcfunction(L, lbox_tuple_next);
-	lua_pushvalue(L, -2); /* tuple */
-	lua_pushnil(L);
-	return 3;
-}
-
 static const struct luaL_reg lbox_tuple_meta[] = {
 	{"__gc", lbox_tuple_gc},
-	{"__len", lbox_tuple_len},
-	{"__index", lbox_tuple_index},
-	{"next", lbox_tuple_next},
-	{"pairs", lbox_tuple_pairs},
 	{"slice", lbox_tuple_slice},
 	{"transform", lbox_tuple_transform},
 	{"find", lbox_tuple_find},
 	{"findall", lbox_tuple_findall},
-	{"unpack", lbox_tuple_unpack},
-	{"totable", lbox_tuple_totable},
 	{NULL, NULL}
 };
 
@@ -582,14 +444,6 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
-
-	/* Precreate a metatable for tuple_unpack */
-	lua_newtable(L);
-	lua_pushstring(L, "_serializer_compact");
-	lua_pushboolean(L, true);
-	lua_settable(L, -3);
-	tuple_totable_mt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	assert(tuple_totable_mt_ref != 0);
 
 	if (luaL_dostring(L, tuple_lua))
 		panic("Error loading Lua source %.160s...: %s",
