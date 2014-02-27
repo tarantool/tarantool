@@ -12,6 +12,25 @@ ffi.cdef[[
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
+
+    struct port;
+    struct port_ffi
+    {
+        struct port_vtab *vtab;
+        uint32_t size;
+        uint32_t capacity;
+        struct tuple **ret;
+    };
+
+    void
+    port_ffi_create(struct port_ffi *port);
+    void
+    port_ffi_destroy(struct port_ffi *port);
+
+    int
+    boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+              int iterator, uint32_t offset, uint32_t limit,
+              const char *key, const char *key_end);
 ]]
 local builtin = ffi.C
 local msgpackffi = require('msgpackffi')
@@ -203,6 +222,12 @@ local iterator_cdata_gc = function(iterator_cdata)
     return iterator_cdata.free(iterator_cdata)
 end
 
+-- global struct port instance to use by select()/get()
+local port = ffi.new('struct port_ffi')
+builtin.port_ffi_create(port)
+ffi.gc(port, builtin.port_ffi_destroy)
+local port_t = ffi.typeof('struct port *')
+
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
@@ -357,12 +382,16 @@ function box.schema.space.bless(space)
     end
 
     index_mt.get = function(index, key)
-        key = keify(key)
-        local result = box._select(index.n, index.id, key, box.index.EQ, 0, 2)
-        if #result == 0 then
+        local key, key_end = msgpackffi.encode_tuple(key)
+        port.size = 0;
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.n,
+           index.id, box.index.EQ, 0, 2, key, key_end) ~=0 then
+            return box.raise()
+        end
+        if port.size == 0 then
             return
-        elseif #result == 1 then
-            return result[1]
+        elseif port.size == 1 then
+            return box.tuple.bless(port.ret[0])
         else
             box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
                 "More than one tuple found by get()")
@@ -374,8 +403,8 @@ function box.schema.space.bless(space)
         local limit = 4294967295
         local iterator = box.index.EQ
 
-        key = keify(key)
-        if #key == 0 then
+        local key, key_end = msgpackffi.encode_tuple(key)
+        if key_end == key + 1 then -- empty array
             iterator = box.index.ALL
         end
 
@@ -394,7 +423,17 @@ function box.schema.space.bless(space)
             end
         end
 
-        return box._select(index.n, index.id, key, iterator, offset, limit)
+        port.size = 0;
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.n,
+            index.id, iterator, offset, limit, key, key_end) ~=0 then
+            return box.raise()
+        end
+
+        local ret = {}
+        for i=0,port.size - 1,1 do
+            table.insert(ret, box.tuple.bless(port.ret[i]))
+        end
+        return ret
     end
     index_mt.update = function(index, key, ops)
         return box._update(index.n, index.id, keify(key), ops);
@@ -501,4 +540,3 @@ function box.schema.space.bless(space)
         end
     end
 end
-

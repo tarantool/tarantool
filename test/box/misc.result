@@ -19,7 +19,6 @@ t
 - - _delete
   - _insert
   - _replace
-  - _select
   - _update
   - call_loadproc
   - cfg

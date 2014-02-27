@@ -263,26 +263,63 @@ lbox_request_create(struct lua_State *L, enum iproto_request_type type,
 	return request;
 }
 
-static int
-lbox_select(lua_State *L)
+static void
+port_ffi_add_tuple(struct port *port, struct tuple *tuple)
 {
-	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
-	    !lua_isnumber(L, 4) || !lua_isnumber(L, 5) || !lua_isnumber(L, 6)) {
-		return luaL_error(L, "Usage index:select(key, "
-				  "iterator, offset, limit)");
+	struct port_ffi *port_ffi = (struct port_ffi *) port;
+	if (port_ffi->size >= port_ffi->capacity) {
+		uint32_t capacity = (port_ffi->capacity > 0) ?
+				2 * port_ffi->capacity : 1024;
+		struct tuple **ret = (struct tuple **)
+			realloc(port_ffi->ret, sizeof(*ret) * capacity);
+		assert(ret != NULL);
+		port_ffi->ret = ret;
+		port_ffi->capacity = capacity;
 	}
+	port_ffi->ret[port_ffi->size++] = tuple;
+}
 
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_SELECT,
-						      3, -1);
-	request->index_id = lua_tointeger(L, 2);
-	request->iterator = lua_tointeger(L, 4);
-	request->offset = lua_tointeger(L, 5);
-	request->limit = lua_tointeger(L, 6);
+struct port_vtab port_ffi_vtab = {
+	port_ffi_add_tuple,
+	null_port_eof,
+};
 
-	lua_newtable(L);
-	box_process(port_lua_process_create(L), request);
-	return 1;
+void
+port_ffi_create(struct port_ffi *port)
+{
+	memset(port, 0, sizeof(*port));
+	port->vtab = &port_ffi_vtab;
+}
+
+void
+port_ffi_destroy(struct port_ffi *port)
+{
+	free(port->ret);
+	port->capacity = port->size = 0;
+}
+
+int
+boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+	      int iterator, uint32_t offset, uint32_t limit,
+	      const char *key, const char *key_end)
+{
+	struct request request;
+	request_create(&request, IPROTO_SELECT);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.limit = limit;
+	request.offset = offset;
+	request.iterator = iterator;
+	request.key = key;
+	request.key_end = key_end;
+
+	try {
+		box_process(port, &request);
+		return 0;
+	} catch (Exception *e) {
+		/* will be hanled by box.raise() in Lua */
+		return -1;
+	}
 }
 
 static int
@@ -859,7 +896,6 @@ lbox_unpack(struct lua_State *L)
 
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
-	{"_select", lbox_select},
 	{"_insert", lbox_insert},
 	{"_replace", lbox_replace},
 	{"_update", lbox_update},

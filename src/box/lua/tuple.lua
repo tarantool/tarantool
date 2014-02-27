@@ -132,8 +132,9 @@ end
 
 local tuple_bless = function(tuple)
     -- update in-place, do not spent time calling tuple_ref
+    local tuple2 = ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
     tuple._refs = tuple._refs + 1
-    return ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
+    return tuple2
 end
 
 local tuple_field = function(tuple, field_n)
@@ -146,7 +147,6 @@ local tuple_field = function(tuple, field_n)
 end
 
 ffi.metatype('struct tuple', {
-    __gc = tuple_gc;
     __len = function(tuple)
         return builtin.tuple_arity(tuple)
     end;
