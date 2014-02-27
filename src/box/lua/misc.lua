@@ -35,7 +35,7 @@ function box.counter.dec(spaceno, key)
     local cnt_index = #key
     local s = box.space[spaceno]
 
-    local tuple = s:select(key)
+    local tuple = s:get(key)
     if tuple == nil then return 0 end
     if tuple[cnt_index] == 1 then
         s:delete(key)

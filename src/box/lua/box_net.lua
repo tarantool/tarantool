@@ -149,9 +149,59 @@ box.net = {
             end
         end,
 
-        select = function(self, space, key)
-            -- unpack - is old behaviour
-            return unpack(self:eselect(space, 0, key, { limit = 4294967295 }))
+        get = function(self, space, key)
+            key = keify(key)
+            local result = self:process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space,
+                    [box.net.box.KEY] = key,
+                    [box.net.box.ITERATOR] = box.index.EQ,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 2
+                }))
+            if #result == 0 then
+                return
+            elseif #result == 1 then
+                return result[1]
+            else
+                box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+                    "More than one tuple found without 'limit'")
+            end
+        end,
+
+        select = function(self, space, key, opts)
+            local offset = 0
+            local limit = 4294967295
+            local iterator = box.index.EQ
+
+            key = keify(key)
+            if #key == 0 then
+                iterator = box.index.ALL
+            end
+
+            if opts ~= nil then
+                if opts.offset ~= nil then
+                    offset = tonumber(opts.offset)
+                end
+                if type(opts.iterator) == "string" then
+                    opts.iterator = box.index[opts.iterator]
+                end
+                if opts.iterator ~= nil then
+                    iterator = tonumber(opts.iterator)
+                end
+                if opts.limit ~= nil then
+                    limit = tonumber(opts.limit)
+                end
+            end
+            local result = self:process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space,
+                    [box.net.box.KEY] = key,
+                    [box.net.box.ITERATOR] = iterator,
+                    [box.net.box.OFFSET] = offset,
+                    [box.net.box.LIMIT] = limit
+                }))
+            return result
         end,
 
         ping = function(self)
@@ -257,6 +307,8 @@ box.net = {
 
     }
 }
+
+box.net.box.put = box.net.box.replace; -- put is an alias for replace
 
 -- box.net.self rpc works like remote.rpc
 box.net.self.rpc = { r = box.net.self }

@@ -27,79 +27,79 @@ replica test 2 (must be ok)
 space = box.space.test
 ---
 ...
-space:select{1}
+space:get{1}
 ---
 - [1, 1]
 ...
-space:select{2}
+space:get{2}
 ---
 - [2, 4]
 ...
-space:select{3}
+space:get{3}
 ---
 - [3, 9]
 ...
-space:select{4}
+space:get{4}
 ---
 - [4, 16]
 ...
-space:select{5}
+space:get{5}
 ---
 - [5, 25]
 ...
-space:select{6}
+space:get{6}
 ---
 - [6, 36]
 ...
-space:select{7}
+space:get{7}
 ---
 - [7, 49]
 ...
-space:select{8}
+space:get{8}
 ---
 - [8, 64]
 ...
-space:select{9}
+space:get{9}
 ---
 - [9, 81]
 ...
-space:select{10}
+space:get{10}
 ---
 - [10, 1000]
 ...
-space:select{11}
+space:get{11}
 ---
 - [11, 1331]
 ...
-space:select{12}
+space:get{12}
 ---
 - [12, 1728]
 ...
-space:select{13}
+space:get{13}
 ---
 - [13, 2197]
 ...
-space:select{14}
+space:get{14}
 ---
 - [14, 2744]
 ...
-space:select{15}
+space:get{15}
 ---
 - [15, 3375]
 ...
-space:select{16}
+space:get{16}
 ---
 - [16, 4096]
 ...
-space:select{17}
+space:get{17}
 ---
 - [17, 4913]
 ...
-space:select{18}
+space:get{18}
 ---
 - [18, 5832]
 ...
-space:select{19}
+space:get{19}
 ---
 - [19, 6859]
 ...

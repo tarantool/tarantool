@@ -98,7 +98,7 @@ sql("select * from t0 where k0=21234567")
 sql("select * from t0 where k1='part1'")
 sql("select * from t0 where k1='part1_a'")
 sql("select * from t0 where k1='part_none'")
-admin("box.space[0].index[1]:select{'part1', 'part2'}")
+admin("box.space[0].index[1]:select({'part1', 'part2'}, { limit = 100 })")
 sql("select * from t0 where k1='part1'")
 sql("select * from t0 where k1='part2'")
 # cleanup

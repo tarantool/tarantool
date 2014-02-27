@@ -30,7 +30,7 @@ ts:insert{1, 'b', 'c'}
 ---
 - error: '[string "function fail(old_tuple, new_tuple) error(''te..."]:1: test'
 ...
-ts:select{1}
+ts:get{1}
 ---
 ...
 ts:on_replace(nil, fail)
@@ -40,7 +40,7 @@ ts:insert{1, 'b', 'c'}
 ---
 - [1, 'b', 'c']
 ...
-ts:select{1}
+ts:get{1}
 ---
 - [1, 'b', 'c']
 ...
@@ -54,7 +54,7 @@ ts:insert{2, 'b', 'c'}
 ---
 - error: '[string "function fail(old_tuple, new_tuple) error(''ab..."]:1: abc'
 ...
-ts:select{2}
+ts:get{2}
 ---
 ...
 function save_out(told, tnew) o = told n = tnew end

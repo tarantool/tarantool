@@ -282,7 +282,7 @@ space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
 - [777, ['a', 'b', 'c', ['d', 'e', [0, 777, '0', '1', '2', '3']]]]
 ...
 --  A test case for tuple:totable() method
-t=space:select{777}:totable()
+t=space:get{777}:totable()
 ---
 ...
 t[2], t[3], t[4], t[5]

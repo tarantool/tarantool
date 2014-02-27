@@ -18,7 +18,7 @@ s = box.schema.create_space('t', { temporary = true })
 s:create_index('primary', { type = 'hash' })
 
 s:insert{1, 2, 3}
-s:select{1}
+s:get{1}
 s:len()
 
 box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})
@@ -40,7 +40,7 @@ s.temporary
 box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})
 s.temporary
 
-s:select{1}
+s:get{1}
 s:insert{1, 2, 3}
 
 box.space[box.schema.SPACE_ID]:update(s.n, {{'=', 3, 'temporary'}})

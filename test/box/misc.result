@@ -401,7 +401,7 @@ box.counter.inc(space.n, {1})
 ---
 - 1
 ...
-space:select{1}
+space:get{1}
 ---
 - [1, 1]
 ...
@@ -413,7 +413,7 @@ box.counter.inc(space.n, {1})
 ---
 - 3
 ...
-space:select{1}
+space:get{1}
 ---
 - [1, 3]
 ...
@@ -429,7 +429,7 @@ box.counter.dec(space.n, {1})
 ---
 - 0
 ...
-space:select{1}
+space:get{1}
 ---
 ...
 space:truncate()

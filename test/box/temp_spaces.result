@@ -42,7 +42,7 @@ s:insert{1, 2, 3}
 ---
 - [1, 2, 3]
 ...
-s:select{1}
+s:get{1}
 ---
 - [1, 2, 3]
 ...
@@ -103,7 +103,7 @@ s.temporary
 ---
 - true
 ...
-s:select{1}
+s:get{1}
 ---
 ...
 s:insert{1, 2, 3}

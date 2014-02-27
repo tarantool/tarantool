@@ -22,11 +22,11 @@ while true do
 end;
 --# setopt delimiter ''
 space:len()
-space.index['primary']:select{0}
-space.index['primary']:select{5}
-space.index['primary']:select{9}
-space.index['primary']:select{11}
-space.index['primary']:select{15}
+space.index['primary']:get{0}
+space.index['primary']:get{5}
+space.index['primary']:get{9}
+space.index['primary']:get{11}
+space.index['primary']:get{15}
 -- check that iterators work
 i = 0
 t = {}
@@ -42,5 +42,5 @@ end;
 t
 space:truncate()
 space:insert{0, 'test'}
-space.index['primary']:select{0}
+space.index['primary']:get{0}
 space:drop()

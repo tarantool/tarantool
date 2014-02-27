@@ -29,10 +29,19 @@ space:insert{123, 'test1', 'test2'}
 ...
 space:select{123}
 ---
+- - [123, 'test1', 'test2']
+...
+space:get{123}
+---
 - [123, 'test1', 'test2']
 ...
-tuple = remote:select(space.n, 123)
+remote:select(space.n, 123)
 ---
+- - [123, 'test1', 'test2']
+...
+remote:get(space.n, 123)
+---
+- [123, 'test1', 'test2']
 ...
 function test(...) return box.tuple.new({ 123, 456 }) end
 ---
@@ -152,13 +161,29 @@ remote:call('test.a:b', 123)
 ---
 - - [1, 123]
 ...
-box.space.tweedledum:select(123)
+box.space.tweedledum:get(123)
 ---
 - [123, 'test1', 'test2']
 ...
-box.space.tweedledum:select({123})
+box.space.tweedledum:get({123})
 ---
 - [123, 'test1', 'test2']
+...
+remote:call('box.space.tweedledum:get', 123)
+---
+- - [123, 'test1', 'test2']
+...
+remote:call('box.space.tweedledum:get', {123})
+---
+- - [123, 'test1', 'test2']
+...
+box.space.tweedledum:select(123)
+---
+- - [123, 'test1', 'test2']
+...
+box.space.tweedledum:select({123})
+---
+- - [123, 'test1', 'test2']
 ...
 remote:call('box.space.tweedledum:select', 123)
 ---
@@ -178,18 +203,6 @@ type(slf)
 type(foo)
 ---
 - table
-...
-tuple
----
-- [123, 'test1', 'test2']
-...
-type(tuple)
----
-- cdata
-...
-#tuple
----
-- 3
 ...
 space:update(123, {{'=', 1, 'test1-updated'}})
 ---
@@ -211,25 +224,49 @@ remote:insert(space.n, {345, 'test1', 'test2'})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:select(space.n, {345})
+remote:get(space.n, {345})
 ---
 - [345, 'test1', 'test2']
+...
+remote:select(space.n, {345})
+---
+- - [345, 'test1', 'test2']
 ...
 remote:call('box.space.tweedledum:select', 345)
 ---
 - - [345, 'test1', 'test2']
 ...
-space:select{345}
+space:get{345}
 ---
 - [345, 'test1', 'test2']
+...
+space:select{345}
+---
+- - [345, 'test1', 'test2']
+...
+remote:put(space.n, {345, 'test1-replaced', 'test3-replaced'})
+---
+- [345, 'test1-replaced', 'test3-replaced']
+...
+space:get{345}
+---
+- [345, 'test1-replaced', 'test3-replaced']
+...
+space:select{345}
+---
+- - [345, 'test1-replaced', 'test3-replaced']
 ...
 remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-space:select{345}
+space:get{345}
 ---
 - [345, 'test1-replaced', 'test2-replaced']
+...
+space:select{345}
+---
+- - [345, 'test1-replaced', 'test2-replaced']
 ...
 space:eselect({}, { iterator = 'GE', limit = 1000 })
 ---
@@ -246,17 +283,29 @@ remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
 ...
+space:get{345}
+---
+- [345, 'test1-replaced', 'test2-replaced']
+...
 space:select{345}
+---
+- - [345, 'test1-replaced', 'test2-replaced']
+...
+remote:get(space.n, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
 remote:select(space.n, {345})
 ---
+- - [345, 'test1-replaced', 'test2-replaced']
+...
+remote:timeout(0.5):get(space.n, {345})
+---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
 remote:timeout(0.5):select(space.n, {345})
 ---
-- [345, 'test1-replaced', 'test2-replaced']
+- - [345, 'test1-replaced', 'test2-replaced']
 ...
 box.net.self:insert(space.n, {12345, 'test1', 'test2'})
 ---
@@ -356,11 +405,19 @@ box.time() - pstart < 0.5
 ---
 - true
 ...
-box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+box.net.self.rpc.box.space.tweedledum.index.primary:get(12345)
 ---
 - - [12345, 'test11', 'test2']
 ...
+box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
+---
+- - - [12345, 'test11', 'test2']
+...
 remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+---
+- - [12345, 'test11', 'test2']
+...
+remote.rpc.box.space.tweedledum.index.primary:get(12345)
 ---
 - - [12345, 'test11', 'test2']
 ...
@@ -374,11 +431,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:506: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:558: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:511: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:563: box.net.box: connection
     was closed'
 ...
 space:drop()

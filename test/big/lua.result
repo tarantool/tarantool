@@ -23,14 +23,14 @@ space.index['minmax']:max()
 ---
 - ['hello', 'old', 'world']
 ...
-space.index['minmax']:select{'new', 'world'}
+space.index['minmax']:get{'new', 'world'}
 ---
 - ['brave', 'new', 'world']
 ...
 -- A test case for Bug #904208
 -- "assert failed, when key cardinality is greater than index cardinality"
 --  https://bugs.launchpad.net/tarantool/+bug/904208
-space.index['minmax']:select{'new', 'world', 'order'}
+space.index['minmax']:get{'new', 'world', 'order'}
 ---
 - error: Invalid key part count (expected [0..2], got 3)
 ...
@@ -45,7 +45,7 @@ space:insert{'item 1', 'alabama', 'song'}
 ---
 - ['item 1', 'alabama', 'song']
 ...
-space.index['minmax']:select{'alabama'}
+space.index['minmax']:get{'alabama'}
 ---
 - ['item 1', 'alabama', 'song']
 ...
@@ -149,7 +149,7 @@ space:insert{2^51, 'hello', 'world'}
 ---
 - [2251799813685248, 'hello', 'world']
 ...
-space.index['primary']:select{2^51}
+space.index['primary']:get{2^51}
 ---
 - [2251799813685248, 'hello', 'world']
 ...
@@ -169,7 +169,7 @@ space:insert{tonumber64('18446744073709551615'), 'magic'}
 ---
 - [18446744073709551615, 'magic']
 ...
-tuple = space.index['primary']:select{tonumber64('18446744073709551615')}
+tuple = space.index['primary']:get{tonumber64('18446744073709551615')}
 ---
 ...
 num = tuple[0]
@@ -202,10 +202,10 @@ space:insert{125ULL, 'magic'}
 ---
 - [125, 'magic']
 ...
-tuple = space.index['primary']:select{125}
+tuple = space.index['primary']:get{125}
 ---
 ...
-tuple2 = space.index['primary']:select{125LL}
+tuple2 = space.index['primary']:get{125LL}
 ---
 ...
 num = tuple[0]
@@ -868,9 +868,9 @@ space:insert{20, 30, 40, 50}
 ...
 space.index['primary']:select{}
 ---
-- [1, 2, 3, 4]
-- [10, 20, 30, 40]
-- [20, 30, 40, 50]
+- - [1, 2, 3, 4]
+  - [10, 20, 30, 40]
+  - [20, 30, 40, 50]
 ...
 -- Truncate must not hang
 space:truncate()
@@ -879,6 +879,7 @@ space:truncate()
 -- Empty result
 space.index['primary']:select{}
 ---
+- []
 ...
 space:drop()
 ---

@@ -72,40 +72,40 @@ box.sort(box.select_all())
   - [1, 'foo', 1, '', 2]
 ...
 -- primary index select
-hash.index['primary']:select{1, 'foo', 0}
+hash.index['primary']:get{1, 'foo', 0}
 ---
 - [1, 'foo', 0, '', 2]
 ...
-hash.index['primary']:select{1, 'bar', 0}
+hash.index['primary']:get{1, 'bar', 0}
 ---
 - [1, 'bar', 0, '', 4]
 ...
 -- primary index select with missing part
-hash.index['primary']:select{1, 'foo'}
+hash.index['primary']:get{1, 'foo'}
 ---
 - error: Invalid key part count in an exact match (expected 3, got 2)
 ...
 -- primary index select with extra part
-hash.index['primary']:select{1, 'foo', 0, 0}
+hash.index['primary']:get{1, 'foo', 0, 0}
 ---
 - error: Invalid key part count (expected [0..3], got 4)
 ...
 -- primary index select with wrong type
-hash.index['primary']:select{1, 'foo', 'baz'}
+hash.index['primary']:get{1, 'foo', 'baz'}
 ---
 - error: 'Supplied key type of part 2 does not match index part type: expected NUM'
 ...
 -- secondary index select
-hash.index['unique']:select{1, 4}
+hash.index['unique']:get{1, 4}
 ---
 - [1, 'bar', 1, '', 4]
 ...
 -- secondary index select with no such key
-hash.index['unique']:select{1, 5}
+hash.index['unique']:get{1, 5}
 ---
 ...
 -- secondary index select with missing part
-hash.index['unique']:select{1}
+hash.index['unique']:get{1}
 ---
 - error: Invalid key part count in an exact match (expected 2, got 1)
 ...

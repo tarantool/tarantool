@@ -4,38 +4,38 @@ space:create_index('primary', { type = 'hash' })
 box.errinj.info()
 box.errinj.set("some-injection", true)
 box.errinj.set("some-injection") -- check error
-space:select{222444}
+space:get{222444}
 box.errinj.set("ERRINJ_TESTING", true)
-space:select{222444}
+space:get{222444}
 box.errinj.set("ERRINJ_TESTING", false)
 
 -- Check how well we handle a failed log write
 box.errinj.set("ERRINJ_WAL_IO", true)
 space:insert{1}
-space:select{1}
+space:get{1}
 box.errinj.set("ERRINJ_WAL_IO", false)
 space:insert{1}
 box.errinj.set("ERRINJ_WAL_IO", true)
 space:update(1, {{'=', 0, 2}})
-space:select{1}
-space:select{2}
+space:get{1}
+space:get{2}
 box.errinj.set("ERRINJ_WAL_IO", false)
 space:truncate()
 
 -- Check a failed log rotation
 box.errinj.set("ERRINJ_WAL_ROTATE", true)
 space:insert{1}
-space:select{1}
+space:get{1}
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 space:insert{1}
 box.errinj.set("ERRINJ_WAL_ROTATE", true)
 space:update(1, {{'=', 0, 2}})
-space:select{1}
-space:select{2}
+space:get{1}
+space:get{2}
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
 space:update(1, {{'=', 0, 2}})
-space:select{1}
-space:select{2}
+space:get{1}
+space:get{2}
 box.errinj.set("ERRINJ_WAL_ROTATE", true)
 space:truncate()
 box.errinj.set("ERRINJ_WAL_ROTATE", false)

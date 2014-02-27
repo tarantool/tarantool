@@ -10,18 +10,18 @@ function fail(old_tuple, new_tuple) error('test') end
 ts:on_replace(fail)
 
 ts:insert{1, 'b', 'c'}
-ts:select{1}
+ts:get{1}
 
 ts:on_replace(nil, fail)
 
 ts:insert{1, 'b', 'c'}
-ts:select{1}
+ts:get{1}
 
 function fail(old_tuple, new_tuple) error('abc') end
 ts:on_replace(fail)
 
 ts:insert{2, 'b', 'c'}
-ts:select{2}
+ts:get{2}
 
 function save_out(told, tnew) o = told n = tnew end
 ts:on_replace(save_out, fail)

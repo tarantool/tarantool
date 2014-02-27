@@ -138,13 +138,16 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 	uint32_t found = 0;
 	uint32_t offset = request->offset;
 	uint32_t limit = request->limit;
+	if (request->iterator >= iterator_type_MAX)
+		tnt_raise(IllegalParams, "Invalid iterator type");
+	enum iterator_type type = (enum iterator_type) request->iterator;
 
 	const char *key = request->key;
 	uint32_t part_count = mp_decode_array(&key);
 
 	struct iterator *it = index->position();
-	key_validate(index->key_def, ITER_EQ, key, part_count);
-	index->initIterator(it, ITER_EQ, key, part_count);
+	key_validate(index->key_def, type, key, part_count);
+	index->initIterator(it, type, key, part_count);
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {
@@ -235,6 +238,9 @@ error:
 			break;
 		case IPROTO_LIMIT:
 			request->limit = mp_decode_uint(&value);
+			break;
+		case IPROTO_ITERATOR:
+			request->iterator = mp_decode_uint(&value);
 			break;
 		case IPROTO_TUPLE:
 			request->tuple = value;

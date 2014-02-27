@@ -25,14 +25,14 @@ box.errinj.set("some-injection") -- check error
 ---
 - 'error: can''t find error injection ''some-injection'''
 ...
-space:select{222444}
+space:get{222444}
 ---
 ...
 box.errinj.set("ERRINJ_TESTING", true)
 ---
 - ok
 ...
-space:select{222444}
+space:get{222444}
 ---
 - error: Error injection 'ERRINJ_TESTING'
 ...
@@ -49,7 +49,7 @@ space:insert{1}
 ---
 - error: Failed to write to disk
 ...
-space:select{1}
+space:get{1}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
@@ -68,11 +68,11 @@ space:update(1, {{'=', 0, 2}})
 ---
 - error: Failed to write to disk
 ...
-space:select{1}
+space:get{1}
 ---
 - [1]
 ...
-space:select{2}
+space:get{2}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_IO", false)
@@ -91,7 +91,7 @@ space:insert{1}
 ---
 - error: Failed to write to disk
 ...
-space:select{1}
+space:get{1}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
@@ -110,11 +110,11 @@ space:update(1, {{'=', 0, 2}})
 ---
 - error: Failed to write to disk
 ...
-space:select{1}
+space:get{1}
 ---
 - [1]
 ...
-space:select{2}
+space:get{2}
 ---
 ...
 box.errinj.set("ERRINJ_WAL_ROTATE", false)
@@ -125,10 +125,10 @@ space:update(1, {{'=', 0, 2}})
 ---
 - [2]
 ...
-space:select{1}
+space:get{1}
 ---
 ...
-space:select{2}
+space:get{2}
 ---
 - [2]
 ...

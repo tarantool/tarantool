@@ -242,7 +242,7 @@ s:insert{1, 2, 3}
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
 ...
 -- increase arity -- error
 box.space['_space']:update(s.n, {{"=", 1, 3}})
@@ -251,7 +251,7 @@ box.space['_space']:update(s.n, {{"=", 1, 3}})
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
 ...
 -- decrease arity - error
 box.space['_space']:update(s.n, {{"=", 1, 1}})
@@ -265,7 +265,7 @@ box.space['_space']:update(s.n, {{"=", 1, 0}})
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
 ...
 -- increase arity - error
 box.space['_space']:update(s.n, {{"=", 1, 3}})
@@ -277,6 +277,7 @@ s:truncate()
 ...
 s:select{}
 ---
+- []
 ...
 -- set arity of an empty space
 box.space['_space']:update(s.n, {{"=", 1, 3}})
@@ -285,6 +286,7 @@ box.space['_space']:update(s.n, {{"=", 1, 3}})
 ...
 s:select{}
 ---
+- []
 ...
 -- arity actually works
 s:insert{3, 4}
@@ -305,8 +307,8 @@ s:insert{7, 8, 9}
 ...
 s:select{}
 ---
-- [3, 4, 5]
-- [7, 8, 9]
+- - [3, 4, 5]
+  - [7, 8, 9]
 ...
 -- check transition of space from enabled to disabled on
 -- deletion of the primary key
@@ -727,13 +729,13 @@ s:create_index('year', { type = 'tree', unique=false, parts = { 1, 'num'} })
 ...
 s.index.primary:select{}
 ---
-- ['Almanya - Willkommen in Deutschland', 2011]
-- ['Barbara', 2012]
-- ['Cloud Atlas', 2012]
-- ['Die Fremde', 2010]
-- ['Halt auf freier Strecke', 2011]
-- ['Homevideo', 2011]
-- ['No such movie', 999]
+- - ['Almanya - Willkommen in Deutschland', 2011]
+  - ['Barbara', 2012]
+  - ['Cloud Atlas', 2012]
+  - ['Die Fremde', 2010]
+  - ['Halt auf freier Strecke', 2011]
+  - ['Homevideo', 2011]
+  - ['No such movie', 999]
 ...
 -- a duplicate in the created index
 s:create_index('nodups', { type = 'tree', unique=true, parts = { 1, 'num'} })
@@ -747,13 +749,13 @@ s.index.year:alter({unique=true})
 ...
 s.index.primary:select{}
 ---
-- ['Almanya - Willkommen in Deutschland', 2011]
-- ['Barbara', 2012]
-- ['Cloud Atlas', 2012]
-- ['Die Fremde', 2010]
-- ['Halt auf freier Strecke', 2011]
-- ['Homevideo', 2011]
-- ['No such movie', 999]
+- - ['Almanya - Willkommen in Deutschland', 2011]
+  - ['Barbara', 2012]
+  - ['Cloud Atlas', 2012]
+  - ['Die Fremde', 2010]
+  - ['Halt auf freier Strecke', 2011]
+  - ['Homevideo', 2011]
+  - ['No such movie', 999]
 ...
 box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
 ---

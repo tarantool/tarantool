@@ -151,11 +151,11 @@ _index:replace{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ...
 _index:select{}
 ---
-- [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
-- [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
-- [280, 1, 'name', 'tree', 1, 1, 2, 'str']
-- [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
-- [288, 1, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
+- - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
+  - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [280, 1, 'name', 'tree', 1, 1, 2, 'str']
+  - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
+  - [288, 1, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
 ...
 -- modify indexes of a system space
 _index:delete{_index.n, 0}

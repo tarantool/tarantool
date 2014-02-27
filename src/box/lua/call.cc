@@ -266,17 +266,23 @@ lbox_request_create(struct lua_State *L, enum iproto_request_type type,
 static int
 lbox_select(lua_State *L)
 {
-	if (lua_gettop(L) != 3 || ! lua_isnumber(L, 1) ||
-	    ! lua_isnumber(L, 2)) {
-		return luaL_error(L, "Usage index:select(key)");
+	if (lua_gettop(L) != 6 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    !lua_isnumber(L, 4) || !lua_isnumber(L, 5) || !lua_isnumber(L, 6)) {
+		return luaL_error(L, "Usage index:select(key, "
+				  "iterator, offset, limit)");
 	}
+
 	RegionGuard region_guard(&fiber()->gc);
 	struct request *request = lbox_request_create(L, IPROTO_SELECT,
 						      3, -1);
 	request->index_id = lua_tointeger(L, 2);
-	request->limit = 4294967295;
-	box_process(port_lua_create(L), request);
-	return lua_gettop(L) - 3;
+	request->iterator = lua_tointeger(L, 4);
+	request->offset = lua_tointeger(L, 5);
+	request->limit = lua_tointeger(L, 6);
+
+	lua_newtable(L);
+	box_process(port_lua_process_create(L), request);
+	return 1;
 }
 
 static int

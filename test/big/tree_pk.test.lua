@@ -10,9 +10,9 @@ s0:insert{2, 'tuple 2'}
 box.snapshot()
 
 s0:insert{3, 'tuple 3'}
-s0.index['primary']:select{1}
-s0.index['primary']:select{2}
-s0.index['primary']:select{3}
+s0.index['primary']:get{1}
+s0.index['primary']:get{2}
+s0.index['primary']:get{3}
 
 -- Cleanup
 s0:delete{1}
@@ -40,9 +40,9 @@ s1.index['primary']:eselect('second', { limit = 100, iterator = 'GE' })
 s1.index['primary']:eselect('identifier', { limit = 100, iterator = 'GE' })
 
 s1:insert{'third', 'tuple 3'}
-s1.index['primary']:select{'identifier'}
-s1.index['primary']:select{'second'}
-s1.index['primary']:select{'third'}
+s1.index['primary']:get{'identifier'}
+s1.index['primary']:get{'second'}
+s1.index['primary']:get{'third'}
 
 -- Cleanup
 s1:delete{'identifier'}
@@ -82,9 +82,9 @@ s2:truncate()
 
 -- Bug #922520 - select missing keys
 s0:insert{200, 'select me!'}
-s0.index['primary']:select{200}
-s0.index['primary']:select{199}
-s0.index['primary']:select{201}
+s0.index['primary']:get{200}
+s0.index['primary']:get{199}
+s0.index['primary']:get{201}
 
 -- Test partially specified keys in TREE indexes
 s1:insert{'abcd'}
@@ -119,11 +119,11 @@ s0:insert{2, 2, 2, 2}
 s0:replace{1, 1, 1, 1}
 s0:replace{1, 10, 10, 10}
 s0:replace{1, 1, 1, 1}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
-s0.index['primary']:select{1}
+s0.index['primary']:get{1}
 s0.index['i1']:select{1}
 s0.index['i2']:select{1}
 s0.index['i3']:select{1}
@@ -131,7 +131,7 @@ s0.index['i3']:select{1}
 -- OK
 s0:insert{10, 10, 10, 10}
 s0:delete{10}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
@@ -139,22 +139,22 @@ s0.index['i3']:select{10}
 
 -- TupleFound (primary key)
 s0:insert{1, 10, 10, 10}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
-s0.index['primary']:select{1}
+s0.index['primary']:get{1}
 
 -- TupleNotFound (primary key)
 s0:replace{10, 10, 10, 10}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
 
 -- TupleFound (key #1)
 s0:insert{10, 0, 10, 10}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
@@ -162,7 +162,7 @@ s0.index['i1']:select{0}
 
 -- TupleFound (key #1)
 s0:replace{2, 0, 10, 10}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
@@ -170,7 +170,7 @@ s0.index['i1']:select{0}
 
 -- TupleFound (key #3)
 s0:insert{10, 10, 10, 0}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
@@ -178,7 +178,7 @@ s0.index['i3']:select{0}
 
 -- TupleFound (key #3)
 s0:replace{2, 10, 10, 0}
-s0.index['primary']:select{10}
+s0.index['primary']:get{10}
 s0.index['i1']:select{10}
 s0.index['i2']:select{10}
 s0.index['i3']:select{10}
@@ -189,9 +189,9 @@ s0:insert{4, 4, 0, 4}
 s0:insert{5, 5, 0, 5}
 s0:insert{6, 6, 0, 6}
 s0:replace{5, 5, 0, 5}
-box.sort({s0.index['i2']:select{0}})
+box.sort(s0.index['i2']:select(0, { limit = 100 }))
 s0:delete{5}
-box.sort({s0.index['i2']:select{0}})
+box.sort(s0.index['i2']:select(0, { limit = 100 }))
 
 s0:drop()
 s0 = nil

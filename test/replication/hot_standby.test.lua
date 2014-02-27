@@ -27,7 +27,7 @@ do
     function _select(_begin, _end)
         local a = {}
         for i = _begin, _end do
-            table.insert(a, box.space['tweedledum']:select{i})
+            table.insert(a, box.space['tweedledum']:get{i})
         end
         return unpack(a)
     end

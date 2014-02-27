@@ -1,6 +1,6 @@
 fifomax = 5
 function find_or_create_fifo(space, name)
-    fifo = space:select{name}
+    fifo = space:get{name}
     if fifo == nil then
         fifo = {}
         for i = 1, fifomax do fifo[i] = 0 end

@@ -55,7 +55,7 @@ box.schema.create_space = box.schema.space.create
 box.schema.space.drop = function(space_id)
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
-    local keys = { _index:select{space_id} }
+    local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
         _index:delete{v[0], v[1]}
@@ -157,7 +157,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         _index:update({space_id, index_id}, ops)
         return
     end
-    local tuple = _index:select{space_id, index_id}
+    local tuple = _index:get{space_id, index_id}
     if options.name == nil then
         options.name = tuple[2]
     end
@@ -266,7 +266,7 @@ function box.schema.space.bless(space)
     index_mt.count = function(index, key, opts)
         local count = 0
         local iterator
-        
+
         if opts and opts.iterator ~= nil then
             iterator = opts.iterator
         else
@@ -356,9 +356,45 @@ function box.schema.space.bless(space)
         return result
     end
 
-    --
-    index_mt.select = function(index, key)
-        return box._select(index.n, index.id, keify(key))
+    index_mt.get = function(index, key)
+        key = keify(key)
+        local result = box._select(index.n, index.id, key, box.index.EQ, 0, 2)
+        if #result == 0 then
+            return
+        elseif #result == 1 then
+            return result[1]
+        else
+            box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+                "More than one tuple found by get()")
+        end
+    end
+
+    index_mt.select = function(index, key, opts)
+        local offset = 0
+        local limit = 4294967295
+        local iterator = box.index.EQ
+
+        key = keify(key)
+        if #key == 0 then
+            iterator = box.index.ALL
+        end
+
+        if opts ~= nil then
+            if opts.offset ~= nil then
+                offset = tonumber(opts.offset)
+            end
+            if type(opts.iterator) == "string" then
+                opts.iterator = box.index[opts.iterator]
+            end
+            if opts.iterator ~= nil then
+                iterator = tonumber(opts.iterator)
+            end
+            if opts.limit ~= nil then
+                limit = tonumber(opts.limit)
+            end
+        end
+
+        return box._select(index.n, index.id, key, iterator, offset, limit)
     end
     index_mt.update = function(index, key, ops)
         return box._update(index.n, index.id, keify(key), ops);
@@ -384,10 +420,13 @@ function box.schema.space.bless(space)
         check_index(space, 0)
         return space.index[0]:eselect(key, opts)
     end
-
-    space_mt.select = function(space, key)
+    space_mt.get = function(space, key)
         check_index(space, 0)
-        return space.index[0]:select(key)
+        return space.index[0]:get(key)
+    end
+    space_mt.select = function(space, key, opts)
+        check_index(space, 0)
+        return space.index[0]:select(key, opts)
     end
     space_mt.insert = function(space, tuple)
         return box._insert(space.n, tuple);
@@ -395,6 +434,7 @@ function box.schema.space.bless(space)
     space_mt.replace = function(space, tuple)
         return box._replace(space.n, tuple);
     end
+    space_mt.put = space_mt.replace; -- put is an alias for replace
     space_mt.update = function(space, key, ops)
         check_index(space, 0)
         return space.index[0]:update(key, ops)

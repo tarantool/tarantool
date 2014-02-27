@@ -6,13 +6,13 @@ space:insert{'brave', 'new', 'world'}
 space:insert{'hello', 'old', 'world'}
 space.index['minmax']:min()
 space.index['minmax']:max()
-space.index['minmax']:select{'new', 'world'}
+space.index['minmax']:get{'new', 'world'}
 
 -- A test case for Bug #904208
 -- "assert failed, when key cardinality is greater than index cardinality"
 --  https://bugs.launchpad.net/tarantool/+bug/904208
 
-space.index['minmax']:select{'new', 'world', 'order'}
+space.index['minmax']:get{'new', 'world', 'order'}
 space:delete{'brave'}
 
 -- A test case for Bug #902091
@@ -20,7 +20,7 @@ space:delete{'brave'}
 -- https://bugs.launchpad.net/tarantool/+bug/902091
 
 space:insert{'item 1', 'alabama', 'song'}
-space.index['minmax']:select{'alabama'}
+space.index['minmax']:get{'alabama'}
 space:insert{'item 2', 'california', 'dreaming '}
 space:insert{'item 3', 'california', 'uber alles'}
 space:insert{'item 4', 'georgia', 'on my mind'}
@@ -59,7 +59,7 @@ space:truncate()
 --
 
 space:insert{2^51, 'hello', 'world'}
-space.index['primary']:select{2^51}
+space.index['primary']:get{2^51}
 space:drop()
 
 --
@@ -69,7 +69,7 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type  = 'tree', parts = {0, 'num'}, unique = true })
 
 space:insert{tonumber64('18446744073709551615'), 'magic'}
-tuple = space.index['primary']:select{tonumber64('18446744073709551615')}
+tuple = space.index['primary']:get{tonumber64('18446744073709551615')}
 num = tuple[0]
 num
 type(num) == 'cdata'
@@ -78,8 +78,8 @@ num = tuple[0]
 num == tonumber64('18446744073709551615')
 space:delete{18446744073709551615ULL}
 space:insert{125ULL, 'magic'}
-tuple = space.index['primary']:select{125}
-tuple2 = space.index['primary']:select{125LL}
+tuple = space.index['primary']:get{125}
+tuple2 = space.index['primary']:get{125LL}
 num = tuple[0]
 num2 = tuple2[0]
 num, num2

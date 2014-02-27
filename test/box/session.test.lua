@@ -69,7 +69,7 @@ box.session.on_disconnect(audit_disconnect)
 
 --# create connection con_three to default
 --# set connection con_three
-space:select{box.session.id()}[0] == box.session.id()
+space:get{box.session.id()}[0] == box.session.id()
 --# set connection default
 --# drop connection con_three
 

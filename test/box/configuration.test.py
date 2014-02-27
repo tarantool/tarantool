@@ -40,9 +40,9 @@ admin("box.space.tweedledum:insert{4, 8, 16}")
 print """
 # Test insert from init.lua
 """
-admin("box.space.tweedledum:select{1}")
-admin("box.space.tweedledum:select(2)")
-admin("box.space.tweedledum:select(4)")
+admin("box.space.tweedledum:get(1)")
+admin("box.space.tweedledum:get(2)")
+admin("box.space.tweedledum:get(4)")
 
 print """
 # Test bug #1002272

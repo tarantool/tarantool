@@ -229,7 +229,7 @@ insert into t0 values (2, 'test box delete')
 ---
 - [2, 'test box delete']
 ...
-call space:select(2)
+call space:get(2)
 ---
 - [2, 'test box delete']
 ...
@@ -237,23 +237,35 @@ space:delete{2}
 ---
 - [2, 'test box delete']
 ...
-call space:select(2)
+call space:get(2)
 ---
 ...
 insert into t0 values (2, 'test box.select()')
 ---
 - [2, 'test box.select()']
 ...
+call space:get(2)
+---
+- [2, 'test box.select()']
+...
 call space:select(2)
+---
+- [2, 'test box.select()']
+...
+space:get{2}
 ---
 - [2, 'test box.select()']
 ...
 space:select{2}
 ---
-- [2, 'test box.select()']
+- - [2, 'test box.select()']
+...
+space:get{1}
+---
 ...
 space:select{1}
 ---
+- []
 ...
 call myreplace(2, 'hello', 'world')
 ---
@@ -263,15 +275,27 @@ call myreplace(2, 'goodbye', 'universe')
 ---
 - [2, 'goodbye', 'universe']
 ...
+call space:get(2)
+---
+- [2, 'goodbye', 'universe']
+...
 call space:select(2)
+---
+- [2, 'goodbye', 'universe']
+...
+space:get{2}
 ---
 - [2, 'goodbye', 'universe']
 ...
 space:select{2}
 ---
-- [2, 'goodbye', 'universe']
+- - [2, 'goodbye', 'universe']
 ...
 call myreplace(2)
+---
+- [2]
+...
+call space:get(2)
 ---
 - [2]
 ...
@@ -300,6 +324,10 @@ space:update({3}, {{'=', 0, 4}, {'=', 1, 'new'}})
 ---
 - [4, 'new', 2]
 ...
+call space:get(4)
+---
+- [4, 'new', 2]
+...
 call space:select(4)
 ---
 - [4, 'new', 2]
@@ -312,11 +340,15 @@ space:update({4}, {{'-', 2, 1}})
 ---
 - [4, 'new', 2]
 ...
+call space:get(4)
+---
+- [4, 'new', 2]
+...
 call space:select(4)
 ---
 - [4, 'new', 2]
 ...
-function field_x(key, field_index) return space:select{key}[field_index] end
+function field_x(key, field_index) return space:get(key)[field_index] end
 ---
 ...
 call field_x(4, 0)

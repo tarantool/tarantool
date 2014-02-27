@@ -7,7 +7,9 @@ remote:ping()
 box.net.box.ping(remote)
 space:insert{123, 'test1', 'test2'}
 space:select{123}
-tuple = remote:select(space.n, 123)
+space:get{123}
+remote:select(space.n, 123)
+remote:get(space.n, 123)
 
 function test(...) return box.tuple.new({ 123, 456 }) end
 f, a = box.call_loadproc('test')
@@ -47,7 +49,10 @@ type(a)
 
 remote:call('test.a:b', 123)
 
-
+box.space.tweedledum:get(123)
+box.space.tweedledum:get({123})
+remote:call('box.space.tweedledum:get', 123)
+remote:call('box.space.tweedledum:get', {123})
 
 box.space.tweedledum:select(123)
 box.space.tweedledum:select({123})
@@ -58,10 +63,6 @@ slf, foo = box.call_loadproc('box.net.self:select')
 type(slf)
 type(foo)
 
-tuple
-type(tuple)
-#tuple
-
 space:update(123, {{'=', 1, 'test1-updated'}})
 remote:update(space.n, 123, {{'=', 2, 'test2-updated'}})
 
@@ -69,18 +70,28 @@ space:insert{123, 'test1', 'test2'}
 remote:insert(space.n, {123, 'test1', 'test2'})
 
 remote:insert(space.n, {345, 'test1', 'test2'})
+remote:get(space.n, {345})
 remote:select(space.n, {345})
 remote:call('box.space.tweedledum:select', 345)
+space:get{345}
+space:select{345}
+
+remote:put(space.n, {345, 'test1-replaced', 'test3-replaced'})
+space:get{345}
 space:select{345}
 
 remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
+space:get{345}
 space:select{345}
 
 space:eselect({}, { iterator = 'GE', limit = 1000 })
 box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
 remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
+space:get{345}
 space:select{345}
+remote:get(space.n, {345})
 remote:select(space.n, {345})
+remote:timeout(0.5):get(space.n, {345})
 remote:timeout(0.5):select(space.n, {345})
 
 
@@ -128,8 +139,10 @@ box.time() - pstart < 0.5
 
 
 
+box.net.self.rpc.box.space.tweedledum.index.primary:get(12345)
 box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
 remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
+remote.rpc.box.space.tweedledum.index.primary:get(12345)
 remote.rpc.box.space.tweedledum.index.primary:select(12345)
 
 remote:close()

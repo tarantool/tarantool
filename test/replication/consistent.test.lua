@@ -25,7 +25,7 @@ do
             box.fiber.sleep(0.001)
         end
         for i = _begin, _end do
-            table.insert(a, box.space[0]:select{i})
+            table.insert(a, box.space[0]:get{i})
         end
         return unpack(a)
     end

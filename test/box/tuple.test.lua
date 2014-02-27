@@ -88,7 +88,7 @@ t
 space:replace(t)
 space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
 --  A test case for tuple:totable() method
-t=space:select{777}:totable()
+t=space:get{777}:totable()
 t[2], t[3], t[4], t[5]
 space:truncate()
 --  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'

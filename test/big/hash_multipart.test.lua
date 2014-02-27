@@ -31,21 +31,21 @@ end;
 box.sort(box.select_all())
 
 -- primary index select
-hash.index['primary']:select{1, 'foo', 0}
-hash.index['primary']:select{1, 'bar', 0}
+hash.index['primary']:get{1, 'foo', 0}
+hash.index['primary']:get{1, 'bar', 0}
 -- primary index select with missing part
-hash.index['primary']:select{1, 'foo'}
+hash.index['primary']:get{1, 'foo'}
 -- primary index select with extra part
-hash.index['primary']:select{1, 'foo', 0, 0}
+hash.index['primary']:get{1, 'foo', 0, 0}
 -- primary index select with wrong type
-hash.index['primary']:select{1, 'foo', 'baz'}
+hash.index['primary']:get{1, 'foo', 'baz'}
 
 -- secondary index select
-hash.index['unique']:select{1, 4}
+hash.index['unique']:get{1, 4}
 -- secondary index select with no such key
-hash.index['unique']:select{1, 5}
+hash.index['unique']:get{1, 5}
 -- secondary index select with missing part
-hash.index['unique']:select{1}
+hash.index['unique']:get{1}
 -- secondary index select with wrong type
 hash.index['unique']:select{1, 'baz'}
 
