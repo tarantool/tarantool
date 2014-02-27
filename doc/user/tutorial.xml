@@ -467,7 +467,7 @@ which make a minimal configuration file that will be suitable for day one.
 <programlisting>
 <command>echo</command> "slab_alloc_arena = 0.1" | <command>tee</command> tarantool.cfg
 <command>echo</command> "pid_file = \"box.pid\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "primary_port = 33013" | <command>tee</command> <option>-a</option> tarantool.cfg
+<command>echo</command> "primary_port = 3301" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "admin_port = 33015" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "rows_per_wal = 50000" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
@@ -507,7 +507,7 @@ If all goes well, you will see the server displaying progress as it initializes,
 2014-02-06 11:50:24.219 ... 1/sched I&gt; recovery start
 2014-02-06 11:50:24.224 ... 1/sched I&gt; recover from `./00000000000000000001.snap'
 2014-02-06 11:50:24.230 ... 1/sched I&gt; snapshot recovered, confirmed lsn: 1
-2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 33013
+2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 3301
 2014-02-06 11:50:24.232 ... 1/sched I&gt; I am primary
 2014-02-06 11:50:24.232 ... 1/sched I&gt; bound to admin port 33015
 2014-02-06 11:50:24.232 ... 1/sched C&gt; entering the event loop</programlisting>
@@ -603,7 +603,7 @@ localhost>&gt;</programlisting>
 </para>
 
 <para>
-You can repeat box.insert() and box.select() indefinitely.
+You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop the client:  <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
@@ -684,7 +684,7 @@ inserted and selected tuples with the Tarantool client.
     Old syntax box.space.name:X() no longer exists.
     Old syntax box.X() no longer exists.
     New syntax is
-    box.space.<replaceable>space_name</replaceable>:X<replaceable>Lua-table</replaceable>.
+    box.space.<replaceable>space_name(</replaceable>:X<replaceable>Lua-table</replaceable>).
     Example: box.space.t0:insert{0,'Hello'}
     Minor properties of a space (for example the name) can be altered without rebuild.
     All properties of an index can be altered without rebuild.
@@ -699,11 +699,11 @@ inserted and selected tuples with the Tarantool client.
     Output format is now consistently YAML so it can always be used with print().
   </para>
   <para>NEW METADATA RETRIEVAL METHOD = SYSTEM SPACES.
-    The new system spaces contain metadata that can be retrieved with box.select.
+    The new system spaces contain metadata that can be retrieved with box.space..:select.
     The _space system space has information about existing spaces.
     The _index system space has information about existing indexes.
     Old syntax "show ..." no longer exists.
-    New syntax is box.space._space:select<replaceable>Lua-table</replaceable>
+    New syntax is box.space._space:select(<replaceable>Lua-table</replaceable>)
     or other Lua functions.
   </para>
   <para>NEW TRIGGERS FOR REPLACE.

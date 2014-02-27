@@ -58,7 +58,7 @@ function string_function()
   return "hello world"
   end!
 </programlisting>
-The word "function" is a Lua keyword -- we're about to go into Lual.
+The word "function" is a Lua keyword -- we're about to go into Lua.
 The function name is string_function.
 The function has one executable statement, <code>return "hello world"</code>.
 The string "hello world" is enclosed in double quotes here,
@@ -346,7 +346,7 @@ localhost&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
         -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
-        -&gt;   <userinput>box.replace(0,t)</userinput>
+        -&gt;   <userinput>box.space.space0:replace(t)</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
@@ -433,7 +433,7 @@ function main_function()
   end_time = os.clock()
   end!
 main_function()!
-print('insert done in ' .. end_time - start_time .. ' seconds')!
+'insert done in ' .. end_time - start_time .. ' seconds'!
 </programlisting>
 
 The screen now looks like this:

@@ -13,10 +13,10 @@
         is a light-weight, multi-paradigm, embeddable language.
         Stored procedures in Lua can be used to implement
         data manipulation patterns or data structures. A
-        server-side procedure written in Lua can select and modify
+        server-side routine written in Lua can select and modify
         data, access configuration and perform administrative
         tasks. It is possible to dynamically define, invoke,
-        alter and drop Lua procedures. Lua procedures can run
+        alter and drop Lua functions. Lua functions can run
         in the background and perform administrative tasks,
         such as data expiration or re-sharding.
 
@@ -186,8 +186,9 @@ localhost> <userinput>f1(1234)</userinput>
       the format <computeroutput><replaceable>object-specifier</replaceable>:<replaceable>function-name ...</replaceable></computeroutput>,
       where object-specifier is acquired as the result of another function invocation,
       or is the full <replaceable>library-name.package-name.object-name</replaceable>,
+      or is the full <replaceable>library-name.package-name['object-name']</replaceable>,
       or is the full <replaceable>library-name.package-name[object-numeric-id]</replaceable>.
-      The following example shows all three forms of object-specifier:
+      The following example shows all four forms of object-specifier:
 <programlisting>
 localhost> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
 ---
@@ -195,13 +196,17 @@ localhost> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</u
 localhost> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})</userinput>
 ---
 ...
-localhost> <userinput>s:insert{'a','b','c'}</userinput>
+localhost> <userinput>s:insert{'a', 'b', 'c'}</userinput>
 ---
 - ['a', 'b', 'c']
 ...
 localhost> <userinput>box.space.name_of_space:insert{'c', 'd', 'e'}</userinput>
 ---
 - ['c', 'd', 'e']
+...
+localhost> <userinput>box.space['name_of_space']:insert{'x', 'y', 'z'}</userinput>
+---
+- ['x', 'y', 'z']
 ...
 localhost> <userinput>box.space[33]:drop()</userinput>
 ---
@@ -687,7 +692,7 @@ localhost> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             <para>
                 Insert a tuple into a space. If a tuple with
                 the same primary key already exists,
-                <code>box.replace()</code> replaces the existing
+                <code>box.space...:replace()</code> replaces the existing
                 tuple with a new one.
             </para>
             <para>
@@ -1496,7 +1501,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 Lua constants which correspond to Tarantool errors
                 are defined in the <code>box.error</code> module. The error
                 message can be arbitrary.
-                Lua procedures can use <code>box.raise()</code> to emulate
+                Lua function can use <code>box.raise()</code> to emulate
                 request errors (for example: unique key exception).
                 When called without arguments this function re-throws last
                 thrown error.
@@ -1619,7 +1624,7 @@ The example function will: (1) select the tuple whose key value is 1000;
 (4) Get field[2] from what was replaced;
 (5) Format the value from field[2] as yyyy-mm-dd hh:mm:ss.ffff;
 (6) Return the formatted value.
-The function uses Tarantool box functions box.replace(), box.time(), box.select_limit(), box_uuid_hex().
+The function uses Tarantool box functions box.space...select(), box.space...replace(), box.time(), box_uuid_hex().
 The function uses Lua functions
 <link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
@@ -2433,9 +2438,9 @@ localhost> <userinput>box.space.space17:drop()</userinput>
       A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
       However, <code>box.fiber.cancel()</code> is advisory &mdash; it works
       only if the runaway fiber calls <code>box.fiber.testcancel()</code>
-      once in a while. Most <code>box.*</code> hooks, such as <code>box.delete()</code>
-      or <code>box.update()</code>, do call <code>box.fiber.testcancel()</code>.
-      <code>box.select()</code> does not.
+      once in a while. Most <code>box.*</code> hooks, such as <code>box.space...delete()</code>
+      or <code>box.space...update()</code>, do call <code>box.fiber.testcancel()</code>.
+      <code>box.space...select()</code> does not.
       In practice, a runaway fiber can only become unresponsive
       if it does many computations and does not check
       whether it's been canceled.
@@ -2795,10 +2800,16 @@ the status is dead because the cancel worked.<programlisting>
 <prompt>localhost&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do print(k, ' ', v) end</userinput>
+
+<prompt>localhost&gt;</prompt><userinput> m = ''</userinput>
 ---
-radius_of_mars 3396
-random_memorandum Don't forget the eggs.
+...
+<prompt>localhost&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+---
+...
+<prompt>localhost&gt;</prompt><userinput> m</userinput>
+---
+- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
 ...</programlisting>
 </para>
 
@@ -2995,14 +3006,14 @@ function consumer2_fiber()
         if task ~= nil then
             ...
         else
-            print("timeout!")
+            ...                             -- timeout
         end
     end
 end
 
 function producer_fiber()
     while true do
-        task = box.select(...)
+        task = box.space...:select(...)
         ...
         if channel:is_empty() then
             # channel is empty
@@ -3027,12 +3038,12 @@ end
 
 function producer2_fiber()
     while true do
-        task = box.select(...)
+        task = box.space...select(...)
 
         if channel:put(task, 10) then       -- 10 seconds
             ...
         else
-            print("timeout!")
+            ...                             -- timeout
         end
     end
 end
@@ -3458,7 +3469,7 @@ end
                connection object named <code>box.net.self</code>.
                Its purpose is to make polymorphic use of the
                <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 33013)</code> can
+               <code>conn = box.net.box.new('localhost', 3301)</code> can
                be replaced by <code>conn = box.net.box.self</code>.
                However, there is an important difference between the embedded
                connection and a remote one. With the embedded connection,
@@ -3473,7 +3484,7 @@ end
                Returns: (type = userdata) conn object).
             </para>
             <para>
-               Example: <code>conn = box.net.box.new('localhost', 33013)</code>.
+               Example: <code>conn = box.net.box.new('localhost', 3301)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3515,13 +3526,14 @@ end
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.select">
-         conn:select(<replaceable>space-number</replaceable>, <replaceable>index-number</replaceable>, ...)</emphasis></term>
+         conn:select(<replaceable>space-number</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-              <code>conn:select(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.select">box.select(...)</code>.
-              Please note this difference: a local <code>box.select()</code> does not yield,
-              but a remote <code>conn:select()</code> call does yield,
-              so local data may change while a remote <code>conn:select()</code> is running.
+              <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.select">box.space[<replaceable>space-number</replaceable>]:select(...)</code>.
+              Please note this difference: a local <code>box.space[<replaceable>space-number</replaceable>]:select(...)</code> does not yield,
+              but a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> call does yield,
+              so local data may change while a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is running.
             </para>
         </listitem>
     </varlistentry>
@@ -3531,7 +3543,8 @@ end
          conn:insert(<replaceable>space-number</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-              <code>conn:insert(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.insert">box.insert(...)</code>.
+              <code>conn:insert(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.insert">box.space[<replaceable>space-number</replaceable>]:insert(...)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3541,7 +3554,8 @@ end
          conn:replace(<replaceable>space-number</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-              <code>conn:replace(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.replace">box.replace(...)</code>.
+              <code>conn:replace(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.replace">box.space[<replaceable>space-number</replaceable>]:replace(...)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3551,17 +3565,19 @@ end
          conn:update(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-              <code>conn:update(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.update">box.update(...)</code>.
+              <code>conn:update(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.update">box.space[<replaceable>space-number</replaceable>]:update(...)</code>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="box.net.box.delete">
-         conn:delete(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>)</emphasis></term>
+         conn:delete(<replaceable>space-number</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
-              <code>conn:delete(...)</code> is the remote-call equivalent of the local call <code xlink:href="#box.delete">box.delete(...)</code>.
+              <code>conn:delete(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.delete">box.space[<replaceable>space-number</replaceable>]:delete(...)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3580,7 +3596,7 @@ end
               strings.
             </para>
             <para>
-              Example: <code>conn:call("box.select_reverse_range", "1", "4", "10", "Smith")</code>.
+              Example: <code>conn:call('box.space.space0:insert',{2})</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3612,7 +3628,7 @@ end
  This example will work with the sandbox configuration described in the preface.
  That is, there is a space named space0 with a numeric primary key.
  Assume that the database is nearly empty.
- Assume that the tarantool_box server is running on localhost 127.0.0.1:33013.
+ Assume that the tarantool_box server is running on localhost 127.0.0.1:3301.
 <programlisting>
 <prompt>localhost&gt;</prompt><userinput> ta = {}</userinput>
 ---
@@ -3623,13 +3639,13 @@ end
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 33013 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 33013 = default')</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3301 then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3301 = default')</userinput>
 <prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 33013')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3301')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 33013)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3301)</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.n, {800, 'data'})</userinput>
@@ -3657,7 +3673,7 @@ end
 ---
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 33013 = default
+  - The local server primary port number = 3301 = default
   - conn:delete done on space0.
   - conn:insert done on space0, index 0
   - '  primary key value = 800.'

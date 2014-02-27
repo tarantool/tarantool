@@ -146,9 +146,11 @@ Linking CXX shared library libmysql.so
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', '', 'test')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
@@ -263,9 +265,11 @@ Linking CXX shared library libpg.so
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...

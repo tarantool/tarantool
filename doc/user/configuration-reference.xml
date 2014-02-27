@@ -315,7 +315,7 @@ Tarantool 1.4.0-69-g45551dd
           <entry>The read/write data port.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
-          in the configuration file. Normally set to 33013.
+          in the configuration file. Normally set to 3301.
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.</entry>
@@ -359,11 +359,11 @@ Tarantool 1.4.0-69-g45551dd
              ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary pri: 33013 sec: 33014 adm: 33015</programlisting>
+tarantool_box: primary pri: 3301 adm: 33015</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
           the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting>
+tarantool_box: primary@sessions pri: 3301 adm: 33015</programlisting>
           </entry>
         </row>
 

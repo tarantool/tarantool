@@ -22,7 +22,7 @@
       (also called the "binary protocol"), and provides full data access.
       </para>
       <para>
-      The default value of the port is <literal>33013</literal>,
+      The default value of the port is <literal>3301</literal>,
       as defined in the <olink targetptr="primary_port"/>
       configuration option.
     </para></listitem>
