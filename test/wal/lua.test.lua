@@ -27,7 +27,7 @@ space:truncate()
 -- 5.4
 --
 for i = 1, 100000, 1 do space:insert{tostring(i), i} end
-local t1 = space.index['secondary']:select({}, { limit = 100000 })
+local t1 = space.index['secondary']:select()
 space:drop()
 
 --

@@ -55,19 +55,19 @@ space.index['primary']:get{'The Wolf!', 'Vincent', 3}
 space.index['primary']:get{'Vincent', 'The Wolf!', 2}
 
 -- Select all messages from Vincent to Jules
-space.index['primary']:select({'Vincent', 'Jules'}, { limit = 100 })
+space.index['primary']:select({'Vincent', 'Jules'})
 
 -- Select all messages from Jules to Vincent
-space.index['primary']:select({'Jules', 'Vincent'}, { limit = 100 })
+space.index['primary']:select({'Jules', 'Vincent'})
 
 -- Select all messages from Vincent to The Wolf
-space.index['primary']:select({'Vincent', 'The Wolf!'}, { limit = 100 })
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 
 -- Select all messages from The Wolf to Vincent
-space.index['primary']:select({'The Wolf!', 'Vincent'}, { limit = 100 })
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- Select all Vincent messages
-space.index['primary']:select({'Vincent'}, { limit = 100 })
+space.index['primary']:select({'Vincent'})
 
 --
 -- Delete test
@@ -81,9 +81,9 @@ space:delete{'Vincent', 'The Wolf!', 0}
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 0, 'Updated' }, {'=', 4, 'New'}})
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 0, 'Vincent'}, { '#', 4, 1 }})
 -- Checking Vincent's last messages
-space.index['primary']:select({'Vincent', 'The Wolf!'}, { limit = 100 })
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 -- Checking The Wolf's last messages
-space.index['primary']:select({'The Wolf!', 'Vincent'}, { limit = 100 })
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- try to delete nonexistent message
 space:delete{'Vincent', 'The Wolf!', 3}
@@ -99,9 +99,9 @@ space:update({'The Wolf!', 'Vincent', 1}, {{'=', 3, '<ooops>'}})
 space:update({'Vincent', 'The Wolf!', 1}, {{'=', 3, '<ooops>'}})
 
 -- Checking Vincent's last messages
-space.index['primary']:select({'Vincent', 'The Wolf!'}, { limit = 100 })
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 -- Checking The Wolf's last messages
-space.index['primary']:select({'The Wolf!', 'Vincent'}, { limit = 100 })
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 3}, {{'=', 3, '<ooops>'}})

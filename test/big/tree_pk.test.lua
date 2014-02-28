@@ -189,9 +189,9 @@ s0:insert{4, 4, 0, 4}
 s0:insert{5, 5, 0, 5}
 s0:insert{6, 6, 0, 6}
 s0:replace{5, 5, 0, 5}
-box.sort(s0.index['i2']:select(0, { limit = 100 }))
+box.sort(s0.index['i2']:select(0))
 s0:delete{5}
-box.sort(s0.index['i2']:select(0, { limit = 100 }))
+box.sort(s0.index['i2']:select(0))
 
 s0:drop()
 s0 = nil

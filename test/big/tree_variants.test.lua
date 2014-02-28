@@ -20,10 +20,10 @@ space:insert{9, 9, 400, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 
 space.index['primary']:get{1}
 space.index['i1']:select{2}
-space.index[2]:select({300}, { limit = 100 })
-#space.index['i3']:select({'Joe', 'Sixpack'}, { limit = 100 })
-#space.index['i3']:select('John', { limit = 100 })
-#space.index['i4']:select('A Pipe', { limit = 100 })
+space.index[2]:select({300})
+#space.index['i3']:select({'Joe', 'Sixpack'})
+#space.index['i3']:select('John')
+#space.index['i4']:select('A Pipe')
 {space.index['i4']:select{'Miller Genuine Draft', 'Drinks'}}
 space.index['i5']:select{2007}
 space.index[6]:select{'Miller Genuine Draft', 'Drinks'}
@@ -40,8 +40,8 @@ space:insert{9, 9ULL, 400ULL, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009}
 
 space.index['i1']:select{6ULL}
 space.index['i1']:select{6}
-space.index['i2']:select(400ULL, { limit = 100 })
-space.index['i2']:select(400, { limit = 100})
+space.index['i2']:select(400ULL)
+space.index['i2']:select(400)
 
 space:select{}
 

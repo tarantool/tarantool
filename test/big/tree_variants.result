@@ -70,21 +70,21 @@ space.index['i1']:select{2}
 ---
 - - [2, 2, 200, 'Joe', 'Sixpack', 'Drinks', 'Carlsberg', 'bar', 2002]
 ...
-space.index[2]:select({300}, { limit = 100 })
+space.index[2]:select({300})
 ---
 - - [3, 3, 300, 'Joe', 'Sixpack', 'Drinks', 'Corona Extra', 'bar', 2003]
   - [4, 4, 300, 'Joe', 'Sixpack', 'Drinks', 'Stella Artois', 'bar', 2004]
   - [5, 5, 300, 'Joe', 'Sixpack', 'Drinks', 'Miller Genuine Draft', 'bar', 2005]
 ...
-#space.index['i3']:select({'Joe', 'Sixpack'}, { limit = 100 })
+#space.index['i3']:select({'Joe', 'Sixpack'})
 ---
 - 6
 ...
-#space.index['i3']:select('John', { limit = 100 })
+#space.index['i3']:select('John')
 ---
 - 4
 ...
-#space.index['i4']:select('A Pipe', { limit = 100 })
+#space.index['i4']:select('A Pipe')
 ---
 - 1
 ...
@@ -140,14 +140,14 @@ space.index['i1']:select{6}
 ---
 - - [6, 6, 400, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006]
 ...
-space.index['i2']:select(400ULL, { limit = 100 })
+space.index['i2']:select(400ULL)
 ---
 - - [6, 6, 400, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006]
   - [7, 7, 400, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007]
   - [8, 8, 400, 'John', 'Smoker', 'Rolls', 'A Joint', 'foo', 2008]
   - [9, 9, 400, 'John', 'Smoker', 'Rolls', 'A Blunt', 'foo', 2009]
 ...
-space.index['i2']:select(400, { limit = 100})
+space.index['i2']:select(400)
 ---
 - - [6, 6, 400, 'John', 'Smoker', 'Hits', 'A Pipe', 'foo', 2006]
   - [7, 7, 400, 'John', 'Smoker', 'Hits', 'A Bong', 'foo', 2007]

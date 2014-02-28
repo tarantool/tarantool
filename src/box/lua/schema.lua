@@ -381,16 +381,16 @@ function box.schema.space.bless(space)
 
         if opts ~= nil then
             if opts.offset ~= nil then
-                offset = tonumber(opts.offset)
+                offset = opts.offset
             end
             if type(opts.iterator) == "string" then
                 opts.iterator = box.index[opts.iterator]
             end
             if opts.iterator ~= nil then
-                iterator = tonumber(opts.iterator)
+                iterator = opts.iterator
             end
             if opts.limit ~= nil then
-                limit = tonumber(opts.limit)
+                limit = opts.limit
             end
         end
 
