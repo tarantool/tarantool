@@ -11,7 +11,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <say.h>

@@ -2804,7 +2804,7 @@ for instructions about defining triggers for connect and disconnect events
       The channel is garbage collected when no one is using it, as with any
       other Lua object.
       Object-oriented and functional APIs are equivalent, so <code>channel:put(message)</code>
-      is the same as <code>box.ipc.channel.put(channel, message)</code>. 
+      is the same as <code>channel:put(channel, message)</code>. 
     </para>
 <variablelist xml:id="box.ipc">
     <para>
@@ -2824,11 +2824,11 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.put(<replaceable>channel, message[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:put(<replaceable>channel, message[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message using a channel. If the channel is full,
-                <code>box.ipc.channel.put()</code>
+                <code>channel:put()</code>
                 blocks until there is a free slot in the channel.
             </para>
             <para>
@@ -2838,17 +2838,28 @@ for instructions about defining triggers for connect and disconnect events
                 Returns: If <code>timeout</code> is provided,
                 and the channel doesn't become empty for the duration
                 of the timeout,
-                <code>box.ipc.channel.put()</code>
+                <code>channel:put()</code>
                 returns false. Otherwise it returns true.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.get(<replaceable>channel[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:close()</emphasis></term>
+        <listitem>
+            <simpara>
+               Close the channel. All waiters in the channel will be
+               woken up. All following <code>channel:put()</code>
+               or <code>channel:get()</code> operations will return
+               an error (nil).
+            </simpara>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">channel:get(<replaceable>channel[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Fetch a message from a channel. If the channel is empty,
-                <code>box.ipc.channel.get()</code>
+                <code>channel:get()</code>
                 blocks until there is a message.
             </para>
             <para>
@@ -2858,18 +2869,18 @@ for instructions about defining triggers for connect and disconnect events
                 Possible errors: If <code>timeout</code> is provided,
                 and there are no new messages for the duration
                 of the timeout,
-                <code>box.ipc.channel.get()</code>
+                <code>channel:get()</code>
                 returns error.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.broadcast(<replaceable>channel, message, timeout</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:broadcast(<replaceable>channel, message, timeout</replaceable>)</emphasis></term>
         <listitem>
             <para>
-             If the channel is empty, <code>box.ipc.channel.broadcast()</code> is equivalent to
-             <code>box.ipc.channel.put()</code>.
-              Otherwise, <code>box.ipc.channel.broadcast()</code> sends the message to all readers of the
+             If the channel is empty, <code>channel:broadcast()</code> is equivalent to
+             <code>channel:put()</code>.
+              Otherwise, <code>channel:broadcast()</code> sends the message to all readers of the
               channel.
             </para>
             <para>
@@ -2878,7 +2889,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.is_empty(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_empty(<replaceable>channel</replaceable>)</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty (has no messages).
@@ -2892,7 +2903,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.is_full(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_full(<replaceable>channel</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full.
@@ -2906,11 +2917,11 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.has_readers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_readers(<replaceable>channel</replaceable>)</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty and has readers waiting
-               for a message (because they have issued <code>box.ipc.channel.get()</code> and then
+               for a message (because they have issued <code>channel:get()</code> and then
                blocked).
             </para>
             <para>
@@ -2922,11 +2933,11 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel.has_writers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_writers(<replaceable>channel</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full and has writers waiting
-                (because they have issued <code>box.ipc.channel.put()</code> and then blocked
+                (because they have issued <code>channel:put()</code> and then blocked
                 due to lack of room).
             </para>
             <para>
@@ -2935,6 +2946,16 @@ for instructions about defining triggers for connect and disconnect events
             <para>
                 Returns: (type = boolean) true if blocked users are waiting. Otherwise false.
             </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">channel:is_closed()</emphasis></term>
+        <listitem>
+            <simpara>
+                Return true if the specified channel is already
+                closed.
+                Otherwise return false.
+            </simpara>
         </listitem>
     </varlistentry>
 </variablelist>

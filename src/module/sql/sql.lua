@@ -92,9 +92,9 @@ box.net.sql = {
         execute = function(self, sql, ...)
             -- waits until connection will be free
             while self.processing do
-                self.queue[ box.fiber.fid ] = box.ipc.channel()
-                self.queue[ box.fiber.fid ]:get()
-                self.queue[ box.fiber.fid ] = nil
+                self.queue[ box.fiber.id() ] = box.ipc.channel()
+                self.queue[ box.fiber.id() ]:get()
+                self.queue[ box.fiber.id() ] = nil
             end
             self.processing = true
 

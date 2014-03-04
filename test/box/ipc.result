@@ -229,3 +229,116 @@ tfbr2 - 43
 tfbr  - 44
 tfbr2 - 45
 ...
+lua ch = box.ipc.channel(1)
+---
+...
+lua ch:is_closed()
+---
+ - false
+...
+lua passed = false
+---
+...
+lua type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+---
+ - userdata
+...
+lua ch:close()
+---
+...
+lua passed
+---
+ - true
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:put(10)
+---
+ - false
+...
+lua ch:is_closed()
+---
+ - true
+...
+lua ch = box.ipc.channel(1)
+---
+...
+lua ch:put(true)
+---
+ - true
+...
+lua ch:is_closed()
+---
+ - false
+...
+lua passed = false
+---
+...
+lua type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+---
+ - userdata
+...
+lua ch:close()
+---
+...
+lua passed
+---
+ - true
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:get()
+---
+ - nil
+...
+lua ch:put(10)
+---
+ - false
+...
+lua ch:is_closed()
+---
+ - true
+...
+lua chs = {}
+---
+...
+lua count = 0
+---
+...
+lua res = { }
+---
+...
+lua for i = 1, 10 do table.insert(chs, box.ipc.channel()) end
+---
+...
+lua for i = 1, 10 do local no = i box.fiber.wrap(function() box.fiber.self():name('pusher') while true do  chs[no]:put({no}) box.fiber.sleep(0.001 * math.random()) end end) end
+---
+...
+lua for i = 1, 10 do local no = i box.fiber.wrap(function() box.fiber.self():name('receiver') while true do local r = chs[no]:get(math.random() * .001) if r ~= nil and r[1] == no then res[no] = true elseif r ~= nil then break end box.fiber.sleep(0.001 * math.random()) count = count + 1 end res[no] = false end) end
+---
+...
+lua for i = 1, 100 do box.fiber.sleep(0.01) if count > 2000 then break end end
+---
+...
+lua #res, unpack(res)
+---
+ - 10
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+ - true
+...

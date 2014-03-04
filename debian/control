@@ -12,7 +12,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
@@ -47,6 +47,8 @@ Description: In-memory database with Lua application server
  This package provides Tarantool server.
 
 Package: tarantool-modules
+Conflicts: tarantool-plugins (<< 1.5.3)
+Replaces: tarantool-plugins (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
@@ -55,41 +57,43 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool-postgresql-module,
  tarantool-mysql-module,
  tarantool-sophia-module
-Suggests: tarantool-dbg, libdr-tarantool-perl
 Description: Tarantool in-memory database - all plug-ins bundle
  Tarantool is an in-memory database and Lua application server.
- This package provides (or depends on) all Tarantool plug-ins.
+ This package provides (or depends on) all Tarantool additional
+ modules.
 
 Package: tarantool-sql-module
+Conflicts:
+ tarantool-postgresql-plugin (<< 1.5.3),
+ tarantool-mysql-plugin (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
-Suggests: tarantool-dbg, libdr-tarantool-perl
 Description: Tarantool in-memory database - PostgreSQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to PostgreSQL database for
  Tarantool Lua stored procedures.
 
 Package: tarantool-postgresql-module
+Conflicts: tarantool-postgresql-plugin (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool-sql-module (= ${binary:Version}),
  tarantool (= ${binary:Version})
-Suggests: tarantool-dbg, libdr-tarantool-perl
 Description: Tarantool in-memory database - PostgreSQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to PostgreSQL database for
  Tarantool Lua stored procedures.
 
 Package: tarantool-mysql-module
+Conflicts: tarantool-mysql-plugin (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool-sql-module (= ${binary:Version}),
  tarantool (= ${binary:Version})
-Suggests: tarantool-dbg, libdr-tarantool-perl
 Description: Tarantool in-memory database - MySQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to MySQL database for Tarantool
@@ -100,7 +104,6 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool (= ${binary:Version})
-Suggests: tarantool-dbg
 Description: Tarantool in-memory database - sophia bindings
  Tarantool is an in-memory database and Lua application server.
  This package contains a bindings to the Sophia database for
