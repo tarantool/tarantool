@@ -203,23 +203,49 @@ local function keify(key)
     return {key}
 end
 
-local iterator_mt = {
-    __call = function(iterator)
-        local tuple = iterator.cdata.next(iterator.cdata)
-        if tuple ~= nil then
-            return box.tuple.bless(tuple)
-        else
-            return nil
-        end
-    end;
+local iterator_t = ffi.typeof('struct iterator')
+ffi.metatype(iterator_t, {
     __tostring = function(iterator)
-        return string.format("iterator on space %d index %d",
-            iterator.index.n, iterator.index.id)
+        return "<iterator state>"
     end;
-}
+})
 
-local iterator_cdata_gc = function(iterator_cdata)
-    return iterator_cdata.free(iterator_cdata)
+local iterator_gen = function(param, state)
+    --[[
+        index:pairs() mostly confirms to the Lua for-in loop conventions and
+        tries to follow the best practices of Lua community.
+
+        - this generating function is stateless.
+
+        - *param* should contain **immutable** data needed to fully define
+          an iterator. *param* is opaque for users. Currently it contains keybuf
+          string just to prevent GC from collecting it. In future some other
+          variables like space_id, index_id, sc_version will be stored here.
+
+        - *state* should contain **immutable** transient state of an iterator.
+          *state* is opaque for users. Currently it contains `struct iterator`
+          cdata that is modified during iteration. This is a sad limitation of
+          underlying C API. Moreover, the separation of *param* and *state* is
+          not properly implemented here. These drawbacks can be fixed in
+          future without changing this API.
+
+        Please checkout http://www.lua.org/pil/7.3.html for the further
+        information.
+    --]]
+    if not ffi.istype(iterator_t, state) then
+        error('usage gen(param, state)')
+    end
+    -- next() modifies state in-place
+    local tuple = state.next(state)
+    if tuple ~= nil then
+        return state, box.tuple.bless(tuple) -- new state, value
+    else
+        return nil
+    end
+end
+
+local iterator_cdata_gc = function(iterator)
+    return iterator.free(iterator)
 end
 
 -- global struct port instance to use by select()/get()
@@ -260,7 +286,7 @@ function box.schema.space.bless(space)
     end
     index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
-    index_mt.iterator = function(index, key, opts)
+    index_mt.pairs = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         -- Use ALL for {} and nil keys and EQ for other keys
         local itype = pkey + 1 < pkey_end and box.index.EQ or box.index.ALL
@@ -281,12 +307,10 @@ function box.schema.space.bless(space)
             box.raise()
         end
 
-        return setmetatable({
-            cdata = ffi.gc(cdata, iterator_cdata_gc);
-            keybuf = keybuf;
-            index = index;
-        }, iterator_mt)
+        return iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc)
     end
+    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
     -- index subtree size
     index_mt.count = function(index, key, opts)
         local count = 0
@@ -302,7 +326,8 @@ function box.schema.space.bless(space)
             return #index.idx
         end
 
-        for tuple in index:iterator(key, { iterator = iterator }) do
+        local state, tuple
+        for state, tuple in index:pairs(key, { iterator = iterator }) do
             count = count + 1
         end
         return count
@@ -352,7 +377,8 @@ function box.schema.space.bless(space)
             return result
         end
 
-        for tuple in index:iterator(key, { iterator = iterator }) do
+        local state, tuple
+        for state, tuple in index:pairs(key, { iterator = iterator }) do
             if grep == nil or grep(tuple) then
                 if skip < offset then
                     skip = skip + 1
@@ -494,15 +520,18 @@ function box.schema.space.bless(space)
         table.insert(tuple, 1, max + 1)
         return space:insert(tuple)
     end
-    space_mt.iterator = function(space, key)
+    space_mt.pairs = function(space, key)
         check_index(space, 0)
-        return space.index[0]:iterator(key)
+        return space.index[0]:pairs(key)
     end
+    space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
+    space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.truncate = function(space)
         check_index(space, 0)
         local pk = space.index[0]
         while #pk.idx > 0 do
-            for t in pk:iterator() do
+            local state, t
+            for state, t in pk:pairs() do
                 local key = {}
                 -- ipairs does not work because pk.key_field is zero-indexed
                 for _k2, key_field in pairs(pk.key_field) do

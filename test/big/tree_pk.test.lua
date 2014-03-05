@@ -52,8 +52,8 @@ s1:delete{'third'}
 --# setopt delimiter ';'
 function crossjoin(space0, space1, limit)
     local result = {}
-    for v0 in space0:iterator() do
-        for v1 in space1:iterator() do
+    for state, v0 in space0:pairs() do
+        for state, v1 in space1:pairs() do
             if limit <= 0 then
                 return result
             end
@@ -212,7 +212,7 @@ s:insert{7}
 s:insert{8}
 
 -- it seems that all elements will be deleted:
-for t in ind:iterator() do s:delete{t[0]} end
+for state, t in ind:pairs() do s:delete{t[0]} end
 
 -- but (oops) some elements are left in space:
 iterate('test', 'primary', 0, 1)
@@ -232,12 +232,16 @@ s:insert{2}
 s:insert{4} -- now you see me
 s:insert{1}
 
-itr = ind:iterator()
-itr() -- 1
-itr() -- 2
+gen, param, state = ind:pairs()
+state, val = gen(param, state)
+val -- 1
+state, val = gen(param, state)
+val -- 2
 for i = 5,100 do s:insert{i} end
-itr() -- 3
-itr() -- now you don't
+state, val = gen(param, state)
+val -- 3
+state, val = gen(param, state)
+val -- now you don't
 
 -- cleanup
 s:drop()
@@ -254,12 +258,15 @@ s:insert{2}
 s:insert{1}
 s:insert{3}
 
-itr = ind:iterator()
-itr() -- 1
+gen, param, state = ind:pairs()
+state, val = gen(param, state)
+val -- 1
 s:delete{2}
 s:insert{0}
-itr() -- 1 again
-itr() -- null
+state, val = gen(param, state)
+val -- 1 again
+state, val = gen(param, state)
+val -- null
 
 -- cleanup
 s:drop()

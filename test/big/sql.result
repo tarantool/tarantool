@@ -228,7 +228,7 @@ insert into t0 values (41234567, 'part1_a', 'part2_a')
 l = {}
 ---
 ...
-for v in s:iterator() do table.insert(l, v) end
+for state, v in s:pairs() do table.insert(l, v) end
 ---
 ...
 return l

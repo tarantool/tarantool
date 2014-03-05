@@ -12,7 +12,7 @@ for i = 1, 1000 do
         space:insert{tostring(j), os.time(), 1}
     end
     count = 0
-    for v in space.index[1]:iterator() do
+    for state, v in space.index[1]:pairs() do
         count = count + 1
     end
     if count ~= 30 then
