@@ -515,7 +515,7 @@ class TarantoolServer(Server):
     def copy_config(self, rand=True, override = ['all']):
         override_all = (True if 'all' in override else False)
 
-        port = random.randrange(34000, 65535)
+        port = random.randrange(3300, 9999)
         for t in self.generate_ports:
             if not t in self.conf:
                 self.conf[t] = find_port(port)
