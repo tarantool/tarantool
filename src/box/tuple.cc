@@ -380,7 +380,10 @@ tuple_new(struct tuple_format *format, uint32_t field_count,
 {
 	size_t tuple_len = end - *data;
 
-	if (tuple_len != tuple_range_size(data, end, field_count))
+	uint32_t test_field_count = field_count;
+	if (tuple_len != tuple_range_size(data, end, &test_field_count))
+		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
+	if (test_field_count > 0)
 		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
 
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
