@@ -216,19 +216,6 @@ box.net = {
                     [box.net.box.TUPLE] = {...}}))
         end,
 
-        eselect = function(self, sno, ino, key, opts)
-            local res = self:call('box.net.self:eselect', sno, ino, key, opts)
-            if opts and opts.limit == nil then
-                if res[1] ~= nil then
-                    return res[1]
-                else
-                    return
-                end
-            end
-            return res
-        end,
-
-
         -- To make use of timeouts safe across multiple
         -- concurrent fibers do not store timeouts as
         -- part of conection state, but put it inside
@@ -262,23 +249,6 @@ box.net = {
     self = {
         process = function(self, ...)
             return box.process(...)
-        end,
-
-
-        eselect = function(self, sno, ino, key, opts)
-            local space = box.space[ sno ]
-            if space == nil then
-                box.raise(box.error.ER_NO_SUCH_SPACE,
-                    sprintf("No such space #%s", tostring(sno)))
-            end
-            local index = space.index[ ino ]
-            if index == nil then
-                box.raise(box.error.ER_NO_SUCH_INDEX,
-                    sprintf("No such index #%s in space #%s",
-                        tostring(sno), tostring(ino)))
-            end
-
-            return index:eselect(key, opts)
         end,
 
         -- for compatibility with the networked version,

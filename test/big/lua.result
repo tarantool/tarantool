@@ -135,12 +135,12 @@ space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
 ---
 - [1, 'of', 'might', 'and', 'magic']
 ...
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'GE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'GE' })
 ---
 - - [1, 'of', 'might', 'and', 'magic']
   - [0, 'of', 'puppets']
 ...
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'LE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'LE' })
 ---
 - - [0, 'of', 'puppets']
   - [1, 'of', 'might', 'and', 'magic']
@@ -321,7 +321,7 @@ space:insert{9, 0}
 ---
 - [9, 0]
 ...
-space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
+space.index['range']:select({}, { limit = 10, iterator = 'GE' })
 ---
 - - [0, 0]
   - [1, 0]
@@ -334,7 +334,7 @@ space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
   - [8, 0]
   - [9, 0]
 ...
-space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
+space.index['range']:select({}, { limit = 10, iterator = 'LE' })
 ---
 - - [9, 0]
   - [8, 0]
@@ -347,7 +347,7 @@ space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
   - [1, 0]
   - [0, 0]
 ...
-space.index['range']:eselect({}, { limit = 4, iterator = 'LE' })
+space.index['range']:select({}, { limit = 4, iterator = 'LE' })
 ---
 - - [9, 0]
   - [8, 0]
@@ -472,7 +472,7 @@ t = {}
 ...
 index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
 ---
-- error: '[string "-- schema.lua (internal file)..."]:299: Wrong iterator type: wrong_iterator_type'
+- error: '[string "-- schema.lua (internal file)..."]:298: Wrong iterator type: wrong_iterator_type'
 ...
 index = nil
 ---

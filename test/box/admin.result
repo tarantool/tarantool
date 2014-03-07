@@ -14,7 +14,7 @@ box.stat()
     total: 0
     rps: 0
   SELECT:
-    total: 0
+    total: 1
     rps: 0
   REPLACE:
     total: 0
@@ -76,7 +76,7 @@ box.stat()
     total: 0
     rps: 0
   SELECT:
-    total: 0
+    total: 1
     rps: 0
   REPLACE:
     total: 0

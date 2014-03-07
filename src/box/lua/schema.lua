@@ -112,8 +112,7 @@ box.schema.index.create = function(space_id, name, options)
     local iid = 0
     -- max
     local tuple = _index.index[0]
-        :eselect(space_id, { limit = 1, iterator = 'LE' })
-    tuple = tuple[1]
+        :select(space_id, { limit = 1, iterator = 'LE' })[1]
     if tuple then
         local id = tuple[0]
         if id == space_id then
@@ -266,9 +265,9 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
         end
-        local lst = index:eselect(key, { iterator = 'GE', limit = 1 })
-        if lst[1] ~= nil then
-            return lst[1]
+        local lst = index:select(key, { iterator = 'GE', limit = 1 })[1]
+        if lst ~= nil then
+            return lst
         else
             return
         end
@@ -277,9 +276,9 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
         end
-        local lst = index:eselect(key, { iterator = 'LE', limit = 1 })
-        if lst[1] ~= nil then
-            return lst[1]
+        local lst = index:select(key, { iterator = 'LE', limit = 1 })[1]
+        if lst ~= nil then
+            return lst
         else
             return
         end
@@ -339,72 +338,6 @@ function box.schema.space.bless(space)
                 string.format("No index #%d is defined in space %d", index_id,
                     space.n))
         end
-    end
-
-    -- eselect
-    index_mt.eselect = function(index, key, opts)
-        -- user can catch link to index
-        check_index(box.space[index.n], index.id)
-
-        if opts == nil then
-            opts = {}
-        end
-
-        local iterator = opts.iterator
-
-        if iterator == nil then
-            iterator = box.index.EQ
-        end
-        if type(iterator) == 'string' then
-            if box.index[ iterator ] == nil then
-                error(string.format("Wrong iterator: %s", tostring(iterator)))
-            end
-            iterator = box.index[ iterator ]
-        end
-
-        local result = {}
-        local offset = 0
-        local skip = 0
-        local count = 0
-        if opts.offset ~= nil then
-            offset = tonumber(opts.offset)
-        end
-        local limit = opts.limit
-        local grep = opts.grep
-        local map = opts.map
-
-        if limit == 0 then
-            return result
-        end
-
-        local state, tuple
-        for state, tuple in index:pairs(key, { iterator = iterator }) do
-            if grep == nil or grep(tuple) then
-                if skip < offset then
-                    skip = skip + 1
-                else
-                    if map == nil then
-                        table.insert(result, tuple)
-                    else
-                        table.insert(result, map(tuple))
-                    end
-                    count = count + 1
-
-                    if limit == nil then
-                        if count > 1 then
-                            box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
-                                "More than one tuple found without 'limit'")
-                        end
-                    elseif count >= limit then
-                        break
-                    end
-                end
-            end
-        end
-        if limit == nil then
-            return result[1]
-        end
-        return result
     end
 
     index_mt.get = function(index, key)
@@ -481,10 +414,6 @@ function box.schema.space.bless(space)
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
 
-    space_mt.eselect = function(space, key, opts)
-        check_index(space, 0)
-        return space.index[0]:eselect(key, opts)
-    end
     space_mt.get = function(space, key)
         check_index(space, 0)
         return space.index[0]:get(key)
