@@ -306,17 +306,6 @@ static inline size_t tuple_len(struct tuple *tuple)
 		sizeof(tuple->field_count);
 }
 
-static inline size_t
-tuple_range_size(const char **begin, const char *end, uint32_t *count)
-{
-	const char *start = *begin;
-	while (*begin < end && (*count)-- > 0) {
-		size_t len = load_varint32(begin);
-		*begin += len;
-	}
-	return *begin - start;
-}
-
 void tuple_free(struct tuple *tuple);
 
 /**
