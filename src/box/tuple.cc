@@ -374,14 +374,24 @@ tuple_update(struct tuple_format *format,
 	return new_tuple;
 }
 
+static inline void
+tuple_verify_data(const char **begin, const char *end, uint32_t field_count)
+{
+	while (*begin < end && field_count-- > 0) {
+		size_t len = load_varint32(begin);
+		*begin += len;
+	}
+	if (field_count > 0 || *begin != end)
+		tnt_raise(IllegalParams, "during verifying tuple: incorrect tuple format");
+}
+
 struct tuple *
 tuple_new(struct tuple_format *format, uint32_t field_count,
 	  const char **data, const char *end)
 {
 	size_t tuple_len = end - *data;
 
-	if (tuple_len != tuple_range_size(data, end, field_count))
-		tnt_raise(IllegalParams, "tuple_new(): incorrect tuple format");
+	tuple_verify_data(data, end, field_count);
 
 	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
 	new_tuple->field_count = field_count;

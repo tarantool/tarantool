@@ -63,6 +63,9 @@ exec sql "call f1()"
 exec admin "lua function f1() return f1 end"
 exec sql "call f1()"
 
+# Test case for gh-140, crash with wrong box.process(..) call
+exec admin "lua box.process(13, box.pack('iiippp', 0, 0, 99999, 99999, 'wrong', 'tuple'))"
+
 exec sql "insert into t0 values (1, 'test box delete')"
 exec sql "call box.delete('0', '\1\0\0\0')"
 exec sql "call box.delete('0', '\1\0\0\0')"
