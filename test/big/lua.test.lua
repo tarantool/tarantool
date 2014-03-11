@@ -52,8 +52,8 @@ space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, uniq
 space:insert{1234567, 'new', 'world'}
 space:insert{0, 'of', 'puppets'}
 space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'GE' })
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'LE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'GE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'LE' })
 space:truncate()
 
 --
@@ -121,9 +121,9 @@ space:insert{6, 0}
 space:insert{7, 0}
 space:insert{8, 0}
 space:insert{9, 0}
-space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
-space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
-space.index['range']:eselect({}, { limit = 4, iterator = 'LE' })
+space.index['range']:select({}, { limit = 10, iterator = 'GE' })
+space.index['range']:select({}, { limit = 10, iterator = 'LE' })
+space.index['range']:select({}, { limit = 4, iterator = 'LE' })
 space:drop()
 
 --

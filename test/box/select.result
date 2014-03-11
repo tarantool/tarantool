@@ -1,7 +1,4 @@
-print('eselect')
----
-...
-s = box.schema.create_space('eselect', { temporary = true })
+s = box.schema.create_space('select', { temporary = true })
 ---
 ...
 index = s:create_index('primary', { type = 'tree' })
@@ -12,101 +9,6 @@ s:create_index('second', { type = 'tree', unique = true,  parts = {1, 'num', 0, 
 ...
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 ---
-...
-s.index[0]:eselect(nil, { iterator = 'ALL', offset = 0, limit = 4294967295 })
----
-- - [1, 1, 2, 3]
-  - [2, 1, 2, 3]
-  - [3, 1, 2, 3]
-  - [4, 1, 2, 3]
-  - [5, 1, 2, 3]
-  - [6, 1, 2, 3]
-  - [7, 1, 2, 3]
-  - [8, 1, 2, 3]
-  - [9, 1, 2, 3]
-  - [10, 1, 2, 3]
-  - [11, 1, 2, 3]
-  - [12, 1, 2, 3]
-  - [13, 1, 2, 3]
-  - [14, 1, 2, 3]
-  - [15, 1, 2, 3]
-  - [16, 1, 2, 3]
-  - [17, 1, 2, 3]
-  - [18, 1, 2, 3]
-  - [19, 1, 2, 3]
-  - [20, 1, 2, 3]
-...
-s.index[0]:eselect({}, { iterator = 'ALL', offset = 0, limit = 4294967295 })
----
-- - [1, 1, 2, 3]
-  - [2, 1, 2, 3]
-  - [3, 1, 2, 3]
-  - [4, 1, 2, 3]
-  - [5, 1, 2, 3]
-  - [6, 1, 2, 3]
-  - [7, 1, 2, 3]
-  - [8, 1, 2, 3]
-  - [9, 1, 2, 3]
-  - [10, 1, 2, 3]
-  - [11, 1, 2, 3]
-  - [12, 1, 2, 3]
-  - [13, 1, 2, 3]
-  - [14, 1, 2, 3]
-  - [15, 1, 2, 3]
-  - [16, 1, 2, 3]
-  - [17, 1, 2, 3]
-  - [18, 1, 2, 3]
-  - [19, 1, 2, 3]
-  - [20, 1, 2, 3]
-...
-s.index[0]:eselect(1)
----
-- [1, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = box.index.EQ })
----
-- [1, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'EQ' })
----
-- [1, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'GE' })
----
-- error: More than one tuple found without 'limit'
-...
-s.index[0]:eselect(1, { iterator = 'GE', limit = 2 })
----
-- - [1, 1, 2, 3]
-  - [2, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'LE', limit = 2 })
----
-- - [1, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'GE', offset = 10, limit = 2 })
----
-- - [11, 1, 2, 3]
-  - [12, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'GE', grep = function(t) if math.fmod(t[0], 2) == 0 then return true end end, limit = 2 })
----
-- - [2, 1, 2, 3]
-  - [4, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'GE', grep = function(t) if math.fmod(t[0], 2) == 0 then return true end end, limit = 2, offset = 1 })
----
-- - [4, 1, 2, 3]
-  - [6, 1, 2, 3]
-...
-s.index[0]:eselect(1, { iterator = 'GE', grep = function(t) if math.fmod(t[0], 2) == 0 then return true end end, limit = 2, offset = 1, map = function(t) return { t[0] } end })
----
-- - - 4
-  - - 6
-...
-s:eselect(2)
----
-- [2, 1, 2, 3]
 ...
 --------------------------------------------------------------------------------
 -- get tests
@@ -531,6 +433,105 @@ s.index[1]:select({1, 2}, {iterator = box.index.REQ})
 - - [2, 1, 2, 3]
 ...
 s.index[1]:select({1, 2})
+---
+- - [2, 1, 2, 3]
+...
+s.index[0]:select(nil, { iterator = 'ALL', offset = 0, limit = 4294967295 })
+---
+- - [1, 1, 2, 3]
+  - [2, 1, 2, 3]
+  - [3, 1, 2, 3]
+  - [4, 1, 2, 3]
+  - [5, 1, 2, 3]
+  - [6, 1, 2, 3]
+  - [7, 1, 2, 3]
+  - [8, 1, 2, 3]
+  - [9, 1, 2, 3]
+  - [10, 1, 2, 3]
+  - [11, 1, 2, 3]
+  - [12, 1, 2, 3]
+  - [13, 1, 2, 3]
+  - [14, 1, 2, 3]
+  - [15, 1, 2, 3]
+  - [16, 1, 2, 3]
+  - [17, 1, 2, 3]
+  - [18, 1, 2, 3]
+  - [19, 1, 2, 3]
+  - [20, 1, 2, 3]
+...
+s.index[0]:select({}, { iterator = 'ALL', offset = 0, limit = 4294967295 })
+---
+- - [1, 1, 2, 3]
+  - [2, 1, 2, 3]
+  - [3, 1, 2, 3]
+  - [4, 1, 2, 3]
+  - [5, 1, 2, 3]
+  - [6, 1, 2, 3]
+  - [7, 1, 2, 3]
+  - [8, 1, 2, 3]
+  - [9, 1, 2, 3]
+  - [10, 1, 2, 3]
+  - [11, 1, 2, 3]
+  - [12, 1, 2, 3]
+  - [13, 1, 2, 3]
+  - [14, 1, 2, 3]
+  - [15, 1, 2, 3]
+  - [16, 1, 2, 3]
+  - [17, 1, 2, 3]
+  - [18, 1, 2, 3]
+  - [19, 1, 2, 3]
+  - [20, 1, 2, 3]
+...
+s.index[0]:select(1)
+---
+- - [1, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = box.index.EQ })
+---
+- - [1, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = 'EQ' })
+---
+- - [1, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = 'GE' })
+---
+- - [1, 1, 2, 3]
+  - [2, 1, 2, 3]
+  - [3, 1, 2, 3]
+  - [4, 1, 2, 3]
+  - [5, 1, 2, 3]
+  - [6, 1, 2, 3]
+  - [7, 1, 2, 3]
+  - [8, 1, 2, 3]
+  - [9, 1, 2, 3]
+  - [10, 1, 2, 3]
+  - [11, 1, 2, 3]
+  - [12, 1, 2, 3]
+  - [13, 1, 2, 3]
+  - [14, 1, 2, 3]
+  - [15, 1, 2, 3]
+  - [16, 1, 2, 3]
+  - [17, 1, 2, 3]
+  - [18, 1, 2, 3]
+  - [19, 1, 2, 3]
+  - [20, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = 'GE', limit = 2 })
+---
+- - [1, 1, 2, 3]
+  - [2, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = 'LE', limit = 2 })
+---
+- - [1, 1, 2, 3]
+...
+s.index[0]:select(1, { iterator = 'GE', offset = 10, limit = 2 })
+---
+- - [11, 1, 2, 3]
+  - [12, 1, 2, 3]
+...
+s:select(2)
 ---
 - - [2, 1, 2, 3]
 ...
