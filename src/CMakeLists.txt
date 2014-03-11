@@ -23,6 +23,7 @@ set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
+lua_source(lua_sources ../third_party/luafun/fun.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 

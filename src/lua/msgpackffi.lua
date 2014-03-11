@@ -507,7 +507,7 @@ end
 -- exports
 --------------------------------------------------------------------------------
 
-package.loaded.msgpackffi = {
+return {
     NULL = NULL;
     encode = encode;
     on_encode = on_encode;

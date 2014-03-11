@@ -891,8 +891,7 @@ space.index['primary']:pairs({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 ---
-- error: '[string "-- msgpackffi.lua (internal file)..."]:261: can not encode Lua
-    type: ''function'''
+- error: 'builtin/msgpackffi.lua:261: can not encode Lua type: ''function'''
 ...
 space:drop()
 ---

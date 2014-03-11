@@ -1,0 +1,180 @@
+--------------------------------------------------------------------------------
+-- # luafun integration
+--------------------------------------------------------------------------------
+space = box.schema.create_space('tweedledum')
+---
+...
+space:create_index('primary', { type = 'hash' })
+---
+...
+for i = 1,5,1 do space:replace({i, i}) end
+---
+...
+fun = require('fun')
+---
+...
+-- print all methods from metatable
+methods = fun.iter(getmetatable(fun.range(5)).__index):totable()
+---
+...
+table.sort(methods)
+---
+...
+methods
+---
+- - all
+  - any
+  - car
+  - cdr
+  - chain
+  - cycle
+  - drop
+  - drop_n
+  - drop_while
+  - each
+  - elem_index
+  - elem_indexes
+  - elem_indices
+  - enumerate
+  - every
+  - filter
+  - foldl
+  - for_each
+  - foreach
+  - grep
+  - head
+  - index
+  - index_of
+  - indexes
+  - indices
+  - intersperse
+  - is_null
+  - is_prefix_of
+  - length
+  - map
+  - max
+  - max_by
+  - maximum
+  - min
+  - min_by
+  - minimum
+  - minimum_by
+  - nth
+  - op
+  - operator
+  - partition
+  - product
+  - reduce
+  - remove_if
+  - some
+  - span
+  - split
+  - split_at
+  - sum
+  - tail
+  - take
+  - take_n
+  - take_while
+  - tomap
+  - totable
+  - unwrap
+  - zip
+...
+-- iter on arrays
+fun.iter({1, 2, 3}):totable()
+---
+- - 1
+  - 2
+  - 3
+...
+fun.iter({2, 4, 6, 8}):all(function(x) return x % 2 == 1 end)
+---
+- false
+...
+-- iter on hashes
+fun.iter({a = 1, b = 2, c = 3}):tomap()
+---
+- b: 2
+  a: 1
+  c: 3
+...
+-- iter on tuple
+fun.iter(box.tuple.new({1, 2, 3}):pairs()):totable()
+---
+- - 1
+  - 2
+  - 3
+...
+-- iter on space (using __ipairs)
+function pred(t) return t[1] % 2 == 0 end
+---
+...
+fun.iter(space):totable()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+fun.iter(space:pairs()):totable()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+space:pairs():filter(pred):drop(2):take(3):totable()
+---
+- []
+...
+-- iter on index (using __ipairs)
+fun.iter(space.index[0]):totable()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+fun.iter(space.index[0]:pairs()):totable()
+---
+- - [1, 1]
+  - [2, 2]
+  - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+space.index[0]:pairs():drop(2):take(3):totable()
+---
+- - [3, 3]
+  - [4, 4]
+  - [5, 5]
+...
+-- test global functions
+--# setopt delimiter ';'
+fun.reduce(function(acc, val) return acc + val end, 0,
+    fun.filter(function(x) return x % 11 == 0 end,
+    fun.map(function(x) return 2 * x end, fun.range(1000))));
+---
+- 90090
+...
+--# setopt delimiter ''
+t = {}
+---
+...
+fun.foreach(function(x) table.insert(t, x) end, "abcde")
+---
+...
+t
+---
+- - a
+  - b
+  - c
+  - d
+  - e
+...
+space:drop()
+---
+...

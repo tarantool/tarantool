@@ -3,6 +3,7 @@
 local ffi = require('ffi')
 local yaml = require('yaml')
 local msgpackffi = require('msgpackffi')
+local fun = require('fun')
 
 ffi.cdef([[
 struct tuple
@@ -83,7 +84,7 @@ end
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-ipairs
 local function tuple_ipairs(tuple, pos)
     local it = ffi.new(tuple_iterator_t)
-    return it, tuple, pos
+    return fun.wrap(it, tuple, pos)
 end
 
 -- a precreated metatable for totable()

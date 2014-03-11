@@ -34,6 +34,7 @@ ffi.cdef[[
 ]]
 local builtin = ffi.C
 local msgpackffi = require('msgpackffi')
+local fun = require('fun')
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -306,7 +307,7 @@ function box.schema.space.bless(space)
             box.raise()
         end
 
-        return iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc)
+        return fun.wrap(iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc))
     end
     index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
     index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
