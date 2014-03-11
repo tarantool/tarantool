@@ -600,12 +600,14 @@ msgpack.decode(msgpackffi.encode(t))
 - - a
   - b
   - c
+- 8
 ...
 msgpack.decode(msgpack.encode(t))
 ---
 - - a
   - b
   - c
+- 8
 ...
 msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 ---
@@ -618,6 +620,7 @@ msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
     - z
   - 2
   - 3
+- 19
 ...
 msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 ---
@@ -630,6 +633,7 @@ msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
     - z
   - 2
   - 3
+- 19
 ...
 space:drop()
 ---

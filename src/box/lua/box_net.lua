@@ -467,7 +467,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
-                    local header, offset = msgpack.next(resp);
+                    local header, offset = msgpack.decode(resp);
                     local code = header[box.net.box.CODE]
                     local sync = header[box.net.box.SYNC]
                     if sync == nil then

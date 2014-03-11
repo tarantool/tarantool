@@ -41,7 +41,7 @@ end;
 function test(x)
     local buf1 = msgpack.encode(x)
     local buf2 = msgpackffi.encode(x)
-    local x1, offset1 = msgpack.next(buf1)
+    local x1, offset1 = msgpack.decode(buf1)
     local x2, offset2 = msgpackffi.decode_unchecked(buf2)
     local xstr
     if type(x) == "table" then
@@ -220,18 +220,18 @@ msgpackffi.decode_unchecked(msgpackffi.encode(a));
 --# setopt delimiter ''
 -- Test  aliases, loads and dumps
 a = { 1, 2, 3 }
-msgpack.decode(msgpack.dumps(a))
-msgpack.loads(msgpack.encode(a))
--- Test msgpack.next
+(msgpack.decode(msgpack.dumps(a)))
+(msgpack.loads(msgpack.encode(a)))
+-- Test msgpack.decode with offsets
 dump = msgpack.dumps({1, 2, 3})..msgpack.dumps({4, 5, 6})
 dump:len()
-a, offset = msgpack.next(dump)
+a, offset = msgpack.decode(dump)
 a
 offset
-a, offset = msgpack.next(dump, offset)
+a, offset = msgpack.decode(dump, offset)
 a
 offset
-a, offset = msgpack.next(dump, offset)
+a, offset = msgpack.decode(dump, offset)
 
 -- Test decode with offset
 dump = msgpackffi.encode({1, 2, 3})..msgpackffi.encode({4, 5, 6})
