@@ -244,8 +244,11 @@ s:select{}
 ---
 - - [1, 2]
 ...
+ARITY = 3
+---
+...
 -- increase arity -- error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
@@ -254,21 +257,21 @@ s:select{}
 - - [1, 2]
 ...
 -- decrease arity - error
-box.space['_space']:update(s.n, {{"=", 1, 1}})
+box.space['_space']:update(s.n, {{"=", ARITY, 1}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 -- remove arity - ok
-box.space['_space']:update(s.n, {{"=", 1, 0}})
+box.space['_space']:update(s.n, {{"=", ARITY, 0}})
 ---
-- [512, 0, 'test', '']
+- [512, 1, 'test', 0, '']
 ...
 s:select{}
 ---
 - - [1, 2]
 ...
 -- increase arity - error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
@@ -280,9 +283,9 @@ s:select{}
 - []
 ...
 -- set arity of an empty space
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
-- [512, 3, 'test', '']
+- [512, 1, 'test', 3, '']
 ...
 s:select{}
 ---
@@ -659,7 +662,7 @@ s:create_index('third', { type = 'hash', parts = {  2, 'num' } })
 ...
 s.index.third:rename('second')
 ---
-- error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 2
 ...
 s.index.third.id
 ---

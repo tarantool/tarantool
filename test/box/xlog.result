@@ -37,17 +37,17 @@ box.space[0]:insert{3, 'third tuple'}
 00000000000000000006.xlog.inprogress has been successfully deleted
 
 A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
-panic_on_wal_error doens't work for duplicate key errors
+panic_on_wal_error doesn't work for duplicate key errors
 
-box.space[0]:get{1}
+box.space['test']:get{1}
 ---
-- [1, 'First record']
+- [1, 'first tuple']
 ...
-box.space[0]:get{2}
+box.space['test']:get{2}
 ---
-- [2, 'Second record']
+- [2, 'second tuple']
 ...
-#box.space[0]
+box.space['test']:len()
 ---
-- 0
+- 2
 ...

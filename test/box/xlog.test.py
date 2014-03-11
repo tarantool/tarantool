@@ -109,7 +109,7 @@ if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
 
 print """
 A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
-panic_on_wal_error doens't work for duplicate key errors
+panic_on_wal_error doesn't work for duplicate key errors
 """
 server.stop()
 server.cfgfile_source = "box/panic_on_wal_error.cfg"
@@ -120,9 +120,9 @@ shutil.copy(abspath("box/dup_key1.xlog"),
 shutil.copy(abspath("box/dup_key2.xlog"),
            os.path.join(server.vardir, "00000000000000000004.xlog"))
 server.start()
-admin("box.space[0]:get{1}")
-admin("box.space[0]:get{2}")
-admin("#box.space[0]")
+admin("box.space['test']:get{1}")
+admin("box.space['test']:get{2}")
+admin("box.space['test']:len()")
 
 # cleanup
 server.stop()

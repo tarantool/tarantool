@@ -93,6 +93,7 @@ box.net = {
         FUNCTION_NAME = 0x22,
         DATA = 0x30,
         ERROR = 0x31,
+        GREETING_SIZE = 128,
 
         delete = function(self, space, key)
             local t = self:process(box.net.box.DELETE,
@@ -423,6 +424,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     self.host, self.port, s[4])
                 return false
             end
+            sc:recv(box.net.box.GREETING_SIZE)
 
             self.s = sc
 

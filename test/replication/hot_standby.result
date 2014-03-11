@@ -2,8 +2,15 @@
 --# create server replica with configuration='replication/cfg/replica.cfg' with rpl_master=default
 --# start server hot_standby
 --# start server replica
+--# set connection default
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
+while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end;
+---
+...
 do
     begin_lsn = box.info.lsn
 

@@ -1,0 +1,123 @@
+-- user id for a Lua session is admin - 1
+box.session.uid()
+---
+- 1
+...
+-- extra arguments are ignored
+box.session.uid(nil)
+---
+- 1
+...
+-- admin
+box.session.user()
+---
+- admin
+...
+-- extra argumentes are ignored
+box.session.user(nil)
+---
+- admin
+...
+-- password() is a function which returns base64(sha1(sha1(password))
+-- a string to store in _user table
+box.schema.user.password('test')
+---
+- lL3OvhkIPOKh+Vn9Avlkx69M/Ck=
+...
+box.schema.user.password('test1')
+---
+- BsC/W2Ts4vZItfBIpxkDkGugjlw=
+...
+-- admin can create any user
+box.schema.user.create('test', { password = 'test' })
+---
+...
+-- su() let's you change the user of the session
+-- the user will be unabe to change back unless he/she
+-- is granted access to 'su'
+box.session.su('test')
+---
+...
+-- you can't create spaces unless you have a write access on
+-- system space _space
+-- in future we may  introduce a separate privilege
+box.schema.create_space('test')
+---
+- error: Read access denied for user 'test' to space '_space'
+...
+-- su() goes through because called from admin
+-- console, and it has no access checks
+-- for functions
+box.session.su('admin')
+---
+...
+box.schema.user.grant('test', 'write', 'space', '_space')
+---
+...
+--# setopt delimiter ';'
+function usermax()
+    local i = 1
+    while true do
+        box.schema.user.create('user'..i)
+        i = i + 1
+    end
+end;
+---
+...
+usermax();
+---
+- error: 'A limit on the total number of users has been reached: 32'
+...
+function usermax()
+    local i = 1
+    while true do
+        box.schema.user.drop('user'..i)
+        i = i + 1
+    end
+end;
+---
+...
+usermax();
+---
+- error: User 'user30' does not exist
+...
+--# setopt delimiter ''
+box.schema.user.create('rich')
+---
+...
+box.schema.user.grant('rich', 'read,write', 'universe')
+---
+...
+box.session.su('rich')
+---
+...
+uid = box.session.uid()
+---
+...
+box.schema.func.create('dummy')
+---
+...
+box.session.su('admin')
+---
+...
+box.space['_user']:delete{uid}
+---
+- error: 'Failed to drop user ''rich'': the user has objects'
+...
+box.schema.func.drop('dummy')
+---
+...
+box.space['_user']:delete{uid}
+---
+- error: 'Failed to drop user ''rich'': the user has objects'
+...
+box.schema.user.revoke('rich', 'read,write', 'universe')
+---
+...
+box.space['_user']:delete{uid}
+---
+- [3, '', 'rich', []]
+...
+box.schema.user.drop('test')
+---
+...

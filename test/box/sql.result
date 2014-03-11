@@ -1,7 +1,22 @@
-space = box.schema.create_space('tweedledum', { id = 0 })
+function f() box.schema.create_space('test', { id = 0 }) end
 ---
 ...
-space:create_index('primary', { type = 'hash' })
+box.schema.user.create('test', { password = 'test' })
+---
+...
+box.schema.func.create('f')
+---
+...
+box.schema.user.grant('test', 'Write', 'space', '_space')
+---
+...
+box.schema.user.grant('test', 'Execute', 'function', 'f')
+---
+...
+call f()
+---
+...
+box.space.test:create_index('primary', { type = 'hash' })
 ---
 ...
 ping
@@ -168,6 +183,9 @@ select * from t4294967295 where k0 = 0
     errmsg: Space 4294967295 does not exist
 ...
 box.space[0]:drop()
+---
+...
+box.schema.user.drop('test')
 ---
 ...
 #

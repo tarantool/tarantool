@@ -51,6 +51,7 @@ unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x20 */	MP_ARRAY, /* IPROTO_KEY */
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
+	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
 	/* }}} */
 };
 

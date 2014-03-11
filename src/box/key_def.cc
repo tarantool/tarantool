@@ -40,6 +40,15 @@ const uint32_t key_mp_type[] = {
 	/* [_STR]    = */ 1U << MP_STR
 };
 
+enum schema_object_type
+schema_object_type(const char *name)
+{
+	static const char *strs[] = {
+		"unknown", "universe", "space", "function" };
+	int index = strindex(strs, name, 4);
+	return (enum schema_object_type) (index == 4 ? 0 : index);
+}
+
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, bool is_unique, uint32_t part_count)

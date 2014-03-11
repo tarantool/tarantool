@@ -1,3 +1,9 @@
+box.schema.user.create('test', { password = 'test' })
+---
+...
+box.schema.user.grant('test', 'execute,read,write', 'universe')
+---
+...
 s = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
@@ -583,6 +589,9 @@ delete from t0 where k0=2
 delete from t0 where k0=3
 ---
 - [3, 'Creature ']
+...
+box.schema.user.drop('test')
+---
 ...
 s:drop()
 ---

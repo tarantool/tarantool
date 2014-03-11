@@ -90,6 +90,7 @@ int
 replica_bootstrap(const char *replication_source)
 {
 	char ip_addr[32];
+	char greeting[IPROTO_GREETING_SIZE];
 	int port;
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
@@ -109,7 +110,8 @@ replica_bootstrap(const char *replication_source)
 	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 	sio_connect(master, &addr, sizeof(addr));
-	sio_write(master, &iproto_subscribe_request,
+	sio_readn(master, greeting, sizeof(greeting));
+	sio_writen(master, &iproto_subscribe_request,
 		  sizeof(iproto_subscribe_request));
 
 	guard.fd = -1;
@@ -120,10 +122,12 @@ static void
 remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	       int64_t initial_lsn, const char **err)
 {
+	char greeting[IPROTO_GREETING_SIZE];
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
 	coio_connect(coio, remote_addr);
+	coio_readn(coio, greeting, sizeof(greeting));
 
 	struct iproto_subscribe_request request = iproto_subscribe_request;
 	request.lsn = mp_bswap_u64(initial_lsn);

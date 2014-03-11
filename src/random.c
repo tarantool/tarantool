@@ -1,5 +1,3 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +26,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
+#include "random.h"
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdlib.h>
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
+#ifdef __linux__
+#define DEV_RANDOM "/dev/urandom"
+#else
+#define DEV_RANDOM "/dev/random"
+#endif
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+void
+random_init(void)
+{
+	int fd = open(DEV_RANDOM, O_RDONLY);
+	long int seed;
+	read(fd, &seed, sizeof(seed));
+	close(fd);
+	srandom(seed);
+	srand(seed);
+}

@@ -79,3 +79,6 @@ box.session.on_disconnect(nil, audit_disconnect)
 active_connections
 
 space:drop()
+
+box.session.uid()
+box.session.user()

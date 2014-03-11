@@ -4,6 +4,9 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 ---
 ...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 ---
 ...
@@ -427,13 +430,16 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:528: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:530: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:533: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:535: box.net.box: connection
     was closed'
 ...
 space:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...

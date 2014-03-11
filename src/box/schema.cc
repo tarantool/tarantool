@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "schema.h"
+#include "access.h"
 #include "space.h"
 #include "tuple.h"
 #include "assoc.h"
@@ -53,6 +54,7 @@
 
 /** All existing spaces. */
 static struct mh_i32ptr_t *spaces;
+static struct mh_i32ptr_t *funcs;
 int sc_version;
 
 bool
@@ -107,7 +109,7 @@ space_foreach(void (*func)(struct space *sp, void *udata), void *udata)
 		while ((tuple = it->next(it))) {
 			/* Get space id, primary key, field 0. */
 			uint32_t id = tuple_field_u32(tuple, 0);
-			space = space_find(id);
+			space = space_cache_find(id);
 			if (! space_is_system(space))
 				break;
 			func(space, udata);
@@ -197,6 +199,24 @@ sc_space_new(struct space_def *space_def,
 	return space;
 }
 
+uint32_t
+schema_find_id(uint32_t system_space_id, uint32_t index_id,
+	       const char *name, uint32_t len)
+{
+	struct space *space = space_cache_find(system_space_id);
+	Index *index = index_find(space, index_id);
+	struct iterator *it = index->position();
+	char key[5 /* str len */ + BOX_NAME_MAX];
+	mp_encode_str(key, name, len);
+	index->initIterator(it, ITER_EQ, key, 1);
+	struct tuple *tuple;
+	while ((tuple = it->next(it))) {
+		/* id is always field #1 */
+		return tuple_field_u32(tuple, 0);
+	}
+	return SC_ID_NIL;
+}
+
 /**
  * Initialize a prototype for the two mandatory data
  * dictionary spaces and create a cache entry for them.
@@ -208,6 +228,7 @@ schema_init()
 {
 	/* Initialize the space cache. */
 	spaces = mh_i32ptr_new();
+	funcs = mh_i32ptr_new();
 	/*
 	 * Create surrogate space objects for the mandatory system
 	 * spaces (the primal eggs from which we get all the
@@ -219,7 +240,7 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct space_def def = { SC_SCHEMA_ID, 0, "_schema", false };
+	struct space_def def = { SC_SCHEMA_ID, ADMIN, 0, "_schema", false };
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */
@@ -235,6 +256,23 @@ schema_init()
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, NUM);
 
 	(void) sc_space_new(&def, key_def, &alter_space_on_replace_space);
+
+	/* _user - all existing users */
+	key_def->space_id = def.id = SC_USER_ID;
+	snprintf(def.name, sizeof(def.name), "_user");
+	(void) sc_space_new(&def, key_def, &on_replace_user);
+
+	/* _func - all executable objects on which one can have grants */
+	key_def->space_id = def.id = SC_FUNC_ID;
+	snprintf(def.name, sizeof(def.name), "_func");
+	(void) sc_space_new(&def, key_def, &on_replace_func);
+	/*
+	 * _priv - association user <-> object
+	 * The real index is defined in the snapshot.
+	 */
+	key_def->space_id = def.id = SC_PRIV_ID;
+	snprintf(def.name, sizeof(def.name), "_priv");
+	(void) sc_space_new(&def, key_def, &on_replace_priv);
 	key_def_delete(key_def);
 
 	/* _index - definition of indexes in all spaces */
@@ -298,4 +336,57 @@ schema_free(void)
 		space_delete(space);
 	}
 	mh_i32ptr_delete(spaces);
+	while (mh_size(funcs) > 0) {
+		mh_int_t i = mh_first(funcs);
+
+		struct func_def *func = (struct func_def *)
+				mh_i32ptr_node(funcs, i)->val;
+		func_cache_delete(func->fid);
+	}
+	mh_i32ptr_delete(funcs);
+}
+
+void
+func_cache_replace(struct func_def *func)
+{
+	struct func_def *old = func_by_id(func->fid);
+	if (old) {
+		*old = *func;
+		return;
+	}
+	if (mh_size(funcs) >= BOX_FUNCTION_MAX)
+		tnt_raise(ClientError, ER_FUNCTION_MAX, BOX_FUNCTION_MAX);
+	void *ptr = malloc(sizeof(*func));
+	if (ptr == NULL) {
+error:
+		panic_syserror("Out of memory for the data "
+			       "dictionary cache.");
+	}
+	memcpy(ptr, func, sizeof(*func));
+	func = (struct func_def *) ptr;
+	const struct mh_i32ptr_node_t node = { func->fid, func };
+	mh_int_t k = mh_i32ptr_put(funcs, &node, NULL, NULL);
+	if (k == mh_end(funcs))
+		goto error;
+}
+
+void
+func_cache_delete(uint32_t fid)
+{
+	mh_int_t k = mh_i32ptr_find(funcs, fid, NULL);
+	if (k == mh_end(funcs))
+		return;
+	struct func_def *func = (struct func_def *)
+		mh_i32ptr_node(funcs, k)->val;
+	mh_i32ptr_del(funcs, k, NULL);
+	free(func);
+}
+
+struct func_def *
+func_by_id(uint32_t fid)
+{
+	mh_int_t func = mh_i32ptr_find(funcs, fid, NULL);
+	if (func == mh_end(funcs))
+		return NULL;
+	return (struct func_def *) mh_i32ptr_node(funcs, func)->val;
 }

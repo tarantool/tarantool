@@ -39,9 +39,17 @@ enum schema_id {
 	SC_SPACE_ID = 280,
 	/** Space id of _index. */
 	SC_INDEX_ID = 288,
+	/** Space id of _func. */
+	SC_FUNC_ID = 296,
+	/** Space id of _user. */
+	SC_USER_ID = 304,
+	/** Space id of _priv. */
+	SC_PRIV_ID = 312,
 	/** End of the reserved range of system spaces. */
 	SC_SYSTEM_ID_MAX = 511
 };
+
+enum { SC_ID_NIL = 4294967295 };
 
 extern int sc_version;
 
@@ -65,7 +73,7 @@ extern "C" const char *
 space_name_by_id(uint32_t id);
 
 static inline struct space *
-space_find(uint32_t id)
+space_cache_find(uint32_t id)
 {
 	struct space *space = space_by_id(id);
 	if (space)
@@ -110,5 +118,37 @@ void
 space_end_recover();
 
 struct space *schema_space(uint32_t id);
+
+/*
+ * Find object id by object name.
+ */
+uint32_t
+schema_find_id(uint32_t system_space_id, uint32_t index_id,
+	       const char *name, uint32_t len);
+
+void
+func_cache_replace(struct func_def *func);
+
+void
+func_cache_delete(uint32_t fid);
+
+struct func_def *
+func_by_id(uint32_t fid);
+
+static inline struct func_def *
+func_cache_find(uint32_t fid)
+{
+	struct func_def *func = func_by_id(fid);
+	if (func == NULL)
+		tnt_raise(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
+	return func;
+}
+
+static inline struct func_def *
+func_by_name(const char *name, uint32_t name_len)
+{
+	uint32_t fid = schema_find_id(SC_FUNC_ID, 2, name, name_len);
+	return func_by_id(fid);
+}
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

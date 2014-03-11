@@ -31,10 +31,26 @@ ffi.cdef[[
     boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
               int iterator, uint32_t offset, uint32_t limit,
               const char *key, const char *key_end);
+    void password_prepare(const char *password, int len,
+		                  char *out, int out_len);
 ]]
 local builtin = ffi.C
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
+
+local function user_resolve(user)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple
+    if type(user) == 'string' then
+        tuple = _user.index['name']:get{user}
+    else
+        tuple = _user.index['primary']:get{user}
+    end
+    if tuple == nil then
+        return nil
+    end
+    return tuple[0]
+end
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -68,7 +84,14 @@ box.schema.space.create = function(name, options)
     if options.arity == nil then
         options.arity = 0
     end
-    _space:insert{id, options.arity, name, temporary}
+    local uid = nil
+    if options.user then
+        uid = user_resolve(options.user)
+    end
+    if uid == nil then
+        uid = box.session.uid()
+    end
+    _space:insert{id, uid, name, options.arity, temporary}
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create
@@ -499,3 +522,168 @@ function box.schema.space.bless(space)
         end
     end
 end
+
+local function privilege_resolve(privilege)
+    local numeric = 0
+    if type(privilege) == 'string' then
+        privilege = string.lower(privilege)
+        if string.find(privilege, 'read') then
+            numeric = numeric + 1
+        end
+        if string.find(privilege, 'write') then
+            numeric = numeric + 2
+        end
+        if string.find(privilege, 'execute') then
+            numeric = numeric + 4
+        end
+    else
+        numeric = privilege
+    end
+    return numeric
+end
+
+local function object_resolve(object_type, object_name)
+    if object_type == 'universe' then
+        return 0
+    end
+    if object_type == 'space' then
+        local space = box.space[object_name]
+        if  space == nil then
+            box.raise(box.error.ER_NO_SUCH_SPACE,
+                      "Space '"..object_name.."' does not exist")
+        end
+        return space.n
+    end
+    if object_type == 'function' then
+        local _func = box.space[box.schema.FUNC_ID]
+        local func
+        if type(object_name) == 'string' then
+            func = _func.index['name']:get{object_name}
+        else
+            func = _func.index['primary']:get{object_name}
+        end
+        if func then
+            return func[0]
+        else
+            box.raise(box.error.ER_NO_SUCH_FUNCTION,
+                      "Function '"..object_name.."' does not exist")
+        end
+    end
+    box.raise(box.error.ER_UNKNOWN_SCHEMA_OBJECT,
+              "Unknown object type '"..object_type.."'")
+end
+
+box.schema.func = {}
+box.schema.func.create = function(name)
+    local _func = box.space[box.schema.FUNC_ID]
+    local func = _func.index['name']:get{name}
+    if func then
+            box.raise(box.error.ER_FUNCTION_EXISTS,
+                      "Function '"..name.."' already exists")
+    end
+    _func:auto_increment{box.session.uid(), name}
+end
+
+box.schema.func.drop = function(name)
+    local _func = box.space[box.schema.FUNC_ID]
+    local fid = object_resolve('function', name)
+    _func:delete{fid}
+end
+
+box.schema.user = {}
+
+box.schema.user.password = function(password)
+    local BUF_SIZE = 128
+    local buf = ffi.new("char[?]", BUF_SIZE)
+    ffi.C.password_prepare(password, #password, buf, BUF_SIZE)
+    return ffi.string(buf)
+end
+
+box.schema.user.passwd = function(new_password)
+    local uid = box.session.uid()
+    local _user = box.space[box.schema.USER_ID]
+    auth_mech_list = {}
+    auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
+    _user:update({uid}, {"=", 3, auth_mech_list})
+end
+
+box.schema.user.create = function(name, opts)
+    local uid = user_resolve(name)
+    if uid then
+        box.raise(box.error.ER_USER_EXISTS,
+                  "User '"..name.."' already exists")
+    end
+    if opts == nil then
+        opts = {}
+    end
+    auth_mech_list = {}
+    if opts.password then
+        auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
+    end
+    local _user = box.space[box.schema.USER_ID]
+    _user:auto_increment{'', name, auth_mech_list}
+end
+
+box.schema.user.drop = function(name)
+    local uid = user_resolve(name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                 "User '"..name.."' does not exist")
+    end
+    -- recursive delete of user data
+    local _priv = box.space[box.schema.PRIV_ID]
+    local privs = _priv.index['owner']:select{uid}
+    for k, tuple in pairs(privs) do
+        box.schema.user.revoke(uid, tuple[4], tuple[2], tuple[3])
+    end
+    local spaces = box.space[box.schema.SPACE_ID].index['owner']:select{uid}
+    for k, tuple in pairs(spaces) do
+        box.space[tuple[0]]:drop()
+    end
+    local funcs = box.space[box.schema.FUNC_ID].index['owner']:select{uid}
+    for k, tuple in pairs(spaces) do
+        box.schema.func.drop(tuple[0])
+    end
+    box.space[box.schema.USER_ID]:delete{uid}
+end
+
+box.schema.user.grant = function(user_name, privilege, object_type,
+                                 object_name, grantor)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                  "User '"..user_name.."' does not exist")
+    end
+    privilege = privilege_resolve(privilege)
+    local oid = object_resolve(object_type, object_name)
+    if grantor == nil then
+        grantor = box.session.uid()
+    else
+        grantor = user_resolve(grantor)
+    end
+    local _priv = box.space[box.schema.PRIV_ID]
+    _priv:replace{grantor, uid, object_type, oid, privilege}
+end
+
+box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                  "User '"..name.."' does not exist")
+    end
+    privilege = privilege_resolve(privilege)
+    local oid = object_resolve(object_type, object_name)
+    local _priv = box.space[box.schema.PRIV_ID]
+    local tuple = _priv:get{uid, object_type, oid}
+    if tuple == nil then
+        return
+    end
+    local old_privilege = tuple[4]
+    if old_privilege ~= privilege then
+        privilege = bit.band(old_privilege, bit.bnot(privilege))
+        _priv:update({uid, object_type, oid}, { "=", 4, privilege})
+    else
+        _priv:delete{uid, object_type, oid}
+    end
+end
+

@@ -84,20 +84,22 @@ s:insert{1}
 s:insert{1, 2}
 s:insert{1, 2, 3}
 s:select{}
+ARITY = 3
 -- increase arity -- error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 s:select{}
 -- decrease arity - error
-box.space['_space']:update(s.n, {{"=", 1, 1}})
+box.space['_space']:update(s.n, {{"=", ARITY, 1}})
 -- remove arity - ok
-box.space['_space']:update(s.n, {{"=", 1, 0}})
+box.space['_space']:update(s.n, {{"=", ARITY, 0}})
 s:select{}
 -- increase arity - error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 s:truncate()
 s:select{}
 -- set arity of an empty space
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 s:select{}
 -- arity actually works
 s:insert{3, 4}

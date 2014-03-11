@@ -443,7 +443,6 @@ fiber_new(const char *name, void (*f) (va_list))
 		rlist_create(&fiber->state);
 	}
 
-
 	fiber->f = f;
 
 	/* fids from 0 to 100 are reserved */

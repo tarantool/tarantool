@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
+#ifndef INCLUDES_TARANTOOL_RANDOM_H
+#define INCLUDES_TARANTOOL_RANDOM_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
+#if defined(__cplusplus)
+extern "C" {
+#endif
+void
+random_init(void);
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
-
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+#if defined(__cplusplus)
+}
+#endif /* extern "C" */
+#endif /* INCLUDES_TARANTOOL_RANDOM_H */

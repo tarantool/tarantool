@@ -77,6 +77,7 @@ void space_build_primary_key(struct space *space);
 void space_build_all_keys(struct space *space);
 
 struct space {
+	uint8_t access[BOX_USER_MAX];
 	/**
 	 * Reflects the current space state and is also a vtab
 	 * with methods. Unlike a C++ vtab, changes during space

@@ -41,6 +41,8 @@ schema = {
 master.sql.set_schema(schema)
 replica.sql.set_schema(schema)
 
+master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+replica.admin("while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end")
 master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
 master.admin("s:create_index('primary', {type = 'hash'})")
 id = ID_BEGIN

@@ -171,6 +171,9 @@ void symbols_free();
 
 char *abspath(const char *filename);
 
+char *
+int2str(int val);
+
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */
 void *

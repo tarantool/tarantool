@@ -44,6 +44,9 @@ class BoxConnection(TarantoolConnection):
     def connect(self):
         self.py_con.connect()
 
+    def authenticate(self, user, password):
+        self.py_con.authenticate(user, password)
+
     def disconnect(self):
         self.py_con.close()
 

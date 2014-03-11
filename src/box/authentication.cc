@@ -1,5 +1,3 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +26,38 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
+#include "access.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
+void
+authenticate(const char *user_name, uint32_t len,
+	     const char *tuple, const char * /* tuple_end */)
+{
+	struct user *user = user_by_name(user_name, len);
+	if (user == NULL) {
+		char name[BOX_NAME_MAX + 1];
+		/* \0 - to correctly print user name the error message. */
+		snprintf(name, sizeof(name), "%.*s", len, user_name);
+		tnt_raise(ClientError, ER_NO_SUCH_USER, name);
+	}
+	struct session *session = fiber()->session;
+	uint32_t part_count = mp_decode_array(&tuple);
+	if (part_count < 2) {
+		/* Expected at least: authentication mechanism and data. */
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			   "authentication request body");
+	}
+	mp_next(&tuple); /* Skip authentication mechanism. */
+	uint32_t scramble_len;
+	const char *scramble = mp_decode_str(&tuple, &scramble_len);
+	if (scramble_len != SCRAMBLE_SIZE) {
+		/* Authentication mechanism, data. */
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			   "scramble is too short");
+	}
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+	if (scramble_check(scramble, session->salt, user->hash2))
+		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
+
+	session_set_user(session, user->auth_token, user->uid);
+}
+

@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
+#ifndef INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H
+#define INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
-
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+void
+authenticate(const char *user_name, uint32_t len,
+	     const char *tuple, const char *tuple_end);
+#endif /* INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H */

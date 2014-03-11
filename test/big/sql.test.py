@@ -3,6 +3,8 @@ sql.sort = True
 #
 # Prepare spaces
 #
+admin("box.schema.user.create('test', { password = 'test' })")
+admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
 admin("s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })")
 admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})")
@@ -12,7 +14,7 @@ print """#
 # "SELECT fails with a disjunct and small LIMIT"
 # https://bugs.launchpad.net/tarantool/+bug/729758
 #"""
-
+sql.authenticate('test', 'test')
 sql("insert into t0 values ('Doe', 'Richard')")
 sql("insert into t0 values ('Roe', 'Richard')")
 sql("insert into t0 values ('Woe', 'Richard')")
@@ -203,6 +205,7 @@ admin("s.index[1]:max()")
 sql("delete from t0 where k0=1")
 sql("delete from t0 where k0=2")
 sql("delete from t0 where k0=3")
+admin("box.schema.user.drop('test')")
 admin("s:drop()")
 
 sql.sort = False
