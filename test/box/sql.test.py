@@ -1,16 +1,4 @@
 import tarantool
-sql.set_schema({
-    0 : {
-            'default_type': tarantool.STR,
-            'fields' : {
-                0 : tarantool.NUM,
-                1 : tarantool.STR
-            },
-            'indexes': {
-                0 : [0] # HASH
-            }
-    }
-})
 
 admin("function f() box.schema.create_space('test', { id = 0 }) end")
 admin("box.schema.user.create('test', { password = 'test' })")
