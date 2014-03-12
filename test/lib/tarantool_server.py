@@ -470,6 +470,7 @@ class TarantoolServer(Server):
             exe = os.path.join(_dir, cls.default_tarantool["bin"])
             if os.access(exe, os.X_OK):
                 cls.binary = os.path.abspath(exe)
+                os.environ["PATH"] = os.path.abspath(_dir) + ":" + os.environ["PATH"]
                 return exe
         raise RuntimeError("Can't find server executable in " + path)
 
