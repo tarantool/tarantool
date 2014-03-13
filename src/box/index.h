@@ -59,9 +59,10 @@ struct tuple;
  * For ITER_EQ, the key must not be NULL.
  */
 #define ITERATOR_TYPE(_)                                             \
-	_(ITER_ALL, 0)       /* all tuples                      */   \
-	_(ITER_EQ,  1)       /* key == x ASC order              */   \
-	_(ITER_REQ, 2)       /* key == x DESC order             */   \
+	/* ITER_EQ must be the first member for request_create  */   \
+	_(ITER_EQ,  0)       /* key == x ASC order              */   \
+	_(ITER_REQ, 1)       /* key == x DESC order             */   \
+	_(ITER_ALL, 2)       /* all tuples                      */   \
 	_(ITER_LT,  3)       /* key <  x                        */   \
 	_(ITER_LE,  4)       /* key <= x                        */   \
 	_(ITER_GE,  5)       /* key >= x                        */   \

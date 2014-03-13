@@ -40,6 +40,15 @@ const uint32_t key_mp_type[] = {
 	/* [_STR]    = */ 1U << MP_STR
 };
 
+enum schema_object_type
+schema_object_type(const char *name)
+{
+	static const char *strs[] = {
+		"unknown", "universe", "space", "function" };
+	int index = strindex(strs, name, 4);
+	return (enum schema_object_type) (index == 4 ? 0 : index);
+}
+
 struct key_def *
 key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	    enum index_type type, bool is_unique, uint32_t part_count)
@@ -210,7 +219,8 @@ key_def_check(struct key_def *key_def)
 }
 
 void
-space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
+                int32_t errcode)
 {
 	if (def->id > BOX_SPACE_MAX) {
 		tnt_raise(ClientError, errcode,
@@ -221,5 +231,10 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
 		tnt_raise(ClientError, errcode,
 			  (unsigned) def->id,
 			  "space name is too long");
+	}
+	if (engine_namelen >= sizeof(def->engine_name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space engine name is too long");
 	}
 }

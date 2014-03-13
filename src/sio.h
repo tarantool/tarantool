@@ -81,7 +81,6 @@ int sio_listen_backlog();
 int sio_accept(int fd, struct sockaddr_in *addr, socklen_t *addrlen);
 
 ssize_t sio_read(int fd, void *buf, size_t count);
-ssize_t sio_read_total(int fd, void *buf, size_t count, size_t total);
 
 ssize_t sio_write(int fd, const void *buf, size_t count);
 ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);

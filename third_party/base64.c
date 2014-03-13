@@ -153,9 +153,12 @@ base64_encode_blockend(char *out_base64, int out_len,
 	}
 	if (out_pos >= out_end)
 		return out_pos - out_base64;
+#if 0
+	/* Sometimes the output is useful without a newline. */
 	*out_pos++ = '\n';
 	if (out_pos >= out_end)
 		return out_pos - out_base64;
+#endif
 	*out_pos = '\0';
 	return out_pos - out_base64;
 }
@@ -241,7 +244,7 @@ base64_decode_block(const char *in_base64, int in_len,
 			*out_pos    = (fragment & 0x03f) << 2;
 	case step_b:
 			do {
-				if (in_pos == in_end || out_pos + 1 >= out_end)
+				if (in_pos == in_end || out_pos >= out_end)
 				{
 					state->step = step_b;
 					state->result = *out_pos;
@@ -250,10 +253,11 @@ base64_decode_block(const char *in_base64, int in_len,
 				fragment = base64_decode_value(*in_pos++);
 			} while (fragment < 0);
 			*out_pos++ |= (fragment & 0x030) >> 4;
-			*out_pos    = (fragment & 0x00f) << 4;
+			if (out_pos < out_end)
+				*out_pos = (fragment & 0x00f) << 4;
 	case step_c:
 			do {
-				if (in_pos == in_end || out_pos + 1 >= out_end)
+				if (in_pos == in_end || out_pos >= out_end)
 				{
 					state->step = step_c;
 					state->result = *out_pos;
@@ -262,7 +266,8 @@ base64_decode_block(const char *in_base64, int in_len,
 				fragment = base64_decode_value(*in_pos++);
 			} while (fragment < 0);
 			*out_pos++ |= (fragment & 0x03c) >> 2;
-			*out_pos    = (fragment & 0x003) << 6;
+			if (out_pos < out_end)
+				*out_pos = (fragment & 0x003) << 6;
 	case step_d:
 			do {
 				if (in_pos == in_end || out_pos >= out_end)

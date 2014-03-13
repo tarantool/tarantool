@@ -2,9 +2,12 @@
 --# create server replica with configuration='replication/cfg/replica.cfg' with rpl_master=default
 --# start server hot_standby
 --# start server replica
+--# set connection default
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
+while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end;
 do
     begin_lsn = box.info.lsn
 
@@ -27,7 +30,7 @@ do
     function _select(_begin, _end)
         local a = {}
         for i = _begin, _end do
-            table.insert(a, box.space['tweedledum']:select{i})
+            table.insert(a, box.space['tweedledum']:get{i})
         end
         return unpack(a)
     end

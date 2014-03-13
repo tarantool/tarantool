@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 struct txn;
 struct request;
 struct port;
@@ -39,5 +41,27 @@ struct port;
  */
 void
 box_lua_call(struct request *request, struct txn *txn, struct port *port);
+
+extern "C" {
+struct port_ffi
+{
+	struct port_vtab *vtab;
+	uint32_t size;
+	uint32_t capacity;
+	struct tuple **ret;
+};
+
+void
+port_ffi_create(struct port_ffi *port);
+
+void
+port_ffi_destroy(struct port_ffi *port);
+
+int
+boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+	      int iterator, uint32_t offset, uint32_t limit,
+	      const char *key, const char *key_end);
+
+} /* extern "C" */
 
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_CALL_H */

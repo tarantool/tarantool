@@ -579,9 +579,15 @@ box.fiber.resume(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
-function r() box.fiber.yield(box.space.tweedledum:insert{0, 0, 1}) box.fiber.yield(box.space.tweedledum:select{0}) box.fiber.yield(box.space.tweedledum:truncate()) end
+--# setopt delimiter ';'
+function r()
+    box.fiber.yield(box.space.tweedledum:insert{0, 0, 1})
+    box.fiber.yield(box.space.tweedledum:get{0})
+    box.fiber.yield(box.space.tweedledum:truncate())
+end;
 ---
 ...
+--# setopt delimiter ''
 f = box.fiber.create(r)
 ---
 ...

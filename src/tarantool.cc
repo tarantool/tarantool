@@ -68,7 +68,7 @@ extern "C" {
 #include "session.h"
 #include "box/box.h"
 #include "scoped_guard.h"
-
+#include "random.h"
 
 static pid_t master_pid;
 const char *cfg_filename = NULL;
@@ -608,6 +608,7 @@ main(int argc, char **argv)
 		shebang = abspath(argv[0]);
 	}
 
+	random_init();
 	say_init(argv[0]);
 
 	crc32_init();
@@ -776,7 +777,6 @@ main(int argc, char **argv)
 		strcpy(custom_proc_title, "@");
 		strcat(custom_proc_title, cfg.custom_proc_title);
 	}
-
 	say_logger_init(cfg.logger, &cfg.log_level, cfg.logger_nonblock);
 
 	say_crit("version %s", tarantool_version());

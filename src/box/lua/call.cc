@@ -44,6 +44,8 @@
 #include "box/port.h"
 #include "box/request.h"
 #include "bit/bit.h"
+#include "box/access.h"
+#include "box/schema.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[] ;
@@ -263,20 +265,63 @@ lbox_request_create(struct lua_State *L, enum iproto_request_type type,
 	return request;
 }
 
-static int
-lbox_select(lua_State *L)
+static void
+port_ffi_add_tuple(struct port *port, struct tuple *tuple)
 {
-	if (lua_gettop(L) != 3 || ! lua_isnumber(L, 1) ||
-	    ! lua_isnumber(L, 2)) {
-		return luaL_error(L, "Usage index:select(key)");
+	struct port_ffi *port_ffi = (struct port_ffi *) port;
+	if (port_ffi->size >= port_ffi->capacity) {
+		uint32_t capacity = (port_ffi->capacity > 0) ?
+				2 * port_ffi->capacity : 1024;
+		struct tuple **ret = (struct tuple **)
+			realloc(port_ffi->ret, sizeof(*ret) * capacity);
+		assert(ret != NULL);
+		port_ffi->ret = ret;
+		port_ffi->capacity = capacity;
 	}
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_SELECT,
-						      3, -1);
-	request->index_id = lua_tointeger(L, 2);
-	request->limit = 4294967295;
-	box_process(port_lua_create(L), request);
-	return lua_gettop(L) - 3;
+	port_ffi->ret[port_ffi->size++] = tuple;
+}
+
+struct port_vtab port_ffi_vtab = {
+	port_ffi_add_tuple,
+	null_port_eof,
+};
+
+void
+port_ffi_create(struct port_ffi *port)
+{
+	memset(port, 0, sizeof(*port));
+	port->vtab = &port_ffi_vtab;
+}
+
+void
+port_ffi_destroy(struct port_ffi *port)
+{
+	free(port->ret);
+	port->capacity = port->size = 0;
+}
+
+int
+boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
+	      int iterator, uint32_t offset, uint32_t limit,
+	      const char *key, const char *key_end)
+{
+	struct request request;
+	request_create(&request, IPROTO_SELECT);
+	request.space_id = space_id;
+	request.index_id = index_id;
+	request.limit = limit;
+	request.offset = offset;
+	request.iterator = iterator;
+	request.key = key;
+	request.key_end = key_end;
+
+	try {
+		box_process(port, &request);
+		return 0;
+	} catch (Exception *e) {
+		/* will be hanled by box.raise() in Lua */
+		return -1;
+	}
 }
 
 static int
@@ -433,6 +478,25 @@ lbox_call_loadproc(struct lua_State *L)
 	return box_lua_find(L, name, name + name_len);
 }
 
+static inline void
+access_check_func(const char *name, uint32_t name_len,
+		  struct user *user, uint8_t access)
+{
+	if (access == 0)
+		return;
+
+	struct func_def *func = func_by_name(name, name_len);
+	if (func == NULL || (func->uid != user->uid && user->uid != ADMIN &&
+			     access & ~func->access[user->auth_token])) {
+
+		char name_buf[BOX_NAME_MAX + 1];
+		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
+
+		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
+			  priv_name(access), user->name, name_buf);
+	}
+}
+
 /**
  * Invoke a Lua stored procedure from the binary protocol
  * (implementation of 'CALL' command code).
@@ -441,11 +505,15 @@ void
 box_lua_call(struct request *request, struct txn *txn,
 	     struct port *port)
 {
+	struct user *user = user();
 	(void) txn;
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
+
+	uint8_t access = PRIV_X & ~user->universal_access;
+	access_check_func(name, name_len, user, access);
 
 	/* proc name */
 	int oc = box_lua_find(L, name, name + name_len);
@@ -853,7 +921,6 @@ lbox_unpack(struct lua_State *L)
 
 static const struct luaL_reg boxlib[] = {
 	{"process", lbox_process},
-	{"_select", lbox_select},
 	{"_insert", lbox_insert},
 	{"_replace", lbox_replace},
 	{"_update", lbox_update},

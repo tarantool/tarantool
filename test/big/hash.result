@@ -60,34 +60,34 @@ hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 -- 32-bit hash select fields test
 -------------------------------------------------------------------------------
 -- select by valid keys
-hash.index['primary']:select{0}
+hash.index['primary']:get{0}
 ---
 - [0, 'value1 v1.0', 'value2 v1.0']
 ...
-hash.index['primary']:select{1}
+hash.index['primary']:get{1}
 ---
 - [1, 'value1 v1.32', 'value2 1.72']
 ...
-hash.index['primary']:select{2}
+hash.index['primary']:get{2}
 ---
 - [2, 'value1 v1.43', 'value2 1.92']
 ...
-hash.index['primary']:select{3}
+hash.index['primary']:get{3}
 ---
 - [3, 'value1 v1.31', 'value2 1.12']
 ...
-hash.index['primary']:select{4}
+hash.index['primary']:get{4}
 ---
 ...
-hash.index['primary']:select{5}
+hash.index['primary']:get{5}
 ---
 ...
 -- select by invalid keys
-hash.index['primary']:select{'invalid key'}
+hash.index['primary']:get{'invalid key'}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-hash.index['primary']:select{1, 2}
+hash.index['primary']:get{1, 2}
 ---
 - error: Invalid key part count (expected [0..1], got 2)
 ...
@@ -210,57 +210,57 @@ hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 -- 64-bit hash select fields test
 -------------------------------------------------------------------------------
 -- select by valid keys
-hash.index['primary']:select{0ULL}
+hash.index['primary']:get{0ULL}
 ---
 - [0, 'value1 v1.0', 'value2 v1.0']
 ...
-hash.index['primary']:select{1ULL}
+hash.index['primary']:get{1ULL}
 ---
 - [1, 'value1 v1.32', 'value2 1.72']
 ...
-hash.index['primary']:select{2ULL}
+hash.index['primary']:get{2ULL}
 ---
 - [2, 'value1 v1.43', 'value2 1.92']
 ...
-hash.index['primary']:select{3ULL}
+hash.index['primary']:get{3ULL}
 ---
 - [3, 'value1 v1.31', 'value2 1.12']
 ...
-hash.index['primary']:select{4ULL}
+hash.index['primary']:get{4ULL}
 ---
 ...
-hash.index['primary']:select{5ULL}
+hash.index['primary']:get{5ULL}
 ---
 ...
 -- select by valid NUM keys
-hash.index['primary']:select{0}
+hash.index['primary']:get{0}
 ---
 - [0, 'value1 v1.0', 'value2 v1.0']
 ...
-hash.index['primary']:select{1}
+hash.index['primary']:get{1}
 ---
 - [1, 'value1 v1.32', 'value2 1.72']
 ...
-hash.index['primary']:select{2}
+hash.index['primary']:get{2}
 ---
 - [2, 'value1 v1.43', 'value2 1.92']
 ...
-hash.index['primary']:select{3}
+hash.index['primary']:get{3}
 ---
 - [3, 'value1 v1.31', 'value2 1.12']
 ...
-hash.index['primary']:select{4}
+hash.index['primary']:get{4}
 ---
 ...
-hash.index['primary']:select{5}
+hash.index['primary']:get{5}
 ---
 ...
 -- select by invalid keys
-hash.index['primary']:select{'invalid key'}
+hash.index['primary']:get{'invalid key'}
 ---
 - error: 'Supplied key type of part 0 does not match index part type: expected NUM'
 ...
-hash.index['primary']:select{'00000001', '00000002'}
+hash.index['primary']:get{'00000001', '00000002'}
 ---
 - error: Invalid key part count (expected [0..1], got 2)
 ...
@@ -390,30 +390,30 @@ hash:replace{'key 2', 'value1 v1.43', 'value2 1.92'}
 -- String hash select fields test
 -------------------------------------------------------------------------------
 -- select by valid keys
-hash.index['primary']:select{'key 0'}
+hash.index['primary']:get{'key 0'}
 ---
 - ['key 0', 'value1 v1.0', 'value2 v1.0']
 ...
-hash.index['primary']:select{'key 1'}
+hash.index['primary']:get{'key 1'}
 ---
 - ['key 1', 'value1 v1.32', 'value2 1.72']
 ...
-hash.index['primary']:select{'key 2'}
+hash.index['primary']:get{'key 2'}
 ---
 - ['key 2', 'value1 v1.43', 'value2 1.92']
 ...
-hash.index['primary']:select{'key 3'}
+hash.index['primary']:get{'key 3'}
 ---
 - ['key 3', 'value1 v1.31', 'value2 1.12']
 ...
-hash.index['primary']:select{'key 4'}
+hash.index['primary']:get{'key 4'}
 ---
 ...
-hash.index['primary']:select{'key 5'}
+hash.index['primary']:get{'key 5'}
 ---
 ...
 -- select by invalid keys
-hash.index['primary']:select{'key 1', 'key 2'}
+hash.index['primary']:get{'key 1', 'key 2'}
 ---
 - error: Invalid key part count (expected [0..1], got 2)
 ...
@@ -486,31 +486,31 @@ hash:replace{1, 1, 1, 1}
 ---
 - [1, 1, 1, 1]
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 ...
-hash.index['primary']:select{1}
----
-- [1, 1, 1, 1]
-...
-hash.index['field1']:select{1}
+hash.index['primary']:get{1}
 ---
 - [1, 1, 1, 1]
 ...
-hash.index['field2']:select{1}
+hash.index['field1']:get{1}
 ---
 - [1, 1, 1, 1]
 ...
-hash.index['field3']:select{1}
+hash.index['field2']:get{1}
+---
+- [1, 1, 1, 1]
+...
+hash.index['field3']:get{1}
 ---
 - [1, 1, 1, 1]
 ...
@@ -523,16 +523,16 @@ hash:delete{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 ...
 -- TupleFound (primary key)
@@ -540,19 +540,19 @@ hash:insert{1, 10, 10, 10}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 ...
-hash.index['primary']:select{1}
+hash.index['primary']:get{1}
 ---
 - [1, 1, 1, 1]
 ...
@@ -561,19 +561,19 @@ hash:replace{10, 10, 10, 10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
@@ -582,45 +582,45 @@ hash:insert{10, 0, 10, 10}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{0}
+hash.index['field1']:get{0}
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key --1)
 -- hash:replace_if_exists(2, 0, 10, 10)
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{0}
+hash.index['field1']:get{0}
 ---
 - [0, 0, 0, 0]
 ...
@@ -629,45 +629,45 @@ hash:insert{10, 10, 10, 0}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{0}
+hash.index['field3']:get{0}
 ---
 - [0, 0, 0, 0]
 ...
 -- TupleFound (key --3)
 -- hash:replace_if_exists(2, 10, 10, 0)
-hash.index['primary']:select{10}
+hash.index['primary']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field1']:select{10}
+hash.index['field1']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field2']:select{10}
+hash.index['field2']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{10}
+hash.index['field3']:get{10}
 ---
 - [10, 10, 10, 10]
 ...
-hash.index['field3']:select{0}
+hash.index['field3']:get{0}
 ---
 - [0, 0, 0, 0]
 ...

@@ -1,19 +1,14 @@
 import tarantool
-sql.set_schema({
-    0 : {
-            'default_type': tarantool.STR,
-            'fields' : {
-                0 : tarantool.NUM,
-                1 : tarantool.STR
-            },
-            'indexes': {
-                0 : [0] # HASH
-            }
-    }
-})
 
-admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', { type = 'hash' })")
+admin("function f() box.schema.create_space('test', { id = 0 }) end")
+admin("box.schema.user.create('test', { password = 'test' })")
+admin("box.schema.func.create('f')")
+admin("box.schema.user.grant('test', 'Write', 'space', '_space')")
+admin("box.schema.user.grant('test', 'Execute', 'function', 'f')")
+sql.authenticate('test', 'test')
+# call from sql to have the right owner
+sql("call f()")
+admin("box.space.test:create_index('primary', { type = 'hash' })")
 sql("ping")
 # xxx: bug -- currently selects no rows
 sql("select * from t0")
@@ -73,6 +68,7 @@ sql("select * from t1 where k0 = 0")
 sql("select * from t65537 where k0 = 0")
 sql("select * from t4294967295 where k0 = 0")
 admin("box.space[0]:drop()")
+admin("box.schema.user.drop('test')")
 
 print """#
 # A test case for: http://bugs.launchpad.net/bugs/716683

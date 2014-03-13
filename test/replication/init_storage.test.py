@@ -46,7 +46,7 @@ replica.deploy()
 replica.admin('space = box.space.test');
 replica.wait_lsn(lsn)
 for i in range(1, 20):
-    replica.admin('space:select{%d}' % i)
+    replica.admin('space:get{%d}' % i)
 
 replica.stop()
 replica.cleanup(True)

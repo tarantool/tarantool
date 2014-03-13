@@ -1,3 +1,9 @@
+box.schema.user.create('test', { password = 'test' })
+---
+...
+box.schema.user.grant('test', 'execute,read,write', 'universe')
+---
+...
 s = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
@@ -89,11 +95,11 @@ select * from t0 where k1='Britney'
 ---
 - ['Spears', 'Britney']
 ...
-s.index[0]:eselect('Spears', { limit = 100, iterator = 'GE' })
+s.index[0]:select('Spears', { limit = 100, iterator = 'GE' })
 ---
 - - ['Spears', 'Britney']
 ...
-s.index[1]:eselect('Britney', { limit = 100, iterator = 'GE' })
+s.index[1]:select('Britney', { limit = 100, iterator = 'GE' })
 ---
 - - ['Spears', 'Britney']
 ...
@@ -128,9 +134,9 @@ insert into t0 values ('key3', 'part1', 'part2_b')
 ...
 s.index[1]:select{}
 ---
-- ['key1', 'part1', 'part2']
-- ['key2', 'part1', 'part2_a']
-- ['key3', 'part1', 'part2_b']
+- - ['key1', 'part1', 'part2']
+  - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
 ...
 select * from t0 where k0='key1'
 ---
@@ -150,18 +156,18 @@ select * from t0 where k1='part1'
 - ['key2', 'part1', 'part2_a']
 - ['key3', 'part1', 'part2_b']
 ...
-s.index[1]:eselect('part1', { limit = 100, iterator = 'GE' })
+s.index[1]:select('part1', { limit = 100, iterator = 'GE' })
 ---
 - - ['key1', 'part1', 'part2']
   - ['key2', 'part1', 'part2_a']
   - ['key3', 'part1', 'part2_b']
 ...
-s.index[0]:eselect('key2', { limit = 100, iterator = 'GE' })
+s.index[0]:select('key2', { limit = 100, iterator = 'GE' })
 ---
 - - ['key2', 'part1', 'part2_a']
   - ['key3', 'part1', 'part2_b']
 ...
-s.index[1]:eselect({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })
+s.index[1]:select({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })
 ---
 - - ['key2', 'part1', 'part2_a']
   - ['key3', 'part1', 'part2_b']
@@ -228,7 +234,7 @@ insert into t0 values (41234567, 'part1_a', 'part2_a')
 l = {}
 ---
 ...
-for v in s:iterator() do table.insert(l, v) end
+for state, v in s:pairs() do table.insert(l, v) end
 ---
 ...
 return l
@@ -265,10 +271,10 @@ select * from t0 where k1='part1_a'
 select * from t0 where k1='part_none'
 ---
 ...
-box.space[0].index[1]:select{'part1', 'part2'}
+box.space[0].index[1]:select({'part1', 'part2'})
 ---
-- [1234567, 'part1', 'part2']
-- [11234567, 'part1', 'part2']
+- - [1234567, 'part1', 'part2']
+  - [11234567, 'part1', 'part2']
 ...
 select * from t0 where k1='part1'
 ---
@@ -301,6 +307,7 @@ delete from t0 where k0=41234567
 ...
 s:select{}
 ---
+- []
 ...
 s:truncate()
 ---
@@ -551,9 +558,9 @@ insert into t0 values(3, 'Creature ')
 ...
 s.index[1]:select{}
 ---
-- [1, 'Aardvark ']
-- [2, 'Bilimbi']
-- [3, 'Creature ']
+- - [1, 'Aardvark ']
+  - [2, 'Bilimbi']
+  - [3, 'Creature ']
 ...
 s.index[0]:min()
 ---
@@ -582,6 +589,9 @@ delete from t0 where k0=2
 delete from t0 where k0=3
 ---
 - [3, 'Creature ']
+...
+box.schema.user.drop('test')
+---
 ...
 s:drop()
 ---

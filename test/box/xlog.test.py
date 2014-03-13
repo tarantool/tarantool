@@ -107,22 +107,47 @@ server.start()
 if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
    print "00000000000000000006.xlog.inprogress has been successfully deleted"
 
-print """
-A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
-panic_on_wal_error doens't work for duplicate key errors
-"""
-server.stop()
-server.cfgfile_source = "box/panic_on_wal_error.cfg"
-server.deploy()
-server.stop()
-shutil.copy(abspath("box/dup_key1.xlog"),
-            os.path.join(server.vardir, "00000000000000000002.xlog"))
-shutil.copy(abspath("box/dup_key2.xlog"),
-           os.path.join(server.vardir, "00000000000000000004.xlog"))
-server.start()
-admin("box.space[0]:select{1}")
-admin("box.space[0]:select{2}")
-admin("#box.space[0]")
+#print """
+#A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
+#panic_on_wal_error doesn't work for duplicate key errors
+#"""
+
+# Step-by-step instruction for log files preparation
+# needed for bugtest #1052018.
+#
+#
+# 1.  box.schema.create_space('test')
+# 2.  box.space['test']:create_index('primary')
+# 3.  box.space['test']:insert{1, 'first tuple}
+# 4.  box.space['test']:insert{2, 'second tuple}
+# 5.  stop tarantool
+# 6.  copy xlog to dup_key1.xlog
+# 7.  remove xlog
+# 8.  start tarantool
+# 9.  box.schema.create_space('test')
+# 10. box.space['test']:create_index('primary')
+# 11. box.space['test']:insert{1, 'first tuple}
+# 12. box.space['test']:delete{1}
+# 13. stop tarantool
+# 14. start tarantool
+# 15. box.space['test']:insert{1, 'third tuple'}
+# 16. box.space['test']:insert{2, 'fourth tuple'}
+# 17. stop tarantool
+# 18. copy xlog to dup_key2.xlog
+#
+
+#server.stop()
+#server.cfgfile_source = "box/panic_on_wal_error.cfg"
+#server.deploy()
+#server.stop()
+#shutil.copy(abspath("box/dup_key1.xlog"),
+            #os.path.join(server.vardir, "00000000000000000002.xlog"))
+#shutil.copy(abspath("box/dup_key2.xlog"),
+           #os.path.join(server.vardir, "00000000000000000004.xlog"))
+#server.start()
+#admin("box.space['test']:get{1}")
+#admin("box.space['test']:get{2}")
+#admin("box.space['test']:len()")
 
 # cleanup
 server.stop()

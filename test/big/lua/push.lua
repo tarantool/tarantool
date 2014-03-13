@@ -1,7 +1,7 @@
 
 function push_collection(space, size, cid, ...)
 	local append = { ... }
-	local tuple = space:select{cid}
+	local tuple = space:get{cid}
 	if tuple == nil then
 		return space:insert{cid, unpack(append)}
 	end

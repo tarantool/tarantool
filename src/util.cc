@@ -348,6 +348,13 @@ abspath(const char *filename)
 	return abspath;
 }
 
+char *
+int2str(int val)
+{
+	static char __thread buf[22];
+	snprintf(buf, sizeof(buf), "%d", val);
+	return buf;
+}
 
 #ifdef HAVE_BFD
 static struct symbol *symbols;

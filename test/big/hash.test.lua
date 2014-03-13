@@ -35,16 +35,16 @@ hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash.index['primary']:select{0}
-hash.index['primary']:select{1}
-hash.index['primary']:select{2}
-hash.index['primary']:select{3}
-hash.index['primary']:select{4}
-hash.index['primary']:select{5}
+hash.index['primary']:get{0}
+hash.index['primary']:get{1}
+hash.index['primary']:get{2}
+hash.index['primary']:get{3}
+hash.index['primary']:get{4}
+hash.index['primary']:get{5}
 
 -- select by invalid keys
-hash.index['primary']:select{'invalid key'}
-hash.index['primary']:select{1, 2}
+hash.index['primary']:get{'invalid key'}
+hash.index['primary']:get{1, 2}
 
 -------------------------------------------------------------------------------
 -- 32-bit hash delete fields test
@@ -104,24 +104,24 @@ hash:replace{'invalid key', 'value1 v1.0', 'value2 v1.0'}
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash.index['primary']:select{0ULL}
-hash.index['primary']:select{1ULL}
-hash.index['primary']:select{2ULL}
-hash.index['primary']:select{3ULL}
-hash.index['primary']:select{4ULL}
-hash.index['primary']:select{5ULL}
+hash.index['primary']:get{0ULL}
+hash.index['primary']:get{1ULL}
+hash.index['primary']:get{2ULL}
+hash.index['primary']:get{3ULL}
+hash.index['primary']:get{4ULL}
+hash.index['primary']:get{5ULL}
 
 -- select by valid NUM keys
-hash.index['primary']:select{0}
-hash.index['primary']:select{1}
-hash.index['primary']:select{2}
-hash.index['primary']:select{3}
-hash.index['primary']:select{4}
-hash.index['primary']:select{5}
+hash.index['primary']:get{0}
+hash.index['primary']:get{1}
+hash.index['primary']:get{2}
+hash.index['primary']:get{3}
+hash.index['primary']:get{4}
+hash.index['primary']:get{5}
 
 -- select by invalid keys
-hash.index['primary']:select{'invalid key'}
-hash.index['primary']:select{'00000001', '00000002'}
+hash.index['primary']:get{'invalid key'}
+hash.index['primary']:get{'00000001', '00000002'}
 
 -------------------------------------------------------------------------------
 -- 64-bit hash delete fields test
@@ -182,15 +182,15 @@ hash:replace{'key 2', 'value1 v1.43', 'value2 1.92'}
 -------------------------------------------------------------------------------
 
 -- select by valid keys
-hash.index['primary']:select{'key 0'}
-hash.index['primary']:select{'key 1'}
-hash.index['primary']:select{'key 2'}
-hash.index['primary']:select{'key 3'}
-hash.index['primary']:select{'key 4'}
-hash.index['primary']:select{'key 5'}
+hash.index['primary']:get{'key 0'}
+hash.index['primary']:get{'key 1'}
+hash.index['primary']:get{'key 2'}
+hash.index['primary']:get{'key 3'}
+hash.index['primary']:get{'key 4'}
+hash.index['primary']:get{'key 5'}
 
 -- select by invalid keys
-hash.index['primary']:select{'key 1', 'key 2'}
+hash.index['primary']:get{'key 1', 'key 2'}
 
 -------------------------------------------------------------------------------
 -- String hash delete fields test
@@ -223,68 +223,68 @@ hash:insert{2, 2, 2, 2}
 
 -- OK
 hash:replace{1, 1, 1, 1}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['primary']:select{1}
-hash.index['field1']:select{1}
-hash.index['field2']:select{1}
-hash.index['field3']:select{1}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['primary']:get{1}
+hash.index['field1']:get{1}
+hash.index['field2']:get{1}
+hash.index['field3']:get{1}
 
 -- OK
 hash:insert{10, 10, 10, 10}
 hash:delete{10}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
 
 -- TupleFound (primary key)
 hash:insert{1, 10, 10, 10}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['primary']:select{1}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['primary']:get{1}
 
 -- TupleNotFound (primary key)
 hash:replace{10, 10, 10, 10}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
 
 -- TupleFound (key --1)
 hash:insert{10, 0, 10, 10}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['field1']:select{0}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['field1']:get{0}
 
 -- TupleFound (key --1)
 -- hash:replace_if_exists(2, 0, 10, 10)
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['field1']:select{0}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['field1']:get{0}
 
 -- TupleFound (key --3)
 hash:insert{10, 10, 10, 0}
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['field3']:select{0}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['field3']:get{0}
 
 -- TupleFound (key --3)
 -- hash:replace_if_exists(2, 10, 10, 0)
-hash.index['primary']:select{10}
-hash.index['field1']:select{10}
-hash.index['field2']:select{10}
-hash.index['field3']:select{10}
-hash.index['field3']:select{0}
+hash.index['primary']:get{10}
+hash.index['field1']:get{10}
+hash.index['field2']:get{10}
+hash.index['field3']:get{10}
+hash.index['field3']:get{0}
 
 hash:drop()

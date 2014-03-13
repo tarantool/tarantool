@@ -1,7 +1,10 @@
 --# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
 --# start server replica
 --# set connection default
-
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+-- Wait until the grant reaches the replica
+--# set connection replica
+while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end
 --# setopt delimiter ';'
 --# set connection default, replica
 do
@@ -25,7 +28,7 @@ do
             box.fiber.sleep(0.001)
         end
         for i = _begin, _end do
-            table.insert(a, box.space[0]:select{i})
+            table.insert(a, box.space[0]:get{i})
         end
         return unpack(a)
     end
@@ -168,3 +171,4 @@ box.space[0]:insert{0, 'replica is RO'}
 --# cleanup server replica
 --# set connection default
 box.space[0]:drop()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

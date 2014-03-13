@@ -9,7 +9,7 @@ color_stdout = Colorer()
 def check_libs():
     deps = [
         ('msgpack', 'msgpack-python'),
-        ('tarantool', 'tarantool-python/src')
+        ('tarantool', 'tarantool-python')
     ]
     base_path = os.path.dirname(os.path.abspath(__file__))
 

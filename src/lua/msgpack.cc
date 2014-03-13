@@ -385,34 +385,14 @@ static int
 lua_msgpack_decode(lua_State *L)
 {
 	int index = lua_gettop(L);
-	if (index != 1 || lua_type(L, index) != LUA_TSTRING)
-		return luaL_error(L, "msgpack.decode: a Lua string expected");
-
-	size_t data_len;
-	const char *data = lua_tolstring(L, index, &data_len);
-	const char *end = data + data_len;
-
-	const char *b = data;
-	if (mp_check(&b, end) || b != end)
-		return luaL_error(L, "msgpack.decode: invalid MsgPack");
-
-	b = data;
-	luamp_decode(L, &b);
-	return 1;
-}
-
-static int
-lua_msgpack_next(lua_State *L)
-{
-	int index = lua_gettop(L);
 	if (index != 2 && index != 1 && lua_type(L, 1) != LUA_TSTRING)
-		return luaL_error(L, "msgpack.next: a Lua string expected");
+		return luaL_error(L, "msgpack.decode: a Lua string expected");
 
 	size_t data_len;
 	uint32_t offset = index > 1 ? lua_tointeger(L, 2) - 1 : 0;
 	const char *data = lua_tolstring(L, 1, &data_len);
 	if (offset >= data_len)
-		luaL_error(L, "msgpack.next: offset is out of bounds");
+		luaL_error(L, "msgpack.decode: offset is out of bounds");
 	const char *end = data + data_len;
 
 	const char *b = data + offset;
@@ -433,7 +413,6 @@ luaopen_msgpack(lua_State *L)
 		{ "dumps",  lua_msgpack_encode },
 		{ "decode", lua_msgpack_decode },
 		{ "loads",  lua_msgpack_decode },
-		{ "next",   lua_msgpack_next},
 		{ NULL, NULL}
 	};
 

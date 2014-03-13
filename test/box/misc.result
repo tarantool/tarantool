@@ -19,7 +19,6 @@ t
 - - _delete
   - _insert
   - _replace
-  - _select
   - _update
   - call_loadproc
   - cfg
@@ -194,34 +193,50 @@ end;
 ...
 t;
 ---
-- - 'box.error.ER_NO_SUCH_INDEX : 35'
+- - 'box.error.ER_CREATE_FUNCTION : 50'
+  - 'box.error.ER_NO_SUCH_INDEX : 35'
   - 'box.error.ER_TUPLE_FOUND : 3'
   - 'box.error.ER_CREATE_SPACE : 9'
   - 'box.error.ER_TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.ER_FIELD_TYPE : 23'
   - 'box.error.ER_OK : 0'
+  - 'box.error.ER_NO_SUCH_ENGINE : 57'
   - 'box.error.ER_TUPLE_NOT_FOUND : 4'
   - 'box.error.ER_INDEX_ARITY : 39'
   - 'box.error.ER_WAL_IO : 40'
+  - 'box.error.ER_USER_MAX : 56'
+  - 'box.error.ER_NO_SUCH_FUNCTION : 51'
   - 'box.error.ER_INJECTION : 8'
   - 'box.error.ER_DROP_PRIMARY_KEY : 17'
   - 'box.error.ER_INDEX_TYPE : 13'
   - 'box.error.ER_ARG_TYPE : 26'
+  - 'box.error.ER_FUNCTION_MAX : 54'
+  - 'box.error.ER_FUNCTION_ACCESS_DENIED : 53'
+  - 'box.error.ER_SPACE_ARITY : 38'
   - 'box.error.ER_INVALID_MSGPACK : 20'
+  - 'box.error.ER_SPACE_ACCESS_DENIED : 55'
   - 'box.error.ER_KEY_PART_COUNT : 31'
+  - 'box.error.ER_UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.ER_USER_EXISTS : 46'
   - 'box.error.ER_MEMORY_ISSUE : 2'
   - 'box.error.ER_ILLEGAL_PARAMS : 1'
   - 'box.error.ER_KEY_FIELD_TYPE : 18'
   - 'box.error.ER_NONMASTER : 6'
+  - 'box.error.ER_UNKNOWN_REQUEST_TYPE : 48'
   - 'box.error.ER_FIELD_TYPE_MISMATCH : 24'
   - 'box.error.ER_MODIFY_INDEX : 14'
+  - 'box.error.ER_PASSWORD_MISMATCH : 47'
   - 'box.error.ER_EXACT_MATCH : 19'
+  - 'box.error.ER_NO_SUCH_USER : 45'
   - 'box.error.ER_SECONDARY : 7'
+  - 'box.error.ER_FUNCTION_EXISTS : 52'
+  - 'box.error.ER_CREATE_USER : 43'
+  - 'box.error.ER_ACCESS_DENIED : 42'
   - 'box.error.ER_LAST_DROP : 15'
   - 'box.error.ER_UPDATE_FIELD : 29'
   - 'box.error.ER_FIBER_STACK : 30'
   - 'box.error.ER_UNKNOWN_UPDATE_OP : 28'
-  - 'box.error.ER_SPACE_ARITY : 38'
+  - 'box.error.ER_DROP_USER : 44'
   - 'box.error.ER_UNSUPPORTED : 5'
   - 'box.error.ER_NO_SUCH_FIELD : 37'
   - 'box.error.ER_TUPLE_NOT_ARRAY : 22'
@@ -401,7 +416,7 @@ box.counter.inc(space.n, {1})
 ---
 - 1
 ...
-space:select{1}
+space:get{1}
 ---
 - [1, 1]
 ...
@@ -413,7 +428,7 @@ box.counter.inc(space.n, {1})
 ---
 - 3
 ...
-space:select{1}
+space:get{1}
 ---
 - [1, 3]
 ...
@@ -429,7 +444,7 @@ box.counter.dec(space.n, {1})
 ---
 - 0
 ...
-space:select{1}
+space:get{1}
 ---
 ...
 space:truncate()

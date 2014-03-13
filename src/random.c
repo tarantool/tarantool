@@ -26,57 +26,26 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "random.h"
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
 
-#include <connector/c/include/tarantool/tnt.h>
-#include <connector/c/include/tarantool/tnt_net.h>
-#include <connector/c/include/tarantool/tnt_xlog.h>
-#include <connector/c/include/tarantool/tnt_rpl.h>
+#ifdef __linux__
+#define DEV_RANDOM "/dev/urandom"
+#else
+#define DEV_RANDOM "/dev/random"
+#endif
 
-static char *opname(uint32_t type) {
-	switch (type) {
-	case TNT_OP_PING:   return "Ping";
-	case TNT_OP_INSERT: return "Insert";
-	case TNT_OP_DELETE: return "Delete";
-	case TNT_OP_UPDATE: return "Update";
-	case TNT_OP_SELECT: return "Select";
-	case TNT_OP_CALL:   return "Call";
-	}
-	return "Unknown";
-}
-
-int
-main(int argc, char * argv[])
+void
+random_init(void)
 {
-	if (argc != 2)
-		return 1;
-
-	struct tnt_stream s;
-	tnt_xlog(&s);
-
-	if (tnt_xlog_open(&s, argv[1]) == -1)
-		return 1;
-
-	struct tnt_iter i;
-	tnt_iter_request(&i, &s);
-
-	while (tnt_next(&i)) {
-		struct tnt_stream_xlog *sx = TNT_SXLOG_CAST(&s);
-		printf("%s lsn: %"PRIu64", time: %f, len: %d\n",
-		       opname(sx->log.current.row.op),
-		       sx->log.current.hdr.lsn,
-		       sx->log.current.hdr.tm,
-		       sx->log.current.hdr.len);
-	}
-	if (i.status == TNT_ITER_FAIL)
-		printf("parsing failed: %s\n", tnt_xlog_strerror(&s));
-
-	tnt_iter_free(&i);
-	tnt_stream_free(&s);
-	return 0;
+	int fd = open(DEV_RANDOM, O_RDONLY);
+	long int seed;
+	read(fd, &seed, sizeof(seed));
+	close(fd);
+	srandom(seed);
+	srand(seed);
 }

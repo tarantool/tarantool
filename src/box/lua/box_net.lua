@@ -93,6 +93,7 @@ box.net = {
         FUNCTION_NAME = 0x22,
         DATA = 0x30,
         ERROR = 0x31,
+        GREETING_SIZE = 128,
 
         delete = function(self, space, key)
             local t = self:process(box.net.box.DELETE,
@@ -149,9 +150,59 @@ box.net = {
             end
         end,
 
-        select = function(self, space, key)
-            -- unpack - is old behaviour
-            return unpack(self:eselect(space, 0, key, { limit = 4294967295 }))
+        get = function(self, space, key)
+            key = keify(key)
+            local result = self:process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space,
+                    [box.net.box.KEY] = key,
+                    [box.net.box.ITERATOR] = box.index.EQ,
+                    [box.net.box.OFFSET] = 0,
+                    [box.net.box.LIMIT] = 2
+                }))
+            if #result == 0 then
+                return
+            elseif #result == 1 then
+                return result[1]
+            else
+                box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+                    "More than one tuple found without 'limit'")
+            end
+        end,
+
+        select = function(self, space, key, opts)
+            local offset = 0
+            local limit = 4294967295
+            local iterator = box.index.EQ
+
+            key = keify(key)
+            if #key == 0 then
+                iterator = box.index.ALL
+            end
+
+            if opts ~= nil then
+                if opts.offset ~= nil then
+                    offset = tonumber(opts.offset)
+                end
+                if type(opts.iterator) == "string" then
+                    opts.iterator = box.index[opts.iterator]
+                end
+                if opts.iterator ~= nil then
+                    iterator = tonumber(opts.iterator)
+                end
+                if opts.limit ~= nil then
+                    limit = tonumber(opts.limit)
+                end
+            end
+            local result = self:process(box.net.box.SELECT,
+                msgpack.encode({
+                    [box.net.box.SPACE_ID] = space,
+                    [box.net.box.KEY] = key,
+                    [box.net.box.ITERATOR] = iterator,
+                    [box.net.box.OFFSET] = offset,
+                    [box.net.box.LIMIT] = limit
+                }))
+            return result
         end,
 
         ping = function(self)
@@ -165,19 +216,6 @@ box.net = {
                     [box.net.box.FUNCTION_NAME] = name,
                     [box.net.box.TUPLE] = {...}}))
         end,
-
-        eselect = function(self, sno, ino, key, opts)
-            local res = self:call('box.net.self:eselect', sno, ino, key, opts)
-            if opts and opts.limit == nil then
-                if res[1] ~= nil then
-                    return res[1]
-                else
-                    return
-                end
-            end
-            return res
-        end,
-
 
         -- To make use of timeouts safe across multiple
         -- concurrent fibers do not store timeouts as
@@ -214,23 +252,6 @@ box.net = {
             return box.process(...)
         end,
 
-
-        eselect = function(self, sno, ino, key, opts)
-            local space = box.space[ sno ]
-            if space == nil then
-                box.raise(box.error.ER_NO_SUCH_SPACE,
-                    sprintf("No such space #%s", tostring(sno)))
-            end
-            local index = space.index[ ino ]
-            if index == nil then
-                box.raise(box.error.ER_NO_SUCH_INDEX,
-                    sprintf("No such index #%s in space #%s",
-                        tostring(sno), tostring(ino)))
-            end
-
-            return index:eselect(key, opts)
-        end,
-
         -- for compatibility with the networked version,
         -- implement call
         call = function(self, proc_name, ...) 
@@ -257,6 +278,8 @@ box.net = {
 
     }
 }
+
+box.net.box.put = box.net.box.replace; -- put is an alias for replace
 
 -- box.net.self rpc works like remote.rpc
 box.net.self.rpc = { r = box.net.self }
@@ -401,6 +424,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     self.host, self.port, s[4])
                 return false
             end
+            sc:recv(box.net.box.GREETING_SIZE)
 
             self.s = sc
 
@@ -445,7 +469,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
-                    local header, offset = msgpack.next(resp);
+                    local header, offset = msgpack.decode(resp);
                     local code = header[box.net.box.CODE]
                     local sync = header[box.net.box.SYNC]
                     if sync == nil then

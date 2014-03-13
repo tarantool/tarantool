@@ -33,8 +33,8 @@
 #define TC_VERSION_MINOR "3"
 
 #define TC_DEFAULT_HOST "localhost"
-#define TC_DEFAULT_PORT 33013
-#define TC_DEFAULT_ADMIN_PORT 33015
+#define TC_DEFAULT_PORT 3301
+#define TC_DEFAULT_ADMIN_PORT 3313
 #define TC_DEFAULT_HISTORY_FILE ".tarantool_history"
 
 struct tarantool_client {

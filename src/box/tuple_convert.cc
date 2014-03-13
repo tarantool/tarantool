@@ -41,3 +41,9 @@ tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf)
 {
 	tbuf_append(buf, tuple->data, tuple->bsize);
 }
+
+void
+tuple_to_buf(struct tuple *tuple, char *buf)
+{
+	memcpy(buf, tuple->data, tuple->bsize);
+}

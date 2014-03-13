@@ -158,7 +158,7 @@ iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
 -- Iterator: various
 -------------------------------------------------------------------------------
 
-space.index['primary']:iterator({}, {iterator = -666 })
+space.index['primary']:pairs({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
-space.index['primary']:iterator(function() end, { iterator = box.index.EQ })
+space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 space:drop()

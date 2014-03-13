@@ -208,7 +208,13 @@ function r() return box.fiber.sleep(0.01) end
 f = box.fiber.create(r)
 box.fiber.resume(f)
 box.fiber.resume(f)
-function r() box.fiber.yield(box.space.tweedledum:insert{0, 0, 1}) box.fiber.yield(box.space.tweedledum:select{0}) box.fiber.yield(box.space.tweedledum:truncate()) end
+--# setopt delimiter ';'
+function r()
+    box.fiber.yield(box.space.tweedledum:insert{0, 0, 1})
+    box.fiber.yield(box.space.tweedledum:get{0})
+    box.fiber.yield(box.space.tweedledum:truncate())
+end;
+--# setopt delimiter ''
 f = box.fiber.create(r)
 box.fiber.resume(f)
 box.fiber.resume(f)

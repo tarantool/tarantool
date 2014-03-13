@@ -22,7 +22,8 @@ function iterate(space_no, index_no, f1, f2, iterator, ...)
 			return f
 		end
 	end
-	for v in box.space[space_no].index[index_no]:iterator({...}, { iterator = iterator }) do
+	local state, v
+	for state, v in box.space[space_no].index[index_no]:pairs({...}, { iterator = iterator }) do
 		local pk = get_field(v, 0);
 		local tk = '$';
 		for f = f1, f2-1, 1 do tk = (tk..(get_field(v, f))..'$'); end;

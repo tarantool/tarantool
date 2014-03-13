@@ -88,7 +88,7 @@ t
 space:replace(t)
 space:replace{777, { 'a', 'b', 'c', {'d', 'e', t}}}
 --  A test case for tuple:totable() method
-t=space:select{777}:totable()
+t=space:get{777}:totable()
 t[2], t[3], t[4], t[5]
 space:truncate()
 --  A test case for Bug#1119389 '(lbox_tuple_index) crashes on 'nil' argument'
@@ -179,5 +179,17 @@ r
 
 t:pairs(nil)
 t:pairs("fdsaf")
+
+--------------------------------------------------------------------------------
+-- test msgpack.encode + tuple
+--------------------------------------------------------------------------------
+
+msgpackffi = require('msgpackffi')
+
+t = box.tuple.new({'a', 'b', 'c'})
+msgpack.decode(msgpackffi.encode(t))
+msgpack.decode(msgpack.encode(t))
+msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 
 space:drop()

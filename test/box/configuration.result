@@ -44,15 +44,15 @@ box.space.tweedledum:insert{4, 8, 16}
 
 # Test insert from init.lua
 
-box.space.tweedledum:select{1}
+box.space.tweedledum:get(1)
 ---
 - [1, 2, 4, 8]
 ...
-box.space.tweedledum:select(2)
+box.space.tweedledum:get(2)
 ---
 - [2, 4, 8, 16]
 ...
-box.space.tweedledum:select(4)
+box.space.tweedledum:get(4)
 ---
 - [4, 8, 16]
 ...

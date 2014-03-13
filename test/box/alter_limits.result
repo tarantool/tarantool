@@ -68,6 +68,11 @@ s:drop()
 ---
 - error: Space 512 does not exist
 ...
+-- no such engine
+box.schema.create_space('tweedleedee', { engine = 'unknown' })
+---
+- error: Space engine 'unknown' does not exist
+...
 -- explicit space id
 s = box.schema.create_space('tweedledum', { id = 3000 })
 ---
@@ -93,6 +98,11 @@ s:drop()
 box.schema.create_space(string.rep('tweedledee', 100))
 ---
 - error: 'Failed to create space 512: space name is too long'
+...
+-- too long space engine name
+box.schema.create_space('tweedleedee', { engine = string.rep('too-long', 100) })
+---
+- error: 'Failed to create space 512: space engine name is too long'
 ...
 -- space name limit
 box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
@@ -242,33 +252,36 @@ s:insert{1, 2, 3}
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
+...
+ARITY = 4
+---
 ...
 -- increase arity -- error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
 ...
 -- decrease arity - error
-box.space['_space']:update(s.n, {{"=", 1, 1}})
+box.space['_space']:update(s.n, {{"=", ARITY, 1}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
 -- remove arity - ok
-box.space['_space']:update(s.n, {{"=", 1, 0}})
+box.space['_space']:update(s.n, {{"=", ARITY, 0}})
 ---
-- [512, 0, 'test', '']
+- [512, 1, 'test', 'memtx', 0, '']
 ...
 s:select{}
 ---
-- [1, 2]
+- - [1, 2]
 ...
 -- increase arity - error
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
 - error: 'Can''t modify space 512: can not change arity on a non-empty space'
 ...
@@ -277,14 +290,16 @@ s:truncate()
 ...
 s:select{}
 ---
+- []
 ...
 -- set arity of an empty space
-box.space['_space']:update(s.n, {{"=", 1, 3}})
+box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
-- [512, 3, 'test', '']
+- [512, 1, 'test', 'memtx', 3, '']
 ...
 s:select{}
 ---
+- []
 ...
 -- arity actually works
 s:insert{3, 4}
@@ -305,8 +320,8 @@ s:insert{7, 8, 9}
 ...
 s:select{}
 ---
-- [3, 4, 5]
-- [7, 8, 9]
+- - [3, 4, 5]
+  - [7, 8, 9]
 ...
 -- check transition of space from enabled to disabled on
 -- deletion of the primary key
@@ -657,7 +672,7 @@ s:create_index('third', { type = 'hash', parts = {  2, 'num' } })
 ...
 s.index.third:rename('second')
 ---
-- error: Duplicate key exists in unique index 1
+- error: Duplicate key exists in unique index 2
 ...
 s.index.third.id
 ---
@@ -727,13 +742,13 @@ s:create_index('year', { type = 'tree', unique=false, parts = { 1, 'num'} })
 ...
 s.index.primary:select{}
 ---
-- ['Almanya - Willkommen in Deutschland', 2011]
-- ['Barbara', 2012]
-- ['Cloud Atlas', 2012]
-- ['Die Fremde', 2010]
-- ['Halt auf freier Strecke', 2011]
-- ['Homevideo', 2011]
-- ['No such movie', 999]
+- - ['Almanya - Willkommen in Deutschland', 2011]
+  - ['Barbara', 2012]
+  - ['Cloud Atlas', 2012]
+  - ['Die Fremde', 2010]
+  - ['Halt auf freier Strecke', 2011]
+  - ['Homevideo', 2011]
+  - ['No such movie', 999]
 ...
 -- a duplicate in the created index
 s:create_index('nodups', { type = 'tree', unique=true, parts = { 1, 'num'} })
@@ -747,13 +762,13 @@ s.index.year:alter({unique=true})
 ...
 s.index.primary:select{}
 ---
-- ['Almanya - Willkommen in Deutschland', 2011]
-- ['Barbara', 2012]
-- ['Cloud Atlas', 2012]
-- ['Die Fremde', 2010]
-- ['Halt auf freier Strecke', 2011]
-- ['Homevideo', 2011]
-- ['No such movie', 999]
+- - ['Almanya - Willkommen in Deutschland', 2011]
+  - ['Barbara', 2012]
+  - ['Cloud Atlas', 2012]
+  - ['Die Fremde', 2010]
+  - ['Halt auf freier Strecke', 2011]
+  - ['Homevideo', 2011]
+  - ['No such movie', 999]
 ...
 box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
 ---

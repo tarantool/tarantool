@@ -11,7 +11,7 @@ for i = 1,10 do s:insert{i, i, 'test' .. i} end
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, s:select{i}) end
+for i = 1,10 do table.insert(res, s:get{i}) end
 ---
 ...
 res
@@ -30,7 +30,7 @@ res
 res = {}
 ---
 ...
-for t in s.index[0]:iterator() do table.insert(res, t) end
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
 ---
 ...
 res
@@ -53,7 +53,7 @@ box.errinj.set("ERRINJ_TREE_ALLOC", true)
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, s:select{i}) end
+for i = 1,10 do table.insert(res, s:get{i}) end
 ---
 ...
 res
@@ -80,7 +80,7 @@ s:delete{1}
 res = {}
 ---
 ...
-for t in s.index[0]:iterator() do table.insert(res, t) end
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
 ---
 - error: Failed to allocate 196 bytes in TreeIndex for init iterator
 ...
@@ -93,7 +93,7 @@ box.errinj.set("ERRINJ_TREE_ALLOC", false)
 ---
 - ok
 ...
-s:select{1}
+s:get{1}
 ---
 ...
 box.errinj.set("ERRINJ_TREE_ALLOC", true)
@@ -103,7 +103,7 @@ box.errinj.set("ERRINJ_TREE_ALLOC", true)
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, (s:select{i})) end
+for i = 1,10 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
@@ -126,7 +126,7 @@ s:delete{2}
 ---
 - [2, 2, 'test2']
 ...
-s.index[0]:iterator()
+s.index[0]:pairs()
 ---
 - error: Failed to allocate 200 bytes in TreeIndex for init iterator
 ...
@@ -136,7 +136,7 @@ box.errinj.set("ERRINJ_TREE_ALLOC", false)
 ---
 - ok
 ...
-s:select{1}
+s:get{1}
 ---
 ...
 box.errinj.set("ERRINJ_TREE_ALLOC", true)
@@ -146,7 +146,7 @@ box.errinj.set("ERRINJ_TREE_ALLOC", true)
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, (s:select{i})) end
+for i = 1,10 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
@@ -168,7 +168,7 @@ s:delete{3}
 ---
 - [3, 3, 'test3']
 ...
-s.index[0]:iterator()
+s.index[0]:pairs()
 ---
 - error: Failed to allocate 200 bytes in TreeIndex for init iterator
 ...
@@ -182,7 +182,7 @@ for i = 2001,2500 do s:insert{i, i} end
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, (s:select{i})) end
+for i = 1,10 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
@@ -202,7 +202,7 @@ s:delete{8}
 res = {}
 ---
 ...
-for i = 1,10 do table.insert(res, (s:select{i})) end
+for i = 1,10 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
@@ -217,7 +217,7 @@ res
 res = {}
 ---
 ...
-for i = 2001,2010 do table.insert(res, (s:select{i})) end
+for i = 2001,2010 do table.insert(res, (s:get{i})) end
 ---
 ...
 res

@@ -296,16 +296,6 @@ class TarantoolServer(Server):
         self._cfgfile_source = os.path.abspath(path)
 
     @property
-    def init_lua_source(self):
-        if not hasattr(self, '_init_lua_source'): self._init_lua_source = None
-        return self._init_lua_source
-    @init_lua_source.setter
-    def init_lua_source(self, val):
-        if val is None:
-            return
-        self._init_lua_source = os.path.abspath(val)
-
-    @property
     def builddir(self):
         if not hasattr(self, '_builddir'):
             raise ValueError("No build-dir is specified")
@@ -429,7 +419,7 @@ class TarantoolServer(Server):
             'config': None,
             'core': 'tarantool',
             'gdb': False,
-            'init_lua': None,
+            'shebang': None,
             'lua_libs': [],
             'random_ports': True,
             'valgrind': False,
@@ -449,7 +439,7 @@ class TarantoolServer(Server):
         self.cfgfile_source = ini['config']
         self.core = ini['core']
         self.gdb = ini['gdb']
-        self.init_lua_source = ini['init_lua']
+        self.shebang = ini['shebang']
         self.lua_libs = ini['lua_libs']
         self.random_ports = ini['random_ports']
         self.valgrind = ini['valgrind']
@@ -470,6 +460,7 @@ class TarantoolServer(Server):
             exe = os.path.join(_dir, cls.default_tarantool["bin"])
             if os.access(exe, os.X_OK):
                 cls.binary = os.path.abspath(exe)
+                os.environ["PATH"] = os.path.abspath(_dir) + ":" + os.environ["PATH"]
                 return exe
         raise RuntimeError("Can't find server executable in " + path)
 
@@ -515,7 +506,7 @@ class TarantoolServer(Server):
     def copy_config(self, rand=True, override = ['all']):
         override_all = (True if 'all' in override else False)
 
-        port = random.randrange(34000, 65535)
+        port = random.randrange(3300, 9999)
         for t in self.generate_ports:
             if not t in self.conf:
                 self.conf[t] = find_port(port)
@@ -539,8 +530,6 @@ class TarantoolServer(Server):
         if self.shebang:
             shutil.copy(self.shebang, self.init_lua)
             os.chmod(self.init_lua, 0777)
-        elif self.init_lua_source:
-            shutil.copy(self.init_lua_source, self.init_lua)
         if self.lua_libs:
             for i in self.lua_libs:
                 source = os.path.join(self.testdir, i)

@@ -32,42 +32,42 @@ space:insert{'Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time 
 --
 
 -- Select by one entry
-space.index['primary']:select{'Vincent', 'Jules', 0}
-space.index['primary']:select{'Jules', 'Vincent', 0}
-space.index['primary']:select{'Vincent', 'Jules', 1}
-space.index['primary']:select{'Jules', 'Vincent', 1}
-space.index['primary']:select{'Vincent', 'Jules', 2}
-space.index['primary']:select{'Jules', 'Vincent', 2}
-space.index['primary']:select{'Vincent', 'Jules', 3}
-space.index['primary']:select{'Jules', 'Vincent', 3}
-space.index['primary']:select{'Vincent', 'Jules', 4}
-space.index['primary']:select{'Jules', 'Vincent', 4}
-space.index['primary']:select{'Vincent', 'Jules', 5}
-space.index['primary']:select{'Jules', 'Vincent', 5}
-space.index['primary']:select{'Vincent', 'Jules', 6}
+space.index['primary']:get{'Vincent', 'Jules', 0}
+space.index['primary']:get{'Jules', 'Vincent', 0}
+space.index['primary']:get{'Vincent', 'Jules', 1}
+space.index['primary']:get{'Jules', 'Vincent', 1}
+space.index['primary']:get{'Vincent', 'Jules', 2}
+space.index['primary']:get{'Jules', 'Vincent', 2}
+space.index['primary']:get{'Vincent', 'Jules', 3}
+space.index['primary']:get{'Jules', 'Vincent', 3}
+space.index['primary']:get{'Vincent', 'Jules', 4}
+space.index['primary']:get{'Jules', 'Vincent', 4}
+space.index['primary']:get{'Vincent', 'Jules', 5}
+space.index['primary']:get{'Jules', 'Vincent', 5}
+space.index['primary']:get{'Vincent', 'Jules', 6}
 
-space.index['primary']:select{'The Wolf!', 'Vincent', 0}
-space.index['primary']:select{'Vincent', 'The Wolf!', 0}
-space.index['primary']:select{'The Wolf!', 'Vincent', 1}
-space.index['primary']:select{'Vincent', 'The Wolf!', 1}
-space.index['primary']:select{'The Wolf!', 'Vincent', 2}
-space.index['primary']:select{'The Wolf!', 'Vincent', 3}
-space.index['primary']:select{'Vincent', 'The Wolf!', 2}
+space.index['primary']:get{'The Wolf!', 'Vincent', 0}
+space.index['primary']:get{'Vincent', 'The Wolf!', 0}
+space.index['primary']:get{'The Wolf!', 'Vincent', 1}
+space.index['primary']:get{'Vincent', 'The Wolf!', 1}
+space.index['primary']:get{'The Wolf!', 'Vincent', 2}
+space.index['primary']:get{'The Wolf!', 'Vincent', 3}
+space.index['primary']:get{'Vincent', 'The Wolf!', 2}
 
 -- Select all messages from Vincent to Jules
-space.index['primary']:select{'Vincent', 'Jules'}
+space.index['primary']:select({'Vincent', 'Jules'})
 
 -- Select all messages from Jules to Vincent
-space.index['primary']:select{'Jules', 'Vincent'}
+space.index['primary']:select({'Jules', 'Vincent'})
 
 -- Select all messages from Vincent to The Wolf
-space.index['primary']:select{'Vincent', 'The Wolf!'}
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 
 -- Select all messages from The Wolf to Vincent
-space.index['primary']:select{'The Wolf!', 'Vincent'}
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- Select all Vincent messages
-space.index['primary']:select{'Vincent'}
+space.index['primary']:select({'Vincent'})
 
 --
 -- Delete test
@@ -81,9 +81,9 @@ space:delete{'Vincent', 'The Wolf!', 0}
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 0, 'Updated' }, {'=', 4, 'New'}})
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 0, 'Vincent'}, { '#', 4, 1 }})
 -- Checking Vincent's last messages
-space.index['primary']:select{'Vincent', 'The Wolf!'}
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 -- Checking The Wolf's last messages
-space.index['primary']:select{'The Wolf!', 'Vincent'}
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- try to delete nonexistent message
 space:delete{'Vincent', 'The Wolf!', 3}
@@ -99,9 +99,9 @@ space:update({'The Wolf!', 'Vincent', 1}, {{'=', 3, '<ooops>'}})
 space:update({'Vincent', 'The Wolf!', 1}, {{'=', 3, '<ooops>'}})
 
 -- Checking Vincent's last messages
-space.index['primary']:select{'Vincent', 'The Wolf!'}
+space.index['primary']:select({'Vincent', 'The Wolf!'})
 -- Checking The Wolf's last messages
-space.index['primary']:select{'The Wolf!', 'Vincent'}
+space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 3}, {{'=', 3, '<ooops>'}})
@@ -127,10 +127,10 @@ space:insert{'b', 'b', 'b'}
 space:insert{'c', 'c', 'c'}
 
 t = {}
-iterator = space.index['second']:iterator(nil, { iterator = box.index.GE })
+gen, param, state = space.index['second']:pairs(nil, { iterator = box.index.GE })
 --# setopt delimiter ';'
 for i = 1, 2 do
-    v = iterator()
+    state, v = gen(param, state)
     table.insert(t, v)
 end;
 --# setopt delimiter ''
@@ -141,7 +141,7 @@ v
 collectgarbage('collect')
 v
 
-v = iterator()
+param, v = gen(param, state)
 v
 collectgarbage('collect')
 v
@@ -149,7 +149,7 @@ v
 t = {}
 --# setopt delimiter ';'
 for i = 1, 3 do
-    v = iterator()
+    param, v = gen(param, state)
     table.insert(t, v)
 end;
 --# setopt delimiter ''
