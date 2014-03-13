@@ -59,9 +59,11 @@ box.schema.space.create = function(name, options)
         options = {}
     end
     local if_not_exists = options.if_not_exists
-
     local temporary = options.temporary and "temporary" or ""
-
+    local engine = "memtx"
+	if options.engine then
+		engine = options.engine
+	end
     if box.space[name] then
         if options.if_not_exists then
             return box.space[name], "not created"
@@ -91,7 +93,7 @@ box.schema.space.create = function(name, options)
     if uid == nil then
         uid = box.session.uid()
     end
-    _space:insert{id, uid, name, options.arity, temporary}
+    _space:insert{id, uid, name, engine, options.arity, temporary}
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create

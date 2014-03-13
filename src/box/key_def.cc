@@ -219,7 +219,8 @@ key_def_check(struct key_def *key_def)
 }
 
 void
-space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
+space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen,
+                int32_t errcode)
 {
 	if (def->id > BOX_SPACE_MAX) {
 		tnt_raise(ClientError, errcode,
@@ -230,5 +231,10 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode)
 		tnt_raise(ClientError, errcode,
 			  (unsigned) def->id,
 			  "space name is too long");
+	}
+	if (engine_namelen >= sizeof(def->engine_name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space engine name is too long");
 	}
 }

@@ -40,24 +40,25 @@
 #include <ctype.h>
 
 /** _space columns */
-#define ID			0
-#define UID			1
-#define NAME			2
-#define ARITY			3
-#define FLAGS			4
+#define ID               0
+#define UID              1
+#define NAME             2
+#define ENGINE           3
+#define ARITY            4
+#define FLAGS            5
 /** _index columns */
-#define INDEX_ID		1
-#define INDEX_TYPE		3
-#define INDEX_IS_UNIQUE		4
-#define INDEX_PART_COUNT	5
+#define INDEX_ID         1
+#define INDEX_TYPE       3
+#define INDEX_IS_UNIQUE  4
+#define INDEX_PART_COUNT 5
 
 /** _user columns */
-#define AUTH_DATA			3
+#define AUTH_DATA        3
 
 /** _priv columns */
-#define PRIV_OBJECT_TYPE	2
-#define PRIV_OBJECT_ID		3
-#define PRIV_ACCESS		4
+#define PRIV_OBJECT_TYPE 2
+#define PRIV_OBJECT_ID   3
+#define PRIV_ACCESS      4
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -152,11 +153,13 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 	def->id = tuple_field_u32(tuple, ID);
 	def->uid = tuple_field_u32(tuple, UID);
 	def->arity = tuple_field_u32(tuple, ARITY);
-	int n = snprintf(def->name, sizeof(def->name),
+	int namelen = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
+	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
+			 "%s", tuple_field_cstr(tuple, ENGINE));
 
 	space_def_init_flags(def, tuple);
-	space_def_check(def, n, errcode);
+	space_def_check(def, namelen, engine_namelen, errcode);
 	if (errcode != ER_ALTER_SPACE &&
 	    def->id >= SC_SYSTEM_ID_MIN && def->id < SC_SYSTEM_ID_MAX) {
 		say_warn("\n"
@@ -483,6 +486,11 @@ ModifySpace::prepare(struct alter_space *alter)
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) space_id(alter->old_space),
 			  "space id is immutable");
+
+	if (strcmp(def.engine_name, alter->old_space->def.engine_name) != 0)
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  (unsigned) space_id(alter->old_space),
+			  "can not change space engine");
 
 	if (def.arity != 0 &&
 	    def.arity != alter->old_space->def.arity &&

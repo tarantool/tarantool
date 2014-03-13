@@ -34,6 +34,15 @@
 #include "scoped_guard.h"
 #include "trigger.h"
 
+static struct engine*
+space_engine_find(const char *name)
+{
+	if (strcmp(name, MEMTX) == 0)
+		return &engine_no_keys;
+
+	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+}
+
 void
 space_fill_index_map(struct space *space)
 {
@@ -81,7 +90,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 		space->index_map[key_def->iid] = Index::factory(key_def);
 	}
 	space_fill_index_map(space);
-	space->engine = engine_no_keys;
+	space->engine = *space_engine_find(def->engine_name);
 	space->run_triggers = true;
 	scoped_guard.is_active = false;
 	return space;

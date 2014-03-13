@@ -68,6 +68,11 @@ s:drop()
 ---
 - error: Space 512 does not exist
 ...
+-- no such engine
+box.schema.create_space('tweedleedee', { engine = 'unknown' })
+---
+- error: Space engine 'unknown' does not exist
+...
 -- explicit space id
 s = box.schema.create_space('tweedledum', { id = 3000 })
 ---
@@ -93,6 +98,11 @@ s:drop()
 box.schema.create_space(string.rep('tweedledee', 100))
 ---
 - error: 'Failed to create space 512: space name is too long'
+...
+-- too long space engine name
+box.schema.create_space('tweedleedee', { engine = string.rep('too-long', 100) })
+---
+- error: 'Failed to create space 512: space engine name is too long'
 ...
 -- space name limit
 box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
@@ -244,7 +254,7 @@ s:select{}
 ---
 - - [1, 2]
 ...
-ARITY = 3
+ARITY = 4
 ---
 ...
 -- increase arity -- error
@@ -264,7 +274,7 @@ box.space['_space']:update(s.n, {{"=", ARITY, 1}})
 -- remove arity - ok
 box.space['_space']:update(s.n, {{"=", ARITY, 0}})
 ---
-- [512, 1, 'test', 0, '']
+- [512, 1, 'test', 'memtx', 0, '']
 ...
 s:select{}
 ---
@@ -285,7 +295,7 @@ s:select{}
 -- set arity of an empty space
 box.space['_space']:update(s.n, {{"=", ARITY, 3}})
 ---
-- [512, 1, 'test', 3, '']
+- [512, 1, 'test', 'memtx', 3, '']
 ...
 s:select{}
 ---

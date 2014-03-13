@@ -25,6 +25,8 @@ s = box.schema.create_space('tweedledum', { if_not_exists = true })
 s:drop()
 -- no such space
 s:drop()
+-- no such engine
+box.schema.create_space('tweedleedee', { engine = 'unknown' })
 -- explicit space id
 s = box.schema.create_space('tweedledum', { id = 3000 })
 s.n
@@ -35,6 +37,8 @@ box.schema.create_space('tweedledee', { id = 'tweedledee' })
 s:drop()
 -- too long space name
 box.schema.create_space(string.rep('tweedledee', 100))
+-- too long space engine name
+box.schema.create_space('tweedleedee', { engine = string.rep('too-long', 100) })
 -- space name limit
 box.schema.create_space(string.rep('t', box.schema.NAME_MAX)..'_')
 s = box.schema.create_space(string.rep('t', box.schema.NAME_MAX - 1)..'_')
@@ -84,7 +88,7 @@ s:insert{1}
 s:insert{1, 2}
 s:insert{1, 2, 3}
 s:select{}
-ARITY = 3
+ARITY = 4
 -- increase arity -- error
 
 box.space['_space']:update(s.n, {{"=", ARITY, 3}})

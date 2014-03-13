@@ -72,7 +72,10 @@ struct engine {
 	space_replace_f replace;
 };
 
+#define MEMTX "memtx"
+
 extern struct engine engine_no_keys;
+
 void space_build_primary_key(struct space *space);
 void space_build_all_keys(struct space *space);
 

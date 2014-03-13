@@ -240,7 +240,9 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct space_def def = { SC_SCHEMA_ID, ADMIN, 0, "_schema", false };
+	struct space_def def = {
+		SC_SCHEMA_ID, ADMIN, 0, "_schema", MEMTX, false
+	};
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
 					      "primary", /* name */

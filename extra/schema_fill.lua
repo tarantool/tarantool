@@ -10,12 +10,12 @@ _priv = box.space[box.schema.PRIV_ID]
 -- define schema version
 _schema:insert{'version', 1, 6}
 -- define system spaces
-_space:insert{_schema.n, ADMIN, '_schema', 0}
-_space:insert{_space.n, ADMIN, '_space', 0}
-_space:insert{_index.n, ADMIN, '_index', 0}
-_space:insert{_func.n, ADMIN, '_func', 0}
-_space:insert{_user.n, ADMIN, '_user', 0}
-_space:insert{_priv.n, ADMIN, '_priv', 0}
+_space:insert{_schema.n, ADMIN, '_schema', 'memtx', 0}
+_space:insert{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:insert{_index.n, ADMIN, '_index', 'memtx', 0}
+_space:insert{_func.n, ADMIN, '_func', 'memtx', 0}
+_space:insert{_user.n, ADMIN, '_user', 'memtx', 0}
+_space:insert{_priv.n, ADMIN, '_priv', 'memtx', 0}
 -- define indexes
 _index:insert{_schema.n, 0, 'primary', 'tree', 1, 1, 0, 'str'}
 

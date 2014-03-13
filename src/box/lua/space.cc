@@ -114,6 +114,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pushstring(L, space_name(space));
 	lua_settable(L, i);
 
+	/* space.engine */
+	lua_pushstring(L, "engine");
+	lua_pushstring(L, space->def.engine_name);
+	lua_settable(L, i);
+
 	lua_pushstring(L, "enabled");
 	lua_pushboolean(L, space_index(space, 0) != 0);
 	lua_settable(L, i);

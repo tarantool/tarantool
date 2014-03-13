@@ -200,6 +200,7 @@ t;
   - 'box.error.ER_TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.ER_FIELD_TYPE : 23'
   - 'box.error.ER_OK : 0'
+  - 'box.error.ER_NO_SUCH_ENGINE : 57'
   - 'box.error.ER_TUPLE_NOT_FOUND : 4'
   - 'box.error.ER_INDEX_ARITY : 39'
   - 'box.error.ER_WAL_IO : 40'

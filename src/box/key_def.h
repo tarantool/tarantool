@@ -215,6 +215,7 @@ struct space_def {
 	 */
 	uint32_t arity;
 	char name[BOX_NAME_MAX + 1];
+	char engine_name[BOX_NAME_MAX + 1];
         /**
 	 * The space is a temporary:
 	 * - it is empty at server start
@@ -226,7 +227,9 @@ struct space_def {
 
 /** Check space definition structure for errors. */
 void
-space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
+space_def_check(struct space_def *def, uint32_t namelen,
+                uint32_t engine_namelen,
+                int32_t errcode);
 
 /** A helper table for key_mp_type_validate */
 extern const uint32_t key_mp_type[];

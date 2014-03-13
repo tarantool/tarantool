@@ -17,14 +17,14 @@ _space:insert{_space.n, ADMIN, 'test', 'world'}
 --
 -- There is already a tuple for the system space
 --
-_space:insert{_space.n, ADMIN, '_space', 0}
-_space:replace{_space.n, ADMIN, '_space', 0}
-_space:insert{_index.n, ADMIN, '_index', 0}
-_space:replace{_index.n, ADMIN, '_index', 0}
+_space:insert{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:insert{_index.n, ADMIN, '_index', 'memtx', 0}
+_space:replace{_index.n, ADMIN, '_index', 'memtx', 0}
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.n, ADMIN, '_space', 0}
+_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
 --
 -- Can't drop a system space
 --
@@ -38,7 +38,7 @@ _space:update({_space.n}, {{'+', 0, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{ADMIN, 'hello', 0}
+t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 -- Check that a space exists
 space = box.space[t[0]]
 space.n
@@ -63,7 +63,7 @@ _index:replace{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 _index:select{}
 -- modify indexes of a system space
 _index:delete{_index.n, 0}
-_space:insert{1000, ADMIN, 'hello', 0}
+_space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 _index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 box.space[1000]:insert{0, 'hello, world'}
 box.space[1000]:drop()
@@ -76,7 +76,7 @@ box.snapshot()
 --# stop server default
 --# start server default
 ADMIN = 1
-box.space['_space']:insert{1000, ADMIN, 'test', 0}
+box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
 box.space[1000].n
 box.space['_space']:delete{1000}
 box.space[1000]
