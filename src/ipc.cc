@@ -131,7 +131,7 @@ ipc_channel_get_timeout(struct ipc_channel *ch, ev_tstamp timeout)
 		fiber_yield_timeout(timeout);
 		rlist_del_entry(fiber(), state);
 
-		/* broadcast messsage wakes us up */
+		/* broadcast message wakes us up */
 		if (ch->bcast) {
 			fiber_wakeup(ch->bcast);
 			fiber_testcancel();
