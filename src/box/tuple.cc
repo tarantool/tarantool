@@ -428,7 +428,7 @@ tuple_new(struct tuple_format *format, const char *data, const char *end)
 inline __attribute__((always_inline)) int
 mp_compare_uint(const char **data_a, const char **data_b);
 
-static inline int
+int
 tuple_compare_field(const char *field_a, const char *field_b,
 		    enum field_type type)
 {

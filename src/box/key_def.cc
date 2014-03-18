@@ -201,6 +201,20 @@ key_def_check(struct key_def *key_def)
 				  "BITSET can not be unique");
 		}
 		break;
+	case SOPHIA:
+		if (! key_def->is_unique) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "SOPHIA index must be unique");
+		}
+		if (key_def->part_count != 1) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "SOPHIA index key can not be multipart");
+		}
+		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,
 			  (unsigned) key_def->iid,

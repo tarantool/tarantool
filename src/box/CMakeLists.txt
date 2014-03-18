@@ -25,6 +25,7 @@ tarantool_module("box"
     hash_index.cc
     tree_index.cc
     bitset_index.cc
+    sophia_index.cc
     space.cc
     alter.cc
     schema.cc
@@ -39,4 +40,7 @@ tarantool_module("box"
     lua/index.cc
     lua/space.cc)
 
-target_link_libraries(tarantool_box bitset msgpuck)
+include_directories(${SOPHIA_INCLUDE_DIR})
+set (sophia_lib "${PROJECT_BINARY_DIR}/third_party/sophia/db/libsophia.a")
+
+target_link_libraries(tarantool_box bitset msgpuck ${sophia_lib} -rdynamic)

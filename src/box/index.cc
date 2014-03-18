@@ -30,6 +30,7 @@
 #include "hash_index.h"
 #include "tree_index.h"
 #include "bitset_index.h"
+#include "sophia_index.h"
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
@@ -110,6 +111,8 @@ Index::factory(struct key_def *key_def)
 		return new TreeIndex(key_def);
 	case BITSET:
 		return new BitsetIndex(key_def);
+	case SOPHIA:
+		return new SophiaIndex(key_def);
 	default:
 		assert(false);
 		return NULL; /* silent compiler warning. */

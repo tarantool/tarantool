@@ -83,7 +83,14 @@ iterator_type_is_reverse(enum iterator_type type)
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
 	void (*free)(struct iterator *);
+	void (*close)(struct iterator *);
 };
+
+static inline void
+iterator_close(struct iterator *it) {
+	if (it->close)
+		it->close(it);
+}
 
 /**
  * Check that the key has correct part count and correct part size

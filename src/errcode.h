@@ -91,6 +91,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 39 */_(ER_INDEX_ARITY,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found") \
+	/* 42 */_(ER_SOPHIA,		    2, "%s") \
 
 
 /*
