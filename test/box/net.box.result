@@ -4,6 +4,9 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 ---
 ...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 ---
 ...
@@ -268,17 +271,17 @@ space:select{345}
 ---
 - - [345, 'test1-replaced', 'test2-replaced']
 ...
-space:eselect({}, { iterator = 'GE', limit = 1000 })
+space:select({}, { iterator = 'GE', limit = 1000 })
 ---
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
 ...
-box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
+box.net.self:select(space.n, {}, { iterator = 'GE', limit = 1000 })
 ---
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
+remote:select(space.n, {}, { limit = 1000, iterator = 'GE' })
 ---
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
@@ -413,10 +416,6 @@ box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
 ---
 - - - [12345, 'test11', 'test2']
 ...
-remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
----
-- - [12345, 'test11', 'test2']
-...
 remote.rpc.box.space.tweedledum.index.primary:get(12345)
 ---
 - - [12345, 'test11', 'test2']
@@ -431,13 +430,16 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:558: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:530: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:563: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:535: box.net.box: connection
     was closed'
 ...
 space:drop()
+---
+...
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...

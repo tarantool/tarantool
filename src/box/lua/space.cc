@@ -75,7 +75,8 @@ lbox_space_on_replace(struct lua_State *L)
 	   "usage: space:on_replace(function | nil, [function | nil])");
 	}
 	lua_getfield(L, 1, "n"); /* Get space id. */
-	struct space *space = space_find(lua_tointeger(L, lua_gettop(L)));
+	uint32_t id = lua_tointeger(L, lua_gettop(L));
+	struct space *space = space_cache_find(id);
 	lua_pop(L, 1);
 
 	return lbox_trigger_reset(L, 3,
@@ -111,6 +112,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space.name */
 	lua_pushstring(L, "name");
 	lua_pushstring(L, space_name(space));
+	lua_settable(L, i);
+
+	/* space.engine */
+	lua_pushstring(L, "engine");
+	lua_pushstring(L, space->def.engine_name);
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");
@@ -275,6 +281,12 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SPACE_ID");
 	lua_pushnumber(L, SC_INDEX_ID);
 	lua_setfield(L, -2, "INDEX_ID");
+	lua_pushnumber(L, SC_USER_ID);
+	lua_setfield(L, -2, "USER_ID");
+	lua_pushnumber(L, SC_FUNC_ID);
+	lua_setfield(L, -2, "FUNC_ID");
+	lua_pushnumber(L, SC_PRIV_ID);
+	lua_setfield(L, -2, "PRIV_ID");
 	lua_pushnumber(L, SC_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, SC_SYSTEM_ID_MAX);

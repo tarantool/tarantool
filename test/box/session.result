@@ -186,3 +186,11 @@ active_connections
 space:drop()
 ---
 ...
+box.session.uid()
+---
+- 1
+...
+box.session.user()
+---
+- admin
+...

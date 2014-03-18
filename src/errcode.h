@@ -91,7 +91,23 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 39 */_(ER_INDEX_ARITY,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found") \
-	/* 42 */_(ER_SOPHIA,		    2, "%s") \
+	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \
+	/* 43 */_(ER_CREATE_USER,		2, "Failed to create user '%s': %s") \
+	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user '%s': %s") \
+	/* 45 */_(ER_NO_SUCH_USER,		2, "User '%s' is not found") \
+	/* 46 */_(ER_USER_EXISTS,		2, "User '%s' already exists") \
+	/* 47 */_(ER_PASSWORD_MISMATCH,		2, "Incorrect password supplied for user '%s'") \
+	/* 48 */_(ER_UNKNOWN_REQUEST_TYPE,	2, "Unknown request type %u") \
+	/* 49 */_(ER_UNKNOWN_SCHEMA_OBJECT,	2, "Unknown object type '%s'") \
+	/* 50 */_(ER_CREATE_FUNCTION,		2, "Failed to create function: %s") \
+	/* 51 */_(ER_NO_SUCH_FUNCTION,		2, "Function '%s' does not exist") \
+	/* 52 */_(ER_FUNCTION_EXISTS,		2, "Function '%s' already exists") \
+	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access denied for user '%s' to function '%s'") \
+	/* 54 */_(ER_FUNCTION_MAX,		2, "A limit on the total number of functions has been reached: %u") \
+	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access denied for user '%s' to space '%s'") \
+	/* 56 */_(ER_USER_MAX,			2, "A limit on the total number of users has been reached: %u") \
+	/* 57 */_(ER_NO_SUCH_ENGINE,		2, "Space engine '%s' does not exist") \
+	/* 58 */_(ER_SOPHIA,		    2, "%s") \
 
 
 /*

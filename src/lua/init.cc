@@ -67,10 +67,10 @@ extern "C" {
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
-extern char uuid_lua[], session_lua[], msgpackffi_lua[];
-static const char *lua_sources[] = { uuid_lua, session_lua, msgpackffi_lua,
-	NULL };
-
+extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[];
+static const char *lua_sources[] = { uuid_lua, session_lua, NULL };
+static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
+	"fun", fun_lua, NULL };
 /*
  * {{{ box Lua library: common functions
  */
@@ -316,6 +316,21 @@ tarantool_lua_init()
 	tarantool_lua_error_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
+
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	for (const char **s = lua_modules; *s; s += 2) {
+		const char *modname = *s;
+		const char *modsrc = *(s + 1);
+		const char *modfile = lua_pushfstring(L,
+			"@builtin/%s.lua", modname);
+		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
+			panic("Error loading Lua module %s...: %s",
+			      modname, lua_tostring(L, -1));
+		lua_call(L, 0, 1);
+		lua_setfield(L, -3, modname); /* package.loaded.modname = t */
+		lua_pop(L, 1); /* chunkname */
+	}
+	lua_pop(L, 1); /* _LOADED */
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s++) {

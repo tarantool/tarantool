@@ -137,9 +137,6 @@ def setenv(args):
             os.path.join(os.getcwd(), '../src/plugin/pg'))
         )
     )
-    path = os.path.join(os.path.abspath(args.builddir), "src/box")
-    path = path + ":" + os.getenv("PATH")
-    os.environ["PATH"] = path
 
 #######################################################################
 # Program body

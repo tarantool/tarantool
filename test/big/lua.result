@@ -61,14 +61,20 @@ space:insert{'item 4', 'georgia', 'on my mind'}
 ---
 - ['item 4', 'georgia', 'on my mind']
 ...
-iter, state = space.index['minmax']:iterator('california', { iterator =  box.index.GE })
+iter, param, state = space.index['minmax']:pairs('california', { iterator =  box.index.GE })
 ---
 ...
-iter()
+state, v = iter(param, state)
+---
+...
+v
 ---
 - ['item 2', 'california', 'dreaming ']
 ...
-iter()
+state, v = iter(param, state)
+---
+...
+v
 ---
 - ['item 3', 'california', 'uber alles']
 ...
@@ -129,12 +135,12 @@ space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
 ---
 - [1, 'of', 'might', 'and', 'magic']
 ...
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'GE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'GE' })
 ---
 - - [1, 'of', 'might', 'and', 'magic']
   - [0, 'of', 'puppets']
 ...
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'LE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'LE' })
 ---
 - - [0, 'of', 'puppets']
   - [1, 'of', 'might', 'and', 'magic']
@@ -315,7 +321,7 @@ space:insert{9, 0}
 ---
 - [9, 0]
 ...
-space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
+space.index['range']:select({}, { limit = 10, iterator = 'GE' })
 ---
 - - [0, 0]
   - [1, 0]
@@ -328,7 +334,7 @@ space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
   - [8, 0]
   - [9, 0]
 ...
-space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
+space.index['range']:select({}, { limit = 10, iterator = 'LE' })
 ---
 - - [9, 0]
   - [8, 0]
@@ -341,7 +347,7 @@ space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
   - [1, 0]
   - [0, 0]
 ...
-space.index['range']:eselect({}, { limit = 4, iterator = 'LE' })
+space.index['range']:select({}, { limit = 4, iterator = 'LE' })
 ---
 - - [9, 0]
   - [8, 0]
@@ -386,7 +392,7 @@ index = space.index['i1']
 t = {}
 ---
 ...
-for v in index:iterator('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -401,7 +407,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -416,7 +422,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -428,7 +434,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -440,7 +446,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -452,7 +458,7 @@ t
 t = {}
 ---
 ...
-for v in index:iterator('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
 ---
 ...
 t
@@ -464,9 +470,9 @@ t
 t = {}
 ---
 ...
-index:iterator('sid_t', { iterator = 'wrong_iterator_type' })
+index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
 ---
-- error: '[string "-- schema.lua (internal file)..."]:273: Wrong iterator type: wrong_iterator_type'
+- error: '[string "-- schema.lua (internal file)..."]:324: Wrong iterator type: wrong_iterator_type'
 ...
 index = nil
 ---
@@ -568,8 +574,7 @@ space.index['i1']:count()
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['i1']:count(function() end)
 ---
-- error: '[string "-- msgpackffi.lua (internal file)..."]:261: can not encode Lua
-    type: ''function'''
+- error: 'builtin/msgpackffi.lua:261: can not encode Lua type: ''function'''
 ...
 space:drop()
 ---

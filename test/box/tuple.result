@@ -377,15 +377,15 @@ t:next(3)
 ...
 t:next(4)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:65: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
 ...
 t:next(-1)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:65: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
 ...
 t:next("fdsaf")
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:48: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:52: error: invalid key to ''next'''
 ...
 box.tuple.new({'x', 'y', 'z'}):next()
 ---
@@ -397,7 +397,7 @@ t=space:insert{1953719668}
 ...
 t:next(1684234849)
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:65: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
 ...
 t:next(1)
 ---
@@ -466,7 +466,8 @@ gen, init, state = t:pairs()
 ...
 gen, init, state
 ---
-- <tuple iterator>
+- gen: <tuple iterator>
+  param: ['a', 'b', 'c']
 - ['a', 'b', 'c']
 - null
 ...
@@ -552,7 +553,7 @@ r = {}
 ...
 for _state, val in t:pairs(10) do table.insert(r, val) end
 ---
-- error: '[string "-- tuple.lua (internal file)..."]:65: error: invalid key to ''next'''
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
 ...
 r
 ---
@@ -572,15 +573,67 @@ r
 ...
 t:pairs(nil)
 ---
-- <tuple iterator>
+- gen: <tuple iterator>
+  param: ['a', 'b', 'c']
 - ['a', 'b', 'c']
 - null
 ...
 t:pairs("fdsaf")
 ---
-- <tuple iterator>
+- state: fdsaf
+  gen: <tuple iterator>
+  param: ['a', 'b', 'c']
 - ['a', 'b', 'c']
 - fdsaf
+...
+--------------------------------------------------------------------------------
+-- test msgpack.encode + tuple
+--------------------------------------------------------------------------------
+msgpackffi = require('msgpackffi')
+---
+...
+t = box.tuple.new({'a', 'b', 'c'})
+---
+...
+msgpack.decode(msgpackffi.encode(t))
+---
+- - a
+  - b
+  - c
+- 8
+...
+msgpack.decode(msgpack.encode(t))
+---
+- - a
+  - b
+  - c
+- 8
+...
+msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+---
+- - 1
+  - - x
+    - y
+    - - a
+      - b
+      - c
+    - z
+  - 2
+  - 3
+- 19
+...
+msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+---
+- - 1
+  - - x
+    - y
+    - - a
+      - b
+      - c
+    - z
+  - 2
+  - 3
+- 19
 ...
 space:drop()
 ---

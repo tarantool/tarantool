@@ -96,11 +96,11 @@ box.snapshot()
 ---
 - ok
 ...
-s1.index['primary']:eselect('second', { limit = 100, iterator = 'GE' })
+s1.index['primary']:select('second', { limit = 100, iterator = 'GE' })
 ---
 - - ['second', 'tuple 2']
 ...
-s1.index['primary']:eselect('identifier', { limit = 100, iterator = 'GE' })
+s1.index['primary']:select('identifier', { limit = 100, iterator = 'GE' })
 ---
 - - ['identifier', 'tuple']
   - ['second', 'tuple 2']
@@ -137,8 +137,8 @@ s1:delete{'third'}
 --# setopt delimiter ';'
 function crossjoin(space0, space1, limit)
     local result = {}
-    for v0 in space0:iterator() do
-        for v1 in space1:iterator() do
+    for state, v0 in space0:pairs() do
+        for state, v1 in space1:pairs() do
             if limit <= 0 then
                 return result
             end
@@ -248,7 +248,7 @@ s1:insert{'abcdc_'}
 ---
 - ['abcdc_']
 ...
-box.sort(s1.index['primary']:eselect('abcdb', { limit = 3, iterator = 'GE' }))
+box.sort(s1.index['primary']:select('abcdb', { limit = 3, iterator = 'GE' }))
 ---
 - - ['abcdb']
   - ['abcdb_']
@@ -590,7 +590,7 @@ s:insert{8}
 - [8]
 ...
 -- it seems that all elements will be deleted:
-for t in ind:iterator() do s:delete{t[0]} end
+for state, t in ind:pairs() do s:delete{t[0]} end
 ---
 ...
 -- but (oops) some elements are left in space:
@@ -635,25 +635,37 @@ s:insert{1}
 ---
 - [1]
 ...
-itr = ind:iterator()
+gen, param, state = ind:pairs()
 ---
 ...
-itr() -- 1
+state, val = gen(param, state)
+---
+...
+val -- 1
 ---
 - [1]
 ...
-itr() -- 2
+state, val = gen(param, state)
+---
+...
+val -- 2
 ---
 - [2]
 ...
 for i = 5,100 do s:insert{i} end
 ---
 ...
-itr() -- 3
+state, val = gen(param, state)
+---
+...
+val -- 3
 ---
 - [3]
 ...
-itr() -- now you don't
+state, val = gen(param, state)
+---
+...
+val -- now you don't
 ---
 - null
 ...
@@ -687,10 +699,13 @@ s:insert{3}
 ---
 - [3]
 ...
-itr = ind:iterator()
+gen, param, state = ind:pairs()
 ---
 ...
-itr() -- 1
+state, val = gen(param, state)
+---
+...
+val -- 1
 ---
 - [1]
 ...
@@ -702,11 +717,17 @@ s:insert{0}
 ---
 - [0]
 ...
-itr() -- 1 again
+state, val = gen(param, state)
+---
+...
+val -- 1 again
 ---
 - [1]
 ...
-itr() -- null
+state, val = gen(param, state)
+---
+...
+val -- null
 ---
 - null
 ...

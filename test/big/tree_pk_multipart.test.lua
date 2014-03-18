@@ -127,10 +127,10 @@ space:insert{'b', 'b', 'b'}
 space:insert{'c', 'c', 'c'}
 
 t = {}
-iterator = space.index['second']:iterator(nil, { iterator = box.index.GE })
+gen, param, state = space.index['second']:pairs(nil, { iterator = box.index.GE })
 --# setopt delimiter ';'
 for i = 1, 2 do
-    v = iterator()
+    state, v = gen(param, state)
     table.insert(t, v)
 end;
 --# setopt delimiter ''
@@ -141,7 +141,7 @@ v
 collectgarbage('collect')
 v
 
-v = iterator()
+param, v = gen(param, state)
 v
 collectgarbage('collect')
 v
@@ -149,7 +149,7 @@ v
 t = {}
 --# setopt delimiter ';'
 for i = 1, 3 do
-    v = iterator()
+    param, v = gen(param, state)
     table.insert(t, v)
 end;
 --# setopt delimiter ''

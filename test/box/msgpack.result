@@ -21,7 +21,7 @@ msgpack.encode('a', 'b')
 ...
 msgpack.decode('a', 'b')
 ---
-- error: 'msgpack.decode: a Lua string expected'
+- error: 'msgpack.decode: offset is out of bounds'
 ...
 --# setopt delimiter ';'
 function deepcompare(a, b)
@@ -53,7 +53,7 @@ end;
 function test(x)
     local buf1 = msgpack.encode(x)
     local buf2 = msgpackffi.encode(x)
-    local x1, offset1 = msgpack.next(buf1)
+    local x1, offset1 = msgpack.decode(buf1)
     local x2, offset2 = msgpackffi.decode_unchecked(buf2)
     local xstr
     if type(x) == "table" then
@@ -337,6 +337,7 @@ msgpack.decode(msgpack.encode({[0] = 1, 2, 3, 4, 5}))
   3: 4
   1: 2
   4: 5
+- 12
 ...
 -- test sparse / dense arrays
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
@@ -347,6 +348,7 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [10] = 10}))
   1: 1
   10: 10
   4: 4
+- 14
 ...
 msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
 ---
@@ -356,6 +358,7 @@ msgpack.decode(msgpack.encode({1, 2, 3, 4, 5, [100] = 100}))
   1: 1
   100: 100
   4: 4
+- 14
 ...
 msgpackffi.decode_unchecked(msgpackffi.encode({1, 2, 3, 4, 5, [100] = 100}))
 ---
@@ -462,6 +465,7 @@ msgpack.decode(msgpack.encode(a));
                                 - b
                                 - c
                                 - null
+- 90
 ...
 msgpackffi.decode_unchecked(msgpackffi.encode(a));
 ---
@@ -521,19 +525,19 @@ msgpackffi.decode_unchecked(msgpackffi.encode(a));
 a = { 1, 2, 3 }
 ---
 ...
-msgpack.decode(msgpack.dumps(a))
+(msgpack.decode(msgpack.dumps(a)))
 ---
 - - 1
   - 2
   - 3
 ...
-msgpack.loads(msgpack.encode(a))
+(msgpack.loads(msgpack.encode(a)))
 ---
 - - 1
   - 2
   - 3
 ...
--- Test msgpack.next
+-- Test msgpack.decode with offsets
 dump = msgpack.dumps({1, 2, 3})..msgpack.dumps({4, 5, 6})
 ---
 ...
@@ -541,7 +545,7 @@ dump:len()
 ---
 - 8
 ...
-a, offset = msgpack.next(dump)
+a, offset = msgpack.decode(dump)
 ---
 ...
 a
@@ -554,7 +558,7 @@ offset
 ---
 - 5
 ...
-a, offset = msgpack.next(dump, offset)
+a, offset = msgpack.decode(dump, offset)
 ---
 ...
 a
@@ -567,10 +571,10 @@ offset
 ---
 - 9
 ...
-a, offset = msgpack.next(dump, offset)
+a, offset = msgpack.decode(dump, offset)
 ---
-- error: '[string "a, offset = msgpack.next(dump, offset) "]:1: msgpack.next: offset
-    is out of bounds'
+- error: '[string "a, offset = msgpack.decode(dump, offset) "]:1: msgpack.decode:
+    offset is out of bounds'
 ...
 -- Test decode with offset
 dump = msgpackffi.encode({1, 2, 3})..msgpackffi.encode({4, 5, 6})
@@ -608,6 +612,5 @@ offset
 ...
 a, offset = msgpackffi.decode_unchecked(dump, offset)
 ---
-- error: '[string "-- msgpackffi.lua (internal file)..."]:460: offset = 9 is out of
-    bounds [1..8]'
+- error: 'builtin/msgpackffi.lua:460: offset = 9 is out of bounds [1..8]'
 ...

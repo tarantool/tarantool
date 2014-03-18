@@ -180,4 +180,16 @@ r
 t:pairs(nil)
 t:pairs("fdsaf")
 
+--------------------------------------------------------------------------------
+-- test msgpack.encode + tuple
+--------------------------------------------------------------------------------
+
+msgpackffi = require('msgpackffi')
+
+t = box.tuple.new({'a', 'b', 'c'})
+msgpack.decode(msgpackffi.encode(t))
+msgpack.decode(msgpack.encode(t))
+msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+
 space:drop()

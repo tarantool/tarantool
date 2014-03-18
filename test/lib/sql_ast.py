@@ -128,10 +128,12 @@ class StatementUpdate(Statement):
             raise RuntimeError("UPDATE can only be made by the"
                     " primary key (#0)")
         self.value_list = where[1]
+        if not isinstance(self.value_list, (list, tuple)):
+            self.value_list = [self.value_list]
         self.update_list = update_list
 
     def pack(self, connection):
-        return RequestUpdate(connection, self.space_no, self.value_list, self.update_list)
+        return RequestUpdate(connection, self.space_no, 0, self.value_list, self.update_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -146,9 +148,11 @@ class StatementDelete(Statement):
             raise RuntimeError("DELETE can only be made by the "
                     "primary key (#0)")
         self.value_list = where[1]
+        if not isinstance(self.value_list, (list, tuple)):
+            self.value_list = [self.value_list]
 
     def pack(self, connection):
-        return RequestDelete(connection, self.space_no, self.value_list)
+        return RequestDelete(connection, self.space_no, 0, self.value_list)
 
     def unpack(self, response):
         if response.return_code:
@@ -159,6 +163,8 @@ class StatementSelect(Statement):
     def __init__(self, table_name, where, limit):
         self.space_no = table_name
         (self.index_no, self.key) = where
+        if not isinstance(self.key, (list, tuple)):
+            self.key = [self.key]
         self.offset = 0
         self.limit = limit
 

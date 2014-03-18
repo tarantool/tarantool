@@ -455,6 +455,13 @@ tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 void
 tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf);
 
+/**
+ * Store tuple fields in the memory buffer. Buffer must have at least
+ * tuple->bsize bytes.
+ */
+extern "C" void
+tuple_to_buf(struct tuple *tuple, char *buf);
+
 /** Initialize tuple library */
 void
 tuple_init(float slab_alloc_arena, uint32_t slab_alloc_minimal,

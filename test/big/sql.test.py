@@ -3,6 +3,8 @@ sql.sort = True
 #
 # Prepare spaces
 #
+admin("box.schema.user.create('test', { password = 'test' })")
+admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
 admin("s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })")
 admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})")
@@ -12,7 +14,7 @@ print """#
 # "SELECT fails with a disjunct and small LIMIT"
 # https://bugs.launchpad.net/tarantool/+bug/729758
 #"""
-
+sql.authenticate('test', 'test')
 sql("insert into t0 values ('Doe', 'Richard')")
 sql("insert into t0 values ('Roe', 'Richard')")
 sql("insert into t0 values ('Woe', 'Richard')")
@@ -45,8 +47,8 @@ sql("select * from t0 where k0='Spears'")
 sql("select * from t0 where k1='Anything'")
 sql("select * from t0 where k1='Britney'")
 
-admin("s.index[0]:eselect('Spears', { limit = 100, iterator = 'GE' })")
-admin("s.index[1]:eselect('Britney', { limit = 100, iterator = 'GE' })")
+admin("s.index[0]:select('Spears', { limit = 100, iterator = 'GE' })")
+admin("s.index[1]:select('Britney', { limit = 100, iterator = 'GE' })")
 
 
 sql("delete from t0 where k0='Spears'")
@@ -69,9 +71,9 @@ sql("select * from t0 where k0='key1'")
 sql("select * from t0 where k0='key2'")
 sql("select * from t0 where k0='key3'")
 sql("select * from t0 where k1='part1'")
-admin("s.index[1]:eselect('part1', { limit = 100, iterator = 'GE' })")
-admin("s.index[0]:eselect('key2', { limit = 100, iterator = 'GE' })")
-admin("s.index[1]:eselect({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })")
+admin("s.index[1]:select('part1', { limit = 100, iterator = 'GE' })")
+admin("s.index[0]:select('key2', { limit = 100, iterator = 'GE' })")
+admin("s.index[1]:select({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })")
 sql("select * from t0 where k0='key1'")
 sql("select * from t0 where k0='key2'")
 sql("select * from t0 where k0='key3'")
@@ -90,7 +92,7 @@ sql("insert into t0 values (21234567, 'part1', 'part2_a')")
 sql("insert into t0 values (31234567, 'part1_a', 'part2')")
 sql("insert into t0 values (41234567, 'part1_a', 'part2_a')")
 admin("l = {}")
-admin("for v in s:iterator() do table.insert(l, v) end")
+admin("for state, v in s:pairs() do table.insert(l, v) end")
 admin("return l")
 sql("select * from t0 where k0=01234567")
 sql("select * from t0 where k0=11234567")
@@ -203,6 +205,7 @@ admin("s.index[1]:max()")
 sql("delete from t0 where k0=1")
 sql("delete from t0 where k0=2")
 sql("delete from t0 where k0=3")
+admin("box.schema.user.drop('test')")
 admin("s:drop()")
 
 sql.sort = False

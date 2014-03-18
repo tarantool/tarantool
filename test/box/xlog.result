@@ -35,19 +35,3 @@ box.space[0]:insert{3, 'third tuple'}
 # Inprogress xlog with bad record must be deleted during recovery.
 
 00000000000000000006.xlog.inprogress has been successfully deleted
-
-A test case for https://bugs.launchpad.net/tarantool/+bug/1052018
-panic_on_wal_error doens't work for duplicate key errors
-
-box.space[0]:get{1}
----
-- [1, 'First record']
-...
-box.space[0]:get{2}
----
-- [2, 'Second record']
-...
-#box.space[0]
----
-- 0
-...

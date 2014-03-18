@@ -24,9 +24,11 @@ space.index['minmax']:get{'alabama'}
 space:insert{'item 2', 'california', 'dreaming '}
 space:insert{'item 3', 'california', 'uber alles'}
 space:insert{'item 4', 'georgia', 'on my mind'}
-iter, state = space.index['minmax']:iterator('california', { iterator =  box.index.GE })
-iter()
-iter()
+iter, param, state = space.index['minmax']:pairs('california', { iterator =  box.index.GE })
+state, v = iter(param, state)
+v
+state, v = iter(param, state)
+v
 space:delete{'item 1'}
 space:delete{'item 2'}
 space:delete{'item 3'}
@@ -50,8 +52,8 @@ space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, uniq
 space:insert{1234567, 'new', 'world'}
 space:insert{0, 'of', 'puppets'}
 space:insert{00000001ULL, 'of', 'might', 'and', 'magic'}
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'GE' })
-space.index['minmax']:eselect('of', { limit = 2, iterator = 'LE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'GE' })
+space.index['minmax']:select('of', { limit = 2, iterator = 'LE' })
 space:truncate()
 
 --
@@ -119,9 +121,9 @@ space:insert{6, 0}
 space:insert{7, 0}
 space:insert{8, 0}
 space:insert{9, 0}
-space.index['range']:eselect({}, { limit = 10, iterator = 'GE' })
-space.index['range']:eselect({}, { limit = 10, iterator = 'LE' })
-space.index['range']:eselect({}, { limit = 4, iterator = 'LE' })
+space.index['range']:select({}, { limit = 10, iterator = 'GE' })
+space.index['range']:select({}, { limit = 10, iterator = 'LE' })
+space.index['range']:select({}, { limit = 4, iterator = 'LE' })
 space:drop()
 
 --
@@ -146,27 +148,27 @@ end;
 index = space.index['i1']
 
 t = {}
-for v in index:iterator('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'GE' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'LE' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'EQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_1', { iterator = 'REQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'EQ' }) do table.insert(t, v) end
 t
 t = {}
-for v in index:iterator('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
+for state, v in index:pairs('sid_2', { iterator = 'REQ' }) do table.insert(t, v) end
 t
 t = {}
 
 
-index:iterator('sid_t', { iterator = 'wrong_iterator_type' })
+index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
 
 index = nil
 space:drop()

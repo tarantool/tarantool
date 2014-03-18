@@ -93,6 +93,7 @@ box.net = {
         FUNCTION_NAME = 0x22,
         DATA = 0x30,
         ERROR = 0x31,
+        GREETING_SIZE = 128,
 
         delete = function(self, space, key)
             local t = self:process(box.net.box.DELETE,
@@ -216,19 +217,6 @@ box.net = {
                     [box.net.box.TUPLE] = {...}}))
         end,
 
-        eselect = function(self, sno, ino, key, opts)
-            local res = self:call('box.net.self:eselect', sno, ino, key, opts)
-            if opts and opts.limit == nil then
-                if res[1] ~= nil then
-                    return res[1]
-                else
-                    return
-                end
-            end
-            return res
-        end,
-
-
         -- To make use of timeouts safe across multiple
         -- concurrent fibers do not store timeouts as
         -- part of conection state, but put it inside
@@ -262,23 +250,6 @@ box.net = {
     self = {
         process = function(self, ...)
             return box.process(...)
-        end,
-
-
-        eselect = function(self, sno, ino, key, opts)
-            local space = box.space[ sno ]
-            if space == nil then
-                box.raise(box.error.ER_NO_SUCH_SPACE,
-                    sprintf("No such space #%s", tostring(sno)))
-            end
-            local index = space.index[ ino ]
-            if index == nil then
-                box.raise(box.error.ER_NO_SUCH_INDEX,
-                    sprintf("No such index #%s in space #%s",
-                        tostring(sno), tostring(ino)))
-            end
-
-            return index:eselect(key, opts)
         end,
 
         -- for compatibility with the networked version,
@@ -453,6 +424,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     self.host, self.port, s[4])
                 return false
             end
+            sc:recv(box.net.box.GREETING_SIZE)
 
             self.s = sc
 
@@ -497,7 +469,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
-                    local header, offset = msgpack.next(resp);
+                    local header, offset = msgpack.decode(resp);
                     local code = header[box.net.box.CODE]
                     local sync = header[box.net.box.SYNC]
                     if sync == nil then

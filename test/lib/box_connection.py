@@ -44,6 +44,9 @@ class BoxConnection(TarantoolConnection):
     def connect(self):
         self.py_con.connect()
 
+    def authenticate(self, user, password):
+        self.py_con.authenticate(user, password)
+
     def disconnect(self):
         self.py_con.close()
 
@@ -78,7 +81,7 @@ class BoxConnection(TarantoolConnection):
         request = statement.pack(self.py_con)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            response = self.py_con._send_request(request, False)
+            response = self.py_con._send_request(request)
 
         if not silent:
             print statement.unpack(response)

@@ -4,11 +4,14 @@ _space = box.space[box.schema.SPACE_ID]
 _index = box.space[box.schema.INDEX_ID]
 ---
 ...
+ADMIN = 1
+---
+...
 --
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
 --
-_space:insert{_space.n, 5, 'test'}
+_space:insert{_space.n, ADMIN, 'test', 5 }
 ---
 - error: Duplicate key exists in unique index 0
 ...
@@ -22,35 +25,35 @@ _space:insert{'hello', 'world', 'test'}
 --
 -- Can't create a space which has wrong arity - arity must be NUM
 --
-_space:insert{_space.n, 'world', 'test'}
+_space:insert{_space.n, ADMIN, 'test', 'world'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
 --
 -- There is already a tuple for the system space
 --
-_space:insert{_space.n, 0, '_space'}
+_space:insert{_space.n, ADMIN, '_space', 'memtx', 0}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace{_space.n, 0, '_space'}
+_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
 ---
-- [280, 0, '_space']
+- [280, 1, '_space', 'memtx', 0]
 ...
-_space:insert{_index.n, 0, '_index'}
+_space:insert{_index.n, ADMIN, '_index', 'memtx', 0}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace{_index.n, 0, '_index'}
+_space:replace{_index.n, ADMIN, '_index', 'memtx', 0}
 ---
-- [288, 0, '_index']
+- [288, 1, '_index', 'memtx', 0]
 ...
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.n, 0, '_space'}
+_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
 ---
-- [280, 0, '_space']
+- [280, 1, '_space', 'memtx', 0]
 ...
 --
 -- Can't drop a system space
@@ -77,7 +80,7 @@ _space:update({_space.n}, {{'+', 0, 2}})
 --
 -- Create a space
 --
-t = _space:auto_increment{0, 'hello'}
+t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 ---
 ...
 -- Check that a space exists
@@ -86,7 +89,7 @@ space = box.space[t[0]]
 ...
 space.n
 ---
-- 289
+- 313
 ...
 space.arity
 ---
@@ -101,23 +104,23 @@ space.index[0]
 --
 space:select{0}
 ---
-- error: 'No index #0 is defined in space 289'
+- error: 'No index #0 is defined in space 313'
 ...
 space:insert{0, 0}
 ---
-- error: 'No index #0 is defined in space 289'
+- error: 'No index #0 is defined in space 313'
 ...
 space:replace{0, 0}
 ---
-- error: 'No index #0 is defined in space 289'
+- error: 'No index #0 is defined in space 313'
 ...
 space:update({0}, {{'+', 0, 1}})
 ---
-- error: 'No index #0 is defined in space 289'
+- error: 'No index #0 is defined in space 313'
 ...
 space:delete{0}
 ---
-- error: 'No index #0 is defined in space 289'
+- error: 'No index #0 is defined in space 313'
 ...
 t = _space:delete{space.n}
 ---
@@ -131,7 +134,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space 289 does not exist
+- error: Space 313 does not exist
 ...
 _index:insert{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
@@ -153,18 +156,26 @@ _index:select{}
 ---
 - - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
   - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [280, 1, 'name', 'tree', 1, 1, 2, 'str']
+  - [280, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [280, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
-  - [288, 1, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
+  - [288, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
+  - [296, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [296, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [296, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [304, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
+  - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
+  - [312, 1, 'owner', 'tree', 0, 1, 1, 'num']
 ...
 -- modify indexes of a system space
 _index:delete{_index.n, 0}
 ---
 - error: Can't drop the primary key in a system space, space id 288
 ...
-_space:insert{1000, 0, 'hello'}
+_space:insert{1000, ADMIN, 'hello', 'memtx', 0}
 ---
-- [1000, 0, 'hello']
+- [1000, 1, 'hello', 'memtx', 0]
 ...
 _index:insert{1000, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
@@ -195,9 +206,12 @@ box.snapshot()
 ...
 --# stop server default
 --# start server default
-box.space['_space']:insert{1000, 0, 'test'}
+ADMIN = 1
 ---
-- [1000, 0, 'test']
+...
+box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
+---
+- [1000, 1, 'test', 'memtx', 0]
 ...
 box.space[1000].n
 ---
@@ -205,7 +219,7 @@ box.space[1000].n
 ...
 box.space['_space']:delete{1000}
 ---
-- [1000, 0, 'test']
+- [1000, 1, 'test', 'memtx', 0]
 ...
 box.space[1000]
 ---

@@ -33,8 +33,10 @@
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
-	IPROTO_BODY_LEN_MAX = 2147483648UL
+	IPROTO_BODY_LEN_MAX = 2147483648UL,
+	IPROTO_GREETING_SIZE = 128,
 };
+
 
 enum iproto_key {
 	IPROTO_CODE = 0x00,
@@ -49,6 +51,7 @@ enum iproto_key {
 	IPROTO_KEY = 0x20,
 	IPROTO_TUPLE = 0x21,
 	IPROTO_FUNCTION_NAME = 0x22,
+	IPROTO_USER_NAME = 0x23,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -60,7 +63,7 @@ enum iproto_key {
 #define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(KEY) | bit(TUPLE) | \
-			  bit(FUNCTION_NAME))
+			  bit(FUNCTION_NAME) | bit(USER_NAME))
 static inline bool
 iproto_header_has_key(const char *pos, const char *end)
 {
@@ -87,9 +90,9 @@ enum iproto_request_type {
 	IPROTO_UPDATE = 4,
 	IPROTO_DELETE = 5,
 	IPROTO_CALL = 6,
-	IPROTO_DML_REQUEST_MAX = 7,
+	IPROTO_AUTH = 7,
+	IPROTO_DML_REQUEST_MAX = 8,
 	IPROTO_PING = 64,
-	IPROTO_AUTH = 65,
 	IPROTO_SUBSCRIBE = 66
 };
 

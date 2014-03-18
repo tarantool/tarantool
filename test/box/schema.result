@@ -11,6 +11,7 @@ t
 ---
 - - 'temporary: false'
   - 'n: 0'
+  - 'engine: memtx'
   - 'enabled: true'
   - 'name: tweedledum'
   - 'arity: 0'

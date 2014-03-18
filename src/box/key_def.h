@@ -36,9 +36,11 @@
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
+	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 10,
 	BOX_NAME_MAX = 32,
 	BOX_FIELD_MAX = INT32_MAX,
+	BOX_USER_MAX = 32,
 	/**
 	 * A fairly arbitrary limit which is still necessary
 	 * to keep tuple_format object small.
@@ -49,6 +51,20 @@ enum {
 	 */
 	BOX_INDEX_PART_MAX = UINT8_MAX
 };
+
+/*
+ * Different objects which can be subject to access
+ * control.
+ *
+ * Use 0 for unknown to use the same index consistently
+ * even when there are more object types in the future.
+ */
+enum schema_object_type {
+	SC_UNKNOWN = 0, SC_UNIVERSE = 1, SC_SPACE = 2, SC_FUNCTION = 3
+};
+
+enum schema_object_type
+schema_object_type(const char *name);
 
 /*
  * Possible field data types. Can't use STRS/ENUM macros for them,
@@ -190,6 +206,8 @@ key_def_check(struct key_def *key_def);
 struct space_def {
 	/** Space id. */
 	uint32_t id;
+	/** User id of the creator of the space */
+	uint32_t uid;
 	/**
 	 * If not set (is 0), any tuple in the
 	 * space can have any number of fields.
@@ -198,6 +216,7 @@ struct space_def {
 	 */
 	uint32_t arity;
 	char name[BOX_NAME_MAX + 1];
+	char engine_name[BOX_NAME_MAX + 1];
         /**
 	 * The space is a temporary:
 	 * - it is empty at server start
@@ -209,7 +228,9 @@ struct space_def {
 
 /** Check space definition structure for errors. */
 void
-space_def_check(struct space_def *def, uint32_t namelen, uint32_t errcode);
+space_def_check(struct space_def *def, uint32_t namelen,
+                uint32_t engine_namelen,
+                int32_t errcode);
 
 /** A helper table for key_mp_type_validate */
 extern const uint32_t key_mp_type[];
@@ -231,5 +252,41 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 		tnt_raise(ClientError, err, field_no,
 			  field_type_strs[key_type]);
 }
+
+/**
+ * Definition of a function. Function body is not stored
+ * or replicated (yet).
+ */
+
+struct func_def {
+	/** Function id. */
+	uint32_t fid;
+	/** Owner of the function. */
+	uint32_t uid;
+	/** Function name. */
+	char name[BOX_NAME_MAX + 1];
+	/**
+	 * Strictly speaking, this doesn't belong
+	 * to func def but belongs to func cache entry.
+	 * Kept here for simplicity.
+	 */
+	uint8_t access[BOX_USER_MAX];
+};
+
+/**
+ * Definition of a privilege
+ */
+struct priv_def {
+	/** Who grants the privilege. */
+	uint32_t grantor_id;
+	/** Whom the privilege is granted. */
+	uint32_t grantee_id;
+	/* Object id - is only defined for object type */
+	uint32_t object_id;
+	/* Object type - function, space, universe */
+	enum schema_object_type object_type;
+	/** What is being or has been granted. */
+	uint8_t access;
+};
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

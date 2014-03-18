@@ -76,7 +76,7 @@
 	if (e != 0 && e != EBUSY)		\
 		say_error("%s error %d at %s:%d", __func__, e, __FILE__, __LINE__);\
 	assert(e == 0 || e == EBUSY);		\
-	e					\
+	e;					\
 })
 
 #define tt_pthread_mutex_unlock(mutex)		\
@@ -145,7 +145,7 @@
 	if (ETIMEDOUT != e)                           \
 		say_error("%s error %d", __func__, e);\
 	assert(e == 0 || e == ETIMEDOUT);             \
-	e                                             \
+	e;                                             \
 })
 
 #define tt_pthread_once(control, function)	\

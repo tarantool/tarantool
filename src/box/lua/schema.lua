@@ -31,9 +31,26 @@ ffi.cdef[[
     boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
               int iterator, uint32_t offset, uint32_t limit,
               const char *key, const char *key_end);
+    void password_prepare(const char *password, int len,
+		                  char *out, int out_len);
 ]]
 local builtin = ffi.C
 local msgpackffi = require('msgpackffi')
+local fun = require('fun')
+
+local function user_resolve(user)
+    local _user = box.space[box.schema.USER_ID]
+    local tuple
+    if type(user) == 'string' then
+        tuple = _user.index['name']:get{user}
+    else
+        tuple = _user.index['primary']:get{user}
+    end
+    if tuple == nil then
+        return nil
+    end
+    return tuple[0]
+end
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -42,9 +59,11 @@ box.schema.space.create = function(name, options)
         options = {}
     end
     local if_not_exists = options.if_not_exists
-
     local temporary = options.temporary and "temporary" or ""
-
+    local engine = "memtx"
+	if options.engine then
+		engine = options.engine
+	end
     if box.space[name] then
         if options.if_not_exists then
             return box.space[name], "not created"
@@ -67,7 +86,14 @@ box.schema.space.create = function(name, options)
     if options.arity == nil then
         options.arity = 0
     end
-    _space:insert{id, options.arity, name, temporary}
+    local uid = nil
+    if options.user then
+        uid = user_resolve(options.user)
+    end
+    if uid == nil then
+        uid = box.session.uid()
+    end
+    _space:insert{id, uid, name, engine, options.arity, temporary}
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create
@@ -112,8 +138,7 @@ box.schema.index.create = function(space_id, name, options)
     local iid = 0
     -- max
     local tuple = _index.index[0]
-        :eselect(space_id, { limit = 1, iterator = 'LE' })
-    tuple = tuple[1]
+        :select(space_id, { limit = 1, iterator = 'LE' })[1]
     if tuple then
         local id = tuple[0]
         if id == space_id then
@@ -203,23 +228,49 @@ local function keify(key)
     return {key}
 end
 
-local iterator_mt = {
-    __call = function(iterator)
-        local tuple = iterator.cdata.next(iterator.cdata)
-        if tuple ~= nil then
-            return box.tuple.bless(tuple)
-        else
-            return nil
-        end
-    end;
+local iterator_t = ffi.typeof('struct iterator')
+ffi.metatype(iterator_t, {
     __tostring = function(iterator)
-        return string.format("iterator on space %d index %d",
-            iterator.index.n, iterator.index.id)
+        return "<iterator state>"
     end;
-}
+})
 
-local iterator_cdata_gc = function(iterator_cdata)
-    return iterator_cdata.free(iterator_cdata)
+local iterator_gen = function(param, state)
+    --[[
+        index:pairs() mostly confirms to the Lua for-in loop conventions and
+        tries to follow the best practices of Lua community.
+
+        - this generating function is stateless.
+
+        - *param* should contain **immutable** data needed to fully define
+          an iterator. *param* is opaque for users. Currently it contains keybuf
+          string just to prevent GC from collecting it. In future some other
+          variables like space_id, index_id, sc_version will be stored here.
+
+        - *state* should contain **immutable** transient state of an iterator.
+          *state* is opaque for users. Currently it contains `struct iterator`
+          cdata that is modified during iteration. This is a sad limitation of
+          underlying C API. Moreover, the separation of *param* and *state* is
+          not properly implemented here. These drawbacks can be fixed in
+          future without changing this API.
+
+        Please checkout http://www.lua.org/pil/7.3.html for the further
+        information.
+    --]]
+    if not ffi.istype(iterator_t, state) then
+        error('usage gen(param, state)')
+    end
+    -- next() modifies state in-place
+    local tuple = state.next(state)
+    if tuple ~= nil then
+        return state, box.tuple.bless(tuple) -- new state, value
+    else
+        return nil
+    end
+end
+
+local iterator_cdata_gc = function(iterator)
+    return iterator.free(iterator)
 end
 
 -- global struct port instance to use by select()/get()
@@ -240,9 +291,9 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
         end
-        local lst = index:eselect(key, { iterator = 'GE', limit = 1 })
-        if lst[1] ~= nil then
-            return lst[1]
+        local lst = index:select(key, { iterator = 'GE', limit = 1 })[1]
+        if lst ~= nil then
+            return lst
         else
             return
         end
@@ -251,16 +302,16 @@ function box.schema.space.bless(space)
         if index.type == 'HASH' then
             box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
         end
-        local lst = index:eselect(key, { iterator = 'LE', limit = 1 })
-        if lst[1] ~= nil then
-            return lst[1]
+        local lst = index:select(key, { iterator = 'LE', limit = 1 })[1]
+        if lst ~= nil then
+            return lst
         else
             return
         end
     end
     index_mt.random = function(index, rnd) return index.idx:random(rnd) end
     -- iteration
-    index_mt.iterator = function(index, key, opts)
+    index_mt.pairs = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         -- Use ALL for {} and nil keys and EQ for other keys
         local itype = pkey + 1 < pkey_end and box.index.EQ or box.index.ALL
@@ -281,12 +332,10 @@ function box.schema.space.bless(space)
             box.raise()
         end
 
-        return setmetatable({
-            cdata = ffi.gc(cdata, iterator_cdata_gc);
-            keybuf = keybuf;
-            index = index;
-        }, iterator_mt)
+        return fun.wrap(iterator_gen, keybuf, ffi.gc(cdata, iterator_cdata_gc))
     end
+    index_mt.__pairs = index_mt.pairs -- Lua 5.2 compatibility
+    index_mt.__ipairs = index_mt.pairs -- Lua 5.2 compatibility
     -- index subtree size
     index_mt.count = function(index, key, opts)
         local count = 0
@@ -302,7 +351,8 @@ function box.schema.space.bless(space)
             return #index.idx
         end
 
-        for tuple in index:iterator(key, { iterator = iterator }) do
+        local state, tuple
+        for state, tuple in index:pairs(key, { iterator = iterator }) do
             count = count + 1
         end
         return count
@@ -314,71 +364,6 @@ function box.schema.space.bless(space)
                 string.format("No index #%d is defined in space %d", index_id,
                     space.n))
         end
-    end
-
-    -- eselect
-    index_mt.eselect = function(index, key, opts)
-        -- user can catch link to index
-        check_index(box.space[index.n], index.id)
-
-        if opts == nil then
-            opts = {}
-        end
-
-        local iterator = opts.iterator
-
-        if iterator == nil then
-            iterator = box.index.EQ
-        end
-        if type(iterator) == 'string' then
-            if box.index[ iterator ] == nil then
-                error(string.format("Wrong iterator: %s", tostring(iterator)))
-            end
-            iterator = box.index[ iterator ]
-        end
-
-        local result = {}
-        local offset = 0
-        local skip = 0
-        local count = 0
-        if opts.offset ~= nil then
-            offset = tonumber(opts.offset)
-        end
-        local limit = opts.limit
-        local grep = opts.grep
-        local map = opts.map
-
-        if limit == 0 then
-            return result
-        end
-
-        for tuple in index:iterator(key, { iterator = iterator }) do
-            if grep == nil or grep(tuple) then
-                if skip < offset then
-                    skip = skip + 1
-                else
-                    if map == nil then
-                        table.insert(result, tuple)
-                    else
-                        table.insert(result, map(tuple))
-                    end
-                    count = count + 1
-
-                    if limit == nil then
-                        if count > 1 then
-                            box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
-                                "More than one tuple found without 'limit'")
-                        end
-                    elseif count >= limit then
-                        break
-                    end
-                end
-            end
-        end
-        if limit == nil then
-            return result[1]
-        end
-        return result
     end
 
     index_mt.get = function(index, key)
@@ -455,10 +440,6 @@ function box.schema.space.bless(space)
     space_mt.len = function(space) return space.index[0]:len() end
     space_mt.__newindex = index_mt.__newindex
 
-    space_mt.eselect = function(space, key, opts)
-        check_index(space, 0)
-        return space.index[0]:eselect(key, opts)
-    end
     space_mt.get = function(space, key)
         check_index(space, 0)
         return space.index[0]:get(key)
@@ -494,15 +475,18 @@ function box.schema.space.bless(space)
         table.insert(tuple, 1, max + 1)
         return space:insert(tuple)
     end
-    space_mt.iterator = function(space, key)
+    space_mt.pairs = function(space, key)
         check_index(space, 0)
-        return space.index[0]:iterator(key)
+        return space.index[0]:pairs(key)
     end
+    space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
+    space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.truncate = function(space)
         check_index(space, 0)
         local pk = space.index[0]
         while #pk.idx > 0 do
-            for t in pk:iterator() do
+            local state, t
+            for state, t in pk:pairs() do
                 local key = {}
                 -- ipairs does not work because pk.key_field is zero-indexed
                 for _k2, key_field in pairs(pk.key_field) do
@@ -540,3 +524,168 @@ function box.schema.space.bless(space)
         end
     end
 end
+
+local function privilege_resolve(privilege)
+    local numeric = 0
+    if type(privilege) == 'string' then
+        privilege = string.lower(privilege)
+        if string.find(privilege, 'read') then
+            numeric = numeric + 1
+        end
+        if string.find(privilege, 'write') then
+            numeric = numeric + 2
+        end
+        if string.find(privilege, 'execute') then
+            numeric = numeric + 4
+        end
+    else
+        numeric = privilege
+    end
+    return numeric
+end
+
+local function object_resolve(object_type, object_name)
+    if object_type == 'universe' then
+        return 0
+    end
+    if object_type == 'space' then
+        local space = box.space[object_name]
+        if  space == nil then
+            box.raise(box.error.ER_NO_SUCH_SPACE,
+                      "Space '"..object_name.."' does not exist")
+        end
+        return space.n
+    end
+    if object_type == 'function' then
+        local _func = box.space[box.schema.FUNC_ID]
+        local func
+        if type(object_name) == 'string' then
+            func = _func.index['name']:get{object_name}
+        else
+            func = _func.index['primary']:get{object_name}
+        end
+        if func then
+            return func[0]
+        else
+            box.raise(box.error.ER_NO_SUCH_FUNCTION,
+                      "Function '"..object_name.."' does not exist")
+        end
+    end
+    box.raise(box.error.ER_UNKNOWN_SCHEMA_OBJECT,
+              "Unknown object type '"..object_type.."'")
+end
+
+box.schema.func = {}
+box.schema.func.create = function(name)
+    local _func = box.space[box.schema.FUNC_ID]
+    local func = _func.index['name']:get{name}
+    if func then
+            box.raise(box.error.ER_FUNCTION_EXISTS,
+                      "Function '"..name.."' already exists")
+    end
+    _func:auto_increment{box.session.uid(), name}
+end
+
+box.schema.func.drop = function(name)
+    local _func = box.space[box.schema.FUNC_ID]
+    local fid = object_resolve('function', name)
+    _func:delete{fid}
+end
+
+box.schema.user = {}
+
+box.schema.user.password = function(password)
+    local BUF_SIZE = 128
+    local buf = ffi.new("char[?]", BUF_SIZE)
+    ffi.C.password_prepare(password, #password, buf, BUF_SIZE)
+    return ffi.string(buf)
+end
+
+box.schema.user.passwd = function(new_password)
+    local uid = box.session.uid()
+    local _user = box.space[box.schema.USER_ID]
+    auth_mech_list = {}
+    auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
+    _user:update({uid}, {"=", 3, auth_mech_list})
+end
+
+box.schema.user.create = function(name, opts)
+    local uid = user_resolve(name)
+    if uid then
+        box.raise(box.error.ER_USER_EXISTS,
+                  "User '"..name.."' already exists")
+    end
+    if opts == nil then
+        opts = {}
+    end
+    auth_mech_list = {}
+    if opts.password then
+        auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
+    end
+    local _user = box.space[box.schema.USER_ID]
+    _user:auto_increment{'', name, auth_mech_list}
+end
+
+box.schema.user.drop = function(name)
+    local uid = user_resolve(name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                 "User '"..name.."' does not exist")
+    end
+    -- recursive delete of user data
+    local _priv = box.space[box.schema.PRIV_ID]
+    local privs = _priv.index['owner']:select{uid}
+    for k, tuple in pairs(privs) do
+        box.schema.user.revoke(uid, tuple[4], tuple[2], tuple[3])
+    end
+    local spaces = box.space[box.schema.SPACE_ID].index['owner']:select{uid}
+    for k, tuple in pairs(spaces) do
+        box.space[tuple[0]]:drop()
+    end
+    local funcs = box.space[box.schema.FUNC_ID].index['owner']:select{uid}
+    for k, tuple in pairs(spaces) do
+        box.schema.func.drop(tuple[0])
+    end
+    box.space[box.schema.USER_ID]:delete{uid}
+end
+
+box.schema.user.grant = function(user_name, privilege, object_type,
+                                 object_name, grantor)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                  "User '"..user_name.."' does not exist")
+    end
+    privilege = privilege_resolve(privilege)
+    local oid = object_resolve(object_type, object_name)
+    if grantor == nil then
+        grantor = box.session.uid()
+    else
+        grantor = user_resolve(grantor)
+    end
+    local _priv = box.space[box.schema.PRIV_ID]
+    _priv:replace{grantor, uid, object_type, oid, privilege}
+end
+
+box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.raise(box.error.ER_NO_SUCH_USER,
+                  "User '"..name.."' does not exist")
+    end
+    privilege = privilege_resolve(privilege)
+    local oid = object_resolve(object_type, object_name)
+    local _priv = box.space[box.schema.PRIV_ID]
+    local tuple = _priv:get{uid, object_type, oid}
+    if tuple == nil then
+        return
+    end
+    local old_privilege = tuple[4]
+    if old_privilege ~= privilege then
+        privilege = bit.band(old_privilege, bit.bnot(privilege))
+        _priv:update({uid, object_type, oid}, { "=", 4, privilege})
+    else
+        _priv:delete{uid, object_type, oid}
+    end
+end
+

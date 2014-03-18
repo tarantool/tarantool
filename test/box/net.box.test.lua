@@ -1,5 +1,6 @@
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
 remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
 type(remote)
 remote:ping()
@@ -84,9 +85,9 @@ remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
 space:get{345}
 space:select{345}
 
-space:eselect({}, { iterator = 'GE', limit = 1000 })
-box.net.self:eselect(space.n, 0, {}, { iterator = 'GE', limit = 1000 })
-remote:eselect(space.n, 0, {}, { limit = 1000, iterator = 'GE' })
+space:select({}, { iterator = 'GE', limit = 1000 })
+box.net.self:select(space.n, {}, { iterator = 'GE', limit = 1000 })
+remote:select(space.n, {}, { limit = 1000, iterator = 'GE' })
 space:get{345}
 space:select{345}
 remote:get(space.n, {345})
@@ -141,7 +142,6 @@ box.time() - pstart < 0.5
 
 box.net.self.rpc.box.space.tweedledum.index.primary:get(12345)
 box.net.self.rpc.box.space.tweedledum.index.primary:select(12345)
-remote.rpc.box.space.tweedledum.index.primary:eselect(12345)
 remote.rpc.box.space.tweedledum.index.primary:get(12345)
 remote.rpc.box.space.tweedledum.index.primary:select(12345)
 
@@ -150,3 +150,4 @@ remote:close()
 remote:ping()
 
 space:drop()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')

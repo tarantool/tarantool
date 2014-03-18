@@ -1,6 +1,9 @@
 import os
 import sys
 
+admin("box.schema.user.create('test', { password = 'test' })")
+admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
+sql.authenticate('test', 'test')
 admin("function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end")
 admin("f1()")
 sql("call f1()")
@@ -118,3 +121,4 @@ sql("call field_x(4, 1)")
 sql("call space:delete(4)")
 
 admin("space:drop()")
+admin("box.schema.user.drop('test')")

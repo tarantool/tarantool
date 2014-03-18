@@ -514,19 +514,20 @@ replies = 0
 packet = msgpack.encode({[0] = 64, [1] = 0})
 packet = msgpack.encode(packet:len())..packet
 function bug1160869()
-	local s = box.socket.tcp()
-	s:connect('127.0.0.1', box.cfg.primary_port)
-	box.fiber.resume( box.fiber.create(function()
-		box.fiber.detach()
-		while true do
-			_, status =  s:recv(18)
+    local s = box.socket.tcp()
+    s:connect('127.0.0.1', box.cfg.primary_port)
+    s:recv(128)
+    box.fiber.resume( box.fiber.create(function()
+        box.fiber.detach()
+        while true do
+            _, status =  s:recv(18)
             if status == "eof" then
                 error("unexpected eof")
             end
-			replies = replies + 1
-		end
-	end) )
-	return s:send(packet)
+            replies = replies + 1
+        end
+    end) )
+    return s:send(packet)
 end
 """
 admin(test.replace('\n', ' '))
@@ -544,29 +545,30 @@ reps = 0
 packet = msgpack.encode({[0] = 64, [1] = 0})
 packet = msgpack.encode(packet:len())..packet
 function iostart()
-	if s ~= nil then
-		return
-	end
-	s = box.socket.tcp()
-	s:connect('127.0.0.1', box.cfg.primary_port)
-	box.fiber.resume( box.fiber.create(function()
-		box.fiber.detach()
-		while true do
-			s:recv(18)
+    if s ~= nil then
+        return
+    end
+    s = box.socket.tcp()
+    s:connect('127.0.0.1', box.cfg.primary_port)
+    s:recv(128)
+    box.fiber.resume( box.fiber.create(function()
+        box.fiber.detach()
+        while true do
+            s:recv(18)
             if status == "eof" then
                 error("unexpected eof")
             end
-			reps = reps + 1
-		end
-	end))
+            reps = reps + 1
+        end
+    end))
 end
 
 function iotest()
-	iostart()
-	syncno = syncno + 1
+    iostart()
+    syncno = syncno + 1
     packet = msgpack.encode({[0] = 64, [1] = syncno})
     packet = msgpack.encode(packet:len())..packet
-	return s:send(packet)
+    return s:send(packet)
 end
 """
 admin(test.replace('\n', ' '))
@@ -582,19 +584,19 @@ admin("reps")
 #
 test="""
 function server()
-	ms = box.socket.tcp()
-	ms:bind('127.0.0.1', 8181)
-	ms:listen()
-	test_listen_done = true
+    ms = box.socket.tcp()
+    ms:bind('127.0.0.1', 8181)
+    ms:listen()
+    test_listen_done = true
 
-	while true do
-		local s = ms:accept( .5 )
-		if s ~= 'timeout' then
-			print("accepted connection ", s)
-			s:send('Hello world')
-			s:shutdown(box.socket.SHUT_RDWR)
-		end
-	end
+    while true do
+        local s = ms:accept( .5 )
+        if s ~= 'timeout' then
+            print("accepted connection ", s)
+            s:send('Hello world')
+            s:shutdown(box.socket.SHUT_RDWR)
+        end
+    end
 end
 
 fbr = box.fiber.wrap(server)

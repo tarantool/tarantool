@@ -36,12 +36,6 @@
 #include "request.h" /* for request_name */
 
 void
-txn_add_redo(struct txn *txn, struct request *request)
-{
-	txn->request = request;
-}
-
-void
 txn_replace(struct txn *txn, struct space *space,
 	    struct tuple *old_tuple, struct tuple *new_tuple,
 	    enum dup_replace_mode mode)

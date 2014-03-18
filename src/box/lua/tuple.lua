@@ -3,6 +3,7 @@
 local ffi = require('ffi')
 local yaml = require('yaml')
 local msgpackffi = require('msgpackffi')
+local fun = require('fun')
 
 ffi.cdef([[
 struct tuple
@@ -35,6 +36,9 @@ tuple_seek(struct tuple_iterator *it, uint32_t field_no);
 
 const char *
 tuple_next(struct tuple_iterator *it);
+
+void
+tuple_to_buf(struct tuple *tuple, char *buf);
 ]])
 
 local builtin = ffi.C
@@ -80,7 +84,7 @@ end
 -- See http://www.lua.org/manual/5.2/manual.html#pdf-ipairs
 local function tuple_ipairs(tuple, pos)
     local it = ffi.new(tuple_iterator_t)
-    return it, tuple, pos
+    return fun.wrap(it, tuple, pos)
 end
 
 -- a precreated metatable for totable()
@@ -106,6 +110,15 @@ end
 local function tuple_unpack(tuple)
     return unpack(tuple_totable(tuple))
 end
+
+-- Set encode hooks for msgpackffi
+local function tuple_to_msgpack(buf, tuple)
+    buf:reserve(tuple._bsize)
+    builtin.tuple_to_buf(tuple, buf.p)
+    buf.p = buf.p + tuple._bsize
+end
+
+msgpackffi.on_encode(ffi.typeof('const struct tuple &'), tuple_to_msgpack)
 
 -- cfuncs table is set by C part
 
