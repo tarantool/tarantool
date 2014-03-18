@@ -39,7 +39,9 @@ space_engine_find(const char *name)
 {
 	if (strcmp(name, MEMTX) == 0)
 		return &engine_no_keys;
-
+	else
+	if (strcmp(name, SOPHIA) == 0)
+		return &engine_sophia;
 	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
 }
 
@@ -303,6 +305,12 @@ struct engine engine_no_keys = {
 	/* .state = */   READY_NO_KEYS,
 	/* .recover = */ space_begin_build_primary_key,
 	/* .replace = */ space_replace_no_keys
+};
+
+struct engine engine_sophia = {
+	READY_NO_KEYS,
+	space_begin_build_primary_key,
+	space_replace_no_keys
 };
 
 void

@@ -145,8 +145,9 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
 	if (new_tuple) {
+		assert(new_tuple->refs == 0);
 		auto scoped_guard =
-			make_scoped_guard([=] { tuple_ref(new_tuple, -1); });
+			make_scoped_guard([=] { tuple_ref(new_tuple, 0); });
 
 		switch (mode) {
 		case DUP_REPLACE_OR_INSERT:

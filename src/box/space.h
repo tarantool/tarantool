@@ -73,8 +73,10 @@ struct engine {
 };
 
 #define MEMTX "memtx"
+#define SOPHIA "sophia"
 
 extern struct engine engine_no_keys;
+extern struct engine engine_sophia;
 
 void space_build_primary_key(struct space *space);
 void space_build_all_keys(struct space *space);
