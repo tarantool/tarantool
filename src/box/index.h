@@ -156,6 +156,11 @@ protected:
 	 */
 	Index(struct key_def *key_def);
 
+	/*
+	 * Pre-allocated iterator to speed up the main case of
+	 * box_process(). Should not be used elsewhere.
+	 */
+	struct iterator *m_position;
 public:
 	virtual ~Index();
 
@@ -194,12 +199,6 @@ public:
 			m_position = allocIterator();
 		return m_position;
 	}
-private:
-	/*
-	 * Pre-allocated iterator to speed up the main case of
-	 * box_process(). Should not be used elsewhere.
-	 */
-	struct iterator *m_position;
 };
 
 /**

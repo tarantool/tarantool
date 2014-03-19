@@ -65,38 +65,22 @@ sophia_gettuple(void *db, const char *key, size_t keysize)
 	auto scoped_guard = make_scoped_guard([=] { free(value); });
 	struct tuple *ret =
 		tuple_new(tuple_format_ber, value, value + valuesize);
+	tuple_ref(ret, 1);
 	return ret;
 }
 
 /* {{{ SophiaIndex */
 
-SophiaIndex::SophiaIndex(struct key_def *key_def)
-	: Index(key_def)
-{
-	db  = NULL;
-	env = NULL;
-}
-
-SophiaIndex::~SophiaIndex()
-{
-	if (db) {
-		int rc = sp_destroy(db);
-		if (rc == -1)
-			say_info("Sophia space %d close error: %s", key_def->space_id,
-			         sp_error(env));
-	}
-	if (env) {
-		sp_destroy(env);
-	}
-}
-
-void
-SophiaIndex::endBuild()
+SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
+	: Index(key_def_arg)
 {
 	env = sp_env();
 	if (env == NULL)
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(void*),
 			  "SophiaIndex", "env");
+
+	auto env_freer =
+		make_scoped_guard([=] { sp_destroy(env); });
 
 	int rc = sp_ctl(env, SPCMP, sophia_index_compare, key_def);
 	if (rc == -1)
@@ -115,6 +99,31 @@ SophiaIndex::endBuild()
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 
 	say_info("Recover complete");
+
+	env_freer.is_active = false;
+}
+
+SophiaIndex::~SophiaIndex()
+{
+	if (m_position != NULL) {
+		m_position->free(m_position);
+		m_position = NULL;
+	}
+
+	if (db) {
+		int rc = sp_destroy(db);
+		if (rc == -1)
+			say_info("Sophia space %d close error: %s", key_def->space_id,
+			         sp_error(env));
+	}
+	if (env) {
+		sp_destroy(env);
+	}
+}
+
+void
+SophiaIndex::endBuild()
+{
 }
 
 size_t
@@ -223,6 +232,7 @@ sophia_iterator_next(struct iterator *ptr)
 	const char *value = sp_value(it->cursor);
 	struct tuple *ret =
 		tuple_new(tuple_format_ber, value, value + valuesize);
+	tuple_ref(ret, 1);
 	return ret;
 }
 
