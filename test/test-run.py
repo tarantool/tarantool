@@ -130,13 +130,8 @@ class Options:
             exit(-1)
 
 
-def setenv(args):
-    os.putenv("TARANTOOL_PLUGIN_DIR",
-        ':'.join(
-            (os.path.join(os.getcwd(), '../src/plugin/mysql'),
-            os.path.join(os.getcwd(), '../src/plugin/pg'))
-        )
-    )
+def setenv():
+    os.putenv("TARANTOOL_SRC_DIR", os.path.abspath('..'))
 
 #######################################################################
 # Program body
@@ -144,7 +139,6 @@ def setenv(args):
 
 def main():
     options = Options()
-    setenv(options.args)
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
     # collections are supposed to reside
@@ -154,6 +148,7 @@ def main():
     if not path:
         path = '.'
     os.chdir(path)
+    setenv()
 
     failed_tests = []
 
