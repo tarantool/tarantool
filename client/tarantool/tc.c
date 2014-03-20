@@ -59,7 +59,7 @@ struct tc tc;
 static void tc_init(void) {
 	memset(&tc, 0, sizeof(tc));
 	setlocale(LC_ALL, "");
-	tc.pager_fd = fileno(stdout);
+	tc.pager_stream = stdout;
 	tc.pager_pid = 0;
 }
 
