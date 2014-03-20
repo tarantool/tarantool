@@ -20,16 +20,16 @@ macro(install_cfg type_cfg dest)
 endmacro(install_cfg)
 
 if (ENABLE_RPM)
-    install_cfg(rpm ${CMAKE_SYSCONF_DIR}/tarantool/)
+    install_cfg(rpm ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/)
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION share/tarantool)
 else()
     if (TARGET_OS_DARWIN)
-        install_cfg(dmg ${CMAKE_SYSCONF_DIR})
+        install_cfg(dmg ${CMAKE_INSTALL_SYSCONFDIR})
     else()
-        install_cfg(tgz ${CMAKE_SYSCONF_DIR})
+        install_cfg(tgz ${CMAKE_INSTALL_SYSCONFDIR})
     endif()
 
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-             DESTINATION "${CMAKE_LOCALSTATE_DIR}/lib/tarantool")
+             DESTINATION "${CMAKE_INSTALL_LOCALSTATEDIR}/lib/tarantool")
 endif()

@@ -66,5 +66,5 @@ set_target_properties(tntnet_shared PROPERTIES OUTPUT_NAME "tarantoolnet")
 # Install
 #----------------------------------------------------------------------------#
 
-install (TARGETS tntnet ARCHIVE DESTINATION lib)
-install (TARGETS tntnet_shared LIBRARY DESTINATION lib)
+install (TARGETS tntnet ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install (TARGETS tntnet_shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

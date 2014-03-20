@@ -46,6 +46,16 @@ Description: In-memory database with Lua application server
  .
  This package provides Tarantool server.
 
+Package: tarantool-dev
+Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Priority: optional
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ tarantool (= ${binary:Version}),
+Description: Tarantool in-memory database - development headers
+ Tarantool is an in-memory database and Lua application server.
+ This package provides server headers needed to build pluggable modules.
+
 Package: tarantool-modules
 Conflicts: tarantool-plugins (<< 1.5.3)
 Replaces: tarantool-plugins (<< 1.5.3)
