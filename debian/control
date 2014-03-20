@@ -11,7 +11,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libiberty-dev | binutils-dev,
  libmysqlclient-dev,
  libpq-dev,
- postgresql-server-dev
+ postgresql-server-dev-all
 Section: database
 Standards-Version: 3.9.5
 Homepage: http://tarantool.org/
