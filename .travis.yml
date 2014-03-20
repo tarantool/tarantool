@@ -11,7 +11,7 @@ branches:
 install:
   - sudo apt-get update > /dev/null
   - sudo apt-get -q install binutils-dev python-daemon python-yaml python-pexpect
-  - sudo apt-get -q install libmysqlclient-dev libpq-dev
+  - sudo apt-get -q install libmysqlclient-dev libpq-dev postgresql-server-dev
 
 script:
   - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
