@@ -34,15 +34,6 @@
 #include "scoped_guard.h"
 #include "trigger.h"
 
-static struct engine*
-space_engine_find(const char *name)
-{
-	if (strcmp(name, MEMTX) == 0)
-		return &engine_no_keys;
-
-	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
-}
-
 void
 space_fill_index_map(struct space *space)
 {
@@ -85,12 +76,13 @@ space_new(struct space_def *def, struct rlist *key_list)
 	space->format = tuple_format_new(key_list);
 	tuple_format_ref(space->format, 1);
 	space->index_id_max = index_id_max;
+	/* init space engine instance */
+	engine_init(&space->engine, def->engine_name);
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
 		space->index_map[key_def->iid] = Index::factory(key_def);
 	}
 	space_fill_index_map(space);
-	space->engine = *space_engine_find(def->engine_name);
 	space->run_triggers = true;
 	scoped_guard.is_active = false;
 	return space;
@@ -286,24 +278,6 @@ space_build_all_keys(struct space *space)
 	space_build_primary_key(space);
 	space_build_secondary_keys(space);
 }
-
-/**
- * This is a vtab with which a newly created space which has no
- * keys is primed.
- * At first it is set to correctly work for spaces created during
- * recovery from snapshot. In process of recovery it is updated as
- * below:
- *
- * 1) after SNAP is loaded:
- *    recover = space_build_primary_key
- * 2) when all XLOGs are loaded:
- *    recover = space_build_all_keys
- */
-struct engine engine_no_keys = {
-	/* .state = */   READY_NO_KEYS,
-	/* .recover = */ space_begin_build_primary_key,
-	/* .replace = */ space_replace_no_keys
-};
 
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)

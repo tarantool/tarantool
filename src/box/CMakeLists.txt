@@ -25,6 +25,7 @@ tarantool_module("box"
     hash_index.cc
     tree_index.cc
     bitset_index.cc
+    engine.cc
     space.cc
     alter.cc
     schema.cc

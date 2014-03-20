@@ -576,7 +576,7 @@ DropIndex::alter(struct alter_space *alter)
 	 *   can be put back online properly with
 	 *   engine_no_keys.recover.
 	 */
-	alter->new_space->engine = engine_no_keys;
+	engine_derive(&alter->new_space->engine);
 }
 
 void

@@ -28,6 +28,7 @@
  */
 #include "schema.h"
 #include "access.h"
+#include "engine.h"
 #include "space.h"
 #include "tuple.h"
 #include "assoc.h"
@@ -164,10 +165,14 @@ space_cache_replace(struct space *space)
 static void
 do_one_recover_step(struct space *space, void * /* param */)
 {
-	if (space_index(space, 0))
+	if (space_index(space, 0)) {
 		space->engine.recover(space);
-	else
-		space->engine = engine_no_keys;
+	} else {
+		/* in case of space has no primary index,
+		 * derive it's engine handler recovery state from
+		 * the global one. */
+		engine_derive(&space->engine);
+	}
 }
 
 /** A wrapper around space_new() for data dictionary spaces. */
@@ -241,7 +246,7 @@ schema_init()
 	 */
 	/* _schema - key/value space with schema description */
 	struct space_def def = {
-		SC_SCHEMA_ID, ADMIN, 0, "_schema", MEMTX, false
+		SC_SCHEMA_ID, ADMIN, 0, "_schema", "memtx", false
 	};
 	struct key_def *key_def = key_def_new(def.id,
 					      0 /* index id */,
@@ -294,6 +299,13 @@ schema_init()
 	key_def_delete(key_def);
 }
 
+static inline void
+space_end_recover_snapshot_cb(struct engine *engine, void *udate)
+{
+	(void)udate;
+	engine->recover = space_build_primary_key;
+}
+
 void
 space_end_recover_snapshot()
 {
@@ -301,7 +313,8 @@ space_end_recover_snapshot()
 	 * For all new spaces created from now on, when the
 	 * PRIMARY key is added, enable it right away.
 	 */
-	engine_no_keys.recover = space_build_primary_key;
+	engine_foreach(space_end_recover_snapshot_cb, NULL);
+
 	space_foreach(do_one_recover_step, NULL);
 }
 
@@ -311,6 +324,13 @@ fix_lua(struct space *space, void * /* param */)
 	box_lua_space_new(tarantool_L, space);
 }
 
+static inline void
+space_end_recover_cb(struct engine *engine, void *udate)
+{
+	(void)udate;
+	engine->recover = space_build_all_keys;
+}
+
 void
 space_end_recover()
 {
@@ -318,8 +338,10 @@ space_end_recover()
 	 * For all new spaces created after recovery is complete,
 	 * when the primary key is added, enable all keys.
 	 */
-	engine_no_keys.recover = space_build_all_keys;
+	engine_foreach(space_end_recover_cb, NULL);
+
 	space_foreach(do_one_recover_step, NULL);
+
 	/* TODO: temporary solution for Bug#1229709 */
 	space_foreach(fix_lua, NULL);
 }
