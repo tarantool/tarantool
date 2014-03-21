@@ -1,6 +1,9 @@
 import os
+import os.path
 
 try:
-	(host, port, user, password, db) = os.getenv('MYSQL').split(':')
+    (host, port, user, password, db) = os.getenv('MYSQL').split(':')
+    if not os.path.exists(os.path.join(self.args.builddir, 'src/module/mysql/mysql.so')):
+        raise RuntimeError('No MySQL module found')
 except (RuntimeError, TypeError, NameError, AttributeError, ValueError):
-	self.skip = 1
+    self.skip = 1

@@ -45,7 +45,7 @@ void tc_pager_start()
 	if (tc.pager_pid != 0)
 		tc_pager_kill();
 	if (tc.opt.pager == NULL) {
-		tc.pager_fd = fileno(stdout);
+		tc.pager_stream = stdout;
 		return;
 	}
 	int pipefd[2];
@@ -63,7 +63,7 @@ void tc_pager_start()
 		tc_error("Can't start pager! Errno: %s", strerror(errno));
 	} else {
 		close(pipefd[0]);
-		tc.pager_fd = pipefd[1];
+		tc.pager_stream = fdopen(pipefd[1], "w");
 		tc.pager_pid = pid;
 	}
 }
@@ -71,8 +71,8 @@ void tc_pager_start()
 void tc_pager_stop()
 {
 	if (tc.pager_pid != 0) {
-		close(tc.pager_fd);
-		tc.pager_fd = fileno(stdout);
+		fclose(tc.pager_stream);
+		tc.pager_stream = stdout;
 		waitpid(tc.pager_pid, NULL, 0);
 		tc.pager_pid = 0;
 	}

@@ -1,4 +1,4 @@
-package.path  = "../../src/module/sql/?.lua"
+package.path  = os.getenv("TARANTOOL_SRC_DIR").."/src/module/sql/?.lua"
 package.cpath  = "?.so"
 
 require("sql")

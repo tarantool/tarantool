@@ -1,4 +1,5 @@
-package.path  = "../../src/module/sql/?.lua"
+--# push filter 'error: .*/src/module/sql/sql.lua' to 'error: src/module/sql/sql.lua'
+package.path  = os.getenv("TARANTOOL_SRC_DIR").."/src/module/sql/?.lua"
 package.cpath  = "?.so"
 
 require("sql")
@@ -47,3 +48,4 @@ c:commit()
 c:txn(function(dbi) dbi:single('SELECT 1') end)
 
 os.execute("rm -rf box/net/")
+--# clear filter
