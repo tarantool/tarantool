@@ -43,5 +43,12 @@ memory_init()
 void
 memory_free()
 {
+	/*
+	 * If this is called from a fiber != sched, then
+	 * %rsp is pointing at the memory that we
+	 * would be trying to unmap. Don't.
+	 */
+#if 0
 	slab_arena_destroy(&runtime);
+#endif
 }
