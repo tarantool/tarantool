@@ -3,7 +3,7 @@ import os.path
 
 try:
     (host, port, user, password, db) = os.getenv('PG').split(':')
-    if not os.path.exists(os.path.join(server.builddir, 'src/module/pg/pg.so')):
+    if not os.path.exists(os.path.join(self.args.builddir, 'src/module/pg/pg.so')):
         raise RuntimeError('No PG module found')
 except (RuntimeError, TypeError, NameError, AttributeError, ValueError):
     self.skip = 1
