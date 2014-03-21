@@ -41,23 +41,17 @@
 extern struct tarantool_client tc;
 
 void tc_print_buf(char *buf, size_t size) {
-	printf("%-.*s", (int)size, buf);
-	fflush(stdout);
+	fprintf(tc.pager_stream, "%-.*s", (int)size, buf);
+	fflush(tc.pager_stream);
 }
 
 void tc_printf(char *fmt, ...) {
-	char *str;
 	va_list args;
 	va_start(args, fmt);
-	ssize_t str_len = vasprintf(&str, fmt, args);
-	if (str_len == -1)
-		tc_error("Error in vasprintf - %d", errno);
-	ssize_t stat = write(tc.pager_fd, str, str_len);
-	if (stat == -1)
+	int stat = vfprintf(tc.pager_stream, fmt, args);
+	if (stat < 0)
 		tc_error("Can't write into pager - %d", errno);
 	va_end(args);
-	if (str)
-		free(str);
 	return;
 }
 

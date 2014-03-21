@@ -53,7 +53,7 @@ tc_init(void)
 		free(tc.opt.pager);
 	if (tc.opt.delim)
 		free(tc.opt.delim);
-	tc.pager_fd = fileno(stdout);
+	tc.pager_stream = stdout;
 	tc.pager_pid = 0;
 	tb_sesinit(&tc.console);
 }

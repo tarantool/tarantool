@@ -1,5 +1,3 @@
-# A special hack for buggy FindPostgreSQL.cmake in Debian/Ubuntu
-set(PostgreSQL_ROOT /usr/include/postgresql;/usr/include/postgres)
 find_optional_package(PostgreSQL)
 
 if (PostgreSQL_FOUND)
