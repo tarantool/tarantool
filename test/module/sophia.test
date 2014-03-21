@@ -4,8 +4,11 @@ import shutil
 
 module_path = os.path.join(vardir, "box")
 module_path_so = module_path + "/sophia.so"
-os.makedirs(module_path)
-shutil.copy("../src/module/sophia/sophia.so", module_path_so)
+try:
+    os.makedirs(module_path)
+except OSError:
+    pass
+shutil.copy(os.path.join(self.args.builddir, "src/module/sophia/sophia.so"), module_path_so)
 
 server.stop()
 server.deploy(init_lua="module/sophia.lua")

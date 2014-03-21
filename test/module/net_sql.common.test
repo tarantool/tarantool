@@ -1,8 +1,12 @@
 # encoding: tarantool
+import sys
 
 server.stop()
 server.deploy(init_lua="module/net_sql.common.lua")
 
+sys.stdout.push_filter("error: .*/src/module/sql/sql.lua", "error: src/module/sql/sql.lua")
+
 exec admin "lua type(box.net.sql)"
 exec admin "lua c = box.net.sql.connect('abcd')"
 
+sys.stdout.clear_all_filters()

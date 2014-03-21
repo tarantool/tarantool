@@ -137,22 +137,13 @@ class Options:
 
 
 def setenv():
-    os.putenv("TARANTOOL_PLUGIN_DIR",
-        string.join(
-            (
-                os.path.join(os.getcwd(), '../src/plugin/mysql'),
-                os.path.join(os.getcwd(), '../src/plugin/pg')
-            ),
-            ':'
-        )
-    )
+    os.putenv("TARANTOOL_SRC_DIR", os.path.abspath('..'))
 
 #######################################################################
 # Program body
 #######################################################################
 
 def main():
-    setenv()
     options = Options()
     oldcwd = os.getcwd()
     # Change the current working directory to where all test
@@ -163,7 +154,8 @@ def main():
     if not path:
         path = '.'
     os.chdir(path)
-
+    setenv()
+    
     failed_tests = 0
 
     try:
