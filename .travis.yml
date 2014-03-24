@@ -8,6 +8,19 @@ branches:
     - master
     - stable
 
+addons:
+  postgresql: "9.1"
+
+before_script:
+  - psql -c "CREATE USER tarantool WITH PASSWORD 'tarantool';" -U postgres
+  - psql -c "CREATE DATABASE tarantool;" -U postgres
+  - psql -c "GRANT ALL PRIVILEGES ON DATABASE tarantool TO tarantool;" -U postgres
+  - mysql -e "CREATE USER 'tarantool'@'localhost' IDENTIFIED BY 'tarantool';" -u root
+  - mysql -e "CREATE DATABASE tarantool;" -u root
+  - mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'tarantool'@'localhost' WITH GRANT OPTION;" -u root
+  - export PG='127.0.0.1:5432:tarantool:tarantool:tarantool'
+  - export MYSQL='127.0.0.1:3306:tarantool:tarantool:tarantool'
+
 install:
   - sudo apt-get update > /dev/null
   - sudo apt-get -q install binutils-dev python-daemon python-yaml
