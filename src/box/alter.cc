@@ -442,7 +442,9 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * since engine.recover does different things depending on
 	 * the recovery phase.
 	 */
-	alter->new_space->engine = alter->old_space->engine;
+	alter->new_space->engine->recovery =
+		alter->old_space->engine->recovery;
+
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
 	/*
@@ -492,9 +494,12 @@ ModifySpace::prepare(struct alter_space *alter)
 			  (unsigned) space_id(alter->old_space),
 			  "can not change space engine");
 
+	engine_recovery *recovery =
+		&alter->old_space->engine->recovery;
+
 	if (def.arity != 0 &&
 	    def.arity != alter->old_space->def.arity &&
-	    alter->old_space->engine.state != READY_NO_KEYS &&
+	    recovery->state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
@@ -502,7 +507,7 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "can not change arity on a non-empty space");
 	}
 	if (def.temporary != alter->old_space->def.temporary &&
-	    alter->old_space->engine.state != READY_NO_KEYS &&
+	    recovery->state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) space_id(alter->old_space),
@@ -576,7 +581,7 @@ DropIndex::alter(struct alter_space *alter)
 	 *   can be put back online properly with
 	 *   engine_no_keys.recover.
 	 */
-	engine_derive(&alter->new_space->engine);
+	alter->new_space->engine->recover_derive();
 }
 
 void
@@ -765,7 +770,10 @@ AddIndex::alter(struct alter_space *alter)
 	 * READY_NO_KEYS is when a space has no functional keys.
 	 * Possible both during and after recovery.
 	 */
-	if (alter->new_space->engine.state == READY_NO_KEYS) {
+	engine_recovery *recovery =
+		&alter->new_space->engine->recovery;
+
+	if (recovery->state == READY_NO_KEYS) {
 		if (new_key_def->iid == 0) {
 			/*
 			 * Adding a primary key: bring the space
@@ -777,7 +785,7 @@ AddIndex::alter(struct alter_space *alter)
 			 * key. After recovery, it means building
 			 * all keys.
 			 */
-			alter->new_space->engine.recover(alter->new_space);
+			recovery->recover(alter->new_space);
 		} else {
 			/*
 			 * Adding a secondary key: nothing to do.
@@ -796,8 +804,9 @@ AddIndex::alter(struct alter_space *alter)
 	}
 	Index *pk = index_find(alter->old_space, 0);
 	Index *new_index = index_find(alter->new_space, new_key_def->iid);
+
 	/* READY_PRIMARY_KEY is a state that only occurs during WAL recovery. */
-	if (alter->new_space->engine.state == READY_PRIMARY_KEY) {
+	if (recovery->state == READY_PRIMARY_KEY) {
 		if (new_key_def->iid == 0) {
 			/*
 			 * Bulk rebuild of the new primary key

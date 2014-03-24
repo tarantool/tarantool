@@ -32,15 +32,8 @@
 #include "index.h"
 #include <exception.h>
 
-struct tuple;
 struct space;
-
-typedef void (*engine_recover_f)(struct space *space);
-
-typedef struct tuple*
-(*engine_replace_f)(struct space *space,
-                    struct tuple *old_tuple,
-                    struct tuple *new_tuple, enum dup_replace_mode);
+struct tuple;
 
 /** Reflects what space_replace() is supposed to do. */
 enum engine_recovery_state {
@@ -66,9 +59,13 @@ enum engine_recovery_state {
 	READY_ALL_KEYS
 };
 
-struct engine {
-	const char *name;
-	struct engine *origin;
+typedef void (*engine_recover_f)(struct space*);
+
+typedef struct tuple*
+(*engine_replace_f)(struct space*, struct tuple*, struct tuple*,
+                    enum dup_replace_mode);
+
+struct engine_recovery {
 	enum engine_recovery_state state;
 	/* Recover is called after each recover step to enable
 	 * keys. When recovery is complete, it enables all keys
@@ -76,37 +73,59 @@ struct engine {
 	 */
 	engine_recover_f recover;
 	engine_replace_f replace;
+};
 
-	void (*init)(struct engine*);
-	void (*free)(struct engine*);
+struct Engine;
 
+/** Engine instance */
+struct EngineFactory: public Object {
+	EngineFactory(const char *engine_name);
+	virtual ~EngineFactory() {}
+	virtual void init();
+	virtual void shutdown();
+	virtual Engine *open() = 0;
+	virtual void close(Engine*);
+	const char *name;
+	struct engine_recovery recovery;
 	struct rlist link;
 };
 
-extern struct rlist engines;
+/** Engine handle */
+struct Engine: public Object {
+	Engine(EngineFactory *f);
+	virtual ~Engine() {}
 
-/** Register engine instance. */
-void engine_register(struct engine *engine);
+	inline struct tuple*
+	replace(struct space *space,
+	        struct tuple *old_tuple,
+	        struct tuple *new_tuple, enum dup_replace_mode mode)
+	{
+		return recovery.replace(space, old_tuple, new_tuple, mode);
+	}
 
-/** Find engine by name. */
-struct engine *engine_find(const char *name);
+	inline void recover(struct space *space) {
+		recovery.recover(space);
+	}
 
-/** Init engine instance. */
-void engine_init(struct engine *instance, const char *name);
+	inline void recover_derive() {
+		recovery = host->recovery;
+	}
 
-/** Shutdown all engines. */
-void engine_shutdown();
+	engine_recovery recovery;
+	EngineFactory *host;
+};
+
+/** Register engine factory instance. */
+void engine_register(EngineFactory *engine);
 
 /** Call a visitor function on every registered engine. */
-void engine_foreach(void (*func)(struct engine *engine, void *udata),
+void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
                     void *udata);
 
-/**
- * Derive recovery state from a parent engine
- * handler.
- */
-void engine_derive(struct engine *engine);
+/** Find engine factory by name. */
+EngineFactory *engine_find(const char *name);
 
-extern struct engine engine_memtx;
+/** Shutdown all engines factories. */
+void engine_shutdown();
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

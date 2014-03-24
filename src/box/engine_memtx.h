@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
+#define TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,70 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple.h"
-#include "engine.h"
-#include "space.h"
-#include "exception.h"
-#include "salad/rlist.h"
-#include <stdlib.h>
-#include <string.h>
 
-static RLIST_HEAD(engines);
+struct MEMTX: public EngineFactory {
+	MEMTX();
+	virtual Engine *open();
+};
 
-EngineFactory::EngineFactory(const char *engine_name)
-	:name(engine_name),
-	 link(RLIST_INITIALIZER(link))
-{}
-
-void EngineFactory::init()
-{}
-
-void EngineFactory::shutdown()
-{}
-
-void EngineFactory::close(Engine*)
-{}
-
-Engine::Engine(EngineFactory *f)
-	:host(f)
-{
-	/* derive recovery state from engine factory */
-	recover_derive();
-}
-
-/** Register engine factory instance. */
-void engine_register(EngineFactory *engine)
-{
-	rlist_add_entry(&engines, engine, link);
-}
-
-/** Find factory engine by name. */
-EngineFactory*
-engine_find(const char *name)
-{
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link) {
-		if (strcmp(e->name, name) == 0)
-			return e;
-	}
-	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
-}
-
-/** Call a visitor function on every registered engine. */
-void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
-                    void *udata)
-{
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link)
-		func(e, udata);
-}
-
-/** Shutdown all engine factories. */
-void engine_shutdown()
-{
-	EngineFactory *e, *tmp;
-	rlist_foreach_entry_safe(e, &engines, link, tmp) {
-		e->shutdown();
-		delete e;
-	}
-}
+#endif /* TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED */

@@ -166,12 +166,12 @@ static void
 do_one_recover_step(struct space *space, void * /* param */)
 {
 	if (space_index(space, 0)) {
-		space->engine.recover(space);
+		space->engine->recover(space);
 	} else {
 		/* in case of space has no primary index,
 		 * derive it's engine handler recovery state from
 		 * the global one. */
-		engine_derive(&space->engine);
+		space->engine->recover_derive();
 	}
 }
 
@@ -198,9 +198,9 @@ sc_space_new(struct space_def *space_def,
 	 *   ensures validation of tuples when starting from
 	 *   a snapshot of older version.
 	 */
-	space->engine.recover(space); /* load snapshot - begin */
-	space->engine.recover(space); /* load snapshot - end */
-	space->engine.recover(space); /* build secondary keys */
+	space->engine->recover(space); /* load snapshot - begin */
+	space->engine->recover(space); /* load snapshot - end */
+	space->engine->recover(space); /* build secondary keys */
 	return space;
 }
 
@@ -300,10 +300,10 @@ schema_init()
 }
 
 static inline void
-space_end_recover_snapshot_cb(struct engine *engine, void *udate)
+space_end_recover_snapshot_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	engine->recover = space_build_primary_key;
+	f->recovery.recover = space_build_primary_key;
 }
 
 void
@@ -325,10 +325,10 @@ fix_lua(struct space *space, void * /* param */)
 }
 
 static inline void
-space_end_recover_cb(struct engine *engine, void *udate)
+space_end_recover_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	engine->recover = space_build_all_keys;
+	f->recovery.recover = space_build_all_keys;
 }
 
 void

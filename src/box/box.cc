@@ -47,6 +47,7 @@ extern "C" {
 #include "lua/call.h"
 #include "schema.h"
 #include "engine.h"
+#include "engine_memtx.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -278,6 +279,13 @@ box_free(void)
 	stat_free();
 }
 
+static void
+box_engine_init()
+{
+	MEMTX *memtx = new MEMTX();
+	engine_register(memtx);
+}
+
 void
 box_init()
 {
@@ -287,7 +295,7 @@ box_init()
 	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
 		   cfg.slab_alloc_factor);
 
-	engine_register(&engine_memtx);
+	box_engine_init();
 
 	schema_init();
 	user_cache_init();

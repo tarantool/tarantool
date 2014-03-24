@@ -77,7 +77,8 @@ space_new(struct space_def *def, struct rlist *key_list)
 	tuple_format_ref(space->format, 1);
 	space->index_id_max = index_id_max;
 	/* init space engine instance */
-	engine_init(&space->engine, def->engine_name);
+	EngineFactory *engine = engine_find(def->engine_name);
+	space->engine = engine->open();
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
 		space->index_map[key_def->iid] = Index::factory(key_def);
@@ -95,6 +96,8 @@ space_delete(struct space *space)
 		delete space->index[j];
 	if (space->format)
 		tuple_format_ref(space->format, -1);
+	if (space->engine)
+		delete space->engine;
 
 	struct trigger *trigger, *tmp;
 	rlist_foreach_entry_safe(trigger, &space->on_replace, link, tmp) {
@@ -228,9 +231,10 @@ space_build_secondary_keys(struct space *space)
 			say_info("Space %d: done", space_id(space));
 		}
 	}
-	space->engine.state = READY_ALL_KEYS;
-	space->engine.recover = space_noop; /* mark the end of recover */
-	space->engine.replace = space_replace_all_keys;
+	engine_recovery *r = &space->engine->recovery;
+	r->state   = READY_ALL_KEYS;
+	r->recover = space_noop; /* mark the end of recover */
+	r->replace = space_replace_all_keys;
 }
 
 /** Build the primary key after loading data from a snapshot. */
@@ -238,9 +242,10 @@ void
 space_end_build_primary_key(struct space *space)
 {
 	space->index[0]->endBuild();
-	space->engine.state = READY_PRIMARY_KEY;
-	space->engine.replace = space_replace_primary_key;
-	space->engine.recover = space_build_secondary_keys;
+	engine_recovery *r = &space->engine->recovery;
+	r->state   = READY_PRIMARY_KEY;
+	r->replace = space_replace_primary_key;
+	r->recover = space_build_secondary_keys;
 }
 
 /** Prepare the primary key for bulk load (loading from
@@ -250,8 +255,9 @@ void
 space_begin_build_primary_key(struct space *space)
 {
 	space->index[0]->beginBuild();
-	space->engine.replace = space_replace_build_next;
-	space->engine.recover = space_end_build_primary_key;
+	engine_recovery *r = &space->engine->recovery;
+	r->replace = space_replace_build_next;
+	r->recover = space_end_build_primary_key;
 }
 
 /**

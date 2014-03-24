@@ -28,68 +28,51 @@
  */
 #include "tuple.h"
 #include "engine.h"
+#include "engine_memtx.h"
 #include "space.h"
 #include "exception.h"
 #include "salad/rlist.h"
 #include <stdlib.h>
 #include <string.h>
 
-static RLIST_HEAD(engines);
-
-EngineFactory::EngineFactory(const char *engine_name)
-	:name(engine_name),
-	 link(RLIST_INITIALIZER(link))
-{}
-
-void EngineFactory::init()
-{}
-
-void EngineFactory::shutdown()
-{}
-
-void EngineFactory::close(Engine*)
-{}
-
-Engine::Engine(EngineFactory *f)
-	:host(f)
-{
-	/* derive recovery state from engine factory */
-	recover_derive();
-}
-
-/** Register engine factory instance. */
-void engine_register(EngineFactory *engine)
-{
-	rlist_add_entry(&engines, engine, link);
-}
-
-/** Find factory engine by name. */
-EngineFactory*
-engine_find(const char *name)
-{
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link) {
-		if (strcmp(e->name, name) == 0)
-			return e;
+struct MEMTX_Engine: public Engine {
+	MEMTX_Engine(EngineFactory *e)
+		: Engine(e)
+	{ }
+	virtual ~MEMTX_Engine()
+	{
+		/* do nothing */
+		/* engine->close(this); */
 	}
-	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+};
+
+/**
+ * This is a vtab with which a newly created space which has no
+ * keys is primed.
+ * At first it is set to correctly work for spaces created during
+ * recovery from snapshot. In process of recovery it is updated as
+ * below:
+ *
+ * 1) after SNAP is loaded:
+ *    recover = space_build_primary_key
+ * 2) when all XLOGs are loaded:
+ *    recover = space_build_all_keys
+*/
+static inline void
+memtx_recovery_prepare(struct engine_recovery *r)
+{
+	r->state   = READY_NO_KEYS;
+	r->recover = space_begin_build_primary_key;
+	r->replace = space_replace_no_keys;
 }
 
-/** Call a visitor function on every registered engine. */
-void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
-                    void *udata)
+MEMTX::MEMTX()
+	:EngineFactory("memtx")
 {
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link)
-		func(e, udata);
+	memtx_recovery_prepare(&recovery);
 }
 
-/** Shutdown all engine factories. */
-void engine_shutdown()
+Engine *MEMTX::open()
 {
-	EngineFactory *e, *tmp;
-	rlist_foreach_entry_safe(e, &engines, link, tmp) {
-		e->shutdown();
-		delete e;
-	}
+	return new MEMTX_Engine(this);
 }

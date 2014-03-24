@@ -42,7 +42,7 @@ struct space {
 	 * life cycle, throughout phases of recovery or with
 	 * deletion and addition of indexes.
 	 */
-	struct engine engine;
+	Engine *engine;
 
 	/** Triggers fired after space_replace() -- see txn_replace(). */
 	struct rlist on_replace;
@@ -183,8 +183,7 @@ static inline struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	return space->engine.replace(space, old_tuple, new_tuple,
-				     mode);
+	return space->engine->replace(space, old_tuple, new_tuple, mode);
 }
 
 struct tuple *
