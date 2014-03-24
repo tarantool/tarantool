@@ -30,17 +30,29 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/uio.h> /* struct iovec */
+#include <msgpuck/msgpuck.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 enum {
 	/** Maximal iproto package body length (2GiB) */
 	IPROTO_BODY_LEN_MAX = 2147483648UL,
 	IPROTO_GREETING_SIZE = 128,
+	IPROTO_FIXHEADER_SIZE = 5, /* len + (padding) */
+	XLOG_FIXHEADER_SIZE = 19 /* marker + len + prev crc32 + cur crc32 + (padding) */
 };
 
 
 enum iproto_key {
 	IPROTO_CODE = 0x00,
 	IPROTO_SYNC = 0x01,
+	/* replication keys */
+	IPROTO_SERVER_ID = 0x02,
+	IPROTO_LSN = 0x03,
+	IPROTO_TIMESTAMP = 0x04,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
@@ -60,7 +72,7 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC))
+#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC) | bit(SERVER_ID) | bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(KEY) | bit(TUPLE) | \
 			  bit(FUNCTION_NAME) | bit(USER_NAME))
@@ -80,8 +92,7 @@ iproto_body_has_key(const char *pos, const char *end)
 
 #undef bit
 
-
-extern unsigned char iproto_key_type[IPROTO_KEY_MAX];
+extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {
 	IPROTO_SELECT = 1,
@@ -117,5 +128,52 @@ iproto_request_is_dml(uint32_t type)
 {
 	return type < IPROTO_DML_REQUEST_MAX;
 }
+
+enum {
+	IPROTO_PACKET_HEAD_IOVMAX = 1,
+	IPROTO_PACKET_BODY_IOVMAX = 2,
+	IPROTO_PACKET_IOVMAX = IPROTO_PACKET_HEAD_IOVMAX +
+		IPROTO_PACKET_BODY_IOVMAX
+};
+
+struct iproto_packet {
+	uint32_t code;
+	uint64_t sync;
+	uint64_t lsn;
+	double tm;
+
+	int bodycnt;
+	struct iovec body[IPROTO_PACKET_BODY_IOVMAX];
+};
+
+void
+iproto_packet_decode(struct iproto_packet *packet, const char **pos, const char *end);
+int
+iproto_packet_encode(const struct iproto_packet *packet, struct iovec *out);
+
+struct iproto_subscribe {
+	uint8_t m_len;                          /* MP_STR */
+	uint32_t v_len;                         /* length */
+	uint8_t m_header;                       /* MP_MAP */
+	uint8_t k_code;                         /* IPROTO_CODE */
+	uint8_t v_code;                         /* response status */
+	uint8_t k_sync;                         /* IPROTO_SYNC */
+	uint8_t m_sync;                         /* MP_UINT64 */
+	uint64_t sync;                          /* sync */
+	uint8_t k_lsn;                          /* IPROTO_LSN */
+	uint8_t m_lsn;                          /* MP_UINT64 */
+	uint64_t lsn;                           /* lsn */
+} __attribute__((packed));
+
+static const struct iproto_subscribe iproto_subscribe_stub = {
+	0xce, mp_bswap_u32(sizeof(struct iproto_subscribe) - 5), 0x83,
+	IPROTO_CODE, IPROTO_SUBSCRIBE,
+	IPROTO_SYNC, 0xcf, 0,
+	IPROTO_LSN, 0xcf, 0
+};
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif
 
 #endif /* TARANTOOL_IPROTO_CONSTANTS_H_INCLUDED */

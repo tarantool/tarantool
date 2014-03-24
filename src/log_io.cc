@@ -35,36 +35,21 @@
 #include "fio.h"
 #include "tarantool_eio.h"
 #include "fiob.h"
+#include "msgpuck/msgpuck.h"
+#include "iproto_constants.h"
 
 const uint32_t xlog_format = 12;
-const log_magic_t row_marker = 0xba0babed;
-const log_magic_t eof_marker = 0x10adab1e;
+
+/*
+ * marker is MsgPack fixext2
+ * +--------+--------+--------+--------+
+ * |  0xd5  |  type  |       data      |
+ * +--------+--------+--------+--------+
+ */
+const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
+const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 const char inprogress_suffix[] = ".inprogress";
 const char v12[] = "0.12\n";
-
-void
-log_row_sign(struct log_row *header)
-{
-	header->data_crc32c = crc32_calc(0, header->data, header->len);
-	header->header_crc32c = crc32_calc(0, header->header, sizeof(*header) -
-					   offsetof(struct log_row, header));
-}
-
-void
-log_row_fill(struct log_row *row, int64_t lsn, uint64_t cookie,
-	     const char *metadata, size_t metadata_len, const char *data,
-	     size_t data_len)
-{
-	row->marker = row_marker;
-	row->tag  = WAL; /* unused. */
-	row->cookie = cookie;
-	row->lsn = lsn;
-	row->tm = ev_now(loop());
-	row->len = metadata_len + data_len;
-
-	memcpy(row->data, metadata, metadata_len);
-	memcpy(row->data + metadata_len, data, data_len);
-}
 
 struct log_dir snap_dir = {
 	/* .panic_if_error = */ false,
@@ -222,39 +207,97 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 
 /* {{{ struct log_io_cursor */
 
-static struct log_row ROW_EOF;
-
-static const struct log_row *
-row_reader(FILE *f)
+static int
+row_reader(FILE *f, struct iproto_packet *packet)
 {
-	struct log_row m;
+	const char *data;
 
-	uint32_t header_crc, data_crc;
-
-	if (fread(&m.header_crc32c, sizeof(m) - sizeof(log_magic_t), 1, f) != 1)
-		return &ROW_EOF;
-
-	header_crc = crc32_calc(0, m.header, sizeof(struct log_row) -
-				offsetof(struct log_row, header));
-
-	if (m.header_crc32c != header_crc) {
-		say_error("header crc32c mismatch");
-		return NULL;
-	}
-	char *row = (char *) region_alloc(&fiber()->gc, sizeof(m) + m.len);
-	memcpy(row, &m, sizeof(m));
-
-	if (fread(row + sizeof(m), m.len, 1, f) != 1)
-		return &ROW_EOF;
-
-	data_crc = crc32_calc(0, row + sizeof(m), m.len);
-	if (m.data_crc32c != data_crc) {
-		say_error("data crc32c mismatch");
-		return NULL;
+	/* Read fixed header */
+	char fixheader[XLOG_FIXHEADER_SIZE - sizeof(log_magic_t)];
+	if (fread(fixheader, sizeof(fixheader), 1, f) != 1) {
+		if (feof(f))
+			return 1;
+error:
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "invalid fixed header");
 	}
 
-	say_debug("read row v11 success lsn:%lld", (long long) m.lsn);
-	return (const struct log_row *) row;
+	/* Decode len, previous crc32 and row crc32 */
+	data = fixheader;
+	if (mp_check(&data, data + sizeof(fixheader)) != 0)
+		goto error;
+	data = fixheader;
+
+	/* Read length */
+	if (mp_typeof(*data) != MP_UINT)
+		goto error;
+	uint32_t len = mp_decode_uint(&data);
+	if (len > IPROTO_BODY_LEN_MAX) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "received packet is too big");
+	}
+
+	/* Read previous crc32 */
+	if (mp_typeof(*data) != MP_UINT)
+		goto error;
+
+	/* Read current crc32 */
+	uint32_t crc32p = mp_decode_uint(&data);
+	if (mp_typeof(*data) != MP_UINT)
+		goto error;
+	uint32_t crc32c = mp_decode_uint(&data);
+	assert(data <= fixheader + sizeof(fixheader));
+	(void) crc32p;
+
+	/* Allocate memory for body */
+	char *bodybuf = (char *) region_alloc(&fiber()->gc, len);
+
+	/* Read header and body */
+	if (fread(bodybuf, len, 1, f) != 1)
+		return 1;
+
+	/* Validate checksum */
+	if (crc32_calc(0, bodybuf, len) != crc32c)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "invalid crc32");
+
+	data = bodybuf;
+	iproto_packet_decode(packet, &data, bodybuf + len);
+
+	return 0;
+}
+
+int
+xlog_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+		char fixheader[XLOG_FIXHEADER_SIZE])
+{
+	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
+	uint32_t len = 0;
+	uint32_t crc32p = 0;
+	uint32_t crc32c = 0;
+	for (int i = 1; i < iovcnt; i++) {
+		crc32c = crc32_calc(crc32c, (const char *) iov[i].iov_base,
+				    iov[i].iov_len);
+		len += iov[i].iov_len;
+	}
+
+	char *data = fixheader;
+	*(log_magic_t *) data = row_marker;
+	data += sizeof(row_marker);
+	data = mp_encode_uint(data, len);
+	/* Encode crc32 for previous row */
+	data = mp_encode_uint(data, crc32p);
+	/* Encode crc32 for current row */
+	data = mp_encode_uint(data, crc32c);
+	/* Encode padding */
+	ssize_t padding = XLOG_FIXHEADER_SIZE - (data - fixheader);
+	if (padding > 0)
+		data = mp_encode_strl(data, padding - 1) + padding - 1;
+	assert(data == fixheader + XLOG_FIXHEADER_SIZE);
+	iov[0].iov_base = fixheader;
+	iov[0].iov_len = XLOG_FIXHEADER_SIZE;
+
+	assert(iovcnt <= XLOG_ROW_IOVMAX);
+	return iovcnt;
 }
 
 void
@@ -288,11 +331,10 @@ log_io_cursor_close(struct log_io_cursor *i)
  * @param i	iterator object, encapsulating log specifics.
  *
  */
-const struct log_row *
-log_io_cursor_next(struct log_io_cursor *i)
+int
+log_io_cursor_next(struct log_io_cursor *i, struct iproto_packet *packet)
 {
 	struct log_io *l = i->log;
-	const struct log_row *row;
 	log_magic_t magic;
 	off_t marker_offset = 0;
 
@@ -331,11 +373,10 @@ restart:
 			(uintmax_t)i->good_offset);
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
-	row = row_reader(l->f);
-	if (row == &ROW_EOF)
-		goto eof;
-
-	if (row == NULL) {
+	try {
+		if (row_reader(l->f, packet) != 0)
+			goto eof;
+	} catch (Exception *e) {
 		if (l->dir->panic_if_error)
 			panic("failed to read row");
 		say_warn("failed to read row");
@@ -348,7 +389,7 @@ restart:
 	if (i->row_count % 100000 == 0)
 		say_info("%.1fM rows processed", i->row_count / 1000000.);
 
-	return row;
+	return 0;
 eof:
 	/*
 	 * The only two cases of fully read file:
@@ -380,7 +421,7 @@ eof:
 		}
 	}
 	/* No more rows. */
-	return NULL;
+	return 1;
 }
 
 /* }}} */

@@ -83,14 +83,7 @@ session_create(int fd, uint64_t cookie)
 	 * fiber sid.
 	 */
 	fiber_set_session(fiber(), session);
-	try {
-		trigger_run(&session_on_connect, NULL);
-	} catch (Exception *e) {
-		fiber_set_session(fiber(), NULL);
-		mh_i32ptr_remove(session_registry, &node, NULL);
-		mempool_free(&session_pool, session);
-		throw;
-	}
+
 	/* Set session user to guest, until it is authenticated. */
 	session_set_user(session, GUEST, GUEST);
 	return session;

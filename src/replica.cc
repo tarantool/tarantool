@@ -39,55 +39,86 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "tarantool.h"
+#include "iproto.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
 #include "replica.h"
 
 static void
-remote_apply_row(struct recovery_state *r, const struct log_row *row);
+remote_apply_row(struct recovery_state *r, struct iproto_packet *packet);
 
-static const struct log_row *
-remote_read_row(struct ev_io *coio, struct iobuf *iobuf)
+static void
+remote_remote_read_row_fd(struct ev_io *coio, struct iobuf *iobuf,
+		 struct iproto_packet *packet)
 {
 	struct ibuf *in = &iobuf->in;
-	ssize_t to_read = sizeof(struct log_row) - ibuf_size(in);
 
-	if (to_read > 0) {
-		ibuf_reserve(in, cfg_readahead);
-		coio_breadn(coio, in, to_read);
+	/* Read fixed header */
+	if (ibuf_size(in) < IPROTO_FIXHEADER_SIZE)
+		coio_breadn(coio, in, IPROTO_FIXHEADER_SIZE - ibuf_size(in));
+
+	/* Read length */
+	if (mp_typeof(*in->pos) != MP_UINT) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "invalid fixed header");
 	}
 
-	ssize_t request_len = ((const struct log_row *) in->pos)->len +
-			sizeof(struct log_row);
-	to_read = request_len - ibuf_size(in);
+	const char *data = in->pos;
+	uint32_t len = mp_decode_uint(&data);
+	if (len > IPROTO_BODY_LEN_MAX) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "received packet is too big");
+	}
+	in->pos += IPROTO_FIXHEADER_SIZE;
 
+	/* Read header and body */
+	ssize_t to_read = len - ibuf_size(in);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	const struct log_row *row = (const struct log_row *) in->pos;
-	in->pos += request_len;
-	return row;
+	iproto_packet_decode(packet, (const char **) &in->pos, in->pos + len);
 }
 
-struct iproto_subscribe_request {
-	uint8_t v_len;                         /* length */
-	uint8_t m_header;                       /* MP_MAP */
-	uint8_t k_code;                         /* IPROTO_CODE */
-	uint8_t v_code;                        /* response status */
-	uint8_t m_body;                         /* MP_MAP */
-	uint8_t k_data;                         /* IPROTO_OFFSET */
-	uint8_t m_data;                         /* MP_UINT64 */
-	uint64_t lsn;                           /* lsn */
-} __attribute__((packed));
+/* Blocked I/O  */
+static void
+remote_read_row_fd(int sock, struct iproto_packet *packet)
+{
+	const char *data;
 
-static const struct iproto_subscribe_request iproto_subscribe_request = {
-	sizeof(struct iproto_subscribe_request) - 1,
-	0x81, IPROTO_CODE, IPROTO_SUBSCRIBE,
-	0x81, IPROTO_OFFSET, 0xcf, 0
-};
+	/* Read fixed header */
+	char fixheader[IPROTO_FIXHEADER_SIZE];
+	if (sio_read(sock, fixheader, sizeof(fixheader)) != sizeof(fixheader)) {
+error:
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "invalid fixed header");
+	}
+	data = fixheader;
+	if (mp_check(&data, data + sizeof(fixheader)) != 0)
+		goto error;
+	data = fixheader;
 
-int
-replica_bootstrap(const char *replication_source)
+	/* Read length */
+	if (mp_typeof(*data) != MP_UINT)
+		goto error;
+	uint32_t len = mp_decode_uint(&data);
+	if (len > IPROTO_BODY_LEN_MAX) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "received packet is too big");
+	}
+
+	/* Read header and body */
+	char *bodybuf = (char *) region_alloc(&fiber()->gc, len);
+	if (sio_read(sock, bodybuf, len) != len) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "invalid row - can't read");
+	}
+
+	data = bodybuf;
+	iproto_packet_decode(packet, &data, data + len);
+}
+
+void
+replica_bootstrap(struct recovery_state *r, const char *replication_source)
 {
 	char ip_addr[32];
 	char greeting[IPROTO_GREETING_SIZE];
@@ -109,13 +140,36 @@ replica_bootstrap(const char *replication_source)
 
 	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
+
+	assert(r->confirmed_lsn == 0 && r->lsn == 0);
+	uint64_t sync = rand();
+
+	/* Send JOIN request */
+	struct iproto_subscribe subscribe = iproto_subscribe_stub;
+	subscribe.sync = mp_bswap_u64(sync);
 	sio_connect(master, &addr, sizeof(addr));
 	sio_readn(master, greeting, sizeof(greeting));
-	sio_writen(master, &iproto_subscribe_request,
-		  sizeof(iproto_subscribe_request));
+	sio_write(master, &subscribe, sizeof(subscribe));
 
-	guard.fd = -1;
-	return master;
+	while (true) {
+		struct iproto_packet packet;
+
+		remote_read_row_fd(master, &packet);
+		if (packet.sync != sync)
+			tnt_raise(IllegalParams, "unexpected packet");
+
+		/* Recv JOIN response (= end of stream) */
+		if (packet.code == IPROTO_SUBSCRIBE) {
+			if (packet.bodycnt != 0)
+				tnt_raise(IllegalParams, "subscribe response body");
+			set_lsn(r, packet.lsn);
+			say_info("done");
+			break;
+		}
+
+		remote_apply_row(r, &packet);
+	}
+	/* master socket closed by guard */
 }
 
 static void
@@ -129,7 +183,8 @@ remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
 	coio_connect(coio, remote_addr);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	struct iproto_subscribe_request request = iproto_subscribe_request;
+	/* Send JOIN request */
+	struct iproto_subscribe request = iproto_subscribe_stub;
 	request.lsn = mp_bswap_u64(initial_lsn);
 	coio_write(coio, &request, sizeof(request));
 
@@ -165,15 +220,16 @@ pull_from_remote(va_list ap)
 				      "connected");
 			}
 			err = "can't read row";
-			const struct log_row *row = remote_read_row(&coio, iobuf);
+			struct iproto_packet packet;
+			remote_remote_read_row_fd(&coio, iobuf, &packet);
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now(loop) - row->tm;
+			r->remote->recovery_lag = ev_now(loop) - packet.tm;
 			r->remote->recovery_last_update_tstamp =
 				ev_now(loop);
 
-			remote_apply_row(r, row);
+			remote_apply_row(r, &packet);
 
 			iobuf_gc(iobuf);
 			fiber_gc();
@@ -213,14 +269,12 @@ pull_from_remote(va_list ap)
 }
 
 static void
-remote_apply_row(struct recovery_state *r, const struct log_row *row)
+remote_apply_row(struct recovery_state *r, struct iproto_packet *packet)
 {
-	assert(row->tag == WAL);
-
-	if (r->row_handler(r->row_handler_param, row) < 0)
+	if (r->row_handler(r->row_handler_param, packet) < 0)
 		panic("replication failure: can't apply row");
 
-	set_lsn(r, row->lsn);
+	set_lsn(r, packet->lsn);
 }
 
 void
