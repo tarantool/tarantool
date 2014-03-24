@@ -32,6 +32,7 @@
 struct MEMTX: public EngineFactory {
 	MEMTX();
 	virtual Engine *open();
+	virtual Index *createIndex(struct key_def *key_def);
 };
 
 #endif /* TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED */

@@ -85,6 +85,7 @@ struct EngineFactory: public Object {
 	virtual void shutdown();
 	virtual Engine *open() = 0;
 	virtual void close(Engine*);
+	virtual Index *createIndex(struct key_def*) = 0;
 	const char *name;
 	struct engine_recovery recovery;
 	struct rlist link;
@@ -94,6 +95,7 @@ struct EngineFactory: public Object {
 struct Engine: public Object {
 	Engine(EngineFactory *f);
 	virtual ~Engine() {}
+	virtual Index *createIndex(struct key_def*);
 
 	inline struct tuple*
 	replace(struct space *space,

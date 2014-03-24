@@ -57,6 +57,12 @@ Engine::Engine(EngineFactory *f)
 	recover_derive();
 }
 
+Index*
+Engine::createIndex(struct key_def *key_def)
+{
+	return host->createIndex(key_def);
+}
+
 /** Register engine factory instance. */
 void engine_register(EngineFactory *engine)
 {

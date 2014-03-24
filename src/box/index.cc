@@ -100,22 +100,6 @@ primary_key_validate(struct key_def *key_def, const char *key,
 
 /* {{{ Index -- base class for all indexes. ********************/
 
-Index *
-Index::factory(struct key_def *key_def)
-{
-	switch (key_def->type) {
-	case HASH:
-		return new HashIndex(key_def);
-	case TREE:
-		return new TreeIndex(key_def);
-	case BITSET:
-		return new BitsetIndex(key_def);
-	default:
-		assert(false);
-		return NULL; /* silent compiler warning. */
-	}
-}
-
 Index::Index(struct key_def *key_def_arg)
 	:key_def(key_def_dup(key_def_arg)),
 	m_position(NULL)

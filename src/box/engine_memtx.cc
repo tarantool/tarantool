@@ -29,6 +29,10 @@
 #include "tuple.h"
 #include "engine.h"
 #include "engine_memtx.h"
+#include "index.h"
+#include "hash_index.h"
+#include "tree_index.h"
+#include "bitset_index.h"
 #include "space.h"
 #include "exception.h"
 #include "salad/rlist.h"
@@ -75,4 +79,20 @@ MEMTX::MEMTX()
 Engine *MEMTX::open()
 {
 	return new MEMTX_Engine(this);
+}
+
+Index*
+MEMTX::createIndex(struct key_def *key_def)
+{
+	switch (key_def->type) {
+	case HASH:
+		return new HashIndex(key_def);
+	case TREE:
+		return new TreeIndex(key_def);
+	case BITSET:
+		return new BitsetIndex(key_def);
+	default:
+		assert(false);
+		return NULL;
+	}
 }
