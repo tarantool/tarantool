@@ -486,7 +486,7 @@ which make a minimal configuration file that will be suitable for day one.
 <command>echo</command> "space[0].index[0].unique = 1" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "space[0].index[0].key_field[0].fieldno = 0" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "space[0].index[0].key_field[0].type = \"NUM\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "logger = \"tee --append tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
+<command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "work_dir = \"work_dir\"" | <command>tee</command> <option>-a</option> tarantool.cfg
 # (With some downloads a tarantool.cfg file like this is already available
 # in a test subdirectory.)

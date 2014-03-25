@@ -270,7 +270,7 @@ server on the same processor without ill effects.
 </para>
 <para>
   Additional examples of SQL statements can be found in the <citetitle
-  xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
+  xlink:href="https://github.com/tarantool/tarantool/tree/stable/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of
   supported SQL is provided in the <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
@@ -282,7 +282,7 @@ server on the same processor without ill effects.
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename
-  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
+  xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
 </para>
 
 </section>

@@ -19,7 +19,7 @@
 The Tarantool API exists so that a client program can send a request packet
 to the server, and receive a response. Here is an example of a what the client
  would send for <command>INSERT INTO t0 VALUES ('A','BB')</command>. The BNF description of the components
-is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
+is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/stable/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
  A third-party contribution written in Lua for unpacking Tarantool messages is in file 
  <link xlink:href="https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua" xlink:title="tarantool.dis.lua">Tnt-dissector</link>.
 
@@ -195,7 +195,7 @@ int main()
     <para>
        The example program only shows one command and does not show all that's necessary for
        good practice. For that, please see <link
-       xlink:href="https://github.com/tarantool/tarantool/blob/master/connector/c/include/tp.h"><filename>connector/c</filename></link> in the source tree.
+       xlink:href="https://github.com/tarantool/tarantool/blob/stable/connector/c/include/tp.h"><filename>connector/c</filename></link> in the source tree.
     </para>
   </section>
 
