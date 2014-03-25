@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple.h"
 #include "engine.h"
 #include "space.h"
 #include "exception.h"
@@ -47,20 +46,11 @@ void EngineFactory::init()
 void EngineFactory::shutdown()
 {}
 
-void EngineFactory::close(Engine*)
-{}
-
 Engine::Engine(EngineFactory *f)
-	:host(f)
+	:factory(f)
 {
 	/* derive recovery state from engine factory */
-	recover_derive();
-}
-
-Index*
-Engine::createIndex(struct key_def *key_def)
-{
-	return host->createIndex(key_def);
+	initRecovery();
 }
 
 /** Register engine factory instance. */
@@ -70,7 +60,7 @@ void engine_register(EngineFactory *engine)
 }
 
 /** Find factory engine by name. */
-EngineFactory*
+EngineFactory *
 engine_find(const char *name)
 {
 	EngineFactory *e;

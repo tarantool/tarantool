@@ -39,11 +39,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct MEMTX_Engine: public Engine {
-	MEMTX_Engine(EngineFactory *e)
+struct Memtx: public Engine {
+	Memtx(EngineFactory *e)
 		: Engine(e)
 	{ }
-	virtual ~MEMTX_Engine()
+	virtual ~Memtx()
 	{
 		/* do nothing */
 		/* engine->close(this); */
@@ -70,19 +70,19 @@ memtx_recovery_prepare(struct engine_recovery *r)
 	r->replace = space_replace_no_keys;
 }
 
-MEMTX::MEMTX()
+MemtxFactory::MemtxFactory()
 	:EngineFactory("memtx")
 {
 	memtx_recovery_prepare(&recovery);
 }
 
-Engine *MEMTX::open()
+Engine *MemtxFactory::open()
 {
-	return new MEMTX_Engine(this);
+	return new Memtx(this);
 }
 
-Index*
-MEMTX::createIndex(struct key_def *key_def)
+Index *
+MemtxFactory::createIndex(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:

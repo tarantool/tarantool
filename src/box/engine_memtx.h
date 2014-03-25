@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-struct MEMTX: public EngineFactory {
-	MEMTX();
+struct MemtxFactory: public EngineFactory {
+	MemtxFactory();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
 };

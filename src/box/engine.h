@@ -28,9 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple.h"
-#include "index.h"
 #include <exception.h>
+#include "index.h"
 
 struct space;
 struct tuple;
@@ -61,8 +60,8 @@ enum engine_recovery_state {
 
 typedef void (*engine_recover_f)(struct space*);
 
-typedef struct tuple*
-(*engine_replace_f)(struct space*, struct tuple*, struct tuple*,
+typedef struct tuple *
+(*engine_replace_f)(struct space *, struct tuple *, struct tuple *,
                     enum dup_replace_mode);
 
 struct engine_recovery {
@@ -75,27 +74,38 @@ struct engine_recovery {
 	engine_replace_f replace;
 };
 
-struct Engine;
+class Engine;
 
 /** Engine instance */
-struct EngineFactory: public Object {
+class EngineFactory: public Object {
+public:
 	EngineFactory(const char *engine_name);
 	virtual ~EngineFactory() {}
+	/** Called once at startup. */
 	virtual void init();
+	/** Called at server shutdown */
 	virtual void shutdown();
+	/** Create a new engine instance for a space. */
 	virtual Engine *open() = 0;
-	virtual void close(Engine*);
+	/**
+	 * Create an instance of space index. Used in alter
+	 * space.
+	 */
 	virtual Index *createIndex(struct key_def*) = 0;
+public:
+	/** Name of the engine. */
 	const char *name;
 	struct engine_recovery recovery;
+	/** Used for search for engine by name. */
 	struct rlist link;
 };
 
-/** Engine handle */
+/** Engine handle  - an operator of a space */
+
 struct Engine: public Object {
+public:
 	Engine(EngineFactory *f);
 	virtual ~Engine() {}
-	virtual Index *createIndex(struct key_def*);
 
 	inline struct tuple*
 	replace(struct space *space,
@@ -109,12 +119,12 @@ struct Engine: public Object {
 		recovery.recover(space);
 	}
 
-	inline void recover_derive() {
-		recovery = host->recovery;
+	inline void initRecovery() {
+		recovery = factory->recovery;
 	}
 
 	engine_recovery recovery;
-	EngineFactory *host;
+	EngineFactory *factory;
 };
 
 /** Register engine factory instance. */
@@ -127,7 +137,7 @@ void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
 /** Find engine factory by name. */
 EngineFactory *engine_find(const char *name);
 
-/** Shutdown all engines factories. */
+/** Shutdown all engine factories. */
 void engine_shutdown();
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

@@ -171,7 +171,7 @@ do_one_recover_step(struct space *space, void * /* param */)
 		/* in case of space has no primary index,
 		 * derive it's engine handler recovery state from
 		 * the global one. */
-		space->engine->recover_derive();
+		space->engine->initRecovery();
 	}
 }
 

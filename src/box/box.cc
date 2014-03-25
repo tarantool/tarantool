@@ -282,7 +282,7 @@ box_free(void)
 static void
 box_engine_init()
 {
-	MEMTX *memtx = new MEMTX();
+	MemtxFactory *memtx = new MemtxFactory();
 	engine_register(memtx);
 }
 

@@ -82,7 +82,7 @@ space_new(struct space_def *def, struct rlist *key_list)
 	/* fill space indexes */
 	rlist_foreach_entry(key_def, key_list, link) {
 		space->index_map[key_def->iid] =
-			space->engine->createIndex(key_def);
+			space->engine->factory->createIndex(key_def);
 	}
 	space_fill_index_map(space);
 	space->run_triggers = true;
