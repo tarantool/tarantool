@@ -169,15 +169,15 @@ require("box.net.mysql")
 # For explanations of the statement types used here, read the
 # Lua tutorial in the Tarantool user manual.
 <prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>lua function mysql_select ()</userinput>
-        <prompt>-&gt; </prompt><userinput>  local resulter</userinput>
+<prompt>localhost&gt; </prompt><userinput>function mysql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', 'root', 'test')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    resulter = card.s2</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
-        <prompt>-&gt; </prompt><userinput>  return resulter</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
@@ -185,10 +185,8 @@ require("box.net.mysql")
 <prompt>localhost&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>CALL mysql_select()</userinput>
-localhost> CALL mysql_select()
-Call OK, 1 rows affected
-['MySQL row']
+<prompt>localhost&gt; </prompt><userinput>mysql_select()</userinput>
+- 2013-12-03 17:57:24.688 [12957] 102/iproto I&gt; MySQL row
 
 # Observe the result. It contains "MySQL row".
 # So this is the row that was inserted into the MySQL database.
@@ -286,25 +284,20 @@ Linking CXX shared library libpg.so
 <prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
 <prompt>localhost&gt; </prompt>
 
-# Say <quote>show plugins</quote>. Since all has gone well, this is certain to work.
-<prompt>localhost&gt; </prompt> <userinput>show plugins</userinput>
----
-plugins:
-  - { name: "postgresql", version: 1 }
-...
-
 # Create a Lua function that will connect to the PostgreSQL server,
 # retrieve one row, and display the row.
 # For explanations of the statement types used here, read the
 # Lua tutorial in the Tarantool user manual.
 <prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>lua function postgresql_select ()</userinput>
+<prompt>localhost&gt; </prompt><userinput>function postgresql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
@@ -312,9 +305,9 @@ plugins:
 <prompt>localhost&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>CALL postgresql_select()</userinput>
-2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
-Call OK, 0 rows affected
+<prompt>localhost&gt; </prompt><userinput>postgresql_select()</userinput>
+- 2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
+
 
 
 # Observe the result. It contains "PostgreSQL row".

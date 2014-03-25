@@ -10,8 +10,9 @@
 <blockquote>
     <para>
         Triggers are Lua scripts invoked by the system upon
-        a certain event. Tarantool currently only supports
-        system-wide triggers, run when a new connection
+        a certain event. As well as on_replace triggers,
+        Tarantool currently supports
+        system-wide triggers which are run when a new connection
         is established or dropped. Since trigger body is
         a Lua script, it is external to the server, and
         a trigger must be set up on each server start.
