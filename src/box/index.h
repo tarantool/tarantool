@@ -134,13 +134,6 @@ public:
 	/* Description of a possibly multipart key. */
 	struct key_def *key_def;
 
-	/**
-	 * Allocate index instance.
-	 *
-	 * @param key_def  key part description
-	 */
-	static Index *factory(struct key_def *key_def);
-
 protected:
 	/**
 	 * Initialize index instance.

@@ -30,54 +30,9 @@
  */
 #include "index.h"
 #include "key_def.h"
+#include "engine.h"
 #include "salad/rlist.h"
 #include <exception.h>
-
-typedef void (*space_f)(struct space *space);
-typedef struct tuple *(*space_replace_f)
-	(struct space *space, struct tuple *old_tuple,
-	 struct tuple *new_tuple, enum dup_replace_mode mode);
-
-/** Reflects what space_replace() is supposed to do. */
-enum space_state {
-	/**
-	 * The space is created, but has no data
-	 * and no primary key, or, if there is a primary
-	 * key, it's not ready for use (being built with
-	 * buildNext()).
-	 * Replace is always an error, since there are no
-	 * indexes to add data to.
-	 */
-	READY_NO_KEYS,
-	/**
-	 * The space has a functional primary key.
-	 * Replace adds the tuple to this key.
-	 */
-	READY_PRIMARY_KEY,
-	/**
-	 * The space is fully functional, all keys
-	 * are fully built, replace adds its tuple
-	 * to all keys.
-	 */
-	READY_ALL_KEYS
-};
-
-struct engine {
-	enum space_state state;
-	/* Recover is called after each recover step to enable
-	 * keys. When recovery is complete, it enables all keys
-	 * at once and resets itself to a no-op.
-	 */
-	space_f recover;
-	space_replace_f replace;
-};
-
-#define MEMTX "memtx"
-
-extern struct engine engine_no_keys;
-
-void space_build_primary_key(struct space *space);
-void space_build_all_keys(struct space *space);
 
 struct space {
 	uint8_t access[BOX_USER_MAX];
@@ -87,7 +42,7 @@ struct space {
 	 * life cycle, throughout phases of recovery or with
 	 * deletion and addition of indexes.
 	 */
-	struct engine engine;
+	Engine *engine;
 
 	/** Triggers fired after space_replace() -- see txn_replace(). */
 	struct rlist on_replace;
@@ -228,9 +183,16 @@ static inline struct tuple *
 space_replace(struct space *space, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode)
 {
-	return space->engine.replace(space, old_tuple, new_tuple,
-				     mode);
+	return space->engine->replace(space, old_tuple, new_tuple, mode);
 }
+
+struct tuple *
+space_replace_no_keys(struct space*, struct tuple*, struct tuple*,
+                      enum dup_replace_mode);
+
+void space_begin_build_primary_key(struct space *space);
+void space_build_primary_key(struct space *space);
+void space_build_all_keys(struct space *space);
 
 uint32_t
 space_size(struct space *space);
