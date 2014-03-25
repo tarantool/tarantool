@@ -270,7 +270,7 @@ so advanced users may be able to start a second Tarantool
 server on the same processor without ill effects.
 </para>
 <para>
-  Additional examples of data-manipulation requests can be found in the <citetitle
+  Additional examples of SQL statements can be found in the <citetitle
   xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of

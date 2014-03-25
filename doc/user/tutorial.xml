@@ -427,10 +427,10 @@ This is the end of the list of steps to take for source downloads.
 <para>
 For your added convenience, github.com has README files with example scripts:
 
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.CentOS">README.CentOS</productname> for CentOS 5.8,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.FreeBSD">README.FreeBSD</productname> for FreeBSD 8.3,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.MacOSX">README.MacOSX</productname> for Mac OS X <quote>Lion</quote>,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.md">README.md</productname> for generic GNU/Linux.
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.CentOS">README.CentOS</productname> for CentOS 5.8,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.FreeBSD">README.FreeBSD</productname> for FreeBSD 8.3,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.MacOSX">README.MacOSX</productname> for Mac OS X <quote>Lion</quote>,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.md">README.md</productname> for generic GNU/Linux.
 
 These example scripts assume that the intent is to download from the master branch, build
 the server and the client (but not the documentation), and run tests after build.
