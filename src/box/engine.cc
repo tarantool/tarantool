@@ -1,4 +1,3 @@
-
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,62 +25,67 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-*/
+ */
+#include "engine.h"
+#include "space.h"
+#include "exception.h"
+#include "salad/rlist.h"
+#include <stdlib.h>
+#include <string.h>
 
-#include <lib/tarantool.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+static RLIST_HEAD(engines);
 
-#include "client/tarantool/opt.h"
-#include "client/tarantool/main.h"
-#include "client/tarantool/pager.h"
+EngineFactory::EngineFactory(const char *engine_name)
+	:name(engine_name),
+	 link(RLIST_INITIALIZER(link))
+{}
 
-extern struct tarantool_client tc;
+void EngineFactory::init()
+{}
 
-void tc_pager_start()
+void EngineFactory::shutdown()
+{}
+
+Engine::Engine(EngineFactory *f)
+	:factory(f)
 {
-	if (tc.pager_pid != 0)
-		tc_pager_kill();
-	if (tc.opt.pager == NULL) {
-		tc.pager_stream = stdout;
-		return;
-	}
-	int pipefd[2];
-	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
-	if (pipe(pipefd) < 0)
-		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
-
-	pid_t pid = fork();
-	if (pid < 0) {
-		tc_error("Failed to fork. Errno: %s", strerror(errno));
-	} else if (pid == 0) {
-		close(pipefd[1]);
-		dup2(pipefd[0], STDIN_FILENO);
-		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
-		tc_error("Can't start pager! Errno: %s", strerror(errno));
-	} else {
-		close(pipefd[0]);
-		tc.pager_stream = fdopen(pipefd[1], "w");
-		tc.pager_pid = pid;
-	}
+	/* derive recovery state from engine factory */
+	initRecovery();
 }
 
-void tc_pager_stop()
+/** Register engine factory instance. */
+void engine_register(EngineFactory *engine)
 {
-	if (tc.pager_pid != 0) {
-		fclose(tc.pager_stream);
-		tc.pager_stream = stdout;
-		waitpid(tc.pager_pid, NULL, 0);
-		tc.pager_pid = 0;
-	}
+	rlist_add_entry(&engines, engine, link);
 }
 
-void tc_pager_kill()
+/** Find factory engine by name. */
+EngineFactory *
+engine_find(const char *name)
 {
-	if (tc.pager_pid != 0) {
-		kill(tc.pager_pid, SIGTERM);
-		tc_pager_stop();
+	EngineFactory *e;
+	rlist_foreach_entry(e, &engines, link) {
+		if (strcmp(e->name, name) == 0)
+			return e;
+	}
+	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+}
+
+/** Call a visitor function on every registered engine. */
+void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
+                    void *udata)
+{
+	EngineFactory *e;
+	rlist_foreach_entry(e, &engines, link)
+		func(e, udata);
+}
+
+/** Shutdown all engine factories. */
+void engine_shutdown()
+{
+	EngineFactory *e, *tmp;
+	rlist_foreach_entry_safe(e, &engines, link, tmp) {
+		e->shutdown();
+		delete e;
 	}
 }

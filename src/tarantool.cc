@@ -592,7 +592,7 @@ main(int argc, char **argv)
 #endif
 	const char *argv0 = argv[0];
 
-	if (argc > 1 && access(argv[1], X_OK) == 0) {
+	if (argc > 1 && access(argv[1], R_OK) == 0) {
 		/*
 		 * Support only #!/usr/bin/tarantol but not
 		 * #!/usr/bin/tarantool -a -b because:

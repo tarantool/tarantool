@@ -83,10 +83,9 @@ field_type_maxlen(enum field_type type)
 }
 
 #define ENUM_INDEX_TYPE(_) \
-	_(HASH,    0)       /* HASH Index  */   \
-	_(TREE,    1)       /* TREE Index  */   \
-	_(BITSET,  2)       /* BITSET Index  */ \
-	_(SOPHIA,  3)       /* SOPHIA Index  */
+	_(HASH,    0) /* HASH Index */   \
+	_(TREE,    1) /* TREE Index */   \
+	_(BITSET,  2) /* BITSET Index */
 
 ENUM(index_type, ENUM_INDEX_TYPE);
 extern const char *index_type_strs[];
@@ -195,9 +194,7 @@ key_list_del_key(struct rlist *key_list, uint32_t id);
 /**
  * Check a key definition for violation of various limits.
  *
- * @param id        space id
  * @param key_def   key_def
- * @param type_str  type name (to produce a nice error)
  */
 void
 key_def_check(struct key_def *key_def);

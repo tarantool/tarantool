@@ -58,8 +58,6 @@ server.lua_libs.append("box/lua/require_mod.lua")
 server.cfgfile_source = "box/tarantool_scriptdir.cfg"
 server.deploy()
 server.lua_libs.pop()
-admin("string.gmatch(package_path, '([^;]*)')()")
-admin("string.gmatch(package_cpath, '([^;]*)')()")
 admin("mod.test(10, 15)")
 
 sys.stdout.pop_filter()

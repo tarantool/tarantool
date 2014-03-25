@@ -8,16 +8,19 @@ UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 
 DEB_CMAKE_EXTRA_FLAGS := \
 	-DCMAKE_BUILD_TYPE=RelWithDebugInfo \
-	-DENABLE_CLIENT=true
+	-DENABLE_CLIENT=true \
+	-DWITH_MYSQL=ON \
+	-DWITH_POSTGRESQL=ON
 
 DEB_DH_INSTALLINIT_ARGS := --name=tarantool
 
 DEB_CMAKE_INSTALL_PREFIX := /usr
 DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
-    -DCMAKE_SKIP_RPATH=ON \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_SYSCONF_DIR=/etc/tarantool \
-    -DCMAKE_LOCALSTATE_DIR=/var
+	-DCMAKE_SKIP_RPATH=ON \
+	-DCMAKE_VERBOSE_MAKEFILE=ON \
+	-DCMAKE_INSTALL_SYSCONFDIR=/etc/tarantool \
+	-DCMAKE_INSTALL_LOCALSTATEDIR=/var \
+	-DCMAKE_INSTALL_LIBDIR=/usr/lib
 #     -DCMAKE_C_FLAGS="$(CFLAGS)" \
 #     -DCMAKE_LD_FLAGS="$(LDFLAGS)" \
 #     -DENABLE_STATIC=ON
@@ -26,7 +29,7 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE 		:= /usr/lib/tarantool/plugins
+DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool/1.6
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
 DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool_box
 
@@ -35,12 +38,15 @@ include /usr/share/cdbs/1/class/cmake.mk
 
 DEB_BUILDDIR := build-area
 
+DIRNAME=$(shell basename $(CURDIR))
+
 tarball: clean
 	git describe > VERSION
 	cd .. && tar --exclude=.git --exclude=debian 		\
 		--exclude=rfc4627.txt				\
 		--exclude=doc/www-data/ycsb			\
-		-czf tarantool_$(UVERSION).orig.tar.gz tarantool-$(UVERSION)
+		--transform='s,^$(DIRNAME),tarantool_$(UVERSION),' \
+		-czf tarantool_$(UVERSION).orig.tar.gz $(DIRNAME)
 
 clean::
 	find -type f -name \*.pyc -delete

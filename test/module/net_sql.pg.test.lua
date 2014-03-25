@@ -1,4 +1,4 @@
-package.path  = "../../src/module/sql/?.lua"
+package.path  = os.getenv("TARANTOOL_SRC_DIR").."/src/module/sql/?.lua"
 package.cpath  = "?.so"
 
 require("sql")
@@ -8,8 +8,13 @@ os.execute("mkdir -p box/net/")
 os.execute("cp ../../src/module/pg/pg.so box/net/")
 
 require("box.net.pg")
-
-c = box.net.sql.connect('abcd')
+--# setopt delimiter ';'
+do
+    stat, err = pcall(box.net.sql.connect, 'abcd')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:29: Unknown driver \'abcd\''
+end;
+--# setopt delimiter ''
 dump = function(v) return box.cjson.encode(v) end
 
 connect = {}
@@ -30,12 +35,22 @@ dump({c:execute('DROP TABLE IF EXISTS unknown_table')})
 dump({c:execute('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 c:ping()
 dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
-dump({c:single('SELECT * FROM (VALUES (1,2), (2,3)) t')})
+--# setopt delimiter ';'
+do
+    stat, err = pcall(c.single, c, 'SELECT * FROM (VALUES (1,2), (2,3)) t')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:156: SQL request returned multiply rows'
+end;
+--# setopt delimiter ''
 dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
 dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
-c:execute('SELEC T')
-
-c = box.net.sql.connect('abcd')
+--# setopt delimiter ';'
+do
+    stat, err = pcall(c.execute, c, 'SELEC T')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:105: ERROR:  syntax error at or near "SELEC"\nLINE 1: SELEC T\n        ^\n'
+end;
+--# setopt delimiter ''
 
 c:quote('abc\"cde\"def')
 

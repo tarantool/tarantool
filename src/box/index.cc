@@ -34,7 +34,6 @@
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
-#include <new>
 
 STRS(iterator_type, ITERATOR_TYPE);
 
@@ -68,8 +67,7 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 		 * - ITERA_ALL iterator type, all index types
 		 * - ITER_GE iterator in HASH index (legacy)
 		 */
-		if (key_def->type == TREE || key_def->type == SOPHIA ||
-		    type == ITER_ALL)
+		if (key_def->type == TREE || type == ITER_ALL)
 			return;
 		/* Fall through. */
 	}
@@ -101,24 +99,6 @@ primary_key_validate(struct key_def *key_def, const char *key,
 /* }}} */
 
 /* {{{ Index -- base class for all indexes. ********************/
-
-Index *
-Index::factory(struct key_def *key_def)
-{
-	switch (key_def->type) {
-	case HASH:
-		return new HashIndex(key_def);
-	case TREE:
-		return new TreeIndex(key_def);
-	case BITSET:
-		return new BitsetIndex(key_def);
-	case SOPHIA:
-		return new SophiaIndex(key_def);
-	default:
-		assert(false);
-		return NULL; /* silent compiler warning. */
-	}
-}
 
 Index::Index(struct key_def *key_def_arg)
 	:key_def(key_def_dup(key_def_arg)),

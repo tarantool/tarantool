@@ -262,8 +262,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 	const char *p;
 	while ((p = va_arg(args, const char*))) {
 		/*
-		 * If LUA_SYSPATH or LUA_SYSCPATH is an empty
-		 * string, skip it.
+		 * If MODULE_PATH is an empty string, skip it.
 		 */
 		if (*p == '\0')
 			continue;
@@ -293,8 +292,8 @@ tarantool_lua_init()
 	 * 2 types of packages become available for use: standard
 	 * Lua packages and Tarantool-specific Lua libs
 	 */
-	tarantool_lua_setpath(L, "path", LUA_LIBPATH, LUA_SYSPATH, NULL);
-	tarantool_lua_setpath(L, "cpath", LUA_LIBCPATH, LUA_SYSCPATH, NULL);
+	tarantool_lua_setpath(L, "path", MODULE_LUAPATH, NULL);
+	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
 
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);

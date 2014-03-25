@@ -232,7 +232,7 @@ sophia_iterator_next(struct iterator *ptr)
 	const char *value = sp_value(it->cursor);
 	struct tuple *ret =
 		tuple_new(tuple_format_ber, value, value + valuesize);
-	tuple_ref(ret, 1);
+	//tuple_ref(ret, 1);
 	return ret;
 }
 

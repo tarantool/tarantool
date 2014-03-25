@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 #include "key_def.h"
+#include "space.h"
+#include "schema.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include "exception.h"
@@ -184,52 +186,11 @@ key_def_check(struct key_def *key_def)
 			}
 		}
 	}
-	switch (key_def->type) {
-	case HASH:
-		if (! key_def->is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
-				  "HASH index must be unique");
-		}
-		break;
-	case TREE:
-		/* TREE index has no limitations. */
-		break;
-	case BITSET:
-		if (key_def->part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
-				  "BITSET index key can not be multipart");
-		}
-		if (key_def->is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
-				  "BITSET can not be unique");
-		}
-		break;
-	case SOPHIA:
-		if (! key_def->is_unique) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
-				  "SOPHIA index must be unique");
-		}
-		if (key_def->part_count != 1) {
-			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  (unsigned) key_def->iid,
-				  (unsigned) key_def->space_id,
-				  "SOPHIA index key can not be multipart");
-		}
-		break;
-	default:
-		tnt_raise(ClientError, ER_INDEX_TYPE,
-			  (unsigned) key_def->iid,
-			  (unsigned) key_def->space_id);
-		break;
-	}
+	struct space *space =
+		space_cache_find(key_def->space_id);
+
+	/* validate key_def->type */
+	space->engine->factory->key_def_check(key_def);
 }
 
 void

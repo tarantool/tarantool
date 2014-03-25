@@ -1,4 +1,4 @@
-package.path  = "../../src/module/sql/?.lua"
+package.path  = os.getenv("TARANTOOL_SRC_DIR").."/src/module/sql/?.lua"
 ---
 ...
 package.cpath  = "?.so"
@@ -23,15 +23,24 @@ require("box.net.mysql")
 ---
 - true
 ...
-c = box.net.sql.connect('abcd')
+--# setopt delimiter ';'
+do
+    stat, err = pcall(box.net.sql.connect, 'abcd')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:29: Unknown driver \'abcd\''
+end;
 ---
-- error: '../../src/module/sql/sql.lua:29: Unknown driver ''abcd'''
+- true
 ...
-c = box.net.sql.connect('mysql')
+do
+    stat, err = pcall(box.net.sql.connect, 'mysql')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:64: Usage: box.net.sql.connect(\'mysql\', host, port, user, password, db, ...)'
+end;
 ---
-- error: '../../src/module/sql/sql.lua:64: Usage: box.net.sql.connect(''mysql'', host,
-    port, user, password, db, ...)'
+- true
 ...
+--# setopt delimiter ''
 function dump(v) return box.cjson.encode(v) end
 ---
 ...
@@ -48,12 +57,16 @@ c = box.net.sql.connect('mysql', unpack(connect))
 for k, v in pairs(c) do print(k, ': ', type(v)) end
 ---
 ...
-c:execute('SEL ECT 1')
+--# setopt delimiter ';'
+do
+    stat, err = pcall(c.execute, c, 'SEL ECT 1')
+    err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
+    return err == 'error: src/module/sql/sql.lua:105: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near \'SEL ECT 1\' at line 1'
+end;
 ---
-- error: '../../src/module/sql/sql.lua:105: You have an error in your SQL syntax;
-    check the manual that corresponds to your MySQL server version for the right syntax
-    to use near ''SEL ECT 1'' at line 1'
+- true
 ...
+--# setopt delimiter ''
 dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
 ---
 - '[[{"bool2":0,"str":"abc","num":123,"bool1":1}],1]'

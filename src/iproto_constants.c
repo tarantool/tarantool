@@ -64,4 +64,5 @@ const char *iproto_request_type_strs[] =
 	"UPDATE",
 	"DELETE",
 	"CALL",
+	NULL,
 };

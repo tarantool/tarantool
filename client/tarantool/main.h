@@ -40,7 +40,7 @@
 struct tarantool_client {
 	struct tbses console;
 	struct tc_opt opt;
-	int pager_fd;
+	FILE *pager_stream;
 	pid_t pager_pid;
 };
 

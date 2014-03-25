@@ -71,14 +71,6 @@ floor(1.1)
 ---
 - 1
 ...
-string.gmatch(package_path, '([^;]*)')()
----
-- 
-...
-string.gmatch(package_cpath, '([^;]*)')()
----
-- 
-...
 mod.test(10, 15)
 ---
 - 25

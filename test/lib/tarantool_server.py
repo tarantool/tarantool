@@ -660,7 +660,7 @@ class TarantoolServer(Server):
         print self.test_option_get(option_list_str)
 
     def test_debug(self):
-        if self.test_option_get("-V", True).find("-Debug"):
+        if re.findall(r"-Debug", self.test_option_get("-V", True), re.I):
             return True
         return False
 

@@ -1,4 +1,5 @@
-
+#ifndef TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
+#define TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,62 +27,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
-*/
+ */
 
-#include <lib/tarantool.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+struct MemtxFactory: public EngineFactory {
+	MemtxFactory();
+	virtual Engine *open();
+	virtual Index *createIndex(struct key_def *key_def);
+	virtual void key_def_check(struct key_def *key_def);
+};
 
-#include "client/tarantool/opt.h"
-#include "client/tarantool/main.h"
-#include "client/tarantool/pager.h"
-
-extern struct tarantool_client tc;
-
-void tc_pager_start()
-{
-	if (tc.pager_pid != 0)
-		tc_pager_kill();
-	if (tc.opt.pager == NULL) {
-		tc.pager_stream = stdout;
-		return;
-	}
-	int pipefd[2];
-	const char *const argv[] = {"/bin/sh", "-c", tc.opt.pager, NULL};
-	if (pipe(pipefd) < 0)
-		tc_error("Failed to open pipe. Errno: %s", strerror(errno));
-
-	pid_t pid = fork();
-	if (pid < 0) {
-		tc_error("Failed to fork. Errno: %s", strerror(errno));
-	} else if (pid == 0) {
-		close(pipefd[1]);
-		dup2(pipefd[0], STDIN_FILENO);
-		execve(argv[0], (char * const*)argv, (char * const*)tc.opt.envp);
-		tc_error("Can't start pager! Errno: %s", strerror(errno));
-	} else {
-		close(pipefd[0]);
-		tc.pager_stream = fdopen(pipefd[1], "w");
-		tc.pager_pid = pid;
-	}
-}
-
-void tc_pager_stop()
-{
-	if (tc.pager_pid != 0) {
-		fclose(tc.pager_stream);
-		tc.pager_stream = stdout;
-		waitpid(tc.pager_pid, NULL, 0);
-		tc.pager_pid = 0;
-	}
-}
-
-void tc_pager_kill()
-{
-	if (tc.pager_pid != 0) {
-		kill(tc.pager_pid, SIGTERM);
-		tc_pager_stop();
-	}
-}
+#endif /* TARANTOOL_BOX_ENGINE_MEMTX_H_INCLUDED */
