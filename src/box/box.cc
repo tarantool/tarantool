@@ -46,6 +46,8 @@ extern "C" {
 #include "tuple.h"
 #include "lua/call.h"
 #include "schema.h"
+#include "engine.h"
+#include "engine_memtx.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -273,7 +275,15 @@ box_free(void)
 	schema_free();
 	tuple_free();
 	recovery_free();
+	engine_shutdown();
 	stat_free();
+}
+
+static void
+box_engine_init()
+{
+	MemtxFactory *memtx = new MemtxFactory();
+	engine_register(memtx);
 }
 
 void
@@ -284,6 +294,9 @@ box_init()
 
 	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
 		   cfg.slab_alloc_factor);
+
+	box_engine_init();
+
 	schema_init();
 	user_cache_init();
 

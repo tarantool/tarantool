@@ -192,10 +192,15 @@ rlist_swap(struct rlist *rhs, struct rlist *lhs)
 }
 
 /**
+ * list initializer
+ */
+#define RLIST_INITIALIZER(name) { &(name), &(name) }
+
+/**
  * allocate and init head of list
  */
 #define RLIST_HEAD(name)	\
-	struct rlist name = { &(name), &(name) }
+	struct rlist name = RLIST_INITIALIZER(name)
 
 /**
  * return entry by list item
