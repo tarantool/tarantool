@@ -34,13 +34,13 @@
 struct txn;
 struct port;
 
-typedef void (*request_execute_f)(struct request *,
-				  struct txn *,
-				  struct port *);
+typedef void (*request_execute_f)(struct request *, struct txn *, struct port *);
+enum { REQUEST_IOVMAX = IPROTO_PACKET_BODY_IOVMAX };
 
 struct request
 {
-	uint32_t type;
+	struct iproto_packet *packet;
+	uint32_t code;
 	uint32_t space_id;
 	uint32_t index_id;
 	uint32_t offset;
@@ -53,18 +53,16 @@ struct request
 	const char *tuple;
 	const char *tuple_end;
 
-	const char *data;
-	uint32_t len;
 	request_execute_f execute;
 };
 
 void
-request_create(struct request *request, uint32_t type);
+request_create(struct request *request, uint32_t code);
 
 void
 request_decode(struct request *request, const char *data, uint32_t len);
 
-void
-request_encode(struct request *request);
+int
+request_encode(struct request *request, struct iovec *iov);
 
 #endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

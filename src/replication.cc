@@ -49,6 +49,8 @@ extern "C" {
 #include "recovery.h"
 #include "log_io.h"
 #include "evio.h"
+#include "iproto_constants.h"
+#include "msgpuck/msgpuck.h"
 
 /** Replication topology
  * ----------------------
@@ -86,6 +88,7 @@ struct replica {
 	int sock;
 	/** Initial lsn. */
 	int64_t lsn;
+	uint64_t sync;
 } replica;
 
 /** Send a file descriptor to replication relay spawner.
@@ -194,11 +197,12 @@ struct subscribe_request {
 	struct ev_io io;
 	int fd;
 	int64_t lsn;
+	uint64_t sync;
 };
 
 /** Replication acceptor fiber handler. */
 void
-subscribe(int fd, int64_t lsn)
+subscribe(int fd, int64_t lsn, uint64_t sync)
 {
 	struct subscribe_request *request = (struct subscribe_request *)
 		malloc(sizeof(struct subscribe_request));
@@ -209,6 +213,7 @@ subscribe(int fd, int64_t lsn)
 	request->fd = fd;
 	request->io.data = request;
 	request->lsn = lsn;
+	request->sync = sync;
 	ev_io_init(&request->io, replication_send_socket,
 		   master_to_spawner_socket, EV_WRITE);
 	ev_io_start(loop(), &request->io);
@@ -227,7 +232,7 @@ replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */)
 	struct cmsghdr *control_message = NULL;
 
 	iov.iov_base = &request->lsn;
-	iov.iov_len = sizeof(request->lsn);
+	iov.iov_len = sizeof(request->lsn) + sizeof(request->sync);
 
 	memset(&msg, 0, sizeof(msg));
 
@@ -342,7 +347,7 @@ spawner_main_loop()
 	char control_buf[CMSG_SPACE(sizeof(int))];
 
 	iov.iov_base = &replica.lsn;
-	iov.iov_len = sizeof(replica.lsn);
+	iov.iov_len = sizeof(replica.lsn) + sizeof(replica.sync);
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
@@ -537,56 +542,102 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 	exit(EXIT_FAILURE);
 }
 
+/* Only for blocked I/O */
+static inline ssize_t
+sio_writev_all(int fd, struct iovec *iov, int iovcnt)
+{
+	ssize_t bytes_total = 0;
+	struct iovec *iovend = iov + iovcnt;
+	while(1) {
+		ssize_t bytes_written = sio_writev(fd, iov, iovend - iov);
+		bytes_total += bytes_written;
+		while (bytes_written >= iov->iov_len)
+			bytes_written -= (iov++)->iov_len;
+		if (iov == iovend)
+			break;
+		iov->iov_base = (char *) iov->iov_base + bytes_written;
+		iov->iov_len -= bytes_written;
+	}
+
+	return bytes_total;
+}
+
+
+enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
+
+static int
+iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+		  char fixheader[IPROTO_FIXHEADER_SIZE])
+{
+	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
+	uint32_t len = 0;
+	for (int i = 1; i < iovcnt; i++)
+		len += iov[i].iov_len;
+
+	/* Encode length */
+	char *data = fixheader;
+	data = mp_encode_uint(data, len);
+	/* Encode padding */
+	ssize_t padding = IPROTO_FIXHEADER_SIZE - (data - fixheader);
+	if (padding > 0)
+		data = mp_encode_strl(data, padding - 1) + padding - 1;
+	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
+	iov[0].iov_base = fixheader;
+	iov[0].iov_len = IPROTO_FIXHEADER_SIZE;
+
+	assert(iovcnt <= IPROTO_ROW_IOVMAX);
+	return iovcnt;
+}
 
 /** Send a single row to the client. */
 static int
-replication_relay_send_row(void * /* param */, const struct log_row *row)
+replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
 {
-	ssize_t bytes, len = log_row_size(row);
-	while (len > 0) {
-		bytes = write(replica.sock, row, len);
-		if (bytes < 0) {
-			if (errno == EPIPE) {
-				/* socket closed on opposite site */
-				goto shutdown_handler;
-			}
-			panic_syserror("write");
-		}
-		len -= bytes;
-		row += bytes;
+	try {
+		packet->sync = replica.sync;
+		/* Encode length */
+		struct iovec iov[IPROTO_ROW_IOVMAX];
+		char fixheader[IPROTO_FIXHEADER_SIZE];
+		int iovcnt = iproto_encode_row(packet, iov, fixheader);
+		sio_writev_all(replica.sock, iov, iovcnt);
+	} catch(SocketError *e) {
+		say_info("the client has closed its replication socket, exiting");
+		exit(EXIT_SUCCESS);
 	}
 
 	return 0;
-shutdown_handler:
-	say_info("the client has closed its replication socket, exiting");
-	exit(EXIT_SUCCESS);
 }
 
 static void
-replication_relay_send_snapshot()
+replication_relay_join(struct recovery_state *r, uint64_t sync)
 {
 	FDGuard guard_replica(replica.sock);
-	struct log_dir dir = snap_dir;
-	dir.dirname = cfg.snap_dir;
-	int64_t lsn = greatest_lsn(&dir);
-	const char *filename = format_filename(&dir, lsn, NONE);
-	int snapshot = open(filename, O_RDONLY);
-	if (snapshot < 0)
-		panic_syserror("can't find/open snapshot");
 
-	FDGuard guard_snapshot(snapshot);
+	int64_t lsn = greatest_lsn(r->snap_dir);
+	if (lsn <= 0)
+		panic("can't find snapshot");
 
-	struct stat st;
-	if (fstat(snapshot, &st) != 0)
-		panic_syserror("fstat");
+	struct log_io *snap = log_io_open_for_read(r->snap_dir, lsn, NONE);
+	if (snap == NULL)
+		panic("can't open snapshot");
+	say_info("sending snapshot `%s'", snap->filename);
 
-	uint64_t header[2];
-	header[0] = lsn;
-	header[1] = st.st_size;
-	sio_writen(replica.sock, header, sizeof(header));
-	sio_sendfile(replica.sock, snapshot, NULL, header[1]);
+	/* Send rows */
+	int rc = recover_wal(r, snap);
+	log_io_close(&snap);
 
+	if (rc != 0)
+		panic("can't sent snapshot");
+
+	/* Send response to JOIN command = end of stream */
+	struct iproto_subscribe response = iproto_subscribe_stub;
+	response.lsn = mp_bswap_u64(lsn);
+	response.sync = mp_bswap_u64(sync);
+	sio_write(replica.sock, &response, sizeof(response));
+
+	say_info("snapshot sent, lsn: %" PRIi64, lsn);
 	exit(EXIT_SUCCESS);
+	/* replica.sock closed by guard */
 }
 
 /** The main loop of replication client service process. */
@@ -633,8 +684,6 @@ replication_relay_loop()
 		say_syserror("sigaction");
 	}
 
-	if (replica.lsn == 0)
-		replication_relay_send_snapshot(); /* exits */
 	/*
 	 * Init a read event: when replica closes its end
 	 * of the socket, we can read EOF and shutdown the
@@ -649,11 +698,16 @@ replication_relay_loop()
 	/* Initialize the recovery process */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
 		      replication_relay_send_row,
-		      NULL, INT32_MAX);
+		      NULL, NULL, INT32_MAX);
 	/*
 	 * Note that recovery starts with lsn _NEXT_ to
 	 * the confirmed one.
 	 */
+	if (replica.lsn == 0) {
+		recovery_state->lsn = recovery_state->confirmed_lsn = 0;
+		replication_relay_join(recovery_state, replica.sync); /* exits */
+	}
+
 	recovery_state->lsn = recovery_state->confirmed_lsn = replica.lsn - 1;
 	recover_existing_wals(recovery_state);
 	/* Found nothing. */

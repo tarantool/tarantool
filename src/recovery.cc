@@ -40,6 +40,9 @@
 
 #include "replica.h"
 #include "fiber.h"
+#include "msgpuck/msgpuck.h"
+#include "iproto_constants.h"
+#include "crc32.h"
 
 /*
  * Recovery subsystem
@@ -207,7 +210,7 @@ recovery_stop_local(struct recovery_state *r);
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, void *row_handler_param,
-	      int rows_per_wal)
+	      snapshot_handler snapshot_handler, int rows_per_wal)
 {
 	assert(recovery_state == NULL);
 	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
@@ -218,6 +221,8 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 
 	r->row_handler = row_handler;
 	r->row_handler_param = row_handler_param;
+
+	r->snapshot_handler = snapshot_handler;
 
 	r->snap_dir = &snap_dir;
 	r->snap_dir->dirname = strdup(snap_dirname);
@@ -291,7 +296,7 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
  *  @return panics on error
  *  Errors are logged to the log file.
  */
-static void
+void
 init_storage_on_master(struct log_dir *dir)
 {
 	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
@@ -307,47 +312,13 @@ init_storage_on_master(struct log_dir *dir)
 			       filename);
 	}
 	close(fd);
-}
-
-/** Download the latest snapshot from master. */
-static void
-init_storage_on_replica(struct log_dir *dir, const char *replication_source)
-{
-	say_info("downloading snapshot from master %s...",
-		 replication_source);
-
-	int master = replica_bootstrap(replication_source);
-	FDGuard guard_master(master);
-
-	struct {
-		uint64_t lsn;
-		uint64_t file_size;
-	} response;
-	sio_readn(master, &response, sizeof(response));
-
-	const char *filename = format_filename(dir, response.lsn, NONE);
-	say_info("saving snapshot `%s'", filename);
-	int fd = open(filename, O_WRONLY|O_CREAT|O_EXCL, dir->mode);
-	if (fd == -1) {
-		panic_syserror("failed to open snapshot file `%s' for "
-			       "writing", filename);
-	}
-	FDGuard guard_fd(fd);
-
-	sio_recvfile(master, fd, NULL, response.file_size);
-}
-
-/** Create the initial snapshot file in the snap directory. */
-void
-init_storage(struct log_dir *dir, const char *replication_source)
-{
-	if (replication_source)
-		init_storage_on_replica(dir, replication_source);
-	else
-		init_storage_on_master(dir);
 	say_info("done");
 }
 
+/**
+ * Read a snapshot and call row_handler for every snapshot row.
+ * Panic in case of error.
+ */
 /**
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
@@ -361,12 +332,21 @@ recover_snap(struct recovery_state *r, const char *replication_source)
 
 	struct log_io *snap;
 	int64_t lsn;
+	int rc = 0;
 
 	lsn = greatest_lsn(r->snap_dir);
 	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
 		say_info("found an empty data directory, initializing...");
-		init_storage(r->snap_dir, replication_source);
-		lsn = greatest_lsn(r->snap_dir);
+		if (replication_source) {
+			/* play rows and save snapshot */
+			replica_bootstrap(r, replication_source);
+			snapshot_save(r);
+			assert(r->lsn == greatest_lsn(r->snap_dir));
+			return;
+		} else {
+			init_storage_on_master(r->snap_dir);
+			lsn = greatest_lsn(r->snap_dir);
+		}
 	}
 
 	if (lsn <= 0) {
@@ -383,18 +363,19 @@ recover_snap(struct recovery_state *r, const char *replication_source)
 
 	log_io_cursor_open(&i, snap);
 
-	const struct log_row *row;
-	while ((row = log_io_cursor_next(&i))) {
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+	struct iproto_packet packet;
+	while (log_io_cursor_next(&i, &packet) == 0) {
+		if (r->row_handler(r->row_handler_param, &packet) < 0) {
 			say_error("can't apply row");
 			if (snap->dir->panic_if_error)
 				break;
+			rc = 1;
 		}
 	}
 	log_io_cursor_close(&i);
 	log_io_close(&snap);
 
-	if (row == NULL) {
+	if (rc == 0) {
 		r->lsn = r->confirmed_lsn = lsn;
 		say_info("snapshot recovered, confirmed lsn: %"
 			 PRIi64, r->confirmed_lsn);
@@ -415,7 +396,7 @@ error:
  * @retval 0 EOF
  * @retval 1 ok, maybe read something
  */
-static int
+int
 recover_wal(struct recovery_state *r, struct log_io *l)
 {
 	int res = -1;
@@ -423,9 +404,9 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	log_io_cursor_open(&i, l);
 
-	const struct log_row *row;
-	while ((row = log_io_cursor_next(&i))) {
-		if (row->lsn <= r->confirmed_lsn) {
+	struct iproto_packet packet;
+	while (log_io_cursor_next(&i, &packet) == 0) {
+		if (packet.lsn <= r->confirmed_lsn) {
 			say_debug("skipping too young row");
 			continue;
 		}
@@ -433,12 +414,12 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(r->row_handler_param, row) < 0) {
+		if (r->row_handler(r->row_handler_param, &packet) < 0) {
 			say_error("can't apply row");
 			if (l->dir->panic_if_error)
 				goto end;
 		}
-		set_lsn(r, row->lsn);
+		set_lsn(r, packet.lsn);
 	}
 	res = i.eof_read ? LOG_EOF : 1;
 end:
@@ -773,7 +754,8 @@ struct wal_write_request {
 	/* Auxiliary. */
 	int res;
 	struct fiber *fiber;
-	struct log_row row;
+	struct iproto_packet *packet;
+	char wal_fixheader[XLOG_FIXHEADER_SIZE];
 };
 
 /* Context of the WAL writer thread. */
@@ -1102,10 +1084,11 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	/* Post-condition of successful wal_opt_rotate(). */
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
-	while (req != NULL && ! fio_batch_is_full(batch)) {
-		struct log_row *row = &req->row;
-		log_row_sign(row);
-		fio_batch_add(batch, row, log_row_size(row));
+
+	struct iovec iov[XLOG_ROW_IOVMAX];
+	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
+		int iovcnt = xlog_encode_row(req->packet, iov, req->wal_fixheader);
+		fio_batch_add(batch, iov, iovcnt);
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -1137,7 +1120,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 
 	while (req) {
 		if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
-				   req->row.lsn) != 0)
+				   req->packet->lsn) != 0)
 			break;
 		struct wal_write_request *batch_end;
 		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
@@ -1194,23 +1177,22 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
-	  uint16_t op, const char *row, uint32_t row_len)
+wal_write(struct recovery_state *r, struct iproto_packet *packet)
 {
 	assert(r->wal_mode != WAL_NONE);
-	say_debug("wal_write lsn=%" PRIi64, lsn);
+	say_debug("wal_write lsn=%" PRIi64, packet->lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	struct wal_writer *writer = r->writer;
 
 	struct wal_write_request *req = (struct wal_write_request *)
-		region_alloc(&fiber()->gc, sizeof(struct wal_write_request) +
-			     sizeof(op) + row_len);
+		region_alloc(&fiber()->gc, sizeof(struct wal_write_request));
 
 	req->fiber = fiber();
 	req->res = -1;
-	log_row_fill(&req->row, lsn, cookie, (const char *) &op,
-		     sizeof(op), row, row_len);
+	req->packet = packet;
+	packet->tm = ev_now(loop());
+	packet->sync = 0;
 
 	(void) tt_pthread_mutex_lock(&writer->mutex);
 
@@ -1232,9 +1214,7 @@ wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
 /* {{{ box.snapshot() */
 
 void
-snapshot_write_row(struct log_io *l,
-		   const char *metadata, size_t metadata_len,
-		   const char *data, size_t data_len)
+snapshot_write_row(struct log_io *l, struct iproto_packet *packet)
 {
 	static int rows;
 	static uint64_t bytes;
@@ -1242,24 +1222,26 @@ snapshot_write_row(struct log_io *l,
 	static ev_tstamp last = 0;
 	ev_loop *loop = loop();
 
-	struct log_row *row = (struct log_row *) region_alloc(&fiber()->gc,
-		sizeof(*row) + data_len + metadata_len);
+	packet->tm = last;
+	packet->lsn = ++rows;
+	packet->sync = 0; /* don't write sync to wal */
 
-	log_row_fill(row, ++rows, snapshot_cookie, metadata,
-		     metadata_len, data, data_len);
-	log_row_sign(row);
+	char fixheader[XLOG_FIXHEADER_SIZE];
+	struct iovec iov[XLOG_ROW_IOVMAX];
+	int iovcnt = xlog_encode_row(packet, iov, fixheader);
+
+	/* TODO: use writev here */
+	for (int i = 0; i < iovcnt; i++) {
+		if (fwrite(iov[i].iov_base, iov[i].iov_len, 1, l->f) != 1) {
+			say_error("Can't write row (%zu bytes)",
+				  iov[i].iov_len);
+			panic_syserror("snapshot_write_row");
+		}
+		bytes += iov[i].iov_len;
+	}
 
 	if (rows % 100000 == 0)
 		say_crit("%.1fM rows written", rows / 1000000.);
-
-	size_t written = fwrite(row, 1, log_row_size(row), l->f);
-
-	if (written != log_row_size(row)) {
-		say_error("Can't write row (%zu bytes)", log_row_size(row));
-		panic_syserror("snapshot_write_row");
-	}
-
-	bytes += written;
 
 	region_free_after(&fiber()->gc, 128 * 1024);
 
@@ -1302,8 +1284,9 @@ snapshot_write_row(struct log_io *l,
 }
 
 void
-snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
+snapshot_save(struct recovery_state *r)
 {
+	assert(r->snapshot_handler != NULL);
 	struct log_io *snap;
 	snap = log_io_open_for_write(r->snap_dir, r->confirmed_lsn,
 				     INPROGRESS);
@@ -1317,8 +1300,8 @@ snapshot_save(struct recovery_state *r, void (*f) (struct log_io *))
 	say_info("saving snapshot `%s'",
 		 format_filename(r->snap_dir, r->confirmed_lsn,
 				 NONE));
-	if (f)
-		f(snap);
+
+	r->snapshot_handler(snap);
 
 	log_io_close(&snap);
 

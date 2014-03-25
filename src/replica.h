@@ -48,8 +48,8 @@ struct remote {
  * @return A connected socket, ready too receive
  * data.
  */
-int
-replica_bootstrap(const char *replication_source);
+void
+replica_bootstrap(struct recovery_state *r, const char *replication_source);
 
 void
 recovery_follow_remote(struct recovery_state *r, const char *addr);

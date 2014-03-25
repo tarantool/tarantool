@@ -44,14 +44,8 @@ struct txn {
 	struct rlist on_rollback;
 
 	/* Redo info: binary packet */
-	struct request *request;
+	struct iproto_packet *packet;
 };
-
-static inline void
-txn_add_redo(struct txn *txn, struct request *request)
-{
-	txn->request = request;
-}
 
 struct txn *txn_begin();
 void txn_commit(struct txn *txn);
@@ -60,4 +54,5 @@ void txn_rollback(struct txn *txn);
 void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);
+void txn_add_redo(struct txn *txn, struct request *request);
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

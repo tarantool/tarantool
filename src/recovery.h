@@ -32,6 +32,7 @@
 
 #include "trivia/util.h"
 #include "tarantool_ev.h"
+#include "log_io.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -40,7 +41,8 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-typedef int (row_handler)(void *, const struct log_row *row);
+typedef int (row_handler)(void *, struct iproto_packet *packet);
+typedef void (snapshot_handler)(struct log_io *);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -88,6 +90,7 @@ struct recovery_state {
 	 */
 	row_handler *row_handler;
 	void *row_handler_param;
+	snapshot_handler *snapshot_handler;
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	double wal_fsync_delay;
@@ -101,18 +104,20 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   int rows_per_wal);
+		   snapshot_handler snapshot_handler, int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r,
 			  const char *wal_mode, double fsync_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();
-void recover_snap(struct recovery_state *, const char *replication_source);
+void recover_snap(struct recovery_state *r, const char *replication_source);
 void recover_existing_wals(struct recovery_state *);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
-int wal_write(struct recovery_state *r, int64_t lsn, uint64_t cookie,
-	      uint16_t op, const char *data, uint32_t len);
+
+int
+recover_wal(struct recovery_state *r, struct log_io *l); /* for replication */
+int wal_write(struct recovery_state *r, struct iproto_packet *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 
@@ -124,13 +129,12 @@ void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
 
 struct fio_batch;
 
-void snapshot_write_row(struct log_io *i,
-			const char *metadata, size_t metadata_size,
-			const char *data, size_t data_size);
-void snapshot_save(struct recovery_state *r, void (*loop) (struct log_io *));
+void
+snapshot_write_row(struct log_io *l, struct iproto_packet *packet);
+void snapshot_save(struct recovery_state *r);
 
 void
-init_storage(struct log_dir *dir, const char *replication_source);
+init_storage_on_master(struct log_dir *dir);
 
 #if defined(__cplusplus)
 } /* extern "C" */

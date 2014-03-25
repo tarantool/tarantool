@@ -89,8 +89,9 @@ admin_handler(va_list ap)
 	 * stored procedures.
 	 */
 
-	session_set_user(session_create(coio.fd, *(uint64_t *) addr),
-			 ADMIN, ADMIN);
+	struct session *session = session_create(coio.fd, *(uint64_t *) addr);
+	session_set_user(session, ADMIN, ADMIN);
+	trigger_run(&session_on_connect, NULL);
 
 	for (;;) {
 		if (admin_dispatch(&coio, iobuf, L) < 0)

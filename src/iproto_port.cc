@@ -39,11 +39,11 @@ struct iproto_header_bin {
 	uint32_t v_code;                        /* response status */
 	uint8_t k_sync;                         /* IPROTO_SYNC */
 	uint8_t m_sync;                         /* MP_UIN32 */
-	uint32_t v_sync;                        /* sync */
+	uint64_t v_sync;                        /* sync */
 } __attribute__((packed));
 
 static const struct iproto_header_bin iproto_header_bin = {
-	0xce, 0, 0x82, IPROTO_CODE, 0xce, 0, IPROTO_SYNC, 0xce, 0
+	0xce, 0, 0x82, IPROTO_CODE, 0xce, 0, IPROTO_SYNC, 0xcf, 0
 };
 
 struct iproto_body_bin {
@@ -62,16 +62,16 @@ static const struct iproto_body_bin iproto_error_bin = {
 };
 
 void
-iproto_reply_ping(struct obuf *out, uint32_t sync)
+iproto_reply_ping(struct obuf *out, uint64_t sync)
 {
 	struct iproto_header_bin reply = iproto_header_bin;
 	reply.v_len = mp_bswap_u32(sizeof(iproto_header_bin) - 5);
-	reply.v_sync = mp_bswap_u32(sync);
+	reply.v_sync = mp_bswap_u64(sync);
 	obuf_dup(out, &reply, sizeof(reply));
 }
 
 void
-iproto_reply_error(struct obuf *out, const ClientError *e, uint32_t sync)
+iproto_reply_error(struct obuf *out, const ClientError *e, uint64_t sync)
 {
 	uint32_t msg_len = strlen(e->errmsg());
 
@@ -81,7 +81,7 @@ iproto_reply_error(struct obuf *out, const ClientError *e, uint32_t sync)
 	uint32_t len = sizeof(header) - 5 + sizeof(body) + msg_len;
 	header.v_len = mp_bswap_u32(len);
 	header.v_code = mp_bswap_u32(tnt_errcode_val(e->errcode()));
-	header.v_sync = mp_bswap_u32(sync);
+	header.v_sync = mp_bswap_u64(sync);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
 
@@ -110,7 +110,7 @@ iproto_port_eof(struct port *ptr)
 
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);
-	header.v_sync = mp_bswap_u32(port->sync);
+	header.v_sync = mp_bswap_u64(port->sync);
 
 	struct iproto_body_bin body = iproto_body_bin;
 	body.v_data_len = mp_bswap_u32(port->found);

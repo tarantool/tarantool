@@ -60,7 +60,7 @@ set (common_sources
      admin.cc
      replica.cc
      iproto.cc
-     iproto_constants.c
+     iproto_constants.cc
      iproto_port.cc
      session.cc
      object.cc

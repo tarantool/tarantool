@@ -63,16 +63,16 @@ box_process_func box_process = process_ro;
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
 
+static void
+box_snapshot_cb(struct log_io *l);
 
 /** The snapshot row metadata repeats the structure of REPLACE request. */
-struct box_snap_row {
-	uint16_t op;
+struct request_replace_body {
 	uint8_t m_body;
 	uint8_t k_space_id;
 	uint8_t m_space_id;
 	uint32_t v_space_id;
 	uint8_t k_tuple;
-	char data[];
 } __attribute__((packed));
 
 void
@@ -89,7 +89,7 @@ process_rw(struct port *port, struct request *request)
 	struct txn *txn = txn_begin();
 
 	try {
-		stat_collect(stat_base, request->type, 1);
+		stat_collect(stat_base, request->code, 1);
 		request->execute(request, txn, port);
 		txn_commit(txn);
 		port_send_tuple(port, txn);
@@ -104,7 +104,7 @@ process_rw(struct port *port, struct request *request)
 static void
 process_replica(struct port *port, struct request *request)
 {
-	if (!iproto_request_is_select(request->type)) {
+	if (!iproto_request_is_select(request->code)) {
 		tnt_raise(ClientError, ER_NONMASTER,
 			  cfg.replication_source);
 	}
@@ -114,21 +114,21 @@ process_replica(struct port *port, struct request *request)
 static void
 process_ro(struct port *port, struct request *request)
 {
-	if (!iproto_request_is_select(request->type))
+	if (!iproto_request_is_select(request->code))
 		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, request);
 }
 
 static int
-recover_row(void *param __attribute__((unused)), const struct log_row *row)
+recover_row(void *param __attribute__((unused)), struct iproto_packet *packet)
 {
 	try {
-		const char *data = row->data;
-		const char *end = data + row->len;
-		uint16_t op = pick_u16(&data, end);
+		assert(packet->bodycnt == 1); /* always 1 for read */
 		struct request request;
-		request_create(&request, op);
-		request_decode(&request, data, end - data);
+		request_create(&request, packet->code);
+		request_decode(&request, (const char *) packet->body[0].iov_base,
+				packet->body[0].iov_len);
+		request.packet = packet;
 		process_rw(&null_port, &request);
 	} catch (Exception *e) {
 		e->log();
@@ -302,7 +302,7 @@ box_init()
 
 	/* recovery initialization */
 	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, NULL, cfg.rows_per_wal);
+		      recover_row, NULL, box_snapshot_cb, cfg.rows_per_wal);
 	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
 	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
 
@@ -327,17 +327,24 @@ static void
 snapshot_write_tuple(struct log_io *l,
 		     uint32_t n, struct tuple *tuple)
 {
-	struct box_snap_row header;
-	header.op = IPROTO_INSERT;
-	header.m_body = 0x82; /* map of two elements. */
-	header.k_space_id = IPROTO_SPACE_ID;
-	header.m_space_id = 0xce; /* uint32 */
-	header.v_space_id = mp_bswap_u32(n);
-	header.k_tuple = IPROTO_TUPLE;
-	snapshot_write_row(l, (const char *) &header, sizeof(header),
-	                   tuple->data, tuple->bsize);
-}
+	struct request_replace_body body;
+	body.m_body = 0x82; /* map of two elements. */
+	body.k_space_id = IPROTO_SPACE_ID;
+	body.m_space_id = 0xce; /* uint32 */
+	body.v_space_id = mp_bswap_u32(n);
+	body.k_tuple = IPROTO_TUPLE;
 
+	struct iproto_packet packet;
+	memset(&packet, 0, sizeof(packet));
+	packet.code = IPROTO_INSERT;
+
+	packet.bodycnt = 2;
+	packet.body[0].iov_base = &body;
+	packet.body[0].iov_len = sizeof(body);
+	packet.body[1].iov_base = tuple->data;
+	packet.body[1].iov_len = tuple->bsize;
+	snapshot_write_row(l, &packet);
+}
 
 static void
 snapshot_space(struct space *sp, void *udata)
@@ -356,7 +363,7 @@ snapshot_space(struct space *sp, void *udata)
 		snapshot_write_tuple(l, space_id(sp), tuple);
 }
 
-void
+static void
 box_snapshot_cb(struct log_io *l)
 {
 	space_foreach(snapshot_space, l);
@@ -393,7 +400,7 @@ box_snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, sayfd);
-	snapshot_save(recovery_state, box_snapshot_cb);
+	snapshot_save(recovery_state);
 
 	exit(EXIT_SUCCESS);
 	return 0;
@@ -404,7 +411,7 @@ box_init_storage(const char *dirname)
 {
 	struct log_dir dir = snap_dir;
 	dir.dirname = (char *) dirname;
-	init_storage(&dir, NULL);
+	init_storage_on_master(&dir);
 }
 
 void

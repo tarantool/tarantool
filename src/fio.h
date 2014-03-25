@@ -153,25 +153,32 @@ struct fio_batch
 	ssize_t bytes;
 	/** Total number of batched rows.*/
 	int rows;
+	/** Total number of I/O vectors */
+	int iovcnt;
 	/** A cap on how many rows can be batched. Can be set to INT_MAX. */
 	int max_rows;
 	/** A system cap on how many rows can be batched. */
-	long max_iov;
+	int max_iov;
+	/**
+	 * End of row flags for each iov (bitset). fio_write() tries to
+	 * write {iov, iov, iov with flag} blocks atomically.
+	 */
+	char *rowflag;
 	/* Batched rows. */
 	struct iovec iov[];
 };
 
 struct fio_batch *
-fio_batch_alloc(long max_iov);
+fio_batch_alloc(int max_iov);
 
 /** Begin a new batch write. Set a cap on the number of rows in the batch.  */
 void
 fio_batch_start(struct fio_batch *batch, long max_rows);
 
 static inline bool
-fio_batch_is_full(struct fio_batch *batch)
+fio_batch_has_space(struct fio_batch *batch, int iovcnt)
 {
-	return batch->rows >= batch->max_iov ||
+	return batch->iovcnt + iovcnt > batch->max_iov ||
 		batch->rows >= batch->max_rows;
 }
 
@@ -180,7 +187,7 @@ fio_batch_is_full(struct fio_batch *batch)
  * @pre fio_batch_is_full() == false
  */
 void
-fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len);
+fio_batch_add(struct fio_batch *batch, const struct iovec *iov, int iovcnt);
 
 /**
  * Write all rows stacked into the batch.

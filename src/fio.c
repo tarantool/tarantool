@@ -36,6 +36,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <errno.h>
+#include <lib/bit/bit.h>
 
 #include <say.h>
 
@@ -158,58 +159,78 @@ fio_truncate(int fd, off_t offset)
 }
 
 struct fio_batch *
-fio_batch_alloc(long max_iov)
+fio_batch_alloc(int max_iov)
 {
 	struct fio_batch *batch = (struct fio_batch *)
 		malloc(sizeof(struct fio_batch) +
-		       sizeof(struct iovec) * max_iov);
+		       sizeof(struct iovec) * max_iov +
+		       (max_iov / CHAR_BIT + 1));
 	if (batch == NULL)
 		return NULL;
-	batch->bytes = batch->rows = batch->max_rows = 0;
+	batch->bytes = batch->rows = batch->iovcnt = batch->max_rows = 0;
 	batch->max_iov = max_iov;
+	batch->rowflag = (char *) (batch + 1) + sizeof(struct iovec) * max_iov;
 	return batch;
 }
 
 void
 fio_batch_start(struct fio_batch *batch, long max_rows)
 {
-	batch->bytes = batch->rows = 0;
+	batch->bytes = batch->rows = batch->iovcnt = 0;
 	batch->max_rows = max_rows;
+	memset(batch->rowflag, 0, batch->max_iov / CHAR_BIT + 1);
 }
 
 void
-fio_batch_add(struct fio_batch *batch, void *row, ssize_t row_len)
+fio_batch_add(struct fio_batch *batch, const struct iovec *iov, int iovcnt)
 {
+	assert(!fio_batch_has_space(batch, iovcnt));
+	assert(iovcnt > 0);
 	assert(batch->max_rows > 0);
-	assert(! fio_batch_is_full(batch));
-
-	batch->iov[batch->rows].iov_base = row;
-	batch->iov[batch->rows].iov_len = row_len;
+	for (int i = 0; i < iovcnt; i++) {
+		batch->iov[batch->iovcnt++] = iov[i];
+		batch->bytes += iov[i].iov_len;
+	}
+	bit_set(batch->rowflag, batch->iovcnt);
 	batch->rows++;
-	batch->bytes += row_len;
 }
 
 int
 fio_batch_write(struct fio_batch *batch, int fd)
 {
-	ssize_t bytes_written = fio_writev(fd, batch->iov, batch->rows);
+	ssize_t bytes_written = fio_writev(fd, batch->iov, batch->iovcnt);
 	if (bytes_written <= 0)
 		return 0;
 
 	if (bytes_written == batch->bytes)
-		return batch->rows;
+		return batch->rows; /* returns the number of written rows */
 
 	say_warn("fio_batch_write, [%s]: partial write,"
 		 " wrote %jd out of %jd bytes",
 		 fio_filename(fd),
 		 (intmax_t) bytes_written, (intmax_t) batch->bytes);
 
-	ssize_t good_bytes = 0;
+	/* Iterate over end of row flags */
+	struct bit_iterator bit_it;
+	bit_iterator_init(&bit_it, batch->rowflag,
+			  batch->max_iov / CHAR_BIT + 1, 1);
+	size_t row_last_iov = bit_iterator_next(&bit_it);
+
+	int good_rows = 0; /* the number of fully written rows */
+	ssize_t good_bytes = 0; /* the number of bytes in fully written rows */
+	ssize_t row_bytes = 0;  /* the number of bytes in the current row */
 	struct iovec *iov = batch->iov;
-	while (iov < batch->iov + batch->rows) {
-		if (good_bytes + iov->iov_len > bytes_written)
+	while (iov < batch->iov + batch->iovcnt) {
+		if (good_bytes + row_bytes + iov->iov_len > bytes_written)
 			break;
-		good_bytes += iov->iov_len;
+		row_bytes += iov->iov_len;
+		if ((iov - batch->iov) == row_last_iov) {
+			/* the end of current row  */
+			good_bytes += row_bytes;
+			row_bytes = 0;
+			good_rows++;
+			row_last_iov = bit_iterator_next(&bit_it);
+		}
 		iov++;
 	}
 	/*
@@ -232,5 +253,5 @@ fio_batch_write(struct fio_batch *batch, int fd)
 	 */
 	if (! errno)
 		errno = EAGAIN;
-	return iov - batch->iov;
+	return good_rows;  /* returns the number of written rows */
 }
