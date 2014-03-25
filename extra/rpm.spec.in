@@ -123,7 +123,20 @@ This package provides Tarantool client libraries.
 %setup -n @RPM_SOURCE_DIRECTORY_NAME@
 
 %build
-cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_SYSCONF_DIR=/etc -DCMAKE_MAN_DIR=/usr/share/man
+# https://fedoraproject.org/wiki/Packaging:RPMMacros
+cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON \
+    -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir} \
+    -DCMAKE_INSTALL_BINDIR=%{_bindir} \
+    -DCMAKE_INSTALL_LIBDIR=%{_libdir}   \
+    -DCMAKE_INSTALL_LIBEXECDIR=%{_libexecdir} \
+    -DCMAKE_INSTALL_SBINDIR=%{_sbindir} \
+    -DCMAKE_INSTALL_SHAREDSTATEDIR=%{_sharedstatedir} \
+    -DCMAKE_INSTALL_DATADIR=%{_datadir} \
+    -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} \
+    -DCMAKE_INSTALL_INFODIR=%{_infodir} \
+    -DCMAKE_INSTALL_MANDIR=%{_mandir} \
+    -DCMAKE_INSTALL_LOCALSTATEDIR=%{_localstatedir}
 
 make %{?_smp_mflags}
 
@@ -160,77 +173,85 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files sql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-%dir "/usr/lib/tarantool/1.5/box/net"
-"/usr/lib/tarantool/1.5/box/net/sql.lua"
+%dir "%{_datadir}/tarantool/1.5"
+%dir "%{_datadir}/tarantool/1.5/box"
+%dir "%{_datadir}/tarantool/1.5/box/net"
+"%{_datadir}/tarantool/1.5/box/net/sql.lua"
 
 %files pg-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-"/usr/lib/tarantool/1.5/box/net/pg.so"
+%dir "%{_libdir}/tarantool/1.5"
+%dir "%{_libdir}/tarantool/1.5/box"
+"%{_libdir}/tarantool/1.5/box/net/pg.so"
 
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-"/usr/lib/tarantool/1.5/box/net/mysql.so"
+%dir "%{_libdir}/tarantool/1.5"
+%dir "%{_libdir}/tarantool/1.5/box"
+"%{_libdir}/tarantool/1.5/box/net/mysql.so"
 
 %files sophia-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.5"
-%dir "/usr/lib/tarantool/1.5/box"
-"/usr/lib/tarantool/1.5/box/sophia.so"
+%dir "%{_libdir}/tarantool/1.5"
+%dir "%{_libdir}/tarantool/1.5/box"
+"%{_libdir}/tarantool/1.5/box/sophia.so"
 
 %files dev
 %defattr(-,root,root,-)
-%dir "/usr/include/tarantool"
-"/usr/include/tarantool/tnt.h"
-"/usr/include/tarantool/tnt_buf.h"
-"/usr/include/tarantool/tnt_call.h"
-"/usr/include/tarantool/tnt_delete.h"
-"/usr/include/tarantool/tnt_dir.h"
-"/usr/include/tarantool/tnt_enc.h"
-"/usr/include/tarantool/tnt_insert.h"
-"/usr/include/tarantool/tnt_io.h"
-"/usr/include/tarantool/tnt_iob.h"
-"/usr/include/tarantool/tnt_iter.h"
-"/usr/include/tarantool/tnt_lex.h"
-"/usr/include/tarantool/tnt_log.h"
-"/usr/include/tarantool/tnt_mem.h"
-"/usr/include/tarantool/tnt_net.h"
-"/usr/include/tarantool/tnt_opt.h"
-"/usr/include/tarantool/tnt_ping.h"
-"/usr/include/tarantool/tnt_proto.h"
-"/usr/include/tarantool/tnt_queue.h"
-"/usr/include/tarantool/tnt_reply.h"
-"/usr/include/tarantool/tnt_request.h"
-"/usr/include/tarantool/tnt_rpl.h"
-"/usr/include/tarantool/tnt_select.h"
-"/usr/include/tarantool/tnt_snapshot.h"
-"/usr/include/tarantool/tnt_sql.h"
-"/usr/include/tarantool/tnt_stream.h"
-"/usr/include/tarantool/tnt_tuple.h"
-"/usr/include/tarantool/tnt_update.h"
-"/usr/include/tarantool/tnt_utf8.h"
-"/usr/include/tarantool/tnt_xlog.h"
-"/usr/lib/libtarantool.a"
-"/usr/lib/libtarantool.so"
-"/usr/lib/libtarantool.so.1"
-"/usr/lib/libtarantool.so.1.1"
-"/usr/lib/libtarantoolnet.a"
-"/usr/lib/libtarantoolnet.so"
-"/usr/lib/libtarantoolnet.so.1"
-"/usr/lib/libtarantoolnet.so.1.1"
-"/usr/lib/libtarantoolrpl.a"
-"/usr/lib/libtarantoolrpl.so"
-"/usr/lib/libtarantoolrpl.so.1"
-"/usr/lib/libtarantoolrpl.so.1.1"
-"/usr/lib/libtarantoolsql.a"
-"/usr/lib/libtarantoolsql.so"
-"/usr/lib/libtarantoolsql.so.1"
-"/usr/lib/libtarantoolsql.so.1.1"
+%dir "%{_includedir}/tarantool"
+"%{_includedir}/tarantool/tnt.h"
+"%{_includedir}/tarantool/tnt_buf.h"
+"%{_includedir}/tarantool/tnt_call.h"
+"%{_includedir}/tarantool/tnt_delete.h"
+"%{_includedir}/tarantool/tnt_dir.h"
+"%{_includedir}/tarantool/tnt_enc.h"
+"%{_includedir}/tarantool/tnt_insert.h"
+"%{_includedir}/tarantool/tnt_io.h"
+"%{_includedir}/tarantool/tnt_iob.h"
+"%{_includedir}/tarantool/tnt_iter.h"
+"%{_includedir}/tarantool/tnt_lex.h"
+"%{_includedir}/tarantool/tnt_log.h"
+"%{_includedir}/tarantool/tnt_mem.h"
+"%{_includedir}/tarantool/tnt_net.h"
+"%{_includedir}/tarantool/tnt_opt.h"
+"%{_includedir}/tarantool/tnt_ping.h"
+"%{_includedir}/tarantool/tnt_proto.h"
+"%{_includedir}/tarantool/tnt_queue.h"
+"%{_includedir}/tarantool/tnt_reply.h"
+"%{_includedir}/tarantool/tnt_request.h"
+"%{_includedir}/tarantool/tnt_rpl.h"
+"%{_includedir}/tarantool/tnt_select.h"
+"%{_includedir}/tarantool/tnt_snapshot.h"
+"%{_includedir}/tarantool/tnt_sql.h"
+"%{_includedir}/tarantool/tnt_stream.h"
+"%{_includedir}/tarantool/tnt_tuple.h"
+"%{_includedir}/tarantool/tnt_update.h"
+"%{_includedir}/tarantool/tnt_utf8.h"
+"%{_includedir}/tarantool/tnt_xlog.h"
+"%{_libdir}/libtarantool.a"
+"%{_libdir}/libtarantool.so"
+"%{_libdir}/libtarantool.so.1"
+"%{_libdir}/libtarantool.so.1.1"
+"%{_libdir}/libtarantoolnet.a"
+"%{_libdir}/libtarantoolnet.so"
+"%{_libdir}/libtarantoolnet.so.1"
+"%{_libdir}/libtarantoolnet.so.1.1"
+"%{_libdir}/libtarantoolrpl.a"
+"%{_libdir}/libtarantoolrpl.so"
+"%{_libdir}/libtarantoolrpl.so.1"
+"%{_libdir}/libtarantoolrpl.so.1.1"
+"%{_libdir}/libtarantoolsql.a"
+"%{_libdir}/libtarantoolsql.so"
+"%{_libdir}/libtarantoolsql.so.1"
+"%{_libdir}/libtarantoolsql.so.1.1"
+%dir "%{_includedir}/tarantool/1.5"
+"%{_includedir}/tarantool/1.5/config.h"
+"%{_includedir}/tarantool/1.5/lauxlib.h"
+"%{_includedir}/tarantool/1.5/luaconf.h"
+"%{_includedir}/tarantool/1.5/lua.h"
+"%{_includedir}/tarantool/1.5/lua.hpp"
+"%{_includedir}/tarantool/1.5/luajit.h"
+"%{_includedir}/tarantool/1.5/lualib.h"
 
 %files client
 %defattr(-,root,root,-)

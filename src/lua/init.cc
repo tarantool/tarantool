@@ -1167,8 +1167,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 	const char *p;
 	while ((p = va_arg(args, const char*))) {
 		/*
-		 * If LUA_SYSPATH or LUA_SYSCPATH is an empty
-		 * string, skip it.
+		 * If MODULE_PATH is an empty string, skip it.
 		 */
 		if (*p == '\0')
 			continue;
@@ -1204,11 +1203,9 @@ tarantool_lua_init()
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s/?.lua", cfg.script_dir);
-	tarantool_lua_setpath(L, "path", path, LUA_LIBPATH,
-	                      LUA_SYSPATH, NULL);
+	tarantool_lua_setpath(L, "path", path, MODULE_LUAPATH, NULL);
 	snprintf(path, sizeof(path), "%s/?.so", cfg.script_dir);
-	tarantool_lua_setpath(L, "cpath", path, LUA_LIBCPATH,
-	                      LUA_SYSCPATH, NULL);
+	tarantool_lua_setpath(L, "cpath", path, MODULE_LIBPATH, NULL);
 
 	/* Loadi 'ffi' extension and make it inaccessible */
 	lua_getglobal(L, "require");
