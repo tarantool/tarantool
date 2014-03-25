@@ -125,7 +125,20 @@ with history support.
 %setup -n @RPM_SOURCE_DIRECTORY_NAME@
 
 %build
-cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_SYSCONF_DIR=/etc -DCMAKE_MAN_DIR=/usr/share/man
+# https://fedoraproject.org/wiki/Packaging:RPMMacros
+cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON \
+    -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir} \
+    -DCMAKE_INSTALL_BINDIR=%{_bindir} \
+    -DCMAKE_INSTALL_LIBDIR=%{_libdir}   \
+    -DCMAKE_INSTALL_LIBEXECDIR=%{_libexecdir} \
+    -DCMAKE_INSTALL_SBINDIR=%{_sbindir} \
+    -DCMAKE_INSTALL_SHAREDSTATEDIR=%{_sharedstatedir} \
+    -DCMAKE_INSTALL_DATADIR=%{_datadir} \
+    -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} \
+    -DCMAKE_INSTALL_INFODIR=%{_infodir} \
+    -DCMAKE_INSTALL_MANDIR=%{_mandir} \
+    -DCMAKE_INSTALL_LOCALSTATEDIR=%{_localstatedir}
 
 make %{?_smp_mflags}
 
@@ -211,28 +224,40 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files sql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.6"
-%dir "/usr/lib/tarantool/1.6/box"
-%dir "/usr/lib/tarantool/1.6/box/net"
-"/usr/lib/tarantool/1.6/box/net/sql.lua"
+%dir "%{_datadir}/tarantool/1.6"
+%dir "%{_datadir}/tarantool/1.6/box"
+%dir "%{_datadir}/tarantool/1.6/box/net"
+"%{_datadir}/tarantool/1.6/box/net/sql.lua"
 
 %files pg-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.6"
-%dir "/usr/lib/tarantool/1.6/box"
-"/usr/lib/tarantool/1.6/box/net/pg.so"
+%dir "%{_libdir}/tarantool/1.6"
+%dir "%{_libdir}/tarantool/1.6/box"
+"%{_libdir}/tarantool/1.6/box/net/pg.so"
 
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.6"
-%dir "/usr/lib/tarantool/1.6/box"
-"/usr/lib/tarantool/1.6/box/net/mysql.so"
+%dir "%{_libdir}/tarantool/1.6"
+%dir "%{_libdir}/tarantool/1.6/box"
+"%{_libdir}/tarantool/1.6/box/net/mysql.so"
 
 %files sophia-module
 %defattr(-,root,root,-)
-%dir "/usr/lib/tarantool/1.6"
-%dir "/usr/lib/tarantool/1.6/box"
-"/usr/lib/tarantool/1.6/box/sophia.so"
+%dir "%{_libdir}/tarantool/1.6"
+%dir "%{_libdir}/tarantool/1.6/box"
+"%{_libdir}/tarantool/1.6/box/sophia.so"
+
+%files dev
+%defattr(-,root,root,-)
+%dir "%{_includedir}/tarantool"
+%dir "%{_includedir}/tarantool/1.6"
+"%{_includedir}/tarantool/1.6/config.h"
+"%{_includedir}/tarantool/1.6/lauxlib.h"
+"%{_includedir}/tarantool/1.6/luaconf.h"
+"%{_includedir}/tarantool/1.6/lua.h"
+"%{_includedir}/tarantool/1.6/lua.hpp"
+"%{_includedir}/tarantool/1.6/luajit.h"
+"%{_includedir}/tarantool/1.6/lualib.h"
 
 %files client
 %defattr(-,root,root,-)

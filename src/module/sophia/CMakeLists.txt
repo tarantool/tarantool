@@ -9,4 +9,4 @@ add_dependencies(sophia libsophia)
 set_target_properties(sophia PROPERTIES PREFIX "")
 target_link_libraries(sophia ${sophia_lib} -rdynamic)
 
-install(TARGETS sophia LIBRARY DESTINATION ${MODULE_DIR}/box)
+install(TARGETS sophia LIBRARY DESTINATION ${MODULE_LIBDIR}/box)

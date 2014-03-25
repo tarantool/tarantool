@@ -53,10 +53,8 @@ if(NOT CMAKE_BUILD_TYPE)
         FORCE)
 endif()
 
-if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
-  set(CMAKE_INSTALL_LIBDIR lib)
-endif(NOT DEFINED CMAKE_INSTALL_LIBDIR)
-
+# Define GNU standard installation directories
+include(GNUInstallDirs)
 
 include(cmake/utils.cmake)
 
@@ -156,37 +154,20 @@ include_directories("${PROJECT_SOURCE_DIR}")
 #
 # Specify Tarantool modules prefixes
 #
-set(MODULE_DIR "${CMAKE_INSTALL_LIBDIR}/tarantool/")
-set(MODULE_DIR "${MODULE_DIR}${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
 
-#
-# Specify prefixes
-#
-if (NOT DEFINED CMAKE_SYSCONF_DIR)
-    set (CMAKE_SYSCONF_DIR "etc")
-endif()
-if (NOT DEFINED CMAKE_LOCALSTATE_DIR)
-    set (CMAKE_LOCALSTATE_DIR "var")
-endif()
-if (NOT DEFINED CMAKE_MAN_DIR)
-    set (CMAKE_MAN_DIR "man")
-endif()
+set(MODULE_SUFFIX "tarantool/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
+set(MODULE_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/${MODULE_SUFFIX}")
+set(MODULE_LUADIR "${CMAKE_INSTALL_FULL_DATADIR}/${MODULE_SUFFIX}")
+set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${MODULE_SUFFIX}")
+message(STATUS "Module sources: ${MODULE_LUADIR}")
+message(STATUS "Module libraries:${MODULE_LIBDIR}")
+message(STATUS "Module includes: ${MODULE_INCLUDEDIR}")
 
-#
-# Specify system-specific Lua prefixes
-#
-if (NOT DEFINED LUA_SYSPATH)
-    set (LUA_SYSPATH "")
-endif()
-if (NOT DEFINED LUA_SYSCPATH)
-    set (LUA_SYSCPATH "")
-endif()
-
-#
-# Specify Tarantool modules Lua prefixes
-#
-set (LUA_LIBPATH  "${LUA_LIBPATH};${MODULE_DIR}/?.lua")
-set (LUA_LIBCPATH "${LUA_LIBCPATH};${MODULE_DIR}/?.so")
+list(APPEND MODULE_LUAPATH "${MODULE_LUADIR}/?.lua")
+list(APPEND MODULE_LUAPATH "${MODULE_LUADIR}/?/init.lua")
+list(APPEND MODULE_LIBPATH "${MODULE_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+message(STATUS "Module package.path: ${MODULE_LUAPATH}")
+message(STATUS "Module package.cpath: ${MODULE_LIBPATH}")
 
 #
 # Now handle all configuration options.
@@ -385,6 +366,8 @@ configure_file(
     "${PROJECT_SOURCE_DIR}/src/trivia/config.h.cmake"
     "${PROJECT_BINARY_DIR}/src/trivia/config.h"
     )
+install(FILES ${PROJECT_BINARY_DIR}/src/trivia/config.h
+    DESTINATION ${MODULE_INCLUDEDIR})
 message (STATUS "")
 message (STATUS "Tarantool configuration is complete:")
 message (STATUS "")
