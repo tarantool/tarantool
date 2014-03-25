@@ -21,7 +21,7 @@ endmacro(install_cfg)
 
 if (ENABLE_RPM)
     install_cfg(rpm ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/)
-    install (FILES ${CMAKE_SOURCE_DIR}/src/src/bootstrap.snap
+    install (FILES ${CMAKE_SOURCE_DIR}/src/bootstrap.snap
              DESTINATION ${CMAKE_INSTALL_DATADIR}/tarantool)
 else()
     if (TARGET_OS_DARWIN)
