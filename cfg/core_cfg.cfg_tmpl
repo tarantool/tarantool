@@ -47,6 +47,9 @@ pid_file="tarantool.pid", ro
 # when logger is not configured all logging going to STDERR
 logger=NULL, ro
 
+#daemonize or not
+background=false,  ro
+
 # make logging nonblocking, this potentially can lose some logging data
 logger_nonblock=true, ro
 

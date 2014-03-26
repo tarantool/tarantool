@@ -15,23 +15,24 @@ print_config()
   slab_alloc_minimal: 64
   admin_port: <number>
   logger: cat - >> tarantool.log
-  snap_io_rate_limit: 0
-  log_level: 5
+  readahead: 16320
+  wal_dir: .
   logger_nonblock: true
+  log_level: 5
   snap_dir: .
   coredump: false
-  primary_port: <number>
-  slab_alloc_arena: 0.1
-  wal_dir: .
+  background: false
+  too_long_threshold: 0.5
+  rows_per_wal: 50
   wal_mode: fsync_delay
-  readahead: 16320
+  snap_io_rate_limit: 0
   panic_on_snap_error: true
   panic_on_wal_error: false
-  rows_per_wal: 50
   local_hot_standby: false
+  slab_alloc_arena: 0.1
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  too_long_threshold: 0.5
+  primary_port: <number>
   wal_dir_rescan_delay: 0.1
 ...
 
@@ -82,10 +83,25 @@ mod.test(10, 15)
 Can't start Tarantool
 ok
 
-# Bug#100 Segmentation fault if rows_per_wal = 1
+# Bug#100 Segmentation fault if rows_per_wal = 0
 #  (https://github.com/tarantool/tarantool/issues/100)
 
-tarantool_box -c tarantool_bug_gh100.cfg
-tarantool_box: can't load config:rows_per_wal must be greater than one.
+Can't start Tarantool
+ok
+#
+# Check that --background  doesn't work if there is no logger
+# This is a test case for
+# https://bugs.launchpad.net/tarantool/+bug/750658
+# "--background neither closes nor redirects stdin/stdout/stderr"
 
+Can't start Tarantool
+ok
+
+# A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
+# longer relative to work_dir".
+# https://bugs.launchpad.net/tarantool/+bug/726778
+# After addition of gopt(), we started to chdir() to the working
+# directory after option parsing.
+# Verify that this is not the case, and snap_dir and xlog_dir
+# can be relative to work_dir.
 

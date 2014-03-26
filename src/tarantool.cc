@@ -78,7 +78,6 @@ char *custom_proc_title;
 char status[64] = "unknown";
 char **main_argv;
 int main_argc;
-static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
@@ -546,8 +545,6 @@ tarantool_free(void)
 		free(shebang);
 	if (cfg_filename_fullpath)
 		free(cfg_filename_fullpath);
-	if (main_opt)
-		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
 	/* unlink pidfile. */
@@ -581,32 +578,61 @@ int
 main(int argc, char **argv)
 {
 #ifndef HAVE_LIBC_STACK_END
-/*
- * GNU libc provides a way to get at the top of the stack. This
- * is, of course, not-standard and doesn't work on non-GNU
- * systems, such as FreeBSD. But as far as we're concerned, argv
- * is at the top of the main thread's stack, so save the address
- * of it.
- */
+	/*
+	 * GNU libc provides a way to get at the top of the stack. This
+	 * is, of course, not-standard and doesn't work on non-GNU
+	 * systems, such as FreeBSD. But as far as we're concerned, argv
+	 * is at the top of the main thread's stack, so save the address
+	 * of it.
+	 */
 	__libc_stack_end = (void*) &argv;
 #endif
-	const char *argv0 = argv[0];
 
-	if (argc > 1 && access(argv[1], R_OK) == 0) {
-		/*
-		 * Support only #!/usr/bin/tarantol but not
-		 * #!/usr/bin/tarantool -a -b because:
-		 * - not all shells support it,
-		 * - those shells that do support it, do not
-		 *   split multiple options, so "-a -b" comes as
-		 *   a single value in argv[1].
-		 * - in case one uses #!/usr/bin/env tarantool
-		 *   such options (in shebang line) don't work
-		 */
-		argv++;
-		argc--;
-		shebang = abspath(argv[0]);
+	if (argc <= 1 || access(argv[1], R_OK) != 0) {
+		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+		if (gopt(opt, 'V')) {
+			printf("Tarantool %s\n", tarantool_version());
+			printf("Target: %s\n", BUILD_INFO);
+			printf("Build options: %s\n", BUILD_OPTIONS);
+			printf("Compiler: %s\n", COMPILER_INFO);
+			printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
+			printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
+			return 0;
+		}
+
+		if (gopt(opt, 'h') || argc == 1) {
+			puts("Tarantool - a Lua application server");
+			puts("");
+			printf("Usage: %s script.lua [OPTIONS]\n",
+			       basename(argv[0]));
+			puts("");
+			puts("All command line options are passed to the interpreted script.");
+			puts("When no script name is provided, the server responds to:");
+			gopt_help(opt_def);
+			puts("");
+			puts("Please visit project home page at http://tarantool.org");
+			puts("to see online documentation, submit bugs or contribute a patch.");
+			return 0;
+		}
+		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
+		exit(EX_USAGE);
 	}
+#ifdef HAVE_BFD
+	symbols_load(argv[0]);
+#endif
+	/*
+	 * Support only #!/usr/bin/tarantol but not
+	 * #!/usr/bin/tarantool -a -b because:
+	 * - not all shells support it,
+	 * - those shells that do support it, do not
+	 *   split multiple options, so "-a -b" comes as
+	 *   a single value in argv[1].
+	 * - in case one uses #!/usr/bin/env tarantool
+	 *   such options (in shebang line) don't work
+	 */
+	argv++;
+	argc--;
+	shebang = abspath(argv[0]);
 
 	random_init();
 	say_init(argv[0]);
@@ -614,41 +640,10 @@ main(int argc, char **argv)
 	crc32_init();
 	memory_init();
 
-#ifdef HAVE_BFD
-	symbols_load(argv0);
-#else
-	(void) argv0;
-#endif
-
 	argv = init_set_proc_title(argc, argv);
 	main_argc = argc;
 	main_argv = argv;
 
-	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
-	main_opt = opt;
-
-	if (gopt(opt, 'V')) {
-		printf("Tarantool %s\n", tarantool_version());
-		printf("Target: %s\n", BUILD_INFO);
-		printf("Build options: %s\n", BUILD_OPTIONS);
-		printf("Compiler: %s\n", COMPILER_INFO);
-		printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
-		printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
-		return 0;
-	}
-
-	if (gopt(opt, 'h')) {
-		puts("Tarantool -- an efficient in-memory data store.");
-		printf("Usage: %s [OPTIONS]\n", basename(argv[0]));
-		puts("");
-		gopt_help(opt_def);
-		puts("");
-		puts("Please visit project home page at http://tarantool.org");
-		puts("to see online documentation, submit bugs or contribute a patch.");
-		return 0;
-	}
-
-	gopt_arg(opt, 'c', &cfg_filename);
 	/*
 	 * if config is not specified trying ./tarantool.cfg then
 	 * /etc/tarantool.cfg
@@ -662,49 +657,10 @@ main(int argc, char **argv)
 	if (cfg_filename != NULL)
 		cfg_filename_fullpath = abspath(cfg_filename);
 
-	cfg.log_level += gopt(opt, 'v');
-
-	if (argc != 1) {
-		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
-		exit(EX_USAGE);
-	}
-
 	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
-
-	if (gopt(opt, 'k')) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 ||
-		    load_cfg(&cfg, 0) != 0) {
-
-			say_error("check_config FAILED%.*s",
-				  (int) cfg_logsize, cfg_log);
-			return 1;
-		}
-		return 0;
-	}
 
 	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
 		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
-	}
-
-	const char *cfg_paramname = NULL;
-
-	if (gopt_arg(opt, 'g', &cfg_paramname)) {
-		tarantool_cfg_iterator_t *i;
-		char *key, *value;
-
-		i = tarantool_cfg_iterator_init();
-		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-			if (strcmp(key, cfg_paramname) == 0 && value != NULL) {
-				printf("%s\n", value);
-				free(value);
-
-				return 0;
-			}
-
-			free(value);
-		}
-
-		return 1;
 	}
 
 	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
@@ -752,12 +708,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (gopt(opt, 'I')) {
-		box_init_storage(cfg.snap_dir);
-		exit(EXIT_SUCCESS);
-	}
-
-	if (gopt(opt, 'B')) {
+	if (cfg.background) {
 		if (cfg.logger == NULL) {
 			say_crit("--background requires 'logger' configuration option to be set");
 			exit(EXIT_FAILURE);

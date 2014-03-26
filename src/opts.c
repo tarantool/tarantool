@@ -32,24 +32,9 @@
 #include <third_party/gopt/gopt.h>
 
 const void *opt_def =
-	gopt_start(gopt_option('g', GOPT_ARG, gopt_shorts(0),
-			       gopt_longs("cfg-get", "cfg_get"),
-			       "=KEY", "return a value from configuration file described by KEY"),
-		   gopt_option('k', 0, gopt_shorts(0),
-			       gopt_longs("check-config"),
-			       NULL, "Check configuration file for errors"),
-		   gopt_option('c', GOPT_ARG, gopt_shorts('c'),
-			       gopt_longs("config"),
-			       "=FILE", "path to configuration file (default: " DEFAULT_CFG_FILENAME ")"),
-		   gopt_option('I', 0, gopt_shorts(0),
-			       gopt_longs("init-storage", "init_storage"),
-			       NULL, "initialize storage (an empty snapshot file) and exit"),
-		   gopt_option('v', 0, gopt_shorts('v'), gopt_longs("verbose"),
-			       NULL, "increase verbosity level in log messages"),
-		   gopt_option('B', 0, gopt_shorts('B'), gopt_longs("background"),
-			       NULL, "redirect input/output streams to a log file and run as daemon"),
+	gopt_start(
 		   gopt_option('h', 0, gopt_shorts('h', '?'), gopt_longs("help"),
 			       NULL, "display this help and exit"),
 		   gopt_option('V', 0, gopt_shorts('V'), gopt_longs("version"),
 			       NULL, "print program version and exit")
-);
+	);

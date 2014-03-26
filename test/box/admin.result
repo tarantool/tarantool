@@ -51,23 +51,24 @@ box.cfg()
   slab_alloc_minimal: 64
   admin_port: <number>
   logger: cat - >> tarantool.log
-  snap_io_rate_limit: 0
-  log_level: 5
+  readahead: 16320
+  wal_dir: .
   logger_nonblock: true
+  log_level: 5
   snap_dir: .
   coredump: false
-  primary_port: <number>
-  slab_alloc_arena: 0.1
-  wal_dir: .
+  background: false
+  too_long_threshold: 0.5
+  rows_per_wal: 50
   wal_mode: fsync_delay
-  readahead: 16320
+  snap_io_rate_limit: 0
   panic_on_snap_error: true
   panic_on_wal_error: false
-  rows_per_wal: 50
   local_hot_standby: false
+  slab_alloc_arena: 0.1
   bind_ipaddr: INADDR_ANY
   wal_fsync_delay: 0
-  too_long_threshold: 0.5
+  primary_port: <number>
   wal_dir_rescan_delay: 0.1
 ...
 box.stat()

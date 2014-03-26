@@ -134,8 +134,8 @@ class State(object):
                 temp.cfgfile_source = self.suite_ini['config']
             if 'need_init' in opts:
                 temp.need_init   = True if opts['need_init'] == 'True' else False
-            if 'init' in opts:
-                temp.init_lua = opts['init'][1:-1]
+            if 'script' in opts:
+                temp.script = opts['script'][1:-1]
             if 'rpl_master' in opts:
                 temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
             elif 'hot_master' in opts:
@@ -177,15 +177,13 @@ class State(object):
             if 'configuration' in opts:
                 temp.reconfigure(opts['configuration'][1:-1], silent = True)
             else:
-                temp.cofnfig = self.suite_ini['config']
-                if temp.init_lua != None:
-                    var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
-                    if os.path.exists(var_init_lua):
-                        os.unlink(var_init_lua)
-                if 'init' in opts:
-                    temp.init_lua = opts['init'][1:-1]
-                    var_init_lua = os.path.join(temp.vardir, temp.default_init_lua_name)
-                    shutil.copy(temp.init_lua, var_init_lua)
+                temp.config = self.suite_ini['config']
+                if temp.script != None:
+                    if os.path.exists(temp.script_dst):
+                        os.unlink(temp.script_dst)
+                if 'script' in opts:
+                    temp.script = opts['script'][1:-1]
+                    shutil.copy(temp.script, temp.script_dst)
                     temp.restart()
             nmsp = Namespace()
             setattr(nmsp, 'admin_port', temp.admin.port)

@@ -78,6 +78,9 @@ typedef struct tarantool_cfg {
 	 */
 	char*	logger;
 
+	/* daemonize or not */
+	confetti_bool_t	background;
+
 	/* make logging nonblocking, this potentially can lose some logging data */
 	confetti_bool_t	logger_nonblock;
 

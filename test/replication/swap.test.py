@@ -20,6 +20,7 @@ master = server
 cfgfile_bkp = server.cfgfile_source
 # replica server
 replica = TarantoolServer()
+replica.script = "replication/replica.lua"
 replica.rpl_master = master
 replica.cfgfile_source = "replication/cfg/replica.cfg"
 replica.vardir = os.path.join(server.vardir, 'replica')
