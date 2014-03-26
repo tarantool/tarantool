@@ -29,11 +29,12 @@
 #include "txn.h"
 #include "tuple.h"
 #include "space.h"
-#include <cfg/tarantool_box_cfg.h>
 #include <tarantool.h>
 #include <recovery.h>
 #include <fiber.h>
 #include "request.h" /* for request_name */
+
+double too_long_threshold;
 
 void
 txn_add_redo(struct txn *txn, struct request *request)
@@ -104,7 +105,7 @@ txn_commit(struct txn *txn)
 			res = wal_write(recovery_state, packet);
 			stop = ev_now(loop());
 
-			if (stop - start > cfg.too_long_threshold) {
+			if (stop - start > too_long_threshold) {
 				say_warn("too long %s: %.3f sec",
 					 iproto_request_name(packet->code),
 					 stop - start);

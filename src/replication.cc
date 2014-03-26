@@ -29,10 +29,6 @@
 #include <replication.h>
 #include <say.h>
 #include <fiber.h>
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
 #include <stddef.h>
 
 #include <stddef.h>
@@ -78,6 +74,9 @@ extern "C" {
  * children and exits.
  */
 static int master_to_spawner_socket;
+static char cfg_wal_dir[PATH_MAX];
+static char cfg_snap_dir[PATH_MAX];
+
 
 /**
  * State of a replica. We only need one global instance
@@ -154,8 +153,10 @@ replication_relay_loop();
 
 /** Pre-fork replication spawner process. */
 void
-replication_prefork()
+replication_prefork(const char *snap_dir, const char *wal_dir)
 {
+	snprintf(cfg_snap_dir, sizeof(cfg_snap_dir), "%s", snap_dir);
+	snprintf(cfg_wal_dir, sizeof(cfg_wal_dir), "%s", wal_dir);
 	int sockpair[2];
 	/*
 	 * Create UNIX sockets to communicate between the main and
@@ -696,7 +697,7 @@ replication_relay_loop()
 	ev_io_start(loop(), &sock_read_ev);
 
 	/* Initialize the recovery process */
-	recovery_init(cfg.snap_dir, cfg.wal_dir,
+	recovery_init(cfg_snap_dir, cfg_wal_dir,
 		      replication_relay_send_row,
 		      NULL, NULL, INT32_MAX);
 	/*

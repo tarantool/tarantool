@@ -39,7 +39,7 @@ struct ev_io;
 /** {{{ Input buffer.
  *
  * Continuous piece of memory to store input.
- * Allocated in factors of cfg.readahead.
+ * Allocated in factors of 'readahead'.
  * Maintains position of the data "to be processed".
  *
  * Typical use case:

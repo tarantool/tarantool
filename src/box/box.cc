@@ -41,6 +41,9 @@ extern "C" {
 #include <log_io.h>
 #include <pickle.h>
 #include <say.h>
+#include <admin.h>
+#include <iproto.h>
+#include <replication.h>
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"
@@ -264,6 +267,14 @@ box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf
 
 		box_enter_master_or_replica_mode(new_conf);
 	}
+	if (old_conf->io_collect_interval !=
+	    new_conf->io_collect_interval)  {
+
+		ev_set_io_collect_interval(loop(),
+					   new_conf->io_collect_interval);
+	}
+	if (old_conf->too_long_threshold != new_conf->too_long_threshold)
+		too_long_threshold = new_conf->too_long_threshold;
 
 	return 0;
 }
@@ -290,6 +301,7 @@ void
 box_init()
 {
 	title("loading", NULL);
+	replication_prefork(cfg.snap_dir, cfg.wal_dir);
 	stat_init();
 
 	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
@@ -321,6 +333,11 @@ box_init()
 		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
 		title("hot_standby", NULL);
 	}
+	iproto_init(cfg.bind_ipaddr, cfg.primary_port, cfg.readahead);
+	admin_init(cfg.bind_ipaddr, cfg.admin_port);
+	if (cfg.io_collect_interval > 0)
+		ev_set_io_collect_interval(loop(), cfg.io_collect_interval);
+	too_long_threshold = cfg.too_long_threshold;
 }
 
 static void

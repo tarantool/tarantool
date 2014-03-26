@@ -45,12 +45,8 @@
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
-#include <admin.h>
-#include <replication.h>
 #include <fiber.h>
 #include <coeio.h>
-#include "iobuf.h"
-#include <iproto.h>
 #include "mutex.h"
 #include <crc32.h>
 #include "memory.h"
@@ -166,16 +162,6 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	return box_check_config(conf);
 }
 
-static int
-core_reload_config(const struct tarantool_cfg *old_conf,
-		   const struct tarantool_cfg *new_conf)
-{
-	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
-		ev_set_io_collect_interval(loop(), new_conf->io_collect_interval);
-
-	return 0;
-}
-
 int
 reload_cfg()
 {
@@ -232,10 +218,6 @@ reload_cfg()
 		out_warning(CNF_OK, "Could not accept read only '%s' option", diff);
 		return -1;
 	}
-
-	/* Process wal-writer-related changes. */
-	if (core_reload_config(&cfg, &new_cfg) != 0)
-		return -1;
 
 	/* Now pass the config to the module, to take action. */
 	if (box_reload_config(&cfg, &new_cfg) != 0)
@@ -710,12 +692,15 @@ main(int argc, char **argv)
 
 	if (cfg.background) {
 		if (cfg.logger == NULL) {
-			say_crit("--background requires 'logger' configuration option to be set");
+			say_crit("'background' requires 'logger' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		if (cfg.pid_file == NULL) {
+			say_crit("'background' requires 'pid_file' configuration option to be set");
 			exit(EXIT_FAILURE);
 		}
 		background();
-	}
-	else {
+	} else {
 		create_pid();
 	}
 
@@ -737,20 +722,16 @@ main(int argc, char **argv)
 	atexit(tarantool_free);
 
 	fiber_init();
-	replication_prefork();
-	iobuf_init(cfg.readahead);
 	coeio_init();
 	signal_init();
+	session_init();
+	tarantool_lua_init();
 
 	bool start_loop = false;
 	try {
-		tarantool_lua_init();
-		box_init();
 		tarantool_lua_load_cfg(&cfg);
 		int events = ev_activecnt(loop());
-		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
-		admin_init(cfg.bind_ipaddr, cfg.admin_port);
-		session_init();
+		box_init();
 		/*
 		 * Load user init script.  The script should have access
 		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
@@ -762,8 +743,6 @@ main(int argc, char **argv)
 		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_crit("entering the event loop");
-			if (cfg.io_collect_interval > 0)
-				ev_set_io_collect_interval(loop(), cfg.io_collect_interval);
 			ev_now_update(loop());
 			start_time = ev_now(loop());
 			signal_start();

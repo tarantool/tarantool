@@ -37,7 +37,7 @@
  * @return None. Panics and exits on error.
  */
 void
-replication_prefork();
+replication_prefork(const char *snap_dir, const char *wal_dir);
 
 /**
  * Subscribe a replica to updates.

@@ -802,8 +802,9 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 /** Initialize a read-write port. */
 void
-iproto_init(const char *bind_ipaddr, int primary_port)
+iproto_init(const char *bind_ipaddr, int primary_port, int readahead)
 {
+	iobuf_init(readahead);
 	/* Run a primary server. */
 	if (primary_port == 0)
 		return;
