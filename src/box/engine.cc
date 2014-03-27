@@ -46,6 +46,9 @@ void EngineFactory::init()
 void EngineFactory::shutdown()
 {}
 
+void EngineFactory::txn_finish(struct txn*)
+{}
+
 Engine::Engine(EngineFactory *f)
 	:factory(f)
 {

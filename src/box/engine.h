@@ -97,6 +97,9 @@ public:
 	 * various limits.
 	 */
 	virtual void key_def_check(struct key_def *key_def) = 0;
+
+	/* Clean transaction engine resources.  */
+	virtual void txn_finish(struct txn *txn);
 public:
 	/** Name of the engine. */
 	const char *name;

@@ -146,7 +146,39 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count) const
 	const char *keyptr = key;
 	mp_next(&keyptr);
 	size_t keysize = keyptr - key;
-	return sophia_gettuple(db, key, keysize);
+	struct tuple *ret = sophia_gettuple(db, key, keysize);
+	return ret;
+}
+
+static inline uint32_t
+sophia_check_dup(struct key_def *key_def,
+                 struct tuple *old_tuple,
+                 struct tuple *dup_tuple, enum dup_replace_mode mode)
+{
+	if (dup_tuple == NULL) {
+		if (mode == DUP_REPLACE) {
+			/*
+			 * dup_replace_mode is DUP_REPLACE, and
+			 * a tuple with the same key is not found.
+			 */
+			return ER_TUPLE_NOT_FOUND;
+		}
+	} else { /* dup_tuple != NULL */
+
+		int equal = old_tuple != NULL &&
+			tuple_compare(dup_tuple, old_tuple, key_def) == 0;
+
+		if (!equal && (old_tuple != NULL || mode == DUP_INSERT)) {
+			/*
+			 * There is a duplicate of new_tuple,
+			 * and it's not old_tuple: we can't
+			 * possibly delete more than one tuple
+			 * at once.
+			 */
+			return ER_TUPLE_FOUND;
+		}
+	}
+	return 0;
 }
 
 struct tuple *
@@ -155,24 +187,31 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 {
 	if (new_tuple) {
 		assert(new_tuple->refs == 0);
-		auto scoped_guard =
-			make_scoped_guard([=] { tuple_ref(new_tuple, 0); });
 
-		switch (mode) {
-		case DUP_REPLACE_OR_INSERT:
-			/* default */
-			break;
-		case DUP_INSERT:
-		case DUP_REPLACE:
-			break;
-		}
 		const char *key = tuple_field(new_tuple, key_def->parts[0].fieldno);
 		const char *keyptr = key;
 		mp_next(&keyptr);
 		size_t keysize = keyptr - key;
+
+		struct tuple *dup_tuple = sophia_gettuple(db, key, keysize);
+
+		uint32_t errcode =
+			sophia_check_dup(key_def, old_tuple, dup_tuple, mode);
+		if (errcode) {
+			if (dup_tuple)
+				tuple_ref(dup_tuple, -1);
+			tnt_raise(ClientError, errcode, index_id(this));
+		}
+
 		int rc = sp_set(db, key, keysize, new_tuple->data, new_tuple->bsize);
-		if (rc == -1)
+		if (rc == -1) {
+			if (dup_tuple)
+				tuple_ref(dup_tuple, -1);
 			tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+		}
+
+		if (dup_tuple)
+			return dup_tuple;
 	}
 
 	if (old_tuple) {
@@ -232,7 +271,7 @@ sophia_iterator_next(struct iterator *ptr)
 	const char *value = sp_value(it->cursor);
 	struct tuple *ret =
 		tuple_new(tuple_format_ber, value, value + valuesize);
-	//tuple_ref(ret, 1);
+	tuple_ref(ret, 1);
 	return ret;
 }
 

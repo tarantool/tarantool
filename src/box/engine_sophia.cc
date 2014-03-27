@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "txn.h"
 #include "tuple.h"
 #include "engine.h"
 #include "engine_sophia.h"
@@ -104,4 +105,11 @@ SophiaFactory::key_def_check(struct key_def *key_def)
 			  (unsigned) key_def->space_id);
 		break;
 	}
+}
+
+void
+SophiaFactory::txn_finish(struct txn *txn)
+{
+	if (txn->new_tuple)
+		tuple_ref(txn->new_tuple, -1);
 }
