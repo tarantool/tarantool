@@ -155,28 +155,6 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 }
 
 /**
- * Redefine lua 'print' built-in to print to the log file
- * When printing to the log file, we use 'say_info'.
- */
-static int
-lbox_print(struct lua_State *L)
-{
-	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *out = tbuf_new(&fiber()->gc);
-	/* serialize arguments of 'print' Lua built-in to tbuf */
-	int top = lua_gettop(L);
-	for (int i = 1; i <= top; i++) {
-		tbuf_printf(out, "%s", tarantool_lua_tostring(L, i));
-		if (i != top) {
-			/* Conventional in Lua print() */
-			tbuf_append(out, "\t", 1);
-		}
-	}
-	say_info("%.*s", out->size, tbuf_str(out));
-	return 0;
-}
-
-/**
  * Redefine lua 'pcall' built-in to correctly handle exceptions,
  * produced by 'box' C functions.
  *
@@ -298,7 +276,6 @@ tarantool_lua_init()
 	luaL_register(L, boxlib_name, boxlib);
 	lua_pop(L, 1);
 
-	lua_register(L, "print", lbox_print);
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
@@ -574,17 +551,17 @@ tarantool_lua_load_cfg(struct tarantool_cfg *cfg)
 }
 
 /**
- * Load start-up file routine.
+ * Execute start-up script.
  */
 static void
-load_init_script(va_list ap)
+run_script(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
 
 	/*
-	 * Return control to tarantool_lua_load_init_script.
-	 * tarantool_lua_load_init_script then will start an auxiliary event
+	 * Return control to tarantool_lua_run_script.
+	 * tarantool_lua_run_script then will start an auxiliary event
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
@@ -605,48 +582,13 @@ load_init_script(va_list ap)
 
 	/*
 	 * Lua script finished. Stop the auxiliary event loop and
-	 * return control back to tarantool_lua_load_init_script.
+	 * return control back to tarantool_lua_run_script.
 	 */
 	ev_break(loop(), EVBREAK_ALL);
 }
 
-#if 0
-/**
- * Unset functions in the Lua state which can be used to
- * execute external programs or otherwise introduce a breach
- * in security.
- *
- * @param L is a Lua State.
- */
-static void
-tarantool_lua_sandbox(struct lua_State *L)
-{
-	/*
-	 * Unset some functions for security reasons:
-	 * 1. Some os.* functions (like os.execute, os.exit, etc..)
-	 * 2. require(), since it can be used to provide access to ffi
-	 * or anything else we unset in 1.
-	 * 3. package, because it can be used to invoke require or to get
-	 * any builtin module using package.loaded
-	 */
-	int result = tarantool_lua_dostring(L,
-					    "os.execute = nil\n"
-					    "os.exit = nil\n"
-					    "os.rename = nil\n"
-					    "os.tmpname = nil\n"
-					    "os.remove = nil\n"
-					    "ffi = nil\n"
-					    "io = nil\n"
-					    "require = nil\n"
-					    "package = nil\n");
-
-	if (result)
-		panic("%s", lua_tostring(L, -1));
-}
-#endif
-
 void
-tarantool_lua_load_init_script(char *path)
+tarantool_lua_run_script(char *path)
 {
 	if (path == NULL)
 		return;
@@ -657,21 +599,14 @@ tarantool_lua_load_init_script(char *path)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_new(basename(path), load_init_script);
+	struct fiber *loader = fiber_new(basename(path), run_script);
 	fiber_call(loader, tarantool_L, path);
 
 	/*
-	 * Run an auxiliary event loop to re-schedule load_init_script fiber.
+	 * Run an auxiliary event loop to re-schedule run_script fiber.
 	 * When this fiber finishes, it will call ev_break to stop the loop.
 	 */
 	ev_run(loop(), 0);
-
-#if 0
-	/* Outside the startup file require() or ffi are not
-	 * allowed.
-	*/
-	tarantool_lua_sandbox(tarantool_L);
-#endif
 }
 
 void

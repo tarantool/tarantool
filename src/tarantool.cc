@@ -69,7 +69,7 @@ extern "C" {
 static pid_t master_pid;
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
-char *shebang = NULL;
+char *script = NULL;
 char *custom_proc_title;
 char status[64] = "unknown";
 char **main_argv;
@@ -523,8 +523,8 @@ tarantool_free(void)
 	tarantool_lua_free();
 	box_free();
 
-	if (shebang)
-		free(shebang);
+	if (script)
+		free(script);
 	if (cfg_filename_fullpath)
 		free(cfg_filename_fullpath);
 	free_proc_title(main_argc, main_argv);
@@ -610,11 +610,11 @@ main(int argc, char **argv)
 	 *   split multiple options, so "-a -b" comes as
 	 *   a single value in argv[1].
 	 * - in case one uses #!/usr/bin/env tarantool
-	 *   such options (in shebang line) don't work
+	 *   such options (in script line) don't work
 	 */
 	argv++;
 	argc--;
-	shebang = abspath(argv[0]);
+	script = abspath(argv[0]);
 
 	random_init();
 	say_init(argv[0]);
@@ -738,7 +738,7 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_load_init_script(shebang);
+		tarantool_lua_run_script(script);
 		start_loop = ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
