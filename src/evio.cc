@@ -38,6 +38,8 @@
 
 #define BIND_RETRY_DELAY 0.1
 
+#pragma clang diagnostic ignored "-Wdeprecated"
+
 /**
  * Try to convert IPv4 or IPv6 addresses from text to binary form.
  * sa buf must be sizeo of sizeof(sockaddr_in6).

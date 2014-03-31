@@ -38,6 +38,8 @@
 #include "coio_buf.h"
 #include "tarantool.h"
 
+#pragma clang diagnostic ignored "-Wdeprecated"
+
 static void
 remote_apply_row(struct recovery_state *r, const char *row, uint32_t rowlne);
 

@@ -53,6 +53,8 @@ extern "C" {
 #include "tbuf.h"
 #include "scoped_guard.h"
 
+#pragma clang diagnostic ignored "-Wdeprecated"
+
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char box_lua[], box_net_lua[], misc_lua[];
 static const char *lua_sources[] = { box_lua, box_net_lua, misc_lua, NULL };
