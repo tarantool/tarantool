@@ -49,6 +49,9 @@ void EngineFactory::shutdown()
 void EngineFactory::txn_finish(struct txn*)
 {}
 
+void EngineFactory::recovery_event(enum engine_recovery_event)
+{}
+
 Engine::Engine(EngineFactory *f)
 	:factory(f)
 {

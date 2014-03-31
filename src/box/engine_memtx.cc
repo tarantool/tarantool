@@ -62,6 +62,7 @@ struct Memtx: public Engine {
  * 2) when all XLOGs are loaded:
  *    recover = space_build_all_keys
 */
+
 static inline void
 memtx_recovery_prepare(struct engine_recovery *r)
 {
@@ -74,6 +75,19 @@ MemtxFactory::MemtxFactory()
 	:EngineFactory("memtx")
 {
 	memtx_recovery_prepare(&recovery);
+}
+
+void
+MemtxFactory::recovery_event(enum engine_recovery_event event)
+{
+	switch (event) {
+	case END_RECOVERY_SNAPSHOT:
+		recovery.recover = space_build_primary_key;
+		break;
+	case END_RECOVERY:
+		recovery.recover = space_build_all_keys;
+		break;
+	}
 }
 
 Engine *MemtxFactory::open()

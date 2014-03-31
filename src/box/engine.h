@@ -58,6 +58,15 @@ enum engine_recovery_state {
 	READY_ALL_KEYS
 };
 
+/**
+ * Engine specific recovery events that represents
+ * global recovery stage change.
+ */
+enum engine_recovery_event {
+	END_RECOVERY_SNAPSHOT,
+	END_RECOVERY
+};
+
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -97,9 +106,10 @@ public:
 	 * various limits.
 	 */
 	virtual void key_def_check(struct key_def *key_def) = 0;
-
 	/* Clean transaction engine resources.  */
 	virtual void txn_finish(struct txn *txn);
+	/* Inform engine about a recovery stage change. */
+	virtual void recovery_event(enum engine_recovery_event);
 public:
 	/** Name of the engine. */
 	const char *name;

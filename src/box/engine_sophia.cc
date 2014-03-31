@@ -48,9 +48,62 @@ Sophia::Sophia(EngineFactory *e)
 	:Engine(e)
 { }
 
+static struct tuple *
+sophia_replace_noop(struct space*,
+                    struct tuple*, struct tuple*,
+                    enum dup_replace_mode)
+{
+	return NULL;
+}
+
+#if 0
+static void
+sophia_build_secondary_keys(struct space *space)
+{
+	engine_recovery *r = &space->engine->recovery;
+	r->state = READY_ALL_KEYS;
+	/* enable replace */
+	r->replace = space_replace_primary_key;
+	r->recover = space_noop;
+}
+#endif
+
+static void
+sophia_end_build_primary_key(struct space *space)
+{
+	engine_recovery *r = &space->engine->recovery;
+	/*
+	r->state   = READY_PRIMARY_KEY;
+	r->replace = sophia_replace_noop;
+	r->recover = sophia_build_secondary_keys;
+	*/
+	/* enable replace */
+	r->state = READY_ALL_KEYS;
+	r->replace = space_replace_primary_key;
+	r->recover = space_noop;
+}
+
+static void
+sophia_begin_build_primary_key(struct space *space)
+{
+	engine_recovery *r = &space->engine->recovery;
+	r->replace = sophia_replace_noop;
+	r->recover = sophia_end_build_primary_key;
+}
+
+static inline void
+sophia_recovery_prepare(struct engine_recovery *r)
+{
+	r->state   = READY_NO_KEYS;
+	r->recover = sophia_begin_build_primary_key;
+	r->replace = space_replace_no_keys;
+}
+
 SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
-{ }
+{
+	sophia_recovery_prepare(&recovery);
+}
 
 void
 SophiaFactory::init()
@@ -62,6 +115,21 @@ Engine*
 SophiaFactory::open()
 {
 	return new Sophia(this);
+}
+
+void
+SophiaFactory::recovery_event(enum engine_recovery_event event)
+{
+	switch (event) {
+	case END_RECOVERY_SNAPSHOT:
+		recovery.replace = sophia_replace_noop;
+		break;
+	case END_RECOVERY:
+		recovery.state   = READY_NO_KEYS;
+		recovery.replace = space_replace_primary_key;
+		recovery.recover = space_noop;
+		break;
+	}
 }
 
 Index*
