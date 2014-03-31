@@ -12,7 +12,7 @@ lua dump = function(v) return box.cjson.encode(v) end
 lua connect = {}
 ---
 ...
-lua for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end
+lua for tk in string.gmatch(os.getenv('PG')..':', '(.-):') do table.insert(connect, tk) end
 ---
 ...
 lua c = box.net.sql.connect('pg', unpack(connect))
