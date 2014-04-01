@@ -271,9 +271,9 @@ Tarantool 1.4.0-69-g45551dd
           <entry>""</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>A directory where write ahead log (.xlog) files are stored.
+          <entry>A directory where write-ahead log (.xlog) files are stored.
           Can be relative to work_dir. Most commonly used so
-          that snapshot files and write ahead log files
+          that snapshot files and write-ahead log files
           can be stored on separate disks.
           If not specified, defaults to work_dir.</entry>
         </row>
@@ -315,21 +315,10 @@ Tarantool 1.4.0-69-g45551dd
           <entry>The read/write data port.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
-          in the configuration file. Normally set to 33013.
+          in the configuration file. Normally set to 3301.
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.</entry>
-        </row>
-
-        <row>
-          <entry xml:id="secondary_port"
-            xreflabel="secondary_port">secondary_port</entry>
-          <entry>integer</entry>
-          <entry>none</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>Additional, read-only port. Normally set to
-          33014. Not used unless is set.</entry>
         </row>
 
         <row>
@@ -370,11 +359,11 @@ Tarantool 1.4.0-69-g45551dd
              ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary pri: 33013 sec: 33014 adm: 33015</programlisting>
+tarantool_box: primary pri: 3301 adm: 33015</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
           the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting>
+tarantool_box: primary@sessions pri: 3301 adm: 33015</programlisting>
           </entry>
         </row>
 
@@ -446,22 +435,6 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           and the distribution of item sizes.</entry>
         </row>
 
-        <row>
-          <entry>space</entry>
-          <entry>array of objects</entry>
-          <entry>none</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry><emphasis role="strong">no</emphasis></entry>
-          <entry>This is the main Tarantool parameter, describing
-          the data structure that users get access to via the
-          client/server protocol. It holds an array of
-          entries, and each entry describes a tuple set
-          and its indexes. Every entry is a composite object,
-          best seen as a C programming language "struct"
-          <footnote><xi:include href="space.xml"/></footnote>.
-          </entry>
-        </row>
-
       </tbody>
     </tgroup>
   </table>
@@ -501,7 +474,7 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           <entry>false</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>If there is an error reading a write ahead
+          <entry>If there is an error reading a write-ahead
           log file (at server start), abort.</entry>
         </row>
 
@@ -511,8 +484,8 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
           <entry>500000</entry>
           <entry>no</entry>
           <entry>no</entry>
-          <entry>How many log records to store in a single write
-          ahead log file. When this limit is reached, Tarantool
+          <entry>How many log records to store in a single
+          write-ahead log file. When this limit is reached, Tarantool
           creates another WAL file named
           <filename>&lt;first-lsn-in-wal&gt;.xlog</filename>
           This can be useful for simple rsync-based backups.
@@ -535,12 +508,12 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
         </row>
 
         <row>
-        <entry>wal_fsync_delay</entry>
+        <entry xml:id="wal_fsync_delay" xreflabel="wal_fsync_delay">wal_fsync_delay</entry>
         <entry>float</entry>
         <entry>0</entry>
         <entry>no</entry>
         <entry>yes</entry>
-        <entry>Do not flush the write ahead log to disk more often
+        <entry>Do not flush the write-ahead log to disk more often
           than once in wal_fsync_delay seconds. By default the
           delay is zero, which means there is no flushing after writes
           (the meaning of wal_fsync_delay=0 may change in later versions).
@@ -559,8 +532,8 @@ tarantool_box: primary@sessions pri: 33013 sec: 33014 adm: 33015</programlisting
             <entry>no</entry>
             <entry>yes</entry>
             <entry>Specify fiber-WAL-disk synchronization mode as:
-                <emphasis>none:</emphasis> write ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
-                be written to the write ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
+                <emphasis>none:</emphasis> write-ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
+                be written to the write-ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
                 fibers wait for their data, fsync(2) follows each write(2);
                 <emphasis>fsync_delay</emphasis>: fibers wait for their
                 data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>

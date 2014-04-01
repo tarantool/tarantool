@@ -1,15 +1,10 @@
 tarantool_box --help
-Tarantool -- an efficient in-memory data store.
-Usage: tarantool_box [OPTIONS]
+Tarantool - a Lua application server
 
-      --cfg-get=KEY                return a value from configuration file described by
-                                   KEY
-      --check-config               Check configuration file for errors
-  -c, --config=FILE                path to configuration file (default: tarantool.cfg)
-      --init-storage               initialize storage (an empty snapshot file) and exit
-  -v, --verbose                    increase verbosity level in log messages
-  -B, --background                 redirect input/output streams to a log file and run as
-                                   daemon
+Usage: tarantool_box script.lua [OPTIONS]
+
+All command line options are passed to the interpreted script.
+When no script name is provided, the server responds to:
   -h, --help                       display this help and exit
   -V, --version                    print program version and exit
 
@@ -17,24 +12,17 @@ Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
 tarantool_box -h
-Tarantool -- an efficient in-memory data store.
-Usage: tarantool_box [OPTIONS]
+Tarantool - a Lua application server
 
-      --cfg-get=KEY                return a value from configuration file described by
-                                   KEY
-      --check-config               Check configuration file for errors
-  -c, --config=FILE                path to configuration file (default: tarantool.cfg)
-      --init-storage               initialize storage (an empty snapshot file) and exit
-  -v, --verbose                    increase verbosity level in log messages
-  -B, --background                 redirect input/output streams to a log file and run as
-                                   daemon
+Usage: tarantool_box script.lua [OPTIONS]
+
+All command line options are passed to the interpreted script.
+When no script name is provided, the server responds to:
   -h, --help                       display this help and exit
   -V, --version                    print program version and exit
 
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
-
-tarantool_box --cfg-get=custom_proc_title
 
 tarantool_box -Z
 tarantool_box: -Z: unknown option
@@ -44,30 +32,6 @@ tarantool_box: --no-such-option: unknown option
 
 tarantool_box --version --no-such-option
 tarantool_box: --no-such-option: unknown option
-
-tarantool_box --config
-tarantool_box: --config: option requires an option argument
-
-tarantool_box -c
-tarantool_box: -c: option requires an option argument
-
-tarantool_box --config tarantool.cfg
-tarantool_box: the daemon is already running
-
-tarantool_box --daemonize
-tarantool_box: --daemonize: unknown option
-
-tarantool_box --background
-tarantool_box: the daemon is already running
-
-#
-# Check that --background  doesn't work if there is no logger
-# This is a test case for
-# https:tarantool/+bug/750658
-# "--background neither closes nor redirects stdin/stdout/stderr"
-#
-tarantool_box --config=tarantool_bug750658.cfg --background
-tarantool_box: --background requires 'logger' configuration option to be set
 
 tarantool_box --version
 Tarantool 1.minor.patch-<rev>-<commit>
@@ -84,24 +48,4 @@ Build options: flags
 Compiler: cc
 C_FLAGS: flags
 CXX_FLAGS: flags
-
-#
-# A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
-# longer relative to work_dir".
-# https://bugs.launchpad.net/tarantool/+bug/726778
-# After addition of gopt(), we started to chdir() to the working
-# directory after option parsing.
-# Verify that this is not the case, and snap_dir and xlog_dir
-# can be relative to work_dir.
-
-tarantool_box --config=bug726778.cfg --init-storage
-tarantool_box: saving snapshot `snapshots/00000000000000000001.snap'
-tarantool_box: done
-
-#
-# A test case for Bug#897162, cat command should
-# not require a configuration file.
-
-tarantool_box --config=nonexists.cfg --cat=nonexists.xlog
-tarantool_box: --cat: unknown option
 

@@ -109,7 +109,8 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 					    request->tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	enum dup_replace_mode mode = dup_replace_mode(request->type);
+	enum dup_replace_mode mode = dup_replace_mode(request->code);
+
 	txn_add_redo(txn, request);
 	txn_replace(txn, space, NULL, new_tuple, mode);
 }
@@ -225,33 +226,31 @@ execute_auth(struct request *request, struct txn * /* txn */,
 /** }}} */
 
 void
-request_check_type(uint32_t type)
+request_check_code(uint32_t code)
 {
-	if (type < IPROTO_SELECT || type >= IPROTO_DML_REQUEST_MAX)
-		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
+	if (code < IPROTO_SELECT || code >= IPROTO_DML_REQUEST_MAX)
+		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, code);
 }
 
 void
-request_create(struct request *request, uint32_t type)
+request_create(struct request *request, uint32_t code)
 {
-	request_check_type(type);
+	request_check_code(code);
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete, box_lua_call,
 		execute_auth,
 	};
 	memset(request, 0, sizeof(*request));
-	request->type = type;
-	request->execute = execute_map[type];
+	request->execute = execute_map[code];
+	request->code = code;
 }
 
 void
 request_decode(struct request *request, const char *data, uint32_t len)
 {
-	assert(request->type != 0);
+	assert(request->execute != NULL);
 	const char *end = data + len;
-	request->data = data;
-	request->len = len;
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
@@ -305,16 +304,15 @@ error:
 #endif
 }
 
-void
-request_encode(struct request *request)
+int
+request_encode(struct request *request, struct iovec *iov)
 {
-	assert(request->data == NULL);
+	int iovcnt = 1;
 	const int HEADER_LEN_MAX = 32;
-	uint32_t tuple_len = request->tuple_end - request->tuple;
 	uint32_t key_len = request->key_end - request->key;
-	uint32_t len = HEADER_LEN_MAX + tuple_len + key_len;
-	request->data = (char *) region_alloc(&fiber()->gc, len);
-	char *d = (char *) request->data + 1; /* Skip 1 byte for MP_MAP */
+	uint32_t len = HEADER_LEN_MAX + key_len;
+	char *data = (char *) region_alloc(&fiber()->gc, len);
+	char *d = (char *) data + 1; /* Skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (true) {
 		d = mp_encode_uint(d, IPROTO_SPACE_ID);
@@ -334,11 +332,16 @@ request_encode(struct request *request)
 	}
 	if (request->tuple) {
 		d = mp_encode_uint(d, IPROTO_TUPLE);
-		memcpy(d, request->tuple, tuple_len);
-		d += tuple_len;
+		iov[1].iov_base = (void *) request->tuple;
+		iov[1].iov_len = (request->tuple_end - request->tuple);
+		iovcnt = 2;
 		map_size++;
 	}
-	request->len = (d - request->data);
-	assert(request->len <= len);
-	mp_encode_map((char *) request->data, map_size);
+
+	assert(d <= data + len);
+	mp_encode_map(data, map_size);
+	iov[0].iov_base = data;
+	iov[0].iov_len = (d - data);
+
+	return iovcnt;
 }

@@ -77,9 +77,10 @@ struct iproto_request
 	struct session *session;
 	iproto_request_f process;
 	/* Request message code and sync. */
-	uint32_t header[2];
+	struct iproto_packet packet;
 	/* Box request, if this is a DML */
 	struct request request;
+	size_t total_len;
 };
 
 struct mempool iproto_request_pool;
@@ -383,18 +384,6 @@ iproto_connection_close(struct iproto_connection *con)
 	close(fd);
 }
 
-static inline void
-iproto_validate_header(uint32_t len)
-{
-	if (len > IPROTO_BODY_LEN_MAX) {
-		/*
-		 * The package is too big, just close connection for now to
-		 * avoid DoS.
-		 */
-		tnt_raise(IllegalParams, "received packet is too big");
-	}
-}
-
 /**
  * If there is no space for reading input, we can do one of the
  * following:
@@ -468,73 +457,24 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	return newbuf;
 }
 
-
-int64_t
-subscribe_request_decode(const char *begin, const char *end)
-{
-	const char *pos = begin;
-	if (mp_check(&pos, end))
-		goto error;
-	if (mp_typeof(*begin) != MP_MAP)
-		goto error;
-	mp_decode_map(&begin);
-	/* Key */
-	if (mp_typeof(*begin) != MP_UINT)
-		goto error;
-	mp_decode_uint(&begin);
-	/* Value */
-	if (mp_typeof(*begin) != MP_UINT)
-		goto error;
-	return mp_decode_uint(&begin);
-error:
-	tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe request body");
-}
-
-static inline void
-iproto_decode_header(const char **pos, const char *end, uint32_t *keys)
-{
-	/* Only a small map can be here. */
-	if (mp_typeof(**pos) != MP_MAP || mp_check_map(*pos, end) > 0) {
-error:
-		tnt_raise(ClientError,
-			  ER_INVALID_MSGPACK, "packet header");
-	}
-	uint32_t size = mp_decode_map(pos);
-	for (int i = 0; i < size; i++) {
-
-		if (! iproto_header_has_key(*pos, end)) {
-			mp_check(pos, end);
-			mp_check(pos, end);
-			continue;
-		}
-
-		unsigned char key = mp_decode_uint(pos);
-
-		if (mp_typeof(**pos) != MP_UINT ||
-		    mp_check_uint(*pos, end) > 0)
-			goto error;
-
-		keys[key] = mp_decode_uint(pos);
-	}
-}
-
 static void
 iproto_process_admin(struct iproto_request *ireq,
-		     struct iproto_connection *con,
-		     const char *body, const char *end)
+		     struct iproto_connection *con)
 {
-	switch (ireq->header[IPROTO_CODE]) {
+	switch (ireq->packet.code) {
 	case IPROTO_PING:
-		iproto_reply_ping(&ireq->iobuf->out,
-				  ireq->header[IPROTO_SYNC]);
+		iproto_reply_ping(&ireq->iobuf->out, ireq->packet.sync);
 		break;
 	case IPROTO_SUBSCRIBE:
-		subscribe(con->input.fd,
-			  subscribe_request_decode(body, end));
+		if (ireq->packet.bodycnt != 0) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "subscribe request body");
+		}
+		subscribe(con->input.fd, ireq->packet.lsn, ireq->packet.sync);
 		tnt_raise(IprotoConnectionShutdown);
 	default:
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			  (uint32_t) ireq->header[IPROTO_CODE]);
+			   (uint32_t) ireq->packet.code);
 	}
 	if (! ev_is_active(&con->output))
 		ev_feed_event(con->loop, &con->output, EV_WRITE);
@@ -556,7 +496,8 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		if (mp_check_uint(pos, in->end) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
-		iproto_validate_header(len);
+
+		/* Skip fixheader */
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
@@ -564,25 +505,32 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			iproto_request_new(con, iproto_process_dml);
 		IprotoRequestGuard guard(ireq);
 
-		ireq->header[IPROTO_CODE] = ireq->header[IPROTO_SYNC] = 0;
-		iproto_decode_header(&pos, reqend, ireq->header);
+		iproto_packet_decode(&ireq->packet, &pos, reqend);
+		ireq->total_len = pos - reqstart; /* total request length */
+
 		/*
 		 * sic: in case of exception con->parse_size
 		 * as well as in->pos must not be advanced, to
 		 * stay in sync.
 		 */
-		if (iproto_request_is_dml(ireq->header[IPROTO_CODE])) {
-			request_create(&ireq->request,
-				       ireq->header[IPROTO_CODE]);
-			request_decode(&ireq->request, pos, reqend - pos);
+		if (iproto_request_is_dml(ireq->packet.code)) {
+			if (ireq->packet.bodycnt == 0) {
+				tnt_raise(IllegalParams,
+					  "Invalid MsgPack - invalid request");
+			}
+			request_create(&ireq->request, ireq->packet.code);
+			pos = (const char *) ireq->packet.body[0].iov_base;
+			request_decode(&ireq->request, pos,
+				       ireq->packet.body[0].iov_len);
+			ireq->request.packet = &ireq->packet;
 			iproto_queue_push(&request_queue, guard.release());
-			/* Request header can be discarded. */
-			in->pos += pos - reqstart;
-	        } else {
-			iproto_process_admin(ireq, con, pos, reqend);
+			/* Request will be discarded in iproto_process_dml */
+		} else {
+			iproto_process_admin(ireq, con);
 			/* Entire request can be discarded. */
-			in->pos += reqend - reqstart;
+			in->pos += ireq->packet.body[0].iov_len;
 		}
+
 		/* Request is parsed */
 		con->parse_size -= reqend - reqstart;
 		if (con->parse_size == 0)
@@ -723,7 +671,8 @@ iproto_process_dml(struct iproto_request *ireq)
 	struct iproto_connection *con = ireq->connection;
 
 	auto scope_guard = make_scoped_guard([=]{
-		iobuf->in.pos += ireq->request.len;
+		/* Discard request (see iproto_enqueue_batch()) */
+		iobuf->in.pos += ireq->total_len;
 
 		if (evio_is_active(&con->output)) {
 			if (! ev_is_active(&con->output))
@@ -741,13 +690,13 @@ iproto_process_dml(struct iproto_request *ireq)
 	struct obuf *out = &iobuf->out;
 
 	struct iproto_port port;
-	iproto_port_init(&port, out, ireq->header[IPROTO_SYNC]);
+	iproto_port_init(&port, out, ireq->packet.sync);
 	try {
 		box_process((struct port *) &port, &ireq->request);
 	} catch (ClientError *e) {
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
-		iproto_reply_error(out, e, ireq->header[IPROTO_SYNC]);
+		iproto_reply_error(out, e, ireq->packet.sync);
 	}
 }
 
@@ -793,8 +742,9 @@ iproto_process_connect(struct iproto_request *request)
 		con->session = session_create(fd, con->cookie);
 		coio_write(&con->input, iproto_greeting(con->session->salt),
 			   IPROTO_GREETING_SIZE);
+		trigger_run(&session_on_connect, NULL);
 	} catch (ClientError *e) {
-		iproto_reply_error(&iobuf->out, e, request->header[IPROTO_SYNC]);
+		iproto_reply_error(&iobuf->out, e, request->packet.code);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
 		} catch (Exception *e) {
@@ -852,8 +802,9 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 /** Initialize a read-write port. */
 void
-iproto_init(const char *bind_ipaddr, int primary_port)
+iproto_init(const char *bind_ipaddr, int primary_port, int readahead)
 {
+	iobuf_init(readahead);
 	/* Run a primary server. */
 	if (primary_port == 0)
 		return;

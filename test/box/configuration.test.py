@@ -13,18 +13,17 @@ print """
 # stop current server
 server.stop()
 
-cfgfile_bkp = server.cfgfile_source
+old_cfgfile = server.cfgfile_source
 server.cfgfile_source = "box/tarantool_bug876541.cfg"
 server.deploy()
 # check values
 admin("box.cfg.wal_fsync_delay")
 
 server.stop()
-old_binary = server.binary
-server.cfgfile_source = "box/tarantool_scriptdir.cfg"
-server.shebang = "box/lua/test_init.lua"
+server.cfgfile_source = old_cfgfile
+old_script = server.script
+server.script = "box/lua/test_init.lua"
 server.deploy()
-os.chmod(server.init_lua, 0744)
 sys.stdout.push_filter("admin_port: .*", "admin_port: <number>")
 sys.stdout.push_filter("primary_port: .*", "primary_port: <number>")
 admin("print_config()")
@@ -50,45 +49,94 @@ print """
 admin("floor(0.5)")
 admin("floor(0.9)")
 admin("floor(1.1)")
+server.stop()
+server.script = old_script
 
 # Test script_dir + require
-server.stop()
-server.shebang = "box/lua/require_init.lua"
+old_script = server.script
+server.script = "box/lua/require_init.lua"
 server.lua_libs.append("box/lua/require_mod.lua")
-server.cfgfile_source = "box/tarantool_scriptdir.cfg"
 server.deploy()
 server.lua_libs.pop()
 admin("mod.test(10, 15)")
+server.stop()
+server.script = old_script
 
-sys.stdout.pop_filter()
 
 print """
 # Bug#99 Salloc initialization is not checked on startup
 #  (https://github.com/tarantool/tarantool/issues/99)
 """
-# stop current server
-server.stop()
-
-# Restore the old binary
-self.shebang=None
+old_cfgfile = server.cfgfile_source
+server.cfgfile_source="box/tarantool_bug_gh-99.cfg"
 try:
-    server.cfgfile_source="box/tarantool_bug_gh-99.cfg"
+    server.deploy()
+except OSError as e:
+    print e
+    print("ok")
+server.stop()
+server.cfgfile_source = old_cfgfile
+
+print """
+# Bug#100 Segmentation fault if rows_per_wal = 0
+#  (https://github.com/tarantool/tarantool/issues/100)
+"""
+old_cfgfile = server.cfgfile_source
+server.cfgfile_source = "box/tarantool_bug_gh100.cfg"
+try:
+    server.deploy()
+except OSError as e:
+    print e
+    print("ok")
+server.stop()
+server.cfgfile_source = old_cfgfile
+print """#
+# Check that --background  doesn't work if there is no logger
+# This is a test case for
+# https://bugs.launchpad.net/tarantool/+bug/750658
+# "--background neither closes nor redirects stdin/stdout/stderr"
+"""
+old_cfgfile = server.cfgfile_source
+server.cfgfile_source = "box/tarantool_bug750658.cfg"
+try:
     server.deploy()
 except OSError as e:
     print e
     print("ok")
 
-print """
-# Bug#100 Segmentation fault if rows_per_wal = 1
-#  (https://github.com/tarantool/tarantool/issues/100)
-"""
-# stop current server
 server.stop()
+server.cfgfile_source = old_cfgfile
+print """
+# A test case for Bug#726778 "Gopt broke wal_dir and snap_dir: they are no
+# longer relative to work_dir".
+# https://bugs.launchpad.net/tarantool/+bug/726778
+# After addition of gopt(), we started to chdir() to the working
+# directory after option parsing.
+# Verify that this is not the case, and snap_dir and xlog_dir
+# can be relative to work_dir.
+"""
+import shutil
+vardir = server.vardir
+shutil.rmtree(os.path.join(vardir, "bug726778"), True)
+os.mkdir(os.path.join(vardir, "bug726778"))
+os.mkdir(os.path.join(vardir, "bug726778/snapshots"))
+os.mkdir(os.path.join(vardir, "bug726778/xlogs"))
+
 sys.stdout.push_filter("(/\S+)+/tarantool", "tarantool")
-server.test_option("-c " + os.path.join(os.getcwd(), "box/tarantool_bug_gh100.cfg"))
-sys.stdout.pop_filter()
+sys.stdout.push_filter(".*(P|p)lugin.*", "")
+sys.stdout.push_filter(".*shared.*", "")
+old_cfgfile = server.cfgfile_source
+old_logfile = server.logfile
+# make sure deploy() looks for start message in a correct
+# place
+server.logfile = os.path.join(vardir, "bug726778/tarantool.log")
+server.cfgfile_source = "box/bug726778.cfg"
+server.deploy()
+sys.stdout.clear_all_filters()
+server.stop()
+shutil.rmtree(os.path.join(vardir, "bug726778"))
+server.cfgfile_source = old_cfgfile
+server.logfile = old_logfile
 
 # restore default server
-server.shebang = None
-server.cfgfile_source = cfgfile_bkp
 server.deploy()

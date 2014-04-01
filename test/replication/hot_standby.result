@@ -1,5 +1,5 @@
---# create server hot_standby with configuration='replication/cfg/hot_standby.cfg' with hot_master=default
---# create server replica with configuration='replication/cfg/replica.cfg' with rpl_master=default
+--# create server hot_standby with configuration='replication/cfg/hot_standby.cfg', hot_master=default, script='replication/master.lua'
+--# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default, script='replication/replica.lua'
 --# start server hot_standby
 --# start server replica
 --# set connection default

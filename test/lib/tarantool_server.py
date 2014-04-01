@@ -196,7 +196,7 @@ class ValgrindMixin(Mixin):
                 --gen-suppressions=all --leak-check=full \
                 --read-var-info=yes --quiet {bin}".format(log = self.valgrind_log,
                                                         sup = self.valgrind_sup,
-                                                        bin = self.init_lua if self.shebang else self.binary))
+                                                        bin = self.script_dst if self.script else self.binary))
 
     def wait_stop(self):
         return self.process.wait()
@@ -220,7 +220,7 @@ class GdbMixin(Mixin):
         color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
         return shlex.split("screen -dmS {0} gdb {1} -ex \
                 \'b main\' -ex \'run >> {2} 2>> {2}\'".format(self.default_gdb['name'],
-                                                       self.init_lua if self.shebang else self.binary,
+                                                       self.script_dst if self.script else self.binary,
                                                        self.logfile))
 
     def wait_stop(self):
@@ -232,7 +232,6 @@ class TarantoolServer(Server):
             "bin":       "tarantool_box",
             "config":    "tarantool.cfg",
             "logfile":   "tarantool.log",
-            "init":           "init.lua",
             "pidfile":         "box.pid",
             "name":            "default"}
     generate_ports = [
@@ -307,8 +306,8 @@ class TarantoolServer(Server):
         self._builddir = os.path.abspath(val)
 
     @property
-    def init_lua(self):
-        return os.path.join(self.vardir, self.default_tarantool['init'])
+    def script_dst(self):
+        return os.path.join(self.vardir, os.path.basename(self.script))
 
     @property
     def logfile_pos(self):
@@ -320,16 +319,16 @@ class TarantoolServer(Server):
         self._logfile_pos.positioning()
 
     @property
-    def shebang(self):
-        if not hasattr(self, '_shebang'): self._shebang = None
-        return self._shebang
-    @shebang.setter
-    def shebang(self, val):
+    def script(self):
+        if not hasattr(self, '_script'): self._script = None
+        return self._script
+    @script.setter
+    def script(self, val):
         if val is None:
-            if hasattr(self, '_shebang'):
-                delattr(self, '_shebang')
+            if hasattr(self, '_script'):
+                delattr(self, '_script')
             return
-        self._shebang = os.path.abspath(val)
+        self._script = os.path.abspath(val)
 
     @property
     def _admin(self):
@@ -419,13 +418,14 @@ class TarantoolServer(Server):
             'config': None,
             'core': 'tarantool',
             'gdb': False,
-            'shebang': None,
+            'script': None,
             'lua_libs': [],
             'random_ports': True,
             'valgrind': False,
             'vardir': None,
             'start_and_exit': False
-        }; ini.update(_ini)
+        }
+        ini.update(_ini)
         Server.__init__(self, ini)
         self.generated_fields = self.generate_ports + self.generated_props
         self.testdir = os.path.abspath(os.curdir)
@@ -439,7 +439,7 @@ class TarantoolServer(Server):
         self.cfgfile_source = ini['config']
         self.core = ini['core']
         self.gdb = ini['gdb']
-        self.shebang = ini['shebang']
+        self.script = ini['script']
         self.lua_libs = ini['lua_libs']
         self.random_ports = ini['random_ports']
         self.valgrind = ini['valgrind']
@@ -527,20 +527,20 @@ class TarantoolServer(Server):
         TarantoolConfig(self.cfgfile).generate(basic)
 
     def copy_files(self):
-        if self.shebang:
-            shutil.copy(self.shebang, self.init_lua)
-            os.chmod(self.init_lua, 0777)
+        if self.script:
+            shutil.copy(self.script, self.script_dst)
+            os.chmod(self.script_dst, 0777)
         if self.lua_libs:
             for i in self.lua_libs:
                 source = os.path.join(self.testdir, i)
                 shutil.copy(source, self.vardir)
 
     def prepare_args(self):
-        return shlex.split(self.init_lua if self.shebang else self.binary)
+        return shlex.split(self.script_dst if self.script else self.binary)
 
     def start_and_exit(self):
         color_stdout('Starting the server {0} on ports {1} ...\n'.format(
-            os.path.basename(self.binary) if not self.shebang else self.shebang,
+            os.path.basename(self.binary) if not self.script else self.script_dst,
             ', '.join([': '.join([str(j) for j in i]) for i in self.conf.items() if i[0].find('port') != -1])
             ), schema='serv_text')
         with daemon.DaemonContext():
@@ -555,7 +555,7 @@ class TarantoolServer(Server):
         if not silent or self._start_and_exit:
             color_stdout("Starting the server ...\n", schema='serv_text')
             color_stdout("Starting ", schema='serv_text')
-            color_stdout((os.path.basename(self.binary) if not self.shebang else self.shebang) + " \n", schema='path')
+            color_stdout((os.path.basename(self.binary) if not self.script else self.script_dst) + " \n", schema='path')
             color_stdout(self.version() + "\n", schema='version')
 
         check_port(self.conf['admin_port'])

@@ -45,12 +45,8 @@
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
-#include <admin.h>
-#include <replication.h>
 #include <fiber.h>
 #include <coeio.h>
-#include "iobuf.h"
-#include <iproto.h>
 #include "mutex.h"
 #include <crc32.h>
 #include "memory.h"
@@ -73,12 +69,11 @@ extern "C" {
 static pid_t master_pid;
 const char *cfg_filename = NULL;
 char *cfg_filename_fullpath = NULL;
-char *shebang = NULL;
+char *script = NULL;
 char *custom_proc_title;
 char status[64] = "unknown";
 char **main_argv;
 int main_argc;
-static void *main_opt = NULL;
 struct tarantool_cfg cfg;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
@@ -167,16 +162,6 @@ load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
 	return box_check_config(conf);
 }
 
-static int
-core_reload_config(const struct tarantool_cfg *old_conf,
-		   const struct tarantool_cfg *new_conf)
-{
-	if (old_conf->io_collect_interval != new_conf->io_collect_interval)
-		ev_set_io_collect_interval(loop(), new_conf->io_collect_interval);
-
-	return 0;
-}
-
 int
 reload_cfg()
 {
@@ -233,10 +218,6 @@ reload_cfg()
 		out_warning(CNF_OK, "Could not accept read only '%s' option", diff);
 		return -1;
 	}
-
-	/* Process wal-writer-related changes. */
-	if (core_reload_config(&cfg, &new_cfg) != 0)
-		return -1;
 
 	/* Now pass the config to the module, to take action. */
 	if (box_reload_config(&cfg, &new_cfg) != 0)
@@ -542,12 +523,10 @@ tarantool_free(void)
 	tarantool_lua_free();
 	box_free();
 
-	if (shebang)
-		free(shebang);
+	if (script)
+		free(script);
 	if (cfg_filename_fullpath)
 		free(cfg_filename_fullpath);
-	if (main_opt)
-		gopt_free(main_opt);
 	free_proc_title(main_argc, main_argv);
 
 	/* unlink pidfile. */
@@ -581,32 +560,61 @@ int
 main(int argc, char **argv)
 {
 #ifndef HAVE_LIBC_STACK_END
-/*
- * GNU libc provides a way to get at the top of the stack. This
- * is, of course, not-standard and doesn't work on non-GNU
- * systems, such as FreeBSD. But as far as we're concerned, argv
- * is at the top of the main thread's stack, so save the address
- * of it.
- */
+	/*
+	 * GNU libc provides a way to get at the top of the stack. This
+	 * is, of course, not-standard and doesn't work on non-GNU
+	 * systems, such as FreeBSD. But as far as we're concerned, argv
+	 * is at the top of the main thread's stack, so save the address
+	 * of it.
+	 */
 	__libc_stack_end = (void*) &argv;
 #endif
-	const char *argv0 = argv[0];
 
-	if (argc > 1 && access(argv[1], R_OK) == 0) {
-		/*
-		 * Support only #!/usr/bin/tarantol but not
-		 * #!/usr/bin/tarantool -a -b because:
-		 * - not all shells support it,
-		 * - those shells that do support it, do not
-		 *   split multiple options, so "-a -b" comes as
-		 *   a single value in argv[1].
-		 * - in case one uses #!/usr/bin/env tarantool
-		 *   such options (in shebang line) don't work
-		 */
-		argv++;
-		argc--;
-		shebang = abspath(argv[0]);
+	if (argc <= 1 || access(argv[1], R_OK) != 0) {
+		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
+		if (gopt(opt, 'V')) {
+			printf("Tarantool %s\n", tarantool_version());
+			printf("Target: %s\n", BUILD_INFO);
+			printf("Build options: %s\n", BUILD_OPTIONS);
+			printf("Compiler: %s\n", COMPILER_INFO);
+			printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
+			printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
+			return 0;
+		}
+
+		if (gopt(opt, 'h') || argc == 1) {
+			puts("Tarantool - a Lua application server");
+			puts("");
+			printf("Usage: %s script.lua [OPTIONS]\n",
+			       basename(argv[0]));
+			puts("");
+			puts("All command line options are passed to the interpreted script.");
+			puts("When no script name is provided, the server responds to:");
+			gopt_help(opt_def);
+			puts("");
+			puts("Please visit project home page at http://tarantool.org");
+			puts("to see online documentation, submit bugs or contribute a patch.");
+			return 0;
+		}
+		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
+		exit(EX_USAGE);
 	}
+#ifdef HAVE_BFD
+	symbols_load(argv[0]);
+#endif
+	/*
+	 * Support only #!/usr/bin/tarantol but not
+	 * #!/usr/bin/tarantool -a -b because:
+	 * - not all shells support it,
+	 * - those shells that do support it, do not
+	 *   split multiple options, so "-a -b" comes as
+	 *   a single value in argv[1].
+	 * - in case one uses #!/usr/bin/env tarantool
+	 *   such options (in script line) don't work
+	 */
+	argv++;
+	argc--;
+	script = abspath(argv[0]);
 
 	random_init();
 	say_init(argv[0]);
@@ -614,41 +622,10 @@ main(int argc, char **argv)
 	crc32_init();
 	memory_init();
 
-#ifdef HAVE_BFD
-	symbols_load(argv0);
-#else
-	(void) argv0;
-#endif
-
 	argv = init_set_proc_title(argc, argv);
 	main_argc = argc;
 	main_argv = argv;
 
-	void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
-	main_opt = opt;
-
-	if (gopt(opt, 'V')) {
-		printf("Tarantool %s\n", tarantool_version());
-		printf("Target: %s\n", BUILD_INFO);
-		printf("Build options: %s\n", BUILD_OPTIONS);
-		printf("Compiler: %s\n", COMPILER_INFO);
-		printf("C_FLAGS:%s\n", TARANTOOL_C_FLAGS);
-		printf("CXX_FLAGS:%s\n", TARANTOOL_CXX_FLAGS);
-		return 0;
-	}
-
-	if (gopt(opt, 'h')) {
-		puts("Tarantool -- an efficient in-memory data store.");
-		printf("Usage: %s [OPTIONS]\n", basename(argv[0]));
-		puts("");
-		gopt_help(opt_def);
-		puts("");
-		puts("Please visit project home page at http://tarantool.org");
-		puts("to see online documentation, submit bugs or contribute a patch.");
-		return 0;
-	}
-
-	gopt_arg(opt, 'c', &cfg_filename);
 	/*
 	 * if config is not specified trying ./tarantool.cfg then
 	 * /etc/tarantool.cfg
@@ -662,49 +639,10 @@ main(int argc, char **argv)
 	if (cfg_filename != NULL)
 		cfg_filename_fullpath = abspath(cfg_filename);
 
-	cfg.log_level += gopt(opt, 'v');
-
-	if (argc != 1) {
-		fprintf(stderr, "Can't parse command line: try --help or -h for help.\n");
-		exit(EX_USAGE);
-	}
-
 	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
-
-	if (gopt(opt, 'k')) {
-		if (fill_default_tarantool_cfg(&cfg) != 0 ||
-		    load_cfg(&cfg, 0) != 0) {
-
-			say_error("check_config FAILED%.*s",
-				  (int) cfg_logsize, cfg_log);
-			return 1;
-		}
-		return 0;
-	}
 
 	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
 		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
-	}
-
-	const char *cfg_paramname = NULL;
-
-	if (gopt_arg(opt, 'g', &cfg_paramname)) {
-		tarantool_cfg_iterator_t *i;
-		char *key, *value;
-
-		i = tarantool_cfg_iterator_init();
-		while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-			if (strcmp(key, cfg_paramname) == 0 && value != NULL) {
-				printf("%s\n", value);
-				free(value);
-
-				return 0;
-			}
-
-			free(value);
-		}
-
-		return 1;
 	}
 
 	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
@@ -752,19 +690,17 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (gopt(opt, 'I')) {
-		box_init_storage(cfg.snap_dir);
-		exit(EXIT_SUCCESS);
-	}
-
-	if (gopt(opt, 'B')) {
+	if (cfg.background) {
 		if (cfg.logger == NULL) {
-			say_crit("--background requires 'logger' configuration option to be set");
+			say_crit("'background' requires 'logger' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		if (cfg.pid_file == NULL) {
+			say_crit("'background' requires 'pid_file' configuration option to be set");
 			exit(EXIT_FAILURE);
 		}
 		background();
-	}
-	else {
+	} else {
 		create_pid();
 	}
 
@@ -786,33 +722,27 @@ main(int argc, char **argv)
 	atexit(tarantool_free);
 
 	fiber_init();
-	replication_prefork();
-	iobuf_init(cfg.readahead);
 	coeio_init();
 	signal_init();
+	session_init();
+	tarantool_lua_init();
 
 	bool start_loop = false;
 	try {
-		tarantool_lua_init();
-		box_init();
 		tarantool_lua_load_cfg(&cfg);
 		int events = ev_activecnt(loop());
-		iproto_init(cfg.bind_ipaddr, cfg.primary_port);
-		admin_init(cfg.bind_ipaddr, cfg.admin_port);
-		session_init();
+		box_init();
 		/*
 		 * Load user init script.  The script should have access
 		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		tarantool_lua_load_init_script(shebang);
+		tarantool_lua_run_script(script);
 		start_loop = ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_crit("entering the event loop");
-			if (cfg.io_collect_interval > 0)
-				ev_set_io_collect_interval(loop(), cfg.io_collect_interval);
 			ev_now_update(loop());
 			start_time = ev_now(loop());
 			signal_start();

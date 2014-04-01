@@ -72,9 +72,10 @@ OK
 OK
 
 # Check that the mysql client can connect using some factory defaults:
-# port = 3306, user = 'root', user password = '', database = 'test'.
+# port = 3306, user = 'root', user password = 'root', database = 'test'.
+# (Do not use a blank password.)
 # These can be changed, provided one changes them in all places.
-<prompt>$ </prompt><userinput>~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --database=test</userinput>
+<prompt>$ </prompt><userinput>~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --password=root--database=test</userinput>
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 25
 Server version: 5.5.35 MySQL Community Server (GPL)
@@ -111,6 +112,7 @@ Bye
 <prompt>$ </prompt><userinput>make</userinput>
 ...
 [ 49%] Built target core
+Scanning dependencies of target mysql
 [ 50%] Building CXX object src/plugin/mysql/CMakeFiles/mysql.dir/mysql.cc.o
 Linking CXX shared library libmysql.so
 [ 50%] Built target mysql
@@ -119,17 +121,42 @@ Linking CXX shared library libmysql.so
 [100%] Built target man
 <prompt>$ </prompt>
 
-# Before starting Tarantool server, tell it where the MySQL plugin is.
-<prompt>$ </prompt><userinput>export TARANTOOL_PLUGIN_DIR=~/tarantool-stable/src/plugin/mysql</userinput>
-<prompt>$ </prompt>
+# The MySQL module should now be in ./src/module/mysql/mysql.so.
+# If a "make install" had been done, then mysql.so would be in a
+# different place, for example /usr/local/lib/tarantool/1.5/box/net/mysql.so.
+# In that case there should be additional cmake options such as
+# -DCMAKE_INSTALL_LIBDIR and -DCMAKE_INSTALL_PREFIX.
+# For this example we assume that "make install" is not done.
+
+# Change directory to a directory which contains the tarantool.cfg file.
+# For this example we assume that the name of this directory is
+# /home/pgulutzan/tarantool_test. (Change "/home/pgulutzan" to whatever
+# is the actual base directory for the machine that's used for this test.)
+# Edit the tarantool.cfg file and add this line:
+# script_dir = "/home/pgulutzan/tarantool_test"
+# The script_dir is the directory where the init.lua file must be.
+# Now create a file named /home/pgulutzan/tarantool_test/init.lua
+# and put the following lines in it (again, change "/home/pgulutzan"
+# to whatever the real directory is that contains tarantool-stable):
+package.path = "/home/pgulutzan/tarantool-stable/src/module/sql/?.lua;"..package.path
+require("sql")
+if type(box.net.sql) ~= "table" then
+error("net.sql load failed")
+end
+require("box.net.mysql")
+
+# Now, to help tarantool_box find the essential mysql.so file, execute these lines:
+<userinput>cd /home/pgulutzan/tarantool_test</userinput>
+<userinput>mkdir box</userinput>
+<userinput>mkdir box/net</userinput>
+<userinput>cp ~/tarantool-stable/src/module/mysql/mysql.so ./box/net/mysql.so</userinput>
 
 # Start the Tarantool server.
 # Run it in the background but let the initial display be in the foreground.
 # So it's possible to see the message that the plugin was loaded.
 <prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool_box&amp;</userinput>
 2013-12-03 17:46:16.239 [12957] 1/sched C&gt; version 1.5.1-271-g610930e
-... Loading plugin: ~/tarantool-stable/src/plugin/mysql/libmysql.so ...
-... Plugin 'mysql' was loaded, version: 1
+... loading /home/pgulutzan/tarantool_test/init.lua ...
 ...
 2013-12-03 17:46:16.244 [12957] 1/sched C&gt; entering event loop
 
@@ -137,25 +164,20 @@ Linking CXX shared library libmysql.so
 <prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
 <prompt>localhost&gt; </prompt>
 
-# Say <quote>show plugins</quote>. Since all has gone well, this is certain to work.
-<prompt>localhost&gt; </prompt> <userinput>show plugins</userinput>
----
-plugins:
-  - { name: "mysql", version: 1 }
-...
-
 # Create a Lua function that will connect to the MySQL server,
 # retrieve one row, and display the row.
 # For explanations of the statement types used here, read the
 # Lua tutorial in the Tarantool user manual.
 <prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>lua function mysql_select ()</userinput>
+<prompt>localhost&gt; </prompt><userinput>function mysql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
-        <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', '', 'test')</userinput>
+        <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', 'root', 'test')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
@@ -163,9 +185,8 @@ plugins:
 <prompt>localhost&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>CALL mysql_select()</userinput>
-2013-12-03 17:57:24.688 [12957] 102/iproto I&gt; MySQL row
-Call OK, 0 rows affected
+<prompt>localhost&gt; </prompt><userinput>mysql_select()</userinput>
+- 2013-12-03 17:57:24.688 [12957] 102/iproto I&gt; MySQL row
 
 # Observe the result. It contains "MySQL row".
 # So this is the row that was inserted into the MySQL database.
@@ -174,8 +195,9 @@ Call OK, 0 rows affected
 
 <para xml:id="plugin-postgresql-example">
 <bridgehead renderas="sect4">PostgreSQL Example</bridgehead>
+Warning: This example is obsolete; a new example is being prepared to replace it.
 This example assumes that a recent version of PostgreSQL has been installed.
-The PostgreSQL library library and include files are also necessary.
+The PostgreSQL library and include files are also necessary.
 On Ubuntu they can be installed with <programlisting><prompt>$ </prompt><userinput>sudo apt-get install libpq-dev</userinput></programlisting>
 If that works, then cmake will find the necessary files without requiring any special user input.
 However, because not all platforms are alike, for this example the assumption is
@@ -262,25 +284,20 @@ Linking CXX shared library libpg.so
 <prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
 <prompt>localhost&gt; </prompt>
 
-# Say <quote>show plugins</quote>. Since all has gone well, this is certain to work.
-<prompt>localhost&gt; </prompt> <userinput>show plugins</userinput>
----
-plugins:
-  - { name: "postgresql", version: 1 }
-...
-
 # Create a Lua function that will connect to the PostgreSQL server,
 # retrieve one row, and display the row.
 # For explanations of the statement types used here, read the
 # Lua tutorial in the Tarantool user manual.
 <prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>lua function postgresql_select ()</userinput>
+<prompt>localhost&gt; </prompt><userinput>function postgresql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
+        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
-        <prompt>-&gt; </prompt><userinput>    print(card.s2)</userinput>
+        <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
+        <prompt> &gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
@@ -288,9 +305,9 @@ plugins:
 <prompt>localhost&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>CALL postgresql_select()</userinput>
-2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
-Call OK, 0 rows affected
+<prompt>localhost&gt; </prompt><userinput>postgresql_select()</userinput>
+- 2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
+
 
 
 # Observe the result. It contains "PostgreSQL row".

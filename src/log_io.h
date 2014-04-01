@@ -31,8 +31,10 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <sys/uio.h>
 #include "trivia/util.h"
 #include "tarantool_ev.h"
+#include "iproto_constants.h"
 
 extern const uint32_t xlog_format;
 
@@ -111,39 +113,14 @@ log_io_cursor_open(struct log_io_cursor *i, struct log_io *l);
 void
 log_io_cursor_close(struct log_io_cursor *i);
 
-const struct log_row *
-log_io_cursor_next(struct log_io_cursor *i);
+int
+log_io_cursor_next(struct log_io_cursor *i, struct iproto_packet *packet);
+int
+xlog_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+		char fixheader[XLOG_FIXHEADER_SIZE]);
+enum { XLOG_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
 
 typedef uint32_t log_magic_t;
-
-struct log_row {
-	log_magic_t marker;
-	uint32_t header_crc32c; /* calculated for the header block */
-	/* {{{ header block */
-	char header[0]; /* start of the header */
-	int64_t lsn;
-	double tm;
-	uint32_t len;
-	uint16_t tag;
-	uint64_t cookie;
-	uint32_t data_crc32c; /* calculated for data */
-	/* }}} */
-	char data[0];   /* start of the data */
-} __attribute__((packed));
-
-void
-log_row_sign(struct log_row *row);
-
-void
-log_row_fill(struct log_row *row, int64_t lsn, uint64_t cookie,
-	     const char *metadata, size_t metadata_len, const char *data,
-	     size_t data_len);
-
-static inline size_t
-log_row_size(const struct log_row *row)
-{
-	return sizeof(struct log_row) + row->len;
-}
 
 int
 inprogress_log_unlink(char *filename);

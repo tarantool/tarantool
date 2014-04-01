@@ -12,65 +12,50 @@
   This chapter provides a reference of Tarantool data operations
   and administrative commands.
 </para></blockquote>
-<bridgehead renderas="sect2">Digression: data and administrative ports</bridgehead>
+<bridgehead renderas="sect2">Digression: primary and administrative ports</bridgehead>
 <para>
-  Unlike many other key/value servers, Tarantool uses
-  different TCP ports and client/server protocols for data
-  manipulation and administrative statements.
-  During start up, the server can connect to up to four TCP ports:
+  During start up, the server can allow connections on up to two TCP ports:
   <itemizedlist>
     <listitem><para>
-      Read/write data port, to handle INSERTs, UPDATEs,
-      DELETEs, SELECTs and CALLs. This port speaks the
-      <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>, and provides full data access.
+      Primary port. This port is for handling requests in the
+      <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>
+      (also called the "binary protocol"), and provides full data access.
       </para>
       <para>
-      The default value of the port is <literal>33013</literal>,
-      as defined in <olink targetptr="primary_port"/>
+      The default value of the port is <literal>3301</literal>,
+      as defined in the <olink targetptr="primary_port"/>
       configuration option.
     </para></listitem>
     <listitem><para>
-      Read only port, which only accepts SELECTs and CALLs,
-      default  port number <literal>33014</literal>, as defined in
-      <olink targetptr="secondary_port"/> configuration option.
-    </para></listitem>
-    <listitem><para>
-      Administrative port, which defaults to <literal>33015</literal>,
-      and is defined in <olink targetptr="admin_port"/>
+      Administrative port, which is for handling requests in unconverted text (also called the "text protocol"),
+      which defaults to <literal>33015</literal>,
+      and is defined in the <olink targetptr="admin_port"/>
       configuration option.
     </para></listitem>
-    <listitem><para>Replication port (see <olink
-        targetptr="replication_port"/>), by default set to
-        <literal>33016</literal>, used to send updates to
-        replicas. Replication is optional, and if this port is not
-        set in the configuration file, the corresponding server process
-        is not started.
-      </para></listitem>
   </itemizedlist>
-  In absence of authentication, this approach allows system
-  administrators to restrict access to read/write or
-  administrative ports. The client, however, has to be aware of
-  the separation, and <command>tarantool</command> command line
-  client automatically selects the correct port for you
-  with help of a simple regular expression. SELECTs, UPDATEs,
-  INSERTs, DELETEs and CALLs are sent to the primary port.
-  Lua commands are sent to the administrative port.
+  Traditionally, in the absence of authentication,
+  ordinary users could be blocked from
+  doing administrative operations by simply having them
+  blocked from access to the administrative port.
+  The client, however, had to be aware of
+  the separation, and the <command>tarantool</command> command line
+  client automatically selected the correct port
+  with the help of a simple regular expression. SELECTs, UPDATEs,
+  INSERTs, DELETEs and CALLs were sent to the primary port.
+  Lua commands were sent to the administrative port.
 </para>
 
 <section xml:id="data-manipulation">
   <title>Data manipulation</title>
 
   <para>
-    Five basic request types are supported: INSERT, UPDATE,
-    DELETE, SELECT and CALL. All requests, including
-    INSERT, UPDATE and DELETE may return data. A SELECT can be
-    requested to limit the number of returned tuples. This is
-    useful when searching in a non-unique index or when 
-    a special <quote>wildcard</quote> (zero-length string) value
-    is supplied as search key or a key part.
+    The four basic "data-manipulation" types are: insert(),
+    update(), delete(), select(). They all, including
+    insert() and update() and delete(), may return data.
+    There are other request types for scanning multiple keys.
  </para>
   <para>
-    UPDATE statement supports operations on fields &mdash;
+    The update() function supports operations on fields &mdash;
     assignment, arithmetic operations (the field must be numeric),
     cutting and pasting fragments of a field, &mdash; as well as
     operations on a tuple: push and pop of a field at the tail of
@@ -82,7 +67,7 @@
     be relative to the most recent state of the tuple, i.e. as if
     all previous operations in a multi-operation update have
     already been applied. In other words, it's always safe to
-    merge multiple UPDATE statements into a single one, with no
+    merge multiple update() invocations into a single one, with no
     change in semantics.
   </para>
   <para>Tarantool protocol was designed with focus on asynchronous
@@ -98,25 +83,23 @@
     possible to match a request to a response, even if the latter
     arrived out of order.
   </para>
-  <para>Request type defines the format of the payload.
-    INSERTs, UPDATEs and DELETEs can only be made by the primary key, so
-    an index id and a key (possibly multipart) are always present
-    in these requests. SELECTs can use secondary keys. UPDATE
-    only needs to list the fields that are actually changed. With
-    this one exception, all commands operate on whole tuple(s).
+  <para>For the insert() and update() and delete() operations,
+    it is mandatory to pass the primary-key value.
+    For the select() operation, either a primary-key value or a
+    secondary-key value (possibly multi-part) may be passed.
+    All the data-manipulation functions operate on whole tuple(s),
+    except update() -- for update() one only needs
+    to list the fields that are actually changed.
   </para>
   <para>Unless implementing a client driver, one needn't
     concern oneself with the complications of the binary
     protocol. <olink targetptr="connectors">Language-specific
     drivers</olink> provide a friendly way to store domain
-    language data structures in Tarantool, and the command line
-    client supports a subset of standard SQL.
-    A complete description of both, the binary protocol and
-    the supported SQL, is maintained in annotated Backus-Naur
+    language data structures in Tarantool.
+    A complete description of the binary protocol
+    is maintained in annotated Backus-Naur
     form in the source tree: please see
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
-    and
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link> respectively.
+    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>.
   </para>
 </section>
 
@@ -128,14 +111,14 @@
     using any <command>telnet</command> client, or a tool like
     <command>rlwrap</command>, if access to readline features is
     desired. Additionally, <command>tarantool</command>, the
-    SQL-capable command line client, automatically distinguishes
-    SQL and Lua statements and directs them to the appropriate port.
+    command line client, may distinguish between requests types
+    and direct them to the appropriate port.
     The server response to an administrative command, even though
     it is always in plain text, can be quite complex.
     It is encoded using YAML markup to simplify automated parsing.
   </para>
-  <para>To learn about all supported administrative commands, you
-    can type <emphasis role="tntadmin">help</emphasis> in the
+  <para>To learn which functions are considered to be administrative,
+    type <emphasis role="tntadmin">help</emphasis> in the
     administrative console. A reference description also follows
     below:</para>
 
@@ -169,17 +152,16 @@
         is, on average, sufficient. This statement waits until a
         snapshot is taken and returns operation result. For
         example:
-<programlisting>localhost> box.info()
+<programlisting>localhost> <userinput>box.info.version, box.info.lsn</userinput>
 ---
-info:
-  version: "1.4.6"
-  lsn: 843301
+- 1.6.0-805-g4a7e71d
+- 843301
 ...
-localhost> box.snapshot()
+localhost> <userinput>box.snapshot()</userinput>
 ---
 ok
 ...
-localhost> box.snapshot()
+localhost> <userinput>box.snapshot()</userinput>
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
@@ -187,13 +169,13 @@ fail: can't save snapshot, errno 17 (File exists)
       </para>
       <para>
         Taking a snapshot does not cause the server to start a new
-        write ahead log. Once a snapshot is taken, old WALs can be
+        write-ahead log. Once a snapshot is taken, old WALs can be
         deleted as long as all replicas are up to date. But the
         WAL which was current at the time <emphasis
         role="tntadmin">box.snapshot()</emphasis> started must be
         kept for recovery, since it still contains log records
-        written after the start of <emphasis role="tntadmin">save
-        snapshot</emphasis>.
+        written after the start of <emphasis role="tntadmin">
+        box.snapshot()</emphasis>.
       </para>
       <para>
         An alternative way to save a snapshot is to send the server
@@ -236,19 +218,25 @@ fail: can't save snapshot, errno 17 (File exists)
       </term>
       <listitem><para>
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>show info</userinput>
----
-info:
-  version: "1.5.2-8-g54a279d"
-  uptime: 441524
-  pid: 12315
-  logger_pid: 12316
-  snapshot_pid: 0
-  lsn: 15481913304
-  recovery_lag: 0.000
-  recovery_last_update: 1306964594.980
+<prompt>localhost&gt;</prompt> <userinput>box.info()</userinput>
+- version: 1.6.0-805-g4a7e71d
   status: primary
-  config: "/usr/local/etc/tarantool.cfg"
+  pid: 12315
+  lsn: 15481913304
+  snapshot_pid: 0
+  recovery_last_update: 1306964594
+  recovery_lag: 0
+  uptime: 441524
+  build:
+    flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
+      -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
+      -Wno-strict-aliasing -fopenmp -pthread'
+    target: Linux-x86_64-Debug
+    compiler: /usr/bin/cc /usr/bin/c++
+    options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
+      -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
+  logger_pid: 12316
+  config: /usr/local/etc/tarantool.cfg
 </programlisting>
       </para>
       <para>
@@ -262,7 +250,7 @@ info:
       <para>
         <emphasis role="strong">recovery_last_update</emphasis> is
         the wall clock time of the last change recorded in the
-        write ahead log. To convert it to human-readable time,
+        write-ahead log. To convert it to human-readable time,
         you can use <command>date -d@<replaceable>1306964594.980</replaceable></command>.
       </para>
       <para>
@@ -278,56 +266,93 @@ info:
        <emphasis role="tntadmin">show index</emphasis>
      </term>
      <listitem><para>
-     Show the number of keys and the amount of memory used by each each index.
+     This is no longer supported.
      </para></listitem>
     </varlistentry>
 
     <varlistentry>
       <term xml:id="box.stat.show" xreflabel="box.stat.show()">
-        <emphasis role="tntadmin">box.stat.show()</emphasis>
+        <emphasis role="tntadmin">box.stat()</emphasis>
       </term>
       <listitem><para>
       Show the average number of requests per second, and the
       total number of requests since startup, broken down by
-      request type: INSERT or SELECT or UPDATE or DELETE."
+      request type.
 <programlisting>
-localhost> box.stat()
+localhost&gt; <userinput>box.stat()</userinput>
 ---
-statistics:
-  INSERT:        { rps:  139  , total:  48207694    }
-  SELECT_LIMIT:  { rps:  0    , total:  0           }
-  SELECT:        { rps:  1246 , total:  388322317   }
-  UPDATE_FIELDS: { rps:  1874 , total:  743350520   }
-  DELETE:        { rps:  147  , total:  48902544    }
+- DELETE:
+    total: 48902544
+    rps: 147
+  SELECT:
+    total: 388322317
+    rps: 1246
+  REPLACE:
+    total: 0
+    rps: 0
+  INSERT:
+    total: 48207694
+    rps: 139
+  CALL:
+    total: 0
+    rps: 0
+  UPDATE:
+    total: 743350520
+    rps: 1874
+...
 </programlisting>
       </para></listitem>
     </varlistentry>
 
     <varlistentry>
       <term xml:id="box.slab.info" xreflabel="box.slab.info()">
-        <emphasis role="tntadmin">box.slab.info()</emphasis>
+        <emphasis role="tntadmin">box.slab()</emphasis>
       </term>
       <listitem>
         <para>
           Show the statistics of the slab allocator. The slab
           allocator is the main allocator used to store tuples.
           This can be used to monitor the total memory use and
-          memory fragmentation.
+          memory fragmentation. For example:
         </para>
+<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>box.slab.info()</userinput>
+---
+- slabs:
+    64:
+      items: 16
+      bytes_used: 1024
+      item_size: 64
+      slabs: 1
+      bytes_free: 4193200
+    ...
+    136:
+      items: 1
+      bytes_used: 136
+      item_size: 136
+      slabs: 1
+      bytes_free: 4194088
+    ...
+  arena_size: 8388448
+  arena_used: 1160
+</programlisting>
         <para>
-          <emphasis role="strong">items_used</emphasis> contains
-          the % of <olink targetptr="slab_alloc_arena"/> already
-          used to store tuples.
-        </para>
-        <para>
-          <emphasis role="strong">arena_used</emphasis> contains
+          The display of slabs is broken down by the slab size --
+          64-byte, 136-byte, and so on. The example omits the slabs
+          which are empty. The example display is saying that:
+          there are 16 items stored
+          in the 64-byte slab (and 16*64=1024 so
+          bytes_used = 1024); there is 1 item
+          stored in the 136-byte slab (and
+          136*1=136 so bytes_used = 136); the
+          arena_used value is the total of all the bytes_used
+          values (1024+136 = 1160); the
+          arena_size value is the arena_used value
+          plus the total of all the bytes_free values
+          (1160+4193200+4194088 = 8388448). The
+          arena_size and arena_used values are the amount of  
           the % of <olink targetptr="slab_alloc_arena"/> that is
           already distributed to the slab allocator.
-        </para>
-        <para>
-          <emphasis role="strong">bytes_waste</emphasis> contains
-          the amount of memory wasted by the slab allocator due to
-          internal fragmentation.
         </para>
         <para>
         </para>
@@ -362,7 +387,7 @@ statistics:
       <listitem><para>
         Execute any chunk of Lua code. This can be used to define,
         invoke, debug and drop <olink
-        targetptr="stored-procedures">stored procedures</olink>,
+        targetptr="stored-procedures">Lua functions</olink>,
         inspect server environment, perform automated
         administrative tasks.
       </para></listitem>

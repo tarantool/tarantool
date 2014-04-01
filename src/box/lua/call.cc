@@ -43,6 +43,7 @@
 #include "box/box.h"
 #include "box/port.h"
 #include "box/request.h"
+#include "box/txn.h"
 #include "bit/bit.h"
 #include "box/access.h"
 #include "box/schema.h"
@@ -502,8 +503,7 @@ access_check_func(const char *name, uint32_t name_len,
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(struct request *request, struct txn *txn,
-	     struct port *port)
+box_lua_call(struct request *request, struct txn *txn, struct port *port)
 {
 	struct user *user = user();
 	(void) txn;

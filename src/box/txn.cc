@@ -29,19 +29,35 @@
 #include "txn.h"
 #include "tuple.h"
 #include "space.h"
-#include <cfg/tarantool_box_cfg.h>
 #include <tarantool.h>
 #include <recovery.h>
 #include <fiber.h>
 #include "request.h" /* for request_name */
+
+double too_long_threshold;
+
+void
+txn_add_redo(struct txn *txn, struct request *request)
+{
+	if (recovery_state->wal_mode == WAL_NONE)
+		return;
+	if (request->packet == NULL) {
+		/* Generate binary body for Lua requests */
+		struct iproto_packet *packet = (struct iproto_packet *)
+			region_alloc0(&fiber()->gc, sizeof(*packet));
+		packet->code = request->code;
+		packet->bodycnt = request_encode(request, packet->body);
+		txn->packet = packet;
+	} else {
+		txn->packet = request->packet;
+	}
+}
 
 void
 txn_replace(struct txn *txn, struct space *space,
 	    struct tuple *old_tuple, struct tuple *new_tuple,
 	    enum dup_replace_mode mode)
 {
-	/* txn_add_undo() must be done after txn_add_redo() */
-	assert(txn->request->type != 0);
 	assert(old_tuple || new_tuple);
 	/*
 	 * Remember the old tuple only if we replaced it
@@ -77,24 +93,21 @@ txn_commit(struct txn *txn)
 {
 	if ((txn->old_tuple || txn->new_tuple) &&
 	    !space_is_temporary(txn->space)) {
-		struct request *request = txn->request;
+		struct iproto_packet *packet = txn->packet;
 		int64_t lsn = next_lsn(recovery_state);
 
 		int res = 0;
 		if (recovery_state->wal_mode != WAL_NONE) {
-			/* Generate binary body for Lua requests */
-			if (request->data == NULL)
-				request_encode(request);
-
+			/* txn_commit() must be done after txn_add_redo() */
+			assert(txn->packet != NULL);
+			packet->lsn = lsn;
 			ev_tstamp start = ev_now(loop()), stop;
-			res = wal_write(recovery_state, lsn, fiber()->cookie,
-					request->type, request->data,
-					request->len);
+			res = wal_write(recovery_state, packet);
 			stop = ev_now(loop());
 
-			if (stop - start > cfg.too_long_threshold) {
+			if (stop - start > too_long_threshold) {
 				say_warn("too long %s: %.3f sec",
-					 iproto_request_name(request->type),
+					 iproto_request_name(packet->code),
 					 stop - start);
 			}
 		}

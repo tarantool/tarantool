@@ -42,6 +42,7 @@ init_tarantool_cfg(tarantool_cfg *c) {
 	c->wal_dir = NULL;
 	c->pid_file = NULL;
 	c->logger = NULL;
+	c->background = false;
 	c->logger_nonblock = false;
 	c->io_collect_interval = 0;
 	c->readahead = 0;
@@ -80,6 +81,7 @@ fill_default_tarantool_cfg(tarantool_cfg *c) {
 	c->pid_file = strdup("tarantool.pid");
 	if (c->pid_file == NULL) return CNF_NOMEMORY;
 	c->logger = NULL;
+	c->background = false;
 	c->logger_nonblock = true;
 	c->io_collect_interval = 0;
 	c->readahead = 16320;
@@ -146,6 +148,9 @@ static NameAtom _name__pid_file[] = {
 };
 static NameAtom _name__logger[] = {
 	{ "logger", -1, NULL }
+};
+static NameAtom _name__background[] = {
+	{ "background", -1, NULL }
 };
 static NameAtom _name__logger_nonblock[] = {
 	{ "logger_nonblock", -1, NULL }
@@ -421,6 +426,31 @@ acceptValue(tarantool_cfg* c, OptDef* opt, int check_rdonly) {
 		c->logger = (opt->paramValue.scalarval) ? strdup(opt->paramValue.scalarval) : NULL;
 		if (opt->paramValue.scalarval && c->logger == NULL)
 			return CNF_NOMEMORY;
+	}
+	else if ( cmpNameAtoms( opt->name, _name__background) ) {
+		if (opt->paramType != scalarType )
+			return CNF_WRONGTYPE;
+		c->__confetti_flags &= ~CNF_FLAG_STRUCT_NOTSET;
+		errno = 0;
+		bool bln;
+
+		if (strcasecmp(opt->paramValue.scalarval, "true") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "yes") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "enable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "on") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "1") == 0 )
+			bln = true;
+		else if (strcasecmp(opt->paramValue.scalarval, "false") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "no") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "disable") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "off") == 0 ||
+				strcasecmp(opt->paramValue.scalarval, "0") == 0 )
+			bln = false;
+		else
+			return CNF_WRONGRANGE;
+		if (check_rdonly && c->background != bln)
+			return CNF_RDONLY;
+		c->background = bln;
 	}
 	else if ( cmpNameAtoms( opt->name, _name__logger_nonblock) ) {
 		if (opt->paramType != scalarType )
@@ -746,6 +776,7 @@ typedef enum IteratorState {
 	S_name__wal_dir,
 	S_name__pid_file,
 	S_name__logger,
+	S_name__background,
 	S_name__logger_nonblock,
 	S_name__io_collect_interval,
 	S_name__readahead,
@@ -929,6 +960,17 @@ again:
 				return NULL;
 			}
 			snprintf(buf, PRINTBUFLEN-1, "logger");
+			i->state = S_name__background;
+			return buf;
+		case S_name__background:
+			*v = malloc(8);
+			if (*v == NULL) {
+				free(i);
+				out_warning(CNF_NOMEMORY, "No memory to output value");
+				return NULL;
+			}
+			sprintf(*v, "%s", c->background ? "true" : "false");
+			snprintf(buf, PRINTBUFLEN-1, "background");
 			i->state = S_name__logger_nonblock;
 			return buf;
 		case S_name__logger_nonblock:
@@ -1133,6 +1175,7 @@ dup_tarantool_cfg(tarantool_cfg* dst, tarantool_cfg* src) {
 	if (dst->logger) free(dst->logger);dst->logger = src->logger == NULL ? NULL : strdup(src->logger);
 	if (src->logger != NULL && dst->logger == NULL)
 		return CNF_NOMEMORY;
+	dst->background = src->background;
 	dst->logger_nonblock = src->logger_nonblock;
 	dst->io_collect_interval = src->io_collect_interval;
 	dst->readahead = src->readahead;
@@ -1274,6 +1317,11 @@ cmp_tarantool_cfg(tarantool_cfg* c1, tarantool_cfg* c2, int only_check_rdonly) {
 
 		return diff;
 }
+	if (c1->background != c2->background) {
+		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->background");
+
+		return diff;
+	}
 	if (c1->logger_nonblock != c2->logger_nonblock) {
 		snprintf(diff, PRINTBUFLEN - 1, "%s", "c->logger_nonblock");
 

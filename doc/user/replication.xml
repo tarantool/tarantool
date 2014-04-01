@@ -17,7 +17,7 @@
     <title>Replication architecture</title>
   <para>
     A replica gets all updates from the master by continuously
-    fetching and applying its write ahead log (WAL).
+    fetching and applying its write-ahead log (WAL).
     Each record in the WAL represents a single Tarantool
     command such as INSERT or UPDATE or DELETE, and is assigned
     a monotonically growing log sequence number (LSN).
@@ -28,7 +28,7 @@
   <para>
     A stored program invocation
     <!-- , unless requested explicitly, -->
-    does not enter the Write Ahead Log. Instead, log events
+    is not written to the write-ahead log. Instead, log events
     for actual UPDATEs and DELETEs, performed by the Lua code,
     are written to the log. This ensures that possible
     non-determinism of Lua does not cause replication

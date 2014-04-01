@@ -53,7 +53,7 @@ class TestSuite:
         self.ini.update(dict(config.items("default")))
         self.ini.update(self.args.__dict__)
 
-        for i in ["config", "shebang"]:
+        for i in ["config", "script"]:
             self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
         for i in ["disabled", "valgrind_disabled", "release_disabled"]:
             self.ini[i] = dict.fromkeys(self.ini[i].split()) if i in self.ini else dict()

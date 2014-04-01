@@ -60,7 +60,7 @@ struct iproto_port
 	/** Output buffer. */
 	struct obuf *buf;
 	/** Reply header. */
-	uint32_t sync;
+	uint64_t sync;
 	uint32_t found;
 	/** A pointer in the reply buffer where the reply starts. */
 	struct obuf_svp svp;
@@ -70,7 +70,7 @@ extern struct port_vtab iproto_port_vtab;
 
 static inline void
 iproto_port_init(struct iproto_port *port, struct obuf *buf,
-		 uint32_t sync)
+		 uint64_t sync)
 {
 	port->vtab = &iproto_port_vtab;
 	port->buf = buf;
@@ -80,11 +80,10 @@ iproto_port_init(struct iproto_port *port, struct obuf *buf,
 
 /** Stack a reply to 'ping' packet. */
 void
-iproto_reply_ping(struct obuf *out, uint32_t sync);
+iproto_reply_ping(struct obuf *out, uint64_t sync);
 
 /** Send an error packet back. */
 void
-iproto_reply_error(struct obuf *out, const ClientError *e,
-		   uint32_t sync);
+iproto_reply_error(struct obuf *out, const ClientError *e, uint64_t sync);
 
 #endif /* TARANTOOL_IPROTO_PORT_H_INCLUDED */

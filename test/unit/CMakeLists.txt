@@ -34,6 +34,8 @@ add_executable(slab_arena.test slab_arena.c)
 target_link_libraries(slab_arena.test small)
 add_executable(arena_mt.test arena_mt.c)
 target_link_libraries(arena_mt.test small pthread)
+add_executable(pt_alloc.test pt_alloc.cc)
+target_link_libraries(pt_alloc.test small)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

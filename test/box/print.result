@@ -1,7 +1,10 @@
 print("Hello, world")
 ---
 ...
-box.fiber.wrap(function() print("Hello, world") end)
+io = require('io')
+---
+...
+box.fiber.wrap(function() print("Ehllo, world") io.flush() end)
 ---
 - null
 ...
@@ -12,25 +15,7 @@ Check log line
 ---
 - "line contains 'Hello'" 
 ...
-box.fiber.wrap(function() print("Ehllo, world") end)
----
-- null
-...
-box.fiber.sleep(0.1)
----
-...
 Check log line
 ---
-- "line doesn't contain 'Hello'" 
-...
-box.fiber.wrap(function() print() end)
----
-- null
-...
-box.fiber.sleep(0.1)
----
-...
-Check log line
----
-- "line doesn't contain 'PPPPPPPP'" 
+- "line contains 'Ehllo'" 
 ...

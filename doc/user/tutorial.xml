@@ -427,10 +427,10 @@ This is the end of the list of steps to take for source downloads.
 <para>
 For your added convenience, github.com has README files with example scripts:
 
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.CentOS">README.CentOS</productname> for CentOS 5.8,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.FreeBSD">README.FreeBSD</productname> for FreeBSD 8.3,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.MacOSX">README.MacOSX</productname> for Mac OS X <quote>Lion</quote>,
-<productname xlink:href="https://github.com/tarantool/tarantool/blob/stable/README.md">README.md</productname> for generic GNU/Linux.
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.CentOS">README.CentOS</productname> for CentOS 5.8,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.FreeBSD">README.FreeBSD</productname> for FreeBSD 8.3,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.MacOSX">README.MacOSX</productname> for Mac OS X <quote>Lion</quote>,
+<productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.md">README.md</productname> for generic GNU/Linux.
 
 These example scripts assume that the intent is to download from the master branch, build
 the server and the client (but not the documentation), and run tests after build.
@@ -467,7 +467,7 @@ which make a minimal configuration file that will be suitable for day one.
 <programlisting>
 <command>echo</command> "slab_alloc_arena = 0.1" | <command>tee</command> tarantool.cfg
 <command>echo</command> "pid_file = \"box.pid\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "primary_port = 33013" | <command>tee</command> <option>-a</option> tarantool.cfg
+<command>echo</command> "primary_port = 3301" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "admin_port = 33015" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "rows_per_wal = 50000" | <command>tee</command> <option>-a</option> tarantool.cfg
 <command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
@@ -507,7 +507,7 @@ If all goes well, you will see the server displaying progress as it initializes,
 2014-02-06 11:50:24.219 ... 1/sched I&gt; recovery start
 2014-02-06 11:50:24.224 ... 1/sched I&gt; recover from `./00000000000000000001.snap'
 2014-02-06 11:50:24.230 ... 1/sched I&gt; snapshot recovered, confirmed lsn: 1
-2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 33013
+2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 3301
 2014-02-06 11:50:24.232 ... 1/sched I&gt; I am primary
 2014-02-06 11:50:24.232 ... 1/sched I&gt; bound to admin port 33015
 2014-02-06 11:50:24.232 ... 1/sched C&gt; entering the event loop</programlisting>
@@ -526,7 +526,7 @@ Now start the server again. This time start it in the background.<programlisting
 
 <para>
 If all went well, there is now an instance of the Tarantool server
-	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-a</option> | <command>grep</command> tarantool_box</programlisting>
+	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-A</option> | <command>grep</command> tarantool_box</programlisting>
 	or look at the log file:<programlisting><command>less</command> work_dir/tarantool.log</programlisting>
 </para>
 
@@ -563,7 +563,7 @@ The client is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first index, try this:<programlisting>
-<prompt>localhost&gt; </prompt><userinput>s = box.schema.space.create('space0')</userinput>
+<prompt>localhost&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
 <prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -579,7 +579,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-localhost&gt; s = box.schema.space.create('space0')
+localhost&gt; s = box.schema.create_space('space0')
 ---
 ...
 localhost&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
@@ -603,7 +603,7 @@ localhost>&gt;</programlisting>
 </para>
 
 <para>
-You can repeat box.insert() and box.select() indefinitely.
+You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop the client:  <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
@@ -647,8 +647,11 @@ inserted and selected tuples with the Tarantool client.
     Applications should use the names rather than the numbers.
   </para>
   <para>CHANGED TUPLE STORAGE = MSGPACK.
-    There is a new format (msgpack).
-    Snapshot and WAL files have msgpack format; incompatible with the old format.
+    There is a new format
+    (<link xlink:href="https://en.wikipedia.org/wiki/MessagePack">msgpack</link>).
+    Snapshot and WAL files have
+     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">an implementation of the msgpack format</link>;
+    incompatible with the old format.
     Snapshot and WAL files have the same format (snapshots are  logs of inserts).
   </para>
   <para>CHANGED AUTHENTICATION.
@@ -667,10 +670,11 @@ inserted and selected tuples with the Tarantool client.
     "memcached" no longer exists (memcached is not supported).
     The admin port is Lua-only now, and the lua prefix is gone. 
   </para>
-  <para>NEW PACKAGE = BOX.SCHEMA.
+  <para>DATA DEFINITION WITH RUNTIME REQUESTS RATHER THAN A CONFIGURATION FILE.
     <computeroutput>box.schema</computeroutput> is a new package for space configuration.
-    Spaces are added/dropped with box.schema.create / box.schema.<replaceable>schema_name</replaceable>.drop.
-    Indexes are added/dropped with box.schema.create_index / box.schema.<replaceable>index_name</replaceable>.drop.
+    Spaces are added/dropped with box.schema.create_space / box.space.<replaceable>space_name</replaceable>.drop.
+    Indexes are added/dropped with box.space.<replaceable>space-name</replaceable>.create_index /
+    box.space.<replaceable>.space-name</replaceable>.index.<replaceable>index_name</replaceable>.drop.
     "space.estimated_rows" no longer exists.
     "space.cardinality" is renamed to "space.field_count".
     "space.temporary" means "not in snapshot or WAL, only definition exists".
@@ -680,7 +684,7 @@ inserted and selected tuples with the Tarantool client.
     Old syntax box.space.name:X() no longer exists.
     Old syntax box.X() no longer exists.
     New syntax is
-    box.space.<replaceable>space_name</replaceable>:X<replaceable>Lua-table</replaceable>.
+    box.space.<replaceable>space_name(</replaceable>:X<replaceable>Lua-table</replaceable>).
     Example: box.space.t0:insert{0,'Hello'}
     Minor properties of a space (for example the name) can be altered without rebuild.
     All properties of an index can be altered without rebuild.
@@ -695,11 +699,11 @@ inserted and selected tuples with the Tarantool client.
     Output format is now consistently YAML so it can always be used with print().
   </para>
   <para>NEW METADATA RETRIEVAL METHOD = SYSTEM SPACES.
-    The new system spaces contain metadata that can be retrieved with box.select.
+    The new system spaces contain metadata that can be retrieved with box.space..:select.
     The _space system space has information about existing spaces.
     The _index system space has information about existing indexes.
     Old syntax "show ..." no longer exists.
-    New syntax is box.space._space:select<replaceable>Lua-table</replaceable>
+    New syntax is box.space._space:select(<replaceable>Lua-table</replaceable>)
     or other Lua functions.
   </para>
   <para>NEW TRIGGERS FOR REPLACE.
@@ -710,20 +714,22 @@ inserted and selected tuples with the Tarantool client.
     At start, if neither of the ports is bound, and no fibers are started
     by a script, the server exits as soon as the script finishes.
     The server now automatically creates a snapshot file 
-    if it is missing. If it is a replica, it automaticaly 
+    if it is missing. If it is a replica, it automatically 
     connects to the master and downloads the snapshot file
     from it.
   </para>
-  <para>TARANTOOL = A SHELL SCRIPT PROCESSOR.
-    Instead of processing shell scripts with bash or Perl, use tarantool server.
+  <para>TARANTOOL = A SCRIPT PROCESSOR.
+    Instead of processing scripts with bash or Perl, use tarantool server.
     For example, let the first line of a shell script be
     <computeroutput>#!/usr/bin/tarantool_box</computeroutput>.
-    This will be a hint that Tarantool will be the script processor.
+    This will be a
+    (<link xlink:href="https://en.wikipedia.org/wiki/Shebang_%28Unix%29" xlink:title="wikipedia.org/Shebang">"Hashbang" hint</link>)
+    that Tarantool will be the script processor.
     Since Tarantool includes Lua, the file's instructions can be Lua.
   </para>
   <para>PERFORMANCE ENHANCEMENTS WHICH DO NOT AFFECT SYNTAX OR CONFIGURATION.
     On start, Tarantool uses multithreaded sorting to build tree indexes.
-    There is a new slab allocator for tuples, which is less susceptible to fragmeentation.
+    There is a new slab allocator for tuples, which is less susceptible to fragmentation.
     The new tuple storage with msgpack handles a wide value range in a compact way.
     For the binary protocol, box request ids are renumbered to form a continuous space from 0 to 6.
   </para>

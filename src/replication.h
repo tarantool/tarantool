@@ -37,7 +37,7 @@
  * @return None. Panics and exits on error.
  */
 void
-replication_prefork();
+replication_prefork(const char *snap_dir, const char *wal_dir);
 
 /**
  * Subscribe a replica to updates.
@@ -45,7 +45,7 @@ replication_prefork();
  * @return None. On error, closes the socket.
  */
 void
-subscribe(int fd, int64_t lsn);
+subscribe(int fd, int64_t lsn, uint64_t sync);
 
 #endif // TARANTOOL_REPLICATION_H_INCLUDED
 

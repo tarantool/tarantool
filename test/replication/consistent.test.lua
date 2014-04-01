@@ -1,4 +1,4 @@
---# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
+--# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default, script='replication/replica.lua'
 --# start server replica
 --# set connection default
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
