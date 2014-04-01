@@ -39,6 +39,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
 
 struct Sophia: public Engine {
 	Sophia(EngineFactory*);
@@ -56,27 +59,10 @@ sophia_replace_noop(struct space*,
 	return NULL;
 }
 
-#if 0
-static void
-sophia_build_secondary_keys(struct space *space)
-{
-	engine_recovery *r = &space->engine->recovery;
-	r->state = READY_ALL_KEYS;
-	/* enable replace */
-	r->replace = space_replace_primary_key;
-	r->recover = space_noop;
-}
-#endif
-
 static void
 sophia_end_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
-	/*
-	r->state   = READY_PRIMARY_KEY;
-	r->replace = sophia_replace_noop;
-	r->recover = sophia_build_secondary_keys;
-	*/
 	/* enable replace */
 	r->state = READY_ALL_KEYS;
 	r->replace = space_replace_primary_key;
@@ -108,7 +94,12 @@ SophiaFactory::SophiaFactory()
 void
 SophiaFactory::init()
 {
-	/* create directory */
+	int rc = mkdir("sophia", 0755);
+
+	if (rc == -1 && errno != EEXIST) {
+		say_error("failed to create directory: 'sophia', %d, %s",
+		          errno, strerror(errno));
+	}
 }
 
 Engine*

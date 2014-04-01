@@ -298,6 +298,7 @@ box_engine_init()
 	engine_register(memtx);
 
 	SophiaFactory *sophia = new SophiaFactory();
+	sophia->init();
 	engine_register(sophia);
 }
 

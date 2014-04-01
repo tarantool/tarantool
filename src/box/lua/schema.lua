@@ -8,6 +8,7 @@ ffi.cdef[[
     struct iterator {
         struct tuple *(*next)(struct iterator *);
         void (*free)(struct iterator *);
+        void (*close)(struct iterator *);
     };
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,

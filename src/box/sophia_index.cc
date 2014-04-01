@@ -86,19 +86,19 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	if (rc == -1)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 
-	char name[256];
-	snprintf(name, sizeof(name), "space%04d", key_def->space_id);
-	rc = sp_ctl(env, SPDIR, SPO_RDWR|SPO_CREAT, name);
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "sophia/%04d", key_def->space_id);
+	rc = sp_ctl(env, SPDIR, SPO_RDWR|SPO_CREAT, path);
 	if (rc == -1)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 
-	say_info("Start sophia space '%s' recover", name);
+	say_info("start sophia space '%s' recover", path);
 
 	db = sp_open(env);
 	if (db == NULL)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 
-	say_info("Recover complete");
+	say_info("recover complete");
 
 	env_freer.is_active = false;
 }
@@ -113,7 +113,7 @@ SophiaIndex::~SophiaIndex()
 	if (db) {
 		int rc = sp_destroy(db);
 		if (rc == -1)
-			say_info("Sophia space %d close error: %s", key_def->space_id,
+			say_info("sophia space %d close error: %s", key_def->space_id,
 			         sp_error(env));
 	}
 	if (env) {
