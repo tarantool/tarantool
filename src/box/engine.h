@@ -101,6 +101,10 @@ public:
 	 * space.
 	 */
 	virtual Index *createIndex(struct key_def*) = 0;
+	/*
+	 * Delete all tuples in the index on drop.
+	 */
+	virtual void dropIndex(Index*) = 0;
 	/**
 	 * Check a key definition for violation of
 	 * various limits.

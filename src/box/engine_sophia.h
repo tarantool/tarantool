@@ -34,6 +34,7 @@ struct SophiaFactory: public EngineFactory {
 	virtual void init();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
+	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void txnFinish(struct txn *txn);
 	virtual void recoveryEvent(enum engine_recovery_event event);

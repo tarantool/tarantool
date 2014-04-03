@@ -103,7 +103,7 @@ t
 space:drop()
 ---
 ...
-os.execute("rm -rf space0123")
+os.execute("rm -rf sophia")
 ---
 - 0
 ...

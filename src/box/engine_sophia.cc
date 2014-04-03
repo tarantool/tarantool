@@ -135,6 +135,12 @@ SophiaFactory::createIndex(struct key_def *key_def)
 }
 
 void
+SophiaFactory::dropIndex(Index *index)
+{
+	(void)index;
+}
+
+void
 SophiaFactory::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {

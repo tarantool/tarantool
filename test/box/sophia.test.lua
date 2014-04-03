@@ -24,4 +24,4 @@ for v=1, 10 do table.insert(t, space:get({v})) end
 t
 
 space:drop()
-os.execute("rm -rf space0123")
+os.execute("rm -rf sophia")

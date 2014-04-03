@@ -112,6 +112,16 @@ MemtxFactory::createIndex(struct key_def *key_def)
 }
 
 void
+MemtxFactory::dropIndex(Index *index)
+{
+	struct iterator *it = index->position();
+	index->initIterator(it, ITER_ALL, NULL, 0);
+	struct tuple *tuple;
+	while ((tuple = it->next(it)))
+		tuple_ref(tuple, -1);
+}
+
+void
 MemtxFactory::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {

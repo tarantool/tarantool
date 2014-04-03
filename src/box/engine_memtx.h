@@ -33,6 +33,7 @@ struct MemtxFactory: public EngineFactory {
 	MemtxFactory();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
+	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void recoveryEvent(enum engine_recovery_event event);
 };
