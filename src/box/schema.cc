@@ -303,7 +303,7 @@ static inline void
 space_end_recover_snapshot_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	f->recovery_event(END_RECOVERY_SNAPSHOT);
+	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
 }
 
 void
@@ -328,7 +328,7 @@ static inline void
 space_end_recover_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	f->recovery_event(END_RECOVERY);
+	f->recoveryEvent(END_RECOVERY);
 }
 
 void

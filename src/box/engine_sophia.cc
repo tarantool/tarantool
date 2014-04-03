@@ -109,7 +109,7 @@ SophiaFactory::open()
 }
 
 void
-SophiaFactory::recovery_event(enum engine_recovery_event event)
+SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 {
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
@@ -135,7 +135,7 @@ SophiaFactory::createIndex(struct key_def *key_def)
 }
 
 void
-SophiaFactory::key_def_check(struct key_def *key_def)
+SophiaFactory::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case TREE:
@@ -167,7 +167,7 @@ SophiaFactory::key_def_check(struct key_def *key_def)
 }
 
 void
-SophiaFactory::txn_finish(struct txn *txn)
+SophiaFactory::txnFinish(struct txn *txn)
 {
 	if (txn->new_tuple)
 		tuple_ref(txn->new_tuple, -1);

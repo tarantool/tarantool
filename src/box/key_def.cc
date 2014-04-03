@@ -190,7 +190,7 @@ key_def_check(struct key_def *key_def)
 		space_cache_find(key_def->space_id);
 
 	/* validate key_def->type */
-	space->engine->factory->key_def_check(key_def);
+	space->engine->factory->keydefCheck(key_def);
 }
 
 void

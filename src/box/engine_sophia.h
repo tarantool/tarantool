@@ -34,9 +34,9 @@ struct SophiaFactory: public EngineFactory {
 	virtual void init();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
-	virtual void key_def_check(struct key_def *key_def);
-	virtual void txn_finish(struct txn *txn);
-	virtual void recovery_event(enum engine_recovery_event event);
+	virtual void keydefCheck(struct key_def *key_def);
+	virtual void txnFinish(struct txn *txn);
+	virtual void recoveryEvent(enum engine_recovery_event event);
 };
 
 #endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */

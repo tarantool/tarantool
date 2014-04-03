@@ -56,4 +56,5 @@ void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);
 void txn_add_redo(struct txn *txn, struct request *request);
+
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

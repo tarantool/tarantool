@@ -105,11 +105,11 @@ public:
 	 * Check a key definition for violation of
 	 * various limits.
 	 */
-	virtual void key_def_check(struct key_def *key_def) = 0;
+	virtual void keydefCheck(struct key_def *key_def) = 0;
 	/* Clean transaction engine resources.  */
-	virtual void txn_finish(struct txn *txn);
+	virtual void txnFinish(struct txn *txn);
 	/* Inform engine about a recovery stage change. */
-	virtual void recovery_event(enum engine_recovery_event);
+	virtual void recoveryEvent(enum engine_recovery_event);
 public:
 	/** Name of the engine. */
 	const char *name;

@@ -78,7 +78,7 @@ MemtxFactory::MemtxFactory()
 }
 
 void
-MemtxFactory::recovery_event(enum engine_recovery_event event)
+MemtxFactory::recoveryEvent(enum engine_recovery_event event)
 {
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
@@ -112,7 +112,7 @@ MemtxFactory::createIndex(struct key_def *key_def)
 }
 
 void
-MemtxFactory::key_def_check(struct key_def *key_def)
+MemtxFactory::keydefCheck(struct key_def *key_def)
 {
 	switch (key_def->type) {
 	case HASH:
