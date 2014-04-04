@@ -306,7 +306,6 @@ sio_recvfrom(int fd, void *buf, size_t len, int flags,
 }
 
 /** Get socket peer name. */
-#pragma clang diagnostic ignored "-Wdeprecated"
 int
 sio_getpeername(int fd, struct sockaddr_in *addr)
 {
