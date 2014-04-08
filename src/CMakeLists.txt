@@ -11,6 +11,7 @@ include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
+include_directories(${READLINE_INCLUDE_DIR})
 
 # Require pthread globally if compiling with GCC
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -23,6 +24,7 @@ set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
+lua_source(lua_sources lua/interactive.lua)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 set(bin_sources)
@@ -113,6 +115,7 @@ list(APPEND common_libraries
     ${LIBGOPT_LIBRARIES}
     ${LIBCJSON_LIBRARIES}
     ${LIBYAML_LIBRARIES}
+    ${READLINE_LIBRARIES}
     ${LUAJIT_LIB}
     misc
 )

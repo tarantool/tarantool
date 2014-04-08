@@ -4,6 +4,8 @@
 #include <box/tuple.h>
 #include <box/lua/index.h>
 #include <box/lua/call.h>
+#include <readline/readline.h>
+#include <lua/init.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -25,5 +27,7 @@ void *ffi_symbols[] = {
 	(void *) port_ffi_create,
 	(void *) port_ffi_destroy,
 	(void *) boxffi_select,
-	(void *) password_prepare
+	(void *) password_prepare,
+	(void *) readline,
+	(void *) tarantool_lua_interactive
 };

@@ -570,7 +570,7 @@ main(int argc, char **argv)
 	__libc_stack_end = (void*) &argv;
 #endif
 
-	if (argc <= 1 || access(argv[1], R_OK) != 0) {
+	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 		if (gopt(opt, 'V')) {
 			printf("Tarantool %s\n", tarantool_version());
@@ -612,9 +612,11 @@ main(int argc, char **argv)
 	 * - in case one uses #!/usr/bin/env tarantool
 	 *   such options (in script line) don't work
 	 */
-	argv++;
-	argc--;
-	script = abspath(argv[0]);
+	if (argc > 1) {
+		argv++;
+		argc--;
+		script = abspath(argv[0]);
+	}
 
 	random_init();
 	say_init(argv[0]);

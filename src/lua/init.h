@@ -87,4 +87,10 @@ void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
 
+/**
+ * Eval line and print output.
+ */
+extern "C" void
+tarantool_lua_interactive(char *line);
+
 #endif /* INCLUDES_TARANTOOL_LUA_H */

@@ -64,6 +64,11 @@ include(cmake/os.cmake)
 include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/profile.cmake)
+include(cmake/FindReadline.cmake)
+
+if (NOT READLINE_FOUND)
+    message(FATAL_ERROR "readline library not found.")
+endif()
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)

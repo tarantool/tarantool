@@ -67,8 +67,10 @@ extern "C" {
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
-extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[];
-static const char *lua_sources[] = { uuid_lua, session_lua, NULL };
+extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
+       interactive_lua[];
+static const char *lua_sources[] = { uuid_lua, session_lua, interactive_lua,
+	NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, NULL };
 /*
@@ -354,16 +356,6 @@ tarantool_lua_dostring(struct lua_State *L, const char *str)
 	return 0;
 }
 
-static int
-tarantool_lua_dofile(struct lua_State *L, const char *filename)
-{
-	lua_getglobal(L, "dofile");
-	lua_pushstring(L, filename);
-	lbox_pcall(L);
-	bool result = lua_toboolean(L, 1);
-	return result ? 0 : 1;
-}
-
 extern "C" {
 	int yamlL_encode(lua_State*);
 };
@@ -430,6 +422,17 @@ tarantool_lua(struct lua_State *L,
 		tbuf_printf(out, "---\n- error: %s\n...\n", err);
 		lua_settop(L, 0);
 	}
+}
+
+extern "C" void
+tarantool_lua_interactive(char *line)
+{
+	struct tbuf *out = tbuf_new(&fiber()->gc);
+	struct lua_State *L = lua_newthread(tarantool_L);
+	tarantool_lua(L, out, line);
+	lua_pop(tarantool_L, 1);
+	printf("%.*s", out->size, out->data);
+	fiber_gc();
 }
 
 /**
@@ -569,12 +572,17 @@ run_script(va_list ap)
 	if (access(path, F_OK) == 0) {
 		say_info("loading %s", path);
 		/* Execute the init file. */
-		if (tarantool_lua_dofile(L, path))
-			panic("%s", lua_tostring(L, -1));
-
-		/* clear the stack from return values. */
-		lua_settop(L, 0);
+		lua_getglobal(L, "dofile");
+		lua_pushstring(L, path);
+	} else {
+		lua_getglobal(L, "interactive");
 	}
+	lbox_pcall(L);
+	if (! lua_toboolean(L, 1))
+		panic("%s", lua_tostring(L, -1));
+
+	/* clear the stack from return values. */
+	lua_settop(L, 0);
 	/*
 	 * The file doesn't exist. It's OK, tarantool may
 	 * have no init file.
@@ -590,8 +598,7 @@ run_script(va_list ap)
 void
 tarantool_lua_run_script(char *path)
 {
-	if (path == NULL)
-		return;
+	const char *title = path ? basename(path) : "interactive";
 	/*
 	 * init script can call box.fiber.yield (including implicitly via
 	 * box.insert, box.update, etc...), but box.fiber.yield() today,
@@ -599,7 +606,7 @@ tarantool_lua_run_script(char *path)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_new(basename(path), run_script);
+	struct fiber *loader = fiber_new(title, run_script);
 	fiber_call(loader, tarantool_L, path);
 
 	/*
