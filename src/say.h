@@ -51,11 +51,14 @@ enum say_level {
 extern int sayfd;
 extern pid_t logger_pid;
 
+void
+say_set_log_level(int new_level);
+
 /** Basic init. */
 void say_init(const char *argv0);
 
 /* Move logging to a separate process. */
-void say_logger_init(char *logger, int *log_level, int nonblock);
+void say_logger_init(const char *logger, int log_level, int nonblock);
 
 void vsay(int level, const char *filename, int line, const char *error,
           const char *format, va_list ap)

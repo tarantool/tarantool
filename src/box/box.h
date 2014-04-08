@@ -45,7 +45,6 @@ struct tbuf;
 struct port;
 struct fio_batch;
 struct log_io;
-struct tarantool_cfg;
 struct lua_State;
 
 /** To be called at program start. */
@@ -64,19 +63,6 @@ typedef void (*box_process_func)(struct port *port, struct request *request);
 /** For read-write operations. */
 extern box_process_func box_process;
 /** For read-only port. */
-
-/*
- * Check storage-layer related options in the
- * configuration file.
- */
-int
-box_check_config(struct tarantool_cfg *conf);
-/*
- * Take into effect storage-layer related
- * changes in the server configuration.
- */
-int
-box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf);
 
 /** Non zero if snapshot is in progress. */
 extern int snapshot_pid;
@@ -105,6 +91,18 @@ const char *box_status(void);
  */
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
+
+void
+box_set_wal_fsync_delay(double delay);
+
+void
+box_set_replication_source(const char *source);
+
+void box_set_wal_mode(const char *mode);
+void box_set_log_level(int level);
+void box_set_io_collect_interval(double interval);
+void box_set_snap_io_rate_limit(double limit);
+void box_set_too_long_threshold(double threshold);
 
 #if defined(__cplusplus)
 }

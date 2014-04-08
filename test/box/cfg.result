@@ -2,73 +2,62 @@
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "getmetatable(box.cfg).__newindex = function(t..."]:2: Attempt to
-    modify a read-only table'
+- error: '[string "-- load_cfg.lua - internal file..."]:89: Attempt to modify a read-only
+    table'
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
 ---
 ...
 t
 ---
-- - 'io_collect_interval: 0'
-  - 'pid_file: box.pid'
+- - 'pid_file: tarantool.pid'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
   - 'admin_port: <number>
-  - 'logger: cat - >> tarantool.log'
-  - 'readahead: 16320'
+  - 'primary_port: <number>
   - 'log_level: 5'
-  - 'rows_per_wal: 50'
   - 'logger_nonblock: true'
-  - 'too_long_threshold: 0.5'
   - 'snap_dir: .'
   - 'coredump: false'
-  - 'primary_port: <number>
+  - 'too_long_threshold: 0.5'
+  - 'wal_mode: write'
+  - 'rows_per_wal: 50'
+  - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'wal_dir: .'
-  - 'wal_mode: fsync_delay'
-  - 'slab_alloc_arena: 0.1'
-  - 'panic_on_snap_error: true'
-  - 'local_hot_standby: false'
-  - 'snap_io_rate_limit: 0'
+  - 'readahead: 16320'
   - 'bind_ipaddr: INADDR_ANY'
-  - 'wal_fsync_delay: 0'
+  - 'slab_alloc_arena: 0.1'
   - 'background: false'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 -- must be read-only
-box.cfg.reload()
+box.cfg()
 ---
-- ok
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
 ---
 ...
 t
 ---
-- - 'io_collect_interval: 0'
-  - 'pid_file: box.pid'
+- - 'pid_file: tarantool.pid'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
   - 'admin_port: <number>
-  - 'logger: cat - >> tarantool.log'
-  - 'readahead: 16320'
+  - 'primary_port: <number>
   - 'log_level: 5'
-  - 'rows_per_wal: 50'
   - 'logger_nonblock: true'
-  - 'too_long_threshold: 0.5'
   - 'snap_dir: .'
   - 'coredump: false'
-  - 'primary_port: <number>
+  - 'too_long_threshold: 0.5'
+  - 'wal_mode: write'
+  - 'rows_per_wal: 50'
+  - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'wal_dir: .'
-  - 'wal_mode: fsync_delay'
-  - 'slab_alloc_arena: 0.1'
-  - 'panic_on_snap_error: true'
-  - 'local_hot_standby: false'
-  - 'snap_io_rate_limit: 0'
+  - 'readahead: 16320'
   - 'bind_ipaddr: INADDR_ANY'
-  - 'wal_fsync_delay: 0'
+  - 'slab_alloc_arena: 0.1'
   - 'background: false'
   - 'wal_dir_rescan_delay: 0.1'
 ...

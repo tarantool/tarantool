@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ADMIN_H_INCLUDED
-#define TARANTOOL_ADMIN_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_CFG_H
+#define INCLUDES_TARANTOOL_CFG_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,7 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-int admin_init(const char *bind_ipaddr, int admin_port,
-	       void (*on_bind)(void *));
+int
+cfg_geti(const char *param);
 
-#endif /* TARANTOOL_ADMIN_H_INCLUDED */
+const char *
+cfg_gets(const char *param);
+
+double
+cfg_getd(const char *param);
+#endif /* INCLUDES_TARANTOOL_CFG_H */

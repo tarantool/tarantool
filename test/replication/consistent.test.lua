@@ -1,4 +1,4 @@
---# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default, script='replication/replica.lua'
+--# create server replica with rpl_master=default, script='replication/replica.lua'
 --# start server replica
 --# set connection default
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
@@ -64,7 +64,8 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration 'replication/cfg/replica_to_master.cfg', rpl_master=None
+old_replication_source = box.cfg.replication_source
+box.cfg{replication_source=""}
 --# set connection default
 _insert(11, 20, 'master')
 _select(11, 20)
@@ -82,7 +83,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
+box.cfg{replication_source=old_replication_source}
 _select(11, 20)
 --# set connection default
 -- Master LSN:
@@ -97,7 +98,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg', rpl_master=None
+box.cfg{replication_source=""}
 --# set connection default
 _insert(21, 30, 'master')
 _select(21, 30)
@@ -115,7 +116,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
+box.cfg{replication_source=old_replication_source}
 _select(21, 30)
 
 --# set connection default
@@ -131,7 +132,7 @@ _print_lsn()
 --------------------
 -- Replica to Master
 --------------------
---# reconfigure server replica with configuration='replication/cfg/replica_to_master.cfg', rpl_master=None
+box.cfg{replication_source=""}
 --# set connection default
 _insert(31, 40, 'master')
 _select(31, 40)
@@ -149,7 +150,7 @@ _print_lsn()
 -------------------
 -- rollback Replica
 -------------------
---# reconfigure server replica with configuration='replication/cfg/replica.cfg', rpl_master=default
+box.cfg{replication_source=old_replication_source}
 _select(31, 50)
 --# set connection default
 _insert(41, 60, 'master')

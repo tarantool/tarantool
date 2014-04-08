@@ -19,16 +19,19 @@ class LuaPreprocessorException(Exception):
     def __str__(self):
         return "lua preprocessor error: " + repr(self.value)
 
-class State(object):
-    def __init__(self, suite_ini, curcon, server):
+class TestState(object):
+    def __init__(self, suite_ini, default_server, create_server):
         self.delimiter = ''
         self.suite_ini = suite_ini
-        self.curcon = [curcon]
-        self.tarantool_server = server
         self.environ = Namespace()
+        self.create_server = create_server 
+        self.servers =      { 'default': default_server }
+        self.connections =  { 'default': default_server.admin }
+        # curcon is an array since we may have many connections
+        self.curcon = [self.connections['default']]
         nmsp = Namespace()
-        setattr(nmsp, 'admin_port', self.suite_ini['servers']['default'].admin.port)
-        setattr(nmsp, 'primary_port', self.suite_ini['servers']['default'].sql.port)
+        setattr(nmsp, 'admin_port', default_server.admin.port)
+        setattr(nmsp, 'primary_port', default_server.sql.port)
         setattr(self.environ, 'default', nmsp)
 
     def parse_preprocessor(self, string):
@@ -125,97 +128,71 @@ class State(object):
 
     def server(self, ctype, sname, opts):
         if ctype == 'create':
-            if sname in self.suite_ini['servers']:
+            if sname in self.servers:
                 raise LuaPreprocessorException('Server {0} already exists'.format(repr(sname)))
-            temp = self.tarantool_server()
-            if 'configuration' in opts:
-                temp.cfgfile_source = opts['configuration'][1:-1]
-            else:
-                temp.cfgfile_source = self.suite_ini['config']
+            temp = self.create_server()
             if 'need_init' in opts:
                 temp.need_init   = True if opts['need_init'] == 'True' else False
             if 'script' in opts:
                 temp.script = opts['script'][1:-1]
+            temp.rpl_master = None
             if 'rpl_master' in opts:
-                temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
-            elif 'hot_master' in opts:
-                temp.hot_master = (self.suite_ini['servers'][opts['hot_master']] if (not opts['hot_master'] == 'None') else None)
+                temp.rpl_master = self.servers[opts['rpl_master']]
             temp.vardir = os.path.join(self.suite_ini['vardir'], sname)
             temp.name = sname
-            self.suite_ini['servers'][sname] = temp
-            self.suite_ini['servers'][sname].deploy(silent=True)
+            self.servers[sname] = temp
+            self.servers[sname].deploy(silent=True)
             nmsp = Namespace()
             setattr(nmsp, 'admin_port', temp.admin.port)
             setattr(nmsp, 'primary_port', temp.sql.port)
+            if temp.rpl_master:
+                setattr(nmsp, 'master_port', temp.rpl_master.sql.port)
             setattr(self.environ, sname, nmsp)
         elif ctype == 'start':
-            if sname not in self.suite_ini['servers']:
+            if sname not in self.servers:
                 raise LuaPreprocessorException('Can\'t start nonexistent server '+repr(sname))
-            self.suite_ini['servers'][sname].start(silent=True)
-            self.suite_ini['connections'][sname] = [self.suite_ini['servers'][sname].admin, sname]
+            self.servers[sname].start(silent=True)
+            self.connections[sname] = self.servers[sname].admin
             try:
-                self.suite_ini['connections'][sname][0]('print(\'Started? I\'t seems to me, that yep\')', silent=True)
+                self.connections[sname]('return true', silent=True)
             except socket.error as e:
                 LuaPreprocessorException('Can\'t start server '+repr(sname))
         elif ctype == 'stop':
-            if sname not in self.suite_ini['servers']:
+            if sname not in self.servers:
                 raise LuaPreprocessorException('Can\'t stop nonexistent server '+repr(sname))
-            self.suite_ini['servers'][sname].stop()
-            for cname in [k for k, v in self.suite_ini['connections'].iteritems() if v[1] == 'sname']:
-                self.suite_ini['connections'][cname][0].disconnect()
-                self.suite_ini['connections'].pop(cname)
+            self.connections[sname].disconnect()
+            self.connections.pop(sname)
+            self.servers[sname].stop()
         elif ctype == 'deploy':
             pass
-        elif ctype == 'reconfigure':
-            if sname not in self.suite_ini['servers']:
-                raise LuaPreprocessorException('Can\'t reconfigure nonexistent server '+repr(sname))
-            temp = self.suite_ini['servers'][sname]
-            if 'rpl_master' in opts:
-                temp.rpl_master = (self.suite_ini['servers'][opts['rpl_master']] if (not opts['rpl_master'] == 'None') else None)
-            elif 'hot_master' in opts:
-                temp.hot_master = (self.suite_ini['servers'][opts['hot_master']] if (not opts['hot_master'] == 'None') else None)
-            if 'configuration' in opts:
-                temp.reconfigure(opts['configuration'][1:-1], silent = True)
-            else:
-                temp.config = self.suite_ini['config']
-                if temp.script != None:
-                    if os.path.exists(temp.script_dst):
-                        os.unlink(temp.script_dst)
-                if 'script' in opts:
-                    temp.script = opts['script'][1:-1]
-                    shutil.copy(temp.script, temp.script_dst)
-                    temp.restart()
-            nmsp = Namespace()
-            setattr(nmsp, 'admin_port', temp.admin.port)
-            setattr(nmsp, 'primary_port', temp.sql.port)
-            setattr(self.environ, sname, nmsp)
         elif ctype == 'cleanup':
-            if sname not in self.suite_ini['servers']:
+            if sname not in self.servers:
                 raise LuaPreprocessorException('Can\'t cleanup nonexistent server '+repr(sname))
-            self.suite_ini['servers'][sname].cleanup()
+            self.servers[sname].cleanup()
             delattr(self.environ, sname)
         else:
             raise LuaPreprocessorException('Unknown command for server: '+repr(ctype))
 
-    def connection(self, ctype, cname, sname):
+    def connection(self, ctype, cnames, sname):
+        # we always get a list of connections as input here
+        cname = cnames[0]
         if ctype == 'create':
-            if sname not in self.suite_ini['servers']:
+            if sname not in self.servers:
                 raise LuaPreprocessorException('Can\'t create connection to nonexistent server '+repr(sname))
-            if cname[0] in self.suite_ini['connections']:
+            if cname in self.connections:
                 raise LuaPreprocessorException('Connection {0} already exists'.format(repr(cname)))
-            self.suite_ini['connections'][cname[0]] = [AdminConnection('localhost',
-                    self.suite_ini['servers'][sname].port), sname]
-            self.suite_ini['connections'][cname[0]][0].connect()
+            self.connections[cname] = AdminConnection('localhost', self.servers[sname].admin.port)
+            self.connections[cname].connect()
         elif ctype == 'drop':
-            if cname[0] not in self.suite_ini['connections']:
+            if cname not in self.connections:
                 raise LuaPreprocessorException('Can\'t drop nonexistent connection '+repr(cname))
-            self.suite_ini['connections'][cname[0]][0].disconnect()
-            self.suite_ini['connections'].pop(cname[0])
+            self.connections[cname].disconnect()
+            self.connections.pop(cname)
         elif ctype == 'set':
-            for i in cname:
-                if not i in self.suite_ini['connections']:
+            for i in cnames:
+                if not i in self.connections:
                     raise LuaPreprocessorException('Can\'t set nonexistent connection '+repr(cname))
-            self.curcon = [self.suite_ini['connections'][i][0] for i in cname]
+            self.curcon = [self.connections[i] for i in cnames]
         else:
             raise LuaPreprocessorException('Unknown command for connection: '+repr(ctype))
 
@@ -239,16 +216,14 @@ class State(object):
         string = string[3:].strip()
         self.parse_preprocessor(string)
 
-    def flush(self):
+    def cleanup(self):
         sys.stdout.clear_all_filters()
-        a = self.suite_ini['servers']['default']
-        self.suite_ini['servers'].pop('default')
-        for k, v in self.suite_ini['servers'].iteritems():
+        # don't stop the default server
+        self.servers.pop('default')
+        for k, v in self.servers.iteritems():
             v.stop(silent=True)
             v.cleanup()
-            for cname in [name for name, tup in self.suite_ini['connections'].iteritems() if tup[1] == 'sname']:
-                self.suite_ini['connections'][cname].disconnect()
-                self.suite_ini['connections'].pop(cname)
-        self.suite_ini['servers'] = {}
-        self.suite_ini['servers']['default'] = a
+            if k in self.connections:
+                self.connections[k].disconnect()
+                self.connections.pop(k)
 

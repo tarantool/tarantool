@@ -24,12 +24,10 @@ class UnittestServer(Server):
         if _ini is None:
             _ini = {}
         ini = {
-            'config': None,
             'core': 'tarantool',
             'gdb': False,
             'init_lua': None,
             'lua_libs': [],
-            'random_ports': True,
             'valgrind': False,
             'vardir': None
         }; ini.update(_ini)

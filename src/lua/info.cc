@@ -90,6 +90,14 @@ lbox_info_snapshot_pid(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_logger_pid(struct lua_State *L)
+{
+	lua_pushnumber(L, logger_pid);
+	return 1;
+}
+
+
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
 {
@@ -99,6 +107,7 @@ lbox_info_dynamic_meta [] =
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},
+	{"logger_pid", lbox_info_logger_pid},
 	{NULL, NULL}
 };
 
@@ -131,16 +140,6 @@ lbox_info_init_static_values(struct lua_State *L)
 	/* pid */
 	lua_pushstring(L, "pid");
 	lua_pushnumber(L, getpid());
-	lua_settable(L, -3);
-
-	/* logger_pid */
-	lua_pushstring(L, "logger_pid");
-	lua_pushnumber(L, logger_pid);
-	lua_settable(L, -3);
-
-	/* config */
-	lua_pushstring(L, "config");
-	lua_pushstring(L, cfg_filename_fullpath);
 	lua_settable(L, -3);
 
 	/* build */

@@ -215,7 +215,8 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	assert(recovery_state == NULL);
 	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
-	recovery_update_mode(r, "none", 0);
+	recovery_update_mode(r, WAL_NONE);
+	recovery_update_fsync_delay(r, 0);
 
 	assert(rows_per_wal > 1);
 
@@ -236,18 +237,22 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 }
 
 void
-recovery_update_mode(struct recovery_state *r,
-		     const char *mode, double fsync_delay)
+recovery_update_mode(struct recovery_state *r, enum wal_mode mode)
 {
-	r->wal_mode = (enum wal_mode) strindex(wal_mode_STRS, mode, WAL_MODE_MAX);
-	assert(r->wal_mode != WAL_MODE_MAX);
+	assert(mode < WAL_MODE_MAX);
+	r->wal_mode = mode;
+}
+
+void
+recovery_update_fsync_delay(struct recovery_state *r, double new_delay)
+{
 	/* No mutex lock: let's not bother with whether
 	 * or not a WAL writer thread is present, and
 	 * if it's present, the delay will be propagated
 	 * to it whenever there is a next lock/unlock of
 	 * wal_writer->mutex.
 	 */
-	r->wal_fsync_delay = fsync_delay;
+	r->wal_fsync_delay = new_delay;
 }
 
 void
@@ -560,7 +565,9 @@ recover_current_wal:
 		result = -1;
 	}
 
+#if 0
 	region_free(&fiber()->gc);
+#endif
 	return result;
 }
 
@@ -584,7 +591,10 @@ recover_existing_wals(struct recovery_state *r)
 		panic("recover failed");
 	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
 out:
+#if 0
 	region_free(&fiber()->gc);
+#endif
+	;
 }
 
 void

@@ -48,7 +48,6 @@ space:update(1936941424, {{'-', 2, 1}})
 space:update(1936941424, {{'-', 2, 1}})
 space:update(1936941424, {{'+', 2, 1}})
 space:delete{1936941424}
-box.cfg.reload()
 -- must be read-only
 
 space:insert{1953719668}

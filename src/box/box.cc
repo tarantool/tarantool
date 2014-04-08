@@ -30,11 +30,6 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-} /* extern "C" */
-
 #include <errcode.h>
 #include <recovery.h>
 #include "replica.h"
@@ -57,6 +52,7 @@ extern "C" {
 #include "txn.h"
 #include "fiber.h"
 #include "access.h"
+#include "cfg.h"
 
 static void process_replica(struct port *port, struct request *request);
 static void process_ro(struct port *port, struct request *request);
@@ -109,7 +105,7 @@ process_replica(struct port *port, struct request *request)
 {
 	if (!iproto_request_is_select(request->code)) {
 		tnt_raise(ClientError, ER_NONMASTER,
-			  cfg.replication_source);
+			  cfg_gets("replication_source"));
 	}
 	return process_rw(port, request);
 }
@@ -123,7 +119,8 @@ process_ro(struct port *port, struct request *request)
 }
 
 static int
-recover_row(void *param __attribute__((unused)), struct iproto_packet *packet)
+recover_row(void *param __attribute__((unused)),
+	    struct iproto_packet *packet)
 {
 	try {
 		assert(packet->bodycnt == 1); /* always 1 for read */
@@ -142,14 +139,13 @@ recover_row(void *param __attribute__((unused)), struct iproto_packet *packet)
 }
 
 static void
-box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
+box_enter_master_or_replica_mode(const char *replication_source)
 {
-	if (conf->replication_source != NULL) {
+	if (replication_source != NULL) {
 		box_process = process_replica;
 
 		recovery_wait_lsn(recovery_state, recovery_state->lsn);
-		recovery_follow_remote(recovery_state,
-				       conf->replication_source);
+		recovery_follow_remote(recovery_state, replication_source);
 
 	} else {
 		box_process = process_rw;
@@ -158,125 +154,148 @@ box_enter_master_or_replica_mode(struct tarantool_cfg *conf)
 	}
 }
 
+/* {{{ configuration bindings */
+
 void
-box_leave_local_standby_mode(void *data __attribute__((unused)))
+box_check_replication_source(const char *source)
 {
-	recovery_finalize(recovery_state);
-
-	recovery_update_mode(recovery_state, cfg.wal_mode,
-			     cfg.wal_fsync_delay);
-
-	box_enter_master_or_replica_mode(&cfg);
+	if (source == NULL)
+		return;
+	/* check replication port */
+	char ip_addr[32];
+	int port;
+	if (sscanf(source, "%31[^:]:%i", ip_addr, &port) != 2) {
+		tnt_raise(ClientError, ER_CFG,
+			  "replication source IP address is not recognized");
+	}
+	if (port <= 0 || port >= USHRT_MAX) {
+		tnt_raise(ClientError, ER_CFG,
+			  "invalid replication source port");
+	}
 }
 
-int
-box_check_config(struct tarantool_cfg *conf)
+static void
+box_check_wal_mode(const char *mode_name)
 {
-	if (strindex(wal_mode_STRS, conf->wal_mode,
-		     WAL_MODE_MAX) == WAL_MODE_MAX) {
-		out_warning(CNF_OK, "wal_mode %s is not recognized", conf->wal_mode);
-		return -1;
+	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
+	if (mode == WAL_MODE_MAX) {
+		tnt_raise(ClientError, ER_CFG,
+			  "wal_mode is not recognized");
 	}
-	/* replication & hot standby modes can not work together */
-	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
-		out_warning(CNF_OK, "replication and local hot standby modes "
-			       "can't be enabled simultaneously");
-		return -1;
-	}
+}
 
+static void
+box_check_config()
+{
+	box_check_wal_mode(cfg_gets("wal_mode"));
 	/* check replication mode */
-	if (conf->replication_source != NULL) {
-		/* check replication port */
-		char ip_addr[32];
-		int port;
-
-		if (sscanf(conf->replication_source, "%31[^:]:%i",
-			   ip_addr, &port) != 2) {
-			out_warning(CNF_OK, "replication source IP address is not recognized");
-			return -1;
-		}
-		if (port <= 0 || port >= USHRT_MAX) {
-			out_warning(CNF_OK, "invalid replication source port value: %i", port);
-			return -1;
-		}
-	}
+	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check primary port */
-	if (conf->primary_port != 0 &&
-	    (conf->primary_port <= 0 || conf->primary_port >= USHRT_MAX)) {
-		out_warning(CNF_OK, "invalid primary port value: %i", conf->primary_port);
-		return -1;
-	}
+	int primary_port = cfg_geti("primary_port");
+	if (primary_port < 0 || primary_port >= USHRT_MAX)
+		tnt_raise(ClientError, ER_CFG,
+			  "invalid primary port value");
 
 	/* check rows_per_wal configuration */
-	if (conf->rows_per_wal <= 1) {
-		out_warning(CNF_OK, "rows_per_wal must be greater than one");
-		return -1;
+	if (cfg_geti("rows_per_wal") <= 1) {
+		tnt_raise(ClientError, ER_CFG,
+			  "rows_per_wal must be greater than one");
 	}
-
-	return 0;
 }
 
-int
-box_reload_config(struct tarantool_cfg *old_conf, struct tarantool_cfg *new_conf)
+extern "C" void
+box_set_replication_source(const char *source)
 {
-	if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode) != 0 ||
-	    old_conf->wal_fsync_delay != new_conf->wal_fsync_delay) {
-
-		double new_delay = new_conf->wal_fsync_delay;
-
-		/* Mode has changed: */
-		if (strcasecmp(old_conf->wal_mode, new_conf->wal_mode)) {
-			if (strcasecmp(old_conf->wal_mode, "fsync") == 0 ||
-			    strcasecmp(new_conf->wal_mode, "fsync") == 0) {
-				out_warning(CNF_OK, "wal_mode cannot switch to/from fsync");
-				return -1;
-			}
-		}
-
-		/*
-		 * Unless wal_mode=fsync_delay, wal_fsync_delay is
-		 * irrelevant and must be 0.
-		 */
-		if (strcasecmp(new_conf->wal_mode, "fsync_delay") != 0)
-			new_delay = 0.0;
-
-
-		recovery_update_mode(recovery_state, new_conf->wal_mode, new_delay);
-	}
-
-	if (old_conf->snap_io_rate_limit != new_conf->snap_io_rate_limit)
-		recovery_update_io_rate_limit(recovery_state, new_conf->snap_io_rate_limit);
-	bool old_is_replica = old_conf->replication_source != NULL;
-	bool new_is_replica = new_conf->replication_source != NULL;
+	box_check_replication_source(source);
+	bool old_is_replica = recovery_state->remote;
+	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(old_conf->replication_source, new_conf->replication_source) != 0))) {
+	     (strcmp(source, recovery_state->remote->source) != 0))) {
 
-		if (recovery_state->finalize != true) {
-			out_warning(CNF_OK, "Could not propagate %s before local recovery finished",
-				    old_is_replica == true ? "slave to master" :
-				    "master to slave");
-
-			return -1;
+		if (recovery_state->finalize) {
+			if (recovery_state->remote)
+				recovery_stop_remote(recovery_state);
+			box_enter_master_or_replica_mode(source);
+		} else {
+			/*
+			 * Do nothing, we're in local hot
+			 * standby mode, the server
+			 * will automatically begin following
+			 * the remote when local hot standby
+			 * mode is finished, see
+			 * box_leave_local_hot_standby_mode()
+			 */
 		}
-		if (recovery_state->remote) {
-			recovery_stop_remote(recovery_state);
-		}
-
-		box_enter_master_or_replica_mode(new_conf);
 	}
-	if (old_conf->io_collect_interval !=
-	    new_conf->io_collect_interval)  {
+}
 
-		ev_set_io_collect_interval(loop(),
-					   new_conf->io_collect_interval);
+extern "C" void
+box_set_wal_fsync_delay(double delay)
+{
+	recovery_update_fsync_delay(recovery_state, delay);
+}
+
+extern "C" void
+box_set_wal_mode(const char *mode_name)
+{
+	box_check_wal_mode(mode_name);
+	enum wal_mode mode = (enum wal_mode)
+		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
+	if (mode != recovery_state->wal_mode &&
+	    (mode == WAL_FSYNC || recovery_state->wal_mode == WAL_FSYNC)) {
+		tnt_raise(ClientError, ER_CFG,
+			  "wal_mode cannot switch to/from fsync");
 	}
-	if (old_conf->too_long_threshold != new_conf->too_long_threshold)
-		too_long_threshold = new_conf->too_long_threshold;
+	recovery_update_mode(recovery_state, mode);
+}
 
-	return 0;
+extern "C" void
+box_set_log_level(int level)
+{
+	say_set_log_level(level);
+}
+
+extern "C" void
+box_set_io_collect_interval(double interval)
+{
+	ev_set_io_collect_interval(loop(), interval);
+}
+
+extern "C" void
+box_set_snap_io_rate_limit(double limit)
+{
+	recovery_update_io_rate_limit(recovery_state, limit);
+}
+
+extern "C" void
+box_set_too_long_threshold(double threshold)
+{
+	too_long_threshold = threshold;
+}
+
+/* }}} configuration bindings */
+
+void
+box_leave_local_standby_mode(void *data __attribute__((unused)))
+{
+	if (recovery_state->finalize) {
+		/*
+		 * Nothing to do: this happens when the server
+		 * binds to both ports, and one of the callbacks
+		 * is called first.
+		 */
+		return;
+	}
+
+	recovery_finalize(recovery_state);
+
+	box_set_wal_mode(cfg_gets("wal_mode"));
+	box_set_wal_fsync_delay(cfg_getd("wal_fsync_delay"));
+
+	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
 }
 
 void
@@ -291,7 +310,7 @@ box_free(void)
 }
 
 static void
-box_engine_init()
+engine_init()
 {
 	MemtxFactory *memtx = new MemtxFactory();
 	engine_register(memtx);
@@ -300,44 +319,76 @@ box_engine_init()
 void
 box_init()
 {
+	box_check_config();
 	title("loading", NULL);
-	replication_prefork(cfg.snap_dir, cfg.wal_dir);
+
+	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
 
-	tuple_init(cfg.slab_alloc_arena, cfg.slab_alloc_minimal,
-		   cfg.slab_alloc_factor);
+	tuple_init(cfg_getd("slab_alloc_arena"),
+		   cfg_geti("slab_alloc_minimal"),
+		   cfg_getd("slab_alloc_factor"));
 
-	box_engine_init();
+	engine_init();
 
 	schema_init();
 	user_cache_init();
 
 	/* recovery initialization */
-	recovery_init(cfg.snap_dir, cfg.wal_dir,
-		      recover_row, NULL, box_snapshot_cb, cfg.rows_per_wal);
-	recovery_update_io_rate_limit(recovery_state, cfg.snap_io_rate_limit);
-	recovery_setup_panic(recovery_state, cfg.panic_on_snap_error, cfg.panic_on_wal_error);
+	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+		      recover_row, NULL, box_snapshot_cb,
+		      cfg_geti("rows_per_wal"));
+	recovery_update_io_rate_limit(recovery_state,
+				      cfg_getd("snap_io_rate_limit"));
+	recovery_setup_panic(recovery_state,
+			     cfg_geti("panic_on_snap_error"),
+			     cfg_geti("panic_on_wal_error"));
 
 	stat_base = stat_register(iproto_request_type_strs,
 				  IPROTO_DML_REQUEST_MAX);
 
-	recover_snap(recovery_state, cfg.replication_source);
+	recover_snap(recovery_state, cfg_gets("replication_source"));
 	space_end_recover_snapshot();
 	recover_existing_wals(recovery_state);
 	space_end_recover();
 
 	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 	title("orphan", NULL);
-	if (cfg.local_hot_standby) {
-		say_info("starting local hot standby");
-		recovery_follow_local(recovery_state, cfg.wal_dir_rescan_delay);
-		title("hot_standby", NULL);
+	recovery_follow_local(recovery_state,
+			      cfg_getd("wal_dir_rescan_delay"));
+	title("hot_standby", NULL);
+	const char *bind_ipaddr = cfg_gets("bind_ipaddr");
+	int primary_port = cfg_geti("primary_port");
+	int admin_port = cfg_geti("admin_port");
+	/*
+	 * If neither of the ports is set, become a master right
+	 * away (e.g. this is interactive mode or other
+	 * application server configuration).
+	 */
+	if (primary_port == 0 && admin_port == 0)
+		box_leave_local_standby_mode(NULL);
+	else {
+		void (*on_bind)(void *) = NULL;
+		if (primary_port) {
+			iproto_init(bind_ipaddr, primary_port,
+				    cfg_geti("readahead"));
+		} else {
+			/*
+			 * If no prmary port is given, leave local
+			 * host standby mode as soon as bound to the
+			 * admin port. Otherwise, wait till we're
+			 * bound to the master port.
+			 */
+			on_bind = box_leave_local_standby_mode;
+		}
+		if (admin_port)
+			admin_init(bind_ipaddr, admin_port, on_bind);
 	}
-	iproto_init(cfg.bind_ipaddr, cfg.primary_port, cfg.readahead);
-	admin_init(cfg.bind_ipaddr, cfg.admin_port);
-	if (cfg.io_collect_interval > 0)
-		ev_set_io_collect_interval(loop(), cfg.io_collect_interval);
-	too_long_threshold = cfg.too_long_threshold;
+	if (cfg_getd("io_collect_interval") > 0) {
+		ev_set_io_collect_interval(loop(),
+					   cfg_getd("io_collect_interval"));
+	}
+	too_long_threshold = cfg_getd("too_long_threshold");
 }
 
 static void

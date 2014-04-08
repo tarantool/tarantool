@@ -321,7 +321,9 @@ log_io_cursor_close(struct log_io_cursor *i)
 	 * Seek back to last known good offset.
 	 */
 	fseeko(l->f, i->good_offset, SEEK_SET);
+#if 0
 	region_free(&fiber()->gc);
+#endif
 }
 
 /**
@@ -343,12 +345,14 @@ log_io_cursor_next(struct log_io_cursor *i, struct iproto_packet *packet)
 	say_debug("log_io_cursor_next: marker:0x%016X/%zu",
 		  row_marker, sizeof(row_marker));
 
+#if 0
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
 	region_free_after(&fiber()->gc, 128 * 1024);
+#endif
 
 restart:
 	if (marker_offset > 0)

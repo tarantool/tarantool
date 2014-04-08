@@ -33,7 +33,6 @@
 
 struct lua_State;
 struct luaL_Reg;
-struct tarantool_cfg;
 struct tbuf;
 
 /**
@@ -70,12 +69,6 @@ const char *
 tarantool_lua_tostring(struct lua_State *L, int index);
 
 /**
- * Make a new configuration available in Lua
- */
-void
-tarantool_lua_load_cfg(struct tarantool_cfg *cfg);
-
-/**
  * Load and execute start-up file
  *
  * @param L is a Lua State.
@@ -87,6 +80,7 @@ void
 tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
 
+extern char *history;
 /**
  * Eval line and print output.
  */

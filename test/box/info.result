@@ -20,7 +20,7 @@ string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 ---
 - true
 ...
-string.match(box.info.logger_pid, '^[1-9][0-9]*$') ~= nil
+string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
@@ -39,10 +39,6 @@ box.info.recovery_last_update
 box.info.status
 ---
 - primary
-...
-string.len(box.info.config) > 0
----
-- true
 ...
 string.len(box.info.build.target) > 0
 ---
@@ -80,7 +76,6 @@ table.sort(t)
 t
 ---
 - - build
-  - config
   - logger_pid
   - lsn
   - pid

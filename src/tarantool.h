@@ -35,15 +35,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct tarantool_cfg;
 struct tbuf;
 
-extern struct tarantool_cfg cfg;
-extern char *cfg_filename_fullpath;
 extern char *custom_proc_title;
-int reload_cfg();
 extern char status[];
-void show_cfg(struct tbuf *out);
 const char *tarantool_version(void);
 /**
  * Get version (defined in PACKAGE_VERSION), packed into uint32_t
@@ -56,6 +51,12 @@ double tarantool_uptime(void);
 
 void __attribute__((format (printf, 2, 3)))
 title(const char *role, const char *fmt, ...);
+
+void
+load_cfg();
+
+void
+reload_cfg();
 
 #if defined(__cplusplus)
 } /* extern "C" */

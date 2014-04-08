@@ -8,10 +8,6 @@ function box.dostring(s, ...)
     return chunk(...)
 end
 
--- User can redefine the hook
-function box.on_reload_configuration()
-end
-
 require("bit")
 
 -- vim: set et ts=4 sts

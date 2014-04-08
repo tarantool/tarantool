@@ -25,6 +25,7 @@ lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
 lua_source(lua_sources lua/interactive.lua)
+lua_source(lua_sources lua/load_cfg.lua)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 set(bin_sources)
@@ -78,6 +79,7 @@ set (common_sources
      scramble.c
      tbuf.c
      opts.c
+     cfg.cc
      cpu_feature.c
      fiob.c
      ffisyms.cc
@@ -106,7 +108,7 @@ set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
 
-set (common_libraries cfg core small salad)
+set (common_libraries core small salad)
 
 list(APPEND common_libraries
     ${LIBEV_LIBRARIES}
@@ -160,22 +162,7 @@ set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
 function(tarantool_module mod)
     set (module_sources ${ARGN})
-    set(cfg_c_flags "-Wno-unused -Wno-unused-parameter")
-    if (CMAKE_COMPILER_IS_CLANG)
-        set(cfg_c_flags "${cfg_c_flags} -Wno-semicolon-before-method-body")
-    endif()
-    set_source_files_properties(
-        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c
-        PROPERTIES COMPILE_FLAGS ${cfg_c_flags}
-        GENERATED True)
-    unset(cfg_c_flags)
-    add_executable(tarantool_${mod}
-        ${module_sources}
-        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.c)
-
-    set_source_files_properties(${recompiled_sources}
-        PROPERTIES OBJECT_DEPENDS
-        ${CMAKE_SOURCE_DIR}/cfg/tarantool_${mod}_cfg.h)
+    add_executable(tarantool_${mod} ${module_sources})
 
     set_source_files_compile_flags(
         ${recompiled_sources} ${module_sources})

@@ -8,7 +8,7 @@ space:create_index('primary', { type = 'hash' })
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
 box.stat()
 help()
-box.cfg()
+box.cfg
 box.stat()
 space:insert{1, 'tuple'}
 box.snapshot()
@@ -24,7 +24,7 @@ function test_box_info()
     local tmp = box.info()
     local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
     local buildstr = {'flags', 'target', 'compiler', 'options'}
-    local str = {'version', 'status', 'config'}
+    local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.lsn, 'cdata') == false then
         table.insert(failed1, 'box.info().lsn')

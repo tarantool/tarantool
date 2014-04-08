@@ -1,10 +1,12 @@
 #!/usr/bin/env tarantool_box
+os = require('os')
 box.cfg({
-    primary_port        = os.getenv("PRIMARY_PORT"),
+    primary_port        = os.getenv("MASTER_PORT"),
     admin_port          = os.getenv("ADMIN_PORT"),
-    replication_source  = "127.0.0.1:"..os.getenv("MASTER_PORT"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
     logger              = "cat - >> tarantool.log",
-    custom_proc_title   = "replica",
+    custom_proc_title   = "hot_standby",
+    wal_dir             = "..",
+    snap_dir            = "..",
 })

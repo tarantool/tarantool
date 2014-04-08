@@ -17,12 +17,10 @@ def select_tuples(_server, begin, end, lsn):
 
 # master server
 master = server
-cfgfile_bkp = server.cfgfile_source
 # replica server
 replica = TarantoolServer()
 replica.script = "replication/replica.lua"
 replica.rpl_master = master
-replica.cfgfile_source = "replication/cfg/replica.cfg"
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.deploy()
 
@@ -49,10 +47,12 @@ for i in range(REPEAT):
     print "swap servers"
     # reconfigure replica to master
     replica.rpl_master = None
-    replica.reconfigure("replication/cfg/replica_to_master.cfg", silent = False)
+    print("switch replica to master")
+    replica.admin("box.cfg{replication_source=''}")
     # reconfigure master to replica
     master.rpl_master = replica
-    master.reconfigure("replication/cfg/master_to_replica.cfg", silent = False)
+    print("switch master to replica")
+    master.admin("box.cfg{replication_source='127.0.0.1:%s'}" % replica.sql.port, silent=True)
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
@@ -69,15 +69,16 @@ for i in range(REPEAT):
     print "rollback servers configuration"
     # reconfigure replica to master
     master.rpl_master = None
-    master.reconfigure("replication/cfg/master.cfg", silent = False)
+    print("switch master to master")
+    master.admin("box.cfg{replication_source=''}")
     # reconfigure master to replica
     replica.rpl_master = master
-    replica.reconfigure("replication/cfg/replica.cfg", silent = False)
+    print("switch replica to replica")
+    replica.admin("box.cfg{replication_source='127.0.0.1:%s'}" % master.sql.port, silent=True)
 
 
 # Cleanup.
 replica.stop()
 replica.cleanup(True)
 server.stop()
-server.cfgfile_source = cfgfile_bkp
 server.deploy()

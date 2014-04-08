@@ -3,7 +3,6 @@ import glob
 from lib.tarantool_server import TarantoolServer
 
 # master server
-cfgfile_backup = server.cfgfile_source
 master = server
 
 master.admin("space = box.schema.create_space('test', {id =  42})")
@@ -19,7 +18,7 @@ print 'replica test 1 (no such space)'
 print '-------------------------------------------------------------'
 
 replica = TarantoolServer(server.ini)
-replica.cfgfile_source = 'replication/cfg/replica.cfg'
+replica.script = 'replication/replica.lua'
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
@@ -38,7 +37,7 @@ print 'replica test 2 (must be ok)'
 print '-------------------------------------------------------------'
 
 replica = TarantoolServer(server.ini)
-replica.cfgfile_source = 'replication/cfg/replica.cfg'
+replica.script = 'replication/replica.lua'
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.rpl_master = master
 replica.deploy()
@@ -52,6 +51,5 @@ replica.stop()
 replica.cleanup(True)
 
 server.stop()
-server.cfgfile_source = cfgfile_backup
 server.deploy()
 
