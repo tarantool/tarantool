@@ -4,8 +4,9 @@
 #include <box/tuple.h>
 #include <box/lua/index.h>
 #include <box/lua/call.h>
-#include <readline/readline.h>
 #include <lua/init.h>
+#include <stdio.h>
+#include <readline/readline.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
