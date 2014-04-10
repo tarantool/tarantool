@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>StandardOutPath</key>
-    <string>/var/log/tarantool_@TARANTOOL_PRODUCT@.log</string>
+    <string>/var/log/tarantool.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/tarantool_@TARANTOOL_PRODUCT@.log</string>
+    <string>/var/log/tarantool.log</string>
     <key>WorkingDirectory</key>
     <string>@CMAKE_INSTALL_PREFIX@</string>
     <key>EnvironmentVariables</key>
@@ -19,11 +19,10 @@
         <false/>
     </dict>
     <key>Label</key>
-    <string>@DARWIN_PACKAGE_ID@.@CPACK_PACKAGE_VENDOR@.tarantool_@TARANTOOL_PRODUCT@</string>
+    <string>@DARWIN_PACKAGE_ID@.@CPACK_PACKAGE_VENDOR@.tarantool</string>
     <key>ProgramArguments</key>
     <array>
-        <string>tarantool_@TARANTOOL_PRODUCT@</string>
-	<string>--config=@CMAKE_INSTALL_PREFIX@/etc/tarantool.cfg</string>
+        <string>tarantool</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

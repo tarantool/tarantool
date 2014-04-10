@@ -390,7 +390,7 @@ complete and up-to-date on-disk backup.  This consists of snapshot
 files (extension .snap) which are copies of the database as of the
 time the snapshot was taken, and write-ahead-log files (extension
 .xlog) which contain records of insert/update/delete operations that
-are written when the operations occur. If the tarantool_box server
+are written when the operations occur. If the tarantool server
 goes down and later restarts, it will recover the database by
 reading the snapshot and then re-applying the write-ahead-log records.
 </para>
@@ -415,7 +415,7 @@ is not always the ideal method.
 Taking snapshots with tarantar, instead of with box.snapshot(),
 can be better because:
 <itemizedlist>
-  <listitem><para>tarantar can work even if the tarantool_box server is down
+  <listitem><para>tarantar can work even if the tarantool server is down
   because it works from the existing .snap and .xlog files,
    rather than from an in-memory database.</para></listitem>
    <listitem><para>tarantar saves memory when constructing its own in-memory
@@ -496,13 +496,13 @@ last xlog lsn: 0
 <title>Utility <code>tarantool_deploy</code></title>
 <para>
 With tarantool_deploy one can set up so that, during system boot,
-one or more instances of the tarantool_box server will start.
+one or more instances of the tarantool server will start.
 This utility is for use on Red Hat or CentOS where Tarantool
 was installed using <code>rpm --install</code>.
 </para>
 <para>
 Technically, tarantool_deploy will place instructions in <filename>/etc/init.d</filename>
-which will initiate tarantool_box with appropriate options and
+which will initiate tarantool with appropriate options and
 with settings that maximize resource usage.
 The root password is necessary. These options are available,
 as shown by <code>tarantool_deploy --help</code>:
@@ -525,7 +525,7 @@ usage: tarantool_deploy.sh [options] &lt;instance&gt;
 <para>
 The default prefixes (<filename>/usr</filename> and <filename>/etc</filename> and <filename>/var</filename>) are appropriate
 if a Tarantool installation was done with default settings,
-for example tarantool_box should be in <filename>/usr/bin</filename>.
+for example tarantool should be in <filename>/usr/bin</filename>.
 The only necessary argument is the "instance", which is an
 arbitrary numeric identification formatted as digit.digit.
 The following is a sample run:

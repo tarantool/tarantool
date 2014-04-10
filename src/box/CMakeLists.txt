@@ -16,7 +16,7 @@ add_custom_target(box_generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-tarantool_module("box"
+add_library(box
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
@@ -43,4 +43,3 @@ tarantool_module("box"
     lua/index.cc
     lua/space.cc)
 
-target_link_libraries(tarantool_box bitset msgpuck)

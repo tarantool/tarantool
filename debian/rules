@@ -31,7 +31,7 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 
 DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool/1.6
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
-DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool_box
+DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk

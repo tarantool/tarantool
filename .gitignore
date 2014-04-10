@@ -51,8 +51,7 @@ lcov
 src/bootstrap.h
 src/lua/*.lua.c
 src/box/lua/*.lua.c
-src/box/tarantool_box
-src/box/tarantool.cfg
+src/tarantool
 tarantool-*.tar.gz
 test/connector_c/protocol
 test/connector_c/rpl

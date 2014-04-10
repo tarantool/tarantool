@@ -13,8 +13,6 @@ Key features of the system:
  * lua functions, procedures, triggers, with
    rich access to database API, JSON support,
    inter-procedure and network communication libraries
- * a command line client supporting simple SQL and
-   a native Lua console
 
 Tarantool is ideal for data-enriched components of 
 scalable Web architecture: traditional database caches, queue
@@ -34,8 +32,7 @@ CMake is used for configuration management.
  also provides debugging capabilities
  * Release -- use only if the highest performance is required
 
-The only external library dependency is readline: libreadline-dev
-is required to build the command line client.
+The only external library dependency is readline: libreadline-dev.
 
 There are two OPTIONAL dependencies: 
 - uuid-dev. It is required for box.uuid_* functions.
@@ -57,10 +54,9 @@ To use a different release type, say, RelWithDebugInfo, use:
 
 Additional build options can be set similarly:
 
-    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=true # builds the command line client.
+    tarantool $ cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_DOC=true # builds the docs
 
-'make' creates tarantool_box executable in directory
-src/box and tarantool executable in client/tarantool.
+'make' creates tarantool executable in directory src/.
 
 There is no 'make install' goal, but no installation
 is required either.
@@ -77,14 +73,13 @@ Once all prerequisites are installed, try:
 
 This will create a 'var' subdirectory in directory 'test',
 populate it with necessary files, and
-start the server. To connect, you could use
-a simple command-line client:
+start the server. To connect, start the server in interactive
+mode:
 
-    tarantool $ ./test/tarantool
+    tarantool $ ./src/tarantool
 
 Alternatively, if a customized server configuration is required,
 you could follow these steps:
-
 
     tarantool $ emacs cfg/tarantool.cfg # edit the configuration
     # Initialize the storage directory, path to this directory

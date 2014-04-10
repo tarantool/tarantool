@@ -1,4 +1,4 @@
-#!/usr/bin/env tarantool_box
+#!/usr/bin/env tarantool
 os = require('os')
 box.cfg({
     primary_port        = os.getenv("PRIMARY_PORT"),

@@ -1,7 +1,7 @@
-tarantool_box --help
+tarantool --help
 Tarantool - a Lua application server
 
-Usage: tarantool_box script.lua [OPTIONS]
+Usage: tarantool script.lua [OPTIONS]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
@@ -11,10 +11,10 @@ When no script name is provided, the server responds to:
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
-tarantool_box -h
+tarantool -h
 Tarantool - a Lua application server
 
-Usage: tarantool_box script.lua [OPTIONS]
+Usage: tarantool script.lua [OPTIONS]
 
 All command line options are passed to the interpreted script.
 When no script name is provided, the server responds to:
@@ -24,16 +24,16 @@ When no script name is provided, the server responds to:
 Please visit project home page at http://tarantool.org
 to see online documentation, submit bugs or contribute a patch.
 
-tarantool_box -Z
-tarantool_box: -Z: unknown option
+tarantool -Z
+tarantool: -Z: unknown option
 
-tarantool_box --no-such-option
-tarantool_box: --no-such-option: unknown option
+tarantool --no-such-option
+tarantool: --no-such-option: unknown option
 
-tarantool_box --version --no-such-option
-tarantool_box: --no-such-option: unknown option
+tarantool --version --no-such-option
+tarantool: --no-such-option: unknown option
 
-tarantool_box --version
+tarantool --version
 Tarantool 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags
@@ -41,7 +41,7 @@ Compiler: cc
 C_FLAGS: flags
 CXX_FLAGS: flags
 
-tarantool_box -V
+tarantool -V
 Tarantool 1.minor.patch-<rev>-<commit>
 Target: platform <build>
 Build options: flags

@@ -26,7 +26,7 @@ endif()
 configure_file(rpm.spec.in rpm.spec @ONLY)
 
 if (TARGET_OS_DARWIN)
-	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool_${TARANTOOL_PRODUCT}.plist
+	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool.plist
 	# to check syntax of plist file.
 	# Also cmake doesn't support changing package id from 'com.' to 'org.'
 	# Need chage to 'org.' after update lines this file:
@@ -35,7 +35,7 @@ if (TARGET_OS_DARWIN)
 	# ^^^ DO NOT CHANGE DARWIN_PACKAGE_ID BEFORE SEE URL ABOVE ^^^
 	#
 	set (DARWIN_PACKAGE_ID "com")
-	set (LUANCHD_PLIST "${DARWIN_PACKAGE_ID}.${CPACK_PACKAGE_VENDOR}.tarantool_${TARANTOOL_PRODUCT}.plist")
+	set (LUANCHD_PLIST "${DARWIN_PACKAGE_ID}.${CPACK_PACKAGE_VENDOR}.tarantool.plist")
 	# Configure scripts for *.pkg and luanchd daemon by templates
 	configure_file(dmg/postflight.in postflight @ONLY)
 	configure_file(org.tarantool.in ${LUANCHD_PLIST} @ONLY)

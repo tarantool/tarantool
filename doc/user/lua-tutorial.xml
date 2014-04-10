@@ -33,7 +33,7 @@ in with the tarantool client while reading along.
 We are going to use the "tarantool_sandbox" that was created in section
 <olink targetptr="getting-started-start-stop">Starting Tarantool and making your first database</olink>.
 So there is a single space, and a numeric primary key,
-a running tarantool_box server, and a running tarantool client.
+a running tarantool server, and a running tarantool client.
 </para>
 
 <para>

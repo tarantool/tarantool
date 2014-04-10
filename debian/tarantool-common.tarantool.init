@@ -16,7 +16,7 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
-DAEMON=/usr/bin/tarantool_box
+DAEMON=/usr/bin/tarantool
 INSTANCES=`find $CONF_DIR -xtype f -name '*.cfg'`
 INSTSCRIPT=/usr/sbin/tarantool_instance
 

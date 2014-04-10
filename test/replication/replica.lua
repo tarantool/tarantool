@@ -1,4 +1,4 @@
-#!/usr/bin/env tarantool_box
+#!/usr/bin/env tarantool
 box.cfg({
     primary_port        = os.getenv("PRIMARY_PORT"),
     admin_port          = os.getenv("ADMIN_PORT"),

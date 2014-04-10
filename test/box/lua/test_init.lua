@@ -1,4 +1,4 @@
-#!/usr/bin/env tarantool_box
+#!/usr/bin/env tarantool
 box.load_cfg()
 -- testing start-up script
 floor = require("math").floor

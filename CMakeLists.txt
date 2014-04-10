@@ -30,12 +30,6 @@ find_program(LD ld)
 find_program(POD2MAN pod2man)
 
 
-#
-# This instructs the rest of the build system what product
-# and what modules to produce.
-#
-set (TARANTOOL_PRODUCT "box")
-set (TARANTOOL_MODULES "box")
 # Disable tarancheck and tarantar for 1.6
 # set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
 set (TARANTOOL_CLIENTS "")

@@ -36,15 +36,8 @@ add_custom_target(generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-#
-# Used by modules.
-#
-set (recompiled_sources
-     ${CMAKE_SOURCE_DIR}/src/tarantool.cc
-     ${CMAKE_SOURCE_DIR}/src/lua/init.cc
-     ${CMAKE_SOURCE_DIR}/src/replication.cc)
-
 set (common_sources
+     replication.cc
      memory.cc
      fiber.cc
      util.cc
@@ -83,6 +76,7 @@ set (common_sources
      cpu_feature.c
      fiob.c
      ffisyms.cc
+     lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
      lua/admin.cc
@@ -106,9 +100,8 @@ endif()
 
 set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
-add_dependencies(core generate_headers)
 
-set (common_libraries core small salad)
+set (common_libraries core small salad misc bitset msgpuck)
 
 list(APPEND common_libraries
     ${LIBEV_LIBRARIES}
@@ -119,7 +112,6 @@ list(APPEND common_libraries
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
     ${LUAJIT_LIB}
-    misc
 )
 
 set (THREAD_LIB pthread)
@@ -156,35 +148,22 @@ endif()
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 add_subdirectory(lib)
+add_subdirectory(box)
 # Save CMAKE_XXX_FLAGS from this directory for config.h (used in --version)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
-function(tarantool_module mod)
-    set (module_sources ${ARGN})
-    add_executable(tarantool_${mod} ${module_sources})
+add_executable(tarantool tarantool.cc)
+add_dependencies(tarantool build_bundled_libs)
+target_link_libraries(tarantool box ${common_libraries} -rdynamic)
+if (ENABLE_STATIC)
+    set_target_properties(tarantool PROPERTIES
+        LINK_SEARCH_END_STATIC ON)
+    set (module_link_flags "${module_link_flags} -static")
+endif()
 
-    set_source_files_compile_flags(
-        ${recompiled_sources} ${module_sources})
-
-    add_library(lt${mod} STATIC ${recompiled_sources})
-    add_dependencies(lt${mod} generate_headers generate_admin_cc build_bundled_libs)
-
-    target_link_libraries(tarantool_${mod} lt${mod} ${common_libraries} -rdynamic)
-
-    if (ENABLE_STATIC)
-        set_target_properties(tarantool_${mod} PROPERTIES
-            LINK_SEARCH_END_STATIC ON)
-        set (module_link_flags "${module_link_flags} -static")
-    endif()
-
-    if (module_link_flags)
-        set_target_properties(tarantool_${mod} PROPERTIES
-            LINK_FLAGS ${module_link_flags})
-    endif()
-    install (TARGETS tarantool_${mod} DESTINATION bin)
-endfunction()
-
-foreach (module ${TARANTOOL_MODULES})
-add_subdirectory(${module})
-endforeach()
+if (module_link_flags)
+    set_target_properties(tarantool PROPERTIES
+        LINK_FLAGS ${module_link_flags})
+endif()
+install (TARGETS tarantool DESTINATION bin)

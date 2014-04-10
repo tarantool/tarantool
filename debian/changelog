@@ -20,7 +20,7 @@ tarantool (1.5.2.16.g18b8e4e-1) unstable; urgency=low
   * New Debian snapshot.
    - Drop legacy packages (libtarantool*).
    - Drop tarantool-dbg.
-   - Don't strip tarantool_box (it uses debug symbols runtime).
+   - Don't strip tarantool (it uses debug symbols runtime).
 
  -- Dmitry E. Oboukhov <unera@debian.org>  Fri, 20 Dec 2013 15:44:11 +0400
 

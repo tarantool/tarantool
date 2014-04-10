@@ -208,9 +208,9 @@ class GdbMixin(Mixin):
 
 class TarantoolServer(Server):
     default_tarantool = {
-            "bin":       "tarantool_box",
+            "bin":       "tarantool",
             "logfile":   "tarantool.log",
-            "pidfile":         "box.pid",
+            "pidfile":         "tarantool.pid",
             "name":            "default"}
 #----------------------------------PROPERTIES----------------------------------#
     @property
@@ -377,7 +377,7 @@ class TarantoolServer(Server):
     @classmethod
     def find_exe(cls, builddir, silent=True):
         cls.builddir = os.path.abspath(builddir)
-        builddir = os.path.join(builddir, "src/box")
+        builddir = os.path.join(builddir, "src")
         path = builddir + os.pathsep + os.environ["PATH"]
         if not silent:
             color_stdout("Looking for server binary in ", schema='serv_text')

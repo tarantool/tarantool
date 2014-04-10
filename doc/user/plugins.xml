@@ -145,7 +145,7 @@ error("net.sql load failed")
 end
 require("box.net.mysql")
 
-# Now, to help tarantool_box find the essential mysql.so file, execute these lines:
+# Now, to help tarantool find the essential mysql.so file, execute these lines:
 <userinput>cd /home/pgulutzan/tarantool_test</userinput>
 <userinput>mkdir box</userinput>
 <userinput>mkdir box/net</userinput>
@@ -154,7 +154,7 @@ require("box.net.mysql")
 # Start the Tarantool server.
 # Run it in the background but let the initial display be in the foreground.
 # So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool_box&amp;</userinput>
+<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool&amp;</userinput>
 2013-12-03 17:46:16.239 [12957] 1/sched C&gt; version 1.5.1-271-g610930e
 ... loading /home/pgulutzan/tarantool_test/init.lua ...
 ...
@@ -273,7 +273,7 @@ Linking CXX shared library libpg.so
 # Start the Tarantool server.
 # Run it in the background but let the initial display be in the foreground.
 # So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool_box&amp;</userinput>
+<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool&amp;</userinput>
 2013-12-06 13:01:51.518 [23978] 1/sched C> version 1.5.1-290-g45b93e7
 ... Loading plugin: ~/tarantool-stable/src/plugin/pg/libpg.so ...
 ... Plugin 'postgresql' was loaded, version: 1

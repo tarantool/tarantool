@@ -129,7 +129,7 @@
   <para>
     UNIX shell command input is prefixed with '$ ' and is in
     a fixed-width font:
-    <programlisting><prompt>$ </prompt>tarantool_box <option>--background</option></programlisting>
+    <programlisting><prompt>$ </prompt>tarantool <option>--background</option></programlisting>
   </para>
   <para>
     File names are also in a fixed-width font:
@@ -141,7 +141,7 @@
   </para>
   <para>
     Within user input, replaceable items are in italics:
-    <programlisting><prompt>$ </prompt><userinput>tarantool_box <replaceable>--option</replaceable></userinput></programlisting>
+    <programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>--option</replaceable></userinput></programlisting>
   </para>
 </section>
 <section xml:id="reporting-bugs">

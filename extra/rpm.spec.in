@@ -161,12 +161,12 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
 "%{_datadir}/doc/tarantool/box-protocol.txt"
-"%{_mandir}/man1/tarantool_box.1.gz"
+"%{_mandir}/man1/tarantool.1.gz"
 
-"%{_bindir}/tarantool_box"
+"%{_bindir}/tarantool"
 "%{_bindir}/tarantool_multi.sh"
 "%{_bindir}/tarantool_deploy.sh"
-"/etc/init.d/tarantool_box"
+"/etc/init.d/tarantool"
 
 %dir "%{_sysconfdir}/tarantool"
 

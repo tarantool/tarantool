@@ -8,7 +8,7 @@ CONFIG_DIR=/var/lib/tarantool/started
 SNAPSHOT_DIR=/var/lib/tarantool/snapshot
 PID_DIR=/var/run/tarantool
 LOG_DIR=/var/log/tarantool
-BOX=/usr/bin/tarantool_box
+BOX=/usr/bin/tarantool
 SSD=start-stop-daemon
 CFG_DIR=/etc/tarantool/instances.enabled
 

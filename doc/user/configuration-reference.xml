@@ -49,7 +49,7 @@ both.
     <listitem xml:id="version-option">
       <para><option>--version</option>, <option>-V</option></para>
       <para>Print product name and version, for example:
-        <programlisting><prompt>$ </prompt> ./tarantool_box --version
+        <programlisting><prompt>$ </prompt> ./tarantool --version
 Tarantool 1.4.0-69-g45551dd
         </programlisting>
         In this example:
@@ -118,7 +118,7 @@ Tarantool 1.4.0-69-g45551dd
         incorrect, an error is returned. If the option
         is not explicitly specified, its default value is used
         instead. Example:
-        <programlisting><prompt>$ </prompt>./tarantool_box --cfg-get=admin_port
+        <programlisting><prompt>$ </prompt>./tarantool --cfg-get=admin_port
 33015   </programlisting>
       </para>
     </listitem>
@@ -359,11 +359,11 @@ Tarantool 1.4.0-69-g45551dd
              ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary pri: 3301 adm: 33015</programlisting>
+tarantool: primary pri: 3301 adm: 33015</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
           the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool_box: primary@sessions pri: 3301 adm: 33015</programlisting>
+tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           </entry>
         </row>
 

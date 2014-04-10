@@ -481,22 +481,22 @@ which make a minimal configuration file that will be suitable for day one.
 Initialize the storage area.
 You only have to do this once.<programlisting>
 #if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool_box --init-storage</command>
+  <command>/usr/bin/tarantool --init-storage</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool_box --init-storage</command>
+  <command>~/tarantool/bin/tarantool --init-storage</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool_box --init-storage</command></programlisting>
+  <command>~/tarantool/src/box/tarantool --init-storage</command></programlisting>
 </para>
 
 <para>
 Start the server.
-The server name is <computeroutput><filename>tarantool_box</filename></computeroutput>.<programlisting>
+The server name is <computeroutput><filename>tarantool</filename></computeroutput>.<programlisting>
 #if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool_box</command>
+  <command>/usr/bin/tarantool</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool_box</command>
+  <command>~/tarantool/bin/tarantool</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool_box</command> </programlisting>
+  <command>~/tarantool/src/box/tarantool</command> </programlisting>
 </para>
 
 <para>
@@ -517,16 +517,16 @@ Now take the server down, with <programlisting><keycombo><keysym>Ctrl</keysym><k
 <para>
 Now start the server again. This time start it in the background.<programlisting>
 #if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool_box --background</command>
+  <command>/usr/bin/tarantool --background</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool_box --background</command>
+  <command>~/tarantool/bin/tarantool --background</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool_box --background</command></programlisting>
+  <command>~/tarantool/src/box/tarantool --background</command></programlisting>
 </para>
 
 <para>
 If all went well, there is now an instance of the Tarantool server
-	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-A</option> | <command>grep</command> tarantool_box</programlisting>
+	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-A</option> | <command>grep</command> tarantool</programlisting>
 	or look at the log file:<programlisting><command>less</command> work_dir/tarantool.log</programlisting>
 </para>
 
@@ -607,7 +607,7 @@ You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop the client:  <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
-To stop the server: <computeroutput><command>sudo pkill</command> -f tarantool_box</computeroutput>.
+To stop the server: <computeroutput><command>sudo pkill</command> -f tarantool</computeroutput>.
 To destroy the test: <computeroutput><command>rm</command> -r ~/tarantool_sandbox</computeroutput>.
 </para>
 
@@ -721,7 +721,7 @@ inserted and selected tuples with the Tarantool client.
   <para>TARANTOOL = A SCRIPT PROCESSOR.
     Instead of processing scripts with bash or Perl, use tarantool server.
     For example, let the first line of a shell script be
-    <computeroutput>#!/usr/bin/tarantool_box</computeroutput>.
+    <computeroutput>#!/usr/bin/tarantool</computeroutput>.
     This will be a
     (<link xlink:href="https://en.wikipedia.org/wiki/Shebang_%28Unix%29" xlink:title="wikipedia.org/Shebang">"Hashbang" hint</link>)
     that Tarantool will be the script processor.

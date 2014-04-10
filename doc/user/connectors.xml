@@ -93,7 +93,7 @@ is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/
                     </tgroup>
                 </informaltable>
 <para>
-Now, one could send that packet to the tarantool_box server,
+Now, one could send that packet to the tarantool server,
 and interpret the response (box-protocol.txt has a description
 of the packet format for responses as well as requests).
 But it would be easier, and less error-prone, if one could
@@ -113,11 +113,11 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the necessary file <filename>tp.h</filename>, and the default library path contains
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
-    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
     To run, say <code>./example</code>.
     The program will format a buffer for sending an INSERT request, then open a socket connection
-    with the tarantool_box server at localhost:3301, then send the request, then check if the
+    with the tarantool server at localhost:3301, then send the request, then check if the
     server returned an error, then &mdash; if all is well &mdash; print "Insert succeeded". If the
     row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
     </para>
@@ -226,14 +226,14 @@ sudo cpan install DR::Tarantool
     <para>
     Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
     Before trying to run, check that the server
-    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
-    with the tarantool_box server at localhost:3301, then send an INSERT request,
+    with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; end without displaying any messages.
-    If tarantool_box is not running on localhost with primary port = 3301, the program will print
+    If tarantool is not running on localhost with primary port = 3301, the program will print
     <quote>Connection refused</quote>.
     </para>
     <para>
@@ -243,8 +243,8 @@ use DR::Tarantool ':constant', 'tarantool';
 use DR::Tarantool ':all';
 
 my $tnt = tarantool
-  host    =&gt; '127.0.0.1',                      # look for tarantool_box on localhost
-  port    =&gt; 3301,                             # assume tarantool_box primary port = default
+  host    =&gt; '127.0.0.1',                      # look for tarantool on localhost
+  port    =&gt; 3301,                             # assume tarantool primary port = default
   spaces  =&gt; {
     0 =&gt; {                                     # definition of space[0] ...
       name =&gt; 't0',                            #   space[0] name = 't0'
@@ -302,11 +302,11 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     <para>
     Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
     Before trying to run, check that the server
-    (tarantool_box) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
-    with the tarantool_box server at localhost:3301, then send an INSERT request,
+    with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; print "Insert succeeded".
     If the tuple already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
     </para>
@@ -340,7 +340,7 @@ catch (Exception $e) {
     <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
     <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
-    Before trying to run, check that the server (tarantool_box) is running on localhost (127.0.0.1) and its primary port
+    Before trying to run, check that the server (tarantool) is running on localhost (127.0.0.1) and its primary port
     is the default (3301) and space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
     To run, say <code>python example.py</code>.
     The program will connect to the server, will send the request, and will not throw an exception if all went well.

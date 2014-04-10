@@ -3502,7 +3502,7 @@ end
         One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
         &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
         In this section the subject is the built-in variant, <code>box.net.box</code>.
-        This is for connecting to tarantool_box servers via a network.
+        This is for connecting to tarantool servers via a network.
     </para>
 <variablelist xml:id="box.net.box">
     <para>
@@ -3547,7 +3547,7 @@ end
                 requests, such as select, update or delete.
             </para>
             <para>
-               For the local tarantool_box server there is a pre-created always-established
+               For the local tarantool server there is a pre-created always-established
                connection object named <code>box.net.self</code>.
                Its purpose is to make polymorphic use of the
                <code>box.net.box</code> API easier. Therefore
@@ -3710,7 +3710,7 @@ end
  This example will work with the sandbox configuration described in the preface.
  That is, there is a space named space0 with a numeric primary key.
  Assume that the database is nearly empty.
- Assume that the tarantool_box server is running on localhost 127.0.0.1:3301.
+ Assume that the tarantool server is running on localhost 127.0.0.1:3301.
 <programlisting>
 <prompt>localhost&gt;</prompt><userinput> ta = {}</userinput>
 ---

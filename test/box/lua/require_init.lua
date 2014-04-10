@@ -1,4 +1,4 @@
-#!/usr/bin/env tarantool_box
+#!/usr/bin/env tarantool
 box.load_cfg()
 mod = require("require_mod")
 package_path = package.path

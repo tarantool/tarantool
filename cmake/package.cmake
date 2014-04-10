@@ -14,7 +14,7 @@ set (CPACK_SOURCE_IGNORE_FILES
     "CMakeFiles" "\\\\.gz" "\\\\.Z" "\\\\.zip" "\\\\.rpm"
     "\\\\.o" "\\\\.so" "\\\\.a"
     "client/tarantool/tarantool"
-    "src/box/tarantool_box"
+    "src/box/tarantool"
     "install_manifest.txt"
     "cmake_install.cmake" "test/var/"
 )

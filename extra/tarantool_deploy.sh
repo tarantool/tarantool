@@ -66,11 +66,11 @@ usage() {
 
 rollback_instance() {
 	id=$1
-	workdir="${prefix_var}/tarantool_box$id"
-	config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
+	workdir="${prefix_var}/tarantool$id"
+	config="${prefix_etc}/tarantool/tarantool$id.cfg"
 	rm -rf $workdir
 	rm -f $config
-	rm -f "${prefix}/bin/tarantool_box$id.sh"
+	rm -f "${prefix}/bin/tarantool$id.sh"
 	rm -f "${prefix_etc}/init.d/tarantool_box$id"
 }
 

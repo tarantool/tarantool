@@ -22,7 +22,7 @@
 </para>
 <para>
   <emphasis role="strong">program_name</emphasis> is typically
-  <command>tarantool_box</command>. The role can be one of the
+  <command>tarantool</command>. The role can be one of the
   following:
   <itemizedlist>
     <listitem><para>
@@ -50,10 +50,10 @@
   For example:
   <itemizedlist>
     <listitem><para>
-      <command>tarantool_box: primary pri: 50000 sec: 50001 adm: 50002</command>
+      <command>tarantool: primary pri: 50000 sec: 50001 adm: 50002</command>
     </para></listitem>
     <listitem><para>
-      <command>tarantool_box: primary@infobox pri: 15013 sec: 15523 adm: 10012</command>
+      <command>tarantool: primary@infobox pri: 15013 sec: 15523 adm: 10012</command>
     </para></listitem>
   </itemizedlist>
 </para>
