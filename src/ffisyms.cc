@@ -7,8 +7,6 @@
 #include <box/lua/call.h>
 #include <lua/init.h>
 #include <tarantool.h>
-#include <stdio.h>
-#include <readline/readline.h>
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -31,7 +29,6 @@ void *ffi_symbols[] = {
 	(void *) port_ffi_destroy,
 	(void *) boxffi_select,
 	(void *) password_prepare,
-	(void *) readline,
 	(void *) tarantool_lua_interactive,
 	(void *) load_cfg,
 	(void *) box_set_wal_fsync_delay,

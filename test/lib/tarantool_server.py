@@ -502,9 +502,6 @@ class TarantoolServer(Server):
         2) wait until server tells us his status
 
         """
-        print self.logfile_pos.log_begin
-        print self.logfile_pos.path
-
         self.logfile_pos.seek_from('entering the event loop', self.process if not self.gdb else None)
         while True:
             try:

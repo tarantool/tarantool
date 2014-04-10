@@ -44,6 +44,7 @@ extern "C" {
 
 
 #include <fiber.h>
+#include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/admin.h"
 #include "lua/errinj.h"
@@ -58,6 +59,8 @@ extern "C" {
 
 #include <ctype.h>
 #include "small/region.h"
+#include <stdio.h>
+#include <readline/readline.h>
 #include <readline/history.h>
 
 struct lua_State *tarantool_L;
@@ -422,17 +425,32 @@ tarantool_lua(struct lua_State *L,
 
 char *history = NULL;
 
-extern "C" void
-tarantool_lua_interactive(char *line)
+ssize_t
+readline_cb(va_list ap)
 {
-	struct tbuf *out = tbuf_new(&fiber()->gc);
-	struct lua_State *L = lua_newthread(tarantool_L);
-	tarantool_lua(L, out, line);
-	lua_pop(tarantool_L, 1);
-	printf("%.*s", out->size, out->data);
-	fiber_gc();
-	if (history)
-		add_history(line);
+	const char **line = va_arg(ap, const char **);
+	*line = readline("tarantool> ");
+	return 0;
+}
+
+extern "C" void
+tarantool_lua_interactive()
+{
+	char *line;
+	while (true) {
+		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line);
+		if (line == NULL)
+			break;
+		struct tbuf *out = tbuf_new(&fiber()->gc);
+		struct lua_State *L = lua_newthread(tarantool_L);
+		tarantool_lua(L, out, line);
+		lua_pop(tarantool_L, 1);
+		printf("%.*s", out->size, out->data);
+		fiber_gc();
+		if (history)
+			add_history(line);
+		free(line);
+	}
 }
 
 /**

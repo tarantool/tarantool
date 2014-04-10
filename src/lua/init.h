@@ -85,6 +85,6 @@ extern char *history;
  * Eval line and print output.
  */
 extern "C" void
-tarantool_lua_interactive(char *line);
+tarantool_lua_interactive();
 
 #endif /* INCLUDES_TARANTOOL_LUA_H */
