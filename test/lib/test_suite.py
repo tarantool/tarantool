@@ -53,7 +53,7 @@ class TestSuite:
         self.ini.update(dict(config.items("default")))
         self.ini.update(self.args.__dict__)
 
-        for i in ["config", "script"]:
+        for i in ["script"]:
             self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
         for i in ["disabled", "valgrind_disabled", "release_disabled"]:
             self.ini[i] = dict.fromkeys(self.ini[i].split()) if i in self.ini else dict()
@@ -61,8 +61,6 @@ class TestSuite:
             self.ini[i] = map(lambda x: os.path.join(suite_path, x),
                     dict.fromkeys(self.ini[i].split()) if i in self.ini else
                     dict())
-        for i in ["random_ports"]:
-            self.ini[i] = True if i not in self.ini or self.ini[i].lower() == 'true' else False
         try:
             if self.ini['core'] == 'tarantool':
                 self.server = TarantoolServer(self.ini)
@@ -88,8 +86,6 @@ class TestSuite:
             return []
         self.server.deploy(silent=False)
         if self.ini['core'] != 'unittest':
-            self.ini['servers'] = {'default' : self.server}
-            self.ini['connections'] = {'default' : [self.server.admin, 'default']}
             self.ini['vardir'] = self.args.vardir
             self.ini['builddir'] = self.args.builddir
 

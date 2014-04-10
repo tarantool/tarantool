@@ -105,8 +105,8 @@ extern struct recovery_state *recovery_state;
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
 		   snapshot_handler snapshot_handler, int rows_per_wal);
-void recovery_update_mode(struct recovery_state *r,
-			  const char *wal_mode, double fsync_delay);
+void recovery_update_mode(struct recovery_state *r, enum wal_mode mode);
+void recovery_update_fsync_delay(struct recovery_state *r, double new_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();

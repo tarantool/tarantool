@@ -58,19 +58,15 @@ extern "C" {
 
 #include <ctype.h>
 #include "small/region.h"
-
-extern "C" {
-#include <cfg/tarantool_box_cfg.h>
-#include <cfg/warning.h>
-} /* extern "C" */
+#include <readline/history.h>
 
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       interactive_lua[];
-static const char *lua_sources[] = { uuid_lua, session_lua, interactive_lua,
-	NULL };
+       load_cfg_lua[], interactive_lua[];
+static const char *lua_sources[] = { uuid_lua, session_lua,
+	load_cfg_lua, interactive_lua, NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, NULL };
 /*
@@ -424,6 +420,8 @@ tarantool_lua(struct lua_State *L,
 	}
 }
 
+char *history = NULL;
+
 extern "C" void
 tarantool_lua_interactive(char *line)
 {
@@ -433,124 +431,8 @@ tarantool_lua_interactive(char *line)
 	lua_pop(tarantool_L, 1);
 	printf("%.*s", out->size, out->data);
 	fiber_gc();
-}
-
-/**
- * Check if the given literal is a number/boolean or string
- * literal. A string literal needs quotes.
- */
-static bool
-is_string(const char *str)
-{
-	if (strcmp(str, "true") == 0 || strcmp(str, "false") == 0)
-	    return false;
-	if (! isdigit(*str))
-	    return true;
-	char *endptr;
-	double r = strtod(str, &endptr);
-	/* -Wunused-result warning suppression */
-	(void) r;
-	return *endptr != '\0';
-}
-
-static int
-lbox_cfg_reload(struct lua_State *L)
-{
-	if (reload_cfg())
-		luaL_error(L, cfg_log);
-	lua_pushstring(L, "ok");
-	return 1;
-}
-
-/**
- * Make a new configuration available in Lua.
- * We could perhaps make Lua bindings to access the C
- * structure in question, but for now it's easier and just
- * as functional to convert the given configuration to a Lua
- * table and export the table into Lua.
- */
-void
-tarantool_lua_load_cfg(struct tarantool_cfg *cfg)
-{
-	struct lua_State *L = tarantool_L;
-	luaL_Buffer b;
-	char *key, *value;
-
-	luaL_buffinit(L, &b);
-	tarantool_cfg_iterator_t *i = tarantool_cfg_iterator_init();
-	luaL_addstring(&b,
-		       "box.cfg = {}\n"
-		       "setmetatable(box.cfg, {})\n"
-		       "getmetatable(box.cfg).__index = "
-		       "function(table, index)\n"
-		       "  table[index] = {}\n"
-		       "  setmetatable(table[index], getmetatable(table))\n"
-		       "  return rawget(table, index)\n"
-		       "end\n"
-		       "getmetatable(box.cfg).__call = "
-		       "function(table, index)\n"
-		       "  local t = {}\n"
-		       "  for i, v in pairs(table) do\n"
-		       "    if type(v) ~= 'function' then\n"
-		       "      t[i] = v\n"
-		       "    end\n"
-		       "  end\n"
-		       "  return t\n"
-		       "end\n");
-	while ((key = tarantool_cfg_iterator_next(i, cfg, &value)) != NULL) {
-		if (value == NULL)
-			continue;
-		const char *quote = is_string(value) ? "'" : "";
-		if (strchr(key, '.') == NULL) {
-			lua_pushfstring(L, "box.cfg.%s = %s%s%s\n",
-					key, quote, value, quote);
-			luaL_addvalue(&b);
-		}
-		free(value);
-	}
-	luaL_pushresult(&b);
-	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
-	    lua_pcall(L, 0, 0, 0) != 0) {
-		panic("%s", lua_tostring(L, -1));
-	}
-	lua_pop(L, 1);
-
-	/* add box.cfg.reload() function */
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "cfg");
-	lua_gettable(L, -2);
-	lua_pushstring(L, "reload");
-	lua_pushcfunction(L, lbox_cfg_reload);
-	lua_settable(L, -3);
-	lua_pop(L, 2);
-
-	/* make box.cfg read-only */
-	luaL_buffinit(L, &b);
-	luaL_addstring(&b,
-		       "getmetatable(box.cfg).__newindex = "
-		       "function(table, index)\n"
-		       "  error('Attempt to modify a read-only table')\n"
-		       "end\n"
-		       "getmetatable(box.cfg).__index = nil\n");
-	luaL_pushresult(&b);
-	if (luaL_loadstring(L, lua_tostring(L, -1)) != 0 ||
-	    lua_pcall(L, 0, 0, 0) != 0) {
-		panic("%s", lua_tostring(L, -1));
-	}
-	lua_pop(L, 1);
-
-	/*
-	 * Invoke a user-defined on_reload_configuration hook,
-	 * if it exists. Do it after everything else is done.
-	 */
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "on_reload_configuration");
-	lua_gettable(L, -2);
-	if (lua_isfunction(L, -1) && lua_pcall(L, 0, 0, 0) != 0) {
-		say_error("on_reload_configuration() hook failed: %s",
-			  lua_tostring(L, -1));
-	}
-	lua_pop(L, 1);	/* cleanup stack */
+	if (history)
+		add_history(line);
 }
 
 /**
@@ -575,6 +457,7 @@ run_script(va_list ap)
 		lua_getglobal(L, "dofile");
 		lua_pushstring(L, path);
 	} else {
+		say_crit("version %s", tarantool_version());
 		lua_getglobal(L, "interactive");
 	}
 	lbox_pcall(L);

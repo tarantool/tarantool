@@ -43,32 +43,27 @@ help()
   - box.cfg.reload()
   - box.coredump()
 ...
-box.cfg()
+box.cfg
 ---
-- io_collect_interval: 0
-  pid_file: box.pid
+- pid_file: tarantool.pid
   slab_alloc_factor: 2
   slab_alloc_minimal: 64
   admin_port: <number>
-  logger: cat - >> tarantool.log
-  readahead: 16320
-  wal_dir: .
-  logger_nonblock: true
+  primary_port: <number>
   log_level: 5
+  logger_nonblock: true
   snap_dir: .
   coredump: false
-  background: false
   too_long_threshold: 0.5
+  wal_mode: write
   rows_per_wal: 50
-  wal_mode: fsync_delay
-  snap_io_rate_limit: 0
   panic_on_snap_error: true
   panic_on_wal_error: false
-  local_hot_standby: false
-  slab_alloc_arena: 0.1
+  wal_dir: .
+  readahead: 16320
   bind_ipaddr: INADDR_ANY
-  wal_fsync_delay: 0
-  primary_port: <number>
+  slab_alloc_arena: 0.1
+  background: false
   wal_dir_rescan_delay: 0.1
 ...
 box.stat()
@@ -115,7 +110,7 @@ function test_box_info()
     local tmp = box.info()
     local num = {'pid', 'snapshot_pid', 'recovery_last_update', 'recovery_lag', 'uptime', 'logger_pid'}
     local buildstr = {'flags', 'target', 'compiler', 'options'}
-    local str = {'version', 'status', 'config'}
+    local str = {'version', 'status' }
     local failed = {}
     if check_type(tmp.lsn, 'cdata') == false then
         table.insert(failed1, 'box.info().lsn')

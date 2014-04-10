@@ -167,10 +167,6 @@ space:delete{1936941424}
 ---
 - [1936941424, 'new', 1684234849]
 ...
-box.cfg.reload()
----
-- ok
-...
 -- must be read-only
 space:insert{1953719668}
 ---

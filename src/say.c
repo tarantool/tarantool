@@ -84,14 +84,20 @@ say_init(const char *argv0)
 }
 
 void
-say_logger_init(char *logger, int *level, int nonblock)
+say_set_log_level(int new_level)
 {
-	log_level = level;
+	*log_level = new_level;
+}
+
+void
+say_logger_init(const char *logger, int level, int nonblock)
+{
+	*log_level = level;
 	int pipefd[2];
 	pid_t pid;
 	char cmd[] = { "/bin/sh" };
 	char args[] = { "-c" };
-	char *argv[] = { cmd, args, logger, NULL };
+	char *argv[] = { cmd, args, (char *) logger, NULL };
 	char *envp[] = { NULL };
 	setvbuf(stderr, NULL, _IONBF, 0);
 

@@ -16,11 +16,11 @@ wal = os.path.join(server.vardir, "00000000000000000002.xlog")
 
 server.start()
 
-admin("space = box.schema.create_space('tweedledum', { id = 0 })")
+server.admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress exists"
 
-admin("space:create_index('primary', { type = 'hash' })")
+server.admin("space:create_index('primary', { type = 'hash' })")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print "00000000000000000002.xlog.inprogress has been successfully renamed"
@@ -34,7 +34,7 @@ server.start()
 wal_inprogress = os.path.join(server.vardir, "00000000000000000004.xlog.inprogress")
 wal = os.path.join(server.vardir, "00000000000000000004.xlog")
 
-admin("box.space[0]:insert{3, 'third tuple'}")
+server.admin("box.space[0]:insert{3, 'third tuple'}")
 
 if os.access(wal_inprogress, os.F_OK):
   print "00000000000000000004.xlog.inprogress exists"

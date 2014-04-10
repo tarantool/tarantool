@@ -25,7 +25,7 @@ except ImportError:
 
 from lib.test import Test
 from lib.server import Server
-from lib.preprocessor import State
+from lib.preprocessor import TestState
 from lib.box_connection import BoxConnection
 from lib.admin_connection import AdminConnection
 
@@ -65,7 +65,7 @@ class FuncTest(Test):
 
 class LuaTest(FuncTest):
     def execute(self, server):
-        ts = State(self.suite_ini, server.admin, TarantoolServer)
+        ts = TestState(self.suite_ini, server, TarantoolServer)
         cmd = None
 
         def send_command(command):
@@ -98,35 +98,14 @@ class LuaTest(FuncTest):
                     sys.stdout.write(result.replace("\r\n", "\n"))
                     cmd.close()
                     cmd = None
-        ts.flush()
+        # stop any servers created by the test, except the default one
+        ts.cleanup()
 
 
 class PythonTest(FuncTest):
     def execute(self, server):
         execfile(self.name, dict(locals(), **server.__dict__))
 
-
-class TarantoolConfig(object):
-    def __init__(self, path):
-        self.path = path
-
-    def parse(self):
-        cfg = {}
-        with open(self.path, 'r') as f:
-            for line in f:
-                line = [part.strip() for part in line.split('=', 1)]
-                if not line or not line[0] or line[0][0] == '#':
-                    continue
-                if len(line) != 2:
-                    raise Exception("Bad cfg line: {line}. file: {file}".format(\
-                                    line = repr(line), file = repr(self.path)))
-                cfg[line[0]] = line[1]
-        return cfg
-
-    def generate(self, original):
-        with open(self.path, 'w') as f:
-            for el in original.iteritems():
-                f.write(' = '.join(el) + '\n')
 
 class TarantoolLog(object):
     def __init__(self, path):
@@ -230,17 +209,9 @@ class GdbMixin(Mixin):
 class TarantoolServer(Server):
     default_tarantool = {
             "bin":       "tarantool_box",
-            "config":    "tarantool.cfg",
             "logfile":   "tarantool.log",
             "pidfile":         "box.pid",
             "name":            "default"}
-    generate_ports = [
-            'primary_port',
-            'admin_port',
-            ]
-    generated_props = [
-            'replication_source'
-            ]
 #----------------------------------PROPERTIES----------------------------------#
     @property
     def debug(self):
@@ -271,28 +242,6 @@ class TarantoolServer(Server):
     @pidfile.setter
     def pidfile(self, val):
         self._pidfile = os.path.join(self.vardir, val)
-
-    @property
-    def cfgfile(self):
-        if not hasattr(self, '_cfgfile') or not self._cfgfile:
-            return os.path.join(self.vardir, self.default_tarantool["config"])
-        return self._cfgfile
-    @cfgfile.setter
-    def cfgfile(self, val):
-        self._cfgfile = os.path.join(self.vardir, val)
-
-    @property
-    def cfgfile_source(self):
-        if not hasattr(self, '_cfgfile_source'):
-            raise ValueError("No config-file is specified")
-        return self._cfgfile_source
-    @cfgfile_source.setter
-    def cfgfile_source(self, path):
-        if path == None:
-            if hasattr(self, '_cfgfile_source'):
-                delattr(self, '_cfgfile_source')
-            return
-        self._cfgfile_source = os.path.abspath(path)
 
     @property
     def builddir(self):
@@ -340,12 +289,9 @@ class TarantoolServer(Server):
             int(port)
         except ValueError as e:
             raise ValueError("Bad port number: '%s'" % port)
-        if not hasattr(self, 'admin') or self.admin is None:
-            self.admin = AdminConnection('localhost', port)
-            return
-        if self.admin.port != port:
-            self.admin.port = port
-            self.admin.reconnect()
+        if hasattr(self, 'admin'):
+            del self.admin
+        self.admin = AdminConnection('localhost', port)
 
     @property
     def _sql(self):
@@ -357,12 +303,9 @@ class TarantoolServer(Server):
             port = int(port)
         except ValueError as e:
             raise ValueError("Bad port number: '%s'" % port)
-        if not hasattr(self, 'sql') or self.sql is None:
-            self.sql = BoxConnection('localhost', port)
-            return
-        if self.sql.port != port:
-            self.sql.port = port
-            self.sql.reconnect()
+        if hasattr(self, 'sql'):
+            del self.sql
+        self.sql = BoxConnection('localhost', port)
 
     @property
     def log_des(self):
@@ -385,18 +328,6 @@ class TarantoolServer(Server):
                     ' Server class, his derivation or None')
         self._rpl_master = val
 
-    @property
-    def hot_master(self):
-        if not hasattr(self, '_hot_master'): self._hot_master = None
-        return self._hot_master
-    @hot_master.setter
-    def hot_master(self, val):
-        if not isinstance(self, (TarantoolServer, None)):
-            raise ValueError('Hot-standby master must be Tarantool'
-                    ' Server class, his derivation or None')
-        self._hot_master = val
-
-
 #------------------------------------------------------------------------------#
 
     def __new__(cls, ini=None):
@@ -415,33 +346,28 @@ class TarantoolServer(Server):
         if _ini is None:
             _ini = {}
         ini = {
-            'config': None,
             'core': 'tarantool',
             'gdb': False,
             'script': None,
             'lua_libs': [],
-            'random_ports': True,
             'valgrind': False,
             'vardir': None,
             'start_and_exit': False
         }
         ini.update(_ini)
         Server.__init__(self, ini)
-        self.generated_fields = self.generate_ports + self.generated_props
         self.testdir = os.path.abspath(os.curdir)
         self.re_vardir_cleanup += [
             "*.snap", "*.xlog", "*.inprogress",
-            "*.cfg", "*.sup", "*.lua", "*.pid"]
+            "*.sup", "*.lua", "*.pid"]
         self.name = "default"
         self.conf = {}
         self.status = None
         #-----InitBasicVars-----#
-        self.cfgfile_source = ini['config']
         self.core = ini['core']
         self.gdb = ini['gdb']
         self.script = ini['script']
         self.lua_libs = ini['lua_libs']
-        self.random_ports = ini['random_ports']
         self.valgrind = ini['valgrind']
         self._start_and_exit = ini['start_and_exit']
 
@@ -479,8 +405,9 @@ class TarantoolServer(Server):
             self.kill_old_server()
             self.cleanup()
         self.copy_files()
-        self.configure()
-        return
+        port = random.randrange(3300, 9999)
+        self._admin = find_port(port)
+        self._sql = find_port(port + 1)
 
     def deploy(self, silent=True):
         self.install(silent)
@@ -488,43 +415,6 @@ class TarantoolServer(Server):
             self.start(silent)
         else:
             self.start_and_exit()
-
-    def configure(self, config=None):
-        self.copy_config(config)
-        self.port   = self.conf['admin_port']
-        self._sql    = self.conf['primary_port']
-        self._admin  = self.conf['admin_port']
-
-    def reconfigure(self, config, silent=False, override=['all']):
-        if config == None:
-            os.unlink(self.cfgfile)
-        else:
-            self.cfgfile_source = config
-            self.copy_config(override=override)
-        self.admin.execute("box.cfg.reload()", silent=silent)
-
-    def copy_config(self, rand=True, override = ['all']):
-        override_all = (True if 'all' in override else False)
-
-        port = random.randrange(3300, 9999)
-        for t in self.generate_ports:
-            if not t in self.conf:
-                self.conf[t] = find_port(port)
-                port += 1
-        if not self.hot_master is None:
-            self.conf['primary_port'] = self.hot_master.sql.port
-        if not self.rpl_master is None and 'replication_source' in self.generated_fields:
-            self.conf['replication_source'] = \
-                '127.0.0.1:'+str(self.rpl_master.conf['primary_port'])
-
-
-        basic = TarantoolConfig(self.cfgfile_source).parse()
-        addit = {}
-        for key in self.generated_fields:
-            if key in basic and (override_all or key in override) and key in self.conf:
-                addit[key] = str(self.conf[key])
-        basic.update(addit)
-        TarantoolConfig(self.cfgfile).generate(basic)
 
     def copy_files(self):
         if self.script:
@@ -558,8 +448,12 @@ class TarantoolServer(Server):
             color_stdout((os.path.basename(self.binary) if not self.script else self.script_dst) + " \n", schema='path')
             color_stdout(self.version() + "\n", schema='version')
 
-        check_port(self.conf['admin_port'])
+        check_port(self.admin.port)
 
+        os.putenv("PRIMARY_PORT", str(self.sql.port))
+        os.putenv("ADMIN_PORT", str(self.admin.port))
+        if self.rpl_master:
+            os.putenv("MASTER_PORT", str(self.rpl_master.sql.port))
         args = self.prepare_args()
         self.logfile_pos = self.logfile
         self.process = subprocess.Popen(args,
@@ -608,11 +502,13 @@ class TarantoolServer(Server):
         2) wait until server tells us his status
 
         """
+        print self.logfile_pos.log_begin
+        print self.logfile_pos.path
 
-        self.logfile_pos.seek_from('entering the event loop\n', self.process if not self.gdb else None)
+        self.logfile_pos.seek_from('entering the event loop', self.process if not self.gdb else None)
         while True:
             try:
-                temp = AdminConnection('localhost', self.conf['admin_port'])
+                temp = AdminConnection('localhost', self.admin.port)
                 ans = yaml.load(temp.execute('box.info.status'))[0]
                 if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
                     return True
@@ -665,14 +561,17 @@ class TarantoolServer(Server):
         return False
 
     def find_tests(self, test_suite, suite_path):
-        def patterned(test, patterns):
-            return [test for i in patterns if test.name.find(i) != -1]
-
         tests  = [PythonTest(k, test_suite.args, test_suite.ini) \
                 for k in sorted(glob.glob(os.path.join(suite_path, "*.test.py" )))]
         tests += [LuaTest(k, test_suite.args, test_suite.ini)    \
                 for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua")))]
-        test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), tests), [])
+        test_suite.tests = []
+        # don't sort, command line arguments must be run in
+        # the specified order
+        for name in test_suite.args.tests:
+            for test in tests:
+                if test.name.find(name) != -1:
+                    test_suite.tests.append(test)
 
     def get_param(self, param = None):
         if not param is None:

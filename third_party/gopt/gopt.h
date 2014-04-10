@@ -19,6 +19,9 @@ Before modifying or distributing this software I ask that you would please
 read http://www.purposeful.co.uk/tfl/
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define GOPT_ONCE   0
 #define GOPT_REPEAT 1
@@ -68,5 +71,9 @@ void gopt_free( void *opts );
 
 /** Prints descriptions for all options. */
 void gopt_help(const void *opt_def);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* GOPT_H_INCLUDED */

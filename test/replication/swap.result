@@ -92,14 +92,11 @@ select * from t0 where k0 = 9
 - [9, 'tuple 9']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (10, 'tuple 10')
 ---
 - [10, 'tuple 10']
@@ -181,14 +178,11 @@ select * from t0 where k0 = 19
 - [19, 'tuple 19']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 1 iteration
 insert into t0 values (20, 'tuple 20')
 ---
@@ -271,14 +265,11 @@ select * from t0 where k0 = 29
 - [29, 'tuple 29']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (30, 'tuple 30')
 ---
 - [30, 'tuple 30']
@@ -360,14 +351,11 @@ select * from t0 where k0 = 39
 - [39, 'tuple 39']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 2 iteration
 insert into t0 values (40, 'tuple 40')
 ---
@@ -450,14 +438,11 @@ select * from t0 where k0 = 49
 - [49, 'tuple 49']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (50, 'tuple 50')
 ---
 - [50, 'tuple 50']
@@ -539,14 +524,11 @@ select * from t0 where k0 = 59
 - [59, 'tuple 59']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 3 iteration
 insert into t0 values (60, 'tuple 60')
 ---
@@ -629,14 +611,11 @@ select * from t0 where k0 = 69
 - [69, 'tuple 69']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (70, 'tuple 70')
 ---
 - [70, 'tuple 70']
@@ -718,14 +697,11 @@ select * from t0 where k0 = 79
 - [79, 'tuple 79']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 4 iteration
 insert into t0 values (80, 'tuple 80')
 ---
@@ -808,14 +784,11 @@ select * from t0 where k0 = 89
 - [89, 'tuple 89']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (90, 'tuple 90')
 ---
 - [90, 'tuple 90']
@@ -897,14 +870,11 @@ select * from t0 where k0 = 99
 - [99, 'tuple 99']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 5 iteration
 insert into t0 values (100, 'tuple 100')
 ---
@@ -987,14 +957,11 @@ select * from t0 where k0 = 109
 - [109, 'tuple 109']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (110, 'tuple 110')
 ---
 - [110, 'tuple 110']
@@ -1076,14 +1043,11 @@ select * from t0 where k0 = 119
 - [119, 'tuple 119']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 6 iteration
 insert into t0 values (120, 'tuple 120')
 ---
@@ -1166,14 +1130,11 @@ select * from t0 where k0 = 129
 - [129, 'tuple 129']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (130, 'tuple 130')
 ---
 - [130, 'tuple 130']
@@ -1255,14 +1216,11 @@ select * from t0 where k0 = 139
 - [139, 'tuple 139']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 7 iteration
 insert into t0 values (140, 'tuple 140')
 ---
@@ -1345,14 +1303,11 @@ select * from t0 where k0 = 149
 - [149, 'tuple 149']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (150, 'tuple 150')
 ---
 - [150, 'tuple 150']
@@ -1434,14 +1389,11 @@ select * from t0 where k0 = 159
 - [159, 'tuple 159']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 8 iteration
 insert into t0 values (160, 'tuple 160')
 ---
@@ -1524,14 +1476,11 @@ select * from t0 where k0 = 169
 - [169, 'tuple 169']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (170, 'tuple 170')
 ---
 - [170, 'tuple 170']
@@ -1613,14 +1562,11 @@ select * from t0 where k0 = 179
 - [179, 'tuple 179']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 9 iteration
 insert into t0 values (180, 'tuple 180')
 ---
@@ -1703,14 +1649,11 @@ select * from t0 where k0 = 189
 - [189, 'tuple 189']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (190, 'tuple 190')
 ---
 - [190, 'tuple 190']
@@ -1792,14 +1735,11 @@ select * from t0 where k0 = 199
 - [199, 'tuple 199']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 10 iteration
 insert into t0 values (200, 'tuple 200')
 ---
@@ -1882,14 +1822,11 @@ select * from t0 where k0 = 209
 - [209, 'tuple 209']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (210, 'tuple 210')
 ---
 - [210, 'tuple 210']
@@ -1971,14 +1908,11 @@ select * from t0 where k0 = 219
 - [219, 'tuple 219']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 11 iteration
 insert into t0 values (220, 'tuple 220')
 ---
@@ -2061,14 +1995,11 @@ select * from t0 where k0 = 229
 - [229, 'tuple 229']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (230, 'tuple 230')
 ---
 - [230, 'tuple 230']
@@ -2150,14 +2081,11 @@ select * from t0 where k0 = 239
 - [239, 'tuple 239']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 12 iteration
 insert into t0 values (240, 'tuple 240')
 ---
@@ -2240,14 +2168,11 @@ select * from t0 where k0 = 249
 - [249, 'tuple 249']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (250, 'tuple 250')
 ---
 - [250, 'tuple 250']
@@ -2329,14 +2254,11 @@ select * from t0 where k0 = 259
 - [259, 'tuple 259']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 13 iteration
 insert into t0 values (260, 'tuple 260')
 ---
@@ -2419,14 +2341,11 @@ select * from t0 where k0 = 269
 - [269, 'tuple 269']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (270, 'tuple 270')
 ---
 - [270, 'tuple 270']
@@ -2508,14 +2427,11 @@ select * from t0 where k0 = 279
 - [279, 'tuple 279']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 14 iteration
 insert into t0 values (280, 'tuple 280')
 ---
@@ -2598,14 +2514,11 @@ select * from t0 where k0 = 289
 - [289, 'tuple 289']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (290, 'tuple 290')
 ---
 - [290, 'tuple 290']
@@ -2687,14 +2600,11 @@ select * from t0 where k0 = 299
 - [299, 'tuple 299']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 15 iteration
 insert into t0 values (300, 'tuple 300')
 ---
@@ -2777,14 +2687,11 @@ select * from t0 where k0 = 309
 - [309, 'tuple 309']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (310, 'tuple 310')
 ---
 - [310, 'tuple 310']
@@ -2866,14 +2773,11 @@ select * from t0 where k0 = 319
 - [319, 'tuple 319']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 16 iteration
 insert into t0 values (320, 'tuple 320')
 ---
@@ -2956,14 +2860,11 @@ select * from t0 where k0 = 329
 - [329, 'tuple 329']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (330, 'tuple 330')
 ---
 - [330, 'tuple 330']
@@ -3045,14 +2946,11 @@ select * from t0 where k0 = 339
 - [339, 'tuple 339']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 17 iteration
 insert into t0 values (340, 'tuple 340')
 ---
@@ -3135,14 +3033,11 @@ select * from t0 where k0 = 349
 - [349, 'tuple 349']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (350, 'tuple 350')
 ---
 - [350, 'tuple 350']
@@ -3224,14 +3119,11 @@ select * from t0 where k0 = 359
 - [359, 'tuple 359']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 18 iteration
 insert into t0 values (360, 'tuple 360')
 ---
@@ -3314,14 +3206,11 @@ select * from t0 where k0 = 369
 - [369, 'tuple 369']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (370, 'tuple 370')
 ---
 - [370, 'tuple 370']
@@ -3403,14 +3292,11 @@ select * from t0 where k0 = 379
 - [379, 'tuple 379']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica
 test 19 iteration
 insert into t0 values (380, 'tuple 380')
 ---
@@ -3493,14 +3379,11 @@ select * from t0 where k0 = 389
 - [389, 'tuple 389']
 ...
 swap servers
-box.cfg.reload()
+switch replica to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch master to replica
 insert into t0 values (390, 'tuple 390')
 ---
 - [390, 'tuple 390']
@@ -3582,11 +3465,8 @@ select * from t0 where k0 = 399
 - [399, 'tuple 399']
 ...
 rollback servers configuration
-box.cfg.reload()
+switch master to master
+box.cfg{replication_source=''}
 ---
-- ok
 ...
-box.cfg.reload()
----
-- ok
-...
+switch replica to replica

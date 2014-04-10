@@ -33,7 +33,6 @@ t
   - info
   - ipc
   - net
-  - on_reload_configuration
   - pack
   - process
   - raise
@@ -199,6 +198,8 @@ t;
   - 'box.error.ER_CREATE_SPACE : 9'
   - 'box.error.ER_TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.ER_FIELD_TYPE : 23'
+  - 'box.error.ER_CFG : 59'
+  - 'box.error.ER_UNKNOWN_SCHEMA_OBJECT : 49'
   - 'box.error.ER_OK : 0'
   - 'box.error.ER_NO_SUCH_ENGINE : 57'
   - 'box.error.ER_TUPLE_NOT_FOUND : 4'
@@ -216,7 +217,7 @@ t;
   - 'box.error.ER_INVALID_MSGPACK : 20'
   - 'box.error.ER_SPACE_ACCESS_DENIED : 55'
   - 'box.error.ER_KEY_PART_COUNT : 31'
-  - 'box.error.ER_UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.ER_RELOAD_CFG : 58'
   - 'box.error.ER_USER_EXISTS : 46'
   - 'box.error.ER_MEMORY_ISSUE : 2'
   - 'box.error.ER_ILLEGAL_PARAMS : 1'

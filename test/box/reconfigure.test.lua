@@ -1,113 +1,44 @@
 box.cfg.too_long_threshold
----
-- 0.5
-...
 -- good
 box.cfg{too_long_threshold=0.2}
----
-...
 box.cfg.too_long_threshold
----
-- 0.2
-...
 -- good 
 box.cfg{snap_io_rate_limit=10}
----
-...
 box.cfg.snap_io_rate_limit
----
-- 10
-...
 box.cfg.io_collect_interval
----
-- null
-...
 box.cfg{io_collect_interval=0.001}
----
-...
 box.cfg.io_collect_interval
----
-- 0.001
-...
+
 -- A test case for http://bugs.launchpad.net/bugs/712447:
 -- Valgrind reports use of not initialized memory after 'reload
 -- configuration'
 --
 space = box.schema.create_space('tweedledum', { id = 0 })
----
-...
 space:create_index('primary', { type = 'hash'})
----
-...
 space:insert{1, 'tuple'}
----
-- [1, 'tuple']
-...
 box.snapshot()
----
-- ok
-...
 box.cfg{}
----
-...
+
 space:insert{2, 'tuple2'}
----
-- [2, 'tuple2']
-...
 box.snapshot()
----
-- ok
-...
 space:insert{3, 'tuple3'}
----
-- [3, 'tuple3']
-...
 box.snapshot()
----
-- ok
-...
+
 -- A test case for https://github.com/tarantool/tarantool/issues/112:
 -- Tarantool crashes with SIGSEGV during reload configuration
 --
 -- log level
 box.cfg{log_level=5}
----
-...
 -- constants
 box.cfg{custom_proc_title="custom proc title"}
----
-- error: Can't set option 'custom_proc_title' dynamically
-...
 box.cfg{wal_dir="dynamic"}
----
-- error: Can't set option 'wal_dir' dynamically
-...
 box.cfg{snap_dir="dynamic"}
----
-- error: Can't set option 'snap_dir' dynamically
-...
 box.cfg{logger="new logger"}
----
-- error: Can't set option 'logger' dynamically
-...
 -- bad1
 box.cfg{slab_alloc_arena=0.2}
----
-- error: Can't set option 'slab_alloc_arena' dynamically
-...
 box.cfg.slab_alloc_arena
----
-- 0.1
-...
+
 space:drop()
----
-...
 box.cfg{snap_io_rate_limit=0}
----
-...
 box.cfg{io_collect_interval=0}
----
-...
 box.cfg{too_long_threshold=0.5}
----
-...

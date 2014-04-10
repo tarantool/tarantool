@@ -1,10 +1,12 @@
 #include <bit/bit.h>
 #include <lib/msgpuck/msgpuck.h>
 #include "scramble.h"
+#include <box/box.h>
 #include <box/tuple.h>
 #include <box/lua/index.h>
 #include <box/lua/call.h>
 #include <lua/init.h>
+#include <tarantool.h>
 #include <stdio.h>
 #include <readline/readline.h>
 
@@ -30,5 +32,13 @@ void *ffi_symbols[] = {
 	(void *) boxffi_select,
 	(void *) password_prepare,
 	(void *) readline,
-	(void *) tarantool_lua_interactive
+	(void *) tarantool_lua_interactive,
+	(void *) load_cfg,
+	(void *) box_set_wal_fsync_delay,
+	(void *) box_set_replication_source,
+	(void *) box_set_wal_mode,
+	(void *) box_set_log_level,
+	(void *) box_set_io_collect_interval,
+	(void *) box_set_snap_io_rate_limit,
+	(void *) box_set_too_long_threshold,
 };

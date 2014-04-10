@@ -54,27 +54,23 @@
 #include <stat.h>
 #include <limits.h>
 #include "trivia/util.h"
-extern "C" {
-#include <cfg/warning.h>
-#include <cfg/tarantool_box_cfg.h>
-#include <third_party/gopt/gopt.h>
-} /* extern "C" */
 #include "tt_pthread.h"
 #include "lua/init.h"
 #include "session.h"
 #include "box/box.h"
 #include "scoped_guard.h"
 #include "random.h"
+#include <third_party/gopt/gopt.h>
+#include "cfg.h"
+#include <readline/history.h>
 
-static pid_t master_pid;
-const char *cfg_filename = NULL;
-char *cfg_filename_fullpath = NULL;
+static pid_t master_pid = getpid();
 char *script = NULL;
+char *pid_file = NULL;
 char *custom_proc_title;
 char status[64] = "unknown";
 char **main_argv;
 int main_argc;
-struct tarantool_cfg cfg;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
@@ -110,7 +106,7 @@ title(const char *role, const char *fmt, ...)
 		bufptr += snprintf(bufptr, bufend - bufptr, "%s", s);
 	}
 
-	int ports[] = { cfg.primary_port, cfg.admin_port };
+	int ports[] = { cfg_geti("primary_port"), cfg_geti("admin_port") };
 	int *pptr = ports;
 	const char *names[] = { "pri", "adm", NULL };
 	const char **nptr = names;
@@ -121,132 +117,6 @@ title(const char *role, const char *fmt, ...)
 					   " %s: %i", *nptr, *pptr);
 
 	set_proc_title(buf);
-}
-
-static int
-load_cfg(struct tarantool_cfg *conf, int32_t check_rdonly)
-{
-	if (cfg_filename_fullpath != NULL) {
-
-		FILE *f;
-		int32_t n_accepted, n_skipped, n_ignored;
-
-		rewind(cfg_out);
-
-		f = fopen(cfg_filename_fullpath, "r");
-
-		if (f == NULL) {
-			out_warning(CNF_OK, "can't open config `%s'", cfg_filename);
-			return -1;
-		}
-
-		int syntax = parse_cfg_file_tarantool_cfg(conf, f, check_rdonly,
-							  &n_accepted,
-							  &n_skipped,
-							  &n_ignored);
-		fclose(f);
-
-		if (syntax != 0)
-			return -1;
-		if (n_accepted == 0) {
-			out_warning(CNF_OK, "empty configuration file '%s'", cfg_filename);
-			return -1;
-		}
-		if (n_skipped != 0)
-			return -1;
-	}
-
-	if (check_cfg_tarantool_cfg(conf) != 0)
-		return -1;
-
-	return box_check_config(conf);
-}
-
-int
-reload_cfg()
-{
-	static struct mutex *mutex = NULL;
-	struct tarantool_cfg new_cfg, aux_cfg;
-
-	rewind(cfg_out);
-
-	if (mutex == NULL) {
-		mutex = (struct mutex *) malloc(sizeof(*mutex));
-		mutex_create(mutex);
-	}
-
-	if (mutex_trylock(mutex) == true) {
-		out_warning(CNF_OK, "Could not reload configuration: it is being reloaded right now");
-		return -1;
-	}
-
-
-	auto scoped_guard = make_scoped_guard([&] {
-		destroy_tarantool_cfg(&aux_cfg);
-		destroy_tarantool_cfg(&new_cfg);
-
-		mutex_unlock(mutex);
-	});
-
-	init_tarantool_cfg(&new_cfg);
-	init_tarantool_cfg(&aux_cfg);
-
-	/*
-	  Prepare a copy of the original config file
-	   for confetti, so that it can compare the new
-	  file with the old one when loading the new file.
-	  Load the new file and return an error if it
-	  contains a different value for some read-only
-	  parameter.
-	*/
-	if (dup_tarantool_cfg(&aux_cfg, &cfg) != 0 ||
-	    load_cfg(&aux_cfg, 1) != 0)
-		return -1;
-	/*
-	  Load the new configuration file, but
-	  skip the check for read only parameters.
-	  new_cfg contains only defaults and
-	  new settings.
-	*/
-	if (fill_default_tarantool_cfg(&new_cfg) != 0 ||
-	    load_cfg(&new_cfg, 0) != 0)
-		return -1;
-
-	/* Check that no default value has been changed. */
-	char *diff = cmp_tarantool_cfg(&aux_cfg, &new_cfg, 1);
-	if (diff != NULL) {
-		out_warning(CNF_OK, "Could not accept read only '%s' option", diff);
-		return -1;
-	}
-
-	/* Now pass the config to the module, to take action. */
-	if (box_reload_config(&cfg, &new_cfg) != 0)
-		return -1;
-
-	/* All OK, activate the config. */
-	swap_tarantool_cfg(&cfg, &new_cfg);
-	tarantool_lua_load_cfg(&cfg);
-
-	return 0;
-}
-
-/** Print the configuration file in YAML format. */
-void
-show_cfg(struct tbuf *out)
-{
-	tarantool_cfg_iterator_t *i;
-	char *key, *value;
-
-	tbuf_printf(out, "configuration:" CRLF);
-	i = tarantool_cfg_iterator_init();
-	while ((key = tarantool_cfg_iterator_next(i, &cfg, &value)) != NULL) {
-		if (value) {
-			tbuf_printf(out, " - %s: \"%s\"" CRLF, key, value);
-			free(value);
-		} else {
-			tbuf_printf(out, " - %s: (null)" CRLF, key);
-		}
-	}
 }
 
 const char *
@@ -359,8 +229,8 @@ sig_term_cb(int signo)
 {
 	psignal(signo, "");
 	/* unlink pidfile. */
-	if (cfg.pid_file != NULL)
-		unlink(cfg.pid_file);
+	if (pid_file != NULL)
+		unlink(pid_file);
 
 	_exit(EXIT_SUCCESS);
 }
@@ -452,10 +322,13 @@ create_pid(void)
 	char buf[16] = { 0 };
 	pid_t pid;
 
-	if (cfg.pid_file == NULL)
+	pid_file = (char *) cfg_gets("pid_file");
+	if (pid_file == NULL)
 		return;
 
-	f = fopen(cfg.pid_file, "a+");
+	pid_file = strdup(pid_file);
+
+	f = fopen(pid_file, "a+");
 	if (f == NULL)
 		panic_syserror("can't open pid file");
 	/*
@@ -475,7 +348,7 @@ create_pid(void)
 		if (fseeko(f, 0, SEEK_SET) != 0)
 			panic_syserror("can't fseek to the beginning of pid file");
 		if (ftruncate(fileno(f), 0) == -1)
-			panic_syserror("ftruncate(`%s')", cfg.pid_file);
+			panic_syserror("ftruncate(`%s')", pid_file);
 	}
 
 	master_pid = getpid();
@@ -513,6 +386,90 @@ error:
 	exit(EXIT_FAILURE);
 }
 
+extern "C" void
+load_cfg()
+{
+	const char *work_dir = cfg_gets("work_dir");
+	if (work_dir != NULL && chdir(work_dir) == -1)
+		say_syserror("can't chdir to `%s'", work_dir);
+
+	const char *username = cfg_gets("username");
+	if (username != NULL) {
+		if (getuid() == 0 || geteuid() == 0) {
+			struct passwd *pw;
+			errno = 0;
+			if ((pw = getpwnam(username)) == 0) {
+				if (errno) {
+					say_syserror("getpwnam: %s",
+						     username);
+				} else {
+					say_error("User not found: %s",
+						  username);
+				}
+				exit(EX_NOUSER);
+			}
+			if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
+				say_syserror("setgid/setuid");
+				exit(EX_OSERR);
+			}
+		} else {
+			say_error("can't switch to %s: i'm not root",
+				  username);
+		}
+	}
+
+	if (cfg_geti("coredump")) {
+		struct rlimit c = { 0, 0 };
+		if (getrlimit(RLIMIT_CORE, &c) < 0) {
+			say_syserror("getrlimit");
+			exit(EX_OSERR);
+		}
+		c.rlim_cur = c.rlim_max;
+		if (setrlimit(RLIMIT_CORE, &c) < 0) {
+			say_syserror("setrlimit");
+			exit(EX_OSERR);
+		}
+#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
+		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
+			say_syserror("prctl");
+			exit(EX_OSERR);
+		}
+#endif
+	}
+
+	if (cfg_geti("background")) {
+		if (cfg_gets("logger") == NULL) {
+			say_crit("'background' requires 'logger' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		if (cfg_gets("pid_file") == NULL) {
+			say_crit("'background' requires 'pid_file' configuration option to be set");
+			exit(EXIT_FAILURE);
+		}
+		background();
+	} else {
+		create_pid();
+	}
+
+	const char *proc_title = cfg_gets("custom_proc_title");
+	/* init process title - used for logging */
+	if (proc_title == NULL) {
+		custom_proc_title = (char *) malloc(1);
+		custom_proc_title[0] = '\0';
+	} else {
+		custom_proc_title = (char *) malloc(strlen(proc_title) + 2);
+		strcpy(custom_proc_title, "@");
+		strcat(custom_proc_title, proc_title);
+	}
+	say_logger_init(cfg_gets("logger"),
+			cfg_geti("log_level"),
+			cfg_geti("logger_nonblock"));
+
+	say_crit("version %s", tarantool_version());
+	say_crit("log level %i", cfg_geti("log_level"));
+	box_init();
+}
+
 void
 tarantool_free(void)
 {
@@ -525,14 +482,18 @@ tarantool_free(void)
 
 	if (script)
 		free(script);
-	if (cfg_filename_fullpath)
-		free(cfg_filename_fullpath);
+	else if (history) {
+		write_history(history);
+		clear_history();
+		free(history);
+	}
 	free_proc_title(main_argc, main_argv);
 
 	/* unlink pidfile. */
-	if (cfg.pid_file != NULL)
-		unlink(cfg.pid_file);
-	destroy_tarantool_cfg(&cfg);
+	if (pid_file != NULL) {
+		unlink(pid_file);
+		free(pid_file);
+	}
 
 	session_free();
 	fiber_free();
@@ -543,11 +504,6 @@ tarantool_free(void)
 #ifdef HAVE_BFD
 	symbols_free();
 #endif
-	if (cfg_out) {
-		fclose(cfg_out);
-		free(cfg_log);
-	}
-
 	/* A hack for cc/ld, see ffisyms.c */
 	if (time(NULL) == 0) {
 		/* never executed */
@@ -616,6 +572,13 @@ main(int argc, char **argv)
 		argv++;
 		argc--;
 		script = abspath(argv[0]);
+	} else if (isatty(STDIN_FILENO)) {
+		/* load history file */
+		char *home = getenv("HOME");
+		history = (char *) malloc(PATH_MAX);
+		snprintf(history, PATH_MAX, "%s/%s", home,
+			 ".tarantool_history");
+		read_history(history);
 	}
 
 	random_init();
@@ -628,98 +591,6 @@ main(int argc, char **argv)
 	main_argc = argc;
 	main_argv = argv;
 
-	/*
-	 * if config is not specified trying ./tarantool.cfg then
-	 * /etc/tarantool.cfg
-	 */
-	if (cfg_filename == NULL) {
-		if (access(DEFAULT_CFG_FILENAME, F_OK) == 0)
-			cfg_filename = DEFAULT_CFG_FILENAME;
-		else if (access(DEFAULT_CFG, F_OK) == 0)
-			cfg_filename = DEFAULT_CFG;
-	}
-	if (cfg_filename != NULL)
-		cfg_filename_fullpath = abspath(cfg_filename);
-
-	cfg_out = open_memstream(&cfg_log, &cfg_logsize);
-
-	if (fill_default_tarantool_cfg(&cfg) != 0 || load_cfg(&cfg, 0) != 0) {
-		panic("can't load config:%.*s", (int) cfg_logsize, cfg_log);
-	}
-
-	if (cfg.work_dir != NULL && chdir(cfg.work_dir) == -1)
-		say_syserror("can't chdir to `%s'", cfg.work_dir);
-
-	if (cfg.username != NULL) {
-		if (getuid() == 0 || geteuid() == 0) {
-			struct passwd *pw;
-			errno = 0;
-			if ((pw = getpwnam(cfg.username)) == 0) {
-				if (errno) {
-					say_syserror("getpwnam: %s",
-						     cfg.username);
-				} else {
-					say_error("User not found: %s",
-						  cfg.username);
-				}
-				exit(EX_NOUSER);
-			}
-			if (setgid(pw->pw_gid) < 0 || setuid(pw->pw_uid) < 0 || seteuid(pw->pw_uid)) {
-				say_syserror("setgit/setuid");
-				exit(EX_OSERR);
-			}
-		} else {
-			say_error("can't switch to %s: i'm not root", cfg.username);
-		}
-	}
-
-	if (cfg.coredump) {
-		struct rlimit c = { 0, 0 };
-		if (getrlimit(RLIMIT_CORE, &c) < 0) {
-			say_syserror("getrlimit");
-			exit(EX_OSERR);
-		}
-		c.rlim_cur = c.rlim_max;
-		if (setrlimit(RLIMIT_CORE, &c) < 0) {
-			say_syserror("setrlimit");
-			exit(EX_OSERR);
-		}
-#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
-		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
-			say_syserror("prctl");
-			exit(EX_OSERR);
-		}
-#endif
-	}
-
-	if (cfg.background) {
-		if (cfg.logger == NULL) {
-			say_crit("'background' requires 'logger' configuration option to be set");
-			exit(EXIT_FAILURE);
-		}
-		if (cfg.pid_file == NULL) {
-			say_crit("'background' requires 'pid_file' configuration option to be set");
-			exit(EXIT_FAILURE);
-		}
-		background();
-	} else {
-		create_pid();
-	}
-
-	/* init process title - used for logging */
-	if (cfg.custom_proc_title == NULL) {
-		custom_proc_title = (char *) malloc(1);
-		custom_proc_title[0] = '\0';
-	} else {
-		custom_proc_title = (char *) malloc(strlen(cfg.custom_proc_title) + 2);
-		strcpy(custom_proc_title, "@");
-		strcat(custom_proc_title, cfg.custom_proc_title);
-	}
-	say_logger_init(cfg.logger, &cfg.log_level, cfg.logger_nonblock);
-
-	say_crit("version %s", tarantool_version());
-	say_crit("log level %i", cfg.log_level);
-
 	/* main core cleanup routine */
 	atexit(tarantool_free);
 
@@ -731,9 +602,7 @@ main(int argc, char **argv)
 
 	bool start_loop = false;
 	try {
-		tarantool_lua_load_cfg(&cfg);
 		int events = ev_activecnt(loop());
-		box_init();
 		/*
 		 * Load user init script.  The script should have access
 		 * to Tarantool Lua API (box.cfg, box.fiber, etc...) that

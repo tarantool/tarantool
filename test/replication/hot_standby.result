@@ -1,5 +1,5 @@
---# create server hot_standby with configuration='replication/cfg/hot_standby.cfg', hot_master=default, script='replication/master.lua'
---# create server replica with configuration='replication/cfg/replica.cfg', rpl_master=default, script='replication/replica.lua'
+--# create server hot_standby with script='replication/hot_standby.lua', rpl_master=default
+--# create server replica with rpl_master=default, script='replication/replica.lua'
 --# start server hot_standby
 --# start server replica
 --# set connection default
@@ -118,7 +118,9 @@ _select(1, 10)
 box.fiber.sleep(0.2)
 ---
 ...
---# set variable hot_standby_port to 'hot_standby.primary_port'
+-- hot_standby.primary_port is garbage, since hot_standby.lua
+-- uses MASTER_PORT environment variable for its primary_port
+--# set variable hot_standby_port to 'hot_standby.master_port'
 a = box.net.box.new('127.0.0.1', hot_standby_port)
 ---
 ...

@@ -30,10 +30,10 @@ class TarantoolConnection(object):
         self.host = host
         self.port = port
         self.is_connected = False
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
     def connect(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
         self.socket.connect((self.host, self.port))
         self.is_connected = True
 
@@ -44,8 +44,6 @@ class TarantoolConnection(object):
 
     def reconnect(self):
         self.disconnect()
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
         self.connect()
 
     def opt_reconnect(self):
@@ -54,7 +52,8 @@ class TarantoolConnection(object):
             Make use of this property and detect whether or not the socket is
             dead. Reconnect a dead socket, do nothing if the socket is good."""
         try:
-            if self.socket.recv(0, socket.MSG_DONTWAIT) == '':
+            if not self.is_connected or \
+                    self.socket.recv(0, socket.MSG_DONTWAIT) == '':
                 self.reconnect()
         except socket.error as e:
             if e.errno == errno.EAGAIN:
