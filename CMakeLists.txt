@@ -26,7 +26,6 @@ find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(RAGEL ragel)
-find_program(CONFETTI confetti)
 find_program(LD ld)
 find_program(POD2MAN pod2man)
 
@@ -340,7 +339,6 @@ include (cmake/package.cmake)
 #
 include (cmake/rpm.cmake)
 
-add_subdirectory(cfg)
 # Disable connector_c for 1.6
 add_subdirectory(connector)
 add_subdirectory(src)

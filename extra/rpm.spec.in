@@ -169,7 +169,6 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "/etc/init.d/tarantool_box"
 
 %dir "%{_sysconfdir}/tarantool"
-%config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"
 
 %files sql-module
 %defattr(-,root,root,-)

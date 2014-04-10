@@ -24,32 +24,6 @@
 <chapter>
 <title>Compiling</title>
 <section>
-<title>How to fix a compile time error about missing confetti</title>
-<para>
-  An error about missing confetti:
-<programlisting>
-Generating prscfg.h, prscfg.c...
-[ 13%] Generating prscfg.h, prscfg.c
-/bin/sh: CONFETTI-NOTFOUND: not found
-</programlisting>
-This error is caused by cmake, trying to re-create generated files
-prscfg.h, prscfg.c in <filename>cfg/</filename> directory.
-These files are under revision control and normally need not to be 
-regenerated. 
-The fix is to
-<programlisting>
-<prompt>$ </prompt>git checkout cfg/prscfg.h
-<prompt>$ </prompt>git checkout cfg/prscfg.c
-<prompt>$ </prompt>touch cfg/prscfg.[hc]
-</programlisting>
-The other alternative, if you have actually modified
-<filename>core_cfg.cfg_tmpl</filename> is to install confetti from
-<link xlink:href="http://github.com/mailru/confetti"/> and let cmake use it.
-  
-  </para>
-</section>
-
-<section>
 <title>How to build the XML manual</title>
 <para>
 To build XML manual, you'll need:
