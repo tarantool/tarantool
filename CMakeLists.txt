@@ -141,7 +141,7 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
-include_directories("${PROJECT_SOURCE_DIR}")
+include_directories(${PROJECT_SOURCE_DIR})
 
 #
 # Specify Tarantool modules prefixes
@@ -193,11 +193,6 @@ if (ENABLE_BACKTRACE)
     if (HAVE_BFD_LIB AND HAVE_BFD_H AND HAVE_IBERTY_LIB)
         set (HAVE_BFD True)
     endif()
-endif()
-
-option(ENABLE_STATIC "Perform static linking whenever possible." OFF)
-if (ENABLE_STATIC)
-    add_compile_flags("C;CXX" "-static")
 endif()
 
 ##
@@ -335,7 +330,6 @@ install (FILES README.md LICENSE doc/box-protocol.txt
 # tarantool info summary (used in server version output)
 #
 set(TARANTOOL_OPTIONS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
-set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_STATIC=${ENABLE_STATIC}")
 set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_TRACE=${ENABLE_TRACE} -DENABLE_BACKTRACE=${ENABLE_BACKTRACE}")
 set(TARANTOOL_BUILD "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
 set(TARANTOOL_C_COMPILER ${CMAKE_C_COMPILER})
@@ -362,7 +356,6 @@ message (STATUS "C_FLAGS:${TARANTOOL_C_FLAGS}")
 message (STATUS "CXX_FLAGS:${TARANTOOL_CXX_FLAGS}")
 message (STATUS "PREFIX: ${CMAKE_INSTALL_PREFIX}")
 message (STATUS "MODULE_DIR: ${MODULE_DIR}")
-message (STATUS "ENABLE_STATIC: ${ENABLE_STATIC}")
 message (STATUS "ENABLE_SSE2: ${ENABLE_SSE2}")
 message (STATUS "ENABLE_AVX: ${ENABLE_AVX}")
 message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")

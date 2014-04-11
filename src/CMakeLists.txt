@@ -115,9 +115,6 @@ list(APPEND common_libraries
 )
 
 set (THREAD_LIB pthread)
-if (ENABLE_STATIC)
-    set (THREAD_LIB -Wl,--whole-archive pthread -Wl,--no-whole-archive)
-endif()
 
 set (common_libraries ${common_libraries} ${THREAD_LIB})
 
@@ -156,11 +153,6 @@ set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 add_executable(tarantool tarantool.cc)
 add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool box ${common_libraries} -rdynamic)
-if (ENABLE_STATIC)
-    set_target_properties(tarantool PROPERTIES
-        LINK_SEARCH_END_STATIC ON)
-    set (module_link_flags "${module_link_flags} -static")
-endif()
 
 if (module_link_flags)
     set_target_properties(tarantool PROPERTIES
