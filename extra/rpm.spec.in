@@ -78,21 +78,6 @@ It supports replication, online backup, stored procedures in Lua.
 This package provides tarantool lua bindings to the
 sophia database.
 
-# Tarantool client spec
-
-%package client
-Summary: Tarantool command line client with history support
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: tarantool-client
-Obsoletes: tarantool-client
-%description -n tarantool-client
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a command line client for Tarantool
-with history support.
-
 # Tarantool dev spec
 
 %package dev
@@ -124,11 +109,11 @@ This package provides Tarantool client libraries.
 
 %build
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
-cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON \
+cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_RPM=ON \
     -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=%{_prefix} \
     -DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir} \
     -DCMAKE_INSTALL_BINDIR=%{_bindir} \
-    -DCMAKE_INSTALL_LIBDIR=%{_libdir}   \
+    -DCMAKE_INSTALL_LIBDIR=%{_libdir} \
     -DCMAKE_INSTALL_LIBEXECDIR=%{_libexecdir} \
     -DCMAKE_INSTALL_SBINDIR=%{_sbindir} \
     -DCMAKE_INSTALL_SHAREDSTATEDIR=%{_sharedstatedir} \
@@ -206,11 +191,6 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_includedir}/tarantool/1.6/lua.hpp"
 "%{_includedir}/tarantool/1.6/luajit.h"
 "%{_includedir}/tarantool/1.6/lualib.h"
-
-%files client
-%defattr(-,root,root,-)
-"%{_mandir}/man1/tarantool.1.gz"
-"%{_bindir}/tarantool"
 
 %changelog
 * Wed Nov 13 2013 Tarantool Team <support@tarantool.org> 1.0-2

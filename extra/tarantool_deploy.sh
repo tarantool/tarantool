@@ -71,7 +71,7 @@ rollback_instance() {
 	rm -rf $workdir
 	rm -f $config
 	rm -f "${prefix}/bin/tarantool$id.sh"
-	rm -f "${prefix_etc}/init.d/tarantool_box$id"
+	rm -f "${prefix_etc}/init.d/tarantool$id"
 }
 
 rollback() {
@@ -93,8 +93,8 @@ try() {
 
 deploy() {
 	id=$1
-	workdir="${prefix_var}/tarantool_box$id"
-	config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
+	workdir="${prefix_var}/tarantool$id"
+	config="${prefix_etc}/tarantool/tarantool$id.cfg"
 
 	log ">>> deploy instance $id"
 
@@ -112,13 +112,13 @@ deploy() {
 	try 'echo logger = \"cat - \>\> logs/tarantool.log\" >> $config'
 
 	# setup wrapper
-	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool_box$id.sh\""
+	try "ln -s \"${prefix}/bin/tarantool_multi.sh\" \"${prefix}/bin/tarantool$id.sh\""
 
 	# setup startup script
-	try "ln -s \"${prefix_etc}/init.d/tarantool_box\" \"${prefix_etc}/init.d/tarantool_box$id\""
+	try "ln -s \"${prefix_etc}/init.d/tarantool\" \"${prefix_etc}/init.d/tarantool$id\""
 
 	# register service
-	[ -x /sbin/chkconfig ] && try "/sbin/chkconfig --add tarantool_box$id"
+	[ -x /sbin/chkconfig ] && try "/sbin/chkconfig --add tarantool$id"
 }
 
 deploy_check() {
@@ -133,10 +133,10 @@ deploy_check() {
 	fi
 	# check, if there are any instance-related files exists that could be
 	# accidently removed or overwritten by setup.
-	instance_workdir="${prefix_var}/tarantool_box$id"
-	instance_config="${prefix_etc}/tarantool/tarantool_box$id.cfg"
-	instance_wrapper="${prefix}/bin/tarantool_box$id.sh"
-	instance_startup="${prefix_etc}/init.d/tarantool_box$id"
+	instance_workdir="${prefix_var}/tarantool$id"
+	instance_config="${prefix_etc}/tarantool/tarantool$id.cfg"
+	instance_wrapper="${prefix}/bin/tarantool$id.sh"
+	instance_startup="${prefix_etc}/init.d/tarantool$id"
 	[ -d $instance_workdir ] && error "Instance workdir exists: '$instance_workdir'"
 	[ -f $instance_config ] && error "Instance configuration file exists: $instance_config"
 	[ -f $instance_wrapper ] && error "Instance wrapper file exists: $instance_wrapper"

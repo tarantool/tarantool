@@ -1,17 +1,17 @@
 #!/bin/bash
 
-#  /etc/rc.d/init.d/tarantool_box
+#  /etc/rc.d/init.d/tarantool
 #
 # chkconfig: 2345 99 99
-# description: tarantool_box
-# processname: tarantool_box
+# description: tarantool
+# processname: tarantool
 
 . /etc/init.d/functions
 
 RETVAL=0
 # If we're running from sysinit, the basename is
 # prefixed with a prefix like:
-# /etc/rc3.d/S99tarantool_box1.1 -> ../init.d/tarantool_box1.1
+# /etc/rc3.d/S99tarantool1.1 -> ../init.d/tarantool1.1
 # Filter S99 out.
 INST=$(basename $0 | sed 's/^[SK][0-9]\{2\}//g')
 export PIDFILE="/var/${INST}/box.pid"
@@ -25,7 +25,7 @@ export OPTIONS=""
 # If, for some reason, this script is invoked not via
 # a symlink, do nothing.
 #
-if [ "${INST}" == "tarantool_box" ]
+if [ "${INST}" == "tarantool" ]
 then
         echo_failure
         echo
