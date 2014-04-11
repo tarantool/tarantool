@@ -9,7 +9,6 @@ UVERSION := $(shell echo $(VERSION)|sed 's/-[[:digit:]]\+$$//')
 DEB_CMAKE_EXTRA_FLAGS := \
 	-DCMAKE_BUILD_TYPE=RelWithDebugInfo \
 	-DWITH_MYSQL=ON \
-	-DMODULE_SUFFIX=tarantool/lua \
 	-DWITH_POSTGRESQL=ON
 #         -DENABLE_CLIENT=true \
 
@@ -30,7 +29,7 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool/lua
+DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool/1.6
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
 DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool
 
