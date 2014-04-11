@@ -5,7 +5,6 @@ project(tarantool C CXX)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_INCLUDE_PATH})
 
-
 include(CheckLibraryExists)
 include(CheckIncludeFile)
 include(CheckCCompilerFlag)
@@ -25,14 +24,9 @@ find_program(JING jing)
 find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
-find_program(RAGEL ragel)
 find_program(LD ld)
 find_program(POD2MAN pod2man)
 
-
-# Disable tarancheck and tarantar for 1.6
-# set (TARANTOOL_CLIENTS "tarancheck" "tarantar")
-set (TARANTOOL_CLIENTS "")
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
 
@@ -172,11 +166,6 @@ message(STATUS "Module package.cpath: ${MODULE_LIBPATH}")
 # Now handle all configuration options.
 #
 option(ENABLE_DOC "Enable building of documentation" OFF)
-
-option(ENABLE_CLIENT "Enable building of console client" OFF)
-if (ENABLE_CLIENT)
-    set (TARANTOOL_CLIENTS ${TARANTOOL_CLIENTS} "tarantool")
-endif()
 
 option(ENABLE_TRACE "Enable debug trace of tarantool_box execution to
 a file specified in TARANTOOL_TRACE environment variable" ON)
@@ -334,11 +323,8 @@ include (cmake/package.cmake)
 #
 include (cmake/rpm.cmake)
 
-# Disable connector_c for 1.6
-add_subdirectory(connector)
 add_subdirectory(src)
 add_subdirectory(extra)
-add_subdirectory(client)
 add_subdirectory(test)
 add_subdirectory(doc)
 
@@ -351,7 +337,6 @@ install (FILES README.md LICENSE doc/box-protocol.txt
 set(TARANTOOL_OPTIONS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_STATIC=${ENABLE_STATIC}")
 set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_TRACE=${ENABLE_TRACE} -DENABLE_BACKTRACE=${ENABLE_BACKTRACE}")
-set(TARANTOOL_OPTIONS "${TARANTOOL_OPTIONS} -DENABLE_CLIENT=${ENABLE_CLIENT}")
 set(TARANTOOL_BUILD "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_BUILD_TYPE}")
 set(TARANTOOL_C_COMPILER ${CMAKE_C_COMPILER})
 set(TARANTOOL_CXX_COMPILER ${CMAKE_CXX_COMPILER})
@@ -384,7 +369,6 @@ message (STATUS "ENABLE_GCOV: ${ENABLE_GCOV}")
 message (STATUS "ENABLE_GPROF: ${ENABLE_GPROF}")
 message (STATUS "ENABLE_TRACE: ${ENABLE_TRACE}")
 message (STATUS "ENABLE_BACKTRACE: ${ENABLE_BACKTRACE} (symbol resolve: ${HAVE_BFD})")
-message (STATUS "ENABLE_CLIENT: ${ENABLE_CLIENT}")
 message (STATUS "ENABLE_BUNDLED_LUAJIT: ${ENABLE_BUNDLED_LUAJIT}")
 message (STATUS "ENABLE_BUNDLED_LIBEV: ${ENABLE_BUNDLED_LIBEV}")
 message (STATUS "ENABLE_BUNDLED_LIBEIO: ${ENABLE_BUNDLED_LIBEIO}")
