@@ -552,7 +552,7 @@ sio_writev_all(int fd, struct iovec *iov, int iovcnt)
 	while(1) {
 		ssize_t bytes_written = sio_writev(fd, iov, iovend - iov);
 		bytes_total += bytes_written;
-		while (bytes_written >= iov->iov_len)
+		while (bytes_written > 0 && bytes_written >= iov->iov_len)
 			bytes_written -= (iov++)->iov_len;
 		if (iov == iovend)
 			break;
