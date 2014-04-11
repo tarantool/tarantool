@@ -153,7 +153,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_bindir}/tarantool_deploy.sh"
 "/etc/init.d/tarantool"
 
-%dir "%{_sysconfdir}/tarantool"
+# %dir "%{_sysconfdir}/tarantool"
 
 %files sql-module
 %defattr(-,root,root,-)

@@ -181,8 +181,8 @@ deploy_exists=0
 # do migration from old deployment (if necessary)
 if [ $deploy_exists -eq 0 ]; then
 	deploy_cfg_old="/usr/local/etc/tarantool_deploy.cfg"
+	mkdir -p /etc/tarantool
 	if [ -f $deploy_cfg_old ]; then
-		mkdir -p /etc/tarantool
 		cp /usr/local/etc/tarantool* "${prefix_etc}/tarantool/"
 		deploy_exists=1
 	fi
