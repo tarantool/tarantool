@@ -5,7 +5,7 @@
 
 export PATH=$PATH:/usr/bin
 
-NAME="tarantool_box"
+NAME="tarantool"
 BINARY="/usr/bin/${NAME}"
 INST=$(basename $0 .sh)
 CONF="/etc/tarantool/${INST}.cfg"
