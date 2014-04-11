@@ -30,9 +30,16 @@
 extern "C" {
 	#include <postgres.h>
 	#include <libpq-fe.h>
-	#include <catalog/pg_type.h>
 	#undef PACKAGE_VERSION
 }
+
+/* PostgreSQL types (see catalog/pg_type.h) */
+#define INT2OID 21
+#define INT4OID 23
+#define INT8OID 20
+#define NUMERICOID 1700
+#define BOOLOID 16
+#define TEXTOID 25
 
 #include <stddef.h>
 
