@@ -2,34 +2,39 @@ index:
     main: |
         # Introduction
 
-        Tarantool is an in-memory database designed to store the most volatile
-        and highly accessible web content. Tarantool has been extensively used
-        in production since 2009. It's **open source**, BSD licensed.
+        Tarantool is a NoSQL database running inside a Lua program. It's
+        created to store and process the most volatile and highly accessible
+        Web data. Tarantool has been extensively used in production since 2009.
+        It's **open source**, BSD licensed.
 
         # Features
 
+        - a drop-in replacement for Lua 5.1, based on LuaJIT 2.0;
+          simply use *#!/usr/bin/tarantool* instead of *#!/usr/bin/lua* in your script,
+        - [MsgPack](http://msgpack.org) data format and MsgPack based client-server
+          protocol,
+        - two data engines: 100% in-memory with optional persistence and a
+          [2-level disk-based B-tree](http://sphia.org), to use with large data
+          sets,
+        - secondary key and index iterators support,
+        - asynchronous master-master replication,
+        - authentication and access control,
         - [lowest CPU overhead](benchmark.html) to store or serve a
-        piece of content,
-        - optional Write Ahead Logging for persistency and reliability,
-        - universal data access with [rich Lua stored
-        procedures](http://github.com/mailru/tntlua), which can exchange messages
-        between each other or networked peers,
-        - asynchronous master-slave replication and hot backup.
+        piece of content
 
         # Get started
 
         ``` bash
-        # apt-get install tarantool tarantool-client
-        # cd /etc/tarantool
-        # cp instances.available/example.cfg instances.enabled/fqueue.cfg
-        # cd /usr/share/tarantool/lua
-        # wget http://github.com/mailru/tntlua/raw/master/fqueue.lua -O init.lua
-        # service tarantool start
-        tarantool: Staring instances
-            Starting 'fqueue' ... ok
+        # apt-get install tarantool
+        # tarantool
+        # tarantool> myspace = box.schema.create_space('myspace')
+        # tarantool> myspace:create_index('primary')
+        # tarantool> tuple = {{ name = 'Tarantool', release = box.info.version,
+        #            type = {{ 'NoSQL database', 'Lua interpreter'}}}}
+        # tarantool> myspace:auto_increment{{tuple}}
+        #   - [1, {{'release': '1.6.1-445-ge8d3201', 'name': 'Tarantool'
+        #          'type': ['NoSQL database', 'Lua interpreter']}}]
         ```
-
-        A fast and customizable message queue server is up and running.
 
         # Learn more
 
