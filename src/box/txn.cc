@@ -130,6 +130,8 @@ txn_finish(struct txn *txn)
 {
 	if (txn->old_tuple)
 		tuple_ref(txn->old_tuple, -1);
+	if (txn->space)
+		txn->space->engine->factory->txnFinish(txn);
 	TRASH(txn);
 }
 

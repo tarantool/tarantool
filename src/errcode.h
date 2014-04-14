@@ -107,8 +107,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 55 */_(ER_SPACE_ACCESS_DENIED,	2, "%s access denied for user '%s' to space '%s'") \
 	/* 56 */_(ER_USER_MAX,			2, "A limit on the total number of users has been reached: %u") \
 	/* 57 */_(ER_NO_SUCH_ENGINE,		2, "Space engine '%s' does not exist") \
-	/* 57 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
-	/* 57 */_(ER_CFG,			2, "Incorrect option value: %s") \
+	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
+	/* 59 */_(ER_CFG,			2, "Incorrect option value: %s") \
+	/* 60 */_(ER_SOPHIA,			2, "%s") \
 
 
 /*

@@ -1,0 +1,109 @@
+space = box.schema.create_space('tweedledum', { id = 123, engine = 'sophia' })
+---
+...
+space:create_index('primary', { type = 'tree', parts = {0, 'num'} })
+---
+...
+for v=1, 10 do space:insert({v}) end
+---
+...
+t = space.index[0]:select({}, {iterator = box.index.ALL})
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+t = space.index[0]:select({}, {iterator = box.index.GE})
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+t = space.index[0]:select(4, {iterator = box.index.GE})
+---
+...
+t
+---
+- - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+t = space.index[0]:select({}, {iterator = box.index.LE})
+---
+...
+t
+---
+- - [10]
+  - [9]
+  - [8]
+  - [7]
+  - [6]
+  - [5]
+  - [4]
+  - [3]
+  - [2]
+  - [1]
+...
+t = space.index[0]:select(7, {iterator = box.index.LE})
+---
+...
+t
+---
+- - [7]
+  - [6]
+  - [5]
+  - [4]
+  - [3]
+  - [2]
+  - [1]
+...
+t = {}
+---
+...
+for v=1, 10 do table.insert(t, space:get({v})) end
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+space:drop()
+---
+...
+os.execute("rm -rf sophia")
+---
+- 0
+...

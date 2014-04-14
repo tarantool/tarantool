@@ -472,7 +472,7 @@ t = {}
 ...
 index:pairs('sid_t', { iterator = 'wrong_iterator_type' })
 ---
-- error: '[string "-- schema.lua (internal file)..."]:324: Wrong iterator type: wrong_iterator_type'
+- error: '[string "-- schema.lua (internal file)..."]:325: Wrong iterator type: wrong_iterator_type'
 ...
 index = nil
 ---

@@ -300,6 +300,7 @@ add_dependencies(build_bundled_libs misc)
 
 include(BuildSophia)
 sophia_build()
+set (sophia_lib "${PROJECT_BINARY_DIR}/third_party/sophia/db/libsophia.a")
 
 option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 

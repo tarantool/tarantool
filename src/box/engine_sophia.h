@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TXN_H_INCLUDED
-#define TARANTOOL_BOX_TXN_H_INCLUDED
+#ifndef TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED
+#define TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,33 +28,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
-#include "trigger.h"
 
-extern double too_long_threshold;
-struct tuple;
-struct space;
-
-struct txn {
-	/* Undo info. */
-	struct space *space;
-	struct tuple *old_tuple;
-	struct tuple *new_tuple;
-
-	struct rlist on_commit;
-	struct rlist on_rollback;
-
-	/* Redo info: binary packet */
-	struct iproto_packet *packet;
+struct SophiaFactory: public EngineFactory {
+	SophiaFactory();
+	virtual void init();
+	virtual Engine *open();
+	virtual Index *createIndex(struct key_def *key_def);
+	virtual void dropIndex(Index *index);
+	virtual void keydefCheck(struct key_def *key_def);
+	virtual void txnFinish(struct txn *txn);
+	virtual void recoveryEvent(enum engine_recovery_event event);
 };
 
-struct txn *txn_begin();
-void txn_commit(struct txn *txn);
-void txn_finish(struct txn *txn);
-void txn_rollback(struct txn *txn);
-void txn_replace(struct txn *txn, struct space *space,
-		 struct tuple *old_tuple, struct tuple *new_tuple,
-		 enum dup_replace_mode mode);
-void txn_add_redo(struct txn *txn, struct request *request);
-
-#endif /* TARANTOOL_BOX_TXN_H_INCLUDED */
+#endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */

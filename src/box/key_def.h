@@ -194,9 +194,7 @@ key_list_del_key(struct rlist *key_list, uint32_t id);
 /**
  * Check a key definition for violation of various limits.
  *
- * @param id        space id
  * @param key_def   key_def
- * @param type_str  type name (to produce a nice error)
  */
 void
 key_def_check(struct key_def *key_def);

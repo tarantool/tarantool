@@ -46,6 +46,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "engine_memtx.h"
+#include "engine_sophia.h"
 #include "space.h"
 #include "port.h"
 #include "request.h"
@@ -315,6 +316,10 @@ engine_init()
 {
 	MemtxFactory *memtx = new MemtxFactory();
 	engine_register(memtx);
+
+	SophiaFactory *sophia = new SophiaFactory();
+	sophia->init();
+	engine_register(sophia);
 }
 
 void

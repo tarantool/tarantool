@@ -392,6 +392,19 @@ tuple_update(struct tuple_format *new_format,
 	     const char *expr, const char *expr_end);
 
 /**
+ * @brief Compare two tuple fields using using field type definition
+ * @param field_a field
+ * @param field_b field
+ * @param field_type field type definition
+ * @retval 0  if field_a == field_b
+ * @retval <0 if field_a < field_b
+ * @retval >0 if field_a > field_b
+ */
+int
+tuple_compare_field(const char *field_a, const char *field_b,
+		    enum field_type type);
+
+/**
  * @brief Compare two tuples using field by field using key definition
  * @param tuple_a tuple
  * @param tuple_b tuple
