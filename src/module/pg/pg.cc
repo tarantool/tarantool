@@ -28,7 +28,6 @@
  */
 
 extern "C" {
-	#include <postgres.h>
 	#include <libpq-fe.h>
 	#undef PACKAGE_VERSION
 }
