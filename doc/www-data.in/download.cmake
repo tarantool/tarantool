@@ -60,7 +60,7 @@ download:
         # For Ubuntu:
         cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
         deb http://tarantool.org/dist/master/ubuntu/ $release main
-        deb-src http://tarantool.org/dist/mater/ubuntu/ $release main
+        deb-src http://tarantool.org/dist/master/ubuntu/ $release main
         EOF
 
         sudo apt-get update
