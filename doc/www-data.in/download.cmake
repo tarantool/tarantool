@@ -15,10 +15,10 @@ download:
         The version string may also contain a git revision id, to ease
         identification of the unqiue commit used to generate the build.
 
-        The current version of the stable branch is **@PACKAGE_VERSION@**.
+        The current version of the master branch is **@PACKAGE_VERSION@**.
 
         An automatic build system creates, tests and publishes packages
-        for every push into the stable branch. All binary packages contain
+        for every push into the master branch. All binary packages contain
         symbol information. Additionally, **-debug-**
         packages contain asserts and are compiled without optimization.
 
@@ -129,15 +129,15 @@ download:
 
         [Apple Developer]: https://developer.apple.com/downloads/
 
-        # Development branch
+        # Old master branch
 
-        In the same manner as for [the stable branch][stable], every push into
-        [the master branch][master] is [available online][builds-m].
-        The server roadmap is maintained on [Github][issues].
+        In the same manner as for [the master branch][master], every push into
+        [the old master][stable] is [available online][builds-s].
+        The server bugs database is maintained on [Github][issues].
         
         [stable]:   http://github.com/tarantool/tarantool/tree/stable
         [master]:   http://github.com/tarantool/tarantool/tree/master
-        [builds-m]: http://tarantool.org/dist/master
+        [builds-s]: http://tarantool.org/dist/stable
         [issues]:   http://github.com/tarantool/tarantool/issues
 
         ## Connectors

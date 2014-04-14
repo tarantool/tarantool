@@ -57,7 +57,7 @@ This example assumes that MySQL 5.5 or MySQL 5.6 has been installed
 
 <para>
 The example was run on a Linux machine where the base directory
-had a copy of the Tarantool source on ~/tarantool-stable, and
+had a copy of the Tarantool source on ~/tarantool, and
 a copy of MySQL on ~/mysql-5.5. The mysqld server is already running
 on the local host 127.0.0.1.
 </para>
@@ -95,7 +95,7 @@ Bye
 # Build the Tarantool server. Make certain that "cmake" gets the right
 # paths for the MySQL include directory and the MySQL libmysqlclient
 # library which were checked earlier.
-<prompt>$ </prompt><userinput>cd ~/tarantool-stable</userinput>
+<prompt>$ </prompt><userinput>cd ~/tarantool</userinput>
 <prompt>$ </prompt><userinput>make clean</userinput>
 <prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
 <prompt>$ </prompt><userinput>cmake . -DWITH_MYSQL=on -DMYSQL_INCLUDE_DIR=~/mysql-5.5/include\</userinput>
@@ -108,7 +108,7 @@ Bye
 ...
 -- Configuring done
 -- Generating done
--- Build files have been written to: ~/tarantool-stable
+-- Build files have been written to: ~/tarantool
 <prompt>$ </prompt><userinput>make</userinput>
 ...
 [ 49%] Built target core
@@ -137,8 +137,8 @@ Linking CXX shared library libmysql.so
 # The script_dir is the directory where the init.lua file must be.
 # Now create a file named /home/pgulutzan/tarantool_test/init.lua
 # and put the following lines in it (again, change "/home/pgulutzan"
-# to whatever the real directory is that contains tarantool-stable):
-package.path = "/home/pgulutzan/tarantool-stable/src/module/sql/?.lua;"..package.path
+# to whatever the real directory is that contains tarantool):
+package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
 require("sql")
 if type(box.net.sql) ~= "table" then
 error("net.sql load failed")
@@ -149,19 +149,19 @@ require("box.net.mysql")
 <userinput>cd /home/pgulutzan/tarantool_test</userinput>
 <userinput>mkdir box</userinput>
 <userinput>mkdir box/net</userinput>
-<userinput>cp ~/tarantool-stable/src/module/mysql/mysql.so ./box/net/mysql.so</userinput>
+<userinput>cp ~/tarantool/src/module/mysql/mysql.so ./box/net/mysql.so</userinput>
 
 # Start the Tarantool server.
 # Run it in the background but let the initial display be in the foreground.
 # So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool&amp;</userinput>
+<prompt>$ </prompt><userinput>~/tarantool/src/box/tarantool&amp;</userinput>
 2013-12-03 17:46:16.239 [12957] 1/sched C&gt; version 1.5.1-271-g610930e
 ... loading /home/pgulutzan/tarantool_test/init.lua ...
 ...
 2013-12-03 17:46:16.244 [12957] 1/sched C&gt; entering event loop
 
 # Type 'Enter' and then start the Tarantool client.
-<prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
+<prompt>$ </prompt><userinput>~/tarantool/client/tarantool/tarantool</userinput>
 <prompt>localhost&gt; </prompt>
 
 # Create a Lua function that will connect to the MySQL server,
@@ -207,7 +207,7 @@ must explicitly state where they are when building Tarantool from source.
 
 <para>
 The example was run on a Linux machine where the base directory
-had a copy of the Tarantool source on ~/tarantool-stable, and
+had a copy of the Tarantool source on ~/tarantool, and
 a copy of PostgreSQL on /usr. The postgres server is already running
 on the local host 127.0.0.1.
 </para>
@@ -242,7 +242,7 @@ INSERT 0 1
 # Build the Tarantool server. Make certain that "cmake" gets the right
 # paths for the PostgreSQL include directory and the PostgreSQL libpq
 # library which were checked earlier.
-<prompt>$ </prompt><userinput>cd ~/tarantool-stable</userinput>
+<prompt>$ </prompt><userinput>cd ~/tarantool</userinput>
 <prompt>$ </prompt><userinput>make clean</userinput>
 <prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
 <prompt>$ </prompt><userinput>cmake . -DWITH_POSTGRESQL=on -DPostgreSQL_LIBRARY=/usr/lib/libpq.so\</userinput>
@@ -254,7 +254,7 @@ INSERT 0 1
 ...
 -- Configuring done
 -- Generating done
--- Build files have been written to: ~/tarantool-stable
+-- Build files have been written to: ~/tarantool
 <prompt>$ </prompt><userinput>make</userinput>
 ...
 [ 49%] Built target core
@@ -267,21 +267,21 @@ Linking CXX shared library libpg.so
 <prompt>$ </prompt>
 
 # Before starting Tarantool server, tell it where the PostgreSQL plugin is.
-<prompt>$ </prompt><userinput>export TARANTOOL_PLUGIN_DIR=~/tarantool-stable/src/plugin/pg</userinput>
+<prompt>$ </prompt><userinput>export TARANTOOL_PLUGIN_DIR=~/tarantool/src/plugin/pg</userinput>
 <prompt>$ </prompt>
 
 # Start the Tarantool server.
 # Run it in the background but let the initial display be in the foreground.
 # So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool-stable/src/box/tarantool&amp;</userinput>
+<prompt>$ </prompt><userinput>~/tarantool/src/box/tarantool&amp;</userinput>
 2013-12-06 13:01:51.518 [23978] 1/sched C> version 1.5.1-290-g45b93e7
-... Loading plugin: ~/tarantool-stable/src/plugin/pg/libpg.so ...
+... Loading plugin: ~/tarantool/src/plugin/pg/libpg.so ...
 ... Plugin 'postgresql' was loaded, version: 1
 ...
 2013-12-06 13:01:51.531 [23978] 1/sched C> entering event loop
 
 # Type 'Enter' and then start the Tarantool client.
-<prompt>$ </prompt><userinput>~/tarantool-stable/client/tarantool/tarantool</userinput>
+<prompt>$ </prompt><userinput>~/tarantool/client/tarantool/tarantool</userinput>
 <prompt>localhost&gt; </prompt>
 
 # Create a Lua function that will connect to the PostgreSQL server,
