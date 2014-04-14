@@ -98,8 +98,8 @@ class Loader(object):
 [mul_page]: /doc/mpage/index.html """
 
         env = {
-            'type'  : 'Switch to ' + ('One-page' if not one_page else 'Multi-page') + ' version',
-            'ot'     : 'one_page' if one_page else 'mul_page',
+            'type' : 'Page Per Chapter' if one_page else 'All in One Page',
+            'ot'   : 'one_page' if one_page else 'mul_page',
             't'    : 'mul_page' if one_page else 'one_page',
         }
         lheader = markdown(lheader.format(**env), extensions=mdext)
