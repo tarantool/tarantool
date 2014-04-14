@@ -47,7 +47,7 @@ download:
         It can be added to your apt sources list with:
         
         ```bash
-        wget http://tarantool.org/dist/master/public.key
+        wget http://tarantool.org/dist/public.key
         sudo apt-key add ./public.key
         release=`lsb_release -c -s`
 
@@ -110,19 +110,6 @@ download:
         
         [layman]: http://wiki.gentoo.org/wiki/Layman
 
-        ### Other Linux distributions
-        <table border=1 title="Download the latest build, @PACKAGE_VERSION@" width=100%>
-        <th colspan=3>Static builds for Linux</th>
-        <tr>
-            <td> Binary tarball (**.tar.gz**) </td>
-            <td align=center> [32-bit] </td>
-            <td align=center> [64-bit] </td>
-        </tr>
-        </table>
-        
-        [32-bit]: http://tarantool.org/dist/master/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz
-        [64-bit]: http://tarantool.org/dist/master/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz
-
         ### FreeBSD
         
         Tarantool is available from the FreeBSD Ports collection
@@ -155,14 +142,14 @@ download:
 
         ## Connectors
 
-        - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
+        - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.42/lib/DR/Tarantool.pm)
         - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
         - Ruby driver, [https://github.com/mailru/tarantool-ruby]
         - Python driver, [http://pypi.python.org/pypi/tarantool]
         - PHP driver, [https://github.com/tarantool/tarantool-php]
         - node.js driver, [https://github.com/devgru/node-tarantool]
         - Erlang driver, [https://github.com/rtsisyk/etarantool]
-        - C connector [is maintained in the server source tree](https://github.com/tarantool/tarantool/blob/master/connector/c)
+        - C connector [https://github.com/tarantool/tarantool-c]
         
         [http://tarantool.org/dist/master]: http://tarantool.org/dist/master
         [http://tarantool.org/dist/master/debian]: http://tarantool.org/dist/master/debian

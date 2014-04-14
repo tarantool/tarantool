@@ -180,7 +180,7 @@ int main()
     <para>
        The example program only shows one command and does not show all that's necessary for
        good practice. For that, please see <link
-       xlink:href="https://github.com/tarantool/tarantool/blob/master/connector/c/include/tp.h"><filename>connector/c</filename></link> in the source tree.
+       xlink:href="https://github.com/tarantool/tarantool-c"><filename>connector/c</filename></link> source tree.
     </para>
   </section>
 
