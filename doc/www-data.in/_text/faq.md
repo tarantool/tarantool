@@ -19,9 +19,10 @@ faq:
 
         **Q. What's the key advantage of Tarantool?**
 
-        A. Tarantool provides a fairly rich core feature set (HASH, TREE BITSET
+        A. Tarantool provides a rich database feature set (HASH, TREE BITSET
            indexes, secondary indexes, composite indexes, asynchronous replication,
-           hot standby, data durability) along with support for Lua stored procedures.
+           hot standby, data durability) in a flexible environment of a Lua
+           interpreter.
            These two properties make it possible to code fast, atomic and reliable
            in-memory data servers which handle non-trivial application-specific logic.
            The win over traditional SQL servers is in performance: low-overhead,
@@ -32,8 +33,9 @@ faq:
 
         **Q. What are your development plans?**
 
-        A. They are standard. Performance. Better support for transactions.
-           Master-master replication, automatic sharding.
+        A. We continuously improve server performance. On the feature
+           front, automatic sharding and online upgrade are the two
+           major goals of 2014.
 
         **Q. Who is developing Tarantool?**
 
@@ -48,9 +50,10 @@ faq:
            and as such does not depend on any one sponsor. However, it is currently
            and integral part of Mail.Ru backbone, so it gets a lot of support from Mail.ru.
 
-        **Q. Why is Tarantool primary port number 33013?**
+        **Q. Why is Tarantool primary port number 3303?**
 
-        A. It's a prime number which is easy to remember, because 3313, 3301, 313, 13 and 3 are also prime numbers.
+        A. It's a prime number which is easy to remember, because 3313,
+           3301, 313, 13 and 3 are also prime numbers.
 
         **Q. My arena_used/items_used in SHOW SLAB output is >> 1. What does it mean and what should I do?**
 
@@ -59,3 +62,9 @@ faq:
            small tuples stored in the system initially, and later on each tuple becomes
            bigger and doesn't fit into its old slab size. The old slabs are never
            relinquished by the allocator. Currently this can be solved only by a server restart.
+
+        **Q. What happens when Tarantool runs out of memory?**
+
+        A. The server stops accepting updates until more memory is
+           available. Read and delete requests are served just fine.
+

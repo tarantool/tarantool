@@ -14,7 +14,7 @@
       {% block header %}
       <div id="blurb">
         <h1><a href="/" class="index">Tarantool</a></h1>
-        <h2>An in-memory NoSQL database</h2>
+        <h2>A NoSQL database in a Lua script</h2>
         <h3>
           <a href="intro.html" class="intro">Overview</a> &nbsp;
           <a href="doc/stable/mpage/index.html" class="documentation">Documentation</a> &nbsp;
