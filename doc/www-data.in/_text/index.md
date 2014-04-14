@@ -20,13 +20,14 @@ index:
         - asynchronous master-master replication,
         - authentication and access control,
         - [lowest CPU overhead](benchmark.html) to store or serve a
-        piece of content
+        piece of content.
 
         # Get started
 
         ``` bash
         # apt-get install tarantool
         # tarantool
+        # tarantool> box.cfg{{admin_port=3313}}
         # tarantool> myspace = box.schema.create_space('myspace')
         # tarantool> myspace:create_index('primary')
         # tarantool> tuple = {{ name = 'Tarantool', release = box.info.version,
