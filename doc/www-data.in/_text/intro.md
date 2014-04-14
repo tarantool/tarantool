@@ -2,7 +2,8 @@ intro:
     main: |
         ## What is Tarantool?
 
-        Tarantool is an in-memory NoSQL database. The code is available
+        Tarantool is a NoSQL database running and a Lua application server.
+        The code is available
         for free under the terms of [BSD license]. Supported platforms
         are GNU/Linux, Mac OS and FreeBSD.
 

@@ -8,8 +8,9 @@
 <section xml:id="tarantool-overview">
   <title>Tarantool: an overview</title>
   <para>
-    <productname>Tarantool</productname> is an in-memory NoSQL
-    database management system. The code is available for free under the terms of the
+    <productname>Tarantool</productname> is a NoSQL
+    database management system running in a Lua application
+    server. The code is available for free under the terms of the
     <citetitle
     xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
     license</citetitle>. Supported platforms are GNU/Linux, Mac OS
