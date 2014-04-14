@@ -53,6 +53,7 @@
 #include "fiber.h"
 #include "access.h"
 #include "cfg.h"
+#include "iobuf.h"
 
 static void process_replica(struct port *port, struct request *request);
 static void process_ro(struct port *port, struct request *request);
@@ -370,8 +371,7 @@ box_init()
 	else {
 		void (*on_bind)(void *) = NULL;
 		if (primary_port) {
-			iproto_init(bind_ipaddr, primary_port,
-				    cfg_geti("readahead"));
+			iproto_init(bind_ipaddr, primary_port);
 		} else {
 			/*
 			 * If no prmary port is given, leave local
@@ -389,6 +389,7 @@ box_init()
 					   cfg_getd("io_collect_interval"));
 	}
 	too_long_threshold = cfg_getd("too_long_threshold");
+	iobuf_set_readahead(cfg_geti("readahead"));
 }
 
 static void

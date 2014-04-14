@@ -60,6 +60,7 @@
 #include "box/box.h"
 #include "scoped_guard.h"
 #include "random.h"
+#include "iobuf.h"
 #include <third_party/gopt/gopt.h>
 #include "cfg.h"
 #include <readline/history.h>
@@ -595,6 +596,8 @@ main(int argc, char **argv)
 	atexit(tarantool_free);
 
 	fiber_init();
+	/* Init iobuf library with default readahead */
+	iobuf_init();
 	coeio_init();
 	signal_init();
 	session_init();

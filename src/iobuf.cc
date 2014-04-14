@@ -31,6 +31,11 @@
 #include "fiber.h"
 
 struct mempool iobuf_pool;
+/**
+ * Network readahead. A signed integer to avoid
+ * automatic type coercion to an unsigned type.
+ */
+static int iobuf_readahead = 16384;
 
 /* {{{ struct ibuf */
 
@@ -70,8 +75,8 @@ ibuf_reserve(struct ibuf *ibuf, size_t size)
 	if (size + current_size <= ibuf->capacity) {
 		memmove(ibuf->buf, ibuf->pos, current_size);
 	} else {
-		/* Use cfg_readahead as allocation factor. */
-		size_t new_capacity = MAX(ibuf->capacity * 2, cfg_readahead);
+		/* Use iobuf_readahead as allocation factor. */
+		size_t new_capacity = MAX(ibuf->capacity * 2, iobuf_readahead);
 		while (new_capacity < current_size + size)
 			new_capacity *= 2;
 
@@ -107,7 +112,7 @@ obuf_init_pos(struct obuf *buf, size_t pos)
 static inline void
 obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
 {
-	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 : cfg_readahead;
+	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 : iobuf_readahead;
 	while (capacity < size) {
 		capacity *=2;
 	}
@@ -265,7 +270,7 @@ obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp)
  */
 static int iobuf_max_pool_size()
 {
-	return 18 * cfg_readahead;
+	return 18 * iobuf_readahead;
 }
 
 SLIST_HEAD(iobuf_cache, iobuf) iobuf_cache;
@@ -318,14 +323,14 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio)
 	iobuf_gc(iobuf);
 	/*
 	 * If there is some residue in the input buffer, move it
-	 * but only in case if we don't have cfg_readahead
+	 * but only in case if we don't have iobuf_readahead
 	 * bytes available for the next round: it's more efficient
 	 * to move any residue now, when it's likely to be small,
 	 * rather than when we have read a bunch more data, and only
 	 * then discovered we don't have enough space to read a
 	 * full request.
 	 */
-	ibuf_reserve(&iobuf->in, cfg_readahead);
+	ibuf_reserve(&iobuf->in, iobuf_readahead);
 	return total;
 }
 
@@ -342,13 +347,16 @@ iobuf_gc(struct iobuf *iobuf)
 	obuf_reset(&iobuf->out);
 }
 
-int cfg_readahead;
-
 void
-iobuf_init(int readahead)
+iobuf_init()
 {
 	mempool_create(&iobuf_pool, &cord()->slabc, sizeof(struct iobuf));
-	cfg_readahead =  readahead;
+}
+
+void
+iobuf_set_readahead(int readahead)
+{
+	iobuf_readahead =  readahead;
 }
 
 /* struct iobuf }}} */
