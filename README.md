@@ -53,8 +53,7 @@ The build depends on the following external libraries:
 Please follow these steps to compile Tarantool:
 
     # If compiling from git
-    tarantool $ git submodule init
-    tarantool $ git submodule update
+    tarantool $ git submodule update --init
 
     tarantool $ cmake .
     tarantool $ make
