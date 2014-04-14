@@ -101,21 +101,6 @@ find_path(PostgreSQL_INCLUDE_DIR
   DOC "The ${PostgreSQL_INCLUDE_DIR_MESSAGE}"
 )
 
-find_path(PostgreSQL_TYPE_INCLUDE_DIR
-  NAMES catalog/pg_type.h
-  PATHS
-   # Look in other places.
-   ${PostgreSQL_ROOT_DIRECTORIES}
-  PATH_SUFFIXES
-    server
-    postgresql
-    pgsql/server
-    postgresql/server
-    include/server
-  # Help the user find it if we cannot.
-  DOC "The ${PostgreSQL_INCLUDE_DIR_MESSAGE}"
-)
-
 # The PostgreSQL library.
 set (PostgreSQL_LIBRARY_TO_FIND pq)
 # Setting some more prefixes for the library
@@ -146,14 +131,14 @@ endif()
 # Did we find anything?
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(PostgreSQL
-                                  REQUIRED_VARS PostgreSQL_LIBRARY PostgreSQL_INCLUDE_DIR PostgreSQL_TYPE_INCLUDE_DIR
+                                  REQUIRED_VARS PostgreSQL_LIBRARY PostgreSQL_INCLUDE_DIR
                                   VERSION_VAR PostgreSQL_VERSION_STRING)
 set( PostgreSQL_FOUND  ${POSTGRESQL_FOUND})
 
 # Now try to get the include and library path.
 if(PostgreSQL_FOUND)
 
-  set(PostgreSQL_INCLUDE_DIRS ${PostgreSQL_INCLUDE_DIR} ${PostgreSQL_TYPE_INCLUDE_DIR} )
+  set(PostgreSQL_INCLUDE_DIRS ${PostgreSQL_INCLUDE_DIR} )
   set(PostgreSQL_LIBRARY_DIRS ${PostgreSQL_LIBRARY_DIR} )
   set(PostgreSQL_LIBRARIES ${PostgreSQL_LIBRARY_TO_FIND})
 
@@ -162,4 +147,4 @@ if(PostgreSQL_FOUND)
   #message("Final PostgreSQL libraries:   ${PostgreSQL_LIBRARIES}")
 endif()
 
-mark_as_advanced(PostgreSQL_INCLUDE_DIR PostgreSQL_TYPE_INCLUDE_DIR PostgreSQL_LIBRARY )
+mark_as_advanced(PostgreSQL_INCLUDE_DIR PostgreSQL_LIBRARY )
