@@ -17,7 +17,7 @@
         <h2>An in-memory NoSQL database</h2>
         <h3>
           <a href="intro.html" class="intro">Overview</a> &nbsp;
-          <a href="doc/stable/mpage/index.html" class="documentation">Documentation</a> &nbsp;
+          <a href="doc/mpage/index.html" class="documentation">Documentation</a> &nbsp;
           <a href="download.html" class="download">Download</a> &nbsp;
           <a href="support.html" class="support">Support</a>
         </h3>

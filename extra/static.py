@@ -23,11 +23,11 @@ class MockConfig(object):
         self.output_path = '../www-data/'
         self.layout_dir  = '_layout/'
         self.text_dir    = '_text/'
-        self.doc         = 'doc/{branch}'
+        self.doc         = 'doc/'
         self.doc_mpage   = 'mpage/'
         self.doc_opage   = 'user_guide.html'
         self.doc_css     = '../user/tnt.css'
-        self.target      = '' 
+        self.target      = ''
 
 
 class Loader(object):
@@ -84,27 +84,23 @@ class Loader(object):
     <div id="headr" class="column">{1}</div>
 </div>
     """
+
         lheader = """
-### [Home](/) -> [Documentation][{co}]
+### [Home](/) -> [Documentation][{ot}]
 
-[opa]: /doc/{branch1}/user_guide.html
-[mpa]: /doc/{branch1}/mpage/index.html """
+[one_page]: /doc/user_guide.html
+[mul_page]: /doc/mpage/index.html """
+
         rheader = """
-### [{bn}][{o}1] / [{bno}][mpa2]
+### [{type}][{t}]
 
-[opa1]: /doc/{branch1}/user_guide.html
-[mpa1]: /doc/{branch1}/mpage/index.html
-
-[opa2]: /doc/{branch2}/user_guide.html
-[mpa2]: /doc/{branch2}/mpage/index.html """
+[one_page]: /doc/user_guide.html
+[mul_page]: /doc/mpage/index.html """
 
         env = {
-            'bn'      : branch.capitalize(),
-            'bno'     : ('master' if branch != 'master' else 'stable').capitalize(),
-            'branch1' : branch,
-            'branch2' : ('master' if branch != 'master' else 'stable'),
-            'o'        : 'mpa' if one_page else 'opa',
-            'co'       : 'opa' if one_page else 'mpa',
+            'type'  : 'Switch to ' + ('One-page' if not one_page else 'Multi-page') + ' version',
+            'ot'     : 'one_page' if one_page else 'mul_page',
+            't'    : 'mul_page' if one_page else 'one_page',
         }
         lheader = markdown(lheader.format(**env), extensions=mdext)
         rheader = markdown(rheader.format(**env), extensions=mdext)
@@ -116,7 +112,7 @@ class Loader(object):
         branch = proc.communicate()[0].strip()
         docs_template = self.environ.get_template('documentation')
         # ==========================================
-        doc_mpath = os.path.join(self.config.doc, self.config.doc_mpage).format(branch=branch)
+        doc_mpath = os.path.join(self.config.doc, self.config.doc_mpage)
         doc_mpage_out = doc_mpath
         doc_mpath_out = os.path.join(self.config.output_path, doc_mpath)
         doc_mpath = os.path.join(self.config.input, doc_mpath)
@@ -133,7 +129,7 @@ class Loader(object):
                 self.write(os.path.join(doc_mpage_out, i), data)
             shutil.copy(self.config.doc_css, doc_mpath_out)
         # ===========================================
-        doc_opath = self.config.doc.format(branch=branch)
+        doc_opath = self.config.doc
         doc_opath_out = os.path.join(self.config.output_path, doc_opath)
         doc_opage_out = os.path.join(doc_opath, self.config.doc_opage)
         doc_opath = os.path.join(self.config.input, doc_opath)

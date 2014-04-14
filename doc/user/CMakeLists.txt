@@ -1,17 +1,5 @@
-
-execute_process(
-    COMMAND git rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_BRANCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-if (NOT GIT_BRANCH STREQUAL "")
-    set (GIT_BRANCH "${GIT_BRANCH}/")
-endif (NOT GIT_BRANCH STREQUAL "")
-
-set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}user_guide.html")
-set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/${GIT_BRANCH}mpage/")
+set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/user_guide.html")
+set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/mpage/")
 set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
 
 if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")
