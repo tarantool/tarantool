@@ -64,7 +64,7 @@ download:
         EOF
 
         sudo apt-get update
-        sudo apt-get install tarantool tarantool-client
+        sudo apt-get install tarantool
         ```
         
         ### CentOS 5-6 and RHEL 5-6
