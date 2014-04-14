@@ -46,14 +46,14 @@ targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your
 <title>Downloading and installing a binary package</title>
 
 <para>
-The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
+The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist/stable" xlink:title="tarantool.org/dist/stable">tarantool.org/dist/stable</link>.
 The repositories for the <quote>master</quote> release are at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
-Since this is the manual for the <quote>stable</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
+Since this is the manual for the <quote>stable</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist/stable" xlink:title="tarantool.org/dist/stable">tarantool.org/dist/stable</link>.
 </para>
 
 <para>
 An automatic build system creates, tests and publishes packages for every push into the stable branch. 
-Therefore if you looked at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link> you would see many files.
+Therefore if you looked at <link xlink:href="http://tarantool.org/dist/stable" xlink:title="tarantool.org/dist/stable">tarantool.org/dist/stable</link> you would see many files.
 Names of binary packages have the format <computeroutput><filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename></computeroutput>.
 Here is one example:
 <programlisting>tarantool-1.5.1-97-g8e8cd06-linux-x86_64.tar.gz    26-Sep-2013 15:55    3664777</programlisting>
@@ -71,7 +71,7 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 <programlisting>
 # DEBIAN commands for Tarantool stable binary download:
 # There is always an up-to-date Debian repository at
-# <link xlink:href="http://tarantool.org/dist/debian">http://tarantool.org/dist/debian</link>
+# <link xlink:href="http://tarantool.org/dist/stable/debian">http://tarantool.org/dist/stable/debian</link>
 # The repository contains builds for Debian unstable "Sid", stable "Wheezy",
 # forthcoming "Jessie", ...
 # add the tarantool.org repository to your apt sources list:
@@ -81,9 +81,9 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/debian/ $release main" | \
+<command>echo</command> "deb http://tarantool.org/dist/stable/debian/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/debian/ $release main" | \
+<command>echo</command> "deb-src http://tarantool.org/dist/stable/debian/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
@@ -95,7 +95,7 @@ release=`lsb_release -c -s`
 <programlisting>
 # UBUNTU commands for Tarantool stable binary download:
 # There is always an up-to-date Ubuntu repository at
-# <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/ubuntu</link>
+# <link xlink:href="http://tarantool.org/dist/stable/ubuntu">http://tarantool.org/dist/stable/ubuntu</link>
 # The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
 # 13.04 "raring", 13.10 "saucy", ...
 # add the tarantool.org repository to your apt sources list:
@@ -108,9 +108,9 @@ release=`lsb_release -c -s`
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
 # append two lines to a list of source repositories
-<command>echo</command> "deb http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>echo</command> "deb http://tarantool.org/dist/stable/ubuntu/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
-<command>echo</command> "deb-src http://tarantool.org/dist/ubuntu/ $release main" | \
+<command>echo</command> "deb-src http://tarantool.org/dist/stable/ubuntu/ $release main" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
@@ -125,10 +125,10 @@ release=`lsb_release -c -s`
 # and RHEL version 5 or 6
 # Pick the CentOS repository which fits your CentOS/RHEL version
 # and your x86 platform:
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/i386">http://tarantool.org/dist/centos/5/os/i386 for version 5, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/5/os/x86_64">http://tarantool.org/dist/centos/5/os/x86_64 for version 5, x86-64</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/i386">http://tarantool.org/dist/centos/6/os/i386 for version 6, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/centos/6/os/x86_64">http://tarantool.org/dist/centos/6/os/x86_64 for version 6, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/centos/5/os/i386">http://tarantool.org/dist/stable/centos/5/os/i386 for version 5, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/stable/centos/5/os/x86_64">http://tarantool.org/dist/stable/centos/5/os/x86_64 for version 5, x86-64</link>
+# <link xlink:href="http://tarantool.org/dist/stable/centos/6/os/i386">http://tarantool.org/dist/stable/centos/6/os/i386 for version 6, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/stable/centos/6/os/x86_64">http://tarantool.org/dist/stable/centos/6/os/x86_64 for version 6, x86-64</link>
 # Add the following section to your yum repository list
 # (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
 # (in the following instructions,
@@ -137,7 +137,7 @@ release=`lsb_release -c -s`
 #     $basearch i.e. base architecture must be either i386 or x86_64)
 # [tarantool]
 # name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
-# baseurl=http://tarantool.org/dist/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
+# baseurl=http://tarantool.org/dist/stable/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
 # enabled=1
 # gpgcheck=0
 # For example, if you have CentOS version 6 and x86-64, you can
@@ -145,7 +145,7 @@ release=`lsb_release -c -s`
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "baseurl=http://tarantool.org/dist/centos/6/os/x86_64/" | \
+<command>echo</command> "baseurl=http://tarantool.org/dist/stable/centos/6/os/x86_64/" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -169,7 +169,7 @@ release=`lsb_release -c -s`
 # If you have a GNU/Linux distribution which is not one of the above,
 # or if you want to install on your own subdirectory without affecting
 # /usr /etc etc., start your browser and go to
-# <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link> download page.
+# <link xlink:href="http://stable.tarantool.org/download.html">http://stable.tarantool.org/download.html</link> download page.
 # Look for words similar to "Other Linux distributions". You will want the
 # right binary tarball (<filename>.tar.gz</filename>) file for your release architecture.
 # Click on either "32-bit" or "64-bit" depending on your release architecture.
@@ -203,14 +203,14 @@ release=`lsb_release -c -s`
 # First upgrade Clang (the C compiler) to version 3.2 or later using
 # Command Line Tools for Xcode disk image version 4.6+ from
 # Apple Developer web-site.
-<command>brew install</command> --use-clang http://tarantool.org/dist/tarantool.rb
+<command>brew install</command> --use-clang http://tarantool.org/dist/stable/tarantool.rb
 # or
-<command>brew install</command> http://tarantool.org/dist/tarantool.rb
+<command>brew install</command> http://tarantool.org/dist/stable/tarantool.rb
 </programlisting>
 </para>
 
 <para>
-More advice for binary downloads is at <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link>.
+More advice for binary downloads is at <link xlink:href="http://stable.tarantool.org/download.html">http://stable.tarantool.org/download.html</link>.
 </para>
 
 </section>
@@ -232,7 +232,7 @@ The absolutely necessary ones are:
     <listitem>
       <para>
 A program for downloading source repositories.
-In this case the necessary program is <quote><productname>git</productname></quote>. Although tarantool.org/dist
+In this case the necessary program is <quote><productname>git</productname></quote>. Although tarantool.org/dist/stable
 has source tarballs (the files whose names end in <quote>-src.tar.gz</quote>), the latest complete source downloads are on
 github.com, and from github one gets with git.
  </para>

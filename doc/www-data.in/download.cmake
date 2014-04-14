@@ -2,7 +2,8 @@ download:
     main: |
         # All downloads
 
-        All published releases are available at [http://tarantool.org/dist].
+        All published releases are available at
+        [http://tarantool.org/dist/stable].
 
         # How to choose the right version for download
 
@@ -26,7 +27,8 @@ download:
         The latest source archive is [tarantool-@PACKAGE_VERSION@-src.tar.gz]
         Please consult with README for build instructions on your system.
         
-        [tarantool-@PACKAGE_VERSION@-src.tar.gz]: http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-src.tar.gz 
+        [tarantool-@PACKAGE_VERSION@-src.tar.gz]:
+        http://tarantool.org/dist/stable/tarantool-@PACKAGE_VERSION@-src.tar.gz 
 
         ## Binary downloads
 
@@ -37,7 +39,8 @@ download:
         ### Debian GNU/Linux and Ubuntu
 
         We maintain an always up-to-date Debian GNU/Linux and Ubuntu package
-        repository at [http://tarantool.org/dist/debian] and [http://tarantool.org/dist/ubuntu]
+        repository at [http://tarantool.org/dist/stable/debian] and
+        [http://tarantool.org/dist/stable/ubuntu]
         respectively.
 
         At the moment the repository contains builds for Debian "Sid", "Jessie",
@@ -51,14 +54,14 @@ download:
 
         # For Debian:
         cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
-        deb http://tarantool.org/dist/debian/ $release main
-        deb-src http://tarantool.org/dist/debian/ $release main
+        deb http://tarantool.org/dist/stable/debian/ $release main
+        deb-src http://tarantool.org/dist/stable/debian/ $release main
         EOF
 
         # For Ubuntu:
         cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
-        deb http://tarantool.org/dist/ubuntu/ $release main
-        deb-src http://tarantool.org/dist/ubuntu/ $release main
+        deb http://tarantool.org/dist/stable/ubuntu/ $release main
+        deb-src http://tarantool.org/dist/stable/ubuntu/ $release main
         EOF
 
         sudo apt-get update
@@ -67,7 +70,7 @@ download:
         
         ### CentOS 5-6 and RHEL 5-6
 
-        CentOS repository is available at [http://tarantool.org/dist/centos]
+        CentOS repository is available at [http://tarantool.org/dist/stable/centos]
 
         Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
         to enable it:
@@ -75,14 +78,14 @@ download:
         ```ini
         [tarantool]
         name=CentOS-$releasever - Tarantool
-        baseurl=http://tarantool.org/dist/centos/$releasever/os/$basearch/
+        baseurl=http://tarantool.org/dist/stable/centos/$releasever/os/$basearch/
         enabled=1
         gpgcheck=0
         ```
         
         ### Fedora
 
-        Fedora repository is available at [http://tarantool.org/dist/fedora]
+        Fedora repository is available at [http://tarantool.org/dist/stable/fedora]
 
         Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
         to enable it:
@@ -90,7 +93,7 @@ download:
         ```ini
         [tarantool]
         name=Fedora-$releasever - Tarantool
-        baseurl=http://tarantool.org/dist/fedora/$releasever/os/$basearch/
+        baseurl=http://tarantool.org/dist/stable/fedora/$releasever/os/$basearch/
         enabled=1
         gpgcheck=0
         ```
@@ -118,8 +121,8 @@ download:
         </tr>
         </table>
         
-        [32-bit]: http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz
-        [64-bit]: http://tarantool.org/dist/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz
+        [32-bit]: http://tarantool.org/dist/stable/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz
+        [64-bit]: http://tarantool.org/dist/stable/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz
 
         ### FreeBSD
         
@@ -131,7 +134,7 @@ download:
         You can install Tarantool using homebrew:
         
         ```
-        $ brew install --use-clang http://tarantool.org/dist/tarantool.rb
+        $ brew install --use-clang http://tarantool.org/dist/stable/tarantool.rb
         ```
         
         Please upgrade `clang` to version 3.2 or later using
@@ -162,11 +165,11 @@ download:
         - Erlang driver, [https://github.com/rtsisyk/etarantool]
         - C connector [is maintained in the server source tree](https://github.com/tarantool/tarantool/blob/master/connector/c)
         
-        [http://tarantool.org/dist]: http://tarantool.org/dist
-        [http://tarantool.org/dist/debian]: http://tarantool.org/dist/debian
-        [http://tarantool.org/dist/ubuntu]: http://tarantool.org/dist/ubuntu
-        [http://tarantool.org/dist/centos]: http://tarantool.org/dist/centos
-        [http://tarantool.org/dist/fedora]: http://tarantool.org/dist/fedora
+        [http://tarantool.org/dist]: http://tarantool.org/dist/stable
+        [http://tarantool.org/dist/stable/debian]: http://tarantool.org/dist/stable/debian
+        [http://tarantool.org/dist/stable/ubuntu]: http://tarantool.org/dist/stable/ubuntu
+        [http://tarantool.org/dist/stable/centos]: http://tarantool.org/dist/stable/centos
+        [http://tarantool.org/dist/stable/fedora]: http://tarantool.org/dist/stable/fedora
         [https://github.com/mailru/tarantool-ruby]: https://github.com/mailru/tarantool-ruby
         [http://pypi.python.org/pypi/tarantool]: http://pypi.python.org/pypi/tarantool
         [https://github.com/tarantool/tarantool-php]: https://github.com/tarantool/tarantool-php
