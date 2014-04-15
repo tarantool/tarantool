@@ -85,6 +85,10 @@ foreach (root ${PostgreSQL_KNOWN_ROOTS} )
     endforeach()
 endforeach()
 
+foreach (version ${PostgreSQL_KNOWN_VERSIONS} )
+    list(APPEND PostgreSQL_ROOT_DIRECTORIES "/usr/pgsql-${version}" )
+endforeach()
+
 #
 # Look for an installation.
 #

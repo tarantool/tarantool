@@ -2,6 +2,7 @@ find_optional_package(PostgreSQL)
 
 if (PostgreSQL_FOUND)
 	include_directories(${PostgreSQL_INCLUDE_DIRS})
+	link_directories(${PostgreSQL_LIBRARY_DIRS})
 	add_library(pg SHARED pg.cc)
 	target_link_libraries(pg ${PostgreSQL_LIBRARIES} -rdynamic)
 	set_target_properties(pg PROPERTIES PREFIX "")
