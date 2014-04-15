@@ -596,11 +596,7 @@ DropIndex::commit(struct alter_space *alter)
 	Index *pk = index_find(alter->old_space, 0);
 	if (pk == NULL)
 		return;
-	struct iterator *it = pk->position();
-	pk->initIterator(it, ITER_ALL, NULL, 0);
-	struct tuple *tuple;
-	while ((tuple = it->next(it)))
-		tuple_ref(tuple, -1);
+	alter->old_space->engine->factory->dropIndex(pk);
 }
 
 /** Change non-essential (no data change) properties of an index. */

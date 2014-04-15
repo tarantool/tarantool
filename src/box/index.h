@@ -83,7 +83,14 @@ iterator_type_is_reverse(enum iterator_type type)
 struct iterator {
 	struct tuple *(*next)(struct iterator *);
 	void (*free)(struct iterator *);
+	void (*close)(struct iterator *);
 };
+
+static inline void
+iterator_close(struct iterator *it) {
+	if (it->close)
+		it->close(it);
+}
 
 /**
  * Check that the key has correct part count and correct part size
@@ -142,6 +149,11 @@ protected:
 	 */
 	Index(struct key_def *key_def);
 
+	/*
+	 * Pre-allocated iterator to speed up the main case of
+	 * box_process(). Should not be used elsewhere.
+	 */
+	struct iterator *m_position;
 public:
 	virtual ~Index();
 
@@ -180,12 +192,6 @@ public:
 			m_position = allocIterator();
 		return m_position;
 	}
-private:
-	/*
-	 * Pre-allocated iterator to speed up the main case of
-	 * box_process(). Should not be used elsewhere.
-	 */
-	struct iterator *m_position;
 };
 
 /**

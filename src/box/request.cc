@@ -199,6 +199,8 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 	struct iterator *it = index->position();
 	key_validate(index->key_def, type, key, part_count);
 	index->initIterator(it, type, key, part_count);
+	auto iterator_guard =
+		make_scoped_guard([=] { iterator_close(it); });
 
 	struct tuple *tuple;
 	while ((tuple = it->next(it)) != NULL) {

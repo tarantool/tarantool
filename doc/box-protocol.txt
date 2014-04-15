@@ -4,8 +4,15 @@
 ; The latest version of this document can be found in
 ; Tarantool source tree, doc/box-protocol.txt
 ;
-; IPROTO is a binary request/response protocol that features a
-; complete access to Tarantool functionality, including:
+; IPROTO is a binary request/response protocol.
+; The server begins the dialogue by sending a fixed-size (128 bytes)
+; text greeting to the client. The first 64 bytes of the greeting
+; contain server version. The second 64 bytes contain a base64-
+; encoded random string, to use in authentification packet.
+
+; Once a greeting is read, the protocol becomes pure
+; request/response and features a complete access to Tarantool
+; functionality, including:
 ; - request multiplexing, e.g. ability to asynchronously issue
 ;   multiple requests via the same connection
 ; - response format that supports zero-copy writes
@@ -51,7 +58,7 @@
 
 ;
 ; The value of the constant defines the type of value of the map.
-; For example, for <error> key (0x31), the expected value is a 
+; For example, for <error> key (0x31), the expected value is a
 ; msgpack string with error message.
 ; All requests and responses utilize the same basic structure
 
@@ -89,13 +96,15 @@
 ; Request packet structure
 ; -----------------------------------
 ; Value for <code> key in request can be:
-; 0  -- <ping>
 ; 1  -- <select>
 ; 2  -- <insert>
 ; 3  -- <replace>
 ; 4  -- <update>
 ; 5  -- <delete>
 ; 6  -- <call>
+; 7  -- <auth>
+; 64  -- <ping>
+; 66 -- <subscribe>
 
 ; <sync> is a unique request identifier, preserved in the response,
 ; The identifier is necessary to allow request multiplexing --
@@ -130,9 +139,24 @@
 ; Call a stored function
 <call> ::= <function_name> | <tuple>
 
+; Authenticate a session
+; <key> holds the user name. <tuple> must be an array of 2 fields:
+; authentication mechanism ("chap-sha1" is the only supported
+; mechanism right now) and password, encrypted according to the
+; specified mechanism
+; https://github.com/tarantool/tarantool/blob/master/src/scramble.h
+; for instructions how to prepare a hashed password for "chap-sha1"
+; authentication mechanism.
+; Authentication in Tarantool is optional, if no
+; authentication is performed, session user is 'guest'.
+; The server responds to authentication packet with a standard
+; response with 0 tuples.
+
+<auth> ::= <key> | <tuple>
+
 ; As can be seen from the grammar some requests have common keys,
 ; whereas other keys can be present only in a body of a single
-; request type. 
+; request type.
 
 ; <space_id> space to use in the request
 ; To find the numeric space id by space name, one
@@ -201,7 +225,7 @@
 ; more tuples, otherwise it carries an error message that corresponds
 ; to the return code.
 
-; On success, the server always returns a tuple or tuples, 
+; On success, the server always returns a tuple or tuples,
 ; when found.
 ; I.e. on success, response <body> contains <set> key.
 ; For select/update/delete, it's the tuple that matched
@@ -250,5 +274,9 @@
 ; Convenience macros which define hexadecimal constants for
 ; <int32> return codes (completion status + code) can be found here:
 ; https://github.com/tarantool/tarantool/blob/master/src/errcode.h
+;
+;
+; Additional packets
+; ------------------
 
 ; vim: syntax=bnf

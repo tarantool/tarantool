@@ -4,6 +4,8 @@ endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
+include_directories(${SOPHIA_INCLUDE_DIR})
+
 set(lua_sources)
 lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/box.lua)
@@ -27,6 +29,8 @@ add_library(box
     bitset_index.cc
     engine.cc
     engine_memtx.cc
+    engine_sophia.cc
+    sophia_index.cc
     space.cc
     alter.cc
     schema.cc
@@ -42,4 +46,3 @@ add_library(box
     lua/slab.cc
     lua/index.cc
     lua/space.cc)
-

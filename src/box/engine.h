@@ -58,6 +58,15 @@ enum engine_recovery_state {
 	READY_ALL_KEYS
 };
 
+/**
+ * Engine specific recovery events that represents
+ * global recovery stage change.
+ */
+enum engine_recovery_event {
+	END_RECOVERY_SNAPSHOT,
+	END_RECOVERY
+};
+
 typedef void (*engine_recover_f)(struct space*);
 
 typedef struct tuple *
@@ -83,7 +92,7 @@ public:
 	virtual ~EngineFactory() {}
 	/** Called once at startup. */
 	virtual void init();
-	/** Called at server shutdown */
+	/** Called at server shutdown. */
 	virtual void shutdown();
 	/** Create a new engine instance for a space. */
 	virtual Engine *open() = 0;
@@ -92,6 +101,19 @@ public:
 	 * space.
 	 */
 	virtual Index *createIndex(struct key_def*) = 0;
+	/*
+	 * Delete all tuples in the index on drop.
+	 */
+	virtual void dropIndex(Index*) = 0;
+	/**
+	 * Check a key definition for violation of
+	 * various limits.
+	 */
+	virtual void keydefCheck(struct key_def *key_def) = 0;
+	/* Clean transaction engine resources.  */
+	virtual void txnFinish(struct txn *txn);
+	/* Inform engine about a recovery stage change. */
+	virtual void recoveryEvent(enum engine_recovery_event);
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -100,7 +122,7 @@ public:
 	struct rlist link;
 };
 
-/** Engine handle  - an operator of a space */
+/** Engine handle - an operator of a space */
 
 struct Engine: public Object {
 public:

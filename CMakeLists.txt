@@ -97,7 +97,7 @@ add_custom_target(tags COMMAND ctags -R -f tags
 #
 set (CPACK_PACKAGE_VERSION_MAJOR "1")
 set (CPACK_PACKAGE_VERSION_MINOR "6")
-set (CPACK_PACKAGE_VERSION_PATCH "1")
+set (CPACK_PACKAGE_VERSION_PATCH "2")
 
 set (PACKAGE_VERSION "")
 
@@ -300,6 +300,7 @@ add_dependencies(build_bundled_libs misc)
 
 include(BuildSophia)
 sophia_build()
+set (sophia_lib "${PROJECT_BINARY_DIR}/third_party/sophia/db/libsophia.a")
 
 option(ENABLE_RPM "Enable install of a RPM specific files" OFF)
 

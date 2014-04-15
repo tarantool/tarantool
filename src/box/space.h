@@ -189,10 +189,14 @@ space_replace(struct space *space, struct tuple *old_tuple,
 struct tuple *
 space_replace_no_keys(struct space*, struct tuple*, struct tuple*,
                       enum dup_replace_mode);
+struct tuple *
+space_replace_primary_key(struct space*, struct tuple*, struct tuple*,
+                          enum dup_replace_mode);
 
 void space_begin_build_primary_key(struct space *space);
 void space_build_primary_key(struct space *space);
 void space_build_all_keys(struct space *space);
+void space_noop(struct space *space);
 
 uint32_t
 space_size(struct space *space);

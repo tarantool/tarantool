@@ -15,10 +15,10 @@ download:
         The version string may also contain a git revision id, to ease
         identification of the unqiue commit used to generate the build.
 
-        The current version of the stable branch is **@PACKAGE_VERSION@**.
+        The current version of the master branch is **@PACKAGE_VERSION@**.
 
         An automatic build system creates, tests and publishes packages
-        for every push into the stable branch. All binary packages contain
+        for every push into the master branch. All binary packages contain
         symbol information. Additionally, **-debug-**
         packages contain asserts and are compiled without optimization.
 
@@ -47,7 +47,7 @@ download:
         It can be added to your apt sources list with:
         
         ```bash
-        wget http://tarantool.org/dist/master/public.key
+        wget http://tarantool.org/dist/public.key
         sudo apt-key add ./public.key
         release=`lsb_release -c -s`
 
@@ -60,11 +60,11 @@ download:
         # For Ubuntu:
         cat > /etc/apt/sources.list.d/tarantool.list <<- EOF
         deb http://tarantool.org/dist/master/ubuntu/ $release main
-        deb-src http://tarantool.org/dist/mater/ubuntu/ $release main
+        deb-src http://tarantool.org/dist/master/ubuntu/ $release main
         EOF
 
         sudo apt-get update
-        sudo apt-get install tarantool tarantool-client
+        sudo apt-get install tarantool
         ```
         
         ### CentOS 5-6 and RHEL 5-6
@@ -110,19 +110,6 @@ download:
         
         [layman]: http://wiki.gentoo.org/wiki/Layman
 
-        ### Other Linux distributions
-        <table border=1 title="Download the latest build, @PACKAGE_VERSION@" width=100%>
-        <th colspan=3>Static builds for Linux</th>
-        <tr>
-            <td> Binary tarball (**.tar.gz**) </td>
-            <td align=center> [32-bit] </td>
-            <td align=center> [64-bit] </td>
-        </tr>
-        </table>
-        
-        [32-bit]: http://tarantool.org/dist/master/tarantool-@PACKAGE_VERSION@-linux-i686.tar.gz
-        [64-bit]: http://tarantool.org/dist/master/tarantool-@PACKAGE_VERSION@-linux-x86_64.tar.gz
-
         ### FreeBSD
         
         Tarantool is available from the FreeBSD Ports collection
@@ -142,27 +129,27 @@ download:
 
         [Apple Developer]: https://developer.apple.com/downloads/
 
-        # Development branch
+        # Old master branch
 
-        In the same manner as for [the stable branch][stable], every push into
-        [the master branch][master] is [available online][builds-m].
-        The server roadmap is maintained on [Github][issues].
+        In the same manner as for [the master branch][master], every push into
+        [the old master][stable] is [available online][builds-s].
+        The server bugs database is maintained on [Github][issues].
         
         [stable]:   http://github.com/tarantool/tarantool/tree/stable
         [master]:   http://github.com/tarantool/tarantool/tree/master
-        [builds-m]: http://tarantool.org/dist/master
+        [builds-s]: http://tarantool.org/dist/stable
         [issues]:   http://github.com/tarantool/tarantool/issues
 
         ## Connectors
 
-        - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.37/lib/DR/Tarantool.pm)
+        - Perl driver, [DR:Tarantool](http://search.cpan.org/~unera/DR-Tarantool-0.42/lib/DR/Tarantool.pm)
         - Java driver, [Maven repository](http://dgreenru.github.com/tarantool-java)
         - Ruby driver, [https://github.com/mailru/tarantool-ruby]
         - Python driver, [http://pypi.python.org/pypi/tarantool]
         - PHP driver, [https://github.com/tarantool/tarantool-php]
         - node.js driver, [https://github.com/devgru/node-tarantool]
         - Erlang driver, [https://github.com/rtsisyk/etarantool]
-        - C connector [is maintained in the server source tree](https://github.com/tarantool/tarantool/blob/master/connector/c)
+        - C connector [https://github.com/tarantool/tarantool-c]
         
         [http://tarantool.org/dist/master]: http://tarantool.org/dist/master
         [http://tarantool.org/dist/master/debian]: http://tarantool.org/dist/master/debian

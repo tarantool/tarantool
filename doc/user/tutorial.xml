@@ -36,7 +36,7 @@ targetptr="getting-started-source"><quote>Downloading and building a source pack
 <para>
 If the installation has already been done, then you should try it out.
 	So we've provided some instructions that you can use to make a temporary <quote>sandbox</quote>.
-In a few minutes you can start the server, start the client, and type in some
+In a few minutes you can start the server and type in some
 database-manipulation statements.
 The section about sandbox is <olink
 targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>.
@@ -46,9 +46,9 @@ targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your
 <title>Downloading and installing a binary package</title>
 
 <para>
-The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist">tarantool.org/dist</link>.
+The repositories for the <quote>stable</quote> release are at <link xlink:href="http://tarantool.org/dist/stable" xlink:title="tarantool.org/dist/stble">tarantool.org/dist/stable</link>.
 The repositories for the <quote>master</quote> release are at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
-Since this is the manual for the <quote>master</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
+Since this is the manual for the <quote>master</quote> release, all instructions use <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link>.
 </para>
 
 <para>
@@ -87,7 +87,7 @@ release=`lsb_release -c -s`
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
-<command>sudo apt-get install</command> tarantool tarantool-client
+<command>sudo apt-get install</command> tarantool
 </programlisting>
 </para>
 
@@ -114,7 +114,7 @@ release=`lsb_release -c -s`
 <command>sudo tee</command> <option>-a</option> <filename>/etc/apt/sources.list.d/tarantool.list</filename>
 # install
 <command>sudo apt-get update</command>
-<command>sudo apt-get install</command> tarantool tarantool-client
+<command>sudo apt-get install</command> tarantool
 </programlisting>
 </para>
 
@@ -164,27 +164,6 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
-# ANY-LINUX commands for Tarantool master binary download:
-# If you have a GNU/Linux distribution which is not one of the above,
-# or if you want to install on your own subdirectory without affecting
-# /usr /etc etc., start your browser and go to
-# <link xlink:href="http://tarantool.org/dist/master">http://tarantool.org/dist/master</link> download page.
-# Look for a recent file whose name ends with "tar.gz". You will want the
-# right binary tarball (<filename>.tar.gz</filename>) file for your release architecture.
-# Click on either the one whose name ends with "linux-i686.tar.gz" or
-# the one whose name ends with "linux-x86_64.tar.gz" depending on your release architecture.
-# This will cause a download of the latest master tarball.
-# Suppose it is <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz</filename>. Say:
-<command>tar</command> <option>zxvf</option> <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz</filename>
-# You now have a directory named tarantool-1.6.1-9-g30fe8ae-linux-x86_64.
-# Let's move it to ~/tarantool, which is an easier name to remember.
-<command>mv</command> <filename>tarantool-1.6.1-9-g30fe8ae-linux-x86_64 ~/tarantool</filename>
-# Within it there is a subdirectory <filename>/bin</filename> containing both server and client.
-</programlisting>
-</para>
-
-<para>
-<programlisting>
 # FREEBSD commands for Tarantool master binary download:
 # With your browser go to the FreeBSD ports page
 # <link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
@@ -212,7 +191,6 @@ More advice for binary downloads is at <link xlink:href="http://tarantool.org/do
 </para>
 
 </section>
-
 
 <section xml:id="getting-started-source">
 <title>Downloading and building a source package</title>
@@ -261,10 +239,10 @@ ones unless you intend to work on the documentation.
 <programlisting> binutils-dev or binutils-devel        # contains GNU bfd for printing stack traces
  gcc or clang                        # see above
  git                                 # see above
- uuid-dev                            # optional, for box_uuid_* functions
+ uuid-dev                            # for box.uuid_* functions and replication
  cmake                               # see above
- libreadline-dev                     # optional, for build with -DENABLE_CLIENT
- libncurses5-dev or ncurses-devel    # optional, for build with -DENABLE_CLIENT
+ libreadline-dev                     # for interactive mode
+ libncurses5-dev or ncurses-devel    # see above
  xsltproc                            # optional, for build with -DENABLE_DOC
  lynx                                # optional, for build with -DENABLE_DOC
  jing                                # optional, for build with -DENABLE_DOC
@@ -342,7 +320,7 @@ the tarantool download will go inside it, as <computeroutput><filename>~/taranto
 4. Use <productname>git</productname> to download from github.com.<programlisting>
 <command>cd</command> ~
 <command>git clone</command> <option>-b master</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
-The optional argument <quote>-b master</quote> causes download from the stable branch instead of the stable branch,
+The optional argument <quote>-b master</quote> causes download from the master branch instead of the stable branch,
 and the optional last word on the line, <quote>tarantool</quote>, means download is to <computeroutput>~/tarantool</computeroutput>.
 </para>
 
@@ -360,15 +338,13 @@ but we prefer this method because it works with older versions of <productname>g
 6. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
 <command>make clean</command>         # unnecessary, added for good luck
 <command>rm CMakeCache.txt</command>  # unnecessary, added for good luck
-<command>cmake .</command>            # Start build with build type=Debug, no client, no doc</programlisting>
+<command>cmake .</command>            # Start build with build type=Debug, no doc</programlisting>
 
 The option for specifying build type is <option>-DCMAKE_BUILD_TYPE=</option><replaceable>type</replaceable> where
    type = {None | Debug | Release | RelWithDebInfo | MinSizeRel} and a reasonable
 				choice for production is <option>-DCMAKE_BUILD_TYPE=RelWithDebInfo</option> (<quote>Debug</quote>
 				is used only by project maintainers and <quote>Release</quote> is used only when the
    highest performance is required).
-The option for asking to build client is <computeroutput><option>-DENABLE_CLIENT=</option><replaceable>{true|false}</replaceable></computeroutput>
-and a reasonable choice is <computeroutput><option>-DENABLE_CLIENT=true</option></computeroutput>.
 	The option for asking to build documentation is <computeroutput><option>-DENABLE_DOC=</option><replaceable>{true|false}</replaceable></computeroutput>
    and the assumption is that only a minority will need to rebuild the
    documentation (such as what you're reading now), so details about
@@ -433,7 +409,7 @@ For your added convenience, github.com has README files with example scripts:
 <productname xlink:href="https://github.com/tarantool/tarantool/blob/master/README.md">README.md</productname> for generic GNU/Linux.
 
 These example scripts assume that the intent is to download from the master branch, build
-the server and the client (but not the documentation), and run tests after build.
+the server (but not the documentation), and run tests after build.
 </para>
 
 <para>
@@ -458,45 +434,21 @@ Here is how to create a simple test database after installing.
 </para>
 
 <para>
-2. Create a configuration file. The Tarantool server can use a configuration
-file with some definitions of ports and database objects.
-  The server, by default, looks for its configuration file in
-  the current working directory and in <computeroutput><filename>etc/</filename></computeroutput>.
-Enter the following commands
-which make a minimal configuration file that will be suitable for day one.
-<programlisting>
-<command>echo</command> "slab_alloc_arena = 0.1" | <command>tee</command> tarantool.cfg
-<command>echo</command> "pid_file = \"box.pid\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "primary_port = 3301" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "admin_port = 33015" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "rows_per_wal = 50000" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "logger = \"tee -a tarantool.log\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-<command>echo</command> "work_dir = \"work_dir\"" | <command>tee</command> <option>-a</option> tarantool.cfg
-# (With some downloads a tarantool.cfg file like this is already available
-# in a test subdirectory.)
-</programlisting>
-</para>
-
-<para>
-Initialize the storage area.
-You only have to do this once.<programlisting>
-#if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool --init-storage</command>
-#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool --init-storage</command>
-#if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool --init-storage</command></programlisting>
-</para>
-
-<para>
-Start the server.
+2. Start the server.
 The server name is <computeroutput><filename>tarantool</filename></computeroutput>.<programlisting>
 #if you downloaded a binary with apt-get or yum, say this:
   <command>/usr/bin/tarantool</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
   <command>~/tarantool/bin/tarantool</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool</command> </programlisting>
+  <command>~/tarantool/src/tarantool</command> </programlisting>
+</para>
+
+<para>
+    The server starts in interactive mode and outputs a command prompt.
+    To turn on the database, configure it:
+<programlisting>tarantool> box.cfg{admin_port=3313}</programlisting>
+    (this minimal example is sufficient).
 </para>
 
 <para>
@@ -517,11 +469,13 @@ Now take the server down, with <programlisting><keycombo><keysym>Ctrl</keysym><k
 <para>
 Now start the server again. This time start it in the background.<programlisting>
 #if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool --background</command>
+  <command>/usr/bin/tarantool</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool --background</command>
+  <command>~/tarantool/bin/tarantool</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool --background</command></programlisting>
+  <command>~/tarantool/src/box/tarantool</command>
+  <command>tarantool> box.cfg{admin_port=3313, background = true}</command>
+</programlisting>
 </para>
 
 <para>
@@ -536,28 +490,11 @@ Please follow
 instructions</olink> to find out how to manage
 Tarantool instances on your operating system.
 </para>
-<note>
-<para>
-  Alternatively, the server can be
-  started right out of the in-source build. Use the Tarantool
-  regression testing framework:
-  <programlisting><prompt>$ </prompt><command>./test/run</command> <option>--start-and-exit</option></programlisting>
-  It will create necessary files in directory
-  <filename>./test/var/</filename>, and start the server with
-  minimal configuration.
-</para>
-</note>
   
 <para>
-	Now that the server is up, you can start the client. The client name is tarantool.<programlisting>
-#if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool</command>
-#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool</command>
-#if you built from a source download on ~tarantool, say this:
-  <command>~/tarantool/client/tarantool/tarantool</command></programlisting>
+	Now that the server is up, you can connect to its administrative port.<programlisting>
+  <command>telnet 0 3313</command></programlisting>
    
-If all goes well, a prompt will appear:<programlisting><prompt>localhost&gt;</prompt></programlisting>
 The client is waiting for the user to type instructions.
 </para>
 
@@ -573,7 +510,6 @@ try this:<programlisting><prompt>localhost&gt; </prompt><userinput>t = s:insert(
 <prompt>localhost&gt; </prompt><userinput>t = s:insert({2, 'Music'})</userinput>
 <prompt>localhost&gt; </prompt><userinput>t = s:insert({3, 'Length', 93})</userinput>
 </programlisting>
-
 
 To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
@@ -617,7 +553,7 @@ To review ...
 If you followed all the instructions in this chapter, then
 so far you have: installed Tarantool from either a binary
 or a source repository, started up the Tarantool server,
-inserted and selected tuples with the Tarantool client.
+inserted and selected tuples.
 </para>
 </sidebar>
 

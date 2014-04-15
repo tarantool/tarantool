@@ -303,7 +303,7 @@ static inline void
 space_end_recover_snapshot_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	f->recovery.recover = space_build_primary_key;
+	f->recoveryEvent(END_RECOVERY_SNAPSHOT);
 }
 
 void
@@ -328,7 +328,7 @@ static inline void
 space_end_recover_cb(EngineFactory *f, void *udate)
 {
 	(void)udate;
-	f->recovery.recover = space_build_all_keys;
+	f->recoveryEvent(END_RECOVERY);
 }
 
 void

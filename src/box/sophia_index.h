@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_TXN_H_INCLUDED
-#define TARANTOOL_BOX_TXN_H_INCLUDED
+#ifndef TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,33 +28,31 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #include "index.h"
-#include "trigger.h"
 
-extern double too_long_threshold;
-struct tuple;
-struct space;
+class SophiaIndex: public Index {
+public:
+	SophiaIndex(struct key_def *key_def);
+	~SophiaIndex();
 
-struct txn {
-	/* Undo info. */
-	struct space *space;
-	struct tuple *old_tuple;
-	struct tuple *new_tuple;
+	virtual size_t size() const;
+	virtual void endBuild();
 
-	struct rlist on_commit;
-	struct rlist on_rollback;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
+	virtual struct tuple *replace(struct tuple *old_tuple,
+				      struct tuple *new_tuple,
+				      enum dup_replace_mode mode);
 
-	/* Redo info: binary packet */
-	struct iproto_packet *packet;
+	virtual struct iterator *allocIterator() const;
+	virtual void initIterator(struct iterator *iterator,
+				  enum iterator_type type,
+				  const char *key, uint32_t part_count) const;
+	virtual size_t memsize() const;
+
+protected:
+	void *env;
+	void *db;
 };
 
-struct txn *txn_begin();
-void txn_commit(struct txn *txn);
-void txn_finish(struct txn *txn);
-void txn_rollback(struct txn *txn);
-void txn_replace(struct txn *txn, struct space *space,
-		 struct tuple *old_tuple, struct tuple *new_tuple,
-		 enum dup_replace_mode mode);
-void txn_add_redo(struct txn *txn, struct request *request);
-
-#endif /* TARANTOOL_BOX_TXN_H_INCLUDED */
+#endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */
