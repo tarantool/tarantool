@@ -62,6 +62,7 @@ set_property(DIRECTORY PROPERTY CLEAN_NO_CUSTOM true)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
+lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/session.lua)
 
 add_custom_target(generate_lua_sources
