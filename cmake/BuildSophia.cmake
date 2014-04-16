@@ -7,6 +7,7 @@ macro(sophia_build)
 		add_custom_command(OUTPUT ${PROJECT_SOURCE_DIR}/third_party/sophia/db/libsophia.a
 			WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third_party/sophia
 			COMMAND $(MAKE) -C db
+			DEPENDS ${CMAKE_SOURCE_DIR}/CMakeCache.txt
 		)
     else()
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/sophia
