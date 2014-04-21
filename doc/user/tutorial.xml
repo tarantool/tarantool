@@ -95,7 +95,7 @@ release=`lsb_release -c -s`
 <programlisting>
 # UBUNTU commands for Tarantool master binary download:
 # There is always an up-to-date Ubuntu repository at
-# <link xlink:href="http://tarantool.org/dist/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
+# <link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
 # The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
 # 13.04 "raring", 13.10 "saucy", ...
 # add the tarantool.org repository to your apt sources list:
@@ -236,7 +236,7 @@ Here are names of tools and libraries which may have to be installed in advance,
 or the equivalent on other platforms. Different platforms may use slightly
 	different names. Do not worry about the <quote>optional, for build with -DENABLE_DOC</quote>
 ones unless you intend to work on the documentation.
-<programlisting> binutils-dev or binutils-devel        # contains GNU bfd for printing stack traces
+<programlisting> binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces
  gcc or clang                        # see above
  git                                 # see above
  uuid-dev                            # for box.uuid_* functions and replication
@@ -332,6 +332,7 @@ but we prefer this method because it works with older versions of <productname>g
 <command>git submodule init</command>
 <command>git submodule update</command>
 <command>cd</command> ../</programlisting>
+On rare occasions, the submodules will need to be updated again with the command: <userinput>git submodule update --init</userinput>.
 </para>
 
 <para>
@@ -365,7 +366,7 @@ Tarantool's developers always run the test suite before they publish new version
    make any changes in the code.
 Assuming you downloaded to <filename>~/tarantool</filename>,
 the principal steps are:<programlisting><command>mkdir</command> ~/tarantool/bin    # make a subdirectory named <filename>bin</filename>
-<command>ln</command> usr/bin/python ~/tarantool/bin/python # link python to bin
+<command>ln</command> usr/bin/python ~/tarantool/bin/python # link python to bin (this may require superuser privilege)
 <command>cd</command> ~/tarantool/test #get on the test subdirectory
 PATH=~/tarantool/bin:$PATH ./run #run tests using python</programlisting>
  
@@ -447,41 +448,25 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
     The server starts in interactive mode and outputs a command prompt.
     To turn on the database, configure it:
-<programlisting>tarantool> box.cfg{admin_port=3313}</programlisting>
+<programlisting><prompt>tarantool></prompt> <userinput>box.cfg{admin_port=3313}</userinput></programlisting>
     (this minimal example is sufficient).
 </para>
 
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
-2014-02-06 11:50:24.216 ... 1/sched C&gt; version 1.6.0-804-g3d5a625
-2014-02-06 11:50:24.216 ... 1/sched C&gt; log level 5
-2014-02-06 11:50:24.219 ... 1/sched I&gt; mapping 107374184 bytes for a shared arena...
-2014-02-06 11:50:24.219 ... 1/sched I&gt; recovery start
-2014-02-06 11:50:24.224 ... 1/sched I&gt; recover from `./00000000000000000001.snap'
-2014-02-06 11:50:24.230 ... 1/sched I&gt; snapshot recovered, confirmed lsn: 1
-2014-02-06 11:50:24.231 ... 1/sched I&gt; bound to primary port 3301
-2014-02-06 11:50:24.232 ... 1/sched I&gt; I am primary
-2014-02-06 11:50:24.232 ... 1/sched I&gt; bound to admin port 33015
-2014-02-06 11:50:24.232 ... 1/sched C&gt; entering the event loop</programlisting>
-Now take the server down, with <programlisting><keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo></programlisting>
-</para>
-
-<para>
-Now start the server again. This time start it in the background.<programlisting>
-#if you downloaded a binary with apt-get or yum, say this:
-  <command>/usr/bin/tarantool</command>
-#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
-  <command>~/tarantool/bin/tarantool</command>
-#if you built from a source download, say this:
-  <command>~/tarantool/src/box/tarantool</command>
-  <command>tarantool> box.cfg{admin_port=3313, background = true}</command>
+2014-04-21 16:12:18.255 ... version 1.6.0-1075-g8be1988
+2014-04-21 16:12:18.255 ... log level 5
+2014-04-21 16:12:18.257 ... mapping 1073741824 bytes for a shared arena...
+2014-04-21 16:12:18.257 ... initialized
+2014-04-21 16:12:18.258 ... recovery start
+2014-04-21 16:12:18.258 ... found an empty data directory, initializing...
+2014-04-21 16:12:18.258 ... saving snapshot `./00000000000000000001.snap'
+2014-04-21 16:12:18.258 ... done
+2014-04-21 16:12:18.258 ... recover from `./00000000000000000001.snap'
+2014-04-21 16:12:18.266 ... snapshot recovered, confirmed lsn: 1
+2014-04-21 16:12:18.266 ... bound to admin port 3313
+2014-04-21 16:12:18.266 ... I am primary
 </programlisting>
-</para>
-
-<para>
-If all went well, there is now an instance of the Tarantool server
-	running in the background. You can confirm that with the command:<programlisting><command>ps</command> <option>-A</option> | <command>grep</command> tarantool</programlisting>
-	or look at the log file:<programlisting><command>less</command> work_dir/tarantool.log</programlisting>
 </para>
 
 <para>
@@ -492,58 +477,63 @@ Tarantool instances on your operating system.
 </para>
   
 <para>
-	Now that the server is up, you can connect to its administrative port.<programlisting>
+	Now that the server is up, you could start up a different shell and
+ connect to its administrative port with<programlisting>
   <command>telnet 0 3313</command></programlisting>
-   
+but for example purposes it is simpler to just leave the
+server running in "interactive mode".
+
 The client is waiting for the user to type instructions.
 </para>
 
 <para>
 To create the first space and the first index, try this:<programlisting>
-<prompt>localhost&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
-<prompt>localhost&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
+<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
+<prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
 </para>
 
 <para>
 To insert three <quote>tuples</quote> (our name for <quote>records</quote>) into the first <quote>space</quote> of the database
-try this:<programlisting><prompt>localhost&gt; </prompt><userinput>t = s:insert({1})</userinput>
-<prompt>localhost&gt; </prompt><userinput>t = s:insert({2, 'Music'})</userinput>
-<prompt>localhost&gt; </prompt><userinput>t = s:insert({3, 'Length', 93})</userinput>
+try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>t = s:insert({1})</userinput>
+<prompt>tarantool&gt; </prompt><userinput>t = s:insert({2, 'Music'})</userinput>
+<prompt>tarantool&gt; </prompt><userinput>t = s:insert({3, 'Length', 93})</userinput>
 </programlisting>
 
 To select a tuple from the first space of the database,
-using the first defined key, try this:<programlisting><prompt>localhost&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
+using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-localhost&gt; s = box.schema.create_space('space0')
+tarantool&gt; s = box.schema.create_space('space0')
+2014-04-21 16:23:28.152 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
-localhost&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+tarantool&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
 ---
 ...
-localhost&gt; t = s:insert{1}
+tarantool&gt; t = s:insert{1}
 ---
 ...
-localhost&gt; t = s:insert{2, 'Music'}
+tarantool&gt; t = s:insert{2, 'Music'}
 ---
 ...
-localhost&gt; t = s:insert{3, 'Length', 93}
+tarantool&gt; t = s:insert{3, 'Length', 93}
 ---
 ...
-localhost&gt; s:select{3}
+tarantool&gt; s:select{3}
 ---
-- [3, 'Length', 93]
+- - [3, 'Length', 93]
 ...
 
-localhost>&gt;</programlisting>
+tarantool&gt;</programlisting>
 </para>
 
 <para>
 You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
-To stop the client:  <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
-To stop the server: <computeroutput><command>sudo pkill</command> -f tarantool</computeroutput>.
+To stop tarantool: <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
+To stop tarantool (a cleaner alternative): <computeroutput>os.exit()</computeroutput>.
+To stop tarantool (from another terminal): <computeroutput><command>sudo pkill</command> -f tarantool</computeroutput>.
 To destroy the test: <computeroutput><command>rm</command> -r ~/tarantool_sandbox</computeroutput>.
 </para>
 
