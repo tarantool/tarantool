@@ -260,7 +260,7 @@ pt2_alloc(pt2 *p, PT_ID_T *result_id)
  * Restoration
  */
 void *
-pt3_get(pt3 *p, PT_ID_T id)
+pt3_get(const pt3 *p, PT_ID_T id)
 {
 	pt_assert(id < p->created);
 
@@ -274,7 +274,7 @@ pt3_get(pt3 *p, PT_ID_T id)
 }
 
 void *
-pt2_get(pt2 *p, PT_ID_T id)
+pt2_get(const pt2 *p, PT_ID_T id)
 {
 	pt_assert(id < p->created);
 
@@ -289,7 +289,7 @@ pt2_get(pt2 *p, PT_ID_T id)
  * Getting number of allocated chunks (of size p->chunk_size each)
  */
 PT_ID_T
-pt3_extents_count(pt3 *p)
+pt3_extents_count(const pt3 *p)
 {
 	PT_ID_T c = (p->created + (p->extent_size / p->block_size - 1))
 		/ (p->extent_size / p->block_size);
@@ -302,7 +302,7 @@ pt3_extents_count(pt3 *p)
 	return res;
 }
 PT_ID_T
-pt2_extents_count(pt2 *p)
+pt2_extents_count(const pt2 *p)
 {
 	PT_ID_T c = (p->created + (p->extent_size / p->block_size - 1))
 		/ (p->extent_size / p->block_size);

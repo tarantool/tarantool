@@ -31,74 +31,42 @@
 #include "space.h"
 #include "exception.h"
 #include "errinj.h"
+#include "memory.h"
+#include "fiber.h"
+
+static struct mempool tree_extent_pool;
+static int tree_index_count = 0;
 
 /* {{{ Utilities. *************************************************/
 
-struct sptree_index_key_data
+struct key_data
 {
 	const char *key;
 	uint32_t part_count;
 };
 
-static inline struct tuple *
-sptree_index_unfold(const void *node)
+int
+tree_index_compare(const tuple *a, const tuple *b, struct key_def *key_def)
 {
-	return node ? *(struct tuple **) node : NULL;
+	int r = tuple_compare(a, b, key_def);
+	if (r == 0 && !key_def->is_unique)
+		r = a < b ? -1 : a > b;
+	return r;
 }
-
-static int
-sptree_index_node_compare(const void *node_a, const void *node_b, void *arg)
+int
+tree_index_compare_key(const tuple *a, const key_data *key_data, struct key_def *key_def)
 {
-	struct key_def *key_def = (struct key_def *) arg;
-	const struct tuple *tuple_a = *(const struct tuple **) node_a;
-	const struct tuple *tuple_b = *(const struct tuple **) node_b;
-
-	return tuple_compare(tuple_a, tuple_b, key_def);
+	return tuple_compare_with_key(a, key_data->key, key_data->part_count, key_def);
 }
-
-static int
-sptree_index_node_compare_dup(const void *node_a, const void *node_b,
-			      void *arg)
-{
-	struct key_def *key_def = (struct key_def *) arg;
-	const struct tuple *tuple_a = *(const struct tuple **) node_a;
-	const struct tuple *tuple_b = *(const struct tuple **) node_b;
-
-	return tuple_compare_dup(tuple_a, tuple_b, key_def);
-}
-
-static int
-sptree_index_node_compare_with_key(const void *key, const void *node,
-				   void *arg)
-{
-	struct key_def *key_def = (struct key_def *) arg;
-	const struct sptree_index_key_data *key_data =
-			(const struct sptree_index_key_data *) key;
-	const struct tuple *tuple = *(const struct tuple **) node;
-
-	/* the result is inverted because arguments are swapped */
-	return -tuple_compare_with_key(tuple, key_data->key,
-				       key_data->part_count, key_def);
-}
-
-#ifndef NDEBUG
-void *
-realloc_inject(void *ptr, size_t size)
-{
-	if (size)
-		ERROR_INJECT(ERRINJ_TREE_ALLOC, return 0);
-	return realloc(ptr, size);
-}
-#endif
 
 /* {{{ TreeIndex Iterators ****************************************/
 
 struct tree_iterator {
 	struct iterator base;
+	const struct bps_tree *tree;
 	struct key_def *key_def;
-	sptree_index_compare compare;
-	struct sptree_index_iterator *iter;
-	struct sptree_index_key_data key_data;
+	struct bps_tree_iterator bsp_tree_iter;
+	struct key_data key_data;
 };
 
 static void
@@ -114,116 +82,149 @@ tree_iterator(struct iterator *it)
 static void
 tree_iterator_free(struct iterator *iterator)
 {
-	struct tree_iterator *it = tree_iterator(iterator);
-	if (it->iter)
-		sptree_index_iterator_free(it->iter);
-	free(it);
+	free(iterator);
 }
 
 static struct tuple *
-tree_iterator_ge(struct iterator *iterator)
+tree_iterator_dummie(struct iterator *iterator)
 {
-	struct tree_iterator *it = tree_iterator(iterator);
-	void *node = sptree_index_iterator_next(it->iter);
-	return sptree_index_unfold(node);
+	(void)iterator;
+	return 0;
 }
 
 static struct tuple *
-tree_iterator_le(struct iterator *iterator)
+tree_iterator_fwd(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-	void *node = sptree_index_iterator_reverse_next(it->iter);
-	return sptree_index_unfold(node);
+	tuple **res = bps_tree_itr_get_elem(it->tree, &it->bsp_tree_iter);
+	if (!res)
+		return 0;
+	bps_tree_itr_next(it->tree, &it->bsp_tree_iter);
+	return *res;
 }
 
 static struct tuple *
-tree_iterator_eq(struct iterator *iterator)
+tree_iterator_bwd(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_next(it->iter);
-	if (node && it->compare(&it->key_data, node, it->key_def) == 0)
-		return *(struct tuple **) node;
-
-	return NULL;
+	tuple **res = bps_tree_itr_get_elem(it->tree, &it->bsp_tree_iter);
+	if (!res)
+		return 0;
+	bps_tree_itr_prev(it->tree, &it->bsp_tree_iter);
+	return *res;
 }
 
 static struct tuple *
-tree_iterator_req(struct iterator *iterator)
+tree_iterator_fwd_check_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node = sptree_index_iterator_reverse_next(it->iter);
-	if (node && it->compare(&it->key_data, node, it->key_def) == 0)
-		return *(struct tuple **) node;
-
-	return NULL;
-}
-
-static struct tuple *
-tree_iterator_lt(struct iterator *iterator)
-{
-	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node ;
-	while ((node = sptree_index_iterator_reverse_next(it->iter)) != NULL) {
-		if (it->compare(&it->key_data, node, it->key_def) != 0) {
-			it->base.next = tree_iterator_le;
-			return *(struct tuple **) node;
-		}
+	tuple **res = bps_tree_itr_get_elem(it->tree, &it->bsp_tree_iter);
+	if (!res)
+		return 0;
+	if (tree_index_compare_key(*res, &it->key_data, it->key_def) != 0) {
+		it->bsp_tree_iter = bps_tree_invalid_iterator();
+		return 0;
 	}
-
-	return NULL;
+	bps_tree_itr_next(it->tree, &it->bsp_tree_iter);
+	return *res;
 }
 
 static struct tuple *
-tree_iterator_gt(struct iterator *iterator)
+tree_iterator_fwd_check_next_equality(struct iterator *iterator)
 {
 	struct tree_iterator *it = tree_iterator(iterator);
-
-	void *node;
-	while ((node = sptree_index_iterator_next(it->iter)) != NULL) {
-		if (it->compare(&it->key_data, node, it->key_def) != 0) {
-			it->base.next = tree_iterator_ge;
-			return *(struct tuple **) node;
-		}
-	}
-
-	return NULL;
+	tuple **res = bps_tree_itr_get_elem(it->tree, &it->bsp_tree_iter);
+	if (!res)
+		return 0;
+	bps_tree_itr_next(it->tree, &it->bsp_tree_iter);
+	iterator->next = tree_iterator_fwd_check_equality;
+	return *res;
 }
 
+static struct tuple *
+tree_iterator_bwd_skip_one(struct iterator *iterator)
+{
+	struct tree_iterator *it = tree_iterator(iterator);
+	bps_tree_itr_prev(it->tree, &it->bsp_tree_iter);
+	iterator->next = tree_iterator_bwd;
+	return tree_iterator_bwd(iterator);
+}
+
+static struct tuple *
+tree_iterator_bwd_check_equality(struct iterator *iterator)
+{
+	struct tree_iterator *it = tree_iterator(iterator);
+	tuple **res = bps_tree_itr_get_elem(it->tree, &it->bsp_tree_iter);
+	if (!res)
+		return 0;
+	if (tree_index_compare_key(*res, &it->key_data, it->key_def) != 0) {
+		it->bsp_tree_iter = bps_tree_invalid_iterator();
+		return 0;
+	}
+	bps_tree_itr_prev(it->tree, &it->bsp_tree_iter);
+	return *res;
+}
+
+static struct tuple *
+tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
+{
+	struct tree_iterator *it = tree_iterator(iterator);
+	bps_tree_itr_prev(it->tree, &it->bsp_tree_iter);
+	iterator->next = tree_iterator_bwd_check_equality;
+	return tree_iterator_bwd_check_equality(iterator);
+}
 /* }}} */
 
 /* {{{ TreeIndex  **********************************************************/
 
-TreeIndex::TreeIndex(struct key_def *key_def)
-	: Index(key_def)
+static void *
+extent_alloc()
 {
-	memset(&tree, 0, sizeof tree);
+#ifndef NDEBUG
+	ERROR_INJECT(ERRINJ_TREE_ALLOC, return 0);
+#endif
+	return mempool_alloc(&tree_extent_pool);
+}
+
+static void
+extent_free(void *extent)
+{
+	return mempool_free(&tree_extent_pool, extent);
+}
+
+TreeIndex::TreeIndex(struct key_def *key_def_arg)
+	: Index(key_def_arg)
+{
+	if (tree_index_count == 0)
+		mempool_create(&tree_extent_pool, &cord()->slabc, BPS_TREE_EXTENT_SIZE);
+	tree_index_count++;
+	bps_tree_create(&tree, key_def, extent_alloc, extent_free);
 }
 
 TreeIndex::~TreeIndex()
 {
-	sptree_index_destroy(&tree);
+	tree_index_count--;
+	if (tree_index_count == 0)
+		mempool_destroy(&tree_extent_pool);
 }
 
 size_t
 TreeIndex::size() const
 {
-	return tree.size;
+	return bps_tree_size(&tree);
 }
 
 size_t
 TreeIndex::memsize() const
 {
-        return tree.size * (8 + sizeof(struct tuple *));
+	return bps_tree_mem_used(&tree);
 }
 
 struct tuple *
 TreeIndex::random(uint32_t rnd) const
 {
-	void *node = sptree_index_random(&tree, rnd);
-	return sptree_index_unfold(node);
+	struct tuple **res = bps_tree_random(&tree, rnd);
+	return res ? *res : 0;
 }
 
 struct tuple *
@@ -231,11 +232,11 @@ TreeIndex::findByKey(const char *key, uint32_t part_count) const
 {
 	assert(key_def->is_unique && part_count == key_def->part_count);
 
-	struct sptree_index_key_data key_data;
+	struct key_data key_data;
 	key_data.key = key;
 	key_data.part_count = part_count;
-	void *node = sptree_index_find(&tree, &key_data);
-	return sptree_index_unfold(node);
+	struct tuple **res = bps_tree_find(&tree, &key_data);
+	return res ? *res : 0;
 }
 
 struct tuple *
@@ -246,29 +247,28 @@ TreeIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 
 	if (new_tuple) {
 		struct tuple *dup_tuple = NULL;
-		void *p_dup_node = &dup_tuple;
 
 		/* Try to optimistically replace the new_tuple. */
-		int tree_res =
-		sptree_index_replace(&tree, &new_tuple, &p_dup_node);
-		if (tree_res) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, tree_res,
-				  "TreeIndex", "replace");
+		bool tree_res =
+		bps_tree_insert_or_replace(&tree, new_tuple, &dup_tuple);
+		if (!tree_res) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE,
+				  BPS_TREE_EXTENT_SIZE, "TreeIndex", "replace");
 		}
 
 		errcode = replace_check_dup(old_tuple, dup_tuple, mode);
 
 		if (errcode) {
-			sptree_index_delete(&tree, &new_tuple);
+			bps_tree_delete(&tree, new_tuple);
 			if (dup_tuple)
-				sptree_index_replace(&tree, &dup_tuple, NULL);
+				bps_tree_insert_or_replace(&tree, dup_tuple, 0);
 			tnt_raise(ClientError, errcode, index_id(this));
 		}
 		if (dup_tuple)
 			return dup_tuple;
 	}
 	if (old_tuple) {
-		sptree_index_delete(&tree, &old_tuple);
+		bps_tree_delete(&tree, old_tuple);
 	}
 	return old_tuple;
 }
@@ -285,8 +285,9 @@ TreeIndex::allocIterator() const
 	}
 
 	it->key_def = key_def;
-	it->compare = tree.compare;
+	it->tree = &tree;
 	it->base.free = tree_iterator_free;
+	it->bsp_tree_iter = bps_tree_invalid_iterator();
 	return (struct iterator *) it;
 }
 
@@ -306,44 +307,52 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			tnt_raise(ClientError, ER_UNSUPPORTED,
 				  "Tree index", "requested iterator type");
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
-		key = NULL;
+		key = 0;
 	}
 	it->key_data.key = key;
 	it->key_data.part_count = part_count;
 
-	if (iterator_type_is_reverse(type)) {
-		int r = sptree_index_iterator_reverse_init_set(&tree,
-				&it->iter, &it->key_data);
-		if (r)
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  r, "TreeIndex", "init iterator");
+	bool exact = false;
+	if (key == 0) {
+		if (iterator_type_is_reverse(type))
+			it->bsp_tree_iter = bps_tree_invalid_iterator();
+		else
+			it->bsp_tree_iter = bps_tree_itr_first(&tree);
 	} else {
-		int r = sptree_index_iterator_init_set(&tree,
-				&it->iter, &it->key_data);
-		if (r)
-			tnt_raise(ClientError, ER_MEMORY_ISSUE,
-				  r, "TreeIndex", "init iterator");
+		if (type == ITER_ALL || type == ITER_EQ || type == ITER_GE || type == ITER_LT) {
+			it->bsp_tree_iter = bps_tree_lower_bound(&tree, &it->key_data, &exact);
+			if (type == ITER_EQ && !exact) {
+				it->base.next = tree_iterator_dummie;
+				return;
+			}
+		} else { // ITER_GT, ITER_REQ, ITER_LE
+			it->bsp_tree_iter = bps_tree_upper_bound(&tree, &it->key_data, &exact);
+			if (type == ITER_REQ && !exact) {
+				it->base.next = tree_iterator_dummie;
+				return;
+			}
+		}
 	}
 
 	switch (type) {
 	case ITER_EQ:
-		it->base.next = tree_iterator_eq;
+		it->base.next = tree_iterator_fwd_check_next_equality;
 		break;
 	case ITER_REQ:
-		it->base.next = tree_iterator_req;
+		it->base.next = tree_iterator_bwd_skip_one_check_next_equality;
 		break;
 	case ITER_ALL:
 	case ITER_GE:
-		it->base.next = tree_iterator_ge;
+		it->base.next = tree_iterator_fwd;
 		break;
 	case ITER_GT:
-		it->base.next = tree_iterator_gt;
+		it->base.next = tree_iterator_fwd;
 		break;
 	case ITER_LE:
-		it->base.next = tree_iterator_le;
+		it->base.next = tree_iterator_bwd_skip_one;
 		break;
 	case ITER_LT:
-		it->base.next = tree_iterator_lt;
+		it->base.next = tree_iterator_bwd_skip_one;
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,
@@ -354,59 +363,23 @@ TreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 void
 TreeIndex::beginBuild()
 {
-	tree.size = 0;
-	tree.max_size = 0;
-	tree.members = NULL;
+	assert(bps_tree_size(&tree) == 0);
 }
 
 void
 TreeIndex::reserve(uint32_t size_hint)
 {
-	assert(size_hint >= tree.size);
-	size_hint = MAX(size_hint, SPTREE_MIN_SIZE);
-	size_t sz = size_hint * sizeof(struct tuple *);
-	void *members = realloc(tree.members, sz);
-	if (members == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sz,
-			  "TreeIndex::reserve()", "malloc");
-	}
-	tree.members = members;
-	tree.max_size = size_hint;
+	(void)size_hint;
 }
 
 void
 TreeIndex::buildNext(struct tuple *tuple)
 {
-	if (tree.size >= tree.max_size)
-		reserve(tree.max_size * 2);
-
-	struct tuple **node = (struct tuple **) tree.members + tree.size;
-	*node = tuple;
-	tree.size++;
+	bps_tree_insert_or_replace(&tree, tuple, 0);
 }
 
 void
 TreeIndex::endBuild()
 {
-	uint32_t n_tuples = tree.size;
-
-	if (n_tuples) {
-		say_info("Sorting %" PRIu32 " keys in %s index %" PRIu32 "...",
-			 n_tuples, index_type_strs[key_def->type], index_id(this));
-	}
-	uint32_t estimated_tuples = tree.max_size;
-	void *nodes = tree.members;
-
-	/* If n_tuples == 0 then estimated_tuples = 0, elem == NULL, tree is empty */
-	int tree_res =
-	sptree_index_init(&tree, sizeof(struct tuple *),
-			  nodes, n_tuples, estimated_tuples,
-			  sptree_index_node_compare_with_key,
-			  key_def->is_unique ? sptree_index_node_compare
-					     : sptree_index_node_compare_dup,
-			  key_def);
-	if (tree_res) {
-		panic("tree_init: failed to allocate %d bytes", tree_res);
-	}
 }
 
