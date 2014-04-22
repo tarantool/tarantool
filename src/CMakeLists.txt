@@ -65,7 +65,7 @@ set (common_sources
      errinj.cc
      errcode.c
      assoc.c
-     say.c
+     say.cc
      fio.c
      crc32.c
      random.c

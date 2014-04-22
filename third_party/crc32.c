@@ -742,6 +742,7 @@ crc32c(uint32_t crc32c,
 	if (length < 4) {
 		return (singletable_crc32c(crc32c, buffer, length));
 	} else {
-		return (multitable_crc32c(crc32c, buffer, length));
+		return (multitable_crc32c(crc32c, (const unsigned char *)buffer,
+					  length));
 	}
 }

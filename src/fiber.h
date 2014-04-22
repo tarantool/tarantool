@@ -111,7 +111,7 @@ struct fiber {
 };
 
 enum { FIBER_CALL_STACK = 16 };
-struct Exception;
+class Exception;
 
 /**
  * @brief An independent execution unit that can be managed by a separate OS
@@ -153,7 +153,7 @@ struct cord {
 	struct slab_cache slabc;
 	char name[FIBER_NAME_MAX];
 	/** Last thrown exception */
-	struct Exception *exception;
+	class Exception *exception;
 	size_t exception_size;
 };
 

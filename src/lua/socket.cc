@@ -502,19 +502,6 @@ readline_state_init(struct lua_State *L, struct readline_state *rs, int idx)
 	}
 }
 
-static inline int
-readline_state_try(struct readline_state *rs, int i, char chr)
-{
-	if (unlikely(rs[i].sep[ rs[i].pos ] == chr)) {
-		if (unlikely(rs[i].sep_size == rs[i].pos + 1))
-			return i;
-		rs[i].pos++;
-	} else {
-		rs[i].pos = 0;
-	}
-	return -1;
-}
-
 static int
 readline_state_next(struct readline_state *rs, int size, char chr)
 {

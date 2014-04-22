@@ -148,11 +148,13 @@ endmacro(enable_tnt_compile_flags)
 # GCC can also be built on top of llvm runtime (on mac).
 #
 
+check_c_compiler_flag("-Wno-unused-const-variable" CC_HAS_WNO_UNUSED_CONST_VARIABLE)
 check_c_compiler_flag("-Wno-unused-result" CC_HAS_WNO_UNUSED_RESULT)
 check_c_compiler_flag("-Wno-unused-value" CC_HAS_WNO_UNUSED_VALUE)
 check_c_compiler_flag("-fno-strict-aliasing" CC_HAS_FNO_STRICT_ALIASING)
 check_c_compiler_flag("-Wno-comment" CC_HAS_WNO_COMMENT)
 check_c_compiler_flag("-Wno-parentheses" CC_HAS_WNO_PARENTHESES)
+check_c_compiler_flag("-Wno-undefined-inline" CC_HAS_WNO_UNDEFINED_INLINE)
 
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
