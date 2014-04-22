@@ -76,7 +76,7 @@ Replaces: tarantool-postgresql-plugin
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
+ tarantool-modules (= ${binary:Version}),
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - PostgreSQL connector
  Tarantool is an in-memory database and Lua application server.
@@ -89,7 +89,7 @@ Replaces: tarantool-mysql-plugin
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
+ tarantool-modules (= ${binary:Version}),
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - MySQL connector
  Tarantool is an in-memory database and Lua application server.
