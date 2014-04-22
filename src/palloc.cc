@@ -76,7 +76,6 @@ SLIST_HEAD(palloc_pool_head, palloc_pool) pools;
 
 static int class_count;
 const uint32_t chunk_magic = 0xbb84fcf6;
-static const char poison_char = 'P';
 
 struct palloc_pool *eter_pool;
 

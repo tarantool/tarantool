@@ -110,10 +110,6 @@ inline static int
 tnt_sqltry(struct tnt_sql *sql, int tk) {
 	return tnt_sql_try(sql, tk, NULL);
 }
-inline static int
-tnt_sqltryv(struct tnt_sql *sql, int tk, struct tnt_tk **tkp) {
-	return tnt_sql_try(sql, tk, tkp);
-}
 
 /* key-value parsing for tuple operation. */
 

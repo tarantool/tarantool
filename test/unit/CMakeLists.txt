@@ -1,3 +1,4 @@
+add_compile_flags("C;CXX" "-Wno-unused")
 file(GLOB all_sources *.c *.m *.mm)
 set_source_files_compile_flags(${all_sources})
 

@@ -123,6 +123,11 @@ set (common_sources
      ${lua_sources}
 )
 
+if (CC_HAS_WNO_UNUSED_CONST_VARIABLE)
+    set_source_files_properties(admin.cc PROPERTIES
+        COMPILE_FLAGS "-Wno-unused-const-variable") # clang 3.5+
+endif()
+
 if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.c)
 endif()
