@@ -470,7 +470,6 @@ run_script(va_list ap)
 	fiber_sleep(0.0);
 
 	if (access(path, F_OK) == 0) {
-		say_info("loading %s", path);
 		/* Execute the init file. */
 		lua_getglobal(L, "dofile");
 		lua_pushstring(L, path);
