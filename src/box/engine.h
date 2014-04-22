@@ -83,7 +83,7 @@ struct engine_recovery {
 	engine_replace_f replace;
 };
 
-class Engine;
+struct Engine;
 
 /** Engine instance */
 class EngineFactory: public Object {

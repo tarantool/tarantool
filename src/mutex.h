@@ -1,5 +1,5 @@
 #ifndef TARANTOOL_MUTEX_H_INCLUDED
-#define TARNATOOL_MUTEX_H_INCLUDED
+#define TARANTOOL_MUTEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following

@@ -108,8 +108,6 @@
 
 struct recovery_state *recovery_state;
 
-static const uint64_t snapshot_cookie = 0;
-
 const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
 
 /* {{{ LSN API */
