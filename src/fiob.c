@@ -28,7 +28,7 @@ struct fiob {
 #ifdef HAVE_FUNOPEN
 	struct {
 		int     (*read)(void *cookie, char *buf, int len);
-		int     (*write)(void *cookie, char *buf, int len);
+		int     (*write)(void *cookie, const char *buf, int len);
 		fpos_t  (*seek)(void *cookie, fpos_t pos, int whence);
 		int     (*close)(void *cookie);
 	} io;
