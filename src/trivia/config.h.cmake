@@ -131,6 +131,7 @@
 #cmakedefine HAVE_PRCTL_H 1
 
 #cmakedefine HAVE_OPEN_MEMSTREAM 1
+#cmakedefine HAVE_FMEMOPEN 1
 
 /*
  * predefined /etc directory prefix.

@@ -33,12 +33,13 @@
 #include "fiber.h"
 #include "crc32.h"
 #include "fio.h"
-#include "tarantool_eio.h"
+#include "third_party/tarantool_eio.h"
 #include "fiob.h"
 #include "msgpuck/msgpuck.h"
 #include "iproto_constants.h"
-
-const uint32_t xlog_format = 12;
+#include "scoped_guard.h"
+#define MH_UNDEF 1 /* conflicts with mh_nodeids_t */
+#include "recovery.h" /* for mh_cluster */
 
 /*
  * marker is MsgPack fixext2
@@ -51,47 +52,222 @@ const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
 const char inprogress_suffix[] = ".inprogress";
 const char v12[] = "0.12\n";
 
-struct log_dir snap_dir = {
-	/* .panic_if_error = */ false,
-	/* .sync_is_async = */ false,
-	/* .open_wflags = */ "wxd",
-	/* .filetype = */ "SNAP\n",
-	/* .filename_ext = */ ".snap",
-	/* .dirname = */ NULL,
-	/* .mode = */ 0660
-};
+/* {{{ struct log_dir */
 
-struct log_dir wal_dir = {
-	/* .panic_if_error = */ false,
-	/* .sync_is_async = */ true,
-	/* .open_wflags = */ "wx",
-	/* .filetype = */ "XLOG\n",
-	/* .filename_ext = */ ".xlog",
-	/* .dirname = */ NULL,
-	/* .mode = */ 0660
-};
-
-static int
-cmp_i64(const void *_a, const void *_b)
+static inline int
+log_dir_map_cmp(const struct log_meta *a, const struct log_meta *b)
 {
-	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
-	if (*a == *b)
-		return 0;
-	return (*a > *b) ? 1 : -1;
+	if (a->lsnsum != b->lsnsum)
+		return a->lsnsum - b->lsnsum;
+	return 0;
 }
 
-static ssize_t
-scan_dir(struct log_dir *dir, int64_t **ret_lsn)
+rb_gen(, log_dir_map_, log_dir_map_t, struct log_meta, link, log_dir_map_cmp)
+
+static inline int
+log_dir_lsnmap_cmp(const struct log_meta_lsn *a, const struct log_meta_lsn *b)
 {
-	ssize_t result = -1;
-	size_t i = 0, size = 1000;
+	if (a->node_id != b->node_id)
+		return a->node_id - b->node_id;
+	if (a->lsn != b->lsn)
+		return a->lsn - b->lsn;
+
+	if (a->meta == NULL) /* a is a key */
+		return 0;
+
+	/* logs with smaller lsnsum are first */
+	if (a->meta->lsnsum != b->meta->lsnsum)
+		return a->meta->lsnsum - b->meta->lsnsum;
+
+	return 0;
+}
+
+rb_gen(, log_dir_lsnmap_, log_dir_lsnmap_t, struct log_meta_lsn, link,
+       log_dir_lsnmap_cmp)
+
+#define mh_name _nodeids
+#define mh_key_t uint32_t
+#define mh_node_t uint32_t
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((*a))
+#define mh_hash_key(a, arg) (a)
+#define mh_eq(a, b, arg) ((*a) == (*b))
+#define mh_eq_key(key, node, arg) (key == (*node))
+#define MH_SOURCE 1
+#include "salad/mhash.h"
+
+int
+log_dir_create(struct log_dir *dir)
+{
+	memset(dir, 0, sizeof(*dir));
+	dir->nodeids = mh_nodeids_new();
+	if (dir->nodeids == NULL)
+		return -1;
+	log_dir_map_new(&dir->map);
+	log_dir_lsnmap_new(&dir->lsnmap);
+	return 0;
+}
+
+static struct log_meta *
+log_meta_clean(log_dir_map_t *t, struct log_meta *meta, void *arg);
+
+void
+log_dir_destroy(struct log_dir *dir)
+{
+	mh_nodeids_delete(dir->nodeids);
+	free(dir->dirname);
+	log_dir_map_iter(&dir->map, NULL, log_meta_clean, dir);
+}
+
+void
+log_dir_remove_from_index(struct log_dir *dir, struct log_meta *meta)
+{
+	for (uint32_t i = 0; i < meta->lsn_count; i++) {
+		log_dir_lsnmap_remove(&dir->lsnmap, &meta->lsns[i]);
+	}
+	log_dir_map_remove(&dir->map, meta);
+	free(meta);
+}
+
+int
+log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
+{
+	struct log_meta key;
+	key.lsnsum = lsnsum;
+	struct log_meta *meta = log_dir_map_search(&dir->map, &key);
+	if (meta != NULL) {
+		meta->remove_flag = false;
+		return 0;
+	}
+
+	/*
+	 * Open xlog to find SETLSN
+	 */
+	uuid_t uuid;
+	struct log_io *wal = log_io_open_for_read(dir, lsnsum, uuid, INPROGRESS);
+	if (wal == NULL)
+		return -1;
+	auto log_guard = make_scoped_guard([&]{
+		log_io_close(&wal);
+	});
+
+	/*
+	 * Find SETLSN command for xlogs (must be the first)
+	 */
+	struct log_io_cursor cur;
+	log_io_cursor_open(&cur, wal);
+	struct iproto_packet packet;
+	if (log_io_cursor_next(&cur, &packet) != 0 ||
+	    packet.code != IPROTO_SETLSN)
+		return -2;
+
+	/*
+	 * Parse SETLSN
+	 */
+	uint32_t row_count = 0;
+	struct log_setlsn_row *rows = log_decode_setlsn(&packet, &row_count);
+	auto rows_guard = make_scoped_guard([=]{
+		free(rows);
+	});
+
+	/*
+	 * Update indexes
+	 */
+	meta = (struct log_meta *) calloc(1, sizeof(*meta) +
+		sizeof(*meta->lsns) * row_count);
+	if (meta == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
+			"log_dir", "meta");
+	}
+	auto meta_guard = make_scoped_guard([=]{
+		log_dir_remove_from_index(dir, meta);
+		free(meta);
+	});
+
+	meta->lsnsum = lsnsum;
+	log_dir_map_insert(&dir->map, meta);
+
+	meta->lsn_count = row_count;
+	int64_t lsnsum_check = 0;
+	for (uint32_t i = 0; i < row_count; i++) {
+		struct log_meta_lsn *meta_lsn = &meta->lsns[i];
+		meta_lsn->meta = meta;
+		meta_lsn->node_id = rows[i].node_id;
+		meta_lsn->lsn = rows[i].lsn;
+		lsnsum_check += rows[i].lsn;
+		log_dir_lsnmap_insert(&dir->lsnmap, meta_lsn);
+
+		uint32_t k;
+		k = mh_nodeids_find(dir->nodeids, rows[i].node_id, NULL);
+		if (k != mh_end(dir->nodeids))
+			continue;
+
+		/* Update the set of node_ids */
+		k = mh_nodeids_put(dir->nodeids, &rows[i].node_id, NULL, NULL);
+		if (k == mh_end(dir->nodeids)) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
+				"log_dir", "meta->nodeids");
+		}
+	}
+
+	/*
+	 * Snapshots have empty starting SETLSN table. Don't check lsnsum and
+	 * use the information derived from xlog name.
+	 */
+	if (lsnsum_check != lsnsum && !dir->ignore_initial_setlsn)
+		tnt_raise(IllegalParams, "Invalid xlog name");
+
+	meta_guard.is_active = false;
+	return 0;
+}
+
+static struct log_meta *
+log_meta_mark(log_dir_map_t *t, struct log_meta *meta, void *arg)
+{
+	(void) t;
+	(void) arg;
+	meta->remove_flag = true;
+	return meta;
+}
+
+static struct log_meta *
+log_meta_delete(log_dir_map_t *t, struct log_meta *meta, void *arg)
+{
+	(void) t;
+	struct log_dir *dir = (struct log_dir *) arg;
+	if (meta->remove_flag) {
+		log_dir_remove_from_index(dir, meta);
+		return NULL;
+	}
+
+	return meta;
+}
+
+static struct log_meta *
+log_meta_clean(log_dir_map_t *t, struct log_meta *meta, void *arg)
+{
+	(void) t;
+	struct log_dir *dir = (struct log_dir *) arg;
+	log_dir_remove_from_index(dir, meta);
+	return NULL;
+}
+
+int
+log_dir_scan(struct log_dir *dir)
+{
 	ssize_t ext_len = strlen(dir->filename_ext);
-	int64_t *lsn = (int64_t *) region_alloc(&fiber()->gc,
-						sizeof(int64_t) * size);
 	DIR *dh = opendir(dir->dirname);
 
-	if (lsn == NULL || dh == NULL)
-		goto out;
+	if (dh == NULL) {
+		say_syserror("error reading directory `%s'", dir->dirname);
+		return -1;
+	}
+	auto log_guard = make_scoped_guard([&]{
+		closedir(dh);
+	});
+
+	/* Mark all items to delete */
+	log_dir_map_iter(&dir->map, NULL, log_meta_mark, dir);
 
 	errno = 0;
 	struct dirent *dent;
@@ -117,80 +293,128 @@ scan_dir(struct log_dir *dir, int64_t **ret_lsn)
 		if (!ext_is_ok)
 			continue;
 
-		lsn[i] = strtoll(dent->d_name, &ext, 10);
+		long long lsnsum = strtoll(dent->d_name, &ext, 10);
 		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		if (lsn[i] == LLONG_MAX || lsn[i] == LLONG_MIN) {
+		if (lsnsum == LLONG_MAX || lsnsum == LLONG_MIN) {
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		i++;
-		if (i == size) {
-			int64_t *n = (int64_t *) region_alloc(&fiber()->gc, sizeof(int64_t) * size * 2);
-			if (n == NULL)
-				goto out;
-			memcpy(n, lsn, sizeof(int64_t) * size);
-			lsn = n;
-			size = size * 2;
-		}
+		int rc = log_dir_add_to_index(dir, lsnsum);
+		if (rc != 0)
+			return rc;
 	}
 
-	qsort(lsn, i, sizeof(int64_t), cmp_i64);
+	/* Delete marked items */
+	log_dir_map_iter(&dir->map, NULL, log_meta_delete, dir);
 
-	*ret_lsn = lsn;
-	result = i;
-out:
-	if (errno != 0)
-		say_syserror("error reading directory `%s'", dir->dirname);
+	return 0;
+}
 
-	if (dh != NULL)
-		closedir(dh);
+int64_t
+log_dir_greatest(struct log_dir *dir)
+{
+	struct log_meta *meta = log_dir_map_last(&dir->map);
+	if (meta == NULL)
+		return -1;
+	return meta->lsnsum;
+}
+
+static inline struct log_meta_lsn *
+log_dir_lsnmap_lesearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
+{
+	struct log_meta_lsn *node = log_dir_lsnmap_psearch(tree, key);
+	if (node == NULL || node->node_id != key->node_id)
+		return NULL;
+
+	int64_t lsn = node->lsn;
+	while (1) {
+		struct log_meta_lsn *next = log_dir_lsnmap_next(tree, node);
+		if (next == NULL || next->node_id != key->node_id ||
+				next->lsn != lsn)
+			break;
+		node = next;
+	};
+	return node;
+}
+
+static inline struct log_meta_lsn *
+log_dir_lsnmap_gtsearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
+{
+	struct log_meta_lsn *node = log_dir_lsnmap_nsearch(tree, key);
+	if (node == NULL || node->node_id != key->node_id)
+		return NULL;
+
+	int64_t lsn = node->lsn;
+	while (1) {
+		struct log_meta_lsn *prev = log_dir_lsnmap_prev(tree, node);
+		if (prev == NULL || prev->node_id != key->node_id ||
+				prev->lsn != lsn)
+			break;
+		node = prev;
+	};
+	return node;
+}
+
+int64_t
+log_dir_next(struct log_dir *dir, struct mh_cluster_t *cluster)
+{
+	int64_t result = INT64_MAX;
+	uint32_t k;
+	mh_foreach(dir->nodeids, k) {
+		/*
+		 * Find file where lsn <= key.lsn for given node_id
+		 */
+		struct log_meta_lsn key;
+		key.node_id = *mh_nodeids_node(dir->nodeids, k);
+		key.lsn = 0;
+		key.meta = NULL; /* this node is a key */
+		uint32_t m = mh_cluster_find(cluster, key.node_id, NULL);
+		if (m != mh_end(cluster)) {
+			struct node *node = *mh_cluster_node(cluster, m);
+			key.lsn = node->current_lsn;
+		}
+
+		struct log_meta *meta = NULL;
+
+		/*
+		 * Find tree node with greatest node.meta.lsnsum where
+		 * node.node_id == key.node_id, node.lsn <= key.lsn
+		 */
+		struct log_meta_lsn *meta_lsn =
+				log_dir_lsnmap_lesearch(&dir->lsnmap, &key);
+		if (meta_lsn == NULL) {
+			/*
+			 * Find tree node with smallest node.meta.lsnsum where
+			 * node.node_id == key.node_id, node.lsn > key.lsn
+			 */
+			meta_lsn = log_dir_lsnmap_gtsearch(&dir->lsnmap, &key);
+			if (meta_lsn == NULL)
+				return INT64_MAX; /* Not found */
+
+			/*
+			 * Take a previous file
+			 */
+			meta = log_dir_map_prev(&dir->map, meta_lsn->meta);
+			if (meta == NULL)
+				return INT64_MAX; /* Not found */
+		} else {
+			meta = meta_lsn->meta;
+		}
+
+		/*
+		 * Find min([file.lsnsum])
+		 */
+		if (meta->lsnsum < result)
+			result = meta->lsnsum;
+	}
+
 	return result;
-}
-
-int64_t
-greatest_lsn(struct log_dir *dir)
-{
-	int64_t *lsn;
-	ssize_t count = scan_dir(dir, &lsn);
-
-	if (count <= 0)
-		return count;
-
-	return lsn[count - 1];
-}
-
-int64_t
-find_including_file(struct log_dir *dir, int64_t target_lsn)
-{
-	int64_t *lsn;
-	ssize_t count = scan_dir(dir, &lsn);
-
-	if (count <= 0)
-		return count;
-
-	while (count > 1) {
-		if (*lsn <= target_lsn && target_lsn < *(lsn + 1)) {
-			goto out;
-			return *lsn;
-		}
-		lsn++;
-		count--;
-	}
-
-	/*
-	 * we can't check here for sure will or will not last file
-	 * contain record with desired lsn since number of rows in file
-	 * is not known beforehand. so, we simply return the last one.
-	 */
-
-      out:
-	return *lsn;
 }
 
 char *
@@ -201,6 +425,95 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
 		 dir->dirname, (long long)lsn, dir->filename_ext, suffix_str);
 	return filename;
+}
+
+void
+log_encode_setlsn(struct iproto_packet *packet, struct mh_cluster_t *cluster)
+{
+	memset(packet, 0, sizeof(*packet));
+	packet->code = IPROTO_SETLSN;
+	/* node_id and lsn should be set to zero for SETLSN command */
+	assert(packet->node_id == 0 && packet->lsn == 0);
+
+	uint32_t cluster_size = cluster != NULL ? mh_size(cluster) : 0;
+	size_t size = 128 + cluster_size *
+		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_LSNMAP);
+	data = mp_encode_map(data, cluster_size);
+	if (cluster != NULL) {
+		uint32_t k;
+		mh_foreach(cluster, k) {
+			struct node *node = *mh_cluster_node(cluster, k);
+			data = mp_encode_uint(data, node->id);
+			data = mp_encode_uint(data, node->current_lsn);
+		}
+	}
+	assert(data <= buf + size);
+	packet->body[0].iov_base = buf;
+	packet->body[0].iov_len = (data - buf);
+	packet->bodycnt = 1;
+}
+
+struct log_setlsn_row *
+log_decode_setlsn(struct iproto_packet *packet, uint32_t *p_row_count)
+{
+	if (packet->bodycnt == 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SETLSN body");
+	const char *data = (const char *) packet->body[0].iov_base;
+	const char *d = data;
+	if (mp_typeof(*data) != MP_MAP) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "SETLSN request body");
+	}
+	const char *lsnmap = NULL;
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d); /* key */
+			mp_next(&d); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_LSNMAP:
+			if (mp_typeof(*d) != MP_MAP) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid LSN Map");
+			}
+			lsnmap = d;
+			mp_next(&d);
+			break;
+		default:
+			mp_next(&d); /* value */
+		}
+	}
+
+	if (lsnmap == NULL)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "missing LSNMAP");
+
+	d = lsnmap;
+	uint32_t row_count = mp_decode_map(&d);
+	struct log_setlsn_row *rows = (struct log_setlsn_row *)
+			calloc(row_count, sizeof(*rows));
+	if (rows == NULL) {
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE, sizeof(*rows),
+			  "log_index", "meta");
+	}
+
+	for (uint32_t i = 0; i < row_count; i++) {
+		if (mp_typeof(*d) != MP_UINT)
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+		rows[i].node_id = mp_decode_uint(&d);
+		if (mp_typeof(*d) != MP_UINT)
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+		rows[i].lsn = mp_decode_uint(&d);
+	}
+
+	*p_row_count = row_count;
+	return rows;
 }
 
 /* }}} */
@@ -554,12 +867,20 @@ log_io_sync(struct log_io *l)
 	return 0;
 }
 
-static int
-log_io_write_header(struct log_io *l)
-{
-	int ret = fprintf(l->f, "%s%s\n", l->dir->filetype, v12);
+#define NODE_UUID_KEY "Node"
 
-	return ret < 0 ? -1 : 0;
+static int
+log_io_write_meta(struct log_io *l, const uuid_t node_uuid)
+{
+	char uuid_str[UUID_STR_LEN + 1];
+	uuid_unparse(node_uuid, uuid_str);
+
+	if (fprintf(l->f, "%s%s", l->dir->filetype, v12) < 0 ||
+	    fprintf(l->f, NODE_UUID_KEY ": %s\n\n", uuid_str) < 0) {
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -571,7 +892,7 @@ log_io_write_header(struct log_io *l)
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, const char **errmsg)
+log_io_verify_meta(struct log_io *l, uuid_t node_uuid, const char **errmsg)
 {
 	char filetype[32], version[32], buf[256];
 	struct log_dir *dir = l->dir;
@@ -596,8 +917,30 @@ log_io_verify_meta(struct log_io *l, const char **errmsg)
 			*errmsg = "failed to read log file header";
 			goto error;
 		}
-		if (strcmp(buf, "\n") == 0 || strcmp(buf, "\r\n") == 0)
+		if (strcmp(buf, "\n") == 0)
 			break;
+
+		/* Parse RFC822-like string */
+		char *end = buf + strlen(buf);
+		if (end > buf && *(end - 1) == '\n') *(--end) = 0; /* skip \n */
+		char *key = buf;
+		char *val = strchr(buf, ':');
+		if (val == NULL) {
+			*errmsg = "invalid meta";
+			goto error;
+		}
+		*(val++) = 0;
+		while (*val == ' ') ++val; /* skip starting spaces */
+
+		if (strcmp(key, NODE_UUID_KEY) == 0) {
+			if ((end - val) != UUID_STR_LEN ||
+			    uuid_parse(val, node_uuid) != 0) {
+				*errmsg = "can't parse node uuid";
+				goto error;
+			}
+		} else {
+			/* Skip unknown key */
+		}
 	}
 	return 0;
 error:
@@ -605,8 +948,8 @@ error:
 }
 
 struct log_io *
-log_io_open(struct log_dir *dir, enum log_mode mode,
-	    const char *filename, enum log_suffix suffix, FILE *file)
+log_io_open(struct log_dir *dir, enum log_mode mode, const char *filename,
+	    uuid_t node_uuid, enum log_suffix suffix, FILE *file)
 {
 	struct log_io *l = NULL;
 	int save_errno;
@@ -630,11 +973,11 @@ log_io_open(struct log_dir *dir, enum log_mode mode,
 	l->dir = dir;
 	l->is_inprogress = suffix == INPROGRESS;
 	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, &errmsg) != 0)
+		if (log_io_verify_meta(l, node_uuid, &errmsg) != 0)
 			goto error;
 	} else { /* LOG_WRITE */
 		setvbuf(l->f, NULL, _IONBF, 0);
-		if (log_io_write_header(l) != 0) {
+		if (log_io_write_meta(l, node_uuid) != 0) {
 			errmsg = strerror(errno);
 			goto error;
 		}
@@ -652,13 +995,16 @@ error:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t lsnsum, uuid_t node_uuid,
+		     enum log_suffix suffix)
 {
-	assert(lsn != 0);
-
-	const char *filename = format_filename(dir, lsn, suffix);
+	const char *filename = format_filename(dir, lsnsum, suffix);
 	FILE *f = fopen(filename, "r");
-	return log_io_open(dir, LOG_READ, filename, suffix, f);
+	if (suffix == INPROGRESS && f == NULL) {
+		filename = format_filename(dir, lsnsum, NONE);
+		f = fopen(filename, "r");
+	}
+	return log_io_open(dir, LOG_READ, filename, node_uuid, suffix, f);
 }
 
 /**
@@ -666,7 +1012,8 @@ log_io_open_for_read(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, uuid_t node_uuid,
+		      enum log_suffix suffix)
 {
 	char *filename;
 	FILE *f;
@@ -692,7 +1039,7 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	if (!f)
 		goto error;
 	say_info("creating `%s'", filename);
-	return log_io_open(dir, LOG_WRITE, filename, suffix, f);
+	return log_io_open(dir, LOG_WRITE, filename, node_uuid, suffix, f);
 error:
 	say_syserror("%s: failed to open `%s'", __func__, filename);
 	return NULL;

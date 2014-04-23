@@ -13,7 +13,7 @@ replica.rpl_master = master
 replica.vardir = os.path.join(master.vardir, 'replica')
 replica.deploy()
 
-replica.get_param("lsn")
+replica.get_param('node')
 
 cycles = 0
 status = replica.admin.execute_no_reconnect("box.info.status", True)

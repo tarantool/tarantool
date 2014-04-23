@@ -7,6 +7,7 @@ _index = box.space[box.schema.INDEX_ID]
 _func = box.space[box.schema.FUNC_ID]
 _user = box.space[box.schema.USER_ID]
 _priv = box.space[box.schema.PRIV_ID]
+_cluster = box.space[box.schema.CLUSTER_ID]
 -- define schema version
 _schema:insert{'version', 1, 6}
 -- define system spaces
@@ -16,6 +17,7 @@ _space:insert{_index.n, ADMIN, '_index', 'memtx', 0}
 _space:insert{_func.n, ADMIN, '_func', 'memtx', 0}
 _space:insert{_user.n, ADMIN, '_user', 'memtx', 0}
 _space:insert{_priv.n, ADMIN, '_priv', 'memtx', 0}
+_space:insert{_cluster.n, ADMIN, '_cluster', 'memtx', 0}
 -- define indexes
 _index:insert{_schema.n, 0, 'primary', 'tree', 1, 1, 0, 'str'}
 
@@ -45,6 +47,11 @@ _index:insert{_func.n, 2, 'name', 'tree', 1, 1, 2, 'str'}
 -- primary key: user id, object type, object id
 _index:insert{_priv.n, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num'}
 _index:insert{_priv.n, 1, 'owner', 'tree', 0, 1, 1, 'num'}
+
+-- primary key: node id
+_index:insert{_cluster.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+-- node uuid key: node uuid
+_index:insert{_cluster.n, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
 
 -- 
 -- Pre-create user and grants

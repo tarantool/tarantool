@@ -117,6 +117,7 @@ t;
   - SELECT
   - REPLACE
   - INSERT
+  - AUTH
   - CALL
   - UPDATE
   - total
@@ -192,10 +193,13 @@ end;
 ...
 t;
 ---
-- - 'box.error.ER_CREATE_FUNCTION : 50'
+- - 'box.error.ER_FUNCTION_ACCESS_DENIED : 53'
+  - 'box.error.ER_CREATE_FUNCTION : 50'
   - 'box.error.ER_NO_SUCH_INDEX : 35'
   - 'box.error.ER_TUPLE_FOUND : 3'
+  - 'box.error.ER_UNKNOWN_NODE : 62'
   - 'box.error.ER_CREATE_SPACE : 9'
+  - 'box.error.ER_LOCAL_NODE_IS_NOT_ACTIVE : 61'
   - 'box.error.ER_PROC_RET : 21'
   - 'box.error.ER_TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.ER_FIELD_TYPE : 23'
@@ -213,7 +217,7 @@ t;
   - 'box.error.ER_INDEX_TYPE : 13'
   - 'box.error.ER_ARG_TYPE : 26'
   - 'box.error.ER_FUNCTION_MAX : 54'
-  - 'box.error.ER_FUNCTION_ACCESS_DENIED : 53'
+  - 'box.error.ER_INVALID_CLUSTER : 63'
   - 'box.error.ER_SPACE_ARITY : 38'
   - 'box.error.ER_INVALID_MSGPACK : 20'
   - 'box.error.ER_SPACE_ACCESS_DENIED : 55'

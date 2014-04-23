@@ -63,9 +63,25 @@ lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 }
 
 static int
-lbox_info_lsn(struct lua_State *L)
+lbox_info_node(struct lua_State *L)
 {
-	luaL_pushnumber64(L, recovery_state->confirmed_lsn);
+	lua_pushlstring(L, uuid_str(recovery_state->node_uuid), UUID_STR_LEN);
+	return 1;
+}
+
+static int
+lbox_info_cluster(struct lua_State *L)
+{
+	uint32_t cluster_size = mh_size(recovery_state->cluster);
+	lua_createtable(L, 0, cluster_size);
+	uint32_t k;
+	mh_foreach(recovery_state->cluster, k) {
+		struct node *node = *mh_cluster_node(recovery_state->cluster,k);
+		lua_pushlstring(L, uuid_str(node->uuid), UUID_STR_LEN);
+		luaL_pushnumber64(L, node->confirmed_lsn);
+		lua_settable(L, -3);
+	}
+
 	return 1;
 }
 
@@ -103,7 +119,8 @@ lbox_info_dynamic_meta [] =
 {
 	{"recovery_lag", lbox_info_recovery_lag},
 	{"recovery_last_update", lbox_info_recovery_last_update_tstamp},
-	{"lsn", lbox_info_lsn},
+	{"cluster", lbox_info_cluster},
+	{"node", lbox_info_node},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},

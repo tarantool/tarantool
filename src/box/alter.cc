@@ -38,6 +38,7 @@
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
+#include "recovery.h" /* for on_replace_dd_schema trigger */
 
 /** _space columns */
 #define ID               0
@@ -1495,12 +1496,82 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 /* }}} access control */
 
+/* {{{ cluster configuration */
+
+static void
+on_replace_dd_schema(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	struct tuple *old_tuple = txn->old_tuple;
+	struct tuple *new_tuple = txn->new_tuple;
+	const char *key = tuple_field_cstr(new_tuple ? new_tuple : old_tuple,0);
+	if (strcmp(key, "cluster") == 0) {
+		if (old_tuple != NULL || new_tuple == NULL)
+			tnt_raise(IllegalParams, "'cluster' value is read-only");
+
+		const char *value = tuple_field_cstr(new_tuple, 1);
+		uuid_t cluster_uuid;
+		if (uuid_parse(value, cluster_uuid) != 0)
+			tnt_raise(IllegalParams, "invalid 'cluster' value");
+
+		/* Set Cluster-UUID (can only be done from snapshot) */
+		assert(uuid_is_null(recovery_state->cluster_uuid));
+		uuid_copy(recovery_state->cluster_uuid, cluster_uuid);
+	}
+}
+
+/** Remove a function from function cache */
+static void
+on_commit_dd_cluster(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
+	uuid_t node_uuid;
+	uuid_parse(tuple_field_cstr(txn->new_tuple, 1), node_uuid);
+
+	recovery_confirm_node(recovery_state, node_uuid, node_id);
+}
+
+static struct trigger commit_cluster_trigger =
+	{ rlist_nil, on_commit_dd_cluster, NULL, NULL };
+
+/**
+ * A trigger invoked on replace in the space containing cluster configration.
+ */
+static void
+on_replace_dd_cluster(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	if (txn->old_tuple != NULL || txn->new_tuple == NULL)
+		tnt_raise(IllegalParams, "can't change Node-UUID!");
+
+	/* Check fields */
+	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
+	if (node_id == 0)
+		tnt_raise(IllegalParams, "invalid Node-ID!");
+
+	uuid_t node_uuid;
+	if (uuid_parse(tuple_field_cstr(txn->new_tuple, 1), node_uuid) != 0 ||
+	    uuid_is_null(node_uuid))
+		tnt_raise(IllegalParams, "invalid Node-UUID!");
+
+	trigger_set(&txn->on_commit, &commit_cluster_trigger);
+}
+
+/* }}} cluster configuration */
+
 struct trigger alter_space_on_replace_space = {
 	rlist_nil, on_replace_dd_space, NULL, NULL
 };
 
 struct trigger alter_space_on_replace_index = {
 	rlist_nil, on_replace_dd_index, NULL, NULL
+};
+
+struct trigger on_replace_schema = {
+	rlist_nil, on_replace_dd_schema, NULL, NULL
 };
 
 struct trigger on_replace_user = {
@@ -1513,6 +1584,10 @@ struct trigger on_replace_func = {
 
 struct trigger on_replace_priv = {
 	rlist_nil, on_replace_dd_priv, NULL, NULL
+};
+
+struct trigger on_replace_cluster = {
+	rlist_nil, on_replace_dd_cluster, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */

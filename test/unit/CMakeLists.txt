@@ -37,6 +37,11 @@ add_executable(arena_mt.test arena_mt.c)
 target_link_libraries(arena_mt.test small pthread)
 add_executable(pt_alloc.test pt_alloc.cc)
 target_link_libraries(pt_alloc.test small)
+add_executable(log_dir.test log_dir.cc test.c)
+target_link_libraries(log_dir.test  core small salad misc bitset msgpuck uuid
+    ${LIBEV_LIBRARIES}
+    ${LIBEIO_LIBRARIES}
+    ${LIBCORO_LIBRARIES})
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

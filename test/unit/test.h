@@ -27,7 +27,7 @@ int _ok(int condition, const char *fmt, ...);
 /* private function, use note(...) or diag(...) instead */
 void _space(FILE *stream);
 
-#define msg(stream, ...) ({ __space(stream); fprintf(stream, "# ");            \
+#define msg(stream, ...) ({ _space(stream); fprintf(stream, "# ");            \
 	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
 
 #define note(...) msg(stdout, __VA_ARGS__)

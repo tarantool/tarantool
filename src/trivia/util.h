@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <assert.h>
+#include "uuid/uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -193,6 +194,19 @@ FILE *
 open_memstream(char **ptr, size_t *sizeloc);
 #endif /* HAVE_OPEN_MEMSTREAM */
 
+#ifndef HAVE_FMEMOPEN
+/* Declare open_memstream(). */
+#include <stdio.h>
+FILE *
+fmemopen(void *buf, size_t size, const char *mode);
+#endif /* HAVE_FMEMOPEN */
+
+enum {
+	UUID_STR_LEN = 36 /** Length of encoded UUID */
+};
+
+char *
+uuid_str(uuid_t uuid);
 
 #if defined(__cplusplus)
 } /* extern "C" */

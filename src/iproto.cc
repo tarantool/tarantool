@@ -98,6 +98,9 @@ iproto_process_disconnect(struct iproto_request *request);
 static void
 iproto_process_dml(struct iproto_request *request);
 
+static void
+iproto_process_admin(struct iproto_request *request);
+
 struct IprotoRequestGuard {
 	struct iproto_request *ireq;
 	IprotoRequestGuard(struct iproto_request *ireq_arg):ireq(ireq_arg) {}
@@ -457,30 +460,6 @@ iproto_connection_input_iobuf(struct iproto_connection *con)
 	return newbuf;
 }
 
-static void
-iproto_process_admin(struct iproto_request *ireq,
-		     struct iproto_connection *con)
-{
-	switch (ireq->packet.code) {
-	case IPROTO_PING:
-		iproto_reply_ping(&ireq->iobuf->out, ireq->packet.sync);
-		break;
-	case IPROTO_SUBSCRIBE:
-		if (ireq->packet.bodycnt != 0) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "subscribe request body");
-		}
-		subscribe(con->input.fd, ireq->packet.lsn, ireq->packet.sync);
-		tnt_raise(IprotoConnectionShutdown);
-	default:
-		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-			   (uint32_t) ireq->packet.code);
-	}
-	if (! ev_is_active(&con->output))
-		ev_feed_event(con->loop, &con->output, EV_WRITE);
-}
-
-
 /** Enqueue all requests which were read up. */
 static inline void
 iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
@@ -519,6 +498,9 @@ invalid_length:
 		iproto_packet_decode(&ireq->packet, &pos, reqend);
 		ireq->total_len = pos - reqstart; /* total request length */
 
+		/* Mark this request as local (see fill_lsn()) */
+		ireq->packet.node_id = 0;
+
 		/*
 		 * sic: in case of exception con->parse_size
 		 * as well as in->pos must not be advanced, to
@@ -533,14 +515,12 @@ invalid_length:
 			pos = (const char *) ireq->packet.body[0].iov_base;
 			request_decode(&ireq->request, pos,
 				       ireq->packet.body[0].iov_len);
-			ireq->request.packet = &ireq->packet;
-			iproto_queue_push(&request_queue, guard.release());
-			/* Request will be discarded in iproto_process_dml */
 		} else {
-			iproto_process_admin(ireq, con);
-			/* Entire request can be discarded. */
-			in->pos += ireq->packet.body[0].iov_len;
+			ireq->process = iproto_process_admin;
 		}
+		ireq->request.packet = &ireq->packet;
+		iproto_queue_push(&request_queue, guard.release());
+		/* Request will be discarded in iproto_process_XXX */
 
 		/* Request is parsed */
 		con->parse_size -= reqend - reqstart;
@@ -708,6 +688,57 @@ iproto_process_dml(struct iproto_request *ireq)
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
 		iproto_reply_error(out, e, ireq->packet.sync);
+	}
+}
+
+static void
+iproto_process_admin(struct iproto_request *ireq)
+{
+	struct iobuf *iobuf = ireq->iobuf;
+	struct iproto_connection *con = ireq->connection;
+
+	auto scope_guard = make_scoped_guard([=]{
+		/* Discard request (see iproto_enqueue_batch()) */
+		iobuf->in.pos += ireq->total_len;
+
+		if (evio_is_active(&con->output)) {
+			if (! ev_is_active(&con->output))
+				ev_feed_event(con->loop,
+					      &con->output,
+					      EV_WRITE);
+		} else if (iproto_connection_is_idle(con)) {
+			iproto_connection_delete(con);
+		}
+	});
+
+	if (unlikely(! evio_is_active(&con->output)))
+		return;
+
+	try {
+		switch (ireq->packet.code) {
+		case IPROTO_PING:
+			iproto_reply_ping(&ireq->iobuf->out, ireq->packet.sync);
+			break;
+		case IPROTO_JOIN:
+			/* TODO: replication authorization */
+			session_set_user(con->session, ADMIN, ADMIN);
+			replication_join(con->input.fd, &ireq->packet);
+			/* TODO: check requests in `con; queue */
+			iproto_connection_shutdown(con);
+			return;
+		case IPROTO_SUBSCRIBE:
+			/* TODO: replication authorization */
+			replication_subscribe(con->input.fd, &ireq->packet);
+			/* TODO: check requests in `con; queue */
+			iproto_connection_shutdown(con);
+			return;
+		default:
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				   (uint32_t) ireq->packet.code);
+		}
+	} catch (ClientError *e) {
+		say_error("admin command error: %s", e->errmsg());
+		iproto_reply_error(&iobuf->out, e, ireq->packet.sync);
 	}
 }
 

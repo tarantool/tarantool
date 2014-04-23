@@ -4,6 +4,7 @@ _index = box.space[box.schema.INDEX_ID]
 _user = box.space[box.schema.USER_ID]
 _func = box.space[box.schema.FUNC_ID]
 _priv = box.space[box.schema.PRIV_ID]
+_cluster = box.space[box.schema.CLUSTER_ID]
 -- destroy everything - save snapshot produces an empty snapshot now
 _schema:run_triggers(false)
 _schema:truncate()
@@ -17,3 +18,5 @@ _func:run_triggers(false)
 _func:truncate()
 _priv:run_triggers(false)
 _priv:truncate()
+_cluster:run_triggers(false)
+_cluster:truncate()

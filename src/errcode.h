@@ -110,6 +110,10 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			2, "Incorrect option value: %s") \
 	/* 60 */_(ER_SOPHIA,			2, "%s") \
+	/* 61 */_(ER_LOCAL_NODE_IS_NOT_ACTIVE,	2, "Local node is not active") \
+	/* 62 */_(ER_UNKNOWN_NODE,		2, "Unknown node %u") \
+	/* 63 */_(ER_INVALID_CLUSTER,		2, "Invalid cluster id") \
+
 
 
 /*

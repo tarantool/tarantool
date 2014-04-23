@@ -45,11 +45,8 @@
 #include "replica.h"
 
 static void
-remote_apply_row(struct recovery_state *r, struct iproto_packet *packet);
-
-static void
-remote_remote_read_row_fd(struct ev_io *coio, struct iobuf *iobuf,
-		 struct iproto_packet *packet)
+remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
+		struct iproto_packet *packet)
 {
 	struct ibuf *in = &iobuf->in;
 
@@ -120,6 +117,11 @@ error:
 void
 replica_bootstrap(struct recovery_state *r, const char *replication_source)
 {
+	say_info("bootstrapping replica");
+
+	/* Generate Node-UUID */
+	uuid_generate(r->node_uuid);
+
 	char ip_addr[32];
 	char greeting[IPROTO_GREETING_SIZE];
 	int port;
@@ -141,55 +143,97 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 
-	assert(r->confirmed_lsn == 0 && r->lsn == 0);
 	uint64_t sync = rand();
 
 	/* Send JOIN request */
-	struct iproto_subscribe subscribe = iproto_subscribe_stub;
-	subscribe.sync = mp_bswap_u64(sync);
+	struct iproto_packet packet;
+	memset(&packet, 0, sizeof(packet));
+	packet.code = IPROTO_JOIN;
+	packet.sync = sync;
+
+	char buf[128];
+	char *data = buf;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_NODE_UUID);
+	data = mp_encode_str(data, (const char *) recovery_state->node_uuid,
+			     sizeof(uuid_t));
+
+	assert(data <= buf + sizeof(buf));
+	packet.body[0].iov_base = buf;
+	packet.body[0].iov_len = (data - buf);
+	packet.bodycnt = 1;
+	char fixheader[IPROTO_FIXHEADER_SIZE];
+	struct iovec iov[IPROTO_ROW_IOVMAX];
+	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+
 	sio_connect(master, &addr, sizeof(addr));
 	sio_readn(master, greeting, sizeof(greeting));
-	sio_write(master, &subscribe, sizeof(subscribe));
+	sio_writev_all(master, iov, iovcnt);
 
 	while (true) {
-		struct iproto_packet packet;
-
 		remote_read_row_fd(master, &packet);
-		if (packet.sync != sync)
-			tnt_raise(IllegalParams, "unexpected packet");
+		if (packet.sync != sync) {
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "unexpected packet sync");
+		}
 
 		/* Recv JOIN response (= end of stream) */
-		if (packet.code == IPROTO_SUBSCRIBE) {
+		if (packet.code == IPROTO_JOIN) {
 			if (packet.bodycnt != 0)
-				tnt_raise(IllegalParams, "subscribe response body");
-			set_lsn(r, packet.lsn);
+				tnt_raise(IllegalParams, "JOIN body");
 			say_info("done");
 			break;
 		}
 
-		remote_apply_row(r, &packet);
+		recovery_process(r, &packet);
 	}
+	say_info("done");
 	/* master socket closed by guard */
 }
 
 static void
-remote_connect(struct ev_io *coio, struct sockaddr_in *remote_addr,
-	       int64_t initial_lsn, const char **err)
+remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 {
 	char greeting[IPROTO_GREETING_SIZE];
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
-	coio_connect(coio, remote_addr);
+	coio_connect(coio, &r->remote->addr);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	/* Send JOIN request */
-	struct iproto_subscribe request = iproto_subscribe_stub;
-	request.lsn = mp_bswap_u64(initial_lsn);
-	coio_write(coio, &request, sizeof(request));
+	/* Send SUBSCRIBE request */
+	struct iproto_packet packet;
+	memset(&packet, 0, sizeof(packet));
+	packet.code = IPROTO_SUBSCRIBE;
+
+	uint32_t cluster_size = mh_size(r->cluster);
+	size_t size = 128 + cluster_size *
+		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 3);
+	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
+	data = mp_encode_str(data, (const char *) r->cluster_uuid, sizeof(uuid_t));
+	data = mp_encode_uint(data, IPROTO_NODE_UUID);
+	data = mp_encode_str(data, (const char *) r->node_uuid, sizeof(uuid_t));
+	data = mp_encode_uint(data, IPROTO_LSNMAP);
+	data = mp_encode_map(data, cluster_size);
+	uint32_t k;
+	mh_foreach(r->cluster, k) {
+		struct node *node = *mh_cluster_node(r->cluster, k);
+		data = mp_encode_uint(data, node->id);
+		data = mp_encode_uint(data, node->current_lsn);
+	}
+	assert(data <= buf + size);
+	packet.body[0].iov_base = buf;
+	packet.body[0].iov_len = (data - buf);
+	packet.bodycnt = 1;
+	char fixheader[IPROTO_FIXHEADER_SIZE];
+	struct iovec iov[IPROTO_ROW_IOVMAX];
+	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+	coio_writev(coio, iov, iovcnt, 0);
 
 	say_crit("successfully connected to master");
-	say_crit("starting replication from lsn: %" PRIi64, initial_lsn);
 }
 
 static void
@@ -213,15 +257,14 @@ pull_from_remote(va_list ap)
 				      "connecting");
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber()));
-				remote_connect(&coio, &r->remote->addr,
-					       r->confirmed_lsn + 1, &err);
+				remote_connect(r, &coio, &err);
 				warning_said = false;
 				title("replica", "%s/%s", r->remote->source,
 				      "connected");
 			}
 			err = "can't read row";
 			struct iproto_packet packet;
-			remote_remote_read_row_fd(&coio, iobuf, &packet);
+			remote_read_row(&coio, iobuf, &packet);
 			fiber_setcancellable(false);
 			err = NULL;
 
@@ -229,7 +272,7 @@ pull_from_remote(va_list ap)
 			r->remote->recovery_last_update_tstamp =
 				ev_now(loop);
 
-			remote_apply_row(r, &packet);
+			recovery_process(r, &packet);
 
 			iobuf_gc(iobuf);
 			fiber_gc();
@@ -266,15 +309,6 @@ pull_from_remote(va_list ap)
 		if (! evio_is_active(&coio))
 			fiber_sleep(reconnect_delay);
 	}
-}
-
-static void
-remote_apply_row(struct recovery_state *r, struct iproto_packet *packet)
-{
-	if (r->row_handler(r->row_handler_param, packet) < 0)
-		panic("replication failure: can't apply row");
-
-	set_lsn(r, packet->lsn);
 }
 
 void

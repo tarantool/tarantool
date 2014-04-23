@@ -24,9 +24,9 @@ string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
-box.info.lsn > 0
+#box.info.cluster > 0
 ---
-- true
+- false
 ...
 box.info.recovery_lag
 ---
@@ -76,8 +76,9 @@ table.sort(t)
 t
 ---
 - - build
+  - cluster
   - logger_pid
-  - lsn
+  - node
   - pid
   - recovery_lag
   - recovery_last_update

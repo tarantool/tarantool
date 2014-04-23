@@ -135,7 +135,7 @@ spawner_sigchld_handler(int signal __attribute__((unused)));
  * @return 0 on success, -1 on error
  */
 static int
-spawner_create_replication_relay();
+spawner_create_replication_relay(struct relay_data *data);
 
 /** Shut down all relays when shutting down the spawner. */
 static void
@@ -143,7 +143,7 @@ spawner_shutdown_children();
 
 /** Initialize replication relay process. */
 static void
-replication_relay_loop();
+replication_relay_loop(struct relay_data *data);
 
 /*
  * ------------------------------------------------------------------------
@@ -194,27 +194,207 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 /*-----------------------------------------------------------------------------*/
 
 /** State of subscribe request - master process. */
-struct subscribe_request {
+struct relay_data {
+	uint32_t code;
+	uint64_t sync;
+
+	/* for SUBSCRIBE */
+	uint32_t node_id;
+	uint32_t lsnmap_size;
+	struct {
+		uint32_t node_id;
+		int64_t lsn;
+	} lsnmap[];
+};
+
+struct replication_request {
 	struct ev_io io;
 	int fd;
-	int64_t lsn;
-	uint64_t sync;
+	struct relay_data data;
 };
 
 /** Replication acceptor fiber handler. */
 void
-subscribe(int fd, int64_t lsn, uint64_t sync)
+replication_join(int fd, struct iproto_packet *packet)
 {
-	struct subscribe_request *request = (struct subscribe_request *)
-		malloc(sizeof(struct subscribe_request));
+	assert(packet->code == IPROTO_JOIN);
+	if (packet->bodycnt == 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
+
+	const char *data = (const char *) packet->body[0].iov_base;
+	const char *end = data + packet->body[0].iov_len;
+	const char *d = data;
+	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
+
+	uuid_t node_uuid;
+	memset(node_uuid, 0, sizeof(node_uuid));
+	d = data;
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d); /* key */
+			mp_next(&d); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		if (key == IPROTO_NODE_UUID) {
+			if (mp_typeof(*d) != MP_STR ||
+			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid Node-UUID");
+			}
+			memcpy(node_uuid, d, sizeof(uuid_t));
+			d += sizeof(uuid_t);
+		} else {
+			mp_next(&d); /* value */
+		}
+	}
+
+	if (uuid_is_null(node_uuid)) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "Can't find Node-UUID in JOIN request");
+	}
+
+	/* Notify box about new cluster node */
+	char uuid_str[UUID_STR_LEN + 1];
+	uuid_unparse(node_uuid, uuid_str);
+	recovery_state->join_handler(node_uuid);
+
+	struct replication_request *request = (struct replication_request *)
+			malloc(sizeof(*request));
 	if (request == NULL) {
-		close(fd);
-		return;
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*request),
+			  "iproto", "JOIN");
 	}
 	request->fd = fd;
 	request->io.data = request;
-	request->lsn = lsn;
-	request->sync = sync;
+	request->data.code = packet->code;
+	request->data.sync = packet->sync;
+
+	ev_io_init(&request->io, replication_send_socket,
+		   master_to_spawner_socket, EV_WRITE);
+	ev_io_start(loop(), &request->io);
+}
+
+/** Replication acceptor fiber handler. */
+void
+replication_subscribe(int fd, struct iproto_packet *packet)
+{
+	assert(packet->code == IPROTO_SUBSCRIBE);
+	if (packet->bodycnt == 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SUBSCRIBE body");
+	assert(packet->bodycnt == 1);
+	const char *data = (const char *) packet->body[0].iov_base;
+	const char *end = data + packet->body[0].iov_len;
+	const char *d = data;
+	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SUBSCRIBE body");
+	uuid_t cluster_uuid;
+	memset(cluster_uuid, 0, sizeof(cluster_uuid));
+	uuid_t node_uuid;
+	memset(node_uuid, 0, sizeof(node_uuid));
+
+	const char *lsnmap = NULL;
+	d = data;
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d); /* key */
+			mp_next(&d); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_CLUSTER_UUID:
+			if (mp_typeof(*d) != MP_STR ||
+			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid Cluster-UUID");
+			}
+			memcpy(cluster_uuid, d, sizeof(cluster_uuid));
+			d += sizeof(cluster_uuid);
+			break;
+		case IPROTO_NODE_UUID:
+			if (mp_typeof(*d) != MP_STR ||
+			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid Node-UUID");
+			}
+			memcpy(node_uuid, d, sizeof(node_uuid));
+			d += sizeof(node_uuid);
+			break;
+		case IPROTO_LSNMAP:
+			if (mp_typeof(*d) != MP_MAP) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid LSNMAP");
+			}
+			lsnmap = d;
+			mp_next(&d);
+			break;
+		default:
+			mp_next(&d); /* value */
+		}
+	}
+
+	/* Check Cluster-UUID */
+	if (uuid_compare(cluster_uuid, recovery_state->cluster_uuid) != 0)
+		tnt_raise(ClientError, ER_INVALID_CLUSTER);
+
+	/* Check Node-UUID */
+	struct node *node = NULL;
+	uint32_t k;
+	mh_foreach(recovery_state->cluster, k) {
+		struct node *n = *mh_cluster_node(recovery_state->cluster, k);
+		if (uuid_compare(n->uuid, node_uuid) == 0) {
+			node = n;
+			break;
+		}
+	}
+	assert(node !=  NULL);
+	if (lsnmap == NULL)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+	/* Check & save LSNMAP */
+	d = lsnmap;
+	uint32_t lsnmap_size = mp_decode_map(&d);
+	struct replication_request *request = (struct replication_request *)
+		calloc(1, sizeof(*request) + sizeof(*request->data.lsnmap) *
+		       (lsnmap_size + 1)); /* use calloc() for valgrind */
+
+	if (request == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*request) +
+			  sizeof(*request->data.lsnmap) * (lsnmap_size + 1),
+			  "iproto", "SUBSCRIBE");
+	}
+
+	bool remote_found = false;
+	for (uint32_t i = 0; i < lsnmap_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+		map_error:
+			free(request);
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+		}
+		request->data.lsnmap[i].node_id = mp_decode_uint(&d);
+		if (mp_typeof(*d) != MP_UINT)
+			goto map_error;
+		request->data.lsnmap[i].lsn = mp_decode_uint(&d);
+		if (request->data.lsnmap[i].node_id == node->id)
+			remote_found = true;
+	}
+	if (!remote_found) {
+		/* Add remote node to the list */
+		request->data.lsnmap[lsnmap_size].node_id = node->id;
+		request->data.lsnmap[lsnmap_size].lsn = 0;
+		++lsnmap_size;
+	}
+
+	request->fd = fd;
+	request->io.data = request;
+	request->data.code = packet->code;
+	request->data.sync = packet->sync;
+	request->data.node_id = node->id;
+	request->data.lsnmap_size = lsnmap_size;
+
 	ev_io_init(&request->io, replication_send_socket,
 		   master_to_spawner_socket, EV_WRITE);
 	ev_io_start(loop(), &request->io);
@@ -225,22 +405,27 @@ subscribe(int fd, int64_t lsn, uint64_t sync)
 static void
 replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */)
 {
-	struct subscribe_request *request =
-		(struct subscribe_request *) watcher->data;
+	struct replication_request *request =
+		(struct replication_request *) watcher->data;
 	struct msghdr msg;
-	struct iovec iov;
+	struct iovec iov[2];
 	char control_buf[CMSG_SPACE(sizeof(int))];
+	memset(control_buf, 0, sizeof(control_buf)); /* valgrind */
 	struct cmsghdr *control_message = NULL;
 
-	iov.iov_base = &request->lsn;
-	iov.iov_len = sizeof(request->lsn) + sizeof(request->sync);
+	size_t len = sizeof(request->data) + sizeof(*request->data.lsnmap) *
+			request->data.lsnmap_size;
+	iov[0].iov_base = &len;
+	iov[0].iov_len = sizeof(len);
+	iov[1].iov_base = &request->data;
+	iov[1].iov_len = len;
 
 	memset(&msg, 0, sizeof(msg));
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = nelem(iov);
 	msg.msg_control = control_buf;
 	msg.msg_controllen = sizeof(control_buf);
 
@@ -347,8 +532,9 @@ spawner_main_loop()
 	struct iovec iov;
 	char control_buf[CMSG_SPACE(sizeof(int))];
 
-	iov.iov_base = &replica.lsn;
-	iov.iov_len = sizeof(replica.lsn) + sizeof(replica.sync);
+	size_t len;
+	iov.iov_base = &len;
+	iov.iov_len = sizeof(len);
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
@@ -358,18 +544,37 @@ spawner_main_loop()
 	msg.msg_controllen = sizeof(control_buf);
 
 	while (!spawner.killed) {
-		int msglen = recvmsg(spawner.sock, &msg, 0);
-		if (msglen > 0) {
-			replica.sock = spawner_unpack_cmsg(&msg);
-			spawner_create_replication_relay();
-		} else if (msglen == 0) { /* orderly master shutdown */
+		ssize_t msglen = recvmsg(spawner.sock, &msg, 0);
+		if (msglen == 0) { /* orderly master shutdown */
 			say_info("Exiting: master shutdown");
 			break;
-		} else { /* msglen == -1 */
-			if (errno != EINTR)
-				say_syserror("recvmsg");
+		} else if (msglen == -1) {
+			if (errno == EINTR)
+				continue;
+			say_syserror("recvmsg");
 			/* continue, the error may be temporary */
+			break;
 		}
+
+		replica.sock = spawner_unpack_cmsg(&msg);
+		struct relay_data *data = (struct relay_data *) malloc(len);
+		msglen = read(spawner.sock, data, len);
+		if (msglen == 0) { /* orderly master shutdown */
+			say_info("Exiting: master shutdown");
+			free(data);
+			break;
+		} else if (msglen == -1) {
+			free(data);
+			if (errno == EINTR)
+				continue;
+			say_syserror("recvmsg");
+			/* continue, the error may be temporary */
+			break;
+		}
+		replica.sync = data->sync;
+
+		spawner_create_replication_relay(data);
+		free(data);
 	}
 	spawner_shutdown();
 }
@@ -428,7 +633,7 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 
 /** Create replication client handler process. */
 static int
-spawner_create_replication_relay()
+spawner_create_replication_relay(struct relay_data *data)
 {
 	pid_t pid = fork();
 
@@ -441,7 +646,7 @@ spawner_create_replication_relay()
 		ev_loop_fork(loop());
 		ev_run(loop(), EVRUN_NOWAIT);
 		close(spawner.sock);
-		replication_relay_loop();
+		replication_relay_loop(data);
 	} else {
 		spawner.child_count++;
 		close(replica.sock);
@@ -543,107 +748,108 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 	exit(EXIT_FAILURE);
 }
 
-/* Only for blocked I/O */
-static inline ssize_t
-sio_writev_all(int fd, struct iovec *iov, int iovcnt)
-{
-	ssize_t bytes_total = 0;
-	struct iovec *iovend = iov + iovcnt;
-	while(1) {
-		ssize_t bytes_written = sio_writev(fd, iov, iovend - iov);
-		bytes_total += bytes_written;
-		while (bytes_written > 0 && bytes_written >= iov->iov_len)
-			bytes_written -= (iov++)->iov_len;
-		if (iov == iovend)
-			break;
-		iov->iov_base = (char *) iov->iov_base + bytes_written;
-		iov->iov_len -= bytes_written;
-	}
-
-	return bytes_total;
-}
-
-
-enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
-
-static int
-iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
-		  char fixheader[IPROTO_FIXHEADER_SIZE])
-{
-	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
-	uint32_t len = 0;
-	for (int i = 1; i < iovcnt; i++)
-		len += iov[i].iov_len;
-
-	/* Encode length */
-	char *data = fixheader;
-	data = mp_encode_uint(data, len);
-	/* Encode padding */
-	ssize_t padding = IPROTO_FIXHEADER_SIZE - (data - fixheader);
-	if (padding > 0)
-		data = mp_encode_strl(data, padding - 1) + padding - 1;
-	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
-	iov[0].iov_base = fixheader;
-	iov[0].iov_len = IPROTO_FIXHEADER_SIZE;
-
-	assert(iovcnt <= IPROTO_ROW_IOVMAX);
-	return iovcnt;
-}
-
 /** Send a single row to the client. */
-static int
+static void
 replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
 {
-	try {
+	struct recovery_state *r = recovery_state;
+
+	/* Don't duplicate data */
+	assert(r->local_node != NULL);
+	if (r->local_node->id == 0 || packet->node_id != r->local_node->id)  {
 		packet->sync = replica.sync;
 		/* Encode length */
 		struct iovec iov[IPROTO_ROW_IOVMAX];
 		char fixheader[IPROTO_FIXHEADER_SIZE];
 		int iovcnt = iproto_encode_row(packet, iov, fixheader);
 		sio_writev_all(replica.sock, iov, iovcnt);
-	} catch(SocketError *e) {
-		say_info("the client has closed its replication socket, exiting");
-		exit(EXIT_SUCCESS);
 	}
 
-	return 0;
+	/*
+	 * Update LSN table
+	 * This code needed to recover_remaining_wals() logic.
+	 */
+	uint32_t k = mh_cluster_find(r->cluster, packet->node_id, NULL);
+	struct node *node;
+	if (k != mh_end(r->cluster)) {
+		node = *mh_cluster_node(r->cluster, k);
+	} else {
+		/* Create node if it doesn't exist */
+		node = (struct node *) calloc(1, sizeof(*node));
+		if (node == NULL) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(node),
+				  "r->cluster", "node");
+		}
+		k = mh_cluster_put(r->cluster, (const struct node **) &node,
+				   NULL, NULL);
+		if (k == mh_end(r->cluster)) {
+			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
+				  "r->cluster", "r->cluster");
+		}
+		node->id = packet->node_id;
+	}
+	node->confirmed_lsn = node->current_lsn = packet->lsn;
 }
 
 static void
-replication_relay_join(struct recovery_state *r, uint64_t sync)
+replication_relay_join(struct recovery_state *r)
 {
 	FDGuard guard_replica(replica.sock);
 
-	int64_t lsn = greatest_lsn(r->snap_dir);
-	if (lsn <= 0)
-		panic("can't find snapshot");
-
-	struct log_io *snap = log_io_open_for_read(r->snap_dir, lsn, NONE);
-	if (snap == NULL)
-		panic("can't open snapshot");
-	say_info("sending snapshot `%s'", snap->filename);
-
-	/* Send rows */
-	int rc = recover_wal(r, snap);
-	log_io_close(&snap);
-
-	if (rc != 0)
-		panic("can't sent snapshot");
+	/* Send snapshot */
+	recover_snap(r);
 
 	/* Send response to JOIN command = end of stream */
-	struct iproto_subscribe response = iproto_subscribe_stub;
-	response.lsn = mp_bswap_u64(lsn);
-	response.sync = mp_bswap_u64(sync);
-	sio_write(replica.sock, &response, sizeof(response));
+	struct iproto_packet packet;
+	memset(&packet, 0, sizeof(packet));
+	packet.code = IPROTO_JOIN;
+	packet.sync = replica.sync;
 
-	say_info("snapshot sent, lsn: %" PRIi64, lsn);
-	exit(EXIT_SUCCESS);
+	char fixheader[IPROTO_FIXHEADER_SIZE];
+	struct iovec iov[IPROTO_ROW_IOVMAX];
+	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+	sio_writev_all(replica.sock, iov, iovcnt);
+
+	say_info("snapshot sent");
 	/* replica.sock closed by guard */
+}
+
+static void
+replication_relay_subscribe(struct recovery_state *r, struct relay_data *data)
+{
+	assert(data->code == IPROTO_SUBSCRIBE);
+	/* Set LSNs */
+	for (uint32_t i = 0; i < data->lsnmap_size; i++) {
+		struct node *node = (struct node *) calloc(1, sizeof(*node));
+		if (node == NULL)
+			panic("cannot allocate struct node");
+		node->id = data->lsnmap[i].node_id;
+		node->confirmed_lsn = node->current_lsn = data->lsnmap[i].lsn;
+		uint32_t k = mh_cluster_put(r->cluster,
+			(const struct node **) &node, NULL, NULL);
+		if (k == mh_end(r->cluster))
+			panic("cannot reallocate r->cluster");
+	}
+
+	/* Set node */
+	uint32_t k = mh_cluster_find(r->cluster, data->node_id, NULL);
+	assert(k != mh_end(r->cluster));
+	r->local_node = *mh_cluster_node(r->cluster, k);
+	assert(r->local_node->id == data->node_id);
+
+	/* Remove SNAPSHOT_NODE_ID */
+	recovery_fix_lsn(r, false);
+
+	say_warn("replication follow local");
+	recovery_follow_local(r, 0.1);
+	ev_run(loop(), 0);
+
+	say_crit("exiting the relay loop");
 }
 
 /** The main loop of replication client service process. */
 static void
-replication_relay_loop()
+replication_relay_loop(struct relay_data *data)
 {
 	struct sigaction sa;
 
@@ -699,26 +905,23 @@ replication_relay_loop()
 	/* Initialize the recovery process */
 	recovery_init(cfg_snap_dir, cfg_wal_dir,
 		      replication_relay_send_row,
-		      NULL, NULL, INT32_MAX);
-	/*
-	 * Note that recovery starts with lsn _NEXT_ to
-	 * the confirmed one.
-	 */
-	if (replica.lsn == 0) {
-		recovery_state->lsn = recovery_state->confirmed_lsn = 0;
-		replication_relay_join(recovery_state, replica.sync); /* exits */
+		      NULL, NULL, NULL, INT32_MAX);
+	recovery_state->relay = true; /* recovery used in relay mode */
+
+	try {
+		switch (data->code) {
+		case IPROTO_JOIN:
+			replication_relay_join(recovery_state);
+			break;
+		case IPROTO_SUBSCRIBE:
+			replication_relay_subscribe(recovery_state, data);
+			break;
+		default:
+			assert(false);
+		}
+	} catch(Exception *e) {
+		say_error("relay error: %s", e->errmsg());
+		exit(EXIT_FAILURE);
 	}
-
-	recovery_state->lsn = recovery_state->confirmed_lsn = replica.lsn - 1;
-	recover_existing_wals(recovery_state);
-	/* Found nothing. */
-	if (recovery_state->lsn == replica.lsn - 1)
-		say_error("can't find WAL containing record with lsn: %" PRIi64,
-			  replica.lsn);
-	recovery_follow_local(recovery_state, 0.1);
-
-	ev_run(loop(), 0);
-
-	say_crit("exiting the relay loop");
 	exit(EXIT_SUCCESS);
 }
