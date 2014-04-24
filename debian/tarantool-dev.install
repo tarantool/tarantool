@@ -1,7 +1,7 @@
-/usr/include/tarantool/1.5/config.h
-/usr/include/tarantool/1.5/lauxlib.h
-/usr/include/tarantool/1.5/luaconf.h
-/usr/include/tarantool/1.5/lua.h
-/usr/include/tarantool/1.5/lua.hpp
-/usr/include/tarantool/1.5/luajit.h
-/usr/include/tarantool/1.5/lualib.h
+usr/include/tarantool/config.h
+usr/include/tarantool/lauxlib.h
+usr/include/tarantool/luaconf.h
+usr/include/tarantool/lua.h
+usr/include/tarantool/lua.hpp
+usr/include/tarantool/luajit.h
+usr/include/tarantool/lualib.h

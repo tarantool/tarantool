@@ -29,7 +29,7 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool/1.5
+DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
 DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool_box
 

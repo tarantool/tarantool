@@ -173,28 +173,28 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files sql-module
 %defattr(-,root,root,-)
-%dir "%{_datadir}/tarantool/1.5"
-%dir "%{_datadir}/tarantool/1.5/box"
-%dir "%{_datadir}/tarantool/1.5/box/net"
-"%{_datadir}/tarantool/1.5/box/net/sql.lua"
+%dir "%{_datadir}/tarantool"
+%dir "%{_datadir}/tarantool/box"
+%dir "%{_datadir}/tarantool/box/net"
+"%{_datadir}/tarantool/box/net/sql.lua"
 
 %files pg-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.5"
-%dir "%{_libdir}/tarantool/1.5/box"
-"%{_libdir}/tarantool/1.5/box/net/pg.so"
+%dir "%{_libdir}/tarantool/"
+%dir "%{_libdir}/tarantool/box"
+"%{_libdir}/tarantool/box/net/pg.so"
 
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.5"
-%dir "%{_libdir}/tarantool/1.5/box"
-"%{_libdir}/tarantool/1.5/box/net/mysql.so"
+%dir "%{_libdir}/tarantool"
+%dir "%{_libdir}/tarantool/box"
+"%{_libdir}/tarantool/box/net/mysql.so"
 
 %files sophia-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.5"
-%dir "%{_libdir}/tarantool/1.5/box"
-"%{_libdir}/tarantool/1.5/box/sophia.so"
+%dir "%{_libdir}/tarantool"
+%dir "%{_libdir}/tarantool/box"
+"%{_libdir}/tarantool/box/sophia.so"
 
 %files dev
 %defattr(-,root,root,-)
@@ -244,14 +244,14 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_libdir}/libtarantoolsql.so"
 "%{_libdir}/libtarantoolsql.so.1"
 "%{_libdir}/libtarantoolsql.so.1.1"
-%dir "%{_includedir}/tarantool/1.5"
-"%{_includedir}/tarantool/1.5/config.h"
-"%{_includedir}/tarantool/1.5/lauxlib.h"
-"%{_includedir}/tarantool/1.5/luaconf.h"
-"%{_includedir}/tarantool/1.5/lua.h"
-"%{_includedir}/tarantool/1.5/lua.hpp"
-"%{_includedir}/tarantool/1.5/luajit.h"
-"%{_includedir}/tarantool/1.5/lualib.h"
+%dir "%{_includedir}/tarantool"
+"%{_includedir}/tarantool/config.h"
+"%{_includedir}/tarantool/lauxlib.h"
+"%{_includedir}/tarantool/luaconf.h"
+"%{_includedir}/tarantool/lua.h"
+"%{_includedir}/tarantool/lua.hpp"
+"%{_includedir}/tarantool/luajit.h"
+"%{_includedir}/tarantool/lualib.h"
 
 %files client
 %defattr(-,root,root,-)
