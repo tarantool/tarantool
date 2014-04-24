@@ -9,6 +9,16 @@ s = box.schema.create_space('test')
 - error: Space 'test' already exists
 ...
 --
+-- Check a double drop space
+--
+s:drop()
+---
+...
+s:drop()
+---
+- error: Space 512 does not exist
+...
+--
 -- Check double create user
 --
 box.schema.user.create('testus')
@@ -18,13 +28,52 @@ box.schema.user.create('testus')
 ---
 - error: User 'testus' already exists
 ...
+s = box.schema.create_space('admin_space')
+---
+...
+s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+---
+...
+s:insert({1})
+---
+- [1]
+...
 --
 -- Check double grant
 --
-box.schema.user.grant('testus', 'read', 'space', 'test')
+box.schema.user.grant('testus', 'read', 'space', 'admin_space')
 ---
 ...
-box.schema.user.grant('testus', 'read', 'space', 'test')
+box.schema.user.grant('testus', 'read', 'space', 'admin_space')
+---
+...
+box.session.su('testus')
+---
+...
+s:select()
+---
+- - [1]
+...
+--
+-- Check double revoke
+--
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('testus', 'read', 'space', 'admin_space')
+---
+...
+box.schema.user.revoke('testus', 'read', 'space', 'admin_space')
+---
+...
+box.session.su('testus')
+---
+...
+s:select()
+---
+- error: Read access denied for user 'testus' to space 'admin_space'
+...
+box.session.su('admin')
 ---
 ...
 --
@@ -38,16 +87,26 @@ box.schema.user.drop('testus')
 - error: User 'testus' does not exist
 ...
 --
--- Check double drop space
+-- Check 'guest' user
 --
-s:drop()
+box.session.su('guest')
 ---
 ...
-s:drop()
+box.session.uid()
 ---
-- error: Space 512 does not exist
+- 0
 ...
---
+box.space._user:select()
+---
+- error: Read access denied for user 'guest' to space '_user'
+...
+s:select()
+---
+- error: Read access denied for user 'guest' to space 'admin_space'
+...
+box.session.su('admin')
+---
+...
 -- Create user with universe read&write grants
 -- and create this user session
 --
@@ -73,30 +132,108 @@ box.schema.user.drop('uniuser')
 - error: Write access denied for user 'uniuser'
 ...
 --
---Check create and drop function
+--Check create, call and drop function
 --
-box.schema.func.create('bar')
+box.schema.func.create('uniuser_func')
 ---
 ...
-box.schema.func.drop('bar')
+function uniuser_func() return 'hello' end
+---
+...
+uniuser_func()
+---
+- hello
+...
+box.schema.func.drop('uniuser_func')
 ---
 ...
 --
 -- Check create and drop space
 --
-s = box.schema.create_space('test')
+us = box.schema.create_space('uniuser_space')
 ---
 ...
-s:drop()
+us:drop()
 ---
 ...
 --
 -- Check create and drop user
 --
-box.schema.user.create('testus')
+box.schema.user.create('uniuser_testus')
 ---
 ...
-box.schema.user.drop('testus')
+box.schema.user.drop('uniuser_testus')
 ---
 - error: Write access denied for user 'uniuser'
+...
+--
+-- Check access system and any spaces
+--
+box.space.admin_space:select()
+---
+- - [1]
+...
+box.space._user:select()
+---
+- - [0, '', 'guest']
+  - [1, '', 'admin']
+  - [2, '', 'uniuser', []]
+  - [3, '', 'uniuser_testus', []]
+...
+box.space._space:select()
+---
+- - [272, 1, '_schema', 'memtx', 0]
+  - [280, 1, '_space', 'memtx', 0]
+  - [288, 1, '_index', 'memtx', 0]
+  - [296, 1, '_func', 'memtx', 0]
+  - [304, 1, '_user', 'memtx', 0]
+  - [312, 1, '_priv', 'memtx', 0]
+  - [512, 1, 'admin_space', 'memtx', 0, '']
+...
+us = box.schema.create_space('uniuser_space')
+---
+...
+box.schema.func.create('uniuser_func')
+---
+...
+box.schema.user.create('uniuser_testus')
+---
+- error: User 'uniuser_testus' already exists
+...
+box.session.su('admin')
+---
+...
+box.schema.user.create('someuser')
+---
+...
+box.schema.user.grant('someuser', 'read, write, execute', 'universe')
+---
+...
+box.session.su('someuser')
+---
+...
+--
+-- Check drop objects of another user
+--
+s:drop()
+---
+- error: Write access denied for user 'someuser'
+...
+us:drop()
+---
+- error: Write access denied for user 'someuser'
+...
+box.schema.func.drop('uniuser_func')
+---
+- error: Write access denied for user 'someuser'
+...
+box.schema.user.drop('uniuser_testus')
+---
+- error: Write access denied for user 'someuser'
+...
+box.session.su('admin')
+---
+...
+s:drop()
+---
 ...
