@@ -31,7 +31,7 @@
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)   
 #include "libgen.h"
 #endif
 
