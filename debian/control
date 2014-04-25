@@ -4,8 +4,6 @@ Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
- python-yaml,
- python-daemon,
  libncurses5-dev,
  libiberty-dev | binutils-dev,
  libmysqlclient-dev,
