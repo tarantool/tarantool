@@ -65,7 +65,7 @@ lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 static int
 lbox_info_node(struct lua_State *L)
 {
-	lua_pushlstring(L, uuid_str(recovery_state->node_uuid), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&recovery_state->node_uuid), UUID_STR_LEN);
 	return 1;
 }
 
@@ -77,7 +77,7 @@ lbox_info_cluster(struct lua_State *L)
 	uint32_t k;
 	mh_foreach(recovery_state->cluster, k) {
 		struct node *node = *mh_cluster_node(recovery_state->cluster,k);
-		lua_pushlstring(L, uuid_str(node->uuid), UUID_STR_LEN);
+		lua_pushlstring(L, tt_uuid_str(&node->uuid), UUID_STR_LEN);
 		luaL_pushnumber64(L, node->confirmed_lsn);
 		lua_settable(L, -3);
 	}

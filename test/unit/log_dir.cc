@@ -14,7 +14,7 @@ extern "C" {
 #define header() note("*** %s ***", __func__)
 #define footer() note("*** %s: done ***", __func__)
 
-uuid_t node_uuid;
+tt_uuid node_uuid;
 
 static void
 testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
@@ -53,7 +53,7 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 		}
 
 		/* Write XLOG */
-		struct log_io *l = log_io_open_for_write(dir, lsnsum, node_uuid,
+		struct log_io *l = log_io_open_for_write(dir, lsnsum, &node_uuid,
 							 INPROGRESS);
 		int rc = wal_write_setlsn(l, batch, cluster);
 		assert(rc == 0);
@@ -234,7 +234,7 @@ main(int argc, char *argv[])
 	memory_init();
 	fiber_init();
 	crc32_init();
-	uuid_generate(node_uuid);
+	tt_uuid_create(&node_uuid);
 
 	plan(1);
 	test1();

@@ -28,7 +28,6 @@
  */
 #include "recovery.h"
 #include "tarantool.h"
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -120,7 +119,7 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	say_info("bootstrapping replica");
 
 	/* Generate Node-UUID */
-	uuid_generate(r->node_uuid);
+	tt_uuid_create(&r->node_uuid);
 
 	char ip_addr[32];
 	char greeting[IPROTO_GREETING_SIZE];
@@ -155,8 +154,8 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_str(data, (const char *) recovery_state->node_uuid,
-			     sizeof(uuid_t));
+	data = mp_encode_str(data, (const char *) &recovery_state->node_uuid,
+			     sizeof(tt_uuid));
 
 	assert(data <= buf + sizeof(buf));
 	packet.body[0].iov_base = buf;
@@ -213,9 +212,11 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = mp_encode_str(data, (const char *) r->cluster_uuid, sizeof(uuid_t));
+	data = mp_encode_str(data, (const char *) &r->cluster_uuid,
+			     sizeof(tt_uuid));
 	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_str(data, (const char *) r->node_uuid, sizeof(uuid_t));
+	data = mp_encode_str(data, (const char *) &r->node_uuid,
+			     sizeof(tt_uuid));
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
 	uint32_t k;
@@ -274,7 +275,7 @@ pull_from_remote(va_list ap)
 
 			recovery_process(r, &packet);
 
-			iobuf_gc(iobuf);
+			iobuf_reset(iobuf);
 			fiber_gc();
 		} catch (FiberCancelException *e) {
 			title("replica", "%s/%s", r->remote->source, "failed");

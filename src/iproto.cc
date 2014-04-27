@@ -615,7 +615,7 @@ iproto_flush(struct iobuf *iobuf, int fd, struct obuf_svp *svp)
 
 	if (nwr > 0) {
 		if (svp->size + nwr == obuf_size(&iobuf->out)) {
-			iobuf_gc(iobuf);
+			iobuf_reset(iobuf);
 			*svp = obuf_create_svp(&iobuf->out);
 			return 0;
 		}

@@ -143,8 +143,9 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	/*
 	 * Open xlog to find SETLSN
 	 */
-	uuid_t uuid;
-	struct log_io *wal = log_io_open_for_read(dir, lsnsum, uuid, INPROGRESS);
+	tt_uuid uuid;
+	struct log_io *wal = log_io_open_for_read(dir, lsnsum, &uuid,
+						  INPROGRESS);
 	if (wal == NULL)
 		return -1;
 	auto log_guard = make_scoped_guard([&]{
@@ -870,13 +871,11 @@ log_io_sync(struct log_io *l)
 #define NODE_UUID_KEY "Node"
 
 static int
-log_io_write_meta(struct log_io *l, const uuid_t node_uuid)
+log_io_write_meta(struct log_io *l, const tt_uuid *node_uuid)
 {
-	char uuid_str[UUID_STR_LEN + 1];
-	uuid_unparse(node_uuid, uuid_str);
-
 	if (fprintf(l->f, "%s%s", l->dir->filetype, v12) < 0 ||
-	    fprintf(l->f, NODE_UUID_KEY ": %s\n\n", uuid_str) < 0) {
+	    fprintf(l->f, NODE_UUID_KEY ": %s\n\n",
+		    tt_uuid_str(node_uuid)) < 0) {
 		return -1;
 	}
 
@@ -892,7 +891,8 @@ log_io_write_meta(struct log_io *l, const uuid_t node_uuid)
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, uuid_t node_uuid, const char **errmsg)
+log_io_verify_meta(struct log_io *l, tt_uuid *node_uuid,
+		   const char **errmsg)
 {
 	char filetype[32], version[32], buf[256];
 	struct log_dir *dir = l->dir;
@@ -934,7 +934,7 @@ log_io_verify_meta(struct log_io *l, uuid_t node_uuid, const char **errmsg)
 
 		if (strcmp(key, NODE_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
-			    uuid_parse(val, node_uuid) != 0) {
+			    tt_uuid_from_string(val, node_uuid) != 0) {
 				*errmsg = "can't parse node uuid";
 				goto error;
 			}
@@ -949,7 +949,7 @@ error:
 
 struct log_io *
 log_io_open(struct log_dir *dir, enum log_mode mode, const char *filename,
-	    uuid_t node_uuid, enum log_suffix suffix, FILE *file)
+	    tt_uuid *node_uuid, enum log_suffix suffix, FILE *file)
 {
 	struct log_io *l = NULL;
 	int save_errno;
@@ -995,8 +995,8 @@ error:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t lsnsum, uuid_t node_uuid,
-		     enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t lsnsum,
+		     tt_uuid *node_uuid, enum log_suffix suffix)
 {
 	const char *filename = format_filename(dir, lsnsum, suffix);
 	FILE *f = fopen(filename, "r");
@@ -1012,7 +1012,7 @@ log_io_open_for_read(struct log_dir *dir, int64_t lsnsum, uuid_t node_uuid,
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t lsn, uuid_t node_uuid,
+log_io_open_for_write(struct log_dir *dir, int64_t lsn, tt_uuid *node_uuid,
 		      enum log_suffix suffix)
 {
 	char *filename;

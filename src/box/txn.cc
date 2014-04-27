@@ -30,7 +30,8 @@
 #include "tuple.h"
 #include "space.h"
 #include <tarantool.h>
-#include <recovery.h>
+#include "cluster.h"
+#include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
 

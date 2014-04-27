@@ -227,8 +227,7 @@ replication_join(int fd, struct iproto_packet *packet)
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
 
-	uuid_t node_uuid;
-	memset(node_uuid, 0, sizeof(node_uuid));
+	tt_uuid node_uuid = uuid_nil;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -240,26 +239,24 @@ replication_join(int fd, struct iproto_packet *packet)
 		uint8_t key = mp_decode_uint(&d);
 		if (key == IPROTO_NODE_UUID) {
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+			    mp_decode_strl(&d) != sizeof(tt_uuid)) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Node-UUID");
 			}
-			memcpy(node_uuid, d, sizeof(uuid_t));
-			d += sizeof(uuid_t);
+			tt_uuid_set(&node_uuid, d);
+			d += sizeof(node_uuid);
 		} else {
 			mp_next(&d); /* value */
 		}
 	}
 
-	if (uuid_is_null(node_uuid)) {
+	if (tt_uuid_is_nil(&node_uuid)) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			  "Can't find Node-UUID in JOIN request");
 	}
 
 	/* Notify box about new cluster node */
-	char uuid_str[UUID_STR_LEN + 1];
-	uuid_unparse(node_uuid, uuid_str);
-	recovery_state->join_handler(node_uuid);
+	recovery_state->join_handler(&node_uuid);
 
 	struct replication_request *request = (struct replication_request *)
 			malloc(sizeof(*request));
@@ -283,17 +280,14 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 {
 	assert(packet->code == IPROTO_SUBSCRIBE);
 	if (packet->bodycnt == 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SUBSCRIBE body");
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
 	assert(packet->bodycnt == 1);
 	const char *data = (const char *) packet->body[0].iov_base;
 	const char *end = data + packet->body[0].iov_len;
 	const char *d = data;
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SUBSCRIBE body");
-	uuid_t cluster_uuid;
-	memset(cluster_uuid, 0, sizeof(cluster_uuid));
-	uuid_t node_uuid;
-	memset(node_uuid, 0, sizeof(node_uuid));
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
+	tt_uuid cluster_uuid = uuid_nil, node_uuid = uuid_nil;
 
 	const char *lsnmap = NULL;
 	d = data;
@@ -308,20 +302,20 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 		switch (key) {
 		case IPROTO_CLUSTER_UUID:
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+			    mp_decode_strl(&d) != sizeof(cluster_uuid)) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Cluster-UUID");
 			}
-			memcpy(cluster_uuid, d, sizeof(cluster_uuid));
+			tt_uuid_set(&cluster_uuid, d);
 			d += sizeof(cluster_uuid);
 			break;
 		case IPROTO_NODE_UUID:
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(uuid_t)) {
+			    mp_decode_strl(&d) != sizeof(node_uuid)) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Node-UUID");
 			}
-			memcpy(node_uuid, d, sizeof(node_uuid));
+			tt_uuid_set(&node_uuid, d);
 			d += sizeof(node_uuid);
 			break;
 		case IPROTO_LSNMAP:
@@ -338,15 +332,16 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 	}
 
 	/* Check Cluster-UUID */
-	if (uuid_compare(cluster_uuid, recovery_state->cluster_uuid) != 0)
-		tnt_raise(ClientError, ER_INVALID_CLUSTER);
-
+	if (tt_uuid_cmp(&cluster_uuid, &recovery_state->cluster_uuid) != 0) {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "Unknown Cluster-UUID");
+	}
 	/* Check Node-UUID */
 	struct node *node = NULL;
 	uint32_t k;
 	mh_foreach(recovery_state->cluster, k) {
 		struct node *n = *mh_cluster_node(recovery_state->cluster, k);
-		if (uuid_compare(n->uuid, node_uuid) == 0) {
+		if (tt_uuid_cmp(&n->uuid, &node_uuid) == 0) {
 			node = n;
 			break;
 		}

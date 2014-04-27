@@ -38,7 +38,7 @@
 #include <new> /* for placement new */
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
-#include "recovery.h" /* for on_replace_dd_schema trigger */
+#include "cluster.h" /* for cluster_set_uuid() */
 
 /** _space columns */
 #define ID               0
@@ -1498,25 +1498,38 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 /* {{{ cluster configuration */
 
+/**
+ * Parse a tuple field which is expected to contain a string
+ * representation of UUID, and return a 16-byte representation.
+ */
+tt_uuid
+tuple_field_uuid(struct tuple *tuple, int fieldno)
+{
+	const char *value = tuple_field_cstr(tuple, fieldno);
+	tt_uuid uuid;
+	if (tt_uuid_from_string(value, &uuid) != 0)
+		tnt_raise(ClientError, ER_INVALID_UUID, value);
+	return uuid;
+}
+
+/**
+ * This trigger is normally invoked only upon initial recovery.
+ *
+ * Before a cluster is assigned a cluster id it's read only.
+ */
 static void
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct tuple *old_tuple = txn->old_tuple;
 	struct tuple *new_tuple = txn->new_tuple;
-	const char *key = tuple_field_cstr(new_tuple ? new_tuple : old_tuple,0);
+	const char *key = tuple_field_cstr(new_tuple ?
+					   new_tuple : old_tuple, 0);
 	if (strcmp(key, "cluster") == 0) {
 		if (old_tuple != NULL || new_tuple == NULL)
-			tnt_raise(IllegalParams, "'cluster' value is read-only");
-
-		const char *value = tuple_field_cstr(new_tuple, 1);
-		uuid_t cluster_uuid;
-		if (uuid_parse(value, cluster_uuid) != 0)
-			tnt_raise(IllegalParams, "invalid 'cluster' value");
-
-		/* Set Cluster-UUID (can only be done from snapshot) */
-		assert(uuid_is_null(recovery_state->cluster_uuid));
-		uuid_copy(recovery_state->cluster_uuid, cluster_uuid);
+			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
+		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
+		cluster_set_id(&uu);
 	}
 }
 
@@ -1527,35 +1540,49 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
 	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
-	uuid_t node_uuid;
-	uuid_parse(tuple_field_cstr(txn->new_tuple, 1), node_uuid);
+	tt_uuid node_uuid = tuple_field_uuid(txn->new_tuple, 1);
 
-	recovery_confirm_node(recovery_state, node_uuid, node_id);
+	cluster_add_node(&node_uuid, node_id);
 }
 
 static struct trigger commit_cluster_trigger =
 	{ rlist_nil, on_commit_dd_cluster, NULL, NULL };
 
 /**
- * A trigger invoked on replace in the space containing cluster configration.
+ * A trigger invoked on replace in the space _cluster,
+ * which contains cluster configuration.
+ *
+ * The space is modified by JOIN command in IPROTO
+ * protocol.
+ *
+ * The trigger updates the cluster configuration cache
+ * with uuid of the newly joined node.
+ *
+ * During recovery, it acts the same way, loading identifiers
+ * of all nodes into the node cache. Node globally unique
+ * identifiers are used to keep track of cluster configuration,
+ * so that a node that previously joined the cluster can
+ * follow updates, and a node that belongs to a different
+ * cluster can not by mistake join/follow another cluster
+ * without first being reset (emptied).
  */
 static void
 on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	if (txn->old_tuple != NULL || txn->new_tuple == NULL)
-		tnt_raise(IllegalParams, "can't change Node-UUID!");
+	struct tuple *old_tuple = txn->old_tuple;
+	struct tuple *new_tuple = txn->new_tuple;
+	if (old_tuple != NULL || new_tuple == NULL)
+		tnt_raise(ClientError, ER_NODE_ID_IS_RO);
 
 	/* Check fields */
-	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
-	if (node_id == 0)
-		tnt_raise(IllegalParams, "invalid Node-ID!");
-
-	uuid_t node_uuid;
-	if (uuid_parse(tuple_field_cstr(txn->new_tuple, 1), node_uuid) != 0 ||
-	    uuid_is_null(node_uuid))
-		tnt_raise(IllegalParams, "invalid Node-UUID!");
+	uint32_t node_id = tuple_field_u32(new_tuple, 0);
+	if (cnode_id_is_reserved(node_id))
+		tnt_raise(IllegalParams, "Invalid Node-Id");
+	tt_uuid node_uuid = tuple_field_uuid(new_tuple, 1);
+	if (tt_uuid_is_nil(&node_uuid))
+		tnt_raise(ClientError, ER_INVALID_UUID, tt_uuid_str(&node_uuid));
 
 	trigger_set(&txn->on_commit, &commit_cluster_trigger);
 }

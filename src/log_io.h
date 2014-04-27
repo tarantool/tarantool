@@ -35,7 +35,9 @@
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "iproto_constants.h"
-#include "uuid/uuid.h"
+#include "tt_uuid.h"
+
+extern const uint32_t xlog_format;
 
 enum log_mode {
 	LOG_READ,
@@ -151,14 +153,14 @@ struct log_io {
 };
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t lsn, uuid_t node_uuid,
+log_io_open_for_read(struct log_dir *dir, int64_t lsn, tt_uuid *node_uuid,
 		     enum log_suffix suffix);
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t lsn, uuid_t node_uuid,
-		      enum log_suffix suffix);
+log_io_open_for_write(struct log_dir *dir, int64_t lsn,
+		      tt_uuid *node_uuid, enum log_suffix suffix);
 struct log_io *
 log_io_open(struct log_dir *dir, enum log_mode mode, const char *filename,
-	    uuid_t node_uuid, enum log_suffix suffix, FILE *file);
+	    tt_uuid *node_uuid, enum log_suffix suffix, FILE *file);
 int
 log_io_sync(struct log_io *l);
 int

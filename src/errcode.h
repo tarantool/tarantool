@@ -113,8 +113,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 61 */_(ER_LOCAL_NODE_IS_NOT_ACTIVE,	2, "Local node is not active") \
 	/* 62 */_(ER_UNKNOWN_NODE,		2, "Unknown node %u") \
 	/* 63 */_(ER_INVALID_CLUSTER,		2, "Invalid cluster id") \
-
-
+	/* 64 */_(ER_INVALID_UUID,		2, "Invalid UUID: %s") \
+	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \
+	/* 66 */_(ER_NODE_ID_IS_RO,		2, "Can't reset node id") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

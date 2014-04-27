@@ -45,6 +45,7 @@
 #include "iproto_constants.h"
 #include "crc32.h"
 #include "scoped_guard.h"
+#include "box/cluster.h"
 
 /*
  * Recovery subsystem
@@ -195,11 +196,10 @@ confirm_lsn(struct node *node, int64_t lsn, bool is_commit)
 	if (node->confirmed_lsn < lsn) {
 		if (is_commit) {
 			if (node->confirmed_lsn + 1 != lsn) {
-				char uuid_str[UUID_STR_LEN + 1];
-				uuid_unparse(node->uuid, uuid_str);
-				say_warn("non consecutive LSN for %s "
+				say_warn("non consecutive LSN for node %u (%s) "
 					 "confirmed: %jd, new: %jd, diff: %jd",
-					 uuid_str,
+					 (unsigned) node->id,
+					 tt_uuid_str(&node->uuid),
 					 (intmax_t) node->confirmed_lsn,
 					 (intmax_t) lsn,
 					 (intmax_t) (lsn - node->confirmed_lsn));
@@ -207,15 +207,13 @@ confirm_lsn(struct node *node, int64_t lsn, bool is_commit)
 			node->confirmed_lsn = lsn;
 		 }
 	} else {
-		 /*
+		/*
 		 * There can be holes in
 		 * confirmed_lsn, in case of disk write failure, but
 		 * wal_writer never confirms LSNs out order.
 		 */
-		char uuid_str[UUID_STR_LEN + 1];
-		uuid_unparse(node->uuid, uuid_str);
 		panic("LSN for %s is used twice or COMMIT order is broken: "
-		      "confirmed: %jd, new: %jd", uuid_str,
+		      "confirmed: %jd, new: %jd", tt_uuid_str(&node->uuid),
 		      (intmax_t) node->confirmed_lsn, (intmax_t) lsn);
 	}
 }
@@ -284,7 +282,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	if (node == NULL)
 		panic("cannot allocate struct node");
 	node->id = 0;
-	assert(uuid_is_null(node->uuid));
+	assert(tt_uuid_is_nil(&node->uuid));
 	uint32_t k = mh_cluster_put(r->cluster,
 		(const struct node **) &node, NULL, NULL);
 	if (k == mh_end(r->cluster))
@@ -427,54 +425,18 @@ recovery_process(struct recovery_state *r, struct iproto_packet *packet)
 }
 
 void
-recovery_confirm_node(struct recovery_state *r, uuid_t node_uuid,
-		      uint32_t node_id)
-{
-	/* Node-Id must be unique */
-	assert(mh_cluster_find(r->cluster, node_id, NULL) == mh_end(r->cluster));
-	assert(!uuid_is_null(node_uuid));
-	assert(node_id != 0);
-
-	/* Add node */
-	struct node *node = (struct node *) calloc(1, sizeof(*node));
-	if (node == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*node),
-			  "recovery", "r->cluster");
-	}
-	node->id = node_id;
-	memcpy(node->uuid, node_uuid, sizeof(uuid_t));
-	uint32_t k = mh_cluster_put(recovery_state->cluster,
-		(const struct node **) &node, NULL, NULL);
-	if (k == mh_end(recovery_state->cluster)) {
-		free(node);
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*node),
-			  "recovery", "r->cluster");
-	}
-
-	say_debug("confirm node: {uuid = %s, id = %u}",
-		  uuid_str(node_uuid), node_id);
-
-	if (uuid_compare(r->node_uuid, node_uuid) == 0) {
-		/* Confirm Local Node */
-		say_info("synchronized with cluster");
-		assert(r->local_node == NULL || r->local_node->id == 0);
-		r->local_node = node;
-	}
-}
-
-void
 cluster_bootstrap(struct recovery_state *r)
 {
 	/* Generate Node-UUID */
-	uuid_generate(r->node_uuid);
+	tt_uuid_create(&r->node_uuid);
 
 	/* Recover from bootstrap.snap */
 	say_info("initializing cluster");
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	uuid_t bootstrap_uuid; /* ignored */
+	tt_uuid bootstrap_uuid; /* ignored */
 	struct log_io *snap = log_io_open(&r->snap_dir, LOG_READ,
-		"bootstrap.snap", bootstrap_uuid, NONE, f);
+		"bootstrap.snap", &bootstrap_uuid, NONE, f);
 	assert(snap != NULL);
 	auto snap_guard = make_scoped_guard([&]{
 		log_io_close(&snap);
@@ -486,10 +448,10 @@ cluster_bootstrap(struct recovery_state *r)
 		panic("failed to bootstrap data directory");
 
 	/* Initialize local node */
-	r->join_handler(r->node_uuid);
+	r->join_handler(&r->node_uuid);
 	assert(r->local_node != NULL);
 	assert(r->local_node->id == 1);
-	assert(uuid_compare(r->local_node->uuid, r->node_uuid) == 0);
+	assert(tt_uuid_cmp(&r->local_node->uuid, &r->node_uuid) == 0);
 
 	say_info("done");
 }
@@ -517,13 +479,13 @@ recover_snap(struct recovery_state *r)
 		say_error("can't find snapshot");
 		goto error;
 	}
-	snap = log_io_open_for_read(&r->snap_dir, lsn, r->node_uuid, NONE);
+	snap = log_io_open_for_read(&r->snap_dir, lsn, &r->node_uuid, NONE);
 	if (snap == NULL) {
 		say_error("can't find/open snapshot");
 		goto error;
 	}
 
-	if (uuid_is_null(r->node_uuid)) {
+	if (tt_uuid_is_nil(&r->node_uuid)) {
 		say_error("can't find node uuid in snapshot");
 		goto error;
 	}
@@ -646,7 +608,7 @@ find_next_wal:
 				goto find_next_wal;
 		}
 		next_wal = log_io_open(&r->wal_dir, LOG_READ, filename,
-				       r->node_uuid, suffix, f);
+				       &r->node_uuid, suffix, f);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
@@ -1227,7 +1189,7 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 	if (l == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
 		int64_t lsnsum = mh_cluster_current_sum(cluster);
-		l = log_io_open_for_write(&r->wal_dir, lsnsum, r->node_uuid,
+		l = log_io_open_for_write(&r->wal_dir, lsnsum, &r->node_uuid,
 					  INPROGRESS);
 		if (l != NULL) {
 			if (wal_write_setlsn(l, batch, cluster) != 0)
@@ -1516,7 +1478,7 @@ snapshot_save(struct recovery_state *r)
 	assert(r->snapshot_handler != NULL);
 	struct log_io *snap;
 	int64_t lsnsum = mh_cluster_current_sum(r->cluster);
-	snap = log_io_open_for_write(&r->snap_dir, lsnsum, r->node_uuid,
+	snap = log_io_open_for_write(&r->snap_dir, lsnsum, &r->node_uuid,
 				     INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");

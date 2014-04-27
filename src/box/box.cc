@@ -277,12 +277,14 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 }
 
 /**
- * @brief Called when recovery/replication wants to add a new node to cluster.
- * recovery_confirm_node() must be called after insert.
+ * @brief Called when recovery/replication wants to add a new node
+ * to cluster.
+ * cluster_add_node() is called as a commit trigger on _cluster
+ * space and actually adds the node to the cluster.
  * @param node_uuid
  */
 static void
-box_on_cluster_join(uuid_t node_uuid)
+box_on_cluster_join(const tt_uuid *node_uuid)
 {
 	struct space *space = space_cache_find(SC_CLUSTER_ID);
 	class Index *index = index_find(space, 0);
@@ -298,7 +300,7 @@ box_on_cluster_join(uuid_t node_uuid)
 	char *data = buf;
 	data = mp_encode_array(data, 2);
 	data = mp_encode_uint(data, node_id);
-	data = mp_encode_str(data, uuid_str(node_uuid), UUID_STR_LEN);
+	data = mp_encode_str(data, tt_uuid_str(node_uuid), UUID_STR_LEN);
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
@@ -309,8 +311,8 @@ static void
 box_set_cluster_uuid(struct recovery_state *r)
 {
 	/* Save Cluster-UUID to _schema space */
-	uuid_t cluster_uuid;
-	uuid_generate(cluster_uuid);
+	tt_uuid cluster_uuid;
+	tt_uuid_create(&cluster_uuid);
 
 	const char *key = "cluster";
 	struct request req;
@@ -320,7 +322,7 @@ box_set_cluster_uuid(struct recovery_state *r)
 	char *data = buf;
 	data = mp_encode_array(data, 2);
 	data = mp_encode_str(data, key, strlen(key));
-	data = mp_encode_str(data, uuid_str(cluster_uuid), UUID_STR_LEN);
+	data = mp_encode_str(data, tt_uuid_str(&cluster_uuid), UUID_STR_LEN);
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
@@ -328,7 +330,7 @@ box_set_cluster_uuid(struct recovery_state *r)
 	process_rw(&null_port, &req);
 
 	/* Cluster-UUID was be updated by a _schema trigger */
-	assert(uuid_compare(r->cluster_uuid, cluster_uuid) == 0);
+	assert(tt_uuid_cmp(&r->cluster_uuid, &cluster_uuid) == 0);
 }
 
 void
@@ -402,14 +404,11 @@ box_init()
 		snapshot_save(recovery_state);
 	}
 
-	if (uuid_is_null(recovery_state->cluster_uuid))
+	if (tt_uuid_is_nil(&recovery_state->cluster_uuid))
 		tnt_raise(ClientError, ER_INVALID_CLUSTER);
 
 	space_end_recover_snapshot();
 	space_end_recover();
-
-	say_debug("node: %s", uuid_str(recovery_state->node_uuid));
-	say_debug("cluster: %s", uuid_str(recovery_state->cluster_uuid));
 
 	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 	title("orphan", NULL);

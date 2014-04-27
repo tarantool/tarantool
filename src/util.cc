@@ -525,11 +525,3 @@ addr2symbol(void *addr)
 }
 
 #endif /* HAVE_BFD */
-
-char *
-uuid_str(uuid_t uuid)
-{
-	static char buf[UUID_STR_LEN + 1];
-	uuid_unparse(uuid, buf);
-	return buf;
-}

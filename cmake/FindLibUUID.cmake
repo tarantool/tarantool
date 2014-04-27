@@ -1,6 +1,4 @@
 if(NOT LIBUUID_FOUND)
-    message(STATUS "NOT FOUND")
-
     find_path(LIBUUID_INCLUDE_DIR
         NAMES uuid.h
         PATH_SUFFIXES uuid

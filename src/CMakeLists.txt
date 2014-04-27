@@ -70,6 +70,7 @@ set (common_sources
      cfg.cc
      cpu_feature.c
      fiob.c
+     tt_uuid.c
      ffisyms.cc
      lua/init.cc
      lua/fiber.cc

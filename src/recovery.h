@@ -33,7 +33,7 @@
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "log_io.h"
-#include <uuid/uuid.h>
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -44,7 +44,7 @@ struct tbuf;
 
 typedef void (row_handler)(void *, struct iproto_packet *packet);
 typedef void (snapshot_handler)(struct log_io *);
-typedef void (join_handler)(uuid_t node_uuid);
+typedef void (join_handler)(const tt_uuid *node_uuid);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -64,7 +64,7 @@ extern const char *wal_mode_STRS[];
  */
 struct node {
 	uint32_t id;
-	uuid_t uuid;
+	tt_uuid uuid;
 	int64_t current_lsn;
 	int64_t confirmed_lsn;
 };
@@ -112,8 +112,8 @@ struct recovery_state {
 	int rows_per_wal;
 	double wal_fsync_delay;
 	enum wal_mode wal_mode;
-	uuid_t node_uuid;
-	uuid_t cluster_uuid;
+	tt_uuid node_uuid;
+	tt_uuid cluster_uuid;
 
 	bool finalize;
 };
@@ -146,8 +146,6 @@ int wal_write(struct recovery_state *r, struct iproto_packet *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_process(struct recovery_state *r, struct iproto_packet *packet);
-void recovery_confirm_node(struct recovery_state *r, uuid_t node_uuid,
-			   uint32_t node_id);
 void recovery_fix_lsn(struct recovery_state *r, bool master_bootstrap);
 
 struct fio_batch;
