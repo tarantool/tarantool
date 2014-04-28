@@ -1,0 +1,9 @@
+# encoding: tarantool
+# 
+
+exec admin "lua type(box.errno)"
+exec admin "lua box.errno.EINVAL > 0"
+exec admin "lua box.errno.EBADF > 0"
+exec admin "lua box.errno(box.errno.EINVAL) == box.errno.EINVAL, box.errno() == box.errno.EINVAL"
+exec admin "lua box.errno(box.errno.EBADF) ~= box.errno.EINVAL, box.errno() == box.errno.EBADF"
+exec admin "lua box.errno.strerror(box.errno.EINVAL)"

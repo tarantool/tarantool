@@ -64,6 +64,8 @@ set(lua_sources)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/session.lua)
+lua_source(lua_sources lua/bsdsocket.lua)
+lua_source(lua_sources lua/errno.lua)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -121,7 +123,9 @@ set (common_sources
      lua/lua_socket.cc
      lua/session.cc
      lua/cjson.cc
+     lua/errno.c
      fiob.c
+     bsdsocket.cc
      ${lua_sources}
 )
 

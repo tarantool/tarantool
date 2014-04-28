@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_COEIO_H_INCLUDED
-#define TARANTOOL_COEIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,42 +27,27 @@
  * SUCH DAMAGE.
  */
 
-#include "tarantool/config.h"
-#include "tarantool/util.h"
+#ifndef TARANTOOL_BOX_RAWSOCKET_H_INCLUDED
+#define TARANTOOL_BOX_RAWSOCKET_H_INCLUDED
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <tarantool_ev.h>
-#include <tarantool_eio.h>
-#include <coro.h>
-#include <rlist.h>
+#include <stddef.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
-#define ERESOLVE -1
+struct lua_State;
+void tarantool_lua_bsdsocket_init(struct lua_State *L);
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-/**
- * Asynchronous IO Tasks (libeio wrapper)
- *
- * Yield the current fiber until a created task is complete.
- */
-
-void coeio_init(void);
-ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
-
-struct addrinfo *
-coeio_resolve(int socktype, const char *host, const char *port,
-              ev_tstamp timeout);
+int bsdsocket_protocol(const char *proto);
+int bsdsocket_sysconnect(int fh, const char *host, const char *port);
+int bsdsocket_bind(int fh, const char *host, const char *port);
+int bsdsocket_nonblock(int fh, int mode);
+int bsdsocket_sendto(int fh, const char *host, const char *port,
+	const void *octets, size_t len, int flags);
 
 #if defined(__cplusplus)
 }
 #endif
-#endif /* TARANTOOL_COEIO_H_INCLUDED */
+
+#endif /* TARANTOOL_BOX_RAWSOCKET_H_INCLUDED */

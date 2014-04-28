@@ -1,0 +1,26 @@
+lua type(box.errno)
+---
+ - table
+...
+lua box.errno.EINVAL > 0
+---
+ - true
+...
+lua box.errno.EBADF > 0
+---
+ - true
+...
+lua box.errno(box.errno.EINVAL) == box.errno.EINVAL, box.errno() == box.errno.EINVAL
+---
+ - true
+ - true
+...
+lua box.errno(box.errno.EBADF) ~= box.errno.EINVAL, box.errno() == box.errno.EBADF
+---
+ - true
+ - true
+...
+lua box.errno.strerror(box.errno.EINVAL)
+---
+ - Invalid argument
+...

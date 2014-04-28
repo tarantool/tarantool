@@ -72,6 +72,8 @@ public:
 		say_debug("FiberCancelException");
 	}
 };
+
+extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct fiber {
@@ -175,4 +177,7 @@ fiber_set_sid(struct fiber *f, uint32_t sid, uint64_t cookie)
 	f->cookie = cookie;
 }
 
+#if defined(__cplusplus)
+}
+#endif
 #endif /* TARANTOOL_FIBER_H_INCLUDED */

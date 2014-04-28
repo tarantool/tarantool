@@ -1,0 +1,719 @@
+bsdsocket tests
+lua type(box.socket)
+---
+ - table
+...
+lua box.socket:errno()
+---
+ - 0
+...
+lua type(box.socket:error())
+---
+ - nil
+...
+lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222')
+---
+ - nil
+...
+lua box.socket:errno() ~= 0
+---
+ - true
+...
+lua type(box.socket:error())
+---
+ - string
+...
+lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua s:wait(.01)
+---
+ - RW
+...
+lua type(s)
+---
+ - table
+...
+lua s
+---
+ - fd 10, aka 0.0.0.0:0
+...
+lua s:errno()
+---
+ - 0
+...
+lua type(s:error())
+---
+ - nil
+...
+lua s:sysconnect('127.0.0.1', box.cfg.primary_port)
+---
+ - true
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:nonblock()
+---
+ - true
+...
+lua s:nonblock(false)
+---
+ - false
+...
+lua s:nonblock()
+---
+ - false
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:readable(.01)
+---
+ - false
+...
+lua s:wait(.01)
+---
+ - W
+...
+lua s:readable(0)
+---
+ - false
+...
+lua s:errno() > 0
+---
+ - true
+...
+lua s:error()
+---
+ - Connection timed out
+...
+lua s:writable(.00000000000001)
+---
+ - true
+...
+lua s:writable(0)
+---
+ - true
+...
+lua s:wait(.01)
+---
+ - W
+...
+lua s:syswrite(box.pack('iii', 65280, 0, 12334))
+---
+ - 12
+...
+lua s:readable(1)
+---
+ - true
+...
+lua s:wait(.01)
+---
+ - RW
+...
+lua box.unpack('iii', s:sysread(4096))
+---
+ - 65280
+ - 0
+ - 12334
+...
+lua s:syswrite(box.pack('iii', 65280, 0, 12335))
+---
+ - 12
+...
+lua s:readable(1)
+---
+ - true
+...
+lua string.len(s:sysread(4096))
+---
+ - 12
+...
+lua s:close()
+---
+ - true
+...
+lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:bind('127.0.0.1', 3457)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:listen(128)
+---
+ - true
+...
+lua sevres = {}
+---
+...
+lua type(box.fiber.wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+---
+ - userdata
+...
+lua #sevres
+---
+ - 0
+...
+lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua sc:sysconnect('127.0.0.1', 3457)
+---
+ - true
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:readable(.5)
+---
+ - true
+...
+lua sc:sysread(4096)
+---
+ - ok
+...
+lua string.match(tostring(sc), ', peer') ~= nil
+---
+ - true
+...
+lua #sevres
+---
+ - 1
+...
+lua sevres[1].host
+---
+ - nil
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
+---
+ - true
+...
+lua s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+---
+ - 1
+...
+lua s:error()
+---
+ - nil
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_BSDCOMPAT', false)
+---
+ - true
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
+---
+ - true
+...
+lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+---
+ - 0
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
+---
+error: '[string "-- bsdsocket.lua (internal file)..."]:282: Socket option SO_ACCEPTCONN is read only'
+...
+lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:linger()
+---
+ - false
+ - 0
+...
+lua s:linger(true, 1)
+---
+ - true
+ - 1
+...
+lua s:linger()
+---
+ - true
+ - 1
+...
+lua s:linger(false, 1)
+---
+ - false
+ - 1
+...
+lua s:linger()
+---
+ - false
+ - 1
+...
+lua s:shutdown('R')
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+ - true
+...
+lua s:bind('127.0.0.1', 3457)
+---
+ - true
+...
+lua s:listen(128)
+---
+ - true
+...
+lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:writable()
+---
+ - true
+...
+lua sc:readable()
+---
+ - true
+...
+lua sc:sysconnect('127.0.0.1', 3457)
+---
+ - true
+...
+lua sc:writable(10)
+---
+ - true
+...
+lua sc:write('Hello, world')
+---
+ - true
+...
+lua sa = s:accept()
+---
+...
+lua sa:nonblock(1)
+---
+ - true
+...
+lua sa:read(8)
+---
+ - Hello, w
+...
+lua sa:read(3)
+---
+ - orl
+...
+lua sc:writable()
+---
+ - true
+...
+lua sc:write(', again')
+---
+ - true
+...
+lua sa:read(8)
+---
+ - d, again
+...
+lua sa:error()
+---
+ - nil
+...
+lua string.len(sa:read(0))
+---
+ - 0
+...
+lua type(sa:read(0))
+---
+ - string
+...
+lua sa:read(1, .01)
+---
+ - nil
+...
+lua sc:writable()
+---
+ - true
+...
+lua sc:send('abc')
+---
+ - true
+...
+lua sa:read(3)
+---
+ - abc
+...
+lua sc:send('Hello')
+---
+ - true
+...
+lua sa:readable()
+---
+ - true
+...
+lua sa:recv()
+---
+ - Hello
+...
+lua sa:recv()
+---
+ - nil
+...
+lua sc:send('Hello')
+---
+ - true
+...
+lua sc:send(', world')
+---
+ - true
+...
+lua sc:send("\nnew line")
+---
+ - true
+...
+lua sa:readline({'\n'}, 1)
+---
+ - Hello, world
+
+...
+lua sa:readline(1, {'ine'}, 1)
+---
+ - n
+...
+lua sa:readline({'ine'}, 1)
+---
+ - ew line
+...
+lua sa:readline({'ine'}, 0.1)
+---
+ - nil
+...
+lua sc:send('Hello, world')
+---
+ - true
+...
+lua sa:readline({','}, 1)
+---
+ - Hello,
+...
+lua sc:shutdown('W')
+---
+ - true
+...
+lua sa:read(100, 1)
+---
+ -  world
+...
+lua sa:read(100, 1)
+---
+ - 
+...
+lua sa:close()
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+ - true
+...
+lua s ~= nil
+---
+ - true
+...
+lua s:nonblock()
+---
+ - false
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:nonblock()
+---
+ - true
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua tostring(sc)
+---
+ - fd 12, aka unix/:/tmp/tarantool-test-socket
+...
+lua s:listen(1234)
+---
+ - true
+...
+lua sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua sc:error()
+---
+ - nil
+...
+lua s:readable()
+---
+ - true
+...
+lua sa = s:accept()
+---
+...
+lua sa:nonblock(true)
+---
+ - true
+...
+lua sa:send('Hello, world')
+---
+ - true
+...
+lua sc:recv()
+---
+ - Hello, world
+...
+lua sc:close()
+---
+ - true
+...
+lua sa:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua function aexitst(ai, host, port) for i, a in pairs(ai) do if a.host == host and a.port == port then return true end end return false end
+---
+...
+lua aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp', type = 'SOCK_STREAM'}), '127.0.0.1', 80 )
+---
+ - true
+...
+lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
+---
+ - true
+...
+lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+---
+ - true
+...
+lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua tostring(sc)
+---
+ - fd 12, aka 0.0.0.0:0
+...
+lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+ - 0
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:readable()
+---
+ - true
+...
+lua sc:sysconnect('127.0.0.1', 3458)
+---
+ - true
+...
+lua string.match(tostring(sc), ', peer') == nil
+---
+ - true
+...
+lua sc:writable()
+---
+ - true
+...
+lua string.match(tostring(sc), ', peer') == nil
+---
+ - true
+...
+lua box.errno.strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+---
+ - Connection refused
+...
+lua box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80', { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
+---
+ - {}
+...
+lua sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua box.cjson.encode(sc:name())
+---
+ - {"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+lua s:bind('127.0.0.1', 3548)
+---
+ - true
+...
+lua sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+lua sc:sendto('127.0.0.1', 3548, 'Hello, world')
+---
+ - true
+...
+lua s:readable(10)
+---
+ - true
+...
+lua s:recv(4096)
+---
+ - Hello, world
+...
+lua sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
+---
+ - true
+...
+lua s:readable(10)
+---
+ - true
+...
+lua local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
+---
+ - true
+ - ["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]
+...
+lua s:close()
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+lua s:nonblock(true)
+---
+ - true
+...
+lua s:bind('127.0.0.1')
+---
+ - true
+...
+lua s:name().port > 0
+---
+ - true
+...
+lua sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+lua sc:nonblock(true)
+---
+ - true
+...
+lua sc:sendto('127.0.0.1', s:name().port)
+---
+ - true
+...
+lua sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
+---
+ - true
+...
+lua s:readable(1)
+---
+ - true
+...
+lua data, from = s:recvfrom(10)
+---
+...
+lua data
+---
+ - Hello, Wor
+...
+lua s:sendto(from.host, from.port, 'Hello, hello!')
+---
+ - true
+...
+lua sc:readable(1)
+---
+ - true
+...
+lua data_r, from_r = sc:recvfrom(4096)
+---
+...
+lua data_r
+---
+ - Hello, hello!
+...
+lua from_r.host
+---
+ - 127.0.0.1
+...
+lua from_r.port == s:name().port
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...

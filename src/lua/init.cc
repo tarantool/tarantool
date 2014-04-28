@@ -61,6 +61,8 @@ extern "C" {
 #include <dirent.h>
 #include <stdio.h>
 #include "scoped_guard.h"
+#include "errno.h"
+#include "../bsdsocket.h"
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>
@@ -76,8 +78,11 @@ struct lua_State *tarantool_L;
 /* contents of src/lua/ files */
 extern char uuid_lua[];
 extern char session_lua[];
-extern char digest_lua[];
-static const char *lua_sources[] = { uuid_lua, digest_lua, session_lua, NULL };
+static const char *lua_sources[] = {
+	uuid_lua,
+	session_lua,
+	NULL
+};
 
 /**
  * Remember the output of the administrative console in the
@@ -1230,12 +1235,14 @@ tarantool_lua_init()
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_errno_init(L);
 	tarantool_lua_cjson_init(L);
 	tarantool_lua_info_init(L);
 	tarantool_lua_slab_init(L);
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_socket_init(L);
+	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
 
@@ -1245,6 +1252,7 @@ tarantool_lua_init()
 			panic("Error loading Lua source %.160s...: %s",
 			      *s, lua_tostring(L, -1));
 	}
+
 
 	mod_lua_init(L);
 
