@@ -158,8 +158,10 @@ target_link_libraries(tarantool
     ${common_libraries}
     -rdynamic)
 
-if (module_link_flags)
+# Necessary to make LuaJIT work on Darwin, see
+# http://luajit.org/install.html
+if (TARGET_OS_DARWIN)
     set_target_properties(tarantool PROPERTIES
-        LINK_FLAGS ${module_link_flags})
+        LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
 endif()
 install (TARGETS tarantool DESTINATION bin)
