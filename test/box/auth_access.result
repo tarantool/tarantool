@@ -234,6 +234,85 @@ box.schema.user.drop('uniuser_testus')
 box.session.su('admin')
 ---
 ...
+box.schema.user.drop('someuser')
+---
+...
+box.schema.user.drop('uniuser_testus')
+---
+...
+box.schema.user.drop('uniuser')
+---
+- error: Function '513' does not exist
+...
+--
+-- Check write grant on _user
+--
+box.schema.user.create('testuser')
+---
+...
+box.schema.user.grant('testuser', 'write', 'space', '_user')
+---
+...
+box.session.su('testuser')
+---
+...
+box.space._user:delete(2)
+---
+- error: Write access denied for user 'testuser'
+...
+box.space._user:select()
+---
+- error: Read access denied for user 'testuser' to space '_user'
+...
+box.space._user:insert{3,'','testus'i}
+---
+- error: '[string "box.space._user:insert{3,'''',''testus''i} "]:1: ''}'' expected
+    near ''i'''
+...
+box.space._user:delete(3)
+---
+- error: 'Failed to drop user ''testuser'': the user has objects'
+...
+box.session.su('admin')
+---
+...
+box.space._user:select()
+---
+- - [0, '', 'guest']
+  - [1, '', 'admin']
+  - [2, '', 'uniuser', []]
+  - [3, '', 'testuser', []]
+...
+box.schema.user.revoke('testuser', 'write', 'space', '_user')
+---
+...
+--
+-- Check read grant on _user
+--
+box.schema.user.grant('testuser', 'read', 'space', '_user')
+---
+...
+box.session.su('testuser')
+---
+...
+box.space._user:delete(2)
+---
+- error: Write access denied for user 'testuser' to space '_user'
+...
+box.space._user:select()
+---
+- - [0, '', 'guest']
+  - [1, '', 'admin']
+  - [2, '', 'uniuser', []]
+  - [3, '', 'testuser', []]
+...
+box.space._user:insert{3,'','testus'}
+---
+- error: Write access denied for user 'testuser' to space '_user'
+...
+box.session.su('admin')
+---
+...
 s:drop()
 ---
 ...

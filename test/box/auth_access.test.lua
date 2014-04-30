@@ -102,5 +102,34 @@ box.schema.func.drop('uniuser_func')
 box.schema.user.drop('uniuser_testus')
 
 box.session.su('admin')
+box.schema.user.drop('someuser')
+box.schema.user.drop('uniuser_testus')
+box.schema.user.drop('uniuser')
+--
+-- Check write grant on _user
+--
+box.schema.user.create('testuser')
+
+box.schema.user.grant('testuser', 'write', 'space', '_user')
+box.session.su('testuser')
+box.space._user:delete(2)
+box.space._user:select()
+box.space._user:insert{3,'','testus'i}
+box.space._user:delete(3)
+
+box.session.su('admin')
+box.space._user:select()
+
+box.schema.user.revoke('testuser', 'write', 'space', '_user')
+--
+-- Check read grant on _user
+--
+box.schema.user.grant('testuser', 'read', 'space', '_user')
+box.session.su('testuser')
+box.space._user:delete(2)
+box.space._user:select()
+box.space._user:insert{3,'','testus'}
+
+box.session.su('admin')
 s:drop()
 
