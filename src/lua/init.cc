@@ -262,8 +262,9 @@ void
 tarantool_lua_init()
 {
 	lua_State *L = luaL_newstate();
-	if (L == NULL)
-		return;
+	if (L == NULL) {
+		panic("failed to initialize Lua");
+	}
 	luaL_openlibs(L);
 	/*
 	 * Search for Lua modules, apart from the standard
