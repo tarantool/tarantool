@@ -152,13 +152,21 @@ set(MODULE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${MODULE_SUFFIX}")
 set(MODULE_LUADIR "${CMAKE_INSTALL_DATADIR}/${MODULE_SUFFIX}")
 set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_SUFFIX}")
 
-set(MODULE_FULL_LIBDIR "${CMAKE_INSTALL_PREFIX}/${MODULE_LIBDIR}")
-set(MODULE_FULL_LUADIR "${CMAKE_INSTALL_PREFIX}/${MODULE_LUADIR}")
-set(MODULE_FULL_INCLUDEDIR "${CMAKE_INSTALL_PREFIX}/${MODULE_INCLUDEDIR}")
+foreach(dir
+        LIBDIR
+        LUADIR
+        INCLUDEDIR
+        )
+    if(NOT IS_ABSOLUTE ${MODULE_${dir}})
+        set(MODULE_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${MODULE_${dir}}")
+    else()
+        set(MODULE_FULL_${dir} "${MODULE_${dir}}")
+    endif()
+endforeach()
 
-message(STATUS "Module sources: ${MODULE_FULL_LUADIR}")
-message(STATUS "Module libraries:${MODULE_FULL_LIBDIR}")
-message(STATUS "Module includes: ${MODULE_FULL_INCLUDEDIR}")
+message(STATUS "Module sources:   ${MODULE_FULL_LUADIR}")
+message(STATUS "Module libraries: ${MODULE_FULL_LIBDIR}")
+message(STATUS "Module includes:  ${MODULE_FULL_INCLUDEDIR}")
 
 list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
 list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
