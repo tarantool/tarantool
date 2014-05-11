@@ -98,7 +98,7 @@ Target: Linux-x86_64-Debug
     Configuration parameters are usually specified inside a
     Lua file with a call to <olink targetptr="sp-box-cfg">box.cfg</olink>.
     Typically this Lua file is the initialization file
-    which is specified on <olink targetptr="lua-file-option">the tarantool command line</olink>.
+    which is specified on the tarantool command line.
     A simple example of such a file is <filename>test/box/box.lua</filename>:
 <programlisting>
 #!/usr/bin/env tarantool
