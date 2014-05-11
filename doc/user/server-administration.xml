@@ -323,6 +323,218 @@ tarantool_deploy.sh: done
 
 </section>
 
+<section xml:id="authentication">
+
+<title>Authentication and access control</title>
+
+<para>
+Understanding the details of security is primarily an issue for administrators,
+but ordinary users should at least skim this section so that they will have an
+idea of how Tarantool makes it possible for administrators to prevent
+unauthorized access to the database and to certain functions.
+</para>
+
+<para>
+Briefly: there is a method to guarantee with password checks that users really
+are who they say they are ("authentication"). There is a _user space where
+user names and password-hashes are stored. There are functions for saying
+that certain users are allowed to do certain things ("privileges"). There
+is a _priv space where privileges are stored. Whenever a user tries to do
+an operation, there is a check whether the user has the privilege to do
+the operation ("access control").
+</para>
+
+<para>
+<bridgehead renderas="sect4">Passwords</bridgehead>
+Each user may have a password.
+The password is any alphanumeric string.
+Administrators should advise users to choose long unobvious passwords,
+but it is ultimately up to the users to choose or change
+their own passwords.
+</para>
+
+<para>
+Tarantool passwords are stored in the _user space with a
+<link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash">Cryptographic hash function</link>
+so that, if the password is 'x', the stored hashed-password is a long string like
+'lL3OvhkIPOKh+Vn9Avlkx69M/Ck='.
+When a client connects to a Tarantool server, the server sends a random
+<link xlink:href="https://en.wikipedia.org/wiki/Salt_%28cryptography%29">Salt Value</link>
+which the client must mix with the hashed-password before sending
+to the server.
+Thus the original value 'x' is never stored anywhere except in the
+user's head, and the hashed value is never passed passed down a
+network wire except when mixed with a random salt.
+This system prevents malicious onlookers from finding passwords
+by snooping in the log files or snooping on the wire.
+It is the same system that <link xlink:href="http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html">MySQL introduced several years ago</link>
+which has proved adequate for medium-security installations.
+Nevertheless administrators should warn users that no system
+is foolproof against determined long-term attacks, so passwords
+should be guarded and changed occasionally.
+</para>
+
+<para>
+Notes: To get the hash-password of a string 'X', say <code>box.schema.user.password('X')</code>.
+To see more about the details of the algorithm for the purpose of writing a new client application, read 
+<link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/scramble.h">the scramble.h header file</link>.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Users and the _user space</bridgehead>
+The fields in the _user space are:
+a numeric id, a string, the user name, and the optional password.
+</para>
+
+<para>
+There are two special users: 'guest' (user id = 0) and  'admin' (user id = 1).
+They are defined in advance.
+They cannot be dropped.
+(The 'guest' user is a default which usually has minimum privileges;
+the 'admin' user is an administrator which always has maximum privileges.)
+</para>
+
+<para>
+To select a row from the _user space, use <code>box.select</code>.
+For example, here is what happens with a select for user id = 0,
+which is the 'guest' user, without a password:
+<programlisting><prompt>tarantool&gt;</prompt> box.space._user:select{0}
+---
+- - [0, '', 'guest']
+...</programlisting></para>
+
+<para>
+To change tuples in the user space, do not use ordinary <code>box.space</code> functions
+for insert or update or delete -- the _user space is special so
+there are special functions which have appropriate error checking.
+</para>
+
+<para>
+To create a new user, say
+<code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
+or
+<code>box.schema.user.create(<replaceable>user-name</replaceable>', {password=<replaceable>password</replaceable>})</code>.
+</para>
+
+<para>
+To drop a user, say
+<code>box.schema.user.drop(<replaceable>user-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session which creates a new user with
+a strong password, selects from the tuple in
+the _user space, and then drops the user.
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('Elizabeth Browning', {password = 'Iwtso65$SDS?'})
+---
+...
+<prompt>tarantool&gt;</prompt> box.space._user:select{4}
+---
+- - [4, '', 'Elizabeth Browning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.drop('Elizabeth Browning')
+---
+...</programlisting></para>
+
+<para>
+Notes: The maximum number of users is 32.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Privileges and the _priv space</bridgehead>
+The fields in the _priv space are:
+the numeric id of the user who gave the privilege ("grantor_id"),
+the numeric id of the user who received the privilege ("grantee_id"),
+the id of the object,
+the type of object -- "space" or "function" or "universe",
+the type of operation -- "read" or "write" or "execute" or a combination such as "read,write,execute".
+</para>
+
+<para>
+The function for granting a privilege is:
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>
+or
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.
+</para>
+
+<para>
+The function for revoking a privilege is:
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session where the admin user gave
+the guest user the privilege to read from a
+space named space55, and then took the privilege away:
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'read', 'space', 'space55')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.revoke('guest', 'read', 'space', 'space55')
+---
+...</programlisting></para>
+
+<para>
+Notes: Generally privileges are granted or revoked by the owner of the object
+(the user who created it), or by the 'admin' user.
+Before dropping any objects or users, steps should be taken to ensure
+that all their associated privileges have been revoked.
+Only the 'admin' user can grant privileges for the 'universe'.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Functions and the _func space</bridgehead>
+The fields in the _func space are:
+the numeric function id, a number, and the function name.
+</para>
+
+<para>
+The _func space does not include the function's body.
+One continues to create Lua functions in the usual way,
+by saying "<code>function <replaceable>function_name</replaceable> () ... end</code>", without
+adding anything in the _func space. The _func space only
+exists for storing function tuples so that their names
+can be used within grant/revoke functions.
+</para>
+
+<para>
+The function for creating a _func tuple is:
+<code>box.schema.func.create(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+The function for dropping a _func tuple is:
+<code>box.schema.func.drop(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+In the following example, a function named 'f7' is created,
+then it is put in the _func space, then it is used in a
+box.schema.user.grant function, then it is dropped:
+<programlisting><prompt>tarantool&gt;</prompt> function f7() box.session.uid() end
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.func.create('f7')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'execute', 'function', 'f7')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.func.drop('f7')
+---
+...</programlisting></para>
+
+<para>
+<bridgehead renderas="sect4">box.session and security</bridgehead>
+
+After a connection has taken place, the user has access to a "session" object
+which has several functions. The ones which are of interest for security
+purposes are:
+<programlisting>box.session.uid()           #returns the id of the current user
+box.session.user()          #returns the name of the current user
+box.session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
+
+</section>
+
 </chapter>
 
 <!--
