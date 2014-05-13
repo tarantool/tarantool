@@ -1283,7 +1283,7 @@ func_cache_remove_func(struct trigger * /* trigger */, void *event)
 static struct trigger drop_func_trigger =
 	{ rlist_nil, func_cache_remove_func, NULL, NULL };
 
-/** Remove a function from function cache */
+/** Replace a function in the function cache */
 static void
 func_cache_replace_func(struct trigger * /* trigger */, void *event)
 {
@@ -1533,7 +1533,11 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	}
 }
 
-/** Remove a function from function cache */
+/**
+ * A record with id of the new node has been synced to the
+ * write ahead log. Update the cluster configuration with
+ * a new node.
+ */
 static void
 on_commit_dd_cluster(struct trigger *trigger, void *event)
 {
@@ -1552,7 +1556,7 @@ static struct trigger commit_cluster_trigger =
  * A trigger invoked on replace in the space _cluster,
  * which contains cluster configuration.
  *
- * The space is modified by JOIN command in IPROTO
+ * This space is modified by JOIN command in IPROTO
  * protocol.
  *
  * The trigger updates the cluster configuration cache
@@ -1579,10 +1583,12 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	/* Check fields */
 	uint32_t node_id = tuple_field_u32(new_tuple, 0);
 	if (cnode_id_is_reserved(node_id))
-		tnt_raise(IllegalParams, "Invalid Node-Id");
+		tnt_raise(ClientError, ER_NODE_ID_IS_RESERVED,
+			  (unsigned) node_id);
 	tt_uuid node_uuid = tuple_field_uuid(new_tuple, 1);
 	if (tt_uuid_is_nil(&node_uuid))
-		tnt_raise(ClientError, ER_INVALID_UUID, tt_uuid_str(&node_uuid));
+		tnt_raise(ClientError, ER_INVALID_UUID,
+			  tt_uuid_str(&node_uuid));
 
 	trigger_set(&txn->on_commit, &commit_cluster_trigger);
 }
