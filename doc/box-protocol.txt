@@ -124,11 +124,11 @@
 <select> ::= <space_id> | <index_id> | <iterator> | <offset> | <limit> | <key>
 
 ; Insert a tuple into the space or replace an existing one.
-<replace> ::= <space_id> | <index_id> | <tuple>
+<replace> ::= <space_id> | <tuple>
 
 ; Insert is similar to replace, but will return a duplicate key
 ; error if such tuple already exists.
-<insert> ::= <space_id> | <index_id> | <tuple>
+<insert> ::= <space_id> | <tuple>
 
 ; Delete a tuple
 <delete> ::= <space_id> | <index_id> | <key>

@@ -146,17 +146,32 @@ include_directories(${PROJECT_SOURCE_DIR})
 #
 # Specify Tarantool modules prefixes
 #
-set(MODULE_SUFFIX "tarantool/${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}")
-set(MODULE_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/${MODULE_SUFFIX}")
-set(MODULE_LUADIR "${CMAKE_INSTALL_FULL_DATADIR}/${MODULE_SUFFIX}")
-set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}/${MODULE_SUFFIX}")
-message(STATUS "Module sources: ${MODULE_LUADIR}")
-message(STATUS "Module libraries:${MODULE_LIBDIR}")
-message(STATUS "Module includes: ${MODULE_INCLUDEDIR}")
 
-list(APPEND MODULE_LUAPATH "${MODULE_LUADIR}/?.lua")
-list(APPEND MODULE_LUAPATH "${MODULE_LUADIR}/?/init.lua")
-list(APPEND MODULE_LIBPATH "${MODULE_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+set(MODULE_SUFFIX "tarantool")
+set(MODULE_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${MODULE_SUFFIX}")
+set(MODULE_LUADIR "${CMAKE_INSTALL_DATADIR}/${MODULE_SUFFIX}")
+set(MODULE_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_SUFFIX}")
+
+foreach(dir
+        LIBDIR
+        LUADIR
+        INCLUDEDIR
+        )
+    if(NOT IS_ABSOLUTE ${MODULE_${dir}})
+        set(MODULE_FULL_${dir} "${CMAKE_INSTALL_PREFIX}/${MODULE_${dir}}")
+    else()
+        set(MODULE_FULL_${dir} "${MODULE_${dir}}")
+    endif()
+endforeach()
+
+message(STATUS "Module sources:   ${MODULE_FULL_LUADIR}")
+message(STATUS "Module libraries: ${MODULE_FULL_LIBDIR}")
+message(STATUS "Module includes:  ${MODULE_FULL_INCLUDEDIR}")
+
+list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?.lua")
+list(APPEND MODULE_LUAPATH "${MODULE_FULL_LUADIR}/?/init.lua")
+list(APPEND MODULE_LIBPATH "${MODULE_FULL_LIBDIR}/?${CMAKE_SHARED_MODULE_SUFFIX}")
+
 message(STATUS "Module package.path: ${MODULE_LUAPATH}")
 message(STATUS "Module package.cpath: ${MODULE_LIBPATH}")
 

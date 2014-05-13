@@ -1,7 +1,3 @@
-if (TARGET_OS_DARWIN)
-    set(module_link_flags "-pagezero_size 10000 -image_base 100000000")
-endif()
-
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
 
 include_directories(${SOPHIA_INCLUDE_DIR})

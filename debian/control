@@ -4,8 +4,6 @@ Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
- python-yaml,
- python-daemon,
  libncurses5-dev,
  libiberty-dev | binutils-dev,
  libmysqlclient-dev,
@@ -96,7 +94,7 @@ Description: Tarantool in-memory database - MySQL connector
  This package contains a connector to MySQL database for Tarantool
  Lua stored procedures.
 
-Package: libtarantool-dev
+Package: tarantool-dev
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Section: libdevel
