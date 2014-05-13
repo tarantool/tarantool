@@ -154,8 +154,9 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_str(data, (const char *) &recovery_state->node_uuid,
-			     sizeof(tt_uuid));
+	data = mp_encode_strl(data, UUID_LEN);
+	tt_uuid_enc_be(&recovery_state->node_uuid, data);
+	data += UUID_LEN;
 
 	assert(data <= buf + sizeof(buf));
 	packet.body[0].iov_base = buf;
@@ -212,11 +213,13 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = mp_encode_str(data, (const char *) &r->cluster_uuid,
-			     sizeof(tt_uuid));
+	data = mp_encode_strl(data, UUID_LEN);
+	tt_uuid_enc_be(&r->cluster_uuid, data);
+	data += UUID_LEN;
 	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_str(data, (const char *) &r->node_uuid,
-			     sizeof(tt_uuid));
+	data = mp_encode_strl(data, UUID_LEN);
+	tt_uuid_enc_be(&recovery_state->node_uuid, data);
+	data += UUID_LEN;
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
 	uint32_t k;

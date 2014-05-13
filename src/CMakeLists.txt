@@ -139,7 +139,7 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
     endif()
 endif()
 
-set (common_libraries ${common_libraries} uuid)
+set (common_libraries ${common_libraries} ${LIBUUID_LIBRARIES})
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 add_subdirectory(lib)

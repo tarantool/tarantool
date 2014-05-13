@@ -38,7 +38,7 @@ target_link_libraries(arena_mt.test small pthread)
 add_executable(pt_alloc.test pt_alloc.cc)
 target_link_libraries(pt_alloc.test small)
 add_executable(log_dir.test log_dir.cc test.c)
-target_link_libraries(log_dir.test  uuid core small salad misc bitset msgpuck
+target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} core small salad misc bitset msgpuck
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES})

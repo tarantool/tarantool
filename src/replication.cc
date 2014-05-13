@@ -239,12 +239,12 @@ replication_join(int fd, struct iproto_packet *packet)
 		uint8_t key = mp_decode_uint(&d);
 		if (key == IPROTO_NODE_UUID) {
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(tt_uuid)) {
+			    mp_decode_strl(&d) != UUID_LEN) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Node-UUID");
 			}
-			tt_uuid_set(&node_uuid, d);
-			d += sizeof(node_uuid);
+			tt_uuid_dec_be(d, &node_uuid);
+			d += UUID_LEN;
 		} else {
 			mp_next(&d); /* value */
 		}
@@ -302,21 +302,21 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 		switch (key) {
 		case IPROTO_CLUSTER_UUID:
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(cluster_uuid)) {
+			    mp_decode_strl(&d) != UUID_LEN) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Cluster-UUID");
 			}
-			tt_uuid_set(&cluster_uuid, d);
-			d += sizeof(cluster_uuid);
+			tt_uuid_dec_be(d, &cluster_uuid);
+			d += UUID_LEN;
 			break;
 		case IPROTO_NODE_UUID:
 			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != sizeof(node_uuid)) {
+			    mp_decode_strl(&d) != UUID_LEN) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Node-UUID");
 			}
-			tt_uuid_set(&node_uuid, d);
-			d += sizeof(node_uuid);
+			tt_uuid_dec_be(d, &node_uuid);
+			d += UUID_LEN;
 			break;
 		case IPROTO_LSNMAP:
 			if (mp_typeof(*d) != MP_MAP) {

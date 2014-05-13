@@ -28,10 +28,10 @@
  */
 #include "tt_uuid.h"
 /* Zeroed by the linker. */
-tt_uuid uuid_nil;
+const tt_uuid uuid_nil;
 
 char *
-tt_uuid_str(const struct tt_uuid *uu)
+tt_uuid_str(const tt_uuid *uu)
 {
 	static __thread char buf[UUID_STR_LEN + 1];
 	tt_uuid_to_string(uu, buf);
