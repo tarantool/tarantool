@@ -102,9 +102,11 @@ box.schema.func.drop('uniuser_func')
 box.schema.user.drop('uniuser_testus')
 
 box.session.su('admin')
+box.schema.func.drop('uniuser_func')
 box.schema.user.drop('someuser')
 box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
+box.space._user:delete(2)
 --
 -- Check write grant on _user
 --
@@ -114,7 +116,7 @@ box.schema.user.grant('testuser', 'write', 'space', '_user')
 box.session.su('testuser')
 box.space._user:delete(2)
 box.space._user:select()
-box.space._user:insert{3,'','testus'i}
+box.space._user:insert{3,'','someone'}
 box.space._user:delete(3)
 
 box.session.su('admin')
@@ -128,8 +130,34 @@ box.schema.user.grant('testuser', 'read', 'space', '_user')
 box.session.su('testuser')
 box.space._user:delete(2)
 box.space._user:select()
-box.space._user:insert{3,'','testus'}
+box.space._user:insert{4,'','someone2'}
 
 box.session.su('admin')
+--
+-- Check read grant on _index
+--
+box.schema.user.grant('testuser', 'read', 'space', '_index')
+box.session.su('testuser')
+box.space._index:select()
+box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
+
+
+box.session.su('admin')
+--
+-- Check max function limit
+--
+--# setopt delimiter ';'
+function func_limit()
+    local i = 1
+    while i <= 32001 do
+        box.schema.func.create('func'..i)
+        i = i + 1
+    end
+    return i
+end;
+func_limit();
+--# setopt delimiter ''
+
 s:drop()
 
+box.space._user:select()
