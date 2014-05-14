@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +26,50 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "trivia/util.h"
-
-/**
- * Pre-fork replication spawner process.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_prefork(const char *snap_dir, const char *wal_dir);
+#include "cluster.h"
+#include "recovery.h"
+#include "exception.h"
 
 void
-replication_join(int fd, struct iproto_packet *packet);
+cluster_set_id(const tt_uuid *uu)
+{
+	/* Set cluster UUID. */
+	assert(tt_uuid_is_nil(&recovery_state->cluster_uuid));
+	recovery_state->cluster_uuid = *uu;
+}
 
-/**
- * Subscribe a replica to updates.
- *
- * @return None. On error, closes the socket.
- */
 void
-replication_subscribe(int fd, struct iproto_packet *packet);
+cluster_add_node(const tt_uuid *node_uuid, cnode_id_t node_id)
+{
+	struct recovery_state *r = recovery_state;
 
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
+	assert(!tt_uuid_is_nil(node_uuid));
+	assert(!cnode_id_is_reserved(node_id));
 
+	/* Add node */
+	struct node *node = (struct node *) calloc(1, sizeof(*node));
+	if (node == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*node),
+			  "recovery", "r->cluster");
+	}
+	node->id = node_id;
+	node->uuid = *node_uuid;
+	uint32_t k = mh_cluster_put(recovery_state->cluster,
+		(const struct node **) &node, NULL, NULL);
+	if (k == mh_end(recovery_state->cluster)) {
+		free(node);
+		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*node),
+			  "recovery", "r->cluster");
+	}
+
+	say_debug("confirm node: {uuid = %s, id = %u}",
+		  tt_uuid_str(node_uuid), node_id);
+
+	/* Confirm Local node */
+	if (tt_uuid_cmp(&r->node_uuid, node_uuid) == 0) {
+		/* Confirm Local Node */
+		say_info("synchronized with cluster");
+		assert(r->local_node == NULL || r->local_node->id == 0);
+		r->local_node = node;
+	}
+}

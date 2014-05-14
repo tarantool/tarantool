@@ -56,7 +56,6 @@
 #include "cfg.h"
 #include "iobuf.h"
 
-static void process_replica(struct port *port, struct request *request);
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
@@ -88,7 +87,6 @@ static void
 process_rw(struct port *port, struct request *request)
 {
 	struct txn *txn = txn_begin();
-
 	try {
 		stat_collect(stat_base, request->code, 1);
 		request->execute(request, txn, port);
@@ -103,16 +101,6 @@ process_rw(struct port *port, struct request *request)
 }
 
 static void
-process_replica(struct port *port, struct request *request)
-{
-	if (!iproto_request_is_select(request->code)) {
-		tnt_raise(ClientError, ER_NONMASTER,
-			  cfg_gets("replication_source"));
-	}
-	return process_rw(port, request);
-}
-
-static void
 process_ro(struct port *port, struct request *request)
 {
 	if (!iproto_request_is_select(request->code))
@@ -120,37 +108,25 @@ process_ro(struct port *port, struct request *request)
 	return process_rw(port, request);
 }
 
-static int
-recover_row(void *param __attribute__((unused)),
-	    struct iproto_packet *packet)
+static void
+recover_row(void *param __attribute__((unused)), struct iproto_packet *packet)
 {
-	try {
-		assert(packet->bodycnt == 1); /* always 1 for read */
-		struct request request;
-		request_create(&request, packet->code);
-		request_decode(&request, (const char *) packet->body[0].iov_base,
-				packet->body[0].iov_len);
-		request.packet = packet;
-		process_rw(&null_port, &request);
-	} catch (Exception *e) {
-		e->log();
-		return -1;
-	}
-
-	return 0;
+	assert(packet->bodycnt == 1); /* always 1 for read */
+	struct request request;
+	request_create(&request, packet->code);
+	request_decode(&request, (const char *) packet->body[0].iov_base,
+		packet->body[0].iov_len);
+	request.packet = packet;
+	process_rw(&null_port, &request);
 }
 
 static void
 box_enter_master_or_replica_mode(const char *replication_source)
 {
+	box_process = process_rw;
 	if (replication_source != NULL) {
-		box_process = process_replica;
-
-		recovery_wait_lsn(recovery_state, recovery_state->lsn);
 		recovery_follow_remote(recovery_state, replication_source);
-
 	} else {
-		box_process = process_rw;
 		title("primary", NULL);
 		say_info("I am primary");
 	}
@@ -300,6 +276,63 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
 }
 
+/**
+ * @brief Called when recovery/replication wants to add a new node
+ * to cluster.
+ * cluster_add_node() is called as a commit trigger on _cluster
+ * space and actually adds the node to the cluster.
+ * @param node_uuid
+ */
+static void
+box_on_cluster_join(const tt_uuid *node_uuid)
+{
+	struct space *space = space_cache_find(SC_CLUSTER_ID);
+	class Index *index = index_find(space, 0);
+	struct iterator *it = index->position();
+	index->initIterator(it, ITER_LE, NULL, 0);
+	struct tuple *tuple = it->next(it);
+	uint32_t node_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+
+	struct request req;
+	request_create(&req, IPROTO_INSERT);
+	req.space_id = SC_CLUSTER_ID;
+	char buf[128];
+	char *data = buf;
+	data = mp_encode_array(data, 2);
+	data = mp_encode_uint(data, node_id);
+	data = mp_encode_str(data, tt_uuid_str(node_uuid), UUID_STR_LEN);
+	assert(data <= buf + sizeof(buf));
+	req.tuple = buf;
+	req.tuple_end = data;
+	process_rw(&null_port, &req);
+}
+
+static void
+box_set_cluster_uuid(struct recovery_state *r)
+{
+	/* Save Cluster-UUID to _schema space */
+	tt_uuid cluster_uuid;
+	tt_uuid_create(&cluster_uuid);
+
+	const char *key = "cluster";
+	struct request req;
+	request_create(&req, IPROTO_INSERT);
+	req.space_id = SC_SCHEMA_ID;
+	char buf[128];
+	char *data = buf;
+	data = mp_encode_array(data, 2);
+	data = mp_encode_str(data, key, strlen(key));
+	data = mp_encode_str(data, tt_uuid_str(&cluster_uuid), UUID_STR_LEN);
+	assert(data <= buf + sizeof(buf));
+	req.tuple = buf;
+	req.tuple_end = data;
+
+	process_rw(&null_port, &req);
+
+	/* Cluster-UUID was be updated by a _schema trigger */
+	assert(tt_uuid_cmp(&r->cluster_uuid, &cluster_uuid) == 0);
+}
+
 void
 box_free(void)
 {
@@ -342,7 +375,7 @@ box_init()
 
 	/* recovery initialization */
 	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-		      recover_row, NULL, box_snapshot_cb,
+		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
 		      cfg_geti("rows_per_wal"));
 	recovery_update_io_rate_limit(recovery_state,
 				      cfg_getd("snap_io_rate_limit"));
@@ -353,9 +386,28 @@ box_init()
 	stat_base = stat_register(iproto_request_type_strs,
 				  IPROTO_DML_REQUEST_MAX);
 
-	recover_snap(recovery_state, cfg_gets("replication_source"));
+	const char *replication_source = cfg_gets("replication_source");
+	if (recovery_has_data(recovery_state)) {
+		/* Process existing snapshot */
+		recover_snap(recovery_state);
+		recovery_fix_lsn(recovery_state, false);
+	} else if (replication_source != NULL) {
+		/* Initialize replica */
+		replica_bootstrap(recovery_state, replication_source);
+		recovery_fix_lsn(recovery_state, false);
+		snapshot_save(recovery_state);
+	} else {
+		/* Initialize cluster */
+		cluster_bootstrap(recovery_state);
+		box_set_cluster_uuid(recovery_state);
+		recovery_fix_lsn(recovery_state, true);
+		snapshot_save(recovery_state);
+	}
+
+	if (tt_uuid_is_nil(&recovery_state->cluster_uuid))
+		tnt_raise(ClientError, ER_INVALID_CLUSTER);
+
 	space_end_recover_snapshot();
-	recover_existing_wals(recovery_state);
 	space_end_recover();
 
 	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
@@ -478,14 +530,6 @@ box_snapshot(void)
 
 	exit(EXIT_SUCCESS);
 	return 0;
-}
-
-void
-box_init_storage(const char *dirname)
-{
-	struct log_dir dir = snap_dir;
-	dir.dirname = (char *) dirname;
-	init_storage_on_master(&dir);
 }
 
 void

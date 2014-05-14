@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#define MH_SOURCE 1
 #include "recovery.h"
 
 #include <fcntl.h>
@@ -43,6 +44,8 @@
 #include "msgpuck/msgpuck.h"
 #include "iproto_constants.h"
 #include "crc32.h"
+#include "scoped_guard.h"
+#include "box/cluster.h"
 
 /*
  * Recovery subsystem
@@ -110,89 +113,110 @@ struct recovery_state *recovery_state;
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
 
-/* {{{ LSN API */
+/* {{{ mh_cluster definition */
 
+/** Removes all nodes from mhash */
 void
-wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn)
+mh_cluster_clean(struct mh_cluster_t *hash)
 {
-	assert(wait_lsn->waiter == NULL);
-	wait_lsn->waiter = fiber();
-	wait_lsn->lsn = lsn;
-}
-
-
-/* Alert the waiter, if any. */
-static inline void
-wakeup_lsn_waiter(struct recovery_state *r)
-{
-	if (r->wait_lsn.waiter && r->confirmed_lsn >= r->wait_lsn.lsn) {
-		fiber_wakeup(r->wait_lsn.waiter);
+	while (mh_size(hash) > 0) {
+		mh_int_t k = mh_first(hash);
+		struct node *node = *mh_cluster_node(hash, k);
+		mh_cluster_del(hash, k, NULL);
+		free(node);
 	}
 }
 
-void
-confirm_lsn(struct recovery_state *r, int64_t lsn, bool is_commit)
+/** Gets or creates a node */
+struct node *
+mh_cluster_fetch(struct mh_cluster_t *hash, uint32_t node_id)
 {
-	assert(r->confirmed_lsn <= r->lsn);
+	uint32_t k = mh_cluster_find(hash, node_id, NULL);
+	if (k != mh_end(hash))
+		return *mh_cluster_node(hash, k);
 
-	if (r->confirmed_lsn < lsn) {
+	/* Create node if it doesn't exist */
+	struct node *node = (struct node *) calloc(1, sizeof(*node));
+	if (node == NULL)
+		return NULL;
+	node->id = node_id;
+	k = mh_cluster_put(hash, (const struct node **) &node, NULL, NULL);
+	if (k == mh_end(hash))
+		return NULL;
+	return node;
+}
+
+/** Calculates sum([node.current_lsn]) */
+static int64_t
+mh_cluster_current_sum(struct mh_cluster_t *cluster)
+{
+	int64_t sum = 0;
+	uint32_t k;
+	mh_foreach(cluster, k) {
+		struct node *node = *mh_cluster_node(cluster, k);
+		sum += node->current_lsn;
+	}
+
+	return sum;
+}
+
+/* }}} */
+
+/* {{{ LSN API */
+
+static struct node *
+fill_lsn(struct recovery_state *r, struct iproto_packet *packet)
+{
+	struct node *node = r->local_node;
+	assert(packet != NULL || node != NULL);
+	if (packet == NULL || packet->node_id == 0) {
+		/* Local request */
+		if (node == NULL)
+			tnt_raise(ClientError, ER_LOCAL_NODE_IS_NOT_ACTIVE);
+		++node->current_lsn;
+		if (packet != NULL) {
+			packet->lsn = node->current_lsn;
+			packet->node_id = node->id;
+		}
+	} else {
+		/* Remote request */
+		uint32_t k = mh_cluster_find(r->cluster, packet->node_id, NULL);
+		if (k == mh_end(r->cluster))
+			tnt_raise(ClientError, ER_UNKNOWN_NODE, packet->node_id);
+		node = *mh_cluster_node(r->cluster, k);
+		node->current_lsn = packet->lsn;
+	}
+
+	return node;
+}
+
+static void
+confirm_lsn(struct node *node, int64_t lsn, bool is_commit)
+{
+	if (node->confirmed_lsn < lsn) {
 		if (is_commit) {
-			if (r->confirmed_lsn + 1 != lsn)
-				say_warn("non consecutive LSN, confirmed: %jd, "
-					 " new: %jd, diff: %jd",
-					 (intmax_t) r->confirmed_lsn,
+			if (node->confirmed_lsn + 1 != lsn) {
+				say_warn("non consecutive LSN for node %u (%s) "
+					 "confirmed: %jd, new: %jd, diff: %jd",
+					 (unsigned) node->id,
+					 tt_uuid_str(&node->uuid),
+					 (intmax_t) node->confirmed_lsn,
 					 (intmax_t) lsn,
-					 (intmax_t) (lsn - r->confirmed_lsn));
-			r->confirmed_lsn = lsn;
+					 (intmax_t) (lsn - node->confirmed_lsn));
+			}
+			node->confirmed_lsn = lsn;
 		 }
 	} else {
-		 /*
+		/*
 		 * There can be holes in
 		 * confirmed_lsn, in case of disk write failure, but
 		 * wal_writer never confirms LSNs out order.
 		 */
-		assert(false);
-		say_error("LSN is used twice or COMMIT order is broken: "
-			  "confirmed: %jd, new: %jd",
-			  (intmax_t) r->confirmed_lsn, (intmax_t) lsn);
-	}
-	wakeup_lsn_waiter(r);
-}
-
-void
-set_lsn(struct recovery_state *r, int64_t lsn)
-{
-	r->lsn = lsn;
-	r->confirmed_lsn = lsn;
-	say_debug("set_lsn(%p, %" PRIi64, r, r->lsn);
-	wakeup_lsn_waiter(r);
-}
-
-/** Wait until the given LSN makes its way to disk. */
-void
-recovery_wait_lsn(struct recovery_state *r, int64_t lsn)
-{
-	while (lsn < r->confirmed_lsn) {
-		wait_lsn_set(&r->wait_lsn, lsn);
-		try {
-			fiber_yield();
-			wait_lsn_clear(&r->wait_lsn);
-		} catch (Exception *e) {
-			wait_lsn_clear(&r->wait_lsn);
-			throw;
-		}
+		panic("LSN for %s is used twice or COMMIT order is broken: "
+		      "confirmed: %jd, new: %jd", tt_uuid_str(&node->uuid),
+		      (intmax_t) node->confirmed_lsn, (intmax_t) lsn);
 	}
 }
-
-
-int64_t
-next_lsn(struct recovery_state *r)
-{
-	r->lsn++;
-	say_debug("next_lsn(%p, %" PRIi64, r, r->lsn);
-	return r->lsn;
-}
-
 
 /* }}} */
 
@@ -208,7 +232,8 @@ recovery_stop_local(struct recovery_state *r);
 void
 recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      row_handler row_handler, void *row_handler_param,
-	      snapshot_handler snapshot_handler, int rows_per_wal)
+	      snapshot_handler snapshot_handler, join_handler join_handler,
+	      int rows_per_wal)
 {
 	assert(recovery_state == NULL);
 	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
@@ -222,16 +247,52 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->row_handler_param = row_handler_param;
 
 	r->snapshot_handler = snapshot_handler;
+	r->join_handler = join_handler;
 
-	r->snap_dir = &snap_dir;
-	r->snap_dir->dirname = strdup(snap_dirname);
-	r->wal_dir = &wal_dir;
-	r->wal_dir->dirname = strdup(wal_dirname);
+	log_dir_create(&r->snap_dir);
+	r->snap_dir.panic_if_error = false;
+	r->snap_dir.sync_is_async = false;
+	strcpy(r->snap_dir.open_wflags, "wxd");
+	r->snap_dir.filetype = "SNAP\n";
+	r->snap_dir.filename_ext = ".snap";
+	r->snap_dir.dirname = strdup(snap_dirname);
+	r->snap_dir.mode = 0660;
+	r->snap_dir.ignore_initial_setlsn = true;
+
+	log_dir_create(&r->wal_dir);
+	r->wal_dir.panic_if_error = false;
+	r->wal_dir.sync_is_async = true;
+	strcpy(r->wal_dir.open_wflags, "wx");
+	r->wal_dir.filetype = "XLOG\n";
+	r->wal_dir.filename_ext = ".xlog";
+	r->wal_dir.dirname = strdup(wal_dirname);
+	r->wal_dir.mode = 0660;
+
 	if (r->wal_mode == WAL_FSYNC) {
-		(void) strcat(r->wal_dir->open_wflags, "s");
+		(void) strcat(r->wal_dir.open_wflags, "s");
 	}
 	r->rows_per_wal = rows_per_wal;
-	wait_lsn_clear(&r->wait_lsn);
+
+	r->cluster = mh_cluster_new();
+	if (r->cluster == NULL)
+		panic("cannot reallocate r->cluster");
+
+	/* Add a fake node for snapshot/bootstrap */
+	struct node *node = (struct node *) calloc(1, sizeof(*node));
+	if (node == NULL)
+		panic("cannot allocate struct node");
+	node->id = 0;
+	assert(tt_uuid_is_nil(&node->uuid));
+	uint32_t k = mh_cluster_put(r->cluster,
+		(const struct node **) &node, NULL, NULL);
+	if (k == mh_end(r->cluster))
+		panic("cannot reallocate r->cluster");
+	r->local_node = node;
+
+	if (log_dir_scan(&r->snap_dir) != 0)
+		panic("can't scan snap directory");
+	if (log_dir_scan(&r->wal_dir) != 0)
+		panic("can't scan wal directory");
 }
 
 void
@@ -274,8 +335,8 @@ recovery_free()
 	if (r->writer)
 		wal_writer_stop(r);
 
-	free(r->snap_dir->dirname);
-	free(r->wal_dir->dirname);
+	log_dir_destroy(&r->snap_dir);
+	log_dir_destroy(&r->wal_dir);
 	if (r->current_wal) {
 		/*
 		 * Possible if shutting down a replication
@@ -284,37 +345,114 @@ recovery_free()
 		log_io_close(&r->current_wal);
 	}
 
+	mh_cluster_clean(r->cluster);
+	mh_cluster_delete(r->cluster);
+
 	recovery_state = NULL;
 }
 
 void
 recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
 {
-	r->wal_dir->panic_if_error = on_wal_error;
-	r->snap_dir->panic_if_error = on_snap_error;
+	r->wal_dir.panic_if_error = on_wal_error;
+	r->snap_dir.panic_if_error = on_snap_error;
 }
 
-/** Write the bootstrap snapshot.
- *
- *  @return panics on error
- *  Errors are logged to the log file.
- */
-void
-init_storage_on_master(struct log_dir *dir)
+static void
+recovery_process_setlsn(struct recovery_state *r, struct iproto_packet *packet)
 {
-	const char *filename = format_filename(dir, 1 /* lsn */, NONE);
-	int fd = open(filename, O_EXCL|O_CREAT|O_WRONLY, dir->mode);
-	say_info("saving snapshot `%s'", filename);
-	if (fd == -1) {
-		panic_syserror("failed to open snapshot file `%s' for "
-			       "writing", filename);
+	say_debug("SETLSN");
+	uint32_t row_count;
+	struct log_setlsn_row *rows = log_decode_setlsn(packet, &row_count);
+	auto rows_guard = make_scoped_guard([=]{
+		free(rows);
+	});
+
+	for (uint32_t i = 0; i < row_count; i++) {
+		uint32_t k = mh_cluster_find(r->cluster, rows[i].node_id, NULL);
+		if (k == mh_end(r->cluster))
+			tnt_raise(ClientError, ER_UNKNOWN_NODE, rows[i].node_id);
+
+		struct node *node = *mh_cluster_node(r->cluster, k);
+		assert(node->confirmed_lsn == node->current_lsn);
+
+		if (node->current_lsn <= rows[i].lsn) {
+			say_debug("setting\t(%2u, %020lld)",
+				  node->id, (long long) rows[i].lsn);
+			node->confirmed_lsn = node->current_lsn = rows[i].lsn;
+		} else {
+			/* Ignore outdated SETLSN rows */
+			say_debug("skipping\t(%2u, %020lld)",
+				  node->id, (long long) rows[i].lsn);
+		}
 	}
-	if (write(fd, bootstrap_bin, sizeof(bootstrap_bin)) !=
-						sizeof(bootstrap_bin)) {
-		panic_syserror("failed to write to snapshot file `%s'",
-			       filename);
+	say_debug("--");
+}
+
+void
+recovery_process(struct recovery_state *r, struct iproto_packet *packet)
+{
+	if (r->relay)
+		return r->row_handler(r->row_handler_param, packet);
+
+	if (!iproto_request_is_dml(packet->code)) {
+		/* Process admin commands (node_id, lsn are ignored) */
+		switch (packet->code) {
+		case IPROTO_SETLSN:
+			recovery_process_setlsn(r, packet);
+			break;
+		default:
+			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				  packet->code);
+		}
+		return;
 	}
-	close(fd);
+
+	/* Check node_id and lsn */
+	uint32_t k = mh_cluster_find(r->cluster, packet->node_id, NULL);
+	if (k != mh_end(r->cluster)) {
+		struct node *node = *mh_cluster_node(r->cluster, k);
+		if (packet->lsn <= node->confirmed_lsn) {
+			say_debug("skipping too young row");
+			return;
+		}
+	} else {
+		say_warn("skipping row with unknown node_id");
+		return;
+	}
+
+	return r->row_handler(r->row_handler_param, packet);
+}
+
+void
+cluster_bootstrap(struct recovery_state *r)
+{
+	/* Generate Node-UUID */
+	tt_uuid_create(&r->node_uuid);
+
+	/* Recover from bootstrap.snap */
+	say_info("initializing cluster");
+	FILE *f = fmemopen((void *) &bootstrap_bin,
+			   sizeof(bootstrap_bin), "r");
+	tt_uuid bootstrap_uuid; /* ignored */
+	struct log_io *snap = log_io_open(&r->snap_dir, LOG_READ,
+		"bootstrap.snap", &bootstrap_uuid, NONE, f);
+	assert(snap != NULL);
+	auto snap_guard = make_scoped_guard([&]{
+		log_io_close(&snap);
+	});
+
+	int rc = recover_wal(r, snap);
+
+	if (rc != 0)
+		panic("failed to bootstrap data directory");
+
+	/* Initialize local node */
+	r->join_handler(&r->node_uuid);
+	assert(r->local_node != NULL);
+	assert(r->local_node->id == 1);
+	assert(tt_uuid_cmp(&r->local_node->uuid, &r->node_uuid) == 0);
+
 	say_info("done");
 }
 
@@ -322,12 +460,8 @@ init_storage_on_master(struct log_dir *dir)
  * Read a snapshot and call row_handler for every snapshot row.
  * Panic in case of error.
  */
-/**
- * Read a snapshot and call row_handler for every snapshot row.
- * Panic in case of error.
- */
 void
-recover_snap(struct recovery_state *r, const char *replication_source)
+recover_snap(struct recovery_state *r)
 {
 	/*  current_wal isn't open during initial recover. */
 	assert(r->current_wal == NULL);
@@ -335,57 +469,32 @@ recover_snap(struct recovery_state *r, const char *replication_source)
 
 	struct log_io *snap;
 	int64_t lsn;
-	int rc = 0;
 
-	lsn = greatest_lsn(r->snap_dir);
-	if (lsn == 0 && greatest_lsn(r->wal_dir) == 0) {
-		say_info("found an empty data directory, initializing...");
-		if (replication_source) {
-			/* play rows and save snapshot */
-			replica_bootstrap(r, replication_source);
-			snapshot_save(r);
-			assert(r->lsn == greatest_lsn(r->snap_dir));
-			return;
-		} else {
-			init_storage_on_master(r->snap_dir);
-			lsn = greatest_lsn(r->snap_dir);
-		}
+	if (log_dir_scan(&r->snap_dir) != 0) {
+		say_error("can't find snapshot");
+		goto error;
 	}
-
+	lsn = log_dir_greatest(&r->snap_dir);
 	if (lsn <= 0) {
 		say_error("can't find snapshot");
 		goto error;
 	}
-	snap = log_io_open_for_read(r->snap_dir, lsn, NONE);
+	snap = log_io_open_for_read(&r->snap_dir, lsn, &r->node_uuid, NONE);
 	if (snap == NULL) {
 		say_error("can't find/open snapshot");
 		goto error;
 	}
+
+	if (tt_uuid_is_nil(&r->node_uuid)) {
+		say_error("can't find node uuid in snapshot");
+		goto error;
+	}
+
 	say_info("recover from `%s'", snap->filename);
-	struct log_io_cursor i;
-
-	log_io_cursor_open(&i, snap);
-
-	struct iproto_packet packet;
-	while (log_io_cursor_next(&i, &packet) == 0) {
-		if (r->row_handler(r->row_handler_param, &packet) < 0) {
-			say_error("can't apply row");
-			if (snap->dir->panic_if_error)
-				break;
-			rc = 1;
-		}
-	}
-	log_io_cursor_close(&i);
-	log_io_close(&snap);
-
-	if (rc == 0) {
-		r->lsn = r->confirmed_lsn = lsn;
-		say_info("snapshot recovered, confirmed lsn: %"
-			 PRIi64, r->confirmed_lsn);
+	if (recover_wal(r, snap) == 0)
 		return;
-	}
 error:
-	if (greatest_lsn(r->snap_dir) <= 0) {
+	if (log_dir_greatest(&r->snap_dir) <= 0) {
 		say_crit("didn't you forget to initialize storage with --init-storage switch?");
 		_exit(1);
 	}
@@ -409,20 +518,20 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	struct iproto_packet packet;
 	while (log_io_cursor_next(&i, &packet) == 0) {
-		if (packet.lsn <= r->confirmed_lsn) {
-			say_debug("skipping too young row");
-			continue;
-		}
 		/*
 		 * After handler(row) returned, row may be
 		 * modified, do not use it.
 		 */
-		if (r->row_handler(r->row_handler_param, &packet) < 0) {
-			say_error("can't apply row");
+		try {
+			recovery_process(r, &packet);
+		} catch (SocketError *e) {
+			say_error("can't apply row: %s", e->errmsg());
+			goto end;
+		} catch (Exception *e) {
+			say_error("can't apply row: %s", e->errmsg());
 			if (l->dir->panic_if_error)
 				goto end;
 		}
-		set_lsn(r, packet.lsn);
 	}
 	res = i.eof_read ? LOG_EOF : 1;
 end:
@@ -448,35 +557,29 @@ recover_remaining_wals(struct recovery_state *r)
 	char *filename;
 	enum log_suffix suffix;
 
-	current_lsn = r->confirmed_lsn + 1;
-	wal_greatest_lsn = greatest_lsn(r->wal_dir);
+	if (log_dir_scan(&r->wal_dir) != 0)
+		return -1;
 
+	wal_greatest_lsn = log_dir_greatest(&r->wal_dir);
 	/* if the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL)
 		goto recover_current_wal;
 
-	while (r->confirmed_lsn < wal_greatest_lsn) {
-		/*
-		 * If a newer WAL appeared in the directory before
-		 * current_wal was fully read, try re-reading
-		 * one last time. */
-		if (r->current_wal != NULL) {
-			if (r->current_wal->retry++ < 3) {
-				say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
-					 " trying to re-read (attempt #%d)",
-					 r->current_wal->filename, r->current_wal->retry);
-				goto recover_current_wal;
-			} else {
-				say_warn("WAL `%s' wasn't correctly closed",
-					 r->current_wal->filename);
-				log_io_close(&r->current_wal);
+	while (1) {
+find_next_wal:
+		current_lsn = log_dir_next(&r->wal_dir, r->cluster);
+		if (current_lsn == INT64_MAX)
+			break; /* No more WALs */
+
+		if (current_lsn == r->lsnsum) {
+			if (current_lsn != wal_greatest_lsn) {
+				say_error("missing xlog between %020lld and %020lld",
+					  (long long) current_lsn,
+					  (long long) wal_greatest_lsn);
 			}
+			break;
 		}
 
-		/* TODO: find a better way of finding the next xlog */
-		current_lsn = r->confirmed_lsn;
-find_next_wal:
-		current_lsn++;
 		/*
 		 * For the last WAL, first try to open .inprogress
 		 * file: if it doesn't exist, we can safely try an
@@ -487,13 +590,13 @@ find_next_wal:
 		suffix = INPROGRESS;
 		if (current_lsn == wal_greatest_lsn) {
 			/* Last WAL present at the time of rescan. */
-			filename = format_filename(r->wal_dir,
+			filename = format_filename(&r->wal_dir,
 						   current_lsn, suffix);
 			f = fopen(filename, "r");
 		}
 		if (f == NULL) {
 			suffix = NONE;
-			filename = format_filename(r->wal_dir,
+			filename = format_filename(&r->wal_dir,
 						   current_lsn, suffix);
 			f = fopen(filename, "r");
 			/*
@@ -504,12 +607,14 @@ find_next_wal:
 			    current_lsn < wal_greatest_lsn)
 				goto find_next_wal;
 		}
-		next_wal = log_io_open(r->wal_dir, LOG_READ, filename, suffix, f);
+		next_wal = log_io_open(&r->wal_dir, LOG_READ, filename,
+				       &r->node_uuid, suffix, f);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
 		 */
 		if (next_wal == NULL) {
+			say_warn("open fail: %lu", current_lsn);
 			if (r->finalize && suffix == INPROGRESS) {
 				/*
 				 * There is an .inprogress file, but
@@ -524,6 +629,7 @@ find_next_wal:
 			break;
 		}
 		assert(r->current_wal == NULL);
+		r->lsnsum = current_lsn;
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
 
@@ -547,9 +653,28 @@ recover_current_wal:
 			break;
 		}
 		if (result == LOG_EOF) {
-			say_info("done `%s' confirmed_lsn: %" PRIi64,
-				 r->current_wal->filename,
-				 r->confirmed_lsn);
+			say_info("done `%s'", r->current_wal->filename);
+			log_io_close(&r->current_wal);
+			/* goto find_next_wal; */
+		} else if (r->lsnsum == wal_greatest_lsn) {
+			/* last file is not finished */
+			break;
+		} else if (r->finalize && r->current_wal->is_inprogress) {
+			say_warn("fail to find eof on inprogress");
+			/* Let recovery_finalize deal with last file */
+			break;
+		} else if (r->current_wal->retry++ < 3) {
+			/*
+			 * If a newer WAL appeared in the directory before
+			 * current_wal was fully read, try re-reading
+			 * one last time. */
+			say_warn("`%s' has no EOF marker, yet a newer WAL file exists:"
+				 " trying to re-read (attempt #%d)",
+				 r->current_wal->filename, r->current_wal->retry);
+			goto recover_current_wal;
+		} else {
+			say_warn("WAL `%s' wasn't correctly closed",
+				 r->current_wal->filename);
 			log_io_close(&r->current_wal);
 		}
 	}
@@ -558,7 +683,7 @@ recover_current_wal:
 	 * It's not a fatal error when last WAL is empty, but if
 	 * we lose some logs it is a fatal error.
 	 */
-	if (wal_greatest_lsn > r->confirmed_lsn + 1) {
+	if (wal_greatest_lsn > r->lsnsum) {
 		say_error("not all WALs have been successfully read");
 		result = -1;
 	}
@@ -569,30 +694,23 @@ recover_current_wal:
 	return result;
 }
 
-/**
- * Recover all WALs created after the last snapshot. Panic if
- * error.
- */
 void
-recover_existing_wals(struct recovery_state *r)
+recovery_fix_lsn(struct recovery_state *r, bool master_bootstrap)
 {
-	int64_t next_lsn = r->confirmed_lsn + 1;
-	int64_t wal_lsn = find_including_file(r->wal_dir, next_lsn);
-	if (wal_lsn <= 0) {
-		/* No WALs to recover from. */
-		goto out;
+	/* Remove fake snapshot/bootstrap node */
+	uint32_t k = mh_cluster_find(r->cluster, 0, NULL);
+	assert(k != mh_end(r->cluster));
+	struct node *node = *mh_cluster_node(r->cluster, k);
+	if (master_bootstrap) {
+		assert(r->local_node != NULL);
+		assert(r->local_node->confirmed_lsn = r->local_node->current_lsn);
+		r->local_node->current_lsn += node->current_lsn;
+		r->local_node->confirmed_lsn = r->local_node->current_lsn;
 	}
-	r->current_wal = log_io_open_for_read(r->wal_dir, wal_lsn, NONE);
-	if (r->current_wal == NULL)
-		goto out;
-	if (recover_remaining_wals(r) < 0)
-		panic("recover failed");
-	say_info("WALs recovered, confirmed lsn: %" PRIi64, r->confirmed_lsn);
-out:
-#if 0
-	region_free(&fiber()->gc);
-#endif
-	;
+	mh_cluster_del(r->cluster, k, NULL);
+	if (r->local_node == node)
+		r->local_node = NULL;
+	free(node);
 }
 
 void
@@ -606,6 +724,7 @@ recovery_finalize(struct recovery_state *r)
 	r->finalize = true;
 
 	result = recover_remaining_wals(r);
+
 	if (result < 0)
 		panic("unable to successfully finalize recovery");
 
@@ -622,7 +741,7 @@ recovery_finalize(struct recovery_state *r)
 			say_warn("unlink broken %s WAL", r->current_wal->filename);
 			if (inprogress_log_unlink(r->current_wal->filename) != 0)
 				panic("can't unlink 'inprogress' WAL");
-		} else if (r->current_wal->rows == 1) {
+		} else if (r->current_wal->rows <= 2 /* SETLSN + one row */) {
 			/* Rename inprogress wal with one row */
 			say_warn("rename unfinished %s WAL", r->current_wal->filename);
 			if (inprogress_log_rename(r->current_wal) != 0)
@@ -708,9 +827,7 @@ recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 	if (result < 0)
 		panic("recover failed");
 	if (result == LOG_EOF) {
-		say_info("done `%s' confirmed_lsn: %" PRIi64,
-			 r->current_wal->filename,
-			 r->confirmed_lsn);
+		say_info("done `%s'", r->current_wal->filename);
 		log_io_close(&r->current_wal);
 		recovery_stop_file(watcher);
 		/* Don't wait for wal_dir_rescan_delay. */
@@ -764,6 +881,7 @@ struct wal_write_request {
 	struct fiber *fiber;
 	struct iproto_packet *packet;
 	char wal_fixheader[XLOG_FIXHEADER_SIZE];
+	struct node *node;
 };
 
 /* Context of the WAL writer thread. */
@@ -781,6 +899,7 @@ struct wal_writer
 	bool is_shutdown;
 	bool is_rollback;
 	ev_loop *txn_loop;
+	struct mh_cluster_t *cluster;
 };
 
 static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
@@ -879,7 +998,7 @@ wal_schedule(ev_loop * /* loop */, ev_async *watcher, int /* event */)
  * more writers in the future.
  */
 static void
-wal_writer_init(struct wal_writer *writer)
+wal_writer_init(struct wal_writer *writer, struct mh_cluster_t *cluster)
 {
 	/* I. Initialize the state. */
 	pthread_mutexattr_t errorcheck;
@@ -908,6 +1027,20 @@ wal_writer_init(struct wal_writer *writer)
 
 	if (writer->batch == NULL)
 		panic_syserror("fio_batch_alloc");
+
+	/* Create and fill writer->cluster hash */
+	writer->cluster = mh_cluster_new();
+	if (writer->cluster == NULL)
+		panic_syserror("can't reallocate writer->cluster");
+	uint32_t k;
+	mh_foreach(cluster, k) {
+		struct node *node = *mh_cluster_node(cluster, k);
+		struct node *wnode = mh_cluster_fetch(writer->cluster,
+						      node->id);
+		if (wnode == NULL)
+			panic_syserror("can't reallocate writer->cluster");
+		wnode->current_lsn = node->current_lsn;
+	}
 }
 
 /** Destroy a WAL writer structure. */
@@ -917,6 +1050,8 @@ wal_writer_destroy(struct wal_writer *writer)
 	(void) tt_pthread_mutex_destroy(&writer->mutex);
 	(void) tt_pthread_cond_destroy(&writer->cond);
 	free(writer->batch);
+	mh_cluster_clean(writer->cluster);
+	mh_cluster_delete(writer->cluster);
 }
 
 /** WAL writer thread routine. */
@@ -945,7 +1080,7 @@ wal_writer_start(struct recovery_state *r)
 	assert(STAILQ_EMPTY(&wal_writer.commit));
 
 	/* I. Initialize the state. */
-	wal_writer_init(&wal_writer);
+	wal_writer_init(&wal_writer, r->cluster);
 	r->writer = &wal_writer;
 
 	ev_async_start(wal_writer.txn_loop, &wal_writer.write_event);
@@ -1001,6 +1136,26 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
 	}
 }
 
+int
+wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
+		 struct mh_cluster_t *cluster)
+{
+	/* Write SETLSN command */
+	struct iproto_packet setlsn;
+	char fixheader[XLOG_FIXHEADER_SIZE];
+	struct iovec iov[XLOG_ROW_IOVMAX];
+	log_encode_setlsn(&setlsn, cluster);
+	int iovcnt = xlog_encode_row(&setlsn, iov, fixheader);
+	fio_batch_start(batch, 1);
+	fio_batch_add(batch, iov, iovcnt);
+	if (fio_batch_write(batch, fileno(wal->f)) != 1) {
+		say_error("wal_write_setlsn failed");
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * If there is no current WAL, try to open it, and close the
  * previous WAL. We close the previous WAL only after opening
@@ -1016,14 +1171,14 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
  * @return 0 in case of success, -1 on error.
  */
 static int
-wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir,
-	       int64_t lsn)
+wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
+	       struct recovery_state *r, struct mh_cluster_t *cluster)
 {
 	struct log_io *l = *wal, *wal_to_close = NULL;
 
 	ERROR_INJECT_RETURN(ERRINJ_WAL_ROTATE);
 
-	if (l != NULL && (l->rows >= rows_per_wal || lsn % rows_per_wal == 0)) {
+	if (l != NULL && l->rows >= r->rows_per_wal) {
 		/*
 		 * if l->rows == 1, log_io_close() does
 		 * inprogress_log_rename() for us.
@@ -1033,7 +1188,13 @@ wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir,
 	}
 	if (l == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
-		l = log_io_open_for_write(dir, lsn, INPROGRESS);
+		int64_t lsnsum = mh_cluster_current_sum(cluster);
+		l = log_io_open_for_write(&r->wal_dir, lsnsum, &r->node_uuid,
+					  INPROGRESS);
+		if (l != NULL) {
+			if (wal_write_setlsn(l, batch, cluster) != 0)
+				log_io_close(&l);
+		}
 		/*
 		 * Close the file *after* we create the new WAL, since
 		 * this is when replication relays get an inotify alarm
@@ -1048,6 +1209,7 @@ wal_opt_rotate(struct log_io **wal, int rows_per_wal, struct log_dir *dir,
 			 * A warning is written to the server
 			 * log file.
 			 */
+			wal_write_setlsn(wal_to_close, batch, cluster);
 			log_io_close(&wal_to_close);
 		}
 	} else if (l->rows == 1) {
@@ -1086,7 +1248,7 @@ wal_opt_sync(struct log_io *wal, double sync_delay)
 
 static struct wal_write_request *
 wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
-	       struct wal_write_request *req)
+	       struct wal_write_request *req, struct mh_cluster_t *cluster)
 {
 	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
 	/* Post-condition of successful wal_opt_rotate(). */
@@ -1095,6 +1257,11 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 
 	struct iovec iov[XLOG_ROW_IOVMAX];
 	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
+		req->node = mh_cluster_fetch(cluster, req->packet->node_id);
+		if (req->node == NULL) {
+			say_syserror("can't reallocate writer->cluster");
+			return NULL;
+		}
 		int iovcnt = xlog_encode_row(req->packet, iov, req->wal_fixheader);
 		fio_batch_add(batch, iov, iovcnt);
 		req = STAILQ_NEXT(req, wal_fifo_entry);
@@ -1109,6 +1276,8 @@ wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
+		assert(req->node->id == req->packet->node_id);
+		req->node->current_lsn = req->packet->lsn;
 		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
@@ -1127,11 +1296,11 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	struct wal_write_request *write_end = req;
 
 	while (req) {
-		if (wal_opt_rotate(wal, r->rows_per_wal, r->wal_dir,
-				   req->packet->lsn) != 0)
+		if (wal_opt_rotate(wal, batch, r, writer->cluster) != 0)
 			break;
 		struct wal_write_request *batch_end;
-		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req);
+		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req,
+					   writer->cluster);
 		write_end = wal_write_batch(*wal, batch, req, batch_end);
 		if (batch_end != write_end)
 			break;
@@ -1175,8 +1344,10 @@ wal_writer_thread(void *worker_args)
 		ev_async_send(writer->txn_loop, &writer->write_event);
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-	if (r->current_wal != NULL)
+	if (r->current_wal != NULL) {
+		wal_write_setlsn(r->current_wal, writer->batch, writer->cluster);
 		log_io_close(&r->current_wal);
+	}
 	return NULL;
 }
 
@@ -1187,8 +1358,14 @@ wal_writer_thread(void *worker_args)
 int
 wal_write(struct recovery_state *r, struct iproto_packet *packet)
 {
+	struct node *node = fill_lsn(r, packet);
+	if (r->wal_mode == WAL_NONE) {
+		confirm_lsn(node, node->current_lsn, true);
+		return 0;
+	}
+
+	assert(packet != NULL);
 	assert(r->wal_mode != WAL_NONE);
-	say_debug("wal_write lsn=%" PRIi64, packet->lsn);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	struct wal_writer *writer = r->writer;
@@ -1212,8 +1389,10 @@ wal_write(struct recovery_state *r, struct iproto_packet *packet)
 
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 
+	int64_t lsn = node->current_lsn; /* save current lsn on the stack */
 	fiber_yield(); /* Request was inserted. */
 
+	confirm_lsn(node, lsn, req->res == 0);
 	return req->res;
 }
 
@@ -1231,7 +1410,9 @@ snapshot_write_row(struct log_io *l, struct iproto_packet *packet)
 	ev_loop *loop = loop();
 
 	packet->tm = last;
-	packet->lsn = ++rows;
+	packet->node_id = 0;
+	if (iproto_request_is_dml(packet->code))
+		packet->lsn = ++rows;
 	packet->sync = 0; /* don't write sync to wal */
 
 	char fixheader[XLOG_FIXHEADER_SIZE];
@@ -1296,7 +1477,8 @@ snapshot_save(struct recovery_state *r)
 {
 	assert(r->snapshot_handler != NULL);
 	struct log_io *snap;
-	snap = log_io_open_for_write(r->snap_dir, r->confirmed_lsn,
+	int64_t lsnsum = mh_cluster_current_sum(r->cluster);
+	snap = log_io_open_for_write(&r->snap_dir, lsnsum, &r->node_uuid,
 				     INPROGRESS);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
@@ -1305,11 +1487,18 @@ snapshot_save(struct recovery_state *r)
 	 * <lsn>.snap.inprogress. When done, the snapshot is
 	 * renamed to <lsn>.snap.
 	 */
-	say_info("saving snapshot `%s'",
-		 format_filename(r->snap_dir, r->confirmed_lsn,
-				 NONE));
+	say_info("saving snapshot `%s'", snap->filename);
+
+	/* Write starting SETLSN (always empty table for snapshot) */
+	struct iproto_packet setlsn;
+	log_encode_setlsn(&setlsn, NULL);
+	snapshot_write_row(snap, &setlsn);
 
 	r->snapshot_handler(snap);
+
+	/* Write finishing SETLSN */
+	log_encode_setlsn(&setlsn, r->cluster);
+	snapshot_write_row(snap, &setlsn);
 
 	log_io_close(&snap);
 

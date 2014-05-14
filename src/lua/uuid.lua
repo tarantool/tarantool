@@ -10,22 +10,15 @@
         int snprintf(char *str, size_t size, const char *format, ...);
     ]]
 
-    local libuuid = nil
     local builtin = ffi.C
-    function check_libs()
-        if libuuid then return end
-        libuuid = ffi.load('uuid.so.1')
-    end
     box.uuid = function()
-        check_libs()
         local uuid = ffi.new('uuid_t')
-        libuuid.uuid_generate(uuid)
+        builtin.uuid_generate(uuid)
         return ffi.string(uuid, 16)
     end
     box.uuid_hex = function()
-        check_libs()
         local uuid = ffi.new('uuid_t')
-        libuuid.uuid_generate(uuid)
+        builtin.uuid_generate(uuid)
         local uuid_hex = ffi.new('char[33]')
         for i = 0,ffi.sizeof('uuid_t'),1 do
             builtin.snprintf(uuid_hex + i * 2, 3, "%02x",

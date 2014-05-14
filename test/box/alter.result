@@ -89,7 +89,7 @@ space = box.space[t[0]]
 ...
 space.n
 ---
-- 313
+- 321
 ...
 space.arity
 ---
@@ -104,23 +104,23 @@ space.index[0]
 --
 space:select{0}
 ---
-- error: 'No index #0 is defined in space 313'
+- error: 'No index #0 is defined in space 321'
 ...
 space:insert{0, 0}
 ---
-- error: 'No index #0 is defined in space 313'
+- error: 'No index #0 is defined in space 321'
 ...
 space:replace{0, 0}
 ---
-- error: 'No index #0 is defined in space 313'
+- error: 'No index #0 is defined in space 321'
 ...
 space:update({0}, {{'+', 0, 1}})
 ---
-- error: 'No index #0 is defined in space 313'
+- error: 'No index #0 is defined in space 321'
 ...
 space:delete{0}
 ---
-- error: 'No index #0 is defined in space 313'
+- error: 'No index #0 is defined in space 321'
 ...
 t = _space:delete{space.n}
 ---
@@ -134,7 +134,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space 313 does not exist
+- error: Space 321 does not exist
 ...
 _index:insert{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
@@ -167,6 +167,8 @@ _index:select{}
   - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
   - [312, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [320, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
 ...
 -- modify indexes of a system space
 _index:delete{_index.n, 0}

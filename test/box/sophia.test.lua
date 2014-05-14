@@ -1,3 +1,6 @@
+os.execute("rm -rf sophia")
+--# stop server default
+--# start server default
 
 space = box.schema.create_space('tweedledum', { id = 123, engine = 'sophia' })
 space:create_index('primary', { type = 'tree', parts = {0, 'num'} })

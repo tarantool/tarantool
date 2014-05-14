@@ -13,11 +13,6 @@ include_directories(${LIBCORO_INCLUDE_DIR})
 include_directories(${LIBGOPT_INCLUDE_DIR})
 include_directories(${READLINE_INCLUDE_DIR})
 
-# Require pthread globally if compiling with GCC
-if (CMAKE_COMPILER_IS_GNUCC)
-    add_compile_flags("C;CXX" "-pthread")
-endif()
-
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
@@ -75,6 +70,7 @@ set (common_sources
      cfg.cc
      cpu_feature.c
      fiob.c
+     tt_uuid.c
      ffisyms.cc
      lua/init.cc
      lua/fiber.cc
@@ -100,6 +96,7 @@ endif()
 
 set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
+target_link_libraries(core pthread)
 
 set (common_libraries core small salad misc bitset msgpuck)
 
@@ -142,6 +139,7 @@ if (ENABLE_BACKTRACE AND HAVE_BFD)
     endif()
 endif()
 
+set (common_libraries ${common_libraries} ${LIBUUID_LIBRARIES})
 set (common_libraries ${common_libraries} PARENT_SCOPE)
 
 add_subdirectory(lib)
