@@ -78,7 +78,7 @@ lbox_info_cluster(struct lua_State *L)
 	mh_foreach(recovery_state->cluster, k) {
 		struct node *node = *mh_cluster_node(recovery_state->cluster,k);
 		lua_pushlstring(L, tt_uuid_str(&node->uuid), UUID_STR_LEN);
-		luaL_pushnumber64(L, node->confirmed_lsn);
+		luaL_pushnumber64(L, node->current_lsn);
 		lua_settable(L, -3);
 	}
 

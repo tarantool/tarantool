@@ -184,38 +184,23 @@ fill_lsn(struct recovery_state *r, struct iproto_packet *packet)
 		if (k == mh_end(r->cluster))
 			tnt_raise(ClientError, ER_UNKNOWN_NODE, packet->node_id);
 		node = *mh_cluster_node(r->cluster, k);
+		if (node->current_lsn >= packet->lsn) {
+			tnt_raise(ClientError, ER_INVALID_ORDER,
+				  node->id, (long long) node->current_lsn,
+				  (long long) packet->lsn);
+		} else if (node->current_lsn + 1 != packet->lsn) {
+			say_warn("non consecutive LSN for node %u (%s) "
+				 "confirmed: %lld, new: %lld, diff: %lld",
+				 (unsigned) node->id,
+				 tt_uuid_str(&node->uuid),
+				 (long long) node->current_lsn,
+				 (long long) packet->lsn,
+				 (long long) (packet->lsn - node->current_lsn));
+		}
 		node->current_lsn = packet->lsn;
 	}
 
 	return node;
-}
-
-static void
-confirm_lsn(struct node *node, int64_t lsn, bool is_commit)
-{
-	if (node->confirmed_lsn < lsn) {
-		if (is_commit) {
-			if (node->confirmed_lsn + 1 != lsn) {
-				say_warn("non consecutive LSN for node %u (%s) "
-					 "confirmed: %jd, new: %jd, diff: %jd",
-					 (unsigned) node->id,
-					 tt_uuid_str(&node->uuid),
-					 (intmax_t) node->confirmed_lsn,
-					 (intmax_t) lsn,
-					 (intmax_t) (lsn - node->confirmed_lsn));
-			}
-			node->confirmed_lsn = lsn;
-		 }
-	} else {
-		/*
-		 * There can be holes in
-		 * confirmed_lsn, in case of disk write failure, but
-		 * wal_writer never confirms LSNs out order.
-		 */
-		panic("LSN for %s is used twice or COMMIT order is broken: "
-		      "confirmed: %jd, new: %jd", tt_uuid_str(&node->uuid),
-		      (intmax_t) node->confirmed_lsn, (intmax_t) lsn);
-	}
 }
 
 /* }}} */
@@ -374,12 +359,11 @@ recovery_process_setlsn(struct recovery_state *r, struct iproto_packet *packet)
 			tnt_raise(ClientError, ER_UNKNOWN_NODE, rows[i].node_id);
 
 		struct node *node = *mh_cluster_node(r->cluster, k);
-		assert(node->confirmed_lsn == node->current_lsn);
 
 		if (node->current_lsn <= rows[i].lsn) {
 			say_debug("setting\t(%2u, %020lld)",
 				  node->id, (long long) rows[i].lsn);
-			node->confirmed_lsn = node->current_lsn = rows[i].lsn;
+			node->current_lsn = rows[i].lsn;
 		} else {
 			/* Ignore outdated SETLSN rows */
 			say_debug("skipping\t(%2u, %020lld)",
@@ -412,7 +396,7 @@ recovery_process(struct recovery_state *r, struct iproto_packet *packet)
 	uint32_t k = mh_cluster_find(r->cluster, packet->node_id, NULL);
 	if (k != mh_end(r->cluster)) {
 		struct node *node = *mh_cluster_node(r->cluster, k);
-		if (packet->lsn <= node->confirmed_lsn) {
+		if (packet->lsn <= node->current_lsn) {
 			say_debug("skipping too young row");
 			return;
 		}
@@ -704,9 +688,7 @@ recovery_fix_lsn(struct recovery_state *r, bool master_bootstrap)
 	struct node *node = *mh_cluster_node(r->cluster, k);
 	if (master_bootstrap) {
 		assert(r->local_node != NULL);
-		assert(r->local_node->confirmed_lsn = r->local_node->current_lsn);
 		r->local_node->current_lsn += node->current_lsn;
-		r->local_node->confirmed_lsn = r->local_node->current_lsn;
 	}
 	mh_cluster_del(r->cluster, k, NULL);
 	if (r->local_node == node)
@@ -878,7 +860,7 @@ recovery_stop_local(struct recovery_state *r)
 struct wal_write_request {
 	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
 	/* Auxiliary. */
-	int res;
+	int64_t prev_lsn;
 	struct fiber *fiber;
 	struct iproto_packet *packet;
 	char wal_fixheader[XLOG_FIXHEADER_SIZE];
@@ -1278,8 +1260,9 @@ wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
 		assert(req->node->id == req->packet->node_id);
+		assert(req->node->current_lsn < req->packet->lsn);
+		req->prev_lsn = req->node->current_lsn;
 		req->node->current_lsn = req->packet->lsn;
-		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -1360,10 +1343,8 @@ int
 wal_write(struct recovery_state *r, struct iproto_packet *packet)
 {
 	struct node *node = fill_lsn(r, packet);
-	if (r->wal_mode == WAL_NONE) {
-		confirm_lsn(node, node->current_lsn, true);
+	if (r->wal_mode == WAL_NONE)
 		return 0;
-	}
 
 	assert(packet != NULL);
 	assert(r->wal_mode != WAL_NONE);
@@ -1375,7 +1356,7 @@ wal_write(struct recovery_state *r, struct iproto_packet *packet)
 		region_alloc(&fiber()->gc, sizeof(struct wal_write_request));
 
 	req->fiber = fiber();
-	req->res = -1;
+	req->prev_lsn = -1;
 	req->packet = packet;
 	packet->tm = ev_now(loop());
 	packet->sync = 0;
@@ -1393,8 +1374,22 @@ wal_write(struct recovery_state *r, struct iproto_packet *packet)
 	int64_t lsn = node->current_lsn; /* save current lsn on the stack */
 	fiber_yield(); /* Request was inserted. */
 
-	confirm_lsn(node, lsn, req->res == 0);
-	return req->res;
+	/* req->res is -1 on error and prev_lsn on success */
+	if (req->prev_lsn < 0)
+		return -1; /* error */
+
+	if (req->prev_lsn >= lsn) {
+		/*
+		 * There can be holes in
+		 * confirmed_lsn, in case of disk write failure, but
+		 * wal_writer never confirms LSNs out order.
+		 */
+		panic("LSN for %s is used twice or COMMIT order is broken: "
+		      "confirmed: %lld, new: %lld", tt_uuid_str(&node->uuid),
+		      (long long) req->prev_lsn, (long long) lsn);
+	}
+
+	return 0; /* success */
 }
 
 /* }}} */

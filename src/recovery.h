@@ -66,7 +66,6 @@ struct node {
 	uint32_t id;
 	tt_uuid uuid;
 	int64_t current_lsn;
-	int64_t confirmed_lsn;
 };
 
 /*

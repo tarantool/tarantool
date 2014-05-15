@@ -783,7 +783,7 @@ replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
 		}
 		node->id = packet->node_id;
 	}
-	node->confirmed_lsn = node->current_lsn = packet->lsn;
+	node->current_lsn = packet->lsn;
 }
 
 static void
@@ -819,7 +819,7 @@ replication_relay_subscribe(struct recovery_state *r, struct relay_data *data)
 		if (node == NULL)
 			panic("cannot allocate struct node");
 		node->id = data->lsnmap[i].node_id;
-		node->confirmed_lsn = node->current_lsn = data->lsnmap[i].lsn;
+		node->current_lsn = data->lsnmap[i].lsn;
 		uint32_t k = mh_cluster_put(r->cluster,
 			(const struct node **) &node, NULL, NULL);
 		if (k == mh_end(r->cluster))
