@@ -22,7 +22,7 @@ exec admin "lua c = box.net.sql.connect('mysql')"
 exec admin "lua dump = function(v) return box.cjson.encode(v) end"
 
 exec admin "lua connect = {}"
-exec admin "lua for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end"
+exec admin "lua for tk in string.gmatch(os.getenv('MYSQL')..':', '(.-):') do table.insert(connect, tk) end"
 
 # mysql
 exec admin "lua c = box.net.sql.connect('mysql', unpack(connect))"
