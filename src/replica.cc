@@ -41,6 +41,7 @@
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
+#include "box/cluster.h"
 #include "replica.h"
 
 static void
@@ -214,7 +215,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = mp_encode_strl(data, UUID_LEN);
-	tt_uuid_enc_be(&r->cluster_uuid, data);
+	tt_uuid_enc_be(cluster_id(), data);
 	data += UUID_LEN;
 	data = mp_encode_uint(data, IPROTO_NODE_UUID);
 	data = mp_encode_strl(data, UUID_LEN);

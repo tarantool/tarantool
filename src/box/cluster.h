@@ -45,17 +45,16 @@
  * Cluster and node identifiers are stored in a system
  * space _cluster on all nodes. The node identifier
  * is also stored in each snapshot header, this is how
- * the node knows which node id in the cluster belongs
- * to it.
+ * the node knows which node id in the _cluster space is
+ * its own id.
  *
  * Cluster and node identifiers are globally unique
  * (UUID, universally unique identifiers). In addition
- * to a long UUID, which is stored in _cluster system
- * space for each node, a short integer id is used for
- * pervasive node identification in a replication stream,
- * a snapshot, or internal data structures.
+ * to these unique but long identifiers, a short integer id
+ * is used for pervasive node identification in a replication
+ * stream, a snapshot, or internal data structures.
  * The mapping between 16-byte node globally unique id and
- * 4 byte cluster local id is stored in _cluster table. When
+ * 4 byte cluster local id is stored in _cluster space. When
  * a node joins the cluster, it sends its globally unique
  * identifier to one of the masters, and gets its cluster
  * local identifier as part of the reply to the JOIN request
@@ -73,16 +72,13 @@
  *   ----------------------------------
  *  | 2                |  1292         | <-- changes received from
  *   ----------------------------------       a remote node
+ *
+ * This table is called in the code "log sequence number map" or
+ * "log sequence number table" or "cluster vector clock" and
+ * is implemented in @file vclock.h
  */
 
-/** Cluster-local node identifier. */
-typedef uint32_t cnode_id_t;
-
-static inline bool
-cnode_id_is_reserved(cnode_id_t id)
-{
-	return id == 0;
-}
+/** {{{ Global cluster identifier API **/
 
 /**
  * Bootstrap a new cluster consisting of this node by
@@ -95,6 +91,34 @@ void
 cluster_set_id(const tt_uuid *uu);
 
 /**
+ * Get a UUID of the cluster.
+ */
+const tt_uuid *
+cluster_id();
+
+/**
+ * Check that the given UUID matches the UUID of the
+ * cluster this node belongs to. Used to handshake
+ * replica connect, and refuse a connection from a replica
+ * which belongs to a different cluster.
+ */
+void
+cluster_check_id(const tt_uuid *uu);
+
+/* }}} */
+
+/** {{{ Cluster node id API **/
+
+/** Cluster-local node identifier. */
+typedef uint32_t cnode_id_t;
+
+static inline bool
+cnode_id_is_reserved(cnode_id_t id)
+{
+	return id == 0;
+}
+
+/**
  * Register the universally unique identifier of a remote node and
  * a matching cluster-local identifier in the  cluster registry.
  * Called when a remote master joins the cluster.
@@ -103,5 +127,7 @@ cluster_set_id(const tt_uuid *uu);
  */
 void
 cluster_add_node(const tt_uuid *node_uu, cnode_id_t id);
+
+/** }}} **/
 
 #endif

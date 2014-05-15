@@ -113,7 +113,6 @@ struct recovery_state {
 	double wal_fsync_delay;
 	enum wal_mode wal_mode;
 	tt_uuid node_uuid;
-	tt_uuid cluster_uuid;
 
 	bool finalize;
 };

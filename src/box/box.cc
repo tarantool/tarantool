@@ -389,20 +389,17 @@ box_init()
 		recover_snap(recovery_state);
 		recovery_fix_lsn(recovery_state, false);
 	} else if (replication_source != NULL) {
-		/* Initialize replica */
+		/* Initialize a new replica */
 		replica_bootstrap(recovery_state, replication_source);
 		recovery_fix_lsn(recovery_state, false);
 		snapshot_save(recovery_state);
 	} else {
-		/* Initialize cluster */
+		/* Initialize a master node of a new cluster */
 		cluster_bootstrap(recovery_state);
 		box_set_cluster_uuid();
 		recovery_fix_lsn(recovery_state, true);
 		snapshot_save(recovery_state);
 	}
-
-	if (tt_uuid_is_nil(&recovery_state->cluster_uuid))
-		tnt_raise(ClientError, ER_INVALID_CLUSTER);
 
 	space_end_recover_snapshot();
 	space_end_recover();
@@ -416,8 +413,6 @@ box_init()
 	int primary_port = cfg_geti("primary_port");
 	int admin_port = cfg_geti("admin_port");
 	/*
-	 * If neither of the ports is set, become a master right
-	 * away (e.g. this is interactive mode or other
 	 * application server configuration).
 	 */
 	if (primary_port == 0 && admin_port == 0)

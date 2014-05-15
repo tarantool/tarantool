@@ -1513,9 +1513,13 @@ tuple_field_uuid(struct tuple *tuple, int fieldno)
 }
 
 /**
- * This trigger is normally invoked only upon initial recovery.
+ * This trigger is invoked only upon initial recovery, when
+ * reading contents of the system spaces from the snapshot.
  *
  * Before a cluster is assigned a cluster id it's read only.
+ * Since during recovery state of the WAL doesn't
+ * concern us, we can safely change the cluster id in before-replace
+ * event, not in after-replace event.
  */
 static void
 on_replace_dd_schema(struct trigger * /* trigger */, void *event)

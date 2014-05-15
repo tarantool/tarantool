@@ -30,12 +30,33 @@
 #include "recovery.h"
 #include "exception.h"
 
+/**
+ * Globally unique identifier of this cluster.
+ * A cluster is a set of connected replicas.
+ */
+static tt_uuid cluster_uuid;
+
 void
 cluster_set_id(const tt_uuid *uu)
 {
 	/* Set cluster UUID. */
-	assert(tt_uuid_is_nil(&recovery_state->cluster_uuid));
-	recovery_state->cluster_uuid = *uu;
+	assert(tt_uuid_is_nil(&cluster_uuid));
+	cluster_uuid = *uu;
+}
+
+const tt_uuid *
+cluster_id()
+{
+	return &cluster_uuid;
+}
+
+void
+cluster_check_id(const tt_uuid *uu)
+{
+	if (tt_uuid_cmp(uu, cluster_id()) != 0) {
+		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
+			  tt_uuid_str(uu), tt_uuid_str(cluster_id()));
+	}
 }
 
 void

@@ -47,6 +47,7 @@
 #include "evio.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
+#include "box/cluster.h"
 
 /** Replication topology
  * ----------------------
@@ -332,10 +333,8 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 	}
 
 	/* Check Cluster-UUID */
-	if (tt_uuid_cmp(&cluster_uuid, &recovery_state->cluster_uuid) != 0) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "Unknown Cluster-UUID");
-	}
+	cluster_check_id(&cluster_uuid);
+
 	/* Check Node-UUID */
 	struct node *node = NULL;
 	uint32_t k;
