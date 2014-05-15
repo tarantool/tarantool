@@ -18,7 +18,7 @@ end;
 dump = function(v) return box.cjson.encode(v) end
 
 connect = {}
-for tk in string.gmatch(os.getenv('PG'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('PG')..':', '(.-):') do table.insert(connect, tk) end
 
 -- postgresql
 c = box.net.sql.connect('pg', unpack(connect))
