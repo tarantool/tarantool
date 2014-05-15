@@ -35,7 +35,6 @@
 
 #include "log_io.h"
 #include "fiber.h"
-#include "pickle.h"
 #include "coio_buf.h"
 #include "recovery.h"
 #include "tarantool.h"

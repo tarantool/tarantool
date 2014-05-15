@@ -34,7 +34,6 @@
 #include "recovery.h"
 #include "replica.h"
 #include "log_io.h"
-#include <pickle.h>
 #include <say.h>
 #include <admin.h>
 #include <iproto.h>

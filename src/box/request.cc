@@ -35,7 +35,6 @@
 #include "port.h"
 #include "lua/call.h"
 #include <errinj.h>
-#include <pickle.h>
 #include <fiber.h>
 #include <scoped_guard.h>
 #include <third_party/base64.h>
