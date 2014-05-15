@@ -308,7 +308,7 @@ box_on_cluster_join(const tt_uuid *node_uuid)
 }
 
 static void
-box_set_cluster_uuid(struct recovery_state *r)
+box_set_cluster_uuid()
 {
 	/* Save Cluster-UUID to _schema space */
 	tt_uuid cluster_uuid;
@@ -328,9 +328,6 @@ box_set_cluster_uuid(struct recovery_state *r)
 	req.tuple_end = data;
 
 	process_rw(&null_port, &req);
-
-	/* Cluster-UUID was be updated by a _schema trigger */
-	assert(tt_uuid_cmp(&r->cluster_uuid, &cluster_uuid) == 0);
 }
 
 void
@@ -399,7 +396,7 @@ box_init()
 	} else {
 		/* Initialize cluster */
 		cluster_bootstrap(recovery_state);
-		box_set_cluster_uuid(recovery_state);
+		box_set_cluster_uuid();
 		recovery_fix_lsn(recovery_state, true);
 		snapshot_save(recovery_state);
 	}

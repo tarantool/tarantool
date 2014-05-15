@@ -206,6 +206,7 @@ out:
 FILE *
 fmemopen(void *buf, size_t size, const char *mode)
 {
+	(void) mode;
 	assert(strcmp(mode, "r") == 0);
 
 	FILE *ret = tmpfile();

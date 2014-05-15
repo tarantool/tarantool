@@ -48,10 +48,10 @@ enum schema_id {
 	/** Space id of _cluster. */
 	SC_CLUSTER_ID = 320,
 	/** End of the reserved range of system spaces. */
-	SC_SYSTEM_ID_MAX = 511
+	SC_SYSTEM_ID_MAX = 511,
+	SC_ID_NIL = 2147483647
 };
 
-enum { SC_ID_NIL = 4294967295 };
 
 extern int sc_version;
 

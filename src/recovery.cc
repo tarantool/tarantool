@@ -614,7 +614,8 @@ find_next_wal:
 		 * last file, try opening .<ext>.inprogress.
 		 */
 		if (next_wal == NULL) {
-			say_warn("open fail: %lu", current_lsn);
+			say_warn("open fail: %lld",
+				 (long long) current_lsn);
 			if (r->finalize && suffix == INPROGRESS) {
 				/*
 				 * There is an .inprogress file, but
