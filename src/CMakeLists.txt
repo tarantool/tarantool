@@ -133,6 +133,7 @@ if (ENABLE_TRACE)
     set (common_sources ${common_sources} trace.c)
 endif()
 
+set_source_files_properties(sio.cc evio.cc replica.cc PROPERTIES COMPILE_FLAGS "-Wno-deprecated")
 set_source_files_compile_flags(${common_sources})
 add_library(core STATIC ${common_sources})
 add_dependencies(core generate_headers)
