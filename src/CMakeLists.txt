@@ -32,7 +32,6 @@ add_custom_target(generate_lua_sources
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 set (common_sources
-     replication.cc
      memory.cc
      fiber.cc
      util.cc
@@ -46,10 +45,7 @@ set (common_sources
      pickle.cc
      coro.cc
      stat.cc
-     log_io.cc
-     recovery.cc
      admin.cc
-     replica.cc
      iproto.cc
      iproto_constants.cc
      iproto_port.cc

@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <replication.h>
+#include "replication.h"
 #include <say.h>
 #include <fiber.h>
 #include <stddef.h>

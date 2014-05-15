@@ -31,14 +31,14 @@
 #include <sys/wait.h>
 
 #include <errcode.h>
-#include <recovery.h>
+#include "recovery.h"
 #include "replica.h"
-#include <log_io.h>
+#include "log_io.h"
 #include <pickle.h>
 #include <say.h>
 #include <admin.h>
 #include <iproto.h>
-#include <replication.h>
+#include "replication.h"
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"

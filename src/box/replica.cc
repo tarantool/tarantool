@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "replica.h"
 #include "recovery.h"
 #include "tarantool.h"
 #include <sys/socket.h>
@@ -42,7 +43,6 @@
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
-#include "replica.h"
 
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,

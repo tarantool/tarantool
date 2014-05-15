@@ -37,6 +37,10 @@ add_library(box
     access.cc
     authentication.cc
     cluster.cc
+    log_io.cc
+    recovery.cc
+    replica.cc
+    replication.cc
     ${lua_sources}
     lua/call.cc
     lua/tuple.cc

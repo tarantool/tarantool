@@ -4,9 +4,9 @@
 extern "C" {
 #include "test.h"
 } /* extern "C" */
-#include "log_io.h"
+#include "box/log_io.h"
 #include "fio.h"
-#include "recovery.h" /* wal_write_setlsn() */
+#include "box/recovery.h" /* wal_write_setlsn() */
 #include "memory.h"
 #include "fiber.h"
 #include "crc32.h"

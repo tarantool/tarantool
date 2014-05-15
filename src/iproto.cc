@@ -43,7 +43,7 @@
 #include "scoped_guard.h"
 #include "memory.h"
 #include "msgpuck/msgpuck.h"
-#include "replication.h"
+#include "box/replication.h"
 #include "third_party/base64.h"
 #include "coio.h"
 
