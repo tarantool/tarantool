@@ -12,7 +12,6 @@ if type(box.net.sql) ~= "table" then error("net.sql load failed") end
 ---
 ...
 os.execute("mkdir -p box/net/")
-lua for tk in string.gmatch(os.getenv('MYSQL')..':', '(.-):') do table.insert(connect, tk) end
 ---
 - 0
 ...
@@ -48,7 +47,7 @@ function dump(v) return box.cjson.encode(v) end
 connect = {}
 ---
 ...
-for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('MYSQL')..':', '(.-):') do table.insert(connect, tk) end
 ---
 ...
 -- mysql
