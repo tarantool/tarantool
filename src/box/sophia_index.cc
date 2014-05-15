@@ -29,7 +29,6 @@
 #include "sophia_index.h"
 #include "say.h"
 #include "tuple.h"
-#include "pickle.h"
 #include "scoped_guard.h"
 #include "exception.h"
 #include "errinj.h"

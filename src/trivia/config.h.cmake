@@ -131,6 +131,10 @@
 #cmakedefine HAVE_PRCTL_H 1
 
 #cmakedefine HAVE_OPEN_MEMSTREAM 1
+#cmakedefine HAVE_FMEMOPEN 1
+
+#cmakedefine HAVE_LIBUUID_LINUX 1
+#cmakedefine HAVE_LIBUUID_BSD 1
 
 /*
  * predefined /etc directory prefix.
@@ -147,9 +151,9 @@
 /*
  * Modules
  */
-#define MODULE_LIBDIR "@MODULE_LIBDIR@"
-#define MODULE_LUADIR "@MODULE_LUADIR@"
-#define MODULE_INCLUDEDIR "@MODULE_INCLUDEDIR@"
+#define MODULE_LIBDIR "@MODULE_FULL_LIBDIR@"
+#define MODULE_LUADIR "@MODULE_FULL_LUADIR@"
+#define MODULE_INCLUDEDIR "@MODULE_FULL_INCLUDEDIR@"
 #define MODULE_LUAPATH "@MODULE_LUAPATH@"
 #define MODULE_LIBPATH "@MODULE_LIBPATH@"
 

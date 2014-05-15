@@ -31,7 +31,7 @@
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)   
 #include "libgen.h"
 #endif
 
@@ -262,8 +262,9 @@ void
 tarantool_lua_init()
 {
 	lua_State *L = luaL_newstate();
-	if (L == NULL)
-		return;
+	if (L == NULL) {
+		panic("failed to initialize Lua");
+	}
 	luaL_openlibs(L);
 	/*
 	 * Search for Lua modules, apart from the standard

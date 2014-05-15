@@ -63,21 +63,6 @@ It supports replication, online backup, stored procedures in Lua.
 This package provides a MySQL interface to use with
 tarantool-sql-module.
 
-# Tarantool sophia module
-
-%package sophia-module
-Summary: Tarantool sophia bindings
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: tarantool-sophia-module
-Obsoletes: tarantool-sophia-module
-%description -n tarantool-sophia-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides tarantool lua bindings to the
-sophia database.
-
 # Tarantool dev spec
 
 %package dev
@@ -157,40 +142,34 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 
 %files sql-module
 %defattr(-,root,root,-)
-%dir "%{_datadir}/tarantool/1.6"
-%dir "%{_datadir}/tarantool/1.6/box"
-%dir "%{_datadir}/tarantool/1.6/box/net"
-"%{_datadir}/tarantool/1.6/box/net/sql.lua"
+%dir "%{_datadir}/tarantool"
+%dir "%{_datadir}/tarantool/box"
+%dir "%{_datadir}/tarantool/box/net"
+"%{_datadir}/tarantool/box/net/sql.lua"
 
 %files pg-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.6"
-%dir "%{_libdir}/tarantool/1.6/box"
-"%{_libdir}/tarantool/1.6/box/net/pg.so"
+%dir "%{_libdir}/tarantool"
+%dir "%{_libdir}/tarantool/box"
+"%{_libdir}/tarantool/box/net/pg.so"
 
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.6"
-%dir "%{_libdir}/tarantool/1.6/box"
-"%{_libdir}/tarantool/1.6/box/net/mysql.so"
-
-%files sophia-module
-%defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/1.6"
-%dir "%{_libdir}/tarantool/1.6/box"
-"%{_libdir}/tarantool/1.6/box/sophia.so"
+%dir "%{_libdir}/tarantool"
+%dir "%{_libdir}/tarantool/box"
+"%{_libdir}/tarantool/box/net/mysql.so"
 
 %files dev
 %defattr(-,root,root,-)
 %dir "%{_includedir}/tarantool"
-%dir "%{_includedir}/tarantool/1.6"
-"%{_includedir}/tarantool/1.6/config.h"
-"%{_includedir}/tarantool/1.6/lauxlib.h"
-"%{_includedir}/tarantool/1.6/luaconf.h"
-"%{_includedir}/tarantool/1.6/lua.h"
-"%{_includedir}/tarantool/1.6/lua.hpp"
-"%{_includedir}/tarantool/1.6/luajit.h"
-"%{_includedir}/tarantool/1.6/lualib.h"
+%dir "%{_includedir}/tarantool"
+"%{_includedir}/tarantool/config.h"
+"%{_includedir}/tarantool/lauxlib.h"
+"%{_includedir}/tarantool/luaconf.h"
+"%{_includedir}/tarantool/lua.h"
+"%{_includedir}/tarantool/lua.hpp"
+"%{_includedir}/tarantool/luajit.h"
+"%{_includedir}/tarantool/lualib.h"
 
 %changelog
 * Wed Nov 13 2013 Tarantool Team <support@tarantool.org> 1.0-2

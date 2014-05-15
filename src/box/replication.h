@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
+#ifndef TARANTOOL_REPLICATION_H_INCLUDED
+#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,14 +28,27 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
+#include <tarantool.h>
+#include "trivia/util.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_schema;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_priv;
-extern struct trigger on_replace_cluster;
+/**
+ * Pre-fork replication spawner process.
+ *
+ * @return None. Panics and exits on error.
+ */
+void
+replication_prefork(const char *snap_dir, const char *wal_dir);
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+void
+replication_join(int fd, struct iproto_packet *packet);
+
+/**
+ * Subscribe a replica to updates.
+ *
+ * @return None. On error, closes the socket.
+ */
+void
+replication_subscribe(int fd, struct iproto_packet *packet);
+
+#endif // TARANTOOL_REPLICATION_H_INCLUDED
+

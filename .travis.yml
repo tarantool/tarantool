@@ -23,7 +23,7 @@ before_script:
 
 install:
   - sudo apt-get update > /dev/null
-  - sudo apt-get -q install binutils-dev python-daemon python-yaml
+  - sudo apt-get -q install binutils-dev python-daemon python-yaml uuid-dev
   - sudo apt-get -q install libmysqlclient-dev libpq-dev postgresql-server-dev-all
 
 script:
