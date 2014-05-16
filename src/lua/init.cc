@@ -67,9 +67,9 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       load_cfg_lua[], interactive_lua[];
+       load_cfg_lua[], interactive_lua[], digest_lua[];
 static const char *lua_sources[] = { uuid_lua, session_lua,
-	load_cfg_lua, interactive_lua, NULL };
+	load_cfg_lua, interactive_lua, digest_lua, NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, NULL };
 /*

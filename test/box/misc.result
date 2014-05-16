@@ -25,6 +25,7 @@ t
   - cjson
   - coredump
   - counter
+  - digest
   - dostring
   - errinj
   - error
