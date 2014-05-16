@@ -1,2 +1,1 @@
-usr/lib/tarantool/1.6/box/net/mysql.so
-
+usr/lib/tarantool/box/net/mysql.so

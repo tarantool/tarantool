@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,24 +26,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "trivia/util.h"
+#include "tt_uuid.h"
+/* Zeroed by the linker. */
+const tt_uuid uuid_nil;
 
-/**
- * Pre-fork replication spawner process.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_prefork(const char *snap_dir, const char *wal_dir);
-
-/**
- * Subscribe a replica to updates.
- *
- * @return None. On error, closes the socket.
- */
-void
-subscribe(int fd, int64_t lsn, uint64_t sync);
-
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
+char *
+tt_uuid_str(const tt_uuid *uu)
+{
+	static __thread char buf[UUID_STR_LEN + 1];
+	tt_uuid_to_string(uu, buf);
+	return buf;
+}
 

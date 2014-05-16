@@ -78,7 +78,7 @@ To start the server, try:
 This will start Tarantool in interactive mode.
 
 To run Tarantool regression tests (test/test-run.py),
-a few additioonal Python modules are ncessary:
+a few additional Python modules are ncessary:
  * daemon
  * pyyaml
  * msgpack-python

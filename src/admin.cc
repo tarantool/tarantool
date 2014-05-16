@@ -97,7 +97,7 @@ admin_handler(va_list ap)
 	for (;;) {
 		if (admin_dispatch(&coio, iobuf, L) < 0)
 			return;
-		iobuf_gc(iobuf);
+		iobuf_reset(iobuf);
 		fiber_gc();
 	}
 }

@@ -193,6 +193,12 @@ FILE *
 open_memstream(char **ptr, size_t *sizeloc);
 #endif /* HAVE_OPEN_MEMSTREAM */
 
+#ifndef HAVE_FMEMOPEN
+/* Declare open_memstream(). */
+#include <stdio.h>
+FILE *
+fmemopen(void *buf, size_t size, const char *mode);
+#endif /* HAVE_FMEMOPEN */
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -4,12 +4,11 @@ Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
  cmake,
  libreadline-dev,
- python-yaml,
- python-daemon,
  libncurses5-dev,
  libiberty-dev | binutils-dev,
  libmysqlclient-dev,
- libpq-dev
+ libpq-dev,
+ uuid-dev
 Section: database
 Standards-Version: 3.9.5
 Homepage: http://tarantool.org/
@@ -58,12 +57,13 @@ Conflicts: tarantool-plugins (<< 1.5.3)
 Replaces: tarantool-plugins (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool (= ${binary:Version}),
- tarantool-sql-module,
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ tarantool (= ${binary:Version})
+Recommends:
  tarantool-postgresql-module,
- tarantool-mysql-module,
- tarantool-sophia-module
+ tarantool-mysql-module
 Description: Tarantool in-memory database - all plug-ins bundle
  Tarantool is an in-memory database and Lua application server.
  This package provides (or depends on) all Tarantool additional
@@ -75,7 +75,7 @@ Replaces: tarantool-postgresql-plugin
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
+ tarantool-modules (= ${binary:Version}),
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - PostgreSQL connector
  Tarantool is an in-memory database and Lua application server.
@@ -88,14 +88,14 @@ Replaces: tarantool-mysql-plugin
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
+ tarantool-modules (= ${binary:Version}),
  tarantool (= ${binary:Version})
 Description: Tarantool in-memory database - MySQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to MySQL database for Tarantool
  Lua stored procedures.
 
-Package: libtarantool-dev
+Package: tarantool-dev
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Section: libdevel

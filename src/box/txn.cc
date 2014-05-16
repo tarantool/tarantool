@@ -30,7 +30,8 @@
 #include "tuple.h"
 #include "space.h"
 #include <tarantool.h>
-#include <recovery.h>
+#include "cluster.h"
+#include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
 
@@ -39,18 +40,17 @@ double too_long_threshold;
 void
 txn_add_redo(struct txn *txn, struct request *request)
 {
-	if (recovery_state->wal_mode == WAL_NONE)
+	txn->packet = request->packet;
+	if (recovery_state->wal_mode == WAL_NONE || request->packet != NULL)
 		return;
-	if (request->packet == NULL) {
-		/* Generate binary body for Lua requests */
-		struct iproto_packet *packet = (struct iproto_packet *)
-			region_alloc0(&fiber()->gc, sizeof(*packet));
-		packet->code = request->code;
-		packet->bodycnt = request_encode(request, packet->body);
-		txn->packet = packet;
-	} else {
-		txn->packet = request->packet;
-	}
+
+	/* Generate binary body for Lua requests */
+	struct iproto_packet *packet = (struct iproto_packet *)
+		region_alloc0(&fiber()->gc, sizeof(*packet));
+	assert(packet->node_id == 0); /* local request */
+	packet->code = request->code;
+	packet->bodycnt = request_encode(request, packet->body);
+	txn->packet = packet;
 }
 
 void
@@ -93,26 +93,18 @@ txn_commit(struct txn *txn)
 {
 	if ((txn->old_tuple || txn->new_tuple) &&
 	    !space_is_temporary(txn->space)) {
-		struct iproto_packet *packet = txn->packet;
-		int64_t lsn = next_lsn(recovery_state);
-
 		int res = 0;
-		if (recovery_state->wal_mode != WAL_NONE) {
-			/* txn_commit() must be done after txn_add_redo() */
-			assert(txn->packet != NULL);
-			packet->lsn = lsn;
-			ev_tstamp start = ev_now(loop()), stop;
-			res = wal_write(recovery_state, packet);
-			stop = ev_now(loop());
+		/* txn_commit() must be done after txn_add_redo() */
+		assert(recovery_state->wal_mode == WAL_NONE || txn->packet != NULL);
+		ev_tstamp start = ev_now(loop()), stop;
+		res = wal_write(recovery_state, txn->packet);
+		stop = ev_now(loop());
 
-			if (stop - start > too_long_threshold) {
-				say_warn("too long %s: %.3f sec",
-					 iproto_request_name(packet->code),
-					 stop - start);
-			}
+		if (stop - start > too_long_threshold && txn->packet != NULL) {
+			say_warn("too long %s: %.3f sec",
+				iproto_request_name(txn->packet->code),
+					stop - start);
 		}
-
-		confirm_lsn(recovery_state, lsn, res == 0);
 
 		if (res)
 			tnt_raise(LoggedError, ER_WAL_IO);

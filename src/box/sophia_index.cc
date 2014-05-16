@@ -29,7 +29,6 @@
 #include "sophia_index.h"
 #include "say.h"
 #include "tuple.h"
-#include "pickle.h"
 #include "scoped_guard.h"
 #include "exception.h"
 #include "errinj.h"
@@ -141,6 +140,7 @@ SophiaIndex::memsize() const
 struct tuple *
 SophiaIndex::findByKey(const char *key, uint32_t part_count) const
 {
+	(void) part_count;
 	assert(part_count == 1);
 	assert(key_def->is_unique && part_count == key_def->part_count);
 	const char *keyptr = key;

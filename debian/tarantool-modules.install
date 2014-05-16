@@ -1,2 +1,1 @@
-usr/share/tarantool/1.6/box/net/sql.lua
-usr/lib/tarantool/1.6/box/sophia.so
+usr/share/tarantool/box/net/sql.lua

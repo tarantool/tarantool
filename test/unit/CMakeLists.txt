@@ -1,3 +1,4 @@
+add_compile_flags("C;CXX" "-Wno-unused")
 file(GLOB all_sources *.c *.m *.mm)
 set_source_files_compile_flags(${all_sources})
 
@@ -41,6 +42,11 @@ add_executable(bps_tree_itr.test bps_tree_itr.cc ${CMAKE_SOURCE_DIR}/third_party
 target_link_libraries(bps_tree_itr.test small)
 add_executable(pt_alloc.test pt_alloc.cc)
 target_link_libraries(pt_alloc.test small)
+add_executable(log_dir.test log_dir.cc test.c)
+target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} box core small salad misc bitset msgpuck
+    ${LIBEV_LIBRARIES}
+    ${LIBEIO_LIBRARIES}
+    ${LIBCORO_LIBRARIES})
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

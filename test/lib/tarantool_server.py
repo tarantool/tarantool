@@ -575,8 +575,15 @@ class TarantoolServer(Server):
             return yaml.load(self.admin("box.info." + param, silent=True))[0]
         return yaml.load(self.admin("box.info", silent=True))
 
-    def wait_lsn(self, lsn):
-        while (int(self.get_param("lsn")) < lsn):
+    def get_lsn(self, node_uuid):
+        nodes = self.get_param("cluster")
+        if node_uuid in nodes:
+            return int(nodes[node_uuid])
+        else:
+            return -1
+
+    def wait_lsn(self, node_uuid, lsn):
+        while (self.get_lsn(node_uuid) < lsn):
             time.sleep(0.01)
 
     def version(self):

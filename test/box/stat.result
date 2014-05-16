@@ -15,8 +15,8 @@ for i=1,10 do space:insert{i, 'tuple'..tostring(i)} end
 box.stat()
 ---
 - DELETE:
-    total: 0
-    rps: 0
+    total: 14
+    rps: 2
   SELECT:
     total: 1
     rps: 0
@@ -24,8 +24,11 @@ box.stat()
     total: 0
     rps: 0
   INSERT:
-    total: 12
-    rps: 2
+    total: 34
+    rps: 6
+  AUTH:
+    total: 0
+    rps: 0
   CALL:
     total: 0
     rps: 0
@@ -39,8 +42,8 @@ box.stat()
 box.stat()
 ---
 - DELETE:
-    total: 0
-    rps: 0
+    total: 14
+    rps: 2
   SELECT:
     total: 0
     rps: 0
@@ -48,6 +51,9 @@ box.stat()
     total: 0
     rps: 0
   INSERT:
+    total: 34
+    rps: 6
+  AUTH:
     total: 0
     rps: 0
   CALL:

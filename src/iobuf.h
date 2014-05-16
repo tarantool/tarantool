@@ -226,7 +226,7 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio);
  * Is automatically called by iobuf_flush().
  */
 void
-iobuf_gc(struct iobuf *iobuf);
+iobuf_reset(struct iobuf *iobuf);
 
 /** Return true if there is no input and no output. */
 static inline bool

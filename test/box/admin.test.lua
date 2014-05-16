@@ -26,10 +26,10 @@ function test_box_info()
     local buildstr = {'flags', 'target', 'compiler', 'options'}
     local str = {'version', 'status' }
     local failed = {}
-    if check_type(tmp.lsn, 'cdata') == false then
-        table.insert(failed1, 'box.info().lsn')
+    if check_type(tmp.cluster, 'table') == false then
+        table.insert(failed1, 'box.info().cluster')
     else
-        tmp.lsn = nil
+        tmp.cluster = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then
