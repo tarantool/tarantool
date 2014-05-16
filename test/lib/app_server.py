@@ -9,14 +9,14 @@ from subprocess import Popen, PIPE
 from lib.server import Server
 from lib.tarantool_server import Test
 
-class UnitTest(Test):
+class AppTest(Test):
     def execute(self, server):
         execs = [os.path.join(server.builddir, "test", self.name)]
         proc = Popen(execs, stdout=PIPE)
         sys.stdout.write(proc.communicate()[0])
 
-class UnittestServer(Server):
-    """A dummy server implementation for unit test suite"""
+class AppServer(Server):
+    """A dummy server implementation for application server tests"""
     def __new__(cls, ini=None):
         return Server.__new__(cls)
 
@@ -50,7 +50,8 @@ class UnittestServer(Server):
                     answer.append(test)
             return answer
 
-        test_suite.tests = [UnitTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test" )))]
+        test_suite.tests = [AppTest(k, test_suite.args, test_suite.ini) for
+    k in sorted(glob.glob(os.path.join(suite_path, "*.lua" )))]
         test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), test_suite.tests), [])
 
     def print_log(self, lines):
