@@ -47,6 +47,8 @@
 #include "evio.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
+#include "box/schema.h"
+#include "vclock.h"
 
 /** Replication topology
  * ----------------------
@@ -337,16 +339,10 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 			  "Unknown Cluster-UUID");
 	}
 	/* Check Node-UUID */
-	struct node *node = NULL;
-	uint32_t k;
-	mh_foreach(recovery_state->cluster, k) {
-		struct node *n = *mh_cluster_node(recovery_state->cluster, k);
-		if (tt_uuid_cmp(&n->uuid, &node_uuid) == 0) {
-			node = n;
-			break;
-		}
-	}
-	assert(node !=  NULL);
+	uint32_t node_id = schema_find_id(SC_CLUSTER_ID, 1, tt_uuid_str(&node_uuid),
+					  UUID_STR_LEN);
+	if (node_id == SC_ID_NIL)
+		tnt_raise(ClientError, ER_UNKNOWN_NODE, tt_uuid_str(&node_uuid));
 	if (lsnmap == NULL)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
 	/* Check & save LSNMAP */
@@ -373,12 +369,12 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 		if (mp_typeof(*d) != MP_UINT)
 			goto map_error;
 		request->data.lsnmap[i].lsn = mp_decode_uint(&d);
-		if (request->data.lsnmap[i].node_id == node->id)
+		if (request->data.lsnmap[i].node_id == node_id)
 			remote_found = true;
 	}
 	if (!remote_found) {
 		/* Add remote node to the list */
-		request->data.lsnmap[lsnmap_size].node_id = node->id;
+		request->data.lsnmap[lsnmap_size].node_id = node_id;
 		request->data.lsnmap[lsnmap_size].lsn = 0;
 		++lsnmap_size;
 	}
@@ -387,7 +383,7 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 	request->io.data = request;
 	request->data.code = packet->code;
 	request->data.sync = packet->sync;
-	request->data.node_id = node->id;
+	request->data.node_id = node_id;
 	request->data.lsnmap_size = lsnmap_size;
 
 	ev_io_init(&request->io, replication_send_socket,
@@ -750,40 +746,22 @@ replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
 	struct recovery_state *r = recovery_state;
 
 	/* Don't duplicate data */
-	assert(r->local_node != NULL);
-	if (r->local_node->id == 0 || packet->node_id != r->local_node->id)  {
+	if (packet->node_id == 0 || packet->node_id != r->node_id)  {
 		packet->sync = replica.sync;
-		/* Encode length */
 		struct iovec iov[IPROTO_ROW_IOVMAX];
 		char fixheader[IPROTO_FIXHEADER_SIZE];
 		int iovcnt = iproto_encode_row(packet, iov, fixheader);
 		sio_writev_all(replica.sock, iov, iovcnt);
 	}
 
-	/*
-	 * Update LSN table
-	 * This code needed to recover_remaining_wals() logic.
-	 */
-	uint32_t k = mh_cluster_find(r->cluster, packet->node_id, NULL);
-	struct node *node;
-	if (k != mh_end(r->cluster)) {
-		node = *mh_cluster_node(r->cluster, k);
-	} else {
-		/* Create node if it doesn't exist */
-		node = (struct node *) calloc(1, sizeof(*node));
-		if (node == NULL) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(node),
-				  "r->cluster", "node");
-		}
-		k = mh_cluster_put(r->cluster, (const struct node **) &node,
-				   NULL, NULL);
-		if (k == mh_end(r->cluster)) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, 0,
-				  "r->cluster", "r->cluster");
-		}
-		node->id = packet->node_id;
+	if (iproto_request_is_dml(packet->code)) {
+		/*
+		 * Update local vclock. During normal operation wal_write()
+		 * updates local vclock. In relay mode we have to update
+		 * it here.
+		 */
+		vclock_set(&r->vclock, packet->node_id, packet->lsn);
 	}
-	node->current_lsn = packet->lsn;
 }
 
 static void
@@ -815,27 +793,13 @@ replication_relay_subscribe(struct recovery_state *r, struct relay_data *data)
 	assert(data->code == IPROTO_SUBSCRIBE);
 	/* Set LSNs */
 	for (uint32_t i = 0; i < data->lsnmap_size; i++) {
-		struct node *node = (struct node *) calloc(1, sizeof(*node));
-		if (node == NULL)
-			panic("cannot allocate struct node");
-		node->id = data->lsnmap[i].node_id;
-		node->current_lsn = data->lsnmap[i].lsn;
-		uint32_t k = mh_cluster_put(r->cluster,
-			(const struct node **) &node, NULL, NULL);
-		if (k == mh_end(r->cluster))
-			panic("cannot reallocate r->cluster");
+		vclock_set(&r->vclock, data->lsnmap[i].node_id,
+			       data->lsnmap[i].lsn);
 	}
 
-	/* Set node */
-	uint32_t k = mh_cluster_find(r->cluster, data->node_id, NULL);
-	assert(k != mh_end(r->cluster));
-	r->local_node = *mh_cluster_node(r->cluster, k);
-	assert(r->local_node->id == data->node_id);
+	/* Set node_id */
+	r->node_id = data->node_id;
 
-	/* Remove SNAPSHOT_NODE_ID */
-	recovery_fix_lsn(r, false);
-
-	say_warn("replication follow local");
 	recovery_follow_local(r, 0.1);
 	ev_run(loop(), 0);
 

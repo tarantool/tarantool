@@ -9,16 +9,16 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 --# set connection default, hot_standby, replica
 while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end;
 do
-    local pri_uuid = ''
+    local pri_id = ''
     local begin_lsn = 0
 
-    function _set_pri_lsn(_uuid, _lsn)
-        pri_uuid = _uuid
+    function _set_pri_lsn(_id, _lsn)
+        pri_id = _id
         begin_lsn = _lsn
     end
 
     function _get_pri_lsn()
-        return box.info.cluster[pri_uuid]
+        return box.info.vclock[pri_id]
     end
 
     function _print_lsn()
@@ -54,7 +54,7 @@ end;
 -- set begin lsn on master, replica and hot_standby.
 --# set variable replica_port to 'replica.primary_port'
 a = box.net.box.new('127.0.0.1', replica_port)
-a:call('_set_pri_lsn', box.info.node, box.info.cluster[box.info.node])
+a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
 a:close()
 
 space = box.schema.create_space('tweedledum')
@@ -74,7 +74,7 @@ box.fiber.sleep(0.2)
 -- uses MASTER_PORT environment variable for its primary_port
 --# set variable hot_standby_port to 'hot_standby.master_port'
 a = box.net.box.new('127.0.0.1', hot_standby_port)
-a:call('_set_pri_lsn', box.info.node, box.info.cluster[box.info.node])
+a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
 a:close()
 
 --# set connection hot_standby

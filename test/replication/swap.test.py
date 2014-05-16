@@ -28,8 +28,8 @@ replica.admin("while box.space['_priv']:len() < 1 do box.fiber.sleep(0.01) end")
 master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
 master.admin("s:create_index('primary', {type = 'hash'})")
 
-master_uuid = master.get_param('node')
-replica_uuid = replica.get_param('node')
+master_id = master.get_param('node')['id']
+replica_id = replica.get_param('node')['id']
 
 id = ID_BEGIN
 for i in range(REPEAT):
@@ -38,14 +38,14 @@ for i in range(REPEAT):
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
     # select from replica
-    replica.wait_lsn(master_uuid, master.get_lsn(master_uuid))
+    replica.wait_lsn(master_id, master.get_lsn(master_id))
     select_tuples(replica, id, id + ID_STEP)
     id += ID_STEP
 
     # insert to master
     insert_tuples(master, id, id + ID_STEP)
     # select from replica
-    replica.wait_lsn(master_uuid, master.get_lsn(master_uuid))
+    replica.wait_lsn(master_id, master.get_lsn(master_id))
     select_tuples(replica, id, id + ID_STEP)
     id += ID_STEP
 
@@ -62,14 +62,14 @@ for i in range(REPEAT):
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
     # select from master
-    master.wait_lsn(replica_uuid, replica.get_lsn(replica_uuid))
+    master.wait_lsn(replica_id, replica.get_lsn(replica_id))
     select_tuples(master, id, id + ID_STEP)
     id += ID_STEP
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
     # select from master
-    master.wait_lsn(replica_uuid, replica.get_lsn(replica_uuid))
+    master.wait_lsn(replica_id, replica.get_lsn(replica_id))
     select_tuples(master, id, id + ID_STEP)
     id += ID_STEP
 

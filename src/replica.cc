@@ -118,6 +118,8 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 {
 	say_info("bootstrapping replica");
 
+	recovery_begin_recover_snapshot(r);
+
 	/* Generate Node-UUID */
 	tt_uuid_create(&r->node_uuid);
 
@@ -187,6 +189,9 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 
 		recovery_process(r, &packet);
 	}
+
+	recovery_end_recover_snapshot(r);
+
 	say_info("done");
 	/* master socket closed by guard */
 }
@@ -206,7 +211,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	memset(&packet, 0, sizeof(packet));
 	packet.code = IPROTO_SUBSCRIBE;
 
-	uint32_t cluster_size = mh_size(r->cluster);
+	uint32_t cluster_size = vclock_size(&r->vclock);
 	size_t size = 128 + cluster_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
@@ -222,11 +227,9 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	data += UUID_LEN;
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
-	uint32_t k;
-	mh_foreach(r->cluster, k) {
-		struct node *node = *mh_cluster_node(r->cluster, k);
-		data = mp_encode_uint(data, node->id);
-		data = mp_encode_uint(data, node->current_lsn);
+	vclock_foreach(&r->vclock, it) {
+		data = mp_encode_uint(data, it.node_id);
+		data = mp_encode_uint(data, it.lsn);
 	}
 	assert(data <= buf + size);
 	packet.body[0].iov_base = buf;

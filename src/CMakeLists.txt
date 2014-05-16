@@ -48,6 +48,7 @@ set (common_sources
      stat.cc
      log_io.cc
      recovery.cc
+     vclock.cc
      admin.cc
      replica.cc
      iproto.cc

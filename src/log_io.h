@@ -124,13 +124,13 @@ int64_t
 log_dir_greatest(struct log_dir *dir);
 
 int64_t
-log_dir_next(struct log_dir *dir, struct mh_cluster_t *cluster);
+log_dir_next(struct log_dir *dir, struct vclock *vclock);
 
 char *
 format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 
 void
-log_encode_setlsn(struct iproto_packet *packet, struct mh_cluster_t *cluster);
+log_encode_setlsn(struct iproto_packet *packet, const struct vclock *vclock);
 
 struct log_setlsn_row {
 	uint32_t node_id;
