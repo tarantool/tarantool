@@ -92,7 +92,7 @@ download:
         ```ini
         [tarantool]
         name=Fedora-$releasever - Tarantool
-        baseurl=http://tarantool.org/dist/master/fedora/$releasever/os/$basearch/
+        baseurl=http://tarantool.org/dist/master/fedora/$releasever/$basearch/
         enabled=1
         gpgcheck=0
         ```
