@@ -188,6 +188,7 @@ box.space._space:select()
   - [296, 1, '_func', 'memtx', 0]
   - [304, 1, '_user', 'memtx', 0]
   - [312, 1, '_priv', 'memtx', 0]
+  - [320, 1, '_cluster', 'memtx', 0]
   - [512, 1, 'admin_space', 'memtx', 0, '']
 ...
 us = box.schema.create_space('uniuser_space')
@@ -343,6 +344,8 @@ box.space._index:select()
   - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
   - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
   - [312, 1, 'owner', 'tree', 0, 1, 1, 'num']
+  - [320, 0, 'primary', 'tree', 1, 1, 0, 'num']
+  - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
   - [512, 0, 'primary', 'hash', 1, 1, 0, 'NUM']
 ...
 box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
