@@ -6,7 +6,6 @@ CFG=$1
 ACTION=$2
 CONFIG_DIR=/var/lib/tarantool/started
 SNAPSHOT_DIR=/var/lib/tarantool/snapshot
-PID_DIR=/var/run/tarantool
 LOG_DIR=/var/log/tarantool
 BOX=/usr/bin/tarantool
 SSD=start-stop-daemon
@@ -53,9 +52,9 @@ fi
 
 NAME=`basename $CFG .cfg`
 
-PID=$PID_DIR/$NAME.pid
 SCFG=$CONFIG_DIR/$NAME
 RUNDIR=$SNAPSHOT_DIR/$NAME
+PID=$RUNDIR/tarantool.pid
 LOG=$LOG_DIR/$NAME.log
 LOGGER="exec /usr/lib/tarantool/logger $LOG"
 SOCKETS=`grep \
@@ -66,10 +65,6 @@ SOCKETS=`grep \
 
 if test -z $SOCKETS; then
     SOCKETS=1023
-fi
-
-if ! test -x $PID_DIR; then
-    install -otarantool -gtarantool -d -m0750 $PID_DIR
 fi
 
 SSDARGS_NO_PID="--quiet --chdir $RUNDIR --chuid tarantool --exec"
@@ -84,7 +79,6 @@ ulimit -c unlimited
 comment_str="#### - commented by init script"
 sed "s/^[[:space:]]*file_descriptors.*/# & $comment_str/" $CFG > $SCFG
 
-echo "pid_file = $PID"        >> $SCFG
 echo "logger   = \"$LOGGER\"" >> $SCFG
 grep '^[[:space:]]*admin_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
 grep '^[[:space:]]*primary_port[[:space:]]*=' $CFG |tail -n 1 >> $SCFG
