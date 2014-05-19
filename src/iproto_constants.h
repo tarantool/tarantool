@@ -78,8 +78,8 @@ enum iproto_key {
 
 #define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC) | bit(NODE_ID) | bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
-			  bit(OFFSET) | bit(KEY) | bit(TUPLE) | \
-			  bit(FUNCTION_NAME) | bit(USER_NAME))
+			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
+			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME))
 static inline bool
 iproto_header_has_key(const char *pos, const char *end)
 {
