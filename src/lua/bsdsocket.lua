@@ -473,6 +473,10 @@ socket_methods.accept = function(self)
         self._errno = box.errno()
         return nil
     end
+    
+    -- Make socket to be non-blocked by default
+    -- ignore result
+    ffi.C.bsdsocket_nonblock(fh, 1)
 
     local socket = { fh = fh }
     setmetatable(socket, box.socket.internal.socket_mt)
@@ -758,8 +762,10 @@ local function create_socket(self, domain, stype, proto)
 
     -- Make socket to be non-blocked by default
     if ffi.C.bsdsocket_nonblock(fh, 1) < 0 then
-         ffi.C.close(fh)
-         return nil
+        local errno = box.errno()
+        ffi.C.close(fh)
+        box.errno(errno)
+        return nil
     end
 
     local socket = { fh = fh }
