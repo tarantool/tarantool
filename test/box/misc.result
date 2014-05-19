@@ -196,6 +196,7 @@ t;
 ---
 - - 'box.error.ER_CREATE_FUNCTION : 50'
   - 'box.error.ER_PROC_RET : 21'
+  - 'box.error.ER_INVALID_ORDER : 68'
   - 'box.error.ER_TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.ER_FUNCTION_MAX : 54'
   - 'box.error.ER_TUPLE_NOT_FOUND : 4'

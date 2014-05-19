@@ -40,6 +40,7 @@
 #include "scoped_guard.h"
 #define MH_UNDEF 1 /* conflicts with mh_nodeids_t */
 #include "recovery.h" /* for mh_cluster */
+#include "vclock.h"
 
 /*
  * marker is MsgPack fixext2
@@ -363,7 +364,7 @@ log_dir_lsnmap_gtsearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
 }
 
 int64_t
-log_dir_next(struct log_dir *dir, struct mh_cluster_t *cluster)
+log_dir_next(struct log_dir *dir, struct vclock *vclock)
 {
 	int64_t result = INT64_MAX;
 	uint32_t k;
@@ -373,13 +374,10 @@ log_dir_next(struct log_dir *dir, struct mh_cluster_t *cluster)
 		 */
 		struct log_meta_lsn key;
 		key.node_id = *mh_nodeids_node(dir->nodeids, k);
-		key.lsn = 0;
+		key.lsn = vclock_get(vclock, key.node_id);
 		key.meta = NULL; /* this node is a key */
-		uint32_t m = mh_cluster_find(cluster, key.node_id, NULL);
-		if (m != mh_end(cluster)) {
-			struct node *node = *mh_cluster_node(cluster, m);
-			key.lsn = node->current_lsn;
-		}
+		if (key.lsn < 0)
+			key.lsn = 0;
 
 		struct log_meta *meta = NULL;
 
@@ -429,14 +427,14 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 }
 
 void
-log_encode_setlsn(struct iproto_packet *packet, struct mh_cluster_t *cluster)
+log_encode_setlsn(struct iproto_packet *packet, const struct vclock *vclock)
 {
 	memset(packet, 0, sizeof(*packet));
 	packet->code = IPROTO_SETLSN;
 	/* node_id and lsn should be set to zero for SETLSN command */
 	assert(packet->node_id == 0 && packet->lsn == 0);
 
-	uint32_t cluster_size = cluster != NULL ? mh_size(cluster) : 0;
+	uint32_t cluster_size = vclock != NULL ? vclock_size(vclock) : 0;
 	size_t size = 128 + cluster_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
@@ -444,14 +442,13 @@ log_encode_setlsn(struct iproto_packet *packet, struct mh_cluster_t *cluster)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
-	if (cluster != NULL) {
-		uint32_t k;
-		mh_foreach(cluster, k) {
-			struct node *node = *mh_cluster_node(cluster, k);
-			data = mp_encode_uint(data, node->id);
-			data = mp_encode_uint(data, node->current_lsn);
+	if (vclock != NULL) {
+		vclock_foreach(vclock, p) {
+			data = mp_encode_uint(data, p.node_id);
+			data = mp_encode_uint(data, p.lsn);
 		}
 	}
+
 	assert(data <= buf + size);
 	packet->body[0].iov_base = buf;
 	packet->body[0].iov_len = (data - buf);

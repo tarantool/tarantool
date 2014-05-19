@@ -24,7 +24,7 @@ string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
-#box.info.cluster > 0
+#box.info.node > 0
 ---
 - false
 ...
@@ -76,7 +76,6 @@ table.sort(t)
 t
 ---
 - - build
-  - cluster
   - logger_pid
   - node
   - pid
@@ -85,6 +84,7 @@ t
   - snapshot_pid
   - status
   - uptime
+  - vclock
   - version
 ...
 box.info.snapshot_pid

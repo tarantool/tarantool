@@ -49,7 +49,7 @@ print """
 admin("space:insert{1, 'Test tuple'}")
 
 pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
-lsn = yaml.load(admin("next(box.info.cluster)", silent=True))[1]
+lsn = int(yaml.load(admin("box.info.node.lsn", silent=True))[0])
 
 snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(server.vardir, snapshot)

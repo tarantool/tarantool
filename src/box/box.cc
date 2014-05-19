@@ -386,17 +386,14 @@ box_init()
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
-		recovery_fix_lsn(recovery_state, false);
 	} else if (replication_source != NULL) {
 		/* Initialize a new replica */
 		replica_bootstrap(recovery_state, replication_source);
-		recovery_fix_lsn(recovery_state, false);
 		snapshot_save(recovery_state);
 	} else {
 		/* Initialize a master node of a new cluster */
 		cluster_bootstrap(recovery_state);
 		box_set_cluster_uuid();
-		recovery_fix_lsn(recovery_state, true);
 		snapshot_save(recovery_state);
 	}
 

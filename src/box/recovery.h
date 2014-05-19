@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "log_io.h"
+#include "vclock.h"
 #include "tt_uuid.h"
 
 #if defined(__cplusplus)
@@ -59,35 +60,11 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MA
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
-/*
- * Cluster Node
- */
-struct node {
-	uint32_t id;
-	tt_uuid uuid;
-	int64_t current_lsn;
-	int64_t confirmed_lsn;
-};
-
-/*
- * Map: (node_id) => (struct node)
- */
-#define mh_name _cluster
-#define mh_key_t uint32_t
-#define mh_node_t struct node *
-#define mh_arg_t void *
-#define mh_hash(a, arg) ((*a)->id)
-#define mh_hash_key(a, arg) (a)
-#define mh_eq(a, b, arg) ((*a)->id == (*b)->id)
-#define mh_eq_key(key, node, arg) (key == (*node)->id)
-#include "salad/mhash.h"
-
 void
 mh_cluster_clean(struct mh_cluster_t *hash);
 
 struct recovery_state {
-	struct mh_cluster_t *cluster;
-	struct node *local_node;
+	struct vclock vclock;
 	/* The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
 	struct log_dir snap_dir;
@@ -113,6 +90,7 @@ struct recovery_state {
 	double wal_fsync_delay;
 	enum wal_mode wal_mode;
 	tt_uuid node_uuid;
+	uint32_t node_id;
 
 	bool finalize;
 };
@@ -145,7 +123,8 @@ int wal_write(struct recovery_state *r, struct iproto_packet *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_process(struct recovery_state *r, struct iproto_packet *packet);
-void recovery_fix_lsn(struct recovery_state *r, bool master_bootstrap);
+void recovery_begin_recover_snapshot(struct recovery_state *r);
+void recovery_end_recover_snapshot(struct recovery_state *r);
 
 struct fio_batch;
 
@@ -156,7 +135,7 @@ void snapshot_save(struct recovery_state *r);
 /* Only for tests */
 int
 wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
-		 struct mh_cluster_t *cluster);
+		 const struct vclock *vclock);
 
 #if defined(__cplusplus)
 } /* extern "C" */

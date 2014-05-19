@@ -8,7 +8,7 @@ from os.path import abspath
 # cleanup server.vardir
 server.stop()
 server.deploy()
-lsn = yaml.load(server.admin("next(box.info.cluster)", silent=True))[1]
+lsn = int(yaml.load(server.admin("box.info.node.lsn", silent=True))[0])
 server.stop()
 
 print """
@@ -139,7 +139,7 @@ lsn += 1
 server.stop()
 server.cfgfile_source = "box/panic_on_wal_error.cfg"
 server.deploy()
-lsn = yaml.load(server.admin("next(box.info.cluster)", silent=True))[1]
+lsn = int(yaml.load(server.admin("box.info.node.lsn", silent=True))[0])
 filename = str(lsn).zfill(20) + ".xlog"
 wal_old = os.path.join(server.vardir, "old_" + filename)
 wal = os.path.join(server.vardir, filename)

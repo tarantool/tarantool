@@ -26,57 +26,27 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "cluster.h"
-#include "recovery.h"
+
+#include "vclock.h"
 #include "exception.h"
 
-/**
- * Globally unique identifier of this cluster.
- * A cluster is a set of connected replicas.
- */
-static tt_uuid cluster_uuid;
-
 void
-cluster_set_id(const tt_uuid *uu)
+vclock_realloc(struct vclock *vclock, uint32_t node_id)
 {
-	/* Set cluster UUID. */
-	assert(tt_uuid_is_nil(&cluster_uuid));
-	cluster_uuid = *uu;
-}
+	uint32_t newcapacity = vclock->capacity ? vclock->capacity : 8;
+	while (newcapacity <= node_id)
+		newcapacity *= 2;
 
-const tt_uuid *
-cluster_id()
-{
-	return &cluster_uuid;
-}
-
-void
-cluster_check_id(const tt_uuid *uu)
-{
-	if (tt_uuid_cmp(uu, cluster_id()) != 0) {
-		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
-			  tt_uuid_str(uu), tt_uuid_str(cluster_id()));
+	int64_t *newlsn = (int64_t *) realloc(vclock->lsn,
+		newcapacity * sizeof(*vclock->lsn));
+	if (newlsn == NULL)
+		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
+			  newcapacity * sizeof(*vclock->lsn),
+			  "vclock", "reallock");
+	for (int64_t n = vclock->capacity; n < newcapacity; n++) {
+		newlsn[n] = -1; /* unknown node */
 	}
-}
 
-void
-cluster_add_node(const tt_uuid *node_uuid, cnode_id_t node_id)
-{
-	struct recovery_state *r = recovery_state;
-
-	assert(!tt_uuid_is_nil(node_uuid));
-	assert(!cnode_id_is_reserved(node_id));
-
-	/* Add node */
-	vclock_set(&r->vclock, node_id, 0);
-	say_debug("confirm node: {uuid = %s, id = %u}",
-		  tt_uuid_str(node_uuid), node_id);
-
-	/* Confirm Local node */
-	if (tt_uuid_cmp(&r->node_uuid, node_uuid) == 0) {
-		/* Confirm Local Node */
-		say_info("synchronized with cluster");
-		assert(r->node_id == 0);
-		r->node_id = node_id;
-	}
+	vclock->lsn = newlsn;
+	vclock->capacity = newcapacity;
 }

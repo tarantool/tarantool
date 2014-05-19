@@ -29,9 +29,9 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 	dir->dirname = strdup(mkdtemp(tpl));
 	dir->mode = 0660;
 
-	struct mh_cluster_t *cluster = mh_cluster_new();
-	assert(cluster != NULL);
 	for (int f = 0; f < files_n; f++) {
+		struct vclock vclock;
+		vclock_create(&vclock);
 		int64_t lsnsum = 0;
 		for (uint32_t node_id = 0; node_id < node_n; node_id++) {
 			int64_t lsn = *(files + f * node_n + node_id);
@@ -42,27 +42,19 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 			lsnsum += lsn;
 
 			/* Update cluster hash */
-			struct node *node = (struct node *)
-					calloc(1, sizeof(*node));
-			assert(node != NULL);
-			node->id = node_id;
-			node->current_lsn = lsn;
-			uint32_t k = mh_cluster_put(cluster,
-				(const struct node **) &node, NULL, NULL);
-			assert(k != mh_end(cluster));
+			vclock_set(&vclock, node_id, lsn);
 		}
 
 		/* Write XLOG */
 		struct log_io *l = log_io_open_for_write(dir, lsnsum, &node_uuid,
 							 INPROGRESS);
-		int rc = wal_write_setlsn(l, batch, cluster);
+		int rc = wal_write_setlsn(l, batch, &vclock);
 		assert(rc == 0);
 		(void) rc;
 		log_io_close(&l);
-		mh_cluster_clean(cluster);
+		vclock_destroy(&vclock);
 	}
 
-	mh_cluster_delete(cluster);
 	free(batch);
 
 	int rc = log_dir_scan(dir);
@@ -113,10 +105,9 @@ test_next(int64_t *files, int files_n, int node_n, int64_t *queries, int query_n
 	struct log_dir dir;
 	testset_create(&dir, (int64_t *) files, files_n, node_n);
 
-	struct mh_cluster_t *cluster = mh_cluster_new();
-	assert(cluster != NULL);
-
 	for (int q = 0; q < query_n; q++) {
+		struct vclock vclock;
+		vclock_create(&vclock);
 		int64_t *query = (int64_t *) queries + q * (node_n + 1);
 
 		/* Update cluster hash */
@@ -125,22 +116,16 @@ test_next(int64_t *files, int files_n, int node_n, int64_t *queries, int query_n
 			if (lsn <= 0)
 				continue;
 
-			struct node *node = (struct node *) calloc(1, sizeof(*node));
-			assert(node != NULL);
-			node->id = node_id;
-			node->current_lsn = lsn;
-			uint32_t k = mh_cluster_put(cluster,
-				(const struct node **) &node, NULL, NULL);
-			assert(k != mh_end(cluster));
+			vclock_set(&vclock, node_id, lsn);
 		}
 
 		int64_t check = *(query + node_n);
-		int64_t value = log_dir_next(&dir, cluster);
+		int64_t value = log_dir_next(&dir, &vclock);
 		is(value, check, "query #%d", q + 1);
-		mh_cluster_clean(cluster);
+
+		vclock_destroy(&vclock);
 	}
 
-	mh_cluster_delete(cluster);
 	testset_destroy(&dir);
 }
 

@@ -36,6 +36,7 @@ add_library(box
     box.cc
     access.cc
     authentication.cc
+    vclock.cc
     cluster.cc
     log_io.cc
     recovery.cc
