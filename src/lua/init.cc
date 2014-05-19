@@ -53,6 +53,7 @@ extern "C" {
 #include "lua/stat.h"
 #include "lua/session.h"
 #include "lua/cjson.h"
+#include "bsdsocket.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -62,7 +63,6 @@ extern "C" {
 #include <stdio.h>
 #include "scoped_guard.h"
 #include "errno.h"
-#include "../bsdsocket.h"
 
 extern "C" {
 #include <cfg/tarantool_box_cfg.h>

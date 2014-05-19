@@ -124,8 +124,8 @@ set (common_sources
      lua/session.cc
      lua/cjson.cc
      lua/errno.c
+     lua/bsdsocket.cc
      fiob.c
-     bsdsocket.cc
      ${lua_sources}
 )
 

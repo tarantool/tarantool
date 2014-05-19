@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include "bsdsocket.h"
+
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -35,42 +37,22 @@
 #include <netdb.h>
 #include <string.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <lj_obj.h>
-#include <lj_ctype.h>
-#include <lj_cdata.h>
-#include <lj_cconv.h>
 }
 
-#include <arpa/inet.h>
-#include <lib/bit/bit.h>
 #include <coeio.h>
-#include <unistd.h>
 #include <fiber.h>
-#include <say.h>
 #include <scoped_guard.h>
-
-#include "bsdsocket.h"
 
 extern char bsdsocket_lua[];
 
 static const struct { char name[32]; int value; } domains[] = {
-	{ "PF_UNIX",		PF_UNIX		},
-	{ "PF_LOCAL",		PF_LOCAL	},
-	{ "PF_INET",		PF_INET		},
-	{ "PF_INET6",		PF_INET6	},
-	{ "PF_IPX",		PF_IPX		},
-	{ "PF_NETLINK",		PF_NETLINK	},
-	{ "PF_X25",		PF_X25		},
-	{ "PF_AX25",		PF_AX25		},
-	{ "PF_ATMPVC",		PF_ATMPVC	},
-	{ "PF_APPLETALK",	PF_APPLETALK	},
-	{ "PF_PACKET",		PF_PACKET	},
-
 	{ "AF_UNIX",		AF_UNIX		},
 	{ "AF_LOCAL",		AF_LOCAL	},
 	{ "AF_INET",		AF_INET		},
@@ -216,92 +198,56 @@ static const struct { char name[32]; int value; } ai_flags[] = {
 };
 
 int
-bsdsocket_protocol(const char *proto)
+bsdsocket_local_resolve(const char *host, const char *port,
+			struct sockaddr *addr, socklen_t *socklen)
 {
-	struct protoent *p = getprotobyname(proto);
-	if (!p) {
-		errno = EINVAL;
-		return -1;
-	}
-	return p->p_proto;
-}
-
-
-struct dns_res {
-	struct sockaddr *sa;
-	socklen_t salen;
-};
-
-
-
-static struct dns_res *
-local_resolve(const char *host, const char *port)
-{
-	static struct dns_res dns;
-	memset(&dns, 0, sizeof(dns));
-
 	if (strcmp(host, "unix/") == 0) {
-		static struct sockaddr_un uaddr;
-		uaddr.sun_family = AF_UNIX;
-		strncpy(uaddr.sun_path, port, sizeof(uaddr.sun_path));
-
-		dns.sa = (struct sockaddr *)&uaddr;
-		dns.salen = sizeof(uaddr);
-		return &dns;
+		struct sockaddr_un *uaddr = (struct sockaddr_un *) addr;
+		if (*socklen < sizeof(*uaddr)) {
+			errno = ENOBUFS;
+			return -1;
+		}
+		memset(uaddr, 0, sizeof(*uaddr));
+		uaddr->sun_family = AF_UNIX;
+		strncpy(uaddr->sun_path, port, sizeof(uaddr->sun_path));
+		*socklen = sizeof(*uaddr);
+		return 0;
 	}
 
 	/* IPv4 */
 	in_addr_t iaddr = inet_addr(host);
 	if (iaddr != (in_addr_t)(-1)) {
-		static struct sockaddr_in in;
-		in.sin_family = AF_INET;
-		in.sin_addr.s_addr = iaddr;
-
-		in.sin_port = htons(atoi(port));
-
-		dns.sa = (struct sockaddr *)&in;
-		dns.salen = sizeof(in);
-		return &dns;
+		struct sockaddr_in *inaddr = (struct sockaddr_in *) addr;
+		if (*socklen < sizeof(*inaddr)) {
+			errno = ENOBUFS;
+			return -1;
+		}
+		memset(inaddr, 0, sizeof(*inaddr));
+		inaddr->sin_family = AF_INET;
+		inaddr->sin_addr.s_addr = iaddr;
+		inaddr->sin_port = htons(atoi(port));
+		*socklen = sizeof(*inaddr);
+		return 0;
 	}
 
 	/* IPv6 */
 	char ipv6[16];
 	if (inet_pton(AF_INET6, host, ipv6) == 1) {
-		struct sockaddr_in6 in6;
-		memset(&in6, 0, sizeof(in6));
-		in6.sin6_family = AF_INET6;
-		in6.sin6_port = htonl(atol(port));
-		memcpy(in6.sin6_addr.s6_addr, ipv6, 16);
-
-		dns.sa = (struct sockaddr *)&in6;
-		dns.salen = sizeof(in6);
-		return &dns;
+		struct sockaddr_in6 *inaddr6 = (struct sockaddr_in6 *) addr;
+		if (*socklen < sizeof(*inaddr6)) {
+			errno = ENOBUFS;
+			return -1;
+		}
+		memset(inaddr6, 0, sizeof(*inaddr6));
+		inaddr6->sin6_family = AF_INET6;
+		inaddr6->sin6_port = htonl(atol(port));
+		memcpy(inaddr6->sin6_addr.s6_addr, ipv6, 16);
+		*socklen = sizeof(*inaddr6);
+		return 0;
 	}
 
 	errno = EINVAL;
-	return NULL;
-}
-
-int
-bsdsocket_sysconnect(int fh, const char *host, const char *port)
-{
-	struct dns_res *dns = local_resolve(host, port);
-	if (!dns) {
-		errno = EINVAL;
-		return -1;
-	}
-	return connect(fh, dns->sa, dns->salen);;
-}
-
-int
-bsdsocket_bind(int fh, const char *host, const char *port)
-{
-	struct dns_res *dns = local_resolve(host, port);
-	if (!dns) {
-		errno = EINVAL;
-		return -1;
-	}
-	return bind(fh, dns->sa, dns->salen);;
+	return -1;
 }
 
 int
@@ -356,7 +302,6 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 	int events = lua_tointeger(L, 2);
 	ev_tstamp timeout = lua_tonumber(L, 3);
 
-
 	switch(events) {
 		case 0:
 			events = EV_READ;
@@ -368,7 +313,7 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 			events = EV_READ | EV_WRITE;
 			break;
 		default:
-			abort();
+			assert(false);
 	}
 
 	struct ev_io io;
@@ -411,8 +356,6 @@ bsdsocket_getaddrinfo_cb(va_list ap)
 		case EAI_SYSTEM:
 			*res_errno = errno;
 			return -1;
-
-
 		default:
 			*res_errno = rc;
 			return -1;
@@ -453,7 +396,6 @@ lbox_bsdsocket_push_family(struct lua_State *L, int family)
 		case AF_PACKET:
 			lua_pushliteral(L, "AF_PACKET");
 			break;
-
 		default:
 			lua_pushinteger(L, family);
 			break;
@@ -535,7 +477,6 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 				lua_rawset(L, -3);
 			}
 
-
 			break;
 		}
 
@@ -612,7 +553,7 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 		return 1;
 	}
 
-        auto scope_guard = make_scoped_guard([&]{
+	auto scope_guard = make_scoped_guard([&]{
 		freeaddrinfo(result);
 	});
 
@@ -642,7 +583,6 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 			lua_pushstring(L, rp->ai_canonname);
 			lua_rawset(L, -3);
 		}
-
 
 		lua_rawset(L, -3);
 
@@ -696,7 +636,6 @@ lbox_bsdsocket_soname(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 lbox_bsdsocket_peername(struct lua_State *L)
 {
@@ -715,7 +654,6 @@ lbox_bsdsocket_peername(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 lbox_bsdsocket_recvfrom(struct lua_State *L)
 {
@@ -733,7 +671,7 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 		return 1;
 	}
 
-        auto scope_guard = make_scoped_guard([&]{ free(buf); });
+	auto scope_guard = make_scoped_guard([&]{ free(buf); });
 
 	ssize_t res = recvfrom(fh, buf, size, flags,
 		(struct sockaddr*)&fa, &len);
@@ -745,19 +683,6 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 	lua_pushlstring(L, buf, res);
 	lbox_bsdsocket_push_addr(L, (struct sockaddr *)&fa, len);
 	return 2;
-}
-
-
-int
-bsdsocket_sendto(int fh, const char *host, const char *port,
-	const void *octets, size_t len, int flags)
-{
-	struct dns_res *dns = local_resolve(host, port);
-	if (!dns) {
-		errno = EINVAL;
-		return -1;
-	}
-	return sendto(fh, octets, len, flags, dns->sa, dns->salen);
 }
 
 void
@@ -774,7 +699,6 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ NULL,			NULL				}
 	};
 
-
 	if (luaL_dostring(L, bsdsocket_lua))
 		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
 			      lua_tostring(L, -1));
@@ -783,15 +707,18 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	lua_getfield(L, -1, "socket");
 	lua_getfield(L, -1, "internal");
 
-
 	luaL_register(L, NULL, internal_methods);
-
 
 	/* domains table */
 	lua_pushliteral(L, "DOMAIN");
 	lua_newtable(L);
 	for (int i = 0; domains[i].name[0]; i++) {
 		lua_pushstring(L, domains[i].name);
+		lua_pushinteger(L, domains[i].value);
+		lua_rawset(L, -3);
+		lua_pushliteral(L, "PF_");  /* Add PF_ alias */
+		lua_pushstring(L, domains[i].name + 3);
+		lua_concat(L, 2);
 		lua_pushinteger(L, domains[i].value);
 		lua_rawset(L, -3);
 	}
@@ -827,7 +754,6 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	}
 	lua_rawset(L, -3);
 
-
 	/* SO_OPT */
 	lua_pushliteral(L, "SO_OPT");
 	lua_newtable(L);
@@ -856,15 +782,5 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	lua_pushinteger(L, SOL_SOCKET);
 	lua_rawset(L, -3);
 
-	/* constants */
-	lua_pushliteral(L, "INT_SIZE");
-	lua_pushinteger(L, sizeof(int));
-	lua_rawset(L, -3);
-	lua_pushliteral(L, "SIZE_T_SIZE");
-	lua_pushinteger(L, sizeof(size_t));
-	lua_rawset(L, -3);
-
-
 	lua_settop(L, top);
 }
-

@@ -3,25 +3,9 @@ lua type(box.socket)
 ---
  - table
 ...
-lua box.socket:errno()
----
- - 0
-...
-lua type(box.socket:error())
----
- - nil
-...
-lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222')
----
- - nil
-...
-lua box.socket:errno() ~= 0
+lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222'); return box.errno() ~= 0
 ---
  - true
-...
-lua type(box.socket:error())
----
- - string
 ...
 lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
@@ -45,6 +29,10 @@ lua s:errno()
 lua type(s:error())
 ---
  - nil
+...
+lua s:nonblock(false)
+---
+ - false
 ...
 lua s:sysconnect('127.0.0.1', box.cfg.primary_port)
 ---
@@ -147,10 +135,6 @@ lua s:error()
 ---
  - nil
 ...
-lua s:nonblock(true)
----
- - true
-...
 lua s:bind('127.0.0.1', 3457)
 ---
  - true
@@ -176,6 +160,10 @@ lua #sevres
 ...
 lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
+...
+lua sc:nonblock(false)
+---
+ - false
 ...
 lua sc:sysconnect('127.0.0.1', 3457)
 ---
@@ -231,7 +219,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:282: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:307: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -277,10 +265,6 @@ lua s:close()
 lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-lua s:nonblock(true)
----
- - true
-...
 lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 ---
  - true
@@ -295,10 +279,6 @@ lua s:listen(128)
 ...
 lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
-...
-lua sc:nonblock(true)
----
- - true
 ...
 lua sc:writable()
 ---
@@ -461,7 +441,7 @@ lua s ~= nil
 ...
 lua s:nonblock()
 ---
- - false
+ - true
 ...
 lua s:nonblock(true)
 ---

@@ -7,30 +7,49 @@ local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local ffi = require 'ffi'
 
 ffi.cdef[[
-    int write(int fh, const char *octets, size_t len);
-    int read(int fh, char *buf, size_t len);
+    typedef uint32_t socklen_t;
+    typedef ptrdiff_t ssize_t;
+
+    int connect(int sockfd, const struct sockaddr *addr,
+                socklen_t addrlen);
+    int bind(int sockfd, const struct sockaddr *addr,
+                socklen_t addrlen);
+
+    ssize_t write(int fh, const char *octets, size_t len);
+    ssize_t read(int fd, void *buf, size_t count);
     int listen(int fh, int backlog);
     int socket(int domain, int type, int protocol);
     int close(int s);
     int shutdown(int s, int how);
-    int send(int s, const void *msg, size_t len, int flags);
-    int recv(int s, void *buf, size_t len, int flags);
+    ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+    ssize_t recv(int s, void *buf, size_t len, int flags);
     int accept(int s, void *addr, void *addrlen);
+    ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+                   const struct sockaddr *dest_addr, socklen_t addrlen);
 
-    int bsdsocket_protocol(const char *proto);
-    int bsdsocket_sysconnect(int fh, const char *host, const char *port);
-    int bsdsocket_bind(int fh, const char *host, const char *port);
+    int
+    bsdsocket_local_resolve(const char *host, const char *port,
+                            struct sockaddr *addr, socklen_t *socklen);
     int bsdsocket_nonblock(int fh, int mode);
-    int bsdsocket_sendto(int fh, const char *host, const char *port,
-	const void *octets, size_t len, int flags);
-
 
     int setsockopt(int s, int level, int iname, const void *opt, size_t optlen);
     int getsockopt(int s, int level, int iname, void *ptr, size_t *optlen);
 
-
     typedef struct { int active; int timeout; } linger_t;
+
+    struct protoent {
+        char  *p_name;       /* official protocol name */
+        char **p_aliases;    /* alias list */
+        int    p_proto;      /* protocol number */
+    };
+    struct protoent *getprotobyname(const char *name);
 ]]
+
+ffi.cdef([[
+struct sockaddr {
+    char _data[256]; /* enough to fit any address */
+};
+]]);
 
 local function sprintf(fmt, ...)
     return string.format(fmt, ...)
@@ -38,23 +57,6 @@ end
 
 local function printf(fmt, ...)
     print(sprintf(fmt, ...))
-end
-
-
-local function errno(self)
-    if self['_errno'] == nil then
-        return 0
-    else
-        return self['_errno']
-    end
-end
-
-local function errstr(self)
-    if self['_errno'] == nil then
-        return nil
-    else
-        return box.errno.strerror(self._errno)
-    end
 end
 
 local function get_ivalue(table, key)
@@ -82,16 +84,35 @@ local function get_iflags(table, flags)
 end
 
 local socket_methods  = {}
-socket_methods.errno = errno
-socket_methods.error = errstr
-    
+socket_methods.errno = function(self)
+    if self['_errno'] == nil then
+        return 0
+    else
+        return self['_errno']
+    end
+end
+
+socket_methods.error = function(self)
+    if self['_errno'] == nil then
+        return nil
+    else
+        return box.errno.strerror(self._errno)
+    end
+end
+
+local addr = ffi.new('struct sockaddr')
+local addr_len = ffi.new('socklen_t[1]')
 socket_methods.sysconnect = function(self, host, port)
     self._errno = nil
 
     host = tostring(host)
     port = tostring(port)
 
-    local res = ffi.C.bsdsocket_sysconnect(self.fh, host, port)
+    addr_len[0] = ffi.sizeof(addr)
+    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    if res == 0 then
+        res = ffi.C.connect(self.fh, addr, addr_len[0]);
+    end
     if res == 0 then
         return true
     end
@@ -191,7 +212,7 @@ socket_methods.wait = function(self, timeout)
     end
     return res
 end
-    
+
 socket_methods.writable = function(self, timeout)
     self._errno = nil
     if timeout == nil then
@@ -226,10 +247,15 @@ socket_methods.bind = function(self, host, port)
     host = tostring(host)
     port = tostring(port)
 
-    local res = ffi.C.bsdsocket_bind(self.fh, host, port)
+    addr_len[0] = ffi.sizeof(addr)
+    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    if res == 0 then
+        res = ffi.C.bind(self.fh, addr, addr_len[0]);
+    end
     if res == 0 then
         return true
     end
+
     self._errno = box.errno()
     return false
 end
@@ -243,7 +269,6 @@ socket_methods.close = function(self)
         return true
     end
 end
-
 
 socket_methods.shutdown = function(self, how)
     local hvariants = {
@@ -288,11 +313,12 @@ socket_methods.setsockopt = function(self, level, name, value)
         if level == 'SOL_SOCKET' then
             level = box.socket.internal.SOL_SOCKET
         else
-            level = ffi.C.bsdsocket_protocol(level)
-            if level == -1 then
+            local p = ffi.C.getprotobyname(level)
+            if p == nil then
                 self._errno = box.errno()
                 return false
             end
+            level = p.p_proto
         end
     else
         level = tonumber(level)
@@ -309,7 +335,7 @@ socket_methods.setsockopt = function(self, level, name, value)
     if info.type == 1 then
         local value = ffi.new("int[1]", value)
         local res = ffi.C.setsockopt(self.fh,
-            level, info.iname, value, box.socket.internal.INT_SIZE)
+            level, info.iname, value, ffi.sizeof('int'))
 
         if res < 0 then
             self._errno = box.errno()
@@ -320,7 +346,7 @@ socket_methods.setsockopt = function(self, level, name, value)
 
     if info.type == 2 then
         local res = ffi.C.setsockopt(self.fh,
-            level, info.iname, value, box.socket.internal.SIZE_T_SIZE)
+            level, info.iname, value, ffi.sizeof('size_t'))
         if res < 0 then
             self._errno = box.errno()
             return false
@@ -347,11 +373,12 @@ socket_methods.getsockopt = function(self, level, name)
         if level == 'SOL_SOCKET' then
             level = box.socket.internal.SOL_SOCKET
         else
-            level = ffi.C.bsdsocket_protocol(level)
-            if level == -1 then
-                self._errno = box.errno()
+            local p = ffi.C.getprotobyname(level)
+            if p == nil then
+                self._errno = box.errno(box.errno.EINVAL)
                 return nil
             end
+            level = p.p_proto
         end
     else
         level = tonumber(level)
@@ -360,7 +387,7 @@ socket_methods.getsockopt = function(self, level, name)
 
     if info.type == 1 then
         local value = ffi.new("int[1]", 0)
-        local len = ffi.new("size_t[1]", box.socket.internal.INT_SIZE)
+        local len = ffi.new("size_t[1]", ffi.sizeof('int'))
         local res = ffi.C.getsockopt(self.fh, level, info.iname, value, len)
 
         if res < 0 then
@@ -397,7 +424,7 @@ socket_methods.linger = function(self, active, timeout)
     self._errno = nil
     if active == nil then
         local value = ffi.new("linger_t[1]")
-        local len = ffi.new("size_t[1]", 2 * box.socket.internal.INT_SIZE)
+        local len = ffi.new("size_t[1]", 2 * ffi.sizeof('int'))
         local res = ffi.C.getsockopt(self.fh,
             box.socket.internal.SOL_SOCKET, info.iname, value, len)
         if res < 0 then
@@ -425,7 +452,7 @@ socket_methods.linger = function(self, active, timeout)
 
     local value = ffi.new("linger_t[1]",
         { { active = iactive, timeout = timeout } })
-    local len = 2 * box.socket.internal.INT_SIZE
+    local len = 2 * ffi.sizeof('int')
     local res = ffi.C.setsockopt(self.fh,
         box.socket.internal.SOL_SOCKET, info.iname, value, len)
     if res < 0 then
@@ -435,7 +462,6 @@ socket_methods.linger = function(self, active, timeout)
 
     return active, timeout
 end
-
 
 socket_methods.accept = function(self)
 
@@ -452,7 +478,6 @@ socket_methods.accept = function(self)
     setmetatable(socket, box.socket.internal.socket_mt)
     return socket
 end
-
 
 socket_methods.read = function(self, size, timeout)
     if timeout == nil then
@@ -507,7 +532,6 @@ socket_methods.read = function(self, size, timeout)
     return nil
 end
 
-
 local function readline_check(self, eols, limit)
     local rbuf = self.rbuf
     if rbuf == nil then
@@ -531,7 +555,6 @@ local function readline_check(self, eols, limit)
 end
 
 socket_methods.readline = function(self, limit, eol, timeout)
-
     if type(limit) == 'table' then -- :readline({eol}[, timeout ])
         if eol ~= nil then
             timeout = eol
@@ -663,7 +686,6 @@ socket_methods.recv = function(self, size, flags)
     return ffi.string(buf, res)
 end
 
-
 socket_methods.recvfrom = function(self, size, flags)
     local iflags = get_iflags(box.socket.internal.SEND_FLAGS, flags)
     if iflags == nil then
@@ -696,9 +718,12 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     port = tostring(port)
     octets = tostring(octets)
 
-    local res = ffi.C.bsdsocket_sendto(self.fh, host, port,
-        octets, string.len(octets), iflags)
-
+    addr_len[0] = ffi.sizeof(addr)
+    local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
+    if res == 0 then
+        res = ffi.C.sendto(self.fh, octets, string.len(octets), iflags,
+            addr, addr_len[0])
+    end
     if res < 0 then
         self._errno = box.errno()
         return false
@@ -706,41 +731,41 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     return true
 end
 
-
 local function create_socket(self, domain, stype, proto)
-
-    self._errno = nil
-
     local idomain = get_ivalue(box.socket.internal.DOMAIN, domain)
     if idomain == nil then
-        self._errno = box.errno.EINVAL
+        box.errno(box.errno.EINVAL)
         return nil
     end
 
     local itype = get_ivalue(box.socket.internal.SO_TYPE, stype)
     if itype == nil then
-        self._errno = box.errno.EINVAL
+        box.errno(box.errno.EINVAL)
         return nil
     end
 
-    local iproto = ffi.C.bsdsocket_protocol(proto)
-    if iproto == -1 then
-        self._errno = box.errno()
+    local p = ffi.C.getprotobyname(proto)
+    if p == nil then
+        box.errno(box.errno.EINVAL)
         return nil
     end
-
+    local iproto = p.p_proto
 
     local fh = ffi.C.socket(idomain, itype, iproto)
     if fh < 0 then
-        self._errno = box.errno()
         return nil
+    end
+
+    -- Make socket to be non-blocked by default
+    if ffi.C.bsdsocket_nonblock(fh, 1) < 0 then
+         ffi.C.close(fh)
+         return nil
     end
 
     local socket = { fh = fh }
     setmetatable(socket, box.socket.internal.socket_mt)
     return socket
 end
-
 
 local function getaddrinfo(host, port, timeout, opts)
     local self = box.socket
@@ -775,12 +800,12 @@ local function getaddrinfo(host, port, timeout, opts)
         end
 
         if opts.protocol ~= nil then
-            local iproto = ffi.C.bsdsocket_protocol(opts.protocol)
-            if iproto == -1 then
-                self._errno = box.errno()
+            local p = ffi.C.getprotobyname(opts.protocol)
+            if p == nil then
+                self._errno = box.errno(box.errno.EINVAL)
                 return nil
             end
-            ga_opts.protocol = iproto
+            ga_opts.protocol = p.p_proto
         end
 
         if opts.flags ~= nil then
@@ -838,8 +863,6 @@ box.socket.internal = {
 setmetatable(box.socket, {
     __call = create_socket,
     __index = {
-        errno = errno,
-        error = errstr,
         getaddrinfo = getaddrinfo,
     }
 })

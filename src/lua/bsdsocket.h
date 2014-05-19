@@ -27,10 +27,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_BOX_RAWSOCKET_H_INCLUDED
-#define TARANTOOL_BOX_RAWSOCKET_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_BSDSOCKET_H
+#define INCLUDES_TARANTOOL_LUA_BSDSOCKET_H
 
 #include <stddef.h>
+#include <sys/socket.h>
 
 struct lua_State;
 void tarantool_lua_bsdsocket_init(struct lua_State *L);
@@ -39,9 +40,9 @@ void tarantool_lua_bsdsocket_init(struct lua_State *L);
 extern "C" {
 #endif
 
-int bsdsocket_protocol(const char *proto);
-int bsdsocket_sysconnect(int fh, const char *host, const char *port);
-int bsdsocket_bind(int fh, const char *host, const char *port);
+int
+bsdsocket_local_resolve(const char *host, const char *port,
+			struct sockaddr *addr, socklen_t *socklen);
 int bsdsocket_nonblock(int fh, int mode);
 int bsdsocket_sendto(int fh, const char *host, const char *port,
 	const void *octets, size_t len, int flags);
@@ -50,4 +51,4 @@ int bsdsocket_sendto(int fh, const char *host, const char *port,
 }
 #endif
 
-#endif /* TARANTOOL_BOX_RAWSOCKET_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_LUA_BSDSOCKET_H */

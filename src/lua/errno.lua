@@ -11,6 +11,9 @@ ffi.cdef[[
 ]]
 
 box.errno.strerror = function(errno)
+    if errno == nil then
+        errno = box.errno()
+    end
     return ffi.string(ffi.C.strerror(tonumber(errno)))
 end
 

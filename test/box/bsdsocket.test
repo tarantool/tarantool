@@ -6,12 +6,7 @@ import os.path
 
 print("bsdsocket tests")
 exec admin "lua type(box.socket)"
-exec admin "lua box.socket:errno()"
-exec admin "lua type(box.socket:error())"
-exec admin "lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222')"
-exec admin "lua box.socket:errno() ~= 0"
-exec admin "lua type(box.socket:error())"
-
+exec admin "lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222'); return box.errno() ~= 0"
 exec admin "lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua s:wait(.01)"
 exec admin "lua type(s)"
@@ -19,7 +14,7 @@ exec admin "lua s"
 exec admin "lua s:errno()"
 exec admin "lua type(s:error())"
 
-
+exec admin "lua s:nonblock(false)"
 exec admin "lua s:sysconnect('127.0.0.1', box.cfg.primary_port)"
 exec admin "lua s:nonblock(true)"
 exec admin "lua s:nonblock()"
@@ -46,11 +41,9 @@ exec admin "lua s:readable(1)"
 exec admin "lua string.len(s:sysread(4096))"
 exec admin "lua s:close()"
 
-
 exec admin "lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)"
 exec admin "lua s:error()"
-exec admin "lua s:nonblock(true)"
 exec admin "lua s:bind('127.0.0.1', 3457)"
 exec admin "lua s:error()"
 exec admin "lua s:listen(128)"
@@ -58,8 +51,8 @@ exec admin "lua sevres = {}"
 exec admin "lua type(box.fiber.wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))"
 exec admin "lua #sevres"
 
-
 exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
+exec admin "lua sc:nonblock(false)"
 exec admin "lua sc:sysconnect('127.0.0.1', 3457)"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:readable(.5)"
@@ -86,15 +79,12 @@ exec admin "lua s:linger()"
 exec admin "lua s:shutdown('R')"
 exec admin "lua s:close()"
 
-
 exec admin "lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
-exec admin "lua s:nonblock(true)"
 exec admin "lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)"
 exec admin "lua s:bind('127.0.0.1', 3457)"
 exec admin "lua s:listen(128)"
 
 exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
-exec admin "lua sc:nonblock(true)"
 
 exec admin "lua sc:writable()"
 exec admin "lua sc:readable()"
@@ -123,7 +113,6 @@ exec admin "lua sa:readable()"
 exec admin "lua sa:recv()"
 exec admin "lua sa:recv()"
 
-
 exec admin "lua sc:send('Hello')"
 exec admin "lua sc:send(', world')"
 exec admin "lua sc:send(\"\\nnew line\")"
@@ -139,7 +128,6 @@ exec admin "lua sa:read(100, 1)"
 exec admin "lua sa:read(100, 1)"
 exec admin "lua sa:close()"
 exec admin "lua sc:close()"
-
 
 exec admin "lua s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')"
 exec admin "lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)"
@@ -158,14 +146,11 @@ exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:sysconnect('unix/', '/tmp/tarantool-test-socket')"
 exec admin "lua sc:error()"
 
-
 exec admin "lua s:readable()"
 exec admin "lua sa = s:accept()"
 exec admin "lua sa:nonblock(true)"
 exec admin "lua sa:send('Hello, world')"
 exec admin "lua sc:recv()"
-
-
 
 exec admin "lua sc:close()"
 exec admin "lua sa:close()"
@@ -180,8 +165,6 @@ exec admin "lua aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol
 exec admin "lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0"
 exec admin "lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0"
 
-
-
 exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua tostring(sc)"
 exec admin "lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')"
@@ -194,7 +177,6 @@ exec admin "lua string.match(tostring(sc), ', peer') == nil"
 exec admin "lua box.errno.strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))"
 
 exec admin "lua box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80', { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))"
-
 
 exec admin "lua sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua box.cjson.encode(sc:name())"
@@ -211,14 +193,8 @@ exec admin "lua s:recv(4096)"
 exec admin "lua sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')"
 exec admin "lua s:readable(10)"
 exec admin "lua local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}"
-
-
 exec admin "lua s:close()"
 exec admin "lua sc:close()"
-
-
-
-
 
 exec admin "lua s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')"
 exec admin "lua s:nonblock(true)"
@@ -239,7 +215,3 @@ exec admin "lua from_r.host"
 exec admin "lua from_r.port == s:name().port"
 exec admin "lua s:close()"
 exec admin "lua sc:close()"
-
-
-
-
