@@ -156,7 +156,6 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 	{"SO_PASSCRED",		SO_PASSCRED,		1,	1, },
 	{"SO_PEERCRED",		SO_PEERCRED,		1,	0, },
 	{"SO_PRIORITY",		SO_PRIORITY,		1,	1, },
-	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
 	{"SO_RCVBUF",		SO_RCVBUF,		1,	1, },
 	{"SO_RCVBUFFORCE",	SO_RCVBUFFORCE,		1,	1, },
 	{"SO_RCVLOWAT",		SO_RCVLOWAT,		1,	1, },
@@ -167,7 +166,18 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 	{"SO_SNDBUF",		SO_SNDBUF,		1,	1, },
 	{"SO_SNDBUFFORCE",	SO_SNDBUFFORCE,		1,	1, },
 	{"SO_TIMESTAMP",	SO_TIMESTAMP,		1,	1, },
+
+#ifdef SO_PROTOCOL
+	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
+#else
+	#define SO_PROTOCOL	38
+#endif
+
+#ifdef SO_TYPE
 	{"SO_TYPE",		SO_TYPE,		1,	0, },
+#else
+	#define SO_TYPE		3
+#endif
 
 	{"",			0,			0,	0, }
 };
