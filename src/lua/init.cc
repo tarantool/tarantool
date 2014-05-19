@@ -49,7 +49,9 @@ extern "C" {
 #include "lua/admin.h"
 #include "lua/errinj.h"
 #include "lua/ipc.h"
+#include "lua/errno.h"
 #include "lua/socket.h"
+#include "lua/bsdsocket.h"
 #include "lua/info.h"
 #include "lua/stat.h"
 #include "lua/session.h"
@@ -289,7 +291,9 @@ tarantool_lua_init()
 	tarantool_lua_info_init(L);
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
+	tarantool_lua_errno_init(L);
 	tarantool_lua_socket_init(L);
+	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
 	luaopen_msgpack(L);

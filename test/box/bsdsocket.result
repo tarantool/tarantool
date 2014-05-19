@@ -1,0 +1,720 @@
+type(box.socket)
+---
+- table
+...
+box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+---
+- null
+...
+s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:wait(.01)
+---
+- RW
+...
+type(s)
+---
+- table
+...
+s:errno()
+---
+- 0
+...
+type(s:error())
+---
+- nil
+...
+s:nonblock(false)
+---
+- false
+...
+s:sysconnect('127.0.0.1', box.cfg.primary_port)
+---
+- true
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(false)
+---
+- false
+...
+s:nonblock()
+---
+- false
+...
+s:nonblock(true)
+---
+- true
+...
+s:readable(.01)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+s:readable(0)
+---
+- true
+...
+s:errno() > 0
+---
+- false
+...
+s:error()
+---
+- null
+...
+s:writable(.00000000000001)
+---
+- true
+...
+s:writable(0)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+s:syswrite(box.pack('iii', 65280, 0, 12334))
+---
+- 12
+...
+s:readable(1)
+---
+- true
+...
+s:wait(.01)
+---
+- RW
+...
+box.unpack('iii', s:sysread(4096))
+---
+- error: 'box.unpack(''iii''): too many bytes: unpacked 12, total 128'
+...
+s:syswrite(box.pack('iii', 65280, 0, 12335))
+---
+- 12
+...
+s:readable(1)
+---
+- true
+...
+string.len(s:sysread(4096))
+---
+- 0
+...
+s:close()
+---
+- true
+...
+s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('127.0.0.1', 3457)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+sevres = {}
+---
+...
+type(box.fiber.wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+---
+- userdata
+...
+#sevres
+---
+- 0
+...
+sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:nonblock(false)
+---
+- false
+...
+sc:sysconnect('127.0.0.1', 3457)
+---
+- true
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:readable(.5)
+---
+- true
+...
+sc:sysread(4096)
+---
+- ok
+...
+string.match(tostring(sc), ', peer') ~= nil
+---
+- true
+...
+#sevres
+---
+- 1
+...
+sevres[1].host
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_BROADCAST', false)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_TYPE')
+---
+- 1
+...
+s:error()
+---
+- null
+...
+s:setsockopt('SOL_SOCKET', 'SO_BSDCOMPAT', false)
+---
+- true
+...
+s:setsockopt('SOL_SOCKET', 'SO_DEBUG', false)
+---
+- true
+...
+s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
+---
+- 0
+...
+s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
+---
+- error: '[string "-- bsdsocket.lua (internal file)..."]:307: Socket option SO_ACCEPTCONN
+    is read only'
+...
+s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:linger()
+---
+- false
+- 0
+...
+s:linger(true, 1)
+---
+- true
+- 1
+...
+s:linger()
+---
+- true
+- 1
+...
+s:linger(false, 1)
+---
+- false
+- 1
+...
+s:linger()
+---
+- false
+- 1
+...
+s:shutdown('R')
+---
+- true
+...
+s:close()
+---
+- true
+...
+s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:bind('127.0.0.1', 3457)
+---
+- true
+...
+s:listen(128)
+---
+- true
+...
+sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc:writable()
+---
+- true
+...
+sc:readable()
+---
+- true
+...
+sc:sysconnect('127.0.0.1', 3457)
+---
+- true
+...
+sc:writable(10)
+---
+- true
+...
+sc:write('Hello, world')
+---
+- true
+...
+sa = s:accept()
+---
+...
+sa:nonblock(1)
+---
+- true
+...
+sa:read(8)
+---
+- Hello, w
+...
+sa:read(3)
+---
+- orl
+...
+sc:writable()
+---
+- true
+...
+sc:write(', again')
+---
+- true
+...
+sa:read(8)
+---
+- d, again
+...
+sa:error()
+---
+- null
+...
+string.len(sa:read(0))
+---
+- 0
+...
+type(sa:read(0))
+---
+- string
+...
+sa:read(1, .01)
+---
+- null
+...
+sc:writable()
+---
+- true
+...
+sc:send('abc')
+---
+- true
+...
+sa:read(3)
+---
+- abc
+...
+sc:send('Hello')
+---
+- true
+...
+sa:readable()
+---
+- true
+...
+sa:recv()
+---
+- Hello
+...
+sa:recv()
+---
+- null
+...
+sc:send('Hello')
+---
+- true
+...
+sc:send(', world')
+---
+- true
+...
+sc:send("\\nnew line")
+---
+- true
+...
+sa:readline({'\\n'}, 1)
+---
+- Hello, world\n
+...
+sa:readline(1, {'ine'}, 1)
+---
+- n
+...
+sa:readline({'ine'}, 1)
+---
+- ew line
+...
+sa:readline({'ine'}, 0.1)
+---
+- null
+...
+sc:send('Hello, world')
+---
+- true
+...
+sa:readline({','}, 1)
+---
+- Hello,
+...
+sc:shutdown('W')
+---
+- true
+...
+sa:read(100, 1)
+---
+- ' world'
+...
+sa:read(100, 1)
+---
+- 
+...
+sa:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s ~= nil
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+s:nonblock(true)
+---
+- true
+...
+s:nonblock()
+---
+- true
+...
+os.remove('/tmp/tarantool-test-socket')
+---
+- null
+- '/tmp/tarantool-test-socket: No such file or directory'
+- 2
+...
+s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+- true
+...
+sc ~= nil
+---
+- true
+...
+s:listen(1234)
+---
+- true
+...
+sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
+---
+- true
+...
+sc:error()
+---
+- null
+...
+s:readable()
+---
+- true
+...
+sa = s:accept()
+---
+...
+sa:nonblock(true)
+---
+- true
+...
+sa:send('Hello, world')
+---
+- true
+...
+sc:recv()
+---
+- Hello, world
+...
+sc:close()
+---
+- true
+...
+sa:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+os.remove('/tmp/tarantool-test-socket')
+---
+- true
+...
+--# setopt delimiter ';'
+function aexitst(ai, host, port)
+    for i, a in pairs(ai) do
+        if a.host == host and a.port == port then
+            return true
+        end
+    end
+    return false
+end;
+---
+...
+aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+    type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
+---
+- true
+...
+--# setopt delimiter ''
+#(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
+---
+- true
+...
+#(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+---
+- true
+...
+sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+sc ~= nil
+---
+- true
+...
+sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
+---
+- 0
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:readable()
+---
+- true
+...
+sc:sysconnect('127.0.0.1', 3458)
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+sc:writable()
+---
+- true
+...
+string.match(tostring(sc), ', peer') == nil
+---
+- true
+...
+box.errno.strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+---
+- Connection refused
+...
+--# setopt delimiter ';'
+box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80',
+    { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
+---
+- '{}'
+...
+--# setopt delimiter ''
+box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80',
+    { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
+
+---
+- '{}'
+...
+sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+box.cjson.encode(sc:name())
+---
+- '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:bind('127.0.0.1', 3548)
+---
+- true
+...
+sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:sendto('127.0.0.1', 3548, 'Hello, world')
+---
+- true
+...
+s:readable(10)
+---
+- true
+...
+s:recv(4096)
+---
+- Hello, world
+...
+sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
+---
+- true
+...
+s:readable(10)
+---
+- true
+...
+local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
+---
+- '["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]'
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+s:nonblock(true)
+---
+- true
+...
+s:bind('127.0.0.1')
+---
+- true
+...
+s:name().port > 0
+---
+- true
+...
+sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+---
+...
+sc:nonblock(true)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port)
+---
+- true
+...
+sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')
+---
+- true
+...
+s:readable(1)
+---
+- true
+...
+data, from = s:recvfrom(10)
+---
+...
+data
+---
+- Hello, Wor
+...
+s:sendto(from.host, from.port, 'Hello, hello!')
+---
+- true
+...
+sc:readable(1)
+---
+- true
+...
+data_r, from_r = sc:recvfrom(4096)
+---
+...
+data_r
+---
+- Hello, hello!
+...
+from_r.host
+---
+- 127.0.0.1
+...
+from_r.port == s:name().port
+---
+- true
+...
+s:close()
+---
+- true
+...
+sc:close()
+---
+- true
+...

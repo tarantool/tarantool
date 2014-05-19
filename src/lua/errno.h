@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_COEIO_H_INCLUDED
-#define TARANTOOL_COEIO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,42 +26,19 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#ifndef TARANTOOL_LUA_ERRNO_H_INCLUDED
+#define TARANTOOL_LUA_ERRNO_H_INCLUDED
 
-#include "trivia/config.h"
-#include "trivia/util.h"
-
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <coro.h>
-#include "third_party/tarantool_ev.h"
-#include "third_party/tarantool_eio.h"
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
-#define ERESOLVE -1
-
-#if defined(__cplusplus)
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * Asynchronous IO Tasks (libeio wrapper)
- *
- * Yield the current fiber until a created task is complete.
- */
 
-void coeio_init(void);
-ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
+struct lua_State;
+void tarantool_lua_errno_init(struct lua_State *L);
 
-struct addrinfo *
-coeio_resolve(int socktype, const char *host, const char *port,
-              ev_tstamp timeout);
-
-#if defined(__cplusplus)
+#ifdef __cplusplus
 }
 #endif
-#endif /* TARANTOOL_COEIO_H_INCLUDED */
+#endif /* TARANTOOL_LUA_ERRNO_H_INCLUDED */
+

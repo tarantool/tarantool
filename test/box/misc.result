@@ -28,6 +28,7 @@ t
   - digest
   - dostring
   - errinj
+  - errno
   - error
   - fiber
   - index

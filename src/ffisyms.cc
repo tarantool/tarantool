@@ -7,6 +7,7 @@
 #include <box/lua/call.h>
 #include <lua/init.h>
 #include <tarantool.h>
+#include "lua/bsdsocket.h"
 
 /*
  * A special hack to cc/ld to keep symbols in an optimized binary.
@@ -38,4 +39,6 @@ void *ffi_symbols[] = {
 	(void *) box_set_io_collect_interval,
 	(void *) box_set_snap_io_rate_limit,
 	(void *) box_set_too_long_threshold,
+	(void *) bsdsocket_local_resolve,
+	(void *) bsdsocket_nonblock
 };
