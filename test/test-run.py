@@ -166,6 +166,7 @@ def main():
 
         TarantoolServer.find_exe(options.args.builddir)
         UnittestServer.find_exe(options.args.builddir)
+        
 
         for suite in suites:
             failed_tests.extend(suite.run_all())
