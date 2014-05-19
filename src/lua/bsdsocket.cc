@@ -141,32 +141,81 @@ static const struct { char name[32]; int value; } send_flags[] = {
 };
 
 static const struct { char name[32]; int value, type, rw; } so_opts[] = {
+#ifdef SO_ACCEPTCONN
 	{"SO_ACCEPTCONN",	SO_ACCEPTCONN,		1,	0, },
+#endif
+#ifdef SO_BINDTODEVICE
 	{"SO_BINDTODEVICE",	SO_BINDTODEVICE,	2,	1, },
+#endif
+#ifdef SO_BROADCAST
 	{"SO_BROADCAST",	SO_BROADCAST,		1,	1, },
+#endif
+#ifdef SO_BSDCOMPAT
 	{"SO_BSDCOMPAT",	SO_BSDCOMPAT,		1,	1, },
+#endif
+#ifdef SO_DEBUG
 	{"SO_DEBUG",		SO_DEBUG,		1,	1, },
+#endif
+#ifdef SO_DOMAIN
 	{"SO_DOMAIN",		SO_DOMAIN,		1,	0, },
+#endif
+#ifdef SO_ERROR
 	{"SO_ERROR",		SO_ERROR,		1,	0, },
+#endif
+#ifdef SO_DONTROUTE
 	{"SO_DONTROUTE",	SO_DONTROUTE,		1,	1, },
+#endif
+#ifdef SO_KEEPALIVE
 	{"SO_KEEPALIVE",	SO_KEEPALIVE,		1,	1, },
+#endif
+#ifdef SO_LINGER
 	{"SO_LINGER",		SO_LINGER,		0,	0, },
+#endif
+#ifdef SO_MARK
 	{"SO_MARK",		SO_MARK,		1,	1, },
+#endif
+#ifdef SO_OOBINLINE
 	{"SO_OOBINLINE",	SO_OOBINLINE,		1,	1, },
+#endif
+#ifdef SO_PASSCRED
 	{"SO_PASSCRED",		SO_PASSCRED,		1,	1, },
+#endif
+#ifdef SO_PEERCRED
 	{"SO_PEERCRED",		SO_PEERCRED,		1,	0, },
+#endif
+#ifdef SO_PRIORITY
 	{"SO_PRIORITY",		SO_PRIORITY,		1,	1, },
+#endif
+#ifdef SO_RCVBUF
 	{"SO_RCVBUF",		SO_RCVBUF,		1,	1, },
+#endif
+#ifdef SO_RCVBUFFORCE
 	{"SO_RCVBUFFORCE",	SO_RCVBUFFORCE,		1,	1, },
+#endif
+#ifdef SO_RCVLOWAT
 	{"SO_RCVLOWAT",		SO_RCVLOWAT,		1,	1, },
+#endif
+#ifdef SO_SNDLOWAT
 	{"SO_SNDLOWAT",		SO_SNDLOWAT,		1,	1, },
+#endif
+#ifdef SO_RCVTIMEO
 	{"SO_RCVTIMEO",		SO_RCVTIMEO,		1,	1, },
+#endif
+#ifdef SO_SNDTIMEO
 	{"SO_SNDTIMEO",		SO_SNDTIMEO,		1,	1, },
+#endif
+#ifdef SO_REUSEADDR
 	{"SO_REUSEADDR",	SO_REUSEADDR,		1,	1, },
+#endif
+#ifdef SO_SNDBUF
 	{"SO_SNDBUF",		SO_SNDBUF,		1,	1, },
+#endif
+#ifdef SO_SNDBUFFORCE
 	{"SO_SNDBUFFORCE",	SO_SNDBUFFORCE,		1,	1, },
+#endif
+#ifdef SO_TIMESTAMP
 	{"SO_TIMESTAMP",	SO_TIMESTAMP,		1,	1, },
-
+#endif
 #ifdef SO_PROTOCOL
 	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
 #else
@@ -428,7 +477,10 @@ lbox_bsdsocket_push_protocol(struct lua_State *L, int protonumber)
 static int
 lbox_bsdsocket_push_sotype(struct lua_State *L, int sotype)
 {
-	sotype &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
+	/* man 7 socket says that sotype can contain some flags */
+	#if defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
+		sotype &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
+	#endif
 	switch(sotype) {
 		case SOCK_STREAM:
 			lua_pushliteral(L, "SOCK_STREAM");
