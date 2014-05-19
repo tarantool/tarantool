@@ -49,8 +49,8 @@ enum {
 enum iproto_key {
 	IPROTO_CODE = 0x00,
 	IPROTO_SYNC = 0x01,
-	/* replication keys */
-	IPROTO_SERVER_ID = 0x02,
+	/* Replication keys (header) */
+	IPROTO_NODE_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	/* Leave a gap for other keys in the header. */
@@ -64,6 +64,10 @@ enum iproto_key {
 	IPROTO_TUPLE = 0x21,
 	IPROTO_FUNCTION_NAME = 0x22,
 	IPROTO_USER_NAME = 0x23,
+	/* Replication keys (body) */
+	IPROTO_NODE_UUID = 0x24,
+	IPROTO_CLUSTER_UUID = 0x25,
+	IPROTO_LSNMAP = 0x26,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -72,10 +76,10 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC) | bit(SERVER_ID) | bit(LSN))
+#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC) | bit(NODE_ID) | bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
-			  bit(OFFSET) | bit(KEY) | bit(TUPLE) | \
-			  bit(FUNCTION_NAME) | bit(USER_NAME))
+			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
+			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME))
 static inline bool
 iproto_header_has_key(const char *pos, const char *end)
 {
@@ -104,7 +108,9 @@ enum iproto_request_type {
 	IPROTO_AUTH = 7,
 	IPROTO_DML_REQUEST_MAX = 8,
 	IPROTO_PING = 64,
-	IPROTO_SUBSCRIBE = 66
+	IPROTO_JOIN = 65,
+	IPROTO_SUBSCRIBE = 66,
+	IPROTO_SETLSN = 67
 };
 
 extern const char *iproto_request_type_strs[];
@@ -138,6 +144,7 @@ enum {
 
 struct iproto_packet {
 	uint32_t code;
+	uint32_t node_id;
 	uint64_t sync;
 	uint64_t lsn;
 	double tm;
@@ -151,26 +158,11 @@ iproto_packet_decode(struct iproto_packet *packet, const char **pos, const char 
 int
 iproto_packet_encode(const struct iproto_packet *packet, struct iovec *out);
 
-struct iproto_subscribe {
-	uint8_t m_len;                          /* MP_STR */
-	uint32_t v_len;                         /* length */
-	uint8_t m_header;                       /* MP_MAP */
-	uint8_t k_code;                         /* IPROTO_CODE */
-	uint8_t v_code;                         /* response status */
-	uint8_t k_sync;                         /* IPROTO_SYNC */
-	uint8_t m_sync;                         /* MP_UINT64 */
-	uint64_t sync;                          /* sync */
-	uint8_t k_lsn;                          /* IPROTO_LSN */
-	uint8_t m_lsn;                          /* MP_UINT64 */
-	uint64_t lsn;                           /* lsn */
-} __attribute__((packed));
+enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
 
-static const struct iproto_subscribe iproto_subscribe_stub = {
-	0xce, mp_bswap_u32(sizeof(struct iproto_subscribe) - 5), 0x83,
-	IPROTO_CODE, IPROTO_SUBSCRIBE,
-	IPROTO_SYNC, 0xcf, 0,
-	IPROTO_LSN, 0xcf, 0
-};
+int
+iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+		  char fixheader[IPROTO_FIXHEADER_SIZE]);
 
 #if defined(__cplusplus)
 } /* extern "C" */

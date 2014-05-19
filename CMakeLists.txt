@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8)
 
 project(tarantool C CXX)
 
@@ -77,7 +77,7 @@ if (HAVE_SENDFILE)
     endif()
 endif()
 check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
-
+check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
 
 #
@@ -304,6 +304,13 @@ add_dependencies(build_bundled_libs cjson)
 include(BuildLibYAML)
 libyaml_build()
 add_dependencies(build_bundled_libs yaml)
+
+#
+# LibUUID
+#
+
+set(LIBUUID_FIND_REQUIRED ON)
+find_package(LibUUID)
 
 #
 # Third-Party misc

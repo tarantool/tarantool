@@ -1,0 +1,26 @@
+type(box.errno)
+---
+- table
+...
+box.errno.EINVAL > 0
+---
+- true
+...
+box.errno.EBADF > 0
+---
+- true
+...
+box.errno(box.errno.EINVAL) == box.errno.EINVAL, box.errno() == box.errno.EINVAL
+---
+- true
+- true
+...
+box.errno(box.errno.EBADF) ~= box.errno.EINVAL, box.errno() == box.errno.EBADF
+---
+- true
+- true
+...
+box.errno.strerror(box.errno.EINVAL)
+---
+- Invalid argument
+...

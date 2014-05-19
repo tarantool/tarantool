@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_REPLICATION_H_INCLUDED
-#define TARANTOOL_REPLICATION_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,24 +26,19 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "trivia/util.h"
+#ifndef TARANTOOL_LUA_ERRNO_H_INCLUDED
+#define TARANTOOL_LUA_ERRNO_H_INCLUDED
 
-/**
- * Pre-fork replication spawner process.
- *
- * @return None. Panics and exits on error.
- */
-void
-replication_prefork(const char *snap_dir, const char *wal_dir);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/**
- * Subscribe a replica to updates.
- *
- * @return None. On error, closes the socket.
- */
-void
-subscribe(int fd, int64_t lsn, uint64_t sync);
 
-#endif // TARANTOOL_REPLICATION_H_INCLUDED
+struct lua_State;
+void tarantool_lua_errno_init(struct lua_State *L);
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* TARANTOOL_LUA_ERRNO_H_INCLUDED */
 

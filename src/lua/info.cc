@@ -36,8 +36,9 @@ extern "C" {
 #include <lualib.h>
 } /* extern "C" */
 
-#include "replica.h"
-#include "recovery.h"
+#include "box/replica.h"
+#include "box/recovery.h"
+#include "box/cluster.h"
 #include "tarantool.h"
 #include "box/box.h"
 
@@ -63,9 +64,38 @@ lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 }
 
 static int
-lbox_info_lsn(struct lua_State *L)
+lbox_info_node(struct lua_State *L)
 {
-	luaL_pushnumber64(L, recovery_state->confirmed_lsn);
+	if (recovery_state->node_id == 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_createtable(L, 0, 2);
+	lua_pushliteral(L, "id");
+	lua_pushinteger(L, recovery_state->node_id);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "uuid");
+	lua_pushlstring(L, tt_uuid_str(&recovery_state->node_uuid), UUID_STR_LEN);
+	lua_settable(L, -3);
+	lua_pushliteral(L, "lsn");
+	luaL_pushnumber64(L, vclock_get(&recovery_state->vclock,
+					recovery_state->node_id));
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
+lbox_info_vclock(struct lua_State *L)
+{
+	lua_createtable(L, 0, vclock_size(&recovery_state->vclock));
+	vclock_foreach(&recovery_state->vclock, it) {
+		lua_pushinteger(L, it.node_id);
+		luaL_pushnumber64(L, it.lsn);
+		lua_settable(L, -3);
+	}
+
 	return 1;
 }
 
@@ -103,7 +133,8 @@ lbox_info_dynamic_meta [] =
 {
 	{"recovery_lag", lbox_info_recovery_lag},
 	{"recovery_last_update", lbox_info_recovery_last_update_tstamp},
-	{"lsn", lbox_info_lsn},
+	{"vclock", lbox_info_vclock},
+	{"node", lbox_info_node},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},

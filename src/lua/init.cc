@@ -49,7 +49,9 @@ extern "C" {
 #include "lua/admin.h"
 #include "lua/errinj.h"
 #include "lua/ipc.h"
+#include "lua/errno.h"
 #include "lua/socket.h"
+#include "lua/bsdsocket.h"
 #include "lua/info.h"
 #include "lua/stat.h"
 #include "lua/session.h"
@@ -67,9 +69,9 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       load_cfg_lua[], interactive_lua[];
+       load_cfg_lua[], interactive_lua[], digest_lua[];
 static const char *lua_sources[] = { uuid_lua, session_lua,
-	load_cfg_lua, interactive_lua, NULL };
+	load_cfg_lua, interactive_lua, digest_lua, NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, NULL };
 /*
@@ -289,7 +291,9 @@ tarantool_lua_init()
 	tarantool_lua_info_init(L);
 	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
+	tarantool_lua_errno_init(L);
 	tarantool_lua_socket_init(L);
+	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
 	luaopen_msgpack(L);
@@ -471,7 +475,6 @@ run_script(va_list ap)
 	fiber_sleep(0.0);
 
 	if (access(path, F_OK) == 0) {
-		say_info("loading %s", path);
 		/* Execute the init file. */
 		lua_getglobal(L, "dofile");
 		lua_pushstring(L, path);

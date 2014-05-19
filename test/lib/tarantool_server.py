@@ -575,8 +575,18 @@ class TarantoolServer(Server):
             return yaml.load(self.admin("box.info." + param, silent=True))[0]
         return yaml.load(self.admin("box.info", silent=True))
 
-    def wait_lsn(self, lsn):
-        while (int(self.get_param("lsn")) < lsn):
+    def get_lsn(self, node_id):
+        nodes = self.get_param("vclock")
+        if type(nodes) == dict and node_id in nodes:
+            return int(nodes[node_id])
+        elif type(nodes) == list and node_id <= len(nodes):
+            return int(nodes[node_id - 1])
+        else:
+            return -1
+
+    def wait_lsn(self, node_id, lsn):
+        while (self.get_lsn(node_id) < lsn):
+            #print("wait_lsn", node_id, lsn, self.get_param("vclock"))
             time.sleep(0.01)
 
     def version(self):

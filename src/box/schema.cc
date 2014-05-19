@@ -255,7 +255,7 @@ schema_init()
 					      true /* unique */,
 					      1 /* part count */);
 	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */, STRING);
-	(void) sc_space_new(&def, key_def, NULL);
+	(void) sc_space_new(&def, key_def, &on_replace_schema);
 
 	/* _space - home for all spaces. */
 	key_def->space_id = def.id = SC_SPACE_ID;
@@ -280,6 +280,13 @@ schema_init()
 	key_def->space_id = def.id = SC_PRIV_ID;
 	snprintf(def.name, sizeof(def.name), "_priv");
 	(void) sc_space_new(&def, key_def, &on_replace_priv);
+	/*
+	 * _cluster - association server uuid <-> server id
+	 * The real index is defined in the snapshot.
+	 */
+	key_def->space_id = def.id = SC_CLUSTER_ID;
+	snprintf(def.name, sizeof(def.name), "_cluster");
+	(void) sc_space_new(&def, key_def, &on_replace_cluster);
 	key_def_delete(key_def);
 
 	/* _index - definition of indexes in all spaces */

@@ -29,7 +29,6 @@
 #include "hash_index.h"
 #include "say.h"
 #include "tuple.h"
-#include "pickle.h"
 #include "exception.h"
 #include "errinj.h"
 

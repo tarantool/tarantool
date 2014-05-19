@@ -30,7 +30,6 @@
  */
 #include "trivia/util.h"
 #include "key_def.h" /* for enum field_type */
-#include <pickle.h>
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 

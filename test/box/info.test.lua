@@ -6,7 +6,7 @@ box.info['unknown_variable']
 string.match(box.info.version, '^[1-9]') ~= nil
 string.match(box.info.pid, '^[1-9][0-9]*$') ~= nil
 string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
-box.info.lsn > 0
+#box.info.node > 0
 box.info.recovery_lag
 box.info.recovery_last_update
 box.info.status

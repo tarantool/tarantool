@@ -46,6 +46,10 @@
 
 #define ERESOLVE -1
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /**
  * Asynchronous IO Tasks (libeio wrapper)
  *
@@ -59,4 +63,7 @@ struct addrinfo *
 coeio_resolve(int socktype, const char *host, const char *port,
               ev_tstamp timeout);
 
+#if defined(__cplusplus)
+}
+#endif
 #endif /* TARANTOOL_COEIO_H_INCLUDED */

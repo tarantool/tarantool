@@ -5,6 +5,7 @@ set_source_files_compile_flags(${all_sources})
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib)
+include_directories(${CMAKE_SOURCE_DIR}/third_party)
 add_executable(rlist.test rlist.c test.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rlist.c)
 add_executable(fiob.test test.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
 add_executable(queue.test queue.c)
@@ -35,8 +36,17 @@ add_executable(slab_arena.test slab_arena.c)
 target_link_libraries(slab_arena.test small)
 add_executable(arena_mt.test arena_mt.c)
 target_link_libraries(arena_mt.test small pthread)
+add_executable(bps_tree.test bps_tree.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_arg.c)
+target_link_libraries(bps_tree.test small)
+add_executable(bps_tree_itr.test bps_tree_itr.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_arg.c)
+target_link_libraries(bps_tree_itr.test small)
 add_executable(pt_alloc.test pt_alloc.cc)
 target_link_libraries(pt_alloc.test small)
+add_executable(log_dir.test log_dir.cc test.c)
+target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} box core small salad misc bitset msgpuck
+    ${LIBEV_LIBRARIES}
+    ${LIBEIO_LIBRARIES}
+    ${LIBCORO_LIBRARIES})
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

@@ -69,36 +69,32 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-for i = 501,1000 do s:insert{i, i} end
----
-- error: Failed to allocate 1024 bytes in TreeIndex for replace
-...
-s:delete{1}
----
-- [1, 1, 'test1']
-...
 res = {}
 ---
 ...
 for _, t in s.index[0]:pairs() do table.insert(res, t) end
 ---
-- error: Failed to allocate 196 bytes in TreeIndex for init iterator
 ...
 res
 ---
-- []
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
 ...
--- reserve memory for iterator in index. last insert may increase tree depth
-box.errinj.set("ERRINJ_TREE_ALLOC", false)
+for i = 501,2500 do s:insert{i, i} end
 ---
-- ok
+- error: Failed to allocate 16384 bytes in TreeIndex for replace
 ...
-s:get{1}
+s:delete{1}
 ---
-...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
----
-- ok
+- [1, 1, 'test1']
 ...
 res = {}
 ---
@@ -118,28 +114,52 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-for i = 1001,1500 do s:insert{i, i} end
+res = {}
 ---
-- error: Failed to allocate 1024 bytes in TreeIndex for replace
+...
+for i = 501,510 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [501, 501]
+  - [502, 502]
+  - [503, 503]
+  - [504, 504]
+  - [505, 505]
+  - [506, 506]
+  - [507, 507]
+  - [508, 508]
+  - [509, 509]
+  - [510, 510]
+...
+res = {}
+---
+...
+for i = 2001,2010 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- []
+...
+--count must be greater that 1000 but less than 2000
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count <= 1000 and "fail 1" or count >= 2000 and "fail 2" or "ok" end
+---
+...
+check_iter_and_size()
+---
+- ok
+...
+for i = 2501,3500 do s:insert{i, i} end
+---
+- error: Failed to allocate 16384 bytes in TreeIndex for replace
 ...
 s:delete{2}
 ---
 - [2, 2, 'test2']
 ...
-s.index[0]:pairs()
----
-- error: Failed to allocate 200 bytes in TreeIndex for init iterator
-...
--- reserve memory for iterator in index. last insert may increase tree depth
--- (if rebalance was not initiated)
-box.errinj.set("ERRINJ_TREE_ALLOC", false)
----
-- ok
-...
-s:get{1}
----
-...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
+check_iter_and_size()
 ---
 - ok
 ...
@@ -160,23 +180,23 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-for i = 1501,2000 do s:insert{i, i} end
+for i = 3501,4500 do s:insert{i, i} end
 ---
-- error: Failed to allocate 1024 bytes in TreeIndex for replace
+- error: Failed to allocate 16384 bytes in TreeIndex for replace
 ...
 s:delete{3}
 ---
 - [3, 3, 'test3']
 ...
-s.index[0]:pairs()
+check_iter_and_size()
 ---
-- error: Failed to allocate 200 bytes in TreeIndex for init iterator
+- ok
 ...
 box.errinj.set("ERRINJ_TREE_ALLOC", false)
 ---
 - ok
 ...
-for i = 2001,2500 do s:insert{i, i} end
+for i = 4501,5500 do s:insert{i, i} end
 ---
 ...
 res = {}
@@ -217,21 +237,21 @@ res
 res = {}
 ---
 ...
-for i = 2001,2010 do table.insert(res, (s:get{i})) end
+for i = 5001,5010 do table.insert(res, (s:get{i})) end
 ---
 ...
 res
 ---
-- - [2001, 2001]
-  - [2002, 2002]
-  - [2003, 2003]
-  - [2004, 2004]
-  - [2005, 2005]
-  - [2006, 2006]
-  - [2007, 2007]
-  - [2008, 2008]
-  - [2009, 2009]
-  - [2010, 2010]
+- - [5001, 5001]
+  - [5002, 5002]
+  - [5003, 5003]
+  - [5004, 5004]
+  - [5005, 5005]
+  - [5006, 5006]
+  - [5007, 5007]
+  - [5008, 5008]
+  - [5009, 5009]
+  - [5010, 5010]
 ...
 s:drop()
 ---

@@ -31,7 +31,8 @@ replica.cleanup(True)
 master.admin('box.snapshot()')
 master.restart()
 master.admin('for k = 10, 19 do box.space[42]:insert{k, k*k*k} end')
-lsn = master.get_param('lsn')
+master_id = master.get_param('node')['id']
+lsn = master.get_lsn(master_id)
 print '-------------------------------------------------------------'
 print 'replica test 2 (must be ok)'
 print '-------------------------------------------------------------'
@@ -43,7 +44,7 @@ replica.rpl_master = master
 replica.deploy()
 
 replica.admin('space = box.space.test');
-replica.wait_lsn(lsn)
+replica.wait_lsn(master_id, lsn)
 for i in range(1, 20):
     replica.admin('space:get{%d}' % i)
 

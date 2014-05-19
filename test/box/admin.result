@@ -11,16 +11,19 @@ space:create_index('primary', { type = 'hash' })
 box.stat()
 ---
 - DELETE:
-    total: 0
-    rps: 0
+    total: 34
+    rps: 6
   SELECT:
     total: 1
     rps: 0
   REPLACE:
-    total: 0
+    total: 2
     rps: 0
   INSERT:
-    total: 2
+    total: 34
+    rps: 6
+  AUTH:
+    total: 0
     rps: 0
   CALL:
     total: 0
@@ -69,16 +72,19 @@ box.cfg
 box.stat()
 ---
 - DELETE:
-    total: 0
-    rps: 0
+    total: 34
+    rps: 6
   SELECT:
     total: 1
     rps: 0
   REPLACE:
-    total: 0
+    total: 2
     rps: 0
   INSERT:
-    total: 2
+    total: 34
+    rps: 6
+  AUTH:
+    total: 0
     rps: 0
   CALL:
     total: 0
@@ -112,10 +118,10 @@ function test_box_info()
     local buildstr = {'flags', 'target', 'compiler', 'options'}
     local str = {'version', 'status' }
     local failed = {}
-    if check_type(tmp.lsn, 'cdata') == false then
-        table.insert(failed1, 'box.info().lsn')
+    if check_type(tmp.node, 'table') == false then
+        table.insert(failed1, 'box.info().node')
     else
-        tmp.lsn = nil
+        tmp.node = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then

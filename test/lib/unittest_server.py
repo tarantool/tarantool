@@ -24,14 +24,8 @@ class UnittestServer(Server):
         if _ini is None:
             _ini = {}
         ini = {
-            'core': 'tarantool',
-            'gdb': False,
-            'init_lua': None,
-            'lua_libs': [],
-            'valgrind': False,
             'vardir': None
         }; ini.update(_ini)
-        core = ini['core']
         Server.__init__(self, ini)
         self.vardir = ini['vardir']
         self.builddir = ini['builddir']

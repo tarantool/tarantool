@@ -85,9 +85,6 @@ class TestSuite:
             # noting to test, exit
             return []
         self.server.deploy(silent=False)
-        if self.ini['core'] != 'unittest':
-            self.ini['vardir'] = self.args.vardir
-            self.ini['builddir'] = self.args.builddir
 
         if self.args.start_and_exit:
             color_stdout("    Start and exit requested, exiting...\n", schema='info')

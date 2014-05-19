@@ -320,7 +320,7 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio)
 	ssize_t total = coio_writev(coio, iobuf->out.iov,
 				    obuf_iovcnt(&iobuf->out),
 				    obuf_size(&iobuf->out));
-	iobuf_gc(iobuf);
+	iobuf_reset(iobuf);
 	/*
 	 * If there is some residue in the input buffer, move it
 	 * but only in case if we don't have iobuf_readahead
@@ -335,7 +335,7 @@ iobuf_flush(struct iobuf *iobuf, struct ev_io *coio)
 }
 
 void
-iobuf_gc(struct iobuf *iobuf)
+iobuf_reset(struct iobuf *iobuf)
 {
 	/*
 	 * If we happen to have fully processed the input,

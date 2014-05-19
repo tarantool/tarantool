@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/call.h"
+#include "pickle.h"
 
 #include <arpa/inet.h>
 

@@ -34,7 +34,6 @@
 
 #include "salad/rope.h"
 #include <exception.h>
-#include <pickle.h>
 #include "msgpuck/msgpuck.h"
 
 /** UPDATE request implementation.

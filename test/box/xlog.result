@@ -4,11 +4,11 @@
 space = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
-00000000000000000002.xlog.inprogress exists
+.xlog.inprogress exists
 space:create_index('primary', { type = 'hash' })
 ---
 ...
-00000000000000000002.xlog.inprogress has been successfully renamed
+.xlog.inprogress has been successfully renamed
 
 # Inprogress xlog must be renamed during regular termination.
 
@@ -16,22 +16,72 @@ box.space[0]:insert{3, 'third tuple'}
 ---
 - [3, 'third tuple']
 ...
-00000000000000000004.xlog.inprogress exists
-00000000000000000004.xlog.inprogress has been successfully renamed
+.xlog.inprogress exists
+.xlog.inprogress has been successfully renamed
 
 # An inprogress xlog file with one record must be renamed during recovery.
 
-00000000000000000005.xlog.inprogress hash been successfully renamed
+box.space[0]:insert{4, 'fourth tuple'}
+---
+- [4, 'fourth tuple']
+...
+box.space[0]:insert{5, 'Unfinished record'}
+---
+- [5, 'Unfinished record']
+...
+.xlog exists
+.xlog.inprogress hash been successfully renamed
+space = box.schema.create_space('test')
+---
+...
+box.space['test']:create_index('primary')
+---
+...
+box.space['test']:insert{1, 'first tuple'}
+---
+- [1, 'first tuple']
+...
+box.space['test']:insert{2, 'second tuple'}
+---
+- [2, 'second tuple']
+...
+.xlog exists
+space = box.schema.create_space('test')
+---
+...
+box.space['test']:create_index('primary')
+---
+...
+box.space['test']:insert{1, 'first tuple'}
+---
+- [1, 'first tuple']
+...
+box.space['test']:delete{1}
+---
+- [1, 'first tuple']
+...
+box.space['test']:insert{1, 'third tuple'}
+---
+- [1, 'third tuple']
+...
+box.space['test']:insert{2, 'fourth tuple'}
+---
+- [2, 'fourth tuple']
+...
+.xlog exists
+check log line for 'Duplicate key'
 
-# Empty (zero size) inprogress xlog must be deleted during recovery.
+'Duplicate key' exists in server log
 
-00000000000000000006.xlog.inprogress has been successfully deleted
-
-# Empty (header only, no records) inprogress xlog must be deleted
-# during recovery.
-
-00000000000000000006.xlog.inprogress has been successfully deleted
-
-# Inprogress xlog with bad record must be deleted during recovery.
-
-00000000000000000006.xlog.inprogress has been successfully deleted
+box.space['test']:get{1}
+---
+- [1, 'first tuple']
+...
+box.space['test']:get{2}
+---
+- [2, 'second tuple']
+...
+box.space['test']:len()
+---
+- 2
+...

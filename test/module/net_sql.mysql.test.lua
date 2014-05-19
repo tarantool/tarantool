@@ -23,7 +23,7 @@ end;
 function dump(v) return box.cjson.encode(v) end
 
 connect = {}
-for tk in string.gmatch(os.getenv('MYSQL'), '[^:]+') do table.insert(connect, tk) end
+for tk in string.gmatch(os.getenv('MYSQL')..':', '(.-):') do table.insert(connect, tk) end
 
 -- mysql
 c = box.net.sql.connect('mysql', unpack(connect))

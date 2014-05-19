@@ -31,19 +31,25 @@
 
 #include "index.h"
 
-#include <third_party/qsort_arg.h>
-#include <third_party/sptree.h>
+struct tuple;
+struct key_data;
 
-/**
- * Instantiate sptree definitions
- */
-#ifdef NDEBUG
-SPTREE_DEF(index, realloc, qsort_arg);
-#else
-void *
-realloc_inject(void *ptr, size_t size);
-SPTREE_DEF(index, realloc_inject, qsort_arg);
-#endif
+int
+tree_index_compare(const struct tuple *a, const struct tuple *b, struct key_def *key_def);
+
+int
+tree_index_compare_key(const tuple *a, const key_data *b, struct key_def *key_def);
+
+#define BPS_TREE_NAME _index
+#define BPS_TREE_BLOCK_SIZE (512)
+#define BPS_TREE_EXTENT_SIZE (16*1024)
+#define BPS_TREE_COMPARE(a, b, arg) tree_index_compare(a, b, arg)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) tree_index_compare_key(a, b, arg)
+#define bps_tree_elem_t struct tuple *
+#define bps_tree_key_t struct key_data *
+#define bps_tree_arg_t struct key_def *
+
+#include "salad/bps_tree.h"
 
 class TreeIndex: public Index {
 public:
@@ -68,7 +74,7 @@ public:
 				  const char *key, uint32_t part_count) const;
 
 // protected:
-	sptree_index tree;
+	struct bps_tree tree;
 };
 
 #endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */

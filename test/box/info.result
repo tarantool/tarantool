@@ -24,9 +24,9 @@ string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
-box.info.lsn > 0
+#box.info.node > 0
 ---
-- true
+- false
 ...
 box.info.recovery_lag
 ---
@@ -77,13 +77,14 @@ t
 ---
 - - build
   - logger_pid
-  - lsn
+  - node
   - pid
   - recovery_lag
   - recovery_last_update
   - snapshot_pid
   - status
   - uptime
+  - vclock
   - version
 ...
 box.info.snapshot_pid

@@ -31,8 +31,10 @@
 #include <stdbool.h>
 
 #include "trivia/util.h"
-#include "tarantool_ev.h"
+#include "third_party/tarantool_ev.h"
 #include "log_io.h"
+#include "vclock.h"
+#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,27 +43,13 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-typedef int (row_handler)(void *, struct iproto_packet *packet);
+typedef void (row_handler)(void *, struct iproto_packet *packet);
 typedef void (snapshot_handler)(struct log_io *);
+typedef void (join_handler)(const tt_uuid *node_uuid);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
  */
-
-struct wait_lsn {
-	struct fiber *waiter;
-	int64_t lsn;
-};
-
-void
-wait_lsn_set(struct wait_lsn *wait_lsn, int64_t lsn);
-
-inline static void
-wait_lsn_clear(struct wait_lsn *wait_lsn)
-{
-	wait_lsn->waiter = NULL;
-	wait_lsn->lsn = 0LL;
-}
 
 struct wal_writer;
 struct wal_watcher;
@@ -72,15 +60,20 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MA
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
+void
+mh_cluster_clean(struct mh_cluster_t *hash);
+
 struct recovery_state {
-	int64_t lsn, confirmed_lsn;
+	struct vclock vclock;
 	/* The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
-	struct log_dir *snap_dir;
-	struct log_dir *wal_dir;
+	struct log_dir snap_dir;
+	struct log_dir wal_dir;
+	int64_t lsnsum; /* used to find missing xlog files */
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
 	struct remote *remote;
+	bool relay; /* true if recovery initialized for JOIN/SUBSCRIBE */
 	/**
 	 * row_handler is a module callback invoked during initial
 	 * recovery and when reading rows from the master.  It is
@@ -91,11 +84,13 @@ struct recovery_state {
 	row_handler *row_handler;
 	void *row_handler_param;
 	snapshot_handler *snapshot_handler;
+	join_handler *join_handler;
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	double wal_fsync_delay;
-	struct wait_lsn wait_lsn;
 	enum wal_mode wal_mode;
+	tt_uuid node_uuid;
+	uint32_t node_id;
 
 	bool finalize;
 };
@@ -104,28 +99,32 @@ extern struct recovery_state *recovery_state;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,
-		   snapshot_handler snapshot_handler, int rows_per_wal);
+		   snapshot_handler snapshot_handler, join_handler join_handler,
+		   int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r, enum wal_mode mode);
 void recovery_update_fsync_delay(struct recovery_state *r, double new_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();
-void recover_snap(struct recovery_state *r, const char *replication_source);
-void recover_existing_wals(struct recovery_state *);
+
+static inline bool
+recovery_has_data(struct recovery_state *r)
+{
+	return log_dir_greatest(&r->snap_dir) > 0 ||
+	       log_dir_greatest(&r->wal_dir) > 0;
+}
+void cluster_bootstrap(struct recovery_state *r);
+void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);
 
-int
-recover_wal(struct recovery_state *r, struct log_io *l); /* for replication */
+int recover_wal(struct recovery_state *r, struct log_io *l);
 int wal_write(struct recovery_state *r, struct iproto_packet *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
-
-void confirm_lsn(struct recovery_state *r, int64_t lsn, bool is_commit);
-int64_t next_lsn(struct recovery_state *r);
-void set_lsn(struct recovery_state *r, int64_t lsn);
-
-void recovery_wait_lsn(struct recovery_state *r, int64_t lsn);
+void recovery_process(struct recovery_state *r, struct iproto_packet *packet);
+void recovery_begin_recover_snapshot(struct recovery_state *r);
+void recovery_end_recover_snapshot(struct recovery_state *r);
 
 struct fio_batch;
 
@@ -133,8 +132,10 @@ void
 snapshot_write_row(struct log_io *l, struct iproto_packet *packet);
 void snapshot_save(struct recovery_state *r);
 
-void
-init_storage_on_master(struct log_dir *dir);
+/* Only for tests */
+int
+wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
+		 const struct vclock *vclock);
 
 #if defined(__cplusplus)
 } /* extern "C" */

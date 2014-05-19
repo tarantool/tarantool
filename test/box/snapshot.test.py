@@ -49,7 +49,7 @@ print """
 admin("space:insert{1, 'Test tuple'}")
 
 pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
-lsn = yaml.load(admin("box.info.lsn", silent=True))[0]
+lsn = int(yaml.load(admin("box.info.node.lsn", silent=True))[0])
 
 snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(server.vardir, snapshot)
@@ -57,7 +57,6 @@ snapshot = os.path.join(server.vardir, snapshot)
 iteration = 0
 
 MAX_ITERATIONS = 100
-
 while not os.access(snapshot, os.F_OK) and iteration < MAX_ITERATIONS:
   if iteration % 10 == 0:
     os.kill(pid, SIGUSR1)

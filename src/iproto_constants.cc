@@ -37,7 +37,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_CODE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
+		/* 0x02 */	MP_UINT,   /* IPROTO_NODE_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 	/* }}} */
@@ -83,6 +83,9 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
+	/* 0x24 */	MP_STR, /* IPROTO_NODE_UUID */
+	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
+	/* 0x26 */	MP_MAP, /* IPROTO_LSNMAP */
 	/* }}} */
 };
 
@@ -94,7 +97,8 @@ const char *iproto_request_type_strs[] =
 	"REPLACE",
 	"UPDATE",
 	"DELETE",
-	"CALL"
+	"CALL",
+	"AUTH"
 };
 
 void
@@ -124,6 +128,9 @@ error:
 			break;
 		case IPROTO_SYNC:
 			packet->sync = mp_decode_uint(pos);
+			break;
+		case IPROTO_NODE_ID:
+			packet->node_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
 			packet->lsn = mp_decode_uint(pos);
@@ -169,6 +176,12 @@ iproto_packet_encode(const struct iproto_packet *packet, struct iovec *iov)
 		map_size++;
 	}
 
+	if (packet->node_id) {
+		d = mp_encode_uint(d, IPROTO_NODE_ID);
+		d = mp_encode_uint(d, packet->node_id);
+		map_size++;
+	}
+
 	if (packet->lsn) {
 		d = mp_encode_uint(d, IPROTO_LSN);
 		d = mp_encode_uint(d, packet->lsn);
@@ -190,4 +203,35 @@ iproto_packet_encode(const struct iproto_packet *packet, struct iovec *iov)
 	memcpy(iov, packet->body, sizeof(*iov) * packet->bodycnt);
 	assert(1 + packet->bodycnt <= IPROTO_PACKET_IOVMAX);
 	return 1 + packet->bodycnt; /* new iovcnt */
+}
+
+int
+iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+		  char fixheader[IPROTO_FIXHEADER_SIZE])
+{
+	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
+	uint32_t len = 0;
+	for (int i = 1; i < iovcnt; i++)
+		len += iov[i].iov_len;
+
+	/* Encode length */
+	char *data = fixheader;
+	data = mp_encode_uint(data, len);
+	/* Encode padding */
+	ssize_t padding = IPROTO_FIXHEADER_SIZE - (data - fixheader);
+	if (padding > 0) {
+		data = mp_encode_strl(data, padding - 1);
+#if defined(NDEBUG)
+		data += padding - 1;
+#else
+		while (--padding > 0)
+			*(data++) = 0; /* valgrind */
+#endif
+	}
+	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
+	iov[0].iov_base = fixheader;
+	iov[0].iov_len = IPROTO_FIXHEADER_SIZE;
+
+	assert(iovcnt <= IPROTO_ROW_IOVMAX);
+	return iovcnt;
 }
