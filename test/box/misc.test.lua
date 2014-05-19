@@ -15,8 +15,9 @@ t = nil
 
 --# stop server default
 --# start server default
--- do nothing - no exceptions were thrown before
-box.raise()
+-- during server starting there could be exceptions,
+-- therefore box.raise() call can throw and can not throw,
+-- that's why we can't test box.raise() result
 
 1 + 1
 box.raise(123, 'test')
