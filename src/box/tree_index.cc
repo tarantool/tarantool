@@ -34,7 +34,9 @@
 #include "memory.h"
 #include "fiber.h"
 
+/** For all memory used by all tree indexes. */
 static struct mempool tree_extent_pool;
+/** Number of allocated extents. */
 static int tree_index_count = 0;
 
 /* {{{ Utilities. *************************************************/
@@ -54,9 +56,11 @@ tree_index_compare(const tuple *a, const tuple *b, struct key_def *key_def)
 	return r;
 }
 int
-tree_index_compare_key(const tuple *a, const key_data *key_data, struct key_def *key_def)
+tree_index_compare_key(const tuple *a, const key_data *key_data,
+		       struct key_def *key_def)
 {
-	return tuple_compare_with_key(a, key_data->key, key_data->part_count, key_def);
+	return tuple_compare_with_key(a, key_data->key, key_data->part_count,
+				      key_def);
 }
 
 /* {{{ TreeIndex Iterators ****************************************/
@@ -196,7 +200,8 @@ TreeIndex::TreeIndex(struct key_def *key_def_arg)
 	: Index(key_def_arg)
 {
 	if (tree_index_count == 0)
-		mempool_create(&tree_extent_pool, &cord()->slabc, BPS_TREE_EXTENT_SIZE);
+		mempool_create(&tree_extent_pool, &cord()->slabc,
+			       BPS_TREE_EXTENT_SIZE);
 	tree_index_count++;
 	bps_tree_create(&tree, key_def, extent_alloc, extent_free);
 }

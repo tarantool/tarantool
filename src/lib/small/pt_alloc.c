@@ -86,9 +86,6 @@ pt2_construct(pt2 *p, PT_ID_T extent_size, PT_ID_T block_size,
 	p->free_func = free_func;
 }
 
-/*
- * Destruction
- */
 void
 pt3_destroy(pt3 *p)
 {
@@ -156,9 +153,6 @@ pt2_destroy(pt2 *p)
 }
 
 
-/*
- * Allocation
- */
 void *
 pt3_alloc(pt3 *p, PT_ID_T *result_id)
 {
@@ -256,9 +250,6 @@ pt2_alloc(pt2 *p, PT_ID_T *result_id)
 	return (void*)((char*)extent2 + index2 * p->block_size);
 }
 
-/*
- * Restoration
- */
 void *
 pt3_get(const pt3 *p, PT_ID_T id)
 {
@@ -285,8 +276,8 @@ pt2_get(const pt2 *p, PT_ID_T id)
 	return (((char**)p->extent)[index1] + index2 * p->block_size);
 }
 
-/*
- * Getting number of allocated chunks (of size p->chunk_size each)
+/**
+ * Return the number of allocated extents (of size p->extent_size each)
  */
 PT_ID_T
 pt3_extents_count(const pt3 *p)
@@ -301,6 +292,7 @@ pt3_extents_count(const pt3 *p)
 	}
 	return res;
 }
+
 PT_ID_T
 pt2_extents_count(const pt2 *p)
 {

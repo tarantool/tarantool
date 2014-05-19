@@ -6,43 +6,8 @@
 /* {{{ BPS-tree description */
 /**
  * BPS-tree implementation.
- * BPS-tree is an in-memory B+*-tree, i.e. B-tree with (+) and (*) variants.
- * BPS-tree stores specified elements orderly with specified compare function.
- * It supports inserting, replacing, deleting elements and searching by key.
- * Also iterators are implemented, providing ordered sequential access to
- * elements in both directions. Iterators can be initialized by first and
- * last elements of the tree, or by lower/upper bound of some key.
- * Search/modify has logarithmic complexity, iterating - constant complexity.
- * Main features are:
- * 1)It could be very compact. BPS-tree consumes an amount of memory
- *    mostly proportional to (!) maximal payload of the tree. In other words,
- *    if a thee contains N elements of size S, and maximum of N over a lifetime
- *    of the tree is Nmax, then the consumed memory is asymptotically
- *    proportional to (Nmax*S). Practically well configured BPS-tree consumes
- *    about 120% of payload asymptotically when the tree is randomly filled,
- *    i.e. has about 20% of memory overhead on big amounts of data.
- *    In rather bad case, when filled with monotonically increasing
- *    values, asymptotic overhead is about 40% of payload,
- *    and theoretical maximal asymptotic overhead is about 60% of payload
- *    ( and theoretical minimal asymptotic overhead is about 0% :) )
- *    But, and it could be very important, if a tree filled with big amount
- *    of data and then emptied (but not destroyed), it still consumes a big
- *    amount of memory.
- *    Btw, the tree iterator uses only 6 bytes, but probably padded to 8 bytes.
- * 2)Low cache-miss rate. Search in tree is reduced to search in H blocks,
- *    where H is a height of tree, and can be approximately evaluated as
- *    log(N) / log(K), where N - size of a tree, K - average count of
- *    elements in block. For example, with 8-byte values and 512-byte blocks,
- *    the tree with million elements will probably have a height of 4,
- *    and the tree with billion elements will probably have a height of 6.
- * 3)Successful insertion into the tree and deleting element from the tree
- *    can break any (several or every) this tree's iterators.
- *    Nevertheless, dealing with broken iterators will never lead to access
- *    violation; the element, returned by iterator dereference is always
- *    valid (the tree contains the value) and iterating iterators will
- *    never lead to infinite loop.
- *    Note that replacing of an element does not break any iterator.
- *    Note that using of uninitialised iterator can lead to access violation.
+ * BPS-tree is an in-memory B+*-tree, i.e. B-tree with (+) and (*)
+ * variants.
  *
  * Useful links:
  * http://en.wikipedia.org/wiki/B-tree
@@ -50,10 +15,74 @@
  * http://en.wikipedia.org/wiki/B%2B_tree
  * http://ru.wikipedia.org/wiki/B*-%D0%B4%D0%B5%D1%80%D0%B5%D0%B2%D0%BE
  *
- * Usage and quick setup:
+ * BPS-tree stores specified elements orderly with specified
+ * compare function.
  *
- * 1)Define all macros like in example below before including this header.
- *  See "BPS-tree interface settings" section for details. Example:
+ * The tree can be used to insert, replace, delete elements and
+ * search values by key.
+ * Search/modification of elements has logarithmic complexity,
+ * lg B (N).
+ *
+ * It also has iterator support, providing sequential access to
+ * elements in ascending and descending order.  An iterator can be
+ * initialized by the first or last element of the tree, or by the
+ * lower/upper bound value of a key.  Iteration has constant
+ * complexity.
+ *
+ * The main features of the tree are:
+ *
+ * 1) It could be very compact. BPS-tree consumes the amount of
+ *    memory mostly proportional to (!) the maximal payload of the
+ *    tree.  In other words, if a thee contains N elements of size
+ *    S, and maximum of N over a lifetime
+ *    of the tree is Nmax, then the consumed memory is asymptotically
+ *    proportional to (Nmax*S).
+ *
+ *    In practice, a well configured BPS-tree consumes about 120%
+ *    of payload asymptotically when the tree is randomly filled,
+ *    i.e. has about 20% of memory overhead on big amounts of
+ *    data.
+ *
+ *    In a rather bad case, when the tree is filled with
+ *    monotonically increasing values, the asymptotic overhead is
+ *    that about 40% of the payload, and the theoretical maximal
+ *    asymptotic overhead is about 60% of the payload.
+ *
+ *    The  theoretical minimal asymptotic overhead is about 0% :)
+ *
+ *    However, and it could be important, if a tree is first
+ *    filled up and then emptied (but not destroyed), it still
+ *    consumes the amount of memory used to index the now
+ *    deleted elements.
+ *
+ *    The tree iterator structure occupies only 6 bytes of memory
+ *    (with probable padding by the compiler up to 8 bytes).
+ *
+ * 2) It has a low cache-miss rate. A look up in the tree boils
+ *    down to to search in H blocks, where H is the height of the
+ *    tree, and can be bound by log(N) / log(K), where N is the
+ *    size of the tree and K is the average number of elements in
+ *    a block. For example, with 8-byte values and 512-byte blocks,
+ *    the tree with a million of elements will probably have height
+ *    of 4, and the tree with a billion of elements will probably have
+ *    height of 6.
+ * 3) Successful insertion into the tree or deletion of an element
+ *    can break any of this tree's active iterators.
+ *    Nevertheless, dealing with broken iterators never leads to memory
+ *    access violation; the element, returned by the iterator is always
+ *    valid (the tree contains the value) and iteration never leads
+ *    to an infinite loop.
+ *    Note, that replacement of an element does not break an iterator
+ *    at all.
+ *    Note also, that using an uninitialised iterator indeed leads to
+ *    memory access violation.
+ *
+ * Setup and usage:
+ *
+ * 1) Define all macros like in the example below before including
+ *    this header. See "BPS-tree interface settings" section for
+ *    details. Example:
+ *
  * #define BPS_TREE_NAME
  * #define BPS_TREE_BLOCK_SIZE 512
  * #define BPS_TREE_EXTENT_SIZE 16*1024
@@ -63,8 +92,8 @@
  * #define bps_tree_key_t struct key_t *
  * #define bps_tree_arg_t struct compare_context *
  *
- * 2)Use structs and functions from a list below.
- *  See "BPS-tree interface" section for details. Here is short list:
+ * 2) Use structs and functions from the list below.
+ *   See "BPS-tree interface" section for details. Here is short list:
  * // types:
  * struct bps_tree;
  * struct bps_tree_iterator;
@@ -94,7 +123,6 @@
  */
 /* }}} */
 
-
 /* {{{ BPS-tree interface settings */
 /**
  * Custom name for structs and functions.
@@ -110,12 +138,12 @@
 #endif
 
 /**
- * Size of blocks of tree. A block should be large enough to contain
+ * Size of a block of the tree. A block should be large enough to contain
  * dozens of elements and dozens of 32-bit identifiers.
- * Must be power of 2, i.e. log2(BPS_TREE_BLOCK_SIZE) must be an integer.
- * Tests showed, that for 64-bit elements, an ideal block size is 512 bytes
+ * Must be a power of 2, i.e. log2(BPS_TREE_BLOCK_SIZE) must be an integer.
+ * Tests show that for 64-bit elements, an ideal block size is 512 bytes
  * if binary search is used, and 256 bytes if linear search is used.
- * (see below for a binary/linear search setting)
+ * (see below for the binary/linear search setting)
  * Example:
  * #define BPS_TREE_BLOCK_SIZE 512
  */
@@ -124,14 +152,20 @@
 #endif
 
 /**
- * Allocation granularity. The tree allocates memory by extents of that size.
- * Must be power of 2, i.e. log2(BPS_TREE_EXTENT_SIZE) must be a whole number.
+ * Allocation granularity. The tree allocates memory by extents of
+ * that size.  Must be power of 2, i.e. log2(BPS_TREE_EXTENT_SIZE)
+ * must be a whole number.
  * Two important things:
- * 1)The maximal amount of memory, that particular btee instance can use, is
- *  ( (BPS_TREE_EXTENT_SIZE ^ 3) / (sizeof(void *) ^ 2) )
- * 2)The first insertion of an element leads to immidiate allocation of three
- *  extents. Thus, memory overhead of almost empty tree is
+ *
+ * 1) The maximal amount of memory, that particular btee instance
+ *    can use, is
+ *   ( (BPS_TREE_EXTENT_SIZE ^ 3) / (sizeof(void *) ^ 2) )
+ *
+ * 2) The first insertion of an element leads to immidiate
+ *    allocation of three extents. Thus, memory overhead of almost
+ *    empty tree is
  *  3 * BPS_TREE_EXTENT_SIZE
+ *
  * Example:
  * #define BPS_TREE_EXTENT_SIZE 8*1024
  */
@@ -140,10 +174,10 @@
 #endif
 
 /**
- * Type of tree element. Must be POD. In tree implementation elemenst are
- * copied by memmove and assigment operator and compared with provided with
- * comparators defined below, and also could be compared with operator ==
- * Example:
+ * Type of the tree element. Must be POD. The implementation
+ * copies elements by memmove and assignment operator and
+ * compares them with comparators defined below, and also
+ * could be compared with operator == Example:
  * #define bps_tree_elem_t struct tuple *
  */
 #ifndef bps_tree_elem_t
@@ -151,8 +185,8 @@
 #endif
 
 /**
- * Type of tree key. Must be POD. Used in finding an element in tree and
- * in iterator initialization.
+ * Type of tree key. Must be POD. Used for finding an element in
+ * the tree and in iterator initialization.
  * Example:
  * #define bps_tree_key_t struct key_data *
  */
@@ -161,21 +195,21 @@
 #endif
 
 /**
- * Type of comparison addintional argument. The argument of this type is
- * initialized during tree creation and then passed to compare function.
- * If it is non necessare, define as int and forget.
- * Examples:
+ * Type of comparison additional argument. The argument of this
+ * type is initialized during tree creation and then passed to
+ * compare function. If it is non necessary, define as int and
+ * forget. Example:
+ *
  * #define bps_tree_arg_t struct key_def *
- * #define bps_tree_arg_t int
  */
 #ifndef bps_tree_arg_t
-#error "bps_tree_arg_t must be defined"
+#define bps_tree_arg_t int
 #endif
 
 /**
- * Function, comparing elements.
- * Parameters: two elements and additional argument, specified for the tree
- *  instance. See struct bps_tree members for details.
+ * Function to compare elements.
+ * Parameters: two elements and an additional argument, specified
+ * for the tree instance. See struct bps_tree members for details.
  * Must return int-compatible value, like strcmp or memcmp
  * Examples:
  * #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b))
@@ -186,9 +220,9 @@
 #endif
 
 /**
- * Function, comparing element with key.
- * Parameters: element, key and additional argument, specified for the tree
- *  instance. See struct bps_tree members for details.
+ * Function to compare an element with a key.
+ * Parameters: element, key and an additional argument, specified
+ * for the tree instance. See struct bps_tree members for details.
  * Must return int-compatible value, like strcmp or memcmp
  * Examples:
  * #define BPS_TREE_COMPARE_KEY(a, b, arg) ((a) < (b) ? -1 : (a) > (b))
@@ -199,10 +233,12 @@
 #endif
 
 /**
- * Type of search in array switch. By default, btree uses binary search to
- * find a particular element in block. But if the element type is simple
- * (like integer or float) it could be significally faster to use linear
- * search. To turn on lenear search just #define BPS_BLOCK_LINEAR_SEARCH
+ * A switch to define the type of search in an array elements.
+ * By default, bps_tree uses binary search to find a particular
+ * element in a block. But if the element type is simple
+ * (like an integer or float) it could be significantly faster to
+ * use linear search. To turn on the linear search
+ * #define BPS_BLOCK_LINEAR_SEARCH
  */
 #ifdef BPS_BLOCK_LINEAR_SEARCH
 #pragma message("Btree: using linear search")
@@ -329,10 +365,10 @@ void
 bps_tree_destroy(struct bps_tree *tree);
 
 /**
- * @brief Find a first element that is equal to the key (comparator returns 0)
+ * @brief Find the first element that is equal to the key (comparator returns 0)
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
- * @return pointer to a first equal element or NULL if not found
+ * @return pointer to the first equal element or NULL if not found
  */
 bps_tree_elem_t *
 bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
@@ -418,7 +454,7 @@ bps_tree_itr_are_equal(const struct bps_tree *tree,
 		       struct bps_tree_iterator itr2);
 
 /**
- * @brief Get an iterator to a first element of the tree
+ * @brief Get an iterator to the first element of the tree
  * @param tree - pointer to a tree
  * @return - First iterator. Could be invalid if the tree is empty.
  */
@@ -426,7 +462,7 @@ struct bps_tree_iterator
 bps_tree_itr_first(const struct bps_tree *tree);
 
 /**
- * @brief Get an iterator to a last element of the tree
+ * @brief Get an iterator to the last element of the tree
  * @param tree - pointer to a tree
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
@@ -434,12 +470,13 @@ struct bps_tree_iterator
 bps_tree_itr_last(const struct bps_tree *tree);
 
 /**
- * @brief Get an iterator to a first element that is greater or equal than key
+ * @brief Get an iterator to the first element that is greater or
+ * equal than key
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the iterator is equal to the key, false otherwise
- *  Pass NULL if you dont need that info.
+ *  Pass NULL if you don't need that info.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
 struct bps_tree_iterator
@@ -447,12 +484,12 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 		     bool *exact);
 
 /**
- * @brief Get an iterator to a first element that is greater than key
+ * @brief Get an iterator to the first element that is greater than key
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the (!)previous iterator is equal to the key,
- *  false otherwise. Pass NULL if you dont need that info.
+ *  false otherwise. Pass NULL if you don't need that info.
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
@@ -496,7 +533,8 @@ bool
 bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
 
 /**
- * @brief Debug self-checking. Returns bitmask of found errors (0 on success).
+ * @brief Debug self-checking. Returns bitmask of found errors (0
+ * on success).
  *  I hope you will not need it.
  * @param tree - pointer to a tree
  * @return - Bitwise-OR of all errors found
@@ -518,7 +556,7 @@ bps_tree_debug_check(const struct bps_tree *tree);
 #define BPS_TREE_MEMMOVE(dst, src, num, dst_block, src_block) \
 	memmove(dst, src, num)
 #endif
-/* Save as BPS_TREE_MEMMOVE but takes count of values instead of memory size */
+/* Same as BPS_TREE_MEMMOVE but takes count of values instead of memory size */
 #define BPS_TREE_DATAMOVE(dst, src, num, dst_bck, src_bck) \
 	BPS_TREE_MEMMOVE(dst, src, (num) * sizeof((dst)[0]), dst_bck, src_bck)
 
@@ -576,10 +614,11 @@ CT_ASSERT_G(sizeof(struct bps_leaf) <= BPS_TREE_BLOCK_SIZE);
 
 /**
  * Inner block definition.
- * Contains an array of child (inner of leaf) IDs, and array of copies
- *  of maximal elements of the correspondings subtrees. Only last child subtree
- *  does not have corresponding element copy in this array (but it has a copy
- *  of maximal element somewhere in parent's arrays on in tree struct)
+ * Contains an array of child (inner of leaf) IDs, and array of
+ * copies of maximal elements of the corresponding subtrees. Only
+ * last child subtree does not have corresponding element copy in
+ * this array (but it has a copy of maximal element somewhere in
+ * parent's arrays on in tree struct)
  */
 struct bps_inner {
 	/* Block header */
@@ -622,7 +661,7 @@ struct bps_inner_path_elem {
 	bps_tree_block_id_t block_id;
 	/* Position of next path element in block's child_ids array */
 	bps_tree_pos_t insertion_point;
-	/* Position of this path element in parents's child_ids array */
+	/* Position of this path element in parent's child_ids array */
 	bps_tree_pos_t pos_in_parent;
 	/* Pointer to parent block (NULL for root) */
 	struct bps_inner_path_elem *parent;
@@ -631,20 +670,22 @@ struct bps_inner_path_elem {
 };
 
 /**
- * Struct for collecting path in tree, corresponds to one leaf block
+ * An auxiliary struct to collect a path in tree,
+ * corresponds  to one leaf block/one element of the path.
+ *
  */
 struct bps_leaf_path_elem {
-	/* Pointer to block */
+	/* A pointer to the block */
 	struct bps_leaf *block;
 	/* ID of the block */
 	bps_tree_block_id_t block_id;
-	/* Position of next path element in block's child_ids array */
+	/* Position of the next path element in block's child_ids array */
 	bps_tree_pos_t insertion_point;
-	/* Position of this path element in parents's child_ids array */
+	/* Position of this path element in parent's child_ids array */
 	bps_tree_pos_t pos_in_parent;
-	/* Pointer to parent block (NULL for root) */
+	/* A pointer to the parent block (NULL for root) */
 	bps_inner_path_elem *parent;
-	/* Pointer to the sequent to the max element in the subtree */
+	/* A pointer to the sequent to the max element in the subtree */
 	bps_tree_elem_t *max_elem_copy;
 };
 
@@ -785,7 +826,7 @@ bps_tree_find_ins_point_key(const struct bps_tree *tree, bps_tree_elem_t *arr,
 		} else {
 			*exact = true;
 			end = mid;
-			/* Equal founs, continue search lowest equal */
+			/* Equal found, continue search for lowest equal */
 		}
 	}
 	return (bps_tree_pos_t)(end - arr);
@@ -798,7 +839,8 @@ bps_tree_find_ins_point_key(const struct bps_tree *tree, bps_tree_elem_t *arr,
  * @param arr - array of elements
  * @param size - size of the array
  * @param elem - element to find
- * @param exact - point to bool that receives true if equal element was found
+ * @param exact - point to bool that receives true if equal
+ * element was found
  */
 static inline bps_tree_pos_t
 bps_tree_find_ins_point_elem(const struct bps_tree *tree, bps_tree_elem_t *arr,
@@ -837,12 +879,14 @@ bps_tree_find_ins_point_elem(const struct bps_tree *tree, bps_tree_elem_t *arr,
 }
 
 /**
- * @brief Find the lowest element in sorted array that is greater than the key
+ * @brief Find the lowest element in sorted array that is greater
+ * than the key.
  * @param tree - pointer to a tree
  * @param arr - array of elements
  * @param size - size of the array
  * @param key - key to find
- * @param exact - point to bool that receives true if equal element is present
+ * @param exact - point to bool that receives true if equal
+ *                element is present
  */
 static inline bps_tree_pos_t
 bps_tree_find_after_ins_point_key(const struct bps_tree *tree,
@@ -894,7 +938,8 @@ bps_tree_invalid_iterator()
 }
 
 /**
- * @brief Check if an iterator is invalid. See iterator description.
+ * @brief Check if an iterator is invalid. See iterator
+ * description.
  * @param itr - iterator to check
  * @return - true if iterator is invalid, false otherwise
  */
@@ -905,9 +950,10 @@ bps_tree_itr_is_invalid(struct bps_tree_iterator *itr)
 }
 
 /**
- * @brief Check for a validity of an iterator and return pointer to the leaf.
- * Position is also checked an (-1) is converted to position to last element.
- * If smth is wrong, iterator is invalidated and NULL returned.
+ * @brief Check for a validity of an iterator and return pointer
+ * to the leaf.  Position is also checked an (-1) is converted to
+ * position to last element.  If smth is wrong, iterator is
+ * invalidated and NULL returned.
  */
 static inline struct bps_leaf *
 bps_tree_get_leaf_safe(const struct bps_tree *tree,
@@ -931,9 +977,11 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
 }
 
 /**
- * @brief Compare two iterators and return true if trey points to same element.
- *  Two invalid iterators are equal and points to the same nowhere.
- *  Broken iterator is possibly not equal to any valid or invalid iterators.
+ * @brief Compare two iterators and return true if trey point to
+ * the same element.
+ * Two invalid iterators are equal and point to the same nowhere.
+ * A broken iterator is possibly not equal to any valid or invalid
+ * iterators.
  * @param tree - pointer to a tree
  * @param itr1 - first iterator
  * @param itr2 - second iterator
@@ -970,7 +1018,7 @@ bps_tree_itr_are_equal(const struct bps_tree *tree,
 }
 
 /**
- * @brief Get an iterator to a first element of the tree
+ * @brief Get an iterator to the first element of the tree
  * @param tree - pointer to a tree
  * @return - First iterator. Could be invalid if the tree is empty.
  */
@@ -984,7 +1032,7 @@ bps_tree_itr_first(const struct bps_tree *tree)
 }
 
 /**
- * @brief Get an iterator to a last element of the tree
+ * @brief Get an iterator to the last element of the tree.
  * @param tree - pointer to a tree
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
@@ -998,12 +1046,13 @@ bps_tree_itr_last(const struct bps_tree *tree)
 }
 
 /**
- * @brief Get an iterator to a first element that is greater or equal than key
+ * @brief Get an iterator to the first element that is greater
+ * than or equal to the key.
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the iterator is equal to the key, false otherwise
- *  Pass NULL if you dont need that info.
+ *  Pass NULL if you don't need that info.
  * @return - Lower-bound iterator. Invalid if all elements are less than key.
  */
 inline struct bps_tree_iterator
@@ -1047,12 +1096,12 @@ bps_tree_lower_bound(const struct bps_tree *tree, bps_tree_key_t key,
 }
 
 /**
- * @brief Get an iterator to a first element that is greater than key
+ * @brief Get an iterator to the first element that is greater than key
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
  * @param exact - pointer to a bool value, that will be set to true if
  *  and element pointed by the (!)previous iterator is equal to the key,
- *  false otherwise. Pass NULL if you dont need that info.
+ *  false otherwise. Pass NULL if you don't need that info.
  * @return - Upper-bound iterator. Invalid if all elements are less or equal
  *  than the key.
  */
@@ -1179,10 +1228,10 @@ bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr)
 }
 
 /**
- * @brief Find a first element that is equal to the key (comparator returns 0)
+ * @brief Find the first element that is equal to the key (comparator returns 0)
  * @param tree - pointer to a tree
  * @param key - key that will be compared with elements
- * @return pointer to a first equal element or NULL if not found
+ * @return pointer to the first equal element or NULL if not found
  */
 inline bps_tree_elem_t *
 bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key)
@@ -2841,8 +2890,8 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 }
 
 /**
- * Basic deleting from leaf, dealing with spliting, merging and moving data
- * to neighbour blocks if necessary
+ * Basic deletion from a leaf, deals with possible splitting,
+ * merging and moving of elements data to neighbouring blocks.
  */
 static inline void
 bps_tree_process_delete_inner(struct bps_tree *tree,
@@ -2996,11 +3045,13 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 
 /**
  * @brief Insert an element to the tree or replace an element in the tree
- * In case of replacing, if 'replaced' argument is not null,
- *  it'll be filled with replaced element. In case of inserting it's untoched.
- * Thus one can distinguish real insert or replace by passing to the function
- *  pointer to some value; and if it was changed during the function call,
- *  then the replace was happend; insert otherwise.
+ * In case of replacing, if 'replaced' argument is not null, it'll
+ * be filled with replaced element. In case of inserting it's left
+ * intact.
+ * Thus one can distinguish a real insert or replace by passing to
+ * the function a pointer to some value; and if it was changed
+ * during the function call, then the replace has happened.
+ * Otherwise, it was an insert.
  * @param tree - pointer to a tree
  * @param new_elem - inserting or replacing element
  * @replaced - optional pointer for a replaces element
@@ -3146,8 +3197,9 @@ bps_tree_debug_check_block(const struct bps_tree *tree, bps_block *block,
 }
 
 /**
- * @brief Debug self-checking. Returns bitmask of found errors (0 on success).
- *  I hope you will not need it.
+ * @brief A debug self-check.
+ * Returns a bitmask of found errors (0 on success).
+ * I hope you will not need it.
  * @param tree - pointer to a tree
  * @return - Bitwise-OR of all errors found
  */
@@ -3184,7 +3236,6 @@ bps_tree_debug_check(const struct bps_tree *tree)
 	return result;
 }
 /* }}} */
-
 
 /* {{{ Unused now, but could be essential */
 #if 0
