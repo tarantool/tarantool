@@ -10,7 +10,7 @@ exec admin "lua box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222'); return box.er
 exec admin "lua s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua s:wait(.01)"
 exec admin "lua type(s)"
-exec admin "lua s"
+exec admin "lua string.match(tostring(s), 'fd %d+, aka 0%.0%.0%.0:0') ~= nil"
 exec admin "lua s:errno()"
 exec admin "lua type(s:error())"
 
@@ -138,7 +138,7 @@ exec admin "lua s:nonblock()"
 if os.path.exists('/tmp/tarantool-test-socket'):
         os.unlink('/tmp/tarantool-test-socket')
 exec admin "lua s:bind('unix/', '/tmp/tarantool-test-socket')"
-exec admin "lua tostring(sc)"
+exec admin "lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil"
 exec admin "lua s:listen(1234)"
 
 exec admin "lua sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')"
@@ -166,7 +166,6 @@ exec admin "lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0"
 exec admin "lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0"
 
 exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
-exec admin "lua tostring(sc)"
 exec admin "lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:readable()"

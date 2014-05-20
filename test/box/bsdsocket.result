@@ -18,9 +18,9 @@ lua type(s)
 ---
  - table
 ...
-lua s
+lua string.match(tostring(s), 'fd %d+, aka 0%.0%.0%.0:0') ~= nil
 ---
- - fd 10, aka 0.0.0.0:0
+ - true
 ...
 lua s:errno()
 ---
@@ -455,9 +455,9 @@ lua s:bind('unix/', '/tmp/tarantool-test-socket')
 ---
  - true
 ...
-lua tostring(sc)
+lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil
 ---
- - fd 12, aka unix/:/tmp/tarantool-test-socket
+ - true
 ...
 lua s:listen(1234)
 ---
@@ -526,10 +526,6 @@ lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
 ...
 lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
-...
-lua tostring(sc)
----
- - fd 12, aka 0.0.0.0:0
 ...
 lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 ---
