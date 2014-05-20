@@ -53,26 +53,58 @@ extern "C" {
 extern char bsdsocket_lua[];
 
 static const struct { char name[32]; int value; } domains[] = {
-	{ "AF_UNIX",		AF_UNIX		},
-	{ "AF_LOCAL",		AF_LOCAL	},
-	{ "AF_INET",		AF_INET		},
-	{ "AF_INET6",		AF_INET6	},
-	{ "AF_IPX",		AF_IPX		},
-	{ "AF_NETLINK",		AF_NETLINK	},
-	{ "AF_X25",		AF_X25		},
-	{ "AF_AX25",		AF_AX25		},
-	{ "AF_ATMPVC",		AF_ATMPVC	},
-	{ "AF_APPLETALK",	AF_APPLETALK	},
-	{ "AF_PACKET",		AF_PACKET	},
+#ifdef	PF_UNIX
+	{ "PF_UNIX",		PF_UNIX		},
+#endif
+#ifdef	PF_LOCAL
+	{ "PF_LOCAL",		PF_LOCAL	},
+#endif
+#ifdef	PF_INET
+	{ "PF_INET",		PF_INET		},
+#endif
+#ifdef	PF_INET6
+	{ "PF_INET6",		PF_INET6	},
+#endif
+#ifdef	PF_IPX
+	{ "PF_IPX",		PF_IPX		},
+#endif
+#ifdef	PF_NETLINK
+	{ "PF_NETLINK",		PF_NETLINK	},
+#endif
+#ifdef	PF_X25
+	{ "PF_X25",		PF_X25		},
+#endif
+#ifdef	PF_AX25
+	{ "PF_AX25",		PF_AX25		},
+#endif
+#ifdef	PF_ATMPVC
+	{ "PF_ATMPVC",		PF_ATMPVC	},
+#endif
+#ifdef	PF_APPLETALK
+	{ "PF_APPLETALK",	PF_APPLETALK	},
+#endif
+#ifdef	PF_PACKET
+	{ "PF_PACKET",		PF_PACKET	},
+#endif
 	{ "", 0 }
 };
 
 static const struct { char name[32]; int value; } types[] = {
+#ifdef	SOCK_STREAM
 	{ "SOCK_STREAM",	SOCK_STREAM	},
+#endif
+#ifdef	SOCK_DGRAM
 	{ "SOCK_DGRAM",		SOCK_DGRAM	},
+#endif
+#ifdef	SOCK_SEQPACKET
 	{ "SOCK_SEQPACKET",	SOCK_SEQPACKET	},
+#endif
+#ifdef	SOCK_RAW
 	{ "SOCK_RAW",		SOCK_RAW	},
+#endif
+#ifdef	SOCK_RDM
 	{ "SOCK_RDM",		SOCK_RDM	},
+#endif
 	{ "", 0 }
 };
 
@@ -232,12 +264,24 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 };
 
 static const struct { char name[32]; int value; } ai_flags[] = {
+#ifdef	AI_PASSIVE
 	{"AI_PASSIVE",			AI_PASSIVE			},
+#endif
+#ifdef	AI_CANONNAME
 	{"AI_CANONNAME",		AI_CANONNAME			},
+#endif
+#ifdef	AI_NUMERICHOST
 	{"AI_NUMERICHOST",		AI_NUMERICHOST			},
+#endif
+#ifdef	AI_V4MAPPED
 	{"AI_V4MAPPED",			AI_V4MAPPED			},
+#endif
+#ifdef	AI_ALL
 	{"AI_ALL",			AI_ALL				},
+#endif
+#ifdef	AI_ADDRCONFIG
 	{"AI_ADDRCONFIG",		AI_ADDRCONFIG			},
+#endif
 #ifdef AI_IDN
 	{"AI_IDN",			AI_IDN				},
 #endif
@@ -778,7 +822,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		lua_pushstring(L, domains[i].name);
 		lua_pushinteger(L, domains[i].value);
 		lua_rawset(L, -3);
-		lua_pushliteral(L, "PF_");  /* Add PF_ alias */
+		lua_pushliteral(L, "AF_");  /* Add AF_ alias */
 		lua_pushstring(L, domains[i].name + 3);
 		lua_concat(L, 2);
 		lua_pushinteger(L, domains[i].value);
