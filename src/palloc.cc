@@ -187,7 +187,8 @@ next_chunk_for(struct palloc_pool *restrict pool, size_t size)
 	while (clazz != NULL && clazz->allocated_size < size + sizeof(struct chunk))
 		clazz = TAILQ_NEXT(clazz, link);
 
-	assert(clazz != NULL);
+	if (clazz == NULL)
+		return NULL;
 
 	chunk = SLIST_FIRST(&clazz->chunks);
 	if (chunk != NULL) {
