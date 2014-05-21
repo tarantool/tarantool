@@ -103,14 +103,12 @@ admin_handler(va_list ap)
 }
 
 void
-admin_init(const char *bind_ipaddr, int admin_port,
-	   void (*on_bind)(void *))
+admin_init(const char *uri, void (*on_bind)(void *))
 {
-	if (admin_port == 0)
+	if (!uri)
 		return;
 	static struct coio_service admin;
-	coio_service_init(&admin, "admin", bind_ipaddr,
-			  admin_port, admin_handler, NULL);
+	coio_service_init(&admin, "admin", uri, admin_handler, NULL);
 	if (on_bind)
 		evio_service_on_bind(&admin.evio_service, on_bind, NULL);
 	evio_service_start(&admin.evio_service);

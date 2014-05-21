@@ -515,7 +515,7 @@ packet = msgpack.encode({[0] = 64, [1] = 0})
 packet = msgpack.encode(packet:len())..packet
 function bug1160869()
     local s = box.socket.tcp()
-    s:connect('127.0.0.1', box.cfg.primary_port)
+    s:connect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
     s:recv(128)
     box.fiber.resume( box.fiber.create(function()
         box.fiber.detach()
@@ -549,7 +549,7 @@ function iostart()
         return
     end
     s = box.socket.tcp()
-    s:connect('127.0.0.1', box.cfg.primary_port)
+    s:connect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
     s:recv(128)
     box.fiber.resume( box.fiber.create(function()
         box.fiber.detach()

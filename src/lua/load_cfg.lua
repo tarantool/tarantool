@@ -12,6 +12,26 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
+
+local function normalize_port_uri(port)
+    if type(port) == 'string' then
+        if string.match(port, '^%d+$') == nil then
+            return port
+        end
+        port = tonumber(port)
+    end
+    if type(port) == 'number' then
+        return string.format("tcp://INADDR_ANY:%d", port)
+    end
+    return port
+end
+
+-- arguments that can be number or string
+local wrapper_cfg = {
+    admin_port          = normalize_port_uri,
+    primary_port        = normalize_port_uri,
+}
+
 -- all available options
 local default_cfg = {
     admin_port          = nil,
@@ -66,6 +86,9 @@ local function reload_cfg(oldcfg, newcfg)
         if val == "" then
             val = nil
         end
+        if wrapper_cfg[key] ~= nil then
+            val = wrapper_cfg[key](val)
+        end
         dynamic_cfg[key](val)
         rawset(oldcfg, key, val)
     end
@@ -82,6 +105,11 @@ function box.cfg(cfg)
         if cfg[k] == nil then
             cfg[k] = v
         end
+    end
+
+    for k,v in pairs(wrapper_cfg) do
+        -- options that can be number or string
+        cfg[k] = wrapper_cfg[k](cfg[k])
     end
     box.cfg = setmetatable(cfg,
         {

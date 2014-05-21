@@ -1,0 +1,45 @@
+1..42
+# Errors
+ok 1 - parse NULL string
+ok 2 - error.schema = true
+ok 3 - NULL structure
+ok 4 - empty string
+ok 5 - error.schema = true
+ok 6 - no host
+ok 7 - error.schema = true
+ok 8 - invalid schema sep
+ok 9 - error.schema = true
+ok 10 - invalid schema sep
+ok 11 - error.schema = true
+ok 12 - zero host len
+ok 13 - error.schema = false
+ok 14 - error.host = true
+ok 15 - zero schema len
+ok 16 - error.schema = true
+ok 17 - wrong port
+ok 18 - error.schema = false
+ok 19 - error.host = false
+ok 20 - error.port = true
+# Parser
+ok 21 - valid uri
+ok 22 - schema
+ok 23 - host
+ok 24 - port
+ok 25 - tcp flag
+ok 26 - unix flag
+ok 27 - full uri
+ok 28 - schema
+ok 29 - host
+ok 30 - port
+ok 31 - tcp flag
+ok 32 - unix flag
+ok 33 - full uri
+ok 34 - schema
+ok 35 - host
+ok 36 - port
+ok 37 - unix socket
+ok 38 - schema
+ok 39 - host
+ok 40 - port
+ok 41 - tcp flag
+ok 42 - unix flag

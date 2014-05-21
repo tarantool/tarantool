@@ -3,6 +3,10 @@
 
 #include <stdio.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
 @brief example
 
@@ -89,6 +93,10 @@ int check_plan(void);
 #define fail(fmt, args...)		\
 	ok(0, fmt, ##args)
 
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_TEST_H_INCLUDED */
 

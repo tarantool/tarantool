@@ -71,6 +71,7 @@ set (common_sources
      fiob.c
      tt_uuid.c
      ffisyms.cc
+     port-uri.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc

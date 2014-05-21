@@ -93,7 +93,7 @@ struct evio_service
 void
 evio_service_init(ev_loop *loop,
 		  struct evio_service *service, const char *name,
-		  const char *host, int port,
+		  const char *uri,
 		  void (*on_accept)(struct evio_service *,
 				    int, struct sockaddr_in *),
 		  void *on_accept_param);

@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_IPROTO_H_INCLUDED
-#define TARANTOOL_IPROTO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,6 +26,36 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-void
-iproto_init(const char *uri);
-#endif
+#ifndef TARANTOOL_PORT_URI_H_INCLUDED
+#define TARANTOOL_PORT_URI_H_INCLUDED
+#include <stdbool.h>
+
+
+struct port_uri {
+	char *schema;
+	union {
+		char *host;
+		char *path;
+	};
+
+	int port;
+
+	/* flags */
+	struct {
+		bool tcp;
+		bool unix;
+		bool alloc;
+	} is;
+
+	struct {
+		bool schema;
+		bool host;
+		bool port;
+	} error;
+};
+
+struct port_uri *port_uri_parse(struct port_uri *uri, const char *str);
+void port_uri_destroy(struct port_uri * uri);
+
+
+#endif /* TARANTOOL_PORT_URI_H_INCLUDED */
