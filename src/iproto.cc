@@ -469,24 +469,16 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
-invalid_length:
+error:
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "packet length");
 		}
 		if (mp_check_uint(pos, in->end) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
-
-		/*
-		 * A hack to support padding after packet length.
-		 */
-		ptrdiff_t need_bytes = IPROTO_FIXHEADER_SIZE - (pos - reqstart);
-		if (need_bytes > 0 && mp_typeof(*pos) == MP_STR) {
-			uint32_t padding;
-			mp_decode_str(&pos, &padding);
-			if (padding + 1 != need_bytes)
-				goto invalid_length;
-		}
+		/* Skip optional request padding. */
+		if (mp_typeof(*pos) == MP_STR && mp_check(&pos, in->end))
+			goto error;
 
 		const char *reqend = pos + len;
 		if (reqend > in->end)
