@@ -101,6 +101,61 @@ const char *iproto_request_type_strs[] =
 	"AUTH"
 };
 
+#define bit(c) (1ULL<<IPROTO_##c)
+const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
+	0,                                                     /* unused */
+	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
+	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
+	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
+	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
+	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
+	bit(USER_NAME) | bit(TUPLE)                            /* AUTH */
+};
+#undef bit
+
+const char *iproto_key_strs[IPROTO_KEY_MAX] = {
+	"type",             /* 0x00 */
+	"sync",             /* 0x01 */
+	"node_id",          /* 0x02 */
+	"lsn",              /* 0x03 */
+	"timestamp",        /* 0x04 */
+	"",                 /* 0x05 */
+	"",                 /* 0x06 */
+	"",                 /* 0x07 */
+	"",                 /* 0x08 */
+	"",                 /* 0x09 */
+	"",                 /* 0x0a */
+	"",                 /* 0x0b */
+	"",                 /* 0x0c */
+	"",                 /* 0x0d */
+	"",                 /* 0x0e */
+	"",                 /* 0x0f */
+	"space_id",         /* 0x10 */
+	"index_id",         /* 0x11 */
+	"limit",            /* 0x12 */
+	"offset",           /* 0x13 */
+	"iterator",         /* 0x14 */
+	"",                 /* 0x15 */
+	"",                 /* 0x16 */
+	"",                 /* 0x17 */
+	"",                 /* 0x18 */
+	"",                 /* 0x19 */
+	"",                 /* 0x1a */
+	"",                 /* 0x1b */
+	"",                 /* 0x1c */
+	"",                 /* 0x1d */
+	"",                 /* 0x1e */
+	"",                 /* 0x1f */
+	"key",              /* 0x20 */
+	"tuple",            /* 0x21 */
+	"function name",    /* 0x22 */
+	"user name",        /* 0x23 */
+	"node uuid"         /* 0x24 */
+	"cluster uuid"      /* 0x25 */
+	"lsn map"           /* 0x26 */
+};
+
 void
 iproto_header_decode(struct iproto_header *header, const char **pos,
 		     const char *end)

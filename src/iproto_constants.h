@@ -97,6 +97,12 @@ iproto_body_has_key(const char *pos, const char *end)
 
 #undef bit
 
+static inline uint64_t
+iproto_key_bit(unsigned char key)
+{
+	return 1ULL << key;
+}
+
 extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {
@@ -115,6 +121,10 @@ enum iproto_request_type {
 };
 
 extern const char *iproto_request_type_strs[];
+/** Key names. */
+extern const char *iproto_key_strs[];
+/** A map of mandatory members of an iproto DML request. */
+extern const uint64_t iproto_body_key_map[];
 
 static inline const char *
 iproto_request_name(uint32_t type)

@@ -436,6 +436,10 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 return
             end
             local blen = self.s:recv(5)
+            if string.len(blen) < 5 then
+                self:fatal("The server has closed connection")
+                return
+            end
             blen = msgpack.decode(blen)
 
             local body = ''
@@ -469,6 +473,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
                 while not self.closed do
                     local resp = self:read_response()
+                    if resp == nil or string.len(resp) == 0 then
+                        break
+                    end
                     local header, offset = msgpack.decode(resp);
                     local code = header[box.net.box.TYPE]
                     local sync = header[box.net.box.SYNC]

@@ -250,6 +250,7 @@ request_decode(struct request *request, const char *data, uint32_t len)
 {
 	assert(request->execute != NULL);
 	const char *end = data + len;
+	uint64_t key_map = iproto_body_key_map[request->type];
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
@@ -263,6 +264,7 @@ error:
 			continue;
 		}
 		unsigned char key = mp_decode_uint(&data);
+		key_map &= ~iproto_key_bit(key);
 		const char *value = data;
 		if (mp_check(&data, end))
 			goto error;
@@ -301,6 +303,10 @@ error:
 	if (data != end)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet end");
 #endif
+	if (key_map) {
+		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_strs[__builtin_ffsll((long long) key_map) - 1]);
+	  }
 }
 
 int
