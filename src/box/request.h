@@ -39,8 +39,16 @@ enum { REQUEST_IOVMAX = IPROTO_PACKET_BODY_IOVMAX };
 
 struct request
 {
-	struct iproto_packet *packet;
-	uint32_t code;
+	/*
+	 * Either log row, or network header, or NULL, depending
+	 * on where this packet originated from: the write ahead
+	 * log/snapshot, client request, or a Lua request.
+	 */
+	struct iproto_header *header;
+	/**
+	 * Request type - IPROTO type code
+	 */
+	uint32_t type;
 	uint32_t space_id;
 	uint32_t index_id;
 	uint32_t offset;

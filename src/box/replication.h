@@ -40,7 +40,7 @@ void
 replication_prefork(const char *snap_dir, const char *wal_dir);
 
 void
-replication_join(int fd, struct iproto_packet *packet);
+replication_join(int fd, struct iproto_header *packet);
 
 /**
  * Subscribe a replica to updates.
@@ -48,7 +48,7 @@ replication_join(int fd, struct iproto_packet *packet);
  * @return None. On error, closes the socket.
  */
 void
-replication_subscribe(int fd, struct iproto_packet *packet);
+replication_subscribe(int fd, struct iproto_header *packet);
 
 #endif // TARANTOOL_REPLICATION_H_INCLUDED
 

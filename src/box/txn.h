@@ -44,8 +44,8 @@ struct txn {
 	struct rlist on_commit;
 	struct rlist on_rollback;
 
-	/* Redo info: binary packet */
-	struct iproto_packet *packet;
+	/* Redo log row: binary packet */
+	struct iproto_header *row;
 };
 
 struct txn *txn_begin();

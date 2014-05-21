@@ -198,7 +198,7 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 
 /** State of subscribe request - master process. */
 struct relay_data {
-	uint32_t code;
+	uint32_t type;
 	uint64_t sync;
 
 	/* for SUBSCRIBE */
@@ -218,14 +218,14 @@ struct replication_request {
 
 /** Replication acceptor fiber handler. */
 void
-replication_join(int fd, struct iproto_packet *packet)
+replication_join(int fd, struct iproto_header *header)
 {
-	assert(packet->code == IPROTO_JOIN);
-	if (packet->bodycnt == 0)
+	assert(header->type == IPROTO_JOIN);
+	if (header->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
 
-	const char *data = (const char *) packet->body[0].iov_base;
-	const char *end = data + packet->body[0].iov_len;
+	const char *data = (const char *) header->body[0].iov_base;
+	const char *end = data + header->body[0].iov_len;
 	const char *d = data;
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
@@ -269,8 +269,8 @@ replication_join(int fd, struct iproto_packet *packet)
 	}
 	request->fd = fd;
 	request->io.data = request;
-	request->data.code = packet->code;
-	request->data.sync = packet->sync;
+	request->data.type = header->type;
+	request->data.sync = header->sync;
 
 	ev_io_init(&request->io, replication_send_socket,
 		   master_to_spawner_socket, EV_WRITE);
@@ -279,9 +279,8 @@ replication_join(int fd, struct iproto_packet *packet)
 
 /** Replication acceptor fiber handler. */
 void
-replication_subscribe(int fd, struct iproto_packet *packet)
+replication_subscribe(int fd, struct iproto_header *packet)
 {
-	assert(packet->code == IPROTO_SUBSCRIBE);
 	if (packet->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
 	assert(packet->bodycnt == 1);
@@ -380,7 +379,7 @@ replication_subscribe(int fd, struct iproto_packet *packet)
 
 	request->fd = fd;
 	request->io.data = request;
-	request->data.code = packet->code;
+	request->data.type = packet->type;
 	request->data.sync = packet->sync;
 	request->data.node_id = node_id;
 	request->data.lsnmap_size = lsnmap_size;
@@ -740,7 +739,7 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 
 /** Send a single row to the client. */
 static void
-replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
+replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 {
 	struct recovery_state *r = recovery_state;
 
@@ -749,11 +748,11 @@ replication_relay_send_row(void * /* param */, struct iproto_packet *packet)
 		packet->sync = replica.sync;
 		struct iovec iov[IPROTO_ROW_IOVMAX];
 		char fixheader[IPROTO_FIXHEADER_SIZE];
-		int iovcnt = iproto_encode_row(packet, iov, fixheader);
+		int iovcnt = iproto_row_encode(packet, iov, fixheader);
 		sio_writev_all(replica.sock, iov, iovcnt);
 	}
 
-	if (iproto_request_is_dml(packet->code)) {
+	if (iproto_request_is_dml(packet->type)) {
 		/*
 		 * Update local vclock. During normal operation wal_write()
 		 * updates local vclock. In relay mode we have to update
@@ -772,14 +771,14 @@ replication_relay_join(struct recovery_state *r)
 	recover_snap(r);
 
 	/* Send response to JOIN command = end of stream */
-	struct iproto_packet packet;
+	struct iproto_header packet;
 	memset(&packet, 0, sizeof(packet));
-	packet.code = IPROTO_JOIN;
+	packet.type = IPROTO_JOIN;
 	packet.sync = replica.sync;
 
 	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+	int iovcnt = iproto_row_encode(&packet, iov, fixheader);
 	sio_writev_all(replica.sock, iov, iovcnt);
 
 	say_info("snapshot sent");
@@ -789,7 +788,7 @@ replication_relay_join(struct recovery_state *r)
 static void
 replication_relay_subscribe(struct recovery_state *r, struct relay_data *data)
 {
-	assert(data->code == IPROTO_SUBSCRIBE);
+	assert(data->type == IPROTO_SUBSCRIBE);
 	/* Set LSNs */
 	for (uint32_t i = 0; i < data->lsnmap_size; i++) {
 		vclock_set(&r->vclock, data->lsnmap[i].node_id,
@@ -867,7 +866,7 @@ replication_relay_loop(struct relay_data *data)
 	recovery_state->relay = true; /* recovery used in relay mode */
 
 	try {
-		switch (data->code) {
+		switch (data->type) {
 		case IPROTO_JOIN:
 			replication_relay_join(recovery_state);
 			break;

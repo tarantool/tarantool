@@ -34,7 +34,7 @@ struct iproto_header_bin {
 	uint8_t m_len;                          /* MP_UINT32 */
 	uint32_t v_len;                         /* length */
 	uint8_t m_header;                       /* MP_MAP */
-	uint8_t k_code;                         /* IPROTO_CODE */
+	uint8_t k_code;                         /* IPROTO_REQUEST_TYPE */
 	uint8_t m_code;                         /* MP_UINT32 */
 	uint32_t v_code;                        /* response status */
 	uint8_t k_sync;                         /* IPROTO_SYNC */
@@ -43,7 +43,7 @@ struct iproto_header_bin {
 } __attribute__((packed));
 
 static const struct iproto_header_bin iproto_header_bin = {
-	0xce, 0, 0x82, IPROTO_CODE, 0xce, 0, IPROTO_SYNC, 0xcf, 0
+	0xce, 0, 0x82, IPROTO_REQUEST_TYPE, 0xce, 0, IPROTO_SYNC, 0xcf, 0
 };
 
 struct iproto_body_bin {

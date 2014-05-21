@@ -81,7 +81,7 @@ box.net = {
         DELETE = 5,
         CALL = 6,
 
-        CODE = 0x00,
+        TYPE = 0x00,
         SYNC = 0x01,
         SPACE_ID = 0x10,
         INDEX_ID = 0x11,
@@ -343,7 +343,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
             local sync = self.processing:next_sync()
             self.processing[sync] = box.ipc.channel(1)
             local header = msgpack.encode{
-                    [box.net.box.CODE] = op, [box.net.box.SYNC] = sync
+                    [box.net.box.TYPE] = op, [box.net.box.SYNC] = sync
             }
             request = msgpack.encode(header:len() + request:len())..
                       header..request
@@ -470,7 +470,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 while not self.closed do
                     local resp = self:read_response()
                     local header, offset = msgpack.decode(resp);
-                    local code = header[box.net.box.CODE]
+                    local code = header[box.net.box.TYPE]
                     local sync = header[box.net.box.SYNC]
                     if sync == nil then
                         break

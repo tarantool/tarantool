@@ -130,7 +130,7 @@ char *
 format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 
 void
-log_encode_setlsn(struct iproto_packet *packet, const struct vclock *vclock);
+log_encode_setlsn(struct iproto_header *packet, const struct vclock *vclock);
 
 struct log_setlsn_row {
 	uint32_t node_id;
@@ -138,7 +138,7 @@ struct log_setlsn_row {
 };
 
 struct log_setlsn_row *
-log_decode_setlsn(struct iproto_packet *packet, uint32_t *p_size);
+log_decode_setlsn(struct iproto_header *packet, uint32_t *p_size);
 
 struct log_io {
 	struct log_dir *dir;
@@ -182,9 +182,9 @@ void
 log_io_cursor_close(struct log_io_cursor *i);
 
 int
-log_io_cursor_next(struct log_io_cursor *i, struct iproto_packet *packet);
+log_io_cursor_next(struct log_io_cursor *i, struct iproto_header *packet);
 int
-xlog_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+xlog_encode_row(const struct iproto_header *packet, struct iovec *iov,
 		char fixheader[XLOG_FIXHEADER_SIZE]);
 enum { XLOG_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
 

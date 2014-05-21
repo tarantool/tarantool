@@ -45,7 +45,7 @@
 
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
-		struct iproto_packet *packet)
+		struct iproto_header *row)
 {
 	struct ibuf *in = &iobuf->in;
 
@@ -72,12 +72,12 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	iproto_packet_decode(packet, (const char **) &in->pos, in->pos + len);
+	iproto_header_decode(row, (const char **) &in->pos, in->pos + len);
 }
 
 /* Blocked I/O  */
 static void
-remote_read_row_fd(int sock, struct iproto_packet *packet)
+remote_read_row_fd(int sock, struct iproto_header *row)
 {
 	const char *data;
 
@@ -110,13 +110,13 @@ error:
 	}
 
 	data = bodybuf;
-	iproto_packet_decode(packet, &data, data + len);
+	iproto_header_decode(row, &data, data + len);
 }
 
 void
 replica_bootstrap(struct recovery_state *r, const char *replication_source)
 {
-	say_info("bootstrapping replica");
+	say_info("bootstrapping a replica");
 
 	recovery_begin_recover_snapshot(r);
 
@@ -147,10 +147,10 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	uint64_t sync = rand();
 
 	/* Send JOIN request */
-	struct iproto_packet packet;
-	memset(&packet, 0, sizeof(packet));
-	packet.code = IPROTO_JOIN;
-	packet.sync = sync;
+	struct iproto_header row;
+	memset(&row, 0, sizeof(struct iproto_header));
+	row.type = IPROTO_JOIN;
+	row.sync = sync;
 
 	char buf[128];
 	char *data = buf;
@@ -161,38 +161,30 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	data += UUID_LEN;
 
 	assert(data <= buf + sizeof(buf));
-	packet.body[0].iov_base = buf;
-	packet.body[0].iov_len = (data - buf);
-	packet.bodycnt = 1;
+	row.body[0].iov_base = buf;
+	row.body[0].iov_len = (data - buf);
+	row.bodycnt = 1;
 	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov, fixheader);
 
 	sio_connect(master, &addr, sizeof(addr));
 	sio_readn(master, greeting, sizeof(greeting));
 	sio_writev_all(master, iov, iovcnt);
 
 	while (true) {
-		remote_read_row_fd(master, &packet);
-		if (packet.sync != sync) {
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "unexpected packet sync");
-		}
+		remote_read_row_fd(master, &row);
 
 		/* Recv JOIN response (= end of stream) */
-		if (packet.code == IPROTO_JOIN) {
-			if (packet.bodycnt != 0)
-				tnt_raise(IllegalParams, "JOIN body");
+		if (row.type == IPROTO_JOIN) {
 			say_info("done");
 			break;
 		}
 
-		recovery_process(r, &packet);
+		recovery_process(r, &row);
 	}
 
 	recovery_end_recover_snapshot(r);
-
-	say_info("done");
 	/* master socket closed by guard */
 }
 
@@ -207,9 +199,9 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	coio_readn(coio, greeting, sizeof(greeting));
 
 	/* Send SUBSCRIBE request */
-	struct iproto_packet packet;
-	memset(&packet, 0, sizeof(packet));
-	packet.code = IPROTO_SUBSCRIBE;
+	struct iproto_header row;
+	memset(&row, 0, sizeof(row));
+	row.type = IPROTO_SUBSCRIBE;
 
 	uint32_t cluster_size = vclock_size(&r->vclock);
 	size_t size = 128 + cluster_size *
@@ -232,15 +224,15 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 		data = mp_encode_uint(data, it.lsn);
 	}
 	assert(data <= buf + size);
-	packet.body[0].iov_base = buf;
-	packet.body[0].iov_len = (data - buf);
-	packet.bodycnt = 1;
+	row.body[0].iov_base = buf;
+	row.body[0].iov_len = (data - buf);
+	row.bodycnt = 1;
 	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov, fixheader);
 	coio_writev(coio, iov, iovcnt, 0);
 
-	say_crit("successfully connected to master");
+	say_crit("connected to master");
 }
 
 static void
@@ -270,16 +262,16 @@ pull_from_remote(va_list ap)
 				      "connected");
 			}
 			err = "can't read row";
-			struct iproto_packet packet;
-			remote_read_row(&coio, iobuf, &packet);
+			struct iproto_header row;
+			remote_read_row(&coio, iobuf, &row);
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now(loop) - packet.tm;
+			r->remote->recovery_lag = ev_now(loop) - row.tm;
 			r->remote->recovery_last_update_tstamp =
 				ev_now(loop);
 
-			recovery_process(r, &packet);
+			recovery_process(r, &row);
 
 			iobuf_reset(iobuf);
 			fiber_gc();
