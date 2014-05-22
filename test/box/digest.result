@@ -1,148 +1,148 @@
-lua type(box.digest)
+type(box.digest)
 ---
- - table
+- table
 ...
-lua box.digest.md4_hex()
+box.digest.md4_hex()
 ---
- - 31d6cfe0d16ae931b73c59d7e0c089c0
+- 31d6cfe0d16ae931b73c59d7e0c089c0
 ...
-lua box.digest.md5_hex()
+box.digest.md5_hex()
 ---
- - d41d8cd98f00b204e9800998ecf8427e
+- d41d8cd98f00b204e9800998ecf8427e
 ...
-lua box.digest.sha_hex()
+box.digest.sha_hex()
 ---
- - f96cea198ad1dd5617ac084a3d92c6107708c0ef
+- f96cea198ad1dd5617ac084a3d92c6107708c0ef
 ...
-lua box.digest.sha1_hex()
+box.digest.sha1_hex()
 ---
- - da39a3ee5e6b4b0d3255bfef95601890afd80709
+- da39a3ee5e6b4b0d3255bfef95601890afd80709
 ...
-lua box.digest.sha224_hex()
+box.digest.sha224_hex()
 ---
- - d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
+- d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
 ...
-lua box.digest.sha256_hex()
+box.digest.sha256_hex()
 ---
- - e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ...
-lua box.digest.sha384_hex()
+box.digest.sha384_hex()
 ---
- - 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
+- 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
 ...
-lua box.digest.sha512_hex()
+box.digest.sha512_hex()
 ---
- - cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+- cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
 ...
-lua string.len(box.digest.md4_hex())
+string.len(box.digest.md4_hex())
 ---
- - 32
+- 32
 ...
-lua string.len(box.digest.md5_hex())
+string.len(box.digest.md5_hex())
 ---
- - 32
+- 32
 ...
-lua string.len(box.digest.sha_hex())
+string.len(box.digest.sha_hex())
 ---
- - 40
+- 40
 ...
-lua string.len(box.digest.sha1_hex())
+string.len(box.digest.sha1_hex())
 ---
- - 40
+- 40
 ...
-lua string.len(box.digest.sha224_hex())
+string.len(box.digest.sha224_hex())
 ---
- - 56
+- 56
 ...
-lua string.len(box.digest.sha256_hex())
+string.len(box.digest.sha256_hex())
 ---
- - 64
+- 64
 ...
-lua string.len(box.digest.sha384_hex())
+string.len(box.digest.sha384_hex())
 ---
- - 96
+- 96
 ...
-lua string.len(box.digest.sha512_hex())
+string.len(box.digest.sha512_hex())
 ---
- - 128
+- 128
 ...
-lua string.len(box.digest.md4())
+string.len(box.digest.md4())
 ---
- - 16
+- 16
 ...
-lua string.len(box.digest.md5())
+string.len(box.digest.md5())
 ---
- - 16
+- 16
 ...
-lua string.len(box.digest.sha())
+string.len(box.digest.sha())
 ---
- - 20
+- 20
 ...
-lua string.len(box.digest.sha1())
+string.len(box.digest.sha1())
 ---
- - 20
+- 20
 ...
-lua string.len(box.digest.sha224())
+string.len(box.digest.sha224())
 ---
- - 28
+- 28
 ...
-lua string.len(box.digest.sha256())
+string.len(box.digest.sha256())
 ---
- - 32
+- 32
 ...
-lua string.len(box.digest.sha384())
+string.len(box.digest.sha384())
 ---
- - 48
+- 48
 ...
-lua string.len(box.digest.sha512())
+string.len(box.digest.sha512())
 ---
- - 64
+- 64
 ...
-lua box.digest.md5_hex(123)
+box.digest.md5_hex(123)
 ---
- - 202cb962ac59075b964b07152d234b70
+- 202cb962ac59075b964b07152d234b70
 ...
-lua box.digest.md5_hex('123')
+box.digest.md5_hex('123')
 ---
- - 202cb962ac59075b964b07152d234b70
+- 202cb962ac59075b964b07152d234b70
 ...
-lua box.digest.md5_hex(true)
+box.digest.md5_hex(true)
 ---
- - b326b5062b2f0e69046810717534cb09
+- b326b5062b2f0e69046810717534cb09
 ...
-lua box.digest.md5_hex('true')
+box.digest.md5_hex('true')
 ---
- - b326b5062b2f0e69046810717534cb09
+- b326b5062b2f0e69046810717534cb09
 ...
-lua box.digest.md5_hex(nil)
+box.digest.md5_hex(nil)
 ---
- - d41d8cd98f00b204e9800998ecf8427e
+- d41d8cd98f00b204e9800998ecf8427e
 ...
-lua box.digest.md5_hex()
+box.digest.md5_hex()
 ---
- - d41d8cd98f00b204e9800998ecf8427e
+- d41d8cd98f00b204e9800998ecf8427e
 ...
-lua box.digest.crc32()
+box.digest.crc32()
 ---
- - 4294967295
+- 4294967295
 ...
-lua box.digest.crc32_update(4294967295, '')
+box.digest.crc32_update(4294967295, '')
 ---
- - 4294967295
+- 4294967295
 ...
-lua box.digest.crc32('abc')
+box.digest.crc32('abc')
 ---
- - 3384066120
+- 3384066120
 ...
-lua box.digest.crc32_update(4294967295, 'abc')
+box.digest.crc32_update(4294967295, 'abc')
 ---
- - 3384066120
+- 3384066120
 ...
-lua box.digest.crc32('abccde')
+box.digest.crc32('abccde')
 ---
- - 3628146660
+- 3628146660
 ...
-lua box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
+box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
 ---
- - 3628146660
+- 3628146660
 ...
