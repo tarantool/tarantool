@@ -477,9 +477,10 @@ error:
 			break;
 		uint32_t len = mp_decode_uint(&pos);
 		/* Skip optional request padding. */
-		if (mp_typeof(*pos) == MP_STR && mp_check(&pos, in->end))
+		if (pos < in->end && mp_typeof(*pos) == MP_STR &&
+		    mp_check(&pos, in->end)) {
 			goto error;
-
+		}
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
