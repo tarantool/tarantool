@@ -40,17 +40,16 @@ double too_long_threshold;
 void
 txn_add_redo(struct txn *txn, struct request *request)
 {
-	txn->packet = request->packet;
-	if (recovery_state->wal_mode == WAL_NONE || request->packet != NULL)
+	txn->row = request->header;
+	if (recovery_state->wal_mode == WAL_NONE || request->header != NULL)
 		return;
 
-	/* Generate binary body for Lua requests */
-	struct iproto_packet *packet = (struct iproto_packet *)
-		region_alloc0(&fiber()->gc, sizeof(*packet));
-	assert(packet->node_id == 0); /* local request */
-	packet->code = request->code;
-	packet->bodycnt = request_encode(request, packet->body);
-	txn->packet = packet;
+	/* Create a redo log row for Lua requests */
+	struct iproto_header *row= (struct iproto_header *)
+		region_alloc0(&fiber()->gc, sizeof(struct iproto_header));
+	row->type = request->type;
+	row->bodycnt = request_encode(request, row->body);
+	txn->row = row;
 }
 
 void
@@ -95,14 +94,15 @@ txn_commit(struct txn *txn)
 	    !space_is_temporary(txn->space)) {
 		int res = 0;
 		/* txn_commit() must be done after txn_add_redo() */
-		assert(recovery_state->wal_mode == WAL_NONE || txn->packet != NULL);
+		assert(recovery_state->wal_mode == WAL_NONE ||
+		       txn->row != NULL);
 		ev_tstamp start = ev_now(loop()), stop;
-		res = wal_write(recovery_state, txn->packet);
+		res = wal_write(recovery_state, txn->row);
 		stop = ev_now(loop());
 
-		if (stop - start > too_long_threshold && txn->packet != NULL) {
+		if (stop - start > too_long_threshold && txn->row != NULL) {
 			say_warn("too long %s: %.3f sec",
-				iproto_request_name(txn->packet->code),
+				iproto_request_name(txn->row->type),
 					stop - start);
 		}
 

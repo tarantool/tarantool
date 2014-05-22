@@ -158,16 +158,16 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	 */
 	struct log_io_cursor cur;
 	log_io_cursor_open(&cur, wal);
-	struct iproto_packet packet;
-	if (log_io_cursor_next(&cur, &packet) != 0 ||
-	    packet.code != IPROTO_SETLSN)
+	struct iproto_header row;
+	if (log_io_cursor_next(&cur, &row) != 0 ||
+	    row.type != IPROTO_SETLSN)
 		return -2;
 
 	/*
 	 * Parse SETLSN
 	 */
 	uint32_t row_count = 0;
-	struct log_setlsn_row *rows = log_decode_setlsn(&packet, &row_count);
+	struct log_setlsn_row *rows = log_decode_setlsn(&row, &row_count);
 	auto rows_guard = make_scoped_guard([=]{
 		free(rows);
 	});
@@ -427,12 +427,10 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 }
 
 void
-log_encode_setlsn(struct iproto_packet *packet, const struct vclock *vclock)
+log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 {
-	memset(packet, 0, sizeof(*packet));
-	packet->code = IPROTO_SETLSN;
-	/* node_id and lsn should be set to zero for SETLSN command */
-	assert(packet->node_id == 0 && packet->lsn == 0);
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_SETLSN;
 
 	uint32_t cluster_size = vclock != NULL ? vclock_size(vclock) : 0;
 	size_t size = 128 + cluster_size *
@@ -450,17 +448,17 @@ log_encode_setlsn(struct iproto_packet *packet, const struct vclock *vclock)
 	}
 
 	assert(data <= buf + size);
-	packet->body[0].iov_base = buf;
-	packet->body[0].iov_len = (data - buf);
-	packet->bodycnt = 1;
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
 }
 
 struct log_setlsn_row *
-log_decode_setlsn(struct iproto_packet *packet, uint32_t *p_row_count)
+log_decode_setlsn(struct iproto_header *row, uint32_t *p_row_count)
 {
-	if (packet->bodycnt == 0)
+	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SETLSN body");
-	const char *data = (const char *) packet->body[0].iov_base;
+	const char *data = (const char *) row->body[0].iov_base;
 	const char *d = data;
 	if (mp_typeof(*data) != MP_MAP) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -519,7 +517,7 @@ log_decode_setlsn(struct iproto_packet *packet, uint32_t *p_row_count)
 /* {{{ struct log_io_cursor */
 
 static int
-row_reader(FILE *f, struct iproto_packet *packet)
+row_reader(FILE *f, struct iproto_header *row)
 {
 	const char *data;
 
@@ -572,16 +570,16 @@ error:
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "invalid crc32");
 
 	data = bodybuf;
-	iproto_packet_decode(packet, &data, bodybuf + len);
+	iproto_header_decode(row, &data, bodybuf + len);
 
 	return 0;
 }
 
 int
-xlog_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+xlog_encode_row(const struct iproto_header *row, struct iovec *iov,
 		char fixheader[XLOG_FIXHEADER_SIZE])
 {
-	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
+	int iovcnt = iproto_header_encode(row, iov + 1) + 1;
 	uint32_t len = 0;
 	uint32_t crc32p = 0;
 	uint32_t crc32c = 0;
@@ -645,7 +643,7 @@ log_io_cursor_close(struct log_io_cursor *i)
  *
  */
 int
-log_io_cursor_next(struct log_io_cursor *i, struct iproto_packet *packet)
+log_io_cursor_next(struct log_io_cursor *i, struct iproto_header *row)
 {
 	struct log_io *l = i->log;
 	log_magic_t magic;
@@ -689,7 +687,7 @@ restart:
 	say_debug("magic found at 0x%08jx", (uintmax_t)marker_offset);
 
 	try {
-		if (row_reader(l->f, packet) != 0)
+		if (row_reader(l->f, row) != 0)
 			goto eof;
 	} catch (Exception *e) {
 		if (l->dir->panic_if_error)

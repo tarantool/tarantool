@@ -118,6 +118,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 66 */_(ER_NODE_ID_IS_RO,		2, "Can't reset node id") \
 	/* 67 */_(ER_NODE_ID_IS_RESERVED,	2, "Can't initialize node id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for node %u: prev lsn = %llu, new lsn = %llu") \
+	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

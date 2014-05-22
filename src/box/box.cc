@@ -87,7 +87,7 @@ process_rw(struct port *port, struct request *request)
 {
 	struct txn *txn = txn_begin();
 	try {
-		stat_collect(stat_base, request->code, 1);
+		stat_collect(stat_base, request->type, 1);
 		request->execute(request, txn, port);
 		txn_commit(txn);
 		port_send_tuple(port, txn);
@@ -102,20 +102,20 @@ process_rw(struct port *port, struct request *request)
 static void
 process_ro(struct port *port, struct request *request)
 {
-	if (!iproto_request_is_select(request->code))
+	if (!iproto_request_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, request);
 }
 
 static void
-recover_row(void *param __attribute__((unused)), struct iproto_packet *packet)
+recover_row(void *param __attribute__((unused)), struct iproto_header *row)
 {
-	assert(packet->bodycnt == 1); /* always 1 for read */
+	assert(row->bodycnt == 1); /* always 1 for read */
 	struct request request;
-	request_create(&request, packet->code);
-	request_decode(&request, (const char *) packet->body[0].iov_base,
-		packet->body[0].iov_len);
-	request.packet = packet;
+	request_create(&request, row->type);
+	request_decode(&request, (const char *) row->body[0].iov_base,
+		row->body[0].iov_len);
+	request.header = row;
 	process_rw(&null_port, &request);
 }
 
@@ -448,16 +448,16 @@ snapshot_write_tuple(struct log_io *l,
 	body.v_space_id = mp_bswap_u32(n);
 	body.k_tuple = IPROTO_TUPLE;
 
-	struct iproto_packet packet;
-	memset(&packet, 0, sizeof(packet));
-	packet.code = IPROTO_INSERT;
+	struct iproto_header row;
+	memset(&row, 0, sizeof(struct iproto_header));
+	row.type = IPROTO_INSERT;
 
-	packet.bodycnt = 2;
-	packet.body[0].iov_base = &body;
-	packet.body[0].iov_len = sizeof(body);
-	packet.body[1].iov_base = tuple->data;
-	packet.body[1].iov_len = tuple->bsize;
-	snapshot_write_row(l, &packet);
+	row.bodycnt = 2;
+	row.body[0].iov_base = &body;
+	row.body[0].iov_len = sizeof(body);
+	row.body[1].iov_base = tuple->data;
+	row.body[1].iov_len = tuple->bsize;
+	snapshot_write_row(l, &row);
 }
 
 static void

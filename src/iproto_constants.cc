@@ -35,7 +35,7 @@
 const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 {
 	/* {{{ header */
-		/* 0x00 */	MP_UINT,   /* IPROTO_CODE */
+		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
 		/* 0x02 */	MP_UINT,   /* IPROTO_NODE_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
@@ -101,11 +101,66 @@ const char *iproto_request_type_strs[] =
 	"AUTH"
 };
 
+#define bit(c) (1ULL<<IPROTO_##c)
+const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
+	0,                                                     /* unused */
+	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
+	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
+	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
+	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
+	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
+	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
+	bit(USER_NAME) | bit(TUPLE)                            /* AUTH */
+};
+#undef bit
+
+const char *iproto_key_strs[IPROTO_KEY_MAX] = {
+	"type",             /* 0x00 */
+	"sync",             /* 0x01 */
+	"node_id",          /* 0x02 */
+	"lsn",              /* 0x03 */
+	"timestamp",        /* 0x04 */
+	"",                 /* 0x05 */
+	"",                 /* 0x06 */
+	"",                 /* 0x07 */
+	"",                 /* 0x08 */
+	"",                 /* 0x09 */
+	"",                 /* 0x0a */
+	"",                 /* 0x0b */
+	"",                 /* 0x0c */
+	"",                 /* 0x0d */
+	"",                 /* 0x0e */
+	"",                 /* 0x0f */
+	"space_id",         /* 0x10 */
+	"index_id",         /* 0x11 */
+	"limit",            /* 0x12 */
+	"offset",           /* 0x13 */
+	"iterator",         /* 0x14 */
+	"",                 /* 0x15 */
+	"",                 /* 0x16 */
+	"",                 /* 0x17 */
+	"",                 /* 0x18 */
+	"",                 /* 0x19 */
+	"",                 /* 0x1a */
+	"",                 /* 0x1b */
+	"",                 /* 0x1c */
+	"",                 /* 0x1d */
+	"",                 /* 0x1e */
+	"",                 /* 0x1f */
+	"key",              /* 0x20 */
+	"tuple",            /* 0x21 */
+	"function name",    /* 0x22 */
+	"user name",        /* 0x23 */
+	"node uuid"         /* 0x24 */
+	"cluster uuid"      /* 0x25 */
+	"lsn map"           /* 0x26 */
+};
+
 void
-iproto_packet_decode(struct iproto_packet *packet, const char **pos,
+iproto_header_decode(struct iproto_header *header, const char **pos,
 		     const char *end)
 {
-	memset(packet, 0, sizeof(*packet));
+	memset(header, 0, sizeof(struct iproto_header));
 	const char *pos2 = *pos;
 	if (mp_check(&pos2, end) != 0) {
 error:
@@ -123,38 +178,37 @@ error:
 		if (iproto_key_type[key] != mp_typeof(**pos))
 			goto error;
 		switch (key) {
-		case IPROTO_CODE:
-			packet->code = mp_decode_uint(pos);
+		case IPROTO_REQUEST_TYPE:
+			header->type = mp_decode_uint(pos);
 			break;
 		case IPROTO_SYNC:
-			packet->sync = mp_decode_uint(pos);
+			header->sync = mp_decode_uint(pos);
 			break;
 		case IPROTO_NODE_ID:
-			packet->node_id = mp_decode_uint(pos);
+			header->node_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
-			packet->lsn = mp_decode_uint(pos);
+			header->lsn = mp_decode_uint(pos);
 			break;
 		case IPROTO_TIMESTAMP:
-			packet->tm = mp_decode_double(pos);
+			header->tm = mp_decode_double(pos);
 			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
 		}
 	}
-
 	assert(*pos <= end);
 	if (*pos < end) {
-		packet->bodycnt = 1;
-		packet->body[0].iov_base = (void *) *pos;
-		packet->body[0].iov_len = (end - *pos);
+		header->bodycnt = 1;
+		header->body[0].iov_base = (void *) *pos;
+		header->body[0].iov_len = (end - *pos);
 		*pos = end;
 	}
 }
 
 int
-iproto_packet_encode(const struct iproto_packet *packet, struct iovec *iov)
+iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 {
 	enum { HEADER_LEN_MAX = 40 };
 
@@ -165,54 +219,54 @@ iproto_packet_encode(const struct iproto_packet *packet, struct iovec *iov)
 	char *d = data + 1; /* Skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (true) {
-		d = mp_encode_uint(d, IPROTO_CODE);
-		d = mp_encode_uint(d, packet->code);
+		d = mp_encode_uint(d, IPROTO_REQUEST_TYPE);
+		d = mp_encode_uint(d, header->type);
 		map_size++;
 	}
 
-	if (packet->sync) {
+	if (header->sync) {
 		d = mp_encode_uint(d, IPROTO_SYNC);
-		d = mp_encode_uint(d, packet->sync);
+		d = mp_encode_uint(d, header->sync);
 		map_size++;
 	}
 
-	if (packet->node_id) {
+	if (header->node_id) {
 		d = mp_encode_uint(d, IPROTO_NODE_ID);
-		d = mp_encode_uint(d, packet->node_id);
+		d = mp_encode_uint(d, header->node_id);
 		map_size++;
 	}
 
-	if (packet->lsn) {
+	if (header->lsn) {
 		d = mp_encode_uint(d, IPROTO_LSN);
-		d = mp_encode_uint(d, packet->lsn);
+		d = mp_encode_uint(d, header->lsn);
 		map_size++;
 	}
 
-	if (packet->tm) {
+	if (header->tm) {
 		d = mp_encode_uint(d, IPROTO_TIMESTAMP);
-		d = mp_encode_double(d, packet->tm);
+		d = mp_encode_double(d, header->tm);
 		map_size++;
 	}
 
 	assert(d <= data + HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);
-	iov->iov_base = data;
-	iov->iov_len = (d - data);
-	iov++;
+	out->iov_base = data;
+	out->iov_len = (d - data);
+	out++;
 
-	memcpy(iov, packet->body, sizeof(*iov) * packet->bodycnt);
-	assert(1 + packet->bodycnt <= IPROTO_PACKET_IOVMAX);
-	return 1 + packet->bodycnt; /* new iovcnt */
+	memcpy(out, header->body, sizeof(*out) * header->bodycnt);
+	assert(1 + header->bodycnt <= IPROTO_PACKET_IOVMAX);
+	return 1 + header->bodycnt; /* new iovcnt */
 }
 
 int
-iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
-		  char fixheader[IPROTO_FIXHEADER_SIZE])
+iproto_row_encode(const struct iproto_header *row,
+		  struct iovec *out, char fixheader[IPROTO_FIXHEADER_SIZE])
 {
-	int iovcnt = iproto_packet_encode(packet, iov + 1) + 1;
+	int iovcnt = iproto_header_encode(row, out + 1) + 1;
 	uint32_t len = 0;
 	for (int i = 1; i < iovcnt; i++)
-		len += iov[i].iov_len;
+		len += out[i].iov_len;
 
 	/* Encode length */
 	char *data = fixheader;
@@ -229,8 +283,8 @@ iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
 #endif
 	}
 	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
-	iov[0].iov_base = fixheader;
-	iov[0].iov_len = IPROTO_FIXHEADER_SIZE;
+	out[0].iov_base = fixheader;
+	out[0].iov_len = IPROTO_FIXHEADER_SIZE;
 
 	assert(iovcnt <= IPROTO_ROW_IOVMAX);
 	return iovcnt;

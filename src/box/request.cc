@@ -108,7 +108,7 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 					    request->tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
-	enum dup_replace_mode mode = dup_replace_mode(request->code);
+	enum dup_replace_mode mode = dup_replace_mode(request->type);
 
 	txn_add_redo(txn, request);
 	txn_replace(txn, space, NULL, new_tuple, mode);
@@ -193,7 +193,7 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 	enum iterator_type type = (enum iterator_type) request->iterator;
 
 	const char *key = request->key;
-	uint32_t part_count = mp_decode_array(&key);
+	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 
 	struct iterator *it = index->position();
 	key_validate(index->key_def, type, key, part_count);
@@ -225,24 +225,24 @@ execute_auth(struct request *request, struct txn * /* txn */,
 /** }}} */
 
 void
-request_check_code(uint32_t code)
+request_check_type(uint32_t type)
 {
-	if (code < IPROTO_SELECT || code >= IPROTO_DML_REQUEST_MAX)
-		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, code);
+	if (type < IPROTO_SELECT || type >= IPROTO_DML_REQUEST_MAX)
+		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
 }
 
 void
-request_create(struct request *request, uint32_t code)
+request_create(struct request *request, uint32_t type)
 {
-	request_check_code(code);
+	request_check_type(type);
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete, box_lua_call,
 		execute_auth,
 	};
 	memset(request, 0, sizeof(*request));
-	request->execute = execute_map[code];
-	request->code = code;
+	request->type = type;
+	request->execute = execute_map[type];
 }
 
 void
@@ -250,6 +250,7 @@ request_decode(struct request *request, const char *data, uint32_t len)
 {
 	assert(request->execute != NULL);
 	const char *end = data + len;
+	uint64_t key_map = iproto_body_key_map[request->type];
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
@@ -263,6 +264,7 @@ error:
 			continue;
 		}
 		unsigned char key = mp_decode_uint(&data);
+		key_map &= ~iproto_key_bit(key);
 		const char *value = data;
 		if (mp_check(&data, end))
 			goto error;
@@ -301,6 +303,10 @@ error:
 	if (data != end)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "packet end");
 #endif
+	if (key_map) {
+		tnt_raise(ClientError, ER_MISSING_REQUEST_FIELD,
+			  iproto_key_strs[__builtin_ffsll((long long) key_map) - 1]);
+	  }
 }
 
 int

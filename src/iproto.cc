@@ -77,7 +77,7 @@ struct iproto_request
 	struct session *session;
 	iproto_request_f process;
 	/* Request message code and sync. */
-	struct iproto_packet packet;
+	struct iproto_header header;
 	/* Box request, if this is a DML */
 	struct request request;
 	size_t total_len;
@@ -469,25 +469,18 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
-invalid_length:
-			tnt_raise(IllegalParams,
-				  "Invalid MsgPack - packet length");
+error:
+			tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				  "packet length");
 		}
 		if (mp_check_uint(pos, in->end) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
-
-		/*
-		 * A hack to support padding after packet length.
-		 */
-		ptrdiff_t need_bytes = IPROTO_FIXHEADER_SIZE - (pos - reqstart);
-		if (need_bytes > 0 && mp_typeof(*pos) == MP_STR) {
-			uint32_t padding;
-			mp_decode_str(&pos, &padding);
-			if (padding + 1 != need_bytes)
-				goto invalid_length;
+		/* Skip optional request padding. */
+		if (pos < in->end && mp_typeof(*pos) == MP_STR &&
+		    mp_check(&pos, in->end)) {
+			goto error;
 		}
-
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
@@ -495,30 +488,28 @@ invalid_length:
 			iproto_request_new(con, iproto_process_dml);
 		IprotoRequestGuard guard(ireq);
 
-		iproto_packet_decode(&ireq->packet, &pos, reqend);
+		iproto_header_decode(&ireq->header, &pos, reqend);
 		ireq->total_len = pos - reqstart; /* total request length */
 
-		/* Mark this request as local (see fill_lsn()) */
-		ireq->packet.node_id = 0;
 
 		/*
 		 * sic: in case of exception con->parse_size
 		 * as well as in->pos must not be advanced, to
 		 * stay in sync.
 		 */
-		if (iproto_request_is_dml(ireq->packet.code)) {
-			if (ireq->packet.bodycnt == 0) {
-				tnt_raise(IllegalParams,
-					  "Invalid MsgPack - invalid request");
+		if (iproto_request_is_dml(ireq->header.type)) {
+			if (ireq->header.bodycnt == 0) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "request type");
 			}
-			request_create(&ireq->request, ireq->packet.code);
-			pos = (const char *) ireq->packet.body[0].iov_base;
+			request_create(&ireq->request, ireq->header.type);
+			pos = (const char *) ireq->header.body[0].iov_base;
 			request_decode(&ireq->request, pos,
-				       ireq->packet.body[0].iov_len);
+				       ireq->header.body[0].iov_len);
 		} else {
 			ireq->process = iproto_process_admin;
 		}
-		ireq->request.packet = &ireq->packet;
+		ireq->request.header = &ireq->header;
 		iproto_queue_push(&request_queue, guard.release());
 		/* Request will be discarded in iproto_process_XXX */
 
@@ -681,13 +672,13 @@ iproto_process_dml(struct iproto_request *ireq)
 	struct obuf *out = &iobuf->out;
 
 	struct iproto_port port;
-	iproto_port_init(&port, out, ireq->packet.sync);
+	iproto_port_init(&port, out, ireq->header.sync);
 	try {
 		box_process((struct port *) &port, &ireq->request);
 	} catch (ClientError *e) {
 		if (port.found)
 			obuf_rollback_to_svp(out, &port.svp);
-		iproto_reply_error(out, e, ireq->packet.sync);
+		iproto_reply_error(out, e, ireq->header.sync);
 	}
 }
 
@@ -715,30 +706,31 @@ iproto_process_admin(struct iproto_request *ireq)
 		return;
 
 	try {
-		switch (ireq->packet.code) {
+		switch (ireq->header.type) {
 		case IPROTO_PING:
-			iproto_reply_ping(&ireq->iobuf->out, ireq->packet.sync);
+			iproto_reply_ping(&ireq->iobuf->out,
+					  ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
 			/* TODO: replication authorization */
 			session_set_user(con->session, ADMIN, ADMIN);
-			replication_join(con->input.fd, &ireq->packet);
+			replication_join(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
 		case IPROTO_SUBSCRIBE:
 			/* TODO: replication authorization */
-			replication_subscribe(con->input.fd, &ireq->packet);
+			replication_subscribe(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
 		default:
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				   (uint32_t) ireq->packet.code);
+				   (uint32_t) ireq->header.type);
 		}
 	} catch (ClientError *e) {
 		say_error("admin command error: %s", e->errmsg());
-		iproto_reply_error(&iobuf->out, e, ireq->packet.sync);
+		iproto_reply_error(&iobuf->out, e, ireq->header.sync);
 	}
 }
 
@@ -786,7 +778,7 @@ iproto_process_connect(struct iproto_request *request)
 			   IPROTO_GREETING_SIZE);
 		trigger_run(&session_on_connect, NULL);
 	} catch (ClientError *e) {
-		iproto_reply_error(&iobuf->out, e, request->packet.code);
+		iproto_reply_error(&iobuf->out, e, request->header.type);
 		try {
 			iproto_flush(iobuf, fd, &con->write_pos);
 		} catch (Exception *e) {

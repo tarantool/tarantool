@@ -38,6 +38,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <unistd.h>
 
 extern "C" {
@@ -53,26 +55,58 @@ extern "C" {
 extern char bsdsocket_lua[];
 
 static const struct { char name[32]; int value; } domains[] = {
-	{ "AF_UNIX",		AF_UNIX		},
-	{ "AF_LOCAL",		AF_LOCAL	},
-	{ "AF_INET",		AF_INET		},
-	{ "AF_INET6",		AF_INET6	},
-	{ "AF_IPX",		AF_IPX		},
-	{ "AF_NETLINK",		AF_NETLINK	},
-	{ "AF_X25",		AF_X25		},
-	{ "AF_AX25",		AF_AX25		},
-	{ "AF_ATMPVC",		AF_ATMPVC	},
-	{ "AF_APPLETALK",	AF_APPLETALK	},
-	{ "AF_PACKET",		AF_PACKET	},
+#ifdef	PF_UNIX
+	{ "PF_UNIX",		PF_UNIX		},
+#endif
+#ifdef	PF_LOCAL
+	{ "PF_LOCAL",		PF_LOCAL	},
+#endif
+#ifdef	PF_INET
+	{ "PF_INET",		PF_INET		},
+#endif
+#ifdef	PF_INET6
+	{ "PF_INET6",		PF_INET6	},
+#endif
+#ifdef	PF_IPX
+	{ "PF_IPX",		PF_IPX		},
+#endif
+#ifdef	PF_NETLINK
+	{ "PF_NETLINK",		PF_NETLINK	},
+#endif
+#ifdef	PF_X25
+	{ "PF_X25",		PF_X25		},
+#endif
+#ifdef	PF_AX25
+	{ "PF_AX25",		PF_AX25		},
+#endif
+#ifdef	PF_ATMPVC
+	{ "PF_ATMPVC",		PF_ATMPVC	},
+#endif
+#ifdef	PF_APPLETALK
+	{ "PF_APPLETALK",	PF_APPLETALK	},
+#endif
+#ifdef	PF_PACKET
+	{ "PF_PACKET",		PF_PACKET	},
+#endif
 	{ "", 0 }
 };
 
 static const struct { char name[32]; int value; } types[] = {
+#ifdef	SOCK_STREAM
 	{ "SOCK_STREAM",	SOCK_STREAM	},
+#endif
+#ifdef	SOCK_DGRAM
 	{ "SOCK_DGRAM",		SOCK_DGRAM	},
+#endif
+#ifdef	SOCK_SEQPACKET
 	{ "SOCK_SEQPACKET",	SOCK_SEQPACKET	},
+#endif
+#ifdef	SOCK_RAW
 	{ "SOCK_RAW",		SOCK_RAW	},
+#endif
+#ifdef	SOCK_RDM
 	{ "SOCK_RDM",		SOCK_RDM	},
+#endif
 	{ "", 0 }
 };
 
@@ -232,12 +266,24 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 };
 
 static const struct { char name[32]; int value; } ai_flags[] = {
+#ifdef	AI_PASSIVE
 	{"AI_PASSIVE",			AI_PASSIVE			},
+#endif
+#ifdef	AI_CANONNAME
 	{"AI_CANONNAME",		AI_CANONNAME			},
+#endif
+#ifdef	AI_NUMERICHOST
 	{"AI_NUMERICHOST",		AI_NUMERICHOST			},
+#endif
+#ifdef	AI_V4MAPPED
 	{"AI_V4MAPPED",			AI_V4MAPPED			},
+#endif
+#ifdef	AI_ALL
 	{"AI_ALL",			AI_ALL				},
+#endif
+#ifdef	AI_ADDRCONFIG
 	{"AI_ADDRCONFIG",		AI_ADDRCONFIG			},
+#endif
 #ifdef AI_IDN
 	{"AI_IDN",			AI_IDN				},
 #endif
@@ -247,7 +293,7 @@ static const struct { char name[32]; int value; } ai_flags[] = {
 #ifdef AI_IDN_ALLOW_UNASSIGNED
 	{"AI_IDN_ALLOW_UNASSIGNED",	AI_IDN_ALLOW_UNASSIGNED		},
 #endif
-#ifndef AI_IDN_USE_STD3_ASCII_RULES
+#ifdef AI_IDN_USE_STD3_ASCII_RULES
 	{"AI_IDN_USE_STD3_ASCII_RULES",	AI_IDN_USE_STD3_ASCII_RULES	},
 #endif
 #ifdef AI_NUMERICSERV
@@ -426,36 +472,57 @@ static int
 lbox_bsdsocket_push_family(struct lua_State *L, int family)
 {
 	switch(family) {
+#ifdef	AF_UNIX
 		case AF_UNIX:
 			lua_pushliteral(L, "AF_UNIX");
 			break;
+#endif
+#ifdef	AF_INET
 		case AF_INET:
 			lua_pushliteral(L, "AF_INET");
 			break;
+#endif
+#ifdef	AF_INET6
 		case AF_INET6:
 			lua_pushliteral(L, "AF_INET6");
 			break;
+#endif
+#ifdef	AF_IPX
 		case AF_IPX:
 			lua_pushliteral(L, "AF_IPX");
 			break;
+#endif
+#ifdef	AF_NETLINK
 		case AF_NETLINK:
 			lua_pushliteral(L, "AF_NETLINK");
 			break;
+#endif
+#ifdef AF_X25
 		case AF_X25:
 			lua_pushliteral(L, "AF_X25");
 			break;
+#endif
+#ifdef	AF_AX25
 		case AF_AX25:
 			lua_pushliteral(L, "AF_AX25");
 			break;
+#endif
+#ifdef	AF_ATMPVC
 		case AF_ATMPVC:
 			lua_pushliteral(L, "AF_ATMPVC");
 			break;
+#endif
+#ifdef	AF_APPLETALK
 		case AF_APPLETALK:
 			lua_pushliteral(L, "AF_APPLETALK");
 			break;
+#endif
+#ifdef	AF_PACKET
 		case AF_PACKET:
 			lua_pushliteral(L, "AF_PACKET");
 			break;
+#endif
+
 		default:
 			lua_pushinteger(L, family);
 			break;
@@ -483,24 +550,36 @@ lbox_bsdsocket_push_sotype(struct lua_State *L, int sotype)
 		sotype &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
 	#endif
 	switch(sotype) {
+#ifdef SOCK_STREAM
 		case SOCK_STREAM:
 			lua_pushliteral(L, "SOCK_STREAM");
 			break;
+#endif
+#ifdef SOCK_DGRAM
 		case SOCK_DGRAM:
 			lua_pushliteral(L, "SOCK_DGRAM");
 			break;
+#endif
+#ifdef SOCK_SEQPACKET
 		case SOCK_SEQPACKET:
 			lua_pushliteral(L, "SOCK_SEQPACKET");
 			break;
+#endif
+#ifdef SOCK_RAW
 		case SOCK_RAW:
 			lua_pushliteral(L, "SOCK_RAW");
 			break;
+#endif
+#ifdef SOCK_RDM
 		case SOCK_RDM:
 			lua_pushliteral(L, "SOCK_RDM");
 			break;
+#endif
+#ifdef SOCK_PACKET
 		case SOCK_PACKET:
 			lua_pushliteral(L, "SOCK_PACKET");
 			break;
+#endif
 		default:
 			lua_pushinteger(L, sotype);
 			break;
@@ -519,8 +598,8 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 	lua_rawset(L, -3);
 
 	switch(addr->sa_family) {
-		case AF_INET:
-		case AF_INET6: {
+		case PF_INET:
+		case PF_INET6: {
 			char shost[NI_MAXHOST];
 			char sservice[NI_MAXSERV];
 			int rc = getnameinfo(addr,
@@ -543,7 +622,7 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 			break;
 		}
 
-		case AF_UNIX:
+		case PF_UNIX:
 			lua_pushliteral(L, "host");
 			lua_pushliteral(L, "unix/");
 			lua_rawset(L, -3);
@@ -779,7 +858,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		lua_pushstring(L, domains[i].name);
 		lua_pushinteger(L, domains[i].value);
 		lua_rawset(L, -3);
-		lua_pushliteral(L, "PF_");  /* Add PF_ alias */
+		lua_pushliteral(L, "AF_");  /* Add AF_ alias */
 		lua_pushstring(L, domains[i].name + 3);
 		lua_concat(L, 2);
 		lua_pushinteger(L, domains[i].value);

@@ -47,7 +47,7 @@ enum {
 
 
 enum iproto_key {
-	IPROTO_CODE = 0x00,
+	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
 	/* Replication keys (header) */
 	IPROTO_NODE_ID = 0x02,
@@ -76,7 +76,8 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(CODE) | bit(SYNC) | bit(NODE_ID) | bit(LSN))
+#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(NODE_ID) |\
+			  bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
 			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME))
@@ -96,6 +97,12 @@ iproto_body_has_key(const char *pos, const char *end)
 
 #undef bit
 
+static inline uint64_t
+iproto_key_bit(unsigned char key)
+{
+	return 1ULL << key;
+}
+
 extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {
@@ -114,6 +121,10 @@ enum iproto_request_type {
 };
 
 extern const char *iproto_request_type_strs[];
+/** Key names. */
+extern const char *iproto_key_strs[];
+/** A map of mandatory members of an iproto DML request. */
+extern const uint64_t iproto_body_key_map[];
 
 static inline const char *
 iproto_request_name(uint32_t type)
@@ -142,8 +153,8 @@ enum {
 		IPROTO_PACKET_BODY_IOVMAX
 };
 
-struct iproto_packet {
-	uint32_t code;
+struct iproto_header {
+	uint32_t type;
 	uint32_t node_id;
 	uint64_t sync;
 	uint64_t lsn;
@@ -154,14 +165,16 @@ struct iproto_packet {
 };
 
 void
-iproto_packet_decode(struct iproto_packet *packet, const char **pos, const char *end);
+iproto_header_decode(struct iproto_header *header,
+		     const char **pos, const char *end);
 int
-iproto_packet_encode(const struct iproto_packet *packet, struct iovec *out);
+iproto_header_encode(const struct iproto_header *header,
+		     struct iovec *out);
 
 enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
 
 int
-iproto_encode_row(const struct iproto_packet *packet, struct iovec *iov,
+iproto_row_encode(const struct iproto_header *row, struct iovec *out,
 		  char fixheader[IPROTO_FIXHEADER_SIZE]);
 
 #if defined(__cplusplus)

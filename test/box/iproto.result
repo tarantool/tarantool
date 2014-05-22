@@ -13,3 +13,56 @@ ping
 ---
 - ok
 ...
+
+#  Test gh-206 "Segfault if sending IPROTO package without `KEY` field"
+
+IPROTO_SELECT
+query {'IPROTO_CODE': 1} {'IPROTO_SPACE_ID': 280}
+ping
+---
+- ok
+...
+
+
+IPROTO_DELETE
+query {'IPROTO_CODE': 5} {'IPROTO_SPACE_ID': 280}
+ping
+---
+- ok
+...
+
+
+IPROTO_UPDATE
+query {'IPROTO_CODE': 4} {'IPROTO_SPACE_ID': 280}
+ping
+---
+- ok
+...
+query {'IPROTO_CODE': 4} {'IPROTO_SPACE_ID': 280, 'IPROTO_KEY': (1,)}
+ping
+---
+- ok
+...
+
+
+IPROTO_REPLACE
+query {'IPROTO_CODE': 3} {'IPROTO_SPACE_ID': 280}
+ping
+---
+- ok
+...
+
+
+IPROTO_CALL
+query {'IPROTO_CODE': 6} {}
+ping
+---
+- ok
+...
+query {'IPROTO_CODE': 6} {'IPROTO_KEY': ('procname',)}
+ping
+---
+- ok
+...
+
+

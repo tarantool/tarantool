@@ -239,6 +239,7 @@ t;
   - 'box.error.ER_SPACE_EXISTS : 10'
   - 'box.error.ER_UNKNOWN_NODE : 62'
   - 'box.error.ER_MODIFY_INDEX : 14'
+  - 'box.error.ER_MISSING_REQUEST_FIELD : 69'
   - 'box.error.ER_SECONDARY : 7'
   - 'box.error.ER_NODE_ID_IS_RO : 66'
   - 'box.error.ER_INVALID_UUID : 64'
