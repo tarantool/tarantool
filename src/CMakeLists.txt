@@ -26,8 +26,6 @@ lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
-set(bin_sources)
-bin_source(bin_sources bootstrap.snap bootstrap.h)
 
 add_custom_target(generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -88,7 +86,6 @@ set (common_sources
      lua/errno.c
      lua/bsdsocket.cc
      ${lua_sources}
-     ${bin_sources}
 )
 
 if (ENABLE_TRACE)

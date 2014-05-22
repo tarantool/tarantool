@@ -8,6 +8,8 @@ lua_source(lua_sources lua/box.lua)
 lua_source(lua_sources lua/box_net.lua)
 lua_source(lua_sources lua/misc.lua)
 lua_source(lua_sources lua/tuple.lua)
+set(bin_sources)
+bin_source(bin_sources bootstrap.snap bootstrap.h)
 
 add_custom_target(box_generate_lua_sources
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
@@ -47,4 +49,5 @@ add_library(box
     lua/tuple.cc
     lua/slab.cc
     lua/index.cc
-    lua/space.cc)
+    lua/space.cc
+    ${bin_sources})

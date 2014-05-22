@@ -37,7 +37,7 @@ extra/rpm.spec
 src/trivia/config.h
 install_manifest.txt
 lcov
-src/bootstrap.h
+src/box/bootstrap.h
 src/lua/*.lua.c
 src/box/lua/*.lua.c
 src/tarantool
