@@ -410,37 +410,24 @@ recover_snap(struct recovery_state *r)
 	struct log_io *snap;
 	int64_t lsn;
 
-	if (log_dir_scan(&r->snap_dir) != 0) {
-		say_error("can't find snapshot");
-		goto error;
-	}
+	if (log_dir_scan(&r->snap_dir) != 0)
+		panic("can't scan snapshot directory");
 	lsn = log_dir_greatest(&r->snap_dir);
-	if (lsn <= 0) {
-		say_error("can't find snapshot");
-		goto error;
-	}
+	if (lsn <= 0)
+		panic("can't find snapshot! "
+		      "Didn't you forget to initialize storage?");
 	snap = log_io_open_for_read(&r->snap_dir, lsn, &r->node_uuid, NONE);
-	if (snap == NULL) {
-		say_error("can't find/open snapshot");
-		goto error;
-	}
+	if (snap == NULL)
+		panic("can't open snapshot");
 
-	if (tt_uuid_is_nil(&r->node_uuid)) {
-		say_error("can't find node uuid in snapshot");
-		goto error;
-	}
+	if (tt_uuid_is_nil(&r->node_uuid))
+		panic("can't find node uuid in snapshot");
 
 	say_info("recover from `%s'", snap->filename);
-	if (recover_wal(r, snap) == 0) {
-		recovery_end_recover_snapshot(r);
-		return;
-	}
-error:
-	if (log_dir_greatest(&r->snap_dir) <= 0) {
-		say_crit("didn't you forget to initialize storage with --init-storage switch?");
-		_exit(1);
-	}
-	panic("snapshot recovery failed");
+	if (recover_wal(r, snap) != 0)
+		panic("can't process snapshot");
+
+	recovery_end_recover_snapshot(r);
 }
 
 #define LOG_EOF 0
