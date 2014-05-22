@@ -1,13 +1,15 @@
 -- box.session.lua
 
-setmetatable(box.session, {
+local boxsession = require('box.session')
+
+setmetatable(boxsession, {
     __index = function(tbl, idx)
 
         if idx ~= 'storage' then
             return
         end
 
-        local sid = box.session.id()
+        local sid = boxsession.id()
 
         local mt = getmetatable(tbl)
 

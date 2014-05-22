@@ -276,11 +276,6 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-
-	lua_pushstring(L, "ipc");
-	lua_newtable(L);			/* box.ipc table */
-	luaL_register(L, NULL, ipc_meta);
-	lua_settable(L, -3);
+	luaL_register_module(L, "box.ipc", ipc_meta);
 	lua_pop(L, 1);
 }

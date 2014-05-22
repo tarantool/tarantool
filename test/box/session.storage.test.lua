@@ -1,7 +1,7 @@
 print('box.session.storage')
+box.session = require('box.session')
 
-
-dump = function(data) return "'" .. box.cjson.encode(data) .. "'" end
+dump = function(data) return "'" .. require('box.json').encode(data) .. "'" end
 
 
 type(box.session.id())
@@ -36,7 +36,7 @@ tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 
 --# drop connection second
-box.fiber.sleep(.01)
+require('box.fiber').sleep(.01)
 for k,v in pairs(all) do table.insert(tres2, v.abc) end
 
 table.sort(tres1)
@@ -44,3 +44,4 @@ table.sort(tres2)
 dump(tres1)
 dump(tres2)
 
+box.session = nil

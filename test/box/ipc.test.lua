@@ -1,3 +1,6 @@
+box.ipc = require('box.ipc')
+box.fiber = require('box.fiber')
+
 ch = box.ipc.channel()
 ch:is_full()
 ch:is_empty()
@@ -155,3 +158,5 @@ for i = 1, 100 do box.fiber.sleep(0.01) if count > 2000 then break end end;
 count > 2000, #res, res;
 
 --# setopt delimiter ''
+box.ipc = nil
+box.fiber = nil

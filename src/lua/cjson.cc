@@ -35,14 +35,17 @@ extern "C" {
 int luaopen_cjson(lua_State *l);
 }
 
+static const char jsonlib_name[] = "box.json";
 
 int
 tarantool_lua_cjson_init(struct lua_State *L)
 {
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "cjson");
 	luaopen_cjson(L);
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_pushstring(L, jsonlib_name); /* add alias */
+	lua_pushvalue(L, -3);
 	lua_settable(L, -3);
-	lua_pop(L, 1);
+	lua_pop(L, 2);
+
 	return 0;
 }

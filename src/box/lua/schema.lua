@@ -1,6 +1,8 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
+local session = require('box.session')
+
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
@@ -36,7 +38,7 @@ ffi.cdef[[
 		                  char *out, int out_len);
 ]]
 local builtin = ffi.C
-local msgpackffi = require('msgpackffi')
+local msgpackffi = require('box.msgpackffi')
 local fun = require('fun')
 
 local function user_resolve(user)
@@ -92,7 +94,7 @@ box.schema.space.create = function(name, options)
         uid = user_resolve(options.user)
     end
     if uid == nil then
-        uid = box.session.uid()
+        uid = session.uid()
     end
     _space:insert{id, uid, name, engine, options.arity, temporary}
     return box.space[id], "created"
@@ -584,7 +586,7 @@ box.schema.func.create = function(name)
             box.raise(box.error.ER_FUNCTION_EXISTS,
                       "Function '"..name.."' already exists")
     end
-    _func:auto_increment{box.session.uid(), name}
+    _func:auto_increment{session.uid(), name}
 end
 
 box.schema.func.drop = function(name)
@@ -603,7 +605,7 @@ box.schema.user.password = function(password)
 end
 
 box.schema.user.passwd = function(new_password)
-    local uid = box.session.uid()
+    local uid = session.uid()
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
@@ -660,7 +662,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     privilege = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
     if grantor == nil then
-        grantor = box.session.uid()
+        grantor = session.uid()
     else
         grantor = user_resolve(grantor)
     end

@@ -1,3 +1,6 @@
+box.fiber = require('box.fiber')
+---
+...
 space = box.schema.create_space('tweedledum')
 ---
 ...
@@ -430,11 +433,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:537: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:540: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:542: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:545: box.net.box: connection
     was closed'
 ...
 space:drop()

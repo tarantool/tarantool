@@ -330,6 +330,22 @@ luaL_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
+void
+luaL_register_module(struct lua_State *L, const char *modname,
+		     const struct luaL_Reg *methods)
+{
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_getfield(L, -1, modname); /* get package.loaded */
+	if (!lua_istable(L, -1)) {  /* module is not found */
+		lua_pop(L, 1);  /* remove previous result */
+		lua_newtable(L);
+		lua_pushvalue(L, -1);
+		lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
+	}
+	lua_remove(L, -2);  /* remove _LOADED table */
+	luaL_register(L, NULL, methods);
+}
+
 int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {

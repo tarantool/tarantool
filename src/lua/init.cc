@@ -71,9 +71,10 @@ struct lua_State *tarantool_L;
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
        load_cfg_lua[], interactive_lua[], digest_lua[];
 static const char *lua_sources[] = { uuid_lua, session_lua,
-	load_cfg_lua, interactive_lua, digest_lua, NULL };
-static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
-	"fun", fun_lua, NULL };
+	load_cfg_lua, NULL };
+static const char *lua_modules[] = { "box.msgpackffi", msgpackffi_lua,
+	"fun", fun_lua, "box.digest", digest_lua,
+	"box.interactive", interactive_lua, NULL };
 /*
  * {{{ box Lua library: common functions
  */
@@ -480,7 +481,10 @@ run_script(va_list ap)
 		lua_pushstring(L, path);
 	} else {
 		say_crit("version %s", tarantool_version());
-		lua_getglobal(L, "interactive");
+		/* get box.iteractive from package.loaded */
+		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+		lua_getfield(L, -1, "box.interactive");
+		lua_remove(L, -2); /* remove package.loaded */
 	}
 	lbox_pcall(L);
 	if (! lua_toboolean(L, 1))

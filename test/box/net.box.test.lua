@@ -1,3 +1,4 @@
+box.fiber = require('box.fiber')
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')

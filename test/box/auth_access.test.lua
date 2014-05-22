@@ -1,3 +1,4 @@
+box.session = require('box.session')
 --
 -- Check a double create space
 --
@@ -161,3 +162,4 @@ func_limit();
 s:drop()
 
 box.space._user:select()
+box.session = nil

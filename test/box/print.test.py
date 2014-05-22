@@ -12,8 +12,8 @@ log = server.logfile
 f = open(log, "r")
 f.seek(0, 2)
 
-admin('box.fiber.wrap(function() print("Ehllo, world") io.flush() end)')
-admin('box.fiber.sleep(0.1)')
+admin("require('box.fiber').wrap(function() print('Ehllo, world') io.flush() end)")
+admin("require('box.fiber').sleep(0.1)")
 line = f.readline()
 print("Check log line")
 print("---")

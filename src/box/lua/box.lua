@@ -7,7 +7,4 @@ function box.dostring(s, ...)
     end
     return chunk(...)
 end
-
-require("bit")
-
 -- vim: set et ts=4 sts

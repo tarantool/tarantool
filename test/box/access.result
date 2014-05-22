@@ -1,3 +1,6 @@
+box.session = require('box.session')
+---
+...
 -- user id for a Lua session is admin - 1
 box.session.uid()
 ---
@@ -119,5 +122,8 @@ box.space['_user']:delete{uid}
 - [3, '', 'rich', []]
 ...
 box.schema.user.drop('test')
+---
+...
+box.session = nil
 ---
 ...

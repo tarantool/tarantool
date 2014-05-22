@@ -1,3 +1,9 @@
+box.ipc = require('box.ipc')
+---
+...
+box.fiber = require('box.fiber')
+---
+...
 ch = box.ipc.channel()
 ---
 ...
@@ -443,3 +449,9 @@ count > 2000, #res, res;
   - true
 ...
 --# setopt delimiter ''
+box.ipc = nil
+---
+...
+box.fiber = nil
+---
+...

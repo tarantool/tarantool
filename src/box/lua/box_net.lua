@@ -2,6 +2,9 @@
 
 (function()
 
+local ipc = require('box.ipc');
+local msgpack = require('box.msgpack')
+
 local function keify(key)
     if key == nil then
         return {}
@@ -326,10 +329,10 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end,
 
             -- write channel
-            wch = box.ipc.channel(1),
+            wch = ipc.channel(1),
 
             -- ready socket channel
-            rch = box.ipc.channel(1),
+            rch = ipc.channel(1),
         },
 
 
@@ -341,7 +344,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
-            self.processing[sync] = box.ipc.channel(1)
+            self.processing[sync] = ipc.channel(1)
             local header = msgpack.encode{
                     [box.net.box.TYPE] = op, [box.net.box.SYNC] = sync
             }
@@ -412,7 +415,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 return true
             end
 
-            local sc = box.socket.tcp()
+            local sc = require('box.socket').tcp()
             if sc == nil then
                 self:fatal("Can't create socket")
                 return false
@@ -465,7 +468,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         break
                     end
                     -- timeout between reconnect attempts
-                    box.fiber.sleep(self.reconnect_timeout)
+                    require('box.fiber').sleep(self.reconnect_timeout)
                 end
 
                 -- wakeup write fiber
@@ -553,8 +556,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
     setmetatable( remote, { __index = box.net.box } )
 
-    remote.irfiber = box.fiber.wrap(remote.rfiber, remote)
-    remote.iwfiber = box.fiber.wrap(remote.wfiber, remote)
+    remote.irfiber = require('box.fiber').wrap(remote.rfiber, remote)
+    remote.iwfiber = require('box.fiber').wrap(remote.wfiber, remote)
 
     remote.rpc = { r = remote }
     setmetatable(remote.rpc, { __index = rpc_index })

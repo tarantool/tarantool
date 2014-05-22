@@ -184,7 +184,8 @@ t:pairs("fdsaf")
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------
 
-msgpackffi = require('msgpackffi')
+msgpack = require('box.msgpack')
+msgpackffi = require('box.msgpackffi')
 
 t = box.tuple.new({'a', 'b', 'c'})
 msgpack.decode(msgpackffi.encode(t))

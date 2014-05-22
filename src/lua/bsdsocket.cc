@@ -51,6 +51,7 @@ extern "C" {
 #include <coeio.h>
 #include <fiber.h>
 #include <scoped_guard.h>
+#include "lua/utils.h"
 
 extern char bsdsocket_lua[];
 
@@ -830,8 +831,6 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 void
 tarantool_lua_bsdsocket_init(struct lua_State *L)
 {
-	int top = lua_gettop(L);
-
 	static const struct luaL_Reg internal_methods[] = {
 		{ "iowait",		lbox_bsdsocket_iowait		},
 		{ "getaddrinfo",	lbox_bsdsocket_getaddrinfo	},
@@ -841,15 +840,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ NULL,			NULL				}
 	};
 
-	if (luaL_dostring(L, bsdsocket_lua))
-		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
-			      lua_tostring(L, -1));
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_getfield(L, -1, "socket");
-	lua_getfield(L, -1, "internal");
-
-	luaL_register(L, NULL, internal_methods);
+	luaL_register_module(L, "box.socket.internal", internal_methods);
 
 	/* domains table */
 	lua_pushliteral(L, "DOMAIN");
@@ -924,5 +915,9 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	lua_pushinteger(L, SOL_SOCKET);
 	lua_rawset(L, -3);
 
-	lua_settop(L, top);
+	lua_pop(L, 1); /* box.socket.internal */
+
+	if (luaL_dostring(L, bsdsocket_lua))
+		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
+			      lua_tostring(L, -1));
 }

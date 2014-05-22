@@ -1,3 +1,6 @@
+box.session = require('box.session')
+---
+...
 --
 -- Check a double create space
 --
@@ -383,4 +386,7 @@ box.space._user:select()
   - [1, '', 'admin']
   - [2, '', 'testuser', []]
   - [3, '', 'someone']
+...
+box.session = nil
+---
 ...
