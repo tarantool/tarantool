@@ -33,7 +33,7 @@ in with the tarantool client while reading along.
 We are going to use the "tarantool_sandbox" that was created in section
 <olink targetptr="getting-started-start-stop">Starting Tarantool and making your first database</olink>.
 So there is a single space, and a numeric primary key,
-a running tarantool server, and a running tarantool client.
+and a running tarantool server which also serves as a client.
 </para>
 
 <para>
@@ -85,14 +85,16 @@ For more about functions see Lua manual chapter 5 "Functions"
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function string_function()</userinput>
+tarantool&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>return "hello world"</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>string_function()!</userinput>
+tarantool&gt; <userinput>string_function()!</userinput>
+---
 - hello world
-localhost&gt;
+...
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -127,18 +129,18 @@ For more about Lua variables see Lua manual chapter 4.2 "Local Variables and Blo
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function main_function()</userinput>
+tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
         -&gt;   <userinput>return string_value</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 - hello world
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -179,7 +181,7 @@ main_function()!
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function string_function()</userinput>
+tarantool&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>local random_number</userinput>
         -&gt;   <userinput>local random_string</userinput>
         -&gt;   <userinput>random_number = math.random(65, 90)</userinput>
@@ -188,11 +190,11 @@ localhost&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 - C
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 ... Well, actually it won't always look like this because math.random() produces random numbers.
 But for the illustration purposes it won't matter what the random string values are.
@@ -232,7 +234,7 @@ For more about Lua loops see Lua manual chapter 4.3.4 "Numeric for"
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function string_function()</userinput>
+tarantool&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>local random_number</userinput>
         -&gt;   <userinput>local random_string</userinput>
         -&gt;   <userinput>random_string = ""</userinput>
@@ -244,11 +246,11 @@ localhost&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 - 'ZUDJBHKEFM'
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -283,7 +285,7 @@ For more about Tarantool tuples see Tarantool manual section
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function main_function()</userinput>
+tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
         -&gt;   <userinput>t = box.tuple.new({1, string_value})</userinput>
@@ -291,11 +293,11 @@ localhost&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 - [1, 'PNPZPCOOKA']
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -313,14 +315,14 @@ function main_function()
   box.space.space0:replace(t)
   end!
 </programlisting>
-The new line here is box.space.space0:replace(0,t). The name contains 'space0' because the
+The new line here is box.space.space0:replace(t). The name contains 'space0' because the
 insertion is going to be to space0. The second parameter is the tuple value.
 To be perfectly correct we could have said box.space.space0:insert(t) here, rather than
 box.space.space0:replace(t), but "replace" means <quote>insert even if there is already a tuple
 whose primary-key value is a duplicate</quote>, and that makes it easier to re-run
 the exercise even if the sandbox database isn't empty.
 
-Once this is done, space[0] will contain a tuple with two fields. The first
+Once this is done, space0 will contain a tuple with two fields. The first
 field will be 1. The second field will be a random 10-letter string.
 
 Once again the string_function() can be invoked from main_function() which can be invoked with
@@ -342,7 +344,7 @@ For more about Tarantool insert and replace calls, see Tarantool manual section
 <para>
 The screen now looks like this:
 <programlisting>
-localhost&gt; <userinput>function main_function()</userinput>
+tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
         -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
@@ -350,14 +352,14 @@ localhost&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 ...
-localhost&gt; <userinput>box.space.space0:select(1)!</userinput>
+tarantool&gt; <userinput>box.space.space0:select(1)!</userinput>
 ---
-- [1, 'EUJYVEECIL']
+- - [1, 'EUJYVEECIL']
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -391,7 +393,7 @@ and then getting end_time = number of seconds just after the inserting,
 we can calculate (end_time - start_time) = elapsed time in seconds.
 We will display that value by putting it in a request without any assignments,
 which causes Tarantool to send the value to the client, which prints it.
-(Lua's answer to the C printf() function, which is print(), will not work.)
+(Lua's answer to the C printf() function, which is print(), will also work.)
 </para>
 
 <para>
@@ -439,8 +441,8 @@ main_function()!
 The screen now looks like this:
 
 <programlisting>
-localhost&gt; <userinput>setopt delimiter = '!'!</userinput>
-localhost&gt; <userinput>function string_function()</userinput>
+tarantool&gt; <userinput>setopt delimiter = '!'!</userinput>
+tarantool&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>local random_number</userinput>
         -&gt;   <userinput>local random_string</userinput>
         -&gt;   <userinput>random_string = ""</userinput>
@@ -452,7 +454,7 @@ localhost&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>function main_function()</userinput>
+tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>start_time = os.clock()</userinput>
         -&gt;   <userinput>for i = 1,1000000,1 do</userinput>
@@ -464,14 +466,14 @@ localhost&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
-localhost&gt; <userinput>main_function()!</userinput>
+tarantool&gt; <userinput>main_function()!</userinput>
 ---
 ...
-localhost&gt; <userinput>'insert done in ' .. end_time - start_time .. ' seconds'!</userinput>
+tarantool&gt; <userinput>'insert done in ' .. end_time - start_time .. ' seconds'!</userinput>
 ---
-insert done in 60.62 seconds
+- insert done in 60.62 seconds
 ...
-localhost&gt;
+tarantool&gt;
 </programlisting>
 </para>
 
@@ -508,15 +510,14 @@ SETOPT DELIMITER='!'
 function sum_json_field(field_name)
   local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
   sum = 0                                                               --[[2]]
-  v = box.space.space0.index.primary:iterator(box.index.ALL)            --[[3]]
-  for t in v do                                                         --[[4]]
-    is_valid_json, lua_table = pcall(box.cjson.decode, t[1])            --[[5]]
-    if is_valid_json then                                               --[[6]]
-      field_value = lua_table[field_name]                               --[[7]]
-      if type(field_value) == "number" then sum = sum + field_value end --[[8]]
-    end                                                                 --[[9]]
-  end                                                                   --[[10]]
-  return sum                                                            --[[11]]
+  for v, t in box.space.space0:pairs() do                               --[[3]]
+    is_valid_json, lua_table = pcall(box.cjson.decode, t[1])            --[[4]]
+    if is_valid_json then                                               --[[5]]
+      field_value = lua_table[field_name]                               --[[6]]
+      if type(field_value) == "number" then sum = sum + field_value end --[[7]]
+    end                                                                 --[[8]]
+  end                                                                   --[[9]]
+  return sum                                                            --[[10]]
   end!
 SETOPT DELIMITER=''!
 </programlisting>
@@ -532,21 +533,20 @@ function.
 </para>
 
 <para>
-LINE 3: WHY INDEX ITERATOR". Our job is to go through all the rows and there are two ways
+LINE 3: WHY PAIRS()". Our job is to go through all the rows and there are two ways
 to do it: with box.space.<replaceable>space-name</replaceable>:pairs() or with
 <olink targetptr="box.index.iterator">index.iterator</olink>. We preferred
-index.iterator because it delivers in index order regardless of the index type, that is,
-it works with HASH, TREE, and BITSET indexes.
+pairs() because it is simpler.
 </para>
 
 <para>
-LINE 4: START THE MAIN LOOP. Everything inside this "<code>for</code>" loop will be repeated
+LINE 3: START THE MAIN LOOP. Everything inside this "<code>for</code>" loop will be repeated
 as long as there is another index key. A tuple is fetched and can be referenced
 with variable <code>t</code>.
 </para>
 
 <para>
-LINE 5: WHY "PCALL". If we simply said "<code>lua_table = box.cjson.decode(t[1]))</code>",
+LINE 4: WHY "PCALL". If we simply said "<code>lua_table = box.cjson.decode(t[1]))</code>",
 then the function would abort with an error if it encountered something wrong
 with the JSON string -- a missing colon, for example. By putting the function
 inside "<code>pcall</code>" (<link xlink:href="http://www.lua.org/pil/8.4.html">protected call</link>), we're saying: we want to intercept that sort
@@ -555,7 +555,7 @@ will know what to do about it later.
 </para>
 
 <para>
-LINE 5: MEANING. The function is <olink targetptr="box.cjson">box.cjson.decode</olink> which means decode a JSON
+LINE 4: MEANING. The function is <olink targetptr="box.cjson">box.cjson.decode</olink> which means decode a JSON
 string, and the parameter is <code>t[1]</code> which is a reference to a JSON string.
 There's a bit of hard coding here, we're assuming that the second
 field in the tuple is where the JSON string was inserted. For example, we're assuming a tuple looks like <programlisting>field[0]: 444
@@ -569,7 +569,7 @@ decoded string".
 </para>
 
 <para>
-LINE 7. At last we are ready to get the JSON field value from the Lua
+LINE 6. At last we are ready to get the JSON field value from the Lua
 table that came from the JSON string.
 The value in <code>field_name</code>, which is the parameter for the whole function,
 must be a name of a JSON field. For example, inside the JSON string
@@ -582,7 +582,7 @@ in the Lua table, get the value and put it in variable <code>field_value</code>.
 </para>
 
 <para>
-LINE 8: WHY "IF". Suppose that the JSON string is well formed but the
+LINE 7: WHY "IF". Suppose that the JSON string is well formed but the
 JSON field is not a number, or is missing. In that case, the function
 would be aborted when there was an attempt to add it to the sum.
 By first checking <code>type(field_value) == "number"</code>, we avoid that abortion.
@@ -613,7 +613,7 @@ Therefore the real sum of the Quantity field in the JSON strings should be:
 <para>
 Invoke the function with <code>sum_json_field("Quantity")</code>.
 <programlisting language="lua">
-<prompt>localhost&gt;</prompt> <userinput>sum_json_field("Quantity")</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sum_json_field("Quantity")</userinput>
 ---
 - 22
 ...

@@ -8,7 +8,7 @@ homebrew as MacPorts.
 
 If you want to build at the Homebrew environment execute just:
 
-        brew install http://tarantool.org/dist/tarantool.rb
+        brew install http://tarantool.org/dist/master/tarantool.rb
 
 Target OS: MacOS X "Lion"
 

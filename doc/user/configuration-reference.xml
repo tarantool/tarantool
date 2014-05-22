@@ -10,37 +10,36 @@
 <title>Configuration reference</title>
 <blockquote><para>
   This chapter provides a reference of options which
-  can be set in the command line or
-  <filename>tarantool.cfg</filename> configuration file.
+  can be set on the command line or in a configuration file.
 </para></blockquote>
 
 <para>
-Tarantool splits its configuration parameters between command
-line options and a configuration file. Command line options
-are provided only for the most basic properties; the rest
-must be set in the configuration file.
-At runtime, this allows to disambiguate the source of
-a configuration setting: it unequivocally comes either from
-the command line, or from the configuration file, but never from
-both.
+Tarantool is started by entering the command:
+
+<programlisting><prompt>$ </prompt><userinput>tarantool</userinput></programlisting>
+or
+<programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>Lua-initialization-file</replaceable></userinput></programlisting>
+or
+<programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>options</replaceable></userinput></programlisting>
+
 </para>
 
 <section xml:id="command-line-options">
-<title>Command line options</title>
+<title>Command line parameter and options</title>
   <para>
-    Tarantool follows the <citetitle
-    xlink:href="http://www.gnu.org/prep/standards/standards.html#Command_002dLine-Interfaces">GNU
-    standard</citetitle> for its command line interface: long
-    options start with a double dash (<option>--option</option>),
-    their short counterparts use a single one (<option>-o</option>).
-    For phrases, both dashes and
-    underscores can be used as word separators
-    (<option>--cfg-get</option> and <option>--cfg_get</option> both work).
-    If an option requires an argument, you can either separate it
-    with a space or equals sign (<option>--cfg-get=pid_file</option> and
-    <option>--cfg-get pid_file</option> both work).
+
   </para>
   <itemizedlist>
+    <listitem xml:id="lua-file-option">
+     <para><option><replaceable>lua-initialization-file</replaceable></option></para>
+     <para>Invoke the Lua program in this file,
+      which by convention may have the name "script.lua",
+      when starting tarantool.
+      If the program invokes <code>box.cfg{}</code>,
+      see the reference for a
+      <olink targetptr="configuration-file">configuration file</olink>.</para>
+     </listitem>
+    
     <listitem xml:id="help-option">
       <para><option>--help</option>, <option>-h</option></para>
       <para>Print an annotated list of all available options and exit.</para>
@@ -50,18 +49,16 @@ both.
       <para><option>--version</option>, <option>-V</option></para>
       <para>Print product name and version, for example:
         <programlisting><prompt>$ </prompt> ./tarantool --version
-Tarantool 1.4.0-69-g45551dd
+Tarantool 1.6.0-1084-ge067689
+Target: Linux-x86_64-Debug
+...
         </programlisting>
         In this example:
         <simplelist>
           <member>
             <quote>Tarantool</quote> is the name
             of the reusable asynchronous networking programming framework.
-         </member>
-          <member>
-            <quote>Box</quote> is the name
-            of the storage back-end.
-         </member>
+          </member>
           <member>
             The 3-number version follows the standard
             <literal>&lt;major&gt;-&lt;minor&gt;-&lt;patch&gt;</literal>
@@ -76,6 +73,10 @@ Tarantool 1.4.0-69-g45551dd
             only, and indicate how much this particular build has diverged
             from the last release.
          </member>
+          <member>
+            <quote>Target</quote> is the platform tarantool was built on.
+            Some platform-specific details may follow this line.
+         </member>
         </simplelist>
       </para>
       <note><para>
@@ -87,142 +88,60 @@ Tarantool 1.4.0-69-g45551dd
       </para></note>
     </listitem>
 
-    <listitem xml:id="config-option">
-      <para><option>--config=</option><userinput><filename>/path/to/config.file</filename></userinput>, <option>-c</option></para>
-      <para>
-        Tarantool does not start without a configuration file. By
-        default, the server looks for file named
-        <filename>tarantool.cfg</filename> in the current working
-        directory. An alternative location can be provided using
-        this option.
-      </para>
-    </listitem>
-
-    <listitem>
-      <para><option>--check-config</option></para>
-      <para>Check the configuration file for errors. This option is
-        normally used on the command line
-        before <quote>box.cfg.reload()</quote>
-        is issued on the administrative port, to ensure that the new
-        configuration is valid. When configuration is
-        indeed correct, the program produces no output and returns <literal>0</literal>.
-        Otherwise, information about discovered error is printed out
-        and the program terminates with a non-zero value.
-      </para>
-    </listitem>
-
-    <listitem>
-      <para><option>--cfg-get=</option><userinput>option_name</userinput></para>
-      <para>Given option name, print option value. If the
-        option does not exist, or the configuration file is
-        incorrect, an error is returned. If the option
-        is not explicitly specified, its default value is used
-        instead. Example:
-        <programlisting><prompt>$ </prompt>./tarantool --cfg-get=admin_port
-33015   </programlisting>
-      </para>
-    </listitem>
-    <listitem>
-      <para>
-      <option xml:id="init-storage-option"
-            xreflabel="--init-storage">
-          --init-storage
-      </option></para>
-      <para>Initialize the directory, specified in <emphasis>vardir</emphasis>
-      configuration option by creating an empty snapshot file in
-      it. Prior to Tarantool 1.6, if <filename>vardir</filename>
-      didn't contain at least one snapshot, the server did not
-      start. Starting from 1.6, the initial storage file is
-      created automatically when starting in a clean data
-      directory.
-      </para>
-    </listitem>
   </itemizedlist>
-  <para>
-    The only two options which could affect a running server are:
-  </para>
-  <itemizedlist>
-    <listitem>
-      <para><option>--verbose</option>, <option>-v</option></para>
-      <para>Increase verbosity level in log messages. This option
-      currently has no effect.</para>
-    </listitem>
 
-    <listitem>
-      <para><option>--background</option>, <option>-b</option></para>
-      <para>Detach from the controlling terminal and run in the
-        background.
-        <caution><para>Tarantool uses
-        <filename>stdout</filename> and
-        <filename>stderr</filename> for
-        debug and error log output. When starting the server with
-        option <option>--background</option>, make sure to
-        either redirect its standard out and standard error
-        streams, or provide <emphasis>logger</emphasis> option
-        in the configuration file, since otherwise all logging
-        information will be lost.</para></caution>
-      </para>
-    </listitem>
-  </itemizedlist>
 </section>
 
 <section xml:id="configuration-file" xreflabel="configuration file">
 <title>The configuration file</title>
   <para>
-    All advanced configuration parameters must be specified in a
-    configuration file, which is required for server start. If no path to
-    the configuration file is specified on the command line (see
-    <option xlink:href="#config-option"
-    xlink:title="--config=...">--config</option>),
-    the server looks for a file named <filename>tarantool.cfg</filename>
-    in the current working directory.
-  </para>
-  <para>
-    To facilitate centralized and automated configuration
-    management, runtime configuration modifications are supported
-    solely through <olink targetptr="box.cfg.reload"/>
-    administrative statement. Thus, the
-    procedure to change Tarantool configuration at runtime is to
-    edit the configuration file.  This ensures that, should the
-    server get killed or restart, no unexpected changes to
-    configuration can occur.
-  </para>
-  <para>
-    Not all configuration file settings are changeable at runtime:
-    such settings will be highlighted in this reference.
-    If the same setting is given more than once, the latest occurrence
-    takes effect.
-    You can always invoke <olink targetptr="box.cfg.show"/>
-    from the administrative console to show the current
-    configuration.
-  </para>
-  <para>
-    Tarantool maintains a set of all allowed configuration
-    parameters in two template files, which are easy to maintain
-    and extend:
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/cfg/core_cfg.cfg_tmpl">cfg/core_cfg.cfg_tmpl</filename>,
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/box_cfg.cfg_tmpl">src/box/box_cfg.cfg_tmpl</filename>.
-    These files can always be used as a reference for any
-    parameter in this manual.
-  </para>
+    Configuration parameters are usually specified inside a
+    Lua file with a call to <olink targetptr="sp-box-cfg">box.cfg</olink>.
+    Typically this Lua file is the initialization file
+    which is specified on the tarantool command line.
+    A simple example of such a file is <filename>test/box/box.lua</filename>:
+<programlisting>
+#!/usr/bin/env tarantool
+os = require('os')
 
-  <para>In addition, two working examples can be found in the source tree:
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/test/box/tarantool.cfg">test/box/tarantool.cfg</filename>,
-    <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/test/big/tarantool.cfg">test/big/tarantool.cfg</filename>.
+box.cfg{
+    primary_port        = os.getenv("PRIMARY_PORT"),
+    admin_port          = os.getenv("ADMIN_PORT"),
+    slab_alloc_arena    = 0.1,
+    pid_file            = "tarantool.pid",
+    rows_per_wal        = 50
+}
+</programlisting>
+  </para>
+  <para>
+    Most configuration parameters are for allocating resources,
+    opening ports, and specifying database behavior.
+    All parameters are optional.
+    A few parameters are dynamic, that is, they can be changed
+    at runtime by calling box.cfg{} a second time.
+  </para>
+  <para>
+    To see all the non-null parameters, say <code>box.cfg</code> (no parentheses).
+    To see a particular parameter, for example the primary port, say <code>box.cfg.primary_port</code>.
+    To reload the parameters, use <olink targetptr="box.cfg.reload"/>.
+  </para>
+  <para>
+    The following tables describe all parameters for basic operation,
+    for storage, for binary logging and snapshots, for replication,
+    for networking, for logging, and for hot standby.
   </para>
 
   <table frame='all' pgwide='1'>
     <title>Basic parameters</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -233,8 +152,7 @@ Tarantool 1.4.0-69-g45551dd
         <row>
           <entry>username</entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>UNIX user name to switch to after start.</entry>
         </row>
@@ -242,8 +160,7 @@ Tarantool 1.4.0-69-g45551dd
         <row>
           <entry xml:id="work_dir" xreflabel="work_dir">work_dir</entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>A directory where database working files will be stored.
           The server switches to work_dir with chdir(2) after
@@ -252,24 +169,9 @@ Tarantool 1.4.0-69-g45551dd
         </row>
 
         <row>
-          <entry xml:id="script_dir" xreflabel="script_dir">script_dir</entry>
-          <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>If this path is set, it is added to the Lua package
-          search path, so that instance-specific Lua scripts can
-          be loaded and executed. If the directory specified in
-          the path contains <filename>init.lua</filename> file, it
-          is loaded and executed at server start.
-          </entry>
-        </row>
-
-        <row>
           <entry xml:id="wal_dir" xreflabel="wal_dir">wal_dir</entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>"."</entry>
           <entry>no</entry>
           <entry>A directory where write-ahead log (.xlog) files are stored.
           Can be relative to work_dir. Most commonly used so
@@ -281,25 +183,23 @@ Tarantool 1.4.0-69-g45551dd
         <row>
           <entry xml:id="snap_dir" xreflabel="snap_dir">snap_dir</entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>"."</entry>
           <entry>no</entry>
           <entry>A directory where snapshot (.snap) files will be stored. Can be
           relative to work_dir. If not specified, defaults to
           work_dir. See also <olink targetptr="wal_dir"/>.</entry>
         </row>
-<!--
         <row>
-          <entry>coredump</entry><entry>0 or 1</entry><entry>0</entry>
-          <entry>Deprecated. Save core on abort/assert? You may
-          turn off the coredump off when using ulimit</entry>
+          <entry xml:id="coredump" xreflabel="coredump">coredump</entry>
+          <entry>0 or 1</entry>
+          <entry>0</entry>
+          <entry>no</entry>          
+          <entry>Deprecated. Do not use.</entry>
         </row>
--->
         <row>
           <entry xml:id="bind_ipaddr" xreflabel="bind_ipaddr">bind_ipaddr</entry>
           <entry>string</entry>
-          <entry><emphasis role="strong">"INADDR_ANY"</emphasis></entry>
-          <entry>no</entry>
+          <entry>"INADDR_ANY"</entry>
           <entry>no</entry>
           <entry>The network interface to bind to. By default,
           the server binds to all available addresses.
@@ -309,37 +209,38 @@ Tarantool 1.4.0-69-g45551dd
         <row>
           <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
           <entry>integer</entry>
-          <entry><emphasis role="strong">none</emphasis></entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>The read/write data port.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
-          in the configuration file. Normally set to 3301.
+          if connections will occur from remote clients
+          that do not use admin_port.
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
-          reads until the replica becomes a master.</entry>
+          reads until the replica becomes a master.
+          A typical value is 3301.</entry>
         </row>
 
         <row>
           <entry xml:id="admin_port" xreflabel="admin_port">admin_port</entry>
           <entry>integer</entry>
-          <entry>none</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>The TCP port to listen on for administrative
-          connections. Has no default value. Not used unless
-          assigned a value. Normally set to 33015.</entry>
+          connections. Has no default value, so must be specified
+          if connections will occur via telnet. Not used unless
+          assigned a value.
+          A typical value is 3313.</entry>
         </row>
 
         <row>
           <entry>pid_file</entry>
           <entry>string</entry>
-          <entry>tarantool.pid</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>Store the process id in this file. Can be
-          relative to work_dir.</entry>
+          relative to work_dir. A typical value is "tarantool.pid".</entry>
         </row>
 
         <row>
@@ -348,8 +249,7 @@ Tarantool 1.4.0-69-g45551dd
             custom_proc_title
           </entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>
             <para>Inject the given string into <olink
@@ -367,22 +267,30 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           </entry>
         </row>
 
+        <row>
+          <entry>background</entry>
+          <entry>boolean</entry>
+          <entry>false</entry>
+          <entry>no</entry>
+          <entry>Run the server as a background task.
+          The logger and pid_file parameters must be non-null for this to work.</entry>
+        </row>
+
       </tbody>
     </tgroup>
   </table>
 
   <table frame='all' pgwide='1'>
     <title>Configuring the storage</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -394,7 +302,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>slab_alloc_arena</entry>
           <entry>float</entry>
           <entry>1.0</entry>
-          <entry>no</entry>
           <entry>no</entry>
           <entry>
             <anchor xml:id="slab_alloc_arena" xreflabel="slab_alloc_arena"/>
@@ -417,7 +324,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>integer</entry>
           <entry>64</entry>
           <entry>no</entry>
-          <entry>no</entry>
           <entry>Size of the smallest allocation unit. It can be
           tuned down if most of the tuples are very small.</entry>
         </row>
@@ -426,7 +332,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>slab_alloc_factor</entry>
           <entry>float</entry>
           <entry>2.0</entry>
-          <entry>no</entry>
           <entry>no</entry>
           <entry>Use slab_alloc_factor as the multiplier for
           computing the sizes of memory chunks that tuples are
@@ -441,16 +346,15 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
   <table frame='all' pgwide='1'>
     <title>Binary logging and snapshots</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -463,7 +367,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>boolean</entry>
           <entry>true</entry>
           <entry>no</entry>
-          <entry>no</entry>
           <entry>If there is an error reading the snapshot file (at
             server start), abort.</entry>
         </row>
@@ -473,7 +376,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>boolean</entry>
           <entry>false</entry>
           <entry>no</entry>
-          <entry>no</entry>
           <entry>If there is an error reading a write-ahead
           log file (at server start), abort.</entry>
         </row>
@@ -482,7 +384,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry xml:id="rows_per_wal" xreflabel="rows_per_wal">rows_per_wal</entry>
           <entry>integer</entry>
           <entry>500000</entry>
-          <entry>no</entry>
           <entry>no</entry>
           <entry>How many log records to store in a single
           write-ahead log file. When this limit is reached, Tarantool
@@ -495,9 +396,8 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         <row>
           <entry>snap_io_rate_limit</entry>
           <entry>float</entry>
-          <entry>0.0</entry>
-          <entry>no</entry>
-          <entry>yes</entry>
+          <entry>null</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>Reduce the throttling effect of <olink
           targetptr="box.snapshot"/> on INSERT/UPDATE/DELETE
           performance by setting a limit on
@@ -508,12 +408,11 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         </row>
 
         <row>
-        <entry xml:id="wal_fsync_delay" xreflabel="wal_fsync_delay">wal_fsync_delay</entry>
-        <entry>float</entry>
-        <entry>0</entry>
-        <entry>no</entry>
-        <entry>yes</entry>
-        <entry>Do not flush the write-ahead log to disk more often
+          <entry xml:id="wal_fsync_delay" xreflabel="wal_fsync_delay">wal_fsync_delay</entry>
+          <entry>float</entry>
+          <entry>0</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Do not flush the write-ahead log to disk more often
           than once in wal_fsync_delay seconds. By default the
           delay is zero, which means there is no flushing after writes
           (the meaning of wal_fsync_delay=0 may change in later versions).
@@ -526,19 +425,29 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         </row>
 
         <row>
-            <entry xml:id="wal_mode" xreflabel="wal_mode">wal_mode</entry>
-            <entry>string</entry>
-            <entry>"fsync_delay"</entry>
-            <entry>no</entry>
-            <entry>yes</entry>
-            <entry>Specify fiber-WAL-disk synchronization mode as:
-                <emphasis>none:</emphasis> write-ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
-                be written to the write-ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
-                fibers wait for their data, fsync(2) follows each write(2);
-                <emphasis>fsync_delay</emphasis>: fibers wait for their
-                data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>
-                seconds (N=0.0 means no fsync(2) - equivalent to
-                <emphasis>wal_mode = "write"</emphasis>);</entry>
+          <entry xml:id="wal_mode" xreflabel="wal_mode">wal_mode</entry>
+          <entry>string</entry>
+          <entry>"write"</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
+          <entry>Specify fiber-WAL-disk synchronization mode as:
+              <emphasis>none:</emphasis> write-ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
+              be written to the write-ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
+              fibers wait for their data, fsync(2) follows each write(2);
+              <emphasis>fsync_delay</emphasis>: fibers wait for their
+              data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>
+              seconds (N=0.0 means no fsync(2) - equivalent to
+              <emphasis>wal_mode = "write"</emphasis>);</entry>
+        </row>
+
+        <row>
+          <entry xml:id="wal_dir_rescan_delay" xreflabel="wal_dir_rescan_delay">wal_mode</entry>
+          <entry>float</entry>
+          <entry>0.1</entry>
+          <entry>no</entry>
+          <entry>Number of seconds between periodic scans of the
+          write-ahead-log file directory, when checking for
+          changes to write-ahead-log files for the sake of
+          replication or local hot standby.</entry>
         </row>
 
       </tbody>
@@ -547,44 +456,27 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
   <table frame='all' pgwide='1'>
     <title>Replication</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
       </thead>
 
       <tbody>
-        <row>
-          <entry xml:id="replication_port"
-            xreflabel="replication_port">replication_port</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
-          <entry>no</entry>
-          <entry>no</entry>
-          <entry>If replication_port is greater than zero, the
-          server is considered to be a Tarantool master.
-          The master server listens on the specified port
-          for incoming connections from
-          replicas. See also <olink
-          targetptr="replication_source"/>, which complements
-          this setting on the replica side.</entry>
-        </row>
 
         <row>
           <entry xml:id="replication_source"
           xreflabel="replication_source">replication_source</entry>
           <entry>string</entry>
-          <entry>NULL</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>If replication_source is not an empty string, the
           server is considered to be a Tarantool replica.
@@ -605,16 +497,15 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
   <table frame='all' pgwide='1'>
     <title>Networking</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -625,9 +516,8 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         <row>
           <entry>io_collect_interval</entry>
           <entry>float</entry>
-          <entry>0.0</entry>
-          <entry>no</entry>
-          <entry>yes</entry>
+          <entry>null</entry>
+          <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>The server will sleep for io_collect_interval seconds
           between iterations of the event loop. Can be
           used to reduce CPU load in deployments in which the
@@ -639,8 +529,7 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         <row>
           <entry>readahead</entry>
           <entry>integer</entry>
-          <entry>16384</entry>
-          <entry>no</entry>
+          <entry>16320</entry>
           <entry>no</entry>
           <entry>The size of the read-ahead buffer associated with a
           client connection. The larger the buffer, the more
@@ -661,16 +550,15 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
   <table frame='all' pgwide='1'>
     <title>Logging</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -681,8 +569,7 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         <row>
           <entry>log_level</entry>
           <entry>integer</entry>
-          <entry>4</entry>
-          <entry>no</entry>
+          <entry>5</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>How verbose the logging is. There are 5 log
             verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
@@ -697,8 +584,7 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         <row>
           <entry>logger</entry>
           <entry>string</entry>
-          <entry>""</entry>
-          <entry>no</entry>
+          <entry>null</entry>
           <entry>no</entry>
           <entry>By default, the log is sent to the standard
           error stream (<filename>stderr</filename>). If logger
@@ -713,15 +599,14 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
         <row>
           <entry>logger_nonblock</entry>
-          <entry>integer</entry>
-          <entry>0</entry>
+          <entry>boolean</entry>
+          <entry>true</entry>
           <entry>no</entry>
-          <entry>no</entry>
-          <entry>If logger_nonblock equals 1, Tarantool does not
+          <entry>If logger_nonblock equals true, Tarantool does not
           block on the log file descriptor when it's not
           ready for write, and drops the message instead. If
           log_level is high, and a lot of messages go to the log
-          file, setting logger_nonblock to 1 may improve logging
+          file, setting logger_nonblock to true may improve logging
           performance at the cost of some log messages getting
           lost.</entry>
         </row>
@@ -730,7 +615,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>too_long_threshold</entry>
           <entry>float</entry>
           <entry>0.5</entry>
-          <entry>no</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>If processing a request takes longer than the
           given value (in seconds), warn about it in the log.
@@ -744,16 +628,15 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
 
   <table frame='all' pgwide='1'>
     <title>Hot Standby</title>
-    <tgroup cols='6' colsep='1' rowsep='1'>
+    <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>
-      <colspec colnum="6" colname="col4" colwidth="6*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
 
       <thead>
         <row>
           <entry>Name</entry>
           <entry>Type</entry>
           <entry>Default</entry>
-          <entry>Required?</entry>
           <entry>Dynamic?</entry>
           <entry>Description</entry>
         </row>
@@ -765,7 +648,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
           <entry>local_hot_standby</entry>
           <entry>boolean</entry>
           <entry>false</entry>
-          <entry>no</entry>
           <entry>no</entry>
           <entry>
             <anchor xml:id="local_hot_standby" xreflabel="local_hot_standby"/>
