@@ -181,6 +181,56 @@ t:pairs(nil)
 t:pairs("fdsaf")
 
 --------------------------------------------------------------------------------
+-- test tuple:find
+--------------------------------------------------------------------------------
+
+--# setopt delimiter ';'
+t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
+    -9223372036854775807LL})
+--# setopt delimiter ''
+
+t:find('a')
+t:find(1, 'a')
+t:find('c')
+t:find('xxxxx')
+t:find(1, 'xxxxx')
+t:findall('a')
+t:findall(1, 'a')
+t:findall('xxxxx')
+t:findall(1, 'xxxxx')
+t:find(100, 'a')
+t:findall(100, 'a')
+t:find(100, 'xxxxx')
+t:findall(100, 'xxxxx')
+
+---
+-- Lua type coercion
+---
+t:find(2)
+t:findall(2)
+t:find(2ULL)
+t:findall(2ULL)
+t:find(2LL)
+t:findall(2LL)
+t:find(2)
+t:findall(2)
+
+t:find(-1)
+t:findall(-1)
+t:find(-1LL)
+t:findall(-1LL)
+
+t:find(true)
+t:findall(true)
+
+t:find(9223372036854775807LL)
+t:findall(9223372036854775807LL)
+t:find(9223372036854775807ULL)
+t:findall(9223372036854775807ULL)
+t:find(-9223372036854775807LL)
+t:findall(-9223372036854775807LL)
+
+--------------------------------------------------------------------------------
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------
 
