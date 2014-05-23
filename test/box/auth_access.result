@@ -601,6 +601,9 @@ t
 box.session.su('admin')
 ---
 ...
+s:drop()
+---
+...
 box.space._user:select()
 ---
 - - [0, '', 'guest']
@@ -616,7 +619,6 @@ box.space._space:select()
   - [304, 1, '_user', 'memtx', 0]
   - [312, 1, '_priv', 'memtx', 0]
   - [320, 1, '_cluster', 'memtx', 0]
-  - [512, 1, 'glade', 'memtx', 0, '']
 ...
 box.space._func:select()
 ---

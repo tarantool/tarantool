@@ -242,6 +242,8 @@ t
 
 box.session.su('admin')
 
+s:drop()
+
 box.space._user:select()
 box.space._space:select()
 box.space._func:select()

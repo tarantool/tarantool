@@ -244,3 +244,6 @@ space:pairs():totable()
 ---
 - []
 ...
+space:drop()
+---
+...
