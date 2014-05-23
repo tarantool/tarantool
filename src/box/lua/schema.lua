@@ -438,7 +438,12 @@ function box.schema.space.bless(space)
     end
     --
     local space_mt = {}
-    space_mt.len = function(space) return space.index[0]:len() end
+    space_mt.len = function(space)
+        if space.index[0] == nil then
+            return 0 -- empty space without indexes, return 0
+        end
+        return space.index[0]:len()
+    end
     space_mt.__newindex = index_mt.__newindex
 
     space_mt.get = function(space, key)
@@ -477,12 +482,19 @@ function box.schema.space.bless(space)
         return space:insert(tuple)
     end
     space_mt.pairs = function(space, key)
+        if space.index[0] == nil then
+            -- empty space without indexes, return empty iterator
+            return fun.iter({})
+        end
         check_index(space, 0)
         return space.index[0]:pairs(key)
     end
     space_mt.__pairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.__ipairs = space_mt.pairs -- Lua 5.2 compatibility
     space_mt.truncate = function(space)
+        if space.index[0] == nil then
+            return -- empty space without indexes, nothing to truncate
+        end
         check_index(space, 0)
         local pk = space.index[0]
         while #pk.idx > 0 do
