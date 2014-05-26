@@ -31,6 +31,7 @@ void *ffi_symbols[] = {
 	(void *) boxffi_select,
 	(void *) password_prepare,
 	(void *) tarantool_lua_interactive,
+	(void *) tarantool_error_message,
 	(void *) load_cfg,
 	(void *) box_set_wal_fsync_delay,
 	(void *) box_set_replication_source,

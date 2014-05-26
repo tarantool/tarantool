@@ -1,0 +1,7 @@
+--------------------------------------------------------------------------------
+-- #267: Bad exception catching
+--------------------------------------------------------------------------------
+
+pcall inside xpcall:	true	pcall is ok
+pcall with Lua error():	false	some message
+pcall with box.raise():	false	some message

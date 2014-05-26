@@ -16,6 +16,7 @@ include_directories(${READLINE_INCLUDE_DIR})
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/lua)
 set(lua_sources)
+lua_source(lua_sources lua/init.lua)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/session.lua)
