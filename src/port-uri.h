@@ -29,33 +29,22 @@
 #ifndef TARANTOOL_PORT_URI_H_INCLUDED
 #define TARANTOOL_PORT_URI_H_INCLUDED
 #include <stdbool.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 
 struct port_uri {
-	char *schema;
-	union {
-		char *host;
-		char *path;
-	};
 
-	int port;
+	struct sockaddr_storage addr;
+	socklen_t addr_len;
 
-	/* flags */
-	struct {
-		bool tcp;
-		bool unix;
-		bool alloc;
-	} is;
-
-	struct {
-		bool schema;
-		bool host;
-		bool port;
-	} error;
+	char schema[32];
+	char login[32];
+	char password[32];
 };
 
 struct port_uri *port_uri_parse(struct port_uri *uri, const char *str);
-void port_uri_destroy(struct port_uri * uri);
+const char * port_uri_to_string(const struct port_uri * uri);
 
 
 #endif /* TARANTOOL_PORT_URI_H_INCLUDED */

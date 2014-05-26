@@ -282,24 +282,7 @@ evio_service_init(ev_loop *loop,
 	if (!port_uri_parse(&puri, uri))
 		tnt_raise(SocketError, -1, "invalid address for bind: %s", uri);
 
-	auto puri_guard = make_scoped_guard([&]{
-		port_uri_destroy(&puri);
-	});
-
-	if (puri.is.tcp) {
-		service->addr.sin_family = AF_INET;
-		service->addr.sin_port = htons(puri.port);
-
-		if (strcmp(puri.host, "INADDR_ANY") == 0) {
-			service->addr.sin_addr.s_addr = INADDR_ANY;
-		} else if (inet_aton(puri.host, &service->addr.sin_addr) == 0) {
-			tnt_raise(SocketError, -1,
-				"invalid address for bind: %s", uri);
-		}
-
-	} else {
-		tnt_raise(SocketError, -1, "Unsupported uri schema: %s", uri);
-	}
+	memcpy((void *)&service->addr, (void *)&puri.addr, puri.addr_len);
 
 	service->on_accept = on_accept;
 	service->on_accept_param = on_accept_param;

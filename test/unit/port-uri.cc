@@ -2,89 +2,92 @@
 #include <port-uri.h>
 #include <string.h>
 
-#define PLAN	42
-
+#define PLAN	34
 
 int
 main(void)
 {
 	plan(PLAN);
-	note("Errors");
-	{
-		struct port_uri uri;
 
-		is(port_uri_parse(&uri, NULL), 0, "parse NULL string");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
+	struct port_uri uri;
 
-		is(port_uri_parse(NULL, "test"), 0, "NULL structure");
-
-		is(port_uri_parse(&uri, ""), 0, "empty string");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "schema"), 0, "no host");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "schema:"), 0, "invalid schema sep");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "schema:/"), 0, "invalid schema sep");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "schema://"), 0, "zero host len");
-		is(uri.error.schema, 0, "error.schema = false");
-		is(uri.error.host, 1, "error.host = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "://abc"), 0, "zero schema len");
-		is(uri.error.schema, 1, "error.schema = true");
-		port_uri_destroy(&uri);
-
-		is(port_uri_parse(&uri, "schema://host:1a"), 0, "wrong port");
-		is(uri.error.schema, 0, "error.schema = false");
-		is(uri.error.host, 0, "error.host = false");
-		is(uri.error.port, 1, "error.port = true");
-		port_uri_destroy(&uri);
-	}
-
-	note("Parser");
-	{
-		struct port_uri uri;
-		isnt(port_uri_parse(&uri, "schema://host"), 0, "valid uri");
-		is(strcmp(uri.schema, "schema"), 0, "schema");
-		is(strcmp(uri.host, "host"), 0, "host");
-		is(uri.port, 0, "port");
-		is(uri.is.tcp, 0, "tcp flag");
-		is(uri.is.unix, 0, "unix flag");
-		port_uri_destroy(&uri);
+	isnt(port_uri_parse(&uri, "/file"), 0, "/file");
+	is(strcmp(port_uri_to_string(&uri), "unix:///file"), 0,
+				"to_string");
+	is(strcmp(uri.schema, "unix"), 0, "unix://");
 
 
-		isnt(port_uri_parse(&uri, "tcp://host:"), 0, "full uri");
-		is(strcmp(uri.schema, "tcp"), 0, "schema");
-		is(strcmp(uri.host, "host"), 0, "host");
-		is(uri.port, 0, "port");
-		is(uri.is.tcp, 1, "tcp flag");
-		is(uri.is.unix, 0, "unix flag");
-		port_uri_destroy(&uri);
+	isnt(port_uri_parse(&uri, "unix://file"), 0, "unix://file");
+	is(strcmp(port_uri_to_string(&uri), "unix://file"), 0,
+							"to_string");
+	is(strcmp(uri.schema, "unix"), 0, "unix://");
 
-		isnt(port_uri_parse(&uri, "schema://host:123"), 0, "full uri");
-		is(strcmp(uri.schema, "schema"), 0, "schema");
-		is(strcmp(uri.host, "host"), 0, "host");
-		is(uri.port, 123, "port");
-		port_uri_destroy(&uri);
 
-		isnt(port_uri_parse(&uri, "unix:///path/to"), 0, "unix socket");
-		is(strcmp(uri.schema, "unix"), 0, "schema");
-		is(strcmp(uri.host, "/path/to"), 0, "host");
-		is(uri.port, 0, "port");
-		is(uri.is.tcp, 0, "tcp flag");
-		is(uri.is.unix, 1, "unix flag");
-		port_uri_destroy(&uri);
-	}
+	isnt(port_uri_parse(&uri, "123"), 0, "123");
+	is(strcmp(uri.schema, "tcp"), 0, "tcp://");
+	is(strcmp(port_uri_to_string(&uri), "tcp://0.0.0.0:123"), 0,
+		"to_string");
+
+
+
+	isnt(port_uri_parse(&uri, "http://11.2.3.4:123"), 0,
+		"http://11.2.3.4:123");
+	is(strcmp(uri.schema, "http"), 0, "http://");
+	is(strcmp(port_uri_to_string(&uri), "http://11.2.3.4:123"), 0,
+		"to_string");
+
+	isnt(port_uri_parse(&uri, "http://[::fFff:11.2.3.4]:123"), 0,
+		"http://11.2.3.4:123");
+	is(strcmp(uri.schema, "http"), 0, "http://");
+	is(strcmp(port_uri_to_string(&uri), "http://11.2.3.4:123"), 0,
+		"to_string");
+
+
+
+
+	isnt(port_uri_parse(&uri, "schema://[2001:0db8:11a3:09d7::1]"),
+		0, "schema://[2001:0db8:11a3:09d7::1]");
+	is(strcmp(port_uri_to_string(&uri),
+		"schema://[2001:db8:11a3:9d7::1]:0"), 0, "to_string");
+
+
+	is(port_uri_parse(&uri, "schema://[2001::11a3:09d7::1]"),
+		0, "invalid schema://[2001::11a3:09d7::1]");
+
+
+
+	isnt(port_uri_parse(&uri, "128.0.0.1"), 0, "127.0.0.1");
+	is(strcmp(port_uri_to_string(&uri), "tcp://128.0.0.1:0"), 0,
+		"to_string");
+
+	isnt(port_uri_parse(&uri, "128.0.0.1:22"), 0, "127.0.0.1:22");
+	is(strcmp(port_uri_to_string(&uri), "tcp://128.0.0.1:22"), 0,
+		"to_string");
+
+	isnt(port_uri_parse(&uri, "login@password:127.0.0.1"), 0,
+		"login@password:127.0.0.1");
+	is(strcmp(uri.login, "login"), 0, "login");
+	is(strcmp(uri.password, "password"), 0, "password");
+
+	isnt(port_uri_parse(&uri, "unix://login@password:/path/to"), 0,
+		"unix://login@password:/path/to");
+	is(strcmp(uri.login, "login"), 0, "login");
+	is(strcmp(uri.password, "password"), 0, "password");
+	is(strcmp(port_uri_to_string(&uri), "unix:///path/to"), 0,
+		"to_string");
+
+	is(port_uri_parse(&uri, "tcp://abc.cde:90"), 0, "invalid uri");
+
+	isnt(port_uri_parse(&uri, "http://127.0.0.1:http"), 0,
+		"valid uri");
+	is(strcmp(port_uri_to_string(&uri), "http://127.0.0.1:80"), 0,
+		"service to port number");
+
+	isnt(port_uri_parse(&uri, "mail.ru:https"), 0,
+		"valid uri");
+
+	isnt(strstr(port_uri_to_string(&uri), ":443"), 0,
+		"service converted");
 
 	return check_plan();
 }

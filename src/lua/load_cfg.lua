@@ -14,16 +14,10 @@ void box_set_snap_io_rate_limit(double limit);
 
 
 local function normalize_port_uri(port)
-    if type(port) == 'string' then
-        if string.match(port, '^%d+$') == nil then
-            return port
-        end
-        port = tonumber(port)
+    if port == nil then
+        return nil
     end
-    if type(port) == 'number' then
-        return string.format("tcp://INADDR_ANY:%d", port)
-    end
-    return port
+    return tostring(port);
 end
 
 -- arguments that can be number or string
