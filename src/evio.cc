@@ -143,12 +143,11 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 	assert(! evio_is_active(evio));
 	int fd = -1;
 	while (ai) {
-		struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
 		try {
 			fd = sio_socket(ai->ai_family, ai->ai_socktype,
 					ai->ai_protocol);
 			evio_setsockopt_tcpserver(fd);
-			if (sio_bind(fd, addr, ai->ai_addrlen) == 0) {
+			if (sio_bind(fd, ai->ai_addr, ai->ai_addrlen) == 0) {
 				evio->fd = fd;
 				return; /* success. */
 			}
@@ -163,12 +162,6 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 		ai = ai->ai_next;
 	}
 	tnt_raise(SocketError, evio->fd, "evio_bind_addrinfo()");
-}
-
-static inline int
-evio_service_port(struct evio_service *service)
-{
-	return ntohs(service->addr.sin_port);
 }
 
 static inline const char *
@@ -226,14 +219,14 @@ evio_service_bind_and_listen(struct evio_service *service)
 	try {
 		evio_setsockopt_tcpserver(fd);
 
-		if (sio_bind(fd, &service->addr, sizeof(service->addr)) ||
-		    sio_listen(fd)) {
+		if (sio_bind(fd, (struct sockaddr *)&service->port.addr,
+				service->port.addr_len) || sio_listen(fd)) {
 			assert(errno == EADDRINUSE);
 			close(fd);
 			return -1;
 		}
-		say_info("bound to %s port %i", evio_service_name(service),
-			 evio_service_port(service));
+		say_info("bound to %s port %s", evio_service_name(service),
+			port_uri_to_string(&service->port));
 
 		/* Invoke on_bind callback if it is set. */
 		if (service->on_bind)
@@ -278,11 +271,8 @@ evio_service_init(ev_loop *loop,
 	service->loop = loop;
 
 
-	struct port_uri puri;
-	if (!port_uri_parse(&puri, uri))
+	if (!port_uri_parse(&service->port, uri))
 		tnt_raise(SocketError, -1, "invalid address for bind: %s", uri);
-
-	memcpy((void *)&service->addr, (void *)&puri.addr, puri.addr_len);
 
 	service->on_accept = on_accept;
 	service->on_accept_param = on_accept_param;
@@ -307,10 +297,10 @@ evio_service_start(struct evio_service *service)
 
 	if (evio_service_bind_and_listen(service)) {
 		/* Try again after a delay. */
-		say_warn("%s port %i is already in use, will "
+		say_warn("%s port %s is already in use, will "
 			 "retry binding after %lf seconds.",
 			 evio_service_name(service),
-			 evio_service_port(service), BIND_RETRY_DELAY);
+			 port_uri_to_string(&service->port), BIND_RETRY_DELAY);
 
 		ev_timer_set(&service->timer,
 			     BIND_RETRY_DELAY, BIND_RETRY_DELAY);
