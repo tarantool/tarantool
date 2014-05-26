@@ -8,7 +8,13 @@ homebrew as MacPorts.
 
 If you want to build at the Homebrew environment execute just:
 
-        brew install http://tarantool.org/dist/tarantool.rb
+    brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
+
+Possible flags are:
+
+    --devel - for installing master's branch version
+    --with-tests - for testing tarantool after building/installing
+    --with-debug - for building tarantool with -DCMAKE_BUILD_TYPE=Debug
 
 Target OS: MacOS X "Lion"
 
@@ -33,7 +39,7 @@ Go to http://developer.apple.com/ to download and install the latest version
 of "Command Line Tools for Xcode". This package contains /usr/bin/clang and
 /usr/bin/clang++ binaries. Check that clang version is at least 3.2.
 
-3. Install necessary python modules: pyYAML, daemon
+3. Install necessary python modules: pyYAML, python-daemon, pexpect
 -------------
 NB: it is recommended to install python modules through setup.py,
 using the default python (which should be >= 2.6.x and < 3.x);
