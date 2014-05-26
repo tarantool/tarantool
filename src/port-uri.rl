@@ -86,10 +86,6 @@ port_uri_to_string(const struct port_uri * uri)
 
 }
 
-%%{
-	machine port_uri;
-	write data;
-}%%
 
 struct port_uri *
 port_uri_parse(struct port_uri *uri, const char *p)
@@ -118,6 +114,8 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	unsigned port = 0;
 
 	%%{
+		machine port_uri;
+		write data;
 
 		hex1_4	= ( [0-9a-fA-F]{1,4} );
 
@@ -193,6 +191,10 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		write init;
 		write exec;
 	}%%
+
+	(void)port_uri_first_final;
+	(void)port_uri_error;
+	(void)port_uri_en_main;
 
 
 	if (login.start && login.end && password.start && password.end) {
@@ -314,11 +316,5 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	return uri;
 }
 
-
-void
-port_uri_destroy(struct port_uri *uri)
-{
-	(void)uri;
-}
 
 /* vim: set ft=ragel: */
