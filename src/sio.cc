@@ -191,7 +191,7 @@ sio_getsockopt(int fd, int level, int optname,
 
 /** Connect a client socket to a server. */
 int
-sio_connect(int fd, struct sockaddr_in *addr, socklen_t addrlen)
+sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
 {
 	/* Establish the connection. */
 	int rc = connect(fd, (struct sockaddr *) addr, addrlen);

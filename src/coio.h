@@ -45,10 +45,10 @@ struct coio_service
 };
 
 void
-coio_connect(struct ev_io *coio, struct sockaddr_in *addr);
+coio_connect(struct ev_io *coio, struct sockaddr *addr, socklen_t addr_len);
 
 bool
-coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
+coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
 		     socklen_t len, ev_tstamp timeout);
 
 bool

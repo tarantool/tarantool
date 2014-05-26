@@ -82,10 +82,9 @@ coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
  * Connect to a host.
  */
 void
-coio_connect(struct ev_io *coio, struct sockaddr_in *addr)
+coio_connect(struct ev_io *coio, struct sockaddr *addr, socklen_t addr_len)
 {
-	coio_connect_timeout(coio, addr, sizeof(*addr),
-			     TIMEOUT_INFINITY);
+	coio_connect_timeout(coio, addr, addr_len, TIMEOUT_INFINITY);
 }
 
 /**
@@ -94,7 +93,7 @@ coio_connect(struct ev_io *coio, struct sockaddr_in *addr)
  * @retval false connected
  */
 bool
-coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
+coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
 		     socklen_t len, ev_tstamp timeout)
 {
 	if (sio_connect(coio->fd, addr, len) == 0)
@@ -145,13 +144,12 @@ coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
 	assert(! evio_is_active(coio));
 	bool res = true;
 	while (ai) {
-		struct sockaddr_in *addr = (struct sockaddr_in *)ai->ai_addr;
 		try {
 			evio_socket(coio, ai->ai_family,
 				    ai->ai_socktype,
 				    ai->ai_protocol);
-			res = coio_connect_timeout(coio, addr, ai->ai_addrlen,
-						   delay);
+			res = coio_connect_timeout(coio, ai->ai_addr,
+					ai->ai_addrlen, delay);
 			if (res)
 				evio_close(loop, coio);
 			return res;

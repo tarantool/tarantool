@@ -74,7 +74,7 @@ void
 sio_getsockopt(int fd, int level, int optname,
 	       void *optval, socklen_t *optlen);
 
-int sio_connect(int fd, struct sockaddr_in *addr, socklen_t addrlen);
+int sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_listen(int fd);
 int sio_listen_backlog();
