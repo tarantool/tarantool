@@ -54,7 +54,7 @@ port_uri_to_string(const struct port_uri * uri)
 		return str;
 	}
 
-	switch(uri->addr.ss_family) {
+	switch(uri->addr.sa_family) {
 		case AF_INET6:
 		case AF_INET: {
 			char shost[NI_MAXHOST];
@@ -65,7 +65,7 @@ port_uri_to_string(const struct port_uri * uri)
 				shost, sizeof(shost),
 				sservice, sizeof(sservice),
 				NI_NUMERICHOST|NI_NUMERICSERV);
-			if (uri->addr.ss_family == AF_INET)
+			if (uri->addr.sa_family == AF_INET)
 				sprintf(str, "%s://%s:%s",
 					uri->schema, shost, sservice);
 			else

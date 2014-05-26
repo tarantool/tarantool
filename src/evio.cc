@@ -219,7 +219,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 	try {
 		evio_setsockopt_tcpserver(fd);
 
-		if (sio_bind(fd, (struct sockaddr *)&service->port.addr,
+		if (sio_bind(fd, &service->port.addr,
 				service->port.addr_len) || sio_listen(fd)) {
 			assert(errno == EADDRINUSE);
 			close(fd);

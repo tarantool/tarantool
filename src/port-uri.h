@@ -35,7 +35,10 @@
 
 struct port_uri {
 
-	struct sockaddr_storage addr;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addr_storage;
+	};
 	socklen_t addr_len;
 
 	char schema[32];

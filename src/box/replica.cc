@@ -130,7 +130,7 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 		panic("Broken replication_source url: %s", replication_source);
 	}
 
-	int master = sio_socket(uri.addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
+	int master = sio_socket(uri.addr.sa_family, SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 
 	uint64_t sync = rand();
@@ -157,7 +157,7 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	struct iovec iov[IPROTO_ROW_IOVMAX];
 	int iovcnt = iproto_encode_row(&packet, iov, fixheader);
 
-	sio_connect(master, (struct sockaddr *)&uri.addr, uri.addr_len);
+	sio_connect(master, &uri.addr, uri.addr_len);
 	sio_readn(master, greeting, sizeof(greeting));
 	sio_writev_all(master, iov, iovcnt);
 
@@ -192,8 +192,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
-	coio_connect(coio, (struct sockaddr*)&r->remote->uri.addr,
-		r->remote->uri.addr_len);
+	coio_connect(coio, &r->remote->uri.addr, r->remote->uri.addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
 
 	/* Send SUBSCRIBE request */
