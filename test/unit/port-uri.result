@@ -21,10 +21,10 @@ ok 19 - 127.0.0.1
 ok 20 - to_string
 ok 21 - 127.0.0.1:22
 ok 22 - to_string
-ok 23 - login@password:127.0.0.1
+ok 23 - login:password@127.0.0.1
 ok 24 - login
 ok 25 - password
-ok 26 - unix://login@password:/path/to
+ok 26 - unix://login:password@/path/to
 ok 27 - login
 ok 28 - password
 ok 29 - to_string

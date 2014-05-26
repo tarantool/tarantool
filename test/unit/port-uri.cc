@@ -64,13 +64,13 @@ main(void)
 	is(strcmp(port_uri_to_string(&uri), "tcp://128.0.0.1:22"), 0,
 		"to_string");
 
-	isnt(port_uri_parse(&uri, "login@password:127.0.0.1"), 0,
-		"login@password:127.0.0.1");
+	isnt(port_uri_parse(&uri, "login:password@127.0.0.1"), 0,
+		"login:password@127.0.0.1");
 	is(strcmp(uri.login, "login"), 0, "login");
 	is(strcmp(uri.password, "password"), 0, "password");
 
-	isnt(port_uri_parse(&uri, "unix://login@password:/path/to"), 0,
-		"unix://login@password:/path/to");
+	isnt(port_uri_parse(&uri, "unix://login:password@/path/to"), 0,
+		"unix://login:password@/path/to");
 	is(strcmp(uri.login, "login"), 0, "login");
 	is(strcmp(uri.password, "password"), 0, "password");
 	is(strcmp(port_uri_to_string(&uri), "unix:///path/to"), 0,

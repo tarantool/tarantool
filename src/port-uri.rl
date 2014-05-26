@@ -178,10 +178,10 @@ port_uri_parse(struct port_uri *uri, const char *p)
 
 		main := (
 			("unix://"
-				(( login "@" password ":" ) ? ) file)	|
+				(( login ":" password "@" ) ? ) file)	|
 			
 			(( schema "://" )?
-				( ( login "@" password ":" )? )
+				( ( login ":" password "@" )? )
 				host
 				( ( ":" service )? ))			|
 
