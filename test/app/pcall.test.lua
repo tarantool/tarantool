@@ -28,3 +28,6 @@ local status, msg = pcall(function()
     box.raise(box.error.ER_ILLEGAL_PARAMS, 'some message')
 end)
 print('pcall with box.raise():', status, msg)
+
+print('pcall with no return:', select('#', pcall(function() end)))
+print('pcall with multireturn:', pcall(function() return 1, 2, 3 end))

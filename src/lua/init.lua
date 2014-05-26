@@ -9,10 +9,13 @@ tarantool_error_message(void);
 ]]
 
 local pcall_lua = pcall
-pcall = function(fun, ...)
-    local status, msg = pcall_lua(fun, ...)
-    if status == false and msg == 'C++ exception' then
+
+local function pcall_wrap(status, ...)
+    if status == false and ... == 'C++ exception' then
         return false, ffi.string(ffi.C.tarantool_error_message())
     end
-    return status, msg
+    return status, ...
+end
+pcall = function(fun, ...)
+    return pcall_wrap(pcall_lua(fun, ...))
 end
