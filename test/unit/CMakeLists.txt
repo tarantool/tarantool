@@ -40,8 +40,8 @@ add_executable(bps_tree.test bps_tree.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_a
 target_link_libraries(bps_tree.test small)
 add_executable(bps_tree_itr.test bps_tree_itr.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_arg.c)
 target_link_libraries(bps_tree_itr.test small)
-add_executable(pt_alloc.test pt_alloc.cc)
-target_link_libraries(pt_alloc.test small)
+add_executable(matras.test matras.cc)
+target_link_libraries(matras.test small)
 add_executable(log_dir.test log_dir.cc test.c)
 target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} box core small salad misc bitset msgpuck
     ${LIBEV_LIBRARIES}

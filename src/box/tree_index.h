@@ -74,7 +74,7 @@ public:
 				  const char *key, uint32_t part_count) const;
 
 // protected:
-	struct bps_tree tree;
+	struct bps_tree_index tree;
 };
 
 #endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */
