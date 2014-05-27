@@ -54,7 +54,7 @@ box_lua_init(struct lua_State *L);
  * @return  L on success, 0 if out of memory
  */
 void
-tarantool_lua_init();
+tarantool_lua_init(const char *tarantool_bin, int argc, char **argv);
 
 /** Free Lua subsystem resources. */
 void

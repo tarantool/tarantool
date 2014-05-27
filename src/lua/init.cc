@@ -226,7 +226,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 }
 
 void
-tarantool_lua_init()
+tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 {
 	lua_State *L = luaL_newstate();
 	if (L == NULL) {
@@ -286,6 +286,18 @@ tarantool_lua_init()
 	}
 
 	box_lua_init(L);
+
+
+	lua_newtable(L);
+	lua_pushinteger(L, 0);
+	lua_pushstring(L, tarantool_bin);
+	lua_settable(L, -3);
+	for (int i = 0; i < argc; i++) {
+		lua_pushinteger(L, i + 1);
+		lua_pushstring(L, argv[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);

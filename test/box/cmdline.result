@@ -1,0 +1,32 @@
+arg[0] ~= nil
+---
+- true
+...
+arg[1] ~= nil
+---
+- true
+...
+string.match(arg[0], '^/') ~= nil
+---
+- true
+...
+string.match(arg[1], '^/') ~= nil
+---
+- true
+...
+string.match(arg[0], '/tarantool$') ~= nil
+---
+- true
+...
+string.match(arg[1], '/box%.lua$') ~= nil
+---
+- true
+...
+io.type( io.open(arg[0]) )
+---
+- file
+...
+io.type( io.open(arg[1]) )
+---
+- file
+...
