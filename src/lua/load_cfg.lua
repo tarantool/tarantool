@@ -30,7 +30,6 @@ local wrapper_cfg = {
 local default_cfg = {
     admin_port          = nil,
     primary_port        = nil,
-    bind_ipaddr         = "INADDR_ANY",
     slab_alloc_arena    = 1.0,
     slab_alloc_minimal  = 64,
     slab_alloc_factor   = 2.0,
