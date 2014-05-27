@@ -289,11 +289,11 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 
 
 	lua_newtable(L);
-	lua_pushinteger(L, 0);
+	lua_pushinteger(L, -1);
 	lua_pushstring(L, tarantool_bin);
 	lua_settable(L, -3);
 	for (int i = 0; i < argc; i++) {
-		lua_pushinteger(L, i + 1);
+		lua_pushinteger(L, i);
 		lua_pushstring(L, argv[i]);
 		lua_settable(L, -3);
 	}
