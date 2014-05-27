@@ -166,7 +166,8 @@ aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
 --# setopt delimiter ''
 
 #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
-#(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+wrong_addr = box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+wrong_addr == nil or #wrong_addr == 0
 
 sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc ~= nil
