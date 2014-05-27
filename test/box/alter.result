@@ -247,3 +247,69 @@ space:pairs():totable()
 space:drop()
 ---
 ...
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+-- invalid identifiers
+box.schema.create_space('invalid.identifier')
+---
+- error: 'Failed to create space 512: space name contains invalid symbols'
+...
+box.schema.create_space('invalid identifier')
+---
+- error: 'Failed to create space 512: space name contains invalid symbols'
+...
+box.schema.create_space('primary ')
+---
+- error: 'Failed to create space 512: space name contains invalid symbols'
+...
+box.schema.create_space('5')
+---
+- error: 'Failed to create space 512: space name contains invalid symbols'
+...
+box.schema.create_space('')
+---
+- error: 'Failed to create space 512: space name contains invalid symbols'
+...
+-- valid identifiers
+box.schema.create_space('_Abcde'):drop()
+---
+...
+box.schema.create_space('_5'):drop()
+---
+...
+box.schema.create_space('valid_identifier'):drop()
+---
+...
+space = box.schema.create_space('test')
+---
+...
+-- invalid identifiers
+space:create_index('invalid.identifier')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name contains invalid
+    symbols'
+...
+space:create_index('invalid identifier')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name contains invalid
+    symbols'
+...
+space:create_index('primary ')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name contains invalid
+    symbols'
+...
+space:create_index('5')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name contains invalid
+    symbols'
+...
+space:create_index('')
+---
+- error: 'Can''t create or modify index 0 in space 512: index name contains invalid
+    symbols'
+...
+space:drop()
+---
+...

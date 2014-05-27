@@ -33,6 +33,7 @@
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
 #include <limits.h>
+#include <ctype.h>
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
@@ -285,5 +286,21 @@ struct priv_def {
 	/** What is being or has been granted. */
 	uint8_t access;
 };
+
+/**
+ * Check object identifier for invalid symbols
+ */
+static inline bool
+identifier_is_valid(const char *str)
+{
+	/* Allows [a-zA-Z_][a-zA-Z0-9_]* expression */
+	if (!isalpha(*str) && *str != '_')
+		return false;
+	while (*(++str) != '\0') {
+		if (!isalnum(*str) && *str != '_')
+			return false;
+	}
+	return true;
+}
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

@@ -69,6 +69,12 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 			  (unsigned) iid, (unsigned) space_id,
 			  "index name is too long");
 	}
+	if (!identifier_is_valid(def->name)) {
+		free(def);
+		tnt_raise(LoggedError, ER_MODIFY_INDEX,
+			  (unsigned) iid, (unsigned) space_id,
+			  "index name contains invalid symbols");
+	}
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
@@ -207,9 +213,20 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 			  (unsigned) def->id,
 			  "space name is too long");
 	}
+	if (!identifier_is_valid(def->name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space name contains invalid symbols");
+	}
+
 	if (engine_namelen >= sizeof(def->engine_name)) {
 		tnt_raise(ClientError, errcode,
 			  (unsigned) def->id,
 			  "space engine name is too long");
+	}
+	if (!identifier_is_valid(def->engine_name)) {
+		tnt_raise(ClientError, errcode,
+			  (unsigned) def->id,
+			  "space engine name contains invalid symbols");
 	}
 }

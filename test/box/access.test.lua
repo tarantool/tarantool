@@ -56,3 +56,12 @@ box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
+
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+box.schema.user.create('invalid.identifier')
+box.schema.user.create('invalid identifier')
+box.schema.user.create('user ')
+box.schema.user.create('5')
+box.schema.user.create(' ')
