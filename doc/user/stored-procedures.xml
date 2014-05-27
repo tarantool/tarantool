@@ -2799,12 +2799,12 @@ for instructions about defining triggers for connect and disconnect events
     <para>
       Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
       called <code>channel</code> for examples in this section.
-      Call the other box.ipc() routines, passing <code>channel</code>, to send messages, receive messages, or check ipc status.
+      Call the other box.ipc() routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
       Message exchange is synchronous.
       The channel is garbage collected when no one is using it, as with any
       other Lua object.
-      Object-oriented and functional APIs are equivalent, so <code>channel:put(message)</code>
-      is the same as <code>channel:put(channel, message)</code>. 
+      Use object-oriented syntax, for example <code>channel:put(message)</code>
+      rather than <code>box.ipc.channel.put(message)</code>. 
     </para>
 <variablelist xml:id="box.ipc">
     <para>
@@ -2821,10 +2821,13 @@ for instructions about defining triggers for connect and disconnect events
               (spaces for get or put or broadcast messages)
               that might be pending at any given time.
             </para>
+            <para>
+              Returns: new channel.
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:put(<replaceable>channel, message[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:put(<replaceable>message[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message using a channel. If the channel is full,
@@ -2832,7 +2835,7 @@ for instructions about defining triggers for connect and disconnect events
                 blocks until there is a free slot in the channel.
             </para>
             <para>
-                Parameters: <code>channel</code>, <code>message</code>, <code>timeout</code>.
+                Parameters: <code>message</code>, <code>timeout</code>.
             </para>
             <para>
                 Returns: If <code>timeout</code> is provided,
@@ -2846,16 +2849,16 @@ for instructions about defining triggers for connect and disconnect events
     <varlistentry>
         <term><emphasis role="lua">channel:close()</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                Close the channel. All waiters in the channel will be
                woken up. All following <code>channel:put()</code>
                or <code>channel:get()</code> operations will return
                an error (nil).
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:get(<replaceable>channel[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:get(<replaceable>[timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Fetch a message from a channel. If the channel is empty,
@@ -2863,7 +2866,10 @@ for instructions about defining triggers for connect and disconnect events
                 blocks until there is a message.
             </para>
             <para>
-              Parameters: <code>channel</code>, <code>timeout</code>.
+              Parameters: <code>timeout</code>.
+            </para>
+            <para>
+              Returns: the value placed on the channel by an earlier <code>channel:put()</code> or <code>channel:broadcast()</code>.
             </para>
             <para>
                 Possible errors: If <code>timeout</code> is provided,
@@ -2875,7 +2881,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:broadcast(<replaceable>channel, message, timeout</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:broadcast(<replaceable>message</replaceable>)</emphasis></term>
         <listitem>
             <para>
              If the channel is empty, <code>channel:broadcast()</code> is equivalent to
@@ -2884,18 +2890,15 @@ for instructions about defining triggers for connect and disconnect events
               channel.
             </para>
             <para>
-             Parameters: <code>channel</code>, <code>message</code>, <code>timeout</code>.
+             Parameters: <code>message</code>.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_empty(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_empty()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty (has no messages).
-            </para>
-            <para>
-               Parameters: <code>channel</code>.
             </para>
             <para>
                Returns: (type = boolean) true if the specified channel is empty.
@@ -2903,13 +2906,10 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_full(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_full()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full.
-            </para>
-            <para>
-                Parameters: <code>channel</code>.
             </para>
             <para>
                 Returns: (type = boolean) true if the specified channel is full (has no room for a new message).
@@ -2917,7 +2917,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_readers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_readers()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty and has readers waiting
@@ -2925,23 +2925,17 @@ for instructions about defining triggers for connect and disconnect events
                blocked).
             </para>
             <para>
-             Parameters: <code>channel</code>.
-            </para>
-            <para>
                Returns: (type = boolean) true if blocked users are waiting. Otherwise false.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_writers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_writers()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full and has writers waiting
                 (because they have issued <code>channel:put()</code> and then blocked
                 due to lack of room).
-            </para>
-            <para>
-                Parameters: <code>channel</code>.
             </para>
             <para>
                 Returns: (type = boolean) true if blocked users are waiting. Otherwise false.
@@ -2952,9 +2946,9 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:is_closed()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is already
+                Returns: (type = boolean) true if the specified channel is already
                 closed.
-                Otherwise return false.
+                Otherwise false.
             </simpara>
         </listitem>
     </varlistentry>
