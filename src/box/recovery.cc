@@ -1167,8 +1167,6 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 					    &writer->vclock);
 		if (batch_end != write_end)
 			break;
-		if (r->wal_mode == WAL_FSYNC)
-			log_io_sync(*wal);
 		req = write_end;
 	}
 	STAILQ_SPLICE(input, write_end, wal_fifo_entry, rollback);
