@@ -26,13 +26,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-
+#include "port-uri.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "port-uri.h"
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/in.h>
@@ -40,57 +38,55 @@
 #include <sys/un.h>
 #include <netdb.h>
 
-
 const char *
 port_uri_to_string(const struct port_uri * uri)
 {
-	static __thread
-		char str[ NI_MAXSERV + NI_MAXHOST + sizeof(uri->schema) ];
+	static __thread char
+		str[NI_MAXSERV + NI_MAXHOST + sizeof(uri->schema)];
 
 	if (!uri || !uri->addr_len) {
-		sprintf(str, "unknown address");
+		snprintf(str, sizeof(str), "unknown address");
 		return str;
 	}
 
-	switch(uri->addr.sa_family) {
-		case AF_INET6:
-		case AF_INET: {
-			char shost[NI_MAXHOST];
-			char sservice[NI_MAXSERV];
-			getnameinfo(
-				(struct sockaddr *)&uri->addr,
-				uri->addr_len,
-				shost, sizeof(shost),
-				sservice, sizeof(sservice),
-				NI_NUMERICHOST|NI_NUMERICSERV);
-			if (uri->addr.sa_family == AF_INET)
-				sprintf(str, "%s://%s:%s",
-					uri->schema, shost, sservice);
-			else
-				sprintf(str, "%s://[%s]:%s",
-					uri->schema, shost, sservice);
-			return str;
+	switch (uri->addr.sa_family) {
+	case AF_INET6:
+	case AF_INET:
+	{
+		char shost[NI_MAXHOST];
+		char sservice[NI_MAXSERV];
+		getnameinfo(
+			    (struct sockaddr *)&uri->addr,
+			    uri->addr_len,
+			    shost, sizeof(shost),
+			    sservice, sizeof(sservice),
+			    NI_NUMERICHOST|NI_NUMERICSERV);
+		if (uri->addr.sa_family == AF_INET)
+			snprintf(str, sizeof(str), "%s://%s:%s",
+				 uri->schema, shost, sservice);
+		else
+			snprintf(str, sizeof(str), "%s://[%s]:%s",
+				 uri->schema, shost, sservice);
+		return str;
 
-		}
-		
-		case AF_LOCAL: {
-			struct sockaddr_un *un =
-				(struct sockaddr_un *)&uri->addr;
-			sprintf(str, "unix://%.*s",
-				(int)sizeof(un->sun_path), un->sun_path);
-			return str;
-		}
-		default:
-			assert(false);
 	}
-
+	case AF_LOCAL:
+	{
+		struct sockaddr_un *un =
+			(struct sockaddr_un *)&uri->addr;
+		snprintf(str, sizeof(str), "unix://%.*s",
+			 (int) sizeof(un->sun_path), un->sun_path);
+		return str;
+	}
+	default:
+		assert(false);
+	}
 }
-
 
 struct port_uri *
 port_uri_parse(struct port_uri *uri, const char *p)
 {
-	(void)uri;
+	(void) uri;
 	const char *pe = p + strlen(p);
 	const char *eof = pe;
 	int cs;
@@ -99,16 +95,16 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	struct {
 		const char *start;
 		const char *end;
-	} schema	= { 0, 0 },
-	  host		= { 0, 0 },
-	  service	= { 0, 0 },
-	  sport		= { 0, 0 },
-	  login		= { 0, 0 },
-	  password	= { 0, 0 },
-	  ip4		= { 0, 0 },
-	  ip6		= { 0, 0 },
-	  path		= { 0, 0 },
-	  dport		= { 0, 0 }
+	}	schema		= { 0, 0 },
+		host		= { 0, 0 },
+		service		= { 0, 0 },
+		sport		= { 0, 0 },
+		login		= { 0, 0 },
+		password	= { 0, 0 },
+		ip4		= { 0, 0 },
+		ip6		= { 0, 0 },
+		path		= { 0, 0 },
+		dport		= { 0, 0 }
 	;
 
 	unsigned port = 0;
@@ -117,76 +113,73 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		machine port_uri;
 		write data;
 
-		hex1_4	= ( [0-9a-fA-F]{1,4} );
+		hex1_4 = ([0-9a-fA-F]{1,4});
 
 
 		schema		= (alpha+)
 			>{ schema.start = p; }
-			%{ schema.end   = p; };
-		
+		    %{ schema.end   = p; };
+
 		login		= (alnum+)
 			>{ login.start  = p; }
-			%{ login.end    = p; };
+		    %{ login.end    = p; };
 
 		password	= (alnum+)
 			>{ password.start = p; }
-			%{ password.end   = p; };
-		
+		    %{ password.end   = p; };
+
 		ip4	= ((digit{1,3}) (("." digit{1,3}){3}))
 			>{ ip4.start = p; }
-			%{ ip4.end   = p; };
+		    %{ ip4.end   = p; };
 
 		ip4_6	= ("[::" [fF][fF][fF][fF] ":" ip4 "]");
 
 		ip6	= ("["
-				( hex1_4? )
-				(( ":" (hex1_4?) ){1,8})
+			   (hex1_4?)
+			   ((":" (hex1_4?)){1,8})
 			   "]")
 			>{ ip6.start = p + 1; }
-			%{ ip6.end   = p - 1; };
+		    %{ ip6.end   = p - 1; };
 
-		
 		host		= (ip4_6 | ip4 | ip6 | ([^:?]+))
 			>{ host.start   = p; }
-			%{ host.end     = p; };
+		    %{ host.end     = p; };
 
 		dport		= ([1-9] (digit*))
 			>{ dport.start   = p; port = 0; }
-			${ port = port * 10 + (int)(*p - '0'); }
-			%{ dport.end	 = p; };
+		    ${ port = port * 10 + (int)(*p - '0'); }
+		    %{ dport.end	 = p; };
 
 		service		= (dport | (alpha{1,16}))
 			>{ service.start = p; }
-			%{ service.end   = p; };
+		    %{ service.end   = p; };
 
 
 		port		= ([1-9] digit*)
 			>{ sport.start   = p; port = 0; }
-			${ port = port * 10 + (int)(*p - '0'); }
-			%{ sport.end     = p; };
+		    ${ port = port * 10 + (int)(*p - '0'); }
+		    %{ sport.end     = p; };
 
 		abspath		= ("/" any+)
 			>{ path.start = p; }
-			%{ path.end   = p; };
+		    %{ path.end   = p; };
 
 		file		= (any+)
 			>{ path.start = p; }
-			%{ path.end   = p; };
-
-
+		    %{ path.end   = p; };
 
 
 		main := (
-			("unix://"
-				(( login ":" password "@" ) ? ) file)	|
-			
-			(( schema "://" )?
-				( ( login ":" password "@" )? )
-				host
-				( ( ":" service )? ))			|
+		    ("unix://"
+		      ((login ":" password "@") ?) file) |
 
-			port						|
-			abspath
+		     ((schema "://")?
+			((login ":" password "@")?)
+			host
+			((":" service)?))		    |
+
+		     port				    |
+		     abspath
 		);
 		write init;
 		write exec;
@@ -196,11 +189,12 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	(void)port_uri_error;
 	(void)port_uri_en_main;
 
-
 	if (login.start && login.end && password.start && password.end) {
-		strncpy(uri->login, login.start, login.end - login.start);
-		strncpy(uri->password,
-			password.start, password.end - password.start);
+		snprintf(uri->login, sizeof(uri->login),
+			 "%.*s", (int) (login.end - login.start), login.start);
+		snprintf(uri->password, sizeof(uri->password),
+			 "%.*s", (int) (password.end - password.start),
+			 password.start);
 	}
 
 	if (path.start && path.end) {
@@ -210,15 +204,17 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		if (path.end - path.start >= sizeof(un->sun_path))
 			return NULL;
 
-		strncpy(un->sun_path, path.start, path.end - path.start);
-		strcpy(uri->schema, "unix");
+		snprintf(un->sun_path, sizeof(un->sun_path),
+			 "%.*s", (int) (path.end - path.start), path.start);
+		snprintf(uri->schema, sizeof(uri->schema), "unix");
 		return uri;
 	}
 
 	if (schema.start && schema.end) {
-		strncpy(uri->schema, schema.start, schema.end - schema.start);
+		snprintf(uri->schema, sizeof(uri->schema),
+			 "%.*s", (int) (schema.end - schema.start), schema.start);
 	} else {
-		strcpy(uri->schema, "tcp");
+		snprintf(uri->schema, sizeof(uri->schema), "tcp");
 	}
 
 
@@ -232,7 +228,7 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		in->sin_addr.s_addr = INADDR_ANY;
 		return uri;
 	}
-	
+
 
 	if (!(dport.start && dport.end)) {
 		port = 0;
@@ -240,12 +236,13 @@ port_uri_parse(struct port_uri *uri, const char *p)
 			if (service.end - service.start >= NI_MAXSERV)
 				return NULL;
 			char sname[NI_MAXSERV];
-			strncpy(sname, service.start,
-				service.end - service.start);
+			snprintf(sname, sizeof(sname), "%.*s",
+				 (int) (service.end - service.start),
+                 service.start);
 			struct servent *s = getservbyname(sname, NULL);
 			if (!s)
 				return NULL;
-			port = ntohs( s->s_port );
+			port = ntohs(s->s_port);
 		}
 	}
 
@@ -261,7 +258,8 @@ port_uri_parse(struct port_uri *uri, const char *p)
 
 		char sip4[3 * 4 + 3 + 1];
 		memset(sip4, 0, sizeof(sip4));
-		strncpy(sip4, ip4.start, ip4.end - ip4.start);
+		snprintf(sip4, sizeof(sip4), "%.*s", (int) (ip4.end - ip4.start),
+			 ip4.start);
 		if (inet_aton(sip4, &in->sin_addr))
 			return uri;
 		return NULL;
@@ -276,19 +274,20 @@ port_uri_parse(struct port_uri *uri, const char *p)
 
 		char sip6[8 * 4 + 7 + 1];
 		memset(sip6, 0, sizeof(sip6));
-		strncpy(sip6, ip6.start, ip6.end - ip6.start);
-		
+		snprintf(sip6, sizeof(sip6), "%.*s", (int) (ip6.end - ip6.start),
+			 ip6.start);
+
 		in6->sin6_family = AF_INET6;
 		in6->sin6_port = htonl(port);
-		
+
 		if (inet_pton(AF_INET6, sip6, (void *)&in6->sin6_addr))
 			return uri;
-		
+
 		return NULL;
 	}
 
 
-	if (!(host.start && host.end))
+	if (!host.start || !host.end)
 		return NULL;
 
 	if (host.end - host.start >= NI_MAXHOST)
@@ -296,11 +295,13 @@ port_uri_parse(struct port_uri *uri, const char *p)
 
 	char shost[NI_MAXHOST];
 	char sservice[NI_MAXSERV];
-	strncpy(shost, host.start, host.end - host.start);
+	snprintf(shost, sizeof(shost), "%.*s", (int) (host.end - host.start),
+		 host.start);
 	if (service.end) {
-		strncpy(sservice, service.start, service.end - service.start);
+		snprintf(sservice, sizeof(sservice), "%.*s",
+			 (int) (service.end - service.start), service.start);
 	} else {
-		sservice[0] = 0;
+		sservice[0] = '\0';
 	}
 
 	struct addrinfo hints, *res;
@@ -309,12 +310,11 @@ port_uri_parse(struct port_uri *uri, const char *p)
 
 	if (getaddrinfo(shost, sservice, &hints, &res) != 0)
 		return NULL;
-	
+
 	uri->addr_len = res->ai_addrlen;
 	memcpy((void *)&uri->addr, (void *)res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
 	return uri;
 }
-
 
 /* vim: set ft=ragel: */
