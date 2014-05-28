@@ -210,12 +210,6 @@ box_set_replication_source(const char *source)
 }
 
 extern "C" void
-box_set_wal_fsync_delay(double delay)
-{
-	recovery_update_fsync_delay(recovery_state, delay);
-}
-
-extern "C" void
 box_set_wal_mode(const char *mode_name)
 {
 	box_check_wal_mode(mode_name);
@@ -270,7 +264,6 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	recovery_finalize(recovery_state);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
-	box_set_wal_fsync_delay(cfg_getd("wal_fsync_delay"));
 
 	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
 }
