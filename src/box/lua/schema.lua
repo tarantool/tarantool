@@ -501,9 +501,9 @@ function box.schema.space.bless(space)
             local state, t
             for state, t in pk:pairs() do
                 local key = {}
-                -- ipairs does not work because pk.key_field is zero-indexed
-                for _k2, key_field in pairs(pk.key_field) do
-                    table.insert(key, t[key_field.fieldno])
+                -- ipairs does not work because pk.parts is zero-indexed
+                for _k2, parts in pairs(pk.parts) do
+                    table.insert(key, t[parts.fieldno])
                 end
                 space:delete(key)
             end

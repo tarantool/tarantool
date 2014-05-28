@@ -67,7 +67,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 15 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
 	/* 16 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
 	/* 17 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
-	/* 18 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
+	/* 18 */_(ER_KEY_PART_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
 	/* 19 */_(ER_EXACT_MATCH,		2, "Invalid key part count in an exact match (expected %u, got %u)") \
 	/* 20 */_(ER_INVALID_MSGPACK,		2, "Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			2, "msgpack.encode: can not encode Lua type '%s'") \

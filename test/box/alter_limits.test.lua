@@ -179,9 +179,9 @@ end;
 #parts;
 s:create_index('t1', { type = 'hash', parts = parts});
 --# setopt delimiter ''
--- this is actually incorrect since key_field is a lua table
+-- this is actually incorrect since parts is a lua table
 -- and length of a lua table which has index 0 set is not correct
-#s.index[0].key_field
+#s.index[0].parts
 -- cleanup
 s:drop()
 -- check costraints in tuple_format_new()

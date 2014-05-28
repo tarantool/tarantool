@@ -476,9 +476,9 @@ s:create_index('t1', { type = 'hash', parts = parts});
 ---
 ...
 --# setopt delimiter ''
--- this is actually incorrect since key_field is a lua table
+-- this is actually incorrect since parts is a lua table
 -- and length of a lua table which has index 0 set is not correct
-#s.index[0].key_field
+#s.index[0].parts
 ---
 - 254
 ...
@@ -634,13 +634,13 @@ s.index.primary:alter({type='tree', unique=false, name='pk'})
 s.index.primary
 ---
 - unique: true
-  idx: ' index 0'
-  n: 512
-  type: HASH
-  key_field:
+  parts:
     0:
       type: NUM
       fieldno: 0
+  n: 512
+  type: HASH
+  idx: ' index 0'
   name: primary
   id: 0
 ...

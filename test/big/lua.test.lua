@@ -313,7 +313,7 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
 
 -- Print key fields in pk
-space.index['primary'].key_field
+space.index['primary'].parts
 space:insert{1, 2, 3, 4}
 space:insert{10, 20, 30, 40}
 space:insert{20, 30, 40, 50}

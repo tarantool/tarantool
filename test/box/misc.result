@@ -140,7 +140,7 @@ type(box.space);
 t = {};
 ---
 ...
-for i, v in pairs(space.index[0].key_field[0]) do
+for i, v in pairs(space.index[0].parts[0]) do
     table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 ---
@@ -208,7 +208,6 @@ t;
   - 'box.error.ER_USER_EXISTS : 46'
   - 'box.error.ER_MEMORY_ISSUE : 2'
   - 'box.error.ER_ILLEGAL_PARAMS : 1'
-  - 'box.error.ER_KEY_FIELD_TYPE : 18'
   - 'box.error.ER_NONMASTER : 6'
   - 'box.error.ER_NO_SUCH_USER : 45'
   - 'box.error.ER_EXACT_MATCH : 19'
@@ -240,23 +239,24 @@ t;
   - 'box.error.ER_UNKNOWN_NODE : 62'
   - 'box.error.ER_MODIFY_INDEX : 14'
   - 'box.error.ER_MISSING_REQUEST_FIELD : 69'
-  - 'box.error.ER_SECONDARY : 7'
   - 'box.error.ER_NODE_ID_IS_RO : 66'
+  - 'box.error.ER_SECONDARY : 7'
   - 'box.error.ER_INVALID_UUID : 64'
-  - 'box.error.ER_FIELD_TYPE_MISMATCH : 24'
-  - 'box.error.ER_SPLICE : 25'
   - 'box.error.ER_TUPLE_IS_TOO_LONG : 27'
   - 'box.error.ER_DROP_SPACE : 11'
+  - 'box.error.ER_SPLICE : 25'
+  - 'box.error.ER_FIELD_TYPE_MISMATCH : 24'
+  - 'box.error.ER_KEY_PART_TYPE : 18'
   - 'box.error.ER_SPACE_ARITY : 38'
   - 'box.error.ER_LOCAL_NODE_IS_NOT_ACTIVE : 61'
   - 'box.error.ER_UNSUPPORTED : 5'
-  - 'box.error.ER_ACCESS_DENIED : 42'
-  - 'box.error.ER_PROC_LUA : 32'
-  - 'box.error.ER_UPDATE_FIELD : 29'
   - 'box.error.ER_NO_SUCH_FIELD : 37'
-  - 'box.error.ER_ALTER_SPACE : 12'
-  - 'box.error.ER_DROP_USER : 44'
+  - 'box.error.ER_PROC_LUA : 32'
   - 'box.error.ER_UNKNOWN_UPDATE_OP : 28'
+  - 'box.error.ER_DROP_USER : 44'
+  - 'box.error.ER_ALTER_SPACE : 12'
+  - 'box.error.ER_UPDATE_FIELD : 29'
+  - 'box.error.ER_ACCESS_DENIED : 42'
   - 'box.error.ER_NO_SUCH_PROC : 33'
   - 'box.error.ER_SOPHIA : 60'
   - 'box.error.ER_NO_SUCH_TRIGGER : 34'

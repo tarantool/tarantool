@@ -856,7 +856,7 @@ space:create_index('primary', { type = 'tree', parts = {2, 'num', 1, 'num'}, uni
 ---
 ...
 -- Print key fields in pk
-space.index['primary'].key_field
+space.index['primary'].parts
 ---
 - 0:
     type: NUM
