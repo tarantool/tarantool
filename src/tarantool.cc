@@ -582,6 +582,10 @@ main(int argc, char **argv)
 	 * - in case one uses #!/usr/bin/env tarantool
 	 *   such options (in script line) don't work
 	 */
+
+	char *tarantool_bin = find_path(argv[0]);
+	if (!tarantool_bin)
+		tarantool_bin = argv[0];
 	if (argc > 1) {
 		argv++;
 		argc--;
@@ -614,7 +618,7 @@ main(int argc, char **argv)
 	coeio_init();
 	signal_init();
 	session_init();
-	tarantool_lua_init();
+	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	bool start_loop = false;
 	try {

@@ -120,7 +120,7 @@ download:
         You can install Tarantool using homebrew:
         
         ```
-        $ brew install --use-clang http://tarantool.org/dist/master/tarantool.rb
+        $ brew install https://raw.githubusercontent.com/tarantool/tarantool/stable/extra/tarantool.rb
         ```
         
         Please upgrade `clang` to version 3.2 or later using

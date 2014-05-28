@@ -111,6 +111,25 @@ local function tuple_unpack(tuple)
     return unpack(tuple_totable(tuple))
 end
 
+local function tuple_find(tuple, offset, val)
+    if val == nil then
+        val = offset
+        offset = 0
+    end
+    local r = tuple:pairs(offset):index(val)
+    return r ~= nil and offset + r - 1 or nil -- tuple is zero-indexed
+end
+
+local function tuple_findall(tuple, offset, val)
+    if val == nil then
+        val = offset
+        offset = 0
+    end
+    return tuple:pairs(offset):indexes(val)
+        :map(function(i) return offset + i - 1 end) -- tuple is zero-indexed
+        :totable()
+end
+
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
     buf:reserve(tuple._bsize)
@@ -118,7 +137,9 @@ local function tuple_to_msgpack(buf, tuple)
     buf.p = buf.p + tuple._bsize
 end
 
+
 msgpackffi.on_encode(ffi.typeof('const struct tuple &'), tuple_to_msgpack)
+
 
 -- cfuncs table is set by C part
 
@@ -128,8 +149,8 @@ local methods = {
     ["pairs"]       = tuple_ipairs; -- just alias for ipairs()
     ["slice"]       = cfuncs.slice;
     ["transform"]   = cfuncs.transform;
-    ["find"]        = cfuncs.find;
-    ["findall"]     = cfuncs.findall;
+    ["find"]        = tuple_find;
+    ["findall"]     = tuple_findall;
     ["unpack"]      = tuple_unpack;
     ["totable"]     = tuple_totable;
     ["bsize"]       = function(tuple)
@@ -158,6 +179,7 @@ local tuple_field = function(tuple, field_n)
     -- Use () to shrink stack to the first return value
     return (msgpackffi.decode_unchecked(field))
 end
+
 
 ffi.metatype('struct tuple', {
     __len = function(tuple)

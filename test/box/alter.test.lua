@@ -80,3 +80,13 @@ box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
 box.space[1000].n
 box.space['_space']:delete{1000}
 box.space[1000]
+
+--------------------------------------------------------------------------------
+-- #197: box.space.space0:len() returns an error if there is no index
+--------------------------------------------------------------------------------
+
+space = box.schema.create_space('gh197')
+space:len()
+space:truncate()
+space:pairs():totable()
+space:drop()

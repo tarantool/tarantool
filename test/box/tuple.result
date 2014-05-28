@@ -587,6 +587,156 @@ t:pairs("fdsaf")
 - fdsaf
 ...
 --------------------------------------------------------------------------------
+-- test tuple:find
+--------------------------------------------------------------------------------
+--# setopt delimiter ';'
+t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
+    -9223372036854775807LL})
+---
+...
+--# setopt delimiter ''
+t = box.tuple.new({'a','b','c','a', -1, 0, 1, 2, true, 9223372036854775807ULL,
+    -9223372036854775807LL})
+
+---
+...
+t:find('a')
+---
+- 0
+...
+t:find(1, 'a')
+---
+- 3
+...
+t:find('c')
+---
+- 2
+...
+t:find('xxxxx')
+---
+- null
+...
+t:find(1, 'xxxxx')
+---
+- null
+...
+t:findall('a')
+---
+- - 0
+  - 3
+...
+t:findall(1, 'a')
+---
+- - 3
+...
+t:findall('xxxxx')
+---
+- []
+...
+t:findall(1, 'xxxxx')
+---
+- []
+...
+t:find(100, 'a')
+---
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
+...
+t:findall(100, 'a')
+---
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
+...
+t:find(100, 'xxxxx')
+---
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
+...
+t:findall(100, 'xxxxx')
+---
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
+...
+---
+-- Lua type coercion
+---
+t:find(2)
+---
+- 7
+...
+t:findall(2)
+---
+- - 7
+...
+t:find(2ULL)
+---
+- 7
+...
+t:findall(2ULL)
+---
+- - 7
+...
+t:find(2LL)
+---
+- 7
+...
+t:findall(2LL)
+---
+- - 7
+...
+t:find(2)
+---
+- 7
+...
+t:findall(2)
+---
+- - 7
+...
+t:find(-1)
+---
+- 4
+...
+t:findall(-1)
+---
+- - 4
+...
+t:find(-1LL)
+---
+- 4
+...
+t:findall(-1LL)
+---
+- - 4
+...
+t:find(true)
+---
+- 8
+...
+t:findall(true)
+---
+- - 8
+...
+t:find(9223372036854775807LL)
+---
+- 9
+...
+t:findall(9223372036854775807LL)
+---
+- - 9
+...
+t:find(9223372036854775807ULL)
+---
+- 9
+...
+t:findall(9223372036854775807ULL)
+---
+- - 9
+...
+t:find(-9223372036854775807LL)
+---
+- 10
+...
+t:findall(-9223372036854775807LL)
+---
+- - 10
+...
+--------------------------------------------------------------------------------
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------
 msgpackffi = require('msgpackffi')

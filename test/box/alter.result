@@ -227,3 +227,23 @@ box.space[1000]
 ---
 - null
 ...
+--------------------------------------------------------------------------------
+-- #197: box.space.space0:len() returns an error if there is no index
+--------------------------------------------------------------------------------
+space = box.schema.create_space('gh197')
+---
+...
+space:len()
+---
+- 0
+...
+space:truncate()
+---
+...
+space:pairs():totable()
+---
+- []
+...
+space:drop()
+---
+...

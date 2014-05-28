@@ -13,24 +13,31 @@
 <section xml:id="signal-handling">
 <title>Server signal handling</title>
 <para>
-  The server is configured to gracefully shutdown on SIGTERM and
+  The server is configured to shut down gracefully on SIGTERM and
   SIGINT (keyboard interrupt) or SIGHUP. SIGUSR1 can be used to
   save a snapshot.
   All other signals are blocked or ignored.
   The signals are processed in the main event loop. Thus, if the
   control flow never reaches the event loop (thanks to a runaway stored
   procedure), the server stops responding to any signal, and
-  can be only killed with SIGKILL (this signal can not be ignored).
+  can only be killed with SIGKILL (this signal can not be ignored).
 </para>
 </section>
 
 <section xml:id="utility-tarantool">
 
-<title>Utility <code>tarantool</code> &mdash; the main client</title>
+<title>Utility <code>tarantool</code> &mdash; using the server as a client</title>
 
 <para>
-This section shows all legal syntax for the tarantool command-line client, with short notes and examples.
+If <code>tarantool</code> is started without an initialization file, then
+there will be a prompt ("<code>tarantool&gt;</code>") and it will be possible
+to enter requests. When used this way, <code>tarantool</code> is a client
+program as well as a server program.
+</para>
+<para>
+This section shows all legal syntax for the tarantool program, with short notes and examples.
 Other client programs may have similar options and request syntaxes.
+Some of the information in this section is duplicated in the Configuration Reference chapter.
 </para>
 
 <para>
@@ -46,104 +53,33 @@ A vertical bar <code>|</code> means the preceding and following tokens are mutua
 <para>
 <bridgehead renderas="sect4">Options when starting client from the command line</bridgehead>
 
-General form: <code>tarantool [<replaceable>option</replaceable>...] [<replaceable>request</replaceable>]</code>.
-
-Request will be described in a later part of this section.
+General form: <code>tarantool</code> or <code>tarantool <replaceable>file-name</replaceable></code>
+or <code>tarantool <replaceable>option</replaceable>... </code>.
+</para>
+<para>
+File-name can be any script containing code for initializing.
+Effect: The code in the file is executed during startup.
+Example: <code>init.lua</code>.
+Notes: If a script is used, there will be no prompt. The script should contain
+configuration information including "admin_port=..." or "primary_port=..." so
+that a separate program can connect to the server via one of the ports.
+</para>
+<para>
 Option is one of the following (in alphabetical order by the long form of the option):
 </para>
 
 <variablelist>
   <varlistentry>
-    <term xml:id="utility-tarantool-admin-port" xreflabel="utility-tarantool-admin-port">--admin-port</term>
-    <listitem><para>
-    Syntax: short form: <code>-a <replaceable>port-number</replaceable></code>
-    long form: <code>--a[dmin-port] [=] <replaceable>port-number</replaceable></code>.
-    Effect: Client will look for the server on the port designated by port-number.
-    Notes: This is the <quote>administrative</quote> port. The default value is 33015.
-    If --port is specified then there is no need to specify --admin-port, the client will discover it.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-cat" xreflabel="utility-tarantool-cat">--cat</term>
-    <listitem><para>
-    Syntax: short form: <code>-C <replaceable>file-name</replaceable></code>
-          long form: <code>--c[at] <replaceable>file-name</replaceable></code>.
-    Effect: Client will print the contents of the write-ahead log or snapshot designated by file-name.
-    Example: <code>--cat /tarantool_user/work_dir/00000000000000000018.xlog</code>
-    Notes: The client stops after displaying the contents. There is also a way to use --cat for Lua requests.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-delim" xreflabel="utility-tarantool-delim">--delim</term>
-    <listitem><para>
-    Syntax: short form: <code>-D <replaceable>delimiter</replaceable></code>
-          long form: <code>--d[elim] <replaceable>delimiter</replaceable></code>.
-    Effect: If --cat is used, then put delimiter at end of each line
-          of a Lua file. If --cat is not used, then require that
-          all requests end with delimiter.
-           Example: <code>--delim = '!'</code>
-    Notes: See also the SETOPT DELIMITER request.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-format" xreflabel="utility-tarantool-format">--format</term>
-    <listitem><para>
-     Syntax: short form: <code>-M tarantool|raw</code>
-     long form: <code>--fo[rmat] tarantool|raw</code>.
-    Effect: set format for output from --cat
-    Example: <code>--format tarantool</code>
-    Notes: The default format is tarantool.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-from" xreflabel="utility-tarantool-from">--from</term>
-    <listitem><para>
-    Syntax: short form: <code>-F <replaceable>log-sequence-number</replaceable></code>
-          long form: <code>--fr[om] <replaceable>log-sequence-number</replaceable></code>.
-    Effect: Play only what has a a log sequence number greater than or equal to log-sequence-number.
-    Example: <code>--from 55</code>
-    Notes: See also --play and --to.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
     <term xml:id="utility-tarantool-help" xreflabel="utility-tarantool-help">--help</term>
     <listitem><para>
     Syntax: short form: <code>-?</code>
-    long form: <code>--hel[p]</code>.
+    long form: <code>--h[elp]</code>.
     Effect: Client displays a help message including a list of options.
     Example: <code>--help</code>
-    Notes: The client stops after displaying the help.
+    Notes: The program stops after displaying the help.
     </para></listitem>
   </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-host" xreflabel="utility-tarantool-host">--host</term>
-    <listitem><para>
-    Syntax: short form: <code>-h <replaceable>host-name</replaceable></code>
-          long form: <code>--ho[st] [=] <replaceable>host-name</replaceable></code>.
-    Effect: Client will look for the server on the computer designated by host-name.
-    Example: <code>--host =  127.0.0.1</code>
-    Notes: The default value is localhost.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-space" xreflabel="utility-tarantool-space">--space</term>
-    <listitem><para>
-    Syntax: short form: <code>-S <replaceable>space-number</replaceable></code>
-          Long form: <code>--s[pace] <replaceable>space-number</replaceable></code>.
-    Effect: Play only what is applicable to the space designated by space-number.
-    Example: <code>--space 0</code>
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-to" xreflabel="utility-tarantool-to">--to</term>
-    <listitem><para>
-    Syntax: short form: <code>-T <replaceable>log-sequence-number</replaceable></code>
-          long form: <code>--t[o] <replaceable>log-sequence-number</replaceable></code>.
-    Effect: Play only what has a log sequence number less than or equal to log-sequence-number.
-    Example: <code>--to 66</code>
-    Notes: See also --play and --from.
-    </para></listitem>
-  </varlistentry>
+
   <varlistentry>
     <term xml:id="utility-tarantool-version" xreflabel="utility-tarantool-version">--version</term>
     <listitem><para>
@@ -151,7 +87,7 @@ Option is one of the following (in alphabetical order by the long form of the op
     long form: <code>--v[ersion]</code>.
     Effect: Client displays version information.
     Example: <code>--version</code>
-    Notes: The client stops after displaying the version.
+    Notes: The program stops after displaying the version.
     </para></listitem>
   </varlistentry>
 </variablelist>
@@ -161,8 +97,8 @@ Option is one of the following (in alphabetical order by the long form of the op
 </para>
 <para>
 Keywords are: Character sequences containing only letters of the English alphabet.
-              Examples: SETOPT, PAGER.
-              Notes: Keywords are case insensitive so PAGER and Pager are the same thing.
+              Examples: SETOPT.
+              Notes: Keywords are case insensitive so SETOPT and Setopt are the same thing.
 </para>
 <para>
 Procedure identifiers are: Any sequence of letters, digits, or underscores which is
@@ -186,12 +122,11 @@ Tokens must be separated from each other by one or more spaces, except that
 spaces are not necessary around single-byte tokens or string literals.
 </para>
 
-<para>
+<para xml:id="utility-tarantool-delim">
 <bridgehead renderas="sect4">Requests in alphabetical order</bridgehead>
-Although an initial request may be entered on the tarantool command line,
-generally they are entered following the prompt in interactive mode while
-tarantool is running. (A prompt will be the name of the host and a greater-than
-sign, for example <code>localhost&gt;</code>). The end-of-request marker is
+Generally requests are entered following the prompt in interactive mode while
+tarantool is running. (A prompt will be the word tarantool and a greater-than
+sign, for example <code>tarantool&gt;</code>). The end-of-request marker is
 a newline (line feed).
 </para>
 
@@ -199,46 +134,13 @@ a newline (line feed).
   <varlistentry>
     <term xml:id="utility-tarantool-exit" xreflabel="utility-tarantool-exit">EXIT</term>
     <listitem><para>
-    Syntax: <code>EXIT</code>.
-    Effect: The tarantool program stops.
-    Example:  <code>EXIT</code>.
-    Notes: The QUIT request does the same thing. The client sends nothing to the server.
+    Syntax: <code>control-C</code>.
+    Effect: The tarantool program receives a SIGINT signal and stops.
+    Example:  <code>^C</code>.
+    Notes: The preferable way to stop the program is to send an "os.exit()" request.
     </para></listitem>
   </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-help2" xreflabel="utility-tarantool-help2">HELP</term>
-    <listitem><para>
-    Syntax: <code>HELP</code>.
-    Effect: Client displays a message including a list of possible requests.
-    Example:  <code>HELP</code>.
-    Notes: The client sends nothing to the server.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-loadfile" xreflabel="utility-tarantool-loadfile">LOADFILE</term>
-    <listitem><para>
-    Syntax: <code>LOADFILE <replaceable>string-literal</replaceable></code>.
-    Effect: The client loads instructions from the file identified by string-literal.
-    Example:  <code>LOADFILE '/home/tarantool_user/file5.txt'</code>.
-    </para></listitem>
-  </varlistentry>  
-  <varlistentry>
-    <term xml:id="utility-tarantool-quit" xreflabel="utility-tarantool-quit">QUIT</term>
-    <listitem><para>
-    Syntax: <code>QUIT</code>.
-    Effect: The client stops.  This request is handled entirely by the client.
-    Example:  <code>QUIT</code>.
-    Notes: The EXIT request does the same thing. The client sends nothing to the server.
-    </para></listitem>
-  </varlistentry>
-  <varlistentry>
-    <term xml:id="utility-tarantool-set" xreflabel="utility-tarantool-set">SET</term>
-    <listitem><para>
-    Syntax: <code>SET INJECTION <replaceable>name-token</replaceable> <replaceable>state-token</replaceable></code>.
-    Effect: In normal mode: error.
-    Notes: This request is only available in debug mode.
-    </para></listitem>
-  </varlistentry>
+
   <varlistentry>
     <term xml:id="utility-tarantool-setopt" xreflabel="utility-tarantool-setopt">SETOPT</term>
     <listitem><para>
@@ -246,18 +148,8 @@ a newline (line feed).
           The string must be a value in single quotes.
     Effect: string becomes end-of-request delimiter, so newline alone is not treated as end of request.
     Example:  <code>SETOPT DELIMITER = '!'</code>.
-    Notes: The client sends nothing to the server.
-    </para>
-    <para>
-    Syntax: <code>SETOPT PAGER = <replaceable>string-literal</replaceable></code>.
-          The string must be a value in single quotes.
-    Effect: string becomes the pager that will be invoked for subsequent commands;
-            usually the values are '/usr/bin/less' or '/bin/more' for the common
-            Linux pagers.
-    Example: <code>SETOPT PAGER = '/usr/bin/less'</code>.
-    Notes: The client sends nothing to the server.
-    </para>
-   </listitem>
+    Notes: This has been temporarily disabled.
+    </para></listitem>
   </varlistentry>
    
   <varlistentry>
@@ -272,222 +164,64 @@ a newline (line feed).
 </variablelist>
 
 <para>
-For a condensed Backus-Naur Form [BNF] description of some of the requests, see
+For a condensed Backus-Naur Form [BNF] description of the suggested form of client requests, see
     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>
     and
     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/sql.txt"><filename>doc/sql.txt</filename></link>.
 </para>
 
-<para>
-<bridgehead renderas="sect4">Modes</bridgehead>
-Depending how one combines the tarantool client's options, there are in effect three modes of operation:
-<quote>interactive</quote>, <quote>print and play</quote>, or <quote>replication</quote> mode.
-</para>
+
 <para>
 In <emphasis>interactive</emphasis> mode, one types requests and gets results.
-One can specify a request file when starting
-(<code>tarantool &lt; file_name</code>)
-or one can specify a request file with the LOADFILE request:
-(<code>LOADFILE file_name</code>), but typically the requests
+Typically the requests
 are typed in by the user following prompts.
 Here is an example of an interactive-mode tarantool client session:
 
 <programlisting>
 <prompt>$ </prompt>tarantool
-localhost&gt; <userinput>box.space.space0:insert{12345}</userinput>
-- [12345]
-localhost&gt; <userinput>EXIT</userinput>
-<prompt>$ </prompt>
-</programlisting>
-
-</para>
-<para>
-In <emphasis>print and play</emphasis> mode,
-one uses --cat and --play and --from and --to and --space options
-to print write-ahead-log contents, or to send write-ahead-log
-contents to the server.
-Here is an example of a print-and-play-mode tarantool client session:
-<programlisting>
-<prompt>$ </prompt>tarantool --cat 00000000000000000005.xlog --from 22 --to 26
-Insert, lsn: 22, time: 1385327353.345869, len: 33, space: 0,
-    cookie: 127.0.0.1:44787 ['X-1', 100]
-Insert, lsn: 23, time: 1385327353.346745, len: 42, space: 0,
-    cookie: 127.0.0.1:44787 ['X-2', 200, 8243105135088135759]
-Insert, lsn: 24, time: 1385327353.347352, len: 34, space: 0,
-    cookie: 127.0.0.1:44787 ['X-3', 300, '']
-Update, lsn: 25, time: 1385327353.348209, len: 42, space: 0,
-    cookie: 127.0.0.1:44787 ['X-1']
-Delete, lsn: 26, time: 1385327353.348879, len: 28, space: 0,
-    cookie: 127.0.0.1:44787 ['X-2']
-<prompt>$ </prompt>
-</programlisting>
-</para>
-<para>
-In <emphasis>replication</emphasis> mode,
-one connects as a replica, and then writes
-a binary log to a file.
-</para>
-
-</section>
-
-<section xml:id="tarantar">
-<title>Utility <code>tarantar</code></title>
-<para>
-The tarantar utility program will create new snapshots by reading existing
-snapshots and write-ahead-log (xlog) files. Thus it differs from <olink targetptr="box.snapshot"/>,
-which creates new snapshots from the database. Since tarantar uses less
-memory than box.snapshot(), it is especially appropriate for taking periodic
-snapshots as a background task.
-</para>
-<para>
-To prepare: ensure that the configuration file is available.
-</para>
-<para>
-To run:<programlisting> <command>tarantar</command> [options] <replaceable>configuration-file</replaceable></programlisting>
-where possible options are:<simplelist>
- <member><code>-c </code> or <code>--create </code> &mdash; create snapshot file. example: <code>--create</code></member>
- <member><code>-i <replaceable>seconds-count</replaceable></code> or <code>--interval <replaceable>seconds-count</replaceable></code> &mdash; repeat every seconds-count seconds. example: <code>-i 3600</code></member>
- <member><code>-n <replaceable>lsn-number</replaceable></code> or <code>--lsn <replaceable>lsn-number</replaceable></code> &mdash; start from lsn = lsn-number. if not specified, lsn = latest. example: <code>-n 5</code></member>
- <member><code>-l <replaceable>bytes-count</replaceable></code> or <code>--limit <replaceable>bytes-count</replaceable></code> &mdash; do not use more than bytes-count bytes of memory. example: <code>-l 5000000</code></member>
- <member><code>-? </code> or <code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
- <member><code>-V </code> or <code>--version</code> &mdash; display version and exit. example: <code>-V</code></member></simplelist></para>
-<para>
-Example:
-<programlisting>
-<prompt>$ </prompt>~/tarantool/client/tarantar/tarantar -c -i 30 ./tarantool.cfg
-snap_dir: /home/user/tarantool_test/work_dir
-wal_dir:  /home/user/tarantool_test/work_dir
-spaces:   1
-interval: 30
-memory_limit: 0M
-
-START SNAPSHOTTING Fri Oct 25 09:35:25 2013
-
-last snapshot lsn: 7
-(snapshot) 00000000000000000007.snap 0.000M processed
-
-( &gt;&gt; ) 00000000000000000006.snap 0.000M processed
-
-START SNAPSHOTTING Fri Oct 25 09:35:55 2013
-
-last snapshot lsn: 7
-(snapshot) 00000000000000000007.snap 0.000M processed
-
-( &gt;&gt; ) 00000000000000000006.snap 0.000M processed
-
-snapshot exists, skip.
-
+                [ tarantool will display an introductory message including version number here ]
+tarantool> box.cfg{admin_port=3313, primary_port=3301}
+                [ tarantool will display configuration information here ]
+tarantool> s = box.schema.create_space('space0')
+                [ tarantool may display an in-progress message here ]
+---
 ...
-
+tarantool> i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+---
+...
+tarantool> box.space.space0:insert{1,'My first tuple'}
+---
+- [1, 'My first tuple']
+...
+tarantool> box.space.space0:select(1)
+---
+- - [1, 'My first tuple']
+...
+tarantool> box.space.space0:drop()
+---
+...
+tarantool> os.exit()
+2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown
+<prompt>$ </prompt>
 </programlisting>
-</para>
-
-<para>
-<bridgehead renderas="sect4">Why tarantar?</bridgehead>
-To recapitulate the idea of a snapshot and a write-ahead log:
-Tarantool's database is entirely in memory; however, it has a
-complete and up-to-date on-disk backup.  This consists of snapshot
-files (extension .snap) which are copies of the database as of the
-time the snapshot was taken, and write-ahead-log files (extension
-.xlog) which contain records of insert/update/delete operations that
-are written when the operations occur. If the tarantool server
-goes down and later restarts, it will recover the database by
-reading the snapshot and then re-applying the write-ahead-log records.
-</para>
-
-<para>
-The approach is reliable. But if the snapshot gets old and the
-number of write-ahead-log records get huge, then recovery would
-take too long and .xlog files would take too much space.
-So periodically one should make new snapshots -- if a .snap file
-is up to date, then the .xlog files are unnecessary and can be
-archived.
-</para>
-
-<para>
-To take a snapshot with the tarantool client, one can say
-box.snapshot(). box.snapshot() will copy every tuple from
-the in-memory database to the .snap file. However, this
-is not always the ideal method.
-</para>
-
-<para>
-Taking snapshots with tarantar, instead of with box.snapshot(),
-can be better because:
-<itemizedlist>
-  <listitem><para>tarantar can work even if the tarantool server is down
-  because it works from the existing .snap and .xlog files,
-   rather than from an in-memory database.</para></listitem>
-   <listitem><para>tarantar saves memory when constructing its own in-memory
-  index to the rows by making SHA-1 hashes for primary keys
-  that contain strings or that are multi-column and longer
-   than 20 bytes</para></listitem>
-   <listitem><para>tarantar can be made to limit its memory usage so that
-  it does not interfere with resource use by other processes
-   including other Tarantool-related processes.</para></listitem>
-   <listitem><para>
-  tarantar can be made to run periodically as a daemon</para></listitem>
-</itemizedlist>
-</para>
-
-<para>
-For more explanation of tarantar's design see <link xlink:href="https://github.com/tarantool/tarantool/wiki/Tarantar">the Tarantool wiki</link>.
-</para>
-
-</section>
-
-<section xml:id="tarancheck">
-<title>Utility <code>tarancheck</code></title>
-<para>
-The tarancheck utility program will generate and verify <quote>signature files</quote>.
-A signature file contains, along with basic information that identifies the database,
-checksums calculated for each index in each space of the database,
-based on the latest snapshot and all subsequent entries in the write-ahead log.
-Signature files are useful for ensuring that databases have been saved without error,
-and for quick comparisons to see whether a database's components have been modified.
+Explanatory notes about what tarantool displayed in the above example:
 </para>
 <para>
-The main reason that tarancheck was created was
-so that users would be able to compare the
-consistency of two running servers, the master and the replica.
-By creating a signature file on the master using the master
-directory, and then copying the signature file to the replica,
-one will be able to confirm that the replica is not corrupt.
+* Many requests return typed objects.
+    In the case of "box.cfg{admin_port=3313, primary_port=3301}",
+    this result is displayed on the screen.
+    If the request had assigned the result to a variable, for example
+    "c = box.cfg{admin_port=3313, primary_port=3301}", then
+    the result would not have been displayed on the screen.
 </para>
 <para>
-There is one necessary warning. Since either the master or the
-replica is likely to be active when tarancheck runs, the check
-can only be applicable for the database as of the
-last transaction that was run on both the master and the replica.
-That is why tarancheck displays last_xlog_lsn, which is the log
-sequence number of the write-ahead log, when it finishes.
-</para>
-
-<para>
-To prepare: ensure that the configuration file contains 
-<olink targetptr="wal_dir"/> and <olink targetptr="snap_dir"/>
-clauses. Tarancheck does not assume that wal_dir and snap_dir have default values.
+* A display of an object always begins with "---" and ends with "...".
 </para>
 <para>
-To run:<programlisting> <command>tarancheck</command> [options] <replaceable>configuration-file</replaceable></programlisting>
-where possible options are:<simplelist>
- <member><code>-G <replaceable>signature file</replaceable></code> or <code>--generate <replaceable>signature-file</replaceable></code> &mdash; generate signature file. example: <code>-G x.crc</code></member>
- <member><code>-W <replaceable>signature file</replaceable></code> or <code>--verify <replaceable>signature-file</replaceable></code> &mdash; verify signature file. example: <code>--verify x.crc</code></member>
- <member><code>-? </code> or <code>--help </code> &mdash; display a help message and exit. example: <code>--help</code></member>
- <member><code>-V </code> or <code>--version</code> &mdash; display version and exit. example: <code>-V</code></member></simplelist></para>
-<para>
-Example:
-<programlisting>
-<prompt>$ </prompt>~/tarantool/client/tarantar/tarancheck --generate=x.crc tarantool.cfg
-&gt;&gt;&gt; Signature file generation
-configured spaces: 1
-snap_dir: ./work_dir
-wal_dir: ./work_dir
-last snapshot lsn: 1
-last xlog lsn: 0
-(snapshot) 00000000000000000001.snap
-(signature) saving x.crc
-</programlisting>
+* The insert request returns an object of type = tuple, so the object display line
+    begins with a single dash ('- '). However, the select request returns
+    an object of type = <emphasis>table of tuples</emphasis>, so the object display line
+    begins with two dashes ('- - ').
 </para>
 
 </section>
@@ -543,12 +277,13 @@ tarantool_deploy.sh: done
 <section xml:id="os-install-notes">
 <title>System-specific administration notes</title>
 <blockquote><para>
-  This chapter provides a cheatsheet for most common server management
-  routines on every supported operating system.
+  This section will contain information about issue or features which exist
+  on some platforms but not others -- for example, on certain versions of a
+  particular Linux distribution.
 </para></blockquote>
 
   <section xml:id="Debian">
-    <title>Debian GNU/Linux and Ubuntu</title>
+    <title>Administrating with Debian GNU/Linux and Ubuntu</title>
     <para>
         Setting up an instance: ln -s /etc/tarantool/instances.available/instance-name.cfg /etc/tarantool/instances.enabled/
     </para>
@@ -565,23 +300,238 @@ tarantool_deploy.sh: done
   <section xml:id="rpm-based-distros">
     <title>Fedora, RHEL, CentOS</title>
     <para>
-        TBA
+        There are no known permanent issues.
+        For transient issues, go to <link xlink:href="https://github.com/tarantool/tarantool/issues">http://github.com/tarantool/tarantool/issues</link> and enter "RHEL" or "CentOS" or "Fedora" or "Red Hat" in the search box.
     </para>
   </section>
 
   <section xml:id="FreeBSD">
     <title>FreeBSD</title>
     <para>
-        TBA
+        There are no known permanent issues.
+        For transient issues, go to <link xlink:href="https://github.com/tarantool/tarantool/issues">http://github.com/tarantool/tarantool/issues</link> and enter "FreeBSD" in the search box.
     </para>
   </section>
 
   <section xml:id="mac-os-x">
     <title>Mac OS X</title>
     <para>
-        TBA
+        There are no known permanent issues.
+        For transient issues, go to <link xlink:href="https://github.com/tarantool/tarantool/issues">http://github.com/tarantool/tarantool/issues</link> and enter "OS X" in the search box.
     </para>
   </section>
+
+</section>
+
+<section xml:id="authentication">
+
+<title>Authentication and access control</title>
+
+<para>
+Understanding the details of security is primarily an issue for administrators,
+but ordinary users should at least skim this section so that they will have an
+idea of how Tarantool makes it possible for administrators to prevent
+unauthorized access to the database and to certain functions.
+</para>
+
+<para>
+Briefly: there is a method to guarantee with password checks that users really
+are who they say they are ("authentication"). There is a _user space where
+user names and password-hashes are stored. There are functions for saying
+that certain users are allowed to do certain things ("privileges"). There
+is a _priv space where privileges are stored. Whenever a user tries to do
+an operation, there is a check whether the user has the privilege to do
+the operation ("access control").
+</para>
+
+<para>
+<bridgehead renderas="sect4">Passwords</bridgehead>
+Each user may have a password.
+The password is any alphanumeric string.
+Administrators should advise users to choose long unobvious passwords,
+but it is ultimately up to the users to choose or change
+their own passwords.
+</para>
+
+<para>
+Tarantool passwords are stored in the _user space with a
+<link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash">Cryptographic hash function</link>
+so that, if the password is 'x', the stored hashed-password is a long string like
+'lL3OvhkIPOKh+Vn9Avlkx69M/Ck='.
+When a client connects to a Tarantool server, the server sends a random
+<link xlink:href="https://en.wikipedia.org/wiki/Salt_%28cryptography%29">Salt Value</link>
+which the client must mix with the hashed-password before sending
+to the server.
+Thus the original value 'x' is never stored anywhere except in the
+user's head, and the hashed value is never passed passed down a
+network wire except when mixed with a random salt.
+This system prevents malicious onlookers from finding passwords
+by snooping in the log files or snooping on the wire.
+It is the same system that <link xlink:href="http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html">MySQL introduced several years ago</link>
+which has proved adequate for medium-security installations.
+Nevertheless administrators should warn users that no system
+is foolproof against determined long-term attacks, so passwords
+should be guarded and changed occasionally.
+</para>
+
+<para>
+Notes: To get the hash-password of a string 'X', say <code>box.schema.user.password('X')</code>.
+To see more about the details of the algorithm for the purpose of writing a new client application, read 
+<link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/scramble.h">the scramble.h header file</link>.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Users and the _user space</bridgehead>
+The fields in the _user space are:
+a numeric id, a string, the user name, and the optional password.
+</para>
+
+<para>
+There are two special users: 'guest' (user id = 0) and  'admin' (user id = 1).
+They are defined in advance.
+They cannot be dropped.
+(The 'guest' user is a default which usually has minimum privileges;
+the 'admin' user is an administrator which always has maximum privileges.)
+</para>
+
+<para>
+To select a row from the _user space, use <code>box.select</code>.
+For example, here is what happens with a select for user id = 0,
+which is the 'guest' user, without a password:
+<programlisting><prompt>tarantool&gt;</prompt> box.space._user:select{0}
+---
+- - [0, '', 'guest']
+...</programlisting></para>
+
+<para>
+To change tuples in the user space, do not use ordinary <code>box.space</code> functions
+for insert or update or delete -- the _user space is special so
+there are special functions which have appropriate error checking.
+</para>
+
+<para>
+To create a new user, say
+<code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
+or
+<code>box.schema.user.create(<replaceable>user-name</replaceable>', {password=<replaceable>password</replaceable>})</code>.
+</para>
+
+<para>
+To drop a user, say
+<code>box.schema.user.drop(<replaceable>user-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session which creates a new user with
+a strong password, selects from the tuple in
+the _user space, and then drops the user.
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('Elizabeth Browning', {password = 'Iwtso65$SDS?'})
+---
+...
+<prompt>tarantool&gt;</prompt> box.space._user:select{4}
+---
+- - [4, '', 'Elizabeth Browning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.drop('Elizabeth Browning')
+---
+...</programlisting></para>
+
+<para>
+Notes: The maximum number of users is 32.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Privileges and the _priv space</bridgehead>
+The fields in the _priv space are:
+the numeric id of the user who gave the privilege ("grantor_id"),
+the numeric id of the user who received the privilege ("grantee_id"),
+the id of the object,
+the type of object -- "space" or "function" or "universe",
+the type of operation -- "read" or "write" or "execute" or a combination such as "read,write,execute".
+</para>
+
+<para>
+The function for granting a privilege is:
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>
+or
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.
+</para>
+
+<para>
+The function for revoking a privilege is:
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session where the admin user gave
+the guest user the privilege to read from a
+space named space55, and then took the privilege away:
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'read', 'space', 'space55')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.revoke('guest', 'read', 'space', 'space55')
+---
+...</programlisting></para>
+
+<para>
+Notes: Generally privileges are granted or revoked by the owner of the object
+(the user who created it), or by the 'admin' user.
+Before dropping any objects or users, steps should be taken to ensure
+that all their associated privileges have been revoked.
+Only the 'admin' user can grant privileges for the 'universe'.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Functions and the _func space</bridgehead>
+The fields in the _func space are:
+the numeric function id, a number, and the function name.
+</para>
+
+<para>
+The _func space does not include the function's body.
+One continues to create Lua functions in the usual way,
+by saying "<code>function <replaceable>function_name</replaceable> () ... end</code>", without
+adding anything in the _func space. The _func space only
+exists for storing function tuples so that their names
+can be used within grant/revoke functions.
+</para>
+
+<para>
+The function for creating a _func tuple is:
+<code>box.schema.func.create(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+The function for dropping a _func tuple is:
+<code>box.schema.func.drop(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+In the following example, a function named 'f7' is created,
+then it is put in the _func space, then it is used in a
+box.schema.user.grant function, then it is dropped:
+<programlisting><prompt>tarantool&gt;</prompt> function f7() box.session.uid() end
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.func.create('f7')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'execute', 'function', 'f7')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.func.drop('f7')
+---
+...</programlisting></para>
+
+<para>
+<bridgehead renderas="sect4">box.session and security</bridgehead>
+
+After a connection has taken place, the user has access to a "session" object
+which has several functions. The ones which are of interest for security
+purposes are:
+<programlisting>box.session.uid()           #returns the id of the current user
+box.session.user()          #returns the name of the current user
+box.session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
 
 </section>
 
