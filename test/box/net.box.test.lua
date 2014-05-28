@@ -13,8 +13,9 @@ space:get{123}
 remote:select(space.n, 123)
 remote:get(space.n, 123)
 
+internal = require('box.internal')
 function test(...) return box.tuple.new({ 123, 456 }) end
-f, a = box.call_loadproc('test')
+f, a = internal.call_loadproc('test')
 type(f)
 type(a)
 
@@ -26,11 +27,11 @@ remote:call('test', 123, 345, { 678, 910 })
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
 remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
-f, a = box.call_loadproc('test:b')
+f, a = internal.call_loadproc('test:b')
 type(f)
 type(a)
 a.a
-f, a = box.call_loadproc('test.b')
+f, a = internal.call_loadproc('test.b')
 type(f)
 type(a)
 
@@ -41,11 +42,11 @@ remote:call('test:b', 'b', { 'c', { d = 'e' } })
 
 
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
-f, a = box.call_loadproc('test.a:b')
+f, a = internal.call_loadproc('test.a:b')
 type(f)
 type(a)
 a.c
-f, a = box.call_loadproc('test.a.b')
+f, a = internal.call_loadproc('test.a.b')
 type(f)
 type(a)
 

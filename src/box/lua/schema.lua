@@ -41,6 +41,8 @@ local builtin = ffi.C
 local msgpackffi = require('box.msgpackffi')
 local fun = require('fun')
 
+local internal = require('box.internal')
+
 local function user_resolve(user)
     local _user = box.space[box.schema.USER_ID]
     local tuple
@@ -424,10 +426,10 @@ function box.schema.space.bless(space)
         return ret
     end
     index_mt.update = function(index, key, ops)
-        return box._update(index.n, index.id, keify(key), ops);
+        return internal.update(index.n, index.id, keify(key), ops);
     end
     index_mt.delete = function(index, key)
-        return box._delete(index.n, index.id, keify(key));
+        return internal.delete(index.n, index.id, keify(key));
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.n, index.id)
@@ -452,10 +454,10 @@ function box.schema.space.bless(space)
         return space.index[0]:select(key, opts)
     end
     space_mt.insert = function(space, tuple)
-        return box._insert(space.n, tuple);
+        return internal.insert(space.n, tuple);
     end
     space_mt.replace = function(space, tuple)
-        return box._replace(space.n, tuple);
+        return internal.replace(space.n, tuple);
     end
     space_mt.put = space_mt.replace; -- put is an alias for replace
     space_mt.update = function(space, key, ops)

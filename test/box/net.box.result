@@ -49,10 +49,13 @@ remote:get(space.n, 123)
 ---
 - [123, 'test1', 'test2']
 ...
+internal = require('box.internal')
+---
+...
 function test(...) return box.tuple.new({ 123, 456 }) end
 ---
 ...
-f, a = box.call_loadproc('test')
+f, a = internal.call_loadproc('test')
 ---
 ...
 type(f)
@@ -92,7 +95,7 @@ remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 ---
 ...
-f, a = box.call_loadproc('test:b')
+f, a = internal.call_loadproc('test:b')
 ---
 ...
 type(f)
@@ -107,7 +110,7 @@ a.a
 ---
 - a
 ...
-f, a = box.call_loadproc('test.b')
+f, a = internal.call_loadproc('test.b')
 ---
 ...
 type(f)
@@ -137,7 +140,7 @@ remote:call('test:b', 'b', { 'c', { d = 'e' } })
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
 ---
 ...
-f, a = box.call_loadproc('test.a:b')
+f, a = internal.call_loadproc('test.a:b')
 ---
 ...
 type(f)
@@ -152,7 +155,7 @@ a.c
 ---
 - 1
 ...
-f, a = box.call_loadproc('test.a.b')
+f, a = internal.call_loadproc('test.a.b')
 ---
 ...
 type(f)
@@ -201,14 +204,16 @@ remote:call('box.space.tweedledum:select', {123})
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
+- error: '[string "slf, foo = box.call_loadproc(''box.net.self:se..."]:1: attempt
+    to call field ''call_loadproc'' (a nil value)'
 ...
 type(slf)
 ---
-- function
+- nil
 ...
 type(foo)
 ---
-- table
+- nil
 ...
 space:update(123, {{'=', 1, 'test1-updated'}})
 ---
@@ -433,11 +438,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:540: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:541: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:545: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:546: box.net.box: connection
     was closed'
 ...
 space:drop()

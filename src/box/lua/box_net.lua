@@ -4,6 +4,7 @@
 
 local msgpack = require('box.msgpack')
 local boxfiber = require('box.fiber')
+local internal = require('box.internal')
 
 local function keify(key)
     if key == nil then
@@ -252,13 +253,13 @@ box.net = {
     -- local tarantool
     self = {
         process = function(self, ...)
-            return box.process(...)
+            return internal.process(...)
         end,
 
         -- for compatibility with the networked version,
         -- implement call
         call = function(self, proc_name, ...) 
-            local proc = { box.call_loadproc(proc_name) }
+            local proc = { internal.call_loadproc(proc_name) }
             if #proc == 2 then
                 return { proc[1](proc[2], ...) }
             else

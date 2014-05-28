@@ -16,12 +16,7 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - _delete
-  - _insert
-  - _replace
-  - _update
-  - call_loadproc
-  - cfg
+- - cfg
   - coredump
   - counter
   - dostring
@@ -31,7 +26,6 @@ t
   - info
   - net
   - pack
-  - process
   - raise
   - schema
   - slab
