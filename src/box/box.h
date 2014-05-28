@@ -93,9 +93,6 @@ void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
 
 void
-box_set_wal_fsync_delay(double delay);
-
-void
 box_set_replication_source(const char *source);
 
 void box_set_wal_mode(const char *mode);

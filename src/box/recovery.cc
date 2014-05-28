@@ -112,7 +112,7 @@
 
 struct recovery_state *recovery_state;
 
-const char *wal_mode_STRS[] = { "none", "write", "fsync", "fsync_delay", NULL };
+const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 /* {{{ LSN API */
 
@@ -175,7 +175,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
 	struct recovery_state *r = recovery_state;
 	recovery_update_mode(r, WAL_NONE);
-	recovery_update_fsync_delay(r, 0);
 
 	assert(rows_per_wal > 1);
 
@@ -222,18 +221,6 @@ recovery_update_mode(struct recovery_state *r, enum wal_mode mode)
 {
 	assert(mode < WAL_MODE_MAX);
 	r->wal_mode = mode;
-}
-
-void
-recovery_update_fsync_delay(struct recovery_state *r, double new_delay)
-{
-	/* No mutex lock: let's not bother with whether
-	 * or not a WAL writer thread is present, and
-	 * if it's present, the delay will be propagated
-	 * to it whenever there is a next lock/unlock of
-	 * wal_writer->mutex.
-	 */
-	r->wal_fsync_delay = new_delay;
 }
 
 void
@@ -1120,27 +1107,6 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 	return l ? 0 : -1;
 }
 
-static void
-wal_opt_sync(struct log_io *wal, double sync_delay)
-{
-	static ev_tstamp last_sync = 0;
-
-	if (sync_delay <= 0)
-		return;
-
-	/* Don't use ev_now() since it requires a working event loop. */
-	ev_tstamp now = ev_time();
-	if (now - last_sync >= sync_delay) {
-		/*
-		 * XXX: in case of error, we don't really know how
-		 * many records were not written to disk: probably
-		 * way more than the last one.
-		 */
-		(void) log_io_sync(wal);
-		last_sync = now;
-	}
-}
-
 static struct wal_write_request *
 wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	       struct wal_write_request *req, struct vclock *vclock)
@@ -1201,7 +1167,6 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 					    &writer->vclock);
 		if (batch_end != write_end)
 			break;
-		wal_opt_sync(*wal, r->wal_fsync_delay);
 		req = write_end;
 	}
 	STAILQ_SPLICE(input, write_end, wal_fifo_entry, rollback);

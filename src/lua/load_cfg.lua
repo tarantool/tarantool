@@ -4,7 +4,6 @@ local ffi = require('ffi')
 ffi.cdef([[
 void load_cfg();
 void box_set_wal_mode(const char *mode);
-void box_set_wal_fsync_delay(double);
 void box_set_replication_source(const char *source);
 void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
@@ -46,7 +45,6 @@ local default_cfg = {
 -- dynamically settable options
 local dynamic_cfg = {
     wal_mode                = ffi.C.box_set_wal_mode,
-    wal_fsync_delay         = ffi.C.box_set_wal_fsync_delay,
     replication_source      = ffi.C.box_set_replication_source,
     log_level               = ffi.C.box_set_log_level,
     io_collect_interval     = ffi.C.box_set_io_collect_interval,

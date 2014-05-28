@@ -33,7 +33,6 @@ void *ffi_symbols[] = {
 	(void *) tarantool_lua_interactive,
 	(void *) tarantool_error_message,
 	(void *) load_cfg,
-	(void *) box_set_wal_fsync_delay,
 	(void *) box_set_replication_source,
 	(void *) box_set_wal_mode,
 	(void *) box_set_log_level,

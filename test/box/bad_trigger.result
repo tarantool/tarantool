@@ -9,12 +9,11 @@ function f1() nosuchfunction() end
 box.session.on_connect(f1)
 ---
 ...
-select * from t0 where k0=0
----
-- error:
-    errcode: ER_PROC_LUA
-    errmsg: [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
-...
+greeting:  True
+fixheader:  True
+error code: 8194
+error message:  [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
+eof: True
 box.session.on_connect(nil, f1)
 ---
 ...
