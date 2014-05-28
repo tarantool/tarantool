@@ -23,7 +23,7 @@ _space:insert{'hello', 'world', 'test'}
 - error: 'Tuple field 0 type does not match one required by operation: expected NUM'
 ...
 --
--- Can't create a space which has wrong arity - arity must be NUM
+-- Can't create a space which has wrong field count - field_count must be NUM
 --
 _space:insert{_space.n, ADMIN, 'test', 'world'}
 ---
@@ -91,7 +91,7 @@ space.n
 ---
 - 321
 ...
-space.arity
+space.field_count
 ---
 - 0
 ...

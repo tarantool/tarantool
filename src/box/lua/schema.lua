@@ -84,8 +84,8 @@ box.schema.space.create = function(name, options)
             id = id + 1
         end
     end
-    if options.arity == nil then
-        options.arity = 0
+    if options.field_count == nil then
+        options.field_count = 0
     end
     local uid = nil
     if options.user then
@@ -94,7 +94,7 @@ box.schema.space.create = function(name, options)
     if uid == nil then
         uid = box.session.uid()
     end
-    _space:insert{id, uid, name, engine, options.arity, temporary}
+    _space:insert{id, uid, name, engine, options.field_count, temporary}
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create
@@ -501,9 +501,9 @@ function box.schema.space.bless(space)
             local state, t
             for state, t in pk:pairs() do
                 local key = {}
-                -- ipairs does not work because pk.key_field is zero-indexed
-                for _k2, key_field in pairs(pk.key_field) do
-                    table.insert(key, t[key_field.fieldno])
+                -- ipairs does not work because pk.parts is zero-indexed
+                for _k2, parts in pairs(pk.parts) do
+                    table.insert(key, t[parts.fieldno])
                 end
                 space:delete(key)
             end

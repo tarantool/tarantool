@@ -67,7 +67,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 15 */_(ER_LAST_DROP,			2, "Can't drop the primary key in a system space, space id %u") \
 	/* 16 */_(ER_TUPLE_FORMAT_LIMIT,	2, "Tuple format limit reached: %u") \
 	/* 17 */_(ER_DROP_PRIMARY_KEY,		2, "Can't drop primary key in space %u while secondary keys exist") \
-	/* 18 */_(ER_KEY_FIELD_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
+	/* 18 */_(ER_KEY_PART_TYPE,		2, "Supplied key type of part %u does not match index part type: expected %s") \
 	/* 19 */_(ER_EXACT_MATCH,		2, "Invalid key part count in an exact match (expected %u, got %u)") \
 	/* 20 */_(ER_INVALID_MSGPACK,		2, "Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			2, "msgpack.encode: can not encode Lua type '%s'") \
@@ -87,8 +87,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
-	/* 38 */_(ER_SPACE_ARITY,		2, "Tuple field count %u does not match space %u arity %u") \
-	/* 39 */_(ER_INDEX_ARITY,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
+	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space %u field count %u") \
+	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found") \
 	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \

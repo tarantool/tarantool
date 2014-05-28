@@ -202,7 +202,7 @@ uint32_t
 space_size(struct space *space);
 
 /**
- * Check that the tuple has correct arity and correct field
+ * Check that the tuple has correct field count and correct field
  * types (a pre-requisite for an INSERT).
  */
 void

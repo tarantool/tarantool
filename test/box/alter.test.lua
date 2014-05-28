@@ -11,7 +11,7 @@ _space:insert{_space.n, ADMIN, 'test', 5 }
 --
 _space:insert{'hello', 'world', 'test'}
 --
--- Can't create a space which has wrong arity - arity must be NUM
+-- Can't create a space which has wrong field count - field_count must be NUM
 --
 _space:insert{_space.n, ADMIN, 'test', 'world'}
 --
@@ -42,7 +42,7 @@ t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 -- Check that a space exists
 space = box.space[t[0]]
 space.n
-space.arity
+space.field_count
 space.index[0]
 --
 -- check dml - the space has no indexes yet, but must not crash on DML
