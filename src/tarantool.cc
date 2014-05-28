@@ -528,6 +528,19 @@ main(int argc, char **argv)
 #endif
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
+		if (argc == 2 && argv[1][0] != '-') {
+			/*
+			 * Somebody made a mistake in the file
+			 * name. Be nice: open the file to set
+			 * errno.
+			 */
+			int fd = open(argv[1], O_RDONLY);
+			int save_errno = errno;
+			if (fd >= 0)
+				close(fd);
+			printf("Can't open script %s: %s\n", argv[1], strerror(save_errno));
+			return save_errno;
+		}
 		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 		if (gopt(opt, 'V')) {
 			printf("Tarantool %s\n", tarantool_version());
