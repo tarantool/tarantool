@@ -289,10 +289,10 @@ space_build_all_keys(struct space *space)
 void
 space_validate_tuple(struct space *sp, struct tuple *new_tuple)
 {
-	uint32_t arity = tuple_arity(new_tuple);
-	if (sp->def.arity > 0 && sp->def.arity != arity)
-		tnt_raise(ClientError, ER_SPACE_ARITY,
-			  arity, sp->def.id, sp->def.arity);
+	uint32_t field_count = tuple_field_count(new_tuple);
+	if (sp->def.field_count > 0 && sp->def.field_count != field_count)
+		tnt_raise(ClientError, ER_SPACE_FIELD_COUNT,
+			  field_count, sp->def.id, sp->def.field_count);
 }
 
 void

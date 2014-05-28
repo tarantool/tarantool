@@ -87,8 +87,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
-	/* 38 */_(ER_SPACE_ARITY,		2, "Tuple field count %u does not match space %u arity %u") \
-	/* 39 */_(ER_INDEX_ARITY,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
+	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space %u field count %u") \
+	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found") \
 	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \

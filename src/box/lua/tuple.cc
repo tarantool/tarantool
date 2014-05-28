@@ -126,27 +126,27 @@ lbox_tuple_slice(struct lua_State *L)
 	if (argc == 0 || argc > 2)
 		luaL_error(L, "tuple.slice(): bad arguments");
 
-	uint32_t arity = tuple_arity(tuple);
+	uint32_t field_count = tuple_field_count(tuple);
 	offset = lua_tointeger(L, 2);
-	if (offset >= 0 && offset < arity) {
+	if (offset >= 0 && offset < field_count) {
 		start = offset;
-	} else if (offset < 0 && -offset <= arity) {
-		start = offset + arity;
+	} else if (offset < 0 && -offset <= field_count) {
+		start = offset + field_count;
 	} else {
 		return luaL_error(L, "tuple.slice(): start >= field count");
 	}
 
 	if (argc == 2) {
 		offset = lua_tointeger(L, 3);
-		if (offset > 0 && offset <= arity) {
+		if (offset > 0 && offset <= field_count) {
 			end = offset;
-		} else if (offset < 0 && -offset < arity) {
-			end = offset + arity;
+		} else if (offset < 0 && -offset < field_count) {
+			end = offset + field_count;
 		} else {
 			return luaL_error(L, "tuple.slice(): end > field count");
 		}
 	} else {
-		end = arity;
+		end = field_count;
 	}
 	if (end <= start)
 		return luaL_error(L, "tuple.slice(): start must be less than end");
@@ -155,7 +155,7 @@ lbox_tuple_slice(struct lua_State *L)
 	tuple_rewind(&it, tuple);
 	const char *field;
 
-	assert(start < arity);
+	assert(start < field_count);
 	uint32_t field_no = start;
 	field = tuple_seek(&it, start);
 	while (field && field_no < end) {
@@ -227,29 +227,29 @@ lbox_tuple_transform(struct lua_State *L)
 	if (argc < 3)
 		luaL_error(L, "tuple.transform(): bad arguments");
 	lua_Integer offset = lua_tointeger(L, 2);  /* Can be negative and can be > INT_MAX */
-	lua_Integer field_count = lua_tointeger(L, 3);
+	lua_Integer len = lua_tointeger(L, 3);
 
-	uint32_t arity = tuple_arity(tuple);
+	uint32_t field_count = tuple_field_count(tuple);
 	/* validate offset and len */
 	if (offset < 0) {
-		if (-offset > arity)
+		if (-offset > field_count)
 			luaL_error(L, "tuple.transform(): offset is out of bound");
-		offset += arity;
-	} else if (offset > arity) {
-		offset = arity;
+		offset += field_count;
+	} else if (offset > field_count) {
+		offset = field_count;
 	}
-	if (field_count < 0)
+	if (len < 0)
 		luaL_error(L, "tuple.transform(): len is negative");
-	if (field_count > arity - offset)
-		field_count = arity - offset;
+	if (len > field_count - offset)
+		len = field_count - offset;
 
-	assert(offset + field_count <= arity);
+	assert(offset + len <= field_count);
 
 	/*
 	 * Calculate the number of operations and length of UPDATE expression
 	 */
 	uint32_t op_cnt = 0;
-	if (offset < arity && field_count > 0)
+	if (offset < field_count && len > 0)
 		op_cnt++;
 	if (argc > 3)
 		op_cnt += argc - 3;
@@ -267,11 +267,11 @@ lbox_tuple_transform(struct lua_State *L)
 	 */
 	struct tbuf *b = tbuf_new(&fiber()->gc);
 	luamp_encode_array(b, op_cnt);
-	if (field_count > 0) {
+	if (len > 0) {
 		luamp_encode_array(b, 3);
 		luamp_encode_str(b, "#", 1);
 		luamp_encode_uint(b, offset);
-		luamp_encode_uint(b, field_count);
+		luamp_encode_uint(b, len);
 	}
 
 	for (int i = argc ; i > 3; i--) {

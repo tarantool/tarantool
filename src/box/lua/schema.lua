@@ -84,8 +84,8 @@ box.schema.space.create = function(name, options)
             id = id + 1
         end
     end
-    if options.arity == nil then
-        options.arity = 0
+    if options.field_count == nil then
+        options.field_count = 0
     end
     local uid = nil
     if options.user then
@@ -94,7 +94,7 @@ box.schema.space.create = function(name, options)
     if uid == nil then
         uid = box.session.uid()
     end
-    _space:insert{id, uid, name, engine, options.arity, temporary}
+    _space:insert{id, uid, name, engine, options.field_count, temporary}
     return box.space[id], "created"
 end
 box.schema.create_space = box.schema.space.create

@@ -80,32 +80,32 @@ s:drop()
 s = box.schema.create_space('test', { id = 256 })
 s.n
 s:drop()
-s = box.schema.create_space('test', { arity = 2 })
-s.arity
+s = box.schema.create_space('test', { field_count = 2 })
+s.field_count
 s:create_index('primary')
--- arity actually works
+-- field_count actually works
 s:insert{1}
 s:insert{1, 2}
 s:insert{1, 2, 3}
 s:select{}
-ARITY = 4
--- increase arity -- error
+FIELD_COUNT = 4
+-- increase field_count -- error
 
-box.space['_space']:update(s.n, {{"=", ARITY, 3}})
+box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
 s:select{}
--- decrease arity - error
-box.space['_space']:update(s.n, {{"=", ARITY, 1}})
--- remove arity - ok
-box.space['_space']:update(s.n, {{"=", ARITY, 0}})
+-- decrease field_count - error
+box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 1}})
+-- remove field_count - ok
+box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 0}})
 s:select{}
--- increase arity - error
-box.space['_space']:update(s.n, {{"=", ARITY, 3}})
+-- increase field_count - error
+box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
 s:truncate()
 s:select{}
--- set arity of an empty space
-box.space['_space']:update(s.n, {{"=", ARITY, 3}})
+-- set field_count of an empty space
+box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
 s:select{}
--- arity actually works
+-- field_count actually works
 s:insert{3, 4}
 s:insert{3, 4, 5}
 s:insert{3, 4, 5, 6}

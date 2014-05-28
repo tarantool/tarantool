@@ -95,8 +95,8 @@ static void
 lbox_fillspace(struct lua_State *L, struct space *space, int i)
 {
 	/* space.arity */
-	lua_pushstring(L, "arity");
-	lua_pushnumber(L, space->def.arity);
+	lua_pushstring(L, "field_count");
+	lua_pushnumber(L, space->def.field_count);
 	lua_settable(L, i);
 
 	/* space.n */

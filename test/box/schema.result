@@ -14,7 +14,7 @@ t
   - 'engine: memtx'
   - 'enabled: true'
   - 'name: tweedledum'
-  - 'arity: 0'
+  - 'field_count: 0'
 ...
 box.space[300] = 1
 ---

@@ -18,7 +18,7 @@ struct tuple
 void
 tuple_ref(struct tuple *tuple, int count);
 uint32_t
-tuple_arity(const struct tuple *tuple);
+tuple_field_count(const struct tuple *tuple);
 const char *
 tuple_field(const struct tuple *tuple, uint32_t i);
 
@@ -183,7 +183,7 @@ end
 
 ffi.metatype('struct tuple', {
     __len = function(tuple)
-        return builtin.tuple_arity(tuple)
+        return builtin.tuple_field_count(tuple)
     end;
     __tostring = function(tuple)
         -- Unpack tuple, call yaml.encode, remove yaml header and footer
