@@ -19,7 +19,6 @@ t
 - - cfg
   - coredump
   - counter
-  - dostring
   - errinj
   - error
   - index
@@ -367,19 +366,19 @@ tonumber64(-1.0)
 ---
 - -1
 ...
---  box.dostring()
-box.dostring('abc')
+--  dostring()
+dostring('abc')
 ---
 - error: '[string "abc"]:1: ''='' expected near ''<eof>'''
 ...
-box.dostring('abc=2')
+dostring('abc=2')
 ---
 ...
-box.dostring('return abc')
+dostring('return abc')
 ---
 - 2
 ...
-box.dostring('return ...', 1, 2, 3)
+dostring('return ...', 1, 2, 3)
 ---
 - 1
 - 2

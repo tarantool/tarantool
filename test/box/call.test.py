@@ -14,7 +14,7 @@ sql("call f1()")
 
 # A test case for https://github.com/tarantool/tarantool/issues/44
 # IPROTO required!
-sql("call box.dostring('box.raise(33333, \"Hey!\")')")
+sql("call dostring('box.raise(33333, \"Hey!\")')")
 
 print """
 # A test case for Bug#103491

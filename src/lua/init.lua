@@ -19,3 +19,11 @@ end
 pcall = function(fun, ...)
     return pcall_wrap(pcall_lua(fun, ...))
 end
+
+dostring = function(s, ...)
+    local chunk, message = loadstring(s)
+    if chunk == nil then
+        error(message, 2)
+    end
+    return chunk(...)
+end

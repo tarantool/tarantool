@@ -4,7 +4,6 @@ include_directories(${SOPHIA_INCLUDE_DIR})
 
 set(lua_sources)
 lua_source(lua_sources lua/schema.lua)
-lua_source(lua_sources lua/box.lua)
 lua_source(lua_sources lua/box_net.lua)
 lua_source(lua_sources lua/misc.lua)
 lua_source(lua_sources lua/tuple.lua)
