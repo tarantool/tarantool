@@ -109,7 +109,7 @@ remote:call('box.fiber.sleep', .01)
 remote:timeout(0.01):call('box.fiber.sleep', 10)
 
 --# setopt delimiter ';'
-pstart = box.time();
+pstart = box.fiber.time();
 parallel = {};
 function parallel_foo(id)
     box.fiber.sleep(math.random() * .05)
@@ -137,7 +137,7 @@ end;
 --# setopt delimiter ''
 parallel
 #parallel
-box.time() - pstart < 0.5
+box.fiber.time() - pstart < 0.5
 
 
 

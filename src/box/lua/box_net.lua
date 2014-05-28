@@ -4,6 +4,7 @@
 
 local ipc = require('box.ipc');
 local msgpack = require('box.msgpack')
+local boxfiber = require('box.fiber')
 
 local function keify(key)
     if key == nil then
@@ -338,7 +339,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
 
         process = function(self, op, request)
-            local started = box.time()
+            local started = boxfiber.time()
             local timeout = self.request_timeout
             self.request_timeout = nil
 
@@ -358,7 +359,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return nil
                 end
 
-                timeout = timeout - (box.time() - started)
+                timeout = timeout - (boxfiber.time() - started)
             else
                 self.processing.wch:put(request)
             end
@@ -468,7 +469,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         break
                     end
                     -- timeout between reconnect attempts
-                    require('box.fiber').sleep(self.reconnect_timeout)
+                    boxfiber.sleep(self.reconnect_timeout)
                 end
 
                 -- wakeup write fiber
@@ -556,8 +557,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
     setmetatable( remote, { __index = box.net.box } )
 
-    remote.irfiber = require('box.fiber').wrap(remote.rfiber, remote)
-    remote.iwfiber = require('box.fiber').wrap(remote.wfiber, remote)
+    remote.irfiber = boxfiber.wrap(remote.rfiber, remote)
+    remote.iwfiber = boxfiber.wrap(remote.wfiber, remote)
 
     remote.rpc = { r = remote }
     setmetatable(remote.rpc, { __index = rpc_index })

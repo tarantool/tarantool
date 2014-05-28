@@ -3,7 +3,7 @@ function index_random_test(space, index_no)
 	-- clear the space
 	space:truncate()
 	-- randomize
-	math.randomseed(box.time())
+	math.randomseed(os.time())
 	-- insert values into the index
 	for k=1,COUNT,1 do space:insert{k}  end
 	-- delete some values from the index

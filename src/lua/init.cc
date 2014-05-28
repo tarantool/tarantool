@@ -79,8 +79,6 @@ static const char *lua_modules[] = { "box.msgpackffi", msgpackffi_lua,
  * {{{ box Lua library: common functions
  */
 
-const char *boxlib_name = "box";
-
 uint64_t
 tarantool_lua_tointeger64(struct lua_State *L, int idx)
 {
@@ -118,31 +116,6 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 
 	return result;
 }
-
-/** Report libev time (cheap). */
-static int
-lbox_time(struct lua_State *L)
-{
-	lua_pushnumber(L, ev_now(loop()));
-	return 1;
-}
-
-/** Report libev time as 64-bit integer */
-static int
-lbox_time64(struct lua_State *L)
-{
-	luaL_pushnumber64(L, (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 ) );
-	return 1;
-}
-
-/**
- * descriptor for box methods
- */
-static const struct luaL_reg boxlib[] = {
-	{"time", lbox_time},
-	{"time64", lbox_time64},
-	{NULL, NULL}
-};
 
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
@@ -277,9 +250,6 @@ tarantool_lua_init()
 	 */
 	tarantool_lua_setpath(L, "path", MODULE_LUAPATH, NULL);
 	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
-
-	luaL_register(L, boxlib_name, boxlib);
-	lua_pop(L, 1);
 
 	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);

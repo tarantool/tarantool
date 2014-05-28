@@ -218,7 +218,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:310: Socket option SO_ACCEPTCONN
+- error: '[string "-- bsdsocket.lua (internal file)..."]:311: Socket option SO_ACCEPTCONN
     is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32

@@ -769,6 +769,22 @@ lbox_fiber_testcancel(struct lua_State *L)
 	return 0;
 }
 
+/** Report libev time (cheap). */
+static int
+lbox_fiber_time(struct lua_State *L)
+{
+	lua_pushnumber(L, ev_now(loop()));
+	return 1;
+}
+
+/** Report libev time as 64-bit integer */
+static int
+lbox_fiber_time64(struct lua_State *L)
+{
+	luaL_pushnumber64(L, (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 ) );
+	return 1;
+}
+
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
@@ -793,6 +809,8 @@ static const struct luaL_reg fiberlib[] = {
 	{"status", lbox_fiber_status},
 	{"name", lbox_fiber_name},
 	{"detach", lbox_fiber_detach},
+	{"time", lbox_fiber_time},
+	{"time64", lbox_fiber_time64},
 	{NULL, NULL}
 };
 

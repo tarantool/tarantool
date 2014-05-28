@@ -341,7 +341,7 @@ remote:timeout(0.01):call('box.fiber.sleep', 10)
 - null
 ...
 --# setopt delimiter ';'
-pstart = box.time();
+pstart = box.fiber.time();
 ---
 ...
 parallel = {};
@@ -407,7 +407,7 @@ parallel
 ---
 - 20
 ...
-box.time() - pstart < 0.5
+box.fiber.time() - pstart < 0.5
 ---
 - true
 ...
@@ -433,11 +433,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:540: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:541: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:545: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:546: box.net.box: connection
     was closed'
 ...
 space:drop()

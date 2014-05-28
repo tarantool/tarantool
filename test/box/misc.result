@@ -38,8 +38,6 @@ t
   - snapshot
   - space
   - stat
-  - time
-  - time64
   - tuple
   - unpack
   - uuid

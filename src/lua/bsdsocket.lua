@@ -7,6 +7,7 @@ local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local ffi = require 'ffi'
 local boxerrno = require('box.errno')
 local internal = require('box.socket.internal')
+local boxfiber = require('box.fiber')
 
 ffi.cdef[[
     typedef uint32_t socklen_t;
@@ -507,14 +508,14 @@ socket_methods.read = function(self, size, timeout)
     end
 
     while timeout > 0 do
-        local started = box.time()
+        local started = boxfiber.time()
         
         if not self:readable(timeout) then
             self._errno = boxerrno()
             return nil
         end
         
-        timeout = timeout - ( box.time() - started )
+        timeout = timeout - (boxfiber.time() - started )
 
         local data = self:sysread(4096)
         if data ~= nil then
@@ -596,16 +597,16 @@ socket_methods.readline = function(self, limit, eol, timeout)
         return data
     end
 
-    local started = box.time()
+    local started = boxfiber.time()
     while timeout > 0 do
-        local started = box.time()
+        local started = boxfiber.time()
         
         if not self:readable(timeout) then
             self._errno = boxerrno()
             return nil
         end
         
-        timeout = timeout - ( box.time() - started )
+        timeout = timeout - ( boxfiber.time() - started )
 
         local data = self:sysread(4096)
         if data ~= nil then
@@ -639,9 +640,9 @@ socket_methods.write = function(self, octets, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
-    local started = box.time()
+    local started = boxfiber.time()
     while timeout > 0 and self:writable(timeout) do
-        timeout = timeout - ( box.time() - started )
+        timeout = timeout - ( boxfiber.time() - started )
 
         local written = self:syswrite(octets)
         if written == nil then
