@@ -1,7 +1,6 @@
-box.ipc = require('box.ipc')
-box.fiber = require('box.fiber')
+boxfiber = require('box.fiber')
 
-ch = box.ipc.channel()
+ch = boxfiber.channel()
 ch:is_full()
 ch:is_empty()
 ch:get(.1)
@@ -16,15 +15,13 @@ ch:is_full()
 ch:is_empty()
 buffer = {}
 --# setopt delimiter ';'
-tfbr = box.fiber.create(
+tfbr = boxfiber.wrap(
     function()
-        box.fiber.detach()
         while true do
             table.insert(buffer, ch:get())
         end
     end
 );
-box.fiber.resume(tfbr);
 t = {};
 for i = 1, 10 do
     table.insert(t, {i, ch:put(i, 0.1)})
@@ -33,7 +30,7 @@ end;
 t
 ch:has_readers()
 ch:has_writers()
-box.fiber.cancel(tfbr)
+boxfiber.cancel(tfbr)
 
 ch:has_readers()
 ch:has_writers()
@@ -51,18 +48,16 @@ ch:get()
 ch:is_full()
 ch:is_empty()
 --# setopt delimiter ';'
-tfbr = box.fiber.create(
+tfbr = boxfiber.wrap(
     function()
-        box.fiber.detach()
         while true do
             local v = ch:get()
             table.insert(buffer, {'tfbr', tostring(v)})
         end
     end
 );
-tfbr2 = box.fiber.create(
+tfbr2 = boxfiber.wrap(
     function()
-        box.fiber.detach()
         while true do
             local v = ch:get()
             table.insert(buffer, {'tfbr2', tostring(v)})
@@ -70,8 +65,6 @@ tfbr2 = box.fiber.create(
     end
 );
 --# setopt delimiter ''
-box.fiber.resume(tfbr)
-box.fiber.resume(tfbr2)
 
 buffer = {}
 
@@ -89,10 +82,10 @@ for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
 buffer
 
-ch = box.ipc.channel(1)
+ch = boxfiber.channel(1)
 ch:is_closed()
 passed = false
-type(box.fiber.wrap(function() if ch:get() == nil then passed = true end end))
+type(boxfiber.wrap(function() if ch:get() == nil then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -100,11 +93,11 @@ ch:get()
 ch:put(10)
 ch:is_closed()
 
-ch = box.ipc.channel(1)
+ch = boxfiber.channel(1)
 ch:put(true)
 ch:is_closed()
 passed = false
-type(box.fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+type(boxfiber.wrap(function() if ch:put(true) == false then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -119,25 +112,25 @@ chs= {}
 count= 0
 res= { }
 --# setopt delimiter ';'
-for i = 1, 10 do table.insert(chs, box.ipc.channel()) end;
+for i = 1, 10 do table.insert(chs, boxfiber.channel()) end;
 
 
 for i = 1, 10 do
-    local no = i box.fiber.wrap(
+    local no = i boxfiber.wrap(
         function()
-            box.fiber.self():name('pusher')
+            boxfiber.self():name('pusher')
             while true do
                 chs[no]:put({no})
-                box.fiber.sleep(0.001 * math.random())
+                boxfiber.sleep(0.001 * math.random())
             end
         end
     )
 end;
 
 for i = 1, 10 do
-    local no = i box.fiber.wrap(
+    local no = i boxfiber.wrap(
         function()
-            box.fiber.self():name('receiver')
+            boxfiber.self():name('receiver')
             while true do
                 local r = chs[no]:get(math.random() * .001)
                 if r ~= nil and r[1] == no then
@@ -145,7 +138,7 @@ for i = 1, 10 do
                 elseif r ~= nil then
                     break
                 end
-                box.fiber.sleep(0.001 * math.random())
+                boxfiber.sleep(0.001 * math.random())
                 count = count + 1
             end
             res[no] = false
@@ -153,10 +146,8 @@ for i = 1, 10 do
     )
 end;
 
-for i = 1, 100 do box.fiber.sleep(0.01) if count > 2000 then break end end;
+for i = 1, 100 do boxfiber.sleep(0.01) if count > 2000 then break end end;
 
 count > 2000, #res, res;
 
 --# setopt delimiter ''
-box.ipc = nil
-box.fiber = nil

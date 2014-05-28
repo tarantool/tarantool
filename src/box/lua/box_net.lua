@@ -2,7 +2,6 @@
 
 (function()
 
-local ipc = require('box.ipc');
 local msgpack = require('box.msgpack')
 local boxfiber = require('box.fiber')
 
@@ -330,10 +329,10 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end,
 
             -- write channel
-            wch = ipc.channel(1),
+            wch = boxfiber.channel(1),
 
             -- ready socket channel
-            rch = ipc.channel(1),
+            rch = boxfiber.channel(1),
         },
 
 
@@ -345,7 +344,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
-            self.processing[sync] = ipc.channel(1)
+            self.processing[sync] = boxfiber.channel(1)
             local header = msgpack.encode{
                     [box.net.box.TYPE] = op, [box.net.box.SYNC] = sync
             }

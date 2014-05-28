@@ -39,7 +39,7 @@ extern "C" {
 #include <ipc.h>
 #include "lua/utils.h"
 
-static const char channel_lib[]   = "box.ipc.channel";
+static const char channel_lib[]   = "box.fiber.channel";
 
 #define BROADCAST_MASK	(((size_t)1) << (CHAR_BIT * sizeof(size_t) - 1))
 
@@ -56,7 +56,7 @@ lbox_ipc_channel(struct lua_State *L)
 
 		size = lua_tointeger(L, -1);
 		if (size < 0)
-			luaL_error(L, "box.channel(size): negative size");
+			luaL_error(L, "fiber.channel(size): negative size");
 	}
 	struct ipc_channel *ch = ipc_channel_new(size);
 	if (!ch)
@@ -276,6 +276,6 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "box.ipc", ipc_meta);
+	luaL_register_module(L, "box.fiber", ipc_meta);
 	lua_pop(L, 1);
 }
