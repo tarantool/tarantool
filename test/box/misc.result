@@ -34,8 +34,6 @@ t
   - stat
   - tuple
   - unpack
-  - uuid
-  - uuid_hex
 ...
 t = nil
 ---
