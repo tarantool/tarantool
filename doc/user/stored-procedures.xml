@@ -3629,7 +3629,7 @@ end
                connection object named <code>box.net.self</code>.
                Its purpose is to make polymorphic use of the
                <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 3301)</code> can
+               <code>conn = box.net.box.new('localhost', 3303)</code> can
                be replaced by <code>conn = box.net.box.self</code>.
                However, there is an important difference between the embedded
                connection and a remote one. With the embedded connection,
@@ -3644,7 +3644,7 @@ end
                Returns: (type = userdata) conn object).
             </para>
             <para>
-               Example: <code>conn = box.net.box.new('localhost', 3301)</code>.
+               Example: <code>conn = box.net.box.new('localhost', 3303)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3788,7 +3788,7 @@ end
  This example will work with the sandbox configuration described in the preface.
  That is, there is a space named space0 with a numeric primary key.
  Assume that the database is nearly empty.
- Assume that the tarantool server is running on localhost 127.0.0.1:3301.
+ Assume that the tarantool server is running on localhost 127.0.0.1:3303.
 <programlisting>
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
@@ -3799,13 +3799,13 @@ end
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3301 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3301 = default')</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303 = default')</userinput>
 <prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3301')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3301)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.n, {800, 'data'})</userinput>
@@ -3833,7 +3833,7 @@ end
 ---
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 3301 = default
+  - The local server primary port number = 3303 = default
   - conn:delete done on space0.
   - conn:insert done on space0, index 0
   - '  primary key value = 800.'
@@ -3873,7 +3873,7 @@ tarantool> <userinput>box.cfg</userinput>
   panic_on_wal_error = false
   slab_alloc_factor = 2
   slab_alloc_minimal = 64
-  admin_port = 33015
+  admin_port = 3313
   logger = cat - >> tarantool.log
   ...
 ...

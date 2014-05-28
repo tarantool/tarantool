@@ -225,6 +225,7 @@ A C/C++ compiler.
    <para>
 A program for managing the build process.
 	This is always <productname>CMake</productname> for GNU/Linux and FreeBSD.
+ The CMake version should be 2.8 or later.
  </para>
  </listitem>
  </itemizedlist>
@@ -532,7 +533,7 @@ You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop tarantool: <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
-To stop tarantool (a cleaner alternative): <computeroutput>os.exit()</computeroutput>.
+To stop tarantool (an alternative): <computeroutput>os.exit()</computeroutput>.
 To stop tarantool (from another terminal): <computeroutput><command>sudo pkill</command> -f tarantool</computeroutput>.
 To destroy the test: <computeroutput><command>rm</command> -r ~/tarantool_sandbox</computeroutput>.
 </para>
@@ -610,7 +611,7 @@ inserted and selected tuples.
     Old syntax box.space.name:X() no longer exists.
     Old syntax box.X() no longer exists.
     New syntax is
-    box.space.<replaceable>space_name(</replaceable>:X<replaceable>Lua-table</replaceable>).
+    box.space.<replaceable>space_name(</replaceable>:<replaceable>Lua-table</replaceable>).
     Example: box.space.t0:insert{0,'Hello'}
     Minor properties of a space (for example the name) can be altered without rebuild.
     All properties of an index can be altered without rebuild.
