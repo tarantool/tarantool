@@ -539,7 +539,10 @@ aexitst( boxsocket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
 ---
 - true
 ...
-#(boxsocket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+wrong_addr = boxsocket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+---
+...
+wrong_addr == nil or #wrong_addr == 0
 ---
 - true
 ...

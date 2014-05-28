@@ -51,7 +51,7 @@ class AppServer(Server):
             return answer
 
         test_suite.tests = [AppTest(k, test_suite.args, test_suite.ini) for
-    k in sorted(glob.glob(os.path.join(suite_path, "*.lua" )))]
+    k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua" )))]
         test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), test_suite.tests), [])
 
     def print_log(self, lines):

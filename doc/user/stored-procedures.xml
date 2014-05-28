@@ -33,10 +33,10 @@
 </blockquote>
     <para>
       Procedures can be defined and invoked interactively, for example::
-      <programlisting><computeroutput>localhost> <userinput>function f1() return 'hello' end</userinput>
+      <programlisting><computeroutput>tarantool> <userinput>function f1() return 'hello' end</userinput>
 ---
 ...
-localhost> <userinput>f1()</userinput>
+tarantool> <userinput>f1()</userinput>
 ---
 - hello
 ...
@@ -47,18 +47,18 @@ localhost> <userinput>f1()</userinput>
       using the text or binary protocol, for evaluation as a chunk of Lua code.
     </para>
     <para>
-      Thus, the request "<code>function f1() return 'hello' end</code>" sends over
+      Thus, the request "<code>function f1() return 'hello' end</code>"
       causes definition of the Lua function which will be identified as f1().
       Then the request "<code>f1()</code>" causes execution of
       the function. The function returns a string 'hello', which gets displayed.
     </para>
     <para>
       It's possible to execute any chunk of Lua code, not just invoke functions ...
-    <programlisting><computeroutput>localhost> <userinput>1 + 2</userinput>
+    <programlisting><computeroutput>tarantool> <userinput>1 + 2</userinput>
 ---
  - 3
 ...
-localhost> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput>
+tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput>
 ---
  - hello world
 ...
@@ -163,15 +163,15 @@ function f1(a)
     return type(a), s
 end
 kostja@atlas:~<prompt>$</prompt> <userinput>tarantool</userinput>
-localhost> <userinput>dofile('arg.lua')</userinput>
+tarantool> <userinput>dofile('arg.lua')</userinput>
 ---
 ...
-localhost> <userinput>f1('1234')</userinput>
+tarantool> <userinput>f1('1234')</userinput>
 ---
  - string
  - 0x31 0x32 0x33 0x34
 ...
-localhost> <userinput>f1(1234)</userinput>
+tarantool> <userinput>f1(1234)</userinput>
 ---
  - number
  - 1234
@@ -190,26 +190,23 @@ localhost> <userinput>f1(1234)</userinput>
       or is the full <replaceable>library-name.package-name[object-numeric-id]</replaceable>.
       The following example shows all four forms of object-specifier:
 <programlisting>
-localhost> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
+tarantool> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
 ---
 ...
-localhost> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})</userinput>
+tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {0, 'STR'}})</userinput>
 ---
 ...
-localhost> <userinput>s:insert{'a', 'b', 'c'}</userinput>
+tarantool> <userinput>s:insert{'a', 'b', 'c'}</userinput>
 ---
 - ['a', 'b', 'c']
 ...
-localhost> <userinput>box.space.name_of_space:insert{'c', 'd', 'e'}</userinput>
+tarantool> <userinput>box.space.name_of_space:insert{'c', 'd', 'e'}</userinput>
 ---
 - ['c', 'd', 'e']
 ...
-localhost> <userinput>box.space['name_of_space']:insert{'x', 'y', 'z'}</userinput>
+tarantool> <userinput>box.space['name_of_space']:insert{'x', 'y', 'z'}</userinput>
 ---
 - ['x', 'y', 'z']
-...
-localhost> <userinput>box.space[33]:drop()</userinput>
----
 ...
 </programlisting>
     </para>
@@ -220,23 +217,26 @@ localhost> <userinput>box.space[33]:drop()</userinput>
       Similarly, an error which has occurred inside Tarantool (observed on the
       client as an error code), when it happens during execution of a
       Lua procedure, produces a genuine Lua error:
-<programlisting><computeroutput>localhost> <userinput>function f()error('!') end</userinput>
+<programlisting><computeroutput>tarantool> <userinput>function f()error('!') end</userinput>
 ---
 ...
-localhost> <userinput>f()</userinput>
+tarantool> <userinput>f()</userinput>
 - error: '[string "function f()error(''!'') end"]:1: !'
-localhost> <userinput>s:insert{'a'}</userinput>
+tarantool> <userinput>s:insert{5}</userinput>
 ---
 - error: 'Tuple field 0 type does not match one required by operation:
-  expected NUM'
+  expected STR'
 ...
-localhost> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</userinput>
+tarantool> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</userinput>
 ---
 ...
-localhost> <userinput>pcall(insert_without_colon,{'a', 'b', 'c'})</userinput>
+tarantool> <userinput>pcall(insert_without_colon,{0, 'b', 'c'})</userinput>
 ---
 - false
-- 'Tuple field 0 type does not match one required by operation: expected NUM'
+- 'Tuple field 0 type does not match one required by operation: expected STR'
+tarantool> <userinput>box.space[33]:drop()</userinput>
+---
+...
 </computeroutput></programlisting>
     </para>
 
@@ -254,15 +254,15 @@ localhost> <userinput>pcall(insert_without_colon,{'a', 'b', 'c'})</userinput>
               The tonumber64() function is added by Tarantool; the name is global.
               <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>type(123456789012345), type(tonumber64(123456789012345))</userinput>
+tarantool> <userinput>type(123456789012345), type(tonumber64(123456789012345))</userinput>
 ---
 - number
 - cdata
 ...
-localhost> <userinput>i = tonumber64('1000000000')</userinput>
+tarantool> <userinput>i = tonumber64('1000000000')</userinput>
 ---
 ...
-localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinput>
+tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinput>
 ---
  - cdata
  - 500000000
@@ -323,7 +323,7 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
     </para>  
     <para>
       A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
-      A  few functions may return multiple tuples;
+      A  few functions may return multiple tuples.
       A scalar may be converted to a tuple with only one field.
       A Lua table may contain all of a tuple's fields except the "key" (the primary-key fields).
       For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
@@ -349,7 +349,7 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
       <row><entry>Number of indexes accessed</entry><entry>Ordinarily only one index is accessed to retrieve
                                          one tuple. But to update the tuple, there must be
                                          N accesses if the tuple set has N different indexes.</entry></row>
-      <row><entry>Number of tuples accessed</entry><entry>A few requests, for example select_range, can retrieve
+      <row><entry>Number of tuples accessed</entry><entry>A few requests, for example select, can retrieve
                                          multiple tuples. This factor is usually less
                                          important than the others.</entry></row>
       <row><entry>WAL settings</entry>   <entry>The important settings for the write-ahead log are
@@ -396,7 +396,7 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
                     <tgroup cols="4" align="left" colsep="1" rowsep="1">
                       <tbody>
                         <row>
-                         <entry>name</entry><entry>effect</entry><entry>type</entry><entry>default</entry>
+                         <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
                         </row>
                         <row>
                          <entry>temporary</entry><entry>space is temporary</entry><entry>true|false</entry><entry>false</entry>
@@ -405,13 +405,16 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
                          <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last space's id, +1</entry>
                         </row>
                         <row>
-                         <entry>enabled</entry><entry>space is enable</entry><entry>true|false</entry><entry>true</entry>
+                         <entry>enabled</entry><entry>space is enabled</entry><entry>true|false</entry><entry>true</entry>
                         </row>
                         <row>
                          <entry>arity</entry><entry>fixed field count</entry><entry>number</entry><entry>0 i.e. not fixed</entry>
                         </row>
                         <row>
-                         <entry>if_not_exists</entry><entry>error if duplicate</entry><entry>true|false</entry><entry>false</entry>
+                         <entry>if_not_exists</entry><entry>no error if duplicate name</entry><entry>true|false</entry><entry>false</entry>
+                        </row>
+                        <row>
+                         <entry>engine</entry><entry>storage package</entry><entry>string</entry><entry>'memtx'</entry>
                         </row>
                       </tbody>
                     </tgroup>
@@ -424,10 +427,10 @@ localhost> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
               Possible errors: If a space with the same name already exists.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>s = box.schema.create_space('space55')</userinput>
+tarantool> <userinput>s = box.schema.create_space('space55')</userinput>
 ---
 ...
-localhost> <userinput>s = box.schema.create_space('space55', {id = 555, temporary = false})</userinput>
+tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporary = false})</userinput>
 ---
 - error: Space 'space55' already exists
 ...
@@ -479,7 +482,7 @@ localhost> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
                     <tgroup cols="4" align="left" colsep="1" rowsep="1">
                       <tbody>
                         <row>
-                         <entry>name</entry><entry>effect</entry><entry>type</entry><entry>default</entry>
+                         <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
                         </row>
                         <row>
                          <entry>type</entry><entry>type of index</entry><entry>hash|tree|bitset</entry><entry>tree</entry>
@@ -504,10 +507,10 @@ localhost> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
               Possible errors: too many parts.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>s = box.space.space55</userinput>
+tarantool> <userinput>s = box.space.space55</userinput>
 ---
 ...
-localhost> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
 ---
 ...
 
@@ -553,7 +556,7 @@ localhost> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM
                  = values to be matched against the index key, which may be multipart.
             </para>
             <para>
-               Returns: (type = tuple) the selected tuple.
+               Returns: (type = table of tuples) the selected tuple.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -562,23 +565,28 @@ localhost> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM
                Possible Errors: No such space; wrong type.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space0:insert{101, 'test#1', 'my first tuple'}</userinput>
+tarantool> <userinput>box.space.space0:insert{101, 'test#1', 'my first tuple'}</userinput>
 ---
 - [101, 'test#1', 'my first tuple']
 ...
-localhost> <userinput>box.space.space0:select{101}</userinput>
+tarantool> <userinput>box.space.space0:select{101}</userinput>
 ---
-- [101, 'test#1', 'my first tuple']
+- - [101, 'test#1', 'my first tuple']
 ...
-localhost> <userinput>box.space.space0:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
+tarantool> <userinput>box.space.space0:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
 ---
 - [105, 'test#2', 'first_name', 'last_name']
 ...
-localhost> <userinput>box.space.space0:select{105}</userinput>
+tarantool> <userinput>table_of_tuples = box.space.space0:select{105}</userinput>
+---
+...
+tarantool> <userinput>table_of_tuples[1]</userinput>
 ---
 - [105, 'test#2', 'first_name', 'last_name']
 ...
 </programlisting>
+            For examples of complex select()s, which can return multiple tuples
+            via secondary indexes, see the later section <olink targetptr="box.index.iterator">box.space.space-name.index.index-name]:select</olink>.
             </para>
         </listitem>
     </varlistentry>
@@ -606,8 +614,7 @@ localhost> <userinput>box.space.space0:select{105}</userinput>
               Possible errors: If space-name does not exist.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
----
-...
+tarantool> <userinput>box.space.space_that_does_not_exist_drop()</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -633,7 +640,7 @@ localhost> <userinput>box.space.space0:select{105}</userinput>
               Possible errors: If space-name does not exist.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space55:rename('space56')</userinput>
+tarantool> <userinput>box.space.space55:rename('space56')</userinput>
 ---
 ...
 </programlisting>
@@ -661,7 +668,7 @@ localhost> <userinput>box.space.space55:rename('space56')</userinput>
               Possible errors: The first index cannot be changed to {unique = false}.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space55.index.primary:alter({type = 'hash'})</userinput>
+tarantool> <userinput>box.space.space55.index.primary:alter({type = 'hash'})</userinput>
 ---
 ...
 </programlisting>
@@ -689,7 +696,7 @@ localhost> <userinput>box.space.space55.index.primary:alter({type = 'hash'})</us
               Possible errors: If index-name doesn't exist.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space55.index.primary:drop()</userinput>
+tarantool> <userinput>box.space.space55.index.primary:drop()</userinput>
 ---
 ...
 </programlisting>
@@ -717,7 +724,7 @@ localhost> <userinput>box.space.space55.index.primary:drop()</userinput>
               Possible errors: If index-name doesn't exist.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space55.index.primary:rename('secondary')</userinput>
+tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</userinput>
 ---
 ...
 </programlisting>
@@ -895,14 +902,14 @@ box.space.space0:update({999}, {{':p', 1, box.pack('ppp', 1, 1, '!')}})
               Complexity Factors: Index size, Index type
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space0:delete(0)</userinput>
+tarantool> <userinput>box.space.space0:delete(0)</userinput>
 ---
 - [0, 'My first tuple']
 ...
-localhost> <userinput>box.space.space0:delete(0)</userinput>
+tarantool> <userinput>box.space.space0:delete(0)</userinput>
 ---
 ...
-localhost> <userinput>box.space.space0:delete('a')</userinput>
+tarantool> <userinput>box.space.space0:delete('a')</userinput>
 - error: 'Supplied key type of part 0 does not match index part type:
   expected NUM'
 </programlisting>
@@ -951,7 +958,7 @@ localhost> <userinput>box.space.space0:delete('a')</userinput>
               of type <code xlink:href="#box.index">box.index</code> with
               methods to search tuples and iterate over them in predefined order.
         <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0.n,box.space.space0.arity,box.space.space0.index.primary.type</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.n,box.space.space0.arity,box.space.space0.index.primary.type</userinput>
 ---
 - 1029
 - 0
@@ -970,7 +977,7 @@ localhost> <userinput>box.space.space0:delete('a')</userinput>
             <para>
               Returns: (type = number) number of tuples in the space.
               <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0:len()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0:len()</userinput>
 ---
  - 2
 ...
@@ -995,10 +1002,10 @@ localhost> <userinput>box.space.space0:delete('a')</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0:truncate()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0:truncate()</userinput>
 ---
 ...
-localhost&gt; <userinput>box.space.space0:len()</userinput>
+tarantool&gt; <userinput>box.space.space0:len()</userinput>
 ---
  - 0
 ...
@@ -1021,10 +1028,10 @@ localhost&gt; <userinput>box.space.space0:len()</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>tmp = ''; for k, v in box.space.space0:pairs() do tmp = tmp .. v[1] end</userinput>
+tarantool> <userinput>tmp = ''; for k, v in box.space.space0:pairs() do tmp = tmp .. v[1] end</userinput>
 ---
 ...
-localhost> <userinput>tmp</userinput>
+tarantool> <userinput>tmp</userinput>
 ---
 - Hello My Lua world
 ...
@@ -1088,7 +1095,7 @@ end!
 setopt delimiter=''!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
 - - 'version 1 6 '
 ...
@@ -1123,14 +1130,15 @@ end!
 setopt delimiter=''!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
-- - '272 0 _schema '
-  - '280 0 _space '
-  - '288 0 _index '
-  - '512 0 a  '
-  - '513 3 c  '
-  - '514 0 d  '
+- - '33 0 space0 sophia 0  '
+  - '272 1 _schema memtx 0 '
+  - '280 1 _space memtx 0 '
+  - '288 1 _index memtx 0 '
+  - '296 1 _func memtx 0 '
+  - '304 1 _user memtx 0 '
+  - '312 1 _priv memtx 0 '
 ...
 </programlisting>
             </para>
@@ -1164,15 +1172,45 @@ end!
 setopt delimiter=''!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
 - - '272 0 primary tree 1 1 0 str '
   - '280 0 primary tree 1 1 0 num '
+  - '280 1 owner tree 0 1 1 num '
+  - '280 2 name tree 1 1 2 str '
   - '288 0 primary tree 1 2 0 num 1 num '
-  - '512 0 womba tree 1 1 0 NUM '
-  - '512 1 #hash HASH 1 1 0 num '
-  - '512 2 #tree TREE 1 1 0 num '
+  - '288 2 name tree 1 2 0 num 2 str '
+  - '296 0 primary tree 1 1 0 num '
+  - '296 1 owner tree 0 1 1 num '
+  - '296 2 name tree 1 1 2 str '
+  - '304 0 primary tree 1 1 0 num '
+  - '304 2 name tree 1 1 2 str '
+  - '312 0 primary tree 1 3 1 num 2 str 3 num '
+  - '312 1 owner tree 0 1 1 num '
+...  
 </programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._user</emphasis>
+        </term>
+        <listitem>
+            <para>
+             _user is a new system tuple set for support of the authorization feature.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._priv</emphasis>
+        </term>
+        <listitem>
+            <para>
+             _priv is a new system tuple set for support of the authorization feature.
             </para>
         </listitem>
     </varlistentry>
@@ -1219,14 +1257,16 @@ setopt delimiter=''!
 <para>
 ... And here is what happens when one invokes the function:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
-- - _schema tuple_count =0
-  - _space tuple_count =6. first field in first tuple = 272
-  - _index tuple_count =5. first field in first tuple = 272
-  - space2 tuple_count =0
-  - space1 tuple_count =0
+- - space1 tuple_count =0
   - space0 tuple_count =3. first field in first tuple = 1
+  - _schema tuple_count =1. first field in first tuple = version
+  - _space tuple_count =7. first field in first tuple = 33
+  - _index tuple_count =13. first field in first tuple = 272
+  - _func tuple_count =0
+  - _user tuple_count =2. first field in first tuple = 0
+  - _priv tuple_count =0
 ...
 </programlisting>
 </para>
@@ -1329,27 +1369,27 @@ setopt delimiter=''!
             <para>
         <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
+tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
 ---
 - [0, 'hello world']
 ...
-localhost> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
 ---
 - [0, 'bye world']
 ...
-localhost> <userinput>box.space.space0:update({0}, {{'=p', 1, box.pack('ppp', 0, 3, 'hello')}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, box.pack('ppp', 0, 3, 'hello')}})</userinput>
 ---
 - [0, !!binary AAOlaGVsbG8=]
 ...
-localhost> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
 ---
 - [0, 4]
 ...
-localhost> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
 ---
 - [0, 8]
 ...
-localhost> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 ---
 - [0, 12]
 ...
@@ -1372,40 +1412,40 @@ localhost> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>localhost></prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
-<prompt>localhost></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
+<programlisting><prompt>tarantool></prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
 ---
 ...
-<prompt>localhost></prompt> <userinput>string.len(tuple[0])!</userinput>
+<prompt>tarantool></prompt> <userinput>string.len(tuple[0])!</userinput>
 ---
 - 1
 ...
-<prompt>localhost></prompt> <userinput>box.unpack('b', tuple[0])!</userinput>
+<prompt>tarantool></prompt> <userinput>box.unpack('b', tuple[0])!</userinput>
 ---
 - 48
 ...
-<prompt>localhost></prompt> <userinput>box.unpack('bsi', box.pack('bsi', 255, 65535, 4294967295))!</userinput>
+<prompt>tarantool></prompt> <userinput>box.unpack('bsi', box.pack('bsi', 255, 65535, 4294967295))!</userinput>
 ---
 - 255
 - 65535
 - 4294967295
 ...
-<prompt>localhost></prompt> <userinput>box.unpack('ls', box.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
+<prompt>tarantool></prompt> <userinput>box.unpack('ls', box.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
 ---
 - 18446744073709551615
 - 65535
 ...
-<prompt>localhost></prompt> <userinput>num, str, num64 = box.unpack('spl', box.pack('spl', 666, 'string',</userinput>
+<prompt>tarantool></prompt> <userinput>num, str, num64 = box.unpack('spl', box.pack('spl', 666, 'string',</userinput>
 <prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
 ---
 ...
-<prompt>localhost></prompt> <userinput>num, str, num64!</userinput>
+<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
 ---
 - 666
 - string
 - 666666666666666
 ...
-<prompt>localhost></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
+<prompt>tarantool></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1437,21 +1477,21 @@ localhost> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-localhost&gt; <userinput>box.dostring('abc')</userinput>
+tarantool&gt; <userinput>box.dostring('abc')</userinput>
 ---
 error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
 ...
-localhost&gt; <userinput>box.dostring('return 1')</userinput>
+tarantool&gt; <userinput>box.dostring('return 1')</userinput>
 ---
 - 1
 ...
-localhost&gt; <userinput>box.dostring('return ...', 'hello', 'world')</userinput>
+tarantool&gt; <userinput>box.dostring('return ...', 'hello', 'world')</userinput>
 ---
 - hello
 - world
 ...
-localhost&gt; <userinput>setopt delimiter='!' #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
-localhost&gt; <userinput>box.dostring('local f = function(key)</userinput>
+tarantool&gt; <userinput>setopt delimiter='!' #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
@@ -1459,7 +1499,7 @@ localhost&gt; <userinput>box.dostring('local f = function(key)</userinput>
 ---
 - nil
 ...
-localhost&gt; <userinput>setopt delimiter=''!</userinput>
+tarantool&gt; <userinput>setopt delimiter=''!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1476,7 +1516,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 but still useful for constructing artificial
                 tuple keys.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.time(), box.time()</userinput>
+<programlisting>tarantool&gt; <userinput>box.time(), box.time()</userinput>
 ---
  - 1385758759.2591
  - 1385758759.2591
@@ -1494,7 +1534,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
               Returns: current system time (in microseconds since the epoch) as a 64-bit
               integer. The time is taken from the event loop clock.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.time(), box.time64()</userinput>
+<programlisting>tarantool&gt; <userinput>box.time(), box.time64()</userinput>
 ---
  - 1385758828.9825
  - 1385758828982485
@@ -1516,7 +1556,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 when it starts. If the library is not available, which can happen if it was not
                 found when the server was built from source, then box.uuid() returns an error.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.uuid() == box.uuid() -- Comment: == means "are they equal?"</userinput>
+<programlisting>tarantool&gt; <userinput>box.uuid() == box.uuid() -- Comment: == means "are they equal?"</userinput>
 ---
  - false
 ...
@@ -1534,7 +1574,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                 unique id, as a string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.uuid_hex()</userinput>
+<programlisting>tarantool&gt; <userinput>box.uuid_hex()</userinput>
 ---
  - b8eadcb078b54bed8fa8425d129b10e8
 ...
@@ -1572,7 +1612,7 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
               Possible errors: whatever is specified in errcode-number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.raise(box.error.ER_WAL_IO, 'WAL I/O error')</userinput>
+<programlisting>tarantool&gt; <userinput>box.raise(box.error.ER_WAL_IO, 'WAL I/O error')</userinput>
 ---
 - error: 'WAL I/O error'
 ...
@@ -1605,11 +1645,11 @@ localhost&gt; <userinput>setopt delimiter=''!</userinput>
                Possible errors: index has wrong type or primary-key indexed field is not a number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>box.space.space0:auto_increment{'Fld#1', 'Fld#2'}</userinput>
+<programlisting>tarantool> <userinput>box.space.space0:auto_increment{'Fld#1', 'Fld#2'}</userinput>
 ---
 - [1, 'Fld#1', 'Fld#2']
 ...
-localhost> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
+tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
 ---
 - [2, 'Fld#3']
 ...
@@ -1637,11 +1677,11 @@ localhost> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
 ---
 - 1
 ...
-localhost> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
 ---
 - 2
 ...</programlisting>
@@ -1669,11 +1709,11 @@ localhost> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
 ---
 - 1
 ...
-localhost> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
 ---
 - 0
 ...</programlisting>
@@ -1685,7 +1725,7 @@ localhost> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</user
 <para xml:id="box-function-example" xreflabel="box-function-example">
 This example will work with the sandbox configuration described in the preface.
 That is, there is a space named space0 with a numeric primary key.
-The example function will: (1) select the tuple whose key value is 1000;
+The example function will: (1) select a tuple the tuple whose key value is 1000;
 (2) return an error if the tuple already exists and already has 3 fields;
 (3) Insert or replace the tuple with: field[0] = 1000, field[1] = a uuid, field[2] = number of seconds since 1970-01-01;
 (4) Get field[2] from what was replaced;
@@ -1699,11 +1739,13 @@ and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
 <programlisting>
 setopt delimiter='!'
 function example()
-  local a, b, c, selected_tuple, replaced_tuple, time_field
-  selected_tuple = box.space.space0:select(1000)
-  if selected_tuple ~= nil then
-    if #selected_tuple == 3 then
-      box.raise(1, 'This tuple already has 3 fields')
+  local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
+  table_of_selected_tuples = box.space.space0:select(1000)
+  if table_of_selected_tuples ~= nil then
+    if table_of_selected_tuples[1] ~= nil then
+      if #table_of_selected_tuples[1] == 3 then
+        box.raise(1, 'This tuple already has 3 fields')
+      end
     end
   end
   replaced_tuple = box.space.space0:replace
@@ -1720,15 +1762,15 @@ setopt delimiter=''!
 <para>
 ... And here is what happens when one invokes the function:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>box.space.space0:delete(1000)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.space.space0:delete(1000)</userinput>
 ---
 - 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}
 ...
-<prompt>localhost&gt;</prompt> <userinput>example(1000)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example(1000)</userinput>
 ---
 - 2014-01-29 16:11:51.1582
 ...
-<prompt>localhost&gt;</prompt> <userinput>example(1000)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example(1000)</userinput>
 ---
 - error: 'This tuple already has 3 fields'
 ...
@@ -1764,17 +1806,17 @@ setopt delimiter=''!
               Returns: (type = tuple) a new tuple.
             </para>
             <para>
-              In the following example, x and t will be new tuple objects.
+              In the following example, x will be a new table object containing one tuple and t will be a new tuple object.
               Saying <code>t</code> returns the entire tuple t.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>x = box.space.space0:insert{33,tonumber('1'),tonumber64('2')}:totable()</userinput>
+            <programlisting>tarantool&gt; <userinput>x = box.space.space0:insert{33,tonumber('1'),tonumber64('2')}:totable()</userinput>
 ---
 ...
-localhost> <userinput>t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})</userinput>
+tarantool> <userinput>t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})</userinput>
 ---
 ...
-localhost> <userinput>t</userinput>
+tarantool> <userinput>t</userinput>
 ---
 - ['abc', 'def', 'ghi', 'abc']
 ...</programlisting>
@@ -1799,10 +1841,10 @@ localhost> <userinput>t</userinput>
                 and then the number of fields in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
 ---
 ...
-localhost&gt; <userinput>#t</userinput>
+tarantool&gt; <userinput>#t</userinput>
 ---
 - 4
 ...</programlisting>
@@ -1832,10 +1874,10 @@ localhost&gt; <userinput>#t</userinput>
               and a bit for overhead, so bsize() returns  3*(1+3)+1.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'aaa','bbb','ccc'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'aaa','bbb','ccc'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t:bsize()</userinput>
+tarantool&gt; <userinput>t:bsize()</userinput>
 ---
  - 13
 ...</programlisting>
@@ -1859,10 +1901,10 @@ localhost&gt; <userinput>t:bsize()</userinput>
               and then the second field in t is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t[1]</userinput>
+tarantool&gt; <userinput>t[1]</userinput>
 ---
  - Fld#2
 ...</programlisting>
@@ -1893,19 +1935,19 @@ localhost&gt; <userinput>t[1]</userinput>
               are returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'a','b','c','a'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'a','b','c','a'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t:find('a')</userinput>
+tarantool&gt; <userinput>t:find('a')</userinput>
 ---
 - 0
 ...
-localhost&gt; <userinput>t:findall('a')</userinput>
+tarantool&gt; <userinput>t:findall('a')</userinput>
 ---
 - 0
 - 3
 ...
-localhost&gt; <userinput>t:findall(1, 'a')</userinput>
+tarantool&gt; <userinput>t:findall(1, 'a')</userinput>
 ---
  - 3
 ...</programlisting>
@@ -1934,10 +1976,10 @@ localhost&gt; <userinput>t:findall(1, 'a')</userinput>
               but one new one is added, then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t:transform(1,2,'x')</userinput>
+tarantool&gt; <userinput>t:transform(1,2,'x')</userinput>
 ---
 - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
 ...</programlisting>
@@ -1966,10 +2008,10 @@ localhost&gt; <userinput>t:transform(1,2,'x')</userinput>
               Returns: (type = scalar) one or more field values.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t:slice(1, 3)</userinput>
+tarantool&gt; <userinput>t:slice(1, 3)</userinput>
 ---
  - Fld#2
  - Fld#3
@@ -1994,10 +2036,10 @@ localhost&gt; <userinput>t:slice(1, 3)</userinput>
               then the result is returned.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-localhost&gt; <userinput>t:unpack()</userinput>
+tarantool&gt; <userinput>t:unpack()</userinput>
 ---
  - Fld#1
  - Fld#2
@@ -2026,13 +2068,13 @@ localhost&gt; <userinput>t:unpack()</userinput>
               and then all its fields are selected using a Lua for-end loop.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+<programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-localhost&gt; <userinput>tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end</userinput>
+tarantool&gt; <userinput>tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end</userinput>
 ---
 ...
-localhost> <userinput>tmp</userinput>
+tarantool> <userinput>tmp</userinput>
 ---
 - Fld#1Fld#2Fld#3Fld#4Fld#5
 ...</programlisting>
@@ -2073,7 +2115,7 @@ setopt delimiter=''!
 <para>
 ... And here is what happens when one invokes the function:
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>example()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
 - 'tuple2 = '
 - ['a', 'c']
@@ -2109,23 +2151,23 @@ setopt delimiter=''!
               Returns: (type = string) the original value reformatted as a JSON string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.cjson.encode(123)</userinput>
+<programlisting>tarantool&gt; <userinput>box.cjson.encode(123)</userinput>
 ---
 - '123'
 ...
-localhost&gt; <userinput>box.cjson.encode({123})</userinput>
+tarantool&gt; <userinput>box.cjson.encode({123})</userinput>
 ---
 - '[123]'
 ...
-localhost&gt; <userinput>box.cjson.encode({123, 234, 345})</userinput>
+tarantool&gt; <userinput>box.cjson.encode({123, 234, 345})</userinput>
 ---
 - '[123,234,345]'
 ...
-localhost&gt; <userinput>box.cjson.encode({abc = 234, cde = 345})</userinput>
+tarantool&gt; <userinput>box.cjson.encode({abc = 234, cde = 345})</userinput>
 ---
 - '{"cde":345,"abc":234}'
 ...
-localhost&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
+tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
 ---
 - '{"hello":["world"]}'
 ...
@@ -2145,15 +2187,15 @@ localhost&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
               Returns: (type = Lua table) the original contents formatted as a Lua table.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.cjson.decode('123')</userinput>
+<programlisting>tarantool&gt; <userinput>box.cjson.decode('123')</userinput>
 ---
 - 123
 ...
-localhost&gt; <userinput>box.cjson.decode('[123, "hello"]')[2]</userinput>
+tarantool&gt; <userinput>box.cjson.decode('[123, "hello"]')[2]</userinput>
 ---
 - hello
 ...
-localhost&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput>
+tarantool&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput>
 ---
 - world
 ...
@@ -2222,7 +2264,7 @@ localhost&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput
     <varlistentry>
         <term></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0.index.primary</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary</userinput>
 ---
 - unique: true
   idx: ' index 0'
@@ -2236,7 +2278,7 @@ localhost&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput
   id: 0
 ...
 
-localhost&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
+tarantool&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
 ---
  - [ 999, 2, 'c']
 ...</programlisting></listitem>
@@ -2244,7 +2286,7 @@ localhost&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
 
     <varlistentry>
         <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.iterator(type, ...)">
+             <emphasis role="lua" xml:id="boxindexiterator" xreflabel="box.index.iterator(type, ...)">
             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:iterator(<replaceable>iterator-type, bitset-value | field-value...</replaceable>)</emphasis>
         </term>
         <listitem>
@@ -2301,52 +2343,53 @@ localhost&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
             <para>
                 <bridgehead renderas="sect4">Examples</bridgehead>
 <programlisting>
-localhost> <userinput>s = box.schema.create_space('space17')</userinput>
+# This example is not currently working. Use index select function instead.
+tarantool> <userinput>s = box.schema.create_space('space17')</userinput>
 ---
 ...
-localhost> <userinput>s:create_index('primary', {unique = true, parts = {0, 'STR', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'STR', 1, 'STR'}})</userinput>
 ---
 ...
-localhost> <userinput>s:insert{'C', 'C'}</userinput>
----
-- ['C', 'C']
-...
-localhost> <userinput>s:insert{'B', 'A'}</userinput>
----
-- ['B', 'A']
-...
-localhost> <userinput>s:insert{'C', '!'}</userinput>
----
-- ['C', '!']
-...
-localhost> <userinput>s:insert{'A', 'C'}</userinput>
----
-- ['A', 'C']
-...
-localhost> <userinput>iterator_function = s.index.primary:iterator(box.index.GE, 'A')</userinput>
----
-...
-localhost> <userinput>iterator_function()</userinput>
----
-- ['A', 'C']
-...
-localhost> <userinput>iterator_function()</userinput>
----
-- ['B', 'A']
-...
-localhost> <userinput>iterator_function()</userinput>
----
-- ['C', '!']
-...
-localhost> <userinput>iterator_function()</userinput>
+tarantool> <userinput>s:insert{'C', 'C'}</userinput>
 ---
 - ['C', 'C']
 ...
-localhost> <userinput>iterator_function()</userinput>
+tarantool> <userinput>s:insert{'B', 'A'}</userinput>
+---
+- ['B', 'A']
+...
+tarantool> <userinput>s:insert{'C', '!'}</userinput>
+---
+- ['C', '!']
+...
+tarantool> <userinput>s:insert{'A', 'C'}</userinput>
+---
+- ['A', 'C']
+...
+tarantool> <userinput>iterator_function = s.index.primary:iterator(box.index.GE, 'A')</userinput>
+---
+...
+tarantool> <userinput>iterator_function()</userinput>
+---
+- ['A', 'C']
+...
+tarantool> <userinput>iterator_function()</userinput>
+---
+- ['B', 'A']
+...
+tarantool> <userinput>iterator_function()</userinput>
+---
+- ['C', '!']
+...
+tarantool> <userinput>iterator_function()</userinput>
+---
+- ['C', 'C']
+...
+tarantool> <userinput>iterator_function()</userinput>
 ---
 - null
 ...
-localhost> <userinput>box.space.space17:drop()</userinput>
+tarantool> <userinput>box.space.space17:drop()</userinput>
 ---
 ...
 </programlisting>
@@ -2354,7 +2397,48 @@ localhost> <userinput>box.space.space17:drop()</userinput>
         </listitem>
     </varlistentry>
 
-
+    <varlistentry>
+     <term>
+             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
+            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields][, {parameters}]</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+             This is is an alternative to <olink targetptr="box.select">box.select()</olink>
+             which goes via a particular index and can make use of additional parameters that
+             specify the iterator type, and the limit (that is, the maximum number of tuples to
+             return).
+            </para>
+            <para>
+              Returns: (type = table of tuples) the tuple or tuples that match the field values.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+# Create a space named space0.
+# Create a unique index 'primary', which won't be needed for this example.
+# Create a non-unique index 'secondary' with an index on the second field.
+# Insert three tuples, values in field[1] equal to 'X', 'Y', and 'Z'.
+# Select all tuples where the secondary index keys are greater than 'X'.
+box.schema.create_space('space0')
+box.space.space0:create_index('primary', {parts = {0, 'NUM' }})
+box.space.space0:create_index('secondary', {type = 'tree', unique = false, parts = {1, 'STR'}})
+box.space.space0:insert{1,'X','Row with field[1]=X'}
+box.space.space0:insert{2,'Y','Row with field[1]=Y'}
+box.space.space0:insert{3,'Z','Row with field[1]=Z'}
+box.space.space0.index.secondary:select({'X'}, {iterator = 'GT'})
+</programlisting>
+The result will be a table of tuples and will look like this:
+<programlisting>
+---
+- - [2, 'Y', 'Row with field[1]=Y']
+  - [3, 'Z', 'Row with field[1]=Z']
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
     <varlistentry>
         <term>
             <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
@@ -2374,7 +2458,7 @@ localhost> <userinput>box.space.space17:drop()</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space0.index.primary:min()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:min()</userinput>
 ---
 - ['Alpha!', 55, 'This is the first tuple!']
 ...
@@ -2402,7 +2486,7 @@ localhost> <userinput>box.space.space17:drop()</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0.index.primary:max()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:max()</userinput>
 ---
 - ['Gamma!', 55, 'This is the third tuple!']
 ...
@@ -2433,7 +2517,7 @@ localhost> <userinput>box.space.space17:drop()</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0.index.secondary:random(1)</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.secondary:random(1)</userinput>
 ---
 - ['Beta!', 66, 'This is the second tuple!']
 ...
@@ -2461,12 +2545,12 @@ localhost> <userinput>box.space.space17:drop()</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>localhost&gt; <userinput>box.space.space0.index.primary:count(999)</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count(999)</userinput>
 ---
 - 0
 ...
 </programlisting>
-<programlisting>localhost&gt; <userinput>box.space.space0.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
 ---
  - 1
 ...
@@ -2740,8 +2824,8 @@ This function contains an infinite loop
 Each iteration of the loop adds 1 to a global variable
 named gvar, then goes to sleep for 2 seconds.
 The sleep causes an implicit box.fiber.yield().<programlisting>
-<prompt>localhost&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
-<prompt>localhost&gt;</prompt><userinput> function function_x()</userinput>
+<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>tarantool&gt;</prompt><userinput> function function_x()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
 <prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
@@ -2750,17 +2834,17 @@ The sleep causes an implicit box.fiber.yield().<programlisting>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
+<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
 Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.
 <programlisting>
-<prompt>localhost&gt;</prompt><userinput> fiber_of_x = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = box.fiber.wrap(function_x)</userinput>
 ---
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> fid = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = box.fiber.wrap(function_x)</userinput>
 ---
 ...
 </programlisting>
@@ -2768,7 +2852,7 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2783,10 +2867,10 @@ Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
-<prompt>localhost&gt;</prompt><userinput> box.fiber.cancel(fiber_of_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.fiber.cancel(fiber_of_x)</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2870,24 +2954,24 @@ the status is dead because the cancel worked.<programlisting>
 
 <para>
 <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>localhost&gt;</prompt><userinput> box.session.peer(box.session.id())</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.peer(box.session.id())</userinput>
 ---
  - 127.0.0.1:45129
 ...
-<prompt>localhost&gt;</prompt><userinput> box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
 ---
 ...
 
-<prompt>localhost&gt;</prompt><userinput> m = ''</userinput>
+<prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> m</userinput>
+<prompt>tarantool&gt;</prompt><userinput> m</userinput>
 ---
 - 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
 ...</programlisting>
@@ -3463,31 +3547,31 @@ end
  This is not a useful way to communicate with this particular site,
  but shows that the system works.
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>sock = box.socket.tcp()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock = box.socket.tcp()</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt> <userinput>type(sock)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>type(sock)</userinput>
 ---
 - userdata
 ...
-<prompt>localhost&gt;</prompt> <userinput>sock:connect('mail.ru', 80)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock:connect('mail.ru', 80)</userinput>
 ---
 - fd 22, aka 192.168.1.72:49488, peer of 94.100.180.199:80
 ...
-<prompt>localhost&gt;</prompt> <userinput>sock:error()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock:error()</userinput>
 ---
 - 0
  - Success
 ...
-<prompt>localhost&gt;</prompt> <userinput>sock:send('GET / HTTP/1.0\n\n')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock:send('GET / HTTP/1.0\n\n')</userinput>
 ---
 - 16
 ...
-<prompt>localhost&gt;</prompt> <userinput>sock:recv(17)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock:recv(17)</userinput>
 ---
 - "HTTP/1.0 200 OK\r\n"
 ...
- <prompt>localhost&gt;</prompt> <userinput>sock:close()</userinput>
+ <prompt>tarantool&gt;</prompt> <userinput>sock:close()</userinput>
 ---
 ...
 </programlisting>
@@ -3712,11 +3796,11 @@ end
  Assume that the database is nearly empty.
  Assume that the tarantool server is running on localhost 127.0.0.1:3301.
 <programlisting>
-<prompt>localhost&gt;</prompt><userinput> ta = {}</userinput>
+<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
-<prompt>localhost&gt;</prompt><userinput> function example()</userinput>
+<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
 <prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
@@ -3747,11 +3831,11 @@ end
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> setopt delimiter = ''!</userinput>
-<prompt>localhost&gt;</prompt><userinput> example()</userinput>
+<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput>
+<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt><userinput> ta</userinput>
+<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
 ---
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
@@ -3766,7 +3850,7 @@ end
   - conn:update done on space0
   - conn:close done
 ...
-<prompt>localhost&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
 ---
 - [800, 'Fld#1', 'Extra data']
 ...
@@ -3788,7 +3872,7 @@ end
     <varlistentry>
         <term><emphasis role="lua">box.cfg</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>box.cfg</userinput>
+tarantool> <userinput>box.cfg</userinput>
 ---
 - io_collect_interval = 0
   pid_file = box.pid
@@ -3828,7 +3912,7 @@ localhost> <userinput>box.cfg</userinput>
               Returns: (type = Lua table) keys and values in the package.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>box.info()</userinput>
+tarantool> <userinput>box.info()</userinput>
 ---
 - version: 1.6.0-819-geefb2d0
   status: primary
@@ -3849,47 +3933,47 @@ localhost> <userinput>box.info()</userinput>
         </term>
         <listitem>
         <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>box.info.pid</userinput>
+tarantool> <userinput>box.info.pid</userinput>
 ---
 - 1747
 ...
-localhost> <userinput>box.info.logger_pid</userinput>
+tarantool> <userinput>box.info.logger_pid</userinput>
 ---
 - 1748
 ...
-localhost> <userinput>box.info.version</userinput>
+tarantool> <userinput>box.info.version</userinput>
 ---
 - 1.6.0-819-geefb2d0
 ...
-localhost> <userinput>box.info.config</userinput>
+tarantool> <userinput>box.info.config</userinput>
 ---
 - /home/unera/work/tarantool/test/box/tarantool_good.cfg
 ...
-localhost> <userinput>box.info.uptime</userinput>
+tarantool> <userinput>box.info.uptime</userinput>
 ---
 - 3672
 ...
-localhost> <userinput>box.info.lsn</userinput>
+tarantool> <userinput>box.info.lsn</userinput>
 ---
 - 1712
 ...
-localhost> <userinput>box.info.status</userinput>
+tarantool> <userinput>box.info.status</userinput>
 ---
  - primary
 ...
-localhost> <userinput>box.info.recovery_lag</userinput>
+tarantool> <userinput>box.info.recovery_lag</userinput>
 ---
  - 0.000
 ...
-localhost> <userinput>box.info.recovery_last_update</userinput>
+tarantool> <userinput>box.info.recovery_last_update</userinput>
 ---
  - 1306964594.980
 ...
-localhost> <userinput>box.info.snapshot_pid</userinput>
+tarantool> <userinput>box.info.snapshot_pid</userinput>
 ---
  - 0
 ...
-localhost> <userinput>box.info.build</userinput>
+tarantool> <userinput>box.info.build</userinput>
 ---
 - flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
          -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
@@ -3911,20 +3995,20 @@ localhost> <userinput>box.info.build</userinput>
     <varlistentry>
         <term><emphasis role="lua">box.slab</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>box.slab.info().arena_used</userinput>
+tarantool> <userinput>box.slab.info().arena_used</userinput>
 ---
  - 4194304
 ...
-localhost> <userinput>box.slab.info().arena_size</userinput>
+tarantool> <userinput>box.slab.info().arena_size</userinput>
 ---
  - 104857600
 ...
-localhost> <userinput>box.slab.info().slabs</userinput>
+tarantool> <userinput>box.slab.info().slabs</userinput>
 ---
  64
  128
 ...
-localhost> <userinput>box.slab.info().slabs[64]</userinput>
+tarantool> <userinput>box.slab.info().slabs[64]</userinput>
 ---
  items: 1
  bytes_used: 160
@@ -3945,12 +4029,12 @@ localhost> <userinput>box.slab.info().slabs[64]</userinput>
     <varlistentry>
         <term><emphasis role="lua">box.stat</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-localhost> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
+tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
 ---
 - []
 - table
 ...
-localhost> <userinput>box.stat() -- the full contents of the table</userinput>
+tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
 ---
 - DELETE:
     total: 33
@@ -3971,7 +4055,7 @@ localhost> <userinput>box.stat() -- the full contents of the table</userinput>
     total: 8
     rps: 0
 ...
-localhost> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
+tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
 ---
 - total: 33
   rps: 0

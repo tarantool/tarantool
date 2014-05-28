@@ -1,7 +1,8 @@
 #include <string.h> /* memmove, memset */
 #include <stdint.h>
 #include <assert.h>
-#include "small/pt_alloc.h"
+#include <stdio.h> /* printf */
+#include "small/matras.h"
 
 /* {{{ BPS-tree description */
 /**
@@ -103,12 +104,14 @@
  * void bps_tree_create(tree, arg, extent_alloc_func, extent_free_func);
  * void bps_tree_destroy(tree);
  * bps_tree_elem_t *bps_tree_find(tree, key);
- * bool bps_tree_insert_or_replace(tree, new_elem, replaced_elem);
+ * bool bps_tree_insert(tree, new_elem, replaced_elem);
  * bool bps_tree_delete(tree, elem);
  * size_t bps_tree_size(tree);
  * size_t bps_tree_mem_used(tree);
  * bps_tree_elem_t *bps_tree_random(tree, rnd);
  * int bps_tree_debug_check(tree);
+ * void bps_tree_print(tree, "%p");
+ * int bps_tree_debug_check_internal_functions(assert_on_error);
  * // iterators:
  * struct bps_tree_iterator bps_tree_invalid_iterator();
  * bool bps_tree_itr_is_invalid(itr);
@@ -131,7 +134,6 @@
  *  struct bps_tree_test my_tree;
  *  bps_tree_test_create(&my_tree, ...);
  * Allowed to be empty (just #define BPS_TREE_NAME)
- * TODO: does not used yet
  */
 #ifndef BPS_TREE_NAME
 #error "BPS_TREE_NAME must be defined"
@@ -157,7 +159,7 @@
  * must be a whole number.
  * Two important things:
  *
- * 1) The maximal amount of memory, that particular btee instance
+ * 1) The maximal amount of memory, that particular btree instance
  *    can use, is
  *   ( (BPS_TREE_EXTENT_SIZE ^ 3) / (sizeof(void *) ^ 2) )
  *
@@ -259,6 +261,8 @@ typedef uint32_t bps_tree_block_id_t;
 #define CONCAT(a, b) CONCAT_R(a, b)
 #define CONCAT4_R(a, b, c, d) a##b##c##d
 #define CONCAT4(a, b, c, d) CONCAT4_R(a, b, c, d)
+#define CONCAT5_R(a, b, c, d, e) a##b##c##d##e
+#define CONCAT5(a, b, c, d, e) CONCAT5_R(a, b, c, d, e)
 #endif
 /**
  * Compile time assertion for use in function blocks
@@ -275,10 +279,139 @@ typedef uint32_t bps_tree_block_id_t;
 /* }}} */
 
 /* {{{ Macros for custom naming of structs and functions */
+#ifdef _
+#error '_' must be undefinded!
+#endif
 #define _bps(postfix) CONCAT4(bps, BPS_TREE_NAME, _, postfix)
-#define _bps_tree(postfix) CONCAT4(bps_tree, BPS_TREE_NAME, _, postfix)
+#define _bps_tree(postfix) CONCAT5(bps, _tree, BPS_TREE_NAME, _, postfix)
 #define _BPS(postfix) CONCAT4(BPS, BPS_TREE_NAME, _, postfix)
 #define _BPS_TREE(postfix) CONCAT4(BPS_TREE, BPS_TREE_NAME, _, postfix)
+#define _bps_tree_name CONCAT(bps_tree, BPS_TREE_NAME)
+
+#define bps_tree _bps_tree_name
+#define bps_block _bps(block)
+#define bps_leaf _bps(leaf)
+#define bps_inner _bps(inner)
+#define bps_garbage _bps(garbage)
+#define bps_tree_iterator _bps_tree(iterator)
+#define bps_inner_path_elem _bps(inner_path_elem)
+#define bps_leaf_path_elem _bps(leaf_path_elem)
+
+#define bps_tree_create _bps_tree(create)
+#define bps_tree_destroy _bps_tree(destroy)
+#define bps_tree_find _bps_tree(find)
+#define bps_tree_insert _bps_tree(insert)
+#define bps_tree_delete _bps_tree(delete)
+#define bps_tree_size _bps_tree(size)
+#define bps_tree_mem_used _bps_tree(mem_used)
+#define bps_tree_random _bps_tree(random)
+#define bps_tree_invalid_iterator _bps_tree(invalid_iterator)
+#define bps_tree_itr_is_invalid _bps_tree(itr_is_invalid)
+#define bps_tree_itr_are_equal _bps_tree(itr_are_equal)
+#define bps_tree_itr_first _bps_tree(itr_first)
+#define bps_tree_itr_last _bps_tree(itr_last)
+#define bps_tree_lower_bound _bps_tree(lower_bound)
+#define bps_tree_upper_bound _bps_tree(upper_bound)
+#define bps_tree_itr_get_elem _bps_tree(itr_get_elem)
+#define bps_tree_itr_next _bps_tree(itr_next)
+#define bps_tree_itr_prev _bps_tree(itr_prev)
+#define bps_tree_debug_check _bps_tree(debug_check)
+#define bps_tree_print _bps_tree(print)
+#define bps_tree_debug_check_internal_functions \
+	_bps_tree(debug_check_internal_functions)
+
+#define bps_tree_max_sizes _bps_tree(max_sizes)
+#define BPS_TREE_MAX_COUNT_IN_LEAF _BPS_TREE(MAX_COUNT_IN_LEAF)
+#define BPS_TREE_MAX_COUNT_IN_INNER _BPS_TREE(MAX_COUNT_IN_INNER)
+#define bps_block_type _bps(block_type)
+#define BPS_TREE_BT_GARBAGE _BPS_TREE(BT_GARBAGE)
+#define BPS_TREE_BT_INNER _BPS_TREE(BT_INNER)
+#define BPS_TREE_BT_LEAF _BPS_TREE(BT_LEAF)
+
+#define bps_tree_restore_block _bps_tree(restore_block)
+#define bps_tree_find_ins_point_key _bps_tree(find_ins_point_key)
+#define bps_tree_find_ins_point_elem _bps_tree(find_ins_point_elem)
+#define bps_tree_find_after_ins_point_key _bps_tree(find_after_ins_point_key)
+#define bps_tree_get_leaf_safe _bps_tree(get_leaf_safe)
+#define bps_tree_garbage_push _bps_tree(garbage_push)
+#define bps_tree_garbage_pop _bps_tree(garbage_pop)
+#define bps_tree_create_leaf _bps_tree(create_leaf)
+#define bps_tree_create_inner _bps_tree(create_inner)
+#define bps_tree_dispose_leaf _bps_tree(dispose_leaf)
+#define bps_tree_dispose_inner _bps_tree(dispose_inner)
+#define bps_tree_reserve_blocks _bps_tree(reserve_blocks)
+#define bps_tree_insert_first_elem _bps_tree(insert_first_elem)
+#define bps_tree_collect_path _bps_tree(collect_path)
+#define bps_tree_process_replace _bps_tree(process_replace)
+#define bps_tree_debug_memmove _bps_tree(debug_memmove)
+#define bps_tree_insert_into_leaf _bps_tree(insert_into_leaf)
+#define bps_tree_insert_into_inner _bps_tree(insert_into_inner)
+#define bps_tree_delete_from_leaf _bps_tree(delete_from_leaf)
+#define bps_tree_delete_from_inner _bps_tree(delete_from_inner)
+#define bps_tree_move_elems_to_right_leaf _bps_tree(move_elems_to_right_leaf)
+#define bps_tree_move_elems_to_right_inner _bps_tree(move_elems_to_right_inner)
+#define bps_tree_move_elems_to_left_leaf _bps_tree(move_elems_to_left_leaf)
+#define bps_tree_move_elems_to_left_inner _bps_tree(move_elems_to_left_inner)
+#define bps_tree_insert_and_move_elems_to_right_leaf \
+	_bps_tree(insert_and_move_elems_to_right_leaf)
+#define bps_tree_insert_and_move_elems_to_right_inner \
+	_bps_tree(insert_and_move_elems_to_right_inner)
+#define bps_tree_insert_and_move_elems_to_left_leaf \
+	_bps_tree(insert_and_move_elems_to_left_leaf)
+#define bps_tree_insert_and_move_elems_to_left_inner \
+	_bps_tree(insert_and_move_elems_to_left_inner)
+#define bps_tree_leaf_free_size _bps_tree(leaf_free_size)
+#define bps_tree_inner_free_size _bps_tree(inner_free_size)
+#define bps_tree_leaf_overmin_size _bps_tree(leaf_overmin_size)
+#define bps_tree_inner_overmin_size _bps_tree(inner_overmin_size)
+#define bps_tree_collect_left_path_elem_leaf \
+	_bps_tree(collect_left_path_elem_leaf)
+#define bps_tree_collect_left_path_elem_inner \
+	_bps_tree(collect_left_path_elem_inner)
+#define bps_tree_collect_right_ext_leaf _bps_tree(collect_right_ext_leaf)
+#define bps_tree_collect_right_ext_inner _bps_tree(collect_right_ext_inner)
+#define bps_tree_prepare_new_ext_leaf _bps_tree(prepare_new_ext_leaf)
+#define bps_tree_prepare_new_ext_inner _bps_tree(prepare_new_ext_inner)
+#define bps_tree_process_insert_leaf _bps_tree(process_insert_leaf)
+#define bps_tree_process_insert_inner _bps_tree(process_insert_inner)
+#define bps_tree_process_delete_leaf _bps_tree(process_delete_leaf)
+#define bps_tree_process_delete_inner _bps_tree(process_delete_inner)
+#define bps_tree_debug_find_max_elem _bps_tree(debug_find_max_elem)
+#define bps_tree_debug_check_block _bps_tree(debug_check_block)
+#define bps_tree_print_indent _bps_tree(print_indent)
+#define bps_tree_print_block _bps_tree(print_block)
+#define bps_tree_print_leaf _bps_tree(print_leaf)
+#define bps_tree_print_inner _bps_tree(print_inner)
+#define bps_tree_debug_set_elem _bps_tree(debug_set_elem)
+#define bps_tree_debug_get_elem _bps_tree(debug_get_elem)
+#define bps_tree_debug_set_elem_inner _bps_tree(debug_set_elem_inner)
+#define bps_tree_debug_get_elem_inner _bps_tree(debug_get_elem_inner)
+#define bps_tree_debug_check_insert_into_leaf \
+	_bps_tree(debug_check_insert_into_leaf)
+#define bps_tree_debug_check_delete_from_leaf \
+	_bps_tree(debug_check_delete_from_leaf)
+#define bps_tree_debug_check_move_to_right_leaf \
+	_bps_tree(debug_check_move_to_right_leaf)
+#define bps_tree_debug_check_move_to_left_leaf \
+	_bps_tree(debug_check_move_to_left_leaf)
+#define bps_tree_debug_check_insert_and_move_to_right_leaf \
+	_bps_tree(debug_check_insert_and_move_to_right_leaf)
+#define bps_tree_debug_check_insert_and_move_to_left_leaf \
+	_bps_tree(debug_check_insert_and_move_to_left_leaf)
+#define bps_tree_debug_check_insert_into_inner \
+	_bps_tree(debug_check_insert_into_inner)
+#define bps_tree_debug_check_delete_from_inner \
+	_bps_tree(debug_check_delete_from_inner)
+#define bps_tree_debug_check_move_to_right_inner \
+	_bps_tree(debug_check_move_to_right_inner)
+#define bps_tree_debug_check_move_to_left_inner \
+	_bps_tree(debug_check_move_to_left_inner)
+#define bps_tree_debug_check_insert_and_move_to_right_inner \
+	_bps_tree(debug_check_insert_and_move_to_right_inner)
+#define bps_tree_debug_check_insert_and_move_to_left_inner \
+	_bps_tree(debug_check_insert_and_move_to_left_inner)
+#define bps_tree_debug_check_insert_and_move_to_left_inner \
+	_bps_tree(debug_check_insert_and_move_to_left_inner)
 /* }}} */
 
 /* {{{ BPS-tree interface (declaration) */
@@ -300,7 +433,7 @@ struct bps_tree {
 	bps_tree_block_id_t first_id, last_id;
 	/* Counters of used blocks and garbaged blocks */
 	bps_tree_block_id_t leaf_count, inner_count, garbage_count;
-	/* Depth (height?) of a tee. Is 0 in empty tree. */
+	/* Depth (height?) of a tree. Is 0 in empty tree. */
 	bps_tree_block_id_t depth;
 	/* Number of elements in tree */
 	size_t size;
@@ -311,7 +444,7 @@ struct bps_tree {
 	/* Copy of maximal element in tree. Used for beauty */
 	bps_tree_elem_t max_elem;
 	/* Special allocator of blocks and their IDs */
-	pt3 pt_allocator;
+	struct matras matras;
 };
 
 /**
@@ -386,7 +519,7 @@ bps_tree_find(const struct bps_tree *tree, bps_tree_key_t key);
  * @return - true on success or false if memory allocation failed for insert
  */
 bool
-bps_tree_insert_or_replace(struct bps_tree *tree, bps_tree_elem_t new_elem,
+bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 			   bps_tree_elem_t *replaced);
 
 /**
@@ -541,6 +674,27 @@ bps_tree_itr_prev(const struct bps_tree *tree, struct bps_tree_iterator *itr);
  */
 int
 bps_tree_debug_check(const struct bps_tree *tree);
+
+/**
+ * @brief Debug print tree to output in readable form.
+ *  I hope you will not need it.
+ * @param tree - tree to print
+ * @param elem_fmt - format for printing an element. "%d" or "%p" for example.
+ */
+void
+bps_tree_print(const struct bps_tree *tree, const char *elem_fmt);
+
+
+/**
+ * @brief Debug print tree to output in readable form.
+ *  I hope you will not need it.
+ * @param assertme - if true, errors will lead to assert call,
+ *  if false, just error code will be returned.
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+int
+bps_tree_debug_check_internal_functions(bool assertme);
+
 /* }}} */
 
 
@@ -575,7 +729,7 @@ enum bps_block_type {
 struct bps_block {
 	/* Type of a block. See bps_block_type. Used for iterators and debug */
 	bps_tree_pos_t type;
-	/* Count of elements for leaf, and of childs for inner nodes */
+	/* Count of elements for leaf, and of children for inner nodes */
 	bps_tree_pos_t size;
 };
 
@@ -584,7 +738,7 @@ struct bps_block {
  */
 enum bps_tree_max_sizes {
 	BPS_TREE_MAX_COUNT_IN_LEAF =
-		( BPS_TREE_BLOCK_SIZE - sizeof(struct bps_block)
+		(BPS_TREE_BLOCK_SIZE - sizeof(struct bps_block)
 		 - 2 * sizeof(bps_tree_block_id_t) )
 		/ sizeof(bps_tree_elem_t),
 	BPS_TREE_MAX_COUNT_IN_INNER =
@@ -714,7 +868,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 	tree->garbage_head = 0;
 	tree->arg = arg;
 
-	pt3_construct(&tree->pt_allocator,
+	matras_create(&tree->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
 		      extent_alloc_func, extent_free_func);
 }
@@ -726,7 +880,7 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 inline void
 bps_tree_destroy(struct bps_tree *tree)
 {
-	pt3_destroy(&tree->pt_allocator);
+	matras_destroy(&tree->matras);
 }
 
 /**
@@ -749,7 +903,7 @@ bps_tree_size(const struct bps_tree *tree)
 inline size_t
 bps_tree_mem_used(const struct bps_tree *tree)
 {
-	size_t res = pt3_extents_count(&tree->pt_allocator);
+	size_t res = matras_extents_count(&tree->matras);
 	res *= BPS_TREE_EXTENT_SIZE;
 	return res;
 }
@@ -760,7 +914,7 @@ bps_tree_mem_used(const struct bps_tree *tree)
 static inline bps_block *
 bps_tree_restore_block(const struct bps_tree *tree, bps_tree_block_id_t id)
 {
-	return (bps_block *)pt3_get(&tree->pt_allocator, id);
+	return (bps_block *)matras_get(&tree->matras, id);
 }
 
 /**
@@ -1301,7 +1455,7 @@ bps_tree_create_leaf(struct bps_tree *tree, bps_tree_block_id_t *id)
 	struct bps_leaf *res = (struct bps_leaf *)
 			       bps_tree_garbage_pop(tree, id);
 	if (!res)
-		res = (struct bps_leaf *)pt3_alloc(&tree->pt_allocator, id);
+		res = (struct bps_leaf *)matras_alloc(&tree->matras, id);
 	res->header.type = BPS_TREE_BT_LEAF;
 	tree->leaf_count++;
 	return res;
@@ -1316,7 +1470,7 @@ bps_tree_create_inner(struct bps_tree *tree, bps_tree_block_id_t *id)
 	struct bps_inner *res = (struct bps_inner *)
 				bps_tree_garbage_pop(tree, id);
 	if (!res)
-		res = (struct bps_inner *)pt3_alloc(&tree->pt_allocator, id);
+		res = (struct bps_inner *)matras_alloc(&tree->matras, id);
 	res->header.type = BPS_TREE_BT_INNER;
 	tree->inner_count++;
 	return res;
@@ -1352,7 +1506,7 @@ bps_tree_reserve_blocks(struct bps_tree *tree, bps_tree_block_id_t count)
 {
 	while (tree->garbage_count < count) {
 		bps_tree_block_id_t id;
-		bps_block *block = (bps_block *)pt3_alloc(&tree->pt_allocator,
+		bps_block *block = (bps_block *)matras_alloc(&tree->matras,
 							  &id);
 		if (!block)
 			return false;
@@ -1604,7 +1758,8 @@ bps_tree_insert_into_inner(struct bps_tree *tree,
 				  inner->child_ids + pos,
 				  inner->header.size - pos, inner, inner);
 	} else {
-		inner->elems[pos - 1] = *inner_path_elem->max_elem_copy;
+		if (pos > 0)
+			inner->elems[pos - 1] = *inner_path_elem->max_elem_copy;
 		*inner_path_elem->max_elem_copy = max_elem;
 	}
 	inner->child_ids[pos] = block_id;
@@ -2720,7 +2875,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 /**
  * bps_tree_process_delete_inner declaration. See definition for details.
  */
-static inline void
+static void
 bps_tree_process_delete_inner(struct bps_tree *tree,
 			      bps_inner_path_elem *inner_path_elem);
 
@@ -3058,7 +3213,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
  * @return - true on success or false if memory allocation failed for insert
  */
 inline bool
-bps_tree_insert_or_replace(struct bps_tree *tree, bps_tree_elem_t new_elem,
+bps_tree_insert(struct bps_tree *tree, bps_tree_elem_t new_elem,
 			   bps_tree_elem_t *replaced)
 {
 	if (!tree->root)
@@ -3235,1099 +3390,1383 @@ bps_tree_debug_check(const struct bps_tree *tree)
 		result |= 0x4;
 	return result;
 }
-/* }}} */
 
-/* {{{ Unused now, but could be essential */
-#if 0
-// Debug printing to output stream
-public:
-	template <class CStream>
-	void Print(CStream &stream) const
-	{
-		if (!tree->root) {
-			stream << "Empty\n";
-			return;
-		}
-		print(stream, root);
+/**
+ * @brief Print an indent to distinguish levels of the tree in output.
+ * @param level - current printing level of a tree.
+ */
+static inline void
+bps_tree_print_indent(int level)
+{
+	for (int i = 0; i < level; i++)
+		printf("  ");
+}
+
+/**
+ * @brief Print a block of a tree.
+ * @param tree - printing tree
+ * @param block - block to print
+ * @param level - current printing level
+ * @param elem_fmt - printing format of elements
+ */
+static void
+bps_tree_print_block(const struct bps_tree *tree,
+		     const struct bps_block *block,
+		     int level, const char *elem_fmt);
+
+/**
+ * @brief Print a leaf block of a tree.
+ * @param block - block to print
+ * @param level - current printing level
+ * @param elem_fmt - printing format of elements
+ */
+static inline void
+bps_tree_print_leaf(const struct bps_leaf* block, int indent,
+		    const char *elem_fmt)
+{
+	bps_tree_print_indent(indent);
+	printf("[(%d)", (int)block->header.size);
+	for (bps_tree_pos_t i = 0; i < block->header.size; i++) {
+		printf(" ");
+		printf(elem_fmt, block->elems[i]);
 	}
+	printf("]\n");
+}
 
-private:
-	template <class CStream>
-	static void printIndent(CStream &stream, int indent)
-	{
-		for (int i = 0; i < indent; i++)
-			stream << "  ";
+/**
+ * @brief Print an inner block of a tree. Recursively prints children.
+ * @param tree - printing tree
+ * @param block - block to print
+ * @param level - current printing level
+ * @param elem_fmt - printing format of elements
+ */
+static inline void
+bps_tree_print_inner(const struct bps_tree *tree,
+		     const struct bps_inner* block,
+		     int indent, const char *elem_fmt)
+{
+	bps_block *next = bps_tree_restore_block(tree, block->child_ids[0]);
+	bps_tree_print_block(tree, next, indent + 1, elem_fmt);
+	for (bps_tree_pos_t i = 0; i < block->header.size - 1; i++) {
+		bps_tree_print_indent(indent);
+		printf(elem_fmt, block->elems[i]);
+		printf("\n");
+		next = bps_tree_restore_block(tree, block->child_ids[i + 1]);
+		bps_tree_print_block(tree, next, indent + 1, elem_fmt);
 	}
+}
 
-	template <class CStream>
-	void print(CStream &stream, const struct bps_leaf* block, int indent) const
-	{
-		printIndent(stream, indent);
-		stream << "[(" << block->header.size << ")";
-		for (bps_tree_pos_t i = 0; i < block->header.size; i++)
-			stream << " " << block->elems[i];
-		stream << "]\n";
+/**
+ * @brief Print a block of a tree.
+ * @param tree - printing tree
+ * @param block - block to print
+ * @param level - current printing level
+ * @param elem_fmt - printing format of elements
+ */
+static inline void
+bps_tree_print_block(const struct bps_tree *tree,
+		     const struct bps_block *block,
+		     int indent, const char *elem_fmt)
+{
+	if (block->type == BPS_TREE_BT_INNER)
+		bps_tree_print_inner(tree,
+				     (const struct bps_inner *)block,
+				     indent, elem_fmt);
+	else
+		bps_tree_print_leaf((const struct bps_leaf *)block,
+				    indent, elem_fmt);
+}
+
+/**
+ * @brief Debug print tree to output in readable form.
+ *  I hope you will not need it.
+ * @param tree - tree to print
+ * @param elem_fmt - format for printing an element. "%d" or "%p" for example.
+ */
+inline void
+bps_tree_print(const struct bps_tree *tree, const char *elem_fmt)
+{
+	if (tree->root == 0) {
+		printf("Empty\n");
+		return;
 	}
+	bps_tree_print_block(tree, tree->root, 0, elem_fmt);
+}
 
-	template <class CStream>
-	void print(CStream &stream, const struct bps_inner* block, int indent) const
-	{
-		bps_block *next = bps_tree_restore_block(tree, block->child_ids[0]);
-		print(stream, next, indent+1);
-		for (bps_tree_pos_t i = 0; i < block->header.size - 1; i++) {
-			printIndent(stream, indent);
-			stream << block->elems[i] << "\n";
-			next = bps_tree_restore_block(tree, block->child_ids[i + 1]);
-			print(stream, next, indent+1);
-		}
-	}
+/*
+ * Debug utilities for testing base operation on blocks:
+ * inserting, deleting, moving to left and right blocks,
+ * and (inserting and moving)
+ */
 
-	template <class CStream>
-	void print(CStream &stream, const bps_block* block, int indent = 0) const
-	{
-		if (block->header.type == BPS_TREE_BT_INNER)
-			print(stream, static_cast<const struct bps_inner *>(block), indent);
-		else
-			print(stream, static_cast<const struct bps_leaf *>(block), indent);
-	}
+/**
+ * @brief Assign a value to an element.
+ * Used for debug self-check
+ */
+static inline void
+bps_tree_debug_set_elem(bps_tree_elem_t *elem, unsigned char c)
+{
+	memset(elem, 0, sizeof(bps_tree_elem_t));
+	*(unsigned char *)elem = c;
+}
+
+/**
+ * @brief Get previously assigned value from an element.
+ * Used for debug self-check
+ */
+static inline unsigned char
+bps_tree_debug_get_elem(bps_tree_elem_t *elem)
+{
+	return *(unsigned char *)elem;
+}
 
 
-};
-#endif
+/**
+ * @brief Assign a value to an element in inner block.
+ * Used for debug self-check
+ */
+static inline void
+bps_tree_debug_set_elem_inner(bps_inner_path_elem *path_elem,
+			      bps_tree_pos_t pos, unsigned char c)
+{
+	assert(pos >= 0);
+	assert(pos < path_elem->block->header.size);
+	if (pos < path_elem->block->header.size - 1)
+		bps_tree_debug_set_elem(path_elem->block->elems + pos, c);
+	else
+		bps_tree_debug_set_elem(path_elem->max_elem_copy, c);
+}
 
-#if 0
+/**
+ * @brief Get previously assigned value from an element in inner block.
+ * Used for debug self-check
+ */
+static inline unsigned char
+bps_tree_debug_get_elem_inner(const bps_inner_path_elem *path_elem,
+			      bps_tree_pos_t pos)
+{
+	assert(pos >= 0);
+	assert(pos < path_elem->block->header.size);
+	if (pos < path_elem->block->header.size - 1)
+		return bps_tree_debug_get_elem(path_elem->block->elems + pos);
+	else
+		return bps_tree_debug_get_elem(path_elem->max_elem_copy);
+}
 
-// Debug utilities for testing base operation on blocks: inserting, deleting, moving to left and right blocks, and (inserting and moving)
-public:
-	static int InternalMechanismCheck(bool assertme)
-	{
-		This_t test;
-		return test.internalMechanismCheck(assertme);
-	}
+/**
+ * @brief Check all possible insertions into a leaf.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_into_leaf(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 0; i < szlim; i++) {
+		for (unsigned int j = 0; j <= i; j++) {
+			tree->size = 0;
+			struct bps_leaf block;
+			block.header.type = BPS_TREE_BT_LEAF;
+			block.header.size = i;
+			for (unsigned int k = 0; k < szlim; k++)
+				if (k < j)
+					bps_tree_debug_set_elem(block.elems + k,
+						k);
+				else
+					bps_tree_debug_set_elem(block.elems + k,
+						k + 1);
+			struct bps_leaf_path_elem path_elem;
+			bps_tree_elem_t max;
+			bps_tree_elem_t ins;
+			bps_tree_debug_set_elem(&max, i + 1);
+			bps_tree_debug_set_elem(&ins, j);
+			path_elem.block = &block;
+			path_elem.insertion_point = j;
+			path_elem.max_elem_copy = &max;
 
-private:
-	static void debugSetElem(bps_tree_elem_t &elem, unsigned char c)
-	{
-		memset(&elem, 0, sizeof(bps_tree_elem_t));
-		*(unsigned char *)&elem = c;
-	}
+			bps_tree_insert_into_leaf(tree, &path_elem, ins);
 
-	static unsigned char debugGetElem(const bps_tree_elem_t &elem)
-	{
-		return *(unsigned char *)&elem;
-	}
-
-	static void debugSetElem(bps_inner_path_elem &path_elem, bps_tree_pos_t pos, unsigned char c)
-	{
-		assert(pos >= 0);
-		assert(pos < path_elem.block->header.size);
-		if (pos < path_elem.block->header.size - 1)
-			debugSetElem(path_elem.block->elems[pos], c);
-		else
-			debugSetElem(*path_elem.max_elem_copy, c);
-	}
-
-	static unsigned char debugGetElem(const bps_inner_path_elem &path_elem, bps_tree_pos_t pos)
-	{
-		assert(pos >= 0);
-		assert(pos < path_elem.block->header.size);
-		if (pos < path_elem.block->header.size - 1)
-			return *(unsigned char *)(path_elem.block->elems + pos);
-		else
-			return *(unsigned char *)(path_elem.max_elem_copy);
-	}
-
-	int internalMechanismCheckInsertLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i < struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= i; j++) {
-				size = 0;
-				struct bps_leaf block;
-				block.header.size = i;
-				for (unsigned int k = 0; k < struct bps_leaf::ElemMaxCount; k++)
-					if (k < j)
-						debugSetElem(block.elems[k], k);
-					else
-						debugSetElem(block.elems[k], k + 1);
-				struct bps_leaf_path_elem path_elem;
-				bps_tree_elem_t max, ins;
-				debugSetElem(max, i + 1);
-				debugSetElem(ins, j);
-				path_elem.block = &block;
-				path_elem.insertion_point = j;
-				path_elem.max_elem_copy = &max;
-				if (!simpleInsert(path_elem, ins)) {
-					result |= (1 << 0);
-					assert(!assertme);
-				}
-
-				if (block.header.size != bps_tree_pos_t(i + 1) || size != bps_tree_pos_t(1)) {
-					result |= (1 << 0);
-					assert(!assertme);
-				}
-				if (debugGetElem(max) != debugGetElem(block.LastElem())) {
+			if (block.header.size != bps_tree_pos_t(i + 1)
+				|| tree->size != bps_tree_pos_t(1)) {
+				result |= (1 << 0);
+				assert(!assertme);
+			}
+			if (bps_tree_debug_get_elem(&max)
+				!= bps_tree_debug_get_elem(
+					block.elems + block.header.size - 1)) {
+				result |= (1 << 1);
+				assert(!assertme);
+			}
+			for (unsigned int k = 0; k <= i; k++) {
+				if (bps_tree_debug_get_elem(block.elems + k)
+					!= (unsigned char) k) {
 					result |= (1 << 1);
 					assert(!assertme);
 				}
-				for (unsigned int k = 0; k <= i; k++) {
-					if (debugGetElem(block.elems[k]) != (unsigned char)k) {
-						result |= (1 << 1);
-						assert(!assertme);
-					}
-				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckDeleteLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 1; i <= struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j < i; j++) {
-				size = 1;
-				struct bps_leaf block;
-				block.header.size = i;
-				for (unsigned int k = 0; k < struct bps_leaf::ElemMaxCount; k++)
-					debugSetElem(block.elems[k], k);
-				struct bps_leaf_path_elem path_elem;
-				bps_tree_elem_t max;
-				debugSetElem(max, j == i - 1 ? i - 2 : i - 1);
-				path_elem.block = &block;
-				path_elem.insertion_point = j;
-				path_elem.max_elem_copy = &max;
-				if (!simpleDelete(path_elem)) {
-					result |= (1 << 2);
-					assert(!assertme);
-				}
+/**
+ * @brief Check all possible deleting from a leaf.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_delete_from_leaf(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 1; i <= szlim; i++) {
+		for (unsigned int j = 0; j < i; j++) {
+			tree->size = 1;
+			struct bps_leaf block;
+			block.header.type = BPS_TREE_BT_LEAF;
+			block.header.size = i;
+			for (unsigned int k = 0; k < i; k++)
+				bps_tree_debug_set_elem(block.elems + k, k);
+			struct bps_leaf_path_elem path_elem;
+			bps_tree_elem_t max;
+			bps_tree_debug_set_elem(&max,
+				j == i - 1 ? i - 2 : i - 1);
+			path_elem.block = &block;
+			path_elem.insertion_point = j;
+			path_elem.max_elem_copy = &max;
 
-				if (block.header.size != bps_tree_pos_t(i - 1) || size != bps_tree_pos_t(0)) {
-					result |= (1 << 2);
-					assert(!assertme);
-				}
-				if (i > 1 && debugGetElem(max) != debugGetElem(block.LastElem())) {
+			bps_tree_delete_from_leaf(tree, &path_elem);
+
+			if (block.header.size != bps_tree_pos_t(i - 1)
+				|| tree->size != bps_tree_pos_t(0)) {
+				result |= (1 << 2);
+				assert(!assertme);
+			}
+			if (i > 1
+				&& bps_tree_debug_get_elem(&max)
+					!= bps_tree_debug_get_elem(
+						block.elems + block.header.size
+							- 1)) {
+				result |= (1 << 3);
+				assert(!assertme);
+			}
+			for (unsigned int k = 0; k < i - 1; k++) {
+				if (bps_tree_debug_get_elem(block.elems + k)
+					!= (unsigned char) (k < j ? k : k + 1)) {
 					result |= (1 << 3);
 					assert(!assertme);
 				}
-				for (unsigned int k = 0; k < i - 1; k++) {
-					if (debugGetElem(block.elems[k]) != (unsigned char)( k < j ? k : k + 1)) {
-						result |= (1 << 3);
-						assert(!assertme);
-					}
-				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckMoveRightLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_leaf::ElemMaxCount; j++) {
-				unsigned int maxMove = i < struct bps_leaf::ElemMaxCount - j ? i : struct bps_leaf::ElemMaxCount - j;
-				for (unsigned int k = 1; k <= maxMove; k++) {
+/**
+ * @brief Check all possible moving right of leafs.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_move_to_right_leaf(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move = i < szlim - j ? i : szlim - j;
+			for (unsigned int k = 1; k <= max_move; k++) {
+				struct bps_leaf a, b;
+				a.header.type = BPS_TREE_BT_LEAF;
+				a.header.size = i;
+				b.header.type = BPS_TREE_BT_LEAF;
+				b.header.size = j;
+				memset(a.elems, 0xFF, sizeof(a.elems));
+				memset(b.elems, 0xFF, sizeof(b.elems));
+				unsigned char c = 0;
+				for (unsigned int u = 0; u < i; u++)
+					bps_tree_debug_set_elem(a.elems + u,
+						c++);
+				for (unsigned int u = 0; u < j; u++)
+					bps_tree_debug_set_elem(b.elems + u,
+						c++);
+				bps_tree_elem_t ma;
+				bps_tree_debug_set_elem(&ma, 0xFF);
+				bps_tree_elem_t mb;
+				bps_tree_debug_set_elem(&mb, 0xFF);
+				if (i)
+					ma = a.elems[i - 1];
+				if (j)
+					mb = b.elems[j - 1];
+
+				struct bps_leaf_path_elem a_path_elem,
+					b_path_elem;
+				a_path_elem.block = &a;
+				a_path_elem.max_elem_copy = &ma;
+				b_path_elem.block = &b;
+				b_path_elem.max_elem_copy = &mb;
+
+				bps_tree_move_elems_to_right_leaf(tree,
+					&a_path_elem, &b_path_elem,
+					(bps_tree_pos_t) k);
+
+				if (a.header.size != (bps_tree_pos_t) (i - k)) {
+					result |= (1 << 4);
+					assert(!assertme);
+				}
+				if (b.header.size != (bps_tree_pos_t) (j + k)) {
+					result |= (1 << 4);
+					assert(!assertme);
+				}
+
+				if (a.header.size)
+					if (ma != a.elems[a.header.size - 1]) {
+						result |= (1 << 5);
+						assert(!assertme);
+					}
+				if (b.header.size)
+					if (mb != b.elems[b.header.size - 1]) {
+						result |= (1 << 5);
+						assert(!assertme);
+					}
+
+				c = 0;
+				for (unsigned int u = 0;
+					u < (unsigned int) a.header.size; u++)
+					if (bps_tree_debug_get_elem(a.elems + u)
+						!= c++) {
+						result |= (1 << 5);
+						assert(!assertme);
+					}
+				for (unsigned int u = 0;
+					u < (unsigned int) b.header.size; u++)
+					if (bps_tree_debug_get_elem(b.elems + u)
+						!= c++) {
+						result |= (1 << 5);
+						assert(!assertme);
+					}
+			}
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief Check all possible moving left of leafs.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_move_to_left_leaf(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move = j < szlim - i ? j : szlim - i;
+			for (unsigned int k = 1; k <= max_move; k++) {
+				struct bps_leaf a, b;
+				a.header.type = BPS_TREE_BT_LEAF;
+				a.header.size = i;
+				b.header.type = BPS_TREE_BT_LEAF;
+				b.header.size = j;
+
+				memset(a.elems, 0xFF, sizeof(a.elems));
+				memset(b.elems, 0xFF, sizeof(b.elems));
+				unsigned char c = 0;
+				for (unsigned int u = 0; u < i; u++)
+					bps_tree_debug_set_elem(a.elems + u,
+						c++);
+				for (unsigned int u = 0; u < j; u++)
+					bps_tree_debug_set_elem(b.elems + u,
+						c++);
+				bps_tree_elem_t ma;
+				bps_tree_debug_set_elem(&ma, 0xFF);
+				bps_tree_elem_t mb;
+				bps_tree_debug_set_elem(&mb, 0xFF);
+				if (i)
+					ma = a.elems[i - 1];
+				if (j)
+					mb = b.elems[j - 1];
+
+				struct bps_leaf_path_elem a_path_elem,
+					b_path_elem;
+				a_path_elem.block = &a;
+				a_path_elem.max_elem_copy = &ma;
+				b_path_elem.block = &b;
+				b_path_elem.max_elem_copy = &mb;
+
+				bps_tree_move_elems_to_left_leaf(tree,
+					&a_path_elem, &b_path_elem,
+					(bps_tree_pos_t) k);
+
+				if (a.header.size != (bps_tree_pos_t) (i + k)) {
+					result |= (1 << 6);
+					assert(!assertme);
+				}
+				if (b.header.size != (bps_tree_pos_t) (j - k)) {
+					result |= (1 << 6);
+					assert(!assertme);
+				}
+
+				if (a.header.size)
+					if (ma != a.elems[a.header.size - 1]) {
+						result |= (1 << 7);
+						assert(!assertme);
+					}
+				if (b.header.size)
+					if (mb != b.elems[b.header.size - 1]) {
+						result |= (1 << 7);
+						assert(!assertme);
+					}
+
+				c = 0;
+				for (unsigned int u = 0;
+					u < (unsigned int) a.header.size; u++)
+					if (bps_tree_debug_get_elem(a.elems + u)
+						!= c++) {
+						result |= (1 << 7);
+						assert(!assertme);
+					}
+				for (unsigned int u = 0;
+					u < (unsigned int) b.header.size; u++)
+					if (bps_tree_debug_get_elem(b.elems + u)
+						!= c++) {
+						result |= (1 << 7);
+						assert(!assertme);
+					}
+			}
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief Check all possible insertion and moving right of leafs.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_and_move_to_right_leaf(struct bps_tree *tree,
+						   bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move =
+				i + 1 < szlim - j ? i + 1 : szlim - j;
+			for (unsigned int k = 0; k <= i; k++) {
+				for (unsigned int u = 1; u <= max_move; u++) {
 					struct bps_leaf a, b;
+					a.header.type = BPS_TREE_BT_LEAF;
+					a.header.size = i;
+					b.header.type = BPS_TREE_BT_LEAF;
+					b.header.size = j;
 					memset(a.elems, 0xFF, sizeof(a.elems));
 					memset(b.elems, 0xFF, sizeof(b.elems));
-					a.header.size = i;
-					b.header.size = j;
 					unsigned char c = 0;
-					for (unsigned int u = 0; u < i; u++)
-						debugSetElem(a.elems[u], c++);
-					for (unsigned int u = 0; u < j; u++)
-						debugSetElem(b.elems[u], c++);
-					bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-					if (i)
-						ma = a.LastElem();
-					if (j)
-						mb = b.LastElem();
-
-					struct bps_leaf_path_elem aExt, bExt;
-					aExt.block = &a;
-					aExt.max_elem_copy = &ma;
-					bExt.block = &b;
-					bExt.max_elem_copy = &mb;
-
-					if (j) {
-						const bool move_to_empty = false;
-						if (k < i) {
-							const bool move_all = false;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					} else {
-						const bool move_to_empty = true;
-						if (k < i) {
-							const bool move_all = false;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					}
-
-					if (a.header.size != (bps_tree_pos_t)(i - k)) {
-						result |= (1 << 4);
-						assert(!assertme);
-					}
-					if (b.header.size != (bps_tree_pos_t)(j + k)) {
-						result |= (1 << 4);
-						assert(!assertme);
-					}
-
-					if (i - k)
-						if (ma != a.LastElem()) {
-							result |= (1 << 5);
-							assert(!assertme);
-						}
-					if (j + k)
-						if (mb != b.LastElem()) {
-							result |= (1 << 5);
-							assert(!assertme);
-						}
-
-					c = 0;
-					for (unsigned int u = 0; u < (unsigned int)a.header.size; u++)
-						if (debugGetElem(a.elems[u]) != c++) {
-							result |= (1 << 5);
-							assert(!assertme);
-						}
-					for (unsigned int u = 0; u < (unsigned int)b.header.size; u++)
-						if (debugGetElem(b.elems[u]) != c++) {
-							result |= (1 << 5);
-							assert(!assertme);
-						}
-				}
-			}
-		}
-		return result;
-	}
-
-	int internalMechanismCheckMoveLeftLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_leaf::ElemMaxCount; j++) {
-				unsigned int maxMove = j < struct bps_leaf::ElemMaxCount - i ? j : struct bps_leaf::ElemMaxCount - i;
-				for (unsigned int k = 1; k <= maxMove; k++) {
-					struct bps_leaf a, b;
-					memset(a.elems, 0xFF, sizeof(a.elems));
-					memset(b.elems, 0xFF, sizeof(b.elems));
-					a.header.size = i;
-					b.header.size = j;
-					unsigned char c = 0;
-					for (unsigned int u = 0; u < i; u++)
-						debugSetElem(a.elems[u], c++);
-					for (unsigned int u = 0; u < j; u++)
-						debugSetElem(b.elems[u], c++);
-					bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-					if (i)
-						ma = a.LastElem();
-					if (j)
-						mb = b.LastElem();
-
-					struct bps_leaf_path_elem aExt, bExt;
-					aExt.block = &a;
-					aExt.max_elem_copy = &ma;
-					bExt.block = &b;
-					bExt.max_elem_copy = &mb;
-
-					if (i) {
-						const bool move_to_empty = false;
-						if (k < j) {
-							const bool move_all = false;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					} else {
-						const bool move_to_empty = true;
-						if (k < j) {
-							const bool move_all = false;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					}
-
-					if (a.header.size != (bps_tree_pos_t)(i + k)) {
-						result |= (1 << 6);
-						assert(!assertme);
-					}
-					if (b.header.size != (bps_tree_pos_t)(j - k)) {
-						result |= (1 << 6);
-						assert(!assertme);
-					}
-
-					if (i + k)
-						if (ma != a.LastElem()) {
-							result |= (1 << 7);
-							assert(!assertme);
-						}
-					if (j - k)
-						if (mb != b.LastElem()) {
-							result |= (1 << 7);
-							assert(!assertme);
-						}
-
-					c = 0;
-					for (unsigned int u = 0; u < (unsigned int)a.header.size; u++)
-						if (debugGetElem(a.elems[u]) != c++) {
-							result |= (1 << 7);
-							assert(!assertme);
-						}
-					for (unsigned int u = 0; u < (unsigned int)b.header.size; u++)
-						if (debugGetElem(b.elems[u]) != c++) {
-							result |= (1 << 7);
-							assert(!assertme);
-						}
-				}
-			}
-		}
-		return result;
-	}
-
-	int internalMechanismCheckMoveRightInsertLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_leaf::ElemMaxCount; j++) {
-				unsigned int maxMove = i + 1 < struct bps_leaf::ElemMaxCount - j ? i + 1 : struct bps_leaf::ElemMaxCount - j;
-				for (unsigned int k = 0; k <= i; k++) {
-					for (unsigned int u = 1; u <= maxMove; u++) {
-						struct bps_leaf a, b;
-						memset(a.elems, 0xFF, sizeof(a.elems));
-						memset(b.elems, 0xFF, sizeof(b.elems));
-						a.header.size = i;
-						b.header.size = j;
-						unsigned char c = 0;
-						unsigned char ic = i + j;
-						for (unsigned int v = 0; v < i; v++) {
-							if (v == k)
-								ic = c++;
-							debugSetElem(a.elems[v], c++);
-						}
-						if (k == i)
+					unsigned char ic = i + j;
+					for (unsigned int v = 0; v < i; v++) {
+						if (v == k)
 							ic = c++;
-						for (unsigned int v = 0; v < j; v++)
-							debugSetElem(b.elems[v], c++);
-						bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-						if (i)
-							ma = a.LastElem();
-						if (j)
-							mb = b.LastElem();
-
-						struct bps_leaf_path_elem aExt, bExt;
-						aExt.block = &a;
-						aExt.max_elem_copy = &ma;
-						bExt.block = &b;
-						bExt.max_elem_copy = &mb;
-						aExt.insertion_point = k;
-						bps_tree_elem_t ins;
-						debugSetElem(ins, ic);
-
-						if (j) {
-							const bool move_to_empty = false;
-							if (u < i + 1) {
-								const bool move_all = false;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							} else {
-								const bool move_all = true;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							}
-						} else {
-							const bool move_to_empty = true;
-							if (u < i + 1) {
-								const bool move_all = false;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							} else {
-								const bool move_all = true;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							}
-						}
-
-						if (a.header.size != (bps_tree_pos_t)(i - u + 1)) {
-							result |= (1 << 8);
-							assert(!assertme);
-						}
-						if (b.header.size != (bps_tree_pos_t)(j + u)) {
-							result |= (1 << 8);
-							assert(!assertme);
-						}
-
-						if (i - u + 1)
-							if (ma != a.LastElem()) {
-								result |= (1 << 9);
-								assert(!assertme);
-							}
-						if (j + u)
-							if (mb != b.LastElem()) {
-								result |= (1 << 9);
-								assert(!assertme);
-							}
-
-						c = 0;
-						for (unsigned int v = 0; v < (unsigned int)a.header.size; v++)
-							if (debugGetElem(a.elems[v]) != c++) {
-								result |= (1 << 9);
-								assert(!assertme);
-							}
-						for (unsigned int v = 0; v < (unsigned int)b.header.size; v++)
-							if (debugGetElem(b.elems[v]) != c++) {
-								result |= (1 << 9);
-								assert(!assertme);
-							}
-
-
+						bps_tree_debug_set_elem(
+							a.elems + v, c++);
 					}
+					if (k == i)
+						ic = c++;
+					for (unsigned int v = 0; v < j; v++)
+						bps_tree_debug_set_elem(
+							b.elems + v, c++);
+					bps_tree_elem_t ma;
+					bps_tree_debug_set_elem(&ma, 0xFF);
+					bps_tree_elem_t mb;
+					bps_tree_debug_set_elem(&mb, 0xFF);
+					if (i)
+						ma = a.elems[i - 1];
+					if (j)
+						mb = b.elems[j - 1];
+
+					struct bps_leaf_path_elem a_path_elem,
+						b_path_elem;
+					a_path_elem.block = &a;
+					a_path_elem.max_elem_copy = &ma;
+					b_path_elem.block = &b;
+					b_path_elem.max_elem_copy = &mb;
+					a_path_elem.insertion_point = k;
+					bps_tree_elem_t ins;
+					bps_tree_debug_set_elem(&ins, ic);
+
+					bps_tree_insert_and_move_elems_to_right_leaf(
+						tree, &a_path_elem,
+						&b_path_elem,
+						(bps_tree_pos_t) u, ins);
+
+					if (a.header.size
+						!= (bps_tree_pos_t) (i - u + 1)) {
+						result |= (1 << 8);
+						assert(!assertme);
+					}
+					if (b.header.size
+						!= (bps_tree_pos_t) (j + u)) {
+						result |= (1 << 8);
+						assert(!assertme);
+					}
+
+					if (i - u + 1)
+						if (ma
+							!= a.elems[a.header.size
+								- 1]) {
+							result |= (1 << 9);
+							assert(!assertme);
+						}
+					if (j + u)
+						if (mb
+							!= b.elems[b.header.size
+								- 1]) {
+							result |= (1 << 9);
+							assert(!assertme);
+						}
+
+					c = 0;
+					for (unsigned int v = 0;
+						v < (unsigned int) a.header.size;
+						v++)
+						if (bps_tree_debug_get_elem(
+							a.elems + v) != c++) {
+							result |= (1 << 9);
+							assert(!assertme);
+						}
+					for (unsigned int v = 0;
+						v < (unsigned int) b.header.size;
+						v++)
+						if (bps_tree_debug_get_elem(
+							b.elems + v) != c++) {
+							result |= (1 << 9);
+							assert(!assertme);
+						}
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckMoveLeftInsertLeaf(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_leaf::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_leaf::ElemMaxCount; j++) {
-				unsigned int maxMove = j + 1 < struct bps_leaf::ElemMaxCount - i ? j + 1 : struct bps_leaf::ElemMaxCount - i;
-				for (unsigned int k = 0; k <= j; k++) {
-					for (unsigned int u = 1; u <= maxMove; u++) {
-						struct bps_leaf a, b;
-						memset(a.elems, 0xFF, sizeof(a.elems));
-						memset(b.elems, 0xFF, sizeof(b.elems));
-						a.header.size = i;
-						b.header.size = j;
-						unsigned char c = 0;
-						unsigned char ic = i + j;
-						for (unsigned int v = 0; v < i; v++)
-							debugSetElem(a.elems[v], c++);
-						for (unsigned int v = 0; v < j; v++) {
-							if (v == k)
-								ic = c++;
-							debugSetElem(b.elems[v], c++);
-						}
-						bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-						if (i)
-							ma = a.LastElem();
-						if (j)
-							mb = b.LastElem();
-
-						struct bps_leaf_path_elem aExt, bExt;
-						aExt.block = &a;
-						aExt.max_elem_copy = &ma;
-						bExt.block = &b;
-						bExt.max_elem_copy = &mb;
-						bExt.insertion_point = k;
-						bps_tree_elem_t ins;
-						debugSetElem(ins, ic);
-
-						if (i) {
-							const bool move_to_empty = false;
-							if (u < j + 1) {
-								const bool move_all = false;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							} else {
-								const bool move_all = true;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							}
-						} else {
-							const bool move_to_empty = true;
-							if (u < j + 1) {
-								const bool move_all = false;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							} else {
-								const bool move_all = true;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, ins);
-							}
-						}
-
-						if (a.header.size != (bps_tree_pos_t)(i + u)) {
-							result |= (1 << 10);
-							assert(!assertme);
-						}
-						if (b.header.size != (bps_tree_pos_t)(j - u + 1)) {
-							result |= (1 << 10);
-							assert(!assertme);
-						}
-
-						if (i + u)
-							if (ma != a.LastElem()) {
-								result |= (1 << 11);
-								assert(!assertme);
-							}
-						if (j - u + 1)
-							if (mb != b.LastElem()) {
-								result |= (1 << 11);
-								assert(!assertme);
-							}
-
-						c = 0;
-						for (unsigned int v = 0; v < (unsigned int)a.header.size; v++)
-							if (debugGetElem(a.elems[v]) != c++) {
-								result |= (1 << 11);
-								assert(!assertme);
-							}
-						for (unsigned int v = 0; v < (unsigned int)b.header.size; v++)
-							if (debugGetElem(b.elems[v]) != c++) {
-								result |= (1 << 11);
-								assert(!assertme);
-							}
-
-
+/**
+ * @brief Check all possible insertion and moving left of leafs.
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_and_move_to_left_leaf(struct bps_tree *tree,
+						  bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_LEAF;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move =
+				j + 1 < szlim - i ? j + 1 : szlim - i;
+			for (unsigned int k = 0; k <= j; k++) {
+				for (unsigned int u = 1; u <= max_move; u++) {
+					struct bps_leaf a, b;
+					a.header.type = BPS_TREE_BT_LEAF;
+					a.header.size = i;
+					b.header.type = BPS_TREE_BT_LEAF;
+					b.header.size = j;
+					memset(a.elems, 0xFF, sizeof(a.elems));
+					memset(b.elems, 0xFF, sizeof(b.elems));
+					unsigned char c = 0;
+					unsigned char ic = i + j;
+					for (unsigned int v = 0; v < i; v++)
+						bps_tree_debug_set_elem(
+							a.elems + v, c++);
+					for (unsigned int v = 0; v < j; v++) {
+						if (v == k)
+							ic = c++;
+						bps_tree_debug_set_elem(
+							b.elems + v, c++);
 					}
+					bps_tree_elem_t ma;
+					bps_tree_debug_set_elem(&ma, 0xFF);
+					bps_tree_elem_t mb;
+					bps_tree_debug_set_elem(&mb, 0xFF);
+					if (i)
+						ma = a.elems[i - 1];
+					if (j)
+						mb = b.elems[j - 1];
+
+					struct bps_leaf_path_elem a_path_elem,
+						b_path_elem;
+					a_path_elem.block = &a;
+					a_path_elem.max_elem_copy = &ma;
+					b_path_elem.block = &b;
+					b_path_elem.max_elem_copy = &mb;
+					b_path_elem.insertion_point = k;
+					bps_tree_elem_t ins;
+					bps_tree_debug_set_elem(&ins, ic);
+
+					bps_tree_insert_and_move_elems_to_left_leaf(
+						tree, &a_path_elem,
+						&b_path_elem,
+						(bps_tree_pos_t) u, ins);
+
+					if (a.header.size
+						!= (bps_tree_pos_t) (i + u)) {
+						result |= (1 << 10);
+						assert(!assertme);
+					}
+					if (b.header.size
+						!= (bps_tree_pos_t) (j - u + 1)) {
+						result |= (1 << 10);
+						assert(!assertme);
+					}
+
+					if (i + u)
+						if (ma
+							!= a.elems[a.header.size
+								- 1]) {
+							result |= (1 << 11);
+							assert(!assertme);
+						}
+					if (j - u + 1)
+						if (mb
+							!= b.elems[b.header.size
+								- 1]) {
+							result |= (1 << 11);
+							assert(!assertme);
+						}
+
+					c = 0;
+					for (unsigned int v = 0;
+						v < (unsigned int) a.header.size;
+						v++)
+						if (bps_tree_debug_get_elem(
+							a.elems + v) != c++) {
+							result |= (1 << 11);
+							assert(!assertme);
+						}
+					for (unsigned int v = 0;
+						v < (unsigned int) b.header.size;
+						v++)
+						if (bps_tree_debug_get_elem(
+							b.elems + v) != c++) {
+							result |= (1 << 11);
+							assert(!assertme);
+						}
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckInsertInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i < struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= i; j++) {
-				size = 0;
+/**
+ * @brief Check all possible insertion to an inner
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_into_inner(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 0; i < szlim; i++) {
+		for (unsigned int j = 0; j <= i; j++) {
+			tree->size = 0;
 
-				struct bps_inner block;
-				memset(block.elems, 0xFF, sizeof(block.elems));
-				memset(block.child_ids, 0xFF, sizeof(block.child_ids));
-				block.header.size = i;
+			struct bps_inner block;
+			block.header.type = BPS_TREE_BT_INNER;
+			block.header.size = i;
+			memset(block.elems, 0xFF, sizeof(block.elems));
+			memset(block.child_ids, 0xFF, sizeof(block.child_ids));
 
-				bps_tree_elem_t max, ins;
-				debugSetElem(ins, j);
+			bps_tree_elem_t max;
+			bps_tree_elem_t ins;
+			bps_tree_debug_set_elem(&ins, j);
 
-				bps_inner_path_elem path_elem;
-				path_elem.block = &block;
-				path_elem.max_elem_copy = &max;
+			bps_inner_path_elem path_elem;
+			path_elem.block = &block;
+			path_elem.max_elem_copy = &max;
 
-				for (unsigned int k = 0; k < i; k++) {
-					if (k < j)
-						debugSetElem(path_elem, k, k);
-					else
-						debugSetElem(path_elem, k, k + 1);
-				}
-				for (unsigned int k = 0; k < i; k++)
-					if (k < j)
-						block.child_ids[k] = (bps_tree_block_id_t)k;
-					else
-						block.child_ids[k] = (bps_tree_block_id_t)(k + 1);
+			for (unsigned int k = 0; k < i; k++) {
+				if (k < j)
+					bps_tree_debug_set_elem_inner(
+						&path_elem, k, k);
+				else
+					bps_tree_debug_set_elem_inner(
+						&path_elem, k, k + 1);
+			}
+			for (unsigned int k = 0; k < i; k++)
+				if (k < j)
+					block.child_ids[k] =
+						(bps_tree_block_id_t) k;
+				else
+					block.child_ids[k] =
+						(bps_tree_block_id_t) (k + 1);
 
-				bps_inner_path_elem newExt;
-				newExt.max_elem_copy = &ins;
-				newExt.block_id = j;
-				newExt.posInParent = j;
+			bps_tree_insert_into_inner(tree, &path_elem,
+				(bps_tree_block_id_t) j, (bps_tree_pos_t) j,
+				ins);
 
-				if (!simpleInsert(path_elem, newExt)) {
+			for (unsigned int k = 0; k <= i; k++) {
+				if (bps_tree_debug_get_elem_inner(&path_elem, k)
+					!= (unsigned char) k) {
 					result |= (1 << 12);
 					assert(!assertme);
 				}
-
-				for (unsigned int k = 0; k <= i; k++) {
-					if (debugGetElem(path_elem, k) != (unsigned char)k) {
-						result |= (1 << 13);
-						assert(!assertme);
-					}
-				}
-				for (unsigned int k = 0; k <= i; k++) {
-					if (block.child_ids[k] != k) {
-						result |= (1 << 13);
-						assert(!assertme);
-					}
+			}
+			for (unsigned int k = 0; k <= i; k++) {
+				if (block.child_ids[k] != k) {
+					result |= (1 << 13);
+					assert(!assertme);
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckDeleteInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 1; i <= struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j < i; j++) {
-				struct bps_inner block;
-				block.header.size = i;
-				for (unsigned int k = 0; k < struct bps_inner::ElemMaxCount - 1; k++)
-					debugSetElem(block.elems[k], k);
-				for (unsigned int k = 0; k < struct bps_inner::ElemMaxCount; k++)
-					block.child_ids[k] = k;
-				bps_inner_path_elem path_elem;
-				bps_tree_elem_t max;
-				debugSetElem(max, i - 1);
-				path_elem.block = &block;
-				path_elem.insertion_point = j;
-				path_elem.max_elem_copy = &max;
-				if (!simpleDelete(path_elem)) {
+/**
+ * @brief Check all possible deletions from an inner
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_delete_from_inner(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 1; i <= szlim; i++) {
+		for (unsigned int j = 0; j < i; j++) {
+			struct bps_inner block;
+			block.header.type = BPS_TREE_BT_INNER;
+			block.header.size = i;
+			for (unsigned int k = 0; k < szlim - 1; k++)
+				bps_tree_debug_set_elem(block.elems + k, k);
+			for (unsigned int k = 0; k < szlim; k++)
+				block.child_ids[k] = k;
+			bps_inner_path_elem path_elem;
+			bps_tree_elem_t max;
+			bps_tree_debug_set_elem(&max, i - 1);
+			path_elem.block = &block;
+			path_elem.insertion_point = j;
+			path_elem.max_elem_copy = &max;
+
+			bps_tree_delete_from_inner(tree, &path_elem);
+
+			unsigned char c = 0;
+			bps_tree_block_id_t kk = 0;
+			for (unsigned int k = 0; k < i - 1; k++) {
+				if (k == j) {
+					c++;
+					kk++;
+				}
+				if (bps_tree_debug_get_elem_inner(&path_elem, k)
+					!= c++) {
 					result |= (1 << 14);
 					assert(!assertme);
 				}
+				if (block.child_ids[k] != kk++) {
+					result |= (1 << 15);
+					assert(!assertme);
+				}
+			}
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief Check all possible moving right of inners
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_move_to_right_inner(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move = i < szlim - j ? i : szlim - j;
+			for (unsigned int k = 1; k <= max_move; k++) {
+				struct bps_inner a, b;
+				a.header.type = BPS_TREE_BT_INNER;
+				a.header.size = i;
+				b.header.type = BPS_TREE_BT_INNER;
+				b.header.size = j;
+				memset(a.elems, 0xFF, sizeof(a.elems));
+				memset(b.elems, 0xFF, sizeof(b.elems));
+				memset(a.child_ids, 0xFF, sizeof(a.child_ids));
+				memset(b.child_ids, 0xFF, sizeof(b.child_ids));
+
+				bps_tree_elem_t ma;
+				bps_tree_debug_set_elem(&ma, 0xFF);
+				bps_tree_elem_t mb;
+				bps_tree_debug_set_elem(&mb, 0xFF);
+
+				bps_inner_path_elem a_path_elem, b_path_elem;
+				a_path_elem.block = &a;
+				a_path_elem.max_elem_copy = &ma;
+				b_path_elem.block = &b;
+				b_path_elem.max_elem_copy = &mb;
 
 				unsigned char c = 0;
 				bps_tree_block_id_t kk = 0;
-				for (unsigned int k = 0; k < i - 1; k++) {
-					if (k == j) {
-						c++;
-						kk++;
-					}
-					if (debugGetElem(path_elem, k) != c++) {
-						result |= (1 << 15);
+				for (unsigned int u = 0; u < i; u++) {
+					bps_tree_debug_set_elem_inner(
+						&a_path_elem, u, c++);
+					a.child_ids[u] = kk++;
+				}
+				for (unsigned int u = 0; u < j; u++) {
+					bps_tree_debug_set_elem_inner(
+						&b_path_elem, u, c++);
+					b.child_ids[u] = kk++;
+				}
+
+				bps_tree_move_elems_to_right_inner(tree,
+					&a_path_elem, &b_path_elem,
+					(bps_tree_pos_t) k);
+
+				if (a.header.size != (bps_tree_pos_t) (i - k)) {
+					result |= (1 << 16);
+					assert(!assertme);
+				}
+				if (b.header.size != (bps_tree_pos_t) (j + k)) {
+					result |= (1 << 16);
+					assert(!assertme);
+				}
+
+				c = 0;
+				kk = 0;
+				for (unsigned int u = 0;
+					u < (unsigned int) a.header.size; u++) {
+					if (bps_tree_debug_get_elem_inner(
+						&a_path_elem, u) != c++) {
+						result |= (1 << 17);
 						assert(!assertme);
 					}
-					if (block.child_ids[k] != kk++) {
-						result |= (1 << 15);
+					if (a.child_ids[u] != kk++) {
+						result |= (1 << 17);
+						assert(!assertme);
+					}
+				}
+				for (unsigned int u = 0;
+					u < (unsigned int) b.header.size; u++) {
+					if (bps_tree_debug_get_elem_inner(
+						&b_path_elem, u) != c++) {
+						result |= (1 << 17);
+						assert(!assertme);
+					}
+					if (b.child_ids[u] != kk++) {
+						result |= (1 << 17);
 						assert(!assertme);
 					}
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckMoveRightInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_inner::ElemMaxCount; j++) {
-				unsigned int maxMove = i < struct bps_inner::ElemMaxCount - j ? i : struct bps_inner::ElemMaxCount - j;
-				for (unsigned int k = 1; k <= maxMove; k++) {
+/**
+ * @brief Check all possible moving left of inners
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_move_to_left_inner(struct bps_tree *tree, bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move = j < szlim - i ? j : szlim - i;
+			for (unsigned int k = 1; k <= max_move; k++) {
+				struct bps_inner a, b;
+				a.header.type = BPS_TREE_BT_INNER;
+				a.header.size = i;
+				b.header.type = BPS_TREE_BT_INNER;
+				b.header.size = j;
+				memset(a.elems, 0xFF, sizeof(a.elems));
+				memset(b.elems, 0xFF, sizeof(b.elems));
+				memset(a.child_ids, 0xFF, sizeof(a.child_ids));
+				memset(b.child_ids, 0xFF, sizeof(b.child_ids));
+
+				bps_tree_elem_t ma;
+				bps_tree_debug_set_elem(&ma, 0xFF);
+				bps_tree_elem_t mb;
+				bps_tree_debug_set_elem(&mb, 0xFF);
+
+				bps_inner_path_elem a_path_elem, b_path_elem;
+				a_path_elem.block = &a;
+				a_path_elem.max_elem_copy = &ma;
+				b_path_elem.block = &b;
+				b_path_elem.max_elem_copy = &mb;
+
+				unsigned char c = 0;
+				bps_tree_block_id_t kk = 0;
+				for (unsigned int u = 0; u < i; u++) {
+					bps_tree_debug_set_elem_inner(
+						&a_path_elem, u, c++);
+					a.child_ids[u] = kk++;
+				}
+				for (unsigned int u = 0; u < j; u++) {
+					bps_tree_debug_set_elem_inner(
+						&b_path_elem, u, c++);
+					b.child_ids[u] = kk++;
+				}
+
+				bps_tree_move_elems_to_left_inner(tree,
+					&a_path_elem, &b_path_elem,
+					(bps_tree_pos_t) k);
+
+				if (a.header.size != (bps_tree_pos_t) (i + k)) {
+					result |= (1 << 18);
+					assert(!assertme);
+				}
+				if (b.header.size != (bps_tree_pos_t) (j - k)) {
+					result |= (1 << 18);
+					assert(!assertme);
+				}
+
+				c = 0;
+				kk = 0;
+				for (unsigned int u = 0;
+					u < (unsigned int) a.header.size; u++) {
+					if (bps_tree_debug_get_elem_inner(
+						&a_path_elem, u) != c++) {
+						result |= (1 << 19);
+						assert(!assertme);
+					}
+					if (a.child_ids[u] != kk++) {
+						result |= (1 << 19);
+						assert(!assertme);
+					}
+				}
+				for (unsigned int u = 0;
+					u < (unsigned int) b.header.size; u++) {
+					if (bps_tree_debug_get_elem_inner(
+						&b_path_elem, u) != c++) {
+						result |= (1 << 19);
+						assert(!assertme);
+					}
+					if (b.child_ids[u] != kk++) {
+						result |= (1 << 19);
+						assert(!assertme);
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+/**
+ * @brief Check all possible insertion and moving right of inners
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_and_move_to_right_inner(struct bps_tree *tree,
+						    bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move =
+				i + 1 < szlim - j ? i + 1 : szlim - j;
+			for (unsigned int k = 0; k <= i; k++) {
+				for (unsigned int u = 1; u <= max_move; u++) {
 					struct bps_inner a, b;
+					a.header.type = BPS_TREE_BT_INNER;
+					a.header.size = i;
+					b.header.type = BPS_TREE_BT_INNER;
+					b.header.size = j;
 					memset(a.elems, 0xFF, sizeof(a.elems));
 					memset(b.elems, 0xFF, sizeof(b.elems));
-					memset(a.child_ids, 0xFF, sizeof(a.child_ids));
-					memset(b.child_ids, 0xFF, sizeof(b.child_ids));
-					a.header.size = i;
-					b.header.size = j;
+					memset(a.child_ids, 0xFF,
+						sizeof(a.child_ids));
+					memset(b.child_ids, 0xFF,
+						sizeof(b.child_ids));
 
-					bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-					bps_inner_path_elem aExt, bExt;
-					aExt.block = &a;
-					aExt.max_elem_copy = &ma;
-					bExt.block = &b;
-					bExt.max_elem_copy = &mb;
+					bps_tree_elem_t ma;
+					bps_tree_debug_set_elem(&ma, 0xFF);
+					bps_tree_elem_t mb;
+					bps_tree_debug_set_elem(&mb, 0xFF);
+
+					bps_inner_path_elem a_path_elem,
+						b_path_elem;
+					a_path_elem.block = &a;
+					a_path_elem.max_elem_copy = &ma;
+					b_path_elem.block = &b;
+					b_path_elem.max_elem_copy = &mb;
 
 					unsigned char c = 0;
 					bps_tree_block_id_t kk = 0;
-					for (unsigned int u = 0; u < i; u++) {
-						debugSetElem(aExt, u, c++);
-						a.child_ids[u] = kk++;
-					}
-					for (unsigned int u = 0; u < j; u++) {
-						debugSetElem(bExt, u, c++);
-						b.child_ids[u] = kk++;
-					}
+					unsigned char ic = i + j;
+					bps_tree_block_id_t ikk =
+						(bps_tree_block_id_t) (i + j);
 
-					if (j) {
-						const bool move_to_empty = false;
-						if (k < i) {
-							const bool move_all = false;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					} else {
-						const bool move_to_empty = true;
-						if (k < i) {
-							const bool move_all = false;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveRight<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					}
-
-					if (a.header.size != (bps_tree_pos_t)(i - k)) {
-						result |= (1 << 16);
-						assert(!assertme);
-					}
-					if (b.header.size != (bps_tree_pos_t)(j + k)) {
-						result |= (1 << 16);
-						assert(!assertme);
-					}
-
-					c = 0;
-					kk = 0;
-					for (unsigned int u = 0; u < (unsigned int)a.header.size; u++) {
-						if (debugGetElem(aExt, u) != c++) {
-							result |= (1 << 17);
-							assert(!assertme);
-						}
-						if (a.child_ids[u] != kk++) {
-							result |= (1 << 17);
-							assert(!assertme);
-						}
-					}
-					for (unsigned int u = 0; u < (unsigned int)b.header.size; u++) {
-						if (debugGetElem(bExt, u) != c++) {
-							result |= (1 << 17);
-							assert(!assertme);
-						}
-						if (b.child_ids[u] != kk++) {
-							result |= (1 << 17);
-							assert(!assertme);
-						}
-					}
-				}
-			}
-		}
-		return result;
-	}
-
-	int internalMechanismCheckMoveLeftInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_inner::ElemMaxCount; j++) {
-				unsigned int maxMove = j < struct bps_inner::ElemMaxCount - i ? j : struct bps_inner::ElemMaxCount - i;
-				for (unsigned int k = 1; k <= maxMove; k++) {
-					struct bps_inner a, b;
-					memset(a.elems, 0xFF, sizeof(a.elems));
-					memset(b.elems, 0xFF, sizeof(b.elems));
-					memset(a.child_ids, 0xFF, sizeof(a.child_ids));
-					memset(b.child_ids, 0xFF, sizeof(b.child_ids));
-					a.header.size = i;
-					b.header.size = j;
-
-					bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-					bps_inner_path_elem aExt, bExt;
-					aExt.block = &a;
-					aExt.max_elem_copy = &ma;
-					bExt.block = &b;
-					bExt.max_elem_copy = &mb;
-
-					unsigned char c = 0;
-					bps_tree_block_id_t kk = 0;
-					for (unsigned int u = 0; u < i; u++) {
-						debugSetElem(aExt, u, c++);
-						a.child_ids[u] = kk++;
-					}
-					for (unsigned int u = 0; u < j; u++) {
-						debugSetElem(bExt, u, c++);
-						b.child_ids[u] = kk++;
-					}
-
-					if (i) {
-						const bool move_to_empty = false;
-						if (k < j) {
-							const bool move_all = false;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					} else {
-						const bool move_to_empty = true;
-						if (k < j) {
-							const bool move_all = false;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						} else {
-							const bool move_all = true;
-							moveLeft<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)k);
-						}
-					}
-
-					if (a.header.size != (bps_tree_pos_t)(i + k)) {
-						result |= (1 << 18);
-						assert(!assertme);
-					}
-					if (b.header.size != (bps_tree_pos_t)(j - k)) {
-						result |= (1 << 18);
-						assert(!assertme);
-					}
-
-					c = 0;
-					kk = 0;
-					for (unsigned int u = 0; u < (unsigned int)a.header.size; u++) {
-						if (debugGetElem(aExt, u) != c++) {
-							result |= (1 << 19);
-							assert(!assertme);
-						}
-						if (a.child_ids[u] != kk++) {
-							result |= (1 << 19);
-							assert(!assertme);
-						}
-					}
-					for (unsigned int u = 0; u < (unsigned int)b.header.size; u++) {
-						if (debugGetElem(bExt, u) != c++) {
-							result |= (1 << 19);
-							assert(!assertme);
-						}
-						if (b.child_ids[u] != kk++) {
-							result |= (1 << 19);
-							assert(!assertme);
-						}
-					}
-				}
-			}
-		}
-		return result;
-	}
-
-	int internalMechanismCheckMoveRightInsertInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_inner::ElemMaxCount; j++) {
-				unsigned int maxMove = i + 1 < struct bps_inner::ElemMaxCount - j ? i + 1 : struct bps_inner::ElemMaxCount - j;
-				for (unsigned int k = 0; k <= i; k++) {
-					for (unsigned int u = 1; u <= maxMove; u++) {
-						struct bps_inner a, b;
-						memset(a.elems, 0xFF, sizeof(a.elems));
-						memset(b.elems, 0xFF, sizeof(b.elems));
-						memset(a.child_ids, 0xFF, sizeof(a.child_ids));
-						memset(b.child_ids, 0xFF, sizeof(b.child_ids));
-						a.header.size = i;
-						b.header.size = j;
-
-						bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-						bps_inner_path_elem aExt, bExt;
-						aExt.block = &a;
-						aExt.max_elem_copy = &ma;
-						bExt.block = &b;
-						bExt.max_elem_copy = &mb;
-
-						unsigned char c = 0;
-						bps_tree_block_id_t kk = 0;
-						unsigned char ic = i + j;
-						bps_tree_block_id_t ikk = (bps_tree_block_id_t)(i + j);
-
-						for (unsigned int v = 0; v < i; v++) {
-							if (v == k) {
-								ic = c++;
-								ikk = kk++;
-							}
-							debugSetElem(aExt, v, c++);
-							a.child_ids[v] = kk++;
-						}
-						if (k == i) {
+					for (unsigned int v = 0; v < i; v++) {
+						if (v == k) {
 							ic = c++;
 							ikk = kk++;
 						}
-						for (unsigned int v = 0; v < j; v++) {
-							debugSetElem(bExt, v, c++);
-							b.child_ids[v] = kk++;
-						}
-
-						aExt.insertion_point = -1;
-						bps_tree_elem_t ins;
-						debugSetElem(ins, ic);
-						bps_inner_path_elem insExt;
-						insExt.posInParent = k;
-						insExt.max_elem_copy = &ins;
-						insExt.block_id = ikk;
-
-						if (j) {
-							const bool move_to_empty = false;
-							if (u < i + 1) {
-								const bool move_all = false;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							} else {
-								const bool move_all = true;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							}
-						} else {
-							const bool move_to_empty = true;
-							if (u < i + 1) {
-								const bool move_all = false;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							} else {
-								const bool move_all = true;
-								moveRightInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							}
-						}
-
-						if (a.header.size != (bps_tree_pos_t)(i - u + 1)) {
-							result |= (1 << 20);
-							assert(!assertme);
-						}
-						if (b.header.size != (bps_tree_pos_t)(j + u)) {
-							result |= (1 << 20);
-							assert(!assertme);
-						}
-
-						c = 0;
-						kk = 0;
-						for (unsigned int v = 0; v < (unsigned int)a.header.size; v++) {
-							if (debugGetElem(aExt, v) != c++) {
-								result |= (1 << 21);
-								assert(!assertme);
-							}
-							if (a.child_ids[v] != kk++) {
-								result |= (1 << 21);
-								assert(!assertme);
-							}
-						}
-						for (unsigned int v = 0; v < (unsigned int)b.header.size; v++) {
-							if (debugGetElem(bExt, v) != c++) {
-								result |= (1 << 21);
-								assert(!assertme);
-							}
-							if (b.child_ids[v] != kk++) {
-								result |= (1 << 21);
-								assert(!assertme);
-							}
-						}
-
+						bps_tree_debug_set_elem_inner(
+							&a_path_elem, v, c++);
+						a.child_ids[v] = kk++;
 					}
+					if (k == i) {
+						ic = c++;
+						ikk = kk++;
+					}
+					for (unsigned int v = 0; v < j; v++) {
+						bps_tree_debug_set_elem_inner(
+							&b_path_elem, v, c++);
+						b.child_ids[v] = kk++;
+					}
+
+					a_path_elem.insertion_point = -1;
+					bps_tree_elem_t ins;
+					bps_tree_debug_set_elem(&ins, ic);
+
+					bps_tree_insert_and_move_elems_to_right_inner(
+						tree, &a_path_elem,
+						&b_path_elem,
+						(bps_tree_pos_t) u, ikk,
+						(bps_tree_pos_t) k, ins);
+
+					if (a.header.size
+						!= (bps_tree_pos_t) (i - u + 1)) {
+						result |= (1 << 20);
+						assert(!assertme);
+					}
+					if (b.header.size
+						!= (bps_tree_pos_t) (j + u)) {
+						result |= (1 << 20);
+						assert(!assertme);
+					}
+
+					c = 0;
+					kk = 0;
+					for (unsigned int v = 0;
+						v < (unsigned int) a.header.size;
+						v++) {
+						if (bps_tree_debug_get_elem_inner(
+							&a_path_elem, v)
+							!= c++) {
+							result |= (1 << 21);
+							assert(!assertme);
+						}
+						if (a.child_ids[v] != kk++) {
+							result |= (1 << 21);
+							assert(!assertme);
+						}
+					}
+					for (unsigned int v = 0;
+						v < (unsigned int) b.header.size;
+						v++) {
+						if (bps_tree_debug_get_elem_inner(
+							&b_path_elem, v)
+							!= c++) {
+							result |= (1 << 21);
+							assert(!assertme);
+						}
+						if (b.child_ids[v] != kk++) {
+							result |= (1 << 21);
+							assert(!assertme);
+						}
+					}
+
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheckMoveLeftInsertInner(bool assertme)
-	{
-		(void)assertme;
-		int result = 0;
-		for (unsigned int i = 0; i <= struct bps_inner::ElemMaxCount; i++) {
-			for (unsigned int j = 0; j <= struct bps_inner::ElemMaxCount; j++) {
-				unsigned int maxMove = j + 1 < struct bps_inner::ElemMaxCount - i ? j + 1 : struct bps_inner::ElemMaxCount - i;
-				for (unsigned int k = 0; k <= j; k++) {
-					for (unsigned int u = 1; u <= maxMove; u++) {
-						struct bps_inner a, b;
-						memset(a.elems, 0xFF, sizeof(a.elems));
-						memset(b.elems, 0xFF, sizeof(b.elems));
-						memset(a.child_ids, 0xFF, sizeof(a.child_ids));
-						memset(b.child_ids, 0xFF, sizeof(b.child_ids));
-						a.header.size = i;
-						b.header.size = j;
+/**
+ * @brief Check all possible insertion and moving left of inners
+ * Used for debug self-check
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+static inline int
+bps_tree_debug_check_insert_and_move_to_left_inner(struct bps_tree *tree,
+						   bool assertme)
+{
+	(void) assertme;
+	int result = 0;
+	const int szlim = BPS_TREE_MAX_COUNT_IN_INNER;
+	for (unsigned int i = 0; i <= szlim; i++) {
+		for (unsigned int j = 0; j <= szlim; j++) {
+			unsigned int max_move =
+				j + 1 < szlim - i ? j + 1 : szlim - i;
+			for (unsigned int k = 0; k <= j; k++) {
+				for (unsigned int u = 1; u <= max_move; u++) {
+					struct bps_inner a, b;
+					a.header.type = BPS_TREE_BT_INNER;
+					a.header.size = i;
+					b.header.type = BPS_TREE_BT_INNER;
+					b.header.size = j;
+					memset(a.elems, 0xFF, sizeof(a.elems));
+					memset(b.elems, 0xFF, sizeof(b.elems));
+					memset(a.child_ids, 0xFF,
+						sizeof(a.child_ids));
+					memset(b.child_ids, 0xFF,
+						sizeof(b.child_ids));
 
-						bps_tree_elem_t ma = bps_tree_elem_t(), mb = bps_tree_elem_t();
-						bps_inner_path_elem aExt, bExt;
-						aExt.block = &a;
-						aExt.max_elem_copy = &ma;
-						bExt.block = &b;
-						bExt.max_elem_copy = &mb;
+					bps_tree_elem_t ma;
+					bps_tree_debug_set_elem(&ma, 0xFF);
+					bps_tree_elem_t mb;
+					bps_tree_debug_set_elem(&mb, 0xFF);
 
-						unsigned char c = 0;
-						bps_tree_block_id_t kk = 0;
-						unsigned char ic = i + j;
-						bps_tree_block_id_t ikk = (bps_tree_block_id_t)(i + j);
-						for (unsigned int v = 0; v < i; v++) {
-							debugSetElem(aExt, v, c++);
-							a.child_ids[v] = kk++;
-						}
-						for (unsigned int v = 0; v < j; v++) {
-							if (v == k) {
-								ic = c++;
-								ikk = kk++;
-							}
-							debugSetElem(bExt, v, c++);
-							b.child_ids[v] = kk++;
-						}
+					bps_inner_path_elem a_path_elem,
+						b_path_elem;
+					a_path_elem.block = &a;
+					a_path_elem.max_elem_copy = &ma;
+					b_path_elem.block = &b;
+					b_path_elem.max_elem_copy = &mb;
 
-						bExt.insertion_point = -1;
-						bps_tree_elem_t ins;
-						debugSetElem(ins, ic);
-						bps_inner_path_elem insExt;
-						insExt.posInParent = k;
-						insExt.max_elem_copy = &ins;
-						insExt.block_id = ikk;
-
-						if (i) {
-							const bool move_to_empty = false;
-							if (u < j + 1) {
-								const bool move_all = false;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							} else {
-								const bool move_all = true;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							}
-						} else {
-							const bool move_to_empty = true;
-							if (u < j + 1) {
-								const bool move_all = false;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							} else {
-								const bool move_all = true;
-								moveLeftInsert<move_to_empty, move_all>(aExt, bExt, (bps_tree_pos_t)u, insExt);
-							}
-						}
-
-						if (a.header.size != (bps_tree_pos_t)(i + u)) {
-							result |= (1 << 22);
-							assert(!assertme);
-						}
-						if (b.header.size != (bps_tree_pos_t)(j - u + 1)) {
-							result |= (1 << 22);
-							assert(!assertme);
-						}
-
-						c = 0;
-						kk = 0;
-						for (unsigned int v = 0; v < (unsigned int)a.header.size; v++) {
-							if (debugGetElem(aExt, v) != c++) {
-								result |= (1 << 23);
-								assert(!assertme);
-							}
-							if (a.child_ids[v] != kk++) {
-								result |= (1 << 23);
-								assert(!assertme);
-							}
-						}
-						for (unsigned int v = 0; v < (unsigned int)b.header.size; v++) {
-							if (debugGetElem(bExt, v) != c++) {
-								result |= (1 << 23);
-								assert(!assertme);
-							}
-							if (b.child_ids[v] != kk++) {
-								result |= (1 << 23);
-								assert(!assertme);
-							}
-						}
-
+					unsigned char c = 0;
+					bps_tree_block_id_t kk = 0;
+					unsigned char ic = i + j;
+					bps_tree_block_id_t ikk =
+						(bps_tree_block_id_t) (i + j);
+					for (unsigned int v = 0; v < i; v++) {
+						bps_tree_debug_set_elem_inner(
+							&a_path_elem, v, c++);
+						a.child_ids[v] = kk++;
 					}
+					for (unsigned int v = 0; v < j; v++) {
+						if (v == k) {
+							ic = c++;
+							ikk = kk++;
+						}
+						bps_tree_debug_set_elem_inner(
+							&b_path_elem, v, c++);
+						b.child_ids[v] = kk++;
+					}
+
+					b_path_elem.insertion_point = -1;
+					bps_tree_elem_t ins;
+					bps_tree_debug_set_elem(&ins, ic);
+
+					bps_tree_insert_and_move_elems_to_left_inner(
+						tree, &a_path_elem,
+						&b_path_elem,
+						(bps_tree_pos_t) u, ikk,
+						(bps_tree_pos_t) k, ins);
+
+					if (a.header.size
+						!= (bps_tree_pos_t) (i + u)) {
+						result |= (1 << 22);
+						assert(!assertme);
+					}
+					if (b.header.size
+						!= (bps_tree_pos_t) (j - u + 1)) {
+						result |= (1 << 22);
+						assert(!assertme);
+					}
+
+					c = 0;
+					kk = 0;
+					for (unsigned int v = 0;
+						v < (unsigned int) a.header.size;
+						v++) {
+						if (bps_tree_debug_get_elem_inner(
+							&a_path_elem, v)
+							!= c++) {
+							result |= (1 << 23);
+							assert(!assertme);
+						}
+						if (a.child_ids[v] != kk++) {
+							result |= (1 << 23);
+							assert(!assertme);
+						}
+					}
+					for (unsigned int v = 0;
+						v < (unsigned int) b.header.size;
+						v++) {
+						if (bps_tree_debug_get_elem_inner(
+							&b_path_elem, v)
+							!= c++) {
+							result |= (1 << 23);
+							assert(!assertme);
+						}
+						if (b.child_ids[v] != kk++) {
+							result |= (1 << 23);
+							assert(!assertme);
+						}
+					}
+
 				}
 			}
 		}
-		return result;
 	}
+	return result;
+}
 
-	int internalMechanismCheck(bool assertme)
-	{
-		int result = 0;
-		result |= internalMechanismCheckInsertLeaf(assertme);
-		result |= internalMechanismCheckDeleteLeaf(assertme);
-		result |= internalMechanismCheckMoveRightLeaf(assertme);
-		result |= internalMechanismCheckMoveLeftLeaf(assertme);
-		result |= internalMechanismCheckMoveRightInsertLeaf(assertme);
-		result |= internalMechanismCheckMoveLeftInsertLeaf(assertme);
+/**
+ * @brief Debug print tree to output in readable form.
+ *  I hope you will not need it.
+ * @param assertme - if true, errors will lead to assert call,
+ *  if false, just error code will be returned.
+ * @return 0 if OK; bit mask of errors otherwise.
+ */
+inline int
+bps_tree_debug_check_internal_functions(bool assertme)
+{
+	int result = 0;
+	bps_tree tree;
 
-		result |= internalMechanismCheckInsertInner(assertme);
-		result |= internalMechanismCheckDeleteInner(assertme);
-		result |= internalMechanismCheckMoveRightInner(assertme);
-		result |= internalMechanismCheckMoveLeftInner(assertme);
-		result |= internalMechanismCheckMoveRightInsertInner(assertme);
-		result |= internalMechanismCheckMoveLeftInsertInner(assertme);
-		return result;
-	}
+	result |= bps_tree_debug_check_insert_into_leaf(&tree, assertme);
+	result |= bps_tree_debug_check_delete_from_leaf(&tree, assertme);
+	result |= bps_tree_debug_check_move_to_right_leaf(&tree, assertme);
+	result |= bps_tree_debug_check_move_to_left_leaf(&tree, assertme);
+	result |= bps_tree_debug_check_insert_and_move_to_right_leaf(&tree,
+								     assertme);
+	result |= bps_tree_debug_check_insert_and_move_to_left_leaf(&tree,
+								    assertme);
 
-
-#endif
+	result |= bps_tree_debug_check_insert_into_inner(&tree, assertme);
+	result |= bps_tree_debug_check_delete_from_inner(&tree, assertme);
+	result |= bps_tree_debug_check_move_to_right_inner(&tree, assertme);
+	result |= bps_tree_debug_check_move_to_left_inner(&tree, assertme);
+	result |= bps_tree_debug_check_insert_and_move_to_right_inner(&tree,
+								     assertme);
+	result |= bps_tree_debug_check_insert_and_move_to_left_inner(&tree,
+								     assertme);
+	return result;
+}
 /* }}} */
 
 #undef BPS_TREE_MEMMOVE
 #undef BPS_TREE_DATAMOVE
 
+/* {{{ Macros for custom naming of structs and functions */
 #undef _bps
 #undef _bps_tree
 #undef _BPS
 #undef _BPS_TREE
+#undef _bps_tree_name
+
+#undef bps_tree
+#undef bps_block
+#undef bps_leaf
+#undef bps_inner
+#undef bps_garbage
+#undef bps_tree_iterator
+#undef bps_inner_path_elem
+#undef bps_leaf_path_elem
+
+#undef bps_tree_create
+#undef bps_tree_destroy
+#undef bps_tree_find
+#undef bps_tree_insert
+#undef bps_tree_delete
+#undef bps_tree_size
+#undef bps_tree_mem_used
+#undef bps_tree_random
+#undef bps_tree_invalid_iterator
+#undef bps_tree_itr_is_invalid
+#undef bps_tree_itr_are_equal
+#undef bps_tree_itr_first
+#undef bps_tree_itr_last
+#undef bps_tree_lower_bound
+#undef bps_tree_upper_bound
+#undef bps_tree_itr_get_elem
+#undef bps_tree_itr_next
+#undef bps_tree_itr_prev
+#undef bps_tree_debug_check
+#undef bps_tree_print
+#undef bps_tree_debug_check_internal_functions
+
+#undef bps_tree_max_sizes
+#undef BPS_TREE_MAX_COUNT_IN_LEAF
+#undef BPS_TREE_MAX_COUNT_IN_INNER
+#undef bps_block_type
+#undef BPS_TREE_BT_GARBAGE
+#undef BPS_TREE_BT_INNER
+#undef BPS_TREE_BT_LEAF
+
+#undef bps_tree_restore_block
+#undef bps_tree_find_ins_point_key
+#undef bps_tree_find_ins_point_elem
+#undef bps_tree_find_after_ins_point_key
+#undef bps_tree_get_leaf_safe
+#undef bps_tree_garbage_push
+#undef bps_tree_garbage_pop
+#undef bps_tree_create_leaf
+#undef bps_tree_create_inner
+#undef bps_tree_dispose_leaf
+#undef bps_tree_dispose_inner
+#undef bps_tree_reserve_blocks
+#undef bps_tree_insert_first_elem
+#undef bps_tree_collect_path
+#undef bps_tree_process_replace
+#undef bps_tree_debug_memmove
+#undef bps_tree_insert_into_leaf
+#undef bps_tree_insert_into_inner
+#undef bps_tree_delete_from_leaf
+#undef bps_tree_delete_from_inner
+#undef bps_tree_move_elems_to_right_leaf
+#undef bps_tree_move_elems_to_right_inner
+#undef bps_tree_move_elems_to_left_leaf
+#undef bps_tree_move_elems_to_left_inner
+#undef bps_tree_insert_and_move_elems_to_right_leaf
+#undef bps_tree_insert_and_move_elems_to_right_inner
+#undef bps_tree_insert_and_move_elems_to_left_leaf
+#undef bps_tree_insert_and_move_elems_to_left_inner
+#undef bps_tree_leaf_free_size
+#undef bps_tree_inner_free_size
+#undef bps_tree_leaf_overmin_size
+#undef bps_tree_inner_overmin_size
+#undef bps_tree_collect_left_path_elem_leaf
+#undef bps_tree_collect_left_path_elem_inner
+#undef bps_tree_collect_right_ext_leaf
+#undef bps_tree_collect_right_ext_inner
+#undef bps_tree_prepare_new_ext_leaf
+#undef bps_tree_prepare_new_ext_inner
+#undef bps_tree_process_insert_leaf
+#undef bps_tree_process_insert_inner
+#undef bps_tree_process_delete_leaf
+#undef bps_tree_process_delete_inner
+#undef bps_tree_debug_find_max_elem
+#undef bps_tree_debug_check_block
+#undef bps_tree_print_indent
+#undef bps_tree_print_block
+#undef bps_tree_print_leaf
+#undef bps_tree_print_inner
+#undef bps_tree_debug_set_elem
+#undef bps_tree_debug_get_elem
+#undef bps_tree_debug_set_elem_inner
+#undef bps_tree_debug_get_elem_inner
+#undef bps_tree_debug_check_insert_into_leaf
+#undef bps_tree_debug_check_delete_from_leaf
+#undef bps_tree_debug_check_move_to_right_leaf
+#undef bps_tree_debug_check_move_to_left_leaf
+#undef bps_tree_debug_check_insert_and_move_to_right_leaf
+#undef bps_tree_debug_check_insert_and_move_to_left_leaf
+#undef bps_tree_debug_check_insert_into_inner
+#undef bps_tree_debug_check_delete_from_inner
+#undef bps_tree_debug_check_move_to_right_inner
+#undef bps_tree_debug_check_move_to_left_inner
+#undef bps_tree_debug_check_insert_and_move_to_right_inner
+#undef bps_tree_debug_check_insert_and_move_to_left_inner
+#undef bps_tree_debug_check_insert_and_move_to_left_inner
+/* }}} */

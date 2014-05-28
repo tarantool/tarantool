@@ -707,33 +707,39 @@ t:find('A')
 ...
 t:find('0')
 ---
+- null
 ...
 t:findall('A')
 ---
-- 0
+- - 0
 ...
 t:findall('2')
 ---
-- 1
-- 5
+- - 1
+  - 5
 ...
 t:findall('3')
 ---
-- 2
-- 4
-- 8
+- - 2
+  - 4
+  - 8
 ...
 t:findall('0')
 ---
+- []
 ...
 t:find(2, '2')
 ---
+- 5
 ...
 t:find(89, '2')
 ---
+- error: '[string "-- tuple.lua (internal file)..."]:69: error: invalid key to ''next'''
 ...
 t:findall(4, '3')
 ---
+- - 4
+  - 8
 ...
 t = space:insert{'Z', '2', 2, 3, tonumber64(2)}
 ---
@@ -744,8 +750,8 @@ t:find(2)
 ...
 t:findall(tonumber64(2))
 ---
-- 2
-- 4
+- - 2
+  - 4
 ...
 t:find('2')
 ---

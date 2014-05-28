@@ -69,8 +69,8 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       load_cfg_lua[], interactive_lua[], digest_lua[];
-static const char *lua_sources[] = { session_lua, load_cfg_lua, NULL };
+       load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[];
+static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
 static const char *lua_modules[] = { "box.msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, "box.digest", digest_lua,
 	"box.interactive", interactive_lua,
@@ -129,41 +129,6 @@ tarantool_lua_tostring(struct lua_State *L, int index)
 	lua_call(L, 1, 1);
 	lua_replace(L, index);
 	return lua_tostring(L, index);
-}
-
-/**
- * Redefine lua 'pcall' built-in to correctly handle exceptions,
- * produced by 'box' C functions.
- *
- * See Lua documentation on 'pcall' for additional information.
- */
-static int
-lbox_pcall(struct lua_State *L)
-{
-	/*
-	 * Lua pcall() returns true/false for completion status
-	 * plus whatever the called function returns.
-	 */
-	try {
-		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
-		/* push completion status */
-		lua_pushboolean(L, true);
-		/* move 'true' to stack start */
-		lua_insert(L, 1);
-	} catch (ClientError *e) {
-		/*
-		 * Note: FiberCancelException passes through this
-		 * catch and thus leaves garbage on coroutine
-		 * stack.
-		 */
-		/* pop any possible garbage */
-		lua_settop(L, 0);
-		/* completion status */
-		lua_pushboolean(L, false);
-		/* error message */
-		lua_pushstring(L, e->errmsg());
-	}
-	return lua_gettop(L);
 }
 
 /**
@@ -235,7 +200,7 @@ tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
 }
 
 void
-tarantool_lua_init()
+tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 {
 	lua_State *L = luaL_newstate();
 	if (L == NULL) {
@@ -251,7 +216,6 @@ tarantool_lua_init()
 	tarantool_lua_setpath(L, "path", MODULE_LUAPATH, NULL);
 	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
 
-	lua_register(L, "pcall", lbox_pcall);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
 	tarantool_lua_errinj_init(L);
@@ -293,6 +257,18 @@ tarantool_lua_init()
 	}
 
 	box_lua_init(L);
+
+
+	lua_newtable(L);
+	lua_pushinteger(L, -1);
+	lua_pushstring(L, tarantool_bin);
+	lua_settable(L, -3);
+	for (int i = 0; i < argc; i++) {
+		lua_pushinteger(L, i);
+		lua_pushstring(L, argv[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
 	/* clear possible left-overs of init */
 	lua_settop(L, 0);
@@ -429,6 +405,13 @@ tarantool_lua_interactive()
 	}
 }
 
+extern "C" const char *
+tarantool_error_message(void)
+{
+	assert(cord()->exception != NULL); /* called only from error handler */
+	return cord()->exception->errmsg();
+}
+
 /**
  * Execute start-up script.
  */
@@ -456,9 +439,11 @@ run_script(va_list ap)
 		lua_getfield(L, -1, "box.interactive");
 		lua_remove(L, -2); /* remove package.loaded */
 	}
-	lbox_pcall(L);
-	if (! lua_toboolean(L, 1))
-		panic("%s", lua_tostring(L, -1));
+	try {
+		lbox_call(L, lua_gettop(L) - 1, 0);
+	} catch (ClientError *e) {
+		panic("%s", e->errmsg());
+	}
 
 	/* clear the stack from return values. */
 	lua_settop(L, 0);

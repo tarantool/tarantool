@@ -163,11 +163,11 @@ struct symbol {
 	const char *name;
 	void *end;
 };
-char *find_path(const char *argv0);
 struct symbol *addr2symbol(void *addr);
 void symbols_load(const char *name);
 void symbols_free();
 #endif /* HAVE_BFD */
+char *find_path(const char *argv0);
 
 char *abspath(const char *filename);
 

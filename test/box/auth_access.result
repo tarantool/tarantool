@@ -41,8 +41,12 @@ s:insert({1})
 ---
 - [1]
 ...
+s:insert({2})
+---
+- [2]
+...
 --
--- Check double grant
+-- Check double grant and read access
 --
 box.schema.user.grant('testus', 'read', 'space', 'admin_space')
 ---
@@ -53,9 +57,21 @@ box.schema.user.grant('testus', 'read', 'space', 'admin_space')
 box.session.su('testus')
 ---
 ...
-s:select()
+s:select(1)
 ---
 - - [1]
+...
+s:insert({3})
+---
+- error: Write access denied for user 'testus' to space 'admin_space'
+...
+s:delete(1)
+---
+- error: Write access denied for user 'testus' to space 'admin_space'
+...
+s:drop()
+---
+- error: Read access denied for user 'testus' to space '_index'
 ...
 --
 -- Check double revoke
@@ -72,9 +88,37 @@ box.schema.user.revoke('testus', 'read', 'space', 'admin_space')
 box.session.su('testus')
 ---
 ...
-s:select()
+s:select(1)
 ---
 - error: Read access denied for user 'testus' to space 'admin_space'
+...
+box.session.su('admin')
+---
+...
+--
+-- Check write access on space
+-- 
+box.schema.user.grant('testus', 'write', 'space', 'admin_space')
+---
+...
+box.session.su('testus')
+---
+...
+s:select(1)
+---
+- error: Read access denied for user 'testus' to space 'admin_space'
+...
+s:delete(1)
+---
+- [1]
+...
+s:insert({3})
+---
+- [3]
+...
+s:drop()
+---
+- error: Read access denied for user 'testus' to space '_index'
 ...
 box.session.su('admin')
 ---
@@ -99,17 +143,43 @@ box.session.uid()
 ---
 - 0
 ...
-box.space._user:select()
+box.space._user:select(1)
 ---
 - error: Read access denied for user 'guest' to space '_user'
 ...
-s:select()
+s:select(1)
 ---
 - error: Read access denied for user 'guest' to space 'admin_space'
+...
+s:insert({4})
+---
+- error: Write access denied for user 'guest' to space 'admin_space'
+...
+s:delete({3})
+---
+- error: Write access denied for user 'guest' to space 'admin_space'
+...
+s:drop()
+---
+- error: Read access denied for user 'guest' to space '_index'
+...
+gs = box.schema.create_space('guest_space')
+---
+- error: Read access denied for user 'guest' to space '_space'
+...
+box.schema.func.create('guest_func')
+---
+- error: Read access denied for user 'guest' to space '_func'
 ...
 box.session.su('admin')
 ---
 ...
+s:select()
+---
+- - [3]
+  - [2]
+...
+--
 -- Create user with universe read&write grants
 -- and create this user session
 --
@@ -122,9 +192,8 @@ box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 box.session.su('uniuser')
 ---
 ...
-box.session.uid()
+if box.session.uid() < 2 then return 'uid error' end
 ---
-- 2
 ...
 --
 -- Check universal user
@@ -174,35 +243,22 @@ box.schema.user.drop('uniuser_testus')
 --
 box.space.admin_space:select()
 ---
-- - [1]
+- - [3]
+  - [2]
 ...
-box.space._user:select()
+box.space._user:select(1)
 ---
-- - [0, '', 'guest']
-  - [1, '', 'admin']
-  - [2, '', 'uniuser', []]
-  - [3, '', 'uniuser_testus', []]
+- - [1, '', 'admin']
 ...
-box.space._space:select()
+box.space._space:select(280)
 ---
-- - [272, 1, '_schema', 'memtx', 0]
-  - [280, 1, '_space', 'memtx', 0]
-  - [288, 1, '_index', 'memtx', 0]
-  - [296, 1, '_func', 'memtx', 0]
-  - [304, 1, '_user', 'memtx', 0]
-  - [312, 1, '_priv', 'memtx', 0]
-  - [320, 1, '_cluster', 'memtx', 0]
-  - [512, 1, 'admin_space', 'memtx', 0, '']
+- - [280, 1, '_space', 'memtx', 0]
 ...
 us = box.schema.create_space('uniuser_space')
 ---
 ...
 box.schema.func.create('uniuser_func')
 ---
-...
-box.schema.user.create('uniuser_testus')
----
-- error: User 'uniuser_testus' already exists
 ...
 box.session.su('admin')
 ---
@@ -255,6 +311,9 @@ box.space._user:delete(2)
 ---
 - [2, '', 'uniuser', []]
 ...
+s:drop()
+---
+...
 --
 -- Check write grant on _user
 --
@@ -271,7 +330,7 @@ box.space._user:delete(2)
 ---
 - error: 'Failed to drop user ''testuser'': the user has objects'
 ...
-box.space._user:select()
+box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
@@ -286,12 +345,13 @@ box.space._user:delete(3)
 box.session.su('admin')
 ---
 ...
-box.space._user:select()
+box.space._user:select(1)
 ---
-- - [0, '', 'guest']
-  - [1, '', 'admin']
-  - [2, '', 'testuser', []]
-  - [3, '', 'someone']
+- - [1, '', 'admin']
+...
+box.space._user:delete(3)
+---
+- [3, '', 'someone']
 ...
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 ---
@@ -309,12 +369,9 @@ box.space._user:delete(2)
 ---
 - error: Write access denied for user 'testuser' to space '_user'
 ...
-box.space._user:select()
+box.space._user:select(1)
 ---
-- - [0, '', 'guest']
-  - [1, '', 'admin']
-  - [2, '', 'testuser', []]
-  - [3, '', 'someone']
+- - [1, '', 'admin']
 ...
 box.space._user:insert{4,'','someone2'}
 ---
@@ -332,24 +389,9 @@ box.schema.user.grant('testuser', 'read', 'space', '_index')
 box.session.su('testuser')
 ---
 ...
-box.space._index:select()
+box.space._index:select(272)
 ---
 - - [272, 0, 'primary', 'tree', 1, 1, 0, 'str']
-  - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [280, 1, 'owner', 'tree', 0, 1, 1, 'num']
-  - [280, 2, 'name', 'tree', 1, 1, 2, 'str']
-  - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
-  - [288, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str']
-  - [296, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [296, 1, 'owner', 'tree', 0, 1, 1, 'num']
-  - [296, 2, 'name', 'tree', 1, 1, 2, 'str']
-  - [304, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [304, 2, 'name', 'tree', 1, 1, 2, 'str']
-  - [312, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num']
-  - [312, 1, 'owner', 'tree', 0, 1, 1, 'num']
-  - [320, 0, 'primary', 'tree', 1, 1, 0, 'num']
-  - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
-  - [512, 0, 'primary', 'hash', 1, 1, 0, 'NUM']
 ...
 box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 ---
@@ -364,7 +406,7 @@ box.session.su('admin')
 --# setopt delimiter ';'
 function func_limit()
     local i = 1
-    while i <= 32001 do
+    while true do
         box.schema.func.create('func'..i)
         i = i + 1
     end
@@ -372,11 +414,196 @@ function func_limit()
 end;
 ---
 ...
+function drop_limit_func()
+    local i = 1
+    while true do
+        box.schema.func.drop('func'..i)
+        i = i + 1
+    end
+end;
+---
+...
 func_limit();
 ---
 - error: 'A limit on the total number of functions has been reached: 32000'
 ...
+drop_limit_func();
+---
+- error: Function 'func32001' does not exist
+...
+box.schema.user.grant('testuser', 'read, write, execute', 'universe');
+---
+...
+box.session.su('testuser');
+---
+...
+func_limit();
+---
+- error: 'A limit on the total number of functions has been reached: 32000'
+...
+drop_limit_func();
+---
+- error: Function 'func32001' does not exist
+...
 --# setopt delimiter ''
+box.session.su('admin')
+---
+...
+box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
+---
+...
+--
+-- Check that itertors check privileges
+--
+s = box.schema.create_space('glade') 
+---
+...
+box.schema.user.grant('testuser', 'read', 'space', 'glade')
+---
+...
+s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+---
+...
+s:insert({1, 'A'})
+---
+- [1, 'A']
+...
+s:insert({2, 'B'})
+---
+- [2, 'B']
+...
+s:insert({3, 'C'})
+---
+- [3, 'C']
+...
+s:insert({4, 'D'})
+---
+- [4, 'D']
+...
+t = {}
+---
+...
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [3, 'C']
+  - [4, 'D']
+...
+t = {}
+---
+...
+box.session.su('testuser')
+---
+...
+s:select()
+---
+- - [1, 'A']
+  - [2, 'B']
+  - [3, 'C']
+  - [4, 'D']
+...
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [3, 'C']
+  - [4, 'D']
+...
+t = {}
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('testuser', 'write', 'space', 'glade')
+---
+...
+box.session.su('testuser')
+---
+...
+s:select()
+---
+- error: Read access denied for user 'testuser' to space 'glade'
+...
+for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [1, 'A']
+  - [2, 'B']
+  - [3, 'C']
+  - [4, 'D']
+...
+t = {}
+---
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('testuser', 'read, write, execute', 'space', 'glade')
+---
+...
+box.session.su('testuser')
+---
+...
+s:select()
+---
+- - [1, 'A']
+  - [2, 'B']
+  - [3, 'C']
+  - [4, 'D']
+...
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [3, 'C']
+  - [4, 'D']
+...
+t = {}
+---
+...
+box.session.su('guest')
+---
+...
+s:select()
+---
+- error: Read access denied for user 'guest' to space 'glade'
+...
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [3, 'C']
+  - [4, 'D']
+...
+t = {}
+---
+...
+box.session.su('guest')
+---
+...
+s:select()
+---
+- error: Read access denied for user 'guest' to space 'glade'
+...
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+---
+...
+t
+---
+- - [3, 'C']
+  - [4, 'D']
+...
+box.session.su('admin')
+---
+...
 s:drop()
 ---
 ...
@@ -385,7 +612,20 @@ box.space._user:select()
 - - [0, '', 'guest']
   - [1, '', 'admin']
   - [2, '', 'testuser', []]
-  - [3, '', 'someone']
+...
+box.space._space:select()
+---
+- - [272, 1, '_schema', 'memtx', 0]
+  - [280, 1, '_space', 'memtx', 0]
+  - [288, 1, '_index', 'memtx', 0]
+  - [296, 1, '_func', 'memtx', 0]
+  - [304, 1, '_user', 'memtx', 0]
+  - [312, 1, '_priv', 'memtx', 0]
+  - [320, 1, '_cluster', 'memtx', 0]
+...
+box.space._func:select()
+---
+- []
 ...
 box.session = nil
 ---

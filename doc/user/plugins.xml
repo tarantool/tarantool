@@ -45,7 +45,7 @@ can work on both SQL and Tarantool inside the same Lua routine.
 
 <para>
 The connection method is
-<code>box.net.sql.connect('mysql'|'postgresql', <replaceable>host</replaceable>, <replaceable>port</replaceable>, <replaceable>user</replaceable>, <replaceable>password</replaceable>, <replaceable>database</replaceable>)</code>.
+<code>box.net.sql.connect('mysql'|'pg', <replaceable>host</replaceable>, <replaceable>port</replaceable>, <replaceable>user</replaceable>, <replaceable>password</replaceable>, <replaceable>database</replaceable>)</code>.
 The methods for select/insert/etc. are the same as the ones in <olink targetptr="sp-box-net-box">the box.net library</olink>.
 </para>
 
@@ -72,10 +72,10 @@ OK
 OK
 
 # Check that the mysql client can connect using some factory defaults:
-# port = 3306, user = 'root', user password = 'root', database = 'test'.
-# (Do not use a blank password.)
-# These can be changed, provided one changes them in all places.
-<prompt>$ </prompt><userinput>~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --password=root--database=test</userinput>
+# port = 3306, user = 'root', user password = '', database = 'test'.
+# These can be changed, provided one uses the changed values in
+# all places.
+<prompt>$ </prompt><userinput>~/mysql-5.5/bin/mysql --port=3306 -h 127.0.0.1 --user=root --password= --database=test</userinput>
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 25
 Server version: 5.5.35 MySQL Community Server (GPL)
@@ -99,25 +99,21 @@ Bye
 <prompt>$ </prompt><userinput>make clean</userinput>
 <prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
 <prompt>$ </prompt><userinput>cmake . -DWITH_MYSQL=on -DMYSQL_INCLUDE_DIR=~/mysql-5.5/include\</userinput>
-<prompt>&gt; </prompt><userinput> -DMYSQL_LIBRARIES=~/mysql-5.5/lib/libmysqlclient.so -DENABLE_CLIENT=true</userinput>
+<prompt>&gt; </prompt><userinput> -DMYSQL_LIBRARIES=~/mysql-5.5/lib/libmysqlclient.so</userinput>
 ...
 -- Found MySQL includes: ~/mysql-5.5/include/mysql.h
 -- Found MySQL library: ~/mysql-5.5/lib/libmysqlclient.so
--- box.net.sql(mysql) INC=~/mysql-5.5/include
--- box.net.sql(mysql) LIBS=~/mysql-5.5/lib/libmysqlclient.so
 ...
 -- Configuring done
 -- Generating done
 -- Build files have been written to: ~/tarantool
 <prompt>$ </prompt><userinput>make</userinput>
 ...
-[ 49%] Built target core
 Scanning dependencies of target mysql
-[ 50%] Building CXX object src/plugin/mysql/CMakeFiles/mysql.dir/mysql.cc.o
+[ 79%] Building CXX object src/module/mysql/CMakeFiles/mysql.dir/mysql.cc.o
 Linking CXX shared library libmysql.so
-[ 50%] Built target mysql
+[ 79%] Built target mysql
 ...
-[100%] Built target xlog
 [100%] Built target man
 <prompt>$ </prompt>
 
@@ -128,66 +124,56 @@ Linking CXX shared library libmysql.so
 # -DCMAKE_INSTALL_LIBDIR and -DCMAKE_INSTALL_PREFIX.
 # For this example we assume that "make install" is not done.
 
-# Change directory to a directory which contains the tarantool.cfg file.
+# Change directory to a directory which can be used for temporary tests.
 # For this example we assume that the name of this directory is
-# /home/pgulutzan/tarantool_test. (Change "/home/pgulutzan" to whatever
+# /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever
 # is the actual base directory for the machine that's used for this test.)
-# Edit the tarantool.cfg file and add this line:
-# script_dir = "/home/pgulutzan/tarantool_test"
-# The script_dir is the directory where the init.lua file must be.
-# Now create a file named /home/pgulutzan/tarantool_test/init.lua
-# and put the following lines in it (again, change "/home/pgulutzan"
-# to whatever the real directory is that contains tarantool):
-package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
-require("sql")
-if type(box.net.sql) ~= "table" then
-error("net.sql load failed")
-end
-require("box.net.mysql")
-
 # Now, to help tarantool find the essential mysql.so file, execute these lines:
-<userinput>cd /home/pgulutzan/tarantool_test</userinput>
+<userinput>cd /home/pgulutzan/tarantool_sandbox</userinput>
 <userinput>mkdir box</userinput>
 <userinput>mkdir box/net</userinput>
 <userinput>cp ~/tarantool/src/module/mysql/mysql.so ./box/net/mysql.so</userinput>
 
-# Start the Tarantool server.
-# Run it in the background but let the initial display be in the foreground.
-# So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool/src/box/tarantool&amp;</userinput>
-2013-12-03 17:46:16.239 [12957] 1/sched C&gt; version 1.5.1-271-g610930e
-... loading /home/pgulutzan/tarantool_test/init.lua ...
-...
-2013-12-03 17:46:16.244 [12957] 1/sched C&gt; entering event loop
+# Start the Tarantool server. Do not use a Lua initialization file.
 
-# Type 'Enter' and then start the Tarantool client.
-<prompt>$ </prompt><userinput>~/tarantool/client/tarantool/tarantool</userinput>
-<prompt>localhost&gt; </prompt>
+<prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
+~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
+<prompt>tarantool&gt; </prompt>
+
+# Enter the following lines on the prompt (again, change "/home/pgulutzan"
+# to whatever the real directory is that contains tarantool):
+package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
+require("sql")
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+require("box.net.mysql")
+# ... Make sure that tarantool replies "true" for the calls to "require()".
 
 # Create a Lua function that will connect to the MySQL server,
+# (using some factory default values for the port and user and password),
 # retrieve one row, and display the row.
 # For explanations of the statement types used here, read the
-# Lua tutorial in the Tarantool user manual.
-<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>function mysql_select ()</userinput>
+# Lua tutorial earlier in the Tarantool user manual.
+<prompt>tarantool&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
+<prompt>tarantool&gt; </prompt><userinput>function mysql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
-        <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', 'root', 'test')</userinput>
+        <prompt>-&gt; </prompt><userinput>      'mysql', '127.0.0.1', 3306, 'root', '', 'test')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
-        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
+        <prompt>-&gt;  </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
         <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
-        <prompt> &gt; </prompt><userinput>  return row</userinput>
+        <prompt>-&gt; </prompt><userinput>  return row</userinput>
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
-<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = ''!</userinput>
-<prompt>localhost&gt; </prompt>
+<prompt>tarantool&gt; </prompt><userinput>SETOPT delimiter = ''!</userinput>
+<prompt>tarantool&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>mysql_select()</userinput>
-- 2013-12-03 17:57:24.688 [12957] 102/iproto I&gt; MySQL row
-
+<prompt>tarantool&gt; </prompt><userinput>mysql_select()</userinput>
+---
+- 'MySQL row '
+...
 # Observe the result. It contains "MySQL row".
 # So this is the row that was inserted into the MySQL database.
 # And now it's been selected with the Tarantool client.
@@ -195,7 +181,6 @@ require("box.net.mysql")
 
 <para xml:id="plugin-postgresql-example">
 <bridgehead renderas="sect4">PostgreSQL Example</bridgehead>
-Warning: This example is obsolete; a new example is being prepared to replace it.
 This example assumes that a recent version of PostgreSQL has been installed.
 The PostgreSQL library and include files are also necessary.
 On Ubuntu they can be installed with <programlisting><prompt>$ </prompt><userinput>sudo apt-get install libpq-dev</userinput></programlisting>
@@ -226,7 +211,7 @@ OK
 # port = 5432, user = 'postgres', user password = 'postgres', database = 'postgres'.
 # These can be changed, provided one changes them in all places.
 # Insert a row in database postgres, and quit.
-<prompt>$ </prompt><userinput>~psql -h 127.0.0.1 -p 5432 -U postgres -d postgres</userinput>
+<prompt>$ </prompt><userinput>psql -h 127.0.0.1 -p 5432 -U postgres -d postgres</userinput>
 Password for user postgres: 
 psql (9.3.0, server 9.3.2)
 SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
@@ -246,54 +231,56 @@ INSERT 0 1
 <prompt>$ </prompt><userinput>make clean</userinput>
 <prompt>$ </prompt><userinput>rm CMakeCache.txt</userinput>
 <prompt>$ </prompt><userinput>cmake . -DWITH_POSTGRESQL=on -DPostgreSQL_LIBRARY=/usr/lib/libpq.so\</userinput>
-<prompt>&gt; </prompt><userinput> -DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql -DENABLE_CLIENT=true</userinput>
+<prompt>&gt; </prompt><userinput> -DPostgreSQL_INCLUDE_DIR=/usr/include/postgresql</userinput>
 ...
--- Found PostgreSQL: /usr/lib/libpq.so 
--- box.net.sql(pg): INC=/usr/include/postgresql;/usr/include/postgresql
--- box.net.sql(pg): LIBS=pq
+-- Found PostgreSQL: /usr/lib/libpq.so (found version "9.3.2")
 ...
 -- Configuring done
 -- Generating done
 -- Build files have been written to: ~/tarantool
 <prompt>$ </prompt><userinput>make</userinput>
 ...
-[ 49%] Built target core
-[ 50%] Building CXX object src/plugin/pg/CMakeFiles/pg.dir/pg.cc.o
+[ 79%] Building CXX object src/plugin/pg/CMakeFiles/pg.dir/pg.cc.o
 Linking CXX shared library libpg.so
-[ 50%] Built target pg
+[ 79%] Built target pg
 ...
-[100%] Built target xlog
 [100%] Built target man
 <prompt>$ </prompt>
 
-# Before starting Tarantool server, tell it where the PostgreSQL plugin is.
-<prompt>$ </prompt><userinput>export TARANTOOL_PLUGIN_DIR=~/tarantool/src/plugin/pg</userinput>
-<prompt>$ </prompt>
+# Change directory to a directory which can be used for temporary tests.
+# For this example we assume that the name of this directory is
+# /home/pgulutzan/tarantool_sandbox. (Change "/home/pgulutzan" to whatever
+# is the actual base directory for the machine that's used for this test.)
+# Now, to help tarantool find the essential mysql.so file, execute these lines:
+<userinput>cd /home/pgulutzan/tarantool_sandbox</userinput>
+<userinput>mkdir box</userinput>
+<userinput>mkdir box/net</userinput>
+<userinput>cp ~/tarantool/src/module/pg/pg.so ./box/net/pg.so</userinput>
 
-# Start the Tarantool server.
-# Run it in the background but let the initial display be in the foreground.
-# So it's possible to see the message that the plugin was loaded.
-<prompt>$ </prompt><userinput>~/tarantool/src/box/tarantool&amp;</userinput>
-2013-12-06 13:01:51.518 [23978] 1/sched C> version 1.5.1-290-g45b93e7
-... Loading plugin: ~/tarantool/src/plugin/pg/libpg.so ...
-... Plugin 'postgresql' was loaded, version: 1
-...
-2013-12-06 13:01:51.531 [23978] 1/sched C> entering event loop
+# Start the Tarantool server. Do not use a Lua initialization file.
 
-# Type 'Enter' and then start the Tarantool client.
-<prompt>$ </prompt><userinput>~/tarantool/client/tarantool/tarantool</userinput>
-<prompt>localhost&gt; </prompt>
+<prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
+~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
+<prompt>tarantool&gt; </prompt>
+
+# Enter the following lines on the prompt (again, change "/home/pgulutzan"
+# to whatever the real directory is that contains tarantool):
+package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
+require("sql")
+if type(box.net.sql) ~= "table" then error("net.sql load failed") end
+require("box.net.pg")
+# ... Make sure that tarantool replies "true" for the calls to "require()".
 
 # Create a Lua function that will connect to the PostgreSQL server,
 # retrieve one row, and display the row.
 # For explanations of the statement types used here, read the
 # Lua tutorial in the Tarantool user manual.
-<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
-<prompt>localhost&gt; </prompt><userinput>function postgresql_select ()</userinput>
+<prompt>tarantool&gt; </prompt><userinput>SETOPT delimiter = '!'</userinput>
+<prompt>tarantool&gt; </prompt><userinput>function postgresql_select ()</userinput>
         <prompt>-&gt; </prompt><userinput>  local dbh = box.net.sql.connect(</userinput>
         <prompt>-&gt; </prompt><userinput>      'pg', '127.0.0.1', 5432, 'postgres', 'postgres', 'postgres')</userinput>
         <prompt>-&gt; </prompt><userinput>  local test = dbh:select('SELECT * FROM test WHERE s1 = 1')</userinput>
-        <prompt>&gt;  </prompt><userinput>  local row = ''</userinput>
+        <prompt>-&gt; </prompt><userinput>  local row = ''</userinput>
         <prompt>-&gt; </prompt><userinput>  for i, card in pairs(test) do</userinput>
         <prompt>-&gt; </prompt><userinput>    row = row .. card.s2 .. ' '</userinput>
         <prompt>-&gt; </prompt><userinput>    end</userinput>
@@ -301,14 +288,14 @@ Linking CXX shared library libpg.so
         <prompt>-&gt; </prompt><userinput>  end!</userinput>
 ---
 ...
-<prompt>localhost&gt; </prompt><userinput>SETOPT delimiter = ''!</userinput>
-<prompt>localhost&gt; </prompt>
+<prompt>tarantool&gt; </prompt><userinput>SETOPT delimiter = ''!</userinput>
+<prompt>tarantool&gt; </prompt>
 
 # Execute the Lua function.
-<prompt>localhost&gt; </prompt><userinput>postgresql_select()</userinput>
-- 2013-12-06 13:07:45.893 [23978] 102/iproto I> PostgreSQL row
-
-
+<prompt>tarantool&gt; </prompt><userinput>postgresql_select()</userinput>
+---
+- 'PostgreSQL row '
+...
 
 # Observe the result. It contains "PostgreSQL row".
 # So this is the row that was inserted into the PostgreSQL database.
