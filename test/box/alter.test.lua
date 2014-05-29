@@ -90,3 +90,32 @@ space:len()
 space:truncate()
 space:pairs():totable()
 space:drop()
+
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+
+-- invalid identifiers
+box.schema.create_space('invalid.identifier')
+box.schema.create_space('invalid identifier')
+box.schema.create_space('primary ')
+box.schema.create_space('5')
+box.schema.create_space('')
+
+-- valid identifiers
+box.schema.create_space('_Abcde'):drop()
+box.schema.create_space('_5'):drop()
+box.schema.create_space('valid_identifier'):drop()
+box.schema.create_space('ынтыпрайзный_空間'):drop() -- unicode
+box.schema.create_space('utf8_наше_Фсё'):drop() -- unicode
+
+space = box.schema.create_space('test')
+
+-- invalid identifiers
+space:create_index('invalid.identifier')
+space:create_index('invalid identifier')
+space:create_index('primary ')
+space:create_index('5')
+space:create_index('')
+
+space:drop()

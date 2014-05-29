@@ -33,6 +33,8 @@
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
 #include <limits.h>
+#include <wchar.h>
+#include <wctype.h>
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
@@ -285,5 +287,19 @@ struct priv_def {
 	/** What is being or has been granted. */
 	uint8_t access;
 };
+
+/**
+ * Check object identifier for invalid symbols.
+ * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
+ * Result is locale-dependent.
+ */
+bool
+identifier_is_valid(const char *str);
+
+/**
+ * Throw an error if identifier is not valid.
+ */
+void
+identifier_check(const char *str);
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

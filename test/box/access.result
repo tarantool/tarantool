@@ -121,3 +121,34 @@ box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 ---
 ...
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+-- invalid identifiers
+box.schema.user.create('invalid.identifier')
+---
+- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.user.create('invalid identifier')
+---
+- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.user.create('user ')
+---
+- error: Invalid identifier 'user ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.user.create('5')
+---
+- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.user.create(' ')
+---
+- error: Invalid identifier ' ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+-- valid identifiers
+box.schema.user.create('Петя_Иванов')
+---
+...
+box.schema.user.drop('Петя_Иванов')
+---
+...
