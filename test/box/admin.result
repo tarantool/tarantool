@@ -11,8 +11,8 @@ space:create_index('primary', { type = 'hash' })
 box.stat()
 ---
 - DELETE:
-    total: 34
-    rps: 6
+    total: 35
+    rps: 7
   SELECT:
     total: 1
     rps: 0
@@ -20,8 +20,8 @@ box.stat()
     total: 2
     rps: 0
   INSERT:
-    total: 34
-    rps: 6
+    total: 35
+    rps: 7
   AUTH:
     total: 0
     rps: 0
@@ -72,8 +72,8 @@ box.cfg
 box.stat()
 ---
 - DELETE:
-    total: 34
-    rps: 6
+    total: 35
+    rps: 7
   SELECT:
     total: 1
     rps: 0
@@ -81,8 +81,8 @@ box.stat()
     total: 2
     rps: 0
   INSERT:
-    total: 34
-    rps: 6
+    total: 35
+    rps: 7
   AUTH:
     total: 0
     rps: 0
