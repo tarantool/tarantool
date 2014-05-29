@@ -527,7 +527,9 @@ main(int argc, char **argv)
 	 */
 	__libc_stack_end = (void*) &argv;
 #endif
-	setlocale(LC_ALL, ""); /* set locale according to the environment */
+	/* set locale to make iswXXXX function work */
+	if (setlocale(LC_CTYPE, "en_US.UTF-8") == NULL)
+		fprintf(stderr, "Failed to set locale to en_US.UTF-8\n");
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
