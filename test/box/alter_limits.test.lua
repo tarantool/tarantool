@@ -29,7 +29,7 @@ s:drop()
 box.schema.create_space('tweedleedee', { engine = 'unknown' })
 -- explicit space id
 s = box.schema.create_space('tweedledum', { id = 3000 })
-s.n
+s.id
 -- duplicate id
 box.schema.create_space('tweedledee', { id = 3000 })
 -- stupid space id
@@ -78,7 +78,7 @@ s:delete{0}
 s:drop()
 -- create a space with reserved id (ok, but warns in the log)
 s = box.schema.create_space('test', { id = 256 })
-s.n
+s.id
 s:drop()
 s = box.schema.create_space('test', { field_count = 2 })
 s.field_count
@@ -91,19 +91,19 @@ s:select{}
 FIELD_COUNT = 4
 -- increase field_count -- error
 
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 s:select{}
 -- decrease field_count - error
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 1}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 1}})
 -- remove field_count - ok
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 0}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 0}})
 s:select{}
 -- increase field_count - error
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 s:truncate()
 s:select{}
 -- set field_count of an empty space
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 s:select{}
 -- field_count actually works
 s:insert{3, 4}
@@ -233,7 +233,9 @@ s.index.primary.alter({unique=false})
 s.index.primary:alter({unique=false})
 -- unique -> non-unique, index type
 s.index.primary:alter({type='tree', unique=false, name='pk'})
+--# push filter 'function: .*' to 'function <pointer>'
 s.index.primary
+--# clear filter
 s.index.pk.type
 s.index.pk.unique
 s.index.pk:rename('primary')
@@ -268,7 +270,7 @@ s:create_index('nodups', { type = 'tree', unique=true, parts = { 1, 'num'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select{}
-box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
+box.space['_index']:update({s.id, s.index.year.id}, {{"=", 7, 'num'}})
 -- ambiguous field type
 s:create_index('str', { type = 'tree', unique =  false, parts = { 1, 'str'}})
 -- create index on a non-existing field

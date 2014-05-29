@@ -22,8 +22,8 @@ s:insert{1, 2, 3}
 s:get{1}
 s:len()
 
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'temporary'}})
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, ''}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ''}})
 
 --# stop server default
 --# start server default
@@ -33,21 +33,21 @@ s = box.space.t
 s:len()
 s.temporary
 
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'no-temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 s.temporary
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, ',:asfda:temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ',:asfda:temporary'}})
 s.temporary
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'a,b,c,d,e'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'a,b,c,d,e'}})
 s.temporary
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
 s.temporary
 
 s:get{1}
 s:insert{1, 2, 3}
 
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'temporary'}})
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'no-temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 
 s:delete{1}
-box.space[box.schema.SPACE_ID]:update(s.n, {{'=', FLAGS, 'no-temporary'}})
+box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 s:drop()

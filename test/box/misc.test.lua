@@ -131,14 +131,14 @@ bit.bor(1, 2)
 
 -- A test case for box.counter
 space = box.space.tweedledum
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
 space:get{1}
-box.counter.inc(space.n, {1})
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
+box.counter.inc(space.id, {1})
 space:get{1}
-box.counter.dec(space.n, {1})
-box.counter.dec(space.n, {1})
-box.counter.dec(space.n, {1})
+box.counter.dec(space.id, {1})
+box.counter.dec(space.id, {1})
+box.counter.dec(space.id, {1})
 space:get{1}
 space:truncate()
 
