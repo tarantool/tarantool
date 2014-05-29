@@ -40,6 +40,7 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <locale.h>
 #include <libgen.h>
 #include <sysexits.h>
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
@@ -526,6 +527,7 @@ main(int argc, char **argv)
 	 */
 	__libc_stack_end = (void*) &argv;
 #endif
+	setlocale(LC_ALL, ""); /* set locale according to the environment */
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);

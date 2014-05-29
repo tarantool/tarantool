@@ -33,7 +33,8 @@
 #include <exception.h>
 #include "msgpuck/msgpuck.h"
 #include <limits.h>
-#include <ctype.h>
+#include <wchar.h>
+#include <wctype.h>
 
 enum {
 	BOX_SPACE_MAX = INT32_MAX,
@@ -288,18 +289,31 @@ struct priv_def {
 };
 
 /**
- * Check object identifier for invalid symbols
+ * Check object identifier for invalid symbols.
+ * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
+ * Result is locale-dependent.
  */
 static inline bool
 identifier_is_valid(const char *str)
 {
-	/* Allows [a-zA-Z_][a-zA-Z0-9_]* expression */
-	if (!isalpha(*str) && *str != '_')
-		return false;
-	while (*(++str) != '\0') {
-		if (!isalnum(*str) && *str != '_')
-			return false;
+	mbstate_t state;
+	memset(&state, 0, sizeof(state));
+	wchar_t w;
+	ssize_t len = mbrtowc(&w, str, MB_CUR_MAX, &state);
+	if (len <= 0)
+		return false; /* invalid character or zero-length string */
+	if (!iswalpha(w) && w != L'_')
+		return false; /* fail to match [a-zA-Z_] */
+
+	while((len = mbrtowc(&w, str, MB_CUR_MAX, &state)) > 0) {
+		if (!iswalnum(w) && w != L'_')
+			return false; /* fail to match [a-zA-Z0-9_]* */
+		str += len;
 	}
+
+	if (len < 0)
+		return false; /* invalid character  */
+
 	return true;
 }
 
