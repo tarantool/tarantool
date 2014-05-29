@@ -7,8 +7,9 @@ Insert X..1, remove X..1
  	*** compare_with_sptree_check ***
 	*** compare_with_sptree_check: done ***
  	*** bps_tree_debug_self_check ***
-self test finished successfully
 	*** bps_tree_debug_self_check: done ***
+ 	*** loading_test ***
+	*** loading_test: done ***
  	*** printing_test ***
 Inserting 10
 [(1) 10]

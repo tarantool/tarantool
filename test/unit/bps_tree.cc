@@ -223,12 +223,50 @@ bps_tree_debug_self_check()
 	header();
 
 	int res = bps_tree_test_debug_check_internal_functions(false);
-	if (res == 0)
-		printf("self test finished successfully\n");
-	else
+	if (res)
 		printf("self test returned error %d\n", res);
 
 	bps_tree_test_debug_check_internal_functions(true);
+
+	footer();
+}
+
+#include <signal.h>
+
+static void
+loading_test()
+{
+	header();
+
+	bps_tree_test tree;
+
+	const long test_count = 1000;
+	long arr[test_count];
+	for (long i = 0; i < test_count; i++)
+		arr[i] = i;
+
+	for (long i = 0; i <= test_count; i++) {
+		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+
+		if (!bps_tree_test_build(&tree, arr, i))
+			fail("building failed", "true");
+
+		if (bps_tree_test_debug_check(&tree))
+			fail("debug check nonzero", "true");
+
+		struct bps_tree_test_iterator itr;
+		itr = bps_tree_test_itr_first(&tree);
+		for (long j = 0; j < i; j++) {
+			long *v = bps_tree_test_itr_get_elem(&tree, &itr);
+			if (!v || *v != j)
+				fail("wrong build result", "true");
+			bps_tree_test_itr_next(&tree, &itr);
+		}
+		if (!bps_tree_test_itr_is_invalid(&itr))
+			fail("wrong build result", "true");
+
+		bps_tree_test_destroy(&tree);
+	}
 
 	footer();
 }
@@ -325,6 +363,7 @@ main(void)
 	simple_check();
 	compare_with_sptree_check();
 	bps_tree_debug_self_check();
+	loading_test();
 	printing_test();
 	white_box_test();
 }

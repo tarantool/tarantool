@@ -160,9 +160,6 @@ box.schema.index.rename = function(space_id, index_id, name)
     _index:update({space_id, index_id}, {{"=", 2, name}})
 end
 box.schema.index.alter = function(space_id, index_id, options)
-    if space_id == nil or index_id == nil then
-        box.raise(box.error.ER_PROC_LUA, "Usage: index:alter{opts}")
-    end
     if box.space[space_id] == nil then
         box.raise(box.error.ER_NO_SUCH_SPACE,
                   "Space "..space_id.." does not exist")
@@ -175,7 +172,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         return
     end
     if type(space_id) == "string" then
-        space_id = box.space[space_id].n
+        space_id = box.space[space_id].id
     end
     if type(index_id) == "string" then
         index_id = box.space[space_id].index[index_id].id
@@ -327,7 +324,7 @@ function box.schema.space.bless(space)
         end
 
         local keybuf = ffi.string(pkey, pkey_end - pkey)
-        local cdata = builtin.boxffi_index_iterator(index.n, index.id,
+        local cdata = builtin.boxffi_index_iterator(index.space.id, index.id,
             itype, keybuf);
         if cdata == nil then
             box.raise()
@@ -363,14 +360,14 @@ function box.schema.space.bless(space)
         if space.index[index_id] == nil then
             box.raise(box.error.ER_NO_SUCH_INDEX,
                 string.format("No index #%d is defined in space %d", index_id,
-                    space.n))
+                    space.id))
         end
     end
 
     index_mt.get = function(index, key)
         local key, key_end = msgpackffi.encode_tuple(key)
         port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.n,
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.space.id,
            index.id, box.index.EQ, 0, 2, key, key_end) ~=0 then
             return box.raise()
         end
@@ -410,7 +407,7 @@ function box.schema.space.bless(space)
         end
 
         port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.n,
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.space.id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
             return box.raise()
         end
@@ -422,19 +419,22 @@ function box.schema.space.bless(space)
         return ret
     end
     index_mt.update = function(index, key, ops)
-        return box._update(index.n, index.id, keify(key), ops);
+        return box._update(index.space.id, index.id, keify(key), ops);
     end
     index_mt.delete = function(index, key)
-        return box._delete(index.n, index.id, keify(key));
+        return box._delete(index.space.id, index.id, keify(key));
     end
     index_mt.drop = function(index)
-        return box.schema.index.drop(index.n, index.id)
+        return box.schema.index.drop(index.space.id, index.id)
     end
     index_mt.rename = function(index, name)
-        return box.schema.index.rename(index.n, index.id, name)
+        return box.schema.index.rename(index.space.id, index.id, name)
     end
     index_mt.alter= function(index, options)
-        return box.schema.index.alter(index.n, index.id, options)
+        if index.id == nil or index.space == nil then
+            box.raise(box.error.ER_PROC_LUA, "Usage: index:alter{opts}")
+        end
+        return box.schema.index.alter(index.space.id, index.id, options)
     end
     --
     local space_mt = {}
@@ -455,10 +455,10 @@ function box.schema.space.bless(space)
         return space.index[0]:select(key, opts)
     end
     space_mt.insert = function(space, tuple)
-        return box._insert(space.n, tuple);
+        return box._insert(space.id, tuple);
     end
     space_mt.replace = function(space, tuple)
-        return box._replace(space.n, tuple);
+        return box._replace(space.id, tuple);
     end
     space_mt.put = space_mt.replace; -- put is an alias for replace
     space_mt.update = function(space, key, ops)
@@ -510,16 +510,16 @@ function box.schema.space.bless(space)
         end
     end
     space_mt.drop = function(space)
-        return box.schema.space.drop(space.n)
+        return box.schema.space.drop(space.id)
     end
     space_mt.rename = function(space, name)
-        return box.schema.space.rename(space.n, name)
+        return box.schema.space.rename(space.id, name)
     end
     space_mt.create_index = function(space, name, options)
-        return box.schema.index.create(space.n, name, options)
+        return box.schema.index.create(space.id, name, options)
     end
     space_mt.run_triggers = function(space, yesno)
-        local space = ffi.C.space_by_id(space.n)
+        local space = ffi.C.space_by_id(space.id)
         if space == nil then
             box.raise(box.error.ER_NO_SUCH_SPACE, "Space not found")
         end
@@ -531,7 +531,7 @@ function box.schema.space.bless(space)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
-                rawset(index, 'idx', box.index.bind(space.n, j))
+                rawset(index, 'idx', box.index.bind(space.id, j))
                 setmetatable(index, index_mt)
             end
         end
@@ -567,7 +567,7 @@ local function object_resolve(object_type, object_name)
             box.raise(box.error.ER_NO_SUCH_SPACE,
                       "Space '"..object_name.."' does not exist")
         end
-        return space.n
+        return space.id
     end
     if object_type == 'function' then
         local _func = box.space[box.schema.FUNC_ID]
