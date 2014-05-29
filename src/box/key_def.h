@@ -293,28 +293,13 @@ struct priv_def {
  * The function checks \a str for matching [a-zA-Z_][a-zA-Z0-9_]* expression.
  * Result is locale-dependent.
  */
-static inline bool
-identifier_is_valid(const char *str)
-{
-	mbstate_t state;
-	memset(&state, 0, sizeof(state));
-	wchar_t w;
-	ssize_t len = mbrtowc(&w, str, MB_CUR_MAX, &state);
-	if (len <= 0)
-		return false; /* invalid character or zero-length string */
-	if (!iswalpha(w) && w != L'_')
-		return false; /* fail to match [a-zA-Z_] */
+bool
+identifier_is_valid(const char *str);
 
-	while((len = mbrtowc(&w, str, MB_CUR_MAX, &state)) > 0) {
-		if (!iswalnum(w) && w != L'_')
-			return false; /* fail to match [a-zA-Z0-9_]* */
-		str += len;
-	}
-
-	if (len < 0)
-		return false; /* invalid character  */
-
-	return true;
-}
+/**
+ * Throw an error if identifier is not valid.
+ */
+void
+identifier_check(const char *str);
 
 #endif /* TARANTOOL_BOX_KEY_DEF_H_INCLUDED */

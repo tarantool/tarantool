@@ -127,25 +127,23 @@ box.schema.user.drop('test')
 -- invalid identifiers
 box.schema.user.create('invalid.identifier')
 ---
-- error: 'Failed to create user ''invalid.identifier'': user name contains invalid
-    symbols'
+- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 box.schema.user.create('invalid identifier')
 ---
-- error: 'Failed to create user ''invalid identifier'': user name contains invalid
-    symbols'
+- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 box.schema.user.create('user ')
 ---
-- error: 'Failed to create user ''user '': user name contains invalid symbols'
+- error: Invalid identifier 'user ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 box.schema.user.create('5')
 ---
-- error: 'Failed to create user ''5'': user name contains invalid symbols'
+- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 box.schema.user.create(' ')
 ---
-- error: 'Failed to create user '' '': user name contains invalid symbols'
+- error: Invalid identifier ' ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')

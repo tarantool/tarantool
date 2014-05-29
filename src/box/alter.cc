@@ -1170,10 +1170,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  name, "user name is too long");
 	}
-	if (!identifier_is_valid(name)) {
-		tnt_raise(ClientError, ER_CREATE_USER,
-			  name, "user name contains invalid symbols");
-	}
+	identifier_check(name);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).

@@ -117,8 +117,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \
 	/* 66 */_(ER_NODE_ID_IS_RO,		2, "Can't reset node id") \
 	/* 67 */_(ER_NODE_ID_IS_RESERVED,	2, "Can't initialize node id with a reserved value %u") \
-	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for node %u: prev lsn = %llu, new lsn = %llu") \
+	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for node %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
+	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected [a-zA-Z_][a-zA-Z0-9_]*)") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
