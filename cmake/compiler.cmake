@@ -126,10 +126,6 @@ macro(enable_tnt_compile_flags)
         )
     endif()
 
-    if (HAVE_OPENMP)
-        add_compile_flags("C;CXX" "-fopenmp")
-    endif()
-
     add_definitions("-D__STDC_FORMAT_MACROS=1")
     add_definitions("-D__STDC_LIMIT_MACROS=1")
     add_definitions("-D__STDC_CONSTANT_MACROS=1")
@@ -141,6 +137,10 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("C;CXX" "-Werror")
     endif()
 endmacro(enable_tnt_compile_flags)
+
+if (HAVE_OPENMP)
+    add_compile_flags("C;CXX" "-fopenmp")
+endif()
 
 #
 # GCC started to warn for unused result starting from 4.2, and
