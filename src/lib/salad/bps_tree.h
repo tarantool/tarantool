@@ -246,6 +246,17 @@
 #ifdef BPS_BLOCK_LINEAR_SEARCH
 #pragma message("Btree: using linear search")
 #endif
+
+/**
+ * A switch that enables collection of executions of different
+ * branches of code. Used only for debug purposes, I hope you
+ * will not use it.
+ */
+#ifdef BPS_TREE_DEBUG_BRANCH_VISIT
+#pragma message("Btree: debugging: collecting branch visits")
+#endif
+
+
 /* }}} */
 
 /* {{{ BPS-tree internal settings */
@@ -424,6 +435,14 @@ typedef uint32_t bps_tree_block_id_t;
  */
 struct bps_block;
 
+#ifdef BPS_TREE_DEBUG_BRANCH_VISIT
+#define BPS_TREE_BRANCH_TRACE(tree, type, branch_bit) \
+	(tree)->debug_##type##_branches_mask |= (branch_bit)
+#else
+#define BPS_TREE_BRANCH_TRACE(tree, type, branch_bit) \
+	do {} while(0)
+#endif
+
 /**
  * Main tree struct. One instance - one tree.
  */
@@ -448,6 +467,18 @@ struct bps_tree {
 	bps_tree_elem_t max_elem;
 	/* Special allocator of blocks and their IDs */
 	struct matras matras;
+#ifdef BPS_TREE_DEBUG_BRANCH_VISIT
+	/* Bit masks of different branches visits */
+	uint32_t debug_insert_leaf_branches_mask;
+	uint32_t debug_insert_inner_branches_mask;
+	uint32_t debug_delete_leaf_branches_mask;
+	uint32_t debug_delete_inner_branches_mask;
+	/* Possible masks of different branches visits */
+	uint32_t debug_insert_leaf_branches_max_mask;
+	uint32_t debug_insert_inner_branches_max_mask;
+	uint32_t debug_delete_leaf_branches_max_mask;
+	uint32_t debug_delete_inner_branches_max_mask;
+#endif
 };
 
 /**
@@ -887,6 +918,19 @@ bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
 	matras_create(&tree->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
 		      extent_alloc_func, extent_free_func);
+
+#ifdef BPS_TREE_DEBUG_BRANCH_VISIT
+	/* Bit masks of different branches visits */
+	tree->debug_insert_leaf_branches_mask = 0;
+	tree->debug_insert_inner_branches_mask = 0;
+	tree->debug_delete_leaf_branches_mask = 0;
+	tree->debug_delete_inner_branches_mask = 0;
+	/* Possible masks of different branches visits */
+	tree->debug_insert_leaf_branches_max_mask = (1 << 0xE) - 1;
+	tree->debug_insert_inner_branches_max_mask = (1 << 0xE) - 1;
+	tree->debug_delete_leaf_branches_max_mask = (1 << 0x11) - 1;
+	tree->debug_delete_inner_branches_max_mask = (1 << 0x11) - 1;
+#endif
 }
 
 /**
@@ -2694,6 +2738,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 {
 	if (bps_tree_leaf_free_size(leaf_path_elem->block)) {
 		bps_tree_insert_into_leaf(tree, leaf_path_elem, new_elem);
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x0);
 		return true;
 	}
 	struct bps_leaf_path_elem left_ext = {0, 0, 0, 0, 0, 0},
@@ -2716,6 +2761,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x1);
 			return true;
 		} else if (bps_tree_leaf_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
@@ -2723,6 +2769,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x2);
 			return true;
 		}
 	} else if (has_left_ext) {
@@ -2732,6 +2779,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x3);
 			return true;
 		}
 		has_left_left_ext = bps_tree_collect_left_path_elem_leaf(tree,
@@ -2747,6 +2795,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_leaf(tree,
 					&left_ext, leaf_path_elem,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x4);
 			return true;
 		}
 	} else if (has_right_ext) {
@@ -2756,6 +2805,7 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x5);
 			return true;
 		}
 		has_right_right_ext = bps_tree_collect_right_ext_leaf(tree,
@@ -2771,14 +2821,16 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_leaf(tree,
 					leaf_path_elem, &right_ext,
 					move_count, new_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x6);
 			return true;
 		}
 	}
 	bps_tree_block_id_t new_block_id = (bps_tree_block_id_t)(-1);
 	struct bps_leaf *new_leaf = bps_tree_create_leaf(tree, &new_block_id);
 
-	if (!bps_tree_reserve_blocks(tree, tree->depth + 1))
+	if (!bps_tree_reserve_blocks(tree, tree->depth + 1)) {
 		return false;
+	}
 
 	if (leaf_path_elem->block->next_id != (bps_tree_block_id_t)(-1)) {
 		struct bps_leaf *next_leaf = (struct bps_leaf *)
@@ -2799,52 +2851,184 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 	bps_tree_prepare_new_ext_leaf(leaf_path_elem, &new_path_elem, new_leaf,
 				      new_block_id, &new_max_elem);
 	if (has_left_ext && has_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 4;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * left and right has MAX too. Split: insert new node at right
+		 * and evenly rearrange elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [ MAX + 1 ]  [    0    ]  [   MAX   ]
+		 *  Moving:
+		 *                      ----mc1--->
+		 *         ----mc2--->               <---mc3----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc2 = total / 4;
+		const bps_tree_pos_t nc3 = (total - nc2) / 3;
+		const bps_tree_pos_t nc4 = (total - nc2 - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc2 - nc3 - nc4);
+
+		const bps_tree_pos_t mc2 = max - nc1;
+		const bps_tree_pos_t mc3 = max - nc4;
+		const bps_tree_pos_t mc1 = nc3 - mc3;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count * 2, new_elem);
-		bps_tree_move_elems_to_left_leaf(tree, &new_path_elem,
-				&right_ext, move_count);
-		bps_tree_move_elems_to_right_leaf(tree, &left_ext,
-				leaf_path_elem, move_count);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
+		bps_tree_move_elems_to_right_leaf(tree,
+				&left_ext, leaf_path_elem, mc2);
+		bps_tree_move_elems_to_left_leaf(tree,
+				&new_path_elem, &right_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x7);
 	} else if (has_left_ext && has_left_left_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 4;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no right block, and left and left-left has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [   MAX   ]  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *                                   ----mc1--->
+		 *                      ----mc2--->
+		 *         ----mc3--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc4 = total / 4;
+		const bps_tree_pos_t nc3 = (total - nc4) / 3;
+		const bps_tree_pos_t nc2 = (total - nc4 - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc4 - nc3 - nc2);
+
+		const bps_tree_pos_t mc1 = nc4;
+		const bps_tree_pos_t mc3 = max - nc1;
+		const bps_tree_pos_t mc2 = max + mc3 - nc2;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count * 3, new_elem);
-		bps_tree_move_elems_to_right_leaf(tree, &left_ext,
-				leaf_path_elem, move_count * 2);
-		bps_tree_move_elems_to_right_leaf(tree, &left_left_ext,
-				&left_ext, move_count);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
+		bps_tree_move_elems_to_right_leaf(tree,
+				&left_ext, leaf_path_elem, mc2);
+		bps_tree_move_elems_to_right_leaf(tree,
+				&left_left_ext, &left_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x8);
 	} else if (has_right_ext && has_right_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 4;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no left block, and right and right-right has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]  [   MAX   ]  [   MAX   ]
+		 *  Moving:
+		 *         ----mc1--->  <---mc2----
+		 *                                   <---mc3----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc1 = total / 4;
+		const bps_tree_pos_t nc2 = (total - nc1) / 3;
+		const bps_tree_pos_t nc3 = (total - nc1 - nc2) / 2;
+		const bps_tree_pos_t nc4 = (total - nc1 - nc2 - nc3);
+
+		const bps_tree_pos_t mc1 = max + 1 - nc1;
+		const bps_tree_pos_t mc3 = max - nc4;
+		const bps_tree_pos_t mc2 = max + mc3 - nc3;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count, new_elem);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_left_leaf(tree,
-				&new_path_elem, &right_ext, move_count * 2);
+				&new_path_elem, &right_ext, mc2);
 		bps_tree_move_elems_to_left_leaf(tree,
-				&right_ext, &right_right_ext, move_count);
+				&right_ext, &right_right_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0x9);
 	} else if (has_left_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 3;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there only left block, and it has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *                      ----mc1--->
+		 *         ----mc2--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max * 2 + 1;
+		const bps_tree_pos_t nc3 = total / 3;
+		const bps_tree_pos_t nc2 = (total - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc3 - nc2);
+
+		const bps_tree_pos_t mc1 = nc3;
+		const bps_tree_pos_t mc2 = max - nc1;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count * 2, new_elem);
-		bps_tree_move_elems_to_right_leaf(tree, &left_ext,
-				leaf_path_elem, move_count);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
+		bps_tree_move_elems_to_right_leaf(tree,
+				&left_ext, leaf_path_elem, mc2);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xA);
 	} else if (has_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 3;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there only right block, and it has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]  [   MAX   ]
+		 *  Moving:
+		 *         ----mc1--->  <---mc2----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max * 2 + 1;
+		const bps_tree_pos_t nc1 = total / 3;
+		const bps_tree_pos_t nc2 = (total - nc1) / 2;
+		const bps_tree_pos_t nc3 = (total - nc1 - nc2);
+
+		const bps_tree_pos_t mc1 = max + 1 - nc1;
+		const bps_tree_pos_t mc2 = max - nc3;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count, new_elem);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
 		bps_tree_move_elems_to_left_leaf(tree, &new_path_elem,
-				&right_ext, move_count);
+				&right_ext, mc2);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xB);
 	} else {
 		assert(!leaf_path_elem->parent);
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_LEAF / 2;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no siblings.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *         ----mc1--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_LEAF;
+		const bps_tree_pos_t total = max + 1;
+		const bps_tree_pos_t nc2 = total / 2;
+		/* const bps_tree_pos_t nc1 = (total - nc2); */
+
+		const bps_tree_pos_t mc1 = nc2;
+
 		bps_tree_insert_and_move_elems_to_right_leaf(tree,
-				leaf_path_elem, &new_path_elem,
-				move_count, new_elem);
+				leaf_path_elem, &new_path_elem, mc1, new_elem);
 
 		bps_tree_block_id_t new_root_id = (bps_tree_block_id_t)(-1);
 		struct bps_inner *new_root = bps_tree_create_inner(tree,
@@ -2857,9 +3041,12 @@ bps_tree_process_insert_leaf(struct bps_tree *tree,
 		tree->root_id = new_root_id;
 		tree->max_elem = new_max_elem;
 		tree->depth++;
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xC);
 		return true;
 	}
 	assert(leaf_path_elem->parent);
+	BPS_TREE_BRANCH_TRACE(tree, insert_leaf, 1 << 0xD);
 	return bps_tree_process_insert_inner(tree, leaf_path_elem->parent,
 			new_block_id, new_path_elem.pos_in_parent,
 			new_max_elem);
@@ -2878,6 +3065,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 	if (bps_tree_inner_free_size(inner_path_elem->block)) {
 		bps_tree_insert_into_inner(tree, inner_path_elem,
 					   block_id, pos, max_elem);
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x0);
 		return true;
 	}
 	bps_inner_path_elem left_ext = {0, 0, 0, 0, 0, 0},
@@ -2900,6 +3088,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_inner(tree,
 					&left_ext, inner_path_elem, move_count,
 					block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x1);
 			return true;
 		} else if (bps_tree_inner_free_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
@@ -2907,6 +3096,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_inner(tree,
 					inner_path_elem, &right_ext,
 					move_count, block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x2);
 			return true;
 		}
 	} else if (has_left_ext) {
@@ -2916,6 +3106,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_inner(tree,
 					&left_ext, inner_path_elem,
 					move_count, block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x3);
 			return true;
 		}
 		has_left_left_ext = bps_tree_collect_left_path_elem_inner(tree,
@@ -2931,6 +3122,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_left_inner(tree,
 					&left_ext, inner_path_elem, move_count,
 					block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x4);
 			return true;
 		}
 	} else if (has_right_ext) {
@@ -2940,6 +3132,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_inner(tree,
 					inner_path_elem, &right_ext,
 					move_count, block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x5);
 			return true;
 		}
 		has_right_right_ext = bps_tree_collect_right_ext_inner(tree,
@@ -2955,6 +3148,7 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 			bps_tree_insert_and_move_elems_to_right_inner(tree,
 					inner_path_elem, &right_ext,
 					move_count, block_id, pos, max_elem);
+			BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x6);
 			return true;
 		}
 	}
@@ -2968,52 +3162,190 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 	bps_tree_prepare_new_ext_inner(inner_path_elem, &new_path_elem,
 				       new_inner, new_block_id, &new_max_elem);
 	if (has_left_ext && has_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 4;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * left and right has MAX too. Split: insert new node at right
+		 * and evenly rearrange elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [ MAX + 1 ]  [    0    ]  [   MAX   ]
+		 *  Moving:
+		 *                      ----mc1--->
+		 *         ----mc2--->               <---mc3----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc2 = total / 4;
+		const bps_tree_pos_t nc3 = (total - nc2) / 3;
+		const bps_tree_pos_t nc4 = (total - nc2 - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc2 - nc3 - nc4);
+
+		const bps_tree_pos_t mc2 = max - nc1;
+		const bps_tree_pos_t mc3 = max - nc4;
+		const bps_tree_pos_t mc1 = nc3 - mc3;
+
 		bps_tree_insert_and_move_elems_to_right_inner(tree,
 				inner_path_elem, &new_path_elem,
-				move_count * 2, block_id, pos, max_elem);
-		bps_tree_move_elems_to_left_inner(tree, &new_path_elem,
-				&right_ext, move_count);
-		bps_tree_move_elems_to_right_inner(tree, &left_ext,
-				inner_path_elem, move_count);
-	} else if (has_left_ext && has_left_left_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 4;
-		bps_tree_insert_and_move_elems_to_right_inner(tree,
-				inner_path_elem, &new_path_elem,
-				move_count * 3, block_id, pos, max_elem);
+				mc1, block_id, pos, max_elem);
 		bps_tree_move_elems_to_right_inner(tree,
-				&left_ext, inner_path_elem, move_count * 2);
-		bps_tree_move_elems_to_right_inner(tree, &left_left_ext,
-				&left_ext, move_count);
+				&left_ext, inner_path_elem, mc2);
+		bps_tree_move_elems_to_left_inner(tree,
+				&new_path_elem, &right_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x7);
+	} else if (has_left_ext && has_left_left_ext) {
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no right block, and left and left-left has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [   MAX   ]  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *                                   ----mc1--->
+		 *                      ----mc2--->
+		 *         ----mc3--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc4 = total / 4;
+		const bps_tree_pos_t nc3 = (total - nc4) / 3;
+		const bps_tree_pos_t nc2 = (total - nc4 - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc4 - nc3 - nc2);
+
+		const bps_tree_pos_t mc1 = nc4;
+		const bps_tree_pos_t mc3 = max - nc1;
+		const bps_tree_pos_t mc2 = max + mc3 - nc2;
+
+		bps_tree_insert_and_move_elems_to_right_inner(tree,
+				inner_path_elem, &new_path_elem,
+				mc1, block_id, pos, max_elem);
+		bps_tree_move_elems_to_right_inner(tree,
+				&left_ext, inner_path_elem, mc2);
+		bps_tree_move_elems_to_right_inner(tree,
+				&left_left_ext, &left_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x8);
 	} else if (has_right_ext && has_right_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 4;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no left block, and right and right-right has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]  [   MAX   ]  [   MAX   ]
+		 *  Moving:
+		 *         ----mc1--->  <---mc2----
+		 *                                   <---mc3----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]  [   nc4   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max * 3 + 1;
+		const bps_tree_pos_t nc1 = total / 4;
+		const bps_tree_pos_t nc2 = (total - nc1) / 3;
+		const bps_tree_pos_t nc3 = (total - nc1 - nc2) / 2;
+		const bps_tree_pos_t nc4 = (total - nc1 - nc2 - nc3);
+
+		const bps_tree_pos_t mc1 = max + 1 - nc1;
+		const bps_tree_pos_t mc3 = max - nc4;
+		const bps_tree_pos_t mc2 = max + mc3 - nc3;
+
 		bps_tree_insert_and_move_elems_to_right_inner(tree,
 				inner_path_elem, &new_path_elem,
-				move_count, block_id, pos, max_elem);
-		bps_tree_move_elems_to_left_inner(tree, &new_path_elem,
-				&right_ext, move_count * 2);
-		bps_tree_move_elems_to_left_inner(tree, &right_ext,
-				&right_right_ext, move_count);
+				mc1, block_id, pos, max_elem);
+		bps_tree_move_elems_to_left_inner(tree,
+				&new_path_elem, &right_ext, mc2);
+		bps_tree_move_elems_to_left_inner(tree,
+				&right_ext, &right_right_ext, mc3);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0x9);
 	} else if (has_left_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 3;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there only left block, and it has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [   MAX   ]  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *                      ----mc1--->
+		 *         ----mc2--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max * 2 + 1;
+		const bps_tree_pos_t nc3 = total / 3;
+		const bps_tree_pos_t nc2 = (total - nc3) / 2;
+		const bps_tree_pos_t nc1 = (total - nc3 - nc2);
+
+		const bps_tree_pos_t mc1 = nc3;
+		const bps_tree_pos_t mc2 = max - nc1;
+
 		bps_tree_insert_and_move_elems_to_right_inner(tree,
 				inner_path_elem, &new_path_elem,
-				move_count * 2, block_id, pos, max_elem);
-		bps_tree_move_elems_to_right_inner(tree, &left_ext,
-				inner_path_elem, move_count);
+				mc1, block_id, pos, max_elem);
+		bps_tree_move_elems_to_right_inner(tree,
+				&left_ext, inner_path_elem, mc2);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0xA);
 	} else if (has_right_ext) {
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 3;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there only right block, and it has MAX too.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]  [   MAX   ]
+		 *  Moving:
+		 *         ----mc1--->  <---mc2----
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]  [   nc3   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max * 2 + 1;
+		const bps_tree_pos_t nc1 = total / 3;
+		const bps_tree_pos_t nc2 = (total - nc1) / 2;
+		const bps_tree_pos_t nc3 = (total - nc1 - nc2);
+
+		const bps_tree_pos_t mc1 = max + 1 - nc1;
+		const bps_tree_pos_t mc2 = max - nc3;
+
 		bps_tree_insert_and_move_elems_to_right_inner(tree,
 				inner_path_elem, &new_path_elem,
-				move_count, block_id, pos, max_elem);
-		bps_tree_move_elems_to_left_inner(tree, &new_path_elem,
-				&right_ext, move_count);
+				mc1, block_id, pos, max_elem);
+		bps_tree_move_elems_to_left_inner(tree,
+				&new_path_elem, &right_ext, mc2);
+
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0xB);
 	} else {
 		assert(!inner_path_elem->parent);
-		bps_tree_pos_t move_count = BPS_TREE_MAX_COUNT_IN_INNER / 2;
+		/*
+		 * The block has MAX elems and +1 elem is inserted,
+		 * there no siblings.
+		 * Split: insert new node at right and evenly rearrange
+		 * elements.
+		 *  Blocks:
+		 *  [ MAX + 1 ]  [    0    ]
+		 *  Moving:
+		 *         ----mc1--->
+		 *  To become:
+		 *  [   nc1   ]  [   nc2   ]
+		 */
+		const bps_tree_pos_t max = BPS_TREE_MAX_COUNT_IN_INNER;
+		const bps_tree_pos_t total = max + 1;
+		const bps_tree_pos_t nc2 = total / 2;
+		/* const bps_tree_pos_t nc1 = (total - nc2); */
+
+		const bps_tree_pos_t mc1 = nc2;
+
 		bps_tree_insert_and_move_elems_to_right_inner(tree,
 				inner_path_elem, &new_path_elem,
-				move_count, block_id, pos, max_elem);
+				mc1, block_id, pos, max_elem);
 
 		bps_tree_block_id_t new_root_id = (bps_tree_block_id_t)(-1);
 		struct bps_inner *new_root =
@@ -3026,9 +3358,11 @@ bps_tree_process_insert_inner(struct bps_tree *tree,
 		tree->root_id = new_root_id;
 		tree->max_elem = new_max_elem;
 		tree->depth++;
+		BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0xC);
 		return true;
 	}
 	assert(inner_path_elem->parent);
+	BPS_TREE_BRANCH_TRACE(tree, insert_inner, 1 << 0xD);
 	return bps_tree_process_insert_inner(tree, inner_path_elem->parent,
 			new_block_id, new_path_elem.pos_in_parent,
 			new_max_elem);
@@ -3052,8 +3386,10 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 	bps_tree_delete_from_leaf(tree, leaf_path_elem);
 
 	if (leaf_path_elem->block->header.size >=
-	    BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3)
+	    BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3) {
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x0);
 		return;
+	}
 
 	struct bps_leaf_path_elem left_ext = {0, 0, 0, 0, 0, 0},
 		right_ext = {0, 0, 0, 0, 0, 0},
@@ -3074,12 +3410,14 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 				bps_tree_leaf_overmin_size(left_ext.block) / 2;
 			bps_tree_move_elems_to_right_leaf(tree, &left_ext,
 					leaf_path_elem, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x1);
 			return;
 		} else if (bps_tree_leaf_overmin_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
 				bps_tree_leaf_overmin_size(right_ext.block) / 2;
 			bps_tree_move_elems_to_left_leaf(tree, leaf_path_elem,
 					&right_ext, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x2);
 			return;
 		}
 	} else if (has_left_ext) {
@@ -3088,20 +3426,22 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 				bps_tree_leaf_overmin_size(left_ext.block) / 2;
 			bps_tree_move_elems_to_right_leaf(tree, &left_ext,
 					leaf_path_elem, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x3);
 			return;
 		}
 		has_left_left_ext = bps_tree_collect_left_path_elem_leaf(tree,
 				&left_ext, &left_left_ext);
 		if (has_left_left_ext &&
 		    bps_tree_leaf_overmin_size(left_left_ext.block) > 0) {
-			bps_tree_pos_t move_count = 1 + (2 *
+			bps_tree_pos_t move_count2 = 1 + (2 *
 				bps_tree_leaf_overmin_size(left_left_ext.block)
 				- 1) / 3;
+			bps_tree_pos_t move_count1 = 1 + move_count2 / 2;
 			bps_tree_move_elems_to_right_leaf(tree, &left_ext,
-					leaf_path_elem, move_count);
-			move_count = 1 + move_count / 2;
+					leaf_path_elem, move_count1);
 			bps_tree_move_elems_to_right_leaf(tree, &left_left_ext,
-					&left_ext, move_count);
+					&left_ext, move_count2);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x4);
 			return;
 		}
 	} else if (has_right_ext) {
@@ -3111,20 +3451,22 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 				/ 2;
 			bps_tree_move_elems_to_left_leaf(tree, leaf_path_elem,
 					&right_ext, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x5);
 			return;
 		}
 		has_right_right_ext = bps_tree_collect_right_ext_leaf(tree,
 				&right_ext, &right_right_ext);
 		if (has_right_right_ext &&
 		    bps_tree_leaf_overmin_size(right_right_ext.block) > 0) {
-			bps_tree_pos_t move_count = 1 + (2 *
+			bps_tree_pos_t move_count2 = 1 + (2 *
 				bps_tree_leaf_overmin_size(right_right_ext.block)
-				- 1)/ 3;
+				- 1) / 3;
+			bps_tree_pos_t move_count1 = 1 + move_count2 / 2;
 			bps_tree_move_elems_to_left_leaf(tree, leaf_path_elem,
-					&right_ext, move_count);
-			move_count = 1 + move_count / 2;
+					&right_ext, move_count1);
 			bps_tree_move_elems_to_left_leaf(tree, &right_ext,
-					&right_right_ext, move_count);
+					&right_right_ext, move_count2);
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x6);
 			return;
 		}
 	}
@@ -3137,6 +3479,7 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 		move_count = leaf_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_leaf(tree, &left_ext,
 				leaf_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x7);
 	} else if (has_left_ext && has_left_left_ext) {
 		bps_tree_pos_t move_count =
 			(leaf_path_elem->block->header.size + 1) / 2;
@@ -3145,6 +3488,7 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 		move_count = leaf_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_leaf(tree, &left_ext,
 				leaf_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x8);
 	} else if (has_right_ext && has_right_right_ext) {
 		bps_tree_pos_t move_count =
 			(leaf_path_elem->block->header.size + 1) / 2;
@@ -3153,23 +3497,32 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 		move_count = leaf_path_elem->block->header.size;
 		bps_tree_move_elems_to_right_leaf(tree, leaf_path_elem,
 				&right_ext, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x9);
 	} else if (has_left_ext) {
 		if (leaf_path_elem->block->header.size +
-		    left_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_LEAF)
+		    left_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_LEAF) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xA);
 			return;
+		}
 		bps_tree_pos_t move_count = leaf_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_leaf(tree, &left_ext,
 				leaf_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xB);
 	} else if (has_right_ext) {
 		if (leaf_path_elem->block->header.size +
-		    right_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_LEAF)
+		    right_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_LEAF) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xC);
 			return;
+		}
 		bps_tree_pos_t move_count = leaf_path_elem->block->header.size;
 		bps_tree_move_elems_to_right_leaf(tree, leaf_path_elem,
 				&right_ext, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xD);
 	} else {
-		if (leaf_path_elem->block->header.size > 0)
+		if (leaf_path_elem->block->header.size > 0) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xE);
 			return;
+		}
 		assert(leaf_path_elem->parent == 0);
 		assert(tree->depth == 1);
 		assert(tree->size == 0);
@@ -3179,6 +3532,7 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 		tree->last_id = (bps_tree_block_id_t)(-1);
 		bps_tree_dispose_leaf(tree, leaf_path_elem->block,
 				leaf_path_elem->block_id);
+		BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0xF);
 		return;
 	}
 
@@ -3204,6 +3558,7 @@ bps_tree_process_delete_leaf(struct bps_tree *tree,
 			leaf_path_elem->block_id);
 	assert(leaf_path_elem->parent);
 	bps_tree_process_delete_inner(tree, leaf_path_elem->parent);
+	BPS_TREE_BRANCH_TRACE(tree, delete_leaf, 1 << 0x10);
 }
 
 /**
@@ -3217,8 +3572,10 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 	bps_tree_delete_from_inner(tree, inner_path_elem);
 
 	if (inner_path_elem->block->header.size >=
-	    BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3)
+	    BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3) {
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x0);
 		return;
+	}
 
 	bps_inner_path_elem left_ext = {0, 0, 0, 0, 0, 0},
 		right_ext = {0, 0, 0, 0, 0, 0},
@@ -3240,6 +3597,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 				/ 2;
 			bps_tree_move_elems_to_right_inner(tree, &left_ext,
 					inner_path_elem, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x1);
 			return;
 		} else if (bps_tree_inner_overmin_size(right_ext.block) > 0) {
 			bps_tree_pos_t move_count = 1 +
@@ -3248,6 +3606,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 			bps_tree_move_elems_to_left_inner(tree,
 					inner_path_elem, &right_ext,
 					move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x2);
 			return;
 		}
 	} else if (has_left_ext) {
@@ -3257,6 +3616,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 				/ 2;
 			bps_tree_move_elems_to_right_inner(tree, &left_ext,
 					inner_path_elem, move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x3);
 			return;
 		}
 		has_left_left_ext =
@@ -3264,14 +3624,15 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 							      &left_left_ext);
 		if (has_left_left_ext &&
 		    bps_tree_inner_overmin_size(left_left_ext.block) > 0) {
-			bps_tree_pos_t move_count = 1 + (2 *
+			bps_tree_pos_t move_count2 = 1 + (2 *
 				bps_tree_inner_overmin_size(left_left_ext.block)
 				- 1) / 3;
+			bps_tree_pos_t move_count1 = 1 + move_count2 / 2;
 			bps_tree_move_elems_to_right_inner(tree, &left_ext,
-					inner_path_elem, move_count);
-			move_count = 1 + move_count / 2;
+					inner_path_elem, move_count1);
 			bps_tree_move_elems_to_right_inner(tree,
-					&left_left_ext, &left_ext, move_count);
+					&left_left_ext, &left_ext, move_count2);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x4);
 			return;
 		}
 	} else if (has_right_ext) {
@@ -3282,6 +3643,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 			bps_tree_move_elems_to_left_inner(tree,
 					inner_path_elem, &right_ext,
 					move_count);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x5);
 			return;
 		}
 		has_right_right_ext =
@@ -3289,14 +3651,15 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 							 &right_right_ext);
 		if (has_right_right_ext &&
 		    bps_tree_inner_overmin_size(right_right_ext.block) > 0) {
-			bps_tree_pos_t move_count = 1 + (2 *
+			bps_tree_pos_t move_count2 = 1 + (2 *
 				bps_tree_inner_overmin_size(right_right_ext.block)
 				- 1) / 3;
+			bps_tree_pos_t move_count1 = 1 + move_count2 / 2;
 			bps_tree_move_elems_to_left_inner(tree, inner_path_elem,
-					&right_ext, move_count);
-			move_count = 1 + move_count / 2;
+					&right_ext, move_count1);
 			bps_tree_move_elems_to_left_inner(tree, &right_ext,
-					&right_right_ext, move_count);
+					&right_right_ext, move_count2);
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x6);
 			return;
 		}
 	}
@@ -3309,6 +3672,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 		move_count = inner_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_inner(tree, &left_ext,
 				inner_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x7);
 	} else if (has_left_ext && has_left_left_ext) {
 		bps_tree_pos_t move_count =
 			(inner_path_elem->block->header.size + 1) / 2;
@@ -3317,6 +3681,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 		move_count = inner_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_inner(tree, &left_ext,
 				inner_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x8);
 	} else if (has_right_ext && has_right_right_ext) {
 		bps_tree_pos_t move_count =
 			(inner_path_elem->block->header.size + 1) / 2;
@@ -3325,23 +3690,35 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 		move_count = inner_path_elem->block->header.size;
 		bps_tree_move_elems_to_right_inner(tree, inner_path_elem,
 				&right_ext, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x9);
 	} else if (has_left_ext) {
 		if (inner_path_elem->block->header.size +
-		    left_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_INNER)
+		    left_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_INNER) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xA);
+			//throw 1;
 			return;
+		}
 		bps_tree_pos_t move_count = inner_path_elem->block->header.size;
 		bps_tree_move_elems_to_left_inner(tree, &left_ext,
 				inner_path_elem, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xB);
 	} else if (has_right_ext) {
 		if (inner_path_elem->block->header.size +
-		    right_ext.block->header.size > BPS_TREE_MAX_COUNT_IN_INNER)
+		    right_ext.block->header.size >
+		    BPS_TREE_MAX_COUNT_IN_INNER) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xC);
+			//throw 2;
 			return;
+		}
 		bps_tree_pos_t move_count = inner_path_elem->block->header.size;
 		bps_tree_move_elems_to_right_inner(tree, inner_path_elem,
 				&right_ext, move_count);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xD);
 	} else {
-		if (inner_path_elem->block->header.size > 1)
+		if (inner_path_elem->block->header.size > 1) {
+			BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xE);
 			return;
+		}
 		assert(tree->depth > 1);
 		assert(inner_path_elem->parent == 0);
 		tree->depth--;
@@ -3349,6 +3726,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 		tree->root = bps_tree_restore_block(tree, tree->root_id);
 		bps_tree_dispose_inner(tree, inner_path_elem->block,
 				inner_path_elem->block_id);
+		BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0xF);
 		return;
 	}
 	assert(inner_path_elem->block->header.size == 0);
@@ -3357,6 +3735,7 @@ bps_tree_process_delete_inner(struct bps_tree *tree,
 			inner_path_elem->block_id);
 	assert(inner_path_elem->parent);
 	bps_tree_process_delete_inner(tree, inner_path_elem->parent);
+	BPS_TREE_BRANCH_TRACE(tree, delete_inner, 1 << 0x10);
 }
 
 
@@ -3450,13 +3829,17 @@ bps_tree_debug_check_block(const struct bps_tree *tree, bps_block *block,
 			   bps_tree_block_id_t id, int level,
 			   size_t *calc_count,
 			   bps_tree_block_id_t *expected_prev_id,
-			   bps_tree_block_id_t *expected_this_id)
+			   bps_tree_block_id_t *expected_this_id,
+			   bool check_fullness)
 {
 	if (block->type != BPS_TREE_BT_LEAF && block->type != BPS_TREE_BT_INNER)
 		return 0x10;
 	if (block->type == BPS_TREE_BT_LEAF) {
 		struct bps_leaf *leaf = (struct bps_leaf *)(block);
 		int result = 0;
+		if (check_fullness)
+			if (block->size < BPS_TREE_MAX_COUNT_IN_LEAF * 2 / 3)
+				result |= 0x1000000;
 		*calc_count += block->size;
 		if (id != *expected_this_id)
 			result |= 0x10000;
@@ -3479,7 +3862,10 @@ bps_tree_debug_check_block(const struct bps_tree *tree, bps_block *block,
 	} else {
 		struct bps_inner *inner = (struct bps_inner *)(block);
 		int result = 0;
-		if (block->size == 0)
+		if (check_fullness)
+			if (block->size < BPS_TREE_MAX_COUNT_IN_INNER * 2 / 3)
+				result |= 0x2000000;
+		if (block->size < 2)
 			result |= 0x1000;
 		if (block->size > BPS_TREE_MAX_COUNT_IN_INNER)
 			result |= 0x1000;
@@ -3503,12 +3889,30 @@ bps_tree_debug_check_block(const struct bps_tree *tree, bps_block *block,
 					     calc_max_elem, tree->arg) >= 0)
 				result |= 0x8000;
 		}
+		bool check_fullness_next = block->size > 2;
+		if (block->size == 2) {
+			bps_tree_pos_t block_max_size;
+			if (level == 2)
+				block_max_size = BPS_TREE_MAX_COUNT_IN_LEAF;
+			else
+				block_max_size = BPS_TREE_MAX_COUNT_IN_INNER;
+			bps_block *child1 =
+				bps_tree_restore_block(tree,
+						       inner->child_ids[0]);
+			bps_block *child2 =
+				bps_tree_restore_block(tree,
+						       inner->child_ids[1]);
+			if (child1->size + child2->size <= block_max_size)
+				result |= 0x4000000;
+		}
+
 		for (bps_tree_pos_t i = 0; i < block->size; i++)
 			result |= bps_tree_debug_check_block(tree,
 				bps_tree_restore_block(tree,
 						       inner->child_ids[i]),
 				inner->child_ids[i], level - 1, calc_count,
-				expected_prev_id, expected_this_id);
+				expected_prev_id, expected_this_id,
+				check_fullness_next);
 		return result;
 	}
 }
@@ -3543,7 +3947,8 @@ bps_tree_debug_check(const struct bps_tree *tree)
 	result |= bps_tree_debug_check_block(tree, tree->root, tree->root_id,
 					     tree->depth, &calc_count,
 					     &expected_prev_id,
-					     &expected_this_id);
+					     &expected_this_id,
+					     false);
 	if (expected_this_id != (bps_tree_block_id_t)(-1))
 		result |= 0x40000;
 	if (expected_prev_id != tree->last_id)
@@ -4819,6 +5224,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 
 #undef BPS_TREE_MEMMOVE
 #undef BPS_TREE_DATAMOVE
+#undef BPS_TREE_BRANCH_TRACE
 
 /* {{{ Macros for custom naming of structs and functions */
 #undef _bps
