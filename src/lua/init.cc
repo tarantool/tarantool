@@ -44,6 +44,8 @@ extern "C" {
 
 
 #include <fiber.h>
+#include <session.h>
+#include <scoped_guard.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/admin.h"
@@ -427,6 +429,17 @@ run_script(va_list ap)
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
+
+	/*
+	 * Create session with ADMIN privileges for script / interactive mode
+	 */
+	struct session *session = session_create(STDIN_FILENO, 0);
+	auto scope_guard = make_scoped_guard([&] {
+		fiber_set_session(fiber(), NULL);
+		session_destroy(session);
+	});
+	session_set_user(session, ADMIN, ADMIN);
+	fiber_set_session(fiber(), session);
 
 	if (access(path, F_OK) == 0) {
 		/* Execute the init file. */
