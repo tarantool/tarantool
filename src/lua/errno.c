@@ -33,9 +33,9 @@
 #include <lauxlib.h>
 #include <lualib.h>
 #include <say.h>
+#include "lua/utils.h"
 
 extern char errno_lua[];
-
 
 void
 tarantool_lua_errno_init(struct lua_State *L)
@@ -282,22 +282,20 @@ tarantool_lua_errno_init(struct lua_State *L)
 		{ "",			0		}
 	};
 
-	int top = lua_gettop(L);
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushliteral(L, "errno");
-	lua_newtable(L);
+	const luaL_reg errnolib[] = {
+		{ NULL, NULL}
+	};
+	luaL_register_module(L, "box.errno", errnolib);
 	for (int i = 0; elist[i].name[0]; i++) {
 		lua_pushstring(L, elist[i].name);
 		lua_pushinteger(L, elist[i].value);
 		lua_rawset(L, -3);
 	}
-	lua_rawset(L, -3);
+	lua_pop(L, -1);
 
 	if (luaL_dostring(L, errno_lua))
 		panic("Error loading Lua source (internal)/errno.lua: %s",
 			      lua_tostring(L, -1));
-
-	lua_settop(L, top);
 }
 
 int

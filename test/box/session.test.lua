@@ -1,3 +1,6 @@
+box.session = require('box.session')
+box.fiber = require('box.fiber')
+
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
@@ -82,3 +85,5 @@ space:drop()
 
 box.session.uid()
 box.session.user()
+box.fiber = nil
+box.session = nil

@@ -1,3 +1,6 @@
+box.fiber = require('box.fiber')
+---
+...
 space = box.schema.create_space('tweedledum')
 ---
 ...
@@ -7,7 +10,7 @@ space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
-remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+remote = box.net.box.new('localhost', string.gsub(box.cfg.primary_port, '^.*:', ''), '0.5')
 ---
 ...
 type(remote)
@@ -46,10 +49,13 @@ remote:get(space.id, 123)
 ---
 - [123, 'test1', 'test2']
 ...
+internal = require('box.internal')
+---
+...
 function test(...) return box.tuple.new({ 123, 456 }) end
 ---
 ...
-f, a = box.call_loadproc('test')
+f, a = internal.call_loadproc('test')
 ---
 ...
 type(f)
@@ -89,7 +95,7 @@ remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 ---
 ...
-f, a = box.call_loadproc('test:b')
+f, a = internal.call_loadproc('test:b')
 ---
 ...
 type(f)
@@ -104,7 +110,7 @@ a.a
 ---
 - a
 ...
-f, a = box.call_loadproc('test.b')
+f, a = internal.call_loadproc('test.b')
 ---
 ...
 type(f)
@@ -134,7 +140,7 @@ remote:call('test:b', 'b', { 'c', { d = 'e' } })
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
 ---
 ...
-f, a = box.call_loadproc('test.a:b')
+f, a = internal.call_loadproc('test.a:b')
 ---
 ...
 type(f)
@@ -149,7 +155,7 @@ a.c
 ---
 - 1
 ...
-f, a = box.call_loadproc('test.a.b')
+f, a = internal.call_loadproc('test.a.b')
 ---
 ...
 type(f)
@@ -198,14 +204,16 @@ remote:call('box.space.tweedledum:select', {123})
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
+- error: '[string "slf, foo = box.call_loadproc(''box.net.self:se..."]:1: attempt
+    to call field ''call_loadproc'' (a nil value)'
 ...
 type(slf)
 ---
-- function
+- nil
 ...
 type(foo)
 ---
-- table
+- nil
 ...
 space:update(123, {{'=', 1, 'test1-updated'}})
 ---
@@ -338,7 +346,7 @@ remote:timeout(0.01):call('box.fiber.sleep', 10)
 - null
 ...
 --# setopt delimiter ';'
-pstart = box.time();
+pstart = box.fiber.time();
 ---
 ...
 parallel = {};
@@ -404,7 +412,7 @@ parallel
 ---
 - 20
 ...
-box.time() - pstart < 0.5
+box.fiber.time() - pstart < 0.5
 ---
 - true
 ...
@@ -430,11 +438,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:537: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:541: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:542: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:546: box.net.box: connection
     was closed'
 ...
 space:drop()

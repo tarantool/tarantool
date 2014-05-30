@@ -1,7 +1,8 @@
+box.fiber = require('box.fiber')
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+remote = box.net.box.new('localhost', string.gsub(box.cfg.primary_port, '^.*:', ''), '0.5')
 type(remote)
 remote:ping()
 remote:ping()
@@ -12,8 +13,9 @@ space:get{123}
 remote:select(space.id, 123)
 remote:get(space.id, 123)
 
+internal = require('box.internal')
 function test(...) return box.tuple.new({ 123, 456 }) end
-f, a = box.call_loadproc('test')
+f, a = internal.call_loadproc('test')
 type(f)
 type(a)
 
@@ -25,11 +27,11 @@ remote:call('test', 123, 345, { 678, 910 })
 test = { a = 'a', b = function(self, ...) return box.tuple.new(123) end }
 remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
-f, a = box.call_loadproc('test:b')
+f, a = internal.call_loadproc('test:b')
 type(f)
 type(a)
 a.a
-f, a = box.call_loadproc('test.b')
+f, a = internal.call_loadproc('test.b')
 type(f)
 type(a)
 
@@ -40,11 +42,11 @@ remote:call('test:b', 'b', { 'c', { d = 'e' } })
 
 
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
-f, a = box.call_loadproc('test.a:b')
+f, a = internal.call_loadproc('test.a:b')
 type(f)
 type(a)
 a.c
-f, a = box.call_loadproc('test.a.b')
+f, a = internal.call_loadproc('test.a.b')
 type(f)
 type(a)
 
@@ -108,7 +110,7 @@ remote:call('box.fiber.sleep', .01)
 remote:timeout(0.01):call('box.fiber.sleep', 10)
 
 --# setopt delimiter ';'
-pstart = box.time();
+pstart = box.fiber.time();
 parallel = {};
 function parallel_foo(id)
     box.fiber.sleep(math.random() * .05)
@@ -136,7 +138,7 @@ end;
 --# setopt delimiter ''
 parallel
 #parallel
-box.time() - pstart < 0.5
+box.fiber.time() - pstart < 0.5
 
 
 

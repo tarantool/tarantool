@@ -16,41 +16,23 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - _delete
-  - _insert
-  - _replace
-  - _update
-  - call_loadproc
-  - cfg
-  - cjson
+- - cfg
   - coredump
   - counter
-  - digest
-  - dostring
   - errinj
-  - errno
   - error
-  - fiber
   - index
   - info
-  - ipc
   - net
   - pack
-  - process
   - raise
   - schema
-  - session
   - slab
   - snapshot
-  - socket
   - space
   - stat
-  - time
-  - time64
   - tuple
   - unpack
-  - uuid
-  - uuid_hex
 ...
 t = nil
 ---
@@ -385,19 +367,19 @@ tonumber64(-1.0)
 ---
 - -1
 ...
---  box.dostring()
-box.dostring('abc')
+--  dostring()
+dostring('abc')
 ---
 - error: '[string "abc"]:1: ''='' expected near ''<eof>'''
 ...
-box.dostring('abc=2')
+dostring('abc=2')
 ---
 ...
-box.dostring('return abc')
+dostring('return abc')
 ---
 - 2
 ...
-box.dostring('return ...', 1, 2, 3)
+dostring('return ...', 1, 2, 3)
 ---
 - 1
 - 2

@@ -959,7 +959,7 @@ tarantool_lua_socket_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 	luaL_register_type(L, socketlib_name, lbox_socket_meta);
-	luaL_register(L, socketlib_name, socketlib);
+	luaL_register_module(L, socketlib_name, socketlib);
 	lua_pushstring(L, "SHUT_RD");
 	lua_pushnumber(L, SHUT_RD);
 	lua_settable(L, -3);

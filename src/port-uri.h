@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_PORT_URI_H_INCLUDED
+#define TARANTOOL_PORT_URI_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,26 +28,37 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/yaml.h"
+#include <stdbool.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
-extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-int luaopen_yaml(lua_State *l);
-}
+enum { PORT_URI_STR_LEN = 32 };
 
-static const char yamllib_name[] = "box.yaml";
+/** A parsed representation of an URI */
+struct port_uri {
 
-int
-tarantool_lua_yaml_init(struct lua_State *L)
-{
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	luaopen_yaml(L);
-	lua_setfield(L, -2, yamllib_name);
-	lua_pop(L, 1); /* package.loaded */
-	/* Remove global variable */
-	lua_pushnil(L);
-	lua_setfield(L, LUA_GLOBALSINDEX, "yaml");
-	return 0;
-}
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addr_storage;
+	};
+	socklen_t addr_len;
+
+	char schema[PORT_URI_STR_LEN];
+	char login[PORT_URI_STR_LEN];
+	char password[PORT_URI_STR_LEN];
+};
+
+/**
+ * Parse a string and fill port_uri struct.
+ * @retval port_uri success
+ * @retval NULL error
+ */
+struct port_uri *
+port_uri_parse(struct port_uri *uri, const char *str);
+
+/** Convert an uri to string */
+const char *
+port_uri_to_string(const struct port_uri * uri);
+
+
+#endif /* TARANTOOL_PORT_URI_H_INCLUDED */

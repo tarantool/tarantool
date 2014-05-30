@@ -8,7 +8,8 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 for i=1,5 do space:insert{i} end
 
-conn = box.net.box.new('127.0.0.1', tonumber(box.cfg.primary_port))
+primary_port = string.gsub(box.cfg.primary_port, '^.*:', '')
+conn = box.net.box.new('127.0.0.1', tonumber(primary_port))
 conn:select(space.id, 3, { iterator = 'GE' })
 conn:select(space.id, 3, { iterator = 'LE' })
 conn:select(space.id, 3, { iterator = 'GT' })

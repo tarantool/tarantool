@@ -1,6 +1,8 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
+local session = require('box.session')
+
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
     void space_run_triggers(struct space *space, bool yesno);
@@ -36,8 +38,10 @@ ffi.cdef[[
 		                  char *out, int out_len);
 ]]
 local builtin = ffi.C
-local msgpackffi = require('msgpackffi')
+local msgpackffi = require('box.msgpackffi')
 local fun = require('fun')
+
+local internal = require('box.internal')
 
 local function user_resolve(user)
     local _user = box.space[box.schema.USER_ID]
@@ -92,7 +96,7 @@ box.schema.space.create = function(name, options)
         uid = user_resolve(options.user)
     end
     if uid == nil then
-        uid = box.session.uid()
+        uid = session.uid()
     end
     _space:insert{id, uid, name, engine, options.field_count, temporary}
     return box.space[id], "created"
@@ -419,10 +423,10 @@ function box.schema.space.bless(space)
         return ret
     end
     index_mt.update = function(index, key, ops)
-        return box._update(index.space.id, index.id, keify(key), ops);
+        return internal.update(index.space.id, index.id, keify(key), ops);
     end
     index_mt.delete = function(index, key)
-        return box._delete(index.space.id, index.id, keify(key));
+        return internal.delete(index.space.id, index.id, keify(key));
     end
     index_mt.drop = function(index)
         return box.schema.index.drop(index.space.id, index.id)
@@ -455,10 +459,10 @@ function box.schema.space.bless(space)
         return space.index[0]:select(key, opts)
     end
     space_mt.insert = function(space, tuple)
-        return box._insert(space.id, tuple);
+        return internal.insert(space.id, tuple);
     end
     space_mt.replace = function(space, tuple)
-        return box._replace(space.id, tuple);
+        return internal.replace(space.id, tuple);
     end
     space_mt.put = space_mt.replace; -- put is an alias for replace
     space_mt.update = function(space, key, ops)
@@ -596,7 +600,7 @@ box.schema.func.create = function(name)
             box.raise(box.error.ER_FUNCTION_EXISTS,
                       "Function '"..name.."' already exists")
     end
-    _func:auto_increment{box.session.uid(), name}
+    _func:auto_increment{session.uid(), name}
 end
 
 box.schema.func.drop = function(name)
@@ -615,7 +619,7 @@ box.schema.user.password = function(password)
 end
 
 box.schema.user.passwd = function(new_password)
-    local uid = box.session.uid()
+    local uid = session.uid()
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
@@ -672,7 +676,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
     privilege = privilege_resolve(privilege)
     local oid = object_resolve(object_type, object_name)
     if grantor == nil then
-        grantor = box.session.uid()
+        grantor = session.uid()
     else
         grantor = user_resolve(grantor)
     end

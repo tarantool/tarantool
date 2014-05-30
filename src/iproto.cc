@@ -836,15 +836,15 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 
 /** Initialize a read-write port. */
 void
-iproto_init(const char *bind_ipaddr, int primary_port)
+iproto_init(const char *uri)
 {
 	/* Run a primary server. */
-	if (primary_port == 0)
+	if (!uri)
 		return;
 
 	static struct evio_service primary;
 	evio_service_init(loop(), &primary, "primary",
-			  bind_ipaddr, primary_port,
+			  uri,
 			  iproto_on_accept, NULL);
 	evio_service_on_bind(&primary,
 			     box_leave_local_standby_mode, NULL);

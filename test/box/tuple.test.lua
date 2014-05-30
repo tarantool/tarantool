@@ -234,7 +234,8 @@ t:findall(-9223372036854775807LL)
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------
 
-msgpackffi = require('msgpackffi')
+msgpack = require('box.msgpack')
+msgpackffi = require('box.msgpackffi')
 
 t = box.tuple.new({'a', 'b', 'c'})
 msgpack.decode(msgpackffi.encode(t))

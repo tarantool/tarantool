@@ -123,25 +123,14 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	/* Generate Node-UUID */
 	tt_uuid_create(&r->node_uuid);
 
-	char ip_addr[32];
 	char greeting[IPROTO_GREETING_SIZE];
-	int port;
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
 
-	int rc = sscanf(replication_source, "%31[^:]:%i",
-			ip_addr, &port);
+	port_uri uri;
+	if (!port_uri_parse(&uri, replication_source)) {
+		panic("Broken replication_source url: %s", replication_source);
+	}
 
-	assert(rc == 2);
-	(void)rc;
-
-	addr.sin_family = AF_INET;
-	if (inet_aton(ip_addr, (in_addr*)&addr.sin_addr.s_addr) < 0)
-		panic_syserror("inet_aton: %s", ip_addr);
-
-	addr.sin_port = htons(port);
-
-	int master = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	int master = sio_socket(uri.addr.sa_family, SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 
 	uint64_t sync = rand();
@@ -168,7 +157,7 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	struct iovec iov[IPROTO_ROW_IOVMAX];
 	int iovcnt = iproto_row_encode(&row, iov, fixheader);
 
-	sio_connect(master, &addr, sizeof(addr));
+	sio_connect(master, &uri.addr, uri.addr_len);
 	sio_readn(master, greeting, sizeof(greeting));
 	sio_writev_all(master, iov, iovcnt);
 
@@ -195,7 +184,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
-	coio_connect(coio, &r->remote->addr);
+	coio_connect(coio, &r->remote->uri.addr, r->remote->uri.addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
 
 	/* Send SUBSCRIBE request */
@@ -311,19 +300,15 @@ pull_from_remote(va_list ap)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *addr)
+recovery_follow_remote(struct recovery_state *r, const char *uri)
 {
 	char name[FIBER_NAME_MAX];
-	char ip_addr[32];
-	int port;
-	int rc;
 	struct fiber *f;
-	struct in_addr server;
 
 	assert(r->remote == NULL);
 
-	say_crit("initializing the replica, WAL master %s", addr);
-	snprintf(name, sizeof(name), "replica/%s", addr);
+	say_crit("initializing the replica, WAL master %s", uri);
+	snprintf(name, sizeof(name), "replica/%s", uri);
 
 	try {
 		f = fiber_new(name, pull_from_remote);
@@ -331,23 +316,17 @@ recovery_follow_remote(struct recovery_state *r, const char *addr)
 		return;
 	}
 
-	rc = sscanf(addr, "%31[^:]:%i", ip_addr, &port);
-	assert(rc == 2);
-	(void)rc;
 
-	if (inet_aton(ip_addr, &server) < 0) {
-		say_syserror("inet_aton: %s", ip_addr);
-		return;
-	}
 
 	static struct remote remote;
 	memset(&remote, 0, sizeof(remote));
-	remote.addr.sin_family = AF_INET;
-	memcpy(&remote.addr.sin_addr.s_addr, &server, sizeof(server));
-	remote.addr.sin_port = htons(port);
-	memcpy(&remote.cookie, &remote.addr, MIN(sizeof(remote.cookie), sizeof(remote.addr)));
+	if (!port_uri_parse(&remote.uri, uri)) {
+		say_error("Can't parse uri: %s", uri);
+		return;
+	}
+
 	remote.reader = f;
-	snprintf(remote.source, sizeof(remote.source), "%s", addr);
+	snprintf(remote.source, sizeof(remote.source), "%s", uri);
 	r->remote = &remote;
 	fiber_call(f, r);
 }
