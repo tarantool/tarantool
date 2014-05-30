@@ -1,7 +1,7 @@
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+remote = box.net.box.new('localhost', string.gsub(box.cfg.primary_port, '^.*:', ''), '0.5')
 type(remote)
 remote:ping()
 remote:ping()

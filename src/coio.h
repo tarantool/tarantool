@@ -45,10 +45,10 @@ struct coio_service
 };
 
 void
-coio_connect(struct ev_io *coio, struct sockaddr_in *addr);
+coio_connect(struct ev_io *coio, struct sockaddr *addr, socklen_t addr_len);
 
 bool
-coio_connect_timeout(struct ev_io *coio, struct sockaddr_in *addr,
+coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
 		     socklen_t len, ev_tstamp timeout);
 
 bool
@@ -144,7 +144,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 
 void
 coio_service_init(struct coio_service *service, const char *name,
-		  const char *host, int port,
+		  const char *uri,
 		  void (*handler)(va_list ap), void *handler_param);
 
 #endif /* TARANTOOL_COIO_H_INCLUDED */

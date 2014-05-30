@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_IPROTO_H_INCLUDED
-#define TARANTOOL_IPROTO_H_INCLUDED
+#ifndef TARANTOOL_PORT_URI_H_INCLUDED
+#define TARANTOOL_PORT_URI_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,6 +28,37 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-void
-iproto_init(const char *uri);
-#endif
+#include <stdbool.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+enum { PORT_URI_STR_LEN = 32 };
+
+/** A parsed representation of an URI */
+struct port_uri {
+
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addr_storage;
+	};
+	socklen_t addr_len;
+
+	char schema[PORT_URI_STR_LEN];
+	char login[PORT_URI_STR_LEN];
+	char password[PORT_URI_STR_LEN];
+};
+
+/**
+ * Parse a string and fill port_uri struct.
+ * @retval port_uri success
+ * @retval NULL error
+ */
+struct port_uri *
+port_uri_parse(struct port_uri *uri, const char *str);
+
+/** Convert an uri to string */
+const char *
+port_uri_to_string(const struct port_uri * uri);
+
+
+#endif /* TARANTOOL_PORT_URI_H_INCLUDED */

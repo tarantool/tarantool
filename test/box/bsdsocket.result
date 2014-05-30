@@ -29,7 +29,7 @@ s:nonblock(false)
 ---
 - false
 ...
-s:sysconnect('127.0.0.1', box.cfg.primary_port)
+s:sysconnect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
 ---
 - true
 ...

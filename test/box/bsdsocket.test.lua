@@ -9,7 +9,7 @@ s:errno()
 type(s:error())
 
 s:nonblock(false)
-s:sysconnect('127.0.0.1', box.cfg.primary_port)
+s:sysconnect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
 s:nonblock(true)
 s:nonblock()
 s:nonblock(false)

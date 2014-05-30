@@ -48,24 +48,23 @@ help()
 ...
 box.cfg
 ---
-- pid_file: tarantool.pid
+- too_long_threshold: 0.5
   slab_alloc_factor: 2
-  slab_alloc_minimal: 64
+  rows_per_wal: 50
   admin_port: <number>
-  primary_port: <number>
-  log_level: 5
+  slab_alloc_arena: 0.1
+  wal_dir: .
   logger_nonblock: true
   snap_dir: .
   coredump: false
-  too_long_threshold: 0.5
   wal_mode: write
-  rows_per_wal: 50
+  log_level: 5
   panic_on_snap_error: true
   panic_on_wal_error: false
-  wal_dir: .
   readahead: 16320
-  bind_ipaddr: INADDR_ANY
-  slab_alloc_arena: 0.1
+  primary_port: <number>
+  pid_file: tarantool.pid
+  slab_alloc_minimal: 64
   background: false
   wal_dir_rescan_delay: 0.1
 ...

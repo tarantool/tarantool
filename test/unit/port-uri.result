@@ -1,0 +1,35 @@
+1..34
+ok 1 - /file
+ok 2 - to_string
+ok 3 - unix://
+ok 4 - unix://file
+ok 5 - to_string
+ok 6 - unix://
+ok 7 - 123
+ok 8 - tcp://
+ok 9 - to_string
+ok 10 - http://11.2.3.4:123
+ok 11 - http://
+ok 12 - to_string
+ok 13 - http://11.2.3.4:123
+ok 14 - http://
+ok 15 - to_string
+ok 16 - schema://[2001:0db8:11a3:09d7::1]
+ok 17 - to_string
+ok 18 - invalid schema://[2001::11a3:09d7::1]
+ok 19 - 127.0.0.1
+ok 20 - to_string
+ok 21 - 127.0.0.1:22
+ok 22 - to_string
+ok 23 - login:password@127.0.0.1
+ok 24 - login
+ok 25 - password
+ok 26 - unix://login:password@/path/to
+ok 27 - login
+ok 28 - password
+ok 29 - to_string
+ok 30 - invalid uri
+ok 31 - valid uri
+ok 32 - service to port number
+ok 33 - valid uri
+ok 34 - service converted
