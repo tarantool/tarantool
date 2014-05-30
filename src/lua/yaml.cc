@@ -35,10 +35,17 @@ extern "C" {
 int luaopen_yaml(lua_State *l);
 }
 
+static const char yamllib_name[] = "box.yaml";
+
 int
 tarantool_lua_yaml_init(struct lua_State *L)
 {
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	luaopen_yaml(L);
-	lua_pop(L, 1);
+	lua_setfield(L, -2, yamllib_name);
+	lua_pop(L, 1); /* package.loaded */
+	/* Remove global variable */
+	lua_pushnil(L);
+	lua_setfield(L, LUA_GLOBALSINDEX, "yaml");
 	return 0;
 }

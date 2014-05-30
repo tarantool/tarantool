@@ -1165,12 +1165,12 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32(tuple, ID);
 	const char *name = tuple_field_cstr(tuple, NAME);
-	uint32_t len = strlen(name);
+	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  name, "user name is too long");
 	}
-	snprintf(user->name, sizeof(user->name), "%s", name);
+	identifier_check(name);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).

@@ -1,148 +1,151 @@
-type(box.digest)
+boxdigest = require('box.digest')
+---
+...
+type(boxdigest)
 ---
 - table
 ...
-box.digest.md4_hex()
+boxdigest.md4_hex()
 ---
 - 31d6cfe0d16ae931b73c59d7e0c089c0
 ...
-box.digest.md5_hex()
+boxdigest.md5_hex()
 ---
 - d41d8cd98f00b204e9800998ecf8427e
 ...
-box.digest.sha_hex()
+boxdigest.sha_hex()
 ---
 - f96cea198ad1dd5617ac084a3d92c6107708c0ef
 ...
-box.digest.sha1_hex()
+boxdigest.sha1_hex()
 ---
 - da39a3ee5e6b4b0d3255bfef95601890afd80709
 ...
-box.digest.sha224_hex()
+boxdigest.sha224_hex()
 ---
 - d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
 ...
-box.digest.sha256_hex()
+boxdigest.sha256_hex()
 ---
 - e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 ...
-box.digest.sha384_hex()
+boxdigest.sha384_hex()
 ---
 - 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
 ...
-box.digest.sha512_hex()
+boxdigest.sha512_hex()
 ---
 - cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
 ...
-string.len(box.digest.md4_hex())
+string.len(boxdigest.md4_hex())
 ---
 - 32
 ...
-string.len(box.digest.md5_hex())
+string.len(boxdigest.md5_hex())
 ---
 - 32
 ...
-string.len(box.digest.sha_hex())
+string.len(boxdigest.sha_hex())
 ---
 - 40
 ...
-string.len(box.digest.sha1_hex())
+string.len(boxdigest.sha1_hex())
 ---
 - 40
 ...
-string.len(box.digest.sha224_hex())
+string.len(boxdigest.sha224_hex())
 ---
 - 56
 ...
-string.len(box.digest.sha256_hex())
+string.len(boxdigest.sha256_hex())
 ---
 - 64
 ...
-string.len(box.digest.sha384_hex())
+string.len(boxdigest.sha384_hex())
 ---
 - 96
 ...
-string.len(box.digest.sha512_hex())
+string.len(boxdigest.sha512_hex())
 ---
 - 128
 ...
-string.len(box.digest.md4())
+string.len(boxdigest.md4())
 ---
 - 16
 ...
-string.len(box.digest.md5())
+string.len(boxdigest.md5())
 ---
 - 16
 ...
-string.len(box.digest.sha())
+string.len(boxdigest.sha())
 ---
 - 20
 ...
-string.len(box.digest.sha1())
+string.len(boxdigest.sha1())
 ---
 - 20
 ...
-string.len(box.digest.sha224())
+string.len(boxdigest.sha224())
 ---
 - 28
 ...
-string.len(box.digest.sha256())
+string.len(boxdigest.sha256())
 ---
 - 32
 ...
-string.len(box.digest.sha384())
+string.len(boxdigest.sha384())
 ---
 - 48
 ...
-string.len(box.digest.sha512())
+string.len(boxdigest.sha512())
 ---
 - 64
 ...
-box.digest.md5_hex(123)
+boxdigest.md5_hex(123)
 ---
 - 202cb962ac59075b964b07152d234b70
 ...
-box.digest.md5_hex('123')
+boxdigest.md5_hex('123')
 ---
 - 202cb962ac59075b964b07152d234b70
 ...
-box.digest.md5_hex(true)
+boxdigest.md5_hex(true)
 ---
 - b326b5062b2f0e69046810717534cb09
 ...
-box.digest.md5_hex('true')
+boxdigest.md5_hex('true')
 ---
 - b326b5062b2f0e69046810717534cb09
 ...
-box.digest.md5_hex(nil)
+boxdigest.md5_hex(nil)
 ---
 - d41d8cd98f00b204e9800998ecf8427e
 ...
-box.digest.md5_hex()
+boxdigest.md5_hex()
 ---
 - d41d8cd98f00b204e9800998ecf8427e
 ...
-box.digest.crc32()
+boxdigest.crc32()
 ---
 - 4294967295
 ...
-box.digest.crc32_update(4294967295, '')
+boxdigest.crc32_update(4294967295, '')
 ---
 - 4294967295
 ...
-box.digest.crc32('abc')
+boxdigest.crc32('abc')
 ---
 - 3384066120
 ...
-box.digest.crc32_update(4294967295, 'abc')
+boxdigest.crc32_update(4294967295, 'abc')
 ---
 - 3384066120
 ...
-box.digest.crc32('abccde')
+boxdigest.crc32('abccde')
 ---
 - 3628146660
 ...
-box.digest.crc32_update(box.digest.crc32('abc'), 'cde')
+boxdigest.crc32_update(boxdigest.crc32('abc'), 'cde')
 ---
 - 3628146660
 ...

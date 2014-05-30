@@ -97,6 +97,20 @@ matras_destroy(struct matras *m)
 }
 
 /**
+ * Free all memory used by an instance of matras and
+ * reinitialize it.
+ * Identical to matras_destroy(m); matras_create(m, ...);
+ */
+void
+matras_reset(struct matras *m)
+{
+	matras_destroy(m);
+	m->extent = 0;
+	m->block_count = 0;
+}
+
+
+/**
  * Allocate a new block. Return both, block pointer and block
  * id.
  *

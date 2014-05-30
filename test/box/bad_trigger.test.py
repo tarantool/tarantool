@@ -11,7 +11,7 @@ print """
  """
 
 server.admin("function f1() nosuchfunction() end")
-server.admin("box.session.on_connect(f1)")
+server.admin("require('box.session').on_connect(f1)")
 
 unpacker = msgpack.Unpacker(use_list = False)
 
@@ -38,5 +38,4 @@ print 'error message: ', body[IPROTO_ERROR]
 print 'eof:', len(s.recv(1024)) == 0
 s.close()
 
-# Clean-up
-server.admin("box.session.on_connect(nil, f1)")
+server.admin("require('box.session').on_connect(nil, f1)")

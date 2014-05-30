@@ -11,7 +11,7 @@ ADMIN = 1
 -- Test insertion into a system space - verify that
 -- mandatory fields are required.
 --
-_space:insert{_space.n, ADMIN, 'test', 5 }
+_space:insert{_space.id, ADMIN, 'test', 5 }
 ---
 - error: Duplicate key exists in unique index 0
 ...
@@ -25,55 +25,55 @@ _space:insert{'hello', 'world', 'test'}
 --
 -- Can't create a space which has wrong field count - field_count must be NUM
 --
-_space:insert{_space.n, ADMIN, 'test', 'world'}
+_space:insert{_space.id, ADMIN, 'test', 'world'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
 --
 -- There is already a tuple for the system space
 --
-_space:insert{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:insert{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
 - [280, 1, '_space', 'memtx', 0]
 ...
-_space:insert{_index.n, ADMIN, '_index', 'memtx', 0}
+_space:insert{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_space:replace{_index.n, ADMIN, '_index', 'memtx', 0}
+_space:replace{_index.id, ADMIN, '_index', 'memtx', 0}
 ---
 - [288, 1, '_index', 'memtx', 0]
 ...
 --
 -- Can't change properties of a space
 --
-_space:replace{_space.n, ADMIN, '_space', 'memtx', 0}
+_space:replace{_space.id, ADMIN, '_space', 'memtx', 0}
 ---
 - [280, 1, '_space', 'memtx', 0]
 ...
 --
 -- Can't drop a system space
 --
-_space:delete{_space.n}
+_space:delete{_space.id}
 ---
 - error: 'Can''t drop space 280: the space has indexes'
 ...
-_space:delete{_index.n}
+_space:delete{_index.id}
 ---
 - error: 'Can''t drop space 288: the space has indexes'
 ...
 --
 -- Can't change properties of a space
 --
-_space:update({_space.n}, {{'+', 0, 1}})
+_space:update({_space.id}, {{'+', 0, 1}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
-_space:update({_space.n}, {{'+', 0, 2}})
+_space:update({_space.id}, {{'+', 0, 2}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
@@ -87,7 +87,7 @@ t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 space = box.space[t[0]]
 ---
 ...
-space.n
+space.id
 ---
 - 321
 ...
@@ -122,7 +122,7 @@ space:delete{0}
 ---
 - error: 'No index #0 is defined in space 321'
 ...
-t = _space:delete{space.n}
+t = _space:delete{space.id}
 ---
 ...
 space_deleted = box.space[t[0]]
@@ -136,19 +136,19 @@ space:replace{0}
 ---
 - error: Space 321 does not exist
 ...
-_index:insert{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_index:replace{_space.n, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:replace{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---
 - [280, 0, 'primary', 'tree', 1, 1, 0, 'num']
 ...
-_index:insert{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
+_index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-_index:replace{_index.n, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
+_index:replace{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 ---
 - [288, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num']
 ...
@@ -171,7 +171,7 @@ _index:select{}
   - [320, 1, 'uuid', 'tree', 1, 1, 1, 'str']
 ...
 -- modify indexes of a system space
-_index:delete{_index.n, 0}
+_index:delete{_index.id, 0}
 ---
 - error: Can't drop the primary key in a system space, space id 288
 ...
@@ -215,7 +215,7 @@ box.space['_space']:insert{1000, ADMIN, 'test', 'memtx', 0}
 ---
 - [1000, 1, 'test', 'memtx', 0]
 ...
-box.space[1000].n
+box.space[1000].id
 ---
 - 1000
 ...
@@ -243,6 +243,73 @@ space:truncate()
 space:pairs():totable()
 ---
 - []
+...
+space:drop()
+---
+...
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+-- invalid identifiers
+box.schema.create_space('invalid.identifier')
+---
+- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.create_space('invalid identifier')
+---
+- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.create_space('primary ')
+---
+- error: Invalid identifier 'primary ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.create_space('5')
+---
+- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+box.schema.create_space('')
+---
+- error: Invalid identifier '' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+-- valid identifiers
+box.schema.create_space('_Abcde'):drop()
+---
+...
+box.schema.create_space('_5'):drop()
+---
+...
+box.schema.create_space('valid_identifier'):drop()
+---
+...
+box.schema.create_space('ынтыпрайзный_空間'):drop() -- unicode
+---
+...
+box.schema.create_space('utf8_наше_Фсё'):drop() -- unicode
+---
+...
+space = box.schema.create_space('test')
+---
+...
+-- invalid identifiers
+space:create_index('invalid.identifier')
+---
+- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+space:create_index('invalid identifier')
+---
+- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+space:create_index('primary ')
+---
+- error: Invalid identifier 'primary ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+space:create_index('5')
+---
+- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+...
+space:create_index('')
+---
+- error: Invalid identifier '' (expected [a-zA-Z_][a-zA-Z0-9_]*)
 ...
 space:drop()
 ---

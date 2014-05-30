@@ -10,10 +10,10 @@ for i=1,5 do space:insert{i} end
 
 primary_port = string.gsub(box.cfg.primary_port, '^.*:', '')
 conn = box.net.box.new('127.0.0.1', tonumber(primary_port))
-conn:select(space.n, 3, { iterator = 'GE' })
-conn:select(space.n, 3, { iterator = 'LE' })
-conn:select(space.n, 3, { iterator = 'GT' })
-conn:select(space.n, 3, { iterator = 'LT' })
+conn:select(space.id, 3, { iterator = 'GE' })
+conn:select(space.id, 3, { iterator = 'LE' })
+conn:select(space.id, 3, { iterator = 'GT' })
+conn:select(space.id, 3, { iterator = 'LT' })
 conn:close()
 
 space:drop()

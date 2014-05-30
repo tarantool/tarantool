@@ -2,6 +2,10 @@
 
 (function()
 
+local msgpack = require('box.msgpack')
+local boxfiber = require('box.fiber')
+local internal = require('box.internal')
+
 local function keify(key)
     if key == nil then
         return {}
@@ -249,13 +253,13 @@ box.net = {
     -- local tarantool
     self = {
         process = function(self, ...)
-            return box.process(...)
+            return internal.process(...)
         end,
 
         -- for compatibility with the networked version,
         -- implement call
         call = function(self, proc_name, ...) 
-            local proc = { box.call_loadproc(proc_name) }
+            local proc = { internal.call_loadproc(proc_name) }
             if #proc == 2 then
                 return { proc[1](proc[2], ...) }
             else
@@ -326,22 +330,22 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end,
 
             -- write channel
-            wch = box.ipc.channel(1),
+            wch = boxfiber.channel(1),
 
             -- ready socket channel
-            rch = box.ipc.channel(1),
+            rch = boxfiber.channel(1),
         },
 
 
 
         process = function(self, op, request)
-            local started = box.time()
+            local started = boxfiber.time()
             local timeout = self.request_timeout
             self.request_timeout = nil
 
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
-            self.processing[sync] = box.ipc.channel(1)
+            self.processing[sync] = boxfiber.channel(1)
             local header = msgpack.encode{
                     [box.net.box.TYPE] = op, [box.net.box.SYNC] = sync
             }
@@ -355,7 +359,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return nil
                 end
 
-                timeout = timeout - (box.time() - started)
+                timeout = timeout - (boxfiber.time() - started)
             else
                 self.processing.wch:put(request)
             end
@@ -412,7 +416,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 return true
             end
 
-            local sc = box.socket.tcp()
+            local sc = require('box.socket').tcp()
             if sc == nil then
                 self:fatal("Can't create socket")
                 return false
@@ -465,7 +469,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         break
                     end
                     -- timeout between reconnect attempts
-                    box.fiber.sleep(self.reconnect_timeout)
+                    boxfiber.sleep(self.reconnect_timeout)
                 end
 
                 -- wakeup write fiber
@@ -553,8 +557,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
     setmetatable( remote, { __index = box.net.box } )
 
-    remote.irfiber = box.fiber.wrap(remote.rfiber, remote)
-    remote.iwfiber = box.fiber.wrap(remote.wfiber, remote)
+    remote.irfiber = boxfiber.wrap(remote.rfiber, remote)
+    remote.iwfiber = boxfiber.wrap(remote.wfiber, remote)
 
     remote.rpc = { r = remote }
     setmetatable(remote.rpc, { __index = rpc_index })

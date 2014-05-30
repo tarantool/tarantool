@@ -1,3 +1,4 @@
+box.fiber = require('box.fiber')
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 -- A test case for a race condition between ev_schedule
@@ -286,3 +287,4 @@ f:resume()
 fib_id = box.fiber.wrap(testfun):id()
 box.fiber.find(fib_id):cancel()
 box.fiber.find(fib_id)
+box.fiber = nil

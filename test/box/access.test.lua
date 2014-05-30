@@ -1,3 +1,4 @@
+box.session = require('box.session')
 -- user id for a Lua session is admin - 1
 box.session.uid()
 -- extra arguments are ignored
@@ -56,3 +57,18 @@ box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
+box.session = nil
+
+--------------------------------------------------------------------------------
+-- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
+--------------------------------------------------------------------------------
+-- invalid identifiers
+box.schema.user.create('invalid.identifier')
+box.schema.user.create('invalid identifier')
+box.schema.user.create('user ')
+box.schema.user.create('5')
+box.schema.user.create(' ')
+
+-- valid identifiers
+box.schema.user.create('Петя_Иванов')
+box.schema.user.drop('Петя_Иванов')

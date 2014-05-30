@@ -77,7 +77,7 @@ box.schema.create_space('tweedleedee', { engine = 'unknown' })
 s = box.schema.create_space('tweedledum', { id = 3000 })
 ---
 ...
-s.n
+s.id
 ---
 - 3000
 ...
@@ -219,7 +219,7 @@ s:drop()
 s = box.schema.create_space('test', { id = 256 })
 ---
 ...
-s.n
+s.id
 ---
 - 256
 ...
@@ -257,7 +257,7 @@ FIELD_COUNT = 4
 ---
 ...
 -- increase field_count -- error
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 ---
 - error: 'Can''t modify space 512: can not change field count on a non-empty space'
 ...
@@ -266,12 +266,12 @@ s:select{}
 - - [1, 2]
 ...
 -- decrease field_count - error
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 1}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 1}})
 ---
 - error: 'Can''t modify space 512: can not change field count on a non-empty space'
 ...
 -- remove field_count - ok
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 0}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 0}})
 ---
 - [512, 1, 'test', 'memtx', 0, '']
 ...
@@ -280,7 +280,7 @@ s:select{}
 - - [1, 2]
 ...
 -- increase field_count - error
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 ---
 - error: 'Can''t modify space 512: can not change field count on a non-empty space'
 ...
@@ -292,7 +292,7 @@ s:select{}
 - []
 ...
 -- set field_count of an empty space
-box.space['_space']:update(s.n, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
 ---
 - [512, 1, 'test', 'memtx', 3, '']
 ...
@@ -631,19 +631,32 @@ s.index.primary:alter({type='tree', unique=false, name='pk'})
 ---
 - error: 'Can''t create or modify index 0 in space 512: primary key must be unique'
 ...
+--# push filter 'function: .*' to 'function <pointer>'
 s.index.primary
 ---
-- unique: true
+- &0
+  unique: true
   parts:
     0:
       type: NUM
       fieldno: 0
-  n: 512
+  id: 0
   type: HASH
   idx: ' index 0'
+  space:
+    index:
+      0: *0
+      primary: *0
+    on_replace: 'function <pointer>
+    temporary: false
+    id: 512
+    engine: memtx
+    enabled: true
+    name: test
+    field_count: 0
   name: primary
-  id: 0
 ...
+--# clear filter
 s.index.pk.type
 ---
 - error: '[string "return s.index.pk.type "]:1: attempt to index field ''pk'' (a nil
@@ -769,7 +782,7 @@ s.index.primary:select{}
   - ['Homevideo', 2011]
   - ['No such movie', 999]
 ...
-box.space['_index']:update({s.n, s.index.year.id}, {{"=", 7, 'num'}})
+box.space['_index']:update({s.id, s.index.year.id}, {{"=", 7, 'num'}})
 ---
 - [512, 1, 'year', 'tree', 0, 1, 1, 'num']
 ...

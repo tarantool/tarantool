@@ -331,18 +331,18 @@ space_stat(struct space *sp)
 {
 	static __thread struct space_stat space_stat;
 
-	space_stat.n = space_id(sp);
+	space_stat.id = space_id(sp);
 	int i = 0;
 	for (; i < sp->index_id_max; i++) {
 		Index *index = space_index(sp, i);
 		if (index) {
-			space_stat.index[i].n       = i;
+			space_stat.index[i].id      = i;
 			space_stat.index[i].keys    = index->size();
 			space_stat.index[i].memsize = index->memsize();
 		} else
-			space_stat.index[i].n = -1;
+			space_stat.index[i].id = -1;
 	}
-	space_stat.index[i].n = -1;
+	space_stat.index[i].id = -1;
 	return &space_stat;
 }
 

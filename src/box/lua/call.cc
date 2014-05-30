@@ -50,8 +50,8 @@
 #include "box/schema.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char schema_lua[], box_lua[], box_net_lua[], misc_lua[] ;
-static const char *lua_sources[] = { schema_lua, box_lua, box_net_lua, misc_lua, NULL };
+extern char schema_lua[], box_net_lua[], misc_lua[] ;
+static const char *lua_sources[] = { schema_lua, box_net_lua, misc_lua, NULL };
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -921,15 +921,19 @@ lbox_unpack(struct lua_State *L)
 }
 
 static const struct luaL_reg boxlib[] = {
-	{"process", lbox_process},
-	{"_insert", lbox_insert},
-	{"_replace", lbox_replace},
-	{"_update", lbox_update},
-	{"_delete", lbox_delete},
-	{"call_loadproc",  lbox_call_loadproc},
 	{"raise", lbox_raise},
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},
+	{NULL, NULL}
+};
+
+static const struct luaL_reg boxlib_internal[] = {
+	{"process", lbox_process},
+	{"call_loadproc",  lbox_call_loadproc},
+	{"insert", lbox_insert},
+	{"replace", lbox_replace},
+	{"update", lbox_update},
+	{"delete", lbox_delete},
 	{NULL, NULL}
 };
 
@@ -938,6 +942,9 @@ box_lua_init(struct lua_State *L)
 {
 	luaL_register(L, "box", boxlib);
 	lua_pop(L, 1);
+	luaL_register_module(L, "box.internal", boxlib_internal);
+	lua_pop(L, 1);
+
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);

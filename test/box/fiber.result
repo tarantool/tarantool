@@ -1,3 +1,6 @@
+box.fiber = require('box.fiber')
+---
+...
 space = box.schema.create_space('tweedledum')
 ---
 ...
@@ -835,4 +838,7 @@ box.fiber.find(fib_id):cancel()
 box.fiber.find(fib_id)
 ---
 - null
+...
+box.fiber = nil
+---
 ...

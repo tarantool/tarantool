@@ -10,7 +10,7 @@ t = {} for k,v in pairs(box.space[0]) do if type(v) ~= 'table' and type(v) ~= 'f
 t
 ---
 - - 'temporary: false'
-  - 'n: 0'
+  - 'id: 0'
   - 'engine: memtx'
   - 'enabled: true'
   - 'name: tweedledum'

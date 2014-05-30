@@ -6,7 +6,7 @@
 function f1() nosuchfunction() end
 ---
 ...
-box.session.on_connect(f1)
+require('box.session').on_connect(f1)
 ---
 ...
 greeting:  True
@@ -14,6 +14,6 @@ fixheader:  True
 error code: 8194
 error message:  [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
 eof: True
-box.session.on_connect(nil, f1)
+require('box.session').on_connect(nil, f1)
 ---
 ...

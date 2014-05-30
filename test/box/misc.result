@@ -16,41 +16,23 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - _delete
-  - _insert
-  - _replace
-  - _update
-  - call_loadproc
-  - cfg
-  - cjson
+- - cfg
   - coredump
   - counter
-  - digest
-  - dostring
   - errinj
-  - errno
   - error
-  - fiber
   - index
   - info
-  - ipc
   - net
   - pack
-  - process
   - raise
   - schema
-  - session
   - slab
   - snapshot
-  - socket
   - space
   - stat
-  - time
-  - time64
   - tuple
   - unpack
-  - uuid
-  - uuid_hex
 ...
 t = nil
 ---
@@ -235,13 +217,14 @@ t;
   - 'box.error.ER_SPACE_ACCESS_DENIED : 55'
   - 'box.error.ER_KEY_PART_COUNT : 31'
   - 'box.error.ER_SPACE_EXISTS : 10'
+  - 'box.error.ER_TUPLE_IS_TOO_LONG : 27'
   - 'box.error.ER_UNKNOWN_NODE : 62'
   - 'box.error.ER_MODIFY_INDEX : 14'
   - 'box.error.ER_MISSING_REQUEST_FIELD : 69'
   - 'box.error.ER_NODE_ID_IS_RO : 66'
   - 'box.error.ER_INVALID_UUID : 64'
   - 'box.error.ER_SECONDARY : 7'
-  - 'box.error.ER_TUPLE_IS_TOO_LONG : 27'
+  - 'box.error.ER_IDENTIFIER : 70'
   - 'box.error.ER_DROP_SPACE : 11'
   - 'box.error.ER_SPLICE : 25'
   - 'box.error.ER_UNKNOWN_REQUEST_TYPE : 48'
@@ -384,19 +367,19 @@ tonumber64(-1.0)
 ---
 - -1
 ...
---  box.dostring()
-box.dostring('abc')
+--  dostring()
+dostring('abc')
 ---
 - error: '[string "abc"]:1: ''='' expected near ''<eof>'''
 ...
-box.dostring('abc=2')
+dostring('abc=2')
 ---
 ...
-box.dostring('return abc')
+dostring('return abc')
 ---
 - 2
 ...
-box.dostring('return ...', 1, 2, 3)
+dostring('return ...', 1, 2, 3)
 ---
 - 1
 - 2
@@ -424,7 +407,7 @@ bit.bor(1, 2)
 space = box.space.tweedledum
 ---
 ...
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
 ---
 - 1
 ...
@@ -432,11 +415,11 @@ space:get{1}
 ---
 - [1, 1]
 ...
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
 ---
 - 2
 ...
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
 ---
 - 3
 ...
@@ -444,15 +427,15 @@ space:get{1}
 ---
 - [1, 3]
 ...
-box.counter.dec(space.n, {1})
+box.counter.dec(space.id, {1})
 ---
 - 2
 ...
-box.counter.dec(space.n, {1})
+box.counter.dec(space.id, {1})
 ---
 - 1
 ...
-box.counter.dec(space.n, {1})
+box.counter.dec(space.id, {1})
 ---
 - 0
 ...

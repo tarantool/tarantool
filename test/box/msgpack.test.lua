@@ -3,7 +3,8 @@
 --------------------------------------------------------------------------------
 
 ffi = require('ffi')
-msgpackffi = require('msgpackffi')
+msgpack = require('box.msgpack')
+msgpackffi = require('box.msgpackffi')
 
 msgpack.encode()
 msgpack.decode()

@@ -69,6 +69,10 @@ key_def_new(uint32_t space_id, uint32_t iid, const char *name,
 			  (unsigned) iid, (unsigned) space_id,
 			  "index name is too long");
 	}
+	if (!identifier_is_valid(def->name)) {
+		free(def);
+		tnt_raise(ClientError, ER_IDENTIFIER, def->name);
+	}
 	def->type = type;
 	def->space_id = space_id;
 	def->iid = iid;
@@ -207,9 +211,43 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 			  (unsigned) def->id,
 			  "space name is too long");
 	}
+	identifier_check(def->name);
 	if (engine_namelen >= sizeof(def->engine_name)) {
 		tnt_raise(ClientError, errcode,
 			  (unsigned) def->id,
 			  "space engine name is too long");
 	}
+	identifier_check(def->engine_name);
 }
+
+bool
+identifier_is_valid(const char *str)
+{
+	mbstate_t state;
+	memset(&state, 0, sizeof(state));
+	wchar_t w;
+	ssize_t len = mbrtowc(&w, str, MB_CUR_MAX, &state);
+	if (len <= 0)
+		return false; /* invalid character or zero-length string */
+	if (!iswalpha(w) && w != L'_')
+		return false; /* fail to match [a-zA-Z_] */
+
+	while ((len = mbrtowc(&w, str, MB_CUR_MAX, &state)) > 0) {
+		if (!iswalnum(w) && w != L'_')
+			return false; /* fail to match [a-zA-Z0-9_]* */
+		str += len;
+	}
+
+	if (len < 0)
+		return false; /* invalid character  */
+
+	return true;
+}
+
+void
+identifier_check(const char *str)
+{
+	if (! identifier_is_valid(str))
+		tnt_raise(ClientError, ER_IDENTIFIER, str);
+}
+

@@ -75,6 +75,8 @@ public:
 
 // protected:
 	struct bps_tree_index tree;
+	struct tuple **build_array;
+	size_t build_array_size, build_array_alloc_size;
 };
 
 #endif /* TARANTOOL_BOX_TREE_INDEX_H_INCLUDED */

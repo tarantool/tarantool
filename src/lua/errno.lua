@@ -10,14 +10,15 @@ ffi.cdef[[
     int errno_set(int new_errno);
 ]]
 
-box.errno.strerror = function(errno)
+local exports = require('box.errno')
+exports.strerror = function(errno)
     if errno == nil then
-        errno = box.errno()
+        errno = ffi.C.errno_get()
     end
     return ffi.string(ffi.C.strerror(tonumber(errno)))
 end
 
-setmetatable(box.errno, {
+setmetatable(exports, {
     __newindex  = function() error("Can't create new errno constants") end,
     __call = function(self, new_errno)
         local res

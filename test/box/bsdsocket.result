@@ -1,12 +1,18 @@
-type(box.socket)
+json = require('box.json')
+---
+...
+boxsocket = require('box.socket')
+---
+...
+type(boxsocket)
 ---
 - table
 ...
-box.socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+boxsocket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 ---
 - null
 ...
-s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:wait(.01)
@@ -117,7 +123,7 @@ s:close()
 ---
 - true
 ...
-s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -143,7 +149,7 @@ s:listen(128)
 sevres = {}
 ---
 ...
-type(box.fiber.wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+type(require('box.fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
 ---
 - userdata
 ...
@@ -151,7 +157,7 @@ type(box.fiber.wrap(function() s:readable() do local sc = s:accept() table.inser
 ---
 - 0
 ...
-sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc:nonblock(false)
@@ -212,7 +218,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:307: Socket option SO_ACCEPTCONN
+- error: '[string "-- bsdsocket.lua (internal file)..."]:311: Socket option SO_ACCEPTCONN
     is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
@@ -256,7 +262,7 @@ s:close()
 ---
 - true
 ...
-s = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -271,7 +277,7 @@ s:listen(128)
 ---
 - true
 ...
-sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc:writable()
@@ -421,7 +427,7 @@ sc:close()
 ---
 - true
 ...
-s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -462,7 +468,7 @@ s:listen(1234)
 ---
 - true
 ...
-sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+sc = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
 ---
 ...
 sc:nonblock(true)
@@ -523,24 +529,24 @@ function aexitst(ai, host, port)
 end;
 ---
 ...
-aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+aexitst( boxsocket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
 ---
 - true
 ...
 --# setopt delimiter ''
-#(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
+#(boxsocket.getaddrinfo('mail.ru', 'http', {})) > 0
 ---
 - true
 ...
-wrong_addr = box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+wrong_addr = boxsocket.getaddrinfo('mail12211alklkl.ru', 'http', {})
 ---
 ...
 wrong_addr == nil or #wrong_addr == 0
 ---
 - true
 ...
-sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc ~= nil
@@ -575,27 +581,27 @@ string.match(tostring(sc), ', peer') == nil
 ---
 - true
 ...
-box.errno.strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+require('box.errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 ---
 - Connection refused
 ...
 --# setopt delimiter ';'
-box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80',
+json.encode(boxsocket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 ---
 - '{}'
 ...
 --# setopt delimiter ''
-box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80',
+json.encode(boxsocket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 
 ---
 - '{}'
 ...
-sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
+sc = boxsocket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
-box.cjson.encode(sc:name())
+json.encode(sc:name())
 ---
 - '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
 ...
@@ -607,14 +613,14 @@ sc:close()
 ---
 - true
 ...
-s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 s:bind('127.0.0.1', 3548)
 ---
 - true
 ...
-sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 sc:sendto('127.0.0.1', 3548, 'Hello, world')
@@ -637,7 +643,7 @@ s:readable(10)
 ---
 - true
 ...
-local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
+local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return json.encode{d, from}
 ---
 - '["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]'
 ...
@@ -649,7 +655,7 @@ sc:close()
 ---
 - true
 ...
-s = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 s:nonblock(true)
@@ -664,7 +670,7 @@ s:name().port > 0
 ---
 - true
 ...
-sc = box.socket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 sc:nonblock(true)
