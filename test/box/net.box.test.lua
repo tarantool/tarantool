@@ -10,8 +10,8 @@ box.net.box.ping(remote)
 space:insert{123, 'test1', 'test2'}
 space:select{123}
 space:get{123}
-remote:select(space.n, 123)
-remote:get(space.n, 123)
+remote:select(space.id, 123)
+remote:get(space.id, 123)
 
 internal = require('box.internal')
 function test(...) return box.tuple.new({ 123, 456 }) end
@@ -67,43 +67,43 @@ type(slf)
 type(foo)
 
 space:update(123, {{'=', 1, 'test1-updated'}})
-remote:update(space.n, 123, {{'=', 2, 'test2-updated'}})
+remote:update(space.id, 123, {{'=', 2, 'test2-updated'}})
 
 space:insert{123, 'test1', 'test2'}
-remote:insert(space.n, {123, 'test1', 'test2'})
+remote:insert(space.id, {123, 'test1', 'test2'})
 
-remote:insert(space.n, {345, 'test1', 'test2'})
-remote:get(space.n, {345})
-remote:select(space.n, {345})
+remote:insert(space.id, {345, 'test1', 'test2'})
+remote:get(space.id, {345})
+remote:select(space.id, {345})
 remote:call('box.space.tweedledum:select', 345)
 space:get{345}
 space:select{345}
 
-remote:put(space.n, {345, 'test1-replaced', 'test3-replaced'})
+remote:put(space.id, {345, 'test1-replaced', 'test3-replaced'})
 space:get{345}
 space:select{345}
 
-remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
+remote:replace(space.id, {345, 'test1-replaced', 'test2-replaced'})
 space:get{345}
 space:select{345}
 
 space:select({}, { iterator = 'GE', limit = 1000 })
-box.net.self:select(space.n, {}, { iterator = 'GE', limit = 1000 })
-remote:select(space.n, {}, { limit = 1000, iterator = 'GE' })
+box.net.self:select(space.id, {}, { iterator = 'GE', limit = 1000 })
+remote:select(space.id, {}, { limit = 1000, iterator = 'GE' })
 space:get{345}
 space:select{345}
-remote:get(space.n, {345})
-remote:select(space.n, {345})
-remote:timeout(0.5):get(space.n, {345})
-remote:timeout(0.5):select(space.n, {345})
+remote:get(space.id, {345})
+remote:select(space.id, {345})
+remote:timeout(0.5):get(space.id, {345})
+remote:timeout(0.5):select(space.id, {345})
 
 
 
-box.net.self:insert(space.n, {12345, 'test1', 'test2'})
-box.net.self:replace(space.n, {12346, 'test1', 'test2'})
-box.net.self:update(space.n, 12345, {{ '=', 1, 'test11' }})
-box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
-box.net.self:delete(space.n, 12346)
+box.net.self:insert(space.id, {12345, 'test1', 'test2'})
+box.net.self:replace(space.id, {12346, 'test1', 'test2'})
+box.net.self:update(space.id, 12345, {{ '=', 1, 'test11' }})
+box.net.self:update(space.id, 12347, {{ '=', 1, 'test11' }})
+box.net.self:delete(space.id, 12346)
 
 
 remote:call('box.fiber.sleep', .01)

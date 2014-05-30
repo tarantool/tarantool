@@ -55,7 +55,7 @@ struct wal_writer;
 struct wal_watcher;
 struct remote;
 
-enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_FSYNC_DELAY, WAL_MODE_MAX };
+enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
@@ -87,7 +87,6 @@ struct recovery_state {
 	join_handler *join_handler;
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
-	double wal_fsync_delay;
 	enum wal_mode wal_mode;
 	tt_uuid node_uuid;
 	uint32_t node_id;
@@ -102,7 +101,6 @@ void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   snapshot_handler snapshot_handler, join_handler join_handler,
 		   int rows_per_wal);
 void recovery_update_mode(struct recovery_state *r, enum wal_mode mode);
-void recovery_update_fsync_delay(struct recovery_state *r, double new_delay);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
 void recovery_free();

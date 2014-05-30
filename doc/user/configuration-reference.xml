@@ -408,23 +408,6 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
         </row>
 
         <row>
-          <entry xml:id="wal_fsync_delay" xreflabel="wal_fsync_delay">wal_fsync_delay</entry>
-          <entry>float</entry>
-          <entry>0</entry>
-          <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>Do not flush the write-ahead log to disk more often
-          than once in wal_fsync_delay seconds. By default the
-          delay is zero, which means there is no flushing after writes
-          (the meaning of wal_fsync_delay=0 may change in later versions).
-          Setting the delay may be necessary to increase write
-          throughput, but may lead to several last updates being
-          lost in case of a power failure. Such failure, however,
-          does not lead to data corruption: all WAL records have a
-          checksum, and only complete records are processed during
-          recovery.</entry>
-        </row>
-
-        <row>
           <entry xml:id="wal_mode" xreflabel="wal_mode">wal_mode</entry>
           <entry>string</entry>
           <entry>"write"</entry>
@@ -433,10 +416,7 @@ tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
               <emphasis>none:</emphasis> write-ahead log is not maintained; <emphasis>write:</emphasis> fibers wait for their data to
               be written to the write-ahead log (no fsync(2)); <emphasis>fsync</emphasis>:
               fibers wait for their data, fsync(2) follows each write(2);
-              <emphasis>fsync_delay</emphasis>: fibers wait for their
-              data, fsync(2) is called every N=<emphasis>wal_fsync_delay</emphasis>
-              seconds (N=0.0 means no fsync(2) - equivalent to
-              <emphasis>wal_mode = "write"</emphasis>);</entry>
+          </entry>
         </row>
 
         <row>

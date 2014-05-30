@@ -33,11 +33,12 @@
 #include "errinj.h"
 #include "memory.h"
 #include "fiber.h"
+#include <third_party/qsort_arg.h>
 
 /** For all memory used by all tree indexes. */
 static struct mempool tree_extent_pool;
 /** Number of allocated extents. */
-static int tree_index_count = 0;
+static int tree_extent_pool_initialized = 0;
 
 /* {{{ Utilities. *************************************************/
 
@@ -61,6 +62,11 @@ tree_index_compare_key(const tuple *a, const key_data *key_data,
 {
 	return tuple_compare_with_key(a, key_data->key, key_data->part_count,
 				      key_def);
+}
+int tree_index_qcompare(const void* a, const void *b, void *c)
+{
+	return tree_index_compare(*(struct tuple **)a,
+		*(struct tuple **)b, (struct key_def *)c);
 }
 
 /* {{{ TreeIndex Iterators ****************************************/
@@ -196,20 +202,21 @@ extent_free(void *extent)
 }
 
 TreeIndex::TreeIndex(struct key_def *key_def_arg)
-	: Index(key_def_arg)
+	: Index(key_def_arg), build_array(0), build_array_size(0),
+	  build_array_alloc_size(0)
 {
-	if (tree_index_count == 0)
+	if (tree_extent_pool_initialized == 0) {
 		mempool_create(&tree_extent_pool, &cord()->slabc,
 			       BPS_TREE_EXTENT_SIZE);
-	tree_index_count++;
+		tree_extent_pool_initialized = 1;
+	}
 	bps_tree_index_create(&tree, key_def, extent_alloc, extent_free);
 }
 
 TreeIndex::~TreeIndex()
 {
-	tree_index_count--;
-	if (tree_index_count == 0)
-		mempool_destroy(&tree_extent_pool);
+	bps_tree_index_destroy(&tree);
+	free(build_array);
 }
 
 size_t
@@ -373,17 +380,42 @@ TreeIndex::beginBuild()
 void
 TreeIndex::reserve(uint32_t size_hint)
 {
-	(void)size_hint;
+	if (size_hint < build_array_alloc_size)
+		return;
+	build_array = (struct tuple**)
+		realloc(build_array, size_hint * sizeof(struct tuple *));
+	build_array_alloc_size = size_hint;
 }
 
 void
 TreeIndex::buildNext(struct tuple *tuple)
 {
-	bps_tree_index_insert(&tree, tuple, 0);
+	if (!build_array) {
+		build_array = (struct tuple**)malloc(BPS_TREE_EXTENT_SIZE);
+		build_array_alloc_size =
+			BPS_TREE_EXTENT_SIZE / sizeof(struct tuple*);
+	}
+	assert(build_array_size <= build_array_alloc_size);
+	if (build_array_size == build_array_alloc_size) {
+		build_array_alloc_size = build_array_alloc_size +
+					 build_array_alloc_size / 2;
+		build_array = (struct tuple**)
+			realloc(build_array,
+				build_array_alloc_size *
+				sizeof(struct tuple *));
+	}
+	build_array[build_array_size++] = tuple;
 }
 
 void
 TreeIndex::endBuild()
 {
+	qsort_arg(build_array, build_array_size, sizeof(struct tuple *), tree_index_qcompare, key_def);
+	bps_tree_index_build(&tree, build_array, build_array_size);
+
+	free(build_array);
+	build_array = 0;
+	build_array_size = 0;
+	build_array_alloc_size = 0;
 }
 

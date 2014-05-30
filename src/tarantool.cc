@@ -40,6 +40,7 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <locale.h>
 #include <libgen.h>
 #include <sysexits.h>
 #if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
@@ -526,8 +527,24 @@ main(int argc, char **argv)
 	 */
 	__libc_stack_end = (void*) &argv;
 #endif
+	/* set locale to make iswXXXX function work */
+	if (setlocale(LC_CTYPE, "en_US.UTF-8") == NULL)
+		fprintf(stderr, "Failed to set locale to en_US.UTF-8\n");
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
+		if (argc == 2 && argv[1][0] != '-') {
+			/*
+			 * Somebody made a mistake in the file
+			 * name. Be nice: open the file to set
+			 * errno.
+			 */
+			int fd = open(argv[1], O_RDONLY);
+			int save_errno = errno;
+			if (fd >= 0)
+				close(fd);
+			printf("Can't open script %s: %s\n", argv[1], strerror(save_errno));
+			return save_errno;
+		}
 		void *opt = gopt_sort(&argc, (const char **)argv, opt_def);
 		if (gopt(opt, 'V')) {
 			printf("Tarantool %s\n", tarantool_version());

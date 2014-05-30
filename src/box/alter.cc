@@ -45,7 +45,7 @@
 #define UID              1
 #define NAME             2
 #define ENGINE           3
-#define ARITY            4
+#define FIELD_COUNT      4
 #define FLAGS            5
 /** _index columns */
 #define INDEX_ID         1
@@ -129,7 +129,7 @@ space_def_init_flags(struct space_def *def, struct tuple *tuple)
 	def->temporary = false;
 
 	/* there is no property in the space */
-	if (tuple_arity(tuple) <= FLAGS)
+	if (tuple_field_count(tuple) <= FLAGS)
 		return;
 
 	const char *flags = tuple_field_cstr(tuple, FLAGS);
@@ -153,7 +153,7 @@ space_def_create_from_tuple(struct space_def *def, struct tuple *tuple,
 {
 	def->id = tuple_field_u32(tuple, ID);
 	def->uid = tuple_field_u32(tuple, UID);
-	def->arity = tuple_field_u32(tuple, ARITY);
+	def->field_count = tuple_field_u32(tuple, FIELD_COUNT);
 	int namelen = snprintf(def->name, sizeof(def->name),
 			 "%s", tuple_field_cstr(tuple, NAME));
 	int engine_namelen = snprintf(def->engine_name, sizeof(def->engine_name),
@@ -450,7 +450,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	       sizeof(alter->old_space->access));
 	/*
 	 * Change the new space: build the new index, rename,
-	 * change arity.
+	 * change the fixed field count.
 	 */
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->alter(alter);
@@ -498,14 +498,14 @@ ModifySpace::prepare(struct alter_space *alter)
 	engine_recovery *recovery =
 		&alter->old_space->engine->recovery;
 
-	if (def.arity != 0 &&
-	    def.arity != alter->old_space->def.arity &&
+	if (def.field_count != 0 &&
+	    def.field_count != alter->old_space->def.field_count &&
 	    recovery->state != READY_NO_KEYS &&
 	    space_size(alter->old_space) > 0) {
 
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
-			  "can not change arity on a non-empty space");
+			  "can not change field count on a non-empty space");
 	}
 	if (def.temporary != alter->old_space->def.temporary &&
 	    recovery->state != READY_NO_KEYS &&
@@ -936,7 +936,7 @@ static struct trigger drop_space_trigger =
  *
  * 3) modify an existing tuple: some space
  *    properties are immutable, but it's OK to change
- *    space name or arity. This is done in WAL-error-
+ *    space name or field count. This is done in WAL-error-
  *    safe mode.
  *
  * A note about memcached_space: Tarantool 1.4 had a check
@@ -1165,19 +1165,19 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32(tuple, ID);
 	const char *name = tuple_field_cstr(tuple, NAME);
-	uint32_t len = strlen(name);
+	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  name, "user name is too long");
 	}
-	snprintf(user->name, sizeof(user->name), "%s", name);
+	identifier_check(name);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */
-	if (tuple_arity(tuple) > AUTH_DATA) {
+	if (tuple_field_count(tuple) > AUTH_DATA) {
 		const char *auth_data = tuple_field(tuple, AUTH_DATA);
 		user_fill_auth_data(user, auth_data);
 	}

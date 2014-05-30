@@ -202,7 +202,7 @@ uint32_t
 space_size(struct space *space);
 
 /**
- * Check that the tuple has correct arity and correct field
+ * Check that the tuple has correct field count and correct field
  * types (a pre-requisite for an INSERT).
  */
 void
@@ -270,13 +270,13 @@ extern "C" void
 space_run_triggers(struct space *space, bool yesno);
 
 struct index_stat {
-	int32_t n;
+	int32_t id;
 	int64_t keys;
 	int64_t memsize;
 };
 
 struct space_stat {
-	int32_t n;
+	int32_t id;
 	struct index_stat index[BOX_INDEX_MAX];
 };
 

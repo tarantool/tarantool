@@ -206,7 +206,7 @@ tuple_format(const struct tuple *tuple)
  * @return the number of fields in tuple
  */
 extern "C" inline uint32_t
-tuple_arity(const struct tuple *tuple)
+tuple_field_count(const struct tuple *tuple)
 {
 	const char *data = tuple->data;
 	return mp_decode_array(&data);

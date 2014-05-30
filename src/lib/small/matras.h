@@ -158,6 +158,14 @@ matras_create(struct matras *m, matras_id_t extent_size, matras_id_t block_size,
 	      prov_alloc_func alloc_func, prov_free_func free_func);
 
 /**
+ * Free all memory used by an instance of matras and
+ * reinitialize it.
+ * Identical to matras_destroy(m); matras_create(m, ...);
+ */
+void
+matras_reset(struct matras *m);
+
+/**
  * Free all memory used by an instance of matras.
  */
 void

@@ -1,7 +1,7 @@
 function space_field_types(space_no)
 	local types = {};
 	for _, index in pairs(box.space[space_no].index) do
-		for _,key_def in pairs(index.key_field) do
+		for _,key_def in pairs(index.parts) do
 			types[key_def.fieldno] = key_def.type;
 		end
 	end
