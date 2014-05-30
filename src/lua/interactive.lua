@@ -3,7 +3,6 @@
 local ffi = require('ffi')
 ffi.cdef([[
     void tarantool_lua_interactive();
-    void free(void *ptr);
 ]])
 
 function interactive()
@@ -11,3 +10,5 @@ function interactive()
 end
 
 jit.off(interactive)
+
+return interactive

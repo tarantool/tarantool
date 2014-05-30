@@ -105,7 +105,6 @@ else
     end
 end
 
-
-box.digest = m
+return m
 
 end

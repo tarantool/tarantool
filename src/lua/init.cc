@@ -69,16 +69,15 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-	load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[];
-static const char *lua_sources[] = { init_lua, uuid_lua, session_lua,
-	load_cfg_lua, interactive_lua, digest_lua, NULL };
-static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
-	"fun", fun_lua, NULL };
+       load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[];
+static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
+static const char *lua_modules[] = { "box.msgpackffi", msgpackffi_lua,
+	"fun", fun_lua, "box.digest", digest_lua,
+	"box.interactive", interactive_lua,
+	"box.uuid", uuid_lua, NULL };
 /*
  * {{{ box Lua library: common functions
  */
-
-const char *boxlib_name = "box";
 
 uint64_t
 tarantool_lua_tointeger64(struct lua_State *L, int idx)
@@ -117,31 +116,6 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 
 	return result;
 }
-
-/** Report libev time (cheap). */
-static int
-lbox_time(struct lua_State *L)
-{
-	lua_pushnumber(L, ev_now(loop()));
-	return 1;
-}
-
-/** Report libev time as 64-bit integer */
-static int
-lbox_time64(struct lua_State *L)
-{
-	luaL_pushnumber64(L, (uint64_t) ( ev_now(loop()) * 1000000 + 0.5 ) );
-	return 1;
-}
-
-/**
- * descriptor for box methods
- */
-static const struct luaL_reg boxlib[] = {
-	{"time", lbox_time},
-	{"time64", lbox_time64},
-	{NULL, NULL}
-};
 
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
@@ -241,9 +215,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	 */
 	tarantool_lua_setpath(L, "path", MODULE_LUAPATH, NULL);
 	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
-
-	luaL_register(L, boxlib_name, boxlib);
-	lua_pop(L, 1);
 
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
@@ -463,7 +434,10 @@ run_script(va_list ap)
 		lua_pushstring(L, path);
 	} else {
 		say_crit("version %s", tarantool_version());
-		lua_getglobal(L, "interactive");
+		/* get box.iteractive from package.loaded */
+		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+		lua_getfield(L, -1, "box.interactive");
+		lua_remove(L, -2); /* remove package.loaded */
 	}
 	try {
 		lbox_call(L, lua_gettop(L) - 1, 0);

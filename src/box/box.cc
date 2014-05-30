@@ -398,18 +398,19 @@ box_init()
 	recovery_follow_local(recovery_state,
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
-	const char *bind_ipaddr = cfg_gets("bind_ipaddr");
-	int primary_port = cfg_geti("primary_port");
-	int admin_port = cfg_geti("admin_port");
+
+	const char *primary_port = cfg_gets("primary_port");
+	const char *admin_port = cfg_gets("admin_port");
+
 	/*
 	 * application server configuration).
 	 */
-	if (primary_port == 0 && admin_port == 0)
+	if (!primary_port && !admin_port)
 		box_leave_local_standby_mode(NULL);
 	else {
 		void (*on_bind)(void *) = NULL;
 		if (primary_port) {
-			iproto_init(bind_ipaddr, primary_port);
+			iproto_init(primary_port);
 		} else {
 			/*
 			 * If no prmary port is given, leave local
@@ -420,7 +421,7 @@ box_init()
 			on_bind = box_leave_local_standby_mode;
 		}
 		if (admin_port)
-			admin_init(bind_ipaddr, admin_port, on_bind);
+			admin_init(admin_port, on_bind);
 	}
 	if (cfg_getd("io_collect_interval") > 0) {
 		ev_set_io_collect_interval(loop(),

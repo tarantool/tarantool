@@ -177,6 +177,11 @@ void
 luaL_register_type(struct lua_State *L, const char *type_name,
 		   const struct luaL_Reg *methods);
 
+
+void
+luaL_register_module(struct lua_State *L, const char *modname,
+		     const struct luaL_Reg *methods);
+
 /**
  * Convert Lua string, number or cdata (u64) to 64bit value
  */

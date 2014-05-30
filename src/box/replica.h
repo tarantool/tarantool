@@ -30,14 +30,14 @@
  */
 #include <netinet/in.h>
 #include "tarantool_ev.h"
+#include <port-uri.h>
 
 enum { REMOTE_SOURCE_MAXLEN = 32 };
 
 /** Master connection */
 struct remote {
-	struct sockaddr_in addr;
+	struct port_uri uri;
 	struct fiber *reader;
-	uint64_t cookie;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 	char source[REMOTE_SOURCE_MAXLEN];
 };

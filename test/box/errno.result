@@ -1,26 +1,29 @@
-type(box.errno)
+errno = require('box.errno')
+---
+...
+type(errno)
 ---
 - table
 ...
-box.errno.EINVAL > 0
+errno.EINVAL > 0
 ---
 - true
 ...
-box.errno.EBADF > 0
+errno.EBADF > 0
 ---
 - true
 ...
-box.errno(box.errno.EINVAL) == box.errno.EINVAL, box.errno() == box.errno.EINVAL
----
-- true
-- true
-...
-box.errno(box.errno.EBADF) ~= box.errno.EINVAL, box.errno() == box.errno.EBADF
+errno(errno.EINVAL) == errno.EINVAL, errno() == errno.EINVAL
 ---
 - true
 - true
 ...
-box.errno.strerror(box.errno.EINVAL)
+errno(errno.EBADF) ~= errno.EINVAL, errno() == errno.EBADF
+---
+- true
+- true
+...
+errno.strerror(errno.EINVAL)
 ---
 - Invalid argument
 ...

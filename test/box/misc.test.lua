@@ -117,11 +117,11 @@ tonumber64(-1ULL)
 tonumber64(-1.0)
 6LL - 7LL
 
---  box.dostring()
-box.dostring('abc')
-box.dostring('abc=2')
-box.dostring('return abc')
-box.dostring('return ...', 1, 2, 3)
+--  dostring()
+dostring('abc')
+dostring('abc=2')
+dostring('return abc')
+dostring('return ...', 1, 2, 3)
 --  A test case for Bug#1043804 lua error() -> server crash
 error()
 --  A test case for bitwise operations 
@@ -131,14 +131,14 @@ bit.bor(1, 2)
 
 -- A test case for box.counter
 space = box.space.tweedledum
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
 space:get{1}
-box.counter.inc(space.n, {1})
-box.counter.inc(space.n, {1})
+box.counter.inc(space.id, {1})
+box.counter.inc(space.id, {1})
 space:get{1}
-box.counter.dec(space.n, {1})
-box.counter.dec(space.n, {1})
-box.counter.dec(space.n, {1})
+box.counter.dec(space.id, {1})
+box.counter.dec(space.id, {1})
+box.counter.dec(space.id, {1})
 space:get{1}
 space:truncate()
 

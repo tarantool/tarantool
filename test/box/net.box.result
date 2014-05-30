@@ -1,3 +1,6 @@
+box.fiber = require('box.fiber')
+---
+...
 space = box.schema.create_space('tweedledum')
 ---
 ...
@@ -7,7 +10,7 @@ space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
-remote = box.net.box.new('localhost', box.cfg.primary_port, '0.5')
+remote = box.net.box.new('localhost', string.gsub(box.cfg.primary_port, '^.*:', ''), '0.5')
 ---
 ...
 type(remote)
@@ -38,18 +41,21 @@ space:get{123}
 ---
 - [123, 'test1', 'test2']
 ...
-remote:select(space.n, 123)
+remote:select(space.id, 123)
 ---
 - - [123, 'test1', 'test2']
 ...
-remote:get(space.n, 123)
+remote:get(space.id, 123)
 ---
 - [123, 'test1', 'test2']
+...
+internal = require('box.internal')
+---
 ...
 function test(...) return box.tuple.new({ 123, 456 }) end
 ---
 ...
-f, a = box.call_loadproc('test')
+f, a = internal.call_loadproc('test')
 ---
 ...
 type(f)
@@ -89,7 +95,7 @@ remote:call('test:b')
 test.b = function(self, ...) return box.tuple.new({self.a, ...}) end
 ---
 ...
-f, a = box.call_loadproc('test:b')
+f, a = internal.call_loadproc('test:b')
 ---
 ...
 type(f)
@@ -104,7 +110,7 @@ a.a
 ---
 - a
 ...
-f, a = box.call_loadproc('test.b')
+f, a = internal.call_loadproc('test.b')
 ---
 ...
 type(f)
@@ -134,7 +140,7 @@ remote:call('test:b', 'b', { 'c', { d = 'e' } })
 test = { a = { c = 1, b = function(self, ...) return { self.c, ... } end } }
 ---
 ...
-f, a = box.call_loadproc('test.a:b')
+f, a = internal.call_loadproc('test.a:b')
 ---
 ...
 type(f)
@@ -149,7 +155,7 @@ a.c
 ---
 - 1
 ...
-f, a = box.call_loadproc('test.a.b')
+f, a = internal.call_loadproc('test.a.b')
 ---
 ...
 type(f)
@@ -198,20 +204,22 @@ remote:call('box.space.tweedledum:select', {123})
 ...
 slf, foo = box.call_loadproc('box.net.self:select')
 ---
+- error: '[string "slf, foo = box.call_loadproc(''box.net.self:se..."]:1: attempt
+    to call field ''call_loadproc'' (a nil value)'
 ...
 type(slf)
 ---
-- function
+- nil
 ...
 type(foo)
 ---
-- table
+- nil
 ...
 space:update(123, {{'=', 1, 'test1-updated'}})
 ---
 - [123, 'test1-updated', 'test2']
 ...
-remote:update(space.n, 123, {{'=', 2, 'test2-updated'}})
+remote:update(space.id, 123, {{'=', 2, 'test2-updated'}})
 ---
 - [123, 'test1-updated', 'test2-updated']
 ...
@@ -219,19 +227,19 @@ space:insert{123, 'test1', 'test2'}
 ---
 - error: Duplicate key exists in unique index 0
 ...
-remote:insert(space.n, {123, 'test1', 'test2'})
+remote:insert(space.id, {123, 'test1', 'test2'})
 ---
 - error: Duplicate key exists in unique index 0
 ...
-remote:insert(space.n, {345, 'test1', 'test2'})
+remote:insert(space.id, {345, 'test1', 'test2'})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:get(space.n, {345})
+remote:get(space.id, {345})
 ---
 - [345, 'test1', 'test2']
 ...
-remote:select(space.n, {345})
+remote:select(space.id, {345})
 ---
 - - [345, 'test1', 'test2']
 ...
@@ -247,7 +255,7 @@ space:select{345}
 ---
 - - [345, 'test1', 'test2']
 ...
-remote:put(space.n, {345, 'test1-replaced', 'test3-replaced'})
+remote:put(space.id, {345, 'test1-replaced', 'test3-replaced'})
 ---
 - [345, 'test1-replaced', 'test3-replaced']
 ...
@@ -259,7 +267,7 @@ space:select{345}
 ---
 - - [345, 'test1-replaced', 'test3-replaced']
 ...
-remote:replace(space.n, {345, 'test1-replaced', 'test2-replaced'})
+remote:replace(space.id, {345, 'test1-replaced', 'test2-replaced'})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
@@ -276,12 +284,12 @@ space:select({}, { iterator = 'GE', limit = 1000 })
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
 ...
-box.net.self:select(space.n, {}, { iterator = 'GE', limit = 1000 })
+box.net.self:select(space.id, {}, { iterator = 'GE', limit = 1000 })
 ---
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select(space.n, {}, { limit = 1000, iterator = 'GE' })
+remote:select(space.id, {}, { limit = 1000, iterator = 'GE' })
 ---
 - - [123, 'test1-updated', 'test2-updated']
   - [345, 'test1-replaced', 'test2-replaced']
@@ -294,38 +302,38 @@ space:select{345}
 ---
 - - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:get(space.n, {345})
+remote:get(space.id, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:select(space.n, {345})
+remote:select(space.id, {345})
 ---
 - - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:timeout(0.5):get(space.n, {345})
+remote:timeout(0.5):get(space.id, {345})
 ---
 - [345, 'test1-replaced', 'test2-replaced']
 ...
-remote:timeout(0.5):select(space.n, {345})
+remote:timeout(0.5):select(space.id, {345})
 ---
 - - [345, 'test1-replaced', 'test2-replaced']
 ...
-box.net.self:insert(space.n, {12345, 'test1', 'test2'})
+box.net.self:insert(space.id, {12345, 'test1', 'test2'})
 ---
 - [12345, 'test1', 'test2']
 ...
-box.net.self:replace(space.n, {12346, 'test1', 'test2'})
+box.net.self:replace(space.id, {12346, 'test1', 'test2'})
 ---
 - [12346, 'test1', 'test2']
 ...
-box.net.self:update(space.n, 12345, {{ '=', 1, 'test11' }})
+box.net.self:update(space.id, 12345, {{ '=', 1, 'test11' }})
 ---
 - [12345, 'test11', 'test2']
 ...
-box.net.self:update(space.n, 12347, {{ '=', 1, 'test11' }})
+box.net.self:update(space.id, 12347, {{ '=', 1, 'test11' }})
 ---
 ...
-box.net.self:delete(space.n, 12346)
+box.net.self:delete(space.id, 12346)
 ---
 - [12346, 'test1', 'test2']
 ...
@@ -338,7 +346,7 @@ remote:timeout(0.01):call('box.fiber.sleep', 10)
 - null
 ...
 --# setopt delimiter ';'
-pstart = box.time();
+pstart = box.fiber.time();
 ---
 ...
 parallel = {};
@@ -404,7 +412,7 @@ parallel
 ---
 - 20
 ...
-box.time() - pstart < 0.5
+box.fiber.time() - pstart < 0.5
 ---
 - true
 ...
@@ -430,11 +438,11 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:537: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:541: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:542: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:546: box.net.box: connection
     was closed'
 ...
 space:drop()

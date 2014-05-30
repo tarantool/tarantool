@@ -33,6 +33,11 @@ add_custom_target(generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port-uri.cc
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	COMMAND ragel -G2 src/port-uri.rl -o src/port-uri.cc
+	DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.rl)
+
 set (common_sources
      memory.cc
      fiber.cc
@@ -70,6 +75,7 @@ set (common_sources
      fiob.c
      tt_uuid.c
      ffisyms.cc
+     port-uri.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
