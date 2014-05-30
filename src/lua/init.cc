@@ -1157,39 +1157,50 @@ tarantool_lua_error_init(struct lua_State *L) {
 	lua_pop(L, 1);
 }
 
-static void
-tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
-__attribute__((sentinel));
-
 /**
  * Prepend the variable list of arguments to the Lua
- * package search path (or cpath, as defined in 'type').
+ * package search path
  */
 static void
-tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
+tarantool_lua_setpaths(struct lua_State *L)
 {
-	char path[PATH_MAX];
-	va_list args;
-	va_start(args, type);
-	int off = 0;
-	const char *p;
-	while ((p = va_arg(args, const char*))) {
-		/*
-		 * If MODULE_PATH is an empty string, skip it.
-		 */
-		if (*p == '\0')
-			continue;
-		off += snprintf(path + off, sizeof(path) - off, "%s;", p);
-	}
-	va_end(args);
+	const char *home = getenv("HOME");
 	lua_getglobal(L, "package");
-	lua_getfield(L, -1, type);
-	snprintf(path + off, sizeof(path) - off, "%s",
-	         lua_tostring(L, -1));
-	lua_pop(L, 1);
-	lua_pushstring(L, path);
-	lua_setfield(L, -2, type);
-	lua_pop(L, 1);
+	int top = lua_gettop(L);
+	lua_pushstring(L, cfg.script_dir);
+	lua_pushliteral(L, "/?.lua;");
+	lua_pushstring(L, cfg.script_dir);
+	lua_pushliteral(L, "/?/init.lua;");
+	if (home != NULL) {
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?/init.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/?.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/?/init.lua;");
+	}
+	lua_pushliteral(L, MODULE_LUAPATH ";");
+	lua_getfield(L, top, "path");
+	lua_concat(L, lua_gettop(L) - top);
+	lua_setfield(L, top, "path");
+
+	lua_pushstring(L, cfg.script_dir);
+	lua_pushliteral(L, "/?.so;");
+	if (home != NULL) {
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?.so;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/lib/lua/?.so;");
+	}
+	lua_pushliteral(L, MODULE_LIBPATH ";");
+	lua_getfield(L, top, "cpath");
+	lua_concat(L, lua_gettop(L) - top);
+	lua_setfield(L, top, "cpath");
+
+	assert(lua_gettop(L) == top);
+	lua_pop(L, 1); /* package */
 }
 
 struct lua_State *
@@ -1208,12 +1219,7 @@ tarantool_lua_init()
 	 * instance-specific Lua scripts.
 	 */
 
-	char path[PATH_MAX];
-
-	snprintf(path, sizeof(path), "%s/?.lua", cfg.script_dir);
-	tarantool_lua_setpath(L, "path", path, MODULE_LUAPATH, NULL);
-	snprintf(path, sizeof(path), "%s/?.so", cfg.script_dir);
-	tarantool_lua_setpath(L, "cpath", path, MODULE_LIBPATH, NULL);
+	tarantool_lua_setpaths(L);
 
 	/* Loadi 'ffi' extension and make it inaccessible */
 	lua_getglobal(L, "require");
