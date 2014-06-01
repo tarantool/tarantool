@@ -21,36 +21,36 @@ number of the first record in the file, plus an extension <filename>.xlog</filen
 (its format is the same as in the binary protocol and is described
 in <link
 xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
-each WAL record contains a checksum and a UNIX time stamp.
+each WAL record contains a header, some metadata, and then the data formatted
+ according to <link xlink:href="http://wiki.msgpack.org/display/MSGPACK/Format+specification">msgpack rules</link>.
 For example this is what the WAL file looks like after the first INSERT
 request ("s:insert({1})") for the introductory sandbox exercise
 <olink
 targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>.
 On the left are the hexadecimal bytes that one would see with
-<programlisting><prompt>$ </prompt><userinput>hexdump work_dir/00000000000000000002.xlog</userinput></programlisting>
+<programlisting><prompt>$ </prompt><userinput>hexdump 00000000000000000001.xlog</userinput></programlisting>
 and on the right are comments.
 <programlisting>
 Hex dump of WAL file       Comment
 --------------------       -------
 58 4c 4f 47 0a             File header: "XLOG\n"
 30 2e 31 32 0a 0a          File header: "0.12\n\n" = version
-...                        (not shown = inserted tuples for system spaces)
-ed ab 0b ba                Magic row marker always = 0xba0babed if version 0.12
-cf 9f 84 f3                Record header: crc32 checksum of header fields
-04 00 00 00 00 00 00 00    Record header: 4 = (64-bit int) log sequence number
-71 03 81 1b 47 bd d4 41    Record header: UNIX time-since-epoch for transaction
-0a 00 00 00                Record header: 10 = length of unfixed rest of record
-fe ff                      Tag = WAL which is #defined as 65534
-00 00 00 00 00 00 00 00    Session cookie, formerly from sockaddr_in *addr
-45 19 45 97                Record header: crc32 checksum of data fields
-02 00                      Flags = IPROTO_INSERT which is #defined as 2
+...                        (not shown = inserted tuples for LSN and system spaces)
+d5 ba 0b ab                Magic row marker always = 0xab0bbad5 if version 0.12
+19 00                      Length, not including length of header, = 25 bytes
+ce 16 a4 38 6f             Record header: previous crc32, current crc32,
+a7 cc 73 7f 00 00 66 39
+84                         msgpack code meaning "Map of 4 elements" follows
+00 02 02 01                the 4 elements, including 0x02 which is IPROTO_INSERT
+03 04 04                   additional information
+cb 41 d4 e2 2f 62 fd d5 d4 msgpack code meaning "Double" follows, for next 8 bytes
 82                         msgpack code meaning "map of 2 elements" follows
-10                           IPROTO_SPACE_ID which is #defined as 16 (hex 10)
-cd                           msgpack code meaning 2-digit number follows
-02 00                        the id of "space0" which is 2
+10                         IPROTO_SPACE_ID which is #defined as 16 (hex 10)
+cd                         msgpack code meaning 2-digit number follows
+02 00                      the id of "space0" which is 513, it's biggest byte first
 21                         Flags = IPROTO_TUPLE which is #defined as hex 21
 91                         msgpack code meaning "1-element fixed array" follows
-01                           Tuple: field[0] value = 1
+01                         Tuple: field[0] value = 1
 </programlisting>
 </para>
 
