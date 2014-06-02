@@ -2996,12 +2996,12 @@ for instructions about defining triggers for connect and disconnect events
     <para>
       Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
       called <code>channel</code> for examples in this section.
-      Call the other box.ipc() routines, passing <code>channel</code>, to send messages, receive messages, or check ipc status.
+      Call the other box.ipc() routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
       Message exchange is synchronous.
       The channel is garbage collected when no one is using it, as with any
       other Lua object.
-      Object-oriented and functional APIs are equivalent, so <code>channel:put(message)</code>
-      is the same as <code>channel:put(channel, message)</code>. 
+      Use object-oriented syntax, for example <code>channel:put(message)</code>
+      rather than <code>box.ipc.channel.put(message)</code>. 
     </para>
 <variablelist xml:id="box.ipc">
     <para>
@@ -3018,10 +3018,13 @@ for instructions about defining triggers for connect and disconnect events
               (spaces for get or put or broadcast messages)
               that might be pending at any given time.
             </para>
+            <para>
+              Returns: new channel.
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:put(<replaceable>channel, message[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:put(<replaceable>message[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message using a channel. If the channel is full,
@@ -3029,7 +3032,7 @@ for instructions about defining triggers for connect and disconnect events
                 blocks until there is a free slot in the channel.
             </para>
             <para>
-                Parameters: <code>channel</code>, <code>message</code>, <code>timeout</code>.
+                Parameters: <code>message</code>, <code>timeout</code>.
             </para>
             <para>
                 Returns: If <code>timeout</code> is provided,
@@ -3043,16 +3046,16 @@ for instructions about defining triggers for connect and disconnect events
     <varlistentry>
         <term><emphasis role="lua">channel:close()</emphasis></term>
         <listitem>
-            <simpara>
+            <para>
                Close the channel. All waiters in the channel will be
                woken up. All following <code>channel:put()</code>
                or <code>channel:get()</code> operations will return
                an error (nil).
-            </simpara>
+            </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:get(<replaceable>channel[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:get(<replaceable>[timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Fetch a message from a channel. If the channel is empty,
@@ -3060,7 +3063,10 @@ for instructions about defining triggers for connect and disconnect events
                 blocks until there is a message.
             </para>
             <para>
-              Parameters: <code>channel</code>, <code>timeout</code>.
+              Parameters: <code>timeout</code>.
+            </para>
+            <para>
+              Returns: the value placed on the channel by an earlier <code>channel:put()</code> or <code>channel:broadcast()</code>.
             </para>
             <para>
                 Possible errors: If <code>timeout</code> is provided,
@@ -3072,7 +3078,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:broadcast(<replaceable>channel, message, timeout</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:broadcast(<replaceable>message</replaceable>)</emphasis></term>
         <listitem>
             <para>
              If the channel is empty, <code>channel:broadcast()</code> is equivalent to
@@ -3081,18 +3087,15 @@ for instructions about defining triggers for connect and disconnect events
               channel.
             </para>
             <para>
-             Parameters: <code>channel</code>, <code>message</code>, <code>timeout</code>.
+             Parameters: <code>message</code>.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_empty(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_empty()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty (has no messages).
-            </para>
-            <para>
-               Parameters: <code>channel</code>.
             </para>
             <para>
                Returns: (type = boolean) true if the specified channel is empty.
@@ -3100,13 +3103,10 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_full(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:is_full()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full.
-            </para>
-            <para>
-                Parameters: <code>channel</code>.
             </para>
             <para>
                 Returns: (type = boolean) true if the specified channel is full (has no room for a new message).
@@ -3114,7 +3114,7 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_readers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_readers()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty and has readers waiting
@@ -3122,23 +3122,17 @@ for instructions about defining triggers for connect and disconnect events
                blocked).
             </para>
             <para>
-             Parameters: <code>channel</code>.
-            </para>
-            <para>
                Returns: (type = boolean) true if blocked users are waiting. Otherwise false.
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_writers(<replaceable>channel</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">channel:has_writers()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full and has writers waiting
                 (because they have issued <code>channel:put()</code> and then blocked
                 due to lack of room).
-            </para>
-            <para>
-                Parameters: <code>channel</code>.
             </para>
             <para>
                 Returns: (type = boolean) true if blocked users are waiting. Otherwise false.
@@ -3149,9 +3143,9 @@ for instructions about defining triggers for connect and disconnect events
         <term><emphasis role="lua">channel:is_closed()</emphasis></term>
         <listitem>
             <simpara>
-                Return true if the specified channel is already
+                Returns: (type = boolean) true if the specified channel is already
                 closed.
-                Otherwise return false.
+                Otherwise false.
             </simpara>
         </listitem>
     </varlistentry>
@@ -3635,7 +3629,7 @@ end
                connection object named <code>box.net.self</code>.
                Its purpose is to make polymorphic use of the
                <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 3301)</code> can
+               <code>conn = box.net.box.new('localhost', 3303)</code> can
                be replaced by <code>conn = box.net.box.self</code>.
                However, there is an important difference between the embedded
                connection and a remote one. With the embedded connection,
@@ -3650,7 +3644,7 @@ end
                Returns: (type = userdata) conn object).
             </para>
             <para>
-               Example: <code>conn = box.net.box.new('localhost', 3301)</code>.
+               Example: <code>conn = box.net.box.new('localhost', 3303)</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -3794,7 +3788,7 @@ end
  This example will work with the sandbox configuration described in the preface.
  That is, there is a space named space0 with a numeric primary key.
  Assume that the database is nearly empty.
- Assume that the tarantool server is running on localhost 127.0.0.1:3301.
+ Assume that the tarantool server is running on localhost 127.0.0.1:3303.
 <programlisting>
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
@@ -3805,13 +3799,13 @@ end
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3301 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3301 = default')</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303 = default')</userinput>
 <prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3301')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3301)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.n, {800, 'data'})</userinput>
@@ -3839,7 +3833,7 @@ end
 ---
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 3301 = default
+  - The local server primary port number = 3303 = default
   - conn:delete done on space0.
   - conn:insert done on space0, index 0
   - '  primary key value = 800.'
@@ -3856,6 +3850,292 @@ end
 ...
 </programlisting>
 </para>
+</section>
+
+<section xml:id="sp-box-shard">
+    <title>Package <code>box.shard</code></title>
+
+<para>
+With <link xlink:href="https://en.wikipedia.org/wiki/Sharding">Sharding</link>,
+the tuples of a tuple set are distributed
+to multiple nodes, with a Tarantool database server on each node. With this arrangement,
+each server is handling only a subset of the total data, so larger loads can be
+handled by simply adding more computers to a network.
+</para>
+<para>
+The Tarantool box.shard package has facilities
+for creating or redistributing or cleaning up shards, as well as analogues for the
+data-manipulation functions of the box library (select, insert, replace, update, delete).
+The important new concept is that there must be a function which, given a key value,
+returns a Shard Identification Number so that the data-manipulation functions will know
+which location is relevant.
+In fact there must be two such functions, one for giving Shard Identification Number
+according to the current algorithm, and one for giving Shard Identification Number
+according to a previous algorithm. The former is called [curr], the latter is called [prev].
+When the algorithm has to be changed because new nodes are added or because the load
+must be balanced differently, the [curr] function becomes the [prev] function, a
+new [curr] function is introduced, and a function named box.shard.copy() redistributes
+all the tuples -- a process called "resharding".
+</para>
+<para>
+The shard package can be installed by
+putting a directive at the start of an init.lua file:<programlisting>
+  require 'shard'</programlisting>which brings in all the required functionality
+from a program file named shard.lua.
+</para>
+<para>
+For the original package description in Russian, see
+<link xlink:href="https://github.com/tarantool/shard/blob/master/README.md">
+https://github.com/tarantool/shard/blob/master/README.md</link>.
+</para>
+<variablelist>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.schema.config (<replaceable>{ key = value, ... }</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This function configures or reconfigures the shard-host or proxy-host.
+        The parameters which are indicated by the "key = value" pairs are:
+ <code>
+    * shard list - a list of shards and their types (see "List of shards", below)
+    * me -   each node has to know "which shard in the list is me?" so this is the node's number in the list
+             (or 0 if the shard is a proxy)
+    * mode - mode for the current shard (either 'ro' or 'rw')
+    * curr - the current function that returns, for a given space and key, the Shard Number.
+    * prev - the previous function that returns, for a given space and key, the Shard Number.
+</code>
+        The function reconfigures only those parameters that are transmitted during the call.
+        Other parameters' values remain the same.
+        </para>
+        <para>
+        The SHARD LIST is a Lua table, which is an array of arrays.
+        Each entry in the table describes one shard, with the following fields :
+<code>
+        1. Shard operation mode. Either 'ro' = read only, or 'rw' = read / write.
+        2. Shard weight (a number between 0 and 1000 )
+        3. Shard connection parameters (the host and port of the node that handles the shard)
+        ?. Implicitly, a Shard Number.
+</code>
+        </para>
+        <para>
+        Notes:
+        1. If there are multiple descriptions of the same shard, only one of them may have shard operation mode = 'rw'.
+        2. Operations which modify data must always go to hosts with shard operation mode = 'rw'.
+        Operations which do not modify data may go to either 'ro' or 'rw' shards, depending on the semantics of the call.
+        </para>
+        <para>
+        The <code> box.shard.schema.config()</code> function must be performed on each node,
+        before creating a sharded database, and whenever the configuration changes.
+        Care must be taken that the nodes' configurations are consistent with each other.
+        The administrator is responsible for determining the values that [curr] and [prev]
+        functions should return -- a simple example would be "if key is less than a million
+        then return Shard Identification Number = 1, else return Shard Identification Number = 2".
+        </para>
+        <para>
+        Given this configuration information, subsequent box.shard functions will all
+        know what to do. Simplifying slightly, a subroutine in the shard functions will:
+<programlisting>
+Get the space number and the primary-key value from the function's parameters.
+Pass the space number and the primary-key value to [curr] or [prev] to get a Shard Identification Number.
+If the number is equal to "me", perform the function directly because this is the responsible node.
+Otherwise, use the box.net.box package to pass the function to the host and port of
+  the node that, according to the Shard List, is responsible for handling this tuple.
+</programlisting>
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.copy()</code></emphasis></term>
+        <listitem>
+        <para>
+        This function reads all tuples, if necessary copying them to new shards.
+        </para>
+        <para>
+        Start conditions:
+        The 'me' shard, that is, the shard which this node is responsible for, must be marked as 'rw'.
+        The 'me' shard must have both a [curr] and a [prev] function.
+        </para>
+        <para>
+        For each space, for each tuple in the space: if the [prev] function says that the
+        tuple belongs in the 'me' node, and the [curr] function says that the tuple belongs
+        in a different node, then copy it by sending an "insert" request to the different node.
+        This is actually an "insert nothrow", that is, an insert without an error message,
+        because the insert is simply not performed if the different node already has a tuple
+        with the same primary key. The copied tuple is not deleted on the 'me' node at this stage;
+        that is a separate job which will be handled by a separate function, <code>box.shard.cleanup()</code>.
+        </para>
+        <para>
+        The function returns a list of tuples. Each tuple contains two fields:
+        1. ID Number of the space which was worked on
+        2. Count of tuples which are copied into the space (may be 0)
+        </para>
+        <para>
+        In order to perform resharding, the administrator must:
+<code>
+* For all hosts ,determine the functions [curr] and [prev]
+* Update the Shard List with box.shard.config
+* Run box.shard.copy() on all hosts -- this will find tuples
+  on nodes according to [prev], and move them to new nodes
+  according to [curr].
+* Delete the [prev] function on all shards.
+* Run box.shard.cleanup() on all hosts, to remove outdated data.
+</code>
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.cleanup()</code></emphasis></term>
+        <listitem>
+        <para>
+        This function reads all tuples, if necessary deleting tuples which don't fit.
+        </para>
+        <para>
+        Start conditions :
+        current shard marked as 'rw' (read/write)
+        shard specifies only one function - [curr], not [prev] (that is, resharding mode is disabled)
+        </para>
+        <para>
+        This function goes through all the Tarantool spaces and,
+        for each tuple in a space, invokes the [curr] function.
+        If the number returned by [curr] is not equal to the actual number that the shard is in (known as [me]),
+        the tuple is deleted.
+        </para>
+        <para>
+        The function returns a list of tuples. Each tuple contains two fields :
+        1. ID Number of the space which was worked on,
+        2. Count of tuples which are deleted from the space.
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.select (<replaceable>space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This function performs a query using a key. A key may have multiple fields.
+        </para>
+        <para>
+        If <code>box.shard.select()</code> is called while a resharding is taking place,
+        and the tuple is not found on the node which the [curr] function identifies,
+        then the request is forwarded to the node which the [prev] function identifies.
+        </para>
+        <para>
+        Notes:
+        if the key is multi-field key then all fields must be present -- sampling multiple nodes with partially-specified keys is not possible.
+        </para>
+        <para>
+        The box.shard.select() function is the only function which can access hosts that are marked "read only".
+        The host selection algorithm ([curr] or [prev]) may choose among multiple possible hosts that all contain
+        copies of the specific tuple. Usually the algorithm will choose the shard whose 'weight' field in the shard
+        list has the greatest value.
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.eselect (<replaceable>mode, space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This function is the same as <code>box.shard.select()</code> but has an additional parameter, "mode",
+        to indicate which hosts it is preferable to sample.
+        </para>
+        <para>
+        The mode parameter can have one of the following values:
+        'ro' (means that it is preferable to sample the hosts marked as "read only", but if there are none, then sampling an 'rw' node is okay),
+        'rw' (means that it is necessary to sample only the hosts marked as " read-write").
+        Thus, "call box.shard.eselect('ro', ...)" is the same as "call box.shard.select(...)".
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.insert (<replaceable>space, ...</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This functions inserts a specified tuple into a given space.
+        </para>
+        <para>
+        The essential operation is:
+<code>
+* The local node -- call it Node#1 -- uses [curr] to determine the shard to go to,
+  and sends the request to the different node, call it Node#2.
+* Node#1 returns a duplicate-key error if the tuple already exists in its space.
+* If there is a [prev] function on the different node, then the different node
+  uses [prev] to determine another node to go to, and sends the request to the
+  other node, call it Node#3.
+* If Node#3 finds the row in its space, then that is an error, which eventually
+  gets returned to Node#1 and the user sees a duplicate-key error.
+ </code>
+        This mechanism is a bit complex, but all the user has to know is:
+        if there's a duplicate, even if sharding or resharding is taking place when
+        the insert request happens, no problem -- Tarantool will detect the duplicate.
+</para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code><replaceable>box.shard.replace (space, ...)</replaceable></code></emphasis></term>
+        <listitem>
+        <para>
+        This function inserts, or possibly replaces, a tuple.
+        </para>
+        <para>
+        The initial part of the operation is the same as for box.shard.insert(),
+        but box.shard.replace() is simpler because it does not have to search for
+        duplicates.
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.delete (<replaceable>space, key [, subkey, ...])</replaceable></code></emphasis></term>
+        <listitem>
+        <para>
+        This function deletes a tuple.
+        </para>
+        <para>
+        Control is transferred to the node which is responsible according to [curr].
+        That different node will delete the tuple from its own tuple set,
+        and also -- if that different node has a [prev] function in its Shard List --
+        will pass the delete request on to whatever node the [prev] function identifies.
+        </para>
+        <para>
+        Returns: exists_from_curr or exists_from_prev.
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua"><code>box.shard.update (<replaceable>space, key, [subkey, ...] format, ...</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This function updates a tuple.
+        </para>
+        <para>
+        Control is transferred to the node which is responsible according to [curr].
+        If the tuple is present on that different node, the tuple is updated
+        and the new updated value is returned.
+        Otherwise, if that different node has a [prev] function in its Shard List,
+        then the request is passed on to whatever node the [prev[ function identifies,
+        and that node actually performs an insert(), then returns what looks like
+        an updated value.
+        </para>
+        <para>
+        Like <code>box.shard.insert()</code>, the operations for <code>box.shard.update()</code> look a bit
+        complex. But, again, the user only has to know that the box.shard package
+        has routines which ensure that the result is an updated tuple, even though
+        there are several remotely-possible scenarios which must be taken care of.
+        </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+    <term><emphasis role="lua"><code>box.shard.call (<replaceable>mode, procname, ...</replaceable>)</code></emphasis></term>
+        <listitem>
+        <para>
+        This function calls a remote function.
+        </para>
+        <para>
+        The host which receives box.shard.call() selects a random node from
+        the Shard List -- preferably a read-only node if the mode parameter says 'ro'.
+        The remote node will perform the function and return its result to the original
+        node, which will return it to the user.
+        </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
 </section>
 
 <section xml:id="sp-box-cfg">
@@ -3879,7 +4159,7 @@ tarantool> <userinput>box.cfg</userinput>
   panic_on_wal_error = false
   slab_alloc_factor = 2
   slab_alloc_minimal = 64
-  admin_port = 33015
+  admin_port = 3313
   logger = cat - >> tarantool.log
   ...
 ...

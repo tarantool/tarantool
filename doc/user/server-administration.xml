@@ -137,7 +137,7 @@ a newline (line feed).
     Syntax: <code>control-C</code>.
     Effect: The tarantool program receives a SIGINT signal and stops.
     Example:  <code>^C</code>.
-    Notes: The preferable way to stop the program is to send an "os.exit()" request.
+    Notes: Another way to stop the program is to send an "os.exit()" request.
     </para></listitem>
   </varlistentry>
 
@@ -180,7 +180,7 @@ Here is an example of an interactive-mode tarantool client session:
 <programlisting>
 <prompt>$ </prompt>tarantool
                 [ tarantool will display an introductory message including version number here ]
-tarantool> box.cfg{admin_port=3313, primary_port=3301}
+tarantool> box.cfg{admin_port=3313, primary_port=3303}
                 [ tarantool will display configuration information here ]
 tarantool> s = box.schema.create_space('space0')
                 [ tarantool may display an in-progress message here ]
@@ -208,10 +208,10 @@ Explanatory notes about what tarantool displayed in the above example:
 </para>
 <para>
 * Many requests return typed objects.
-    In the case of "box.cfg{admin_port=3313, primary_port=3301}",
+    In the case of "box.cfg{admin_port=3313, primary_port=3303}",
     this result is displayed on the screen.
     If the request had assigned the result to a variable, for example
-    "c = box.cfg{admin_port=3313, primary_port=3301}", then
+    "c = box.cfg{admin_port=3313, primary_port=3303}", then
     the result would not have been displayed on the screen.
 </para>
 <para>

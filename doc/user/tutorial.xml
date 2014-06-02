@@ -18,8 +18,7 @@ This will ensure that you have the same build of the same version that the devel
 That makes analysis easier if later you need to
 report a problem, and avoids subtle problems that might happen if
 you used different tools or different parameters when building from source.
-All programs in the binary tarballs are linked statically so there will be no external dependencies.
-	The section about binaries is <olink
+The section about binaries is <olink
 targetptr="getting-started-binary"><quote>Downloading and
 installing a binary package</quote></olink>.
 </para>
@@ -53,13 +52,8 @@ Since this is the manual for the <quote>master</quote> release, all instructions
 
 <para>
 An automatic build system creates, tests and publishes packages for every push into the master branch. 
-Therefore if you looked at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link> you would see many files.
-Names of binary packages have the format <computeroutput><filename>tarantool-<replaceable>&lt;version&gt;</replaceable>-<replaceable>&lt;OS&gt;</replaceable>-<replaceable>&lt;machine&gt;</replaceable>.tar.gz</filename></computeroutput>.
-Here is one example:
-<programlisting>tarantool-1.6.1-9-g30fe8ae-linux-x86_64.tar.gz     13-Dec-2013 16:55    4176905</programlisting>
-which means <quote>Tarantool package, major version = 1, minor version number = 6, patch number 1,
-git revision id g30fe8ae, is a Linux x86 64-bit compressed tarball, pushed on
-December 13 2013, which contains 4.1 MB.</quote>
+Therefore if you looked at <link xlink:href="http://tarantool.org/dist/master" xlink:title="tarantool.org/dist/master">tarantool.org/dist/master</link> you would see
+that there are source files and subdirectories for the packages that will be described in this section.
 </para>
 
 <para>
@@ -97,7 +91,7 @@ release=`lsb_release -c -s`
 # There is always an up-to-date Ubuntu repository at
 # <link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
 # The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
-# 13.04 "raring", 13.10 "saucy", ...
+# 13.04 "raring", 13.10 "saucy", 14.04 "trusty" ...
 # add the tarantool.org repository to your apt sources list:
 # ($release is an environment variable which will contain the Ubuntu version
 # code e.g. "precise")
@@ -225,6 +219,7 @@ A C/C++ compiler.
    <para>
 A program for managing the build process.
 	This is always <productname>CMake</productname> for GNU/Linux and FreeBSD.
+ The CMake version should be 2.8 or later.
  </para>
  </listitem>
  </itemizedlist>
@@ -264,7 +259,7 @@ ones unless you intend to work on the documentation.
  itself, unless one intends to use the -DENABLE_DOC option in step 6 or the
  "Run the test suite" option in step 8.</para>
 <para>Say:<programlisting><command>python --version</command></programlisting>
-... You should see that the python version is between 2.6 and 3.</para>
+... You should see that the python version is greater than or equal to 2.6 -- preferably 2.7 -- and less than 3.</para>
 <para>On Ubuntu you can get modules from the repository:
 <programlisting>
 # For test suite
@@ -366,7 +361,7 @@ Tarantool's developers always run the test suite before they publish new version
    make any changes in the code.
 Assuming you downloaded to <filename>~/tarantool</filename>,
 the principal steps are:<programlisting><command>mkdir</command> ~/tarantool/bin    # make a subdirectory named <filename>bin</filename>
-<command>ln</command> usr/bin/python ~/tarantool/bin/python # link python to bin (this may require superuser privilege)
+<command>ln</command> /usr/bin/python ~/tarantool/bin/python # link python to bin (this may require superuser privilege)
 <command>cd</command> ~/tarantool/test #get on the test subdirectory
 PATH=~/tarantool/bin:$PATH ./run #run tests using python</programlisting>
  
@@ -430,8 +425,7 @@ Here is how to create a simple test database after installing.
 <para>
 1. Create a new directory. It's just for tests, you can delete it when the tests are over.<programlisting>
 <command>mkdir</command> ~/tarantool_sandbox
-<command>cd</command> ~/tarantool_sandbox
-<command>mkdir</command> work_dir</programlisting>
+<command>cd</command> ~/tarantool_sandbox </programlisting>
 </para>
 
 <para>
@@ -532,7 +526,7 @@ You can repeat box.space...:insert() and box.space...:select() indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop tarantool: <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
-To stop tarantool (a cleaner alternative): <computeroutput>os.exit()</computeroutput>.
+To stop tarantool (an alternative): <computeroutput>os.exit()</computeroutput>.
 To stop tarantool (from another terminal): <computeroutput><command>sudo pkill</command> -f tarantool</computeroutput>.
 To destroy the test: <computeroutput><command>rm</command> -r ~/tarantool_sandbox</computeroutput>.
 </para>
@@ -610,7 +604,7 @@ inserted and selected tuples.
     Old syntax box.space.name:X() no longer exists.
     Old syntax box.X() no longer exists.
     New syntax is
-    box.space.<replaceable>space_name(</replaceable>:X<replaceable>Lua-table</replaceable>).
+    box.space.<replaceable>space_name(</replaceable>:<replaceable>Lua-table</replaceable>).
     Example: box.space.t0:insert{0,'Hello'}
     Minor properties of a space (for example the name) can be altered without rebuild.
     All properties of an index can be altered without rebuild.
