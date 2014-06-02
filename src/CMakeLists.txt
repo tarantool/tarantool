@@ -83,9 +83,6 @@ set (common_sources
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
-     lua/admin.cc
-     lua/info.cc
-     lua/stat.cc
      lua/errinj.cc
      lua/ipc.cc
      lua/socket.cc

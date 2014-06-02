@@ -1,44 +1,46 @@
+errinj = require('errinj')
+
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
-box.errinj.info()
-box.errinj.set("some-injection", true)
-box.errinj.set("some-injection") -- check error
+errinj.info()
+errinj.set("some-injection", true)
+errinj.set("some-injection") -- check error
 space:get{222444}
-box.errinj.set("ERRINJ_TESTING", true)
+errinj.set("ERRINJ_TESTING", true)
 space:get{222444}
-box.errinj.set("ERRINJ_TESTING", false)
+errinj.set("ERRINJ_TESTING", false)
 
 -- Check how well we handle a failed log write
-box.errinj.set("ERRINJ_WAL_IO", true)
+errinj.set("ERRINJ_WAL_IO", true)
 space:insert{1}
 space:get{1}
-box.errinj.set("ERRINJ_WAL_IO", false)
+errinj.set("ERRINJ_WAL_IO", false)
 space:insert{1}
-box.errinj.set("ERRINJ_WAL_IO", true)
+errinj.set("ERRINJ_WAL_IO", true)
 space:update(1, {{'=', 0, 2}})
 space:get{1}
 space:get{2}
-box.errinj.set("ERRINJ_WAL_IO", false)
+errinj.set("ERRINJ_WAL_IO", false)
 space:truncate()
 
 -- Check a failed log rotation
-box.errinj.set("ERRINJ_WAL_ROTATE", true)
+errinj.set("ERRINJ_WAL_ROTATE", true)
 space:insert{1}
 space:get{1}
-box.errinj.set("ERRINJ_WAL_ROTATE", false)
+errinj.set("ERRINJ_WAL_ROTATE", false)
 space:insert{1}
-box.errinj.set("ERRINJ_WAL_ROTATE", true)
+errinj.set("ERRINJ_WAL_ROTATE", true)
 space:update(1, {{'=', 0, 2}})
 space:get{1}
 space:get{2}
-box.errinj.set("ERRINJ_WAL_ROTATE", false)
+errinj.set("ERRINJ_WAL_ROTATE", false)
 space:update(1, {{'=', 0, 2}})
 space:get{1}
 space:get{2}
-box.errinj.set("ERRINJ_WAL_ROTATE", true)
+errinj.set("ERRINJ_WAL_ROTATE", true)
 space:truncate()
-box.errinj.set("ERRINJ_WAL_ROTATE", false)
+errinj.set("ERRINJ_WAL_ROTATE", false)
 space:truncate()
 
 space:drop()
@@ -52,7 +54,7 @@ s_withdata:create_index('primary', { type = 'tree' })
 s_withdata:insert{1, 2, 3, 4, 5}
 s_withdata:insert{4, 5, 6, 7, 8}
 s_withdata:create_index('secondary', { type = 'hash', parts = {1, 'num', 2, 'num' }})
-box.errinj.set("ERRINJ_WAL_IO", true)
+errinj.set("ERRINJ_WAL_IO", true)
 test = box.schema.create_space('test')
 s_disabled:create_index('primary', { type = 'hash' })
 s_disabled.enabled
@@ -65,7 +67,7 @@ s_withdata:drop()
 box.space['withdata'].enabled
 s_withdata:create_index('another', { type = 'tree', parts = { 4, 'num' }, unique = false})
 s_withdata.index.another
-box.errinj.set("ERRINJ_WAL_IO", false)
+errinj.set("ERRINJ_WAL_IO", false)
 test = box.schema.create_space('test')
 s_disabled:create_index('primary', { type = 'hash' })
 s_disabled.enabled
@@ -81,3 +83,5 @@ s_withdata.index.another
 test:drop()
 s_disabled:drop()
 s_withindex:drop()
+
+errinj = nil

@@ -739,10 +739,10 @@ t:findall(-9223372036854775807LL)
 --------------------------------------------------------------------------------
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------
-msgpack = require('box.msgpack')
+msgpack = require('msgpack')
 ---
 ...
-msgpackffi = require('box.msgpackffi')
+msgpackffi = require('msgpackffi')
 ---
 ...
 t = box.tuple.new({'a', 'b', 'c'})

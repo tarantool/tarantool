@@ -1,18 +1,18 @@
-json = require('box.json')
+json = require('json')
 ---
 ...
-boxsocket = require('box.socket')
+socket = require('socket')
 ---
 ...
-type(boxsocket)
+type(socket)
 ---
 - table
 ...
-boxsocket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 ---
 - null
 ...
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:wait(.01)
@@ -123,7 +123,7 @@ s:close()
 ---
 - true
 ...
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -149,7 +149,7 @@ s:listen(128)
 sevres = {}
 ---
 ...
-type(require('box.fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+type(require('fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
 ---
 - userdata
 ...
@@ -157,7 +157,7 @@ type(require('box.fiber').wrap(function() s:readable() do local sc = s:accept() 
 ---
 - 0
 ...
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc:nonblock(false)
@@ -262,7 +262,7 @@ s:close()
 ---
 - true
 ...
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -277,7 +277,7 @@ s:listen(128)
 ---
 - true
 ...
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc:writable()
@@ -427,7 +427,7 @@ sc:close()
 ---
 - true
 ...
-s = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -468,7 +468,7 @@ s:listen(1234)
 ---
 - true
 ...
-sc = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
+sc = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
 ---
 ...
 sc:nonblock(true)
@@ -529,24 +529,24 @@ function aexitst(ai, host, port)
 end;
 ---
 ...
-aexitst( boxsocket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
 ---
 - true
 ...
 --# setopt delimiter ''
-#(boxsocket.getaddrinfo('mail.ru', 'http', {})) > 0
+#(socket.getaddrinfo('mail.ru', 'http', {})) > 0
 ---
 - true
 ...
-wrong_addr = boxsocket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+wrong_addr = socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
 ---
 ...
 wrong_addr == nil or #wrong_addr == 0
 ---
 - true
 ...
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 sc ~= nil
@@ -581,24 +581,24 @@ string.match(tostring(sc), ', peer') == nil
 ---
 - true
 ...
-require('box.errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 ---
 - Connection refused
 ...
 --# setopt delimiter ';'
-json.encode(boxsocket.getaddrinfo('ya.ru', '80',
+json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 ---
 - '{}'
 ...
 --# setopt delimiter ''
-json.encode(boxsocket.getaddrinfo('ya.ru', '80',
+json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 
 ---
 - '{}'
 ...
-sc = boxsocket('AF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
 json.encode(sc:name())
@@ -613,14 +613,14 @@ sc:close()
 ---
 - true
 ...
-s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 s:bind('127.0.0.1', 3548)
 ---
 - true
 ...
-sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 sc:sendto('127.0.0.1', 3548, 'Hello, world')
@@ -655,7 +655,7 @@ sc:close()
 ---
 - true
 ...
-s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 s:nonblock(true)
@@ -670,7 +670,7 @@ s:name().port > 0
 ---
 - true
 ...
-sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 ---
 ...
 sc:nonblock(true)

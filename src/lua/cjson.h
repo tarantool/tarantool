@@ -31,7 +31,7 @@
 
 struct lua_State;
 /**
-* Initialize box.cjson system
+* Initialize json system
 */
 int tarantool_lua_cjson_init(struct lua_State *L);
 

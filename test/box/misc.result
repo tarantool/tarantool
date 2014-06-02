@@ -17,9 +17,7 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 t
 ---
 - - cfg
-  - coredump
   - counter
-  - errinj
   - error
   - index
   - info

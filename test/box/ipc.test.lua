@@ -1,6 +1,6 @@
-boxfiber = require('box.fiber')
+fiber = require('fiber')
 
-ch = boxfiber.channel()
+ch = fiber.channel()
 ch:is_full()
 ch:is_empty()
 ch:get(.1)
@@ -15,7 +15,7 @@ ch:is_full()
 ch:is_empty()
 buffer = {}
 --# setopt delimiter ';'
-tfbr = boxfiber.wrap(
+tfbr = fiber.wrap(
     function()
         while true do
             table.insert(buffer, ch:get())
@@ -30,7 +30,7 @@ end;
 t
 ch:has_readers()
 ch:has_writers()
-boxfiber.cancel(tfbr)
+fiber.cancel(tfbr)
 
 ch:has_readers()
 ch:has_writers()
@@ -48,7 +48,7 @@ ch:get()
 ch:is_full()
 ch:is_empty()
 --# setopt delimiter ';'
-tfbr = boxfiber.wrap(
+tfbr = fiber.wrap(
     function()
         while true do
             local v = ch:get()
@@ -56,7 +56,7 @@ tfbr = boxfiber.wrap(
         end
     end
 );
-tfbr2 = boxfiber.wrap(
+tfbr2 = fiber.wrap(
     function()
         while true do
             local v = ch:get()
@@ -82,10 +82,10 @@ for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
 buffer
 
-ch = boxfiber.channel(1)
+ch = fiber.channel(1)
 ch:is_closed()
 passed = false
-type(boxfiber.wrap(function() if ch:get() == nil then passed = true end end))
+type(fiber.wrap(function() if ch:get() == nil then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -93,11 +93,11 @@ ch:get()
 ch:put(10)
 ch:is_closed()
 
-ch = boxfiber.channel(1)
+ch = fiber.channel(1)
 ch:put(true)
 ch:is_closed()
 passed = false
-type(boxfiber.wrap(function() if ch:put(true) == false then passed = true end end))
+type(fiber.wrap(function() if ch:put(true) == false then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -112,25 +112,25 @@ chs= {}
 count= 0
 res= { }
 --# setopt delimiter ';'
-for i = 1, 10 do table.insert(chs, boxfiber.channel()) end;
+for i = 1, 10 do table.insert(chs, fiber.channel()) end;
 
 
 for i = 1, 10 do
-    local no = i boxfiber.wrap(
+    local no = i fiber.wrap(
         function()
-            boxfiber.self():name('pusher')
+            fiber.self():name('pusher')
             while true do
                 chs[no]:put({no})
-                boxfiber.sleep(0.001 * math.random())
+                fiber.sleep(0.001 * math.random())
             end
         end
     )
 end;
 
 for i = 1, 10 do
-    local no = i boxfiber.wrap(
+    local no = i fiber.wrap(
         function()
-            boxfiber.self():name('receiver')
+            fiber.self():name('receiver')
             while true do
                 local r = chs[no]:get(math.random() * .001)
                 if r ~= nil and r[1] == no then
@@ -138,7 +138,7 @@ for i = 1, 10 do
                 elseif r ~= nil then
                     break
                 end
-                boxfiber.sleep(0.001 * math.random())
+                fiber.sleep(0.001 * math.random())
                 count = count + 1
             end
             res[no] = false
@@ -146,7 +146,7 @@ for i = 1, 10 do
     )
 end;
 
-for i = 1, 100 do boxfiber.sleep(0.01) if count > 2000 then break end end;
+for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
 
 count > 2000, #res, res;
 

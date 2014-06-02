@@ -285,7 +285,7 @@ tarantool_lua_errno_init(struct lua_State *L)
 	const luaL_reg errnolib[] = {
 		{ NULL, NULL}
 	};
-	luaL_register_module(L, "box.errno", errnolib);
+	luaL_register_module(L, "errno", errnolib);
 	for (int i = 0; elist[i].name[0]; i++) {
 		lua_pushstring(L, elist[i].name);
 		lua_pushinteger(L, elist[i].value);

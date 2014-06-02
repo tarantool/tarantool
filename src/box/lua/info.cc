@@ -27,8 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/info.h"
-#include "lua/utils.h"
+#include "info.h"
 
 extern "C" {
 #include <lua.h>
@@ -41,6 +40,7 @@ extern "C" {
 #include "box/cluster.h"
 #include "tarantool.h"
 #include "box/box.h"
+#include "lua/utils.h"
 
 static int
 lbox_info_recovery_lag(struct lua_State *L)
@@ -219,14 +219,15 @@ lbox_info_call(struct lua_State *L)
 
 /** Initialize box.info package. */
 void
-tarantool_lua_info_init(struct lua_State *L)
+box_lua_info_init(struct lua_State *L)
 {
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	static const struct luaL_reg infolib [] = {
+		{NULL, NULL}
+	};
 
-	lua_pushstring(L, "info");
-	lua_newtable(L);		/* box.info table */
+	luaL_register(L, "box.info", infolib);
 
-	lua_newtable(L);		/* metatable for box.info */
+	lua_newtable(L);		/* metatable for info */
 
 	lua_pushstring(L, "__index");
 
@@ -243,6 +244,5 @@ tarantool_lua_info_init(struct lua_State *L)
 
 	lbox_info_init_static_values(L);
 
-	lua_settable(L, -3);    /* box.info = created table */
-	lua_pop(L, 1);          /* cleanup stack */
+	lua_pop(L, 1); /* info module */
 }

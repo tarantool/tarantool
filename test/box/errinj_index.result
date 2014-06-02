@@ -1,3 +1,6 @@
+errinj = require('errinj')
+---
+...
 s = box.schema.create_space('tweedledum')
 ---
 ...
@@ -46,7 +49,7 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
+errinj.set("ERRINJ_TREE_ALLOC", true)
 ---
 - ok
 ...
@@ -192,7 +195,7 @@ check_iter_and_size()
 ---
 - ok
 ...
-box.errinj.set("ERRINJ_TREE_ALLOC", false)
+errinj.set("ERRINJ_TREE_ALLOC", false)
 ---
 - ok
 ...
@@ -254,5 +257,8 @@ res
   - [5010, 5010]
 ...
 s:drop()
+---
+...
+errinj = nil
 ---
 ...

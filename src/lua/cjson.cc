@@ -35,7 +35,7 @@ extern "C" {
 int luaopen_cjson(lua_State *l);
 }
 
-static const char jsonlib_name[] = "box.json";
+static const char jsonlib_name[] = "json";
 
 int
 tarantool_lua_cjson_init(struct lua_State *L)

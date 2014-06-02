@@ -1,4 +1,4 @@
-box.fiber = require('box.fiber')
+fiber = require('fiber')
 ---
 ...
 space = box.schema.create_space('tweedledum')
@@ -215,36 +215,36 @@ space:truncate()
 -- test passing arguments in and out created fiber
 --# setopt delimiter ';'
 function y()
-    box.fiber.detach('started')
+    fiber.detach('started')
     space = box.space['tweedledum']
     while true do
         space:replace{1953719668, os.time()}
-        box.fiber.sleep(0.001)
+        fiber.sleep(0.001)
     end
 end;
 ---
 ...
-f = box.fiber.create(y);
+f = fiber.create(y);
 ---
 ...
-box.fiber.resume(f);
+fiber.resume(f);
 ---
 - started
 ...
-box.fiber.sleep(0.002);
+fiber.sleep(0.002);
 ---
 ...
-box.fiber.cancel(f);
+fiber.cancel(f);
 ---
 ...
-box.fiber.resume(f);
+fiber.resume(f);
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
 for k = 1, 1000, 1 do
-    box.fiber.create(
+    fiber.create(
         function()
-            box.fiber.detach()
+            fiber.detach()
         end
     )
 end;
@@ -256,32 +256,32 @@ collectgarbage('collect')
 - 0
 ...
 -- check that these newly created fibers are garbage collected
-box.fiber.find(900)
+fiber.find(900)
 ---
 - null
 ...
-box.fiber.find(910)
+fiber.find(910)
 ---
 - null
 ...
-box.fiber.find(920)
+fiber.find(920)
 ---
 - null
 ...
-box.fiber.find()
+fiber.find()
 ---
 - error: 'fiber.find(id): bad arguments'
 ...
-box.fiber.find('test')
+fiber.find('test')
 ---
 - null
 ...
 --  https://github.com/tarantool/tarantool/issues/131
---  box.fiber.resume(box.fiber.cancel()) -- hang
-f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)
+--  fiber.resume(fiber.cancel()) -- hang
+f = fiber.create(function() fiber.cancel(fiber.self()) end)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): the child fiber got cancelled'
 ...
@@ -289,19 +289,19 @@ f = nil
 ---
 ...
 -- https://github.com/tarantool/tarantool/issues/119
-ftest = function() box.fiber.sleep(0.01 * math.random() ) return true end
+ftest = function() fiber.sleep(0.01 * math.random() ) return true end
 ---
 ...
 --# setopt delimiter ';'
 for i = 1, 10 do
     result = {}
     for j = 1, 300 do
-        box.fiber.resume(box.fiber.create(function()
-            box.fiber.detach()
+        fiber.resume(fiber.create(function()
+            fiber.detach()
             table.insert(result, ftest())
         end))
     end
-    while #result < 300 do box.fiber.sleep(0.01) end
+    while #result < 300 do fiber.sleep(0.01) end
 end;
 ---
 ...
@@ -313,12 +313,12 @@ end;
 --# setopt delimiter ''
 --
 -- 
---  Test box.fiber.wrap()
+--  Test fiber.wrap()
 -- 
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
-f = function() box.fiber.wrap(f) end
+f = function() fiber.wrap(f) end
 ---
 ...
 f()
@@ -327,7 +327,7 @@ f()
 -- 
 -- Test argument passing
 -- 
-f = function(a, b) box.fiber.wrap(function(arg) result = arg end, a..b) end
+f = function(a, b) fiber.wrap(function(arg) result = arg end, a..b) end
 ---
 ...
 f('hello ', 'world')
@@ -347,7 +347,7 @@ result
 -- 
 -- Test that the created fiber is detached
 -- 
-box.fiber.wrap(function() result = box.fiber.status() end)
+fiber.wrap(function() result = fiber.status() end)
 ---
 - null
 ...
@@ -358,7 +358,7 @@ result
 -- A test case for Bug#933487
 -- tarantool crashed during shutdown if non running LUA fiber
 -- was created
-f = box.fiber.create(function () return true end)
+f = fiber.create(function () return true end)
 ---
 ...
 box.snapshot()
@@ -373,77 +373,77 @@ box.snapshot()
 ---
 - error: can't save snapshot, errno 17 (File exists)
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - true
 - true
 ...
-f = box.fiber.create(function () return true end)
+f = fiber.create(function () return true end)
 ---
 ...
-box.fiber.sleep(0)
+fiber.sleep(0)
 ---
 ...
-box.fiber.sleep(0.01)
+fiber.sleep(0.01)
 ---
 ...
-box.fiber.sleep(0.0001)
+fiber.sleep(0.0001)
 ---
 ...
-box.fiber.sleep('hello')
----
-- error: 'fiber.sleep(delay): bad arguments'
-...
-box.fiber.sleep(box, 0.001)
+fiber.sleep('hello')
 ---
 - error: 'fiber.sleep(delay): bad arguments'
 ...
-box.fiber.cancel(box.fiber.self())
+fiber.sleep(box, 0.001)
+---
+- error: 'fiber.sleep(delay): bad arguments'
+...
+fiber.cancel(fiber.self())
 ---
 - error: 'fiber.cancel(): subject fiber does not permit cancel'
 ...
-f = box.fiber.self()
+f = fiber.self()
 ---
 ...
 old_id = f:id()
 ---
 ...
-box.fiber.cancel(f)
+fiber.cancel(f)
 ---
 - error: 'fiber.cancel(): subject fiber does not permit cancel'
 ...
-box.fiber.self():id() - old_id < 3
+fiber.self():id() - old_id < 3
 ---
 - true
 ...
-box.fiber.cancel(box.fiber.self())
+fiber.cancel(fiber.self())
 ---
 - error: 'fiber.cancel(): subject fiber does not permit cancel'
 ...
-box.fiber.self():id() - old_id < 5
+fiber.self():id() - old_id < 5
 ---
 - true
 ...
-g = box.fiber.self()
+g = fiber.self()
 ---
 ...
 f==g
 ---
 - true
 ...
-function r() f = box.fiber.create(r) return (box.fiber.resume(f)) end
+function r() f = fiber.create(r) return (fiber.resume(f)) end
 ---
 ...
 r()
 ---
 - true
 ...
-f = box.fiber.create(print('hello')
+f = fiber.create(print('hello'))
 ---
-- error: '[string "f = box.fiber.create(print(''hello'') "]:1: '')'' expected near
-    ''<eof>'''
+- error: '[string "f = fiber.create(print(''hello'')) "]:1: fiber.create(function):
+    bad arguments'
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
@@ -451,85 +451,85 @@ box.fiber.resume(f)
 function r(a, b) return a, b end
 ---
 ...
-f=box.fiber.create(r)
+f=fiber.create(r)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - true
 - null
 - null
 ...
-f=box.fiber.create(r)
+f=fiber.create(r)
 ---
 ...
-box.fiber.resume(f, 'hello')
+fiber.resume(f, 'hello')
 ---
 - true
 - hello
 - null
 ...
-f=box.fiber.create(r)
+f=fiber.create(r)
 ---
 ...
-box.fiber.resume(f, 'hello', 'world')
+fiber.resume(f, 'hello', 'world')
 ---
 - true
 - hello
 - world
 ...
-f=box.fiber.create(r)
+f=fiber.create(r)
 ---
 ...
-box.fiber.resume(f, 'hello', 'world', 'wide')
+fiber.resume(f, 'hello', 'world', 'wide')
 ---
 - true
 - hello
 - world
 ...
-function y(a, b) c=box.fiber.yield(a) return box.fiber.yield(b, c) end
+function y(a, b) c=fiber.yield(a) return fiber.yield(b, c) end
 ---
 ...
-f=box.fiber.create(y)
+f=fiber.create(y)
 ---
 ...
-box.fiber.resume(f, 'hello', 'world')
+fiber.resume(f, 'hello', 'world')
 ---
 - hello
 ...
-box.fiber.resume(f, 'wide')
+fiber.resume(f, 'wide')
 ---
 - world
 - wide
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - true
 ...
-function y() box.fiber.detach() while true do box.replace(0, 1953719668, os.time()) box.fiber.sleep(0.001) end end
+function y() fiber.detach() while true do box.replace(0, 1953719668, os.time()) fiber.sleep(0.001) end end
 ---
 ...
-f = box.fiber.create(y)
+f = fiber.create(y)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 ...
-box.fiber.sleep(0.002)
+fiber.sleep(0.002)
 ---
 ...
-box.fiber.cancel(f)
+fiber.cancel(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
 f=nil
 ---
 ...
-for k=1, 10000, 1 do box.fiber.create(function() box.fiber.detach() end) end
+for k=1, 10000, 1 do fiber.create(function() fiber.detach() end) end
 ---
 ...
 collectgarbage('collect')
@@ -537,249 +537,249 @@ collectgarbage('collect')
 - 0
 ...
 -- check that these newly created fibers are garbage collected
-box.fiber.find(9000)
+fiber.find(9000)
 ---
 - null
 ...
-box.fiber.find(9010)
+fiber.find(9010)
 ---
 - null
 ...
-box.fiber.find(9020)
+fiber.find(9020)
 ---
 - null
 ...
---  test box.fiber.status functions: invalid arguments
-box.fiber.status(1)
+--  test fiber.status functions: invalid arguments
+fiber.status(1)
 ---
-- error: 'bad argument #1 to ''?'' (box.fiber expected, got number)'
+- error: 'bad argument #1 to ''?'' (fiber expected, got number)'
 ...
-box.fiber.status('fafa-gaga')
+fiber.status('fafa-gaga')
 ---
-- error: 'bad argument #1 to ''?'' (box.fiber expected, got string)'
+- error: 'bad argument #1 to ''?'' (fiber expected, got string)'
 ...
-box.fiber.status(nil)
+fiber.status(nil)
 ---
-- error: 'bad argument #1 to ''?'' (box.fiber expected, got nil)'
+- error: 'bad argument #1 to ''?'' (fiber expected, got nil)'
 ...
---  A test case for Bug#911641 box.fiber.sleep() works incorrectly if
+--  A test case for Bug#911641 fiber.sleep() works incorrectly if
 --  a fiber is attached.
-function r() return box.fiber.sleep(0.01) end
+function r() return fiber.sleep(0.01) end
 ---
 ...
-f = box.fiber.create(r)
+f = fiber.create(r)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - true
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
 --# setopt delimiter ';'
 function r()
-    box.fiber.yield(box.space.tweedledum:insert{0, 0, 1})
-    box.fiber.yield(box.space.tweedledum:get{0})
-    box.fiber.yield(box.space.tweedledum:truncate())
+    fiber.yield(box.space.tweedledum:insert{0, 0, 1})
+    fiber.yield(box.space.tweedledum:get{0})
+    fiber.yield(box.space.tweedledum:truncate())
 end;
 ---
 ...
 --# setopt delimiter ''
-f = box.fiber.create(r)
+f = fiber.create(r)
 ---
 ...
-box.fiber.resume(f)
----
-- [0, 0, 1]
-...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - [0, 0, 1]
 ...
-box.fiber.resume(f)
+fiber.resume(f)
+---
+- [0, 0, 1]
+...
+fiber.resume(f)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - true
 ...
-function r() return box.fiber.yield(box.fiber.create(r)) end
+function r() return fiber.yield(fiber.create(r)) end
 ---
 ...
 f = r()
 ---
 ...
-f1 = box.fiber.resume(f)
+f1 = fiber.resume(f)
 ---
 ...
-f2 = box.fiber.resume(f1)
+f2 = fiber.resume(f1)
 ---
 ...
-f3 = box.fiber.resume(f2)
+f3 = fiber.resume(f2)
 ---
 ...
-f4 = box.fiber.resume(f3)
+f4 = fiber.resume(f3)
 ---
 ...
-f5 = box.fiber.resume(f4)
+f5 = fiber.resume(f4)
 ---
 ...
-f6 = box.fiber.resume(f5)
+f6 = fiber.resume(f5)
 ---
 ...
-f7 = box.fiber.resume(f6)
+f7 = fiber.resume(f6)
 ---
 ...
-f8 = box.fiber.resume(f7)
+f8 = fiber.resume(f7)
 ---
 ...
-f9 = box.fiber.resume(f8)
+f9 = fiber.resume(f8)
 ---
 ...
-f10 = box.fiber.resume(f9)
+f10 = fiber.resume(f9)
 ---
 ...
-f11 = box.fiber.resume(f10)
+f11 = fiber.resume(f10)
 ---
 ...
-f12 = box.fiber.resume(f11)
+f12 = fiber.resume(f11)
 ---
 ...
-f13 = box.fiber.resume(f12)
+f13 = fiber.resume(f12)
 ---
 ...
-f14 = box.fiber.resume(f13)
+f14 = fiber.resume(f13)
 ---
 ...
-f15 = box.fiber.resume(f14)
+f15 = fiber.resume(f14)
 ---
 ...
-f16 = box.fiber.resume(f15)
+f16 = fiber.resume(f15)
 ---
 ...
-f17 = box.fiber.resume(f16)
+f17 = fiber.resume(f16)
 ---
 ...
-box.fiber.resume(f)
----
-- true
-...
-box.fiber.resume(f1)
+fiber.resume(f)
 ---
 - true
 ...
-box.fiber.resume(f2)
+fiber.resume(f1)
 ---
 - true
 ...
-box.fiber.resume(f3)
+fiber.resume(f2)
 ---
 - true
 ...
-box.fiber.resume(f4)
+fiber.resume(f3)
 ---
 - true
 ...
-box.fiber.resume(f5)
+fiber.resume(f4)
 ---
 - true
 ...
-box.fiber.resume(f6)
+fiber.resume(f5)
 ---
 - true
 ...
-box.fiber.resume(f7)
+fiber.resume(f6)
 ---
 - true
 ...
-box.fiber.resume(f8)
+fiber.resume(f7)
 ---
 - true
 ...
-box.fiber.resume(f9)
+fiber.resume(f8)
 ---
 - true
 ...
-box.fiber.resume(f10)
+fiber.resume(f9)
 ---
 - true
 ...
-box.fiber.resume(f11)
+fiber.resume(f10)
 ---
 - true
 ...
-box.fiber.resume(f12)
+fiber.resume(f11)
 ---
 - true
 ...
-box.fiber.resume(f13)
+fiber.resume(f12)
 ---
 - true
 ...
-box.fiber.resume(f14)
+fiber.resume(f13)
 ---
 - true
 ...
-box.fiber.resume(f15)
+fiber.resume(f14)
 ---
 - true
 ...
-box.fiber.resume(f16)
+fiber.resume(f15)
+---
+- true
+...
+fiber.resume(f16)
 ---
 - true
 ...
 f17 = nil
 ---
 ...
-function r() box.fiber.detach() box.fiber.sleep(1000) end
+function r() fiber.detach() fiber.sleep(1000) end
 ---
 ...
-f = box.fiber.create(r)
+f = fiber.create(r)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): can''t resume a detached fiber'
 ...
-box.fiber.cancel(f)
+fiber.cancel(f)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
---  Test box.fiber.name()
-old_name = box.fiber.name()
+--  Test fiber.name()
+old_name = fiber.name()
 ---
 ...
-box.fiber.name() == old_name
----
-- true
-...
-box.fiber.self():name() == old_name
+fiber.name() == old_name
 ---
 - true
 ...
-box.fiber.name('hello fiber')
+fiber.self():name() == old_name
+---
+- true
+...
+fiber.name('hello fiber')
 ---
 ...
-box.fiber.name()
+fiber.name()
 ---
 - hello fiber
 ...
-box.fiber.self():name('bye fiber')
+fiber.self():name('bye fiber')
 ---
 ...
-box.fiber.self():name()
+fiber.self():name()
 ---
 - bye fiber
 ...
-box.fiber.self():name(old_name)
+fiber.self():name(old_name)
 ---
 ...
 space:drop()
@@ -816,10 +816,10 @@ box_fiber_run_test()
   - 'B: odd  5'
   - 'status: dead'
 ...
-function testfun() while true do box.fiber.sleep(10) end end
+function testfun() while true do fiber.sleep(10) end end
 ---
 ...
-f = box.fiber.wrap(testfun)
+f = fiber.wrap(testfun)
 ---
 ...
 f:cancel()
@@ -829,13 +829,13 @@ f:resume()
 ---
 - error: 'fiber.resume(): the fiber is dead'
 ...
-fib_id = box.fiber.wrap(testfun):id()
+fib_id = fiber.wrap(testfun):id()
 ---
 ...
-box.fiber.find(fib_id):cancel()
+fiber.find(fib_id):cancel()
 ---
 ...
-box.fiber.find(fib_id)
+fiber.find(fib_id)
 ---
 - null
 ...

@@ -27,7 +27,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/stat.h"
+#include "stat.h"
 
 #include <string.h>
 #include <stat.h>
@@ -37,6 +37,8 @@ extern "C" {
 #include <lauxlib.h>
 #include <lualib.h>
 } /* extern "C" */
+
+#include "lua/utils.h"
 
 static void
 fill_stat_item(struct lua_State *L, int rps, int64_t total)
@@ -105,18 +107,18 @@ static const struct luaL_reg lbox_stat_meta [] = {
 
 /** Initialize bos.stat package. */
 void
-tarantool_lua_stat_init(struct lua_State *L)
+box_lua_stat_init(struct lua_State *L)
 {
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
+	static const struct luaL_reg statlib [] = {
+		{NULL, NULL}
+	};
 
-	lua_pushstring(L, "stat");
-	lua_newtable(L);
+	luaL_register(L, "box.stat", statlib);
 
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_meta);
 	lua_setmetatable(L, -2);
 
-	lua_settable(L, -3);    /* box.stat = created table */
-	lua_pop(L, 1);          /* cleanup stack */
+	lua_pop(L, 1); /* stat module */
 }
 

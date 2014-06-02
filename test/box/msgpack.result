@@ -4,10 +4,10 @@
 ffi = require('ffi')
 ---
 ...
-msgpack = require('box.msgpack')
+msgpack = require('msgpack')
 ---
 ...
-msgpackffi = require('box.msgpackffi')
+msgpackffi = require('msgpackffi')
 ---
 ...
 msgpack.encode()
@@ -615,5 +615,5 @@ offset
 ...
 a, offset = msgpackffi.decode_unchecked(dump, offset)
 ---
-- error: 'builtin/box.msgpackffi.lua:460: offset = 9 is out of bounds [1..8]'
+- error: 'builtin/msgpackffi.lua:460: offset = 9 is out of bounds [1..8]'
 ...

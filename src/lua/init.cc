@@ -46,14 +46,11 @@ extern "C" {
 #include <fiber.h>
 #include "coeio.h"
 #include "lua/fiber.h"
-#include "lua/admin.h"
 #include "lua/errinj.h"
 #include "lua/ipc.h"
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/bsdsocket.h"
-#include "lua/info.h"
-#include "lua/stat.h"
 #include "lua/session.h"
 #include "lua/cjson.h"
 #include "lua/yaml.h"
@@ -71,10 +68,10 @@ struct lua_State *tarantool_L;
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
        load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[];
 static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
-static const char *lua_modules[] = { "box.msgpackffi", msgpackffi_lua,
-	"fun", fun_lua, "box.digest", digest_lua,
-	"box.interactive", interactive_lua,
-	"box.uuid", uuid_lua, NULL };
+static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
+	"fun", fun_lua, "digest", digest_lua,
+	"interactive", interactive_lua,
+	"uuid", uuid_lua, NULL };
 /*
  * {{{ box Lua library: common functions
  */
@@ -141,6 +138,14 @@ lbox_tonumber64(struct lua_State *L)
 		luaL_error(L, "tonumber64: wrong number of arguments");
 	uint64_t result = tarantool_lua_tointeger64(L, 1);
 	return luaL_pushnumber64(L, result);
+}
+
+static int
+lbox_coredump(struct lua_State *L __attribute__((unused)))
+{
+	coredump(60);
+	lua_pushstring(L, "ok");
+	return 1;
 }
 
 static const struct luaL_reg errorlib [] = {
@@ -217,14 +222,12 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
 
 	lua_register(L, "tonumber64", lbox_tonumber64);
+	lua_register(L, "coredump", lbox_coredump);
 
 	tarantool_lua_errinj_init(L);
 	tarantool_lua_fiber_init(L);
-	tarantool_lua_admin_init(L);
 	tarantool_lua_cjson_init(L);
 	tarantool_lua_yaml_init(L);
-	tarantool_lua_info_init(L);
-	tarantool_lua_stat_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_socket_init(L);
@@ -434,9 +437,9 @@ run_script(va_list ap)
 		lua_pushstring(L, path);
 	} else {
 		say_crit("version %s", tarantool_version());
-		/* get box.iteractive from package.loaded */
+		/* get iteractive from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_getfield(L, -1, "box.interactive");
+		lua_getfield(L, -1, "interactive");
 		lua_remove(L, -2); /* remove package.loaded */
 	}
 	try {
