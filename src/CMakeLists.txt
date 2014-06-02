@@ -37,6 +37,10 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port-uri.cc
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	COMMAND ragel -G2 src/port-uri.rl -o src/port-uri.cc
 	DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.rl)
+execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
+    ${CMAKE_SOURCE_DIR}/src/port-uri.cc)
+add_custom_target(generate_port_uri_cc
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.cc)
 
 set (common_sources
      memory.cc
