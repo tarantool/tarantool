@@ -50,7 +50,6 @@ extern "C" {
 #include "lua/utils.h"
 #include "session.h"
 #include "scoped_guard.h"
-#include <say.h>
 
 static int
 admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
