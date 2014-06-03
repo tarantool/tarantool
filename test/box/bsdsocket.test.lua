@@ -1,10 +1,10 @@
-json = require('box.json')
-boxsocket = require('box.socket')
-type(boxsocket)
+json = require('json')
+socket = require('socket')
+type(socket)
 
-boxsocket('PF_INET', 'SOCK_STREAM', 'tcp121222');
+socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:wait(.01)
 type(s)
 s:errno()
@@ -37,17 +37,17 @@ s:readable(1)
 string.len(s:sysread(4096))
 s:close()
 
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s:error()
 s:bind('127.0.0.1', 3457)
 s:error()
 s:listen(128)
 sevres = {}
-type(require('box.fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+type(require('fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
 #sevres
 
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc:nonblock(false)
 sc:sysconnect('127.0.0.1', 3457)
 sc:nonblock(true)
@@ -75,12 +75,12 @@ s:linger()
 s:shutdown('R')
 s:close()
 
-s = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s:bind('127.0.0.1', 3457)
 s:listen(128)
 
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 
 sc:writable()
 sc:readable()
@@ -125,7 +125,7 @@ sa:read(100, 1)
 sa:close()
 sc:close()
 
-s = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s ~= nil
 s:nonblock()
@@ -136,7 +136,7 @@ s:bind('unix/', '/tmp/tarantool-test-socket')
 sc ~= nil
 s:listen(1234)
 
-sc = boxsocket('PF_UNIX', 'SOCK_STREAM', 'ip')
+sc = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
 sc:nonblock(true)
 sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
 sc:error()
@@ -163,15 +163,15 @@ function aexitst(ai, host, port)
     return false
 end;
 
-aexitst( boxsocket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
+aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
 --# setopt delimiter ''
 
-#(boxsocket.getaddrinfo('mail.ru', 'http', {})) > 0
-wrong_addr = boxsocket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+#(socket.getaddrinfo('mail.ru', 'http', {})) > 0
+wrong_addr = socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
 wrong_addr == nil or #wrong_addr == 0
 
-sc = boxsocket('PF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 sc ~= nil
 sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 sc:nonblock(true)
@@ -180,21 +180,21 @@ sc:sysconnect('127.0.0.1', 3458)
 string.match(tostring(sc), ', peer') == nil
 sc:writable()
 string.match(tostring(sc), ', peer') == nil
-require('box.errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
+require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 
 --# setopt delimiter ';'
-json.encode(boxsocket.getaddrinfo('ya.ru', '80',
+json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 --# setopt delimiter ''
 
-sc = boxsocket('AF_INET', 'SOCK_STREAM', 'tcp')
+sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 json.encode(sc:name())
 sc:nonblock(true)
 sc:close()
 
-s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 s:bind('127.0.0.1', 3548)
-sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 sc:sendto('127.0.0.1', 3548, 'Hello, world')
 s:readable(10)
 s:recv(4096)
@@ -205,11 +205,11 @@ local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random
 s:close()
 sc:close()
 
-s = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+s = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 s:nonblock(true)
 s:bind('127.0.0.1')
 s:name().port > 0
-sc = boxsocket('AF_INET', 'SOCK_DGRAM', 'udp')
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 sc:nonblock(true)
 sc:sendto('127.0.0.1', s:name().port)
 sc:sendto('127.0.0.1', s:name().port, 'Hello, World!')

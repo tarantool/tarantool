@@ -4,11 +4,11 @@ print("Hello, world")
 io = require('io')
 ---
 ...
-require('box.fiber').wrap(function() print('Ehllo, world') io.flush() end)
+require('fiber').wrap(function() print('Ehllo, world') io.flush() end)
 ---
 - null
 ...
-require('box.fiber').sleep(0.1)
+require('fiber').sleep(0.1)
 ---
 ...
 Check log line

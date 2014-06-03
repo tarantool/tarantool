@@ -1,7 +1,7 @@
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
-while box.space['_priv']:len() < 1 do require('box.fiber').sleep(0.01) end
+while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end
 ---
 ...
 s = box.schema.create_space('tweedledum', {id = 0})

@@ -1,8 +1,8 @@
 -- tuple.lua (internal file)
 
 local ffi = require('ffi')
-local yaml = require('box.yaml')
-local msgpackffi = require('box.msgpackffi')
+local yaml = require('yaml')
+local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 
 ffi.cdef([[

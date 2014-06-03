@@ -1,4 +1,4 @@
-box.fiber = require('box.fiber')
+fiber = require('fiber')
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'tree'})
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
@@ -62,7 +62,7 @@ box.space.tweedledum:select({123})
 remote:call('box.space.tweedledum:select', 123)
 remote:call('box.space.tweedledum:select', {123})
 
-slf, foo = box.call_loadproc('box.net.self:select')
+slf, foo = require('box.internal').call_loadproc('box.net.self:select')
 type(slf)
 type(foo)
 
@@ -106,22 +106,22 @@ box.net.self:update(space.id, 12347, {{ '=', 1, 'test11' }})
 box.net.self:delete(space.id, 12346)
 
 
-remote:call('box.fiber.sleep', .01)
-remote:timeout(0.01):call('box.fiber.sleep', 10)
+remote:call('fiber.sleep', .01)
+remote:timeout(0.01):call('fiber.sleep', 10)
 
 --# setopt delimiter ';'
-pstart = box.fiber.time();
+pstart = fiber.time();
 parallel = {};
 function parallel_foo(id)
-    box.fiber.sleep(math.random() * .05)
+    fiber.sleep(math.random() * .05)
     return id
 end;
 parallel_foo('abc');
 for i = 1, 20 do
-    box.fiber.resume(
-        box.fiber.create(
+    fiber.resume(
+        fiber.create(
             function()
-                box.fiber.detach()
+                fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
                 table.insert(parallel, s == so[1][0])
@@ -133,12 +133,12 @@ for i = 1, 20 do
     if #parallel == 20 then
         break
     end
-    box.fiber.sleep(0.1)
+    fiber.sleep(0.1)
 end;
 --# setopt delimiter ''
 parallel
 #parallel
-box.fiber.time() - pstart < 0.5
+fiber.time() - pstart < 0.5
 
 
 
@@ -153,3 +153,5 @@ remote:ping()
 
 space:drop()
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+fiber = nil

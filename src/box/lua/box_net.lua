@@ -2,8 +2,9 @@
 
 (function()
 
-local msgpack = require('box.msgpack')
-local boxfiber = require('box.fiber')
+local msgpack = require('msgpack')
+local fiber = require('fiber')
+local socket = require('socket')
 local internal = require('box.internal')
 
 local function keify(key)
@@ -330,22 +331,22 @@ box.net.box.new = function(host, port, reconnect_timeout)
             end,
 
             -- write channel
-            wch = boxfiber.channel(1),
+            wch = fiber.channel(1),
 
             -- ready socket channel
-            rch = boxfiber.channel(1),
+            rch = fiber.channel(1),
         },
 
 
 
         process = function(self, op, request)
-            local started = boxfiber.time()
+            local started = fiber.time()
             local timeout = self.request_timeout
             self.request_timeout = nil
 
             -- get an auto-incremented request id
             local sync = self.processing:next_sync()
-            self.processing[sync] = boxfiber.channel(1)
+            self.processing[sync] = fiber.channel(1)
             local header = msgpack.encode{
                     [box.net.box.TYPE] = op, [box.net.box.SYNC] = sync
             }
@@ -359,7 +360,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     return nil
                 end
 
-                timeout = timeout - (boxfiber.time() - started)
+                timeout = timeout - (fiber.time() - started)
             else
                 self.processing.wch:put(request)
             end
@@ -416,7 +417,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 return true
             end
 
-            local sc = require('box.socket').tcp()
+            local sc = socket.tcp()
             if sc == nil then
                 self:fatal("Can't create socket")
                 return false
@@ -469,7 +470,7 @@ box.net.box.new = function(host, port, reconnect_timeout)
                         break
                     end
                     -- timeout between reconnect attempts
-                    boxfiber.sleep(self.reconnect_timeout)
+                    fiber.sleep(self.reconnect_timeout)
                 end
 
                 -- wakeup write fiber
@@ -557,8 +558,8 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
     setmetatable( remote, { __index = box.net.box } )
 
-    remote.irfiber = boxfiber.wrap(remote.rfiber, remote)
-    remote.iwfiber = boxfiber.wrap(remote.wfiber, remote)
+    remote.irfiber = fiber.wrap(remote.rfiber, remote)
+    remote.iwfiber = fiber.wrap(remote.wfiber, remote)
 
     remote.rpc = { r = remote }
     setmetatable(remote.rpc, { __index = rpc_index })

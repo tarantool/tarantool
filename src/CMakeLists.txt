@@ -38,6 +38,10 @@ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port-uri.cc
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	COMMAND ragel -G2 src/port-uri.rl -o src/port-uri.cc
 	DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.rl)
+execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
+    ${CMAKE_SOURCE_DIR}/src/port-uri.cc)
+add_custom_target(generate_port_uri_cc
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.cc)
 
 set (common_sources
      memory.cc
@@ -80,9 +84,6 @@ set (common_sources
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
-     lua/admin.cc
-     lua/info.cc
-     lua/stat.cc
      lua/errinj.cc
      lua/ipc.cc
      lua/socket.cc

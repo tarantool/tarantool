@@ -41,7 +41,7 @@ extern "C" {
 #include <session.h>
 #include <sio.h>
 
-static const char *sessionlib_name = "box.session";
+static const char *sessionlib_name = "session";
 
 /**
  * Return a unique monotonic session
@@ -196,7 +196,7 @@ session_storage_cleanup(int sid)
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		if (!lua_istable(L, -1))
 			goto exit;
-		lua_getfield(L, -1, "box.session");
+		lua_getfield(L, -1, "session");
 		if (!lua_istable(L, -1))
 			goto exit;
 		lua_getmetatable(L, -1);

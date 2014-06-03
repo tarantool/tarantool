@@ -49,4 +49,6 @@ add_library(box
     lua/slab.cc
     lua/index.cc
     lua/space.cc
+    lua/info.cc
+    lua/stat.cc
     ${bin_sources})

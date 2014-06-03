@@ -1,5 +1,5 @@
 -- cjson tests
-json = require('box.json')
+json = require('json')
 type(json)
 
 json.encode(123)
