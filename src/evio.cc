@@ -84,7 +84,7 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol)
 	/* Don't leak fd if setsockopt fails. */
 	coio->fd = sio_socket(domain, type, protocol);
 	if (type == SOCK_STREAM) {
-		evio_setsockopt_tcp(coio->fd);
+		evio_setsockopt_tcp(coio->fd, domain);
 	} else {
 		sio_setfl(coio->fd, O_NONBLOCK, 1);
 	}
@@ -93,7 +93,7 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol)
 
 /** Set common tcp socket client options. */
 void
-evio_setsockopt_tcp(int fd)
+evio_setsockopt_tcp(int fd, int family)
 {
 	int on = 1;
 	/* In case this throws, the socket is not leaked. */
@@ -108,8 +108,8 @@ evio_setsockopt_tcp(int fd)
 	 * bandwidth, and we usually write entire
 	 * request/response in a single syscall.
 	 */
-	sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
-		       &on, sizeof(on));
+	if (family != AF_UNIX)
+		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
 }
 
 /** Set tcp options for server sockets. */
@@ -183,19 +183,20 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 	int fd = -1;
 
 	try {
-		struct sockaddr_in addr;
+		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof(addr);
-		fd = sio_accept(service->ev.fd, &addr, &addrlen);
+		fd = sio_accept(service->ev.fd,
+			(struct sockaddr *)&addr, &addrlen);
 
 		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
 			return;
 		/* set common tcp options */
-		evio_setsockopt_tcp(fd);
+		evio_setsockopt_tcp(fd, service->port.addr.sa_family);
 		/*
 		 * Invoke the callback and pass it the accepted
 		 * socket.
 		 */
-		service->on_accept(service, fd, &addr);
+		service->on_accept(service, fd, (struct sockaddr *)&addr, addrlen);
 
 	} catch (Exception *e) {
 		if (fd >= 0)
@@ -214,7 +215,8 @@ static int
 evio_service_bind_and_listen(struct evio_service *service)
 {
 	/* Create a socket. */
-	int fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	int fd = sio_socket(service->port.addr.sa_family,
+		SOCK_STREAM, IPPROTO_TCP);
 
 	try {
 		evio_setsockopt_tcpserver(fd);
@@ -262,7 +264,7 @@ evio_service_init(ev_loop *loop,
 		  struct evio_service *service, const char *name,
 		  const char *uri,
 		  void (*on_accept)(struct evio_service *, int,
-				    struct sockaddr_in *),
+				    struct sockaddr *, socklen_t),
 		  void *on_accept_param)
 {
 	memset(service, 0, sizeof(struct evio_service));
@@ -317,5 +319,8 @@ evio_service_stop(struct evio_service *service)
 	} else {
 		ev_io_stop(service->loop, &service->ev);
 		close(service->ev.fd);
+		if (service->port.addr.sa_family == AF_UNIX) {
+			unlink(service->port.un.sun_path);
+		}
 	}
 }

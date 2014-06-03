@@ -151,10 +151,11 @@ lbox_session_peer(struct lua_State *L)
 		luaL_checkint(L, -1) : fiber()->session->id;
 
 	int fd = session_fd(sid);
-	struct sockaddr_in addr;
-	sio_getpeername(fd, &addr);
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
+	sio_getpeername(fd, (struct sockaddr *)&addr, addrlen);
 
-	lua_pushstring(L, sio_strfaddr(&addr));
+	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr));
 	return 1;
 }
 
