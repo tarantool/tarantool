@@ -314,3 +314,27 @@ space:create_index('')
 space:drop()
 ---
 ...
+-- gh-57 Confusing error message when trying to create space with a
+-- duplicate id
+auto = box.schema.create_space('auto_original')
+---
+...
+auto2 = box.schema.create_space('auto', {id = auto.id})
+---
+- error: Duplicate key exists in unique index 0
+...
+box.schema.space.drop('auto')
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...
+auto2
+---
+- null
+...
+box.schema.create_space('auto_original', {id = auto.id})
+---
+- error: Space 'auto_original' already exists
+...
+auto:drop()
+---
+...
