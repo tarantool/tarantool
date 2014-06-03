@@ -50,6 +50,7 @@ extern "C" {
 #include "lua/utils.h"
 #include "session.h"
 #include "scoped_guard.h"
+#include <say.h>
 
 static int
 admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
@@ -72,7 +73,7 @@ static void
 admin_handler(va_list ap)
 {
 	struct ev_io coio = va_arg(ap, struct ev_io);
-	struct sockaddr_in *addr = va_arg(ap, struct sockaddr_in *);
+	struct sockaddr *addr = va_arg(ap, struct sockaddr *);
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_guard(tarantool_L);

@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <sys/un.h>
 
 enum { PORT_URI_STR_LEN = 32 };
 
@@ -39,6 +40,9 @@ struct port_uri {
 
 	union {
 		struct sockaddr addr;
+		struct sockaddr_in in;
+		struct sockaddr_un un;
+		struct sockaddr_in6 in6;
 		struct sockaddr_storage addr_storage;
 	};
 	socklen_t addr_len;

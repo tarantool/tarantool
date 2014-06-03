@@ -24,6 +24,7 @@ __author__ = "Konstantin Osipov <kostja.osipov@gmail.com>"
 import socket
 import sys
 import errno
+import re
 
 class TarantoolConnection(object):
     def __init__(self, host, port):
@@ -32,9 +33,13 @@ class TarantoolConnection(object):
         self.is_connected = False
 
     def connect(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-        self.socket.connect((self.host, self.port))
+        if self.host == 'unix/' or re.search(r'^/', str(self.port)):
+            self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.socket.connect(self.port)
+        else:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
+            self.socket.connect((self.host, self.port))
         self.is_connected = True
 
     def disconnect(self):
