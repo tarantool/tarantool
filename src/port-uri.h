@@ -28,8 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
+#include <sys/types.h>		/* for netinet/ip.h on BSD */
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
 #include <netdb.h>
 #include <sys/un.h>
 

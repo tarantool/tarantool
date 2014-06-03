@@ -37,7 +37,6 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <netdb.h>
-#include <say.h>
 
 const char *
 port_uri_to_string(const struct port_uri * uri)
