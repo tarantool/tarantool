@@ -1,7 +1,7 @@
-box.session = require('box.session')
+session = require('session')
 ---
 ...
-box.fiber = require('box.fiber')
+fiber = require('fiber')
 ---
 ...
 space = box.schema.create_space('tweedledum')
@@ -10,41 +10,41 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 ---
 ...
-box.session.exists(box.session.id())
+session.exists(session.id())
 ---
 - 1
 ...
-box.session.exists()
+session.exists()
 ---
 - error: 'session.exists(sid): bad arguments'
 ...
-box.session.exists(1, 2, 3)
+session.exists(1, 2, 3)
 ---
 - error: 'session.exists(sid): bad arguments'
 ...
-box.session.exists(1234567890)
+session.exists(1234567890)
 ---
 - 0
 ...
 -- check session.id()
-box.session.id() > 0
+session.id() > 0
 ---
 - true
 ...
-f = box.fiber.create(function() box.fiber.detach() failed = box.session.id() ~= 0 end)
+f = fiber.create(function() fiber.detach() failed = session.id() ~= 0 end)
 ---
 ...
-box.fiber.resume(f)
+fiber.resume(f)
 ---
 ...
 failed
 ---
 - false
 ...
-f1 = box.fiber.create(function() if box.session.id() == 0 then failed = true end end)
+f1 = fiber.create(function() if session.id() == 0 then failed = true end end)
 ---
 ...
-box.fiber.resume(f1)
+fiber.resume(f1)
 ---
 - true
 ...
@@ -52,7 +52,7 @@ failed
 ---
 - false
 ...
-box.session.peer() == box.session.peer(box.session.id())
+session.peer() == session.peer(session.id())
 ---
 - true
 ...
@@ -60,60 +60,60 @@ box.session.peer() == box.session.peer(box.session.id())
 function noop() end
 ---
 ...
-box.session.on_connect(noop)
+session.on_connect(noop)
 ---
 ...
-box.session.on_disconnect(noop)
+session.on_disconnect(noop)
 ---
 ...
 -- check it's possible to reset these triggers
 function fail() error('hear') end
 ---
 ...
-box.session.on_connect(fail, noop)
+session.on_connect(fail, noop)
 ---
 ...
-box.session.on_disconnect(fail, noop)
+session.on_disconnect(fail, noop)
 ---
 ...
 -- check on_connect/on_disconnect argument count and type
-box.session.on_connect()
+session.on_connect()
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
-box.session.on_disconnect()
+session.on_disconnect()
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
-box.session.on_connect(function() end, function() end)
+session.on_connect(function() end, function() end)
 ---
 - error: Trigger is not found
 ...
-box.session.on_disconnect(function() end, function() end)
+session.on_disconnect(function() end, function() end)
 ---
 - error: Trigger is not found
 ...
-box.session.on_connect(1, 2)
+session.on_connect(1, 2)
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
-box.session.on_disconnect(1, 2)
+session.on_disconnect(1, 2)
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
-box.session.on_connect(1)
+session.on_connect(1)
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
-box.session.on_disconnect(1)
+session.on_disconnect(1)
 ---
 - error: 'trigger reset: incorrect arguments'
 ...
 -- use of nil to clear the trigger
-box.session.on_connect(nil, fail)
+session.on_connect(nil, fail)
 ---
 ...
-box.session.on_disconnect(nil, fail)
+session.on_disconnect(nil, fail)
 ---
 ...
 -- check how connect/disconnect triggers work
@@ -123,10 +123,10 @@ function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
 ---
 ...
-box.session.on_connect(inc)
+session.on_connect(inc)
 ---
 ...
-box.session.on_disconnect(dec)
+session.on_disconnect(dec)
 ---
 ...
 active_connections = 0
@@ -144,45 +144,45 @@ active_connections
 ...
 --# drop connection con_one
 --# drop connection con_two
-box.fiber.sleep(0) -- yield
+fiber.sleep(0) -- yield
 ---
 ...
 active_connections
 ---
 - 0
 ...
-box.session.on_connect(nil, inc)
+session.on_connect(nil, inc)
 ---
 ...
-box.session.on_disconnect(nil, dec)
+session.on_disconnect(nil, dec)
 ---
 ...
 -- write audit trail of connect/disconnect into a space
-function audit_connect() box.space['tweedledum']:insert{box.session.id()} end
+function audit_connect() box.space['tweedledum']:insert{session.id()} end
 ---
 ...
-function audit_disconnect() box.space['tweedledum']:delete{box.session.id()} end
+function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
 ---
 ...
-box.session.on_connect(audit_connect)
+session.on_connect(audit_connect)
 ---
 ...
-box.session.on_disconnect(audit_disconnect)
+session.on_disconnect(audit_disconnect)
 ---
 ...
 --# create connection con_three to default
 --# set connection con_three
-space:get{box.session.id()}[0] == box.session.id()
+space:get{session.id()}[0] == session.id()
 ---
 - true
 ...
 --# set connection default
 --# drop connection con_three
 -- cleanup
-box.session.on_connect(nil, audit_connect)
+session.on_connect(nil, audit_connect)
 ---
 ...
-box.session.on_disconnect(nil, audit_disconnect)
+session.on_disconnect(nil, audit_disconnect)
 ---
 ...
 active_connections
@@ -192,17 +192,17 @@ active_connections
 space:drop()
 ---
 ...
-box.session.uid()
+session.uid()
 ---
 - 1
 ...
-box.session.user()
+session.user()
 ---
 - admin
 ...
-box.fiber = nil
+fiber = nil
 ---
 ...
-box.session = nil
+session = nil
 ---
 ...

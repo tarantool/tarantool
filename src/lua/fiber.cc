@@ -44,25 +44,25 @@ extern "C" {
 /* {{{ box.fiber Lua library: access to Tarantool fibers
  *
  * Each fiber can be running, suspended or dead.
- * A fiber is created (box.fiber.create()) suspended.
- * It can be started with box.fiber.resume(), yield
- * the control back with box.fiber.yield() end
+ * A fiber is created (fiber.create()) suspended.
+ * It can be started with fiber.resume(), yield
+ * the control back with fiber.yield() end
  * with return or just by reaching the end of the
  * function.
  *
  * A fiber can also be attached or detached.
  * An attached fiber is a child of the creator,
  * and is running only if the creator has called
- * box.fiber.resume(). A detached fiber is a child of
+ * fiber.resume(). A detached fiber is a child of
  * Tarntool/Box internal 'sched' fiber, and gets
  * scheduled only if there is a libev event associated
  * with it.
  * To detach itself, a running fiber must invoke
- * box.fiber.detach().
+ * fiber.detach().
  * A detached fiber loses connection with its parent
  * forever.
  *
- * All fibers are part of the fiber registry, box.fiber.
+ * All fibers are part of the fiber registry, fiber.
  * This registry can be searched either by
  * fiber id (fid), which is numeric, or by fiber name,
  * which is a string. If there is more than one
@@ -87,11 +87,11 @@ extern "C" {
  * The other potential problem comes from detached
  * fibers which never get scheduled, because are subscribed
  * or get no events. Such morphing fibers can be killed
- * with box.fiber.cancel(), since box.fiber.cancel()
+ * with fiber.cancel(), since fiber.cancel()
  * sends an asynchronous wakeup event to the fiber.
  */
 
-static const char *fiberlib_name = "box.fiber";
+static const char *fiberlib_name = "fiber";
 
 enum fiber_state { DONE, YIELD, DETACH };
 
@@ -615,7 +615,7 @@ lbox_fiber_yield(struct lua_State *L)
 	fiber_setcancellable(false);
 	/*
 	 * Got resumed. Return whatever the caller has passed
-	 * to us with box.fiber.resume().
+	 * to us with fiber.resume().
 	 * As a side effect, the detached fiber which yields
 	 * to sched always gets back whatever it yields.
 	 */

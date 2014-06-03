@@ -48,7 +48,7 @@ enum { GUEST = 0, ADMIN =  1 };
 struct session {
 	/** Session id. */
 	uint32_t id;
-	/** File descriptor. */
+	/** File descriptor - socket of the connected peer. */
 	int fd;
 	/** Peer cookie - description of the peer. */
 	uint64_t cookie;
@@ -56,6 +56,7 @@ struct session {
 	int salt[SESSION_SEED_SIZE/sizeof(int)];
 	/** A look up key to quickly find session user. */
 	uint8_t auth_token;
+	/** User id of the authenticated user. */
 	uint32_t uid;
 };
 
@@ -123,4 +124,12 @@ session_free();
 
 void
 session_storage_cleanup(int sid);
+
+/** A helper class to create and set session in single-session fibers. */
+struct SessionGuard
+{
+	SessionGuard(int fd, uint64_t cookie);
+        ~SessionGuard();
+};
+
 #endif /* INCLUDES_TARANTOOL_SESSION_H */

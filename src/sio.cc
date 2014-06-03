@@ -27,7 +27,8 @@
  * SUCH DAMAGE.
  */
 #include "sio.h"
-
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/uio.h>
 #include <errno.h>
 #include <stdio.h>
@@ -67,18 +68,20 @@ sio_socketname(int fd)
 	static __thread char name[2 * SERVICE_NAME_MAXLEN];
 	int n = snprintf(name, sizeof(name), "fd %d", fd);
 	if (fd >= 0) {
-		struct sockaddr_in addr;
+		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof(addr);
 		int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
 		if (rc == 0) {
-			n += snprintf(name + n, sizeof(name) - n,
-				      ", aka %s", sio_strfaddr(&addr));
+			n += snprintf(name + n,
+				sizeof(name) - n, ", aka %s",
+				sio_strfaddr((struct sockaddr *)&addr));
 		}
 		addrlen = sizeof(addr);
 		rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
 		if (rc == 0) {
 			n += snprintf(name + n, sizeof(name) - n,
-				      ", peer of %s", sio_strfaddr(&addr));
+				      ", peer of %s",
+				      sio_strfaddr((struct sockaddr *)&addr));
 		}
 	}
 	return name;
@@ -138,6 +141,9 @@ sio_listen_backlog()
 int
 sio_socket(int domain, int type, int protocol)
 {
+	/* AF_UNIX can't use tcp protocol */
+	if (domain == AF_UNIX)
+		protocol = 0;
 	int fd = socket(domain, type, protocol);
 	if (fd < 0)
 		tnt_raise(SocketError, fd, "socket");
@@ -223,10 +229,10 @@ sio_listen(int fd)
 
 /** Accept a client connection on a server socket. */
 int
-sio_accept(int fd, struct sockaddr_in *addr, socklen_t *addrlen)
+sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	/* Accept a connection. */
-	int newfd = accept(fd, (struct sockaddr *) addr, addrlen);
+	int newfd = accept(fd, addr, addrlen);
 	if (newfd < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
 		tnt_raise(SocketError, fd, "accept");
 	return newfd;
@@ -390,7 +396,7 @@ sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size)
 /** Send a message on a socket. */
 ssize_t
 sio_sendto(int fd, const void *buf, size_t len, int flags,
-	   const struct sockaddr_in *dest_addr, socklen_t addrlen)
+	   const struct sockaddr *dest_addr, socklen_t addrlen)
 {
 	ssize_t n = sendto(fd, buf, len, flags, (struct sockaddr*)dest_addr,
 	                   addrlen);
@@ -403,7 +409,7 @@ sio_sendto(int fd, const void *buf, size_t len, int flags,
 /** Receive a message on a socket. */
 ssize_t
 sio_recvfrom(int fd, void *buf, size_t len, int flags,
-	     struct sockaddr_in *src_addr, socklen_t *addrlen)
+	     struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = recvfrom(fd, buf, len, flags, (struct sockaddr*)src_addr,
 	                     addrlen);
@@ -415,27 +421,43 @@ sio_recvfrom(int fd, void *buf, size_t len, int flags,
 
 /** Get socket peer name. */
 int
-sio_getpeername(int fd, struct sockaddr_in *addr)
+sio_getpeername(int fd, struct sockaddr *addr, socklen_t addrlen)
 {
-	socklen_t addrlen = sizeof(struct sockaddr_in);
-	if (getpeername(fd, (struct sockaddr *) addr, &addrlen) < 0) {
+	if (getpeername(fd, addr, &addrlen) < 0) {
 		say_syserror("getpeername");
 		return -1;
 	}
 	/* XXX: I've no idea where this is copy-pasted from. */
+	/*
 	if (addr->sin_addr.s_addr == 0) {
 		say_syserror("getpeername: empty peer");
 		return -1;
 	}
+	*/
 	return 0;
 }
 
 /** Pretty print a peer address. */
 const char *
-sio_strfaddr(struct sockaddr_in *addr)
+sio_strfaddr(struct sockaddr *addr)
 {
 	static __thread char name[SERVICE_NAME_MAXLEN];
-	snprintf(name, sizeof(name), "%s:%d",
-		 inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+	switch(addr->sa_family) {
+		case AF_UNIX:
+			snprintf(name, sizeof(name), "unix://%s",
+				((struct sockaddr_un *)addr)->sun_path);
+			break;
+		case AF_INET: {
+			struct sockaddr_in *in = (struct sockaddr_in *)addr;
+			snprintf(name, sizeof(name), "%s:%d",
+				 inet_ntoa(in->sin_addr), ntohs(in->sin_port));
+			break;
+		}
+		case AF_INET6: {
+			*name = 0;
+			inet_ntop(AF_INET6, addr, name, sizeof(name));
+			break;
+		}
+	}
 	return name;
 }

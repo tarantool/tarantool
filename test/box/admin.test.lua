@@ -122,7 +122,7 @@ function test_fiber(tbl)
     local num = {'fid', 'csw'}
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then
-            table.insert(failed, "require('box.fiber').info().<fiber_name>."..v)
+            table.insert(failed, "require('fiber').info().<fiber_name>."..v)
         else
             tmp[v] = nil
         end
@@ -140,7 +140,7 @@ function test_fiber(tbl)
 end;
 
 function test_box_fiber_info()
-    local tmp = require('box.fiber').info()
+    local tmp = require('fiber').info()
     local failed = {}
     for name, tbl in ipairs(tmp) do
         local bl, fld = test_fiber(tbl)
@@ -153,9 +153,9 @@ function test_box_fiber_info()
         end
     end
     if #tmp > 0 or #failed > 0 then
-        return "require('box.fiber').info is not ok. failed: ", tmp, failed
+        return "require('fiber').info is not ok. failed: ", tmp, failed
     else
-        return "require('box.fiber').info() is ok"
+        return "require('fiber').info() is ok"
     end
 end;
 

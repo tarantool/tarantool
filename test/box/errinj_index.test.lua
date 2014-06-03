@@ -1,3 +1,5 @@
+errinj = require('errinj')
+
 s = box.schema.create_space('tweedledum')
 s:create_index('primary')
 
@@ -11,7 +13,7 @@ res = {}
 for _, t in s.index[0]:pairs() do table.insert(res, t) end
 res
 
-box.errinj.set("ERRINJ_TREE_ALLOC", true)
+errinj.set("ERRINJ_TREE_ALLOC", true)
 
 res = {}
 for i = 1,10 do table.insert(res, s:get{i}) end
@@ -48,7 +50,7 @@ for i = 3501,4500 do s:insert{i, i} end
 s:delete{3}
 check_iter_and_size()
 
-box.errinj.set("ERRINJ_TREE_ALLOC", false)
+errinj.set("ERRINJ_TREE_ALLOC", false)
 
 for i = 4501,5500 do s:insert{i, i} end
 res = {}
@@ -63,3 +65,4 @@ for i = 5001,5010 do table.insert(res, (s:get{i})) end
 res
 s:drop()
 
+errinj = nil

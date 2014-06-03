@@ -10,7 +10,7 @@ ffi.cdef[[
     int errno_set(int new_errno);
 ]]
 
-local exports = require('box.errno')
+local exports = require('errno')
 exports.strerror = function(errno)
     if errno == nil then
         errno = ffi.C.errno_get()

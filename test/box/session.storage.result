@@ -1,67 +1,67 @@
-print('box.session.storage')
+print('session.storage')
 ---
 ...
-box.session = require('box.session')
+session = require('session')
 ---
 ...
-dump = function(data) return "'" .. require('box.json').encode(data) .. "'" end
+dump = function(data) return "'" .. require('json').encode(data) .. "'" end
 ---
 ...
-type(box.session.id())
+type(session.id())
 ---
 - number
 ...
-box.session.unknown_field
+session.unknown_field
 ---
 - null
 ...
-type(box.session.storage)
+type(session.storage)
 ---
 - table
 ...
-box.session.storage.abc = 'cde'
+session.storage.abc = 'cde'
 ---
 ...
-box.session.storage.abc
+session.storage.abc
 ---
 - cde
 ...
-all = getmetatable(box.session).aggregate_storage
+all = getmetatable(session).aggregate_storage
 ---
 ...
 dump(all)
 ---
-- '''[null,{"abc":"cde"}]'''
+- '''[null,null,{"abc":"cde"}]'''
 ...
 --# create connection second to default
 --# set connection second
-type(box.session.storage)
+type(session.storage)
 ---
 - table
 ...
-type(box.session.storage.abc)
+type(session.storage.abc)
 ---
 - nil
 ...
-box.session.storage.abc = 'def'
+session.storage.abc = 'def'
 ---
 ...
-box.session.storage.abc
+session.storage.abc
 ---
 - def
 ...
 --# set connection default
-box.session.storage.abc
+session.storage.abc
 ---
 - cde
 ...
 --# set connection second
-dump(all[box.session.id()])
+dump(all[session.id()])
 ---
 - '''{"abc":"def"}'''
 ...
 --# set connection default
-dump(all[box.session.id()])
+dump(all[session.id()])
 ---
 - '''{"abc":"cde"}'''
 ...
@@ -75,7 +75,7 @@ for k,v in pairs(all) do table.insert(tres1, v.abc) end
 ---
 ...
 --# drop connection second
-require('box.fiber').sleep(.01)
+require('fiber').sleep(.01)
 ---
 ...
 for k,v in pairs(all) do table.insert(tres2, v.abc) end
@@ -95,6 +95,6 @@ dump(tres2)
 ---
 - '''["cde"]'''
 ...
-box.session = nil
+session = nil
 ---
 ...

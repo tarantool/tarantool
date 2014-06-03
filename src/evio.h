@@ -80,7 +80,7 @@ struct evio_service
 	 * accepted socket is closed.
 	 */
 	void (*on_accept)(struct evio_service *, int,
-			  struct sockaddr_in *);
+			  struct sockaddr *, socklen_t);
 	void *on_accept_param;
 
 	/** libev timer object for the bind retry delay. */
@@ -96,7 +96,7 @@ evio_service_init(ev_loop *loop,
 		  struct evio_service *service, const char *name,
 		  const char *uri,
 		  void (*on_accept)(struct evio_service *,
-				    int, struct sockaddr_in *),
+				    int, struct sockaddr *, socklen_t),
 		  void *on_accept_param);
 
 /** Set an optional callback to be invoked upon a successful bind. */
@@ -145,7 +145,7 @@ evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 }
 
 void
-evio_setsockopt_tcp(int fd);
+evio_setsockopt_tcp(int fd, int family);
 
 void
 evio_setsockopt_tcpserver(int fd);

@@ -24,7 +24,7 @@ replica.vardir = os.path.join(server.vardir, 'replica')
 replica.deploy()
 
 master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
-replica.admin("while box.space['_priv']:len() < 1 do require('box.fiber').sleep(0.01) end")
+replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
 master.admin("s:create_index('primary', {type = 'hash'})")
 

@@ -1,4 +1,4 @@
--- box.digest.lua (internal file)
+-- digest.lua (internal file)
 
 do
 

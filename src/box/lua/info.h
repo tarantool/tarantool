@@ -1,5 +1,6 @@
-#ifndef TARANTOOL_LUA_ADMIN_H_INCLUDED
-#define TARANTOOL_LUA_ADMIN_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_LUA_INFO_H
+#define INCLUDES_TARANTOOL_LUA_INFO_H
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,9 +31,6 @@
  */
 
 struct lua_State;
-/**
-* Initialize lua admin bindings
-*/
-int tarantool_lua_admin_init(struct lua_State *L);
+void box_lua_info_init(struct lua_State *L);
 
-#endif /* TARANTOOL_LUA_ADMIN_H_INCLUDED */
+#endif /* INCLUDES_TARANTOOL_LUA_INFO_H */

@@ -1,42 +1,42 @@
-print('box.session.storage')
-box.session = require('box.session')
+print('session.storage')
+session = require('session')
 
-dump = function(data) return "'" .. require('box.json').encode(data) .. "'" end
+dump = function(data) return "'" .. require('json').encode(data) .. "'" end
 
 
-type(box.session.id())
-box.session.unknown_field
+type(session.id())
+session.unknown_field
 
-type(box.session.storage)
-box.session.storage.abc = 'cde'
-box.session.storage.abc
+type(session.storage)
+session.storage.abc = 'cde'
+session.storage.abc
 
-all = getmetatable(box.session).aggregate_storage
+all = getmetatable(session).aggregate_storage
 dump(all)
 
 --# create connection second to default
 --# set connection second
 
-type(box.session.storage)
-type(box.session.storage.abc)
-box.session.storage.abc = 'def'
-box.session.storage.abc
+type(session.storage)
+type(session.storage.abc)
+session.storage.abc = 'def'
+session.storage.abc
 
 --# set connection default
 
-box.session.storage.abc
+session.storage.abc
 
 --# set connection second
-dump(all[box.session.id()])
+dump(all[session.id()])
 
 --# set connection default
-dump(all[box.session.id()])
+dump(all[session.id()])
 tres1 = {}
 tres2 = {}
 for k,v in pairs(all) do table.insert(tres1, v.abc) end
 
 --# drop connection second
-require('box.fiber').sleep(.01)
+require('fiber').sleep(.01)
 for k,v in pairs(all) do table.insert(tres2, v.abc) end
 
 table.sort(tres1)
@@ -44,4 +44,4 @@ table.sort(tres2)
 dump(tres1)
 dump(tres2)
 
-box.session = nil
+session = nil

@@ -214,8 +214,184 @@ itr_check()
 	footer();
 }
 
+static void
+itr_invalidate_check()
+{
+	header();
+
+	const long test_size = 300;
+	const long max_delete_count = 100;
+	const long max_insert_count = 200;
+	const long attempt_count = 100;
+	struct bps_tree_test_iterator iterators[test_size];
+
+	struct bps_tree_test tree;
+
+	/* invalidation during deletion */
+	srand(0);
+	for (long attempt = 0; attempt < attempt_count; attempt++) {
+		long del_pos = rand() % test_size;
+		long del_cnt = rand() % max_delete_count + 1;
+		if (del_pos + del_cnt > test_size)
+			del_cnt = test_size - del_pos;
+		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+
+		for (long i = 0; i < test_size; i++) {
+			elem_t e;
+			e.first = i * test_size * 2;
+			e.second = i * test_size * 2;
+			bps_tree_test_insert(&tree, e, 0);
+		}
+		iterators[0] = bps_tree_test_itr_first(&tree);
+		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		for (long i = 1; i < test_size; i++) {
+			iterators[i] = iterators[i - 1];
+			bps_tree_test_itr_next(&tree, iterators + i);
+			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+		}
+		for (long i = del_pos; i < del_pos + del_cnt; i++) {
+			elem_t e;
+			e.first = i * test_size * 2;
+			e.second = i * test_size * 2;
+			bool res = bps_tree_test_delete(&tree, e);
+			assert(res);
+		}
+		for (long i = 0; i < test_size; i++) {
+			do {
+				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				if (e) {
+					if (e->first != e->second)
+						fail("unexpected result of getting elem (1)", "true");
+					if (e->first % (test_size * 2))
+						fail("unexpected result of getting elem (2)", "true");
+					long v = e->first / (test_size * 2);
+					if ( (v < 0 || v >= del_pos) && (v < del_pos + del_cnt || v >= test_size) )
+						fail("unexpected result of getting elem (3)", "true");
+				}
+			} while(bps_tree_test_itr_next(&tree, iterators + i));
+		}
+		bps_tree_test_destroy(&tree);
+	}
+
+	/* invalidation during insertion */
+	srand(0);
+	for (long attempt = 0; attempt < attempt_count; attempt++) {
+		long ins_pos = rand() % test_size;
+		long ins_cnt = rand() % max_insert_count + 1;
+		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+
+		for (long i = 0; i < test_size; i++) {
+			elem_t e;
+			e.first = i * test_size * 2;
+			e.second = i * test_size * 2;
+			bps_tree_test_insert(&tree, e, 0);
+		}
+		iterators[0] = bps_tree_test_itr_first(&tree);
+		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		for (long i = 1; i < test_size; i++) {
+			iterators[i] = iterators[i - 1];
+			bps_tree_test_itr_next(&tree, iterators + i);
+			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+		}
+		for (long i = 0; i < ins_cnt; i++) {
+			elem_t e;
+			e.first = ins_pos * test_size * 2 + i + 1;
+			e.second = e.first;
+			bool res = bps_tree_test_insert(&tree, e, 0);
+			assert(res);
+		}
+		for (long i = 0; i < test_size; i++) {
+			do {
+				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				if (e) {
+					if (e->first != e->second)
+						fail("unexpected result of getting elem (4)", "true");
+					if (e->first % (test_size * 2)) {
+						long v = e->first / (test_size * 2);
+						long u = e->first % (test_size * 2);
+						if (v != ins_pos)
+							fail("unexpected result of getting elem (5)", "true");
+						if (u <= 0 || u > ins_cnt)
+							fail("unexpected result of getting elem (6)", "true");
+					} else {
+						long v = e->first / (test_size * 2);
+						if ( (v < 0 || v >= test_size) )
+							fail("unexpected result of getting elem (7)", "true");
+					}
+				}
+			} while(bps_tree_test_itr_next(&tree, iterators + i));
+		}
+		bps_tree_test_destroy(&tree);
+	}
+
+	/* invalidation during deletion and insertion */
+	srand(0);
+	for (long attempt = 0; attempt < attempt_count; attempt++) {
+		long del_pos = rand() % test_size;
+		long del_cnt = rand() % max_delete_count + 1;
+		long ins_pos = rand() % test_size;
+		long ins_cnt = rand() % max_insert_count + 1;
+		if (del_pos + del_cnt > test_size)
+			del_cnt = test_size - del_pos;
+		bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
+
+		for (long i = 0; i < test_size; i++) {
+			elem_t e;
+			e.first = i * test_size * 2;
+			e.second = i * test_size * 2;
+			bps_tree_test_insert(&tree, e, 0);
+		}
+		iterators[0] = bps_tree_test_itr_first(&tree);
+		assert(bps_tree_test_itr_get_elem(&tree, iterators));
+		for (long i = 1; i < test_size; i++) {
+			iterators[i] = iterators[i - 1];
+			bps_tree_test_itr_next(&tree, iterators + i);
+			assert(bps_tree_test_itr_get_elem(&tree, iterators + i));
+		}
+		for (long i = del_pos; i < del_pos + del_cnt; i++) {
+			elem_t e;
+			e.first = i * test_size * 2;
+			e.second = i * test_size * 2;
+			bool res = bps_tree_test_delete(&tree, e);
+			assert(res);
+		}
+		for (long i = 0; i < ins_cnt; i++) {
+			elem_t e;
+			e.first = ins_pos * test_size * 2 + i + 1;
+			e.second = e.first;
+			bool res = bps_tree_test_insert(&tree, e, 0);
+			assert(res);
+		}
+		for (long i = 0; i < test_size; i++) {
+			do {
+				elem_t *e = bps_tree_test_itr_get_elem(&tree, iterators + i);
+				if (e) {
+					if (e->first != e->second)
+						fail("unexpected result of getting elem (8)", "true");
+					if (e->first % (test_size * 2)) {
+						long v = e->first / (test_size * 2);
+						long u = e->first % (test_size * 2);
+						if (v != ins_pos)
+							fail("unexpected result of getting elem (9)", "true");
+						if (u <= 0 || u > ins_cnt)
+							fail("unexpected result of getting elem (a)", "true");
+					} else {
+						long v = e->first / (test_size * 2);
+						if ( (v < 0 || v >= del_pos) && (v < del_pos + del_cnt || v >= test_size) )
+							fail("unexpected result of getting elem (b)", "true");
+					}
+				}
+			} while(bps_tree_test_itr_next(&tree, iterators + i));
+		}
+		bps_tree_test_destroy(&tree);
+	}
+
+	footer();
+}
+
 int
 main(void)
 {
 	itr_check();
+	itr_invalidate_check();
 }

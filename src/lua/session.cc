@@ -41,7 +41,7 @@ extern "C" {
 #include <session.h>
 #include <sio.h>
 
-static const char *sessionlib_name = "box.session";
+static const char *sessionlib_name = "session";
 
 /**
  * Return a unique monotonic session
@@ -151,10 +151,11 @@ lbox_session_peer(struct lua_State *L)
 		luaL_checkint(L, -1) : fiber()->session->id;
 
 	int fd = session_fd(sid);
-	struct sockaddr_in addr;
-	sio_getpeername(fd, &addr);
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof(addr);
+	sio_getpeername(fd, (struct sockaddr *)&addr, addrlen);
 
-	lua_pushstring(L, sio_strfaddr(&addr));
+	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr));
 	return 1;
 }
 
@@ -196,7 +197,7 @@ session_storage_cleanup(int sid)
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		if (!lua_istable(L, -1))
 			goto exit;
-		lua_getfield(L, -1, "box.session");
+		lua_getfield(L, -1, "session");
 		if (!lua_istable(L, -1))
 			goto exit;
 		lua_getmetatable(L, -1);

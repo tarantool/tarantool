@@ -1,4 +1,4 @@
-box.fiber = require('box.fiber')
+fiber = require('fiber')
 ---
 ...
 space = box.schema.create_space('tweedledum')
@@ -202,18 +202,16 @@ remote:call('box.space.tweedledum:select', {123})
 ---
 - - [123, 'test1', 'test2']
 ...
-slf, foo = box.call_loadproc('box.net.self:select')
+slf, foo = require('box.internal').call_loadproc('box.net.self:select')
 ---
-- error: '[string "slf, foo = box.call_loadproc(''box.net.self:se..."]:1: attempt
-    to call field ''call_loadproc'' (a nil value)'
 ...
 type(slf)
 ---
-- nil
+- function
 ...
 type(foo)
 ---
-- nil
+- table
 ...
 space:update(123, {{'=', 1, 'test1-updated'}})
 ---
@@ -337,23 +335,23 @@ box.net.self:delete(space.id, 12346)
 ---
 - [12346, 'test1', 'test2']
 ...
-remote:call('box.fiber.sleep', .01)
+remote:call('fiber.sleep', .01)
 ---
 - []
 ...
-remote:timeout(0.01):call('box.fiber.sleep', 10)
+remote:timeout(0.01):call('fiber.sleep', 10)
 ---
 - null
 ...
 --# setopt delimiter ';'
-pstart = box.fiber.time();
+pstart = fiber.time();
 ---
 ...
 parallel = {};
 ---
 ...
 function parallel_foo(id)
-    box.fiber.sleep(math.random() * .05)
+    fiber.sleep(math.random() * .05)
     return id
 end;
 ---
@@ -363,10 +361,10 @@ parallel_foo('abc');
 - abc
 ...
 for i = 1, 20 do
-    box.fiber.resume(
-        box.fiber.create(
+    fiber.resume(
+        fiber.create(
             function()
-                box.fiber.detach()
+                fiber.detach()
                 local s = string.format('%07d', i)
                 local so = remote:call('parallel_foo', s)
                 table.insert(parallel, s == so[1][0])
@@ -380,7 +378,7 @@ for i = 1, 20 do
     if #parallel == 20 then
         break
     end
-    box.fiber.sleep(0.1)
+    fiber.sleep(0.1)
 end;
 ---
 ...
@@ -412,7 +410,7 @@ parallel
 ---
 - 20
 ...
-box.fiber.time() - pstart < 0.5
+fiber.time() - pstart < 0.5
 ---
 - true
 ...
@@ -438,16 +436,19 @@ remote:close()
 ...
 remote:close()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:541: box.net.box: already closed'
+- error: '[string "-- box_net.lua (internal file)..."]:542: box.net.box: already closed'
 ...
 remote:ping()
 ---
-- error: '[string "-- box_net.lua (internal file)..."]:546: box.net.box: connection
+- error: '[string "-- box_net.lua (internal file)..."]:547: box.net.box: connection
     was closed'
 ...
 space:drop()
 ---
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+---
+...
+fiber = nil
 ---
 ...

@@ -1,7 +1,12 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
-local session = require('box.session')
+local session = require('session')
+local msgpackffi = require('msgpackffi')
+local fun = require('fun')
+local internal = require('box.internal')
+
+local builtin = ffi.C
 
 ffi.cdef[[
     struct space *space_by_id(uint32_t id);
@@ -37,11 +42,6 @@ ffi.cdef[[
     void password_prepare(const char *password, int len,
 		                  char *out, int out_len);
 ]]
-local builtin = ffi.C
-local msgpackffi = require('box.msgpackffi')
-local fun = require('fun')
-
-local internal = require('box.internal')
 
 local function user_resolve(user)
     local _user = box.space[box.schema.USER_ID]

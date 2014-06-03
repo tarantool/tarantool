@@ -1,4 +1,4 @@
-box.fiber = require('box.fiber')
+fiber = require('fiber')
 space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 -- A test case for a race condition between ev_schedule
@@ -67,22 +67,22 @@ space:truncate()
 
 --# setopt delimiter ';'
 function y()
-    box.fiber.detach('started')
+    fiber.detach('started')
     space = box.space['tweedledum']
     while true do
         space:replace{1953719668, os.time()}
-        box.fiber.sleep(0.001)
+        fiber.sleep(0.001)
     end
 end;
-f = box.fiber.create(y);
-box.fiber.resume(f);
-box.fiber.sleep(0.002);
-box.fiber.cancel(f);
-box.fiber.resume(f);
+f = fiber.create(y);
+fiber.resume(f);
+fiber.sleep(0.002);
+fiber.cancel(f);
+fiber.resume(f);
 for k = 1, 1000, 1 do
-    box.fiber.create(
+    fiber.create(
         function()
-            box.fiber.detach()
+            fiber.detach()
         end
     )
 end;
@@ -90,29 +90,29 @@ end;
 
 collectgarbage('collect')
 -- check that these newly created fibers are garbage collected
-box.fiber.find(900)
-box.fiber.find(910)
-box.fiber.find(920)
-box.fiber.find()
-box.fiber.find('test')
+fiber.find(900)
+fiber.find(910)
+fiber.find(920)
+fiber.find()
+fiber.find('test')
 --  https://github.com/tarantool/tarantool/issues/131
---  box.fiber.resume(box.fiber.cancel()) -- hang
-f = box.fiber.create(function() box.fiber.cancel(box.fiber.self()) end)
-box.fiber.resume(f)
+--  fiber.resume(fiber.cancel()) -- hang
+f = fiber.create(function() fiber.cancel(fiber.self()) end)
+fiber.resume(f)
 f = nil
 -- https://github.com/tarantool/tarantool/issues/119
-ftest = function() box.fiber.sleep(0.01 * math.random() ) return true end
+ftest = function() fiber.sleep(0.01 * math.random() ) return true end
 
 --# setopt delimiter ';'
 for i = 1, 10 do
     result = {}
     for j = 1, 300 do
-        box.fiber.resume(box.fiber.create(function()
-            box.fiber.detach()
+        fiber.resume(fiber.create(function()
+            fiber.detach()
             table.insert(result, ftest())
         end))
     end
-    while #result < 300 do box.fiber.sleep(0.01) end
+    while #result < 300 do fiber.sleep(0.01) end
 end;
 --# setopt delimiter ''
 #result
@@ -120,17 +120,17 @@ end;
 --# setopt delimiter ''
 --
 -- 
---  Test box.fiber.wrap()
+--  Test fiber.wrap()
 -- 
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
-f = function() box.fiber.wrap(f) end
+f = function() fiber.wrap(f) end
 f()
 -- 
 -- Test argument passing
 -- 
-f = function(a, b) box.fiber.wrap(function(arg) result = arg end, a..b) end
+f = function(a, b) fiber.wrap(function(arg) result = arg end, a..b) end
 f('hello ', 'world')
 result
 f('bye ', 'world')
@@ -138,140 +138,140 @@ result
 -- 
 -- Test that the created fiber is detached
 -- 
-box.fiber.wrap(function() result = box.fiber.status() end)
+fiber.wrap(function() result = fiber.status() end)
 result
 -- A test case for Bug#933487
 -- tarantool crashed during shutdown if non running LUA fiber
 -- was created
-f = box.fiber.create(function () return true end)
+f = fiber.create(function () return true end)
 box.snapshot()
 box.snapshot()
 box.snapshot()
-box.fiber.resume(f)
-f = box.fiber.create(function () return true end)
+fiber.resume(f)
+f = fiber.create(function () return true end)
 
-box.fiber.sleep(0)
-box.fiber.sleep(0.01)
-box.fiber.sleep(0.0001)
-box.fiber.sleep('hello')
-box.fiber.sleep(box, 0.001)
-box.fiber.cancel(box.fiber.self())
-f = box.fiber.self()
+fiber.sleep(0)
+fiber.sleep(0.01)
+fiber.sleep(0.0001)
+fiber.sleep('hello')
+fiber.sleep(box, 0.001)
+fiber.cancel(fiber.self())
+f = fiber.self()
 old_id = f:id()
-box.fiber.cancel(f)
-box.fiber.self():id() - old_id < 3
-box.fiber.cancel(box.fiber.self())
-box.fiber.self():id() - old_id < 5
-g = box.fiber.self()
+fiber.cancel(f)
+fiber.self():id() - old_id < 3
+fiber.cancel(fiber.self())
+fiber.self():id() - old_id < 5
+g = fiber.self()
 f==g
-function r() f = box.fiber.create(r) return (box.fiber.resume(f)) end
+function r() f = fiber.create(r) return (fiber.resume(f)) end
 r()
-f = box.fiber.create(print('hello')
-box.fiber.resume(f)
+f = fiber.create(print('hello'))
+fiber.resume(f)
 -- test passing arguments in and out created fiber
 function r(a, b) return a, b end
-f=box.fiber.create(r)
-box.fiber.resume(f)
-f=box.fiber.create(r)
-box.fiber.resume(f, 'hello')
-f=box.fiber.create(r)
-box.fiber.resume(f, 'hello', 'world')
-f=box.fiber.create(r)
-box.fiber.resume(f, 'hello', 'world', 'wide')
-function y(a, b) c=box.fiber.yield(a) return box.fiber.yield(b, c) end
-f=box.fiber.create(y)
-box.fiber.resume(f, 'hello', 'world')
-box.fiber.resume(f, 'wide')
-box.fiber.resume(f)
-function y() box.fiber.detach() while true do box.replace(0, 1953719668, os.time()) box.fiber.sleep(0.001) end end
-f = box.fiber.create(y)
-box.fiber.resume(f)
-box.fiber.sleep(0.002)
-box.fiber.cancel(f)
-box.fiber.resume(f)
+f=fiber.create(r)
+fiber.resume(f)
+f=fiber.create(r)
+fiber.resume(f, 'hello')
+f=fiber.create(r)
+fiber.resume(f, 'hello', 'world')
+f=fiber.create(r)
+fiber.resume(f, 'hello', 'world', 'wide')
+function y(a, b) c=fiber.yield(a) return fiber.yield(b, c) end
+f=fiber.create(y)
+fiber.resume(f, 'hello', 'world')
+fiber.resume(f, 'wide')
+fiber.resume(f)
+function y() fiber.detach() while true do box.replace(0, 1953719668, os.time()) fiber.sleep(0.001) end end
+f = fiber.create(y)
+fiber.resume(f)
+fiber.sleep(0.002)
+fiber.cancel(f)
+fiber.resume(f)
 f=nil
-for k=1, 10000, 1 do box.fiber.create(function() box.fiber.detach() end) end
+for k=1, 10000, 1 do fiber.create(function() fiber.detach() end) end
 collectgarbage('collect')
 -- check that these newly created fibers are garbage collected
-box.fiber.find(9000)
-box.fiber.find(9010)
-box.fiber.find(9020)
+fiber.find(9000)
+fiber.find(9010)
+fiber.find(9020)
 
---  test box.fiber.status functions: invalid arguments
-box.fiber.status(1)
-box.fiber.status('fafa-gaga')
-box.fiber.status(nil)
+--  test fiber.status functions: invalid arguments
+fiber.status(1)
+fiber.status('fafa-gaga')
+fiber.status(nil)
 
---  A test case for Bug#911641 box.fiber.sleep() works incorrectly if
+--  A test case for Bug#911641 fiber.sleep() works incorrectly if
 --  a fiber is attached.
-function r() return box.fiber.sleep(0.01) end
-f = box.fiber.create(r)
-box.fiber.resume(f)
-box.fiber.resume(f)
+function r() return fiber.sleep(0.01) end
+f = fiber.create(r)
+fiber.resume(f)
+fiber.resume(f)
 --# setopt delimiter ';'
 function r()
-    box.fiber.yield(box.space.tweedledum:insert{0, 0, 1})
-    box.fiber.yield(box.space.tweedledum:get{0})
-    box.fiber.yield(box.space.tweedledum:truncate())
+    fiber.yield(box.space.tweedledum:insert{0, 0, 1})
+    fiber.yield(box.space.tweedledum:get{0})
+    fiber.yield(box.space.tweedledum:truncate())
 end;
 --# setopt delimiter ''
-f = box.fiber.create(r)
-box.fiber.resume(f)
-box.fiber.resume(f)
-box.fiber.resume(f)
-box.fiber.resume(f)
-function r() return box.fiber.yield(box.fiber.create(r)) end
+f = fiber.create(r)
+fiber.resume(f)
+fiber.resume(f)
+fiber.resume(f)
+fiber.resume(f)
+function r() return fiber.yield(fiber.create(r)) end
 f = r()
-f1 = box.fiber.resume(f)
-f2 = box.fiber.resume(f1)
-f3 = box.fiber.resume(f2)
-f4 = box.fiber.resume(f3)
-f5 = box.fiber.resume(f4)
-f6 = box.fiber.resume(f5)
-f7 = box.fiber.resume(f6)
-f8 = box.fiber.resume(f7)
-f9 = box.fiber.resume(f8)
-f10 = box.fiber.resume(f9)
-f11 = box.fiber.resume(f10)
-f12 = box.fiber.resume(f11)
-f13 = box.fiber.resume(f12)
-f14 = box.fiber.resume(f13)
-f15 = box.fiber.resume(f14)
-f16 = box.fiber.resume(f15)
-f17 = box.fiber.resume(f16)
-box.fiber.resume(f)
-box.fiber.resume(f1)
-box.fiber.resume(f2)
-box.fiber.resume(f3)
-box.fiber.resume(f4)
-box.fiber.resume(f5)
-box.fiber.resume(f6)
-box.fiber.resume(f7)
-box.fiber.resume(f8)
-box.fiber.resume(f9)
-box.fiber.resume(f10)
-box.fiber.resume(f11)
-box.fiber.resume(f12)
-box.fiber.resume(f13)
-box.fiber.resume(f14)
-box.fiber.resume(f15)
-box.fiber.resume(f16)
+f1 = fiber.resume(f)
+f2 = fiber.resume(f1)
+f3 = fiber.resume(f2)
+f4 = fiber.resume(f3)
+f5 = fiber.resume(f4)
+f6 = fiber.resume(f5)
+f7 = fiber.resume(f6)
+f8 = fiber.resume(f7)
+f9 = fiber.resume(f8)
+f10 = fiber.resume(f9)
+f11 = fiber.resume(f10)
+f12 = fiber.resume(f11)
+f13 = fiber.resume(f12)
+f14 = fiber.resume(f13)
+f15 = fiber.resume(f14)
+f16 = fiber.resume(f15)
+f17 = fiber.resume(f16)
+fiber.resume(f)
+fiber.resume(f1)
+fiber.resume(f2)
+fiber.resume(f3)
+fiber.resume(f4)
+fiber.resume(f5)
+fiber.resume(f6)
+fiber.resume(f7)
+fiber.resume(f8)
+fiber.resume(f9)
+fiber.resume(f10)
+fiber.resume(f11)
+fiber.resume(f12)
+fiber.resume(f13)
+fiber.resume(f14)
+fiber.resume(f15)
+fiber.resume(f16)
 f17 = nil
-function r() box.fiber.detach() box.fiber.sleep(1000) end
-f = box.fiber.create(r)
-box.fiber.resume(f)
-box.fiber.resume(f)
-box.fiber.cancel(f)
-box.fiber.resume(f)
---  Test box.fiber.name()
-old_name = box.fiber.name()
-box.fiber.name() == old_name
-box.fiber.self():name() == old_name
-box.fiber.name('hello fiber')
-box.fiber.name()
-box.fiber.self():name('bye fiber')
-box.fiber.self():name()
-box.fiber.self():name(old_name)
+function r() fiber.detach() fiber.sleep(1000) end
+f = fiber.create(r)
+fiber.resume(f)
+fiber.resume(f)
+fiber.cancel(f)
+fiber.resume(f)
+--  Test fiber.name()
+old_name = fiber.name()
+fiber.name() == old_name
+fiber.self():name() == old_name
+fiber.name('hello fiber')
+fiber.name()
+fiber.self():name('bye fiber')
+fiber.self():name()
+fiber.self():name(old_name)
 
 space:drop()
 
@@ -280,11 +280,11 @@ dofile("fiber.lua")
 -- print run fiber's test
 box_fiber_run_test()
 
-function testfun() while true do box.fiber.sleep(10) end end
-f = box.fiber.wrap(testfun)
+function testfun() while true do fiber.sleep(10) end end
+f = fiber.wrap(testfun)
 f:cancel()
 f:resume()
-fib_id = box.fiber.wrap(testfun):id()
-box.fiber.find(fib_id):cancel()
-box.fiber.find(fib_id)
+fib_id = fiber.wrap(testfun):id()
+fiber.find(fib_id):cancel()
+fiber.find(fib_id)
 box.fiber = nil

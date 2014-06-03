@@ -276,6 +276,6 @@ tarantool_lua_ipc_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "box.fiber", ipc_meta);
+	luaL_register_module(L, "fiber", ipc_meta);
 	lua_pop(L, 1);
 }

@@ -1,4 +1,4 @@
-errno = require('box.errno')
+errno = require('errno')
 ---
 ...
 type(errno)
@@ -26,4 +26,7 @@ errno(errno.EBADF) ~= errno.EINVAL, errno() == errno.EBADF
 errno.strerror(errno.EINVAL)
 ---
 - Invalid argument
+...
+errno = nil
+---
 ...

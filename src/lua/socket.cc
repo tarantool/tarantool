@@ -52,7 +52,7 @@ extern "C" {
 #include <stdlib.h>
 #include <mutex.h>
 
-static const char socketlib_name[] = "box.socket";
+static const char socketlib_name[] = "socket";
 
 /**
  * gethostbyname(), getaddrinfo() and friends do not use
@@ -107,7 +107,7 @@ bio_checksocket(struct lua_State *L, int narg)
 {
 	/* avoiding unnecessary luajit assert */
 	if (lua_gettop(L) < narg)
-		luaL_error(L, "box.socket: incorrect method call");
+		luaL_error(L, "socket: incorrect method call");
 	return (struct bio_socket *) luaL_checkudata(L, narg, socketlib_name);
 }
 
@@ -116,7 +116,7 @@ bio_checkactivesocket(struct lua_State *L, int narg)
 {
 	struct bio_socket *s = bio_checksocket(L, narg);
 	if (! evio_is_active(&s->io_w))
-		luaL_error(L, "box.socket: socket is not initialized");
+		luaL_error(L, "socket: socket is not initialized");
 	return s;
 }
 
@@ -138,7 +138,7 @@ bio_initbuf(struct bio_socket *s)
 	assert(s->iob == NULL);
 	char name[FIBER_NAME_MAX];
 	const char *type = s->socktype == SOCK_STREAM ? "tcp" : "udp";
-	snprintf(name, sizeof(name), "box.io.%s(%d)",
+	snprintf(name, sizeof(name), "socket.%s(%d)",
 		 type, s->io_w.fd);
 	s->iob = iobuf_new(name);
 }
@@ -213,7 +213,7 @@ lbox_socket_tostring(struct lua_State *L)
 }
 
 /**
- * box.io.tcp()
+ * socket.tcp()
  *
  * Create SOCK_STREAM socket object.
  */
@@ -224,7 +224,7 @@ lbox_socket_tcp(struct lua_State *L)
 }
 
 /**
- * box.io.udp()
+ * socket.udp()
  *
  * Create SOCK_DGRAM socket object.
  */
@@ -496,7 +496,7 @@ readline_state_init(struct lua_State *L, struct readline_state *rs, int idx)
 		rs[i].pos = 0;
 		rs[i].sep = luaL_checklstring(L, -1, &rs[i].sep_size);
 		if (rs[i].sep_size == 0)
-			luaL_error(L, "box.io.readline: bad separator");
+			luaL_error(L, "socket.readline: bad separator");
 		lua_pop(L, 1);
 		i++;
 	}
@@ -551,7 +551,7 @@ lbox_socket_readline_opts(struct lua_State *L, unsigned int *limit,
 			lbox_socket_readline_cr(L);
 			seplist = 3;
 		} else if (! lua_istable(L, 2))
-			luaL_error(L, "box.io.readline: bad argument");
+			luaL_error(L, "socket.readline: bad argument");
 		break;
 	case 3:
 		/* readline(limit, timeout)
@@ -565,11 +565,11 @@ lbox_socket_readline_opts(struct lua_State *L, unsigned int *limit,
 				seplist = 4;
 				break;
 			} else if (! lua_istable(L, 3))
-				luaL_error(L, "box.io.readline: bad argument");
+				luaL_error(L, "socket.readline: bad argument");
 			seplist = 3;
 			break;
 		} else if (! lua_istable(L, 2))
-			luaL_error(L, "box.io.readline: bad argument");
+			luaL_error(L, "socket.readline: bad argument");
 		*timeout = luaL_checknumber(L, 3);
 		seplist = 2;
 		break;
@@ -577,12 +577,12 @@ lbox_socket_readline_opts(struct lua_State *L, unsigned int *limit,
 		/* readline(limit, {seplist}, timeout) */
 		*limit = luaL_checkint(L, 2);
 		if (! lua_istable(L, 3))
-			luaL_error(L, "box.io.readline: bad argument");
+			luaL_error(L, "socket.readline: bad argument");
 		seplist = 3;
 		*timeout = luaL_checknumber(L, 4);
 		break;
 	default:
-		luaL_error(L, "box.io.readline: bad argument");
+		luaL_error(L, "socket.readline: bad argument");
 		break;
 	}
 	return seplist;
@@ -624,7 +624,7 @@ lbox_socket_readline(struct lua_State *L)
 
 	int rs_size = lua_objlen(L, seplist);
 	if (rs_size == 0)
-		luaL_error(L, "box.io.readline: bad separator table");
+		luaL_error(L, "socket.readline: bad separator table");
 
 	/* acquire read lock */
 	ev_tstamp start, delay;
@@ -781,7 +781,7 @@ lbox_socket_accept(struct lua_State *L)
 	bio_pushsocket(L, SOCK_STREAM);
 	struct bio_socket *client = (struct bio_socket *) lua_touserdata(L, -1);
 	try {
-		client->io_w.fd = coio_accept(&s->io_w, (struct sockaddr_in*)&addr,
+		client->io_w.fd = coio_accept(&s->io_w, (struct sockaddr*)&addr,
 					     sizeof(addr), timeout);
 		client->io_r.fd = client->io_w.fd;
 	} catch (SocketError *e) {
@@ -853,7 +853,7 @@ lbox_socket_sendto(struct lua_State *L)
 		if (! evio_is_active(&s->io_w))
 			evio_socket(&s->io_w, addr->sa_family, s->socktype, 0);
 		nwr = coio_sendto_timeout(&s->io_w, buf, buf_size, 0,
-					  (struct sockaddr_in*)addr, addrlen, delay);
+			addr, addrlen, delay);
 		if (a) {
 			freeaddrinfo(a);
 		}
@@ -903,7 +903,7 @@ lbox_socket_recvfrom(struct lua_State *L)
 	try {
 		ibuf_reserve(in, buf_size);
 		nrd = coio_recvfrom_timeout(&s->io_w, in->pos, buf_size, 0,
-					    (struct sockaddr_in*)&addr,
+					    (struct sockaddr*)&addr,
 					    sizeof(addr), timeout);
 	} catch (SocketError *e) {
 		return bio_pushrecverror(L, s, errno);

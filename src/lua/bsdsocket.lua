@@ -4,10 +4,10 @@ do
 
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 
-local ffi = require 'ffi'
-local boxerrno = require('box.errno')
-local internal = require('box.socket.internal')
-local boxfiber = require('box.fiber')
+local ffi = require('ffi')
+local boxerrno = require('errno')
+local internal = require('socket.internal')
+local boxfiber = require('fiber')
 
 ffi.cdef[[
     typedef uint32_t socklen_t;
@@ -855,10 +855,10 @@ socket_mt = {
         end
 }
 
-if package.loaded['box.socket'] == nil then
-    package.loaded['box.socket'] = {}
+if package.loaded['socket'] == nil then
+    package.loaded['socket'] = {}
 end
-setmetatable(package.loaded['box.socket'], {
+setmetatable(package.loaded['socket'], {
     __call = create_socket,
     __index = {
         getaddrinfo = getaddrinfo,

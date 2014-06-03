@@ -81,6 +81,6 @@ static const struct luaL_reg errinjlib[] = {
 void
 tarantool_lua_errinj_init(struct lua_State *L)
 {
-	luaL_register(L, "box.errinj", errinjlib);
+	luaL_register(L, "errinj", errinjlib);
 	lua_pop(L, 1);
 }

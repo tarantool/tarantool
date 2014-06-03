@@ -34,6 +34,8 @@
 #include "box/lua/tuple.h"
 #include "box/lua/index.h"
 #include "box/lua/space.h"
+#include "box/lua/stat.h"
+#include "box/lua/info.h"
 #include "box/tuple.h"
 
 #include "lua/utils.h"
@@ -920,10 +922,24 @@ lbox_unpack(struct lua_State *L)
 #undef CHECK_SIZE
 }
 
+static int
+lbox_snapshot(struct lua_State *L)
+{
+	int ret = box_snapshot();
+	if (ret == 0) {
+		lua_pushstring(L, "ok");
+		return 1;
+	}
+	luaL_error(L, "can't save snapshot, errno %d (%s)",
+		   ret, strerror(ret));
+	return 1;
+}
+
 static const struct luaL_reg boxlib[] = {
 	{"raise", lbox_raise},
 	{"pack", lbox_pack},
 	{"unpack", lbox_unpack},
+	{"snapshot", lbox_snapshot},
 	{NULL, NULL}
 };
 
@@ -948,6 +964,8 @@ box_lua_init(struct lua_State *L)
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);
+	box_lua_info_init(L);
+	box_lua_stat_init(L);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s++) {

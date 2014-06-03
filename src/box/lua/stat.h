@@ -1,3 +1,5 @@
+#ifndef INCLUDES_TARANTOOL_LUA_STAT_H
+#define INCLUDES_TARANTOOL_LUA_STAT_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,49 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/admin.h"
 
-extern "C" {
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
+struct lua_State;
+void box_lua_stat_init(struct lua_State *L);
 
-#include "trivia/util.h"
-#include "box/box.h"
-
-static int
-lbox_save_coredump(struct lua_State *L __attribute__((unused)))
-{
-	coredump(60);
-	lua_pushstring(L, "ok");
-	return 1;
-}
-
-static int
-lbox_save_snapshot(struct lua_State *L)
-{
-	int ret = box_snapshot();
-	if (ret == 0) {
-		lua_pushstring(L, "ok");
-		return 1;
-	}
-	luaL_error(L, "can't save snapshot, errno %d (%s)",
-		   ret, strerror(ret));
-	return 1;
-}
-
-int tarantool_lua_admin_init(struct lua_State *L)
-{
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_pushstring(L, "snapshot");
-	lua_pushcfunction(L, lbox_save_snapshot);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "coredump");
-	lua_pushcfunction(L, lbox_save_coredump);
-	lua_settable(L, -3);
-
-	lua_pop(L, 1);
-	return 0;
-}
+#endif /* INCLUDES_TARANTOOL_LUA_STAT_H */

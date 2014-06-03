@@ -1,5 +1,7 @@
 -- sql.lua (internal file)
 
+local fiber = require('fiber')
+
 box.net.sql = {
     -- constructor 
     -- box.net.sql.connect(
@@ -92,9 +94,9 @@ box.net.sql = {
         execute = function(self, sql, ...)
             -- waits until connection will be free
             while self.processing do
-                self.queue[ box.fiber.id() ] = box.ipc.channel()
-                self.queue[ box.fiber.id() ]:get()
-                self.queue[ box.fiber.id() ] = nil
+                self.queue[ fiber.id() ] = fiber.channel()
+                self.queue[ fiber.id() ]:get()
+                self.queue[ fiber.id() ] = nil
             end
             self.processing = true
 

@@ -78,7 +78,7 @@ int sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_listen(int fd);
 int sio_listen_backlog();
-int sio_accept(int fd, struct sockaddr_in *addr, socklen_t *addrlen);
+int sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
 ssize_t sio_read(int fd, void *buf, size_t count);
 
@@ -153,13 +153,13 @@ sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size);
 
 
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
-		   const struct sockaddr_in *dest_addr, socklen_t addrlen);
+		   const struct sockaddr *dest_addr, socklen_t addrlen);
 
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
-		     struct sockaddr_in *src_addr, socklen_t *addrlen);
+		     struct sockaddr *src_addr, socklen_t *addrlen);
 
-int sio_getpeername(int fd, struct sockaddr_in *addr);
-const char *sio_strfaddr(struct sockaddr_in *addr);
+int sio_getpeername(int fd, struct sockaddr *addr, socklen_t addrlen);
+const char *sio_strfaddr(struct sockaddr *addr);
 
 /**
  * Advance write position in the iovec array
