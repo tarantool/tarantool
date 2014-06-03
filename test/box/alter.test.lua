@@ -119,3 +119,11 @@ space:create_index('5')
 space:create_index('')
 
 space:drop()
+-- gh-57 Confusing error message when trying to create space with a
+-- duplicate id
+auto = box.schema.create_space('auto_original')
+auto2 = box.schema.create_space('auto', {id = auto.id})
+box.schema.space.drop('auto')
+auto2
+box.schema.create_space('auto_original', {id = auto.id})
+auto:drop()

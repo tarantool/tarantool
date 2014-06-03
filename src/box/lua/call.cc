@@ -516,10 +516,16 @@ box_lua_call(struct request *request, struct txn *txn, struct port *port)
 	uint32_t name_len = mp_decode_strl(&name);
 
 	uint8_t access = PRIV_X & ~user->universal_access;
-	access_check_func(name, name_len, user, access);
 
-	/* proc name */
+	/* Try to find a function by name */
 	int oc = box_lua_find(L, name, name + name_len);
+	/**
+	 * Check access to the function. Sic: the order
+	 * is important, as is described in
+	 * https://github.com/tarantool/tarantool/issues/300
+	 * - if a function does not exist, say it first.
+	 */
+	access_check_func(name, name_len, user, access);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);
