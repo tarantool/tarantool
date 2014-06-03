@@ -136,3 +136,14 @@ session_free()
 	if (session_registry)
 		mh_i32ptr_delete(session_registry);
 }
+
+SessionGuard::SessionGuard(int fd, uint64_t cookie)
+{
+	session_set_user(session_create(fd, cookie), ADMIN, ADMIN);
+}
+
+SessionGuard::~SessionGuard()
+{
+	session_destroy(fiber()->session);
+}
+

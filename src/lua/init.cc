@@ -44,6 +44,7 @@ extern "C" {
 
 
 #include <fiber.h>
+#include <session.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/errinj.h"
@@ -431,6 +432,9 @@ run_script(va_list ap)
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
+
+	/* Create session with ADMIN privileges for interactive mode */
+	SessionGuard session_guard(0, 0);
 
 	if (access(path, F_OK) == 0) {
 		/* Execute the init file. */
