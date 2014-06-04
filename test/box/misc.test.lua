@@ -129,16 +129,16 @@ bit.lshift(1, 32)
 bit.band(1, 3)
 bit.bor(1, 2)
 
--- A test case for box.counter
+-- A test case for space:inc and space:dec
 space = box.space.tweedledum
-box.counter.inc(space.id, {1})
+space:inc{1}
 space:get{1}
-box.counter.inc(space.id, {1})
-box.counter.inc(space.id, {1})
+space:inc{1}
+space:inc{1}
 space:get{1}
-box.counter.dec(space.id, {1})
-box.counter.dec(space.id, {1})
-box.counter.dec(space.id, {1})
+space:dec{1}
+space:dec{1}
+space:dec{1}
 space:get{1}
 space:truncate()
 

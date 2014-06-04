@@ -17,7 +17,6 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 t
 ---
 - - cfg
-  - counter
   - error
   - index
   - info
@@ -401,11 +400,11 @@ bit.bor(1, 2)
 ---
 - 3
 ...
--- A test case for box.counter
+-- A test case for space:inc and space:dec
 space = box.space.tweedledum
 ---
 ...
-box.counter.inc(space.id, {1})
+space:inc{1}
 ---
 - 1
 ...
@@ -413,11 +412,11 @@ space:get{1}
 ---
 - [1, 1]
 ...
-box.counter.inc(space.id, {1})
+space:inc{1}
 ---
 - 2
 ...
-box.counter.inc(space.id, {1})
+space:inc{1}
 ---
 - 3
 ...
@@ -425,15 +424,15 @@ space:get{1}
 ---
 - [1, 3]
 ...
-box.counter.dec(space.id, {1})
+space:dec{1}
 ---
 - 2
 ...
-box.counter.dec(space.id, {1})
+space:dec{1}
 ---
 - 1
 ...
-box.counter.dec(space.id, {1})
+space:dec{1}
 ---
 - 0
 ...
