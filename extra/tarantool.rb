@@ -35,10 +35,10 @@ class Tarantool < Formula
     if build.with? 'debug'
       ENV.enable_warnings
       ENV.deparallelize
-      args << ["-DCMAKE_BUILD_TYPE=Debug"]
+      args << "-DCMAKE_BUILD_TYPE=Debug"
       ohai "Building with Debug"
     else
-      args << ["-DCMAKE_BUILD_TYPE=Release"]
+      args << "-DCMAKE_BUILD_TYPE=Release"
       ohai "Building with Release"
     end
     args << "-DENABLE_CLIENT=True" if build.stable?
