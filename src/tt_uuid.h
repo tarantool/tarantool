@@ -67,13 +67,7 @@ tt_uuid_to_string(const tt_uuid *uu, char *out)
 }
 
 static inline void
-tt_uuid_dec_be(const void *in, tt_uuid *uu)
-{
-	memcpy(uu->id, in, sizeof(uu->id));
-}
-
-static inline void
-tt_uuid_enc_be(const tt_uuid *uu, void *out)
+tt_uuid_bin(const tt_uuid *uu, void *out)
 {
 	memcpy(out, uu->id, sizeof(uu->id));
 }
@@ -139,16 +133,9 @@ tt_uuid_is_nil(const tt_uuid *uu)
 }
 
 static inline void
-tt_uuid_dec_be(const void *in, tt_uuid *uu)
+tt_uuid_bin(const tt_uuid *uu, void *out)
 {
-	uuid_dec_be(in, uu);
-
-}
-
-static inline void
-tt_uuid_enc_be(const tt_uuid *uu, void *out)
-{
-	uuid_enc_be(out, uu);
+	uuid_enc_le(out, uu);
 }
 #else
 #error Unsupported libuuid
@@ -158,6 +145,12 @@ extern const tt_uuid uuid_nil;
 
 char *
 tt_uuid_str(const tt_uuid *uu);
+
+int
+tt_uuid_from_msgpack(const char **data, tt_uuid *out);
+
+char *
+tt_uuid_to_msgpack(char *data, const tt_uuid *uu);
 
 #if defined(__cplusplus)
 } /* extern "C" */

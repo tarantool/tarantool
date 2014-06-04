@@ -292,7 +292,7 @@ box_on_cluster_join(const tt_uuid *node_uuid)
 	char *data = buf;
 	data = mp_encode_array(data, 2);
 	data = mp_encode_uint(data, node_id);
-	data = mp_encode_str(data, tt_uuid_str(node_uuid), UUID_STR_LEN);
+	data = tt_uuid_to_msgpack(data, node_uuid);
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;
@@ -314,7 +314,7 @@ box_set_cluster_uuid()
 	char *data = buf;
 	data = mp_encode_array(data, 2);
 	data = mp_encode_str(data, key, strlen(key));
-	data = mp_encode_str(data, tt_uuid_str(&cluster_uuid), UUID_STR_LEN);
+	data = tt_uuid_to_msgpack(data, &cluster_uuid);
 	assert(data <= buf + sizeof(buf));
 	req.tuple = buf;
 	req.tuple_end = data;

@@ -52,7 +52,8 @@ add_executable(log_dir.test log_dir.cc test.c)
 target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} box core small salad misc bitset msgpuck
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
-    ${LIBCORO_LIBRARIES})
+    ${LIBCORO_LIBRARIES}
+    ${LUAJIT_LIB} dl)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test
