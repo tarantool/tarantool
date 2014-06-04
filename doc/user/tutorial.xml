@@ -120,6 +120,7 @@ release=`lsb_release -c -s`
 # Pick the CentOS repository which fits your CentOS/RHEL version
 # and your x86 platform:
 # <link xlink:href="http://tarantool.org/dist/master/centos/5/os/i386">http://tarantool.org/dist/master/centos/5/os/i386 for version 5, x86-32</link>
+# <link xlink:href="http://tarantool.org/dist/master/centos/6/os/i386">http://tarantool.org/dist/master/centos/6/os/i386 for version 6, x86-32</link>
 # <link xlink:href="http://tarantool.org/dist/master/centos/5/os/x86_64">http://tarantool.org/dist/master/centos/5/os/x86_64 for version 5, x86-64</link>
 # <link xlink:href="http://tarantool.org/dist/master/centos/6/os/x86_64">http://tarantool.org/dist/master/centos/6/os/x86_64 for version 6, x86-64</link>
 # Add the following section to your yum repository list
