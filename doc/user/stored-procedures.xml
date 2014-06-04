@@ -1658,7 +1658,7 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-         <emphasis role="lua">box.counter.inc(<replaceable>space-number, {field-value [, field-value ...]}</replaceable>)</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
         </term>
         <listitem>
             <para>
@@ -1667,7 +1667,7 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
                 If there is no tuple matching the field-value(s), a new one is inserted
                 with initial counter value set to 1.
             </para>
-                <para>Parameters: <code>space-number</code>, <code>field-value(s)</code> = values
+                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
                 which must match the primary key.
             </para>
             <para>
@@ -1677,11 +1677,17 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space18')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
 ---
 - 1
 ...
-tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
 ---
 - 2
 ...</programlisting>
@@ -1689,7 +1695,7 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.counter.dec(<replaceable>space-number, {field-value [, field-value ...]}</replaceable>)</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
         </term>
         <listitem>
             <para>
@@ -1699,7 +1705,7 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
                 If the counter value drops to zero, the tuple is deleted.
             </para>
             <para>
-               Parameters: <code>space-number</code>, <code>field-value(s)</code> = values
+               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
                which must match the primary key.
             </para>
             <para>
@@ -1709,14 +1715,24 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
 ---
-- 1
 ...
-tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
 ---
-- 0
-...</programlisting>
+...
+tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
+---
+- [1, 'a', 1000]
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 999
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 998
+... </programlisting>
         </listitem>
     </varlistentry>
 </variablelist>
