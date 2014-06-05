@@ -243,19 +243,13 @@
  * use linear search. To turn on the linear search
  * #define BPS_BLOCK_LINEAR_SEARCH
  */
-#ifdef BPS_BLOCK_LINEAR_SEARCH
-#pragma message("Btree: using linear search")
-#endif
 
 /**
  * A switch that enables collection of executions of different
  * branches of code. Used only for debug purposes, I hope you
- * will not use it.
+ * will not use it. Nevertheless, to turn it on,
+ * #define BPS_TREE_DEBUG_BRANCH_VISIT
  */
-#ifdef BPS_TREE_DEBUG_BRANCH_VISIT
-#pragma message("Btree: debugging: collecting branch visits")
-#endif
-
 
 /* }}} */
 

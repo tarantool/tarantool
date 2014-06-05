@@ -9,15 +9,13 @@ space:create_index('primary', { type = 'hash' })
 ...
 errinj.info()
 ---
-- ERRINJ_WAL_IO:
+- ERRINJ_INDEX_ALLOC:
     state: false
-  ERRINJ_TESTING:
-    state: false
-  ERRINJ_INDEX_ALLOC:
+  ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_TREE_ALLOC:
+  ERRINJ_TESTING:
     state: false
 ...
 errinj.set("some-injection", true)

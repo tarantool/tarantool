@@ -43,8 +43,7 @@ struct errinj {
 	_(ERRINJ_TESTING, false) \
 	_(ERRINJ_WAL_IO, false) \
 	_(ERRINJ_WAL_ROTATE, false) \
-	_(ERRINJ_INDEX_ALLOC, false) \
-	_(ERRINJ_TREE_ALLOC, false)
+	_(ERRINJ_INDEX_ALLOC, false)
 
 ENUM0(errinj_enum, ERRINJ_LIST);
 extern struct errinj errinjs[];
