@@ -352,10 +352,10 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
       <row><entry>Number of tuples accessed</entry><entry>A few requests, for example select, can retrieve
                                          multiple tuples. This factor is usually less
                                          important than the others.</entry></row>
-      <row><entry>WAL settings</entry>   <entry>The important settings for the write-ahead log are
-                                         wal_fsync_delay and  <olink targetptr="wal_mode"/>.
-                                         If the settings cause no writing or delayed writing,
-                                         this factor is unimportant. If the settings cause
+      <row><entry>WAL settings</entry>   <entry>The important setting for the write-ahead log is
+                                         <olink targetptr="wal_mode"/>.
+                                         If the setting causes no writing or delayed writing,
+                                         this factor is unimportant. If the settings causes
                                          every data-change request to wait for writing to
                                          finish on a slow device, this factor is more
                                          important than all the others.</entry></row>
@@ -408,7 +408,7 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
                          <entry>enabled</entry><entry>space is enabled</entry><entry>true|false</entry><entry>true</entry>
                         </row>
                         <row>
-                         <entry>arity</entry><entry>fixed field count</entry><entry>number</entry><entry>0 i.e. not fixed</entry>
+                         <entry>field_count</entry><entry>fixed field count</entry><entry>number</entry><entry>0 i.e. not fixed</entry>
                         </row>
                         <row>
                          <entry>if_not_exists</entry><entry>no error if duplicate name</entry><entry>true|false</entry><entry>false</entry>
@@ -416,6 +416,9 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
                         <row>
                          <entry>engine</entry><entry>storage package</entry><entry>string</entry><entry>'memtx'</entry>
                         </row>
+                        <row>
+                         <entry>user</entry><entry>user name</entry><entry>string</entry><entry>current user's name</entry>
+                        </row>                        
                       </tbody>
                     </tgroup>
                 </table>
@@ -937,12 +940,12 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.arity</emphasis>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.field_count</emphasis>
         </term>
         <listitem>
             <para>
              (type = number) The required field count for all tuples in this space.
-             The arity can be changed with <code>box.space.<replaceable>space-name</replaceable>.arity = <replaceable>new-arity-value</replaceable></code>.
+             The field_count can be changed with <code>box.space.<replaceable>space-name</replaceable>.field_count = <replaceable>new-field-count-value</replaceable></code>.
              The default value is 0, which means there is no required field count.
             </para>
         </listitem>
@@ -958,9 +961,9 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
               of type <code xlink:href="#box.index">box.index</code> with
               methods to search tuples and iterate over them in predefined order.
         <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.n,box.space.space0.arity,box.space.space0.index.primary.type</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.space0.id,box.space.space0.field_count,box.space.space0.index.primary.type</userinput>
 ---
-- 1029
+- 512
 - 0
 - HASH
 ...
@@ -1111,7 +1114,7 @@ setopt delimiter=''!</programlisting>
         <listitem>
             <para>
               _space is a system tuple set. Its tuples contain these fields:
-              space-n, space-arity, space-name.
+              id, uid, space-name, engine, field_count, temporary.
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -1152,7 +1155,7 @@ setopt delimiter=''!</programlisting>
         <listitem>
             <para>
               _index is a system tuple set. Its tuples contain these fields:
-              index-id index-number index-name index-type index-is-unique index-field-count
+              space-id index-id index-name index-type index-is-unique index-field-count
               [tuple-field-no, tuple-field-type ...].
             </para>
             <para>
@@ -1658,7 +1661,7 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-         <emphasis role="lua">box.counter.inc(<replaceable>space-number, {field-value [, field-value ...]}</replaceable>)</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
         </term>
         <listitem>
             <para>
@@ -1667,7 +1670,7 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
                 If there is no tuple matching the field-value(s), a new one is inserted
                 with initial counter value set to 1.
             </para>
-                <para>Parameters: <code>space-number</code>, <code>field-value(s)</code> = values
+                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
                 which must match the primary key.
             </para>
             <para>
@@ -1677,11 +1680,17 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space18')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
 ---
 - 1
 ...
-tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
 ---
 - 2
 ...</programlisting>
@@ -1689,7 +1698,7 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.counter.dec(<replaceable>space-number, {field-value [, field-value ...]}</replaceable>)</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
         </term>
         <listitem>
             <para>
@@ -1699,7 +1708,7 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
                 If the counter value drops to zero, the tuple is deleted.
             </para>
             <para>
-               Parameters: <code>space-number</code>, <code>field-value(s)</code> = values
+               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
                which must match the primary key.
             </para>
             <para>
@@ -1709,14 +1718,24 @@ tarantool> <userinput>box.counter.inc(box.space.space0.n, {'top.mail.ru'})</user
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
 ---
-- 1
 ...
-tarantool> <userinput>box.counter.dec(box.space.space0.n, {'top.mail.ru'})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
 ---
-- 0
-...</programlisting>
+...
+tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
+---
+- [1, 'a', 1000]
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 999
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 998
+... </programlisting>
         </listitem>
     </varlistentry>
 </variablelist>
@@ -4146,8 +4165,9 @@ Otherwise, use the box.net.box package to pass the function to the host and port
 <variablelist>
     <title>Package <code xml:id="box.cfg">box.cfg</code></title>
     <para>
-      The box.cfg package provides read-only access to
-      some server configuration parameters.
+      The box.cfg package is for administrators to specify all the server configuration parameters;
+      the full description of the parameters is in section <olink targetptr="configuration-file">Configuration</olink>.
+      Use <code>box.cfg</code> without braces to get read-only access to those parameters.
     </para>
     <varlistentry>
         <term><emphasis role="lua">box.cfg</emphasis></term>
