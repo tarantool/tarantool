@@ -43,6 +43,8 @@ doc/www-data/*.html
 doc/www-data/*.ru.html
 doc/www-data.in/_text/download.md
 extra/rpm.spec
+extra/rpm/tarantool.rpm.spec
+extra/rpm/tarantool-el.rpm.spec
 include/tarantool/config.h
 install_manifest.txt
 lcov

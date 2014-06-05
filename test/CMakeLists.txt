@@ -9,6 +9,7 @@ add_custom_target(test
 add_custom_target(test-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py --builddir=${PROJECT_BINARY_DIR} --force --vardir=${PROJECT_BINARY_DIR}/test/var)
 
+
 add_subdirectory(unit)
 add_subdirectory(box)
 add_subdirectory(connector_c)
@@ -20,9 +21,14 @@ macro(install_cfg type_cfg dest)
 endmacro(install_cfg)
 
 if (ENABLE_RPM)
-    install_cfg(rpm ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/)
+    if (NOT(RPM_SCL_PREFIX STREQUAL ""))
+        set(RPM_SCL_PREFIX_TEMP2 "-${RPM_SCL_PREFIX}")
+    endif()
+    install (FILES ${CMAKE_SOURCE_DIR}/test/share/tarantool_rpm.cfg
+        DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/
+             RENAME "tarantool${RPM_SCL_PREFIX_TEMP2}.cfg")
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-             DESTINATION share/tarantool)
+             DESTINATION ${CMAKE_INSTALL_DATADIR}/tarantool/)
 else()
     if (TARGET_OS_DARWIN)
         install_cfg(dmg ${CMAKE_INSTALL_SYSCONFDIR})
@@ -31,5 +37,5 @@ else()
     endif()
 
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
-             DESTINATION "${CMAKE_INSTALL_LOCALSTATEDIR}/lib/tarantool")
+             DESTINATION "${CMAKE_INSTALL_SHAREDSTATEDIR}/tarantool")
 endif()
