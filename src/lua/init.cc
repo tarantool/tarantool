@@ -61,6 +61,7 @@ extern "C" {
 #include <ctype.h>
 #include "small/region.h"
 #include <stdio.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -439,9 +440,13 @@ run_script(va_list ap)
 	SessionGuard session_guard(0, 0);
 
 	if (access(path, F_OK) == 0) {
-		/* Execute the init file. */
-		lua_getglobal(L, "dofile");
-		lua_pushstring(L, path);
+		/* Execute script. */
+		if (luaL_loadfile(L, path) != 0)
+			panic("%s", lua_tostring(L, -1));
+	} else if (!isatty(STDIN_FILENO)) {
+		/* Execute stdin */
+		if (luaL_loadfile(L, NULL) != 0)
+			panic("%s", lua_tostring(L, -1));
 	} else {
 		say_crit("version %s", tarantool_version());
 		/* get iteractive from package.loaded */
