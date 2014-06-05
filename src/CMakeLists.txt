@@ -94,6 +94,7 @@ set (common_sources
      lua/utils.c
      lua/errno.c
      lua/bsdsocket.cc
+     lua/pickle.cc
      ${lua_sources}
 )
 

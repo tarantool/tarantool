@@ -1,6 +1,9 @@
 json = require('json')
 ---
 ...
+pickle = require('pickle')
+---
+...
 socket = require('socket')
 ---
 ...
@@ -91,7 +94,7 @@ s:wait(.01)
 ---
 - RW
 ...
-s:syswrite(box.pack('iii', 65280, 0, 12334))
+s:syswrite(pickle.pack('iii', 65280, 0, 12334))
 ---
 - 12
 ...
@@ -103,11 +106,11 @@ s:wait(.01)
 ---
 - RW
 ...
-box.unpack('iii', s:sysread(4096))
+pickle.unpack('iii', s:sysread(4096))
 ---
-- error: 'box.unpack(''iii''): too many bytes: unpacked 12, total 128'
+- error: 'pickle.unpack(''iii''): too many bytes: unpacked 12, total 128'
 ...
-s:syswrite(box.pack('iii', 65280, 0, 12335))
+s:syswrite(pickle.pack('iii', 65280, 0, 12335))
 ---
 - 12
 ...

@@ -56,6 +56,7 @@ extern "C" {
 #include "lua/cjson.h"
 #include "lua/yaml.h"
 #include "lua/msgpack.h"
+#include "lua/pickle.h"
 
 #include <ctype.h>
 #include "small/region.h"
@@ -236,6 +237,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
+	tarantool_lua_pickle_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 
