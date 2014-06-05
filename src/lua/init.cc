@@ -399,13 +399,10 @@ interactive_input(struct tbuf *in)
 	int linenum = 0;
 	const char *delim = fiber()->session->delim;
 	int delim_len = strlen(delim);
-	const char *host = "localhost";
-	char prompt[128];
 
 	do {
-		snprintf(prompt, sizeof(prompt), "%s%c> ", host,
-			 (linenum == 0) ? '=' : '-');
-		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line, prompt);
+		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line,
+			     linenum ? "         > " : "tarantool> ");
 		if (line == NULL)
 			return -1;
 

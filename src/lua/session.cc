@@ -173,7 +173,7 @@ lbox_session_delimiter(struct lua_State *L)
 
 	/* Set delimiter */
 	if (lua_type(L, 1) != LUA_TSTRING)
-		luaL_error(L, "session.delimiter(string): bad arguments");
+		luaL_error(L, "session.delimiter(string): expected a string");
 
 	snprintf(fiber()->session->delim, SESSION_DELIM_SIZE, "%s",
 		 lua_tostring(L, 1));
