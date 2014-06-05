@@ -607,7 +607,7 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 		switch (pid) {
 		case -1:
 			if (errno != ECHILD) {
-				int r = write(sayfd, waitpid_failed,
+				int r = write(STDERR_FILENO, waitpid_failed,
 					      sizeof(waitpid_failed) - 1);
 				(void) r; /* -Wunused-result warning suppression */
 			}

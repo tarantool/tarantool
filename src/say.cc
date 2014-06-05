@@ -41,7 +41,9 @@
 
 #include "fiber.h"
 
-int sayfd = STDERR_FILENO;
+char log_path[PATH_MAX + 1];
+int log_fd = STDERR_FILENO;
+int logger_nonblock;
 pid_t logger_pid;
 static bool booting = true;
 static const char *binary_filename;
@@ -89,88 +91,145 @@ say_set_log_level(int new_level)
 	*log_level = new_level;
 }
 
+/**
+ * Initialize the logger pipe: a standalone
+ * process which is fed all log messages.
+ */
 void
-say_logger_init(const char *logger, int level, int nonblock)
+say_init_pipe()
 {
-	*log_level = level;
 	int pipefd[2];
-	pid_t pid;
 	char cmd[] = { "/bin/sh" };
 	char args[] = { "-c" };
-	char *argv[] = { cmd, args, (char *) logger, NULL };
+	char *argv[] = { cmd, args, (char *) log_path, NULL };
 	char *envp[] = { NULL };
-	setvbuf(stderr, NULL, _IONBF, 0);
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCHLD);
 
-	if (logger != NULL) {
-		sigset_t mask;
-		sigemptyset(&mask);
-		sigaddset(&mask, SIGCHLD);
+	if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+		say_syserror("sigprocmask");
 
-		if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
-			say_syserror("sigprocmask");
+	if (pipe(pipefd) == -1) {
+		say_syserror("pipe");
+		goto error;
+	}
 
-		if (pipe(pipefd) == -1) {
-			say_syserror("pipe");
-			goto error;
-		}
+	logger_pid = fork();
+	if (logger_pid == -1) {
+		say_syserror("pipe");
+		goto error;
+	}
 
-		pid = fork();
-		if (pid == -1) {
-			say_syserror("pipe");
-			goto error;
-		}
-
-		if (pid == 0) {
-			sigprocmask(SIG_UNBLOCK, &mask, NULL);
-
-			close(pipefd[1]);
-			dup2(pipefd[0], STDIN_FILENO);
-			/*
-			 * Move to an own process group, to not
-			 * receive signals from the controlling
-			 * tty. This keeps the log open as long as
-			 * the parent is around. When the parent
-			 * dies, we get SIGPIPE and terminate.
-			 */
-			setpgid(0, 0);
-			execve(argv[0], argv, envp);
-			goto error;
-		}
-#ifndef TARGET_OS_DARWIN
-		/*
-		 * A courtesy to a DBA who might have
-		 * misconfigured the logger option: check whether
-		 * or not the logger process has started, and if
-		 * it didn't, abort. Notice, that if the logger
-		 * makes a slow start this is futile.
-		 */
-		struct timespec timeout;
-		timeout.tv_sec = 0;
-		timeout.tv_nsec = 1; /* Mostly to trigger preemption. */
-		if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD)
-			goto error;
-#endif
-
-		/* OK, let's hope for the best. */
+	if (logger_pid == 0) {
 		sigprocmask(SIG_UNBLOCK, &mask, NULL);
-		close(pipefd[0]);
-		dup2(pipefd[1], STDERR_FILENO);
-		dup2(pipefd[1], STDOUT_FILENO);
-		sayfd = pipefd[1];
 
-		logger_pid = pid;
-	} else {
-		sayfd = STDERR_FILENO;
+		close(pipefd[1]);
+		dup2(pipefd[0], STDIN_FILENO);
+		/*
+		 * Move to an own process group, to not
+		 * receive signals from the controlling
+		 * tty. This keeps the log open as long as
+		 * the parent is around. When the parent
+		 * dies, we get SIGPIPE and terminate.
+		 */
+		setpgid(0, 0);
+		execve(argv[0], argv, envp); /* does not return */
+		goto error;
 	}
-	booting = false;
-	if (nonblock) {
-		int flags = fcntl(sayfd, F_GETFL, 0);
-		fcntl(sayfd, F_SETFL, flags | O_NONBLOCK);
-	}
+#ifndef TARGET_OS_DARWIN
+	/*
+	 * A courtesy to a DBA who might have
+	 * misconfigured the logger option: check whether
+	 * or not the logger process has started, and if
+	 * it didn't, abort. Notice, that if the logger
+	 * makes a slow start this is futile.
+	 */
+	struct timespec timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_nsec = 1; /* Mostly to trigger preemption. */
+	if (sigtimedwait(&mask, NULL, &timeout) == SIGCHLD)
+		goto error;
+#endif
+	/* OK, let's hope for the best. */
+	sigprocmask(SIG_UNBLOCK, &mask, NULL);
+	close(pipefd[0]);
+	log_fd = pipefd[1];
 	return;
 error:
-	say_syserror("Can't start logger: %s", logger);
+	say_syserror("Can't start logger: %s", log_path);
 	_exit(EXIT_FAILURE);
+}
+
+/**
+ * Rotate logs on SIGHUP
+ */
+void
+say_logrotate(int /* signo */)
+{
+	/* For cases when used from a Lua FFI binding */
+	if (logger_pid || strlen(log_path) == 0)
+		return;
+	close(log_fd);
+	log_fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
+		      S_IRUSR | S_IWUSR | S_IRGRP);
+	if (log_fd < 0)
+		return;
+#if 0
+	dup2(log_fd, STDOUT_FILENO);
+#endif
+	dup2(log_fd, STDERR_FILENO);
+	if (logger_nonblock) {
+		int flags = fcntl(log_fd, F_GETFL, 0);
+		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
+	}
+}
+
+/**
+ * Initialize logging to a file and set up a log
+ * rotation signal.
+ */
+void
+say_init_file()
+{
+	int fd = open(log_path, O_WRONLY|O_APPEND|O_CREAT,
+		      S_IRUSR | S_IWUSR | S_IRGRP);
+	if (fd < 0) {
+		say_syserror("Can't open log file: %s", log_path);
+		_exit(EXIT_FAILURE);
+	}
+	signal(SIGHUP, say_logrotate);
+	log_fd = fd;
+}
+
+/**
+ * Initialize logging subsystem to use in daemon mode.
+ */
+void
+say_logger_init(const char *path, int level, int nonblock)
+{
+	*log_level = level;
+	logger_nonblock = nonblock;
+	setvbuf(stderr, NULL, _IONBF, 0);
+
+	if (path != NULL) {
+		if (path[0] == '|') {
+			snprintf(log_path, sizeof(log_path), "%s", path + 1);
+			say_init_pipe();
+		} else {
+			snprintf(log_path, sizeof(log_path), "%s", path);
+			say_init_file();
+		}
+		dup2(log_fd, STDERR_FILENO);
+#if 0
+		dup2(log_fd, STDOUT_FILENO);
+#endif
+	}
+	if (nonblock) {
+		int flags = fcntl(log_fd, F_GETFL, 0);
+		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
+	}
+	booting = false;
 }
 
 void
@@ -226,10 +285,10 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 		p = len - 1;
 	*(buf + p) = '\n';
 
-	int r = write(sayfd, buf, p + 1);
+	int r = write(log_fd, buf, p + 1);
 	(void)r;
 
-	if (S_FATAL && sayfd != STDERR_FILENO) {
+	if (S_FATAL && log_fd != STDERR_FILENO) {
 		r = write(STDERR_FILENO, buf, p + 1);
 		(void)r;
 	}

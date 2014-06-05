@@ -6,6 +6,7 @@ ffi.cdef[[
                const char *error, const char *format, ...);
 
     extern sayfunc_t _say;
+    extern void say_logrotate(int);
 
     enum say_level {
         S_FATAL,
@@ -54,5 +55,8 @@ return {
 
     error = function (fmt, ...)
         say(ffi.C.S_ERROR, fmt, ...)
+    end,
+    rotate = function()
+        ffi.C.say_logrotate(0)
     end,
 }

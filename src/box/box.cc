@@ -507,7 +507,7 @@ box_snapshot(void)
 	 * Safety: make sure we don't double-write
 	 * parent stdio buffers at exit().
 	 */
-	close_all_xcpt(1, sayfd);
+	close_all_xcpt(1, log_fd);
 	snapshot_save(recovery_state);
 
 	exit(EXIT_SUCCESS);

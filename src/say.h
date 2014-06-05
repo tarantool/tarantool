@@ -48,8 +48,11 @@ enum say_level {
 	S_DEBUG
 };
 
-extern int sayfd;
+extern int log_fd;
 extern pid_t logger_pid;
+
+void
+say_logrotate(int /* signo */);
 
 void
 say_set_log_level(int new_level);

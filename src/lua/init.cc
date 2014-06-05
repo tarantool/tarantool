@@ -428,8 +428,10 @@ tarantool_lua_interactive()
 	while (1) {
 		RegionGuard region_guard(&fiber()->gc);
 		struct tbuf *in = tbuf_new(&fiber()->gc);
-		if (interactive_input(in) != 0)
+		if (interactive_input(in) != 0) {
+			printf("Bye\n");
 			return;
+		}
 
 		struct tbuf *out = tbuf_new(&fiber()->gc);
 		struct lua_State *L = lua_newthread(tarantool_L);
