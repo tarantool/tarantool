@@ -45,6 +45,7 @@ extern "C" {
 
 #include <fiber.h>
 #include <session.h>
+#include <scoped_guard.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/errinj.h"
@@ -386,27 +387,58 @@ ssize_t
 readline_cb(va_list ap)
 {
 	const char **line = va_arg(ap, const char **);
-	*line = readline("tarantool> ");
+	const char *prompt = va_arg(ap, const char *);
+	*line = readline(prompt);
+	return 0;
+}
+
+static inline int
+interactive_input(struct tbuf *in)
+{
+	char *line;
+	int linenum = 0;
+	const char *delim = fiber()->session->delim;
+	int delim_len = strlen(delim);
+	const char *host = "localhost";
+	char prompt[128];
+
+	do {
+		snprintf(prompt, sizeof(prompt), "%s%c> ", host,
+			 (linenum == 0) ? '=' : '-');
+		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line, prompt);
+		if (line == NULL)
+			return -1;
+
+		auto scoped_guard = make_scoped_guard([&] { free(line); });
+		if (linenum++ > 0)
+			tbuf_append(in, "\n", 1);
+		tbuf_append(in, line, strlen(line));
+	} while (delim_len > 0 && (in->size < delim_len ||
+		 memcmp(in->data + in->size - delim_len, delim, delim_len)));
+
+	in->size -= delim_len; /* remove delimiter from the end of input */
+	in->data[in->size] = '\0';
+
 	return 0;
 }
 
 extern "C" void
 tarantool_lua_interactive()
 {
-	char *line;
-	while (true) {
-		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line);
-		if (line == NULL)
-			break;
+	while (1) {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tbuf *in = tbuf_new(&fiber()->gc);
+		if (interactive_input(in) != 0)
+			return;
+
 		struct tbuf *out = tbuf_new(&fiber()->gc);
 		struct lua_State *L = lua_newthread(tarantool_L);
-		tarantool_lua(L, out, line);
-		lua_pop(tarantool_L, 1);
+		LuarefGuard coro_ref(tarantool_L);
+		tarantool_lua(L, out, tbuf_str(in));
 		printf("%.*s", out->size, out->data);
-		fiber_gc();
+
 		if (history)
-			add_history(line);
-		free(line);
+			add_history(tbuf_str(in));
 	}
 }
 

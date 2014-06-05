@@ -60,6 +60,8 @@ session_create(int fd, uint64_t cookie)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;
+	session->delim[0] = '\0';
+
 	/*
 	 * At first the session user is a superuser,
 	 * to make sure triggers run correctly.

@@ -159,6 +159,27 @@ lbox_session_peer(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_session_delimiter(struct lua_State *L)
+{
+	if (fiber()->session == NULL)
+		luaL_error(L, "session.delimiter(): session does not exit");
+
+	if (lua_gettop(L) < 1) {
+		/* Get delimiter */
+		lua_pushstring(L, fiber()->session->delim);
+		return 1;
+	}
+
+	/* Set delimiter */
+	if (lua_type(L, 1) != LUA_TSTRING)
+		luaL_error(L, "session.delimiter(string): bad arguments");
+
+	snprintf(fiber()->session->delim, SESSION_DELIM_SIZE, "%s",
+		 lua_tostring(L, 1));
+	return 0;
+}
+
 /**
  * run on_connect|on_disconnect trigger
  */
@@ -227,6 +248,7 @@ tarantool_lua_session_init(struct lua_State *L)
 		{"fd", lbox_session_fd},
 		{"exists", lbox_session_exists},
 		{"peer", lbox_session_peer},
+		{"delimiter", lbox_session_delimiter},
 		{"on_connect", lbox_session_on_connect},
 		{"on_disconnect", lbox_session_on_disconnect},
 		{NULL, NULL}
