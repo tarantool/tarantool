@@ -814,10 +814,10 @@ replication_relay_loop(struct relay_data *data)
 	 * Even though we use only the main fiber, the logger
 	 * uses the current fiber name.
 	 */
-	struct sockaddr_in peer;
+	struct sockaddr_storage peer;
 	socklen_t addrlen = sizeof(peer);
 	getpeername(replica.sock, ((struct sockaddr*)&peer), &addrlen);
-	title("relay", "%s", sio_strfaddr(&peer));
+	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer));
 	fiber_set_name(fiber(), status);
 
 	/* init signals */

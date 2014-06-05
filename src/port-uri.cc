@@ -72,7 +72,7 @@ port_uri_to_string(const struct port_uri * uri)
 		return str;
 
 	}
-	case AF_LOCAL:
+	case AF_UNIX:
 	{
 		struct sockaddr_un *un =
 			(struct sockaddr_un *)&uri->addr;
@@ -5362,7 +5362,7 @@ case 308:
 	if (path.start && path.end) {
 		struct sockaddr_un *un = (struct sockaddr_un *)&uri->addr;
 		uri->addr_len = sizeof(*un);
-		un->sun_family = AF_LOCAL;
+		un->sun_family = AF_UNIX;
 		if (path.end - path.start >= sizeof(un->sun_path))
 			return NULL;
 

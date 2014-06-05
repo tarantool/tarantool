@@ -44,6 +44,7 @@ extern "C" {
 
 
 #include <fiber.h>
+#include <session.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/errinj.h"
@@ -66,12 +67,13 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[];
+       load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[],
+       log_lua[];
 static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, "digest", digest_lua,
 	"interactive", interactive_lua,
-	"uuid", uuid_lua, NULL };
+	"uuid", uuid_lua, "log", log_lua, NULL };
 /*
  * {{{ box Lua library: common functions
  */
@@ -430,6 +432,9 @@ run_script(va_list ap)
 	 * loop and re-schedule this fiber.
 	 */
 	fiber_sleep(0.0);
+
+	/* Create session with ADMIN privileges for interactive mode */
+	SessionGuard session_guard(0, 0);
 
 	if (access(path, F_OK) == 0) {
 		/* Execute the init file. */

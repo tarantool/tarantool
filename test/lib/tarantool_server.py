@@ -16,6 +16,7 @@ import filecmp
 import traceback
 import subprocess
 import collections
+import os.path
 
 
 try:
@@ -34,8 +35,13 @@ color_stdout = Colorer()
 
 def check_port(port, rais=True):
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", port))
+        if isinstance(port, (int, long)):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect(("localhost", port))
+        else:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(port)
+
     except socket.error:
         return True
     if rais:
@@ -185,6 +191,9 @@ class GdbMixin(Mixin):
         "name": "tarantool-gdb"}
 
     def start_and_exit(self):
+        if re.search(r'^/', self._admin.port):
+            if os.path.exists(self._admin.port):
+                os.unlink(self._admin.port)
         color_stdout('You started the server in gdb mode.\n', schema='info')
         color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
         TarantoolServer.start_and_exit(self)
@@ -285,10 +294,6 @@ class TarantoolServer(Server):
         return self.admin
     @_admin.setter
     def _admin(self, port):
-        try:
-            int(port)
-        except ValueError as e:
-            raise ValueError("Bad port number: '%s'" % port)
         if hasattr(self, 'admin'):
             del self.admin
         self.admin = AdminConnection('localhost', port)
@@ -352,7 +357,8 @@ class TarantoolServer(Server):
             'lua_libs': [],
             'valgrind': False,
             'vardir': None,
-            'start_and_exit': False
+            'start_and_exit': False,
+            'use_unix_sockets': False
         }
         ini.update(_ini)
         Server.__init__(self, ini)
@@ -370,6 +376,7 @@ class TarantoolServer(Server):
         self.lua_libs = ini['lua_libs']
         self.valgrind = ini['valgrind']
         self._start_and_exit = ini['start_and_exit']
+        self.use_unix_sockets = ini['use_unix_sockets']
 
     def __del__(self):
         self.stop()
@@ -406,7 +413,11 @@ class TarantoolServer(Server):
             self.cleanup()
         self.copy_files()
         port = random.randrange(3300, 9999)
-        self._admin = find_port(port)
+
+        if self.use_unix_sockets:
+            self._admin = os.path.join(self.vardir, "socket-admin")
+        else:
+            self._admin = find_port(port)
         self._sql = find_port(port + 1)
 
     def deploy(self, silent=True):
@@ -476,6 +487,9 @@ class TarantoolServer(Server):
         self.process.terminate()
         self.wait_stop()
         self.status = None
+        if re.search(r'^/', str(self._admin.port)):
+            if os.path.exists(self._admin.port):
+                os.unlink(self._admin.port)
 
     def restart(self):
         self.stop()
