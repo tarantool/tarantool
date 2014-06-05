@@ -22,7 +22,9 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 	char tpl[] = "/tmp/fileXXXXXX";
 
 	struct fio_batch *batch = fio_batch_alloc(1024);
-	assert(log_dir_create(dir) == 0);
+	int create_res = log_dir_create(dir);
+	assert(create_res == 0);
+	(void)create_res;
 	strcpy(dir->open_wflags, "wx");
 	dir->filetype = "XLOG\n";
 	dir->filename_ext = ".xlog";
