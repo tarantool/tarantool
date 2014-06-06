@@ -488,7 +488,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
                          <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
                         </row>
                         <row>
-                         <entry>type</entry><entry>type of index</entry><entry>hash|tree|bitset</entry><entry>tree</entry>
+                         <entry>type</entry><entry>type of index</entry><entry>'HASH'|'TREE'|'BITSET'</entry><entry>'TREE'</entry>
                         </row>
                         <row>
                          <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last index's id, +1</entry>
@@ -504,7 +504,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
                 </table>
             </para>
             <para>
-              Returns: (type = tuple) the new index descriptor.
+              Returns: nil.
             </para>
             <para>
               Possible errors: too many parts.
@@ -671,7 +671,7 @@ tarantool> <userinput>box.space.space55:rename('space56')</userinput>
               Possible errors: The first index cannot be changed to {unique = false}.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.space55.index.primary:alter({type = 'hash'})</userinput>
+tarantool> <userinput>box.space.space55.index.primary:alter({type = 'HASH'})</userinput>
 ---
 ...
 </programlisting>
@@ -796,9 +796,10 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 for bitwise exclusive OR (XOR), <quote>:</quote>
                 for string splice, <quote>!</quote> for insertion.
                 Possible operation arguments are: <quote>p</quote>.
-                Thus in the instruction <code>s:update(0,44,'+p=p',1,55,3,'x')</code>
+                Thus in the instruction <code>s:update{44,, {{'+p,1,55},{=p',3,'x'}})</code>
                 the primary-key value is 44,
-                the format is '+p=p' meaning "add a value to a field
+                the formats are '+p' and '=p'
+                meaning "add a value to a field
                 and then assign a value to a field", the first affected field
                 is field 1 and the value which will be added to it is 55, the second affected field
                 is field 3 and the value which will be assigned to it is 'x'.
@@ -813,7 +814,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 #Assume that the initial state of the database is ...
-#  space0 has one tuple set and one primary key whose type is 32-bit integer.
+#  space0 has one tuple set and one primary key whose type is 'NUM'.
 #  There is one tuple, with field[0] = 999 and field[1] = 'A'.
 
 #In the following update ...
@@ -825,7 +826,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 #  The fourth argument is 1, that is, the affected field is field[1]
 #  The fifth argument is 'B', that is, field[1] contents change to 'B'
 #  Therefore, after the following update, field[0] = 999 and field[1] = 'B'.
-box.space.space0:update({999}, {{'=p', 1, 'B'}})
+box.space.space0:update(999, {{'=p', 1, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #  the key is passed as a Lua table (inside braces). This is unnecessary
@@ -836,7 +837,7 @@ box.space.space0:update({999}, {{'=p', 1, 'B'}})
 box.space.space0:update({999}, {{'=p', 1, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
-#   The fourth argument is 2, that is the affected field is field[2].
+#   The fourth argument is 2, that is, the affected field is field[2].
 #   It is okay that, until now, field[2] has not existed. It gets added.
 #   Therefore, after the following update, field[0] = 999, field[1] = 'B',
 #     field[2] = 1.
@@ -845,14 +846,14 @@ box.space.space0:update({999}, {{'=p', 2, 1}})
 #In the following update, the arguments are the same, except that ...
 #   The third argument is '+p', that is, the operation is addition rather
 #     than assignment.
-#   Since field[2] previously contained 10, this means we're adding 1 to 1.
+#   Since field[2] previously contained 1, this means we're adding 1 to 1.
 #   Therefore, after the following update, field[0] = 999, field[1] = 'B',
 #     field[2] = 2.
 box.space.space0:update({999}, {{'+p', 2, 1}})
 
 #In the following update ...
 #   The idea is to modify two fields at once.
-#   The third argument is '|p=p', that is, there are two operations, OR and
+#   The formats are '|p' and '=p', that is, there are two operations, OR and
 #     assignment.
 #   The fourth and fifth arguments mean that field[2] gets ORed with 1.
 #   The fifth and sixth arguments mean that field[1] gets assigned 'C'.
@@ -921,10 +922,12 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.n</emphasis></term>
+        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.id</emphasis></term>
         <listitem>
             <para>
-              (type = number) Ordinal space number, usually called the "space id".
+              (type = number) Ordinal space number. Spaces can be referenced by either name or number.
+              Thus, if space 'space0' has id = 800, then "box.space.space0:insert{0}" and "box.space[800]:insert{0}"
+              are equivalent requests.
             </para>
         </listitem>
     </varlistentry>
@@ -945,7 +948,7 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
         <listitem>
             <para>
              (type = number) The required field count for all tuples in this space.
-             The field_count can be changed with <code>box.space.<replaceable>space-name</replaceable>.field_count = <replaceable>new-field-count-value</replaceable></code>.
+             The field_count can be set initially with <code>box.schema.create_space<replaceable>... field_count = new-field-count-value ...</replaceable></code>.
              The default value is 0, which means there is no required field count.
             </para>
         </listitem>
@@ -1030,15 +1033,22 @@ tarantool&gt; <userinput>box.space.space0:len()</userinput>
               Within the loop, a value (type = tuple) is returned for each iteration.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>tmp = ''; for k, v in box.space.space0:pairs() do tmp = tmp .. v[1] end</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>s = box.schema.create_space('space33')</userinput>
 ---
 ...
-tarantool> <userinput>tmp</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>s:create_index('X', {}) -- index 'X' has default parts {0,'NUM'}</userinput>
 ---
-- Hello My Lua world
 ...
-</programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>s:insert{0,'Hello my '}; s:insert{1,'Lua world'}</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[1] end</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>tmp</userinput>
+---
+- Hello my Lua world
+...</programlisting>
         </listitem>
     </varlistentry>
 
@@ -1084,7 +1094,8 @@ replace_counter</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _schema.
-<programlisting>setopt delimiter='!'
+<programlisting>
+my_session = require('session'); my_session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._schema:pairs() do
@@ -1095,11 +1106,12 @@ function example()
   end
   return ta
 end!
-setopt delimiter=''!</programlisting>
+my_session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
+- - 'cluster 1ec4e1f8-8f1b-4304-bb22-6c47ce0cf9c6 '
 - - 'version 1 6 '
 ...
 </programlisting>
@@ -1119,7 +1131,7 @@ setopt delimiter=''!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _space.
-<programlisting>setopt delimiter='!'
+<programlisting>my_session = require('session'); my_session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._space:pairs() do
@@ -1130,7 +1142,7 @@ function example()
   end
   return ta
 end!
-setopt delimiter=''!</programlisting>
+my_session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1142,6 +1154,7 @@ setopt delimiter=''!</programlisting>
   - '296 1 _func memtx 0 '
   - '304 1 _user memtx 0 '
   - '312 1 _priv memtx 0 '
+  - '320 1 _cluster memtx 0 '
 ...
 </programlisting>
             </para>
@@ -1161,7 +1174,7 @@ setopt delimiter=''!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _index.
-<programlisting>setopt delimiter='!'
+<programlisting>my_session = require('session'); my_session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._index:pairs() do
@@ -1172,7 +1185,7 @@ function example()
   end
   return ta
 end!
-setopt delimiter=''!</programlisting>
+my_session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1190,6 +1203,8 @@ setopt delimiter=''!</programlisting>
   - '304 2 name tree 1 1 2 str '
   - '312 0 primary tree 1 3 1 num 2 str 3 num '
   - '312 1 owner tree 0 1 1 num '
+  - '320 0 primary tree 1 1 0 num '
+  - '320 1 uuid tree 1 1 1 str '
 ...  
 </programlisting>
             </para>
@@ -1218,6 +1233,18 @@ setopt delimiter=''!</programlisting>
         </listitem>
     </varlistentry>
     
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space._cluster</emphasis>
+        </term>
+        <listitem>
+            <para>
+             _priv is a new system tuple set for support of the replication feature.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    
 </variablelist>
 
 <bridgehead renderas="sect4">Example showing use of the box.space functions</bridgehead>
@@ -1233,7 +1260,7 @@ means "space_name = the space_name field in the tuple of _space
 that we've just fetched with pairs()". The function returns a table.
 </para>
 <programlisting>
-setopt delimiter='!'
+my_session = require('session'); my_session.delimiter('!')
 function example()
   local tuple_count, space_name, line
   local ta = {}
@@ -1255,7 +1282,7 @@ function example()
   end
   return ta
 end!
-setopt delimiter=''!
+my_session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -1415,7 +1442,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>tarantool></prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+<programlisting><prompt>tarantool></prompt> <userinput>my_session = require('session'); my_session.delimiter('!') #this means following commands must end with '!'</userinput>
 <prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
 ---
 ...
@@ -1448,7 +1475,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 - string
 - 666666666666666
 ...
-<prompt>tarantool></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
+<prompt>tarantool></prompt> <userinput>my_session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1493,7 +1520,7 @@ tarantool&gt; <userinput>box.dostring('return ...', 'hello', 'world')</userinput
 - hello
 - world
 ...
-tarantool&gt; <userinput>setopt delimiter='!' #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>my_session = require('session'); my_session.delimiter('!') #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
 tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
@@ -1502,7 +1529,7 @@ tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
 ---
 - nil
 ...
-tarantool&gt; <userinput>setopt delimiter=''!</userinput>
+tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1756,7 +1783,7 @@ The function uses Lua functions
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
 </para>
 <programlisting>
-setopt delimiter='!'
+my_session = require('session'); my_session.delimiter('!')
 function example()
   local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
   table_of_selected_tuples = box.space.space0:select(1000)
@@ -1776,7 +1803,7 @@ function example()
   formatted_time_field = formatted_time_field .. '.' .. d
   return formatted_time_field
 end!
-setopt delimiter=''!
+my_session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2118,7 +2145,7 @@ and display how many bytes remain in the tuple.
 The function uses Tarantool box.tuple functions new(), unpack(), find(), transform(), bsize().
 </para>
 <programlisting>
-setopt delimiter='!'
+my_session = require('session'); my_session.delimiter('!')
 function example()
   local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
   tuple1 = box.tuple.new({'a', 'b', 'c'})
@@ -2129,7 +2156,7 @@ function example()
   tuple2 = tuple2:transform(field_number, 1)
   return 'tuple2 = ' , tuple2 , ' # of bytes = ' , tuple2:bsize()
 end!
-setopt delimiter=''!
+my_session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2843,7 +2870,7 @@ This function contains an infinite loop
 Each iteration of the loop adds 1 to a global variable
 named gvar, then goes to sleep for 2 seconds.
 The sleep causes an implicit box.fiber.yield().<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>tarantool&gt;</prompt><userinput> my_session = require('session'); my_session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function function_x()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
@@ -2853,7 +2880,7 @@ The sleep causes an implicit box.fiber.yield().<programlisting>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
+<prompt>tarantool&gt;</prompt><userinput> my_session.delimiter('!')</userinput></programlisting>
 Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.
@@ -3812,7 +3839,7 @@ end
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+<prompt>tarantool&gt;</prompt><userinput> my_session = require('session'); my_session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
 <prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
@@ -3844,7 +3871,7 @@ end
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput>
+<prompt>tarantool&gt;</prompt><userinput> my_session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> example()</userinput>
 ---
 ...
@@ -4287,6 +4314,7 @@ tarantool> <userinput>box.info.build</userinput>
         </listitem>
     </varlistentry>
 </variablelist>
+
 <variablelist>
     <title>Package <code>box.slab</code></title>
     <para>
@@ -4321,7 +4349,10 @@ tarantool> <userinput>box.slab.info().slabs[64]</userinput>
 </variablelist>
 
 <variablelist>
-    <title>Package <code xml:id="box.stat">box.stat</code></title>
+
+    <para>
+     <emphasis>Package <code>box.stat</code></emphasis>
+    </para>
     <para>
       The box.stat package provides access to request
       statistics.

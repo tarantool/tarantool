@@ -93,10 +93,17 @@ Target: Linux-x86_64-Debug
 </section>
 
 <section xml:id="configuration-file" xreflabel="configuration file">
-<title>The configuration file</title>
+<title>Configuration</title>
   <para>
-    Configuration parameters are usually specified inside a
-    Lua file with a call to <olink targetptr="sp-box-cfg">box.cfg</olink>.
+     Configuration parameters should be done with
+     <code>box.cfg{<replaceable> key = value [, key_value ...]</replaceable>}</code>
+     which should be one of the first things called, if the database
+     server will be used or if ports need to be opened.
+  </para>
+  <para>
+    Since box.cfg may contain many configuration parameters
+    and since some of the parameters (such as directory addresses)
+    are semi-permanent, it's best to keep box.cfg in a Lua file.
     Typically this Lua file is the initialization file
     which is specified on the tarantool command line.
     A simple example of such a file is <filename>test/box/box.lua</filename>:
@@ -123,7 +130,6 @@ box.cfg{
   <para>
     To see all the non-null parameters, say <code>box.cfg</code> (no parentheses).
     To see a particular parameter, for example the primary port, say <code>box.cfg.primary_port</code>.
-    To reload the parameters, use <olink targetptr="box.cfg.reload"/>.
   </para>
   <para>
     The following tables describe all parameters for basic operation,
@@ -190,21 +196,11 @@ box.cfg{
           work_dir. See also <olink targetptr="wal_dir"/>.</entry>
         </row>
         <row>
-          <entry xml:id="coredump" xreflabel="coredump">coredump</entry>
+          <entry xml:id="core-dump" xreflabel="core-dump">coredump</entry>
           <entry>0 or 1</entry>
           <entry>0</entry>
           <entry>no</entry>          
           <entry>Deprecated. Do not use.</entry>
-        </row>
-        <row>
-          <entry xml:id="bind_ipaddr" xreflabel="bind_ipaddr">bind_ipaddr</entry>
-          <entry>string</entry>
-          <entry>"INADDR_ANY"</entry>
-          <entry>no</entry>
-          <entry>The network interface to bind to. By default,
-          the server binds to all available addresses.
-          Applies to all ports opened by the server.
-          </entry>
         </row>
         <row>
           <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
@@ -227,11 +223,12 @@ box.cfg{
           <entry>integer</entry>
           <entry>null</entry>
           <entry>no</entry>
-          <entry>The TCP port to listen on for administrative
+          <entry>The port to listen on for administrative
           connections. Has no default value, so must be specified
           if connections will occur via telnet. Not used unless
-          assigned a value.
-          A typical value is 3313.</entry>
+          assigned a value. This may be expressed with URI = Universal
+          Resource Identifier format, for example "unix://unix_domain_socket",
+          or as a numeric TCP port. A typical value is 3313.</entry>
         </row>
 
         <row>
@@ -420,7 +417,7 @@ tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
         </row>
 
         <row>
-          <entry xml:id="wal_dir_rescan_delay" xreflabel="wal_dir_rescan_delay">wal_mode</entry>
+          <entry xml:id="wal_dir_rescan_delay" xreflabel="wal_dir_rescan_delay">wal_dir_rescan_delay</entry>
           <entry>float</entry>
           <entry>0.1</entry>
           <entry>no</entry>
@@ -467,8 +464,8 @@ tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
           A replica server does not accept updates
           on <olink targetptr="primary_port"/>. This parameter is
           dynamic, that is, to enter master mode, simply set
-          replication_source to an empty string and issue <olink
-          targetptr="box.cfg.reload"/>.</entry>
+          replication_source to an empty string and issue
+          "box.cfg{replication_source=new-value}".</entry>
         </row>
 
       </tbody>
@@ -627,16 +624,17 @@ tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
         <row>
           <entry>local_hot_standby</entry>
           <entry>boolean</entry>
-          <entry>false</entry>
+          <entry>true</entry>
           <entry>no</entry>
           <entry>
             <anchor xml:id="local_hot_standby" xreflabel="local_hot_standby"/>
-          If local_hot_standby=true, the expectation is that there will be two
+          In version 1.6 local hot standby is always on so this is a legacy setting.
+          When local_hot_standby=true, the expectation is that there will be two
           instances of the server using the same configuration file.
           The first one to start will be the "primary" instance.
           The second one to start will be the "standby" instance.
           The standby instance will initialize and will try to connect on primary_port
-          and secondary_port and admin_port, but will fail because the
+          and admin_port, but will fail because the
           primary instance has already taken them.
           So the standby instance goes into a loop, reading the write
           ahead log which the primary instance is writing (so the
@@ -645,7 +643,7 @@ tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
           the ports will become free so the standby instance will
           succeed in connecting, and will become the primary instance.
           Thus there is no noticeable downtime if the primary instance goes down.
-          If local_hot_standby=true, then replication_source should be an
+          When local_hot_standby=true, replication_source should be an
           empty string and wal_mode should not be equal to "none".
           </entry>
         </row>
