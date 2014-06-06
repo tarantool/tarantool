@@ -10,9 +10,9 @@ class Tarantool < Formula
   option 'with-tests', "Run Tests after building"
 
   stable do
-    url 'https://github.com/tarantool/tarantool.git', :using => :git, :branch => "stable"
+    url 'https://github.com/tarantool/tarantool.git', :branch => "stable", :shallow => false
     depends_on 'e2fsprogs' => :recommended
-    if build.include? 'with-tests'
+    if build.with? 'tests'
       depends_on 'python-daemon' => [:python, "daemon",  :build]
       depends_on 'pyyaml'        => [:python, "yaml",    :build]
       depends_on 'pexpect'       => [:python, "pexpect", :build]
@@ -21,9 +21,9 @@ class Tarantool < Formula
   end
 
   devel do
-    url 'https://github.com/tarantool/tarantool.git', :using => :git, :branch => "master"
+    url 'https://github.com/tarantool/tarantool.git', :branch => "master", :shallow => false
     depends_on 'e2fsprogs' => :build
-    if build.include? 'with-tests'
+    if build.with? 'tests'
       depends_on 'python-daemon' => [:python, "daemon", :build]
       depends_on 'pyyaml'        => [:python, "yaml",   :build]
     end
@@ -32,21 +32,24 @@ class Tarantool < Formula
 
   def install
     args = []
-    if build.include? 'with-debug'
+    if build.with? 'debug'
       ENV.enable_warnings
       ENV.deparallelize
-      args << ["-DCMAKE_BUILD_TYPE=Debug"]
+      args << "-DCMAKE_BUILD_TYPE=Debug"
       ohai "Building with Debug"
     else
-      args << ["-DCMAKE_BUILD_TYPE=Release"]
+      args << "-DCMAKE_BUILD_TYPE=Release"
       ohai "Building with Release"
     end
     args << "-DENABLE_CLIENT=True" if build.stable?
+    args << "-DCMAKE_INSTALL_SYSCONFDIR=#{prefix}/etc"
+    args << "-DCMAKE_INSTALL_LOCALSTATEDIR=#{prefix}/var"
     args += std_cmake_args
-    
+
     ohai "Preparing"
     version = `git -C #{cached_download} describe HEAD`
-    File.open("#{buildpath}/VERSION", 'w') {|file| file.write(version)}
+
+    File.open(buildpath/"VERSION", 'w') {|file| file.write(version)}
 
     ohai "Configuring:"
     system "cmake", ".", *args
@@ -65,7 +68,7 @@ class Tarantool < Formula
 
     ohai "Installing config"
     if build.stable?
-      inreplace etc/"tarantool.cfg", /^work_dir =.*/, "work_dir = #{prefix}/var/lib/tarantool"
+      inreplace prefix/"etc/tarantool.cfg", /^work_dir =.*/, "work_dir = #{prefix}/var/lib/tarantool"
     else
       doc.install "test/box/box.lua"
       inreplace doc/"box.lua" do |s|
@@ -77,13 +80,13 @@ class Tarantool < Formula
       end
     end
 
-    if build.include? 'with-tests'
+    if build.with? 'tests'
         ohai "Testing Tarantool with internal test suite:"
-        system "/usr/bin/env", "python", "#{buildpath}/test/test-run.py", "--builddir", "#{buildpath}", "--vardir", "#{buildpath}/test/var"
+        system "/usr/bin/env", "python", buildpath/"test/test-run.py", "--builddir", buildpath, "--vardir", buildpath/"test/var"
     end
   end
 
   def test
-    system "#{bin}/tarantool", "--version"
+    system bin/"tarantool", "--version"
   end
 end

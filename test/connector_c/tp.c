@@ -120,11 +120,24 @@ test_check_buffer_initialized(void) {
 	tp_free(&req);
 }
 
+static void
+test_gh331(void)
+{
+	struct tp request;
+	tp_init(&request, NULL, 0, tp_realloc, NULL);
+	tp_call(&request, 0, "test", 4);
+	tp_tuple(&request);
+	tp_field(&request, "", 2*tp_size(&request)-1);
+	assert(tp_used(&request) <= tp_size(&request));
+	tp_free(&request);
+}
+
 int
 main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
+	test_gh331();
 	test_check_buffer_initialized();
 	test_check_read();
 	return 0;
