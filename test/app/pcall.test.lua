@@ -25,7 +25,7 @@ local status, msg = pcall(function() error('some message') end)
 print('pcall with Lua error():', status, msg:match('some message'))
 
 local status, msg = pcall(function()
-    box.raise(box.error.ER_ILLEGAL_PARAMS, 'some message')
+    box.raise(box.error.ILLEGAL_PARAMS, 'some message')
 end)
 print('pcall with box.raise():', status, msg)
 

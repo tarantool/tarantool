@@ -164,8 +164,10 @@ tarantool_lua_error_init(struct lua_State *L) {
 		const char *name = tnt_error_codes[i].errstr;
 		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
 			continue;
+		assert(strncmp(name, "ER_", 3) == 0);
 		lua_pushnumber(L, i);
-		lua_setfield(L, -2, name);
+		/* cut ER_ prefix from constant */
+		lua_setfield(L, -2, name + 3);
 	}
 	lua_pop(L, 1);
 }

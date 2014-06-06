@@ -170,7 +170,7 @@ box.net = {
             elseif #result == 1 then
                 return result[1]
             else
-                box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+                box.raise(box.error.MORE_THAN_ONE_TUPLE,
                     "More than one tuple found without 'limit'")
             end
         end,
