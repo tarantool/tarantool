@@ -32,7 +32,7 @@
 #include <stdbool.h>
 #include "trigger.h"
 
-enum {	SESSION_SEED_SIZE = 32 };
+enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 /** Predefined user ids. */
 enum { GUEST = 0, ADMIN =  1 };
 
@@ -58,6 +58,8 @@ struct session {
 	uint8_t auth_token;
 	/** User id of the authenticated user. */
 	uint32_t uid;
+	/** Command delimiter - used by admin console and interactive mode */
+	char delim[SESSION_DELIM_SIZE];
 };
 
 /**

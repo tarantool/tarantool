@@ -22,13 +22,13 @@
       (also called the "binary protocol"), and provides full data access.
       </para>
       <para>
-      The default value of the port is <literal>3301</literal>,
+      The default value of the port is <literal>3303</literal>,
       as defined in the <olink targetptr="primary_port"/>
       configuration option.
     </para></listitem>
     <listitem><para>
       Administrative port, which is for handling requests in unconverted text (also called the "text protocol"),
-      which defaults to <literal>33015</literal>,
+      which defaults to <literal>3313</literal>,
       and is defined in the <olink targetptr="admin_port"/>
       configuration option.
     </para></listitem>
@@ -118,7 +118,7 @@
     It is encoded using YAML markup to simplify automated parsing.
   </para>
   <para>To learn which functions are considered to be administrative,
-    type <emphasis role="tntadmin">help</emphasis> in the
+    type <emphasis role="tntadmin">help()</emphasis> in the
     administrative console. A reference description also follows
     below:</para>
 

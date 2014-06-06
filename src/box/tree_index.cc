@@ -189,9 +189,7 @@ tree_iterator_bwd_skip_one_check_next_equality(struct iterator *iterator)
 static void *
 extent_alloc()
 {
-#ifndef NDEBUG
-	ERROR_INJECT(ERRINJ_TREE_ALLOC, return 0);
-#endif
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
 	return mempool_alloc(&tree_extent_pool);
 }
 

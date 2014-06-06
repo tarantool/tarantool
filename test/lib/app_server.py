@@ -11,8 +11,8 @@ from lib.tarantool_server import Test
 
 class AppTest(Test):
     def execute(self, server):
-        execs = [os.path.join(server.builddir, "test", self.name)]
-        proc = Popen(execs, stdout=PIPE)
+        execs = [os.path.join(os.path.abspath(server.builddir), "test", self.name)]
+        proc = Popen(execs, stdout=PIPE, cwd=server.vardir)
         sys.stdout.write(proc.communicate()[0])
 
 class AppServer(Server):

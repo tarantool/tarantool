@@ -219,7 +219,7 @@ box.cfg{
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.
-          A typical value is 3301.</entry>
+          A typical value is 3303.</entry>
         </row>
 
         <row>
@@ -259,11 +259,11 @@ box.cfg{
              ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: primary pri: 3301 adm: 33015</programlisting>
+tarantool: primary pri: 3303 adm: 33135</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
           the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: primary@sessions pri: 3301 adm: 33015</programlisting>
+tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
           </entry>
         </row>
 

@@ -1,13 +1,13 @@
 errinj = require('errinj')
 ---
 ...
+-- Check a failed realloc in tree index.
 s = box.schema.create_space('tweedledum')
 ---
 ...
-s:create_index('primary')
+s:create_index('primary', {type = 'tree'} )
 ---
 ...
--- Check a failed realloc in tree.
 for i = 1,10 do s:insert{i, i, 'test' .. i} end
 ---
 ...
@@ -49,7 +49,7 @@ res
   - [9, 9, 'test9']
   - [10, 10, 'test10']
 ...
-errinj.set("ERRINJ_TREE_ALLOC", true)
+errinj.set("ERRINJ_INDEX_ALLOC", true)
 ---
 - ok
 ...
@@ -195,7 +195,257 @@ check_iter_and_size()
 ---
 - ok
 ...
-errinj.set("ERRINJ_TREE_ALLOC", false)
+errinj.set("ERRINJ_INDEX_ALLOC", false)
+---
+- ok
+...
+for i = 4501,5500 do s:insert{i, i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+s:delete{8}
+---
+- [8, 8, 'test8']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 5001,5010 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [5001, 5001]
+  - [5002, 5002]
+  - [5003, 5003]
+  - [5004, 5004]
+  - [5005, 5005]
+  - [5006, 5006]
+  - [5007, 5007]
+  - [5008, 5008]
+  - [5009, 5009]
+  - [5010, 5010]
+...
+s:drop()
+---
+...
+-----------------------------------
+-- Check a failed realloc in hash index.
+s = box.schema.create_space('tweedledum')
+---
+...
+s:create_index('primary', {type = 'hash'} )
+---
+...
+for i = 1,10 do s:insert{i, i, 'test' .. i} end
+---
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+errinj.set("ERRINJ_INDEX_ALLOC", true)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, s:get{i}) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for _, t in s.index[0]:pairs() do table.insert(res, t) end
+---
+...
+res
+---
+- - [1, 1, 'test1']
+  - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 501,2500 do s:insert{i, i} end
+---
+- error: Failed to allocate 23 bytes in hash for key
+...
+s:delete{1}
+---
+- [1, 1, 'test1']
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [2, 2, 'test2']
+  - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+res = {}
+---
+...
+for i = 501,510 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- []
+...
+res = {}
+---
+...
+for i = 2001,2010 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- []
+...
+--since every insertion is rejected, count must be (10 - number of deletions)
+function check_iter_and_size(size_must_be) local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end print (count) return count ~= size_must_be and "fail 1" or "ok" end
+---
+...
+check_iter_and_size(9)
+---
+- ok
+...
+for i = 2501,3500 do s:insert{i, i} end
+---
+- error: Failed to allocate 23 bytes in hash for key
+...
+s:delete{2}
+---
+- [2, 2, 'test2']
+...
+check_iter_and_size(8)
+---
+- ok
+...
+res = {}
+---
+...
+for i = 1,10 do table.insert(res, (s:get{i})) end
+---
+...
+res
+---
+- - [3, 3, 'test3']
+  - [4, 4, 'test4']
+  - [5, 5, 'test5']
+  - [6, 6, 'test6']
+  - [7, 7, 'test7']
+  - [8, 8, 'test8']
+  - [9, 9, 'test9']
+  - [10, 10, 'test10']
+...
+for i = 3501,4500 do s:insert{i, i} end
+---
+- error: Failed to allocate 23 bytes in hash for key
+...
+s:delete{3}
+---
+- [3, 3, 'test3']
+...
+check_iter_and_size(7)
+---
+- ok
+...
+errinj.set("ERRINJ_INDEX_ALLOC", false)
 ---
 - ok
 ...

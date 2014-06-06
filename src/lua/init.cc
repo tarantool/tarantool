@@ -45,6 +45,7 @@ extern "C" {
 
 #include <fiber.h>
 #include <session.h>
+#include <scoped_guard.h>
 #include "coeio.h"
 #include "lua/fiber.h"
 #include "lua/errinj.h"
@@ -56,10 +57,12 @@ extern "C" {
 #include "lua/cjson.h"
 #include "lua/yaml.h"
 #include "lua/msgpack.h"
+#include "lua/pickle.h"
 
 #include <ctype.h>
 #include "small/region.h"
 #include <stdio.h>
+#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -236,6 +239,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
 	tarantool_lua_error_init(L);
+	tarantool_lua_pickle_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 
@@ -386,27 +390,57 @@ ssize_t
 readline_cb(va_list ap)
 {
 	const char **line = va_arg(ap, const char **);
-	*line = readline("tarantool> ");
+	const char *prompt = va_arg(ap, const char *);
+	*line = readline(prompt);
+	return 0;
+}
+
+static inline int
+interactive_input(struct tbuf *in)
+{
+	char *line;
+	int linenum = 0;
+	const char *delim = fiber()->session->delim;
+	int delim_len = strlen(delim);
+
+	do {
+		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line,
+			     linenum ? "         > " : "tarantool> ");
+		if (line == NULL)
+			return -1;
+
+		auto scoped_guard = make_scoped_guard([&] { free(line); });
+		if (linenum++ > 0)
+			tbuf_append(in, "\n", 1);
+		tbuf_append(in, line, strlen(line));
+	} while (delim_len > 0 && (in->size < delim_len ||
+		 memcmp(in->data + in->size - delim_len, delim, delim_len)));
+
+	in->size -= delim_len; /* remove delimiter from the end of input */
+	in->data[in->size] = '\0';
+
 	return 0;
 }
 
 extern "C" void
 tarantool_lua_interactive()
 {
-	char *line;
-	while (true) {
-		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line);
-		if (line == NULL)
-			break;
+	while (1) {
+		RegionGuard region_guard(&fiber()->gc);
+		struct tbuf *in = tbuf_new(&fiber()->gc);
+		if (interactive_input(in) != 0) {
+			printf("Bye\n");
+			return;
+		}
+
 		struct tbuf *out = tbuf_new(&fiber()->gc);
 		struct lua_State *L = lua_newthread(tarantool_L);
-		tarantool_lua(L, out, line);
-		lua_pop(tarantool_L, 1);
+		LuarefGuard coro_ref(tarantool_L);
+		tarantool_lua(L, out, tbuf_str(in));
 		printf("%.*s", out->size, out->data);
-		fiber_gc();
+
 		if (history)
-			add_history(line);
-		free(line);
+			add_history(tbuf_str(in));
 	}
 }
 
@@ -437,9 +471,13 @@ run_script(va_list ap)
 	SessionGuard session_guard(0, 0);
 
 	if (access(path, F_OK) == 0) {
-		/* Execute the init file. */
-		lua_getglobal(L, "dofile");
-		lua_pushstring(L, path);
+		/* Execute script. */
+		if (luaL_loadfile(L, path) != 0)
+			panic("%s", lua_tostring(L, -1));
+	} else if (!isatty(STDIN_FILENO)) {
+		/* Execute stdin */
+		if (luaL_loadfile(L, NULL) != 0)
+			panic("%s", lua_tostring(L, -1));
 	} else {
 		say_crit("version %s", tarantool_version());
 		/* get iteractive from package.loaded */

@@ -103,7 +103,7 @@ tonumber64('18446744073709551615') == tonumber64('18446744073709551615')
 tonumber64('18446744073709551615') + 1
 tonumber64(-1)
 tonumber64('184467440737095516155')
-string.byte(box.pack('p', tonumber64(123)))
+string.byte(require('msgpack').encode(tonumber64(123)))
 --  A test case for Bug#1061747 'tonumber64 is not transitive'
 tonumber64(tonumber64(2))
 tostring(tonumber64(tonumber64(3)))

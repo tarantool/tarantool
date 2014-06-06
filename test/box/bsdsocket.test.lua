@@ -1,4 +1,5 @@
 json = require('json')
+pickle = require('pickle')
 socket = require('socket')
 type(socket)
 
@@ -27,12 +28,12 @@ s:writable(.00000000000001)
 s:writable(0)
 s:wait(.01)
 
-s:syswrite(box.pack('iii', 65280, 0, 12334))
+s:syswrite(pickle.pack('iii', 65280, 0, 12334))
 s:readable(1)
 s:wait(.01)
-box.unpack('iii', s:sysread(4096))
+pickle.unpack('iii', s:sysread(4096))
 
-s:syswrite(box.pack('iii', 65280, 0, 12335))
+s:syswrite(pickle.pack('iii', 65280, 0, 12335))
 s:readable(1)
 string.len(s:sysread(4096))
 s:close()

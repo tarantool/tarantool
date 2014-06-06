@@ -7,21 +7,92 @@
 <title>Preface</title>
 <section xml:id="tarantool-overview">
   <title>Tarantool: an overview</title>
-  <para>
-    <productname>Tarantool</productname> is a NoSQL
-    database management system running in a Lua application
-    server. The code is available for free under the terms of the
-    <citetitle
-    xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
-    license</citetitle>. Supported platforms are GNU/Linux, Mac OS
-    and FreeBSD.
+  <para>   
+    <productname>Tarantool</productname> is a scalable software platform integrated with a database management system.
+    It handles Lua functions asynchronously which makes it appropriate for real-time applications.
+    It has a "fiber" model which means that many applications can run simultaneously on a single
+    thread, while the Tarantool server can run multiple threads for input-output and background maintenance.
+    It integrates the LuaJIT -- "Just In Time" -- Lua compiler, Lua libraries for most common
+    applications, socket support, and the Tarantool Database Server which is an established
+    NoSQL DBMS. Thus it serves all the purposes that have made node.js and Twisted popular in
+    other environments, with the additional twist that it has a data persistence level.
+    Tarantool's name and motto are like  <link xlink:href="https://en.wikipedia.org/wiki/Terence">Terentius's</link>:
+    "Rostrum sum, Luae nihil a me alienum puto" -- I am a platform, I regard
+    nothing of Lua to be alien. 
+  </para>
 
+  <para> 
+    The code is free. The open-source license is  <citetitle
+    xlink:href="http://www.gnu.org/licenses/license-list.html#ModifiedBSD">BSD
+    license</citetitle>. The supported platforms are GNU/Linux, Mac OS
+    and FreeBSD.
+  </para>
+  
+  <para>
+    Tarantool's creator and biggest user is <citetitle xlink:href="https://en.wikipedia.org/wiki/Mail.ru">Mail.Ru</citetitle>,
+    the largest internet company in Russia, with 30 million users, 25 million emails per day,
+    and a web site whose Alexa global rank is in the <link xlink:href="http://www.alexa.com/siteinfo/mail.ru">top 40</link> worldwide.
+    Tarantool services Mail.Ru's hottest data, such as the session data of online users,
+    the properties of online applications, the caches of the underlying data,
+    the distribution and sharding algorithms, and much more.
+    Outside Mail.Ru the software is used by a growing
+    number of projects in online gaming, digital marketing, and social
+    media industries. While product development is sponsored by Mail.Ru, the
+    roadmap, the bugs database and the development process are fully
+    open. The software incorporates patches from dozens of
+    community contributors. The Tarantool community writes and maintains
+    most of the drivers for programming languages.
+    The greater Lua community has hundreds of useful packages
+    which can become Tarantool extensions.
   </para>
 
   <para>
-    The server <emphasis role="strong">maintains all its data in
+    Users can create, modify and drop <emphasis
+    role="strong">Lua functions</emphasis> at runtime.
+     Or they can define <emphasis role="strong">Lua programs</emphasis>
+    that are loaded during startup for triggers, background tasks,
+    and interacting with networked peers.
+    Unlike popular application development frameworks based on
+    a "reactor" pattern, networking in server-side Lua is
+    sequential, yet very efficient, as it is built on top of the
+    <emphasis role="strong">cooperative multitasking</emphasis>
+    environment that Tarantool itself uses.
+    A key feature is that the functions
+    can access and modify databases atomically.
+    Thus some developers look at it as "a DBMS with a popular stored procedure language",
+    while others look at it as a replacement for multiple components
+    of "multi-tier Web application architectures".
+    Performance is a few thousand transactions per second
+    on a laptop, scalable upwards or outwards to server farms.
+  </para>
+  
+  <para>
+    <emphasis role="strong">Tarantool is lock-free</emphasis>.
+    Instead of the operating system's concurrency primitives, such
+    as mutexes, Tarantool uses cooperative
+    multitasking to handle thousands of connections simultaneously.
+    There is a fixed number of independent execution threads.
+    The threads do not share state. Instead they
+    exchange data using low-overhead message queues. While this
+    approach limits the number of cores that the server will use,
+    it removes competition for the memory bus and ensures peak
+    scalability of memory access and network throughput.
+    CPU utilization of a typical highly-loaded
+    Tarantool server is under 10%.
+  </para>
+
+  <para>
+    Although Tarantool can run without it, the database management component is a
+    strong distinguishing feature. So here is a closer look at "The Box",
+    or DBMS server.
+  </para>
+
+  <para>
+    Ordinarily the server <emphasis role="strong">keeps all the data in
     random-access memory</emphasis>, and therefore has very low read
-    latency. The server <emphasis role="strong">keeps persistent copies of
+    latency. (There is also a conventional disk-based storage engine
+    named Sophia but we will defer discussion of it to a later section.)
+    The server <emphasis role="strong">keeps persistent copies of
     the data in non-volatile storage</emphasis>, such as disk,
     when users request "snapshots". The server <emphasis role="strong">
     maintains a write-ahead log (WAL)</emphasis> to ensure
@@ -46,47 +117,10 @@
   </para>
 
   <para>
-    <emphasis role="strong">Tarantool is lock-free</emphasis>.
-    Instead of the operating system's concurrency primitives, such
-    as mutexes, Tarantool uses cooperative
-    multitasking to handle thousands of connections simultaneously.
-    There is a fixed number of independent execution threads.
-    The threads do not share state. Instead they
-    exchange data using low-overhead message queues. While this
-    approach limits the number of cores that the server will use,
-    it removes competition for the memory bus and ensures peak
-    scalability of memory access and network throughput.
-    CPU utilization of a typical highly-loaded
-    Tarantool server is under 10%.
-  </para>
-
-  <para>
     Unlike most NoSQL DBMSs, Tarantool supports <emphasis role="strong">
     secondary index keys and multi-part index keys</emphasis>
     as well as primary keys. The possible index types are
     HASH, TREE, and BITSET.
-  </para>
-
-  <para>
-    As its key feature, Tarantool supports <emphasis
-    role="strong">Lua functions</emphasis>, which
-    can access and modify data atomically.
-    Users can create, modify and drop Lua functions at runtime.
-  </para>
-  <para>
-    There is a role not only for Lua functions, but also for Lua programs.
-    During startup, Lua programs can be used to define
-    triggers and background tasks, or interact with networked peers.
-    Unlike popular application development frameworks based on
-    a "reactor" pattern, networking in server-side Lua is
-    sequential, yet very efficient, as it is built on top of the
-    cooperative multitasking environment that Tarantool itself uses.
-    </para>
-    <para>
-    Extended with Lua, Tarantool typically replaces
-    multiple components of an existing system. Complex
-    multi-tier Web application architectures
-    become simpler, and performance is good.
   </para>
 
   <para>
@@ -96,27 +130,12 @@
     cause blocking of writes to the master database.
     If the master becomes unavailable, a replica can assume the
     master role without requiring a restart.
+    In this latest version the replication architecture can be
+    <emphasis role="strong">master-master</emphasis>, that is,
+    many nodes may both handle the loads and receive what others
+    have handled, for the same data sets. 
   </para>
 
-  <para>
-    Tarantool is <emphasis role="strong">in production today</emphasis>.
-    Tarantool was created by and is actively used at
-    <citetitle xlink:href="https://en.wikipedia.org/wiki/Mail.ru">Mail.Ru</citetitle>,
-    one of the leading Russian web content providers. At Mail.Ru
-    the software serves the <quote>hottest</quote>
-    data, such as online users and their sessions, online application
-    properties, mapping between users and their serving shards,
-    and so on.
-   </para>
-   <para>
-   Outside Mail.Ru the software is used by a growing
-    number of projects in online gaming, digital marketing, and social
-    media industries. While product development is sponsored by Mail.Ru, the
-    roadmap, the bugs database and the development process are fully
-    open. The software incorporates patches from dozens of
-    community contributors. The Tarantool community writes and maintains
-    most of the drivers for programming languages.
-  </para>
 
 </section>
 <section xml:id="manual-conventions">

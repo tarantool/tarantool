@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_ERRINJ_H_INCLUDED
-#define TARANTOOL_ERRINJ_H_INCLUDED
+#ifndef TARANTOOL_LUA_PICKLE_H_INCLUDED
+#define TARANTOOL_LUA_PICKLE_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,50 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "exception.h"
-#include "trivia/util.h"
 
-struct errinj {
-	const char *name;
-	bool state;
-};
+void
+tarantool_lua_pickle_init(struct lua_State *L);
 
-/**
- * list of error injection handles.
- */
-#define ERRINJ_LIST(_) \
-	_(ERRINJ_TESTING, false) \
-	_(ERRINJ_WAL_IO, false) \
-	_(ERRINJ_WAL_ROTATE, false) \
-	_(ERRINJ_INDEX_ALLOC, false)
-
-ENUM0(errinj_enum, ERRINJ_LIST);
-extern struct errinj errinjs[];
-
-bool errinj_get(int id);
-
-void errinj_set(int id, bool state);
-int errinj_set_byname(char *name, bool state);
-
-struct tbuf;
-void errinj_info(struct tbuf *out);
-
-typedef int (*errinj_cb)(struct errinj *e, void *cb_ctx);
-int errinj_foreach(errinj_cb cb, void *cb_ctx);
-
-#ifdef NDEBUG
-#  define ERROR_INJECT(ID, CODE)
-#else
-#  define ERROR_INJECT(ID, CODE) \
-	do { \
-		if (errinj_get(ID) == true) \
-			CODE; \
-	} while (0)
-#endif
-
-#define ERROR_INJECT_EXCEPTION(ID) \
-	ERROR_INJECT(ID, tnt_raise(ErrorInjection, #ID))
-
-#define ERROR_INJECT_RETURN(ID) ERROR_INJECT(ID, return -1)
-
-#endif /* TATRANTOOL_ERRINJ_H_INCLUDED */
+#endif /* TARANTOOL_LUA_PICKLE_H_INCLUDED */

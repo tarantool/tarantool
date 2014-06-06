@@ -56,14 +56,20 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 {
 	struct ibuf *in = &iobuf->in;
 	struct tbuf *out = tbuf_new(&fiber()->gc);
+	char delim[SESSION_DELIM_SIZE + 1];
+	/* \n must folow user-specified delimiter */
+	int delim_len = snprintf(delim, sizeof(delim), "%s\n",
+				 fiber()->session->delim);
+
 	char *eol;
-	while ((eol = (char *) memchr(in->pos, '\n', in->end - in->pos)) == NULL) {
+	while ((eol = (char *) memmem(in->pos, in->end - in->pos, delim,
+				      delim_len)) == NULL) {
 		if (coio_bread(coio, in, 1) <= 0)
 			return -1;
 	}
 	eol[0] = '\0';
 	tarantool_lua(L, out, in->pos);
-	in->pos = (eol + 1);
+	in->pos = (eol + delim_len);
 	coio_write(coio, out->data, out->size);
 	return 0;
 }

@@ -21,7 +21,6 @@ t
   - index
   - info
   - net
-  - pack
   - raise
   - schema
   - slab
@@ -29,7 +28,6 @@ t
   - space
   - stat
   - tuple
-  - unpack
 ...
 t = nil
 ---
@@ -318,7 +316,7 @@ tonumber64('184467440737095516155')
 ---
 - error: 'lua_tointeger64: bad argument'
 ...
-string.byte(box.pack('p', tonumber64(123)))
+string.byte(require('msgpack').encode(tonumber64(123)))
 ---
 - 123
 ...
