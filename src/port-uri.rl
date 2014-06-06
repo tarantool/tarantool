@@ -67,8 +67,7 @@ port_uri_to_string(const struct port_uri * uri)
 		else
 			snprintf(str, sizeof(str), "%s://[%s]:%s",
 				 uri->schema, shost, sservice);
-		return str;
-
+                break;
 	}
 	case AF_UNIX:
 	{
@@ -76,11 +75,13 @@ port_uri_to_string(const struct port_uri * uri)
 			(struct sockaddr_un *)&uri->addr;
 		snprintf(str, sizeof(str), "unix://%.*s",
 			 (int) sizeof(un->sun_path), un->sun_path);
-		return str;
+	        break;
 	}
 	default:
-		assert(false);
+		snprintf(str, sizeof(str), "unknown address");
+	        break;
 	}
+	return str;
 }
 
 struct port_uri *
