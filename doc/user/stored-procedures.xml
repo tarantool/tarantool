@@ -292,8 +292,8 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
   
     The contents of the <code>box</code> library can be inspected at runtime with
     <code>box</code>, with no arguments.
-    The packages inside the box library are: schema, box, box.tuple, box.cjson, box.space, box.index, box.fiber,
-    box.session, box.ipc, box.socket, box.net.box, box.cfg, box.info, box.slab, box.stat.
+    The packages inside the box library are: schema, box, box.tuple, box.cjson, box.space, box.index, require('fiber'),
+    session, box.ipc, socket, box.net.box, box.cfg, box.info, box.slab, box.stat.
     Every package contains one or more Lua functions. A few packages contain members as well as functions.
     The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
     creating or resuming or interrupting fibers,
@@ -1095,7 +1095,7 @@ replace_counter</programlisting>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _schema.
 <programlisting>
-my_session = require('session'); my_session.delimiter('!')
+session = require('session'); session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._schema:pairs() do
@@ -1106,7 +1106,7 @@ function example()
   end
   return ta
 end!
-my_session.delimiter('')!</programlisting>
+session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1131,7 +1131,7 @@ my_session.delimiter('')!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _space.
-<programlisting>my_session = require('session'); my_session.delimiter('!')
+<programlisting>session = require('session'); session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._space:pairs() do
@@ -1142,7 +1142,7 @@ function example()
   end
   return ta
 end!
-my_session.delimiter('')!</programlisting>
+session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1174,7 +1174,7 @@ my_session.delimiter('')!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _index.
-<programlisting>my_session = require('session'); my_session.delimiter('!')
+<programlisting>session = require('session'); session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._index:pairs() do
@@ -1185,7 +1185,7 @@ function example()
   end
   return ta
 end!
-my_session.delimiter('')!</programlisting>
+session.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1260,7 +1260,7 @@ means "space_name = the space_name field in the tuple of _space
 that we've just fetched with pairs()". The function returns a table.
 </para>
 <programlisting>
-my_session = require('session'); my_session.delimiter('!')
+session = require('session'); session.delimiter('!')
 function example()
   local tuple_count, space_name, line
   local ta = {}
@@ -1282,7 +1282,7 @@ function example()
   end
   return ta
 end!
-my_session.delimiter('')!
+session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -1442,7 +1442,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>tarantool></prompt> <userinput>my_session = require('session'); my_session.delimiter('!') #this means following commands must end with '!'</userinput>
+<programlisting><prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
 <prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
 ---
 ...
@@ -1475,7 +1475,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 - string
 - 666666666666666
 ...
-<prompt>tarantool></prompt> <userinput>my_session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
+<prompt>tarantool></prompt> <userinput>session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -1483,7 +1483,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
+            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1507,21 +1507,21 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool&gt; <userinput>box.dostring('abc')</userinput>
+tarantool&gt; <userinput>dostring('abc')</userinput>
 ---
 error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
 ...
-tarantool&gt; <userinput>box.dostring('return 1')</userinput>
+tarantool&gt; <userinput>dostring('return 1')</userinput>
 ---
 - 1
 ...
-tarantool&gt; <userinput>box.dostring('return ...', 'hello', 'world')</userinput>
+tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 ---
 - hello
 - world
 ...
-tarantool&gt; <userinput>my_session = require('session'); my_session.delimiter('!') #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
+tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>dostring('local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
@@ -1529,14 +1529,14 @@ tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
 ---
 - nil
 ...
-tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
+tarantool&gt; <userinput>session.delimiter('')!</userinput>
 </programlisting>
             </para>
         </listitem>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.time()</emphasis>
+            <emphasis role="lua">fiber.time()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1546,7 +1546,10 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
                 but still useful for constructing artificial
                 tuple keys.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.time(), box.time()</userinput>
+<programlisting>tarantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput> fiber.time(), fiber.time()</userinput>
 ---
  - 1385758759.2591
  - 1385758759.2591
@@ -1557,14 +1560,17 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.time64()</emphasis>
+            <emphasis role="lua">fiber.time64()</emphasis>
         </term>
         <listitem>
             <para>
               Returns: current system time (in microseconds since the epoch) as a 64-bit
               integer. The time is taken from the event loop clock.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.time(), box.time64()</userinput>
+<programlisting>arantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
 ---
  - 1385758828.9825
  - 1385758828982485
@@ -1575,7 +1581,7 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.uuid()</emphasis>
+            <emphasis role="lua">uuid.bin()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1586,7 +1592,10 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
                 when it starts. If the library is not available, which can happen if it was not
                 found when the server was built from source, then box.uuid() returns an error.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.uuid() == box.uuid() -- Comment: == means "are they equal?"</userinput>
+<programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
 ---
  - false
 ...
@@ -1596,7 +1605,7 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.uuid_hex()</emphasis>
+            <emphasis role="lua">uuid.hex()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1604,7 +1613,11 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
                 unique id, as a string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.uuid_hex()</userinput>
+<programlisting>
+tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.hex()</userinput>
 ---
  - b8eadcb078b54bed8fa8425d129b10e8
 ...
@@ -1631,7 +1644,7 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
                 message can be arbitrary.
                 Lua function can use <code>box.raise()</code> to emulate
                 request errors (for example: unique key exception).
-                When called without arguments this function re-throws last
+                When called without arguments this function re-throws the last
                 thrown error.
             </para>
             <para>
@@ -1642,9 +1655,9 @@ tarantool&gt; <userinput>my_session.delimiter('')!</userinput>
               Possible errors: whatever is specified in errcode-number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.raise(box.error.ER_WAL_IO, 'WAL I/O error')</userinput>
+<programlisting>tarantool&gt; <userinput>box.raise(box.error.NO_SUCH_SPACE, 'Error: No such space')</userinput>
 ---
-- error: 'WAL I/O error'
+- error: 'Error: No such space'
 ...
 </programlisting>
         </listitem>
@@ -1783,9 +1796,11 @@ The function uses Lua functions
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
 </para>
 <programlisting>
-my_session = require('session'); my_session.delimiter('!')
+session = require('session'); session.delimiter('!')
 function example()
   local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
+  local formatted_time_field
+  local fiber = require('fiber')
   table_of_selected_tuples = box.space.space0:select(1000)
   if table_of_selected_tuples ~= nil then
     if table_of_selected_tuples[1] ~= nil then
@@ -1795,7 +1810,7 @@ function example()
     end
   end
   replaced_tuple = box.space.space0:replace
-                   {1000,  box.uuid_hex(), tostring(box.time())}
+            {1000,  require('uuid').hex(), tostring(fiber.time())}
   time_field = tonumber(replaced_tuple[2])
   formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
   c = time_field % 1
@@ -1803,7 +1818,7 @@ function example()
   formatted_time_field = formatted_time_field .. '.' .. d
   return formatted_time_field
 end!
-my_session.delimiter('')!
+session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2145,7 +2160,7 @@ and display how many bytes remain in the tuple.
 The function uses Tarantool box.tuple functions new(), unpack(), find(), transform(), bsize().
 </para>
 <programlisting>
-my_session = require('session'); my_session.delimiter('!')
+session = require('session'); session.delimiter('!')
 function example()
   local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
   tuple1 = box.tuple.new({'a', 'b', 'c'})
@@ -2156,7 +2171,7 @@ function example()
   tuple2 = tuple2:transform(field_number, 1)
   return 'tuple2 = ' , tuple2 , ' # of bytes = ' , tuple2:bsize()
 end!
-my_session.delimiter('')!
+session.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2174,18 +2189,18 @@ my_session.delimiter('')!
 </section>
 
 <section xml:id="sp-box-cjson">
-    <title>Package <code>box.cjson</code></title>
+    <title>Package <code>json</code></title>
 
 <variablelist xml:id="box.cjson" xreflabel="box.cjson">
     <para>
-        The <code>box.cjson</code> package provides JSON manipulation routines.
+        The <code>json</code> package provides JSON manipulation routines.
         It is based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
         Lua-CJSON package by Mark Pulford</link>.
 
         For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.cjson.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">json.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Convert a Lua object to a JSON string.
@@ -2197,23 +2212,27 @@ my_session.delimiter('')!
               Returns: (type = string) the original value reformatted as a JSON string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.cjson.encode(123)</userinput>
+<programlisting>
+tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+tarantool&gt; <userinput>json.encode(123)</userinput>
 ---
 - '123'
 ...
-tarantool&gt; <userinput>box.cjson.encode({123})</userinput>
+tarantool&gt; <userinput>json.encode({123})</userinput>
 ---
 - '[123]'
 ...
-tarantool&gt; <userinput>box.cjson.encode({123, 234, 345})</userinput>
+tarantool&gt; <userinput>json.encode({123, 234, 345})</userinput>
 ---
 - '[123,234,345]'
 ...
-tarantool&gt; <userinput>box.cjson.encode({abc = 234, cde = 345})</userinput>
+tarantool&gt; <userinput>json.encode({abc = 234, cde = 345})</userinput>
 ---
 - '{"cde":345,"abc":234}'
 ...
-tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
+tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
 ---
 - '{"hello":["world"]}'
 ...
@@ -2221,7 +2240,7 @@ tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.cjson.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">json.decode(<replaceable>string-value</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Convert a JSON string to a Lua object.
@@ -2233,15 +2252,18 @@ tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
               Returns: (type = Lua table) the original contents formatted as a Lua table.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.cjson.decode('123')</userinput>
+<programlisting>tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+ tarantool&gt; <userinput>json.decode('123')</userinput>
 ---
 - 123
 ...
-tarantool&gt; <userinput>box.cjson.decode('[123, "hello"]')[2]</userinput>
+tarantool&gt; <userinput>json.decode('[123, "hello"]')[2]</userinput>
 ---
 - hello
 ...
-tarantool&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput>
+tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
 ---
 - world
 ...
@@ -2295,38 +2317,19 @@ tarantool&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput
     </varlistentry>
 
     <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.idx</emphasis>
-        </term>
-        <listitem>
-            <para>
-              A group of methods including max(), min(), count(), random(), next(),
-              next_equal(), prev(), prev_equal(). For each case there is an alternative syntax,
-              and use of the alternative syntax is recommended.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
         <term></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>tarantool&gt; <userinput>box.space.space0.index.primary</userinput>
 ---
-- unique: true
-  idx: ' index 0'
-  n: 1029
-  type: TREE
-  key_field:
+  unique: true
+  parts:
     0:
       type: NUM
       fieldno: 0
-  name: primary
   id: 0
-...
-
-tarantool&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
----
- - [ 999, 2, 'c']
+  type: TREE
+  idx: ' index 0'
+  etc.
 ...</programlisting></listitem>
     </varlistentry>
 
@@ -2358,7 +2361,7 @@ tarantool&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
                 access to all tuples and spaces until it
                 encounters a "context switch": by causing a write to
                 disk, network, or by an explicit call to <emphasis
-                role="lua" xlink:href="#box.fiber.yield">box.fiber.yield()</emphasis>.
+                role="lua" xlink:href="#fiber.yield">fiber.yield()</emphasis>.
                 When the execution flow returns to the yielded
                 procedure, the data set could have changed significantly.
                 Iteration, resumed after a yield point, does not
@@ -2609,46 +2612,46 @@ The result will be a table of tuples and will look like this:
 </section>
 
 <section xml:id="sp-box-fiber">
-    <title>Package <code>box.fiber</code></title>
+    <title>Package <code>fiber</code></title>
     <para>
-      The <code>box.fiber</code> package allows for creating, running and managing <emphasis>fibers</emphasis>.
+      The <code>fiber</code> package allows for creating, running and managing <emphasis>fibers</emphasis>.
     </para>
     <para>
       A fiber is a set of instructions which are executed
       with cooperative multitasking. Fibers managed by the
-      box.fiber package are associated with a user-supplied function
+      fiber package are associated with a user-supplied function
       called the <emphasis>fiber function</emphasis>.
 
       A fiber has three possible states: running, suspended or dead.
-      When a fiber is created with <code>box.fiber.create()</code>, it is suspended.
-      When a fiber is started with <code>box.fiber.resume()</code>, it is running.
-      When a fiber yields control with <code>box.fiber.yield()</code>, it is suspended.
+      When a fiber is created with <code>fiber.create()</code>, it is suspended.
+      When a fiber is started with <code>fiber.resume()</code>, it is running.
+      When a fiber yields control with <code>fiber.yield()</code>, it is suspended.
       When a fiber ends (because the fiber function ends), it is dead.
     </para>
     <para>
       A fiber can also be attached or detached.
       An attached fiber is a child of the creator,
       and is running only if the creator has called
-      <code>box.fiber.resume()</code>. A detached fiber is a child of
+      <code>fiber.resume()</code>. A detached fiber is a child of
       the Tarantool internal <quote>sched</quote> fiber, and gets
       scheduled only if there is a libev event associated
       with it.
-      To detach, a running fiber should invoke <code>box.fiber.wrap()</code>.
+      To detach, a running fiber should invoke <code>fiber.wrap()</code>.
       A detached fiber loses connection with its parent forever.
     </para>
     <para>
-      All fibers are part of the fiber registry, <code>box.fiber</code>.
-      This registry can be searched (<code>box.fiber.find()</code>)
+      All fibers are part of the fiber registry.
+      This registry can be searched (<code>fiber.find()</code>)
       either by fiber id (fid), which is numeric, or by fiber name,
       which is a string. If there is more than one fiber with the given
       name, the first fiber that matches is returned.
     </para>
     <para>
-      A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
-      However, <code>box.fiber.cancel()</code> is advisory &mdash; it works
-      only if the runaway fiber calls <code>box.fiber.testcancel()</code>
+      A runaway fiber can be stopped with <code>fiber.cancel()</code>.
+      However, <code>fiber.cancel()</code> is advisory &mdash; it works
+      only if the runaway fiber calls <code>fiber.testcancel()</code>
       once in a while. Most <code>box.*</code> hooks, such as <code>box.space...delete()</code>
-      or <code>box.space...update()</code>, do call <code>box.fiber.testcancel()</code>.
+      or <code>box.space...update()</code>, do call <code>fiber.testcancel()</code>.
       <code>box.space...select()</code> does not.
       In practice, a runaway fiber can only become unresponsive
       if it does many computations and does not check
@@ -2663,10 +2666,10 @@ procedures.
       The other potential problem comes from detached
       fibers which never get scheduled, because they are not subscribed
       to any events, or because no relevant events occur. Such morphing fibers
-      can be killed with <code>box.fiber.cancel()</code> at any time,
-      since <code>box.fiber.cancel()</code>
+      can be killed with <code>fiber.cancel()</code> at any time,
+      since <code>fiber.cancel()</code>
       sends an asynchronous wakeup event to the fiber,
-      and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
+      and <code>fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>
       Like all Lua objects, dead fibers are
@@ -2675,10 +2678,10 @@ procedures.
       the fiber (now called a fiber carcass) to the fiber pool.
       The carcass can be reused when another fiber is created.
     </para>
-<variablelist xml:id="box.fiber">
+<variablelist xml:id="fiber">
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.id">box.fiber.id(<replaceable>fiber</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.id">fiber.id(<replaceable>fiber</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2689,11 +2692,11 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.self">box.fiber.self() </emphasis>
+            <emphasis role="lua" xml:id="fiber.self">fiber.self() </emphasis>
         </term>
         <listitem>
             <para>
-              Returns: (type = userdata) <code>box.fiber</code>
+              Returns: (type = userdata) <code>require('fiber')</code>
               object for the currently scheduled fiber.
             </para>
         </listitem>
@@ -2701,21 +2704,21 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.find">box.fiber.find(<replaceable>id</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.find">fiber.find(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
               Locate a fiber userdata object by id.
             </para>
             <para>
-              Returns: (type = userdata) box.fiber object for the specified fiber.
+              Returns: (type = userdata) require('fiber') object for the specified fiber.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(<replaceable>function-name</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function-name</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2725,7 +2728,7 @@ procedures.
               Parameters: <code>function-name</code> = the function that the fiber is associated with.
             </para>
             <para>
-              Returns: (type = userdata) the box.fiber object of the new fiber.
+              Returns: (type = userdata) the require('fiber') object of the new fiber.
             </para>
             <para>
               Possible errors: the function does not exist or if a recursion limit is hit.
@@ -2735,7 +2738,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.resume">box.fiber.resume(<replaceable>fiber, ...</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.resume">fiber.resume(<replaceable>fiber, ...</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2747,7 +2750,7 @@ procedures.
 
     <varlistentry>
         <term>
-         <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield">box.fiber.yield(<replaceable>yield-arguments</replaceable>) </emphasis>
+         <emphasis role="lua" xml:id="fiber.yield" xreflabel="fiber.yield">fiber.yield(<replaceable>yield-arguments</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2757,9 +2760,9 @@ procedures.
             <para>
               Parameters: <code>yield-arguments</code>:  
               If the fiber is attached, arguments passed
-              to box.fiber.yield are passed on to the calling fiber.
-              If the fiber is detached, <code>box.fiber.yield()</code>
-              arguments passed to box.fiber.yield are returned after temporarily
+              to fiber.yield are passed on to the calling fiber.
+              If the fiber is detached, <code>fiber.yield()</code>
+              arguments passed to fiber.yield are returned after temporarily
               yielding control back to the scheduler.
             </para>
         </listitem>
@@ -2767,12 +2770,12 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.detach">box.fiber.detach()</emphasis>
+            <emphasis role="lua" xml:id="fiber.detach">fiber.detach()</emphasis>
         </term>
         <listitem>
             <para>
               Detach the current fiber. This is a cancellation point. This is a yield point.
-              It is usually more convenient to use <code>box.fiber.wrap()</code> to create
+              It is usually more convenient to use <code>fiber.wrap()</code> to create
               a fiber which is already detached when it is created.
             </para>
         </listitem>
@@ -2780,7 +2783,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.wrap">box.fiber.wrap(<replaceable>function, function-arguments</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.wrap">fiber.wrap(<replaceable>function, function-arguments</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2797,7 +2800,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.sleep">box.fiber.sleep(<replaceable>time</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.sleep">fiber.sleep(<replaceable>time</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2812,14 +2815,14 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(<replaceable>[fiber]</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.status">fiber.status(<replaceable>[fiber]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
               Return the status of the specified fiber.
             </para>
             <para>
-              Parameters: <code>fiber></code> = the fiber to be checked -- if this is not
+              Parameters: <code>fiber</code> = the fiber to be checked -- if this is not
               supplied, then the current fiber is to be checked.
             </para>
             <para>
@@ -2833,7 +2836,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.cancel">box.fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.cancel">fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2851,7 +2854,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.testcancel">box.fiber.testcancel()</emphasis>
+            <emphasis role="lua" xml:id="fiber.testcancel">fiber.testcancel()</emphasis>
         </term>
         <listitem>
             <para>
@@ -2869,28 +2872,29 @@ This function contains an infinite loop
 ("while 0 == 0" is always true).
 Each iteration of the loop adds 1 to a global variable
 named gvar, then goes to sleep for 2 seconds.
-The sleep causes an implicit box.fiber.yield().<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> my_session = require('session'); my_session.delimiter('!')</userinput>
+The sleep causes an implicit fiber.yield().<programlisting>
+<prompt>tarantool&gt;</prompt><userinput> fiber = require('fiber')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function function_x()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
 <prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
-<prompt>        -&gt;</prompt><userinput>     box.fiber.sleep(2)</userinput>
+<prompt>        -&gt;</prompt><userinput>     fiber.sleep(2)</userinput>
 <prompt>        -&gt;</prompt><userinput>     end</userinput>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> my_session.delimiter('!')</userinput></programlisting>
+<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput></programlisting>
 Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.
 <programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = fiber.wrap(function_x)</userinput>
 ---
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fid = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = fiber.wrap(function_x)</userinput>
 ---
 ...
 </programlisting>
@@ -2898,7 +2902,7 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2913,10 +2917,10 @@ Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> box.fiber.cancel(fiber_of_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber.cancel(fiber_of_x)</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2932,9 +2936,9 @@ the status is dead because the cancel worked.<programlisting>
 <!--   end of lib -->
 
 <section xml:id="sp-box-session">
-    <title>Package <code>box.session</code></title>
+    <title>Package <code>session</code></title>
     <para>
-    The <code>box.session</code> package allows querying the session state,
+    The <code>session</code> package allows querying the session state,
     writing to a session-specific temporary Lua table, or setting up triggers
     which will fire when a session starts or ends.
     A <emphasis>session</emphasis> is an object associated with each client connection.
@@ -2942,7 +2946,7 @@ the status is dead because the cancel worked.<programlisting>
 <variablelist>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.session.id() </emphasis>
+            <emphasis role="lua">session.id() </emphasis>
         </term>
         <listitem>
             <para>
@@ -2956,7 +2960,7 @@ the status is dead because the cancel worked.<programlisting>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.session.exists(<replaceable>id</replaceable>) </emphasis>
+            <emphasis role="lua">session.exists(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2968,7 +2972,7 @@ the status is dead because the cancel worked.<programlisting>
 
     <varlistentry>
         <term>
-        <emphasis role="lua">box.session.peer(<replaceable>id</replaceable>) </emphasis>
+        <emphasis role="lua">session.peer(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2986,7 +2990,7 @@ the status is dead because the cancel worked.<programlisting>
 
     <varlistentry>
         <term>
-           <emphasis role="lua">box.session.storage</emphasis>
+           <emphasis role="lua">session.storage</emphasis>
         </term>
         <listitem>
             <para>
@@ -3000,21 +3004,24 @@ the status is dead because the cancel worked.<programlisting>
 
 <para>
 <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>tarantool&gt;</prompt><userinput> box.session.peer(box.session.id())</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.peer(session.id())</userinput>
 ---
  - 127.0.0.1:45129
 ...
-<prompt>tarantool&gt;</prompt><userinput> box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session.storage.random_memorandum = "Don't forget the eggs."</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session.storage.radius_of_mars = 3396</userinput>
 ---
 ...
 
 <prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt><userinput> m</userinput>
@@ -3026,7 +3033,7 @@ the status is dead because the cancel worked.<programlisting>
     <para>
 See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
 for instructions about defining triggers for connect and disconnect events
- with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
+ with <code>session.on_connect()</code> and <code>session.on_disconnect()</code>.
     </para>
 </section>
 
@@ -3260,18 +3267,18 @@ end
 <!--   end of lib -->
 
 <section xml:id="sp-box-socket">
-    <title>Package <code>box.socket</code> &mdash; TCP and UDP sockets</title>
-<variablelist xml:id="box.socket">
+    <title>Package <code>socket</code> &mdash; TCP and UDP sockets</title>
+<variablelist xml:id="socket">
     <para>
-      The <code>box.socket</code> package allows exchanging data via BSD sockets
+      The <code>socket</code> package allows exchanging data via BSD sockets
       with a local or remote host in connection-oriented (TCP) or datagram-oriented (UDP) mode.
-      Semantics of the calls in the <code>box.socket</code> API closely follow
+      Semantics of the calls in the <code>socket</code> API closely follow
       semantics of the corresponding POSIX calls. Function names
       and signatures are mostly compatible with
       <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
     </para>
     <para>
-      Similarly to luasocket, <code>box.socket</code> doesn't throw exceptions
+      Similarly to luasocket, <code>socket</code> doesn't throw exceptions
       on errors. On success, most calls return a socket object.
       On error, a multiple return of <code>nil, status, errno, errstr</code>
       is produced.
@@ -3294,7 +3301,7 @@ end
     </para>
     <para>
       Calls which require a socket address and in POSIX expect
-      <code>struct sockaddr_in</code>, in <code>box.socket</code>
+      <code>struct sockaddr_in</code>, in <code>socket</code>
       simply accept host name and port as additional arguments.
       Name resolution is done automatically. If it fails,
       status is set to <code>"error"</code>, errno is set to <code>-1</code>
@@ -3310,7 +3317,7 @@ end
     </para>
     <para>
       As with all other <code>box</code> functions, the API can be used
-      in procedural style (e.g. <code>box.socket.close(socket)</code>) as well
+      in procedural style (e.g. <code>socket.close(socket)</code>) as well
       as in object-oriented style (<code>socket:close()</code>).
     </para>
     <para>
@@ -3320,7 +3327,7 @@ end
     </para>
 
     <varlistentry>
-        <term><emphasis role="lua">box.socket.tcp()</emphasis></term>
+        <term><emphasis role="lua">socket.tcp()</emphasis></term>
         <listitem>
             <para>
                 Create a new TCP socket.
@@ -3332,7 +3339,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">box.socket.udp()</emphasis></term>
+        <term><emphasis role="lua">socket.udp()</emphasis></term>
         <listitem>
             <para>
                 Create a new UDP socket.
@@ -3544,8 +3551,8 @@ end
                 Shutdown a reading, writing or both ends of a socket.
             </para>
             <para>
-               Parameters: <code>how</code> = box.socket.SHUT_RD, box.socket.SHUT_WR,
-               or box.socket.SHUT_RDWR.
+               Parameters: <code>how</code> = socket.SHUT_RD, socket.SHUT_WR,
+               or socket.SHUT_RDWR.
             </para>
             <para>
                Returns: (type = userdata) Socket on success, <code>nil, "error", errno, errstr</code> on error.
@@ -3579,7 +3586,7 @@ end
 </variablelist>
 
 
- <bridgehead renderas="sect4">Example showing use of box.socket over the Internet</bridgehead>
+ <bridgehead renderas="sect4">Example showing use of socket over the Internet</bridgehead>
  <para>
  In this example a connection is made over the internet between the Tarantool server
  and <link xlink:href="http://mail.ru">mail.ru</link>,
@@ -3587,7 +3594,10 @@ end
  This is not a useful way to communicate with this particular site,
  but shows that the system works.
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>sock = box.socket.tcp()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>sock = socket.tcp()</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>type(sock)</userinput>
@@ -3839,39 +3849,41 @@ end
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> my_session = require('session'); my_session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'space0')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
 <prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
 <prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303 = default')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303')</userinput>
 <prompt>        -&gt;</prompt><userinput>     else</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...primary_port=3303...} was not stated)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.n, {800, 'data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.id, {800, 'data'})</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on space0, index 0')</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.n, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.id, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on space0, index 0')</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.n, {800, 'New data', 'Extra data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.id, {800, 'New data', 'Extra data'})</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.n, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on space0')</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> my_session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
 <prompt>tarantool&gt;</prompt><userinput> example()</userinput>
 ---
 ...
