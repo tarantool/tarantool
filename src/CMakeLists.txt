@@ -26,6 +26,7 @@ lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
 lua_source(lua_sources lua/log.lua)
+lua_source(lua_sources lua/box_net_box.lua)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 

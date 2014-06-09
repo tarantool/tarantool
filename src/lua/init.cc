@@ -71,12 +71,18 @@ struct lua_State *tarantool_L;
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
        load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[],
-       log_lua[];
+       log_lua[], box_net_box_lua[];
 static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
-static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
-	"fun", fun_lua, "digest", digest_lua,
+static const char *lua_modules[] = {
+	"msgpackffi", msgpackffi_lua,
+	"fun", fun_lua,
+	"digest", digest_lua,
 	"interactive", interactive_lua,
-	"uuid", uuid_lua, "log", log_lua, NULL };
+	"uuid", uuid_lua,
+	"log", log_lua,
+	"net.box", box_net_box_lua,
+	NULL
+};
 /*
  * {{{ box Lua library: common functions
  */
