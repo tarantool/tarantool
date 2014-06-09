@@ -73,7 +73,7 @@ box.schema.space.create = function(name, options)
         if options.if_not_exists then
             return box.space[name], "not created"
         else
-            box.raise(box.error.ER_SPACE_EXISTS,
+            box.raise(box.error.SPACE_EXISTS,
                      "Space '"..name.."' already exists")
         end
     end
@@ -111,7 +111,7 @@ box.schema.space.drop = function(space_id)
         _index:delete{v[0], v[1]}
     end
     if _space:delete{space_id} == nil then
-        box.raise(box.error.ER_NO_SUCH_SPACE,
+        box.raise(box.error.NO_SUCH_SPACE,
                   "Space "..space_id.." does not exist")
     end
 end
@@ -165,11 +165,11 @@ box.schema.index.rename = function(space_id, index_id, name)
 end
 box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
-        box.raise(box.error.ER_NO_SUCH_SPACE,
+        box.raise(box.error.NO_SUCH_SPACE,
                   "Space "..space_id.." does not exist")
     end
     if box.space[space_id].index[index_id] == nil then
-        box.raise(box.error.ER_NO_SUCH_INDEX,
+        box.raise(box.error.NO_SUCH_INDEX,
                   "Index "..index_id.." not found in space"..space_id)
     end
     if options == nil then
@@ -187,7 +187,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     if options.id ~= nil then
         if options.parts ~= nil then
-            box.raise(box.error.ER_PROC_LUA,
+            box.raise(box.error.PROC_LUA,
                       "Don't know how to update both id and parts")
         end
         ops = {}
@@ -291,7 +291,7 @@ function box.schema.space.bless(space)
     -- min and max
     index_mt.min = function(index, key)
         if index.type == 'HASH' then
-            box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support min()')
+            box.raise(box.error.UNSUPPORTED, 'HASH does not support min()')
         end
         local lst = index:select(key, { iterator = 'GE', limit = 1 })[1]
         if lst ~= nil then
@@ -302,7 +302,7 @@ function box.schema.space.bless(space)
     end
     index_mt.max = function(index, key)
         if index.type == 'HASH' then
-            box.raise(box.error.ER_UNSUPPORTED, 'HASH does not support max()')
+            box.raise(box.error.UNSUPPORTED, 'HASH does not support max()')
         end
         local lst = index:select(key, { iterator = 'LE', limit = 1 })[1]
         if lst ~= nil then
@@ -362,7 +362,7 @@ function box.schema.space.bless(space)
 
     local function check_index(space, index_id)
         if space.index[index_id] == nil then
-            box.raise(box.error.ER_NO_SUCH_INDEX,
+            box.raise(box.error.NO_SUCH_INDEX,
                 string.format("No index #%d is defined in space %d", index_id,
                     space.id))
         end
@@ -380,7 +380,7 @@ function box.schema.space.bless(space)
         elseif port.size == 1 then
             return box.tuple.bless(port.ret[0])
         else
-            box.raise(box.error.ER_MORE_THAN_ONE_TUPLE,
+            box.raise(box.error.MORE_THAN_ONE_TUPLE,
                 "More than one tuple found by get()")
         end
     end
@@ -436,7 +436,7 @@ function box.schema.space.bless(space)
     end
     index_mt.alter= function(index, options)
         if index.id == nil or index.space == nil then
-            box.raise(box.error.ER_PROC_LUA, "Usage: index:alter{opts}")
+            box.raise(box.error.PROC_LUA, "Usage: index:alter{opts}")
         end
         return box.schema.index.alter(index.space.id, index.id, options)
     end
@@ -565,7 +565,7 @@ function box.schema.space.bless(space)
     space_mt.run_triggers = function(space, yesno)
         local space = ffi.C.space_by_id(space.id)
         if space == nil then
-            box.raise(box.error.ER_NO_SUCH_SPACE, "Space not found")
+            box.raise(box.error.NO_SUCH_SPACE, "Space not found")
         end
         ffi.C.space_run_triggers(space, yesno)
     end
@@ -608,7 +608,7 @@ local function object_resolve(object_type, object_name)
     if object_type == 'space' then
         local space = box.space[object_name]
         if  space == nil then
-            box.raise(box.error.ER_NO_SUCH_SPACE,
+            box.raise(box.error.NO_SUCH_SPACE,
                       "Space '"..object_name.."' does not exist")
         end
         return space.id
@@ -624,11 +624,11 @@ local function object_resolve(object_type, object_name)
         if func then
             return func[0]
         else
-            box.raise(box.error.ER_NO_SUCH_FUNCTION,
+            box.raise(box.error.NO_SUCH_FUNCTION,
                       "Function '"..object_name.."' does not exist")
         end
     end
-    box.raise(box.error.ER_UNKNOWN_SCHEMA_OBJECT,
+    box.raise(box.error.UNKNOWN_SCHEMA_OBJECT,
               "Unknown object type '"..object_type.."'")
 end
 
@@ -637,7 +637,7 @@ box.schema.func.create = function(name)
     local _func = box.space[box.schema.FUNC_ID]
     local func = _func.index['name']:get{name}
     if func then
-            box.raise(box.error.ER_FUNCTION_EXISTS,
+            box.raise(box.error.FUNCTION_EXISTS,
                       "Function '"..name.."' already exists")
     end
     _func:auto_increment{session.uid(), name}
@@ -669,7 +669,7 @@ end
 box.schema.user.create = function(name, opts)
     local uid = user_resolve(name)
     if uid then
-        box.raise(box.error.ER_USER_EXISTS,
+        box.raise(box.error.USER_EXISTS,
                   "User '"..name.."' already exists")
     end
     if opts == nil then
@@ -686,7 +686,7 @@ end
 box.schema.user.drop = function(name)
     local uid = user_resolve(name)
     if uid == nil then
-        box.raise(box.error.ER_NO_SUCH_USER,
+        box.raise(box.error.NO_SUCH_USER,
                  "User '"..name.."' does not exist")
     end
     -- recursive delete of user data
@@ -710,7 +710,7 @@ box.schema.user.grant = function(user_name, privilege, object_type,
                                  object_name, grantor)
     local uid = user_resolve(user_name)
     if uid == nil then
-        box.raise(box.error.ER_NO_SUCH_USER,
+        box.raise(box.error.NO_SUCH_USER,
                   "User '"..user_name.."' does not exist")
     end
     privilege = privilege_resolve(privilege)
@@ -727,7 +727,7 @@ end
 box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
     local uid = user_resolve(user_name)
     if uid == nil then
-        box.raise(box.error.ER_NO_SUCH_USER,
+        box.raise(box.error.NO_SUCH_USER,
                   "User '"..name.."' does not exist")
     end
     privilege = privilege_resolve(privilege)

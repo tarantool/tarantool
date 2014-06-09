@@ -71,7 +71,7 @@ local function reload_cfg(oldcfg, newcfg)
     end
     for key, val in pairs(newcfg) do
         if dynamic_cfg[key] == nil then
-            box.raise(box.error.ER_RELOAD_CFG,
+            box.raise(box.error.RELOAD_CFG,
             "Can't set option '"..key.."' dynamically");
         end
         if val == "" then

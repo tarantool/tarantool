@@ -225,3 +225,16 @@ from_r.host
 from_r.port == s:name().port
 s:close()
 sc:close()
+
+-- tcp_connect
+
+s = socket.tcp_connect('mail.ru', 80)
+string.match(tostring(s), ', aka') ~= nil
+string.match(tostring(s), ', peer') ~= nil
+s:write("GET / HTTP/1.0\r\nHost: mail.ru\r\n\r\n")
+header = s:readline(4000, { "\n\n", "\r\n\r\n" }, 1)
+string.match(header, "\r\n\r\n$") ~= nil
+string.match(header, "200 [Oo][Kk]") ~= nil
+s:close()
+
+socket.tcp_connect('mail.ru', 80, 0.00000000001)

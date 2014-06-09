@@ -42,5 +42,5 @@ index:
         - [YCSB benchmark results](benchmark.html)
         - [FAQ](faq.html)
         - [Source repository](http://github.com/tarantool/tarantool)
-        - [Lua stored procedures repository](http://github.com/mailru/tntlua)
+        - [Tarantool Lua rocks](http://rocks.tarantool.org)
         - [1.5 web site and downloads](http://stable.tarantool.org)

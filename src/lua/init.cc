@@ -170,49 +170,54 @@ tarantool_lua_error_init(struct lua_State *L) {
 		const char *name = tnt_error_codes[i].errstr;
 		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
 			continue;
+		assert(strncmp(name, "ER_", 3) == 0);
 		lua_pushnumber(L, i);
-		lua_setfield(L, -2, name);
+		/* cut ER_ prefix from constant */
+		lua_setfield(L, -2, name + 3);
 	}
 	lua_pop(L, 1);
 }
 
 /* }}} */
 
-/* {{{ package.path for require */
-
-static void
-tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
-__attribute__((sentinel));
-
 /**
  * Prepend the variable list of arguments to the Lua
- * package search path (or cpath, as defined in 'type').
+ * package search path
  */
 static void
-tarantool_lua_setpath(struct lua_State *L, const char *type, ...)
+tarantool_lua_setpaths(struct lua_State *L)
 {
-	char path[PATH_MAX];
-	va_list args;
-	va_start(args, type);
-	int off = 0;
-	const char *p;
-	while ((p = va_arg(args, const char*))) {
-		/*
-		 * If MODULE_PATH is an empty string, skip it.
-		 */
-		if (*p == '\0')
-			continue;
-		off += snprintf(path + off, sizeof(path) - off, "%s;", p);
-	}
-	va_end(args);
+	const char *home = getenv("HOME");
 	lua_getglobal(L, "package");
-	lua_getfield(L, -1, type);
-	snprintf(path + off, sizeof(path) - off, "%s",
-	         lua_tostring(L, -1));
-	lua_pop(L, 1);
-	lua_pushstring(L, path);
-	lua_setfield(L, -2, type);
-	lua_pop(L, 1);
+	int top = lua_gettop(L);
+	if (home != NULL) {
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?/init.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/?.lua;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/share/lua/?/init.lua;");
+	}
+	lua_pushliteral(L, MODULE_LUAPATH ";");
+	lua_getfield(L, top, "path");
+	lua_concat(L, lua_gettop(L) - top);
+	lua_setfield(L, top, "path");
+
+	if (home != NULL) {
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?.so;");
+		lua_pushstring(L, home);
+		lua_pushliteral(L, "/.luarocks/lib/lua/?.so;");
+	}
+	lua_pushliteral(L, MODULE_LIBPATH ";");
+	lua_getfield(L, top, "cpath");
+	lua_concat(L, lua_gettop(L) - top);
+	lua_setfield(L, top, "cpath");
+
+	assert(lua_gettop(L) == top);
+	lua_pop(L, 1); /* package */
 }
 
 void
@@ -223,14 +228,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 		panic("failed to initialize Lua");
 	}
 	luaL_openlibs(L);
-	/*
-	 * Search for Lua modules, apart from the standard
-	 * locations in the system-wide Tarantool paths. This way
-	 * 2 types of packages become available for use: standard
-	 * Lua packages and Tarantool-specific Lua libs
-	 */
-	tarantool_lua_setpath(L, "path", MODULE_LUAPATH, NULL);
-	tarantool_lua_setpath(L, "cpath", MODULE_LIBPATH, NULL);
+	tarantool_lua_setpaths(L);
 
 	lua_register(L, "tonumber64", lbox_tonumber64);
 	lua_register(L, "coredump", lbox_coredump);
