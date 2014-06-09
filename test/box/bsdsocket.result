@@ -730,3 +730,38 @@ sc:close()
 ---
 - true
 ...
+-- tcp_connect
+s = socket.tcp_connect('mail.ru', 80)
+---
+...
+string.match(tostring(s), ', aka') ~= nil
+---
+- true
+...
+string.match(tostring(s), ', peer') ~= nil
+---
+- true
+...
+s:write("GET / HTTP/1.0\r\nHost: mail.ru\r\n\r\n")
+---
+- true
+...
+header = s:readline(4000, { "\n\n", "\r\n\r\n" }, 1)
+---
+...
+string.match(header, "\r\n\r\n$") ~= nil
+---
+- true
+...
+string.match(header, "200 [Oo][Kk]") ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('mail.ru', 80, 0.00000000001)
+---
+- null
+...
