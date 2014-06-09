@@ -925,6 +925,7 @@ end
 socket_mt = {
         __index     = socket_methods,
         __tostring  = function(self)
+            local save_errno = self._errno
             local name = sprintf("fd %d", self.fh)
             local aka = self:name()
             if aka ~= nil then
@@ -934,6 +935,7 @@ socket_mt = {
             if peer ~= nil then
                 name = sprintf("%s, peer %s:%s", name, peer.host, peer.port)
             end
+            self._errno = save_errno
             return name
         end
 }
