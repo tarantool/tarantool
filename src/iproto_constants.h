@@ -177,6 +177,9 @@ int
 iproto_row_encode(const struct iproto_header *row, struct iovec *out,
 		  char fixheader[IPROTO_FIXHEADER_SIZE]);
 
+void
+iproto_rethrow_error(struct iproto_header *row);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif

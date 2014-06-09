@@ -1,3 +1,6 @@
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 space = box.schema.create_space('test', {id =  42})
 ---
 ...

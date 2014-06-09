@@ -1,4 +1,7 @@
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.create('test', { password = 'pass123456'})
+---
+...
+box.schema.user.grant('test', 'read,write,execute', 'universe')
 ---
 ...
 while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end

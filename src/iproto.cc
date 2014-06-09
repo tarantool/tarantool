@@ -712,14 +712,11 @@ iproto_process_admin(struct iproto_request *ireq)
 					  ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
-			/* TODO: replication authorization */
-			session_set_user(con->session, ADMIN, ADMIN);
 			replication_join(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
 		case IPROTO_SUBSCRIBE:
-			/* TODO: replication authorization */
 			replication_subscribe(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);

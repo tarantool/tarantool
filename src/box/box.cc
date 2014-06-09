@@ -133,24 +133,6 @@ box_enter_master_or_replica_mode(const char *replication_source)
 
 /* {{{ configuration bindings */
 
-void
-box_check_replication_source(const char *source)
-{
-	if (source == NULL)
-		return;
-	/* check replication port */
-	char ip_addr[32];
-	int port;
-	if (sscanf(source, "%31[^:]:%i", ip_addr, &port) != 2) {
-		tnt_raise(ClientError, ER_CFG,
-			  "replication source IP address is not recognized");
-	}
-	if (port <= 0 || port >= USHRT_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "invalid replication source port");
-	}
-}
-
 static void
 box_check_wal_mode(const char *mode_name)
 {
@@ -165,8 +147,6 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	/* check replication mode */
-	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check primary port */
 	int primary_port = cfg_geti("primary_port");
@@ -184,7 +164,6 @@ box_check_config()
 extern "C" void
 box_set_replication_source(const char *source)
 {
-	box_check_replication_source(source);
 	bool old_is_replica = recovery_state->remote;
 	bool new_is_replica = source != NULL;
 
