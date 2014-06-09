@@ -91,7 +91,7 @@ function is_expired(args, tuple)
    end
 
    local current_time = os.time()
-   local tuple_ts = box.unpack("i", field)
+   local tuple_ts = pickle.unpack("i", field)
    return current_time >= tuple_ts + args.ttl
 end
 function purge(args, tuple)
@@ -241,7 +241,7 @@ tarantool> <userinput>box.space[33]:drop()</userinput>
     </para>
 
 <variablelist>
- <title>Lua function <code>tonumber64</code></title>
+<title>Lua functions <code>tonumber64</code> and <code>dostring</code></title>
     <varlistentry>
         <term xml:id="tonumber64" xreflabel="tonumber64"> <emphasis role="lua">tonumber64(<replaceable>value</replaceable>)</emphasis></term>
         <listitem>
@@ -276,6 +276,61 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Parse and execute an arbitrary chunk of Lua code.
+              This function is mainly useful to define and run
+              Lua code without having to
+              introduce changes to the global Lua environment.
+            </para>
+            <para>
+              Parameters: <code>lua-chunk-string</code> = string containing Lua code,
+              <code>lua-chunk-string-argument(s)</code> = zero or more scalar values
+               which will be appended to, or substitute for, items in the Lua chunk.
+             </para>
+             <para>
+               Returns: whatever is returned by the Lua code chunk.
+            </para>
+            <para>
+               Possible errors: If there is a compilation error,
+               it is raised as a Lua error.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool&gt; <userinput>dostring('abc')</userinput>
+---
+error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
+...
+tarantool&gt; <userinput>dostring('return 1')</userinput>
+---
+- 1
+...
+tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
+---
+- hello
+- world
+...
+tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>dostring('local f = function(key)</userinput>
+        -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
+        -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
+        -&gt; <userinput>              end</userinput>
+        -&gt; <userinput>              return f(...)', 0)!</userinput>
+---
+- nil
+...
+tarantool&gt; <userinput>session.delimiter('')!</userinput>
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
 </variablelist>
 
 <section xml:id="sp-box-library">
@@ -292,8 +347,8 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
   
     The contents of the <code>box</code> library can be inspected at runtime with
     <code>box</code>, with no arguments.
-    The packages inside the box library are: schema, box, box.tuple, box.cjson, box.space, box.index, require('fiber'),
-    session, box.ipc, socket, box.net.box, box.cfg, box.info, box.slab, box.stat.
+    The packages inside the box library are: schema, box, box.tuple, box.space, box.index, 
+    box.net.box, box.cfg, box.info, box.slab, box.stat.
     Every package contains one or more Lua functions. A few packages contain members as well as functions.
     The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
     creating or resuming or interrupting fibers,
@@ -787,7 +842,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 There must be a pair of {field_no, value} arguments
                 for each character pair in the format argument.
                 The format and {field_no, value} arguments are passed to
-                <code>box.pack()</code> and the result is sent
+                <code>pickle.pack()</code> and the result is sent
                 to <code>box.process()</code>.
                 Possible operation specifiers are: <quote>+</quote>
                 for addition, <quote>-</quote> for subtraction,
@@ -879,7 +934,7 @@ box.space.space0:update({999}, {{'=p', 1, 'XYZ'}})
 #      a filler, an offset, the number of bytes to cut (1), and the string
 #      to add ('!')
 #   Therefore, after the following update, field[0[ = 999, field[1] = 'X!Z'.
-box.space.space0:update({999}, {{':p', 1, box.pack('ppp', 1, 1, '!')}})
+box.space.space0:update({999}, {{':p', 1, pickle.pack('iiA', 1, 1, '!')}})
 
 </programlisting>
             </para>
@@ -1308,322 +1363,6 @@ session.delimiter('')!
     <title>Package <code>box</code></title>
 <variablelist xml:id="box" xreflabel="box">
 
-
-    <varlistentry>
-        <term><emphasis role="lua">box.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
-        <listitem><para>
-            To use Tarantool binary protocol primitives from Lua,
-            it's necessary to convert Lua variables to binary
-            format. The box.pack() helper function is prototyped after Perl
-            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
-             'pack'</link>.
-            </para>
-            <para>
-               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Format specifiers</bridgehead>
-            <simplelist>
-                <member><code>b</code> &mdash; converts Lua
-                variable to a 1-byte
-                integer, and stores the integer in the resulting
-                string
-                </member>
-                <member><code>s</code> &mdash; converts Lua
-                variable to a 2-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>i</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>l</code> &mdash; converts Lua
-                variable to a 8-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>n</code> &mdash; converts Lua
-                variable to a 2-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>N</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>Q</code> &mdash; converts Lua
-                variable to a 8-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>f</code> &mdash; converts Lua
-                variable to a 4-byte
-                float, and stores the float in the resulting
-                string,
-                </member>
-                <member><code>d</code> &mdash; converts Lua
-                variable to a 8-byte
-                double, and stores the double in the resulting
-                string,
-                </member>
-                <member><code>w</code> &mdash; converts Lua
-                integer to a BER-encoded integer,
-                </member>
-                <member><code>p</code> &mdash; stores the length
-                of the argument as a BER-encoded integer
-                followed by the argument itself (a little-endian 4-byte integer for integers,
-                and a binary blob for other types),
-                </member>
-                <member><code>=, +, &amp;, |, ^, : </code>&mdash;
-                stores the corresponding Tarantool UPDATE
-                operation code: field assignment, addition,
-                conjunction, disjunction, exclusive disjunction,
-                splice (from Perl SPLICE function). Expects
-                field number to update as an argument. These format
-                specifiers only store the corresponding operation
-                code and field number to update, but do not
-                describe operation arguments.
-                </member>
-            </simplelist>
-            </para>
-            <para>
-              Returns: a binary string containing all arguments, packed
-              according to the format specifiers.
-            </para>
-            <para>
-              Possible Errors: Unknown format specifier.
-            </para>
-            <para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
----
-- [0, 'hello world']
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
----
-- [0, 'bye world']
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, box.pack('ppp', 0, 3, 'hello')}})</userinput>
----
-- [0, !!binary AAOlaGVsbG8=]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
----
-- [0, 4]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
----
-- [0, 8]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
----
-- [0, 12]
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua">box.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Counterpart to <code>box.pack()</code>.
-            </para>
-            <para>
-              Parameters: <code>format</code>, <code>binary-string</code>.
-            </para>
-            <para>
-             Returns: (type = scalar) A list of strings or numbers.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
-<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>string.len(tuple[0])!</userinput>
----
-- 1
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('b', tuple[0])!</userinput>
----
-- 48
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('bsi', box.pack('bsi', 255, 65535, 4294967295))!</userinput>
----
-- 255
-- 65535
-- 4294967295
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('ls', box.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
----
-- 18446744073709551615
-- 65535
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64 = box.unpack('spl', box.pack('spl', 666, 'string',</userinput>
-<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
----
-- 666
-- string
-- 666666666666666
-...
-<prompt>tarantool></prompt> <userinput>session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Parse and execute an arbitrary chunk of Lua code.
-              This function is mainly useful to define and run
-              Lua code without having to
-              introduce changes to the global Lua environment.
-            </para>
-            <para>
-              Parameters: <code>lua-chunk-string</code> = string containing Lua code,
-              <code>lua-chunk-string-argument(s)</code> = zero or more scalar values
-               which will be appended to, or substitute for, items in the Lua chunk.
-             </para>
-             <para>
-               Returns: whatever is returned by the Lua code chunk.
-            </para>
-            <para>
-               Possible errors: If there is a compilation error,
-               it is raised as a Lua error.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool&gt; <userinput>dostring('abc')</userinput>
----
-error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
-...
-tarantool&gt; <userinput>dostring('return 1')</userinput>
----
-- 1
-...
-tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
----
-- hello
-- world
-...
-tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>dostring('local f = function(key)</userinput>
-        -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
-        -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
-        -&gt; <userinput>              end</userinput>
-        -&gt; <userinput>              return f(...)', 0)!</userinput>
----
-- nil
-...
-tarantool&gt; <userinput>session.delimiter('')!</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">fiber.time()</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Returns: current system time (in seconds since the epoch) as a Lua
-                number.  The time is taken from the event loop
-                clock, which makes this call very cheap,
-                but still useful for constructing artificial
-                tuple keys.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>fiber = require('fiber')</userinput>
----
-...
-tarantool&gt; <userinput> fiber.time(), fiber.time()</userinput>
----
- - 1385758759.2591
- - 1385758759.2591
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">fiber.time64()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: current system time (in microseconds since the epoch) as a 64-bit
-              integer. The time is taken from the event loop clock.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>arantool&gt; <userinput>fiber = require('fiber')</userinput>
----
-...
-tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
----
- - 1385758828.9825
- - 1385758828982485
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">uuid.bin()</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Returns: a 128-bit (16-byte) unique id in binary form.
-            </para>
-            <para>
-                Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
-                when it starts. If the library is not available, which can happen if it was not
-                found when the server was built from source, then box.uuid() returns an error.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
----
-...
-tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
----
- - false
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">uuid.hex()</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Returns: a 32-byte hexadecimal conversion of a 128-bit
-                unique id, as a string.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool&gt; <userinput>require('uuid')</userinput>
----
-...
-tarantool&gt; <userinput>uuid.hex()</userinput>
----
- - b8eadcb078b54bed8fa8425d129b10e8
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
     <varlistentry>
         <term>
             <emphasis role="lua">box.raise(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
@@ -1671,7 +1410,7 @@ tarantool&gt; <userinput>uuid.hex()</userinput>
             <para>
                 Insert a new tuple using an auto-increment primary key.
                 The space specified by space-name must have a
-                NUM or NUM64 primary key index of type TREE.
+                NUM primary key index of type TREE.
                 The primary-key field will be incremented before the insert.
             </para>
             <para>
@@ -2188,91 +1927,6 @@ session.delimiter('')!
 
 </section>
 
-<section xml:id="sp-box-cjson">
-    <title>Package <code>json</code></title>
-
-<variablelist xml:id="box.cjson" xreflabel="box.cjson">
-    <para>
-        The <code>json</code> package provides JSON manipulation routines.
-        It is based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
-        Lua-CJSON package by Mark Pulford</link>.
-
-        For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">json.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Convert a Lua object to a JSON string.
-            </para>
-            <para>
-              Parameters: either a scalar value or a Lua table value.
-            </para>
-            <para>
-              Returns: (type = string) the original value reformatted as a JSON string.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool&gt; <userinput>require('json')</userinput>
----
-...
-tarantool&gt; <userinput>json.encode(123)</userinput>
----
-- '123'
-...
-tarantool&gt; <userinput>json.encode({123})</userinput>
----
-- '[123]'
-...
-tarantool&gt; <userinput>json.encode({123, 234, 345})</userinput>
----
-- '[123,234,345]'
-...
-tarantool&gt; <userinput>json.encode({abc = 234, cde = 345})</userinput>
----
-- '{"cde":345,"abc":234}'
-...
-tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
----
-- '{"hello":["world"]}'
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua">json.decode(<replaceable>string-value</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Convert a JSON string to a Lua object.
-            </para>
-            <para>
-              Parameters: <code>string-value</code> = a string formatted as JSON.
-            </para>
-            <para>
-              Returns: (type = Lua table) the original contents formatted as a Lua table.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>require('json')</userinput>
----
-...
- tarantool&gt; <userinput>json.decode('123')</userinput>
----
-- 123
-...
-tarantool&gt; <userinput>json.decode('[123, "hello"]')[2]</userinput>
----
-- hello
-...
-tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
----
-- world
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-</variablelist>
-</section>
-
 <section xml:id="sp-box-index">
     <title>Package <code >box.index</code></title>
 <variablelist xml:id="box.index" xreflabel="box.index">
@@ -2611,6 +2265,801 @@ The result will be a table of tuples and will look like this:
 </variablelist>
 </section>
 
+
+<!--   end of lib -->
+
+
+<!--   end of lib -->
+
+<!--   end of lib -->
+
+<section xml:id="sp-box-net-box">
+    <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
+    <para>
+        The <code>box.net</code> package contains connectors to remote database systems.
+        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
+        &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
+        In this section the subject is the built-in variant, <code>box.net.box</code>.
+        This is for connecting to tarantool servers via a network.
+    </para>
+<variablelist xml:id="box.net.box">
+    <para>
+        Call <code>box.net.box.new()</code> to connect and get a connection object,
+        which will be called <code>conn</code> for examples in this section.
+        Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
+        to execute requests on the remote box.
+        Call <code>box.net.box.close(conn)</code> to disconnect.
+        Object-oriented and functional APIs are equivalent, so
+        <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
+    </para>
+
+    <para>
+        All <code>box.net.box</code> methods are fiber-safe, that is, it is
+        safe to share and use the same connection object across
+        multiple concurrent fibers. In fact, it's perhaps the
+        best programming practice with Tarantool. When multiple
+        fibers use the same connection, all requests are pipelined
+        through the same network socket, but each fiber gets back a
+        correct response. Reducing the number of active sockets
+        lowers the overhead of system calls and increases the
+        overall server performance. There are, however, cases when
+        a single connection is not enough &mdash; for example when it's necessary to
+        prioritize requests or to use different authentication ids.
+    </para>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="box.net.box.new">
+             conn = box.net.box.new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, <replaceable>reconnect_interval</replaceable>])</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Create a new connection. The connection is
+                established on demand, at the time of the first
+                request. It is re-established automatically after
+                a disconnect. The argument
+                <code>reconnect_interval</code> (in seconds)
+                specifies the amount of time the server
+                sleeps between failing attempts to reconnect.
+                The returned <code>conn</code> object supports methods for making remote
+                requests, such as select, update or delete.
+            </para>
+            <para>
+               For the local tarantool server there is a pre-created always-established
+               connection object named <code>box.net.self</code>.
+               Its purpose is to make polymorphic use of the
+               <code>box.net.box</code> API easier. Therefore
+               <code>conn = box.net.box.new('localhost', 3303)</code> can
+               be replaced by <code>conn = box.net.box.self</code>.
+               However, there is an important difference between the embedded
+               connection and a remote one. With the embedded connection,
+               requests which do not modify data do not yield. When using
+               a remote connection, any request can yield, and local database state may
+               have changed by the time it returns.
+            </para>
+            <para>
+               Parameters: <code>host</code>, <code>port</code>, <code>reconnect_interval</code>.
+            </para>
+            <para>
+               Returns: (type = userdata) conn object).
+            </para>
+            <para>
+               Example: <code>conn = box.net.box.new('localhost', 3303)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.ping">
+        conn:ping()</emphasis></term>
+        <listitem>
+            <para>
+                Execute a PING command.
+            </para>
+            <para>
+               Returns: (type = boolean) <code>true</code> on success,
+                 <code>false</code> on error. Example: <code>self:ping()</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.close">
+        conn:close()</emphasis></term>
+        <listitem>
+            <para>
+            Close a connection.
+            </para>
+            <para>
+              Connection objects are garbage collected just like any other objects
+              in Lua, so an explicit destruction is not mandatory.
+              However, since <code>close()</code> is a system call, it
+              is good programming practice to close a connection
+              explicitly when it is no longer needed, to avoid lengthy
+              stalls of the garbage collector.
+            </para>
+            <para>
+              Example: <code>conn:close()</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.select">
+         conn:select(<replaceable>space-number</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.select">box.space[<replaceable>space-number</replaceable>]:select(...)</code>.
+              Please note this difference: a local <code>box.space[<replaceable>space-number</replaceable>]:select(...)</code> does not yield,
+              but a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> call does yield,
+              so local data may change while a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is running.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.insert">
+         conn:insert(<replaceable>space-number</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:insert(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.insert">box.space[<replaceable>space-number</replaceable>]:insert(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.replace">
+         conn:replace(<replaceable>space-number</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:replace(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.replace">box.space[<replaceable>space-number</replaceable>]:replace(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.update">
+         conn:update(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:update(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.update">box.space[<replaceable>space-number</replaceable>]:update(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.delete">
+         conn:delete(<replaceable>space-number</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:delete(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.delete">box.space[<replaceable>space-number</replaceable>]:delete(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.call">
+         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
+              That is, box.net.box.call is a remote stored-procedure call.
+              Please keep in mind that the call is using
+              the binary protocol to pack procedure arguments,
+              and the binary protocol is type agnostic, so it's recommended
+              to pass all arguments of remote stored procedure calls as
+              strings.
+            </para>
+            <para>
+              Example: <code>conn:call('box.space.space0:insert',{2})</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="box.net.box.timeout">
+         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
+              Example: <code>conn:timeout(0.5):update({'1'}, {{'=p', 1, 15}})</code>.
+            </para>
+            <para>
+              All remote calls support execution timeouts.
+              Using a wrapper object makes the remote
+              connection API compatible with the local one, removing
+              the need for a separate <code>timeout</code> argument, which
+              the local version would ignore. Once a request is sent,
+              it cannot be revoked from the remote server even if
+              a timeout expires: the timeout expiration only aborts the
+              wait for the remote server response, not the request itself.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
+ <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
+ <para>
+ This example will work with the sandbox configuration described in the preface.
+ That is, there is a space named space0 with a numeric primary key.
+ Assume that the database is nearly empty.
+ Assume that the tarantool server is running on localhost 127.0.0.1:3303.
+<programlisting>
+<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'space0')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
+<prompt>        -&gt;</prompt><userinput>       end</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303')</userinput>
+<prompt>        -&gt;</prompt><userinput>     else</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...primary_port=3303...} was not stated)')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
+<prompt>        -&gt;</prompt><userinput>       end</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.id, {800, 'data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on space0, index 0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
+<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on space0, index 0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.id, {800, 'New data', 'Extra data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on space0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on space0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
+<prompt>        -&gt;</prompt><userinput>   end!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
+<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
+---
+- - self:ping() succeeded
+  - '  (no surprise -- self connection is pre-established)'
+  - The local server primary port number = 3303 = default
+  - conn:delete done on space0.
+  - conn:insert done on space0, index 0
+  - '  primary key value = 800.'
+  - conn:select done on space0, index 0
+  - '  number of fields = 2'
+  - conn:delete done on space0
+  - conn:replace done on space0
+  - conn:update done on space0
+  - conn:close done
+...
+<prompt>tarantool&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
+---
+- [800, 'Fld#1', 'Extra data']
+...
+</programlisting>
+</para>
+</section>
+
+<section xml:id="sp-box-cfg">
+    <title>Packages <code>box.cfg</code>,
+    <code>box.info</code>, <code>box.slab</code> and
+    <code>box.stat</code>: server introspection</title>
+
+<variablelist>
+    <title>Package <code xml:id="box.cfg">box.cfg</code></title>
+    <para>
+      The box.cfg package is for administrators to specify all the server configuration parameters;
+      the full description of the parameters is in section <olink targetptr="configuration-file">Configuration</olink>.
+      Use <code>box.cfg</code> without braces to get read-only access to those parameters.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.cfg</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+tarantool> <userinput>box.cfg</userinput>
+---
+- too_long_threshold: 0.5
+  slab_alloc_factor: 2
+  slab_alloc_minimal: 64
+  background: false
+  slab_alloc_arena: 1
+  log_level: 5
+  ...
+...
+</programlisting></listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Package <code>box.info</code></title>
+    <para>
+        The box.info package provides access to information about
+        server variables -- pid, uptime, version and others.
+    </para>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.info()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Since box.info contents are dynamic, it's not
+              possible to iterate over keys with the Lua
+              <emphasis>pairs()</emphasis> function. For this
+              purpose, <emphasis>box.info()</emphasis> builds and
+              returns a Lua table with all keys and values provided
+              in the package.
+            </para>
+            <para>
+              Returns: (type = Lua table) keys and values in the package.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+tarantool> <userinput>box.info()</userinput>
+---
+- version: 1.6.0-819-geefb2d0
+  status: primary
+  pid: 20978
+  lsn: 340
+  snapshot_pid: 0
+  recovery_last_update: 0
+  recovery_lag: 0
+  uptime: 16071
+  ...
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.info.status, box.info.pid, box.info.version, ...</emphasis>
+        </term>
+        <listitem>
+        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+tarantool> <userinput>box.info.pid</userinput>
+---
+- 1747
+...
+tarantool> <userinput>box.info.logger_pid</userinput>
+---
+- 1748
+...
+tarantool> <userinput>box.info.version</userinput>
+---
+- 1.6.0-819-geefb2d0
+...
+tarantool> <userinput>box.info.uptime</userinput>
+---
+- 3672
+...
+tarantool> <userinput>box.info.status</userinput>
+---
+ - primary
+...
+tarantool> <userinput>box.info.recovery_lag</userinput>
+---
+ - 0.000
+...
+tarantool> <userinput>box.info.recovery_last_update</userinput>
+---
+ - 1306964594.980
+...
+tarantool> <userinput>box.info.snapshot_pid</userinput>
+---
+ - 0
+...
+tarantool> <userinput>box.info.build</userinput>
+---
+- flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
+         -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
+         -Wno-strict-aliasing -fopenmp -pthread'
+  target: Linux-x86_64-Debug
+  compiler: /usr/bin/cc /usr/bin/c++
+  options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
+    -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+    <title>Package <code>box.slab</code></title>
+    <para>
+      The box.slab package provides access to slab allocator statistics.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.slab</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+tarantool&gt; <userinput>box.slab.info().arena_used</userinput>
+---
+ - 4194304
+...
+tarantool&gt; <userinput>box.slab.info().arena_size</userinput>
+---
+ - 104857600
+...
+tarantool&gt; <userinput>box.slab.info().slabs</userinput>
+---
+ 64
+ 128
+...
+tarantool&gt; <userinput>box.slab.info().slabs[64]</userinput>
+---
+ items: 1
+ bytes_used: 160
+ item_size: 64
+ slabs: 1
+ bytes_free: 4194144
+...
+</programlisting></listitem>
+    </varlistentry>
+</variablelist>
+
+<variablelist>
+     <title>Package <code>box.stat</code></title>
+    <para>
+      The box.stat package provides access to request
+      statistics.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.stat</emphasis></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
+tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
+---
+- []
+- table
+...
+tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
+---
+- DELETE:
+    total: 33
+    rps: 0
+  SELECT:
+    total: 4
+    rps: 0
+  REPLACE:
+    total: 4
+    rps: 0
+  INSERT:
+    total: 17
+    rps: 0
+  CALL:
+    total: 8
+    rps: 0
+  UPDATE:
+    total: 8
+    rps: 0
+...
+tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
+---
+- total: 33
+  rps: 0
+...
+</programlisting></listitem>
+    </varlistentry>
+</variablelist>
+
+<para>
+    Additional examples can be found in the open source <link
+    xlink:href="https://github.com/mailru/tntlua">Lua stored
+    procedures repository</link> and in the server test suite.
+</para>
+</section>
+
+<section xml:id="sp-pickle">
+    <title>Package <code>pickle</code></title>
+<variablelist xml:id="x-pickle" xreflabel="x-pickle">
+    <varlistentry>
+        <term><emphasis role="lua">pickle.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
+        <listitem><para>
+            To use Tarantool binary protocol primitives from Lua,
+            it's necessary to convert Lua variables to binary
+            format. The pickle.pack() helper function is prototyped after Perl
+            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
+             'pack'</link>.
+            </para>
+            <para>
+               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Format specifiers</bridgehead>
+            <simplelist>
+                <member><code>b</code> or <code>B</code> &mdash; converts Lua
+                variable to a 1-byte
+                integer, and stores the integer in the resulting
+                string,
+                </member>
+                <member><code>s</code> or <code>S</code> &mdash; converts Lua
+                variable to a 2-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>i</code> or <code>I</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>l</code> or <code>L</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>n</code> or <code>N</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>q</code> or <code>Q</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>f</code> &mdash; converts Lua
+                variable to a 4-byte
+                float, and stores the float in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a 8-byte
+                double, and stores the double in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a sequence of bytes,
+                and stores the sequence in the resulting
+                string,
+                </member>
+            </simplelist>
+            </para>
+            <para>
+              Returns: a binary string containing all arguments, packed
+              according to the format specifiers.
+            </para>
+            <para>
+              Possible Errors: Unknown format specifier.
+            </para>
+            <para>
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> <userinput>pickle = require('pickle')</userinput>
+---
+...
+tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
+---
+- [0, 'hello world']
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
+---
+- [0, 'bye world']
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
+---
+- [0, "\0\0\0\0\x03\0\0\0hello"]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
+---
+- [0, 4]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
+---
+- [0, 8]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
+---
+- [0, 12]
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">pickle.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Counterpart to <code>pickle.pack()</code>.
+            </para>
+            <para>
+              Parameters: <code>format</code>, <code>binary-string</code>.
+            </para>
+            <para>
+             Returns: (type = scalar) A list of strings or numbers.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+<prompt>tarantool</prompt> <userinput>pickle = require('pickle')</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
+<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>string.len(tuple[0])!</userinput>
+---
+- 1
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[0])!</userinput>
+---
+- 48
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!</userinput>
+---
+- 255
+- 65535
+- 4294967295
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
+---
+- 18446744073709551615
+- 65535
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',</userinput>
+<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
+---
+- 666
+- string
+- 666666666666666
+...
+<prompt>tarantool></prompt> <userinput>session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
+<section xml:id="sp-box-uuid">
+    <title>Package <code>uuid</code></title>
+<variablelist xml:id="x-uuid" xreflabel="x-uuid">
+    <varlistentry>
+        <term>
+            <emphasis role="lua">uuid.bin()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: a 128-bit (16-byte) unique id in binary form.
+            </para>
+            <para>
+                Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
+                when it starts. If the library is not available, which can happen if it was not
+                found when the server was built from source, then box.uuid() returns an error.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
+---
+ - false
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">uuid.hex()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: a 32-byte hexadecimal conversion of a 128-bit
+                unique id, as a string.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.hex()</userinput>
+---
+ - b8eadcb078b54bed8fa8425d129b10e8
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
+<section xml:id="sp-box-cjson">
+    <title>Package <code>json</code></title>
+
+<variablelist xml:id="box.cjson" xreflabel="box.cjson">
+    <para>
+        The <code>json</code> package provides JSON manipulation routines.
+        It is based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
+        Lua-CJSON package by Mark Pulford</link>.
+
+        For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">json.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a Lua object to a JSON string.
+            </para>
+            <para>
+              Parameters: either a scalar value or a Lua table value.
+            </para>
+            <para>
+              Returns: (type = string) the original value reformatted as a JSON string.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+tarantool&gt; <userinput>json.encode(123)</userinput>
+---
+- '123'
+...
+tarantool&gt; <userinput>json.encode({123})</userinput>
+---
+- '[123]'
+...
+tarantool&gt; <userinput>json.encode({123, 234, 345})</userinput>
+---
+- '[123,234,345]'
+...
+tarantool&gt; <userinput>json.encode({abc = 234, cde = 345})</userinput>
+---
+- '{"cde":345,"abc":234}'
+...
+tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
+---
+- '{"hello":["world"]}'
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">json.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a JSON string to a Lua object.
+            </para>
+            <para>
+              Parameters: <code>string-value</code> = a string formatted as JSON.
+            </para>
+            <para>
+              Returns: (type = Lua table) the original contents formatted as a Lua table.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+ tarantool&gt; <userinput>json.decode('123')</userinput>
+---
+- 123
+...
+tarantool&gt; <userinput>json.decode('[123, "hello"]')[2]</userinput>
+---
+- hello
+...
+tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
+---
+- world
+...
+</programlisting>
+        </listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
 <section xml:id="sp-box-fiber">
     <title>Package <code>fiber</code></title>
     <para>
@@ -2863,6 +3312,53 @@ procedures.
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">fiber.time()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: current system time (in seconds since the epoch) as a Lua
+                number.  The time is taken from the event loop
+                clock, which makes this call very cheap,
+                but still useful for constructing artificial
+                tuple keys.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput> fiber.time(), fiber.time()</userinput>
+---
+ - 1385758759.2591
+ - 1385758759.2591
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">fiber.time64()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: current system time (in microseconds since the epoch) as a 64-bit
+              integer. The time is taken from the event loop clock.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>arantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
+---
+ - 1385758828.9825
+ - 1385758828982485
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
 </variablelist>
 
 <para>
@@ -2933,134 +3429,28 @@ the status is dead because the cancel worked.<programlisting>
 
 </section>
 
-<!--   end of lib -->
-
-<section xml:id="sp-box-session">
-    <title>Package <code>session</code></title>
+<section xml:id="sp-fiber-ipc">
+    <title>Package <code>fiber-IPC</code> &mdash; inter-process communication</title>
     <para>
-    The <code>session</code> package allows querying the session state,
-    writing to a session-specific temporary Lua table, or setting up triggers
-    which will fire when a session starts or ends.
-    A <emphasis>session</emphasis> is an object associated with each client connection.
-    </para>
-<variablelist>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">session.id() </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: (type = number) the unique identifier
-              (ID) for the current session. The result can be 0 meaning
-              there is no session (for example because a function is
-              running in a detached fiber).
-            </para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">session.exists(<replaceable>id</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: (type = number) 1 if the session exists,
-              0 if the session does not exist.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-        <emphasis role="lua">session.peer(<replaceable>id</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-               Parameters: <code>id</code> = the unique identifier of the session.
-            </para>
-            <para>
-              Returns: (type = string) If the specified session exists, the host
-              address and port of the session peer, for example "127.0.0.1:55457".
-              If the specified session does not exist, "0.0.0.0:0". The command is executed on the server,
-              so the "local name" is the server's host and administrative port,
-              and the "peer name" is the client's host and port.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-           <emphasis role="lua">session.storage</emphasis>
-        </term>
-        <listitem>
-            <para>
-              A Lua table that can hold arbitrary
-              unordered session-specific names and values, which will last until
-              the session ends.
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
-<para>
-<bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>tarantool&gt;</prompt><userinput> session = require('session')</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> session.peer(session.id())</userinput>
----
- - 127.0.0.1:45129
-...
-<prompt>tarantool&gt;</prompt><userinput> session.storage.random_memorandum = "Don't forget the eggs."</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> session.storage.radius_of_mars = 3396</userinput>
----
-...
-
-<prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> m</userinput>
----
-- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
-...</programlisting>
-</para>
-
-    <para>
-See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
-for instructions about defining triggers for connect and disconnect events
- with <code>session.on_connect()</code> and <code>session.on_disconnect()</code>.
-    </para>
-</section>
-
-<!--   end of lib -->
-
-<section xml:id="sp-box-ipc">
-    <title>Package <code>box.ipc</code> &mdash; inter-process communication</title>
-    <para>
-      The <code>box.ipc</code> package allows sending and receiving messages between
+      The <code>fiber-IPC</code> package allows sending and receiving messages between
       different processes. The words "different processes" in this context mean
       different connections, different sessions, or different fibers.
     </para>
     <para>
-      Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
+      Call <code>fiber.channel()</code> to allocate space and get a channel object, which will be
       called <code>channel</code> for examples in this section.
-      Call the other box.ipc() routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
+      Call the other fiber-IPC routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
       Message exchange is synchronous.
       The channel is garbage collected when no one is using it, as with any
       other Lua object.
       Use object-oriented syntax, for example <code>channel:put(message)</code>
-      rather than <code>box.ipc.channel.put(message)</code>. 
+      rather than <code>fiber.channel.put(message)</code>. 
     </para>
-<variablelist xml:id="box.ipc">
+<variablelist xml:id="fiber.ipc">
     <para>
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel(<replaceable>capacity-number</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">fiber.channel(<replaceable>capacity-number</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Create a new communication channel.
@@ -3205,7 +3595,9 @@ for instructions about defining triggers for connect and disconnect events
 </variablelist>
 <para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-local channel = box.ipc.channel(10)
+             
+fiber = require('fiber')            
+channel = fiber.channel(10)
 function consumer_fiber()
     while true do
         local task = channel:get()
@@ -3264,7 +3656,107 @@ end
 </para>
 </section>
 
-<!--   end of lib -->
+<section xml:id="sp-box-session">
+    <title>Package <code>session</code></title>
+    <para>
+    The <code>session</code> package allows querying the session state,
+    writing to a session-specific temporary Lua table, or setting up triggers
+    which will fire when a session starts or ends.
+    A <emphasis>session</emphasis> is an object associated with each client connection.
+    </para>
+<variablelist>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">session.id() </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: (type = number) the unique identifier
+              (ID) for the current session. The result can be 0 meaning
+              there is no session (for example because a function is
+              running in a detached fiber).
+            </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">session.exists(<replaceable>id</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: (type = number) 1 if the session exists,
+              0 if the session does not exist.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+        <emphasis role="lua">session.peer(<replaceable>id</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+               Parameters: <code>id</code> = the unique identifier of the session.
+            </para>
+            <para>
+              Returns: (type = string) If the specified session exists, the host
+              address and port of the session peer, for example "127.0.0.1:55457".
+              If the specified session does not exist, "0.0.0.0:0". The command is executed on the server,
+              so the "local name" is the server's host and administrative port,
+              and the "peer name" is the client's host and port.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+           <emphasis role="lua">session.storage</emphasis>
+        </term>
+        <listitem>
+            <para>
+              A Lua table that can hold arbitrary
+              unordered session-specific names and values, which will last until
+              the session ends.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.peer(session.id())</userinput>
+---
+ - 127.0.0.1:45129
+...
+<prompt>tarantool&gt;</prompt><userinput> session.storage.random_memorandum = "Don't forget the eggs."</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.storage.radius_of_mars = 3396</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> m</userinput>
+---
+- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
+...</programlisting>
+</para>
+
+    <para>
+See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
+for instructions about defining triggers for connect and disconnect events
+ with <code>session.on_connect()</code> and <code>session.on_disconnect()</code>.
+    </para>
+</section>
 
 <section xml:id="sp-box-socket">
     <title>Package <code>socket</code> &mdash; TCP and UDP sockets</title>
@@ -3629,289 +4121,8 @@ end
 
 </section>
 
-<section xml:id="sp-box-net-box">
-    <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
-    <para>
-        The <code>box.net</code> package contains connectors to remote database systems.
-        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
-        &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
-        In this section the subject is the built-in variant, <code>box.net.box</code>.
-        This is for connecting to tarantool servers via a network.
-    </para>
-<variablelist xml:id="box.net.box">
-    <para>
-        Call <code>box.net.box.new()</code> to connect and get a connection object,
-        which will be called <code>conn</code> for examples in this section.
-        Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
-        to execute requests on the remote box.
-        Call <code>box.net.box.close(conn)</code> to disconnect.
-        Object-oriented and functional APIs are equivalent, so
-        <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
-    </para>
-
-    <para>
-        All <code>box.net.box</code> methods are fiber-safe, that is, it is
-        safe to share and use the same connection object across
-        multiple concurrent fibers. In fact, it's perhaps the
-        best programming practice with Tarantool. When multiple
-        fibers use the same connection, all requests are pipelined
-        through the same network socket, but each fiber gets back a
-        correct response. Reducing the number of active sockets
-        lowers the overhead of system calls and increases the
-        overall server performance. There are, however, cases when
-        a single connection is not enough &mdash; for example when it's necessary to
-        prioritize requests or to use different authentication ids.
-    </para>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.net.box.new">
-             conn = box.net.box.new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, <replaceable>reconnect_interval</replaceable>])</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Create a new connection. The connection is
-                established on demand, at the time of the first
-                request. It is re-established automatically after
-                a disconnect. The argument
-                <code>reconnect_interval</code> (in seconds)
-                specifies the amount of time the server
-                sleeps between failing attempts to reconnect.
-                The returned <code>conn</code> object supports methods for making remote
-                requests, such as select, update or delete.
-            </para>
-            <para>
-               For the local tarantool server there is a pre-created always-established
-               connection object named <code>box.net.self</code>.
-               Its purpose is to make polymorphic use of the
-               <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 3303)</code> can
-               be replaced by <code>conn = box.net.box.self</code>.
-               However, there is an important difference between the embedded
-               connection and a remote one. With the embedded connection,
-               requests which do not modify data do not yield. When using
-               a remote connection, any request can yield, and local database state may
-               have changed by the time it returns.
-            </para>
-            <para>
-               Parameters: <code>host</code>, <code>port</code>, <code>reconnect_interval</code>.
-            </para>
-            <para>
-               Returns: (type = userdata) conn object).
-            </para>
-            <para>
-               Example: <code>conn = box.net.box.new('localhost', 3303)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.ping">
-        conn:ping()</emphasis></term>
-        <listitem>
-            <para>
-                Execute a PING command.
-            </para>
-            <para>
-               Returns: (type = boolean) <code>true</code> on success,
-                 <code>false</code> on error. Example: <code>self:ping()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.close">
-        conn:close()</emphasis></term>
-        <listitem>
-            <para>
-            Close a connection.
-            </para>
-            <para>
-              Connection objects are garbage collected just like any other objects
-              in Lua, so an explicit destruction is not mandatory.
-              However, since <code>close()</code> is a system call, it
-              is good programming practice to close a connection
-              explicitly when it is no longer needed, to avoid lengthy
-              stalls of the garbage collector.
-            </para>
-            <para>
-              Example: <code>conn:close()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.select">
-         conn:select(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.select">box.space[<replaceable>space-number</replaceable>]:select(...)</code>.
-              Please note this difference: a local <code>box.space[<replaceable>space-number</replaceable>]:select(...)</code> does not yield,
-              but a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> call does yield,
-              so local data may change while a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is running.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.insert">
-         conn:insert(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:insert(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.insert">box.space[<replaceable>space-number</replaceable>]:insert(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.replace">
-         conn:replace(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:replace(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.replace">box.space[<replaceable>space-number</replaceable>]:replace(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.update">
-         conn:update(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:update(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.update">box.space[<replaceable>space-number</replaceable>]:update(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.delete">
-         conn:delete(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:delete(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.delete">box.space[<replaceable>space-number</replaceable>]:delete(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.call">
-         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
-              That is, box.net.box.call is a remote stored-procedure call.
-              Please keep in mind that the call is using
-              the binary protocol to pack procedure arguments,
-              and the binary protocol is type agnostic, so it's recommended
-              to pass all arguments of remote stored procedure calls as
-              strings.
-            </para>
-            <para>
-              Example: <code>conn:call('box.space.space0:insert',{2})</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.timeout">
-         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
-              Example: <code>conn:timeout(0.5):update({'1'}, {{'=p', 1, 15}})</code>.
-            </para>
-            <para>
-              All remote calls support execution timeouts.
-              Using a wrapper object makes the remote
-              connection API compatible with the local one, removing
-              the need for a separate <code>timeout</code> argument, which
-              the local version would ignore. Once a request is sent,
-              it cannot be revoked from the remote server even if
-              a timeout expires: the timeout expiration only aborts the
-              wait for the remote server response, not the request itself.
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
- <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
- <para>
- This example will work with the sandbox configuration described in the preface.
- That is, there is a space named space0 with a numeric primary key.
- Assume that the database is nearly empty.
- Assume that the tarantool server is running on localhost 127.0.0.1:3303.
-<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'space0')</userinput>
-<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
-<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303')</userinput>
-<prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...primary_port=3303...} was not stated)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.id, {800, 'data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on space0, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on space0, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.id, {800, 'New data', 'Extra data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
-<prompt>        -&gt;</prompt><userinput>   end!</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
-<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
----
-- - self:ping() succeeded
-  - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 3303 = default
-  - conn:delete done on space0.
-  - conn:insert done on space0, index 0
-  - '  primary key value = 800.'
-  - conn:select done on space0, index 0
-  - '  number of fields = 2'
-  - conn:delete done on space0
-  - conn:replace done on space0
-  - conn:update done on space0
-  - conn:close done
-...
-<prompt>tarantool&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
----
-- [800, 'Fld#1', 'Extra data']
-...
-</programlisting>
-</para>
-</section>
-
-<section xml:id="sp-box-shard">
-    <title>Package <code>box.shard</code></title>
+<section xml:id="sp-shard">
+    <title>Package <code>shard</code></title>
 
 <para>
 With <link xlink:href="https://en.wikipedia.org/wiki/Sharding">Sharding</link>,
@@ -3921,7 +4132,7 @@ each server is handling only a subset of the total data, so larger loads can be
 handled by simply adding more computers to a network.
 </para>
 <para>
-The Tarantool box.shard package has facilities
+The Tarantool shard package has facilities
 for creating or redistributing or cleaning up shards, as well as analogues for the
 data-manipulation functions of the box library (select, insert, replace, update, delete).
 The important new concept is that there must be a function which, given a key value,
@@ -3932,13 +4143,13 @@ according to the current algorithm, and one for giving Shard Identification Numb
 according to a previous algorithm. The former is called [curr], the latter is called [prev].
 When the algorithm has to be changed because new nodes are added or because the load
 must be balanced differently, the [curr] function becomes the [prev] function, a
-new [curr] function is introduced, and a function named box.shard.copy() redistributes
+new [curr] function is introduced, and a function named <code>shard.copy()</code> redistributes
 all the tuples -- a process called "resharding".
 </para>
 <para>
 The shard package can be installed by
 putting a directive at the start of an init.lua file:<programlisting>
-  require 'shard'</programlisting>which brings in all the required functionality
+require 'shard'</programlisting>which brings in all the required functionality
 from a program file named shard.lua.
 </para>
 <para>
@@ -3948,7 +4159,7 @@ https://github.com/tarantool/shard/blob/master/README.md</link>.
 </para>
 <variablelist>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.schema.config (<replaceable>{ key = value, ... }</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.schema.config (<replaceable>{ key = value, ... }</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
         This function configures or reconfigures the shard-host or proxy-host.
@@ -3981,7 +4192,7 @@ https://github.com/tarantool/shard/blob/master/README.md</link>.
         Operations which do not modify data may go to either 'ro' or 'rw' shards, depending on the semantics of the call.
         </para>
         <para>
-        The <code> box.shard.schema.config()</code> function must be performed on each node,
+        The <code>shard.schema.config()</code> function must be performed on each node,
         before creating a sharded database, and whenever the configuration changes.
         Care must be taken that the nodes' configurations are consistent with each other.
         The administrator is responsible for determining the values that [curr] and [prev]
@@ -3989,7 +4200,7 @@ https://github.com/tarantool/shard/blob/master/README.md</link>.
         then return Shard Identification Number = 1, else return Shard Identification Number = 2".
         </para>
         <para>
-        Given this configuration information, subsequent box.shard functions will all
+         Given this configuration information, subsequent <code>shard</code> functions will all
         know what to do. Simplifying slightly, a subroutine in the shard functions will:
 <programlisting>
 Get the space number and the primary-key value from the function's parameters.
@@ -4002,7 +4213,7 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.copy()</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.copy()</code></emphasis></term>
         <listitem>
         <para>
         This function reads all tuples, if necessary copying them to new shards.
@@ -4019,7 +4230,7 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         This is actually an "insert nothrow", that is, an insert without an error message,
         because the insert is simply not performed if the different node already has a tuple
         with the same primary key. The copied tuple is not deleted on the 'me' node at this stage;
-        that is a separate job which will be handled by a separate function, <code>box.shard.cleanup()</code>.
+        that is a separate job which will be handled by a separate function, <code>shard.cleanup()</code>.
         </para>
         <para>
         The function returns a list of tuples. Each tuple contains two fields:
@@ -4030,18 +4241,18 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         In order to perform resharding, the administrator must:
 <code>
 * For all hosts ,determine the functions [curr] and [prev]
-* Update the Shard List with box.shard.config
-* Run box.shard.copy() on all hosts -- this will find tuples
+ * Update the Shard List with shard.config
+ * Run shard.copy() on all hosts -- this will find tuples
   on nodes according to [prev], and move them to new nodes
   according to [curr].
 * Delete the [prev] function on all shards.
-* Run box.shard.cleanup() on all hosts, to remove outdated data.
+* Run shard.cleanup() on all hosts, to remove outdated data.
 </code>
         </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.cleanup()</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.cleanup()</code></emphasis></term>
         <listitem>
         <para>
         This function reads all tuples, if necessary deleting tuples which don't fit.
@@ -4065,13 +4276,13 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.select (<replaceable>space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.select (<replaceable>space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
         This function performs a query using a key. A key may have multiple fields.
         </para>
         <para>
-        If <code>box.shard.select()</code> is called while a resharding is taking place,
+        If <code>shard.select()</code> is called while a resharding is taking place,
         and the tuple is not found on the node which the [curr] function identifies,
         then the request is forwarded to the node which the [prev] function identifies.
         </para>
@@ -4080,7 +4291,7 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         if the key is multi-field key then all fields must be present -- sampling multiple nodes with partially-specified keys is not possible.
         </para>
         <para>
-        The box.shard.select() function is the only function which can access hosts that are marked "read only".
+        The <code>shard.select()</code> function is the only function which can access hosts that are marked "read only".
         The host selection algorithm ([curr] or [prev]) may choose among multiple possible hosts that all contain
         copies of the specific tuple. Usually the algorithm will choose the shard whose 'weight' field in the shard
         list has the greatest value.
@@ -4088,22 +4299,22 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.eselect (<replaceable>mode, space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.eselect (<replaceable>mode, space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
-        This function is the same as <code>box.shard.select()</code> but has an additional parameter, "mode",
+        This function is the same as <code>shard.select()</code> but has an additional parameter, "mode",
         to indicate which hosts it is preferable to sample.
         </para>
         <para>
         The mode parameter can have one of the following values:
         'ro' (means that it is preferable to sample the hosts marked as "read only", but if there are none, then sampling an 'rw' node is okay),
         'rw' (means that it is necessary to sample only the hosts marked as " read-write").
-        Thus, "call box.shard.eselect('ro', ...)" is the same as "call box.shard.select(...)".
+        Thus, "call <code>shard.eselect('ro', ...)</code>" is the same as "call <code>shard.select(...)</code>".
         </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.insert (<replaceable>space, ...</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.insert (<replaceable>space, ...</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
         This functions inserts a specified tuple into a given space.
@@ -4127,20 +4338,20 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code><replaceable>box.shard.replace (space, ...)</replaceable></code></emphasis></term>
+        <term><emphasis role="lua"><code><replaceable>shard.replace (space, ...)</replaceable></code></emphasis></term>
         <listitem>
         <para>
         This function inserts, or possibly replaces, a tuple.
         </para>
         <para>
-        The initial part of the operation is the same as for box.shard.insert(),
-        but box.shard.replace() is simpler because it does not have to search for
+        The initial part of the operation is the same as for <code>shard.insert()</code>,
+        but <code>shard.replace()</code> is simpler because it does not have to search for
         duplicates.
         </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.delete (<replaceable>space, key [, subkey, ...])</replaceable></code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.delete (<replaceable>space, key [, subkey, ...])</replaceable></code></emphasis></term>
         <listitem>
         <para>
         This function deletes a tuple.
@@ -4157,7 +4368,7 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.update (<replaceable>space, key, [subkey, ...] format, ...</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.update (<replaceable>space, key, [subkey, ...] format, ...</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
         This function updates a tuple.
@@ -4172,21 +4383,21 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         an updated value.
         </para>
         <para>
-        Like <code>box.shard.insert()</code>, the operations for <code>box.shard.update()</code> look a bit
-        complex. But, again, the user only has to know that the box.shard package
+        Like <code>shard.insert()</code>, the operations for <code>shard.update()</code> look a bit
+        complex. But, again, the user only has to know that the <code>shard</code> package
         has routines which ensure that the result is an updated tuple, even though
         there are several remotely-possible scenarios which must be taken care of.
         </para>
         </listitem>
     </varlistentry>
     <varlistentry>
-    <term><emphasis role="lua"><code>box.shard.call (<replaceable>mode, procname, ...</replaceable>)</code></emphasis></term>
+        <term><emphasis role="lua"><code>shard.call (<replaceable>mode, procname, ...</replaceable>)</code></emphasis></term>
         <listitem>
         <para>
         This function calls a remote function.
         </para>
         <para>
-        The host which receives box.shard.call() selects a random node from
+        The host which receives <code>shard.call()</code> selects a random node from
         the Shard List -- preferably a read-only node if the mode parameter says 'ro'.
         The remote node will perform the function and return its result to the original
         node, which will return it to the user.
@@ -4194,224 +4405,6 @@ Otherwise, use the box.net.box package to pass the function to the host and port
         </listitem>
     </varlistentry>
 </variablelist>
-</section>
-
-<section xml:id="sp-box-cfg">
-    <title>Packages <code>box.cfg</code>,
-    <code>box.info</code>, <code>box.slab</code> and
-    <code>box.stat</code>: server introspection</title>
-
-<variablelist>
-    <title>Package <code xml:id="box.cfg">box.cfg</code></title>
-    <para>
-      The box.cfg package is for administrators to specify all the server configuration parameters;
-      the full description of the parameters is in section <olink targetptr="configuration-file">Configuration</olink>.
-      Use <code>box.cfg</code> without braces to get read-only access to those parameters.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.cfg</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.cfg</userinput>
----
-- io_collect_interval = 0
-  pid_file = box.pid
-  panic_on_wal_error = false
-  slab_alloc_factor = 2
-  slab_alloc_minimal = 64
-  admin_port = 3313
-  logger = cat - >> tarantool.log
-  ...
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<variablelist>
-    <title>Package <code>box.info</code></title>
-    <para>
-        The box.info package provides access to information about
-        server variables: pid, uptime, version and such.
-        Its contents are identical to the output from <olink
-        targetptr="box.info"/>.
-    </para>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.info()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Since box.info contents are dynamic, it's not
-              possible to iterate over keys with the Lua
-              <emphasis>pairs()</emphasis> function. For this
-              purpose, <emphasis>box.info()</emphasis> builds and
-              returns a Lua table with all keys and values provided
-              in the package.
-            </para>
-            <para>
-              Returns: (type = Lua table) keys and values in the package.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.info()</userinput>
----
-- version: 1.6.0-819-geefb2d0
-  status: primary
-  pid: 20978
-  lsn: 340
-  snapshot_pid: 0
-  recovery_last_update: 0
-  recovery_lag: 0
-  uptime: 16071
-  ...
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.info.status, box.info.pid, box.info.lsn, ...</emphasis>
-        </term>
-        <listitem>
-        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.info.pid</userinput>
----
-- 1747
-...
-tarantool> <userinput>box.info.logger_pid</userinput>
----
-- 1748
-...
-tarantool> <userinput>box.info.version</userinput>
----
-- 1.6.0-819-geefb2d0
-...
-tarantool> <userinput>box.info.config</userinput>
----
-- /home/unera/work/tarantool/test/box/tarantool_good.cfg
-...
-tarantool> <userinput>box.info.uptime</userinput>
----
-- 3672
-...
-tarantool> <userinput>box.info.lsn</userinput>
----
-- 1712
-...
-tarantool> <userinput>box.info.status</userinput>
----
- - primary
-...
-tarantool> <userinput>box.info.recovery_lag</userinput>
----
- - 0.000
-...
-tarantool> <userinput>box.info.recovery_last_update</userinput>
----
- - 1306964594.980
-...
-tarantool> <userinput>box.info.snapshot_pid</userinput>
----
- - 0
-...
-tarantool> <userinput>box.info.build</userinput>
----
-- flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
-         -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
-         -Wno-strict-aliasing -fopenmp -pthread'
-  target: Linux-x86_64-Debug
-  compiler: /usr/bin/cc /usr/bin/c++
-  options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
-    -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
-<variablelist>
-    <title>Package <code>box.slab</code></title>
-    <para>
-      The box.slab package provides access to slab allocator statistics.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.slab</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.slab.info().arena_used</userinput>
----
- - 4194304
-...
-tarantool> <userinput>box.slab.info().arena_size</userinput>
----
- - 104857600
-...
-tarantool> <userinput>box.slab.info().slabs</userinput>
----
- 64
- 128
-...
-tarantool> <userinput>box.slab.info().slabs[64]</userinput>
----
- items: 1
- bytes_used: 160
- item_size: 64
- slabs: 1
- bytes_free: 4194144
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<variablelist>
-
-    <para>
-     <emphasis>Package <code>box.stat</code></emphasis>
-    </para>
-    <para>
-      The box.stat package provides access to request
-      statistics.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.stat</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
----
-- []
-- table
-...
-tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
----
-- DELETE:
-    total: 33
-    rps: 0
-  SELECT:
-    total: 4
-    rps: 0
-  REPLACE:
-    total: 4
-    rps: 0
-  INSERT:
-    total: 17
-    rps: 0
-  CALL:
-    total: 8
-    rps: 0
-  UPDATE:
-    total: 8
-    rps: 0
-...
-tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
----
-- total: 33
-  rps: 0
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<para>
-    Additional examples can be found in the open source <link
-    xlink:href="https://github.com/mailru/tntlua">Lua stored
-    procedures repository</link> and in the server test suite.
-</para>
 </section>
 
 <section xml:id="sp-limitations">
