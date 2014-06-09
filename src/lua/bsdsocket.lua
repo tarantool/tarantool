@@ -546,7 +546,7 @@ local function readline_check(self, eols, limit)
     end
     for i, eol in pairs(eols) do
         if string.len(rbuf) >= string.len(eol) then
-            local data = string.match(rbuf, "^(.*" .. eol .. ")")
+            local data = string.match(rbuf, "^(.-" .. eol .. ")")
             if data ~= nil then
                 if string.len(data) > limit then
                     return string.sub(data, 1, limit)
@@ -607,12 +607,8 @@ socket_methods.readline = function(self, limit, eol, timeout)
         local data = self:sysread(4096)
         if data ~= nil then
             self.rbuf = self.rbuf .. data
-            if string.len(self.rbuf) >= limit then
-               data = string.sub(self.rbuf, 1, limit)
-               self.rbuf = string.sub(self.rbuf, limit + 1)
-               return data
-            end
 
+            -- eof
             if string.len(data) == 0 then
                 data = self.rbuf
                 self.rbuf = nil
@@ -624,6 +620,14 @@ socket_methods.readline = function(self, limit, eol, timeout)
                 self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
                 return data
             end
+           
+            -- limit
+            if string.len(self.rbuf) >= limit then
+               data = string.sub(self.rbuf, 1, limit)
+               self.rbuf = string.sub(self.rbuf, limit + 1)
+               return data
+            end
+
         elseif self:errno() ~= box.errno.EAGAIN then
             self._errno = box.errno()
             return nil
@@ -840,36 +844,113 @@ socket_methods.name = function(self)
         self._errno = box.errno()
         return nil
     end
+    self._errno = nil
     return aka
 end
 
-if type(box.socket) == nil then
-    box.socket = {}
+socket_methods.peer = function(self)
+    local peer = box.socket.internal.peer(self.fh)
+    if peer == nil then
+        self._errno = box.errno()
+        return nil
+    end
+    self._errno = nil
+    return peer
+end
+
+-- tcp connector
+local function tcp_connect(host, port, timeout)
+    if host == 'unix/' and port ~= nil then
+        local s = package.loaded.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+        if s == nil then
+            return nil
+        end
+        if s:sysconnect(host, port) then
+            return s
+        else
+            local errno = box.errno()
+            s:close()
+            box.errno(errno)
+            return nil
+        end
+    end
+
+    if timeout == nil then
+        timeout = TIMEOUT_INFINITY
+    end
+    local started = box.time()
+    local dns = box.socket.getaddrinfo(host, port, timeout,
+                                    { type = 'SOCK_STREAM', protocol = 'tcp' })
+    if dns == nil then
+        return nil
+    end
+
+
+
+    for i, remote in pairs(dns) do
+        
+        timeout = timeout - (box.time() - started)
+        if timeout <= 0 then
+            box.errno(box.errno.ETIMEDOUT)
+            return nil
+        end
+
+        started = box.time()
+
+        local s = box.socket(remote.family, remote.type, 'tcp')
+        if s == nil then
+            return nil
+        end
+
+        if s:sysconnect(remote.host, remote.port) then
+
+            timeout = timeout - (box.time() - started)
+            if timeout <= 0 then
+                s:close()
+                break
+            end
+
+            if s:writable(timeout) then
+                return s
+            end
+        end
+
+        local save_errno = box.errno()
+        s:close()
+        box.errno(save_errno)
+    end
+   
+    if timeout <= 0 then
+        box.errno(box.errno.ETIMEDOUT)
+    end 
+    return nil
 end
 
 box.socket.internal = {
     socket_mt   = {
         __index     = socket_methods,
         __tostring  = function(self)
+            local save_errno = self._errno
             local name = sprintf("fd %d", self.fh)
-            local aka = box.socket.internal.name(self.fh)
+            local aka = self:name()
             if aka ~= nil then
                 name = sprintf("%s, aka %s:%s", name, aka.host, aka.port)
             end
-            local peer = box.socket.internal.peer(self.fh)
+            local peer = self:peer(self)
             if peer ~= nil then
                 name = sprintf("%s, peer %s:%s", name, peer.host, peer.port)
             end
+            self._errno = save_errno
             return name
         end
     },
-    
 }
 
 setmetatable(box.socket, {
     __call = create_socket,
     __index = {
         getaddrinfo = getaddrinfo,
+        tcp_connect = tcp_connect
     }
 })
 
