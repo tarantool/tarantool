@@ -184,28 +184,13 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->snapshot_handler = snapshot_handler;
 	r->join_handler = join_handler;
 
-	log_dir_create(&r->snap_dir);
-	r->snap_dir.panic_if_error = false;
-	r->snap_dir.sync_is_async = false;
-	strcpy(r->snap_dir.open_wflags, "wxd");
-	r->snap_dir.filetype = "SNAP\n";
-	r->snap_dir.filename_ext = ".snap";
-	r->snap_dir.dirname = strdup(snap_dirname);
-	r->snap_dir.mode = 0660;
-	r->snap_dir.ignore_initial_setlsn = true;
+	log_dir_create(&r->snap_dir, snap_dirname, SNAP);
 
-	log_dir_create(&r->wal_dir);
-	r->wal_dir.panic_if_error = false;
-	r->wal_dir.sync_is_async = true;
-	strcpy(r->wal_dir.open_wflags, "wx");
-	r->wal_dir.filetype = "XLOG\n";
-	r->wal_dir.filename_ext = ".xlog";
-	r->wal_dir.dirname = strdup(wal_dirname);
-	r->wal_dir.mode = 0660;
+	log_dir_create(&r->wal_dir, wal_dirname, XLOG);
 
-	if (r->wal_mode == WAL_FSYNC) {
+	if (r->wal_mode == WAL_FSYNC)
 		(void) strcat(r->wal_dir.open_wflags, "s");
-	}
+
 	r->rows_per_wal = rows_per_wal;
 
 	vclock_create(&r->vclock);

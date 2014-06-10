@@ -8,30 +8,6 @@ space:create_index('primary', { type = 'hash' })
 ...
 --# push filter 'primary_port: .*' to 'primary_port: <number>'
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
-box.stat()
----
-- DELETE:
-    total: 35
-    rps: 7
-  SELECT:
-    total: 1
-    rps: 0
-  REPLACE:
-    total: 2
-    rps: 0
-  INSERT:
-    total: 35
-    rps: 7
-  AUTH:
-    total: 0
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
-...
 help()
 ---
 - server admin commands
@@ -67,30 +43,6 @@ box.cfg
   slab_alloc_minimal: 64
   background: false
   wal_dir_rescan_delay: 0.1
-...
-box.stat()
----
-- DELETE:
-    total: 35
-    rps: 7
-  SELECT:
-    total: 1
-    rps: 0
-  REPLACE:
-    total: 2
-    rps: 0
-  INSERT:
-    total: 35
-    rps: 7
-  AUTH:
-    total: 0
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
 ...
 space:insert{1, 'tuple'}
 ---

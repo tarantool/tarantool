@@ -98,7 +98,8 @@ rb_gen(, log_dir_lsnmap_, log_dir_lsnmap_t, struct log_meta_lsn, link,
 #include "salad/mhash.h"
 
 int
-log_dir_create(struct log_dir *dir)
+log_dir_create(struct log_dir *dir, const char *dirname,
+	       enum log_dir_type type)
 {
 	memset(dir, 0, sizeof(*dir));
 	dir->nodeids = mh_nodeids_new();
@@ -106,6 +107,21 @@ log_dir_create(struct log_dir *dir)
 		return -1;
 	log_dir_map_new(&dir->map);
 	log_dir_lsnmap_new(&dir->lsnmap);
+	/* Default mode. */
+	dir->mode = 0660;
+	dir->dirname = strdup(dirname);
+	if (type == SNAP) {
+		strcpy(dir->open_wflags, "wxd");
+		dir->filetype = "SNAP\n";
+		dir->filename_ext = ".snap";
+		dir->ignore_initial_setlsn = true;
+		dir->panic_if_error = true;
+	} else {
+		strcpy(dir->open_wflags, "wx");
+		dir->sync_is_async = true;
+		dir->filetype = "XLOG\n";
+		dir->filename_ext = ".xlog";
+	}
 	return 0;
 }
 

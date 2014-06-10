@@ -22,14 +22,11 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 	char tpl[] = "/tmp/fileXXXXXX";
 
 	struct fio_batch *batch = fio_batch_alloc(1024);
-	int create_res = log_dir_create(dir);
+	int create_res = log_dir_create(dir, mkdtemp(tpl), XLOG);
 	assert(create_res == 0);
 	(void)create_res;
-	strcpy(dir->open_wflags, "wx");
-	dir->filetype = "XLOG\n";
-	dir->filename_ext = ".xlog";
-	dir->dirname = strdup(mkdtemp(tpl));
-	dir->mode = 0660;
+	/* Avoid using libeio */
+	dir->sync_is_async = false;
 
 	for (int f = 0; f < files_n; f++) {
 		struct vclock vclock;

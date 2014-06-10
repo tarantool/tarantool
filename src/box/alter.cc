@@ -990,6 +990,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  (unsigned) space_id(old_space),
 				  "the space has indexes");
 		}
+		if (object_has_grants(old_space->access)) {
+			tnt_raise(ClientError, ER_DROP_SPACE,
+				  (unsigned) space_id(old_space),
+				  "the space has grants");
+		}
 		/* @todo lock space metadata until commit. */
 		/*
 		 * dd_space_delete() can't fail, any such
@@ -1268,6 +1273,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 			  name, "function name is too long");
 	}
 	snprintf(func->name, sizeof(func->name), "%s", name);
+	/** Nobody has access to the function but the owner. */
+	memset(func->access, 0, sizeof(func->access));
 }
 
 /** Remove a function from function cache */
@@ -1322,7 +1329,12 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * who created it or a superuser.
 		 */
 		access_check_ddl(func.uid);
-		/* @todo can only delete func if it has no grants */
+		/* Can only delete func if it has no grants. */
+		if (object_has_grants(old_func->access)) {
+			tnt_raise(ClientError, ER_DROP_FUNCTION,
+				  (unsigned) func.uid,
+				  "function has grants");
+		}
 		trigger_set(&txn->on_commit, &drop_func_trigger);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&func, new_tuple);
