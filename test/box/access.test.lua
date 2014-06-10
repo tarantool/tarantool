@@ -1,3 +1,4 @@
+
 session = require('session')
 -- user id for a Lua session is admin - 1
 session.uid()
@@ -57,7 +58,6 @@ box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
-session = nil
 
 --------------------------------------------------------------------------------
 -- #198: names like '' and 'x.y' and 5 and 'primary ' are legal
@@ -81,3 +81,26 @@ c:call('nosuchfunction')
 nosuchfunction = nil
 c:call('nosuchfunction')
 c:close()
+-- Dropping a space recursively drops all grants - it's possible to 
+-- restore from a snapshot
+box.schema.user.create('testus')
+s = box.schema.create_space('admin_space')
+s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+box.schema.user.grant('testus', 'write', 'space', 'admin_space')
+s:drop()
+box.snapshot()
+--# stop server default
+--# start server default
+box.schema.user.drop('testus')
+-- ------------------------------------------------------------
+-- a test case for gh-289
+-- box.schema.user.drop() with cascade doesn't work
+-- ------------------------------------------------------------
+session = require('session')
+box.schema.user.create('uniuser')
+box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+session.su('uniuser')
+us = box.schema.create_space('uniuser_space')
+session.su('admin')
+box.schema.user.drop('uniuser')
+session = nil

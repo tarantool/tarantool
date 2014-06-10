@@ -305,11 +305,9 @@ box.schema.user.drop('uniuser_testus')
 ...
 box.schema.user.drop('uniuser')
 ---
-- error: Function '513' does not exist
 ...
 box.space._user:delete(2)
 ---
-- [2, '', 'uniuser', []]
 ...
 s:drop()
 ---
@@ -397,55 +395,6 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 ---
 - error: Write access denied for user 'testuser' to space '_index'
 ...
-session.su('admin')
----
-...
---
--- Check max function limit
---
---# setopt delimiter ';'
-function func_limit()
-    local i = 1
-    while true do
-        box.schema.func.create('func'..i)
-        i = i + 1
-    end
-    return i
-end;
----
-...
-function drop_limit_func()
-    local i = 1
-    while true do
-        box.schema.func.drop('func'..i)
-        i = i + 1
-    end
-end;
----
-...
-func_limit();
----
-- error: 'A limit on the total number of functions has been reached: 32000'
-...
-drop_limit_func();
----
-- error: Function 'func32001' does not exist
-...
-box.schema.user.grant('testuser', 'read, write, execute', 'universe');
----
-...
-session.su('testuser');
----
-...
-func_limit();
----
-- error: 'A limit on the total number of functions has been reached: 32000'
-...
-drop_limit_func();
----
-- error: Function 'func32001' does not exist
-...
---# setopt delimiter ''
 session.su('admin')
 ---
 ...

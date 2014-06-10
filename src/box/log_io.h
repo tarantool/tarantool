@@ -39,6 +39,11 @@
 
 extern const uint32_t xlog_format;
 
+enum log_dir_type {
+	SNAP,
+	XLOG
+};
+
 enum log_mode {
 	LOG_READ,
 	LOG_WRITE
@@ -113,7 +118,8 @@ struct log_dir {
 };
 
 int
-log_dir_create(struct log_dir *dir);
+log_dir_create(struct log_dir *dir, const char *dirname,
+	       enum log_dir_type type);
 void
 log_dir_destroy(struct log_dir *dir);
 

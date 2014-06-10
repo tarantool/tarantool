@@ -43,7 +43,11 @@ int
 cfg_geti(const char *param)
 {
 	cfg_get(param);
-	int val = lua_tointeger(tarantool_L, -1);
+	int val;
+	if (lua_isboolean(tarantool_L, -1))
+		val = lua_toboolean(tarantool_L, -1);
+	else
+		val = lua_tointeger(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
 	return val;
 }

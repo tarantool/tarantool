@@ -105,10 +105,17 @@ box.schema.create_space = box.schema.space.create
 box.schema.space.drop = function(space_id)
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
     local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
         _index:delete{v[0], v[1]}
+    end
+    local privs = _priv:select{}
+    for k, tuple in pairs(privs) do
+        if tuple[2] == 'space' and tuple[3] == space_id then
+            box.schema.user.revoke(tuple[1], tuple[4], tuple[2], tuple[3])
+        end
     end
     if _space:delete{space_id} == nil then
         box.raise(box.error.NO_SUCH_SPACE,
@@ -323,7 +330,9 @@ function box.schema.space.bless(space)
             elseif box.index[opts.iterator] then
                 itype = box.index[opts.iterator]
             elseif opts.iterator ~= nil then
-                error("Wrong iterator type: "..tostring(opts.iterator))
+                box.raise(box.error.ITERATOR_TYPE,
+                         "Unknown iterator type '"..
+                         tostring(opts.iterator).."'")
             end
         end
 
@@ -645,7 +654,14 @@ end
 
 box.schema.func.drop = function(name)
     local _func = box.space[box.schema.FUNC_ID]
+    local _priv = box.space[box.schema.PRIV_ID]
     local fid = object_resolve('function', name)
+    local privs = _priv:select{}
+    for k, tuple in pairs(privs) do
+        if tuple[2] == 'function' and tuple[3] == function_id then
+            box.schema.user.revoke(tuple[1], tuple[4], tuple[2], tuple[3])
+        end
+    end
     _func:delete{fid}
 end
 
@@ -700,7 +716,7 @@ box.schema.user.drop = function(name)
         box.space[tuple[0]]:drop()
     end
     local funcs = box.space[box.schema.FUNC_ID].index['owner']:select{uid}
-    for k, tuple in pairs(spaces) do
+    for k, tuple in pairs(funcs) do
         box.schema.func.drop(tuple[0])
     end
     box.space[box.schema.USER_ID]:delete{uid}
