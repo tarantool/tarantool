@@ -81,11 +81,6 @@ tarantool_lua(struct lua_State *L,
 	      struct tbuf *out, const char *str);
 
 extern char *history;
-/**
- * Eval line and print output.
- */
-extern "C" void
-tarantool_lua_interactive();
 
 /**
  * Return last exception text

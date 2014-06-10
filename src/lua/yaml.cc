@@ -39,6 +39,8 @@ int
 tarantool_lua_yaml_init(struct lua_State *L)
 {
 	luaopen_yaml(L);
+	lua_pushlightuserdata(L, NULL);
+	lua_setfield(L, -2, "NULL");
 	lua_pop(L, 1); /* yaml module */
 	/* Remove global variable */
 	lua_pushnil(L);
