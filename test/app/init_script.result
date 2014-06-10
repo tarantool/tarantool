@@ -1,3 +1,7 @@
+--
+-- Access to box.cfg from init script
+--
+
 box.cfg
 1	too_long_threshold:0.5
 2	slab_alloc_factor:2
@@ -18,13 +22,26 @@ box.cfg
 17	slab_alloc_arena:1
 18	wal_dir:.
 19	wal_dir_rescan_delay:0.1
+--
+-- Test insert from detached fiber
+--
 
-Test insert from detached fiber
 ---
 []
 ...
 
-Test insert from start-up script
+--
+-- Test insert from init script
+--
+
 [1, 2, 4, 8]
 [2, 4, 8, 16]
 [4, 8, 16]
+--
+-- Check that require function(math.floor) reachable in the init script
+--
+
+0
+0
+1
+25
