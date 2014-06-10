@@ -113,7 +113,8 @@ that it would be illegal to have the same key value twice.
 An index may have <emphasis>one of three types</emphasis>:
 HASH which is fastest and uses the least memory but must be unique,
 TREE which allows partial-key searching and ordered results,
-and BITSET which can be good for searches that contain '=' and 'AND' in the WHERE clause.
+and BITSET which can be good for searches that contain '=' and 
+multiple  ANDed conditions.
 The first index is called the <emphasis><quote>primary key</quote> index</emphasis>
 and it must be unique; all other indexes are called
 <quote>secondary</quote> indexes.
@@ -139,7 +140,7 @@ The syntax details for defining spaces and indexes are in chapter 4
 
 <para>
 The basic operations are: the four data-change operations
-(insert, update, update, replace), and the data-retrieval
+(insert, update, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like <quote>ping</quote>
 which can only be used with the binary protocol.
 Also, there are  <olink
@@ -269,7 +270,7 @@ so advanced users may be able to start a second Tarantool
 server on the same processor without ill effects.
 </para>
 <para>
-  Additional examples of SQL statements can be found in the <citetitle
+  Additional examples of requests can be found in the <citetitle
   xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of
@@ -283,7 +284,7 @@ server on the same processor without ill effects.
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename
-  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
+  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</filename>.
 </para>
 
 </section>

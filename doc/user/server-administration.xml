@@ -93,19 +93,18 @@ Option is one of the following (in alphabetical order by the long form of the op
 </variablelist>
 
 <para>
-<bridgehead renderas="sect4">Tokens for use within requests</bridgehead>
+<bridgehead renderas="sect4">Tokens, requests, and special key combinations</bridgehead>
 </para>
-<para>
-Keywords are: Character sequences containing only letters of the English alphabet.
-              Examples: SETOPT.
-              Notes: Keywords are case insensitive so SETOPT and Setopt are the same thing.
-</para>
+
 <para>
 Procedure identifiers are: Any sequence of letters, digits, or underscores which is
                            legal according to the rules for Lua identifiers.
+                           Procedure identifiers are also called function names.
+                           Notes: function names are case insensitive so <code>insert</code> and <code>Insert</code> are not the same thing.
 </para>
 <para>
 String literals are: Any sequence of zero or more characters enclosed in single quotes.
+                     Double quotes are legal but single quotes are preferred.
                      Examples: 'Hello, world', 'A'.
 </para>
 <para>
@@ -123,45 +122,25 @@ spaces are not necessary around single-byte tokens or string literals.
 </para>
 
 <para xml:id="utility-tarantool-delim">
-<bridgehead renderas="sect4">Requests in alphabetical order</bridgehead>
+<bridgehead renderas="sect4">Requests</bridgehead>
 Generally requests are entered following the prompt in interactive mode while
 tarantool is running. (A prompt will be the word tarantool and a greater-than
 sign, for example <code>tarantool&gt;</code>). The end-of-request marker is
-a newline (line feed).
+by default a newline (line feed).
 </para>
-
-<variablelist>
-  <varlistentry>
-    <term xml:id="utility-tarantool-exit" xreflabel="utility-tarantool-exit">EXIT</term>
-    <listitem><para>
-    Syntax: <code>control-C</code>.
-    Effect: The tarantool program receives a SIGINT signal and stops.
-    Example:  <code>^C</code>.
-    Notes: Another way to stop the program is to send an "os.exit()" request.
-    </para></listitem>
-  </varlistentry>
-
-  <varlistentry>
-    <term xml:id="utility-tarantool-setopt" xreflabel="utility-tarantool-setopt">SETOPT</term>
-    <listitem><para>
-    Syntax: <code>SETOPT DELIMITER = <replaceable>string-literal</replaceable></code>.
-          The string must be a value in single quotes.
-    Effect: string becomes end-of-request delimiter, so newline alone is not treated as end of request.
-    Example:  <code>SETOPT DELIMITER = '!'</code>.
-    Notes: This has been temporarily disabled.
-    </para></listitem>
-  </varlistentry>
-   
-  <varlistentry>
-    <term xml:id="utility-tarantool-lua" xreflabel="utility-tarantool-lua">LUA</term>
-    <listitem><para>
-    Syntax: <code><replaceable>anything-else</replaceable></code>.
-    Effect: The client tells the server to execute the tokens as Lua requests.
-    Example:  <code>"hello".." world"</code>.
-    </para></listitem>
-  </varlistentry>
-   
-</variablelist>
+<para>
+For multi-line requests, it is possible to change the end-of-request marker.
+Syntax: <code>session = require('session'); session.delimiter(<replaceable>string-literal</replaceable>)</code>.
+The string-literal must be a value in single quotes.
+Effect: string becomes end-of-request delimiter, so newline alone is not treated as end of request.
+To go back to normal mode: <code>session.delimiter('')<replaceable>string-literal</replaceable></code>.
+Example:<programlisting>session = require('session'); session.delimiter('!')
+function f ()
+  statement_1 = 'a'
+  statement_2 = 'b'
+  end!
+session.delimiter('')!</programlisting>
+</para>
 
 <para>
 For a condensed Backus-Naur Form [BNF] description of the suggested form of client requests, see
@@ -510,7 +489,7 @@ The function for dropping a _func tuple is:
 In the following example, a function named 'f7' is created,
 then it is put in the _func space, then it is used in a
 box.schema.user.grant function, then it is dropped:
-<programlisting><prompt>tarantool&gt;</prompt> function f7() box.session.uid() end
+<programlisting><prompt>tarantool&gt;</prompt> function f7() session.uid() end
 ---
 ...
 <prompt>tarantool&gt;</prompt> box.schema.func.create('f7')
@@ -524,14 +503,14 @@ box.schema.user.grant function, then it is dropped:
 ...</programlisting></para>
 
 <para>
-<bridgehead renderas="sect4">box.session and security</bridgehead>
+<bridgehead renderas="sect4">"session=require('session')" and security</bridgehead>
 
 After a connection has taken place, the user has access to a "session" object
 which has several functions. The ones which are of interest for security
 purposes are:
-<programlisting>box.session.uid()           #returns the id of the current user
-box.session.user()          #returns the name of the current user
-box.session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
+<programlisting>session.uid()           #returns the id of the current user
+session.user()          #returns the name of the current user
+session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
 
 </section>
 

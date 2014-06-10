@@ -11,7 +11,7 @@ a file name, a detailed reason or operating system error code.
 All such messages, however, are logged in the error log. 
 Below follow only general descriptions
 of some popular codes. A complete list of errors can be found in
-file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</filename> in the source tree.
+file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h">errcode.h</filename> in the source tree.
 
 </para>
 <variablelist>

@@ -8,7 +8,7 @@
 <title>Data persistence</title>
 <para>
 To maintain data persistence, Tarantool writes each data change
-request (INSERT, UPDATE, DELETE) into a write-ahead log (WAL)
+request (INSERT, UPDATE, DELETE, REPLACE) into a write-ahead log (WAL)
 file in the <olink targetptr="wal_dir"/> directory.
 A new WAL file is created for every <olink
 targetptr="rows_per_wal"/> records.  Each data change request
@@ -57,7 +57,7 @@ cd                         msgpack code meaning 2-digit number follows
 <para>
 Tarantool processes requests atomically: a change is either
 accepted and recorded in the WAL, or discarded completely.
-Let's clarify how this happens, using REPLACE command as an
+Let's clarify how this happens, using the REPLACE request as an
 example:
 <orderedlist>
     <listitem><para>

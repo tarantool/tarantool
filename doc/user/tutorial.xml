@@ -175,9 +175,9 @@ release=`lsb_release -c -s`
 # First upgrade Clang (the C compiler) to version 3.2 or later using
 # Command Line Tools for Xcode disk image version 4.6+ from
 # Apple Developer web-site.
-<command>brew install</command> --use-clang http://tarantool.org/dist/master/tarantool.rb
+<command>brew install</command> --use-clang https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
 # or
-<command>brew install</command> http://tarantool.org/dist/master/tarantool.rb
+<command>brew install</command> https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
 </programlisting>
 </para>
 
@@ -235,7 +235,7 @@ ones unless you intend to work on the documentation.
 <programlisting> binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces
  gcc or clang                        # see above
  git                                 # see above
- uuid-dev                            # for box.uuid_* functions and replication
+ uuid-dev                            # for uuid_* functions and replication
  cmake                               # see above
  libreadline-dev                     # for interactive mode
  libncurses5-dev or ncurses-devel    # see above
@@ -369,15 +369,14 @@ PATH=~/tarantool/bin:$PATH ./run #run tests using python</programlisting>
 
 The output should contain reassuring reports, for example
 <programlisting><computeroutput>======================================================================
-TEST                                             RESULT
+TEST                                            RESULT
 ------------------------------------------------------------
-box/admin.test                                  [ pass ]
-box/admin_coredump.test                         [ pass ]
-box/args.test                                   [ pass ]
-box/cjson.test                                  [ pass ]
-box/configuration.test                          [ pass ]
-box/errinj.test                                 [ pass ]
-box/fiber.test                                  [ pass ]
+box/bad_trigger.test.py                         [ pass ]
+box/call.test.py                                [ pass ]
+box/iproto.test.py                              [ pass ]
+box/xlog.test.py                                [ pass ]
+box/admin.test.lua                              [ pass ]
+box/auth_access.test.lua                        [ pass ]
 ... etc.</computeroutput></programlisting>
 There are more than 70 tests in the suite.
 
@@ -390,7 +389,7 @@ subdirectory:<programlisting><command>rm</command> ~/tarantool/bin/python
 <para>
 9. Make an rpm.
    This step is optional. It's only for people who want to redistribute Tarantool.
-   Ordinarily it should be skipped. It will add a new subdirectory: <filename>~/tarantool/RPM</filename>.<programlisting><command>make rpm</command></programlisting>
+   Package maintainers who want to build with rpmbuild should consult the Tarantool developer guide.
 </para>
 
 <para>
@@ -449,18 +448,19 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
-2014-04-21 16:12:18.255 ... version 1.6.0-1075-g8be1988
-2014-04-21 16:12:18.255 ... log level 5
-2014-04-21 16:12:18.257 ... mapping 1073741824 bytes for a shared arena...
-2014-04-21 16:12:18.257 ... initialized
-2014-04-21 16:12:18.258 ... recovery start
-2014-04-21 16:12:18.258 ... found an empty data directory, initializing...
-2014-04-21 16:12:18.258 ... saving snapshot `./00000000000000000001.snap'
-2014-04-21 16:12:18.258 ... done
-2014-04-21 16:12:18.258 ... recover from `./00000000000000000001.snap'
-2014-04-21 16:12:18.266 ... snapshot recovered, confirmed lsn: 1
-2014-04-21 16:12:18.266 ... bound to admin port 3313
-2014-04-21 16:12:18.266 ... I am primary
+2014-06-10 11:53:41.078 ... version 1.6.0-1326-gd5544f2
+2014-06-10 11:53:41.078 ... log level 5
+2014-06-10 11:53:41.080 ... mapping 1073741824 bytes for a shared arena...
+2014-06-10 11:53:41.080 ... initialized
+2014-06-10 11:53:41.081 ... initializing cluster
+2014-06-10 11:53:41.094 ... synchronized with cluster
+2014-06-10 11:53:41.095 ... done
+2014-06-10 11:53:41.095 ... creating `./00000000000000000001.snap.inprogress'
+2014-06-10 11:53:41.095 ... saving snapshot `./00000000000000000001.snap.inprogress'
+2014-06-10 11:53:41.095 ... 0.0M rows written
+2014-06-10 11:53:41.126 ... done
+2014-06-10 11:53:41.126 ... bound to admin port tcp://0.0.0.0:3313
+2014-06-10 11:53:41.127 ... I am primary
 </programlisting>
 </para>
 
@@ -477,8 +477,11 @@ Tarantool instances on your operating system.
   <command>telnet 0 3313</command></programlisting>
 but for example purposes it is simpler to just leave the
 server running in "interactive mode".
+On production machines the interactive mode is just
+for administrators, but because it's convenient for
+learning it will be used for most examples in this manual.
 
-The client is waiting for the user to type instructions.
+Tarantool is waiting for the user to type instructions.
 </para>
 
 <para>
@@ -499,7 +502,7 @@ using the first defined key, try this:<programlisting><prompt>tarantool&gt; </pr
 
 Your terminal screen should now look like this:<programlisting>
 tarantool&gt; s = box.schema.create_space('space0')
-2014-04-21 16:23:28.152 ... creating `./00000000000000000002.xlog.inprogress'
+2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
 tarantool&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})

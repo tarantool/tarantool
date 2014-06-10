@@ -43,7 +43,7 @@ So we <link linkend="utility-tarantool-delim">declare a delimiter</link>.
 This means <quote>Do not send to the server until you see an exclamation mark.</quote>
 
 <programlisting>
-localhost> <userinput>SETOPT DELIMITER = '!'</userinput>
+tarantool> <userinput>session = require('session'); session.delimiter('!')</userinput>
 </programlisting>
 From now on it will be possible to use multiple-line statements,
 but it will be necessary to end all statements with exclamation marks.
@@ -405,13 +405,13 @@ For more on Lua print() see Lua manual chapter 5 "Functions"
 
 <para>
 Since this is the grand finale, we will redo the final versions of all the necessary
-statements: the SETOPT DELIMITER statement, the statement that created string_function(),
-the statement that created main_function(), and the statement that invokes main_function().
+requests: the session.delimiter('!') request, the request that created string_function(),
+the request that created main_function(), and the request that invokes main_function().
 
 
 <programlisting>
-#Skip the following statement if you have already said "setopt delimiter = '!'"
-setopt delimiter = '!'
+#Skip the following statement if you have already said "session.delimiter('!')"
+session = require('session'); session.delimiter('!')
 
 function string_function()
   local random_number
@@ -506,12 +506,13 @@ to read and process tuples.
 </para>
 
 <programlisting language="lua">
-SETOPT DELIMITER='!'
+session = require('session'); session.delimiter('!')
 function sum_json_field(field_name)
+  json = require('json')
   local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
   sum = 0                                                               --[[2]]
   for v, t in box.space.space0:pairs() do                               --[[3]]
-    is_valid_json, lua_table = pcall(box.cjson.decode, t[1])            --[[4]]
+    is_valid_json, lua_table = pcall(json.decode, t[1])                 --[[4]]
     if is_valid_json then                                               --[[5]]
       field_value = lua_table[field_name]                               --[[6]]
       if type(field_value) == "number" then sum = sum + field_value end --[[7]]
@@ -519,7 +520,7 @@ function sum_json_field(field_name)
   end                                                                   --[[9]]
   return sum                                                            --[[10]]
   end!
-SETOPT DELIMITER=''!
+session.delimiter('')!
 </programlisting>
 
 <para>
@@ -546,7 +547,7 @@ with variable <code>t</code>.
 </para>
 
 <para>
-LINE 4: WHY "PCALL". If we simply said "<code>lua_table = box.cjson.decode(t[1]))</code>",
+LINE 4: WHY "PCALL". If we simply said "<code>lua_table = json.decode(t[1]))</code>",
 then the function would abort with an error if it encountered something wrong
 with the JSON string -- a missing colon, for example. By putting the function
 inside "<code>pcall</code>" (<link xlink:href="http://www.lua.org/pil/8.4.html">protected call</link>), we're saying: we want to intercept that sort
@@ -555,7 +556,7 @@ will know what to do about it later.
 </para>
 
 <para>
-LINE 4: MEANING. The function is <olink targetptr="box.cjson">box.cjson.decode</olink> which means decode a JSON
+LINE 4: MEANING. The function is <olink targetptr="box.cjson">json.decode</olink> which means decode a JSON
 string, and the parameter is <code>t[1]</code> which is a reference to a JSON string.
 There's a bit of hard coding here, we're assuming that the second
 field in the tuple is where the JSON string was inserted. For example, we're assuming a tuple looks like <programlisting>field[0]: 444
@@ -595,7 +596,13 @@ Starting with an empty database, defined the same way as the
 sandbox database that was introduced in
 <olink
 targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>,
-add some tuples where the first field is a number and the second field is a string.
+
+<programlisting>
+box.space.space0:drop()           -- if space0 is left over from some previous test, destroy it
+box.schema.create_space('space0')
+box.space.space0:create_index('primary', {parts = {0, 'NUM'}})
+</programlisting>
+then add some tuples where the first field is a number and the second field is a string.
 </para>
 <programlisting>
 box.space.space0:insert{444, '{"Item": "widget", "Quantity": 15}'}

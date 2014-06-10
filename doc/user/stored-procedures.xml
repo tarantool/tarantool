@@ -316,7 +316,7 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 - hello
 - world
 ...
-tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
 tarantool&gt; <userinput>dostring('local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
@@ -1376,7 +1376,7 @@ session.delimiter('')!
                 client as <constant>ER_PROC_LUA</constant>. This function
                 makes it possible to emulate any kind of native exception,
                 such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h"><filename>errcode.h</filename></link>
+                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
                 in the source tree.
                 Lua constants which correspond to Tarantool errors
                 are defined in the <code>box.error</code> module. The error
@@ -1529,7 +1529,7 @@ The example function will: (1) select a tuple the tuple whose key value is 1000;
 (4) Get field[2] from what was replaced;
 (5) Format the value from field[2] as yyyy-mm-dd hh:mm:ss.ffff;
 (6) Return the formatted value.
-The function uses Tarantool box functions box.space...select(), box.space...replace(), box.time(), box_uuid_hex().
+The function uses Tarantool box functions box.space...select(), box.space...replace(), fiber.time(), uuid.hex().
 The function uses Lua functions
 <link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
@@ -2938,7 +2938,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             <para>
                 Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
                 when it starts. If the library is not available, which can happen if it was not
-                found when the server was built from source, then box.uuid() returns an error.
+                found when the server was built from source, then uuid.bin() returns an error.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
 ---

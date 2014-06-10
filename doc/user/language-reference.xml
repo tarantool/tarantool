@@ -49,7 +49,7 @@
   <title>Data manipulation</title>
 
   <para>
-    The four basic "data-manipulation" types are: insert(),
+    The four basic "data-manipulation" requests are: insert() / replace(),
     update(), delete(), select(). They all, including
     insert() and update() and delete(), may return data.
     There are other request types for scanning multiple keys.
@@ -152,16 +152,15 @@
         is, on average, sufficient. This statement waits until a
         snapshot is taken and returns operation result. For
         example:
-<programlisting>localhost> <userinput>box.info.version, box.info.lsn</userinput>
+<programlisting>tarantool> <userinput>box.info.version</userinput>
 ---
 - 1.6.0-805-g4a7e71d
-- 843301
 ...
-localhost> <userinput>box.snapshot()</userinput>
+tarantool> <userinput>box.snapshot()</userinput>
 ---
 ok
 ...
-localhost> <userinput>box.snapshot()</userinput>
+tarantool> <userinput>box.snapshot()</userinput>
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
@@ -193,7 +192,7 @@ fail: can't save snapshot, errno 17 (File exists)
       </term>
       <listitem><para>
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>box.info()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.info()</userinput>
 - version: 1.6.0-805-g4a7e71d
   status: primary
   pid: 12315
@@ -245,7 +244,7 @@ fail: can't save snapshot, errno 17 (File exists)
       total number of requests since startup, broken down by
       request type.
 <programlisting>
-localhost&gt; <userinput>box.stat()</userinput>
+tarantool&gt; <userinput>box.stat()</userinput>
 ---
 - DELETE:
     total: 48902544
@@ -285,7 +284,7 @@ localhost&gt; <userinput>box.stat()</userinput>
           memory fragmentation. For example:
         </para>
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>box.slab.info()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.slab.info()</userinput>
 ---
 - slabs:
     64:

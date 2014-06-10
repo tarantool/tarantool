@@ -149,7 +149,7 @@
   <para>
     UNIX shell command input is prefixed with '$ ' and is in
     a fixed-width font:
-    <programlisting><prompt>$ </prompt>tarantool <option>--background</option></programlisting>
+    <programlisting><prompt>$ </prompt>tarantool <option>--help</option></programlisting>
   </para>
   <para>
     File names are also in a fixed-width font:
