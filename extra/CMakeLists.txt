@@ -3,11 +3,7 @@
 #
 if (ENABLE_RPM)
     # chmod +x 655
-    if (NOT(RPM_SCL_PREFIX STREQUAL ""))
-        set(RPM_SCL_PREFIX_TEMP1 "${RPM_SCL_PREFIX}-")
-    endif()
     install (FILES tarantool_box DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d/
-         RENAME ${RPM_SCL_PREFIX_TEMP1}tarantool_box
          PERMISSIONS
          OWNER_READ OWNER_WRITE
          GROUP_READ GROUP_EXECUTE
@@ -28,7 +24,6 @@ endif()
 
 configure_file(rpm.spec.in rpm.spec @ONLY)
 configure_file(rpm/tarantool.rpm.spec.in rpm/tarantool.rpm.spec @ONLY)
-configure_file(rpm/tarantool-el.rpm.spec.in rpm/tarantool-el.rpm.spec @ONLY)
 
 if (TARGET_OS_DARWIN)
     # NOTE: need add execution 'plutil -lint org.tarantool.tarantool_${TARANTOOL_PRODUCT}.plist
