@@ -200,7 +200,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_bindir}/tarantool"
 "%{_bindir}/tarantool_multi.sh"
 "%{_bindir}/tarantool_deploy.sh"
-%{!?scl: "%{_sysconfdir}/init.d/tarantool_box"}
+%{!?scl: "%{_sysconfdir}/init.d/tarantool"}
 
 
 %files sql-module
