@@ -105,7 +105,9 @@ Procedure identifiers are: Any sequence of letters, digits, or underscores which
 <para>
 String literals are: Any sequence of zero or more characters enclosed in single quotes.
                      Double quotes are legal but single quotes are preferred.
-                     Examples: 'Hello, world', 'A'.
+                     Enclosing in double square brackets is good for multi-line strings as described in
+                     <link xlink:href="http://www.lua.org/pil/2.4.html">Lua documentation</link>.
+                     Examples: 'Hello, world', 'A', [[A\B!]].
 </para>
 <para>
 Numeric literals are: Character sequences containing only digits, optionally preceded by + or -.

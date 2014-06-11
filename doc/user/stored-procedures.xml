@@ -317,13 +317,14 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 - world
 ...
 tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>dostring('local f = function(key)</userinput>
+tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here.</userinput>
+tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
-        -&gt; <userinput>              return f(...)', 0)!</userinput>
+        -&gt; <userinput>              return f(...)]], 0)!</userinput>
 ---
-- nil
+- null
 ...
 tarantool&gt; <userinput>session.delimiter('')!</userinput>
 </programlisting>
