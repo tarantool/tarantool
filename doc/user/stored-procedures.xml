@@ -2924,6 +2924,80 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 </variablelist>
 </section>
 
+<section xml:id="sp-digest">
+    <title>Package <code>digest</code></title>
+    <para>
+    A "digest" is a value which is returned by a
+
+    <link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash_function">Cryptographic hash function</link>
+    applied against a string.
+    Tarantool supports five types of cryptographic hash functions
+    (<link xlink:href="https://en.wikipedia.org/wiki/Md4">MD4</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Md5">MD5</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-0">SHA-0</link>,
+    
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-1">SHA-1</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-2">SHA-2</link>)
+
+    as well as a checksum function
+    (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
+    The functions in <code>digest</code> are:<programlisting><code>    digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
+    digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with crc32.
+    digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
+    digest.sha0_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha0.
+    digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
+    digest.sha1_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha1.
+    digest.sha224(<replaceable>string</replaceable>)                 Returns 224-bit digest made with SHA-2.
+    digest.sha224_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha224.
+    digest.sha256(<replaceable>string</replaceable>)                 Returns 256-bit digest made with SHA-2.
+    digest.sha256_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha256.
+    digest.sha384(<replaceable>string</replaceable>)                 Returns 384-bit digest made with SHA-2.
+    digest.sha384_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha384.
+-   digest.sha512(<replaceable>string</replaceable>)                 Returns 512-bit digest made with SHA-2.
+    digest.sha512_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha512.
+    digest.md4(<replaceable>string</replaceable>)                    Returns 128-bit digest made with MD4.
+    digest.md4_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md4.
+    digest.md5(<replaceable>string</replaceable>)                    Returns 256-bit digest made with MD5.
+    digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.</code></programlisting>
+   </para>
+<bridgehead renderas="sect4">Example</bridgehead>
+    <para>
+    In the following example, the user creates two functions, password_insert() 
+    which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a table,
+    and password_check() which requires input of a password.<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
+<prompt>localhost&gt;</prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+<prompt>localhost&gt;</prompt> <userinput>lua function password_insert()</userinput>
+        <prompt>-&gt;</prompt> <userinput>  box.insert(0,12345,digest.sha1('^S^e^c^ret Wordpass'))</userinput>
+        <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
+        <prompt>-&gt;</prompt> <userinput>  end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput>lua function password_check(password)</userinput>
+        <prompt>-&gt;</prompt>  <userinput> local t</userinput>
+        <prompt>-&gt;</prompt>  <userinput> t=box.select(0,0,12345)</userinput>
+        <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[1]) then</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   print('Password is valid')</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   else</userinput>
+        <prompt>-&gt;</prompt>  <userinput>     print('Password is not valid')</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   end</userinput>
+        <prompt>-&gt;</prompt> <userinput>end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput>call password_insert()!</userinput>
+Call OK, 1 rows affected
+['OK']
+<prompt>localhost></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
+</programlisting></para>
+<para>
+  If a later user calls
+  the password_check() function and enters the wrong password, the result is an
+  error.<programlisting><prompt>localhost&gt;</prompt> <userinput>lua password_check ('Secret Password')</userinput>
+---
+Password is not valid
+...</programlisting></para>
+</section>
+
 <section xml:id="sp-box-uuid">
     <title>Package <code>uuid</code></title>
 <variablelist xml:id="x-uuid" xreflabel="x-uuid">
