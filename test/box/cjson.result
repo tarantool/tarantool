@@ -43,3 +43,11 @@ json.decode('{\"test\": \"Результат\"}').test
 ---
 - !!binary U5UBCw==
 ...
+json.encode(json.NULL)
+---
+- 'null'
+...
+json.decode(json.encode(json.NULL))
+---
+- null
+...

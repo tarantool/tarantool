@@ -202,3 +202,16 @@ type(ffi.metatype('struct test', {
 --# setopt delimiter ''
 -- custom totable function will be called by yaml.encode
 ffi.new('struct test', { a = 15 })
+
+
+
+-------------------------------------------------------------------------------
+-- #346 yaml.null() crases server
+-------------------------------------------------------------------------------
+
+yaml = require('yaml')
+type(yaml.NULL)
+yaml.NULL
+yaml.NULL == nil
+yaml.null() -- for compatibility with luaYAML
+yaml = nil
