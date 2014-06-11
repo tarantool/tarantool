@@ -32,7 +32,7 @@ if (RPMBUILD)
 
     set (RPM_BUILDROOT "${PROJECT_BINARY_DIR}/RPM/BUILDROOT" CACHE STRING "" FORCE)
 
-    add_custom_command(OUTPUT ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
+    add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
         COMMAND $(MAKE) package_source)
 
@@ -51,14 +51,14 @@ if (RPMBUILD)
 
     add_custom_target(rpm
         DEPENDS ${RPM_ROOT}
-        DEPENDS ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
+        DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
         COMMAND ${CP} ${PROJECT_BINARY_DIR}/${RPM_PACKAGE_SOURCE_FILE_NAME} ${RPM_ROOT}/SOURCES
         COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bb ${PROJECT_SOURCE_DIR}/extra/rpm.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
     add_custom_target(rpm_src
         DEPENDS ${RPM_ROOT}
-        DEPENDS ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
+        DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
         COMMAND ${CP} ${PROJECT_BINARY_DIR}/${RPM_PACKAGE_SOURCE_FILE_NAME} ${RPM_ROOT}/SOURCES
         COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bs ${PROJECT_SOURCE_DIR}/extra/rpm.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
@@ -67,26 +67,20 @@ if (RPMBUILD)
 
     add_custom_target(new_rpm
         DEPENDS ${RPM_BUILDROOT}
-        DEPENDS ${RPM_SOURCEDIR}
-        DEPENDS ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
-        COMMAND ${CP} ${PROJECT_BINARY_DIR}/${RPM_PACKAGE_SOURCE_FILE_NAME} ${RPM_SOURCEDIR}
-        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bb ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec
+        DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
+        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --define '_sourcedir ./' -bb ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
     add_custom_target(new_rpm_src
-        DEPENDS ${RPM_BUILDROOT}
-        DEPENDS ${RPM_SOURCEDIR}
-        DEPENDS ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
-        COMMAND ${CP} ${PROJECT_BINARY_DIR}/${RPM_PACKAGE_SOURCE_FILE_NAME} ${RPM_SOURCEDIR}
-        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bs ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec
+        DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
+        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --define '_sourcedir ./' --define '_srcrpmdir ./' -bs ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
     add_custom_target(new_rpm_scl
         DEPENDS ${RPM_BUILDROOT}
-        DEPENDS ${PROJECT_SOURCE_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
-        COMMAND ${CP} ${PROJECT_BINARY_DIR}/${RPM_PACKAGE_SOURCE_FILE_NAME} ${RPM_SOURCEDIR}
+        DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz
         COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bb ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool-scl.rpm.spec
-        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} -bb ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec --define 'scl 15'
+        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --define '_sourcedir ./' -bb ${PROJECT_SOURCE_DIR}/extra/rpm/tarantool.rpm.spec --define 'scl 15'
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
 
     # TODO: Add MOCK builds
