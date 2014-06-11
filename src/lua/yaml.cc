@@ -39,6 +39,12 @@ int
 tarantool_lua_yaml_init(struct lua_State *L)
 {
 	luaopen_yaml(L);
+	/* Fix buggy null() function and add NULL constant */
+	luaL_loadstring(L, "return require('ffi').cast('void *', 0)");
+	lua_pushvalue(L, -1);
+	lua_setfield(L, -3, "null");
+	lua_call(L, 0, 1);
+	lua_setfield(L, -2, "NULL");
 	lua_pop(L, 1); /* yaml module */
 	/* Remove global variable */
 	lua_pushnil(L);

@@ -417,5 +417,9 @@ luaopen_msgpack(lua_State *L)
 	};
 
 	luaL_register_module(L, "msgpack", msgpacklib);
+	/* Add NULL constant */
+	luaL_loadstring(L, "return require('ffi').cast('void *', 0)");
+	lua_call(L, 0, 1);
+	lua_setfield(L, -2, "NULL");
 	return 1;
 }

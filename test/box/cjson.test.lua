@@ -13,3 +13,6 @@ json.decode('[123, \"Кудыкины горы\"]')[2]
 json.decode('{\"test\": \"Результат\"}').test
 -- parser test to recognize binary stream
 '\83\149\1\11'
+
+json.encode(json.NULL)
+json.decode(json.encode(json.NULL))

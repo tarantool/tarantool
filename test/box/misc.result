@@ -602,3 +602,28 @@ ffi.new('struct test', { a = 15 })
 ---
 - - yaml totable test = 15
 ...
+-------------------------------------------------------------------------------
+-- #346 yaml.null() crases server
+-------------------------------------------------------------------------------
+yaml = require('yaml')
+---
+...
+type(yaml.NULL)
+---
+- cdata
+...
+yaml.NULL
+---
+- null
+...
+yaml.NULL == nil
+---
+- true
+...
+yaml.null() -- for compatibility with luaYAML
+---
+- null
+...
+yaml = nil
+---
+...
