@@ -148,6 +148,35 @@ release=`lsb_release -c -s`
 
 <para>
 <programlisting>
+# FEDORA commands for Tarantool master binary download:
+# These instructions are applicable for Fedora 20.
+# Pick the Fedora repository:
+# <link xlink:href="http://tarantool.org/dist/master/fedora/20/x86_64">http://tarantool.org/dist/master/fedora/20/x86_64 for version 20, x86-64</link>
+# Add the following section to your yum repository list
+# (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
+# (in the following instructions,
+#     $releasever i.e. Fedora release version must be 20)
+# (in the following instructions,
+#     $basearch i.e. base architecture must be x86_64)
+# [tarantool]
+# name=Fedora-<replaceable>$releasever</replaceable> - Tarantool
+# baseurl=http://tarantool.org/dist/master/fedora/<replaceable>$releasever</replaceable><replaceable>$basearch</replaceable>/
+# enabled=1
+# gpgcheck=0
+# For example, if you have Fedora version 20, you can
+# add the new section thus:
+<command>echo</command> "[tarantool]" | \
+<command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "name=Fedora - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "baseurl="http://tarantool.org/dist/master/fedora/20/x86_64/" | \
+<command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+</programlisting>
+</para>
+
+<para>
+<programlisting>
 # GENTOO commands for Tarantool master binary download:
 # Tarantool is available from tarantool portage overlay.
 # Use layman to add the overlay to your system:
