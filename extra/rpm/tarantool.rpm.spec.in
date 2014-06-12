@@ -13,6 +13,7 @@
 BuildRequires: scl-utils
 BuildRequires: scl-utils-build
 BuildRequires: e2fsprogs-devel
+BuildRequires: readline-devel
 
 %{lua:
     function rpm_check_string(str)
@@ -50,6 +51,7 @@ Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 Requires: e2fsprogs-libs
+Requires: readline
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -241,7 +243,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %changelog
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2
 - Add SCL support
-- Add flags support
-- Add some dependencies
+- Add --with support
+- Add dependencies
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
 - Initial version of the RPM spec
