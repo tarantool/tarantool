@@ -331,7 +331,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %changelog
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2
 - Add SCL support
-- Add flags support
-- Add some dependencies
+- Add --with support
+- Add dependencies
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
 - Initial version of the RPM spec
