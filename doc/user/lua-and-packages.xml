@@ -1,0 +1,57 @@
+<!DOCTYPE book [
+<!ENTITY % tnt SYSTEM "../tnt.ent">
+%tnt;
+]>
+<chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         xml:id="language-reference">
+
+<title>Lua and the Tarantool Lua Packages</title>
+<blockquote><para>
+  This chapter provides a reference of Tarantool data operations
+  and administrative commands.
+</para></blockquote>
+<bridgehead renderas="sect2">Digression: primary and administrative ports</bridgehead>
+<para>
+  During start up, the server can allow connections on up to two TCP ports:
+  <itemizedlist>
+    <listitem><para>
+      Primary port. This port is for handling requests in the
+      <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>
+      (also called the "binary protocol"), and provides full data access.
+      </para>
+      <para>
+      The default value of the port is <literal>3303</literal>,
+      as defined in the <olink targetptr="primary_port"/>
+      configuration option.
+    </para></listitem>
+    <listitem><para>
+      Administrative port, which is for handling requests in unconverted text (also called the "text protocol"),
+      which defaults to <literal>3313</literal>,
+      and is defined in the <olink targetptr="admin_port"/>
+      configuration option.
+    </para></listitem>
+  </itemizedlist>
+  Traditionally, in the absence of authentication,
+  ordinary users could be blocked from
+  doing administrative operations by simply having them
+  blocked from access to the administrative port.
+  The client, however, had to be aware of
+  the separation, and the <command>tarantool</command> command line
+  client automatically selected the correct port
+  with the help of a simple regular expression. SELECTs, UPDATEs,
+  INSERTs, DELETEs and CALLs were sent to the primary port.
+  Lua commands were sent to the administrative port.
+</para>
+
+
+<xi:include href="stored-procedures.xml" />
+<xi:include href="triggers.xml" />
+
+</chapter>
+
+<!--
+vim: tw=66 syntax=docbk
+vim: spell spelllang=en_us
+-->
