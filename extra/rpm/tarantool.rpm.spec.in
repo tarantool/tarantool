@@ -48,6 +48,7 @@ Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+Requires: libuuid
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
