@@ -12,8 +12,8 @@
 
 BuildRequires: scl-utils
 BuildRequires: scl-utils-build
-BuildRequires: e2fsprogs-devel
 BuildRequires: readline-devel
+BuildRequires: libuuid-devel
 
 %{lua:
     function rpm_check_string(str)
@@ -50,8 +50,8 @@ Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-Requires: e2fsprogs-libs
 Requires: readline
+Requires: libuuid
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
