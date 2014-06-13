@@ -13,32 +13,15 @@
 BuildRequires: scl-utils
 BuildRequires: scl-utils-build
 
-%{lua:
-    function rpm_check_string(str)
-        if type(str) == 'table' then
-            local ans = false
-            for _, v in ipairs(str) do
-                ans = ans or rpm_check_string(v)
-            end
-            return ans
-        end
-        local temp = rpm.expand(str)
-        if temp == str or temp == '' or temp == 0 then
-            return false
-        end
-        return true
-    end
-    local devtoolset = 'scl enable devtoolset-2 %q'
-    if rpm_check_string({'%el4', '%el5', '%el6'}) then
-        print('BuildRequires: cmake28\n')
-        print('BuildRequires: devtoolset-2-toolchain\n')
-        print('BuildRequires: devtoolset-2-binutils-devel\n')
-    else
-        print('BuildRequires: cmake >= 2.8\n')
-        print('BuildRequires: gcc >= 4.5\n')
-        print('BuildRequires: binutils-devel\n')
-    end
-}
+%if 0%{?rhel} < 7
+BuildRequires: cmake28
+BuildRequires: devtoolset-2-toolchain
+BuildRequires: devtoolset-2-binutils-devel
+%else
+BuildRequires: cmake >= 2.8
+BuildRequires: gcc >= 4.5
+BuildRequires: binutils-devel
+%endif
 
 Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
@@ -48,7 +31,11 @@ Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+%if 0%{?rhel} <= 5 then
+Requires: e2fsprogs-libs
+%else
 Requires: libuuid
+%endif
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -63,7 +50,6 @@ scripts.
 Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-dev
 %description -n %{?scl_prefix}tarantool-dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -75,7 +61,6 @@ This package provides Tarantool client libraries.
 Summary: Tarantool sophia bindings
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-sophia-module
 %description -n %{?scl_prefix}tarantool-sophia-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -88,7 +73,6 @@ sophia database.
 Summary: Tarantool common sql interface
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-sql-module
 %description -n %{?scl_prefix}tarantool-sql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -134,7 +118,6 @@ tarantool-sql-module.
 Summary: Tarantool command line client with history support
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-client
 BuildRequires: readline-devel
 Requires: readline
 %description -n %{?scl_prefix}tarantool-client
@@ -157,7 +140,7 @@ with history support.
     local function wrap_with_toolset(cmd)
         local cmd = rpm.expand(cmd)
         local devtoolset = 'scl enable devtoolset-2 %q\n'
-        if rpm_check_string({'%el4', '%el5', '%el6'}) then
+        if rpm.expand('0%{?rhel}') < 7 then
             return devtoolset:format(cmd)
         end
         return cmd
@@ -165,7 +148,6 @@ with history support.
     local function cmake_key_value(key, value)
         return " -D"..key.."="..value
     end
-
     local function dev_with (obj, flag)
         local status = "OFF"
         if rpm.expand("%{with "..obj.."}") then
@@ -174,11 +156,11 @@ with history support.
         return " -D"..flag.."="..status
     end
     local cmd = 'cmake'
-    if rpm_check_string({'%el4', '%el5', '%el6'}) then
+    if rpm.expand('0%{?rhel}') < 7 then
         cmd = 'cmake28'
     end
     cmd = cmd .. ' . '
-        .. cmake_key_value('CMAKE_BUILD_TYPE', '%{_build_type}')
+        .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebugInfo')
         .. cmake_key_value('ENABLE_BACKTRACE', 'ON')
         .. cmake_key_value('CMAKE_INSTALL_PREFIX', '%{_prefix}')
         .. cmake_key_value('CMAKE_INSTALL_SYSCONFDIR', '%{?scl:%_root_sysconfdir}%{!?scl:%_sysconfdir}')
