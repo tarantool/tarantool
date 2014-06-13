@@ -23,6 +23,10 @@ BuildRequires: gcc >= 4.5
 BuildRequires: binutils-devel
 %endif
 
+%if 0%{?fedora} > 0
+BuildRequires: perl-podlators
+%endif
+
 Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
