@@ -17,6 +17,9 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
 RPM
+*.src.rpm
+*.i386.rpm
+*.x86_64.rpm
 tags
 extra/txt2c
 extra/bin2c
