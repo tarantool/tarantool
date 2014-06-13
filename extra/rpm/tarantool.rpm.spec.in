@@ -13,7 +13,7 @@
 BuildRequires: scl-utils
 BuildRequires: scl-utils-build
 
-%if 0%{?rhel} < 7
+%if 0%{?rhel} < 7 && 0%{?rhel} > 0
 BuildRequires: cmake28
 BuildRequires: devtoolset-2-toolchain
 BuildRequires: devtoolset-2-binutils-devel
@@ -31,7 +31,7 @@ Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%if 0%{?rhel} <= 5
+%if 0%{?rhel} <= 5 && 0%{?rhel} > 0
 Requires: e2fsprogs-libs
 %else
 Requires: libuuid
@@ -137,11 +137,15 @@ with history support.
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
 
 %{lua:
+    local function is_rhel_old()
+        local version = tonumber(rpm.expand('0%{?rhel}'))
+        return (version < 7 and version > 0)
+    end
     local function wrap_with_toolset(cmd)
         local cmd = rpm.expand(cmd)
         local devtoolset = 'scl enable devtoolset-2 %q\n'
-        if tonumber(rpm.expand('0%{?rhel}')) < 7 then
-            return devtoolset:format(cmd)
+        if is_rhel_old() then
+            return string.format(devtoolset, cmd)
         end
         return cmd
     end
@@ -156,7 +160,7 @@ with history support.
         return " -D"..flag.."="..status
     end
     local cmd = 'cmake'
-    if tonumber(rpm.expand('0%{?rhel}')) < 7 then
+    if is_rhel_old() then
         cmd = 'cmake28'
     end
     cmd = cmd .. ' . '
