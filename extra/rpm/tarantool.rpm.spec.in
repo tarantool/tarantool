@@ -27,6 +27,9 @@ BuildRequires: binutils-devel
 BuildRequires: perl-podlators
 %endif
 
+# Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
 Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
