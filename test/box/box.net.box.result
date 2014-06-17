@@ -1,0 +1,297 @@
+remote = require 'net.box'
+---
+...
+fiber = require 'fiber'
+---
+...
+log = require 'log'
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+port = box.cfg.primary_port
+---
+...
+space = box.schema.create_space('net_box_test_space')
+---
+...
+space:create_index('primary', { type = 'tree' })
+---
+...
+-- low level connection
+log.info("create connection")
+---
+...
+cn = remote:new('127.0.0.1', port)
+---
+...
+cn:wait_state({'active', 'error'}, 1)
+---
+- true
+...
+log.info("state is %s", cn.state)
+---
+...
+cn:ping()
+---
+- true
+...
+log.info("ping is done")
+---
+...
+cn:ping()
+---
+- true
+...
+log.info("ping is done")
+---
+...
+cn:ping()
+---
+- true
+...
+cn:call('unexists_procedure')
+---
+- error: Procedure 'unexists_procedure' is not defined
+...
+function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
+---
+...
+cn:call('test_foo', 'a', 'b', 'c')
+---
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
+...
+cn:select(space.id, space.index.primary.id, 123)
+---
+- []
+...
+space:insert{123, 345}
+---
+- [123, 345]
+...
+cn:select(space.id, space.index.primary.id, 123)
+---
+- - [123, 345]
+...
+cn:select(space.id, space.index.primary.id, 123, { limit = 0 })
+---
+- []
+...
+cn:select(space.id, space.index.primary.id, 123, { limit = 1 })
+---
+- - [123, 345]
+...
+cn:select(space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
+---
+- []
+...
+cn.space[space.id]  ~= nil
+---
+- true
+...
+cn.space.net_box_test_space ~= nil
+---
+- true
+...
+cn.space.net_box_test_space ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index.primary ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index[space.index.primary.id] ~= nil
+---
+- true
+...
+cn.space.net_box_test_space.index.primary:select(123)
+---
+- - [123, 345]
+...
+cn.space.net_box_test_space.index.primary:select(123, { limit = 0 })
+---
+- []
+...
+cn.space.net_box_test_space.index.primary:select(nil, { limit = 1, })
+---
+- - [123, 345]
+...
+cn.space.net_box_test_space:insert{234, 1,2,3}
+---
+- [234, 1, 2, 3]
+...
+cn.space.net_box_test_space:insert{234, 1,2,3}
+---
+- error: Duplicate key exists in unique index 0
+...
+cn.space.net_box_test_space:replace{354, 1,2,3}
+---
+- [354, 1, 2, 3]
+...
+cn.space.net_box_test_space:replace{354, 1,2,4}
+---
+- [354, 1, 2, 4]
+...
+cn.space.net_box_test_space:select{123}
+---
+- - [123, 345]
+...
+space:select({123}, { iterator = 'GE' })
+---
+- - [123, 345]
+  - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+cn.space.net_box_test_space:select({123}, { iterator = 'GE' })
+---
+- - [123, 345]
+  - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+cn.space.net_box_test_space:select({123}, { iterator = 'GT' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1 })
+---
+- - [234, 1, 2, 3]
+...
+cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1, offset = 1 })
+---
+- - [354, 1, 2, 4]
+...
+cn.space.net_box_test_space:select{123}
+---
+- - [123, 345]
+...
+cn.space.net_box_test_space:update({123}, { { '+', 1, 2 } })
+---
+- [123, 347]
+...
+cn.space.net_box_test_space:select{123}
+---
+- - [123, 347]
+...
+cn.space.net_box_test_space:update({123}, { { '=', 0, 2 } })
+---
+- [2, 347]
+...
+cn.space.net_box_test_space:select{2}
+---
+- - [2, 347]
+...
+cn.space.net_box_test_space:select({234}, { iterator = 'LT' })
+---
+- - [2, 347]
+...
+cn.space.net_box_test_space:update({1}, { { '+', 1, 2 } })
+---
+...
+cn.space.net_box_test_space:delete{1}
+---
+...
+cn.space.net_box_test_space:delete{2}
+---
+- [2, 347]
+...
+cn.space.net_box_test_space:delete{2}
+---
+...
+cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+-- reconnects after errors
+-- -- 1. no reconnect
+cn:fatal('Test fatal error')
+---
+...
+cn.state
+---
+- closed
+...
+cn:ping()
+---
+- false
+...
+cn:call('test_foo')
+---
+- error: Connection was closed
+...
+-- -- 2 reconnect
+cn = remote:new('127.0.0.1', port, { reconnect_after = .1 })
+---
+...
+cn:wait_state({'active'}, 1)
+---
+- true
+...
+cn.space ~= nil
+---
+- true
+...
+cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+cn:fatal 'Test error'
+---
+...
+cn:wait_state({'active', 'activew'}, 2)
+---
+- true
+...
+cn:ping()
+---
+- true
+...
+cn.state
+---
+- active
+...
+cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+cn:fatal 'Test error'
+---
+...
+cn:select(space.id, 0, {}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
+-- -- error while waiting for response
+type(fiber.wrap(function() fiber.sleep(.5) cn:fatal('Test error') end))
+---
+- userdata
+...
+function pause() fiber.sleep(10) return true end
+---
+...
+cn:call('pause')
+---
+- error: Test error
+...
+cn:call('test_foo', 'a', 'b', 'c')
+---
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
+...
+-- cleanup database after tests
+space:drop()
+---
+...

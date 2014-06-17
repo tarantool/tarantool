@@ -120,6 +120,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for node %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected [a-zA-Z_][a-zA-Z0-9_]*)") \
+	/* 71 */_(ER_NO_CONNECTION,		2, "Connection is not established") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
