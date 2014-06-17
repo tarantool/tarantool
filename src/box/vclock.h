@@ -80,6 +80,13 @@ vclock_set(struct vclock *vclock, uint32_t node_id, int64_t lsn)
 }
 
 static inline void
+vclock_add_server(struct vclock *vclock, uint32_t server_id)
+{
+	vclock_set(vclock, server_id, 0);
+}
+
+
+static inline void
 vclock_del(struct vclock *vclock, uint32_t node_id)
 {
 	if (node_id >= vclock->capacity)

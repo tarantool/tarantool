@@ -123,7 +123,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 		/* Local request */
 		int64_t lsn = vclock_get(&r->vclock, r->node_id);
 		if (lsn < 0)
-			tnt_raise(ClientError, ER_LOCAL_NODE_IS_NOT_ACTIVE);
+			tnt_raise(ClientError, ER_LOCAL_SERVER_IS_NOT_ACTIVE);
 		vclock_set(&r->vclock, r->node_id, ++lsn);
 		if (row != NULL) {
 			row->node_id = r->node_id;
@@ -134,7 +134,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 		/* Remote request */
 		int64_t current_lsn = vclock_get(&r->vclock, row->node_id);
 		if (current_lsn < 0) {
-			tnt_raise(ClientError, ER_UNKNOWN_NODE,
+			tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 				  row->node_id);
 		}
 		else if (current_lsn >= row->lsn) {
@@ -266,7 +266,7 @@ recovery_process_setlsn(struct recovery_state *r,
 		int64_t current_lsn = vclock_get(&r->vclock, rows[i].node_id);
 		/* Ignore unknown nodes in relay mode */
 		if (current_lsn < 0 && !r->relay)
-			tnt_raise(ClientError, ER_UNKNOWN_NODE, rows[i].node_id);
+			tnt_raise(ClientError, ER_UNKNOWN_SERVER, rows[i].node_id);
 
 		if (current_lsn == rows[i].lsn) {
 			continue;

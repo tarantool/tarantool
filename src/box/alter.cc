@@ -1545,24 +1545,24 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		if (old_tuple != NULL || new_tuple == NULL)
 			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
 		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
-		cluster_set_id(&uu);
+		cluster_id = uu;
 	}
 }
 
 /**
- * A record with id of the new node has been synced to the
- * write ahead log. Update the cluster configuration with
- * a new node.
+ * A record with id of the new server has been synced to the
+ * write ahead log. Update the cluster configuration cache
+ * with it.
  */
 static void
 on_commit_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
-	tt_uuid node_uuid = tuple_field_uuid(txn->new_tuple, 1);
+	uint32_t id = tuple_field_u32(txn->new_tuple, 0);
+	tt_uuid uuid = tuple_field_uuid(txn->new_tuple, 1);
 
-	cluster_add_node(&node_uuid, node_id);
+	cluster_add_server(&uuid, id);
 }
 
 static struct trigger commit_cluster_trigger =
@@ -1576,13 +1576,13 @@ static struct trigger commit_cluster_trigger =
  * protocol.
  *
  * The trigger updates the cluster configuration cache
- * with uuid of the newly joined node.
+ * with uuid of the newly joined server.
  *
  * During recovery, it acts the same way, loading identifiers
- * of all nodes into the node cache. Node globally unique
+ * of all servers into the cache. Node globally unique
  * identifiers are used to keep track of cluster configuration,
- * so that a node that previously joined the cluster can
- * follow updates, and a node that belongs to a different
+ * so that a server that previously joined the cluster can
+ * follow updates, and a server that belongs to a different
  * cluster can not by mistake join/follow another cluster
  * without first being reset (emptied).
  */
@@ -1594,17 +1594,17 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	struct tuple *old_tuple = txn->old_tuple;
 	struct tuple *new_tuple = txn->new_tuple;
 	if (old_tuple != NULL || new_tuple == NULL)
-		tnt_raise(ClientError, ER_NODE_ID_IS_RO);
+		tnt_raise(ClientError, ER_SERVER_ID_IS_RO);
 
 	/* Check fields */
-	uint32_t node_id = tuple_field_u32(new_tuple, 0);
-	if (cnode_id_is_reserved(node_id))
-		tnt_raise(ClientError, ER_NODE_ID_IS_RESERVED,
-			  (unsigned) node_id);
-	tt_uuid node_uuid = tuple_field_uuid(new_tuple, 1);
-	if (tt_uuid_is_nil(&node_uuid))
+	uint32_t server_id = tuple_field_u32(new_tuple, 0);
+	if (cserver_id_is_reserved(server_id))
+		tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
+			  (unsigned) server_id);
+	tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
+	if (tt_uuid_is_nil(&server_uuid))
 		tnt_raise(ClientError, ER_INVALID_UUID,
-			  tt_uuid_str(&node_uuid));
+			  tt_uuid_str(&server_uuid));
 
 	trigger_set(&txn->on_commit, &commit_cluster_trigger);
 }

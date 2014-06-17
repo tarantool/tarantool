@@ -289,7 +289,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	const char *d = data;
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
-	tt_uuid cluster_uuid = uuid_nil, node_uuid = uuid_nil;
+	tt_uuid uu = uuid_nil, node_uuid = uuid_nil;
 
 	const char *lsnmap = NULL;
 	d = data;
@@ -308,7 +308,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid Cluster-UUID");
 			}
-			tt_uuid_dec_be(d, &cluster_uuid);
+			tt_uuid_dec_be(d, &uu);
 			d += UUID_LEN;
 			break;
 		case IPROTO_NODE_UUID:
@@ -333,14 +333,22 @@ replication_subscribe(int fd, struct iproto_header *packet)
 		}
 	}
 
-	/* Check Cluster-UUID */
-	cluster_check_id(&cluster_uuid);
+	/**
+	 * Check that the given UUID matches the UUID of the
+	 * cluster this node belongs to. Used to handshake
+	 * replica connect, and refuse a connection from a replica
+	 * which belongs to a different cluster.
+	 */
+	if (tt_uuid_cmp(&uu, &cluster_id) != 0) {
+		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
+			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
+	}
 
 	/* Check Node-UUID */
 	uint32_t node_id = schema_find_id(SC_CLUSTER_ID, 1, tt_uuid_str(&node_uuid),
 					  UUID_STR_LEN);
 	if (node_id == SC_ID_NIL)
-		tnt_raise(ClientError, ER_UNKNOWN_NODE, tt_uuid_str(&node_uuid));
+		tnt_raise(ClientError, ER_UNKNOWN_SERVER, tt_uuid_str(&node_uuid));
 	if (lsnmap == NULL)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
 	/* Check & save LSNMAP */
