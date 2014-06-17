@@ -109,6 +109,10 @@ t
 space:drop()
 ---
 ...
+box.snapshot()
+---
+- ok
+...
 os.execute("rm -rf sophia")
 ---
 - 0
