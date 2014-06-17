@@ -262,6 +262,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	}
 
 	recovery_finalize(recovery_state);
+	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
@@ -393,7 +394,6 @@ box_init()
 	space_end_recover_snapshot();
 	space_end_recover();
 
-	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 	title("orphan", NULL);
 	recovery_follow_local(recovery_state,
 			      cfg_getd("wal_dir_rescan_delay"));
