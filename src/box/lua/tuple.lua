@@ -172,7 +172,7 @@ local tuple_bless = function(tuple)
 end
 
 local tuple_field = function(tuple, field_n)
-    local field = builtin.tuple_field(tuple, field_n)
+    local field = builtin.tuple_field(tuple, field_n - 1)
     if field == nil then
         return nil
     end

@@ -117,7 +117,7 @@ type(box.space);
 t = {};
 ---
 ...
-for i, v in pairs(space.index[0].parts[0]) do
+for i, v in pairs(space.index[0].parts[1]) do
     table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 ---
@@ -125,7 +125,7 @@ end;
 t;
 ---
 - - 'type : NUM'
-  - 'fieldno : 0'
+  - 'fieldno : 1'
 ...
 ----------------
 -- # box.space
@@ -451,35 +451,35 @@ fifomax
 ...
 fifo_push(space, 1, 1)
 ---
-- [1, 3, 4, 1, 0, 0, 0, 0]
+- [1, 4, 5, 1, 0, 0, 0, 0]
 ...
 fifo_push(space, 1, 2)
 ---
-- [1, 4, 5, 1, 2, 0, 0, 0]
+- [1, 5, 6, 1, 2, 0, 0, 0]
 ...
 fifo_push(space, 1, 3)
 ---
-- [1, 5, 6, 1, 2, 3, 0, 0]
+- [1, 6, 7, 1, 2, 3, 0, 0]
 ...
 fifo_push(space, 1, 4)
 ---
-- [1, 6, 7, 1, 2, 3, 4, 0]
+- [1, 7, 8, 1, 2, 3, 4, 0]
 ...
 fifo_push(space, 1, 5)
 ---
-- [1, 7, 3, 1, 2, 3, 4, 5]
+- [1, 8, 4, 1, 2, 3, 4, 5]
 ...
 fifo_push(space, 1, 6)
 ---
-- [1, 3, 4, 6, 2, 3, 4, 5]
+- [1, 4, 5, 6, 2, 3, 4, 5]
 ...
 fifo_push(space, 1, 7)
 ---
-- [1, 4, 5, 6, 7, 3, 4, 5]
+- [1, 5, 6, 6, 7, 3, 4, 5]
 ...
 fifo_push(space, 1, 8)
 ---
-- [1, 5, 6, 6, 7, 8, 4, 5]
+- [1, 6, 7, 6, 7, 8, 4, 5]
 ...
 fifo_top(space, 1)
 ---
@@ -487,7 +487,7 @@ fifo_top(space, 1)
 ...
 space:delete{1}
 ---
-- [1, 5, 6, 6, 7, 8, 4, 5]
+- [1, 6, 7, 6, 7, 8, 4, 5]
 ...
 fifo_top(space, 1)
 ---
@@ -495,7 +495,7 @@ fifo_top(space, 1)
 ...
 space:delete{1}
 ---
-- [1, 3, 3, 0, 0, 0, 0, 0]
+- [1, 4, 4, 0, 0, 0, 0, 0]
 ...
 space:drop()
 ---

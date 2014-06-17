@@ -84,7 +84,7 @@ t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 ---
 ...
 -- Check that a space exists
-space = box.space[t[0]]
+space = box.space[t[1]]
 ---
 ...
 space.id
@@ -125,7 +125,7 @@ space:delete{0}
 t = _space:delete{space.id}
 ---
 ...
-space_deleted = box.space[t[0]]
+space_deleted = box.space[t[1]]
 ---
 ...
 space_deleted
