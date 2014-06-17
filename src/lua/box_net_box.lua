@@ -308,7 +308,6 @@ local remote_methods = {
     end,
 
     switch_state = function(self, state)
-        log.info('switch to state "%s" (self.s = %s)', state, tostring(self.s))
         if self.state == state then
             return
         end
@@ -323,7 +322,6 @@ local remote_methods = {
 
         for _, fid in pairs(list) do
             if self.ch.fid[fid] ~= nil then
-                log.info('wakeup fiber %d (%s) by state %s', fid, fiber.find(fid).name(), state)
                 self.ch.fid[fid]:put(true)
                 self.ch.fid[fid] = nil
             end
@@ -331,8 +329,6 @@ local remote_methods = {
     end,
 
     wait_state = function(self, states, timeout)
-        log.info('fiber "%s" waits for state: %s (current: %s)',
-            fiber.name(), json.encode(states), self.state)
         while true do
             for _, state in pairs(states) do
                 if self.state == state then
@@ -466,11 +462,9 @@ local remote_methods = {
     load_schema = function(self)
         self:switch_state('schema')
 
-        log.info 'request schema of spaces'
         local spaces = self:request_internal('select',
             true, box.schema.SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
-        log.info 'request schema of indexes'
         local indexes = self:request_internal('select',
             true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
@@ -550,12 +544,10 @@ local remote_methods = {
                 return
             end
 
-            log.info("read worker %s", self.state)
             if self.s:readable(.5) and self:can_request() then
                 local data = self.s:sysread(4096)
 
                 if data ~= nil then
---                     log.info("received response %d bytes", #data)
                     self.rbuf = self.rbuf .. data
                     self:check_response()
                 else
@@ -592,7 +584,6 @@ local remote_methods = {
                         if written ~= nil then
                             self.wbuf = string.sub(self.wbuf,
                                 tonumber(1 + written))
-                        log.info("sent %d bytes", tonumber(written))
                         else
                             self:fatal(errno.strerror(errno()))
                         end
