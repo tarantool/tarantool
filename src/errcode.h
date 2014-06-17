@@ -120,8 +120,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected [a-zA-Z_][a-zA-Z0-9_]*)") \
-	/* 11 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
-	/* 11 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
+	/* 71 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
+	/* 72 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
+	/* 73 */_(ER_REPLICA_MAX,		2, "Replica count limit reached: %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

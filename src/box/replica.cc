@@ -209,9 +209,9 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	data += UUID_LEN;
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(&r->vclock, it) {
-		data = mp_encode_uint(data, it.node_id);
-		data = mp_encode_uint(data, it.lsn);
+	vclock_foreach(&r->vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
 	}
 	assert(data <= buf + size);
 	row.body[0].iov_base = buf;

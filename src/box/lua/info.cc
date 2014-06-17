@@ -91,7 +91,7 @@ lbox_info_vclock(struct lua_State *L)
 {
 	lua_createtable(L, 0, vclock_size(&recovery_state->vclock));
 	vclock_foreach(&recovery_state->vclock, it) {
-		lua_pushinteger(L, it.node_id);
+		lua_pushinteger(L, it.id);
 		luaL_pushnumber64(L, it.lsn);
 		lua_settable(L, -3);
 	}

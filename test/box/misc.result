@@ -203,6 +203,7 @@ t;
   - 'box.error.INVALID_MSGPACK : 20'
   - 'box.error.KEY_PART_COUNT : 31'
   - 'box.error.ALTER_SPACE : 12'
+  - 'box.error.REPLICA_MAX : 73'
   - 'box.error.ITERATOR_TYPE : 72'
   - 'box.error.NONMASTER : 6'
   - 'box.error.SPACE_EXISTS : 10'
