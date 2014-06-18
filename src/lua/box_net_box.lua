@@ -5,8 +5,6 @@ local fiber = require 'fiber'
 local socket = require 'socket'
 local log = require 'log'
 local errno = require 'errno'
-local yaml = require 'yaml'
-local json = require 'json'
 
 local CODE              = 0
 local PING              = 64
@@ -139,7 +137,7 @@ local proto = {
             box.raise(box.error.NO_SUCH_SPACE,
                 string.format("Space %s does not exist", tostring(spaceno)))
         end
-        
+
         if indexno == nil or type(indexno) ~= 'number' then
             box.raise(box.error.NO_SUCH_INDEX,
                 string.format("No index #%s is defined in space %s",
@@ -179,8 +177,6 @@ local proto = {
 
         return request( { [SYNC] = sync, [TYPE] = SELECT }, body )
     end,
-
-
 }
 
 
@@ -188,23 +184,36 @@ local function space_metatable(self)
     return {
         __index = {
             insert  = function(space, tuple)
-                return self:insert(space.id, tuple)
+                return self:_insert(space.id, tuple)
             end,
 
             replace = function(space, tuple)
-                return self:replace(space.id, tuple)
+                return self:_replace(space.id, tuple)
             end,
 
             select = function(space, key, opts)
-                return self:select(space.id, 0, key, opts)
+                return self:_select(space.id, 0, key, opts)
             end,
 
             delete = function(space, key)
-                return self:delete(space.id, key)
+                return self:_delete(space.id, key)
             end,
 
             update = function(space, key, oplist)
-                return self:update(space.id, key, oplist)
+                return self:_update(space.id, key, oplist)
+            end,
+
+            get = function(space, key)
+                local res = self:_select(space.id, 0, key,
+                                    { limit = 2, iterator = 'EQ' })
+                if #res == 0 then
+                    return
+                end
+                if #res == 1 then
+                    return res[1]
+                end
+                box.raise(box.error.MORE_THAN_ONE_TUPLE,
+                    "More than one tuple found by get()")
             end
         }
     }
@@ -214,7 +223,47 @@ local function index_metatable(self)
     return {
         __index = {
             select = function(idx, key, opts)
-                return self:select(idx.space.id, idx.id, key, opts)
+                return self:_select(idx.space.id, idx.id, key, opts)
+            end,
+
+
+
+            get = function(idx, key)
+                local res = self:_select(idx.space.id, idx.id, key,
+                                    { limit = 2, iterator = 'EQ' })
+                if #res == 0 then
+                    return
+                end
+                if #res == 1 then
+                    return res[1]
+                end
+                box.raise(box.error.MORE_THAN_ONE_TUPLE,
+                    "More than one tuple found by get()")
+            end,
+
+            min = function(idx, key)
+                local res = self:_select(idx.space.id, idx.id, key,
+                    { limit = 1, iterator = 'GE' })
+                if #res > 0 then
+                    return res[1]
+                end
+            end,
+
+            max = function(idx, key)
+                local res = self:_select(idx.space.id, idx.id, key,
+                    { limit = 1, iterator = 'LE' })
+                if #res > 0 then
+                    return res[1]
+                end
+            end,
+
+            count = function(idx, key)
+                local proc = string.format('box.space.%s.index.%s:count',
+                    idx.space.name, idx.name)
+                local res = self:call(proc, key)
+                if #res > 0 then
+                    return res[1][0]
+                end
             end
         }
     }
@@ -248,14 +297,90 @@ local remote_methods = {
         self.wait = { state = {} }
 
 
-        fiber.wrap(function() self:connect_worker() end)
-        fiber.wrap(function() self:read_worker() end)
-        fiber.wrap(function() self:write_worker() end)
+        fiber.wrap(function() self:_connect_worker() end)
+        fiber.wrap(function() self:_read_worker() end)
+        fiber.wrap(function() self:_write_worker() end)
 
         return self
     end,
 
-    check_response = function(self)
+
+    ping    = function(self)
+        if not self:is_connected() then
+            return false
+        end
+        local sync = self.proto:sync()
+        local req = self.proto.ping(sync)
+
+        local res = self:_request('ping', false)
+
+
+        if res == nil then
+            return false
+        end
+
+        if res.hdr[CODE] == 0 then
+            return true
+        end
+        return false
+    end,
+
+    call    = function(self, proc, ...)
+        local res = self:_request('call', true, proc, {...})
+        return res.body[DATA]
+    end,
+
+    is_connected = function(self)
+        if self.state == 'active' then
+            return true
+        end
+        if self.state == 'activew' then
+            return true
+        end
+        return false
+    end,
+
+    wait_connected = function(self, timeout)
+        return self:_wait_state { 'active', 'activew', 'closed' }
+    end,
+
+    -- private methods
+    _fatal = function(self, efmt, ...)
+        local emsg = efmt
+        if select('#', ...) > 0 then
+            emsg = string.format(efmt, ...)
+        end
+
+        if self.s ~= nil then
+            self.s:close()
+            self.s = nil
+        end
+
+        log.warn(emsg)
+        self.error = emsg
+        self.space = {}
+        self:_switch_state('error')
+
+
+        local waiters = self.ch.sync
+        self.ch.sync = {}
+        for sync, channel in pairs(waiters) do
+            channel:put{
+                hdr = {
+                    [TYPE] = ERROR,
+                    [CODE] = box.error.NO_CONNECTION,
+                    [SYNC] = sync
+                },
+                body = {
+                    [ERROR] = self.error
+                }
+            }
+        end
+        self.rbuf = ''
+        self.wbuf = ''
+    end,
+
+    _check_response = function(self)
         while true do
             if #self.rbuf < 5 then
                 break
@@ -287,17 +412,7 @@ local remote_methods = {
         end
     end,
 
-    is_connected = function(self)
-        if self.state == 'active' then
-            return true
-        end
-        if self.state == 'activew' then
-            return true
-        end
-        return false
-    end,
-
-    can_request = function(self)
+    _can_request = function(self)
         if self:is_connected() then
             return true
         end
@@ -307,7 +422,7 @@ local remote_methods = {
         return false
     end,
 
-    switch_state = function(self, state)
+    _switch_state = function(self, state)
         if self.state == state then
             return
         end
@@ -328,7 +443,7 @@ local remote_methods = {
         end
     end,
 
-    wait_state = function(self, states, timeout)
+    _wait_state = function(self, states, timeout)
         while true do
             for _, state in pairs(states) do
                 if self.state == state then
@@ -370,39 +485,39 @@ local remote_methods = {
         end
     end,
 
-    connect_worker = function(self)
+    _connect_worker = function(self)
         fiber.name('net.box.connector')
         while true do
-            self:wait_state{ 'init', 'error', 'closed' }
+            self:_wait_state{ 'init', 'error', 'closed' }
             if self.state == 'closed' then
                 return
             end
 
             if self.state == 'error' then
                 if self.opts.reconnect_after == nil then
-                    self:switch_state('closed')
+                    self:_switch_state('closed')
                     return
                 end
                 fiber.sleep(self.opts.reconnect_after)
             end
 
-            self:switch_state('connecting')
+            self:_switch_state('connecting')
 
             self.s = socket.tcp_connect(self.host, self.port)
             if self.s == nil then
-                self:fatal(errno.strerror(errno()))
+                self:_fatal(errno.strerror(errno()))
                 return
             end
 
             -- on_connect
-            self:switch_state('handshake')
+            self:_switch_state('handshake')
             self.handshake = self.s:read(128)
             if self.handshake == nil then
-                self:fatal(errno.strerror(errno()))
+                self:_fatal(errno.strerror(errno()))
                 return
             end
             if string.len(self.handshake) ~= 128 then
-                self:fatal("Can't read handshake")
+                self:_fatal("Can't read handshake")
                 return
             end
 
@@ -414,58 +529,23 @@ local remote_methods = {
                 error("Auth request is not implemented yet")
             end
 
-            local s, e = pcall(function() self:load_schema() end)
+            local s, e = pcall(function() self:_load_schema() end)
             if not s then
-                self:fatal(e)
+                self:_fatal(e)
             else
-                self:switch_state('active')
+                self:_switch_state('active')
             end
 
         end
     end,
 
-    fatal = function(self, efmt, ...)
-        local emsg = efmt
-        if select('#', ...) > 0 then
-            emsg = string.format(efmt, ...)
-        end
+    _load_schema = function(self)
+        self:_switch_state('schema')
 
-        if self.s ~= nil then
-            self.s:close()
-            self.s = nil
-        end
-        
-        log.warn(emsg)
-        self.error = emsg
-        self.space = {}
-        self:switch_state('error')
-
-
-        local waiters = self.ch.sync
-        self.ch.sync = {}
-        for sync, channel in pairs(waiters) do
-            channel:put{
-                hdr = {
-                    [TYPE] = ERROR,
-                    [CODE] = box.error.NO_CONNECTION,
-                    [SYNC] = sync
-                },
-                body = {
-                    [ERROR] = self.error
-                }
-            }
-        end
-        self.rbuf = ''
-        self.wbuf = ''
-    end,
-
-    load_schema = function(self)
-        self:switch_state('schema')
-
-        local spaces = self:request_internal('select',
+        local spaces = self:_request_internal('select',
             true, box.schema.SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
-        local indexes = self:request_internal('select',
+        local indexes = self:_request_internal('select',
             true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
@@ -496,7 +576,7 @@ local remote_methods = {
 
             sl[id] = s
             sl[name] = s
-            
+
         end
 
         for _, index in pairs(indexes) do
@@ -536,31 +616,31 @@ local remote_methods = {
         self.space = sl
     end,
 
-    read_worker = function(self)
+    _read_worker = function(self)
         fiber.name('net.box.read')
         while true do
-            self:wait_state{'active', 'activew', 'closed', 'schema', 'schemaw' }
+            self:_wait_state{'active', 'activew', 'closed', 'schema', 'schemaw' }
             if self.state == 'closed' then
                 return
             end
 
-            if self.s:readable(.5) and self:can_request() then
+            if self.s:readable(.5) and self:_can_request() then
                 local data = self.s:sysread(4096)
 
                 if data ~= nil then
                     self.rbuf = self.rbuf .. data
-                    self:check_response()
+                    self:_check_response()
                 else
-                    self:fatal(errno.strerror(errno()))
+                    self:_fatal(errno.strerror(errno()))
                 end
             end
         end
     end,
 
-    write_worker = function(self)
+    _write_worker = function(self)
         fiber.name('net.box.write')
         while true do
-            self:wait_state{'activew', 'closed', 'schemaw'}
+            self:_wait_state{'activew', 'closed', 'schemaw'}
 
             if self.state == 'closed' then
                 return
@@ -569,9 +649,9 @@ local remote_methods = {
             if #self.wbuf == 0 then
 
                 if self.state == 'activew' then
-                    self:switch_state('active')
+                    self:_switch_state('active')
                 elseif self.state == 'schemaw' then
-                    self:switch_state('schema')
+                    self:_switch_state('schema')
                 end
 
             end
@@ -585,7 +665,7 @@ local remote_methods = {
                             self.wbuf = string.sub(self.wbuf,
                                 tonumber(1 + written))
                         else
-                            self:fatal(errno.strerror(errno()))
+                            self:_fatal(errno.strerror(errno()))
                         end
                     end
                 end
@@ -594,21 +674,19 @@ local remote_methods = {
     end,
 
 
+    _request = function(self, name, raise, ...)
 
-    -- iproto methods
-    request = function(self, name, raise, ...)
-
-        self:wait_state{ 'active', 'activew', 'closed' }
+        self:_wait_state{ 'active', 'activew', 'closed' }
 
         if self.state == 'closed' then
             box.raise(box.error.NO_CONNECTION,
                 "Connection was closed")
         end
 
-        return self:request_internal(name, raise, ...)
+        return self:_request_internal(name, raise, ...)
     end,
 
-    request_internal = function(self, name, raise, ...)
+    _request_internal = function(self, name, raise, ...)
 
         local sync = self.proto:sync()
         local request = self.proto[name](sync, ...)
@@ -616,9 +694,9 @@ local remote_methods = {
         self.wbuf = self.wbuf .. request
 
         if self.state == 'active' then
-            self:switch_state('activew')
+            self:_switch_state('activew')
         elseif self.state == 'schema' then
-            self:switch_state('schemaw')
+            self:_switch_state('schemaw')
         end
 
         local ch = fiber.channel()
@@ -641,53 +719,29 @@ local remote_methods = {
         return response
     end,
 
-    ping    = function(self)
-        if not self:is_connected() then
-            return false
-        end
-        local sync = self.proto:sync()
-        local req = self.proto.ping(sync)
-
-        local res = self:request('ping', false)
-
-
-        if res == nil then
-            return false
-        end
-
-        if res.hdr[CODE] == 0 then
-            return true
-        end
-        return false
-    end,
-
-    call    = function(self, proc, ...)
-        local res = self:request('call', true, proc, {...})
+    -- private (low level) methods
+    _select = function(self, spaceno, indexno, key, opts)
+        local res = self:_request('select', true, spaceno, indexno, key, opts)
         return res.body[DATA]
     end,
 
-    select = function(self, spaceno, indexno, key, opts)
-        local res = self:request('select', true, spaceno, indexno, key, opts)
-        return res.body[DATA]
-    end,
-
-    insert = function(self, spaceno, tuple)
-        local res = self:request('insert', true, spaceno, tuple)
+    _insert = function(self, spaceno, tuple)
+        local res = self:_request('insert', true, spaceno, tuple)
         return one_tuple(res.body[DATA])
     end,
 
-    replace = function(self, spaceno, tuple)
-        local res = self:request('replace', true, spaceno, tuple)
+    _replace = function(self, spaceno, tuple)
+        local res = self:_request('replace', true, spaceno, tuple)
         return one_tuple(res.body[DATA])
     end,
 
-    delete  = function(self, spaceno, key)
-        local res = self:request('delete', true, spaceno, key)
+    _delete  = function(self, spaceno, key)
+        local res = self:_request('delete', true, spaceno, key)
         return one_tuple(res.body[DATA])
     end,
 
-    update = function(self, spaceno, key, oplist)
-        local res = self:request('update', true, spaceno, key, oplist)
+    _update = function(self, spaceno, key, oplist)
+        local res = self:_request('update', true, spaceno, key, oplist)
         return one_tuple(res.body[DATA])
     end
 }
@@ -696,6 +750,25 @@ setmetatable(remote, { __index = remote_methods })
 
 box.ping = function() return true end
 box.close = function() return true end
+box.wait_connected = function() return true end
+box.call = function(_box, proc_name, ...)
+    local proc = { package.loaded['box.internal'].call_loadproc(proc_name) }
+    local result
+    if #proc == 2 then
+        result = { proc[1](proc[2], ...) }
+    else
+        result = { proc[1](...) }
+    end
+
+    if #result == 1 and type(result[1]) == 'table' then
+        result = result[1]
+    end
+
+    for i, v in pairs(result) do
+        result[i] = box.tuple.new(v)
+    end
+    return result
+end
 
 return remote
 

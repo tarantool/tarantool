@@ -26,7 +26,7 @@ log.info("create connection")
 cn = remote:new('127.0.0.1', port)
 ---
 ...
-cn:wait_state({'active', 'error'}, 1)
+cn:_wait_state({'active', 'error'}, 1)
 ---
 - true
 ...
@@ -64,7 +64,7 @@ cn:call('test_foo', 'a', 'b', 'c')
   - [{'b': 2}]
   - ['c']
 ...
-cn:select(space.id, space.index.primary.id, 123)
+cn:_select(space.id, space.index.primary.id, 123)
 ---
 - []
 ...
@@ -72,19 +72,19 @@ space:insert{123, 345}
 ---
 - [123, 345]
 ...
-cn:select(space.id, space.index.primary.id, 123)
+cn:_select(space.id, space.index.primary.id, 123)
 ---
 - - [123, 345]
 ...
-cn:select(space.id, space.index.primary.id, 123, { limit = 0 })
+cn:_select(space.id, space.index.primary.id, 123, { limit = 0 })
 ---
 - []
 ...
-cn:select(space.id, space.index.primary.id, 123, { limit = 1 })
+cn:_select(space.id, space.index.primary.id, 123, { limit = 1 })
 ---
 - - [123, 345]
 ...
-cn:select(space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
+cn:_select(space.id, space.index.primary.id, 123, { limit = 1, offset = 1 })
 ---
 - []
 ...
@@ -211,9 +211,37 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
 ...
+cn.space.net_box_test_space.index.primary:min()
+---
+- [234, 1, 2, 3]
+...
+cn.space.net_box_test_space.index.primary:min(354)
+---
+- [354, 1, 2, 4]
+...
+cn.space.net_box_test_space.index.primary:max()
+---
+- [354, 1, 2, 4]
+...
+cn.space.net_box_test_space.index.primary:max(234)
+---
+- [234, 1, 2, 3]
+...
+cn.space.net_box_test_space.index.primary:count()
+---
+- 2
+...
+cn.space.net_box_test_space.index.primary:count(354)
+---
+- 1
+...
+cn.space.net_box_test_space:get(354)
+---
+- [354, 1, 2, 4]
+...
 -- reconnects after errors
 -- -- 1. no reconnect
-cn:fatal('Test fatal error')
+cn:_fatal('Test fatal error')
 ---
 ...
 cn.state
@@ -232,7 +260,7 @@ cn:call('test_foo')
 cn = remote:new('127.0.0.1', port, { reconnect_after = .1 })
 ---
 ...
-cn:wait_state({'active'}, 1)
+cn:_wait_state({'active'}, 1)
 ---
 - true
 ...
@@ -245,10 +273,10 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
 ...
-cn:fatal 'Test error'
+cn:_fatal 'Test error'
 ---
 ...
-cn:wait_state({'active', 'activew'}, 2)
+cn:_wait_state({'active', 'activew'}, 2)
 ---
 - true
 ...
@@ -265,16 +293,16 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
 ...
-cn:fatal 'Test error'
+cn:_fatal 'Test error'
 ---
 ...
-cn:select(space.id, 0, {}, { iterator = 'ALL' })
+cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 ---
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
 ...
 -- -- error while waiting for response
-type(fiber.wrap(function() fiber.sleep(.5) cn:fatal('Test error') end))
+type(fiber.wrap(function() fiber.sleep(.5) cn:_fatal('Test error') end))
 ---
 - userdata
 ...
@@ -294,4 +322,17 @@ cn:call('test_foo', 'a', 'b', 'c')
 -- cleanup database after tests
 space:drop()
 ---
+...
+-- call
+box:call('test_foo', 'a', 'b', 'c')
+---
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
+...
+cn:call('test_foo', 'a', 'b', 'c')
+---
+- - [{'a': 1}]
+  - [{'b': 2}]
+  - ['c']
 ...
