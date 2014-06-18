@@ -116,7 +116,7 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 /* {{{ LSN API */
 
-static int64_t
+static void
 fill_lsn(struct recovery_state *r, struct iproto_header *row)
 {
 	if (row == NULL || row->node_id == 0) {
@@ -129,7 +129,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 			row->node_id = r->node_id;
 			row->lsn = lsn;
 		}
-		return lsn;
+		return;
 	} else {
 		/* Remote request */
 		int64_t current_lsn = vclock_get(&r->vclock, row->node_id);
@@ -150,7 +150,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 				 (long long) (row->lsn - current_lsn));
 		}
 		vclock_set(&r->vclock, row->node_id, row->lsn);
-		return row->lsn;
+		return;
 	}
 }
 
@@ -180,6 +180,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 
 	r->row_handler = row_handler;
 	r->row_handler_param = row_handler_param;
+	r->lsnsum = -1;
 
 	r->snapshot_handler = snapshot_handler;
 	r->join_handler = join_handler;
@@ -337,37 +338,23 @@ recovery_end_recover_snapshot(struct recovery_state *r)
 }
 
 void
-cluster_bootstrap(struct recovery_state *r)
+recovery_bootstrap(struct recovery_state *r)
 {
-	recovery_begin_recover_snapshot(r);
-
-	/* Generate Node-UUID */
-	tt_uuid_create(&r->node_uuid);
-
 	/* Recover from bootstrap.snap */
-	say_info("initializing cluster");
+	say_info("initializing an empty data directory");
+	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	tt_uuid bootstrap_uuid; /* ignored */
-	struct log_io *snap = log_io_open(&r->snap_dir, LOG_READ,
-		"bootstrap.snap", &bootstrap_uuid, NONE, f);
-	assert(snap != NULL);
-	auto snap_guard = make_scoped_guard([&]{
-		log_io_close(&snap);
-	});
-
+	struct log_io *snap;
+	snap = log_io_open(&r->snap_dir, LOG_READ, filename,
+			   &r->node_uuid, NONE, f);
+	if (snap == NULL)
+		panic("failed to open %s", filename);
 	int rc = recover_wal(r, snap);
+	log_io_close(&snap);
 
 	if (rc != 0)
-		panic("failed to bootstrap data directory");
-
-	/* Initialize local node */
-	r->join_handler(&r->node_uuid);
-	assert(r->node_id == 1);
-
-	say_info("done");
-
-	recovery_end_recover_snapshot(recovery_state);
+		panic("failed to recover from %s", filename);
 }
 
 /**
@@ -377,11 +364,9 @@ cluster_bootstrap(struct recovery_state *r)
 void
 recover_snap(struct recovery_state *r)
 {
-	/*  current_wal isn't open during initial recover. */
+	/* There's no current_wal during initial recover. */
 	assert(r->current_wal == NULL);
 	say_info("recovery start");
-
-	recovery_begin_recover_snapshot(r);
 
 	struct log_io *snap;
 	int64_t lsn;
@@ -389,21 +374,15 @@ recover_snap(struct recovery_state *r)
 	if (log_dir_scan(&r->snap_dir) != 0)
 		panic("can't scan snapshot directory");
 	lsn = log_dir_greatest(&r->snap_dir);
-	if (lsn <= 0)
-		panic("can't find snapshot! "
-		      "Didn't you forget to initialize storage?");
+	if (lsn < 0)
+		panic("can't find snapshot");
 	snap = log_io_open_for_read(&r->snap_dir, lsn, &r->node_uuid, NONE);
 	if (snap == NULL)
 		panic("can't open snapshot");
 
-	if (tt_uuid_is_nil(&r->node_uuid))
-		panic("can't find node uuid in snapshot");
-
-	say_info("recover from `%s'", snap->filename);
+	say_info("recovering from `%s'", snap->filename);
 	if (recover_wal(r, snap) != 0)
 		panic("can't process snapshot");
-
-	recovery_end_recover_snapshot(r);
 }
 
 #define LOG_EOF 0
@@ -1204,11 +1183,14 @@ wal_writer_thread(void *worker_args)
 int
 wal_write(struct recovery_state *r, struct iproto_header *row)
 {
+	/*
+	 * Bump current LSN even if wal_mode = NONE, so that
+	 * snapshots still works with WAL turned off.
+	 */
 	fill_lsn(r, row);
 	if (r->wal_mode == WAL_NONE)
 		return 0;
 
-	assert(r->wal_mode != WAL_NONE);
 	ERROR_INJECT_RETURN(ERRINJ_WAL_IO);
 
 	struct wal_writer *writer = r->writer;
@@ -1256,6 +1238,13 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 
 	row->tm = last;
 	row->node_id = 0;
+	/**
+	 * Rows in snapshot are numbered from 1 to %rows.
+	 * This makes streaming such rows to a replica or
+	 * to recovery look similar to streaming a normal
+	 * WAL. @sa the place which skips old rows in
+	 * recovery_process().
+	 */
 	if (iproto_request_is_dml(row->type))
 		row->lsn = ++rows;
 	row->sync = 0; /* don't write sync to wal */

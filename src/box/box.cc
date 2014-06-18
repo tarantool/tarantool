@@ -270,6 +270,50 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 }
 
 /**
+ * Execute a request against a given space id with
+ * a variable-argument tuple described in format.
+ *
+ * @example: you want to insert 5 into space 1:
+ * boxk(IPROTO_INSERT, 1, "%u", 5);
+ *
+ * @note Since this is for internal use, it has
+ * no boundary or misuse checks.
+ */
+void
+boxk(enum iproto_request_type type, uint32_t space_id,
+     const char *format, ...)
+{
+	struct request req;
+	va_list ap;
+	request_create(&req, type);
+	req.space_id = space_id;
+	char buf[128];
+	char *data = buf;
+	data = mp_encode_array(data, strlen(format)/2);
+	va_start(ap, format);
+	while (*format) {
+		switch (*format++) {
+		case 'u':
+			data = mp_encode_uint(data, va_arg(ap, unsigned));
+			break;
+		case 's':
+		{
+			char *arg = va_arg(ap, char *);
+			data = mp_encode_str(data, arg, strlen(arg));
+			break;
+		}
+		default:
+			break;
+		}
+	}
+	va_end(ap);
+	assert(data <= buf + sizeof(buf));
+	req.tuple = buf;
+	req.tuple_end = data;
+	process_rw(&null_port, &req);
+}
+
+/**
  * @brief Called when recovery/replication wants to add a new node
  * to cluster.
  * cluster_add_node() is called as a commit trigger on _cluster
@@ -279,48 +323,43 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 static void
 box_on_cluster_join(const tt_uuid *node_uuid)
 {
+	/** Find the largest existing node id. */
 	struct space *space = space_cache_find(SC_CLUSTER_ID);
 	class Index *index = index_find(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
 	struct tuple *tuple = it->next(it);
+	/** Assign a new node id. */
 	uint32_t node_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	if (node_id >= VCLOCK_MAX)
+		tnt_raise(ClientError, ER_REPLICA_MAX, node_id);
 
-	struct request req;
-	request_create(&req, IPROTO_INSERT);
-	req.space_id = SC_CLUSTER_ID;
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_array(data, 2);
-	data = mp_encode_uint(data, node_id);
-	data = mp_encode_str(data, tt_uuid_str(node_uuid), UUID_STR_LEN);
-	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
-	process_rw(&null_port, &req);
+	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
+	     (unsigned) node_id, tt_uuid_str(node_uuid));
 }
 
+/** Replace the current node id in _cluster */
+static void
+box_set_node_uuid()
+{
+	tt_uuid_create(&recovery_state->node_uuid);
+	vclock_del_server(&recovery_state->vclock, recovery_state->node_id);
+	recovery_state->node_id = 0;            /* please the assert */
+	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
+	     1, tt_uuid_str(&recovery_state->node_uuid));
+}
+
+/** Insert a new cluster into _schema */
 static void
 box_set_cluster_uuid()
 {
-	/* Save Cluster-UUID to _schema space */
-	tt_uuid cluster_uuid;
-	tt_uuid_create(&cluster_uuid);
+	tt_uuid uu;
+	/* Generate a new cluster UUID */
+	tt_uuid_create(&uu);
 
-	const char *key = "cluster";
-	struct request req;
-	request_create(&req, IPROTO_INSERT);
-	req.space_id = SC_SCHEMA_ID;
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_array(data, 2);
-	data = mp_encode_str(data, key, strlen(key));
-	data = mp_encode_str(data, tt_uuid_str(&cluster_uuid), UUID_STR_LEN);
-	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
-
-	process_rw(&null_port, &req);
+	/* Save cluster UUID in _schema */
+	boxk(IPROTO_REPLACE, SC_SCHEMA_ID, "%s%s", "cluster",
+	     tt_uuid_str(&uu));
 }
 
 void
@@ -378,16 +417,21 @@ box_init()
 
 	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
+		recovery_begin_recover_snapshot(recovery_state);
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
+		recovery_end_recover_snapshot(recovery_state);
 	} else if (replication_source != NULL) {
 		/* Initialize a new replica */
 		replica_bootstrap(recovery_state, replication_source);
 		snapshot_save(recovery_state);
 	} else {
+		recovery_begin_recover_snapshot(recovery_state);
 		/* Initialize a master node of a new cluster */
-		cluster_bootstrap(recovery_state);
+		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();
+		box_set_node_uuid();
+		recovery_end_recover_snapshot(recovery_state);
 		snapshot_save(recovery_state);
 	}
 
