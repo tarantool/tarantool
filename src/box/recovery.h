@@ -108,10 +108,10 @@ void recovery_free();
 static inline bool
 recovery_has_data(struct recovery_state *r)
 {
-	return log_dir_greatest(&r->snap_dir) > 0 ||
-	       log_dir_greatest(&r->wal_dir) > 0;
+	return log_dir_greatest(&r->snap_dir) >= 0 ||
+	       log_dir_greatest(&r->wal_dir) >= 0;
 }
-void cluster_bootstrap(struct recovery_state *r);
+void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);
 void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay);
 void recovery_finalize(struct recovery_state *r);

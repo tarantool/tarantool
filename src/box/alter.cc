@@ -1542,7 +1542,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	const char *key = tuple_field_cstr(new_tuple ?
 					   new_tuple : old_tuple, 0);
 	if (strcmp(key, "cluster") == 0) {
-		if (old_tuple != NULL || new_tuple == NULL)
+		if (new_tuple == NULL)
 			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
 		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
 		cluster_id = uu;
@@ -1591,9 +1591,8 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	struct tuple *old_tuple = txn->old_tuple;
 	struct tuple *new_tuple = txn->new_tuple;
-	if (old_tuple != NULL || new_tuple == NULL)
+	if (new_tuple == NULL)
 		tnt_raise(ClientError, ER_SERVER_ID_IS_RO);
 
 	/* Check fields */

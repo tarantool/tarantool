@@ -199,7 +199,6 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	}
 	auto meta_guard = make_scoped_guard([=]{
 		log_dir_remove_from_index(dir, meta);
-		free(meta);
 	});
 
 	meta->lsnsum = lsnsum;
@@ -1028,7 +1027,7 @@ log_io_open_for_write(struct log_dir *dir, int64_t lsn, tt_uuid *node_uuid,
 {
 	char *filename;
 	FILE *f;
-	assert(lsn != 0);
+	assert(lsn >= 0);
 
 	if (suffix == INPROGRESS) {
 		/*
