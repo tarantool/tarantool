@@ -1,5 +1,5 @@
-#ifndef INCLUDES_VCLOCK_H
-#define INCLUDES_VCLOCK_H
+#ifndef INCLUDES_TARANTOOL_VCLOCK_H
+#define INCLUDES_TARANTOOL_VCLOCK_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,76 +28,65 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <assert.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
+enum { VCLOCK_MAX = 16 };
+
 struct vclock {
-	int64_t *lsn;
-	uint32_t capacity;
+	int64_t lsn[VCLOCK_MAX];
 };
 
 #define vclock_foreach(vclock, var) \
-	for (struct { uint32_t node_id; int64_t lsn;} (var) = {0, 0}; \
-	     (var).node_id < (vclock)->capacity; (var).node_id++) \
-		if (((var).lsn = (vclock)->lsn[(var).node_id]) < 0) continue; else
+	for (struct { uint32_t id; int64_t lsn;} (var) = {0, 0}; \
+	     (var).id < VCLOCK_MAX; (var).id++) \
+		if (((var).lsn = (vclock)->lsn[(var).id]) >= 0)
 
 static inline void
 vclock_create(struct vclock *vclock)
 {
-	memset(vclock, 0, sizeof(*vclock));
+	memset(vclock, 0xff, sizeof(*vclock));
 }
 
 static inline void
 vclock_destroy(struct vclock *vclock)
 {
-	free(vclock->lsn);
-	vclock->capacity = 0;
+	(void) vclock;
+}
+
+static inline bool
+vclock_has(const struct vclock *vclock, uint32_t server_id)
+{
+	return server_id < VCLOCK_MAX && vclock->lsn[server_id] >= 0;
 }
 
 static inline int64_t
-vclock_get(const struct vclock *vclock, uint32_t node_id)
+vclock_get(const struct vclock *vclock, uint32_t server_id)
 {
-	if (node_id >= vclock->capacity)
-		return -1;
-
-	return vclock->lsn[node_id];
+	return vclock_has(vclock, server_id) ? vclock->lsn[server_id] : -1;
 }
 
 void
-vclock_realloc(struct vclock *vclock, uint32_t node_id);
+vclock_set(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 
-static inline void
-vclock_set(struct vclock *vclock, uint32_t node_id, int64_t lsn)
+static inline int64_t
+vclock_inc(struct vclock *vclock, uint32_t server_id)
 {
-	if (node_id >= vclock->capacity)
-		vclock_realloc(vclock, node_id);
-
-	assert(vclock->lsn[node_id] < lsn);
-	vclock->lsn[node_id] = lsn;
+	assert(vclock_has(vclock, server_id));
+	return ++vclock->lsn[server_id];
 }
 
 static inline void
-vclock_del(struct vclock *vclock, uint32_t node_id)
+vclock_copy(struct vclock *dst, const struct vclock *src)
 {
-	if (node_id >= vclock->capacity)
-		return;
-
-	vclock->lsn[node_id] = -1;
-}
-
-static inline int
-vclock_copy(struct vclock *vclock, const struct vclock *src)
-{
-	for (uint32_t n = 0; n < src->capacity; n++) {
-		if (src->lsn[n] < 0)
-			continue;
-
-		vclock_set(vclock, n, src->lsn[n]);
-	}
-	return 0;
+	*dst = *src;
 }
 
 static inline uint32_t
@@ -106,20 +95,42 @@ vclock_size(const struct vclock *vclock)
 	int32_t size = 0;
 	vclock_foreach(vclock, pair)
 		++size;
-
 	return size;
-
 }
 
 static inline int64_t
 vclock_signature(const struct vclock *vclock)
 {
 	int64_t sum = 0;
-	vclock_foreach(vclock, pair) {
-		sum += pair.lsn;
-	}
-
+	vclock_foreach(vclock, server)
+		sum += server.lsn;
 	return sum;
 }
 
-#endif /* INCLUDES_VCLOCK_H */
+int64_t
+vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+
+#include "exception.h"
+
+static inline void
+vclock_add_server(struct vclock *vclock, uint32_t server_id)
+{
+	if (server_id >= VCLOCK_MAX)
+		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
+	assert(! vclock_has(vclock, server_id));
+	vclock->lsn[server_id] = 0;
+}
+
+static inline void
+vclock_del_server(struct vclock *vclock, uint32_t server_id)
+{
+	assert(vclock_has(vclock, server_id));
+	vclock->lsn[server_id] = -1;
+}
+
+#endif /* defined(__cplusplus) */
+
+#endif /* INCLUDES_TARANTOOL_VCLOCK_H */

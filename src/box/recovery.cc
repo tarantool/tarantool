@@ -123,7 +123,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 		/* Local request */
 		int64_t lsn = vclock_get(&r->vclock, r->node_id);
 		if (lsn < 0)
-			tnt_raise(ClientError, ER_LOCAL_NODE_IS_NOT_ACTIVE);
+			tnt_raise(ClientError, ER_LOCAL_SERVER_IS_NOT_ACTIVE);
 		vclock_set(&r->vclock, r->node_id, ++lsn);
 		if (row != NULL) {
 			row->node_id = r->node_id;
@@ -134,7 +134,7 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 		/* Remote request */
 		int64_t current_lsn = vclock_get(&r->vclock, row->node_id);
 		if (current_lsn < 0) {
-			tnt_raise(ClientError, ER_UNKNOWN_NODE,
+			tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 				  row->node_id);
 		}
 		else if (current_lsn >= row->lsn) {
@@ -265,8 +265,12 @@ recovery_process_setlsn(struct recovery_state *r,
 	for (uint32_t i = 0; i < row_count; i++) {
 		int64_t current_lsn = vclock_get(&r->vclock, rows[i].node_id);
 		/* Ignore unknown nodes in relay mode */
-		if (current_lsn < 0 && !r->relay)
-			tnt_raise(ClientError, ER_UNKNOWN_NODE, rows[i].node_id);
+		if (current_lsn < 0) {
+			if (!r->relay)
+				tnt_raise(ClientError, ER_UNKNOWN_SERVER,
+					  rows[i].node_id);
+			vclock_add_server(&r->vclock, rows[i].node_id);
+		}
 
 		if (current_lsn == rows[i].lsn) {
 			continue;
@@ -322,14 +326,14 @@ void
 recovery_begin_recover_snapshot(struct recovery_state *r)
 {
 	/* Add fake node to recover snapshot */
-	vclock_set(&r->vclock, 0, 0);
+	vclock_add_server(&r->vclock, 0);
 }
 
 void
 recovery_end_recover_snapshot(struct recovery_state *r)
 {
 	/* Remove fake node after recovering snapshot */
-	vclock_del(&r->vclock, 0);
+	vclock_del_server(&r->vclock, 0);
 }
 
 void
@@ -756,7 +760,7 @@ recovery_stop_local(struct recovery_state *r)
 struct wal_write_request {
 	STAILQ_ENTRY(wal_write_request) wal_fifo_entry;
 	/* Auxiliary. */
-	int64_t prev_lsn;
+	int64_t res;
 	struct fiber *fiber;
 	struct iproto_header *row;
 	char wal_fixheader[XLOG_FIXHEADER_SIZE];
@@ -1094,7 +1098,7 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 
 static struct wal_write_request *
 wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
-	       struct wal_write_request *req, struct vclock *vclock)
+	       struct wal_write_request *req)
 {
 	int max_rows = wal->is_inprogress ? 1 : rows_per_wal - wal->rows;
 	/* Post-condition of successful wal_opt_rotate(). */
@@ -1103,10 +1107,6 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 
 	struct iovec iov[XLOG_ROW_IOVMAX];
 	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
-		int64_t lsn = vclock_get(vclock, req->row->node_id);
-		if (lsn < 0) {
-			vclock_set(vclock, req->row->node_id, 0);
-		}
 		int iovcnt = xlog_encode_row(req->row, iov,
 					     req->wal_fixheader);
 		fio_batch_add(batch, iov, iovcnt);
@@ -1123,9 +1123,8 @@ wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
-		req->prev_lsn = vclock_get(vclock, req->row->node_id);
-		assert(req->prev_lsn >= 0);
-		vclock_set(vclock, req->row->node_id, req->row->lsn);
+		vclock_cas(vclock, req->row->node_id, req->row->lsn);
+		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
 	return req;
@@ -1146,8 +1145,8 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 		if (wal_opt_rotate(wal, batch, r, &writer->vclock) != 0)
 			break;
 		struct wal_write_request *batch_end;
-		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal, req,
-					   &writer->vclock);
+		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal,
+					   req);
 		write_end = wal_write_batch(*wal, batch, req, batch_end,
 					    &writer->vclock);
 		if (batch_end != write_end)
@@ -1218,7 +1217,7 @@ wal_write(struct recovery_state *r, struct iproto_header *row)
 		region_alloc(&fiber()->gc, sizeof(struct wal_write_request));
 
 	req->fiber = fiber();
-	req->prev_lsn = -1;
+	req->res = -1;
 	req->row = row;
 	row->tm = ev_now(loop());
 	row->sync = 0;
@@ -1235,21 +1234,9 @@ wal_write(struct recovery_state *r, struct iproto_header *row)
 
 	fiber_yield(); /* Request was inserted. */
 
-	/* req->res is -1 on error and prev_lsn on success */
-	if (req->prev_lsn < 0)
+	/* req->res is -1 on error */
+	if (req->res < 0)
 		return -1; /* error */
-
-	if (req->prev_lsn >= row->lsn) {
-		/*
-		 * There can be holes in
-		 * confirmed_lsn, in case of disk write failure, but
-		 * wal_writer never confirms LSNs out order.
-		 */
-		panic("LSN for %u is used twice or COMMIT order is broken: "
-		      "confirmed: %lld, new: %lld",
-		      (unsigned) row->node_id,
-		      (long long) req->prev_lsn, (long long) row->lsn);
-	}
 
 	return 0; /* success */
 }

@@ -110,18 +110,19 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 58 */_(ER_RELOAD_CFG,		2, "Can't set option '%s' dynamically") \
 	/* 59 */_(ER_CFG,			2, "Incorrect option value: %s") \
 	/* 60 */_(ER_SOPHIA,			2, "%s") \
-	/* 61 */_(ER_LOCAL_NODE_IS_NOT_ACTIVE,	2, "Local node is not active") \
-	/* 62 */_(ER_UNKNOWN_NODE,		2, "Unknown node %u") \
+	/* 61 */_(ER_LOCAL_SERVER_IS_NOT_ACTIVE,2, "Local server is not active") \
+	/* 62 */_(ER_UNKNOWN_SERVER,		2, "Server %u is not registered with the cluster") \
 	/* 63 */_(ER_CLUSTER_ID_MISMATCH,	2, "Cluster id of the replica %s doesn't match cluster id of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		2, "Invalid UUID: %s") \
 	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \
-	/* 66 */_(ER_NODE_ID_IS_RO,		2, "Can't reset node id") \
-	/* 67 */_(ER_NODE_ID_IS_RESERVED,	2, "Can't initialize node id with a reserved value %u") \
-	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for node %u: previous LSN = %llu, new lsn = %llu") \
+	/* 66 */_(ER_SERVER_ID_IS_RO,		2, "Can't reset server id") \
+	/* 67 */_(ER_SERVER_ID_IS_RESERVED,	2, "Can't initialize server id with a reserved value %u") \
+	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected [a-zA-Z_][a-zA-Z0-9_]*)") \
-	/* 11 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
-	/* 11 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
+	/* 71 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
+	/* 72 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
+	/* 73 */_(ER_REPLICA_MAX,		2, "Replica count limit reached: %u") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

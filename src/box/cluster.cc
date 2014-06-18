@@ -34,49 +34,28 @@
  * Globally unique identifier of this cluster.
  * A cluster is a set of connected replicas.
  */
-static tt_uuid cluster_uuid;
+tt_uuid cluster_id;
 
-void
-cluster_set_id(const tt_uuid *uu)
+extern "C" struct vclock *
+cluster_clock()
 {
-	/* Set cluster UUID. */
-	assert(tt_uuid_is_nil(&cluster_uuid));
-	cluster_uuid = *uu;
-}
-
-const tt_uuid *
-cluster_id()
-{
-	return &cluster_uuid;
+	return &recovery_state->vclock;
 }
 
 void
-cluster_check_id(const tt_uuid *uu)
-{
-	if (tt_uuid_cmp(uu, cluster_id()) != 0) {
-		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
-			  tt_uuid_str(uu), tt_uuid_str(cluster_id()));
-	}
-}
-
-void
-cluster_add_node(const tt_uuid *node_uuid, cnode_id_t node_id)
+cluster_add_server(const tt_uuid *server_uuid, cserver_id_t server_id)
 {
 	struct recovery_state *r = recovery_state;
-
-	assert(!tt_uuid_is_nil(node_uuid));
-	assert(!cnode_id_is_reserved(node_id));
+	/** Checked in the before-commit trigger */
+	assert(!tt_uuid_is_nil(server_uuid));
+	assert(!cserver_id_is_reserved(server_id));
 
 	/* Add node */
-	vclock_set(&r->vclock, node_id, 0);
-	say_debug("confirm node: {uuid = %s, id = %u}",
-		  tt_uuid_str(node_uuid), node_id);
+	vclock_add_server(&r->vclock, server_id);
 
-	/* Confirm Local node */
-	if (tt_uuid_cmp(&r->node_uuid, node_uuid) == 0) {
-		/* Confirm Local Node */
-		say_info("synchronized with cluster");
+	if (tt_uuid_cmp(&r->node_uuid, server_uuid) == 0) {
+		/* Assign local node id */
 		assert(r->node_id == 0);
-		r->node_id = node_id;
+		r->node_id = server_id;
 	}
 }

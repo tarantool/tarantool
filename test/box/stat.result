@@ -1,7 +1,27 @@
 -- clear statistics
 --# stop server default
 --# start server default
-space = box.schema.create_space('tweedledum', { id = 0 })
+box.stat.INSERT.total
+---
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
+...
+space = box.schema.create_space('tweedledum')
 ---
 ...
 space:create_index('primary', { type = 'hash' })
@@ -12,58 +32,50 @@ space:create_index('primary', { type = 'hash' })
 for i=1,10 do space:insert{i, 'tuple'..tostring(i)} end
 ---
 ...
-box.stat()
+box.stat.INSERT.total
 ---
-- DELETE:
-    total: 14
-    rps: 2
-  SELECT:
-    total: 1
-    rps: 0
-  REPLACE:
-    total: 0
-    rps: 0
-  INSERT:
-    total: 34
-    rps: 6
-  AUTH:
-    total: 0
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
+- 12
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 2
 ...
 --# stop server default
 --# start server default
 -- statistics must be zero
-box.stat()
+box.stat.INSERT.total
 ---
-- DELETE:
-    total: 14
-    rps: 2
-  SELECT:
-    total: 0
-    rps: 0
-  REPLACE:
-    total: 0
-    rps: 0
-  INSERT:
-    total: 34
-    rps: 6
-  AUTH:
-    total: 0
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 0
-    rps: 0
+- 0
+...
+box.stat.DELETE.total
+---
+- 0
+...
+box.stat.UPDATE.total
+---
+- 0
+...
+box.stat.REPLACE.total
+---
+- 0
+...
+box.stat.SELECT.total
+---
+- 0
 ...
 -- cleanup
-box.space[0]:drop()
+box.space.tweedledum:drop()
 ---
 ...

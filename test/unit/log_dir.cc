@@ -41,6 +41,7 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 			lsnsum += lsn;
 
 			/* Update cluster hash */
+			vclock_add_server(&vclock, node_id);
 			vclock_set(&vclock, node_id, lsn);
 		}
 
@@ -115,6 +116,7 @@ test_next(int64_t *files, int files_n, int node_n, int64_t *queries, int query_n
 			if (lsn <= 0)
 				continue;
 
+			vclock_add_server(&vclock, node_id);
 			vclock_set(&vclock, node_id, lsn);
 		}
 

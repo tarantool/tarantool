@@ -12,34 +12,30 @@
 
 BuildRequires: scl-utils
 BuildRequires: scl-utils-build
-BuildRequires: e2fsprogs-devel
+BuildRequires: readline-devel
 
-%{lua:
-    function rpm_check_string(str)
-        if type(str) == 'table' then
-            local ans = false
-            for _, v in ipairs(str) do
-                ans = ans or rpm_check_string(v)
-            end
-            return ans
-        end
-        local temp = rpm.expand(str)
-        if temp == str or temp == '' or temp == 0 then
-            return false
-        end
-        return true
-    end
-    local devtoolset = 'scl enable devtoolset-2 %q'
-    if rpm_check_string({'%el4', '%el5', '%el6'}) then
-        print('BuildRequires: cmake28\n')
-        print('BuildRequires: devtoolset-2-toolchain\n')
-        print('BuildRequires: devtoolset-2-binutils-devel\n')
-    else
-        print('BuildRequires: cmake >= 2.8\n')
-        print('BuildRequires: gcc >= 4.5\n')
-        print('BuildRequires: binutils-devel\n')
-    end
-}
+%if 0%{?rhel} < 7 && 0%{?rhel} > 0
+BuildRequires: cmake28
+BuildRequires: devtoolset-2-toolchain
+BuildRequires: devtoolset-2-binutils-devel
+%else
+BuildRequires: cmake >= 2.8
+BuildRequires: gcc >= 4.5
+BuildRequires: binutils-devel
+%endif
+
+%if 0%{?rhel} < 6 && 0%{?rhel} > 0
+BuildRequires: e2fsprogs-devel
+%else
+BuildRequires: libuuid-devel
+%endif
+
+%if 0%{?fedora} > 0
+BuildRequires: perl-podlators
+%endif
+
+# Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
@@ -49,7 +45,12 @@ Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+Requires: readline
+%if 0%{?rhel} <= 5 && 0%{?rhel} > 0
 Requires: e2fsprogs-libs
+%else
+Requires: libuuid
+%endif
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -64,7 +65,6 @@ scripts.
 Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-dev
 Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description -n %{?scl_prefix}tarantool-dev
 Tarantool is a high performance in-memory NoSQL database.
@@ -77,7 +77,6 @@ This package provides Tarantool client libraries.
 Summary: Tarantool common sql interface
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-sql-module
 %description -n %{?scl_prefix}tarantool-sql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -126,18 +125,21 @@ tarantool-sql-module.
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
 
 %{lua:
+    local function is_rhel_old()
+        local version = tonumber(rpm.expand('0%{?rhel}'))
+        return (version < 7 and version > 0)
+    end
     local function wrap_with_toolset(cmd)
         local cmd = rpm.expand(cmd)
         local devtoolset = 'scl enable devtoolset-2 %q\n'
-        if rpm_check_string({'%el4', '%el5', '%el6'}) then
-            return devtoolset:format(cmd)
+        if is_rhel_old() then
+            return string.format(devtoolset, cmd)
         end
         return cmd
     end
     local function cmake_key_value(key, value)
         return " -D"..key.."="..value
     end
-
     local function dev_with (obj, flag)
         local status = "OFF"
         if rpm.expand("%{with "..obj.."}") then
@@ -146,11 +148,11 @@ tarantool-sql-module.
         return " -D"..flag.."="..status
     end
     local cmd = 'cmake'
-    if rpm_check_string({'%el4', '%el5', '%el6'}) then
+    if is_rhel_old() then
         cmd = 'cmake28'
     end
     cmd = cmd .. ' . '
-        .. cmake_key_value('CMAKE_BUILD_TYPE', '%{_build_type}')
+        .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebugInfo')
         .. cmake_key_value('ENABLE_BACKTRACE', 'ON')
         .. cmake_key_value('CMAKE_INSTALL_PREFIX', '%{_prefix}')
         .. cmake_key_value('CMAKE_INSTALL_SYSCONFDIR', '%{?scl:%_root_sysconfdir}%{!?scl:%_sysconfdir}')
@@ -241,7 +243,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %changelog
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2
 - Add SCL support
-- Add flags support
-- Add some dependencies
+- Add --with support
+- Add dependencies
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
 - Initial version of the RPM spec

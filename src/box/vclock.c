@@ -26,27 +26,30 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "vclock.h"
-#include "exception.h"
+#include "say.h"
 
 void
-vclock_realloc(struct vclock *vclock, uint32_t node_id)
+vclock_set(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 {
-	uint32_t newcapacity = vclock->capacity ? vclock->capacity : 8;
-	while (newcapacity <= node_id)
-		newcapacity *= 2;
-
-	int64_t *newlsn = (int64_t *) realloc(vclock->lsn,
-		newcapacity * sizeof(*vclock->lsn));
-	if (newlsn == NULL)
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE,
-			  newcapacity * sizeof(*vclock->lsn),
-			  "vclock", "reallock");
-	for (int64_t n = vclock->capacity; n < newcapacity; n++) {
-		newlsn[n] = -1; /* unknown node */
-	}
-
-	vclock->lsn = newlsn;
-	vclock->capacity = newcapacity;
+	assert(vclock_has(vclock, server_id));
+	vclock->lsn[server_id] = lsn;
 }
+
+int64_t
+vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn)
+{
+	assert(lsn >= 0);
+	assert(server_id < VCLOCK_MAX);
+	int64_t prev_lsn = vclock->lsn[server_id];
+	if (lsn <= prev_lsn) {
+		/* Never confirm LSN out of order. */
+		panic("LSN for %u is used twice or COMMIT order is broken: "
+		      "confirmed: %lld, new: %lld",
+		      (unsigned) server_id,
+		      (long long) prev_lsn, (long long) lsn);
+	}
+	vclock->lsn[server_id] = lsn;
+	return prev_lsn;
+}
+

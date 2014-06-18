@@ -457,9 +457,9 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
 	if (vclock != NULL) {
-		vclock_foreach(vclock, p) {
-			data = mp_encode_uint(data, p.node_id);
-			data = mp_encode_uint(data, p.lsn);
+		vclock_foreach(vclock, server) {
+			data = mp_encode_uint(data, server.id);
+			data = mp_encode_uint(data, server.lsn);
 		}
 	}
 

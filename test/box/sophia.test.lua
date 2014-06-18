@@ -27,4 +27,5 @@ for v=1, 10 do table.insert(t, space:get({v})) end
 t
 
 space:drop()
+box.snapshot()
 os.execute("rm -rf sophia")

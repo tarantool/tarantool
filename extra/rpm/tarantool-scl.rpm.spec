@@ -1,4 +1,4 @@
-%global scl 15
+%global scl 16
 
 %{?scl:%global _scl_prefix /opt/tarantool}
 %{?scl:%scl_package}
@@ -13,12 +13,10 @@ Buildarch: noarch
 License: BSD
 Group: Applications/File
 Requires: %{scl_prefix}tarantool
+Requires: %{scl_prefix}tarantool-dev
 Requires: %{scl_prefix}tarantool-sql-module
 Requires: %{scl_prefix}tarantool-pg-module
 Requires: %{scl_prefix}tarantool-mysql-module
-Requires: %{scl_prefix}tarantool-sophia-module
-Requires: %{scl_prefix}tarantool-client
-Requires: %{scl_prefix}tarantool-dev
 %{?scl:BuildRequires: scl-utils-build}
 %{?scl:BuildRequires: iso-codes}
 
@@ -63,6 +61,8 @@ EOF
 %scl_files
 
 %changelog
-* Fri Jun 06 2014 Blikh Eugine <bigbes@gmail.com> 1.0 1
+* Thu Jun 12 2014 Blikh Eugine <bigbes@gmail.com> 1.0-2
+- Port to 1.6 from 1.5
+* Fri Jun 06 2014 Blikh Eugine <bigbes@gmail.com> 1.0-1
 - Initial release
 - Initscripts are broken.
