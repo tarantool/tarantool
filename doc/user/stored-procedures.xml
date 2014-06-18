@@ -95,12 +95,12 @@ function is_expired(args, tuple)
    return current_time >= tuple_ts + args.ttl
 end
 function purge(args, tuple)
-    box.space.space0:delete(tuple[0])
+    box.space.space0:delete(tuple[1])
 end
 
 -- Run task
 expirationd.run_task("exprd space 0", 0, is_expired, purge,
-                    { field_no = 1, ttl = 30 * 60 })
+                    { field_no = 2, ttl = 30 * 60 })
 ]]>
     </programlisting>
     </para>
@@ -193,7 +193,7 @@ tarantool> <userinput>f1(1234)</userinput>
 tarantool> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
 ---
 ...
-tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {0, 'STR'}})</userinput>
+tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})</userinput>
 ---
 ...
 tarantool> <userinput>s:insert{'a', 'b', 'c'}</userinput>
@@ -224,7 +224,7 @@ tarantool> <userinput>f()</userinput>
 - error: '[string "function f()error(''!'') end"]:1: !'
 tarantool> <userinput>s:insert{5}</userinput>
 ---
-- error: 'Tuple field 0 type does not match one required by operation:
+- error: 'Tuple field 1 type does not match one required by operation:
   expected STR'
 ...
 tarantool> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</userinput>
@@ -233,7 +233,7 @@ tarantool> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</
 tarantool> <userinput>pcall(insert_without_colon,{0, 'b', 'c'})</userinput>
 ---
 - false
-- 'Tuple field 0 type does not match one required by operation: expected STR'
+- 'Tuple field 1 type does not match one required by operation: expected STR'
 tarantool> <userinput>box.space[33]:drop()</userinput>
 ---
 ...
@@ -320,9 +320,9 @@ tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --
 tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here.</userinput>
 tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
-        -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
+        -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
-        -&gt; <userinput>              return f(...)]], 0)!</userinput>
+        -&gt; <userinput>              return f(...)]], 1)!</userinput>
 ---
 - null
 ...
@@ -465,11 +465,11 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 <prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
 ---
 ...
-<prompt>tarantool></prompt> <userinput>string.len(tuple[0])!</userinput>
+<prompt>tarantool></prompt> <userinput>string.len(tuple[1])!</userinput>
 ---
 - 1
 ...
-<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[0])!</userinput>
+<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[1])!</userinput>
 ---
 - 48
 ...
@@ -541,20 +541,20 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 <bridgehead renderas="sect4">Example</bridgehead>
     <para>
     In the following example, the user creates two functions, password_insert() 
-    which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a table,
+    which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a tuple set,
     and password_check() which requires input of a password.<programlisting>
 <prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
 <prompt>localhost&gt;</prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
-<prompt>localhost&gt;</prompt> <userinput>lua function password_insert()</userinput>
-        <prompt>-&gt;</prompt> <userinput>  box.insert(0,12345,digest.sha1('^S^e^c^ret Wordpass'))</userinput>
+<prompt>localhost&gt;</prompt> <userinput>function password_insert()</userinput>
+        <prompt>-&gt;</prompt> <userinput>  space0:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
         <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
         <prompt>-&gt;</prompt> <userinput>  end!</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt> <userinput>lua function password_check(password)</userinput>
+<prompt>localhost&gt;</prompt> <userinput>function password_check(password)</userinput>
         <prompt>-&gt;</prompt>  <userinput> local t</userinput>
-        <prompt>-&gt;</prompt>  <userinput> t=box.select(0,0,12345)</userinput>
-        <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[1]) then</userinput>
+        <prompt>-&gt;</prompt>  <userinput> t=box.select{12345}</userinput>
+        <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[2]) then</userinput>
         <prompt>-&gt;</prompt>  <userinput>   print('Password is valid')</userinput>
         <prompt>-&gt;</prompt>  <userinput>   else</userinput>
         <prompt>-&gt;</prompt>  <userinput>     print('Password is not valid')</userinput>

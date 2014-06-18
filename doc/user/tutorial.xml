@@ -516,7 +516,7 @@ Tarantool is waiting for the user to type instructions.
 <para>
 To create the first space and the first index, try this:<programlisting>
 <prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
-<prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</userinput></programlisting>
+<prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
 
 <para>
@@ -534,7 +534,7 @@ tarantool&gt; s = box.schema.create_space('space0')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
-tarantool&gt; i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+tarantool&gt; i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
 tarantool&gt; t = s:insert{1}

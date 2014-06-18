@@ -292,7 +292,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
                          <entry>unique</entry><entry>index is unique</entry><entry>true|false</entry><entry>true</entry>
                         </row>
                         <row>
-                         <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_no, 'NUM'|STR'}</entry><entry>{0, 'NUM'}</entry>
+                         <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_no, 'NUM'|STR'}</entry><entry>{1, 'NUM'}</entry>
                         </row>
                       </tbody>
                     </tgroup>
@@ -308,7 +308,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
 tarantool> <userinput>s = box.space.space55</userinput>
 ---
 ...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
 ---
 ...
 
@@ -610,7 +610,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 <programlisting>
 #Assume that the initial state of the database is ...
 #  space0 has one tuple set and one primary key whose type is 'NUM'.
-#  There is one tuple, with field[0] = 999 and field[1] = 'A'.
+#  There is one tuple, with field[1] = 999 and field[1] = 'A'.
 
 #In the following update ...
 #  The first argument is space0, that is, the affected space is space0
@@ -620,61 +620,61 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 #    to a field
 #  The fourth argument is 1, that is, the affected field is field[1]
 #  The fifth argument is 'B', that is, field[1] contents change to 'B'
-#  Therefore, after the following update, field[0] = 999 and field[1] = 'B'.
+#  Therefore, after the following update, field[1] = 999 and field[2] = 'B'.
 box.space.space0:update(999, {{'=p', 1, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #  the key is passed as a Lua table (inside braces). This is unnecessary
 #  when the primary key has only one field, but would be necessary if the
 #  primary key had more than one field.
-#  Therefore, after the following update, field[0] = 999 and field[1] = 'B'
+#  Therefore, after the following update, field[1] = 999 and field[2] = 'B'
 #    (no change).
 box.space.space0:update({999}, {{'=p', 1, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
-#   The fourth argument is 2, that is, the affected field is field[2].
-#   It is okay that, until now, field[2] has not existed. It gets added.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
-#     field[2] = 1.
-box.space.space0:update({999}, {{'=p', 2, 1}})
+#   The fourth argument is 3, that is, the affected field is field[3].
+#   It is okay that, until now, field[3] has not existed. It gets added.
+#   Therefore, after the following update, field[1] = 999, field[2] = 'B',
+#     field[3] = 1.
+box.space.space0:update({999}, {{'=p', 3, 1}})
 
 #In the following update, the arguments are the same, except that ...
 #   The third argument is '+p', that is, the operation is addition rather
 #     than assignment.
-#   Since field[2] previously contained 1, this means we're adding 1 to 1.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
-#     field[2] = 2.
-box.space.space0:update({999}, {{'+p', 2, 1}})
+#   Since field[3] previously contained 1, this means we're adding 1 to 1.
+#   Therefore, after the following update, field[1] = 999, field[2] = 'B',
+#     field[3] = 2.
+box.space.space0:update({999}, {{'+p', 3, 1}})
 
 #In the following update ...
 #   The idea is to modify two fields at once.
 #   The formats are '|p' and '=p', that is, there are two operations, OR and
 #     assignment.
-#   The fourth and fifth arguments mean that field[2] gets ORed with 1.
-#   The fifth and sixth arguments mean that field[1] gets assigned 'C'.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'C',
-#     field[2] = 3.
-box.space.space0:update({999}, {{'|p', 2, 1}, {'=p', 1, 'C'}})
+#   The fourth and fifth arguments mean that field[3] gets ORed with 1.
+#   The fifth and sixth arguments mean that field[2] gets assigned 'C'.
+#   Therefore, after the following update, field[1] = 999, field[2] = 'C',
+#     field[3] = 3.
+box.space.space0:update({999}, {{'|p', 3, 1}, {'=p', 2, 'C'}})
 
 #In the following update ...
-#   The idea is to delete field[1], then subtract 3 from field[2], but ...
-#   after the delete, there is a renumbering -- so field[2] becomes field[1]
-#   before we subtract 3 from it, and that's why the sixth argument is 1 not 2.
-#   Therefore, after the following update, field[0] = 999, field[1] = 0.
-box.space.space0:update({999}, {{'#p', 1, 0}, {'-p', 1, 3}})
+#   The idea is to delete field[2], then subtract 3 from field[3], but ...
+#   after the delete, there is a renumbering -- so field[3] becomes field[2]
+#   before we subtract 3 from it, and that's why the sixth argument is 2 not 3.
+#   Therefore, after the following update, field[1] = 999, field[2] = 0.
+box.space.space0:update({999}, {{'#p', 2, 0}, {'-p', 2, 3}})
 
 #In the following update ...
 #   We're making a long string so that splice will work in the next example.
-#   Therefore, after the following update, field[0[ = 999, field[1] = 'XYZ'.
-box.space.space0:update({999}, {{'=p', 1, 'XYZ'}})
+#   Therefore, after the following update, field[1] = 999, field[2] = 'XYZ'.
+box.space.space0:update({999}, {{'=p', 2, 'XYZ'}})
 
 #In the following update ...
 #   The third argument is ':p', that is, this is the example of splice.
 #   The fifth argument is actually four arguments packed together ...
 #      a filler, an offset, the number of bytes to cut (1), and the string
 #      to add ('!')
-#   Therefore, after the following update, field[0[ = 999, field[1] = 'X!Z'.
-box.space.space0:update({999}, {{':p', 1, pickle.pack('iiA', 1, 1, '!')}})
+#   Therefore, after the following update, field[1] = 999, field[2] = 'X!Z'.
+box.space.space0:update({999}, {{':p', 2, pickle.pack('iiA', 1, 1, '!')}})
 
 </programlisting>
             </para>
@@ -831,7 +831,7 @@ tarantool&gt; <userinput>box.space.space0:len()</userinput>
 <programlisting><prompt>tarantool&gt;</prompt> <userinput>s = box.schema.create_space('space33')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>s:create_index('X', {}) -- index 'X' has default parts {0,'NUM'}</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>s:create_index('X', {}) -- index 'X' has default parts {1,'NUM'}</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>s:insert{0,'Hello my '}; s:insert{1,'Lua world'}</userinput>
@@ -865,7 +865,7 @@ tarantool&gt; <userinput>box.space.space0:len()</userinput>
               do two inserts, drop the space, and display the counter value -- which is 2,
               because the function is executed once after each insert.
 <programlisting>s = box.schema.create_space('space53')
-s:create_index('primary', {parts = {0, 'NUM'}})
+s:create_index('primary', {parts = {1, 'NUM'}})
 function replace_trigger() replace_counter = replace_counter + 1 end
 s:on_replace(replace_trigger)
 replace_counter = 0
@@ -1034,7 +1034,7 @@ session.delimiter('')!</programlisting>
         </term>
         <listitem>
             <para>
-             _priv is a new system tuple set for support of the replication feature.
+             _cluster is a new system tuple set for support of the replication feature.
             </para>
         </listitem>
     </varlistentry>
@@ -1069,7 +1069,7 @@ function example()
     line = space_name .. ' tuple_count =' .. tuple_count
     if tuple_count > 0 then
       for k1, v1 in box.space[space_name]:pairs() do
-        line = line .. '. first field in first tuple = ' .. v1[0]
+        line = line .. '. first field in first tuple = ' .. v1[1]
         break
       end
     end
@@ -1202,7 +1202,7 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
 <programlisting>tarantool> <userinput>s = box.schema.create_space('space18')</userinput>
 ---
 ...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
 ---
 ...
 tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
@@ -1240,7 +1240,7 @@ tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
 <programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
 ---
 ...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
 ---
 ...
 tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
@@ -1265,9 +1265,9 @@ This example will work with the sandbox configuration described in the preface.
 That is, there is a space named space0 with a numeric primary key.
 The example function will: (1) select a tuple the tuple whose key value is 1000;
 (2) return an error if the tuple already exists and already has 3 fields;
-(3) Insert or replace the tuple with: field[0] = 1000, field[1] = a uuid, field[2] = number of seconds since 1970-01-01;
-(4) Get field[2] from what was replaced;
-(5) Format the value from field[2] as yyyy-mm-dd hh:mm:ss.ffff;
+(3) Insert or replace the tuple with: field[1] = 1000, field[2] = a uuid, field[3] = number of seconds since 1970-01-01;
+(4) Get field[3] from what was replaced;
+(5) Format the value from field[3] as yyyy-mm-dd hh:mm:ss.ffff;
 (6) Return the formatted value.
 The function uses Tarantool box functions box.space...select(), box.space...replace(), fiber.time(), uuid.hex().
 The function uses Lua functions
@@ -1290,7 +1290,7 @@ function example()
   end
   replaced_tuple = box.space.space0:replace
             {1000,  require('uuid').hex(), tostring(fiber.time())}
-  time_field = tonumber(replaced_tuple[2])
+  time_field = tonumber(replaced_tuple[3])
   formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
   c = time_field % 1
   d = string.sub(c, 3, 6)
@@ -1431,7 +1431,7 @@ tarantool&gt; <userinput>t:bsize()</userinput>
             <para>
                 If t is a tuple instance, <code>t[<replaceable>field-number</replaceable>]</code>
                 will return the field numbered <code>field-number</code> in the tuple.
-                 The first field is t[0].
+                 The first field is t[1].
             </para>
             <para>
               Returns: (type = scalar) field value.
@@ -1444,7 +1444,7 @@ tarantool&gt; <userinput>t:bsize()</userinput>
             <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
 ---
 ...
-tarantool&gt; <userinput>t[1]</userinput>
+tarantool&gt; <userinput>t[2]</userinput>
 ---
  - Fld#2
 ...</programlisting>
@@ -1487,7 +1487,7 @@ tarantool&gt; <userinput>t:findall('a')</userinput>
 - 0
 - 3
 ...
-tarantool&gt; <userinput>t:findall(1, 'a')</userinput>
+tarantool&gt; <userinput>t:findall(2, 'a')</userinput>
 ---
  - 3
 ...</programlisting>
@@ -1505,7 +1505,7 @@ tarantool&gt; <userinput>t:findall(1, 'a')</userinput>
               what was removed.
             </para>
             <para>
-              Parameters: <code>start-field-number</code> = base 0, may be negative, <code>fields-to-remove</code>, <code>field-values(s)</code>.
+              Parameters: <code>start-field-number</code> = base 1, may be negative, <code>fields-to-remove</code>, <code>field-values(s)</code>.
             </para>
             <para>
               Returns: (type = tuple) a new tuple.
@@ -1519,7 +1519,7 @@ tarantool&gt; <userinput>t:findall(1, 'a')</userinput>
             <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-tarantool&gt; <userinput>t:transform(1,2,'x')</userinput>
+tarantool&gt; <userinput>t:transform(2,3,'x')</userinput>
 ---
 - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
 ...</programlisting>
@@ -1542,7 +1542,7 @@ tarantool&gt; <userinput>t:transform(1,2,'x')</userinput>
               then the result is returned.
             </para>
             <para>
-              Parameters: <code>start-field-number</code> = base 0, may be negative, <code>end-field-number</code> = optional, base 0, negative treated as positive.
+              Parameters: <code>start-field-number</code> = base 1, may be negative, <code>end-field-number</code> = optional, base 1, negative treated as positive.
             </para>
             <para>
               Returns: (type = scalar) one or more field values.
@@ -1551,7 +1551,7 @@ tarantool&gt; <userinput>t:transform(1,2,'x')</userinput>
             <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-tarantool&gt; <userinput>t:slice(1, 3)</userinput>
+tarantool&gt; <userinput>t:slice(2, 4)</userinput>
 ---
  - Fld#2
  - Fld#3
@@ -1565,7 +1565,7 @@ tarantool&gt; <userinput>t:slice(1, 3)</userinput>
         <listitem>
             <para>
               If t is a tuple instance, <code>t:unpack(<replaceable>n</replaceable>)</code>
-              will return all fields. In effect, <code>unpack()</code> is the same as <code>slice(0, -1)</code>.
+              will return all fields. In effect, <code>unpack()</code> is the same as <code>slice(1, -1)</code>.
             </para>
             <para>
               Returns: (type = scalar) field(s) from the tuple.
@@ -1719,7 +1719,7 @@ session.delimiter('')!
   parts:
     0:
       type: NUM
-      fieldno: 0
+      fieldno: 1
   id: 0
   type: TREE
   idx: ' index 0'
@@ -1790,7 +1790,7 @@ session.delimiter('')!
 tarantool> <userinput>s = box.schema.create_space('space17')</userinput>
 ---
 ...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'STR', 1, 'STR'}})</userinput>
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'STR', 2, 'STR'}})</userinput>
 ---
 ...
 tarantool> <userinput>s:insert{'C', 'C'}</userinput>
@@ -1843,7 +1843,7 @@ tarantool> <userinput>box.space.space17:drop()</userinput>
     <varlistentry>
      <term>
              <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields][, {parameters}]</replaceable>)</emphasis>
+            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1861,21 +1861,21 @@ tarantool> <userinput>box.space.space17:drop()</userinput>
 # Create a space named space0.
 # Create a unique index 'primary', which won't be needed for this example.
 # Create a non-unique index 'secondary' with an index on the second field.
-# Insert three tuples, values in field[1] equal to 'X', 'Y', and 'Z'.
+# Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
 # Select all tuples where the secondary index keys are greater than 'X'.
 box.schema.create_space('space0')
-box.space.space0:create_index('primary', {parts = {0, 'NUM' }})
-box.space.space0:create_index('secondary', {type = 'tree', unique = false, parts = {1, 'STR'}})
-box.space.space0:insert{1,'X','Row with field[1]=X'}
-box.space.space0:insert{2,'Y','Row with field[1]=Y'}
-box.space.space0:insert{3,'Z','Row with field[1]=Z'}
+box.space.space0:create_index('primary', {parts = {1, 'NUM' }})
+box.space.space0:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
+box.space.space0:insert{1,'X','Row with field[2]=X'}
+box.space.space0:insert{2,'Y','Row with field[2]=Y'}
+box.space.space0:insert{3,'Z','Row with field[2]=Z'}
 box.space.space0.index.secondary:select({'X'}, {iterator = 'GT'})
 </programlisting>
 The result will be a table of tuples and will look like this:
 <programlisting>
 ---
-- - [2, 'Y', 'Row with field[1]=Y']
-  - [3, 'Z', 'Row with field[1]=Z']
+- - [2, 'Y', 'Row with field[2]=Y']
+  - [3, 'Z', 'Row with field[2]=Z']
 ...
 </programlisting>
             </para>
