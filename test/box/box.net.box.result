@@ -336,3 +336,48 @@ cn:call('test_foo', 'a', 'b', 'c')
   - [{'b': 2}]
   - ['c']
 ...
+-- auth
+cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
+---
+- !!binary gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=
+...
+cn.proto.b64decode('gJLoc!!!!!!!')
+---
+- !!binary gJLo
+...
+cn = remote:new('127.0.0.1', port, { user = 'netbox', password = '123', wait_connected = true })
+---
+...
+cn:is_connected()
+---
+- false
+...
+cn.error
+---
+- User 'netbox' is not found
+...
+cn.state
+---
+- closed
+...
+box.schema.user.create('netbox', { password  = 'test' })
+---
+...
+box.schema.user.grant('netbox', 'read, write, execute', 'universe');
+---
+...
+cn = remote:new('127.0.0.1', port, { user = 'netbox', password = 'test' })
+---
+...
+cn.state
+---
+- active
+...
+cn.error
+---
+- null
+...
+cn:ping()
+---
+- true
+...

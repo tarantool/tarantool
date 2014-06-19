@@ -7,6 +7,7 @@ local log = require 'log'
 local errno = require 'errno'
 local ffi = require 'ffi'
 local digest = require 'digest'
+local yaml = require 'yaml'
 
 local CODE              = 0
 local PING              = 64
@@ -16,6 +17,7 @@ local REPLACE           = 3
 local UPDATE            = 4
 local DELETE            = 5
 local CALL              = 6
+local AUTH              = 7
 local TYPE              = 0x00
 local SYNC              = 0x01
 local SPACE_ID          = 0x10
@@ -26,6 +28,7 @@ local ITERATOR          = 0x14
 local KEY               = 0x20
 local TUPLE             = 0x21
 local FUNCTION_NAME     = 0x22
+local USER              = 0x23
 local DATA              = 0x30
 local ERROR             = 0x31
 local GREETING_SIZE     = 128
@@ -48,6 +51,28 @@ local function request(header, body)
 
 
     return len .. header .. body
+end
+
+
+local function strxor(s1, s2)
+    local res = ''
+    for i = 1, string.len(s1) do
+        if i > string.len(s2) then
+            break
+        end
+
+        local b1 = string.byte(s1, i)
+        local b2 = string.byte(s2, i)
+        res = res .. string.char(bit.bxor(b1, b2))
+    end
+    return res
+end
+
+local function b64decode(str)
+    local so = ffi.new('char[?]', string.len(str) * 2);
+    local len =
+        ffi.C.base64_decode(str, string.len(str), so, string.len(str) * 2)
+    return ffi.string(so, len)
 end
 
 
@@ -187,16 +212,21 @@ local proto = {
     end,
 
     auth = function(sync, user, password, handshake)
-        local salt = string.sub(b64decode(string.sub(handshake, 129)), 1, 20)
-        
+        local saltb64 = string.sub(handshake, 65)
+        local salt = string.sub(b64decode(saltb64), 1, 20)
+
+        local hpassword = digest.sha1(password)
+        local hhpassword = digest.sha1(hpassword)
+        local scramble = digest.sha1(salt .. hhpassword)
+
+        local hash = strxor(hpassword, scramble)
+        return request(
+            { [SYNC] = sync, [TYPE] = AUTH },
+            { [USER] = user, [TUPLE] = { 'chap-sha1', hash } }
+        )
     end,
 
-    b64decode = function(str)
-        local so = ffi.new('char[?]', string.len(str) * 2);
-        local len =
-            ffi.C.base64_decode(str, string.len(str), so, string.len(str) * 2)
-        return ffi.string(so, len)
-    end
+    b64decode = b64decode,
 }
 
 
@@ -321,6 +351,10 @@ local remote_methods = {
         fiber.wrap(function() self:_read_worker() end)
         fiber.wrap(function() self:_write_worker() end)
 
+        if self.opts.wait_connected == nil or self.opts.wait_connected then
+            self:wait_connected()
+        end
+
         return self
     end,
 
@@ -361,11 +395,14 @@ local remote_methods = {
     end,
 
     wait_connected = function(self, timeout)
-        return self:_wait_state { 'active', 'activew', 'closed' }
+        return self:_wait_state({ 'active', 'activew', 'closed' }, timeout)
     end,
 
     -- private methods
     _fatal = function(self, efmt, ...)
+        if self.state == 'error' then
+            return
+        end
         local emsg = efmt
         if select('#', ...) > 0 then
             emsg = string.format(efmt, ...)
@@ -437,6 +474,9 @@ local remote_methods = {
             return true
         end
         if self.state == 'schema' or self.state == 'schemaw' then
+            return true
+        end
+        if self.state == 'auth' or self.state == 'authw' then
             return true
         end
         return false
@@ -526,40 +566,67 @@ local remote_methods = {
             self.s = socket.tcp_connect(self.host, self.port)
             if self.s == nil then
                 self:_fatal(errno.strerror(errno()))
-                return
-            end
-
-            -- on_connect
-            self:_switch_state('handshake')
-            self.handshake = self.s:read(128)
-            if self.handshake == nil then
-                self:_fatal(errno.strerror(errno()))
-                return
-            end
-            if string.len(self.handshake) ~= 128 then
-                self:_fatal("Can't read handshake")
-                return
-            end
-
-            self.wbuf = ''
-            self.rbuf = ''
-
-            -- if user didn't point auth parameters, skip 'auth' state
-            if self.opts.user ~= nil and self.opts.password ~= nil then
-                error("Auth request is not implemented yet")
-            end
-
-            local s, e = pcall(function() self:_load_schema() end)
-            if not s then
-                self:_fatal(e)
             else
-                self:_switch_state('active')
-            end
 
+                -- on_connect
+                self:_switch_state('handshake')
+                self.handshake = self.s:read(128)
+                if self.handshake == nil then
+                    self:_fatal(errno.strerror(errno()))
+                elseif string.len(self.handshake) ~= 128 then
+                    self:_fatal("Can't read handshake")
+                else
+
+                    self.wbuf = ''
+                    self.rbuf = ''
+
+                    local s, e = pcall(function()
+                        self:_auth()
+                        self:_load_schema()
+                    end)
+                    if not s then
+                        self:_fatal(e)
+                    else
+                        self:_switch_state('active')
+                    end
+                end
+            end
         end
     end,
 
+    _auth = function(self)
+        if self.opts.user == nil or self.opts.password == nil then
+            self:_switch_state 'authen'
+            return
+        end
+
+        self:_switch_state 'auth'
+
+        local auth_res = self:_request_internal('auth',
+            false, self.opts.user, self.opts.password, self.handshake)
+
+        if auth_res.hdr[CODE] ~= 0 then
+            self:_fatal(auth_res.body[ERROR])
+            return
+        end
+
+        self:_switch_state 'authen'
+    end,
+
+    -- states wakeup _read_worker
+    _r_states = {
+        'active', 'activew', 'schema', 'schemaw', 'closed', 'auth', 'authw'
+    },
+
+    -- states wakeup _write_worker
+    _rw_states = { 'activew', 'schemaw', 'closed', 'authw' },
+
     _load_schema = function(self)
+        if self.state ~= 'authen' then
+            self:fatal 'Can not load schema from the state'
+            return
+        end
+        
         self:_switch_state('schema')
 
         local spaces = self:_request_internal('select',
@@ -639,7 +706,7 @@ local remote_methods = {
     _read_worker = function(self)
         fiber.name('net.box.read')
         while true do
-            self:_wait_state{'active', 'activew', 'closed', 'schema', 'schemaw' }
+            self:_wait_state(self._r_states)
             if self.state == 'closed' then
                 return
             end
@@ -660,7 +727,7 @@ local remote_methods = {
     _write_worker = function(self)
         fiber.name('net.box.write')
         while true do
-            self:_wait_state{'activew', 'closed', 'schemaw'}
+            self:_wait_state(self._rw_states)
 
             if self.state == 'closed' then
                 return
@@ -672,13 +739,15 @@ local remote_methods = {
                     self:_switch_state('active')
                 elseif self.state == 'schemaw' then
                     self:_switch_state('schema')
+                elseif self.state == 'authw' then
+                    self:_switch_state('auth')
                 end
 
             end
 
             if self.s:writable(.5) then
 
-                if self.state == 'activew' or self.state == 'schemaw' then
+                if self.state == 'activew' or self.state == 'schemaw' or self.state == 'authw' then
                     if #self.wbuf > 0 then
                         local written = self.s:syswrite(self.wbuf)
                         if written ~= nil then
@@ -717,6 +786,8 @@ local remote_methods = {
             self:_switch_state('activew')
         elseif self.state == 'schema' then
             self:_switch_state('schemaw')
+        elseif self.state == 'auth' then
+            self:_switch_state('authw')
         end
 
         local ch = fiber.channel()

@@ -126,3 +126,17 @@ cn:call('test_foo', 'a', 'b', 'c')
 -- auth
 cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
 cn.proto.b64decode('gJLoc!!!!!!!')
+
+
+cn = remote:new('127.0.0.1', port, { user = 'netbox', password = '123', wait_connected = true })
+cn:is_connected()
+cn.error
+cn.state
+
+box.schema.user.create('netbox', { password  = 'test' })
+box.schema.user.grant('netbox', 'read, write, execute', 'universe');
+
+cn = remote:new('127.0.0.1', port, { user = 'netbox', password = 'test' })
+cn.state
+cn.error
+cn:ping()
