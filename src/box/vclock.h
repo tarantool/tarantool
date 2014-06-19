@@ -40,12 +40,19 @@ extern "C" {
 
 enum { VCLOCK_MAX = 16 };
 
+/** Cluster vector clock */
 struct vclock {
 	int64_t lsn[VCLOCK_MAX];
 };
 
+/* Server id, coordinate */
+struct vclock_c {
+	uint32_t id;
+	int64_t lsn;
+};
+
 #define vclock_foreach(vclock, var) \
-	for (struct { uint32_t id; int64_t lsn;} (var) = {0, 0}; \
+	for (struct vclock_c (var) = {0, 0}; \
 	     (var).id < VCLOCK_MAX; (var).id++) \
 		if (((var).lsn = (vclock)->lsn[(var).id]) >= 0)
 
