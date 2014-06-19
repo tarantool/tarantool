@@ -417,7 +417,6 @@ box_init()
 
 	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
-		recovery_begin_recover_snapshot(recovery_state);
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
 		recovery_end_recover_snapshot(recovery_state);
@@ -426,7 +425,6 @@ box_init()
 		replica_bootstrap(recovery_state, replication_source);
 		snapshot_save(recovery_state);
 	} else {
-		recovery_begin_recover_snapshot(recovery_state);
 		/* Initialize a master node of a new cluster */
 		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();

@@ -267,7 +267,7 @@ recovery_process_setlsn(struct recovery_state *r,
 		int64_t current_lsn = vclock_get(&r->vclock, rows[i].node_id);
 		/* Ignore unknown nodes in relay mode */
 		if (current_lsn < 0) {
-			if (!r->relay)
+			if (!r->relay && !cserver_id_is_reserved(rows[i].node_id))
 				tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 					  rows[i].node_id);
 			vclock_add_server(&r->vclock, rows[i].node_id);
@@ -321,13 +321,6 @@ recovery_process(struct recovery_state *r, struct iproto_header *row)
 	}
 
 	return r->row_handler(r->row_handler_param, row);
-}
-
-void
-recovery_begin_recover_snapshot(struct recovery_state *r)
-{
-	/* Add fake node to recover snapshot */
-	vclock_add_server(&r->vclock, 0);
 }
 
 void
@@ -1325,12 +1318,16 @@ snapshot_save(struct recovery_state *r)
 
 	/* Write starting SETLSN (always empty table for snapshot) */
 	struct iproto_header setlsn;
-	log_encode_setlsn(&setlsn, NULL);
-	snapshot_write_row(snap, &setlsn);
+	struct vclock vclock;
+	vclock_create(&vclock);
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&vclock, 0);
 
+	log_encode_setlsn(&setlsn, &vclock);
+	snapshot_write_row(snap, &setlsn);
 	r->snapshot_handler(snap);
 
-	/* Write finishing SETLSN */
+	/* Preserver cluster clock in the snapshot */
 	log_encode_setlsn(&setlsn, &r->vclock);
 	snapshot_write_row(snap, &setlsn);
 

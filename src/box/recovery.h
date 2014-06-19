@@ -121,7 +121,6 @@ int wal_write(struct recovery_state *r, struct iproto_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_process(struct recovery_state *r, struct iproto_header *packet);
-void recovery_begin_recover_snapshot(struct recovery_state *r);
 void recovery_end_recover_snapshot(struct recovery_state *r);
 
 struct fio_batch;

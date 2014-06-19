@@ -447,7 +447,7 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_SETLSN;
 
-	uint32_t cluster_size = vclock != NULL ? vclock_size(vclock) : 0;
+	uint32_t cluster_size = vclock_size(vclock);
 	size_t size = 128 + cluster_size *
 		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
@@ -455,11 +455,10 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_LSNMAP);
 	data = mp_encode_map(data, cluster_size);
-	if (vclock != NULL) {
-		vclock_foreach(vclock, server) {
-			data = mp_encode_uint(data, server.id);
-			data = mp_encode_uint(data, server.lsn);
-		}
+
+	vclock_foreach(vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
 	}
 
 	assert(data <= buf + size);

@@ -118,8 +118,6 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 {
 	say_info("bootstrapping a replica");
 
-	recovery_begin_recover_snapshot(r);
-
 	/* Generate Node-UUID */
 	tt_uuid_create(&r->node_uuid);
 
