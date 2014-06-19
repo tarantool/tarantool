@@ -197,9 +197,9 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	vclock_create(&r->vclock);
 
 	if (log_dir_scan(&r->snap_dir) != 0)
-		panic("can't scan snap directory");
+		panic("can't scan snapshot directory");
 	if (log_dir_scan(&r->wal_dir) != 0)
-		panic("can't scan wal directory");
+		panic("can't scan WAL directory");
 }
 
 void
