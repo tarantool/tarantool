@@ -153,9 +153,9 @@ lbox_session_peer(struct lua_State *L)
 	int fd = session_fd(sid);
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
-	sio_getpeername(fd, (struct sockaddr *)&addr, addrlen);
+	sio_getpeername(fd, (struct sockaddr *)&addr, &addrlen);
 
-	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr));
+	lua_pushstring(L, sio_strfaddr((struct sockaddr *)&addr, addrlen));
 	return 1;
 }
 

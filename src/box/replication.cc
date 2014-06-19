@@ -825,7 +825,7 @@ replication_relay_loop(struct relay_data *data)
 	struct sockaddr_storage peer;
 	socklen_t addrlen = sizeof(peer);
 	getpeername(replica.sock, ((struct sockaddr*)&peer), &addrlen);
-	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer));
+	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer, addrlen));
 	fiber_set_name(fiber(), status);
 
 	/* init signals */
