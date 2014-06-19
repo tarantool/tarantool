@@ -354,7 +354,6 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	}
 	vclock_create(&request->data.vclock);
 
-	bool remote_found = false;
 	for (uint32_t i = 0; i < lsnmap_size; i++) {
 		if (mp_typeof(*d) != MP_UINT) {
 		map_error:
@@ -365,13 +364,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 		if (mp_typeof(*d) != MP_UINT)
 			goto map_error;
 		int64_t lsn = (int64_t) mp_decode_uint(&d);
-		if (id == node_id)
-			remote_found = true;
 		vclock_follow(&request->data.vclock, id, lsn);
-	}
-	if (!remote_found) {
-		/* Add remote node to the list */
-		vclock_follow(&request->data.vclock, node_id, 0);
 	}
 
 	request->fd = fd;
