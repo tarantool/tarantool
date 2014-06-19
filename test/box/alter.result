@@ -253,23 +253,23 @@ space:drop()
 -- invalid identifiers
 box.schema.create_space('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
 box.schema.create_space('invalid identifier')
 ---
-- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
 ...
 box.schema.create_space('primary ')
 ---
-- error: Invalid identifier 'primary ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
 box.schema.create_space('5')
 ---
-- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier '5' (expected letters, digits or an underscore)
 ...
 box.schema.create_space('')
 ---
-- error: Invalid identifier '' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier '' (expected letters, digits or an underscore)
 ...
 -- valid identifiers
 box.schema.create_space('_Abcde'):drop()
@@ -293,23 +293,23 @@ space = box.schema.create_space('test')
 -- invalid identifiers
 space:create_index('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
 space:create_index('invalid identifier')
 ---
-- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
 ...
 space:create_index('primary ')
 ---
-- error: Invalid identifier 'primary ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'primary ' (expected letters, digits or an underscore)
 ...
 space:create_index('5')
 ---
-- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier '5' (expected letters, digits or an underscore)
 ...
 space:create_index('')
 ---
-- error: Invalid identifier '' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier '' (expected letters, digits or an underscore)
 ...
 space:drop()
 ---
