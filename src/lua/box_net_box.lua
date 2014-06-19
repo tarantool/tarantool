@@ -5,6 +5,8 @@ local fiber = require 'fiber'
 local socket = require 'socket'
 local log = require 'log'
 local errno = require 'errno'
+local ffi = require 'ffi'
+local digest = require 'digest'
 
 local CODE              = 0
 local PING              = 64
@@ -29,6 +31,12 @@ local ERROR             = 0x31
 local GREETING_SIZE     = 128
 
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
+
+
+ffi.cdef[[
+    int base64_decode(const char *in_base64, int in_len,
+                  char *out_bin, int out_len);
+]]
 
 
 local function request(header, body)
@@ -177,6 +185,18 @@ local proto = {
 
         return request( { [SYNC] = sync, [TYPE] = SELECT }, body )
     end,
+
+    auth = function(sync, user, password, handshake)
+        local salt = string.sub(b64decode(string.sub(handshake, 129)), 1, 20)
+        
+    end,
+
+    b64decode = function(str)
+        local so = ffi.new('char[?]', string.len(str) * 2);
+        local len =
+            ffi.C.base64_decode(str, string.len(str), so, string.len(str) * 2)
+        return ffi.string(so, len)
+    end
 }
 
 

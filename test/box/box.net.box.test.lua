@@ -122,3 +122,7 @@ space:drop()
 -- call
 box:call('test_foo', 'a', 'b', 'c')
 cn:call('test_foo', 'a', 'b', 'c')
+
+-- auth
+cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
+cn.proto.b64decode('gJLoc!!!!!!!')
