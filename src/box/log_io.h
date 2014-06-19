@@ -138,13 +138,8 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 void
 log_encode_setlsn(struct iproto_header *packet, const struct vclock *vclock);
 
-struct log_setlsn_row {
-	uint32_t node_id;
-	int64_t lsn;
-};
-
-struct log_setlsn_row *
-log_decode_setlsn(struct iproto_header *packet, uint32_t *p_size);
+void
+log_decode_setlsn(struct iproto_header *packet, struct vclock *vclock);
 
 struct log_io {
 	struct log_dir *dir;

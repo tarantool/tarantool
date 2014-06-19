@@ -117,6 +117,9 @@ vclock_signature(const struct vclock *vclock)
 int64_t
 vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 
+void
+vclock_merge(struct vclock *to, const struct vclock *with);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

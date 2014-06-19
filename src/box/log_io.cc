@@ -182,17 +182,14 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	/*
 	 * Parse SETLSN
 	 */
-	uint32_t row_count = 0;
-	struct log_setlsn_row *rows = log_decode_setlsn(&row, &row_count);
-	auto rows_guard = make_scoped_guard([=]{
-		free(rows);
-	});
+	struct vclock vclock;
+	log_decode_setlsn(&row, &vclock);
 
 	/*
 	 * Update indexes
 	 */
 	meta = (struct log_meta *) calloc(1, sizeof(*meta) +
-		sizeof(*meta->lsns) * row_count);
+		sizeof(*meta->lsns) * vclock_size(&vclock));
 	if (meta == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
 			"log_dir", "meta");
@@ -204,23 +201,24 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	meta->lsnsum = lsnsum;
 	log_dir_map_insert(&dir->map, meta);
 
-	meta->lsn_count = row_count;
+	meta->lsn_count = vclock_size(&vclock);
 	int64_t lsnsum_check = 0;
-	for (uint32_t i = 0; i < row_count; i++) {
-		struct log_meta_lsn *meta_lsn = &meta->lsns[i];
+	int i = 0;
+	vclock_foreach(&vclock, server) {
+		struct log_meta_lsn *meta_lsn = &meta->lsns[i++];
 		meta_lsn->meta = meta;
-		meta_lsn->node_id = rows[i].node_id;
-		meta_lsn->lsn = rows[i].lsn;
-		lsnsum_check += rows[i].lsn;
+		meta_lsn->node_id = server.id;
+		meta_lsn->lsn = server.lsn;
+		lsnsum_check += server.lsn;
 		log_dir_lsnmap_insert(&dir->lsnmap, meta_lsn);
 
 		uint32_t k;
-		k = mh_nodeids_find(dir->nodeids, rows[i].node_id, NULL);
+		k = mh_nodeids_find(dir->nodeids, server.id, NULL);
 		if (k != mh_end(dir->nodeids))
 			continue;
 
 		/* Update the set of node_ids */
-		k = mh_nodeids_put(dir->nodeids, &rows[i].node_id, NULL, NULL);
+		k = mh_nodeids_put(dir->nodeids, &server.id, NULL, NULL);
 		if (k == mh_end(dir->nodeids)) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
 				"log_dir", "meta->nodeids");
@@ -467,8 +465,8 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 	row->bodycnt = 1;
 }
 
-struct log_setlsn_row *
-log_decode_setlsn(struct iproto_header *row, uint32_t *p_row_count)
+void
+log_decode_setlsn(struct iproto_header *row, struct vclock *vclock)
 {
 	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SETLSN body");
@@ -506,24 +504,17 @@ log_decode_setlsn(struct iproto_header *row, uint32_t *p_row_count)
 
 	d = lsnmap;
 	uint32_t row_count = mp_decode_map(&d);
-	struct log_setlsn_row *rows = (struct log_setlsn_row *)
-			calloc(row_count, sizeof(*rows));
-	if (rows == NULL) {
-		tnt_raise(LoggedError, ER_MEMORY_ISSUE, sizeof(*rows),
-			  "log_index", "meta");
-	}
 
+	vclock_create(vclock);
 	for (uint32_t i = 0; i < row_count; i++) {
 		if (mp_typeof(*d) != MP_UINT)
 			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
-		rows[i].node_id = mp_decode_uint(&d);
+		uint32_t server_id = mp_decode_uint(&d);
 		if (mp_typeof(*d) != MP_UINT)
 			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
-		rows[i].lsn = mp_decode_uint(&d);
+		int64_t lsn = mp_decode_uint(&d);
+		vclock_cas(vclock, server_id, lsn);
 	}
-
-	*p_row_count = row_count;
-	return rows;
 }
 
 /* }}} */

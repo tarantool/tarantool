@@ -53,3 +53,20 @@ vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 	return prev_lsn;
 }
 
+void
+vclock_merge(struct vclock *to, const struct vclock *with)
+{
+	/* Botched logic:
+	 * - imagine there is 5.snap and 1.xlog
+	 * - 5.snap has 1: 5 vclock
+	 * - 1.xlog has 1: 1 vclock
+	 * We begin reading the xlog after snap,
+	 * but we don't skip setlsn (we never skip setlsn).
+	 * So we must not update server id 1 with lsn 1,
+	 * hence the code below only updates target if it
+	 * is less than the source.
+	 */
+	for (int i = 0; i < VCLOCK_MAX; i++)
+		if (with->lsn[i] > to->lsn[i])
+			to->lsn[i] = with->lsn[i];
+}

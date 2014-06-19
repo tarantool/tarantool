@@ -252,45 +252,6 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 	r->snap_dir.panic_if_error = on_snap_error;
 }
 
-static void
-recovery_process_setlsn(struct recovery_state *r,
-			struct iproto_header *row)
-{
-	say_debug("SETLSN");
-	uint32_t row_count;
-	struct log_setlsn_row *rows = log_decode_setlsn(row, &row_count);
-	auto rows_guard = make_scoped_guard([=]{
-		free(rows);
-	});
-
-	for (uint32_t i = 0; i < row_count; i++) {
-		int64_t current_lsn = vclock_get(&r->vclock, rows[i].node_id);
-		/* Ignore unknown nodes in relay mode */
-		if (current_lsn < 0) {
-			if (!r->relay && !cserver_id_is_reserved(rows[i].node_id))
-				tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-					  rows[i].node_id);
-			vclock_add_server(&r->vclock, rows[i].node_id);
-		}
-
-		if (current_lsn == rows[i].lsn) {
-			continue;
-		} else if (current_lsn < rows[i].lsn) {
-			say_debug("setting\t(%2u, %020lld)",
-				  (unsigned) rows[i].node_id,
-				  (long long) rows[i].lsn);
-			vclock_set(&r->vclock, rows[i].node_id, rows[i].lsn);
-		} else {
-			/* Ignore outdated SETLSN rows */
-			say_debug("skipping\t(%2u, %020lld)",
-				  (unsigned) rows[i].node_id,
-				  (long long) rows[i].lsn);
-			continue;
-		}
-	}
-	say_debug("--");
-}
-
 void
 recovery_process(struct recovery_state *r, struct iproto_header *row)
 {
@@ -298,7 +259,9 @@ recovery_process(struct recovery_state *r, struct iproto_header *row)
 		/* Process admin commands (node_id, lsn are ignored) */
 		switch (row->type) {
 		case IPROTO_SETLSN:
-			recovery_process_setlsn(r, row);
+			struct vclock vclock;
+			log_decode_setlsn(row, &vclock);
+			vclock_merge(&r->vclock, &vclock);
 			/*
 			 * In relay mode apply SETLSN locally and
 			 * retranslate the command to remote node.
