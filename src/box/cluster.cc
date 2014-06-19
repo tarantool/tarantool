@@ -55,7 +55,7 @@ cluster_add_server(const tt_uuid *server_uuid, cserver_id_t server_id)
 
 	if (tt_uuid_cmp(&r->node_uuid, server_uuid) == 0) {
 		/* Assign local node id */
-		assert(r->node_id == 0);
-		r->node_id = server_id;
+		assert(r->server_id == 0);
+		r->server_id = server_id;
 	}
 }

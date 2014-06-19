@@ -119,24 +119,24 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 static void
 fill_lsn(struct recovery_state *r, struct iproto_header *row)
 {
-	if (row == NULL || row->node_id == 0) {
+	if (row == NULL || row->server_id == 0) {
 		/* Local request */
-		int64_t lsn = vclock_inc(&r->vclock, r->node_id);
+		int64_t lsn = vclock_inc(&r->vclock, r->server_id);
 		if (row != NULL) {
-			row->node_id = r->node_id;
+			row->server_id = r->server_id;
 			row->lsn = lsn;
 		}
 	} else {
 		/* Replication request. */
-		if (!vclock_has(&r->vclock, row->node_id)) {
+		if (!vclock_has(&r->vclock, row->server_id)) {
 			/*
 			 * A safety net, this can only occur
 			 * if we're fed a strangely broken xlog.
 			 */
 			tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-				  (unsigned) row->node_id);
+				  (unsigned) row->server_id);
 		}
-		vclock_follow(&r->vclock,  row->node_id, row->lsn);
+		vclock_follow(&r->vclock,  row->server_id, row->lsn);
 	}
 }
 
@@ -242,11 +242,11 @@ void
 recovery_process(struct recovery_state *r, struct iproto_header *row)
 {
 	if (!iproto_request_is_dml(row->type)) {
-		/* Process admin commands (node_id, lsn are ignored) */
+		/* Process admin commands (server_id, lsn are ignored) */
 		switch (row->type) {
 		case IPROTO_SETLSN:
 			struct vclock vclock;
-			log_decode_setlsn(row, &vclock);
+			log_decode_vclock(row, &vclock);
 			vclock_merge(&r->vclock, &vclock);
 			/*
 			 * In relay mode apply SETLSN locally and
@@ -263,7 +263,7 @@ recovery_process(struct recovery_state *r, struct iproto_header *row)
 	}
 
 	/* Check lsn */
-	int64_t current_lsn = vclock_get(&r->vclock, row->node_id);
+	int64_t current_lsn = vclock_get(&r->vclock, row->server_id);
 	if (current_lsn >=0 && row->lsn <= current_lsn) {
 		say_debug("skipping too young row");
 		return;
@@ -929,19 +929,19 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
 }
 
 int
-wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
+wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
 		 const struct vclock *vclock)
 {
 	/* Write SETLSN command */
-	struct iproto_header setlsn;
+	struct iproto_header row;
 	char fixheader[XLOG_FIXHEADER_SIZE];
 	struct iovec iov[XLOG_ROW_IOVMAX];
-	log_encode_setlsn(&setlsn, vclock);
-	int iovcnt = xlog_encode_row(&setlsn, iov, fixheader);
+	log_encode_vclock(&row, vclock);
+	int iovcnt = xlog_encode_row(&row, iov, fixheader);
 	fio_batch_start(batch, 1);
 	fio_batch_add(batch, iov, iovcnt);
 	if (fio_batch_write(batch, fileno(wal->f)) != 1) {
-		say_error("wal_write_setlsn failed");
+		say_error("wal_write_vclock failed");
 		return -1;
 	}
 
@@ -984,7 +984,7 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 		l = log_io_open_for_write(&r->wal_dir, lsnsum, &r->node_uuid,
 					  INPROGRESS);
 		if (l != NULL) {
-			if (wal_write_setlsn(l, batch, vclock) != 0)
+			if (wal_write_vclock(l, batch, vclock) != 0)
 				log_io_close(&l);
 		}
 		/*
@@ -1001,7 +1001,7 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 			 * A warning is written to the server
 			 * log file.
 			 */
-			wal_write_setlsn(wal_to_close, batch, vclock);
+			wal_write_vclock(wal_to_close, batch, vclock);
 			log_io_close(&wal_to_close);
 		}
 	} else if (l->rows == 1) {
@@ -1044,7 +1044,7 @@ wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
-		vclock_follow(vclock, req->row->node_id, req->row->lsn);
+		vclock_follow(vclock, req->row->server_id, req->row->lsn);
 		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
@@ -1112,7 +1112,7 @@ wal_writer_thread(void *worker_args)
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
 	if (r->current_wal != NULL) {
-		wal_write_setlsn(r->current_wal, writer->batch, &writer->vclock);
+		wal_write_vclock(r->current_wal, writer->batch, &writer->vclock);
 		log_io_close(&r->current_wal);
 	}
 	return NULL;
@@ -1179,7 +1179,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	ev_loop *loop = loop();
 
 	row->tm = last;
-	row->node_id = 0;
+	row->server_id = 0;
 	/**
 	 * Rows in snapshot are numbered from 1 to %rows.
 	 * This makes streaming such rows to a replica or
@@ -1266,19 +1266,19 @@ snapshot_save(struct recovery_state *r)
 	say_info("saving snapshot `%s'", snap->filename);
 
 	/* Write starting SETLSN (always empty table for snapshot) */
-	struct iproto_header setlsn;
+	struct iproto_header row;
 	struct vclock vclock;
 	vclock_create(&vclock);
 	/* Add a surrogate server id for snapshot rows */
 	vclock_add_server(&vclock, 0);
 
-	log_encode_setlsn(&setlsn, &vclock);
-	snapshot_write_row(snap, &setlsn);
+	log_encode_vclock(&row, &vclock);
+	snapshot_write_row(snap, &row);
 	r->snapshot_handler(snap);
 
 	/* Preserver cluster clock in the snapshot */
-	log_encode_setlsn(&setlsn, &r->vclock);
-	snapshot_write_row(snap, &setlsn);
+	log_encode_vclock(&row, &r->vclock);
+	snapshot_write_row(snap, &row);
 
 	log_io_close(&snap);
 

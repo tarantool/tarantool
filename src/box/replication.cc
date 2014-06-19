@@ -231,7 +231,7 @@ replication_join(int fd, struct iproto_header *header)
 			continue;
 		}
 		uint8_t key = mp_decode_uint(&d);
-		if (key == IPROTO_NODE_UUID) {
+		if (key == IPROTO_SERVER_UUID) {
 			if (mp_typeof(*d) != MP_STR ||
 			    mp_decode_strl(&d) != UUID_LEN) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -302,7 +302,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 			tt_uuid_dec_be(d, &uu);
 			d += UUID_LEN;
 			break;
-		case IPROTO_NODE_UUID:
+		case IPROTO_SERVER_UUID:
 			if (mp_typeof(*d) != MP_STR ||
 			    mp_decode_strl(&d) != UUID_LEN) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -311,7 +311,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 			tt_uuid_dec_be(d, &node_uuid);
 			d += UUID_LEN;
 			break;
-		case IPROTO_LSNMAP:
+		case IPROTO_VCLOCK:
 			if (mp_typeof(*d) != MP_MAP) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid LSNMAP");
@@ -336,9 +336,9 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	}
 
 	/* Check Node-UUID */
-	uint32_t node_id = schema_find_id(SC_CLUSTER_ID, 1, tt_uuid_str(&node_uuid),
+	uint32_t server_id = schema_find_id(SC_CLUSTER_ID, 1, tt_uuid_str(&node_uuid),
 					  UUID_STR_LEN);
-	if (node_id == SC_ID_NIL)
+	if (server_id == SC_ID_NIL)
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER, tt_uuid_str(&node_uuid));
 	if (lsnmap == NULL)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
@@ -371,7 +371,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	request->io.data = request;
 	request->data.type = packet->type;
 	request->data.sync = packet->sync;
-	request->data.server_id = node_id;
+	request->data.server_id = server_id;
 
 	ev_io_init(&request->io, replication_send_socket,
 		   master_to_spawner_socket, EV_WRITE);
@@ -727,7 +727,7 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 	struct recovery_state *r = recovery_state;
 
 	/* Don't duplicate data */
-	if (packet->node_id == 0 || packet->node_id != r->node_id)  {
+	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
 		packet->sync = relay.sync;
 		struct iovec iov[IPROTO_ROW_IOVMAX];
 		char fixheader[IPROTO_FIXHEADER_SIZE];
@@ -741,7 +741,7 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 		 * updates local vclock. In relay mode we have to update
 		 * it here.
 		 */
-		vclock_follow(&r->vclock, packet->node_id, packet->lsn);
+		vclock_follow(&r->vclock, packet->server_id, packet->lsn);
 	}
 }
 
@@ -773,8 +773,8 @@ replication_relay_subscribe(struct recovery_state *r)
 {
 	/* Set LSNs */
 	vclock_copy(&r->vclock, &relay.vclock);
-	/* Set node_id */
-	r->node_id = relay.server_id;
+	/* Set server_id */
+	r->server_id = relay.server_id;
 
 	recovery_follow_local(r, 0.1);
 	ev_run(loop(), 0);

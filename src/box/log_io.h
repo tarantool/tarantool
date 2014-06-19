@@ -60,7 +60,7 @@ struct log_meta_lsn;
 /* Used by internal functions */
 struct log_meta_lsn {
 	rb_node(struct log_meta_lsn) link;
-	int32_t node_id;
+	int32_t server_id;
 	int64_t lsn;
 	struct log_meta *meta;
 };
@@ -82,14 +82,14 @@ typedef rb_tree(struct log_meta) log_dir_map_t;
 rb_proto(, log_dir_map_, log_dir_map_t, struct log_meta)
 
 /*
- * Map: (node_id, lsn) => (struct log_meta)
+ * Map: (server_id, lsn) => (struct log_meta)
  */
 
 typedef rb_tree(struct log_meta_lsn) log_dir_lsnmap_t;
 rb_proto(, log_dir_lsnmap_, log_dir_lsnmap_t, struct log_meta_lsn)
 
 /*
- * Set: (node_id) - defined in .cc
+ * Set: (server_id) - defined in .cc
  */
 struct mh_nodeids_t;
 
@@ -100,8 +100,8 @@ struct log_dir {
 	 * in a separate thread.
 	 */
 	bool sync_is_async;
-	/* don't check that sum(setlsn) == lsnsum in filename (for snaps) */
-	bool ignore_initial_setlsn;
+	/* don't check that sum(vclock) == lsnsum in filename (for snaps) */
+	bool ignore_initial_vclock;
 
 	/* Additional flags to apply at fopen(2) to write. */
 	char open_wflags[6];
@@ -136,10 +136,10 @@ char *
 format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 
 void
-log_encode_setlsn(struct iproto_header *packet, const struct vclock *vclock);
+log_encode_vclock(struct iproto_header *packet, const struct vclock *vclock);
 
 void
-log_decode_setlsn(struct iproto_header *packet, struct vclock *vclock);
+log_decode_vclock(struct iproto_header *packet, struct vclock *vclock);
 
 struct log_io {
 	struct log_dir *dir;

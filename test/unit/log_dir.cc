@@ -47,7 +47,7 @@ testset_create(struct log_dir *dir, int64_t *files, int files_n, int node_n)
 		/* Write XLOG */
 		struct log_io *l = log_io_open_for_write(dir, lsnsum, &node_uuid,
 							 INPROGRESS);
-		int rc = wal_write_setlsn(l, batch, &vclock);
+		int rc = wal_write_vclock(l, batch, &vclock);
 		assert(rc == 0);
 		(void) rc;
 		log_io_close(&l);

@@ -68,8 +68,8 @@ rb_gen(, log_dir_map_, log_dir_map_t, struct log_meta, link, log_dir_map_cmp)
 static inline int
 log_dir_lsnmap_cmp(const struct log_meta_lsn *a, const struct log_meta_lsn *b)
 {
-	if (a->node_id != b->node_id)
-		return a->node_id - b->node_id;
+	if (a->server_id != b->server_id)
+		return a->server_id - b->server_id;
 	if (a->lsn != b->lsn)
 		return a->lsn - b->lsn;
 
@@ -114,7 +114,7 @@ log_dir_create(struct log_dir *dir, const char *dirname,
 		strcpy(dir->open_wflags, "wxd");
 		dir->filetype = "SNAP\n";
 		dir->filename_ext = ".snap";
-		dir->ignore_initial_setlsn = true;
+		dir->ignore_initial_vclock = true;
 		dir->panic_if_error = true;
 	} else {
 		strcpy(dir->open_wflags, "wx");
@@ -183,7 +183,7 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	 * Parse SETLSN
 	 */
 	struct vclock vclock;
-	log_decode_setlsn(&row, &vclock);
+	log_decode_vclock(&row, &vclock);
 
 	/*
 	 * Update indexes
@@ -207,7 +207,7 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	vclock_foreach(&vclock, server) {
 		struct log_meta_lsn *meta_lsn = &meta->lsns[i++];
 		meta_lsn->meta = meta;
-		meta_lsn->node_id = server.id;
+		meta_lsn->server_id = server.id;
 		meta_lsn->lsn = server.lsn;
 		lsnsum_check += server.lsn;
 		log_dir_lsnmap_insert(&dir->lsnmap, meta_lsn);
@@ -217,7 +217,7 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 		if (k != mh_end(dir->nodeids))
 			continue;
 
-		/* Update the set of node_ids */
+		/* Update the set of server_ids */
 		k = mh_nodeids_put(dir->nodeids, &server.id, NULL, NULL);
 		if (k == mh_end(dir->nodeids)) {
 			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
@@ -229,7 +229,7 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	 * Snapshots have empty starting SETLSN table. Don't check lsnsum and
 	 * use the information derived from xlog name.
 	 */
-	if (lsnsum_check != lsnsum && !dir->ignore_initial_setlsn)
+	if (lsnsum_check != lsnsum && !dir->ignore_initial_vclock)
 		tnt_raise(IllegalParams, "Invalid xlog name");
 
 	meta_guard.is_active = false;
@@ -344,13 +344,13 @@ static inline struct log_meta_lsn *
 log_dir_lsnmap_lesearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
 {
 	struct log_meta_lsn *node = log_dir_lsnmap_psearch(tree, key);
-	if (node == NULL || node->node_id != key->node_id)
+	if (node == NULL || node->server_id != key->server_id)
 		return NULL;
 
 	int64_t lsn = node->lsn;
 	while (1) {
 		struct log_meta_lsn *next = log_dir_lsnmap_next(tree, node);
-		if (next == NULL || next->node_id != key->node_id ||
+		if (next == NULL || next->server_id != key->server_id ||
 				next->lsn != lsn)
 			break;
 		node = next;
@@ -362,13 +362,13 @@ static inline struct log_meta_lsn *
 log_dir_lsnmap_gtsearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
 {
 	struct log_meta_lsn *node = log_dir_lsnmap_nsearch(tree, key);
-	if (node == NULL || node->node_id != key->node_id)
+	if (node == NULL || node->server_id != key->server_id)
 		return NULL;
 
 	int64_t lsn = node->lsn;
 	while (1) {
 		struct log_meta_lsn *prev = log_dir_lsnmap_prev(tree, node);
-		if (prev == NULL || prev->node_id != key->node_id ||
+		if (prev == NULL || prev->server_id != key->server_id ||
 				prev->lsn != lsn)
 			break;
 		node = prev;
@@ -383,11 +383,11 @@ log_dir_next(struct log_dir *dir, struct vclock *vclock)
 	uint32_t k;
 	mh_foreach(dir->nodeids, k) {
 		/*
-		 * Find file where lsn <= key.lsn for given node_id
+		 * Find file where lsn <= key.lsn for given server_id
 		 */
 		struct log_meta_lsn key;
-		key.node_id = *mh_nodeids_node(dir->nodeids, k);
-		key.lsn = vclock_get(vclock, key.node_id);
+		key.server_id = *mh_nodeids_node(dir->nodeids, k);
+		key.lsn = vclock_get(vclock, key.server_id);
 		key.meta = NULL; /* this node is a key */
 		if (key.lsn < 0)
 			key.lsn = 0;
@@ -396,14 +396,14 @@ log_dir_next(struct log_dir *dir, struct vclock *vclock)
 
 		/*
 		 * Find tree node with greatest node.meta.lsnsum where
-		 * node.node_id == key.node_id, node.lsn <= key.lsn
+		 * node.server_id == key.server_id, node.lsn <= key.lsn
 		 */
 		struct log_meta_lsn *meta_lsn =
 				log_dir_lsnmap_lesearch(&dir->lsnmap, &key);
 		if (meta_lsn == NULL) {
 			/*
 			 * Find tree node with smallest node.meta.lsnsum where
-			 * node.node_id == key.node_id, node.lsn > key.lsn
+			 * node.server_id == key.server_id, node.lsn > key.lsn
 			 */
 			meta_lsn = log_dir_lsnmap_gtsearch(&dir->lsnmap, &key);
 			if (meta_lsn == NULL)
@@ -440,7 +440,7 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 }
 
 void
-log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
+log_encode_vclock(struct iproto_header *row, const struct vclock *vclock)
 {
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_SETLSN;
@@ -451,7 +451,7 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_LSNMAP);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
 
 	vclock_foreach(vclock, server) {
@@ -466,7 +466,7 @@ log_encode_setlsn(struct iproto_header *row, const struct vclock *vclock)
 }
 
 void
-log_decode_setlsn(struct iproto_header *row, struct vclock *vclock)
+log_decode_vclock(struct iproto_header *row, struct vclock *vclock)
 {
 	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SETLSN body");
@@ -486,7 +486,7 @@ log_decode_setlsn(struct iproto_header *row, struct vclock *vclock)
 		}
 		uint8_t key = mp_decode_uint(&d);
 		switch (key) {
-		case IPROTO_LSNMAP:
+		case IPROTO_VCLOCK:
 			if (mp_typeof(*d) != MP_MAP) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "invalid LSN Map");

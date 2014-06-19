@@ -37,7 +37,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_NODE_ID */
+		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 	/* }}} */
@@ -83,9 +83,9 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
-	/* 0x24 */	MP_STR, /* IPROTO_NODE_UUID */
+	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
-	/* 0x26 */	MP_MAP, /* IPROTO_LSNMAP */
+	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* }}} */
 };
 
@@ -117,7 +117,7 @@ const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
 const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
-	"node_id",          /* 0x02 */
+	"server_id",          /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
 	"",                 /* 0x05 */
@@ -151,9 +151,9 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"node uuid"         /* 0x24 */
-	"cluster uuid"      /* 0x25 */
-	"lsn map"           /* 0x26 */
+	"server UUID"       /* 0x24 */
+	"cluster UUID"      /* 0x25 */
+	"vector clock"      /* 0x26 */
 };
 
 void
@@ -184,8 +184,8 @@ error:
 		case IPROTO_SYNC:
 			header->sync = mp_decode_uint(pos);
 			break;
-		case IPROTO_NODE_ID:
-			header->node_id = mp_decode_uint(pos);
+		case IPROTO_SERVER_ID:
+			header->server_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
 			header->lsn = mp_decode_uint(pos);
@@ -230,9 +230,9 @@ iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 		map_size++;
 	}
 
-	if (header->node_id) {
-		d = mp_encode_uint(d, IPROTO_NODE_ID);
-		d = mp_encode_uint(d, header->node_id);
+	if (header->server_id) {
+		d = mp_encode_uint(d, IPROTO_SERVER_ID);
+		d = mp_encode_uint(d, header->server_id);
 		map_size++;
 	}
 

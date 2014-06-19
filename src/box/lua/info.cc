@@ -66,21 +66,21 @@ lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 static int
 lbox_info_node(struct lua_State *L)
 {
-	if (recovery_state->node_id == 0) {
+	if (recovery_state->server_id == 0) {
 		lua_pushnil(L);
 		return 1;
 	}
 
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, recovery_state->node_id);
+	lua_pushinteger(L, recovery_state->server_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
 	lua_pushlstring(L, tt_uuid_str(&recovery_state->node_uuid), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
 	luaL_pushnumber64(L, vclock_get(&recovery_state->vclock,
-					recovery_state->node_id));
+					recovery_state->server_id));
 	lua_settable(L, -3);
 
 	return 1;

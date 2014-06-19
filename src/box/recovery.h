@@ -89,7 +89,7 @@ struct recovery_state {
 	int rows_per_wal;
 	enum wal_mode wal_mode;
 	tt_uuid node_uuid;
-	uint32_t node_id;
+	uint32_t server_id;
 
 	bool finalize;
 };
@@ -131,7 +131,7 @@ void snapshot_save(struct recovery_state *r);
 
 /* Only for tests */
 int
-wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
+wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
 		 const struct vclock *vclock);
 
 #if defined(__cplusplus)

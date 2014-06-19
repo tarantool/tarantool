@@ -142,7 +142,7 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	char buf[128];
 	char *data = buf;
 	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_NODE_UUID);
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
 	data = mp_encode_strl(data, UUID_LEN);
 	/* Greet the remote server with our server UUID */
 	tt_uuid_enc_be(&recovery_state->node_uuid, data);
@@ -201,11 +201,11 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	data = mp_encode_strl(data, UUID_LEN);
 	tt_uuid_enc_be(&cluster_id, data);
 	data += UUID_LEN;
-	data = mp_encode_uint(data, IPROTO_NODE_UUID);
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
 	data = mp_encode_strl(data, UUID_LEN);
 	tt_uuid_enc_be(&recovery_state->node_uuid, data);
 	data += UUID_LEN;
-	data = mp_encode_uint(data, IPROTO_LSNMAP);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
 	vclock_foreach(&r->vclock, server) {
 		data = mp_encode_uint(data, server.id);
