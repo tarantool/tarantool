@@ -121,36 +121,22 @@ fill_lsn(struct recovery_state *r, struct iproto_header *row)
 {
 	if (row == NULL || row->node_id == 0) {
 		/* Local request */
-		int64_t lsn = vclock_get(&r->vclock, r->node_id);
-		if (lsn < 0)
-			tnt_raise(ClientError, ER_LOCAL_SERVER_IS_NOT_ACTIVE);
-		vclock_set(&r->vclock, r->node_id, ++lsn);
+		int64_t lsn = vclock_inc(&r->vclock, r->node_id);
 		if (row != NULL) {
 			row->node_id = r->node_id;
 			row->lsn = lsn;
 		}
-		return;
 	} else {
-		/* Remote request */
-		int64_t current_lsn = vclock_get(&r->vclock, row->node_id);
-		if (current_lsn < 0) {
+		/* Replication request. */
+		if (!vclock_has(&r->vclock, row->node_id)) {
+			/*
+			 * A safety net, this can only occur
+			 * if we're fed a strangely broken xlog.
+			 */
 			tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-				  row->node_id);
+				  (unsigned) row->node_id);
 		}
-		else if (current_lsn >= row->lsn) {
-			tnt_raise(ClientError, ER_INVALID_ORDER,
-				  row->node_id, (long long) current_lsn,
-				  (long long) row->lsn);
-		} else if (current_lsn + 1 != row->lsn) {
-			say_warn("non consecutive LSN for node %u"
-				 "confirmed: %lld, new: %lld, diff: %lld",
-				 (unsigned) row->node_id,
-				 (long long) current_lsn,
-				 (long long) row->lsn,
-				 (long long) (row->lsn - current_lsn));
-		}
-		vclock_set(&r->vclock, row->node_id, row->lsn);
-		return;
+		vclock_follow(&r->vclock,  row->node_id, row->lsn);
 	}
 }
 
@@ -1058,7 +1044,7 @@ wal_write_batch(struct log_io *wal, struct fio_batch *batch,
 	int rows_written = fio_batch_write(batch, fileno(wal->f));
 	wal->rows += rows_written;
 	while (req != end && rows_written-- != 0)  {
-		vclock_cas(vclock, req->row->node_id, req->row->lsn);
+		vclock_follow(vclock, req->row->node_id, req->row->lsn);
 		req->res = 0;
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}

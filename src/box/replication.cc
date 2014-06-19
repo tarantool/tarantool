@@ -766,7 +766,7 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 		 * updates local vclock. In relay mode we have to update
 		 * it here.
 		 */
-		vclock_cas(&r->vclock, packet->node_id, packet->lsn);
+		vclock_follow(&r->vclock, packet->node_id, packet->lsn);
 	}
 }
 
@@ -799,7 +799,7 @@ replication_relay_subscribe(struct recovery_state *r, struct relay_data *data)
 	assert(data->type == IPROTO_SUBSCRIBE);
 	/* Set LSNs */
 	for (uint32_t i = 0; i < data->lsnmap_size; i++) {
-		vclock_cas(&r->vclock, data->lsnmap[i].node_id,
+		vclock_follow(&r->vclock, data->lsnmap[i].node_id,
 			   data->lsnmap[i].lsn);
 	}
 

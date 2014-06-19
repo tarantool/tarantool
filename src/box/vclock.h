@@ -80,9 +80,6 @@ vclock_get(const struct vclock *vclock, uint32_t server_id)
 	return vclock_has(vclock, server_id) ? vclock->lsn[server_id] : -1;
 }
 
-void
-vclock_set(struct vclock *vclock, uint32_t server_id, int64_t lsn);
-
 static inline int64_t
 vclock_inc(struct vclock *vclock, uint32_t server_id)
 {
@@ -115,7 +112,7 @@ vclock_signature(const struct vclock *vclock)
 }
 
 int64_t
-vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn);
+vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 
 void
 vclock_merge(struct vclock *to, const struct vclock *with);

@@ -513,7 +513,7 @@ log_decode_setlsn(struct iproto_header *row, struct vclock *vclock)
 		if (mp_typeof(*d) != MP_UINT)
 			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
 		int64_t lsn = mp_decode_uint(&d);
-		vclock_cas(vclock, server_id, lsn);
+		vclock_follow(vclock, server_id, lsn);
 	}
 }
 

@@ -29,15 +29,8 @@
 #include "vclock.h"
 #include "say.h"
 
-void
-vclock_set(struct vclock *vclock, uint32_t server_id, int64_t lsn)
-{
-	assert(vclock_has(vclock, server_id));
-	vclock->lsn[server_id] = lsn;
-}
-
 int64_t
-vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn)
+vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 {
 	assert(lsn >= 0);
 	assert(server_id < VCLOCK_MAX);
