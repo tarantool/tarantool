@@ -8,41 +8,129 @@
          xml:id="language-reference">
 
 <title>Lua and the Tarantool Lua Packages</title>
-<blockquote><para>
-  This chapter provides a reference of Tarantool data operations
-  and administrative commands.
-</para></blockquote>
-<bridgehead renderas="sect2">Digression: primary and administrative ports</bridgehead>
+
 <para>
-  During start up, the server can allow connections on up to two TCP ports:
-  <itemizedlist>
-    <listitem><para>
-      Primary port. This port is for handling requests in the
-      <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>
-      (also called the "binary protocol"), and provides full data access.
-      </para>
-      <para>
-      The default value of the port is <literal>3303</literal>,
-      as defined in the <olink targetptr="primary_port"/>
-      configuration option.
-    </para></listitem>
-    <listitem><para>
-      Administrative port, which is for handling requests in unconverted text (also called the "text protocol"),
-      which defaults to <literal>3313</literal>,
-      and is defined in the <olink targetptr="admin_port"/>
-      configuration option.
-    </para></listitem>
-  </itemizedlist>
-  Traditionally, in the absence of authentication,
-  ordinary users could be blocked from
-  doing administrative operations by simply having them
-  blocked from access to the administrative port.
-  The client, however, had to be aware of
-  the separation, and the <command>tarantool</command> command line
-  client automatically selected the correct port
-  with the help of a simple regular expression. SELECTs, UPDATEs,
-  INSERTs, DELETEs and CALLs were sent to the primary port.
-  Lua commands were sent to the administrative port.
+<bridgehead renderas="sect4">The "Batteries Included" Lua Software Distribution</bridgehead>
+Tarantool incorporates open-source
+precompiled packages which Tarantool's developers
+have tested for compatibility -- the "built-in" packages.
+Tarantool specializes in packages which aid
+database applications or which Tarantool's own developers
+use to make database-related tools.
+At the same time.
+Tarantool makes it easy to add new Lua packages
+from <link xlink:href=" http://luarocks.org/">LuaRocks</link> -- the "downloadable" packages.
+</para>
+
+<para>
+The included language processor is LuaJIT.
+Major "built-in" components are: fibers,
+MsgPack, digest, JSON, YAML, IPC, and box.
+</para>
+
+<para>
+<link xlink:href="http://luajit.org/">LUAJIT</link>  = a processor for the entire Lua language. 
+This differs from the original Lua interpreter from
+<link xlink:href="http://www.puc-rio.br/index.html">Pontifícia Universidade Católica do Rio de Janeiro</link>
+("RIO-PUC" <link xlink:href="http://www.lua.org/">Lua</link>) 
+because the JIT stands for "Just In Time" compiling, that
+is, it can compile some Lua code into executable form the
+first time it encounters the code. The result is that some
+loops will run as quickly as an equivalent C program.
+Also some precompiled C code can be brought in using
+LuaJIT's FFI (<link xlink:href="https://en.wikipedia.org/wiki/Foreign_function_interface">Foreign Function Interface</link>).
+Examples for using FFI exist on the Internet.
+</para>
+
+<para>
+LuaJIT has been compared to competitive implementations
+and found to be reliable and efficient,
+provided one takes advantage of it where <link xlink:href="http://wiki.luajit.org/Numerical-Computing-Performance-Guide">performance</link> counts. 
+A potential FFI defect is that some routines can cause
+crashes and breaches, which is why Tarantool has a "sandbox"
+to stop some types of access.
+</para>
+
+<para>
+FIBERS = like Lua coroutines, but as <link xlink:href="http://members.chello.nl/~w.couwenberg/fibers.htm">one fiber developer</link>
+put it: "The main difference between a coroutine and a fiber
+is that a running fiber can be suspended anywhere in a call
+chain, regardless of its C and Lua call stack nesting levels."       
+</para>
+
+<para>
+<link xlink:href="http://msgpack.org">MSGPACK</link> = a relatively new way to serialize data.                    
+As the developer who handled the interface (named MsgPuck)
+puts it: "MsgPuck was written to use within Tarantool -
+the world's first full-featured MsgPack-based database."
+The point of MsgPack is that it can
+handle Lua types and C types, with structures and nesting,
+without the overhead of an SGML-style markup language.
+</para>
+
+<para>
+DIGEST = a cryptography package for CRC32, SHA, and MDA.
+Nothing new here -- except that Tarantool has made them into a
+package, so that one doesn't have to get each one of these
+things individually from the <link xlink:href="http://lua-users.org/wiki/CryptographyStuff">many that are available</link>. 
+</para>
+
+<para>
+JSON = a serialization format which has
+become popular in the web world. The package within
+Tarantool is derived from <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">CJSON</link>
+which, according to <link xlink:href="http://lua-users.org/wiki/JsonModules">a survey</link>, 
+handles Unicode surrogate pairs and is robust when
+edge cases come up.
+</para>
+
+<para>
+<link xlink:href="http://en.wikipedia.org/wiki/Yaml">YAML</link> -- short for "YAML Ain't a Markup Language". YAML is a            
+way to show data in human-readable form, without losing
+underlying information about typing, arrays, and structures.
+</para>
+
+<para>
+<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> -- Inter-Process Communication. The primary application       
+is communication between fibers within a Tarantool instance,
+but the senders and receivers who ultimately control those
+fibers may be remote from each other.
+</para>
+
+<para>
+BOX -- the NoSQL DBMS that was developed by Tarantool
+and its community. Box's architecture and routines will be the
+subject of the next chapter.
+</para>
+
+<para>
+<bridgehead renderas="sect4">The Downloadable Packages</bridgehead>
+A directory of Lua Addons packages can be found on the <link xlink:href="http://lua-users.org/wiki/LuaAddons">Lua-users</link> wiki. 
+For a "managed package" system equivalent to Perl's CPAN and Ruby's RubyGems and Python's
+Eggs, one gets "rocks" (modules or packages) from <emphasis>LuaRocks</emphasis>.
+Either way, the installation requirement can be as simple as saying
+require('package-name')
+and the effect is a simple Lua table containing 
+functions and members, superficially like C/Java classes.
+</para>
+
+<para>
+There are <link xlink:href="https://rocks.moonscript.org/modules">several hundred LuaRocks packages</link> that are not built-in       
+but are reasonably easy to obtain by anyone with an Internet
+connection. Just as a sampling: ...
+<link xlink:href="https://rocks.moonscript.org/modules/kikito/ansicolors">ansicolors</link> for color manipulation,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/htmlparser">htmlparser</link> for changing HTML text into a tree of elements,
+<link xlink:href="https://rocks.moonscript.org/modules/kikito/i18n">i18n</link> an internationalization library,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/lposix">lposix</link> a POSIX library,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/lua-spore">lua-Spore</link> a generic ReST client,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/tekui">TekUI</link> a GUI toolkit .
+Examples exist for how to bring in particular downloadable packages after
+starting Tarantool.
+</para>
+
+<para>
+The rest of this chapter is an introduction and reference that has what's needed for programming and
+administration with the built-in packages.
 </para>
 
 
