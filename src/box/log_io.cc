@@ -236,21 +236,22 @@ log_dir_scan(struct log_dir *dir)
 		signs[signs_size++] = sign;
 	}
 
-#if !defined(SNAPSHOT_SETLSN_META)
-	/* Snapshots don't have correct SETLSN command, ignore */
-	if (dir == &recovery_state->snap_dir) {
-		dir->greatest = signs_size > 0 ? signs[signs_size - 1] : INT64_MAX;
-		return 0;
-	}
-#endif
 	if (signs_size == 0) {
 		/* Empty directory */
 		vclockset_clean(&dir->index);
+		dir->greatest = INT64_MAX;
 		return 0;
 	}
 
 	qsort(signs, signs_size, sizeof(*signs), cmp_i64);
 
+#if !defined(SNAPSHOT_SETLSN_META)
+	/* Snapshots don't have correct SETLSN command, ignore */
+	if (dir == &recovery_state->snap_dir) {
+		dir->greatest = signs[signs_size - 1];
+		return 0;
+	}
+#endif
 	struct vclock *cur = vclockset_first(&dir->index);
 	for (size_t i = 0; i < signs_size; i++) {
 		while (cur != NULL) {
