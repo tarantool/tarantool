@@ -116,9 +116,6 @@ cn:call('pause')
 cn:call('test_foo', 'a', 'b', 'c')
 
 
--- cleanup database after tests
-space:drop()
-
 -- call
 box:call('test_foo', 'a', 'b', 'c')
 cn:call('test_foo', 'a', 'b', 'c')
@@ -140,3 +137,19 @@ cn = remote:new('127.0.0.1', port, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
 cn:ping()
+
+function ret_after(to) fiber.sleep(to) return {{to}} end
+
+-- timeouts
+cn:timeout(1).space.net_box_test_space.index.primary:select{234}
+cn:call('ret_after', .01)
+cn:timeout(1):call('ret_after', .01)
+cn:timeout(.01):call('ret_after', 1)
+
+cn = remote:timeout(0.0000000001):new('127.0.0.1', port, { user = 'netbox', password = '123' })
+cn = remote:timeout(1):new('127.0.0.1', port, { user = 'netbox', password = '123' })
+
+
+-- cleanup database after tests
+space:drop()
+

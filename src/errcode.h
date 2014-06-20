@@ -121,6 +121,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected [a-zA-Z_][a-zA-Z0-9_]*)") \
 	/* 71 */_(ER_NO_CONNECTION,		2, "Connection is not established") \
+	/* 72 */_(ER_TIMEOUT,			2, "Timeout exceeded") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

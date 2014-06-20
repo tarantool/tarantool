@@ -329,6 +329,7 @@ local remote_methods = {
         local self = {}
         setmetatable(self, getmetatable(cls))
 
+        self.is_instance = true
         self.host = host
         self.port = port
         self.opts = opts
@@ -345,6 +346,7 @@ local remote_methods = {
 
         self.ch = { sync = {}, fid = {} }
         self.wait = { state = {} }
+        self.timeouts = {}
 
 
         fiber.wrap(function() self:_connect_worker() end)
@@ -398,6 +400,46 @@ local remote_methods = {
         return self:_wait_state({ 'active', 'activew', 'closed' }, timeout)
     end,
 
+    timeout = function(self, timeout)
+        if timeout == nil then
+            return self
+        end
+        if self.is_instance then
+            self.timeouts[ fiber.id() ] = timeout
+            return self
+        end
+
+        return {
+            new = function(cls, host, port, opts)
+                if opts == nil then
+                    opts = {}
+                end
+
+                opts.wait_connected = false
+
+                local cn = self:new(host, port, opts)
+
+                if not cn:wait_connected(timeout) then
+                    cn:close()
+                    box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+                end
+                return cn
+            end
+        }
+    end,
+
+    close = function(self)
+        if self.state == 'closed' then
+            return true
+        end
+        self:_switch_state('closed')
+        self:_error_waiters('Connection was closed')
+        if self.s ~= nil then
+            self.s:close()
+            self.s = nil
+        end
+    end,
+
     -- private methods
     _fatal = function(self, efmt, ...)
         if self.state == 'error' then
@@ -417,8 +459,13 @@ local remote_methods = {
         self.error = emsg
         self.space = {}
         self:_switch_state('error')
+        self:_error_waiters(emsg)
+        self.rbuf = ''
+        self.wbuf = ''
+        self.handshake = ''
+    end,
 
-
+    _error_waiters = function(self, emsg)
         local waiters = self.ch.sync
         self.ch.sync = {}
         for sync, channel in pairs(waiters) do
@@ -429,12 +476,10 @@ local remote_methods = {
                     [SYNC] = sync
                 },
                 body = {
-                    [ERROR] = self.error
+                    [ERROR] = emsg
                 }
             }
         end
-        self.rbuf = ''
-        self.wbuf = ''
     end,
 
     _check_response = function(self)
@@ -469,19 +514,6 @@ local remote_methods = {
         end
     end,
 
-    _can_request = function(self)
-        if self:is_connected() then
-            return true
-        end
-        if self.state == 'schema' or self.state == 'schemaw' then
-            return true
-        end
-        if self.state == 'auth' or self.state == 'authw' then
-            return true
-        end
-        return false
-    end,
-
     _switch_state = function(self, state)
         if self.state == state then
             return
@@ -504,7 +536,11 @@ local remote_methods = {
     end,
 
     _wait_state = function(self, states, timeout)
-        while true do
+        if timeout == nil then
+            timeout = TIMEOUT_INFINITY
+        end
+        while timeout > 0 do
+            local started = fiber.time()
             for _, state in pairs(states) do
                 if self.state == state then
                     return true
@@ -522,11 +558,7 @@ local remote_methods = {
 
             self.ch.fid[fid] = ch
             local res
-            if timeout ~= nil then
-                res = ch:get(timeout)
-            else
-                res = ch:get()
-            end
+            res = ch:get(timeout)
             self.ch.fid[fid] = nil
 
             local has_state = false
@@ -542,6 +574,8 @@ local remote_methods = {
             if has_state or res == nil then
                 return res
             end
+
+            timeout = timeout - (fiber.time() - started)
         end
     end,
 
@@ -617,9 +651,27 @@ local remote_methods = {
     _r_states = {
         'active', 'activew', 'schema', 'schemaw', 'closed', 'auth', 'authw'
     },
-
     -- states wakeup _write_worker
     _rw_states = { 'activew', 'schemaw', 'closed', 'authw' },
+
+    _is_r_state = function(self)
+        for _, state in pairs(self._r_states) do
+            if state == self.state then
+                return true
+            end
+        end
+        return false
+    end,
+
+    _is_rw_state = function(self)
+        for _, state in pairs(self._rw_states) do
+            if state == self.state then
+                return true
+            end
+        end
+        return false
+    end,
+
 
     _load_schema = function(self)
         if self.state ~= 'authen' then
@@ -705,49 +757,56 @@ local remote_methods = {
 
     _read_worker = function(self)
         fiber.name('net.box.read')
-        while true do
+        while self.state ~= 'closed' do
             self:_wait_state(self._r_states)
             if self.state == 'closed' then
-                return
+                break
             end
 
-            if self.s:readable(.5) and self:_can_request() then
-                local data = self.s:sysread(4096)
+            if self.s:readable(.5) then
+                if self.state == 'closed' then
+                    break
+                end
 
-                if data ~= nil then
-                    self.rbuf = self.rbuf .. data
-                    self:_check_response()
-                else
-                    self:_fatal(errno.strerror(errno()))
+                if self:_is_r_state() then
+                    local data = self.s:sysread(4096)
+
+                    if data ~= nil then
+                        self.rbuf = self.rbuf .. data
+                        self:_check_response()
+                    else
+                        self:_fatal(errno.strerror(errno()))
+                    end
                 end
             end
         end
     end,
 
+    _to_wstate = { active = 'activew', schema = 'schemaw', auth = 'authw' },
+    _to_rstate = { activew = 'active', schemaw = 'schema', authw = 'auth' },
+
     _write_worker = function(self)
         fiber.name('net.box.write')
-        while true do
+        while self.state ~= 'closed' do
             self:_wait_state(self._rw_states)
-
+            
             if self.state == 'closed' then
-                return
+                break
             end
 
-            if #self.wbuf == 0 then
+            if string.len(self.wbuf) == 0 then
 
-                if self.state == 'activew' then
-                    self:_switch_state('active')
-                elseif self.state == 'schemaw' then
-                    self:_switch_state('schema')
-                elseif self.state == 'authw' then
-                    self:_switch_state('auth')
+                local wstate = self._to_rstate[self.state]
+                if wstate ~= nil then
+                    self:_switch_state(wstate)
                 end
 
-            end
+            elseif self.s:writable(.5) then
 
-            if self.s:writable(.5) then
-
-                if self.state == 'activew' or self.state == 'schemaw' or self.state == 'authw' then
+                if self.state == 'closed' then
+                    break
+                end
+                if self:_is_rw_state() then
                     if #self.wbuf > 0 then
                         local written = self.s:syswrite(self.wbuf)
                         if written ~= nil then
@@ -758,6 +817,7 @@ local remote_methods = {
                         end
                     end
                 end
+
             end
         end
     end,
@@ -765,37 +825,75 @@ local remote_methods = {
 
     _request = function(self, name, raise, ...)
 
-        self:_wait_state{ 'active', 'activew', 'closed' }
+        local fid = fiber.id()
+        if self.timeouts[fid] == nil then
+            self.timeouts[fid] = TIMEOUT_INFINITY
+        end
+
+        local started = fiber.time()
+
+        self:_wait_state({ 'active', 'activew', 'closed' }, self.timeouts[fid])
+
+        self.timeouts[fid] = self.timeouts[fid] - (fiber.time() - started)
 
         if self.state == 'closed' then
-            box.raise(box.error.NO_CONNECTION,
-                "Connection was closed")
+            if raise then
+                box.raise(box.error.NO_CONNECTION,
+                    "Connection was closed")
+            end
+        end
+
+        if self.timeouts[fid] <= 0 then
+            self.timeouts[fid] = nil
+            if raise then
+                box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+            else
+                return {
+                    hdr = { [CODE] = box.error.TIMEOUT },
+                    body = { [ERROR] = 'Timeout exceeded' }
+                }
+            end
         end
 
         return self:_request_internal(name, raise, ...)
     end,
 
     _request_internal = function(self, name, raise, ...)
+        
+        local fid = fiber.id()
+        if self.timeouts[fid] == nil then
+            self.timeouts[fid] = TIMEOUT_INFINITY
+        end
 
         local sync = self.proto:sync()
         local request = self.proto[name](sync, ...)
 
         self.wbuf = self.wbuf .. request
 
-        if self.state == 'active' then
-            self:_switch_state('activew')
-        elseif self.state == 'schema' then
-            self:_switch_state('schemaw')
-        elseif self.state == 'auth' then
-            self:_switch_state('authw')
+        local wstate = self._to_wstate[self.state]
+        if wstate ~= nil then
+            self:_switch_state(wstate)
         end
 
         local ch = fiber.channel()
 
         self.ch.sync[sync] = ch
 
-        local response = ch:get()
+        local response = ch:get(self.timeouts[fid])
         self.ch.sync[sync] = nil
+        self.timeouts[fid] = nil
+
+
+        if response == nil then
+            if raise then
+                box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+            else
+                return {
+                    hdr = { [CODE] = box.error.TIMEOUT },
+                    body = { [ERROR] = 'Timeout exceeded' }
+                }
+            end
+        end
 
         if raise and response.hdr[CODE] ~= 0 then
             box.raise(response.hdr[CODE], response.body[ERROR])
@@ -860,6 +958,8 @@ box.call = function(_box, proc_name, ...)
     end
     return result
 end
+
+box.timeout = function() return box end
 
 return remote
 
