@@ -1199,17 +1199,17 @@ tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space18')</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
 ---
 ...
 tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
 ---
 ...
-tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
 ---
 - 1
 ...
-tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
 ---
 - 2
 ...</programlisting>
@@ -2785,23 +2785,11 @@ Otherwise, use the box.net.box package to pass the function to the host and port
 </variablelist>
 </section>
 
-<section xml:id="administrative-console">
-  <title>Administrative console</title>
-  <para>
-    The administrative console is simply an outlet of the Tarantool
-    Lua interpreter.  You can connect to the administrative port
-    using any <command>telnet</command> client, or a tool like
-    <command>rlwrap</command>, if access to readline features is
-    desired. Additionally, <command>tarantool</command>, the
-    command line client, may distinguish between requests types
-    and direct them to the appropriate port.
-    The server response to an administrative command, even though
-    it is always in plain text, can be quite complex.
-    It is encoded using YAML markup to simplify automated parsing.
-  </para>
+<section xml:id="administrative-requests">
+  <title>Administrative requests</title>
   <para>To learn which functions are considered to be administrative,
-    type <emphasis role="lua">help()</emphasis> in the
-    administrative console. A reference description also follows
+    type <emphasis role="lua">help()</emphasis>.
+    A reference description also follows
     below:</para>
 
   <variablelist>

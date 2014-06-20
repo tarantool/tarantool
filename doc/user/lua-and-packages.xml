@@ -123,9 +123,9 @@ connection. Just as a sampling: ...
 <link xlink:href="https://rocks.moonscript.org/modules/kikito/i18n">i18n</link> an internationalization library,
 <link xlink:href="https://rocks.moonscript.org/modules/luarocks/lposix">lposix</link> a POSIX library,
 <link xlink:href="https://rocks.moonscript.org/modules/luarocks/lua-spore">lua-Spore</link> a generic ReST client,
-<link xlink:href="https://rocks.moonscript.org/modules/luarocks/tekui">TekUI</link> a GUI toolkit .
-Examples exist for how to bring in particular downloadable packages after
-starting Tarantool.
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/tekui">TekUI</link> a GUI toolkit.
+For example, to bring in the i18n package: install luarocks, say <code>luarocks install i18n</code>,
+start Tarantool, and say <code>require('i18n')</code>.
 </para>
 
 <para>

@@ -335,27 +335,34 @@ catch (Exception $e) {
   <section xml:id="connector-python">
     <title>Python</title>
     <para>
-    Here is a complete Python program that inserts [99999,'BB'] into space[0] via the high-level Python API.
+    Here is a complete Python program that inserts ['First Tuple','Value','Value'] into space99 via the high-level Python API.
     To prepare, paste the code into a file named example.py and install tarantool-python with either
     <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
     <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
-    Before trying to run, check that the server (tarantool) is running on localhost (127.0.0.1) and its primary port
-    is the default (3303) and space[0]'s primary key type is string (space[0].index[0].key_field[1].type = "STR" in configuration file).
-    To run, say <code>python example.py</code>.
+    The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its primary port is
+    the default (3303) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
+    and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
+    starting the tarantool server and executing these requests:<programlisting>
+box.cfg{primary_port = 3303}
+box.schema.create_space('space99') 
+box.space.space99:create_index('primary',{parts = {1,'STR'}})
+box.schema.user.grant('guest', 'read', 'space', '_space')
+box.schema.user.grant('guest', 'read,write', 'space', 'space99')</programlisting>
+    To run the program, say <code>python example.py</code>.
     The program will connect to the server, will send the request, and will not throw an exception if all went well.
-    If the row already exists, the program will throw DatabaseException(“Duplicate key exists in unique index 0”).
+    If the tuple already exists, the program will throw DatabaseException(“Duplicate key exists in unique index”).
     </para>
 <programlisting language="python">
 #!/usr/bin/python
 from tarantool import Connection
 
 c = Connection("127.0.0.1", 3303)
-result = c.insert(0,(99999,'BB'))
+result = c.insert("space99",('First Tuple','Value', 'Value'))
 print result
 </programlisting>
     <para>
-       The example program only shows one command and does not show all that's necessary for
+       The example program only shows one request and does not show all that's necessary for
        good practice. For that, please see
        <link xlink:href="http://tarantool-python.readthedocs.org/en/latest/"><filename>http://tarantool-python.readthedocs.org/en/latest/</filename></link>.
        For an example of a Python API for <link xlink:href="https://github.com/tarantool/queue">Queue managers on Tarantool</link>, see 

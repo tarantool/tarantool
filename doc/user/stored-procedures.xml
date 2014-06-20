@@ -1460,9 +1460,8 @@ for instructions about defining triggers for connect and disconnect events
       a long time.
     </para>
     <para>
-      As with all other <code>box</code> functions, the API can be used
-      in procedural style (e.g. <code>socket.close(socket)</code>) as well
-      as in object-oriented style (<code>socket:close()</code>).
+      Most of the functions in the API are usually used
+      in object-oriented style, for example <code>socket:close()</code>.
     </para>
     <para>
       A closed socket should not be used any more. Alternatively, the
@@ -1723,6 +1722,18 @@ for instructions about defining triggers for connect and disconnect events
             <para>
                 Returns:(type = number) <code>errno, errstr</code>. <code>0, "Success"</code>
                 if there is no error.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term><emphasis role="lua">socket:setsockopt()</emphasis> etc.</term>
+        <listitem>
+            <para>
+                For examples of functions not listed here -- including setsockopt,
+                getsockopt, accept, wait, writable, and all the less-used functions --
+                see the files bsdsocket.test.lua and socket.test.py which are supplied
+                as part of the Tarantool source.
             </para>
         </listitem>
     </varlistentry>
