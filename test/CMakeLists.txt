@@ -18,7 +18,7 @@ if (ENABLE_RPM)
     install (FILES ${CMAKE_SOURCE_DIR}/src/box/bootstrap.snap
              DESTINATION ${CMAKE_INSTALL_DATADIR}/tarantool
              RENAME 00000000000000000001.snap)
-else()
+elseif(NOT ENABLE_RPM_SCL)
     install (FILES ${CMAKE_SOURCE_DIR}/src/box/bootstrap.snap
              DESTINATION "${CMAKE_INSTALL_LOCALSTATEDIR}/lib/tarantool"
              RENAME 00000000000000000001.snap)
