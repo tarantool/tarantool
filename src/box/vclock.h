@@ -32,7 +32,11 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <assert.h>
+
+#define RB_COMPACT 1
+#include <third_party/rb.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -43,6 +47,7 @@ enum { VCLOCK_MAX = 16 };
 /** Cluster vector clock */
 struct vclock {
 	int64_t lsn[VCLOCK_MAX];
+	rb_node(struct vclock) link;
 };
 
 /* Server id, coordinate */
@@ -116,6 +121,60 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 
 void
 vclock_merge(struct vclock *to, const struct vclock *with);
+
+enum { VCLOCK_ORDER_UNDEFINED = INT_MAX };
+
+/**
+ * \brief Compare vclocks
+ * \param a vclock
+ * \param b vclock
+ * \retval 1 if \a vclock is ordered after \a other
+ * \retval -1 if \a vclock is ordered before than \a other
+ * \retval 0 if vclocks are equal
+ * \retval VCLOCK_ORDER_UNDEFINED if vclocks are concurrent
+ */
+static inline int
+vclock_compare(const struct vclock *a, const struct vclock *b)
+{
+	bool le = true, ge = true;
+	for (uint32_t node_id = 0; node_id < VCLOCK_MAX; node_id++) {
+		int64_t lsn_a = vclock_get(a, node_id);
+		int64_t lsn_b = vclock_get(b, node_id);
+		le = le && lsn_a <= lsn_b;
+		ge = ge && lsn_a >= lsn_b;
+		if (!ge && !le)
+			return VCLOCK_ORDER_UNDEFINED;
+	}
+	if (ge && !le)
+		return 1;
+	if (le && !ge)
+		return -1;
+	return 0;
+}
+
+/**
+ * @brief vclockset - a set of vclocks
+ */
+typedef rb_tree(struct vclock) vclockset_t;
+rb_proto(, vclockset_, vclockset_t, struct vclock);
+
+/**
+ * @brief Inclusive search
+ * @param set
+ * @param key
+ * @return a vclock that <= than \a key
+ */
+static inline struct vclock *
+vclockset_isearch(vclockset_t *set, struct vclock *key)
+{
+	struct vclock *res = vclockset_psearch(set, key);
+	while (res != NULL) {
+		if (vclock_compare(res, key) <= 0)
+			return res;
+		res = vclockset_prev(set, res);
+	}
+	return NULL;
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

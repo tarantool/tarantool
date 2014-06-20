@@ -55,58 +55,12 @@ const char v12[] = "0.12\n";
 
 /* {{{ struct log_dir */
 
-static inline int
-log_dir_map_cmp(const struct log_meta *a, const struct log_meta *b)
-{
-	if (a->lsnsum != b->lsnsum)
-		return a->lsnsum - b->lsnsum;
-	return 0;
-}
-
-rb_gen(, log_dir_map_, log_dir_map_t, struct log_meta, link, log_dir_map_cmp)
-
-static inline int
-log_dir_lsnmap_cmp(const struct log_meta_lsn *a, const struct log_meta_lsn *b)
-{
-	if (a->server_id != b->server_id)
-		return a->server_id - b->server_id;
-	if (a->lsn != b->lsn)
-		return a->lsn - b->lsn;
-
-	if (a->meta == NULL) /* a is a key */
-		return 0;
-
-	/* logs with smaller lsnsum are first */
-	if (a->meta->lsnsum != b->meta->lsnsum)
-		return a->meta->lsnsum - b->meta->lsnsum;
-
-	return 0;
-}
-
-rb_gen(, log_dir_lsnmap_, log_dir_lsnmap_t, struct log_meta_lsn, link,
-       log_dir_lsnmap_cmp)
-
-#define mh_name _nodeids
-#define mh_key_t uint32_t
-#define mh_node_t uint32_t
-#define mh_arg_t void *
-#define mh_hash(a, arg) ((*a))
-#define mh_hash_key(a, arg) (a)
-#define mh_eq(a, b, arg) ((*a) == (*b))
-#define mh_eq_key(key, node, arg) (key == (*node))
-#define MH_SOURCE 1
-#include "salad/mhash.h"
-
 int
 log_dir_create(struct log_dir *dir, const char *dirname,
 	       enum log_dir_type type)
 {
 	memset(dir, 0, sizeof(*dir));
-	dir->nodeids = mh_nodeids_new();
-	if (dir->nodeids == NULL)
-		return -1;
-	log_dir_map_new(&dir->map);
-	log_dir_lsnmap_new(&dir->lsnmap);
+	vclockset_new(&dir->index);
 	/* Default mode. */
 	dir->mode = 0660;
 	dir->dirname = strdup(dirname);
@@ -114,7 +68,6 @@ log_dir_create(struct log_dir *dir, const char *dirname,
 		strcpy(dir->open_wflags, "wxd");
 		dir->filetype = "SNAP\n";
 		dir->filename_ext = ".snap";
-		dir->ignore_initial_vclock = true;
 		dir->panic_if_error = true;
 	} else {
 		strcpy(dir->open_wflags, "wx");
@@ -125,46 +78,36 @@ log_dir_create(struct log_dir *dir, const char *dirname,
 	return 0;
 }
 
-static struct log_meta *
-log_meta_clean(log_dir_map_t *t, struct log_meta *meta, void *arg);
+static void
+vclockset_clean(vclockset_t *set) {
+	struct vclock *cur = vclockset_first(set);
+	while (cur != NULL) {
+		struct vclock *next = vclockset_next(set, cur);
+		vclockset_remove(set, cur);
+		vclock_destroy(cur);
+		free(cur);
+		cur = next;
+	}
+}
 
 void
 log_dir_destroy(struct log_dir *dir)
 {
-	mh_nodeids_delete(dir->nodeids);
 	free(dir->dirname);
-	log_dir_map_iter(&dir->map, NULL, log_meta_clean, dir);
+	vclockset_clean(&dir->index);
 }
 
-void
-log_dir_remove_from_index(struct log_dir *dir, struct log_meta *meta)
+static inline void
+log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 {
-	for (uint32_t i = 0; i < meta->lsn_count; i++) {
-		log_dir_lsnmap_remove(&dir->lsnmap, &meta->lsns[i]);
-	}
-	log_dir_map_remove(&dir->map, meta);
-	free(meta);
-}
-
-int
-log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
-{
-	struct log_meta key;
-	key.lsnsum = lsnsum;
-	struct log_meta *meta = log_dir_map_search(&dir->map, &key);
-	if (meta != NULL) {
-		meta->remove_flag = false;
-		return 0;
-	}
-
 	/*
 	 * Open xlog to find SETLSN
 	 */
 	tt_uuid uuid;
-	struct log_io *wal = log_io_open_for_read(dir, lsnsum, &uuid,
+	struct log_io *wal = log_io_open_for_read(dir, signature, &uuid,
 						  INPROGRESS);
 	if (wal == NULL)
-		return -1;
+		tnt_raise(ClientError, ER_INVALID_XLOG, (long long) signature);
 	auto log_guard = make_scoped_guard([&]{
 		log_io_close(&wal);
 	});
@@ -177,94 +120,55 @@ log_dir_add_to_index(struct log_dir *dir, int64_t lsnsum)
 	struct iproto_header row;
 	if (log_io_cursor_next(&cur, &row) != 0 ||
 	    row.type != IPROTO_SETLSN)
-		return -2;
+		tnt_raise(ClientError, ER_INVALID_XLOG, (long long) signature);
 
 	/*
 	 * Parse SETLSN
 	 */
-	struct vclock vclock;
-	log_decode_vclock(&row, &vclock);
-
-	/*
-	 * Update indexes
-	 */
-	meta = (struct log_meta *) calloc(1, sizeof(*meta) +
-		sizeof(*meta->lsns) * vclock_size(&vclock));
-	if (meta == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
-			"log_dir", "meta");
+	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  sizeof(*vclock), "log_dir", "vclockset");
 	}
-	auto meta_guard = make_scoped_guard([=]{
-		log_dir_remove_from_index(dir, meta);
+	auto vclock_guard = make_scoped_guard([&]{
+		vclock_destroy(vclock);
+		free(vclock);
 	});
+	log_decode_vclock(&row, vclock);
+	int64_t signature_check = vclock_signature(vclock);
 
-	meta->lsnsum = lsnsum;
-	log_dir_map_insert(&dir->map, meta);
-
-	meta->lsn_count = vclock_size(&vclock);
-	int64_t lsnsum_check = 0;
-	int i = 0;
-	vclock_foreach(&vclock, server) {
-		struct log_meta_lsn *meta_lsn = &meta->lsns[i++];
-		meta_lsn->meta = meta;
-		meta_lsn->server_id = server.id;
-		meta_lsn->lsn = server.lsn;
-		lsnsum_check += server.lsn;
-		log_dir_lsnmap_insert(&dir->lsnmap, meta_lsn);
-
-		uint32_t k;
-		k = mh_nodeids_find(dir->nodeids, server.id, NULL);
-		if (k != mh_end(dir->nodeids))
-			continue;
-
-		/* Update the set of server_ids */
-		k = mh_nodeids_put(dir->nodeids, &server.id, NULL, NULL);
-		if (k == mh_end(dir->nodeids)) {
-			tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*meta),
-				"log_dir", "meta->nodeids");
-		}
+	/*
+	 * Check filename
+	 */
+	if (signature_check != signature) {
+		tnt_raise(ClientError, ER_INVALID_XLOG_NAME,
+			  (long long) signature_check, (long long) signature);
 	}
 
 	/*
-	 * Snapshots have empty starting SETLSN table. Don't check lsnsum and
-	 * use the information derived from xlog name.
+	 * Check ordering
 	 */
-	if (lsnsum_check != lsnsum && !dir->ignore_initial_vclock)
-		tnt_raise(IllegalParams, "Invalid xlog name");
-
-	meta_guard.is_active = false;
-	return 0;
-}
-
-static struct log_meta *
-log_meta_mark(log_dir_map_t *t, struct log_meta *meta, void *arg)
-{
-	(void) t;
-	(void) arg;
-	meta->remove_flag = true;
-	return meta;
-}
-
-static struct log_meta *
-log_meta_delete(log_dir_map_t *t, struct log_meta *meta, void *arg)
-{
-	(void) t;
-	struct log_dir *dir = (struct log_dir *) arg;
-	if (meta->remove_flag) {
-		log_dir_remove_from_index(dir, meta);
-		return NULL;
+	struct vclock *dup = vclockset_search(&dir->index, vclock);
+	if (dup != NULL) {
+		tnt_raise(ClientError, ER_INVALID_XLOG_ORDER,
+			  (long long) signature,
+			  (long long) vclock_signature(dup));
 	}
 
-	return meta;
+	/*
+	 * Update vclockset
+	 */
+	vclockset_insert(&dir->index, vclock);
+	vclock_guard.is_active = false;
 }
 
-static struct log_meta *
-log_meta_clean(log_dir_map_t *t, struct log_meta *meta, void *arg)
+static int
+cmp_i64(const void *_a, const void *_b)
 {
-	(void) t;
-	struct log_dir *dir = (struct log_dir *) arg;
-	log_dir_remove_from_index(dir, meta);
-	return NULL;
+	const int64_t *a = (const int64_t *) _a, *b = (const int64_t *) _b;
+	if (*a == *b)
+		return 0;
+	return (*a > *b) ? 1 : -1;
 }
 
 int
@@ -281,13 +185,12 @@ log_dir_scan(struct log_dir *dir)
 		closedir(dh);
 	});
 
-	/* Mark all items to delete */
-	log_dir_map_iter(&dir->map, NULL, log_meta_mark, dir);
+	int64_t *signs = NULL;
+	size_t signs_capacity = 0, signs_size = 0;
 
 	errno = 0;
 	struct dirent *dent;
 	while ((dent = readdir(dh)) != NULL) {
-
 		char *ext = strchr(dent->d_name, '.');
 		if (ext == NULL)
 			continue;
@@ -308,125 +211,77 @@ log_dir_scan(struct log_dir *dir)
 		if (!ext_is_ok)
 			continue;
 
-		long long lsnsum = strtoll(dent->d_name, &ext, 10);
+		long long sign = strtoll(dent->d_name, &ext, 10);
 		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		if (lsnsum == LLONG_MAX || lsnsum == LLONG_MIN) {
+		if (sign == LLONG_MAX || sign == LLONG_MIN) {
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		int rc = log_dir_add_to_index(dir, lsnsum);
-		if (rc != 0)
-			return rc;
-	}
-
-	/* Delete marked items */
-	log_dir_map_iter(&dir->map, NULL, log_meta_delete, dir);
-
-	return 0;
-}
-
-int64_t
-log_dir_greatest(struct log_dir *dir)
-{
-	struct log_meta *meta = log_dir_map_last(&dir->map);
-	if (meta == NULL)
-		return -1;
-	return meta->lsnsum;
-}
-
-static inline struct log_meta_lsn *
-log_dir_lsnmap_lesearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
-{
-	struct log_meta_lsn *node = log_dir_lsnmap_psearch(tree, key);
-	if (node == NULL || node->server_id != key->server_id)
-		return NULL;
-
-	int64_t lsn = node->lsn;
-	while (1) {
-		struct log_meta_lsn *next = log_dir_lsnmap_next(tree, node);
-		if (next == NULL || next->server_id != key->server_id ||
-				next->lsn != lsn)
-			break;
-		node = next;
-	};
-	return node;
-}
-
-static inline struct log_meta_lsn *
-log_dir_lsnmap_gtsearch(log_dir_lsnmap_t *tree, struct log_meta_lsn *key)
-{
-	struct log_meta_lsn *node = log_dir_lsnmap_nsearch(tree, key);
-	if (node == NULL || node->server_id != key->server_id)
-		return NULL;
-
-	int64_t lsn = node->lsn;
-	while (1) {
-		struct log_meta_lsn *prev = log_dir_lsnmap_prev(tree, node);
-		if (prev == NULL || prev->server_id != key->server_id ||
-				prev->lsn != lsn)
-			break;
-		node = prev;
-	};
-	return node;
-}
-
-int64_t
-log_dir_next(struct log_dir *dir, struct vclock *vclock)
-{
-	int64_t result = INT64_MAX;
-	uint32_t k;
-	mh_foreach(dir->nodeids, k) {
-		/*
-		 * Find file where lsn <= key.lsn for given server_id
-		 */
-		struct log_meta_lsn key;
-		key.server_id = *mh_nodeids_node(dir->nodeids, k);
-		key.lsn = vclock_get(vclock, key.server_id);
-		key.meta = NULL; /* this node is a key */
-		if (key.lsn < 0)
-			key.lsn = 0;
-
-		struct log_meta *meta = NULL;
-
-		/*
-		 * Find tree node with greatest node.meta.lsnsum where
-		 * node.server_id == key.server_id, node.lsn <= key.lsn
-		 */
-		struct log_meta_lsn *meta_lsn =
-				log_dir_lsnmap_lesearch(&dir->lsnmap, &key);
-		if (meta_lsn == NULL) {
-			/*
-			 * Find tree node with smallest node.meta.lsnsum where
-			 * node.server_id == key.server_id, node.lsn > key.lsn
-			 */
-			meta_lsn = log_dir_lsnmap_gtsearch(&dir->lsnmap, &key);
-			if (meta_lsn == NULL)
-				return INT64_MAX; /* Not found */
-
-			/*
-			 * Take a previous file
-			 */
-			meta = log_dir_map_prev(&dir->map, meta_lsn->meta);
-			if (meta == NULL)
-				return INT64_MAX; /* Not found */
-		} else {
-			meta = meta_lsn->meta;
+		if (signs_size == signs_capacity) {
+			size_t capacity = signs_capacity > 0 ?
+					2 * signs_capacity : 16;
+			int64_t *new_signs = (int64_t *) region_alloc(
+				&fiber()->gc, sizeof(*signs) * capacity);
+			memcpy(new_signs, signs, sizeof(*signs) * signs_size);
+			signs = new_signs;
+			signs_capacity = capacity;
 		}
 
-		/*
-		 * Find min([file.lsnsum])
-		 */
-		if (meta->lsnsum < result)
-			result = meta->lsnsum;
+		signs[signs_size++] = sign;
 	}
 
-	return result;
+#if !defined(SNAPSHOT_SETLSN_META)
+	/* Snapshots don't have correct SETLSN command, ignore */
+	if (dir == &recovery_state->snap_dir) {
+		dir->greatest = signs_size > 0 ? signs[signs_size - 1] : INT64_MAX;
+		return 0;
+	}
+#endif
+	if (signs_size == 0) {
+		/* Empty directory */
+		vclockset_clean(&dir->index);
+		return 0;
+	}
+
+	qsort(signs, signs_size, sizeof(*signs), cmp_i64);
+
+	struct vclock *cur = vclockset_first(&dir->index);
+	for (size_t i = 0; i < signs_size; i++) {
+		while (cur != NULL) {
+			int64_t sign = vclock_signature(cur);
+			if (sign < signs[i]) {
+				struct vclock *next = vclockset_next(&dir->index, cur);
+				vclockset_remove(&dir->index, cur);
+				vclock_destroy(cur);
+				free(cur);
+				cur = next;
+				continue;
+			} else if (sign == signs[i]) {
+				cur = vclockset_next(&dir->index, cur);
+				goto skip; /* already exists */
+			} else /* sign > lsns[i] */ {
+				break;
+			}
+		}
+
+		try {
+			log_dir_add_to_index(dir, signs[i]);
+		} catch (ClientError *e) {
+			e->log();
+			say_warn("failed to scan xlog %lld", (long long) signs[i]);
+			if (dir->panic_if_error)
+				throw;
+		}
+		skip: ;
+	}
+
+	return 0;
 }
 
 char *
@@ -995,13 +850,13 @@ error:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t lsnsum,
-		     tt_uuid *node_uuid, enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
+		     enum log_suffix suffix)
 {
-	const char *filename = format_filename(dir, lsnsum, suffix);
+	const char *filename = format_filename(dir, sign, suffix);
 	FILE *f = fopen(filename, "r");
 	if (suffix == INPROGRESS && f == NULL) {
-		filename = format_filename(dir, lsnsum, NONE);
+		filename = format_filename(dir, sign, NONE);
 		f = fopen(filename, "r");
 	}
 	return log_io_open(dir, LOG_READ, filename, node_uuid, suffix, f);
@@ -1012,25 +867,25 @@ log_io_open_for_read(struct log_dir *dir, int64_t lsnsum,
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t lsn, tt_uuid *node_uuid,
+log_io_open_for_write(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
 		      enum log_suffix suffix)
 {
 	char *filename;
 	FILE *f;
-	assert(lsn >= 0);
+	assert(sign >= 0);
 
 	if (suffix == INPROGRESS) {
 		/*
 		 * Check whether a file with this name already exists.
 		 * We don't overwrite existing files.
 		 */
-		filename = format_filename(dir, lsn, NONE);
+		filename = format_filename(dir, sign, NONE);
 		if (access(filename, F_OK) == 0) {
 			errno = EEXIST;
 			goto error;
 		}
 	}
-	filename = format_filename(dir, lsn, suffix);
+	filename = format_filename(dir, sign, suffix);
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.

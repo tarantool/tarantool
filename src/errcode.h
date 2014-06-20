@@ -123,6 +123,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 71 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
 	/* 72 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
 	/* 73 */_(ER_REPLICA_MAX,		2, "Replica count limit reached: %u") \
+	/* 74 */_(ER_INVALID_XLOG,		2, "Failed to read xlog: %lld") \
+	/* 75 */_(ER_INVALID_XLOG_NAME,		2, "Invalid xlog name: expected %lld got %lld") \
+	/* 76 */_(ER_INVALID_XLOG_ORDER,	2, "Invalid xlog order: %lld and %lld") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

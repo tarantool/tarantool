@@ -108,8 +108,9 @@ void recovery_free();
 static inline bool
 recovery_has_data(struct recovery_state *r)
 {
-	return log_dir_greatest(&r->snap_dir) >= 0 ||
-	       log_dir_greatest(&r->wal_dir) >= 0;
+	return vclockset_first(&r->snap_dir.index) != NULL ||
+	       r->snap_dir.greatest != INT64_MAX ||
+	       vclockset_first(&r->wal_dir.index) != NULL;
 }
 void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);

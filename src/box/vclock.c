@@ -63,3 +63,14 @@ vclock_merge(struct vclock *to, const struct vclock *with)
 		if (with->lsn[i] > to->lsn[i])
 			to->lsn[i] = with->lsn[i];
 }
+
+static int
+vclockset_node_compare(const struct vclock *a, const struct vclock *b)
+{
+	int res = vclock_compare(a, b);
+	if (res == VCLOCK_ORDER_UNDEFINED)
+		return 0;
+	return res;
+}
+
+rb_gen(, vclockset_, vclockset_t, struct vclock, link, vclockset_node_compare);

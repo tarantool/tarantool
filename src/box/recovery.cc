@@ -311,14 +311,22 @@ recover_snap(struct recovery_state *r)
 	say_info("recovery start");
 
 	struct log_io *snap;
-	int64_t lsn;
+	int64_t sign;
 
 	if (log_dir_scan(&r->snap_dir) != 0)
 		panic("can't scan snapshot directory");
-	lsn = log_dir_greatest(&r->snap_dir);
-	if (lsn < 0)
+#if defined(SNAPSHOT_SETLSN_META)
+	struct vclock *res = vclockset_last(&r->snap_dir.index)
+	if (res == NULL)
 		panic("can't find snapshot");
-	snap = log_io_open_for_read(&r->snap_dir, lsn, &r->node_uuid, NONE);
+	sign = vclock_signature(res);
+#else
+	/* TODO: remove this code after moving SETLSN to meta */
+	sign = r->snap_dir.greatest;
+	if (sign < 0)
+		panic("can't find snapshot");
+#endif
+	snap = log_io_open_for_read(&r->snap_dir, sign, &r->node_uuid, NONE);
 	if (snap == NULL)
 		panic("can't open snapshot");
 
@@ -374,6 +382,7 @@ recover_remaining_wals(struct recovery_state *r)
 	int result = 0;
 	struct log_io *next_wal;
 	int64_t current_lsn, wal_greatest_lsn;
+	struct vclock *current_vclock;
 	size_t rows_before;
 	FILE *f;
 	char *filename;
@@ -382,17 +391,20 @@ recover_remaining_wals(struct recovery_state *r)
 	if (log_dir_scan(&r->wal_dir) != 0)
 		return -1;
 
-	wal_greatest_lsn = log_dir_greatest(&r->wal_dir);
+	current_vclock = vclockset_last(&r->wal_dir.index);
+	wal_greatest_lsn = current_vclock != NULL ?
+				vclock_signature(current_vclock) : -1;
 	/* if the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL)
 		goto recover_current_wal;
 
 	while (1) {
 find_next_wal:
-		current_lsn = log_dir_next(&r->wal_dir, &r->vclock);
-		if (current_lsn == INT64_MAX)
+		current_vclock = vclockset_isearch(&r->wal_dir.index, &r->vclock);
+		if (current_vclock == NULL)
 			break; /* No more WALs */
 
+		current_lsn = vclock_signature(current_vclock);
 		if (current_lsn == r->lsnsum) {
 			if (current_lsn != wal_greatest_lsn) {
 				say_error("missing xlog between %020lld and %020lld",
@@ -537,7 +549,7 @@ recovery_finalize(struct recovery_state *r)
 
 		if (!r->current_wal->is_inprogress) {
 			if (r->current_wal->rows == 0)
-			        /* Regular WAL (not inprogress) must contain at least one row */
+				/* Regular WAL (not inprogress) must contain at least one row */
 				panic("zero rows was successfully read from last WAL `%s'",
 				      r->current_wal->filename);
 		} else if (r->current_wal->rows == 0) {
