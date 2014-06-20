@@ -616,11 +616,17 @@ local remote_methods = {
 
                     local s, e = pcall(function()
                         self:_auth()
-                        self:_load_schema()
                     end)
                     if not s then
                         self:_fatal(e)
-                    else
+                    end
+                        
+                    xpcall(function() self:_load_schema() end,
+                        function(e)
+                            log.info("Can't load schema: %s", tostring(e))
+                        end)
+                   
+                    if self.state ~= 'error' and self.state ~= 'closed' then
                         self:_switch_state('active')
                     end
                 end
@@ -675,7 +681,7 @@ local remote_methods = {
 
     _load_schema = function(self)
         if self.state ~= 'authen' then
-            self:fatal 'Can not load schema from the state'
+            self:_fatal 'Can not load schema from the state'
             return
         end
         
@@ -683,7 +689,6 @@ local remote_methods = {
 
         local spaces = self:_request_internal('select',
             true, box.schema.SPACE_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
-
         local indexes = self:_request_internal('select',
             true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
