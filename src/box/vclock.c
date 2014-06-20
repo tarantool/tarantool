@@ -29,15 +29,8 @@
 #include "vclock.h"
 #include "say.h"
 
-void
-vclock_set(struct vclock *vclock, uint32_t server_id, int64_t lsn)
-{
-	assert(vclock_has(vclock, server_id));
-	vclock->lsn[server_id] = lsn;
-}
-
 int64_t
-vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn)
+vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 {
 	assert(lsn >= 0);
 	assert(server_id < VCLOCK_MAX);
@@ -53,3 +46,31 @@ vclock_cas(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 	return prev_lsn;
 }
 
+void
+vclock_merge(struct vclock *to, const struct vclock *with)
+{
+	/* Botched logic:
+	 * - imagine there is 5.snap and 1.xlog
+	 * - 5.snap has 1: 5 vclock
+	 * - 1.xlog has 1: 1 vclock
+	 * We begin reading the xlog after snap,
+	 * but we don't skip setlsn (we never skip setlsn).
+	 * So we must not update server id 1 with lsn 1,
+	 * hence the code below only updates target if it
+	 * is less than the source.
+	 */
+	for (int i = 0; i < VCLOCK_MAX; i++)
+		if (with->lsn[i] > to->lsn[i])
+			to->lsn[i] = with->lsn[i];
+}
+
+static int
+vclockset_node_compare(const struct vclock *a, const struct vclock *b)
+{
+	int res = vclock_compare(a, b);
+	if (res == VCLOCK_ORDER_UNDEFINED)
+		return 0;
+	return res;
+}
+
+rb_gen(, vclockset_, vclockset_t, struct vclock, link, vclockset_node_compare);

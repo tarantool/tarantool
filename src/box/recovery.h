@@ -89,7 +89,7 @@ struct recovery_state {
 	int rows_per_wal;
 	enum wal_mode wal_mode;
 	tt_uuid node_uuid;
-	uint32_t node_id;
+	uint32_t server_id;
 
 	bool finalize;
 };
@@ -108,8 +108,9 @@ void recovery_free();
 static inline bool
 recovery_has_data(struct recovery_state *r)
 {
-	return log_dir_greatest(&r->snap_dir) >= 0 ||
-	       log_dir_greatest(&r->wal_dir) >= 0;
+	return vclockset_first(&r->snap_dir.index) != NULL ||
+	       r->snap_dir.greatest != INT64_MAX ||
+	       vclockset_first(&r->wal_dir.index) != NULL;
 }
 void recovery_bootstrap(struct recovery_state *r);
 void recover_snap(struct recovery_state *r);
@@ -121,7 +122,6 @@ int wal_write(struct recovery_state *r, struct iproto_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_process(struct recovery_state *r, struct iproto_header *packet);
-void recovery_begin_recover_snapshot(struct recovery_state *r);
 void recovery_end_recover_snapshot(struct recovery_state *r);
 
 struct fio_batch;
@@ -132,7 +132,7 @@ void snapshot_save(struct recovery_state *r);
 
 /* Only for tests */
 int
-wal_write_setlsn(struct log_io *wal, struct fio_batch *batch,
+wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
 		 const struct vclock *vclock);
 
 #if defined(__cplusplus)

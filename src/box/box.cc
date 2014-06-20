@@ -330,12 +330,12 @@ box_on_cluster_join(const tt_uuid *node_uuid)
 	index->initIterator(it, ITER_LE, NULL, 0);
 	struct tuple *tuple = it->next(it);
 	/** Assign a new node id. */
-	uint32_t node_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
-	if (node_id >= VCLOCK_MAX)
-		tnt_raise(ClientError, ER_REPLICA_MAX, node_id);
+	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	if (server_id >= VCLOCK_MAX)
+		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
 
 	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
-	     (unsigned) node_id, tt_uuid_str(node_uuid));
+	     (unsigned) server_id, tt_uuid_str(node_uuid));
 }
 
 /** Replace the current node id in _cluster */
@@ -343,8 +343,8 @@ static void
 box_set_node_uuid()
 {
 	tt_uuid_create(&recovery_state->node_uuid);
-	vclock_del_server(&recovery_state->vclock, recovery_state->node_id);
-	recovery_state->node_id = 0;            /* please the assert */
+	vclock_del_server(&recovery_state->vclock, recovery_state->server_id);
+	recovery_state->server_id = 0;            /* please the assert */
 	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&recovery_state->node_uuid));
 }
@@ -417,7 +417,6 @@ box_init()
 
 	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
-		recovery_begin_recover_snapshot(recovery_state);
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
 		recovery_end_recover_snapshot(recovery_state);
@@ -426,7 +425,6 @@ box_init()
 		replica_bootstrap(recovery_state, replication_source);
 		snapshot_save(recovery_state);
 	} else {
-		recovery_begin_recover_snapshot(recovery_state);
 		/* Initialize a master node of a new cluster */
 		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();

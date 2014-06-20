@@ -50,7 +50,7 @@ enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
 	/* Replication keys (header) */
-	IPROTO_NODE_ID = 0x02,
+	IPROTO_SERVER_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	/* Leave a gap for other keys in the header. */
@@ -65,9 +65,9 @@ enum iproto_key {
 	IPROTO_FUNCTION_NAME = 0x22,
 	IPROTO_USER_NAME = 0x23,
 	/* Replication keys (body) */
-	IPROTO_NODE_UUID = 0x24,
+	IPROTO_SERVER_UUID = 0x24,
 	IPROTO_CLUSTER_UUID = 0x25,
-	IPROTO_LSNMAP = 0x26,
+	IPROTO_VCLOCK = 0x26,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -76,7 +76,7 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(NODE_ID) |\
+#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(SERVER_ID) |\
 			  bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
@@ -155,7 +155,7 @@ enum {
 
 struct iproto_header {
 	uint32_t type;
-	uint32_t node_id;
+	uint32_t server_id;
 	uint64_t sync;
 	uint64_t lsn;
 	double tm;

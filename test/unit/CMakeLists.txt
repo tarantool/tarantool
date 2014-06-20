@@ -48,11 +48,10 @@ add_executable(bps_tree_itr.test bps_tree_itr.cc ${CMAKE_SOURCE_DIR}/third_party
 target_link_libraries(bps_tree_itr.test small)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
-add_executable(log_dir.test log_dir.cc test.c)
-target_link_libraries(log_dir.test ${LIBUUID_LIBRARIES} box core small salad misc bitset msgpuck
-    ${LIBEV_LIBRARIES}
-    ${LIBEIO_LIBRARIES}
-    ${LIBCORO_LIBRARIES})
+add_executable(vclock.test vclock.cc test.c
+    ${CMAKE_SOURCE_DIR}/src/box/vclock.c)
+target_link_libraries(vclock.test core small
+    ${LIBEV_LIBRARIES} ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES})
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test
