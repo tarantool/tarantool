@@ -2,6 +2,10 @@
 
 local fiber = require('fiber')
 
+if box.net == nil then
+    box.net = {}
+end
+
 box.net.sql = {
     -- constructor 
     -- box.net.sql.connect(

@@ -16,18 +16,22 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - cfg
+- - call
+  - cfg
+  - close
   - error
   - index
   - info
-  - net
+  - ping
   - raise
   - schema
   - slab
   - snapshot
   - space
   - stat
+  - timeout
   - tuple
+  - wait_connected
 ...
 t = nil
 ---
@@ -203,8 +207,10 @@ t;
   - 'box.error.KEY_PART_COUNT : 31'
   - 'box.error.ALTER_SPACE : 12'
   - 'box.error.NODE_ID_IS_RO : 66'
+  - 'box.error.SPLICE : 25'
   - 'box.error.NONMASTER : 6'
   - 'box.error.SPACE_EXISTS : 10'
+  - 'box.error.NO_CONNECTION : 71'
   - 'box.error.IDENTIFIER : 70'
   - 'box.error.FIBER_STACK : 30'
   - 'box.error.MISSING_REQUEST_FIELD : 69'
@@ -223,7 +229,7 @@ t;
   - 'box.error.TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.INVALID_UUID : 64'
   - 'box.error.DROP_SPACE : 11'
-  - 'box.error.SPLICE : 25'
+  - 'box.error.TIMEOUT : 72'
   - 'box.error.MORE_THAN_ONE_TUPLE : 41'
   - 'box.error.MEMORY_ISSUE : 2'
   - 'box.error.NO_SUCH_TRIGGER : 34'

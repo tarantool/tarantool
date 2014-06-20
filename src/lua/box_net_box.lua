@@ -429,14 +429,13 @@ local remote_methods = {
     end,
 
     close = function(self)
-        if self.state == 'closed' then
-            return true
-        end
-        self:_switch_state('closed')
-        self:_error_waiters('Connection was closed')
-        if self.s ~= nil then
-            self.s:close()
-            self.s = nil
+        if self.state ~= 'closed' then
+            self:_switch_state('closed')
+            self:_error_waiters('Connection was closed')
+            if self.s ~= nil then
+                self.s:close()
+                self.s = nil
+            end
         end
     end,
 
