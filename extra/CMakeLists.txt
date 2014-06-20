@@ -22,7 +22,6 @@ if (ENABLE_RPM)
          WORLD_READ WORLD_EXECUTE)
 endif()
 
-configure_file(rpm.spec.in rpm.spec @ONLY)
 configure_file(rpm/tarantool.rpm.spec.in rpm/tarantool.rpm.spec @ONLY)
 
 if (TARGET_OS_DARWIN)

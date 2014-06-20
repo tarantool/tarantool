@@ -24,7 +24,7 @@ if (ENABLE_RPM)
     install_cfg(rpm ${CMAKE_INSTALL_SYSCONFDIR}/tarantool/)
     install (FILES ${CMAKE_SOURCE_DIR}/test/box/00000000000000000001.snap
              DESTINATION ${CMAKE_INSTALL_DATADIR}/tarantool/)
-else()
+elseif(NOT ENABLE_RPM_SCL)
     if (TARGET_OS_DARWIN)
         install_cfg(dmg ${CMAKE_INSTALL_SYSCONFDIR})
     else()

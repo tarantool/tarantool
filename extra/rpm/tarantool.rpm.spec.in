@@ -148,7 +148,7 @@ with history support.
         local version = tonumber(rpm.expand('0%{?rhel}'))
         return (version < 7 and version > 0)
     end
-    local function wrap_with_toolset(cmd)
+    function wrap_with_toolset(cmd)
         local cmd = rpm.expand(cmd)
         local devtoolset = 'scl enable devtoolset-2 %q\n'
         if is_rhel_old() then
@@ -185,16 +185,18 @@ with history support.
         .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
-        .. ' %{?scl:-DRPM_SCL_PREFIX=%scl}'
         .. ' %{!?scl:-DENABLE_RPM=ON}'
+        .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('client', 'ENABLE_CLIENT')
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
         .. dev_with('mysql', 'WITH_MYSQL')
 
     print(wrap_with_toolset(cmd))
-    print(wrap_with_toolset('make %{?_smp_mflags}\n'))
 }
 
+%{lua:
+    print(wrap_with_toolset('make %{?_smp_mflags}\n'))
+}
 %install
 make DESTDIR=%{buildroot} install
 
@@ -210,7 +212,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %defattr(-,root,root,-)
 
 %dir "%{_datadir}/tarantool"
-"%{_datadir}/tarantool/00000000000000000001.snap"
+%{!?scl:"%{_datadir}/tarantool/00000000000000000001.snap"}
 
 %dir "%{_datadir}/doc/tarantool"
 "%{_datadir}/doc/tarantool/README.md"
@@ -219,13 +221,13 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_mandir}/man1/tarantool_box.1.gz"
 
 "%{_bindir}/tarantool_box"
-"%{_bindir}/tarantool_multi.sh"
-"%{_bindir}/tarantool_deploy.sh"
-%{!?scl: "%{_sysconfdir}/init.d/tarantool_box"}
+%{!?scl:"%{_bindir}/tarantool_multi.sh"}
+%{!?scl:"%{_bindir}/tarantool_deploy.sh"}
+%{!?scl:"%{_sysconfdir}/init.d/tarantool_box"}
 
 
-%{!?scl: %dir "%{_sysconfdir}/tarantool"}
-%{!?scl: %config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"}
+%{!?scl:%dir "%{_sysconfdir}/tarantool"}
+%{!?scl:%config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"}
 
 %files sql-module
 %defattr(-,root,root,-)

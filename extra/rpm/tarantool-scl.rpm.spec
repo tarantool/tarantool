@@ -1,14 +1,20 @@
 %global scl 15
 
+%define _source_filedigest_algorithm 1
+%define _binary_filedigest_algorithm 1
+
 %{?scl:%global _scl_prefix /opt/tarantool}
 %{?scl:%scl_package}
 
 %{?scl:%global scl_name tarantool-%scl}
 
+# Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
 Summary: Package that installs %scl Software Collection.
 Name: %scl_name
 Version: 1.0
-Release: 1%{?dist}
+Release: 1
 Buildarch: noarch
 License: BSD
 Group: Applications/File
