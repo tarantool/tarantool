@@ -52,7 +52,7 @@ authenticate(const char *user_name, uint32_t len,
 	if (scramble_len != SCRAMBLE_SIZE) {
 		/* Authentication mechanism, data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "scramble is too short");
+			   "invalid scramble size");
 	}
 
 	if (scramble_check(scramble, session->salt, user->hash2))
