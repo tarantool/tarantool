@@ -35,7 +35,7 @@
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
-#include "port-uri.h"
+#include "port_uri.h"
 /**
  * Exception-aware way to add a listening socket to the event
  * loop. Callbacks are invoked on bind and accept events.

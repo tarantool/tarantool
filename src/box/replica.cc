@@ -124,8 +124,9 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	char greeting[IPROTO_GREETING_SIZE];
 
 	port_uri uri;
-	if (!port_uri_parse(&uri, replication_source)) {
-		panic("Broken replication_source url: %s", replication_source);
+	if (port_uri_parse(&uri, replication_source)) {
+		panic("Broken replication_source url: %s",
+		      replication_source);
 	}
 
 	int master = sio_socket(uri.addr.sa_family, SOCK_STREAM, IPPROTO_TCP);
@@ -316,7 +317,7 @@ recovery_follow_remote(struct recovery_state *r, const char *uri)
 	}
 
 	memset(&r->remote, 0, sizeof(r->remote));
-	if (!port_uri_parse(&r->remote.uri, uri)) {
+	if (port_uri_parse(&r->remote.uri, uri)) {
 		say_error("Can't parse uri: %s", uri);
 		return;
 	}

@@ -30,7 +30,7 @@
  */
 #include <netinet/in.h>
 #include "tarantool_ev.h"
-#include <port-uri.h>
+#include <port_uri.h>
 
 enum { REMOTE_SOURCE_MAXLEN = 32 };
 
