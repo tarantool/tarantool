@@ -1,7 +1,7 @@
 #! /bin/sh
-# /etc/init.d/tarantool
+# /etc/init.d/tarantool-lts
 ### BEGIN INIT INFO
-# Provides:          tarantool
+# Provides:          tarantool-lts
 # Required-Start:    $remote_fs
 # Required-Stop:     $remote_fs
 # Default-Start:     2 3 4 5

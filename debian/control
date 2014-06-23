@@ -1,4 +1,4 @@
-Source: tarantool
+Source: tarantool-lts
 Priority: optional
 Maintainer: Dmitry E. Oboukhov <unera@debian.org>
 Build-Depends: cdbs, debhelper (>= 8),
@@ -14,21 +14,25 @@ Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
-Package: tarantool-common
+Package: tarantool-lts-common
 Architecture: all
 Priority: optional
+Conflicts: tarantool-common (<< 1.6)
+Replaces: tarantool-common (<< 1.6)
 Depends: ${misc:Depends}, adduser
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
  This package provides scripts to work with tarantool configuration
  and log files.
 
-Package: tarantool
+Package: tarantool-lts
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-common
-Conflicts: tarantool-dbg (<< 1.5.2)
-Suggests: tarantool-dbg, tarantool-client, libdr-tarantool-perl
+Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-lts-common
+Conflicts: tarantool-dbg (<< 1.5.2),
+ tarantool (<< 1.6)
+Replaces: tarantool (<< 1.6)
+Suggests: tarantool-lts-client, libdr-tarantool-perl
 Description: In-memory database with Lua application server
  Tarantool is an in-memory database and Lua application server.
  Its key properties include:
@@ -43,111 +47,78 @@ Description: In-memory database with Lua application server
  .
  This package provides Tarantool server.
 
-Package: tarantool-dev
+Package: tarantool-lts-dev
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Section: libdevel
+Conflicts: libtarantool-dev (<< 1.6)
+Replaces: libtarantool-dev (<< 1.6)
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool (= ${binary:Version}),
+ tarantool-lts (= ${binary:Version}),
 Description: Tarantool in-memory database - development headers
  Tarantool is an in-memory database and Lua application server.
  This package provides server headers needed to build pluggable modules.
 
-Package: tarantool-modules
+Package: tarantool-lts-modules
 Conflicts: tarantool-plugins (<< 1.5.3)
 Replaces: tarantool-plugins (<< 1.5.3)
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool (= ${binary:Version}),
- tarantool-sql-module,
- tarantool-postgresql-module,
- tarantool-mysql-module,
- tarantool-sophia-module
+ tarantool-lts (= ${binary:Version})
+Recommends:
+ tarantool-postgresql-module (= ${binary:Version}),
+ tarantool-mysql-module (= ${binary:Version}),
+ tarantool-sophia-module (= ${binary:Version})
 Description: Tarantool in-memory database - all plug-ins bundle
  Tarantool is an in-memory database and Lua application server.
- This package provides (or depends on) all Tarantool additional
- modules.
+ This package provides some Tarantool additional modules.
 
-Package: tarantool-sql-module
-Conflicts:
- tarantool-postgresql-plugin (<< 1.5.3),
- tarantool-mysql-plugin (<< 1.5.3)
+Package: tarantool-lts-postgresql-module
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
-Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool (= ${binary:Version})
-Description: Tarantool in-memory database - PostgreSQL connector
- Tarantool is an in-memory database and Lua application server.
- This package contains a connector to PostgreSQL database for
- Tarantool Lua stored procedures.
-
-Package: tarantool-postgresql-module
 Conflicts: tarantool-postgresql-plugin (<< 1.5.3)
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
-Priority: optional
+Replaces: tarantool-postgresql-plugin (<< 1.6)
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
- tarantool (= ${binary:Version})
+ tarantool-lts-modules (= ${binary:Version})
 Description: Tarantool in-memory database - PostgreSQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to PostgreSQL database for
  Tarantool Lua stored procedures.
 
-Package: tarantool-mysql-module
-Conflicts: tarantool-mysql-plugin (<< 1.5.3)
+Package: tarantool-lts-mysql-module
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
+Conflicts: tarantool-mysql-plugin (<< 1.5.3)
+Replaces: tarantool-mysql-plugin (<< 1.6)
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool-sql-module (= ${binary:Version}),
- tarantool (= ${binary:Version})
+ tarantool-lts-modules (= ${binary:Version})
 Description: Tarantool in-memory database - MySQL connector
  Tarantool is an in-memory database and Lua application server.
  This package contains a connector to MySQL database for Tarantool
  Lua stored procedures.
 
-Package: tarantool-sophia-module
+Package: tarantool-lts-sophia-module
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
- tarantool (= ${binary:Version})
+ tarantool-lts (= ${binary:Version}),
+ tarantool-modules (= ${binary:Version})
 Description: Tarantool in-memory database - sophia bindings
  Tarantool is an in-memory database and Lua application server.
  This package contains a bindings to the Sophia database for
  Tarantool Lua stored procedures.
 
-Package: tarantool-client
+Package: tarantool-lts-client
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Suggests: tarantool-client-dbg
+Suggests: tarantool-lts, tarantool-tls-client-dbg
+Conflicts: tarantool-client (<< 1.6)
+Replaces: tarantool-client (<< 1.6)
 Description: Tarantool in-memory database - command line client
  Tarantool is an in-memory database and Lua application server.
  This package provides a command line client for Tarantool
  server with support of readline, command history, reader of 
  server binary logs and snapshot files.
 
-Package: tarantool-client-dbg
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
-Priority: extra
-Section: debug
-Depends: ${shlibs:Depends}, ${misc:Depends},
-     tarantool-client (= ${binary:Version})
-Description: Tarantool in-memory database - client debugging symbols
- Tarantool is an in-memory database and Lua application server.
- This package provides debugging symbols for the command line
- client.
-
-Package: libtarantool-dev
-Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
-Priority: optional
-Section: libdevel
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Conflicts:
- libtarantool1 (<< 1.5.2),
- libtarantoolnet1 (<< 1.5.2),
- libtarantoolsql1 (<< 1.5.2),
- libtarantoolrpl1 (<< 1.5.2)
-Description: Tarantool in-memory database - development headers
- Tarantool is an in-memory database and Lua application server.
- This package provides headers for tarantool client.

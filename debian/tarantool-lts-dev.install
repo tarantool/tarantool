@@ -1,3 +1,4 @@
+connector/c/include/tp.h	/usr/include/tarantool/
 usr/include/tarantool/config.h
 usr/include/tarantool/lauxlib.h
 usr/include/tarantool/luaconf.h
