@@ -32,7 +32,6 @@
 
 #include <errcode.h>
 #include "recovery.h"
-#include "replica.h"
 #include "log_io.h"
 #include <say.h>
 #include <admin.h>
@@ -185,15 +184,15 @@ extern "C" void
 box_set_replication_source(const char *source)
 {
 	box_check_replication_source(source);
-	bool old_is_replica = recovery_state->remote;
+	bool old_is_replica = recovery_state->remote.reader;
 	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(source, recovery_state->remote->source) != 0))) {
+	     (strcmp(source, recovery_state->remote.source) != 0))) {
 
 		if (recovery_state->finalize) {
-			if (recovery_state->remote)
+			if (old_is_replica)
 				recovery_stop_remote(recovery_state);
 			box_enter_master_or_replica_mode(source);
 		} else {

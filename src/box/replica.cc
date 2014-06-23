@@ -183,7 +183,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	*err = "can't connect to master";
-	coio_connect(coio, &r->remote->uri.addr, r->remote->uri.addr_len);
+	coio_connect(coio, &r->remote.uri.addr, r->remote.uri.addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
 
 	/* Send SUBSCRIBE request */
@@ -240,13 +240,13 @@ pull_from_remote(va_list ap)
 		try {
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
-				title("replica", "%s/%s", r->remote->source,
+				title("replica", "%s/%s", r->remote.source,
 				      "connecting");
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber()));
 				remote_connect(r, &coio, &err);
 				warning_said = false;
-				title("replica", "%s/%s", r->remote->source,
+				title("replica", "%s/%s", r->remote.source,
 				      "connected");
 			}
 			err = "can't read row";
@@ -255,8 +255,8 @@ pull_from_remote(va_list ap)
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now(loop) - row.tm;
-			r->remote->recovery_last_update_tstamp =
+			r->remote.recovery_lag = ev_now(loop) - row.tm;
+			r->remote.recovery_last_update_tstamp =
 				ev_now(loop);
 
 			recovery_process(r, &row);
@@ -264,12 +264,12 @@ pull_from_remote(va_list ap)
 			iobuf_reset(iobuf);
 			fiber_gc();
 		} catch (FiberCancelException *e) {
-			title("replica", "%s/%s", r->remote->source, "failed");
+			title("replica", "%s/%s", r->remote.source, "failed");
 			iobuf_delete(iobuf);
 			evio_close(loop, &coio);
 			throw;
 		} catch (Exception *e) {
-			title("replica", "%s/%s", r->remote->source, "failed");
+			title("replica", "%s/%s", r->remote.source, "failed");
 			e->log();
 			if (! warning_said) {
 				if (err != NULL)
@@ -304,7 +304,7 @@ recovery_follow_remote(struct recovery_state *r, const char *uri)
 	char name[FIBER_NAME_MAX];
 	struct fiber *f;
 
-	assert(r->remote == NULL);
+	assert(r->remote.reader == NULL);
 
 	say_crit("initializing the replica, WAL master %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
@@ -315,18 +315,14 @@ recovery_follow_remote(struct recovery_state *r, const char *uri)
 		return;
 	}
 
-
-
-	static struct remote remote;
-	memset(&remote, 0, sizeof(remote));
-	if (!port_uri_parse(&remote.uri, uri)) {
+	memset(&r->remote, 0, sizeof(r->remote));
+	if (!port_uri_parse(&r->remote.uri, uri)) {
 		say_error("Can't parse uri: %s", uri);
 		return;
 	}
 
-	remote.reader = f;
-	snprintf(remote.source, sizeof(remote.source), "%s", uri);
-	r->remote = &remote;
+	r->remote.reader = f;
+	snprintf(r->remote.source, sizeof(r->remote.source), "%s", uri);
 	fiber_call(f, r);
 }
 
@@ -334,6 +330,6 @@ void
 recovery_stop_remote(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
-	fiber_cancel(r->remote->reader);
-	r->remote = NULL;
+	fiber_cancel(r->remote.reader);
+	r->remote.reader = NULL;
 }

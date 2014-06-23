@@ -35,6 +35,7 @@
 #include "log_io.h"
 #include "vclock.h"
 #include "tt_uuid.h"
+#include "replica.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -53,7 +54,6 @@ typedef void (join_handler)(const tt_uuid *node_uuid);
 
 struct wal_writer;
 struct wal_watcher;
-struct remote;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
@@ -72,7 +72,7 @@ struct recovery_state {
 	int64_t lsnsum; /* used to find missing xlog files */
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
-	struct remote *remote;
+	struct remote remote;
 	bool relay; /* true if recovery initialized for JOIN/SUBSCRIBE */
 	/**
 	 * row_handler is a module callback invoked during initial
