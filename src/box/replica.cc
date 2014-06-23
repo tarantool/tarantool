@@ -114,22 +114,18 @@ error:
 }
 
 void
-replica_bootstrap(struct recovery_state *r, const char *replication_source)
+replica_bootstrap(struct recovery_state *r)
 {
 	say_info("bootstrapping a replica");
+	assert(recovery_has_remote(r));
 
 	/* Generate Node-UUID */
 	tt_uuid_create(&r->node_uuid);
 
 	char greeting[IPROTO_GREETING_SIZE];
 
-	port_uri uri;
-	if (port_uri_parse(&uri, replication_source)) {
-		panic("Broken replication_source url: %s",
-		      replication_source);
-	}
-
-	int master = sio_socket(uri.addr.sa_family, SOCK_STREAM, IPPROTO_TCP);
+	int master = sio_socket(r->remote.uri.addr.sa_family,
+				SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 
 	uint64_t sync = rand();
@@ -157,7 +153,8 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	struct iovec iov[IPROTO_ROW_IOVMAX];
 	int iovcnt = iproto_row_encode(&row, iov, fixheader);
 
-	sio_connect(master, &uri.addr, uri.addr_len);
+	sio_connect(master, &r->remote.uri.addr,
+		    r->remote.uri.addr_len);
 	sio_readn(master, greeting, sizeof(greeting));
 	sio_writev_all(master, iov, iovcnt);
 
@@ -300,15 +297,16 @@ pull_from_remote(va_list ap)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *uri)
+recovery_follow_remote(struct recovery_state *r)
 {
 	char name[FIBER_NAME_MAX];
 	struct fiber *f;
 
 	assert(r->remote.reader == NULL);
+	assert(recovery_has_remote(r));
 
-	say_crit("initializing the replica, WAL master %s", uri);
-	snprintf(name, sizeof(name), "replica/%s", uri);
+	say_crit("starting replication from %s", r->remote.source);
+	snprintf(name, sizeof(name), "replica/%s", r->remote.source);
 
 	try {
 		f = fiber_new(name, pull_from_remote);
@@ -316,14 +314,7 @@ recovery_follow_remote(struct recovery_state *r, const char *uri)
 		return;
 	}
 
-	memset(&r->remote, 0, sizeof(r->remote));
-	if (port_uri_parse(&r->remote.uri, uri)) {
-		say_error("Can't parse uri: %s", uri);
-		return;
-	}
-
 	r->remote.reader = f;
-	snprintf(r->remote.source, sizeof(r->remote.source), "%s", uri);
 	fiber_call(f, r);
 }
 
@@ -334,3 +325,29 @@ recovery_stop_remote(struct recovery_state *r)
 	fiber_cancel(r->remote.reader);
 	r->remote.reader = NULL;
 }
+
+void
+recovery_set_remote(struct recovery_state *r, const char *uri)
+{
+	/* First, stop the reader, then set the source */
+	assert(r->remote.reader == NULL);
+	if (uri == NULL) {
+		r->remote.source[0] = '\0';
+		return;
+	}
+	/*
+	 * @todo: as long as DNS is involved, this may fail even
+	 * on a valid uri. Don't panic in this case.
+	 */
+	if (port_uri_parse(&r->remote.uri, uri))
+		panic("Can't parse uri: %s", uri);
+	snprintf(r->remote.source,
+		 sizeof(r->remote.source), "%s", uri);
+}
+
+bool
+recovery_has_remote(struct recovery_state *r)
+{
+	return r->remote.source[0];
+}
+

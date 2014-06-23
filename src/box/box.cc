@@ -118,18 +118,6 @@ recover_row(void *param __attribute__((unused)), struct iproto_header *row)
 	process_rw(&null_port, &request);
 }
 
-static void
-box_enter_master_or_replica_mode(const char *replication_source)
-{
-	box_process = process_rw;
-	if (replication_source != NULL) {
-		recovery_follow_remote(recovery_state, replication_source);
-	} else {
-		title("primary", NULL);
-		say_info("I am primary");
-	}
-}
-
 /* {{{ configuration bindings */
 
 void
@@ -188,7 +176,9 @@ box_set_replication_source(const char *source)
 		if (recovery_state->finalize) {
 			if (old_is_replica)
 				recovery_stop_remote(recovery_state);
-			box_enter_master_or_replica_mode(source);
+			recovery_set_remote(recovery_state, source);
+			if (recovery_has_remote(recovery_state))
+				recovery_follow_remote(recovery_state);
 		} else {
 			/*
 			 * Do nothing, we're in local hot
@@ -259,7 +249,12 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
-	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
+	box_process = process_rw;
+	if (recovery_has_remote(recovery_state))
+		recovery_follow_remote(recovery_state);
+
+	title("primary", NULL);
+	say_info("I am primary");
 }
 
 /**
@@ -399,6 +394,7 @@ box_init()
 	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
 		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
 		      cfg_geti("rows_per_wal"));
+	recovery_set_remote(recovery_state, cfg_gets("replication_source"));
 	recovery_update_io_rate_limit(recovery_state,
 				      cfg_getd("snap_io_rate_limit"));
 	recovery_setup_panic(recovery_state,
@@ -408,14 +404,13 @@ box_init()
 	stat_base = stat_register(iproto_request_type_strs,
 				  IPROTO_DML_REQUEST_MAX);
 
-	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
 		recovery_end_recover_snapshot(recovery_state);
-	} else if (replication_source != NULL) {
+	} else if (recovery_has_remote(recovery_state)) {
 		/* Initialize a new replica */
-		replica_bootstrap(recovery_state, replication_source);
+		replica_bootstrap(recovery_state);
 		snapshot_save(recovery_state);
 	} else {
 		/* Initialize a master node of a new cluster */

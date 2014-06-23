@@ -32,7 +32,7 @@
 #include "tarantool_ev.h"
 #include <port_uri.h>
 
-enum { REMOTE_SOURCE_MAXLEN = 32 };
+enum { REMOTE_SOURCE_MAXLEN = 64 };
 
 /** Master connection */
 struct remote {
@@ -49,12 +49,18 @@ struct remote {
  * data.
  */
 void
-replica_bootstrap(struct recovery_state *r, const char *replication_source);
+replica_bootstrap(struct recovery_state *r);
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *addr);
+recovery_follow_remote(struct recovery_state *r);
 
 void
 recovery_stop_remote(struct recovery_state *r);
+
+void
+recovery_set_remote(struct recovery_state *r, const char *source);
+
+bool
+recovery_has_remote(struct recovery_state *r);
 
 #endif /* TARANTOOL_REPLICA_H_INCLUDED */
