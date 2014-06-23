@@ -1,7 +1,7 @@
 %global scl 16
 
-%define _source_filedigest_algorithm 1
-%define _binary_filedigest_algorithm 1
+%define _source_filedigest_algorithm 0
+%define _binary_filedigest_algorithm 0
 
 %{?scl:%global _scl_prefix /opt/tarantool}
 %{?scl:%scl_package}

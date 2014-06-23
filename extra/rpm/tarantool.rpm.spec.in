@@ -1,7 +1,7 @@
 ####################################################
 ################# MACROS AND DEFAULTS ##############
 ####################################################
-%{?scl:%{?scl_package:%scl_package tarantool}}
+%{?scl:%scl_package tarantool}
 
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
@@ -9,7 +9,6 @@
 %bcond_without postgresql
 %bcond_without mysql
 
-BuildRequires: scl-utils
 BuildRequires: scl-utils-build
 BuildRequires: readline-devel
 
@@ -154,7 +153,6 @@ tarantool-sql-module.
         .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebugInfo')
         .. cmake_key_value('ENABLE_BACKTRACE', 'ON')
         .. cmake_key_value('CMAKE_INSTALL_PREFIX', '%{_prefix}')
-        .. cmake_key_value('CMAKE_INSTALL_SYSCONFDIR', '%{?scl:%_root_sysconfdir}%{!?scl:%_sysconfdir}')
         .. cmake_key_value('CMAKE_INSTALL_BINDIR', '%{_bindir}')
         .. cmake_key_value('CMAKE_INSTALL_LIBDIR', '%{_libdir}')
         .. cmake_key_value('CMAKE_INSTALL_LIBEXECDIR', '%{_libexecdir}')
@@ -165,6 +163,7 @@ tarantool-sql-module.
         .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
+	.. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
         .. ' %{!?scl:-DENABLE_RPM=ON}'
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
@@ -202,7 +201,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_bindir}/tarantool"
 %{!?scl:"%{_bindir}/tarantool_multi.sh"}
 %{!?scl:"%{_bindir}/tarantool_deploy.sh"}
-%{!?scl:"%{_sysconfdir}/init.d/tarantool_box"}
+%{!?scl:"%{_sysconfdir}/init.d/tarantool"}
 
 %files sql-module
 %defattr(-,root,root,-)
