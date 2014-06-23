@@ -730,8 +730,7 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
 		packet->sync = relay.sync;
 		struct iovec iov[IPROTO_ROW_IOVMAX];
-		char fixheader[IPROTO_FIXHEADER_SIZE];
-		int iovcnt = iproto_row_encode(packet, iov, fixheader);
+		int iovcnt = iproto_row_encode(packet, iov);
 		sio_writev_all(relay.sock, iov, iovcnt);
 	}
 
@@ -759,9 +758,8 @@ replication_relay_join(struct recovery_state *r)
 	packet.type = IPROTO_JOIN;
 	packet.sync = relay.sync;
 
-	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&packet, iov, fixheader);
+	int iovcnt = iproto_row_encode(&packet, iov);
 	sio_writev_all(relay.sock, iov, iovcnt);
 
 	say_info("snapshot sent");

@@ -261,9 +261,11 @@ iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 
 int
 iproto_row_encode(const struct iproto_header *row,
-		  struct iovec *out, char fixheader[IPROTO_FIXHEADER_SIZE])
+		  struct iovec *out)
 {
 	int iovcnt = iproto_header_encode(row, out + 1) + 1;
+	char *fixheader = (char *)
+		region_alloc(&fiber()->gc, IPROTO_FIXHEADER_SIZE);
 	uint32_t len = 0;
 	for (int i = 1; i < iovcnt; i++)
 		len += out[i].iov_len;

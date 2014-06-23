@@ -149,9 +149,8 @@ replica_bootstrap(struct recovery_state *r)
 	row.body[0].iov_base = buf;
 	row.body[0].iov_len = (data - buf);
 	row.bodycnt = 1;
-	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&row, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov);
 
 	sio_connect(master, &r->remote.uri.addr,
 		    r->remote.uri.addr_len);
@@ -213,9 +212,8 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	row.body[0].iov_base = buf;
 	row.body[0].iov_len = (data - buf);
 	row.bodycnt = 1;
-	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&row, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov);
 	coio_writev(coio, iov, iovcnt, 0);
 
 	say_crit("connected to master");

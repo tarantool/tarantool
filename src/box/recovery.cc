@@ -696,7 +696,6 @@ struct wal_write_request {
 	int64_t res;
 	struct fiber *fiber;
 	struct iproto_header *row;
-	char wal_fixheader[XLOG_FIXHEADER_SIZE];
 };
 
 /* Context of the WAL writer thread. */
@@ -946,10 +945,9 @@ wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
 {
 	/* Write SETLSN command */
 	struct iproto_header row;
-	char fixheader[XLOG_FIXHEADER_SIZE];
 	struct iovec iov[XLOG_ROW_IOVMAX];
 	log_encode_vclock(&row, vclock);
-	int iovcnt = xlog_encode_row(&row, iov, fixheader);
+	int iovcnt = xlog_encode_row(&row, iov);
 	fio_batch_start(batch, 1);
 	fio_batch_add(batch, iov, iovcnt);
 	if (fio_batch_write(batch, fileno(wal->f)) != 1) {
@@ -1040,8 +1038,7 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 
 	struct iovec iov[XLOG_ROW_IOVMAX];
 	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
-		int iovcnt = xlog_encode_row(req->row, iov,
-					     req->wal_fixheader);
+		int iovcnt = xlog_encode_row(req->row, iov);
 		fio_batch_add(batch, iov, iovcnt);
 		req = STAILQ_NEXT(req, wal_fifo_entry);
 	}
@@ -1203,9 +1200,8 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 		row->lsn = ++rows;
 	row->sync = 0; /* don't write sync to wal */
 
-	char fixheader[XLOG_FIXHEADER_SIZE];
 	struct iovec iov[XLOG_ROW_IOVMAX];
-	int iovcnt = xlog_encode_row(row, iov, fixheader);
+	int iovcnt = xlog_encode_row(row, iov);
 
 	/* TODO: use writev here */
 	for (int i = 0; i < iovcnt; i++) {
