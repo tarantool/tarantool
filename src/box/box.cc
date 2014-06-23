@@ -137,16 +137,10 @@ box_check_replication_source(const char *source)
 {
 	if (source == NULL)
 		return;
-	/* check replication port */
-	char ip_addr[32];
-	int port;
-	if (sscanf(source, "%31[^:]:%i", ip_addr, &port) != 2) {
+	struct port_uri uri;
+	if (port_uri_parse(&uri, source)) {
 		tnt_raise(ClientError, ER_CFG,
-			  "replication source IP address is not recognized");
-	}
-	if (port <= 0 || port >= USHRT_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "invalid replication source port");
+			  "incorrect replication source");
 	}
 }
 
