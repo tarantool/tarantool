@@ -178,14 +178,14 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_newtable(L);
 
 		for (uint32_t j = 0; j < key_def->part_count; j++) {
-			lua_pushnumber(L, j);
+			lua_pushnumber(L, j + 1);
 			lua_newtable(L);
 
 			lua_pushstring(L,
 			       field_type_strs[key_def->parts[j].type]);
 			lua_setfield(L, -2, "type");
 
-			lua_pushnumber(L, key_def->parts[j].fieldno);
+			lua_pushnumber(L, key_def->parts[j].fieldno + 1);
 			lua_setfield(L, -2, "fieldno");
 
 			lua_settable(L, -3); /* index[k].parts[j] */

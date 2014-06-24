@@ -54,7 +54,7 @@ local function user_resolve(user)
     if tuple == nil then
         return nil
     end
-    return tuple[0]
+    return tuple[1]
 end
 
 box.schema.space = {}
@@ -81,7 +81,7 @@ box.schema.space.create = function(name, options)
     if options.id then
         id = options.id
     else
-        id = _space.index[0]:max()[0]
+        id = _space.index[0]:max()[1]
         if id < box.schema.SYSTEM_ID_MAX then
             id = box.schema.SYSTEM_ID_MAX + 1
         else
@@ -109,12 +109,12 @@ box.schema.space.drop = function(space_id)
     local keys = _index:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
-        _index:delete{v[0], v[1]}
+        _index:delete{v[1], v[2]}
     end
     local privs = _priv:select{}
     for k, tuple in pairs(privs) do
-        if tuple[2] == 'space' and tuple[3] == space_id then
-            box.schema.user.revoke(tuple[1], tuple[4], tuple[2], tuple[3])
+        if tuple[3] == 'space' and tuple[4] == space_id then
+            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
         end
     end
     if _space:delete{space_id} == nil then
@@ -139,6 +139,13 @@ box.schema.index.create = function(space_id, name, options)
     end
     if options.parts == nil then
         options.parts = { 0, "num" }
+    else
+        for i=1,#options.parts,2 do
+            -- Lua uses one-based field numbers but _space is zero-based
+            if type(options.parts[i]) == "number" then
+                options.parts[i] = options.parts[i] - 1
+            end
+        end
     end
     if options.unique == nil then
         options.unique = true
@@ -152,9 +159,9 @@ box.schema.index.create = function(space_id, name, options)
     local tuple = _index.index[0]
         :select(space_id, { limit = 1, iterator = 'LE' })[1]
     if tuple then
-        local id = tuple[0]
+        local id = tuple[1]
         if id == space_id then
-            iid = tuple[1] + 1
+            iid = tuple[2] + 1
         end
     end
     if options.id then
@@ -212,16 +219,23 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
     local tuple = _index:get{space_id, index_id}
     if options.name == nil then
-        options.name = tuple[2]
+        options.name = tuple[3]
     end
     if options.type == nil then
-        options.type = tuple[3]
+        options.type = tuple[4]
     end
     if options.unique == nil then
-        options.unique = tuple[4]
+        options.unique = tuple[5]
     end
     if options.parts == nil then
         options.parts = {tuple:slice(6)} -- not part count
+    else
+        for i=1,#options.parts,2 do
+            -- Lua uses one-based field numbers but _space is zero-based
+            if type(options.parts[i]) == "number" then
+                options.parts[i] = options.parts[i] - 1
+            end
+        end
     end
     _index:replace{space_id, index_id, options.name, options.type,
                    options.unique, #options.parts/2, unpack(options.parts)}
@@ -489,7 +503,7 @@ function box.schema.space.bless(space)
         local max_tuple = space.index[0]:max()
         local max = 0
         if max_tuple ~= nil then
-            max = max_tuple[0]
+            max = max_tuple[1]
         end
         table.insert(tuple, 1, max + 1)
         return space:insert(tuple)
@@ -512,7 +526,7 @@ function box.schema.space.bless(space)
             tuple = space:insert(data)
             if tuple ~= nil then break end
         end
-        return tuple[cnt_index]
+        return tuple[cnt_index + 1]
     end
 
     --
@@ -525,12 +539,12 @@ function box.schema.space.bless(space)
         local cnt_index = #key
         local tuple = space:get(key)
         if tuple == nil then return 0 end
-        if tuple[cnt_index] == 1 then
+        if tuple[cnt_index + 1] == 1 then
             space:delete(key)
             return 0
         else
             tuple = space:update(key, {{'-', cnt_index, 1}})
-            return tuple[cnt_index]
+            return tuple[cnt_index + 1]
         end
     end
 
@@ -554,8 +568,7 @@ function box.schema.space.bless(space)
             local state, t
             for state, t in pk:pairs() do
                 local key = {}
-                -- ipairs does not work because pk.parts is zero-indexed
-                for _k2, parts in pairs(pk.parts) do
+                for _k2, parts in ipairs(pk.parts) do
                     table.insert(key, t[parts.fieldno])
                 end
                 space:delete(key)
@@ -631,7 +644,7 @@ local function object_resolve(object_type, object_name)
             func = _func.index['primary']:get{object_name}
         end
         if func then
-            return func[0]
+            return func[1]
         else
             box.raise(box.error.NO_SUCH_FUNCTION,
                       "Function '"..object_name.."' does not exist")
@@ -709,15 +722,15 @@ box.schema.user.drop = function(name)
     local _priv = box.space[box.schema.PRIV_ID]
     local privs = _priv.index['owner']:select{uid}
     for k, tuple in pairs(privs) do
-        box.schema.user.revoke(uid, tuple[4], tuple[2], tuple[3])
+        box.schema.user.revoke(uid, tuple[5], tuple[3], tuple[4])
     end
     local spaces = box.space[box.schema.SPACE_ID].index['owner']:select{uid}
     for k, tuple in pairs(spaces) do
-        box.space[tuple[0]]:drop()
+        box.space[tuple[1]]:drop()
     end
     local funcs = box.space[box.schema.FUNC_ID].index['owner']:select{uid}
     for k, tuple in pairs(funcs) do
-        box.schema.func.drop(tuple[0])
+        box.schema.func.drop(tuple[1])
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
@@ -753,7 +766,7 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     if tuple == nil then
         return
     end
-    local old_privilege = tuple[4]
+    local old_privilege = tuple[5]
     if old_privilege ~= privilege then
         privilege = bit.band(old_privilege, bit.bnot(privilege))
         _priv:update({uid, object_type, oid}, { "=", 4, privilege})

@@ -175,7 +175,7 @@ s_withdata:insert{4, 5, 6, 7, 8}
 ---
 - [4, 5, 6, 7, 8]
 ...
-s_withdata:create_index('secondary', { type = 'hash', parts = {1, 'num', 2, 'num' }})
+s_withdata:create_index('secondary', { type = 'hash', parts = {2, 'num', 3, 'num' }})
 ---
 ...
 errinj.set("ERRINJ_WAL_IO", true)
@@ -198,7 +198,7 @@ s_disabled:insert{0}
 ---
 - error: 'No index #0 is defined in space 512'
 ...
-s_withindex:create_index('secondary', { type = 'tree', parts = { 1, 'num'} })
+s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'num'} })
 ---
 - error: Failed to write to disk
 ...
@@ -222,7 +222,7 @@ box.space['withdata'].enabled
 ---
 - true
 ...
-s_withdata:create_index('another', { type = 'tree', parts = { 4, 'num' }, unique = false})
+s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
 ---
 - error: Failed to write to disk
 ...
@@ -248,7 +248,7 @@ s_disabled:insert{0}
 ---
 - [0]
 ...
-s_withindex:create_index('secondary', { type = 'tree', parts = { 1, 'num'} })
+s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'num'} })
 ---
 ...
 s_withindex.index.secondary.unique
@@ -269,7 +269,7 @@ box.space['withdata']
 ---
 - null
 ...
-s_withdata:create_index('another', { type = 'tree', parts = { 4, 'num' }, unique = false})
+s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
 ---
 - error: Space 514 does not exist
 ...

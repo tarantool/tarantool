@@ -7,10 +7,10 @@ box.schema.user.grant('test', 'execute,read,write', 'universe')
 s = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
-s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })
+s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
 ---
 ...
-s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})
+s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
 ---
 ...
 #
@@ -113,7 +113,7 @@ s:truncate()
 #
 # Test composite keys with trees
 #
-s.index.secondary:alter{unique = true, parts = { 1, 'str', 2, 'str'}}
+s.index.secondary:alter{unique = true, parts = { 2, 'str', 3, 'str'}}
 ---
 ...
 insert into t0 values ('key1', 'part1', 'part2')
@@ -205,7 +205,7 @@ delete from t0 where k0='key3'
 s:truncate()
 ---
 ...
-s.index.primary:alter{type = 'tree', parts = { 0, 'num'}}
+s.index.primary:alter{type = 'tree', parts = { 1, 'num'}}
 ---
 ...
 s.index.secondary:alter{unique = false}
@@ -315,7 +315,7 @@ s:truncate()
 s.index.primary:alter{type = 'hash'}
 ---
 ...
-s.index.secondary:alter{type = 'hash', unique = true, parts = { 1, 'str' }}
+s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'str' }}
 ---
 ...
 insert into t0 values (1, 'hello')
@@ -365,7 +365,7 @@ s:truncate()
 # Partial REPLACE corrupts index.
 #
 
-s.index.primary:alter{parts = {0, 'str'}}
+s.index.primary:alter{parts = {1, 'str'}}
 ---
 ...
 s.index.secondary:alter{type = 'tree', unique = false}
@@ -397,7 +397,7 @@ delete from t0 where k0='Spears'
 ---
 - ['Spears', 'Britney']
 ...
-s.index.primary:alter{parts = { 0, 'num'}}
+s.index.primary:alter{parts = { 1, 'num'}}
 ---
 ...
 insert into t0 values (1, 'duplicate one')
