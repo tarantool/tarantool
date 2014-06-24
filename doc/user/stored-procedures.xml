@@ -709,7 +709,169 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
 </programlisting>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="json-null" xreflabel="json-null">json.NULL</emphasis></term>
+        <listitem>
+            <para>
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
+            </para>
+        </listitem>
+    </varlistentry>
 </variablelist>
+</section>
+
+<section xml:id="sp-yaml">
+    <title>Package <code>yaml</code></title>
+    <para>
+     The <code>yaml</code> package takes strings in YAML format and decodes them,
+     or takes a series of non-YAML values and encodes them.
+    </para>
+<variablelist xml:id="yaml">
+    <varlistentry>
+        <term><emphasis role="lua">yaml.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a Lua object to a YAML string.
+            </para>
+            <para>
+              Parameters: either a scalar value or a Lua table value.
+            </para>
+            <para>
+              Returns: (type = string) the original value reformatted as a YAML string.
+            </para>
+       </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">yaml.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a YAML string to a Lua object.
+            </para>
+            <para>
+              Parameters: <code>string-value</code> = a string formatted as YAML.
+            </para>
+            <para>
+              Returns: (type = Lua table) the original contents formatted as a Lua table.
+            </para>
+        </listitem>
+    </varlistentry>
+        <varlistentry>
+        <term><emphasis role="lua" xml:id="yaml-null" xreflabel="yaml-null">yaml.NULL</emphasis></term>
+        <listitem>
+            <para>
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+    <para>
+    <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> y =  yaml.encode({'a',1,'b',2})
+---
+...
+tarantool> z = yaml.decode(y)
+---
+...
+tarantool> z[1],z[2],z[3],z[4]
+---
+- a
+- 1
+- b
+- 2
+...
+tarantool> if yaml.NULL == nil then print('hi') end
+hi
+---
+...
+</programlisting>
+    </para>
+</section>
+
+<section xml:id="sp-msgpack">
+    <title>Package <code>msgpack</code></title>
+    <para>
+     The <code>yaml</code> package takes strings in MsgPack format and decodes them,
+     or takes a series of non-MsgPack values and encodes them.
+    </para>
+<variablelist xml:id="msgpack">
+    <varlistentry>
+        <term><emphasis role="lua">msgpack.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a Lua object to a MsgPack string.
+            </para>
+            <para>
+              Parameters: either a scalar value or a Lua table value.
+            </para>
+            <para>
+              Returns: (type = string) the original value reformatted as a MsgPack string.
+            </para>
+       </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">msgpack.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a MsgPack string to a Lua object.
+            </para>
+            <para>
+              Parameters: <code>string-value</code> = a string formatted as MsgPack.
+            </para>
+            <para>
+              Returns: (type = Lua table) the original contents formatted as a Lua table.
+            </para>
+        </listitem>
+    </varlistentry>
+        <varlistentry>
+        <term><emphasis role="lua" xml:id="msgpack-null" xreflabel="msgpack-null">msgpack.NULL</emphasis></term>
+        <listitem>
+            <para>
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+    <para>
+    <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> y =  msgpack.encode({'a',1,'b',2})
+---
+...
+tarantool> z = msgpack.decode(y)
+---
+...
+tarantool> z[1],z[2],z[3],z[4]
+---
+- a
+- 1
+- b
+- 2
+...
+tarantool> box.space.space0:insert{20,msgpack.NULL,20}
+---
+- [20, null, 20]
+...
+</programlisting>
+    </para>
 </section>
 
 <section xml:id="sp-box-fiber">

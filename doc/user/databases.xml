@@ -112,14 +112,24 @@
       </tbody>
       </tgroup>                                   
       </table>
-    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store as a float
-    if the value contains a decimal point. Although Tarantool can store signed
-    numbers, Lua cannot, and therefore an indexed field should not contain signed numbers.
-    </para>  
+    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store a number
+    as a float if the value contains a decimal point. Tarantool can store signed
+    numbers, but not in indexed fields.
+    </para>
+    <para>
+    A "nil" type has only one possible value, also called "nil", but often displayed
+    as "null". Nils may be compared to values of any types with == (is-equal) or ~=
+    (is-not-equal), but other operations will not work. Nils may not be used in tuples;
+    the workaround is to use
+    <link linkend="yaml-null"><code>yaml.NULL</code></link>
+    or <link linkend="json-null"><code>json.NULL</code></link>
+    or <link linkend="msgpack-null"><code>msgpack.NULL</code></link>.
+    </para>
     <para>
       A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
       A  few functions may return multiple tuples.
       A scalar may be converted to a tuple with only one field.
+      A tuple may not contain nil.
       A Lua table may contain all of a tuple's fields except the "key" (the primary-key fields).
       For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
     </para>
