@@ -3,20 +3,20 @@ box.cfg
 2	slab_alloc_factor:2
 3	rows_per_wal:50
 4	admin_port:3313
-5	primary_port:3314
-6	wal_dir:.
-7	logger_nonblock:true
-8	snap_dir:.
-9	coredump:false
-10	wal_mode:write
-11	background:false
+5	logger:tarantool.log
+6	slab_alloc_arena:0.1
+7	wal_dir:.
+8	logger_nonblock:true
+9	snap_dir:.
+10	coredump:false
+11	wal_mode:write
 12	panic_on_snap_error:true
 13	panic_on_wal_error:false
-14	readahead:16320
-15	too_long_threshold:0.01
-16	slab_alloc_arena:0.1
+14	log_level:5
+15	readahead:16320
+16	too_long_threshold:0.01
 17	slab_alloc_minimal:64
-18	log_level:5
+18	background:false
 19	wal_dir_rescan_delay:0.1
 ------------------------------------------------------
 Check that too_long_threshold = 0.01

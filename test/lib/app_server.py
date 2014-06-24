@@ -3,7 +3,7 @@ import re
 import sys
 import glob
 import traceback
-import subprocess
+import shutil
 from subprocess import Popen, PIPE
 
 from lib.server import Server
@@ -27,9 +27,11 @@ class AppServer(Server):
             'vardir': None
         }; ini.update(_ini)
         Server.__init__(self, ini)
+        self.testdir = os.path.abspath(os.curdir)
         self.vardir = ini['vardir']
         self.builddir = ini['builddir']
         self.debug = False
+        self.lua_libs = ini['lua_libs']
 
     def deploy(self, config=None, binary=None, vardir=None,
                mem=None, start_and_exit=None, gdb=None, valgrind=None,
@@ -37,6 +39,10 @@ class AppServer(Server):
         self.vardir = vardir
         if not os.access(self.vardir, os.F_OK):
             os.makedirs(self.vardir)
+        if self.lua_libs:
+            for i in self.lua_libs:
+                source = os.path.join(self.testdir, i)
+                shutil.copy(source, self.vardir)
 
     @classmethod
     def find_exe(cls, builddir):

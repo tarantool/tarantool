@@ -6,12 +6,17 @@ box.cfg{
     admin_port = 3313,
     primary_port = 3314,
     pid_file = "box.pid",
+    logger="tarantool.log"
 }
 
 yaml = require('yaml')
 fiber = require('fiber')
 
-space = box.schema.create_space('tweedledum', { id = 0 })
+if box.space.tweedledum ~= nil then
+    box.space.space1:drop()
+end
+
+space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
 print[[
@@ -66,7 +71,7 @@ print(floor(0.5))
 print(floor(0.9))
 print(floor(1.1))
 
-mod = dofile('../app/require_mod.lua')
+mod = require('require_mod')
 print(mod.test(10, 15))
 --
 -- A test case for https://github.com/tarantool/tarantool/issues/53
