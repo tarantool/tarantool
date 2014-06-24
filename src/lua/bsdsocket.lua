@@ -177,7 +177,7 @@ end
 
 local function wait_safely(self, what, timeout)
     local f = box.fiber.self()
-    local fid = f.id()
+    local fid = f:id()
 
     if self.waiters == nil then
         self.waiters = {}
