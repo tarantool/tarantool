@@ -530,8 +530,9 @@ coio_service_on_accept(struct evio_service *evio_service,
 	char fiber_name[SERVICE_NAME_MAXLEN];
 	char iobuf_name[SERVICE_NAME_MAXLEN];
 	snprintf(fiber_name, sizeof(fiber_name),
-		 "%s/%s", evio_service->name, sio_strfaddr(addr));
-	snprintf(iobuf_name, sizeof(iobuf_name), "%s/%s", "iobuf", sio_strfaddr(addr));
+		 "%s/%s", evio_service->name, sio_strfaddr(addr, addrlen));
+	snprintf(iobuf_name, sizeof(iobuf_name), "%s/%s", "iobuf",
+		sio_strfaddr(addr, addrlen));
 
 	/* Create the worker fiber. */
 	struct iobuf *iobuf = NULL;
@@ -557,7 +558,6 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * and will have to close it and free before termination.
 	 */
 	fiber_call(f, coio, addr, iobuf, service->handler_param);
-	(void)addrlen;
 }
 
 void

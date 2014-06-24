@@ -74,14 +74,16 @@ sio_socketname(int fd)
 		if (rc == 0) {
 			n += snprintf(name + n,
 				sizeof(name) - n, ", aka %s",
-				sio_strfaddr((struct sockaddr *)&addr));
+				sio_strfaddr((struct sockaddr *)&addr,
+								addrlen));
 		}
 		addrlen = sizeof(addr);
 		rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
 		if (rc == 0) {
 			n += snprintf(name + n, sizeof(name) - n,
 				      ", peer of %s",
-				      sio_strfaddr((struct sockaddr *)&addr));
+				      sio_strfaddr((struct sockaddr *)&addr,
+								addrlen));
 		}
 	}
 	return name;
@@ -421,9 +423,9 @@ sio_recvfrom(int fd, void *buf, size_t len, int flags,
 
 /** Get socket peer name. */
 int
-sio_getpeername(int fd, struct sockaddr *addr, socklen_t addrlen)
+sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
-	if (getpeername(fd, addr, &addrlen) < 0) {
+	if (getpeername(fd, addr, addrlen) < 0) {
 		say_syserror("getpeername");
 		return -1;
 	}
@@ -439,13 +441,18 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t addrlen)
 
 /** Pretty print a peer address. */
 const char *
-sio_strfaddr(struct sockaddr *addr)
+sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 {
 	static __thread char name[SERVICE_NAME_MAXLEN];
 	switch(addr->sa_family) {
 		case AF_UNIX:
-			snprintf(name, sizeof(name), "unix://%s",
-				((struct sockaddr_un *)addr)->sun_path);
+			if (addrlen >= sizeof(sockaddr_un)) {
+				snprintf(name, sizeof(name), "unix://%s",
+					((struct sockaddr_un *)addr)->sun_path);
+			} else {
+				snprintf(name, sizeof(name),
+					"unix://%s", "");
+			}
 			break;
 		case AF_INET: {
 			struct sockaddr_in *in = (struct sockaddr_in *)addr;

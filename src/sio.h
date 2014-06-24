@@ -158,8 +158,8 @@ ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 		     struct sockaddr *src_addr, socklen_t *addrlen);
 
-int sio_getpeername(int fd, struct sockaddr *addr, socklen_t addrlen);
-const char *sio_strfaddr(struct sockaddr *addr);
+int sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
+const char *sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
 
 /**
  * Advance write position in the iovec array

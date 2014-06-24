@@ -819,7 +819,8 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
 	char name[SERVICE_NAME_MAXLEN];
-	snprintf(name, sizeof(name), "%s/%s", "iobuf", sio_strfaddr(addr));
+	snprintf(name, sizeof(name), "%s/%s", "iobuf",
+		sio_strfaddr(addr, addrlen));
 
 	struct iproto_connection *con;
 
@@ -832,8 +833,6 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	struct iproto_request *ireq =
 		iproto_request_new(con, iproto_process_connect);
 	iproto_queue_push(&request_queue, ireq);
-
-	(void)addrlen;
 }
 
 /** Initialize a read-write port. */
