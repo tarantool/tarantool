@@ -72,7 +72,7 @@ session.on_disconnect(audit_disconnect)
 
 --# create connection con_three to default
 --# set connection con_three
-space:get{session.id()}[0] == session.id()
+space:get{session.id()}[1] == session.id()
 --# set connection default
 --# drop connection con_three
 

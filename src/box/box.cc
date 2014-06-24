@@ -32,7 +32,6 @@
 
 #include <errcode.h>
 #include "recovery.h"
-#include "replica.h"
 #include "log_io.h"
 #include <say.h>
 #include <admin.h>
@@ -119,18 +118,6 @@ recover_row(void *param __attribute__((unused)), struct iproto_header *row)
 	process_rw(&null_port, &request);
 }
 
-static void
-box_enter_master_or_replica_mode(const char *replication_source)
-{
-	box_process = process_rw;
-	if (replication_source != NULL) {
-		recovery_follow_remote(recovery_state, replication_source);
-	} else {
-		title("primary", NULL);
-		say_info("I am primary");
-	}
-}
-
 /* {{{ configuration bindings */
 
 void
@@ -138,16 +125,10 @@ box_check_replication_source(const char *source)
 {
 	if (source == NULL)
 		return;
-	/* check replication port */
-	char ip_addr[32];
-	int port;
-	if (sscanf(source, "%31[^:]:%i", ip_addr, &port) != 2) {
+	struct port_uri uri;
+	if (port_uri_parse(&uri, source)) {
 		tnt_raise(ClientError, ER_CFG,
-			  "replication source IP address is not recognized");
-	}
-	if (port <= 0 || port >= USHRT_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "invalid replication source port");
+			  "incorrect replication source");
 	}
 }
 
@@ -165,8 +146,6 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	/* check replication mode */
-	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check primary port */
 	int primary_port = cfg_geti("primary_port");
@@ -185,17 +164,19 @@ extern "C" void
 box_set_replication_source(const char *source)
 {
 	box_check_replication_source(source);
-	bool old_is_replica = recovery_state->remote;
+	bool old_is_replica = recovery_state->remote.reader;
 	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(source, recovery_state->remote->source) != 0))) {
+	     (strcmp(source, recovery_state->remote.source) != 0))) {
 
 		if (recovery_state->finalize) {
-			if (recovery_state->remote)
+			if (old_is_replica)
 				recovery_stop_remote(recovery_state);
-			box_enter_master_or_replica_mode(source);
+			recovery_set_remote(recovery_state, source);
+			if (recovery_has_remote(recovery_state))
+				recovery_follow_remote(recovery_state);
 		} else {
 			/*
 			 * Do nothing, we're in local hot
@@ -266,7 +247,12 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
-	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
+	box_process = process_rw;
+	if (recovery_has_remote(recovery_state))
+		recovery_follow_remote(recovery_state);
+
+	title("primary", NULL);
+	say_info("I am primary");
 }
 
 /**
@@ -356,7 +342,6 @@ box_set_cluster_uuid()
 	tt_uuid uu;
 	/* Generate a new cluster UUID */
 	tt_uuid_create(&uu);
-
 	/* Save cluster UUID in _schema */
 	boxk(IPROTO_REPLACE, SC_SCHEMA_ID, "%s%s", "cluster",
 	     tt_uuid_str(&uu));
@@ -406,6 +391,7 @@ box_init()
 	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
 		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
 		      cfg_geti("rows_per_wal"));
+	recovery_set_remote(recovery_state, cfg_gets("replication_source"));
 	recovery_update_io_rate_limit(recovery_state,
 				      cfg_getd("snap_io_rate_limit"));
 	recovery_setup_panic(recovery_state,
@@ -415,14 +401,13 @@ box_init()
 	stat_base = stat_register(iproto_request_type_strs,
 				  IPROTO_DML_REQUEST_MAX);
 
-	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
 		recovery_end_recover_snapshot(recovery_state);
-	} else if (replication_source != NULL) {
+	} else if (recovery_has_remote(recovery_state)) {
 		/* Initialize a new replica */
-		replica_bootstrap(recovery_state, replication_source);
+		replica_bootstrap(recovery_state);
 		snapshot_save(recovery_state);
 	} else {
 		/* Initialize a master node of a new cluster */

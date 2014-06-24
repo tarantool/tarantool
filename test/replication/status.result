@@ -1,2 +1,5 @@
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 True
 True

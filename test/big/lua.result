@@ -1,10 +1,10 @@
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
 ---
 ...
-space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
+space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
 ---
 ...
 space:insert{'brave', 'new', 'world'}
@@ -117,10 +117,10 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
 ---
 ...
-space:create_index('minmax', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = false })
+space:create_index('minmax', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = false })
 ---
 ...
 space:insert{1234567, 'new', 'world'}
@@ -168,7 +168,7 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type  = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type  = 'tree', parts = {1, 'num'}, unique = true })
 ---
 ...
 space:insert{tonumber64('18446744073709551615'), 'magic'}
@@ -178,7 +178,7 @@ space:insert{tonumber64('18446744073709551615'), 'magic'}
 tuple = space.index['primary']:get{tonumber64('18446744073709551615')}
 ---
 ...
-num = tuple[0]
+num = tuple[1]
 ---
 ...
 num
@@ -193,7 +193,7 @@ num == tonumber64('18446744073709551615')
 ---
 - true
 ...
-num = tuple[0]
+num = tuple[1]
 ---
 ...
 num == tonumber64('18446744073709551615')
@@ -214,10 +214,10 @@ tuple = space.index['primary']:get{125}
 tuple2 = space.index['primary']:get{125LL}
 ---
 ...
-num = tuple[0]
+num = tuple[1]
 ---
 ...
-num2 = tuple2[0]
+num2 = tuple2[1]
 ---
 ...
 num, num2
@@ -275,10 +275,10 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 ---
 ...
-space:create_index('range', { type = 'tree', parts = {1, 'num', 0, 'num'}, unique = true })
+space:create_index('range', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
 ---
 ...
 space:insert{0, 0}
@@ -363,10 +363,10 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {0, 'str'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
 ---
 ...
-space:create_index('i1', { type = 'tree', parts = {1, 'str', 2, 'str'}, unique = true })
+space:create_index('i1', { type = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
 ---
 ...
 pid = 1
@@ -487,10 +487,10 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
 ---
 ...
-space:create_index('i1', { type = 'tree', parts = {1, 'num', 2, 'num'}, unique = false })
+space:create_index('i1', { type = 'tree', parts = {2, 'num', 3, 'num'}, unique = false })
 ---
 ...
 space:insert{1, 1, 1}
@@ -585,7 +585,7 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
+space:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
 ---
 ...
 t = space:insert{'1', '2', '3', '4', '5', '6', '7'}
@@ -768,7 +768,7 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 ---
 ...
 dofile('push.lua')
@@ -852,18 +852,16 @@ space:drop()
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {2, 'num', 1, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {3, 'num', 2, 'num'}, unique = true })
 ---
 ...
 -- Print key fields in pk
 space.index['primary'].parts
 ---
-- 0:
-    type: NUM
+- - type: NUM
+    fieldno: 3
+  - type: NUM
     fieldno: 2
-  1:
-    type: NUM
-    fieldno: 1
 ...
 space:insert{1, 2, 3, 4}
 ---
@@ -904,10 +902,10 @@ dofile('index_random_test.lua')
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
 ---
 ...
-space:create_index('secondary', { type = 'hash', parts = {0, 'num'}, unique = true })
+space:create_index('secondary', { type = 'hash', parts = {1, 'num'}, unique = true })
 ---
 ...
 -------------------------------------------------------------------------------

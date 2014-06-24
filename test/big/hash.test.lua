@@ -7,7 +7,7 @@ dofile('utils.lua')
 -- 32-bit hash insert fields tests
 -------------------------------------------------------------------------------
 hash = box.schema.create_space('tweedledum')
-hash:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
+hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
 
 -- Insert valid fields
 hash:insert{0, 'value1 v1.0', 'value2 v1.0'}
@@ -160,7 +160,7 @@ hash:truncate()
 -- String hash inset fields tests
 -------------------------------------------------------------------------------
 hash.index['primary']:drop()
-hash:create_index('primary', { type = 'hash', parts = {0, 'str'}, unique = true })
+hash:create_index('primary', { type = 'hash', parts = {1, 'str'}, unique = true })
 
 -- Insert valid fields
 hash:insert{'key 0', 'value1 v1.0', 'value2 v1.0'}
@@ -212,10 +212,10 @@ hash:truncate()
 -- hash::replace tests
 ------------------------
 hash.index['primary']:drop()
-hash:create_index('primary', { type = 'hash', parts = {0, 'num'}, unique = true })
-hash:create_index('field1', { type = 'hash', parts = {1, 'num'}, unique = true })
-hash:create_index('field2', { type = 'hash', parts = {2, 'num'}, unique = true })
-hash:create_index('field3', { type = 'hash', parts = {3, 'num'}, unique = true })
+hash:create_index('primary', { type = 'hash', parts = {1, 'num'}, unique = true })
+hash:create_index('field1', { type = 'hash', parts = {2, 'num'}, unique = true })
+hash:create_index('field2', { type = 'hash', parts = {3, 'num'}, unique = true })
+hash:create_index('field3', { type = 'hash', parts = {4, 'num'}, unique = true })
 
 hash:insert{0, 0, 0, 0}
 hash:insert{1, 1, 1, 1}

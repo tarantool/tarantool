@@ -8,11 +8,11 @@ include_directories(${PROJECT_SOURCE_DIR}/src/lib)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 add_executable(rlist.test rlist.c test.c ${CMAKE_SOURCE_DIR}/src/lib/salad/rlist.c)
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port-uri.cc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port_uri.cc
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	COMMAND ragel -G2 src/port-uri.rl -o src/port-uri.cc
-	DEPENDS ${CMAKE_SOURCE_DIR}/src/port-uri.rl)
-add_executable(port-uri.test port-uri.cc test.c ${CMAKE_SOURCE_DIR}/src/port-uri.cc)
+	COMMAND ragel -G2 src/port_uri.rl -o src/port_uri.cc
+	DEPENDS ${CMAKE_SOURCE_DIR}/src/port_uri.rl)
+add_executable(port_uri.test port_uri.cc test.c ${CMAKE_SOURCE_DIR}/src/port_uri.cc)
 add_executable(fiob.test test.c fiob.c ${CMAKE_SOURCE_DIR}/src/fiob.c)
 add_executable(queue.test queue.c)
 add_executable(mhash.test mhash.c)

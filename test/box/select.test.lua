@@ -1,6 +1,6 @@
 s = box.schema.create_space('select', { temporary = true })
 index = s:create_index('primary', { type = 'tree' })
-s:create_index('second', { type = 'tree', unique = true,  parts = {1, 'num', 0, 'num'}})
+s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 
 --------------------------------------------------------------------------------

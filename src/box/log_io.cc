@@ -437,10 +437,11 @@ error:
 }
 
 int
-xlog_encode_row(const struct iproto_header *row, struct iovec *iov,
-		char fixheader[XLOG_FIXHEADER_SIZE])
+xlog_encode_row(const struct iproto_header *row, struct iovec *iov)
 {
 	int iovcnt = iproto_header_encode(row, iov + 1) + 1;
+	char *fixheader = (char *) region_alloc(&fiber()->gc,
+						XLOG_FIXHEADER_SIZE);
 	uint32_t len = 0;
 	uint32_t crc32p = 0;
 	uint32_t crc32c = 0;

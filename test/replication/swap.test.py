@@ -5,6 +5,8 @@ from lib.tarantool_server import TarantoolServer
 REPEAT = 20
 ID_BEGIN = 0
 ID_STEP = 5
+LOGIN = 'test'
+PASSWORD = 'pass123456'
 
 def insert_tuples(_server, begin, end, msg = "tuple"):
     for i in range(begin, end):
@@ -16,15 +18,21 @@ def select_tuples(_server, begin, end):
 
 # master server
 master = server
+master.admin("box.schema.user.create('%s', { password = '%s'})" % (LOGIN, PASSWORD))
+master.admin("box.schema.user.grant('%s', 'read,write,execute', 'universe')" % LOGIN)
+master.sql.py_con.authenticate(LOGIN, PASSWORD)
+master.uri = '%s:%s@127.0.0.1:%s' % (LOGIN, PASSWORD, master.sql.port)
+os.putenv('MASTER_PORT', master.uri)
+
 # replica server
 replica = TarantoolServer()
 replica.script = "replication/replica.lua"
-replica.rpl_master = master
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.deploy()
-
-master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+replica.uri = '%s:%s@127.0.0.1:%s' % (LOGIN, PASSWORD, replica.sql.port)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
+replica.sql.py_con.authenticate(LOGIN, PASSWORD)
+
 master.admin("s = box.schema.create_space('tweedledum', {id = 0})")
 master.admin("s:create_index('primary', {type = 'hash'})")
 
@@ -57,7 +65,7 @@ for i in range(REPEAT):
     # reconfigure master to replica
     master.rpl_master = replica
     print("switch master to replica")
-    master.admin("box.cfg{replication_source='127.0.0.1:%s'}" % replica.sql.port, silent=True)
+    master.admin("box.cfg{replication_source='%s'}" % replica.uri, silent=True)
 
     # insert to replica
     insert_tuples(replica, id, id + ID_STEP)
@@ -81,7 +89,7 @@ for i in range(REPEAT):
     # reconfigure master to replica
     replica.rpl_master = master
     print("switch replica to replica")
-    replica.admin("box.cfg{replication_source='127.0.0.1:%s'}" % master.sql.port, silent=True)
+    replica.admin("box.cfg{replication_source='%s'}" % master.uri, silent=True)
 
 
 # Cleanup.

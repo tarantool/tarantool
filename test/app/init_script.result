@@ -1,0 +1,48 @@
+--
+-- Access to box.cfg from init script
+--
+
+box.cfg
+1	too_long_threshold:0.5
+2	slab_alloc_factor:2
+3	slab_alloc_minimal:64
+4	admin_port:3313
+5	logger:tarantool.log
+6	primary_port:3314
+7	wal_dir:.
+8	logger_nonblock:true
+9	snap_dir:.
+10	coredump:false
+11	wal_mode:write
+12	log_level:5
+13	panic_on_snap_error:true
+14	panic_on_wal_error:false
+15	rows_per_wal:500000
+16	readahead:16320
+17	pid_file:box.pid
+18	background:false
+19	slab_alloc_arena:1
+20	wal_dir_rescan_delay:0.1
+--
+-- Test insert from detached fiber
+--
+
+---
+[]
+...
+
+--
+-- Test insert from init script
+--
+
+[1, 2, 4, 8]
+[2, 4, 8, 16]
+[4, 8, 16]
+--
+-- Check that require function(math.floor) reachable in the init script
+--
+
+0
+0
+1
+25

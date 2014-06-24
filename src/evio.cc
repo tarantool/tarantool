@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "evio.h"
-#include "port-uri.h"
+#include "port_uri.h"
 #include "scoped_guard.h"
 #include <stdio.h>
 #include <netinet/in.h>
@@ -273,8 +273,9 @@ evio_service_init(ev_loop *loop,
 	service->loop = loop;
 
 
-	if (!port_uri_parse(&service->port, uri))
-		tnt_raise(SocketError, -1, "invalid address for bind: %s", uri);
+	if (port_uri_parse(&service->port, uri))
+		tnt_raise(SocketError, -1,
+			  "invalid address for bind: %s", uri);
 
 	service->on_accept = on_accept;
 	service->on_accept_param = on_accept_param;

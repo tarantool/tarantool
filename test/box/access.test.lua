@@ -85,7 +85,7 @@ c:close()
 -- restore from a snapshot
 box.schema.user.create('testus')
 s = box.schema.create_space('admin_space')
-s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 s:drop()
 box.snapshot()

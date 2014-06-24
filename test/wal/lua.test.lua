@@ -1,6 +1,6 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type ='hash', parts = {0, 'str'}, unique = true })
-space:create_index('secondary', { type = 'tree', parts = {1, 'num'}, unique = false })
+space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
+space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
 -- A test case for Bug#1042738
 -- https://bugs.launchpad.net/tarantool/+bug/1042738
 -- Iteration over a non-unique TREE index
@@ -44,8 +44,8 @@ function mktuple(n)
         fields[i] = i
     end
     local t = space:replace(fields)
-    assert(t[0] == 1, "tuple check")
-    assert(t[n-1] == n, "tuple check")
+    assert(t[1] == 1, "tuple check")
+    assert(t[n] == n, "tuple check")
     return string.format("count %u len %u", #t, t:bsize())
 end;
 --# setopt delimiter ''

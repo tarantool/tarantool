@@ -45,21 +45,14 @@ extern "C" {
 static int
 lbox_info_recovery_lag(struct lua_State *L)
 {
-	if (recovery_state->remote)
-		lua_pushnumber(L, recovery_state->remote->recovery_lag);
-	else
-		lua_pushnumber(L, 0);
+	lua_pushnumber(L, recovery_state->remote.recovery_lag);
 	return 1;
 }
 
 static int
 lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 {
-	if (recovery_state->remote)
-		lua_pushnumber(L,
-			recovery_state->remote->recovery_last_update_tstamp);
-	else
-		lua_pushnumber(L, 0);
+	lua_pushnumber(L, recovery_state->remote.recovery_last_update_tstamp);
 	return 1;
 }
 

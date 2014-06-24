@@ -153,6 +153,9 @@ enum {
 		IPROTO_PACKET_BODY_IOVMAX
 };
 
+enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
+
+
 struct iproto_header {
 	uint32_t type;
 	uint32_t server_id;
@@ -167,15 +170,23 @@ struct iproto_header {
 void
 iproto_header_decode(struct iproto_header *header,
 		     const char **pos, const char *end);
+struct tt_uuid;
+
+void
+iproto_decode_uuid(const char **pos, struct tt_uuid *out);
+
+char *
+iproto_encode_uuid(char *pos, const struct tt_uuid *in);
+
 int
 iproto_header_encode(const struct iproto_header *header,
 		     struct iovec *out);
 
-enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
-
 int
-iproto_row_encode(const struct iproto_header *row, struct iovec *out,
-		  char fixheader[IPROTO_FIXHEADER_SIZE]);
+iproto_row_encode(const struct iproto_header *row, struct iovec *out);
+
+void
+iproto_decode_error(struct iproto_header *row);
 
 #if defined(__cplusplus)
 } /* extern "C" */
