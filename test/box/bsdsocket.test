@@ -227,3 +227,17 @@ exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
 exec admin "lua s:close()"
 
 exec admin "lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)"
+
+
+exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
+exec admin "lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))"
+exec admin "lua tostring(sa)"
+exec admin "lua sa:readable(0)"
+exec admin "lua sa:writable(0)"
+
+exec admin "lua ch = box.ipc.channel()"
+exec admin "lua f = box.fiber.wrap(function() s:read(12) ch:put(true) end)"
+exec admin "lua box.fiber.sleep(.1)"
+exec admin "lua s:close()"
+exec admin "lua ch:get(1)"
+exec admin "lua s:error()"

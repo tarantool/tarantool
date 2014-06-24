@@ -219,7 +219,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:307: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:327: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -727,4 +727,43 @@ lua s:close()
 lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)
 ---
  - nil
+...
+lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+---
+...
+lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+---
+...
+lua tostring(sa)
+---
+ - fd 512
+...
+lua sa:readable(0)
+---
+ - true
+...
+lua sa:writable(0)
+---
+ - true
+...
+lua ch = box.ipc.channel()
+---
+...
+lua f = box.fiber.wrap(function() s:read(12) ch:put(true) end)
+---
+...
+lua box.fiber.sleep(.1)
+---
+...
+lua s:close()
+---
+ - true
+...
+lua ch:get(1)
+---
+ - true
+...
+lua s:error()
+---
+ - Connection timed out
 ...
