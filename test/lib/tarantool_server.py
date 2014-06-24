@@ -464,7 +464,7 @@ class TarantoolServer(Server):
         os.putenv("PRIMARY_PORT", str(self.sql.port))
         os.putenv("ADMIN_PORT", str(self.admin.port))
         if self.rpl_master:
-            os.putenv("MASTER_PORT", str(self.rpl_master.sql.port))
+            os.putenv("MASTER_PORT", "127.0.0.1:"+str(self.rpl_master.sql.port))
         args = self.prepare_args()
         self.logfile_pos = self.logfile
         self.process = subprocess.Popen(args,

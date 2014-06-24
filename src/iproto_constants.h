@@ -185,6 +185,9 @@ iproto_header_encode(const struct iproto_header *header,
 int
 iproto_row_encode(const struct iproto_header *row, struct iovec *out);
 
+void
+iproto_decode_error(struct iproto_header *row);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif

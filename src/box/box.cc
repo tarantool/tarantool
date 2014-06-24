@@ -146,8 +146,6 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	/* check replication mode */
-	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check primary port */
 	int primary_port = cfg_geti("primary_port");

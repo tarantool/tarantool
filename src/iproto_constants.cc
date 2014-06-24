@@ -315,3 +315,43 @@ iproto_row_encode(const struct iproto_header *row,
 	return iovcnt;
 }
 
+void
+iproto_decode_error(struct iproto_header *row)
+{
+	uint32_t code = row->type >> 8;
+	if (likely(code == 0))
+		return;
+	char error[TNT_ERRMSG_MAX] = { 0 };
+	const char *pos;
+	uint32_t map_size;
+
+	if (row->bodycnt == 0)
+		goto raise;
+	pos = (char *) row->body[0].iov_base;
+	if (mp_check(&pos, pos + row->body[0].iov_len))
+		goto raise;
+
+	pos = (char *) row->body[0].iov_base;
+	if (mp_typeof(*pos) != MP_MAP)
+		goto raise;
+	map_size = mp_decode_map(&pos);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*pos) != MP_UINT) {
+			mp_next(&pos); /* key */
+			mp_next(&pos); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&pos);
+		if (key != IPROTO_ERROR || mp_typeof(*pos) != MP_STR) {
+			mp_next(&pos); /* value */
+			continue;
+		}
+
+		uint32_t len;
+		const char *str = mp_decode_str(&pos, &len);
+		snprintf(error, sizeof(error), "%.*s", len, str);
+	}
+
+raise:
+	tnt_raise(ClientError, error, code);
+}
