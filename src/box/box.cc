@@ -344,7 +344,6 @@ box_set_cluster_uuid()
 	tt_uuid uu;
 	/* Generate a new cluster UUID */
 	tt_uuid_create(&uu);
-
 	/* Save cluster UUID in _schema */
 	boxk(IPROTO_REPLACE, SC_SCHEMA_ID, "%s%s", "cluster",
 	     tt_uuid_str(&uu));

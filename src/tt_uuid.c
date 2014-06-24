@@ -27,14 +27,25 @@
  * SUCH DAMAGE.
  */
 #include "tt_uuid.h"
+#include "msgpuck/msgpuck.h"
+#include <stdio.h>
+
 /* Zeroed by the linker. */
-const tt_uuid uuid_nil;
+const struct tt_uuid uuid_nil;
+
+static __thread char buf[UUID_STR_LEN + 1];
 
 char *
-tt_uuid_str(const tt_uuid *uu)
+tt_uuid_str(const struct tt_uuid *uu)
 {
-	static __thread char buf[UUID_STR_LEN + 1];
 	tt_uuid_to_string(uu, buf);
 	return buf;
 }
 
+int
+tt_uuid_from_strl(const char *in, size_t len, struct tt_uuid *uu)
+{
+	char buf[UUID_STR_LEN + 1];
+	snprintf(buf, sizeof(buf), "%.*s", (int) len, in);
+	return tt_uuid_from_string(buf, uu);
+}

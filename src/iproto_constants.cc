@@ -31,6 +31,7 @@
 #include "exception.h"
 #include "fiber.h"
 #include "crc32.h"
+#include "tt_uuid.h"
 
 const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 {
@@ -207,6 +208,22 @@ error:
 	}
 }
 
+/**
+ * @pre pos points at a valid msgpack
+ */
+void
+iproto_decode_uuid(const char **pos, struct tt_uuid *out)
+{
+	if (mp_typeof(**pos) != MP_STR)
+error:
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "UUID");
+	uint32_t len = mp_decode_strl(pos);
+	if (tt_uuid_from_strl(*pos, len, out) != 0)
+		goto error;
+	*pos += len;
+}
+
 int
 iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 {
@@ -259,6 +276,12 @@ iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 	return 1 + header->bodycnt; /* new iovcnt */
 }
 
+char *
+iproto_encode_uuid(char *pos, const struct tt_uuid *in)
+{
+	return mp_encode_str(pos, tt_uuid_str(in), UUID_STR_LEN);
+}
+
 int
 iproto_row_encode(const struct iproto_header *row,
 		  struct iovec *out)
@@ -291,3 +314,4 @@ iproto_row_encode(const struct iproto_header *row,
 	assert(iovcnt <= IPROTO_ROW_IOVMAX);
 	return iovcnt;
 }
+

@@ -170,6 +170,14 @@ struct iproto_header {
 void
 iproto_header_decode(struct iproto_header *header,
 		     const char **pos, const char *end);
+struct tt_uuid;
+
+void
+iproto_decode_uuid(const char **pos, struct tt_uuid *out);
+
+char *
+iproto_encode_uuid(char *pos, const struct tt_uuid *in);
+
 int
 iproto_header_encode(const struct iproto_header *header,
 		     struct iovec *out);
