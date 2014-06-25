@@ -204,10 +204,10 @@ box.cfg{
         </row>
         <row>
           <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
-          <entry>integer</entry>
+          <entry>integer or string</entry>
           <entry>null</entry>
           <entry>no</entry>
-          <entry>The read/write data port.
+          <entry>The read/write data port number or URI (Universal Resource Identifier) string.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
           if connections will occur from remote clients
@@ -220,15 +220,16 @@ box.cfg{
 
         <row>
           <entry xml:id="admin_port" xreflabel="admin_port">admin_port</entry>
-          <entry>integer</entry>
+          <entry>integer or string</entry>
           <entry>null</entry>
           <entry>no</entry>
-          <entry>The port to listen on for administrative
+          <entry>The port or URI to listen on for administrative
           connections. Has no default value, so must be specified
           if connections will occur via telnet. Not used unless
           assigned a value. This may be expressed with URI = Universal
           Resource Identifier format, for example "unix://unix_domain_socket",
-          or as a numeric TCP port. A typical value is 3313.</entry>
+          or as a numeric TCP port. Connections are often made with telnet.
+          A typical value is 3313.</entry>
         </row>
 
         <row>

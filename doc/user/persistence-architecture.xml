@@ -50,7 +50,7 @@ cd                         msgpack code meaning 2-digit number follows
 02 00                      the id of "space0" which is 513, it's biggest byte first
 21                         Flags = IPROTO_TUPLE which is #defined as hex 21
 91                         msgpack code meaning "1-element fixed array" follows
-01                         Tuple: field[0] value = 1
+01                         Tuple: field[1] value = 1
 </programlisting>
 </para>
 

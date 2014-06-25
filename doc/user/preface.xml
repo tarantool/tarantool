@@ -16,9 +16,6 @@
     applications, socket support, and the Tarantool Database Server which is an established
     NoSQL DBMS. Thus it serves all the purposes that have made node.js and Twisted popular in
     other environments, with the additional twist that it has a data persistence level.
-    Tarantool's name and motto are like  <link xlink:href="https://en.wikipedia.org/wiki/Terence">Terentius's</link>:
-    "Rostrum sum, Luae nihil a me alienum puto" -- I am a platform, I regard
-    nothing of Lua to be alien. 
   </para>
 
   <para> 

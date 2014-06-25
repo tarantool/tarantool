@@ -512,7 +512,7 @@ function sum_json_field(field_name)
   local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
   sum = 0                                                               --[[2]]
   for v, t in box.space.space0:pairs() do                               --[[3]]
-    is_valid_json, lua_table = pcall(json.decode, t[1])                 --[[4]]
+    is_valid_json, lua_table = pcall(json.decode, t[2])                 --[[4]]
     if is_valid_json then                                               --[[5]]
       field_value = lua_table[field_name]                               --[[6]]
       if type(field_value) == "number" then sum = sum + field_value end --[[7]]
@@ -547,7 +547,7 @@ with variable <code>t</code>.
 </para>
 
 <para>
-LINE 4: WHY "PCALL". If we simply said "<code>lua_table = json.decode(t[1]))</code>",
+LINE 4: WHY "PCALL". If we simply said "<code>lua_table = json.decode(t[2]))</code>",
 then the function would abort with an error if it encountered something wrong
 with the JSON string -- a missing colon, for example. By putting the function
 inside "<code>pcall</code>" (<link xlink:href="http://www.lua.org/pil/8.4.html">protected call</link>), we're saying: we want to intercept that sort
@@ -557,13 +557,13 @@ will know what to do about it later.
 
 <para>
 LINE 4: MEANING. The function is <olink targetptr="box.cjson">json.decode</olink> which means decode a JSON
-string, and the parameter is <code>t[1]</code> which is a reference to a JSON string.
+string, and the parameter is <code>t[2]</code> which is a reference to a JSON string.
 There's a bit of hard coding here, we're assuming that the second
-field in the tuple is where the JSON string was inserted. For example, we're assuming a tuple looks like <programlisting>field[0]: 444
-field[1]: '{"Hello": "world", "Quantity": 15}'
+field in the tuple is where the JSON string was inserted. For example, we're assuming a tuple looks like <programlisting>field[1]: 444
+field[2]: '{"Hello": "world", "Quantity": 15}'
 </programlisting>meaning that the tuple's first field, the primary key field, is a number
 while the tuple's second field, the JSON string, is a string. Thus the
-entire statement means "decode <code>t[1]</code> (the tuple's second field) as a JSON
+entire statement means "decode <code>t[2]</code> (the tuple's second field) as a JSON
 string; if there's an error set <code>is_valid_json = false</code>; if there's no error
 set <code>is_valid_json = true</code> and set <code>lua_table</code> = a Lua table which has the
 decoded string".
@@ -600,7 +600,7 @@ targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your
 <programlisting>
 box.space.space0:drop()           -- if space0 is left over from some previous test, destroy it
 box.schema.create_space('space0')
-box.space.space0:create_index('primary', {parts = {0, 'NUM'}})
+box.space.space0:create_index('primary', {parts = {1, 'NUM'}})
 </programlisting>
 then add some tuples where the first field is a number and the second field is a string.
 </para>

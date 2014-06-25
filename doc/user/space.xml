@@ -6,16 +6,13 @@
 Space is a composite parameter, that is, it has properties.
 <programlisting language="cpp">
 /*
- * Each tuple consists of fields. Three field types are
- * supported.
- */
-
-enum { STR, NUM, NUM64 } field_type;
-
-/*
+ * Each tuple consists of fields. Field types may be
+ * integers, floats, or strings.
  * Tarantool is interested in field types only inasmuch as
- * it needs to build indexes on fields. An index
- * can cover one or more fields.
+ * it needs to build indexes on fields. Two indexed field
+ * types are supported.
+enum { STR, NUM } field_type; 
+ * An index can cover one or more fields.
  */
 
 struct index_field_t {
@@ -57,8 +54,8 @@ a minimal storage configuration looks like the following:
 space[0].enabled = 1
 space[0].index[0].type = HASH
 space[0].index[0].unique = 1
-space[0].index[0].key_field[0].fieldno = 0
-space[0].index[0].key_field[0].type = NUM64
+space[0].index[0].key_field[1].fieldno = 1
+space[0].index[0].key_field[1].type = NUM64
 </programlisting>
 The parameters listed above are mandatory. Other space
 properties are set in the same way.
@@ -71,7 +68,7 @@ space[0] = {
             type = HASH,
             key_field = [
                 {
-                    fieldno = 0,
+                    fieldno = 1,
                     type = NUM64
                 }
             ]
