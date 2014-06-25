@@ -201,7 +201,7 @@ if session.uid() < 2 then return 'uid error' end
 --
 box.schema.user.drop('uniuser')
 ---
-- error: Write access denied for user 'uniuser'
+- error: Create or drop access denied for user 'uniuser'
 ...
 --
 --Check create, call and drop function
@@ -236,7 +236,6 @@ box.schema.user.create('uniuser_testus')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: Write access denied for user 'uniuser'
 ...
 --
 -- Check access system and any spaces
@@ -248,7 +247,7 @@ box.space.admin_space:select()
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._space:select(280)
 ---
@@ -277,19 +276,19 @@ session.su('someuser')
 --
 s:drop()
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 us:drop()
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 box.schema.func.drop('uniuser_func')
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: Write access denied for user 'someuser'
+- error: User 'uniuser_testus' does not exist
 ...
 session.su('admin')
 ---
@@ -302,6 +301,7 @@ box.schema.user.drop('someuser')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
+- error: User 'uniuser_testus' does not exist
 ...
 box.schema.user.drop('uniuser')
 ---
@@ -326,30 +326,29 @@ session.su('testuser')
 ...
 box.space._user:delete(2)
 ---
-- error: 'Failed to drop user ''testuser'': the user has objects'
+- error: Create or drop access denied for user 'testuser'
 ...
 box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
-box.space._user:insert{3,'','someone'}
+box.space._user:insert{3, session.uid(), 'someone'}
 ---
-- [3, '', 'someone']
+- [3, 2, 'someone']
 ...
 box.space._user:delete(3)
 ---
-- error: Write access denied for user 'testuser'
+- [3, 2, 'someone']
 ...
 session.su('admin')
 ---
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._user:delete(3)
 ---
-- [3, '', 'someone']
 ...
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 ---
@@ -369,7 +368,7 @@ box.space._user:delete(2)
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._user:insert{4,'','someone2'}
 ---
@@ -558,9 +557,9 @@ s:drop()
 ...
 box.space._user:select()
 ---
-- - [0, '', 'guest']
-  - [1, '', 'admin']
-  - [2, '', 'testuser', []]
+- - [0, 1, 'guest']
+  - [1, 1, 'admin']
+  - [2, 1, 'testuser', []]
 ...
 box.space._space:select()
 ---

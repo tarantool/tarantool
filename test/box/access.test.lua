@@ -103,4 +103,25 @@ session.su('uniuser')
 us = box.schema.create_space('uniuser_space')
 session.su('admin')
 box.schema.user.drop('uniuser')
+-- ------------------------------------------------------------
+-- A test case for gh-253
+-- A user with universal grant has no access to drop oneself
+-- ------------------------------------------------------------
+-- This behaviour is expected, since an object may be destroyed
+-- only by its creator at the moment
+-- ------------------------------------------------------------
+box.schema.user.create('grantor')
+box.schema.user.grant('grantor', 'read, write, execute', 'universe')  
+session.su('grantor')
+box.schema.user.create('grantee')
+box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
+session.su('grantee')
+-- fails - can't suicide - ask the creator to kill you
+box.schema.user.drop('grantee')
+session.su('grantor')
+box.schema.user.drop('grantee')
+-- fails, can't kill oneself
+box.schema.user.drop('grantor')
+session.su('admin')
+box.schema.user.drop('grantor')
 session = nil

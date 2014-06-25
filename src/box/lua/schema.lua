@@ -709,7 +709,7 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{'', name, auth_mech_list}
+    _user:auto_increment{session.uid(), name, auth_mech_list}
 end
 
 box.schema.user.drop = function(name)

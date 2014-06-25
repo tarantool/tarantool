@@ -57,6 +57,8 @@ priv_name(uint8_t access);
 struct user {
 	/** User id. */
 	uint32_t uid;
+	/** Creator of the user */
+	uint32_t owner;
 	/** User password - hash2 */
 	char hash2[SCRAMBLE_SIZE];
 	/** User name - for error messages and debugging */

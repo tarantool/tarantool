@@ -73,7 +73,7 @@ access_check_ddl(uint32_t owner_uid)
 	 */
 	if (owner_uid != user->uid && user->uid != ADMIN) {
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Write", user->name);
+			  "Create or drop", user->name);
 	}
 }
 
@@ -1169,6 +1169,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32(tuple, ID);
+	user->owner = tuple_field_u32(tuple, UID);
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
@@ -1176,6 +1177,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 			  name, "user name is too long");
 	}
 	identifier_check(name);
+	access_check_ddl(user->owner);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
@@ -1231,7 +1233,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		(void) user_cache_replace(&user);
 		trigger_set(&txn->on_rollback, &drop_user_trigger);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(uid);
+		access_check_ddl(old_user->owner);
 		/* Can't drop guest or super user */
 		if (uid == GUEST || uid == ADMIN) {
 			tnt_raise(ClientError, ER_DROP_USER,

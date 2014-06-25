@@ -37,6 +37,7 @@ _index:insert{_index.id, 0, 'primary', 'tree', 1, 2, 0, 'num', 1, 'num'}
 _index:insert{_index.id, 2, 'name', 'tree', 1, 2, 0, 'num', 2, 'str'}
 -- user name and id are unique
 _index:insert{_user.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
+_index:insert{_user.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
 _index:insert{_user.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
 -- function name and id are unique
 _index:insert{_func.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
@@ -55,5 +56,5 @@ _index:insert{_cluster.id, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
 
 -- 
 -- Pre-create user and grants
-_user:insert{GUEST, '', 'guest'}
-_user:insert{ADMIN, '', 'admin'}
+_user:insert{GUEST, ADMIN, 'guest'}
+_user:insert{ADMIN, ADMIN, 'admin'}

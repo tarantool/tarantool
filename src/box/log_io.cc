@@ -106,7 +106,8 @@ log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 	struct log_io *wal = log_io_open_for_read(dir, signature, NULL,
 						  INPROGRESS);
 	if (wal == NULL)
-		tnt_raise(ClientError, ER_INVALID_XLOG, (long long) signature);
+		tnt_raise(ClientError, ER_INVALID_XLOG,
+			  format_filename(dir, signature, NONE));
 	auto log_guard = make_scoped_guard([&]{
 		log_io_close(&wal);
 	});
@@ -247,7 +248,7 @@ log_dir_scan(struct log_dir *dir)
 			log_dir_add_to_index(dir, signs[i]);
 		} catch (ClientError *e) {
 			e->log();
-			say_warn("failed to scan xlog %lld", (long long) signs[i]);
+			say_warn("failed to scan %s", format_filename(dir, signs[i], NONE));
 			if (dir->panic_if_error)
 				throw;
 		}

@@ -139,7 +139,7 @@ box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
 box.space._user:delete(2)
 box.space._user:select(1)
-box.space._user:insert{3,'','someone'}
+box.space._user:insert{3, session.uid(), 'someone'}
 box.space._user:delete(3)
 
 session.su('admin')
