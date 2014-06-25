@@ -5,6 +5,7 @@ from lib.tarantool_server import TarantoolServer
 # master server
 master = server
 
+master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 master.admin("space = box.schema.create_space('test', {id =  42})")
 master.admin("space:create_index('primary', { type = 'hash'})")
 

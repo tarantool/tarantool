@@ -38,6 +38,7 @@ extern "C" {
 #include <lauxlib.h> /* struct luaL_error */
 } /* extern "C" */
 
+#include <msgpuck/msgpuck.h>
 #include <tbuf.h>
 #include <fiber.h>
 #include "small/region.h"

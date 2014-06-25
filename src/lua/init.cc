@@ -70,12 +70,12 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       load_cfg_lua[], interactive_lua[], digest_lua[], init_lua[],
+       load_cfg_lua[], console_lua[], digest_lua[], init_lua[],
        log_lua[];
 static const char *lua_sources[] = { init_lua, session_lua, load_cfg_lua, NULL };
 static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
 	"fun", fun_lua, "digest", digest_lua,
-	"interactive", interactive_lua,
+	"console", console_lua,
 	"uuid", uuid_lua, "log", log_lua, NULL };
 /*
  * {{{ box Lua library: common functions
@@ -174,6 +174,52 @@ tarantool_lua_error_init(struct lua_State *L) {
 
 /* }}} */
 
+/*
+ * {{{ console library
+ */
+
+static ssize_t
+readline_cb(va_list ap)
+{
+	const char **line = va_arg(ap, const char **);
+	const char *prompt = va_arg(ap, const char *);
+	*line = readline(prompt);
+	return 0;
+}
+
+static int
+tarantool_console_readline(struct lua_State *L)
+{
+	const char *prompt = ">";
+	if (lua_gettop(L) > 0) {
+		if (!lua_isstring(L, 1))
+			luaL_error(L, "console.readline([prompt])");
+		prompt = lua_tostring(L, 1);
+	}
+
+	char *line;
+	coeio_custom(readline_cb, TIMEOUT_INFINITY, &line, prompt);
+	auto scoped_guard = make_scoped_guard([&] { free(line); });
+	if (!line) {
+		lua_pushnil(L);
+	} else {
+		lua_pushstring(L, line);
+	}
+	return 1;
+}
+
+static int
+tarantool_console_add_history(struct lua_State *L)
+{
+	if (lua_gettop(L) < 1 || !lua_isstring(L, 1))
+		luaL_error(L, "console.add_history(string)");
+
+	add_history(lua_tostring(L, 1));
+	return 0;
+}
+
+/* }}} */
+
 /**
  * Prepend the variable list of arguments to the Lua
  * package search path
@@ -241,6 +287,14 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 
+	static const struct luaL_reg consolelib[] = {
+		{"readline", tarantool_console_readline},
+		{"add_history", tarantool_console_add_history},
+		{NULL, NULL}
+	};
+	luaL_register_module(L, "console", consolelib);
+	lua_pop(L, 1);
+
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
@@ -282,165 +336,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_L = L;
 }
 
-/**
- * Attempt to append 'return ' before the chunk: if the chunk is
- * an expression, this pushes results of the expression onto the
- * stack. If the chunk is a statement, it won't compile. In that
- * case try to run the original string.
- */
-static int
-tarantool_lua_dostring(struct lua_State *L, const char *str)
-{
-	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *buf = tbuf_new(&fiber()->gc);
-	tbuf_printf(buf, "%s%s", "return ", str);
-	int r = luaL_loadstring(L, tbuf_str(buf));
-	if (r) {
-		/* pop the error message */
-		lua_pop(L, 1);
-		r = luaL_loadstring(L, str);
-		if (r)
-			return r;
-	}
-	try {
-		lbox_call(L, 0, LUA_MULTRET);
-	} catch (FiberCancelException *e) {
-		throw;
-	} catch (Exception *e) {
-		lua_settop(L, 0);
-		lua_pushstring(L, e->errmsg());
-		return 1;
-	}
-	return 0;
-}
-
-extern "C" {
-	int yamlL_encode(lua_State*);
-};
-
-
-static void
-tarantool_lua_do(struct lua_State *L, struct tbuf *out, const char *str)
-{
-	int r = tarantool_lua_dostring(L, str);
-	if (r) {
-		assert(lua_gettop(L) == 1);
-		const char *msg = lua_tostring(L, -1);
-		msg = msg ? msg : "";
-		lua_newtable(L);
-		lua_pushstring(L, "error");
-		lua_pushstring(L, msg);
-		lua_settable(L, -3);
-		lua_replace(L, 1);
-		assert(lua_gettop(L) == 1);
-	}
-	/* Convert Lua stack to YAML and append to the given tbuf */
-	int top = lua_gettop(L);
-	if (top == 0) {
-		tbuf_printf(out, "---\n...\n");
-		lua_settop(L, 0);
-		return;
-	}
-
-	lua_newtable(L);
-	for (int i = 1; i <= top; i++) {
-		lua_pushnumber(L, i);
-		if (lua_isnil(L, i)) {
-			/**
-			 * When storing a nil in a Lua table,
-			 * there is no way to distinguish nil
-			 * value from no value. This is a trick
-			 * to make sure yaml converter correctly
-			 * outputs nil values on the return stack.
-			 */
-			lua_pushlightuserdata(L, NULL);
-		} else {
-			lua_pushvalue(L, i);
-		}
-		lua_rawset(L, -3);
-	}
-	lua_replace(L, 1);
-	lua_settop(L, 1);
-
-	yamlL_encode(L);
-	lua_replace(L, 1);
-	lua_pop(L, 1);
-	tbuf_printf(out, "%s", lua_tostring(L, 1));
-	lua_settop(L, 0);
-}
-
-void
-tarantool_lua(struct lua_State *L,
-	      struct tbuf *out, const char *str)
-{
-	try {
-		tarantool_lua_do(L, out, str);
-	} catch (...) {
-		const char *err = lua_tostring(L, -1);
-		tbuf_printf(out, "---\n- error: %s\n...\n", err);
-		lua_settop(L, 0);
-	}
-}
-
 char *history = NULL;
-
-ssize_t
-readline_cb(va_list ap)
-{
-	const char **line = va_arg(ap, const char **);
-	const char *prompt = va_arg(ap, const char *);
-	*line = readline(prompt);
-	return 0;
-}
-
-static inline int
-interactive_input(struct tbuf *in)
-{
-	char *line;
-	int linenum = 0;
-	const char *delim = fiber()->session->delim;
-	int delim_len = strlen(delim);
-
-	do {
-		coeio_custom(readline_cb, TIMEOUT_INFINITY, &line,
-			     linenum ? "         > " : "tarantool> ");
-		if (line == NULL)
-			return -1;
-
-		auto scoped_guard = make_scoped_guard([&] { free(line); });
-		if (linenum++ > 0)
-			tbuf_append(in, "\n", 1);
-		tbuf_append(in, line, strlen(line));
-	} while (delim_len > 0 && (in->size < delim_len ||
-		 memcmp(in->data + in->size - delim_len, delim, delim_len)));
-
-	in->size -= delim_len; /* remove delimiter from the end of input */
-	in->data[in->size] = '\0';
-
-	return 0;
-}
-
-extern "C" void
-tarantool_lua_interactive()
-{
-	while (1) {
-		RegionGuard region_guard(&fiber()->gc);
-		struct tbuf *in = tbuf_new(&fiber()->gc);
-		if (interactive_input(in) != 0) {
-			printf("Bye\n");
-			return;
-		}
-
-		struct tbuf *out = tbuf_new(&fiber()->gc);
-		struct lua_State *L = lua_newthread(tarantool_L);
-		LuarefGuard coro_ref(tarantool_L);
-		tarantool_lua(L, out, tbuf_str(in));
-		printf("%.*s", out->size, out->data);
-
-		if (history)
-			add_history(tbuf_str(in));
-	}
-}
 
 extern "C" const char *
 tarantool_error_message(void)
@@ -478,9 +374,11 @@ run_script(va_list ap)
 			panic("%s", lua_tostring(L, -1));
 	} else {
 		say_crit("version %s", tarantool_version());
-		/* get iteractive from package.loaded */
+		/* get console.repl from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_getfield(L, -1, "interactive");
+		lua_getfield(L, -1, "console");
+		lua_getfield(L, -1, "repl");
+		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
 	}
 	try {

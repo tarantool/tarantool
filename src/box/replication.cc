@@ -221,7 +221,7 @@ replication_join(int fd, struct iproto_header *header)
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
 
-	tt_uuid node_uuid = uuid_nil;
+	struct tt_uuid node_uuid = uuid_nil;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -232,23 +232,11 @@ replication_join(int fd, struct iproto_header *header)
 		}
 		uint8_t key = mp_decode_uint(&d);
 		if (key == IPROTO_SERVER_UUID) {
-			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != UUID_LEN) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid Node-UUID");
-			}
-			tt_uuid_dec_be(d, &node_uuid);
-			d += UUID_LEN;
+			iproto_decode_uuid(&d, &node_uuid);
 		} else {
 			mp_next(&d); /* value */
 		}
 	}
-
-	if (tt_uuid_is_nil(&node_uuid)) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "Can't find Node-UUID in JOIN request");
-	}
-
 	/* Notify box about new cluster node */
 	recovery_state->join_handler(&node_uuid);
 
@@ -280,7 +268,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	const char *d = data;
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
-	tt_uuid uu = uuid_nil, node_uuid = uuid_nil;
+	struct tt_uuid uu = uuid_nil, node_uuid = uuid_nil;
 
 	const char *lsnmap = NULL;
 	d = data;
@@ -294,27 +282,15 @@ replication_subscribe(int fd, struct iproto_header *packet)
 		uint8_t key = mp_decode_uint(&d);
 		switch (key) {
 		case IPROTO_CLUSTER_UUID:
-			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != UUID_LEN) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid Cluster-UUID");
-			}
-			tt_uuid_dec_be(d, &uu);
-			d += UUID_LEN;
+			iproto_decode_uuid(&d, &uu);
 			break;
 		case IPROTO_SERVER_UUID:
-			if (mp_typeof(*d) != MP_STR ||
-			    mp_decode_strl(&d) != UUID_LEN) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid Node-UUID");
-			}
-			tt_uuid_dec_be(d, &node_uuid);
-			d += UUID_LEN;
+			iproto_decode_uuid(&d, &node_uuid);
 			break;
 		case IPROTO_VCLOCK:
 			if (mp_typeof(*d) != MP_MAP) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid LSNMAP");
+					  "invalid VCLOCK");
 			}
 			lsnmap = d;
 			mp_next(&d);
@@ -336,12 +312,15 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	}
 
 	/* Check Node-UUID */
-	uint32_t server_id = schema_find_id(SC_CLUSTER_ID, 1, tt_uuid_str(&node_uuid),
-					  UUID_STR_LEN);
-	if (server_id == SC_ID_NIL)
-		tnt_raise(ClientError, ER_UNKNOWN_SERVER, tt_uuid_str(&node_uuid));
+	uint32_t server_id;
+	server_id = schema_find_id(SC_CLUSTER_ID, 1,
+				   tt_uuid_str(&node_uuid), UUID_STR_LEN);
+	if (server_id == SC_ID_NIL) {
+		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
+			  tt_uuid_str(&node_uuid));
+	}
 	if (lsnmap == NULL)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
 	/* Check & save LSNMAP */
 	d = lsnmap;
 	uint32_t lsnmap_size = mp_decode_map(&d);
@@ -358,7 +337,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 		if (mp_typeof(*d) != MP_UINT) {
 		map_error:
 			free(request);
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
 		}
 		uint32_t id = mp_decode_uint(&d);
 		if (mp_typeof(*d) != MP_UINT)
@@ -793,7 +772,7 @@ replication_relay_loop()
 	struct sockaddr_storage peer;
 	socklen_t addrlen = sizeof(peer);
 	getpeername(relay.sock, ((struct sockaddr*)&peer), &addrlen);
-	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer));
+	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer, addrlen));
 	fiber_set_name(fiber(), status);
 
 	/* init signals */

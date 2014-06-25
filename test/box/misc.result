@@ -389,7 +389,7 @@ dostring('return ...', 1, 2, 3)
 --  A test case for Bug#1043804 lua error() -> server crash
 error()
 ---
-- error: 
+- error: null
 ...
 --  A test case for bitwise operations 
 bit.lshift(1, 32)
@@ -587,7 +587,7 @@ ffi.cdef([[struct test { int a; }; ]])
 ...
 ffi.cast('struct test *', 0)
 ---
-- 'cdata<struct test *>: NULL'
+- null
 ...
 --# setopt delimiter ';'
 type(ffi.metatype('struct test', {

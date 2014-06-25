@@ -46,7 +46,7 @@ struct tbuf;
 
 typedef void (row_handler)(void *, struct iproto_header *packet);
 typedef void (snapshot_handler)(struct log_io *);
-typedef void (join_handler)(const tt_uuid *node_uuid);
+typedef void (join_handler)(const struct tt_uuid *node_uuid);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -88,7 +88,7 @@ struct recovery_state {
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	enum wal_mode wal_mode;
-	tt_uuid node_uuid;
+	struct tt_uuid node_uuid;
 	uint32_t server_id;
 
 	bool finalize;
