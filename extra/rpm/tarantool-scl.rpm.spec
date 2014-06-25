@@ -3,10 +3,13 @@
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
 
-%{?scl:%global _scl_prefix /opt/tarantool}
-%{?scl:%scl_package}
+%global _scl_prefix /opt/tarantool
+%scl_package
 
-%{?scl:%global scl_name tarantool-%scl}
+%global scl_name tarantool-%scl
+
+BuildRequires: scl-utils-build
+BuildRequires: iso-codes
 
 # Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -23,8 +26,7 @@ Requires: %{scl_prefix}tarantool-dev
 Requires: %{scl_prefix}tarantool-sql-module
 Requires: %{scl_prefix}tarantool-pg-module
 Requires: %{scl_prefix}tarantool-mysql-module
-%{?scl:BuildRequires: scl-utils-build}
-%{?scl:BuildRequires: iso-codes}
+Requires: scl-utils
 
 %description
 This is the main package for %scl_name Software Collection.
@@ -64,6 +66,9 @@ EOF
 %{_root_sysconfdir}/rpm/macros.%{scl}-config
 
 %files runtime
+%if "0%{rhel}" == "07"
+%{_scl_root}/%{_lib}
+%endif
 %scl_files
 
 %changelog
