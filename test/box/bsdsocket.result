@@ -814,13 +814,39 @@ string.sub(s:read(128), 1, 9)
 ---
 - Tarantool
 ...
--- sa = { fh = 512 } setmetatable(sa, getmetatable(s))
--- tostring(sa)
--- sa:readable(0)
--- sa:writable(0)
--- ch = fiber.channel()
--- f = fiber.wrap(function() s:read(12) ch:put(true) end)
--- fiber.sleep(.1)
--- s:close()
--- ch:get(1)
--- s:error()
+sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+---
+...
+tostring(sa)
+---
+- fd 512
+...
+sa:readable(0)
+---
+- true
+...
+sa:writable(0)
+---
+- true
+...
+ch = fiber.channel()
+---
+...
+f = fiber.wrap(function() s:read(12) ch:put(true) end)
+---
+...
+fiber.sleep(.1)
+---
+...
+s:close()
+---
+- true
+...
+ch:get(1)
+---
+- true
+...
+s:error()
+---
+- Connection timed out
+...
