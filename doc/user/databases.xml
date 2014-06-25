@@ -422,7 +422,7 @@ tarantool> <userinput>table_of_tuples[1]</userinput>
               Possible errors: If space-name does not exist.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.space_that_does_not_exist_drop()</userinput>
+tarantool> <userinput>box.space.space_that_does_not_exist:drop()</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -449,6 +449,9 @@ tarantool> <userinput>box.space.space_that_does_not_exist_drop()</userinput>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 tarantool> <userinput>box.space.space55:rename('space56')</userinput>
+---
+...
+tarantool> box.space.space56:rename('space55')
 ---
 ...
 </programlisting>
@@ -628,10 +631,10 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 #    primary key value = 999
 #  The third argument is '=p', that is, there is one operation, assignment
 #    to a field
-#  The fourth argument is 1, that is, the affected field is field[1]
-#  The fifth argument is 'B', that is, field[1] contents change to 'B'
+#  The fourth argument is 2, that is, the affected field is field[2]
+#  The fifth argument is 'B', that is, field[2] contents change to 'B'
 #  Therefore, after the following update, field[1] = 999 and field[2] = 'B'.
-box.space.space0:update(999, {{'=p', 1, 'B'}})
+box.space.space0:update(999, {{'=', 2, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #  the key is passed as a Lua table (inside braces). This is unnecessary
@@ -639,17 +642,17 @@ box.space.space0:update(999, {{'=p', 1, 'B'}})
 #  primary key had more than one field.
 #  Therefore, after the following update, field[1] = 999 and field[2] = 'B'
 #    (no change).
-box.space.space0:update({999}, {{'=p', 1, 'B'}})
+box.space.space0:update({999}, {{'=', 2, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #   The fourth argument is 3, that is, the affected field is field[3].
 #   It is okay that, until now, field[3] has not existed. It gets added.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'B',
 #     field[3] = 1.
-box.space.space0:update({999}, {{'=p', 3, 1}})
+box.space.space0:update({999}, {{'=', 3, 1}})
 
 #In the following update, the arguments are the same, except that ...
-#   The third argument is '+p', that is, the operation is addition rather
+#   The third argument is '+', that is, the operation is addition rather
 #     than assignment.
 #   Since field[3] previously contained 1, this means we're adding 1 to 1.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'B',
@@ -658,33 +661,33 @@ box.space.space0:update({999}, {{'+p', 3, 1}})
 
 #In the following update ...
 #   The idea is to modify two fields at once.
-#   The formats are '|p' and '=p', that is, there are two operations, OR and
+#   The formats are '|' and '=', that is, there are two operations, OR and
 #     assignment.
 #   The fourth and fifth arguments mean that field[3] gets ORed with 1.
 #   The fifth and sixth arguments mean that field[2] gets assigned 'C'.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'C',
 #     field[3] = 3.
-box.space.space0:update({999}, {{'|p', 3, 1}, {'=p', 2, 'C'}})
+box.space.space0:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
 
 #In the following update ...
 #   The idea is to delete field[2], then subtract 3 from field[3], but ...
 #   after the delete, there is a renumbering -- so field[3] becomes field[2]
 #   before we subtract 3 from it, and that's why the sixth argument is 2 not 3.
 #   Therefore, after the following update, field[1] = 999, field[2] = 0.
-box.space.space0:update({999}, {{'#p', 2, 0}, {'-p', 2, 3}})
+box.space.space0:update({999}, {{'#', 2, 0}, {'-', 2, 3}})
 
 #In the following update ...
 #   We're making a long string so that splice will work in the next example.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'XYZ'.
-box.space.space0:update({999}, {{'=p', 2, 'XYZ'}})
+box.space.space0:update({999}, {{'=', 2, 'XYZ'}})
 
 #In the following update ...
-#   The third argument is ':p', that is, this is the example of splice.
+#   The third argument is ':', that is, this is the example of splice.
 #   The fifth argument is actually four arguments packed together ...
 #      a filler, an offset, the number of bytes to cut (1), and the string
 #      to add ('!')
 #   Therefore, after the following update, field[1] = 999, field[2] = 'X!Z'.
-box.space.space0:update({999}, {{':p', 2, pickle.pack('iiA', 1, 1, '!')}})
+box.space.space0:update({999}, {{':', 2, pickle.pack('iiA', 1, 1, '!')}})
 
 </programlisting>
             </para>
@@ -847,7 +850,7 @@ tarantool&gt; <userinput>box.space.space0:len()</userinput>
 <prompt>tarantool&gt;</prompt> <userinput>s:insert{0,'Hello my '}; s:insert{1,'Lua world'}</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[1] end</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>tmp = ''; for k, v in s:pairs() do tmp = tmp .. v[2] end</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>tmp</userinput>
@@ -904,9 +907,9 @@ session = require('session'); session.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._schema:pairs() do
-    i = 0
+    i = 1
     line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    while i &lt;= #v do line = line .. v[i] .. ' ' i = i + 1 end
     table.insert(ta, line)
   end
   return ta
@@ -940,9 +943,9 @@ session.delimiter('')!</programlisting>
 function example()
   local ta = {}, i, line
   for k, v in box.space._space:pairs() do
-    i = 0
+    i = 1
     line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    while i &lt;= #v do line = line .. v[i] .. ' ' i = i + 1 end
     table.insert(ta, line)
   end
   return ta
@@ -983,9 +986,9 @@ session.delimiter('')!</programlisting>
 function example()
   local ta = {}, i, line
   for k, v in box.space._index:pairs() do
-    i = 0
+    i = 1
     line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
+    while i &lt;= #v do line = line .. v[i] .. ' ' i = i + 1 end
     table.insert(ta, line)
   end
   return ta
@@ -1060,7 +1063,7 @@ how many tuples it contains, and the first field of its first tuple.
 The function uses Tarantool box.space functions len() and pairs().
 The iteration through the spaces is coded as a scan of the
 _space system tuple set, which contains metadata. The third field in
-_space contains the space name, so the key instruction "space_name = v[2]"
+_space contains the space name, so the key instruction "space_name = v[3]"
 means "space_name = the space_name field in the tuple of _space
 that we've just fetched with pairs()". The function returns a table.
 </para>
@@ -1070,7 +1073,7 @@ function example()
   local tuple_count, space_name, line
   local ta = {}
   for k, v in box.space._space:pairs() do
-    space_name = v[2]
+    space_name = v[3]
     if box.space[space_name].index[0] ~= nil then
       tuple_count = box.space[space_name]:len()
     else
@@ -1273,7 +1276,7 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
 <para xml:id="box-function-example" xreflabel="box-function-example">
 This example will work with the sandbox configuration described in the preface.
 That is, there is a space named space0 with a numeric primary key.
-The example function will: (1) select a tuple the tuple whose key value is 1000;
+The example function will: (1) select a tuple whose key value is 1000;
 (2) return an error if the tuple already exists and already has 3 fields;
 (3) Insert or replace the tuple with: field[1] = 1000, field[2] = a uuid, field[3] = number of seconds since 1970-01-01;
 (4) Get field[3] from what was replaced;
@@ -1490,12 +1493,12 @@ tarantool&gt; <userinput>t[2]</userinput>
 ...
 tarantool&gt; <userinput>t:find('a')</userinput>
 ---
-- 0
+- 1
 ...
 tarantool&gt; <userinput>t:findall('a')</userinput>
 ---
-- 0
-- 3
+- 1
+- 4
 ...
 tarantool&gt; <userinput>t:findall(2, 'a')</userinput>
 ---
@@ -1529,7 +1532,7 @@ tarantool&gt; <userinput>t:findall(2, 'a')</userinput>
             <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
 ---
 ...
-tarantool&gt; <userinput>t:transform(2,3,'x')</userinput>
+tarantool&gt; <userinput>t:transform(2,2,'x')</userinput>
 ---
 - ['Fld#1', 'x', 'Fld#4', 'Fld#5']
 ...</programlisting>
@@ -2339,6 +2342,26 @@ tarantool> <userinput>box.cfg</userinput>
         The box.info package provides access to information about
         server variables -- pid, uptime, version and others.
     </para>
+    
+        <para>
+        <emphasis role="strong">recovery_lag</emphasis> holds the
+        difference (in seconds) between the current time on the
+        machine (wall clock time) and the time stamp of the last
+        applied record.  In replication setup, this difference can
+        indicate the delay taking place before a change is
+        applied to a replica.
+      </para>
+      <para>
+        <emphasis role="strong">recovery_last_update</emphasis> is
+        the wall clock time of the last change recorded in the
+        write-ahead log. To convert it to human-readable time,
+        you can use <command>date -d@<replaceable>1306964594.980</replaceable></command>.
+      </para>
+      <para>
+        <emphasis role="strong">status</emphasis> is
+        either "primary" or "replica/&lt;hostname&gt;".
+      </para>
+      
     <varlistentry>
         <term>
             <emphasis role="lua">box.info()</emphasis>
@@ -2422,15 +2445,39 @@ tarantool> <userinput>box.info.build</userinput>
 </programlisting>
         </listitem>
     </varlistentry>
+
 </variablelist>
 
 <variablelist>
     <title>Package <code>box.slab</code></title>
     <para>
       The box.slab package provides access to slab allocator statistics.
+          The slab
+          allocator is the main allocator used to store tuples.
+          This can be used to monitor the total memory use and
+          memory fragmentation.
     </para>
+          <para>
+          The display of slabs is broken down by the slab size --
+          64-byte, 136-byte, and so on. The example omits the slabs
+          which are empty. The example display is saying that:
+          there are 16 items stored
+          in the 64-byte slab (and 16*64=1024 so
+          bytes_used = 1024); there is 1 item
+          stored in the 136-byte slab (and
+          136*1=136 so bytes_used = 136); the
+          arena_used value is the total of all the bytes_used
+          values (1024+136 = 1160); the
+          arena_size value is the arena_used value
+          plus the total of all the bytes_free values
+          (1160+4193200+4194088 = 8388448). The
+          arena_size and arena_used values are the amount of  
+          the % of <olink targetptr="slab_alloc_arena"/> that is
+          already distributed to the slab allocator.
+        </para>
     <varlistentry>
-        <term><emphasis role="lua">box.slab</emphasis></term>
+        <term xml:id="box.slab.info" xreflabel="box.slab.info()">
+        <emphasis role="lua">box.slab</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool&gt; <userinput>box.slab.info().arena_used</userinput>
 ---
@@ -2461,10 +2508,13 @@ tarantool&gt; <userinput>box.slab.info().slabs[64]</userinput>
      <title>Package <code>box.stat</code></title>
     <para>
       The box.stat package provides access to request
-      statistics.
+      statistics. Show the average number of requests per second, and the
+      total number of requests since startup, broken down by
+      request type.
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.stat</emphasis></term>
+        <term xml:id="box.stat" xreflabel="box.stat">
+        <emphasis role="lua">box.stat</emphasis></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
 ---
@@ -2474,23 +2524,23 @@ tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
 tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
 ---
 - DELETE:
-    total: 33
-    rps: 0
+    total: 48902544
+    rps: 147
   SELECT:
-    total: 4
-    rps: 0
+    total: 388322317
+    rps: 1246
   REPLACE:
     total: 4
     rps: 0
   INSERT:
-    total: 17
-    rps: 0
+    total: 48207694
+    rps: 139
   CALL:
     total: 8
     rps: 0
   UPDATE:
-    total: 8
-    rps: 0
+    total: 743350520
+    rps: 1874
 ...
 tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
 ---
@@ -2838,11 +2888,11 @@ Otherwise, use the box.net.box package to pass the function to the host and port
 ...
 tarantool> <userinput>box.snapshot()</userinput>
 ---
-ok
+- ok
 ...
 tarantool> <userinput>box.snapshot()</userinput>
 ---
-fail: can't save snapshot, errno 17 (File exists)
+error: can't save snapshot, errno 17 (File exists)
 ...
 </programlisting>
       </para>
@@ -2863,147 +2913,6 @@ fail: can't save snapshot, errno 17 (File exists)
         way to find out whether the snapshot was taken successfully
         or not.
       </para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="box.info" xreflabel="box.info()">
-        <emphasis role="lua">box.info()</emphasis>
-      </term>
-      <listitem><para>
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>box.info()</userinput>
-- version: 1.6.0-805-g4a7e71d
-  status: primary
-  pid: 12315
-  lsn: 15481913304
-  snapshot_pid: 0
-  recovery_last_update: 1306964594
-  recovery_lag: 0
-  uptime: 441524
-  build:
-    flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
-      -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
-      -Wno-strict-aliasing -fopenmp -pthread'
-    target: Linux-x86_64-Debug
-    compiler: /usr/bin/cc /usr/bin/c++
-    options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
-      -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
-  logger_pid: 12316
-  config: /usr/local/etc/tarantool.cfg
-</programlisting>
-      </para>
-      <para>
-        <emphasis role="strong">recovery_lag</emphasis> holds the
-        difference (in seconds) between the current time on the
-        machine (wall clock time) and the time stamp of the last
-        applied record.  In replication setup, this difference can
-        indicate the delay taking place before a change is
-        applied to a replica.
-      </para>
-      <para>
-        <emphasis role="strong">recovery_last_update</emphasis> is
-        the wall clock time of the last change recorded in the
-        write-ahead log. To convert it to human-readable time,
-        you can use <command>date -d@<replaceable>1306964594.980</replaceable></command>.
-      </para>
-      <para>
-        <emphasis role="strong">status</emphasis> is
-        either "primary" or "replica/&lt;hostname&gt;".
-      </para>
-
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="box.stat" xreflabel="box.stat">
-        <emphasis role="lua">box.stat()</emphasis>
-      </term>
-      <listitem><para>
-      Show the average number of requests per second, and the
-      total number of requests since startup, broken down by
-      request type.
-<programlisting>
-tarantool&gt; <userinput>box.stat()</userinput>
----
-- DELETE:
-    total: 48902544
-    rps: 147
-  SELECT:
-    total: 388322317
-    rps: 1246
-  REPLACE:
-    total: 0
-    rps: 0
-  INSERT:
-    total: 48207694
-    rps: 139
-  AUTH:
-    total: 0
-    rps: 0
-  CALL:
-    total: 0
-    rps: 0
-  UPDATE:
-    total: 743350520
-    rps: 1874
-...
-</programlisting>
-      </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="box.slab.info" xreflabel="box.slab.info()">
-        <emphasis role="lua">box.slab()</emphasis>
-      </term>
-      <listitem>
-        <para>
-          Show the statistics of the slab allocator. The slab
-          allocator is the main allocator used to store tuples.
-          This can be used to monitor the total memory use and
-          memory fragmentation. For example:
-        </para>
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>box.slab.info()</userinput>
----
-- slabs:
-    64:
-      items: 16
-      bytes_used: 1024
-      item_size: 64
-      slabs: 1
-      bytes_free: 4193200
-    ...
-    136:
-      items: 1
-      bytes_used: 136
-      item_size: 136
-      slabs: 1
-      bytes_free: 4194088
-    ...
-  arena_size: 8388448
-  arena_used: 1160
-</programlisting>
-        <para>
-          The display of slabs is broken down by the slab size --
-          64-byte, 136-byte, and so on. The example omits the slabs
-          which are empty. The example display is saying that:
-          there are 16 items stored
-          in the 64-byte slab (and 16*64=1024 so
-          bytes_used = 1024); there is 1 item
-          stored in the 136-byte slab (and
-          136*1=136 so bytes_used = 136); the
-          arena_used value is the total of all the bytes_used
-          values (1024+136 = 1160); the
-          arena_size value is the arena_used value
-          plus the total of all the bytes_free values
-          (1160+4193200+4194088 = 8388448). The
-          arena_size and arena_used values are the amount of  
-          the % of <olink targetptr="slab_alloc_arena"/> that is
-          already distributed to the slab allocator.
-        </para>
-        <para>
-        </para>
       </listitem>
     </varlistentry>
 

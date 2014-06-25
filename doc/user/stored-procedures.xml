@@ -317,7 +317,7 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 - world
 ...
 tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here.</userinput>
+tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
 tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
@@ -418,23 +418,23 @@ tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
 ---
 - [0, 'hello world']
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, 'bye world'}})</userinput>
 ---
 - [0, 'bye world']
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
 ---
 - [0, "\0\0\0\0\x03\0\0\0hello"]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, 4}})</userinput>
 ---
 - [0, 4]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'+', 2, 4}})</userinput>
 ---
 - [0, 8]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
+tarantool> <userinput>box.space.space0:update({0}, {{'^', 2, 4}})</userinput>
 ---
 - [0, 12]
 ...
@@ -494,7 +494,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
 - string
 - 666666666666666
 ...
-<prompt>tarantool></prompt> <userinput>session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
+<prompt>tarantool></prompt> <userinput>session.delimiter('') -- back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -544,16 +544,16 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
     which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a tuple set,
     and password_check() which requires input of a password.<programlisting>
 <prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
-<prompt>localhost&gt;</prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+<prompt>localhost&gt;</prompt> <userinput>session = require('session'); session.delimiter('!') --this means ignore line feeds until next '!'</userinput>
 <prompt>localhost&gt;</prompt> <userinput>function password_insert()</userinput>
-        <prompt>-&gt;</prompt> <userinput>  space0:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
+        <prompt>-&gt;</prompt> <userinput>  box.space.space0:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
         <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
         <prompt>-&gt;</prompt> <userinput>  end!</userinput>
 ---
 ...
 <prompt>localhost&gt;</prompt> <userinput>function password_check(password)</userinput>
         <prompt>-&gt;</prompt>  <userinput> local t</userinput>
-        <prompt>-&gt;</prompt>  <userinput> t=box.select{12345}</userinput>
+        <prompt>-&gt;</prompt>  <userinput> t=box.space.space0:select{12345}</userinput>
         <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[2]) then</userinput>
         <prompt>-&gt;</prompt>  <userinput>   print('Password is valid')</userinput>
         <prompt>-&gt;</prompt>  <userinput>   else</userinput>
@@ -562,15 +562,15 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
         <prompt>-&gt;</prompt> <userinput>end!</userinput>
 ---
 ...
-<prompt>localhost&gt;</prompt> <userinput>call password_insert()!</userinput>
+<prompt>localhost&gt;</prompt> <userinput>password_insert()!</userinput>
 Call OK, 1 rows affected
 ['OK']
-<prompt>localhost></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
+<prompt>localhost></prompt> <userinput>session.delimiter('') --  back to normal: commands end with line feed!</userinput>
 </programlisting></para>
 <para>
   If a later user calls
   the password_check() function and enters the wrong password, the result is an
-  error.<programlisting><prompt>localhost&gt;</prompt> <userinput>lua password_check ('Secret Password')</userinput>
+  error.<programlisting><prompt>localhost&gt;</prompt> <userinput>password_check ('Secret Password')</userinput>
 ---
 Password is not valid
 ...</programlisting></para>
@@ -592,7 +592,7 @@ Password is not valid
                 when it starts. If the library is not available, which can happen if it was not
                 found when the server was built from source, then uuid.bin() returns an error.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
+<programlisting>tarantool&gt; <userinput>uuid=require('uuid')</userinput>
 ---
 ...
 tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
@@ -614,7 +614,7 @@ tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool&gt; <userinput>require('uuid')</userinput>
+tarantool&gt; <userinput>uuid=require('uuid')</userinput>
 ---
 ...
 tarantool&gt; <userinput>uuid.hex()</userinput>
@@ -652,7 +652,7 @@ tarantool&gt; <userinput>uuid.hex()</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool&gt; <userinput>require('json')</userinput>
+tarantool&gt; <userinput>json=require('json')</userinput>
 ---
 ...
 tarantool&gt; <userinput>json.encode(123)</userinput>
@@ -691,7 +691,7 @@ tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
               Returns: (type = Lua table) the original contents formatted as a Lua table.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>require('json')</userinput>
+<programlisting>tarantool&gt; <userinput>json=require('json')</userinput>
 ---
 ...
  tarantool&gt; <userinput>json.decode('123')</userinput>
@@ -779,6 +779,9 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
     <para>
     <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
+tarantool> yaml = require('yaml')
+---
+...
 tarantool> y =  yaml.encode({'a',1,'b',2})
 ---
 ...
@@ -853,6 +856,9 @@ hi
     <para>
     <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
+tarantool> msgpack = require('msgpack')
+---
+...
 tarantool> y =  msgpack.encode({'a',1,'b',2})
 ---
 ...
@@ -1228,6 +1234,8 @@ Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
 <prompt>tarantool&gt;</prompt><userinput> fiber.cancel(fiber_of_x)</userinput>
+... fiber `lua' has been cancelled
+... fiber `lua': exiting
 ---
 ...
 <prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
