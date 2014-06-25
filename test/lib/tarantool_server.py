@@ -151,9 +151,10 @@ class Mixin(object):
 
 class ValgrindMixin(Mixin):
     default_valgr = {
-            "logfile":        "valgrind.log",
-            "suppress_path":        "share/",
-            "suppress_name": "tarantool.sup"}
+            "logfile":       "valgrind.log",
+            "suppress_path": "share/",
+            "suppress_name": "tarantool.sup"
+    }
 
     @property
     def valgrind_log(self):
@@ -188,7 +189,8 @@ class ValgrindMixin(Mixin):
 
 class GdbMixin(Mixin):
     default_gdb = {
-        "name": "tarantool-gdb"}
+        "name": "tarantool-gdb"
+    }
 
     def start_and_exit(self):
         if re.search(r'^/', self._admin.port):
@@ -207,8 +209,8 @@ class GdbMixin(Mixin):
         color_stdout('You started the server in gdb mode.\n', schema='info')
         color_stdout('To attach, use `screen -r tarantool-gdb`\n', schema='info')
         return shlex.split("screen -dmS {0} gdb {1} -ex \
-                \'b main\' -ex \'run >> {2} 2>> {2}\'".format(self.default_gdb['name'],
-                                                       self.script_dst if self.script else self.binary,
+                \'b main\' -ex \'run {2} >> {3} 2>> {3}\'".format(self.default_gdb['name'],
+                                                       self.binary, self.script_dst if self.script else '',
                                                        self.logfile))
 
     def wait_stop(self):
@@ -217,10 +219,11 @@ class GdbMixin(Mixin):
 
 class TarantoolServer(Server):
     default_tarantool = {
-            "bin":       "tarantool",
-            "logfile":   "tarantool.log",
-            "pidfile":         "tarantool.pid",
-            "name":            "default"}
+        "bin":     "tarantool",
+        "logfile": "tarantool.log",
+        "pidfile": "tarantool.pid",
+        "name":    "default"
+    }
 #----------------------------------PROPERTIES----------------------------------#
     @property
     def debug(self):
