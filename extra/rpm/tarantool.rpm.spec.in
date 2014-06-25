@@ -1,7 +1,8 @@
 ####################################################
 ################# MACROS AND DEFAULTS ##############
 ####################################################
-%{?scl:%scl_package tarantool}
+%{?scl:%{?scl_package:%scl_package tarantool}}
+%global scl_runtime tarantool-15-runtime
 
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
@@ -9,7 +10,6 @@
 %bcond_without postgresql
 %bcond_without mysql
 
-BuildRequires: scl-utils-build
 BuildRequires: readline-devel
 
 %if 0%{?rhel} < 7 && 0%{?rhel} > 0
@@ -64,7 +64,7 @@ Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
 Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-%description -n %{?scl_prefix}tarantool-dev
+%description dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
@@ -75,7 +75,7 @@ This package provides Tarantool client libraries.
 Summary: Tarantool common sql interface
 Vendor: tarantool.org
 Group: Applications/Databases
-%description -n %{?scl_prefix}tarantool-sql-module
+%description sql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
@@ -90,7 +90,7 @@ Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-pg-module
 BuildRequires: postgresql-devel >= 9.0
 Requires: postgresql-libs >= 9.0
-%description -n %{?scl_prefix}tarantool-pg-module
+%description pg-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
@@ -106,7 +106,7 @@ Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-mysql-module
 BuildRequires: mysql-devel >= 5.0
 Requires: mysql-libs >= 5.0
-%description -n %{?scl_prefix}tarantool-mysql-module
+%description mysql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
