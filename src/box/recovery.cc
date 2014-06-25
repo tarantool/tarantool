@@ -241,27 +241,6 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_e
 void
 recovery_process(struct recovery_state *r, struct iproto_header *row)
 {
-	if (!iproto_request_is_dml(row->type)) {
-		/* Process admin commands (server_id, lsn are ignored) */
-		switch (row->type) {
-		case IPROTO_SETLSN:
-			struct vclock vclock;
-			log_decode_vclock(row, &vclock);
-			vclock_merge(&r->vclock, &vclock);
-			/*
-			 * In relay mode apply SETLSN locally and
-			 * retranslate the command to remote node.
-			 */
-			if (r->relay)
-				r->row_handler(r->row_handler_param, row);
-			break;
-		default:
-			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				  row->type);
-		}
-		return;
-	}
-
 	/* Check lsn */
 	int64_t current_lsn = vclock_get(&r->vclock, row->server_id);
 	if (current_lsn >=0 && row->lsn <= current_lsn) {
@@ -273,23 +252,18 @@ recovery_process(struct recovery_state *r, struct iproto_header *row)
 }
 
 void
-recovery_end_recover_snapshot(struct recovery_state *r)
-{
-	/* Remove fake node after recovering snapshot */
-	vclock_del_server(&r->vclock, 0);
-}
-
-void
 recovery_bootstrap(struct recovery_state *r)
 {
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
+
 	/* Recover from bootstrap.snap */
 	say_info("initializing an empty data directory");
 	const char *filename = "bootstrap.snap";
 	FILE *f = fmemopen((void *) &bootstrap_bin,
 			   sizeof(bootstrap_bin), "r");
-	struct log_io *snap;
-	snap = log_io_open(&r->snap_dir, LOG_READ, filename,
-			   &r->node_uuid, NONE, f);
+	struct log_io *snap = log_io_open_stream_for_read(&r->snap_dir,
+		filename, NULL, NONE, f);
 	if (snap == NULL)
 		panic("failed to open %s", filename);
 	int rc = recover_wal(r, snap);
@@ -315,24 +289,26 @@ recover_snap(struct recovery_state *r)
 
 	if (log_dir_scan(&r->snap_dir) != 0)
 		panic("can't scan snapshot directory");
-#if defined(SNAPSHOT_SETLSN_META)
-	struct vclock *res = vclockset_last(&r->snap_dir.index)
+	struct vclock *res = vclockset_last(&r->snap_dir.index);
 	if (res == NULL)
 		panic("can't find snapshot");
 	sign = vclock_signature(res);
-#else
-	/* TODO: remove this code after moving SETLSN to meta */
-	sign = r->snap_dir.greatest;
-	if (sign < 0)
-		panic("can't find snapshot");
-#endif
-	snap = log_io_open_for_read(&r->snap_dir, sign, &r->node_uuid, NONE);
+	snap = log_io_open_for_read(&r->snap_dir, sign, NULL, NONE);
 	if (snap == NULL)
 		panic("can't open snapshot");
+
+	/* Save server uuid */
+	memcpy(&r->server_uuid, &snap->server_uuid, sizeof(r->server_uuid));
+
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
 
 	say_info("recovering from `%s'", snap->filename);
 	if (recover_wal(r, snap) != 0)
 		panic("can't process snapshot");
+
+	/* Replace server vclock using data from snapshot */
+	vclock_copy(&r->vclock, &snap->vclock);
 }
 
 #define LOG_EOF 0
@@ -384,8 +360,6 @@ recover_remaining_wals(struct recovery_state *r)
 	int64_t current_lsn, wal_greatest_lsn;
 	struct vclock *current_vclock;
 	size_t rows_before;
-	FILE *f;
-	char *filename;
 	enum log_suffix suffix;
 
 	if (log_dir_scan(&r->wal_dir) != 0)
@@ -399,7 +373,6 @@ recover_remaining_wals(struct recovery_state *r)
 		goto recover_current_wal;
 
 	while (1) {
-find_next_wal:
 		current_vclock = vclockset_isearch(&r->wal_dir.index, &r->vclock);
 		if (current_vclock == NULL)
 			break; /* No more WALs */
@@ -420,29 +393,9 @@ find_next_wal:
 		 * .xlog, with no risk of a concurrent
 		 * inprogress_log_rename().
 		 */
-		f = NULL;
-		suffix = INPROGRESS;
-		if (current_lsn == wal_greatest_lsn) {
-			/* Last WAL present at the time of rescan. */
-			filename = format_filename(&r->wal_dir,
-						   current_lsn, suffix);
-			f = fopen(filename, "r");
-		}
-		if (f == NULL) {
-			suffix = NONE;
-			filename = format_filename(&r->wal_dir,
-						   current_lsn, suffix);
-			f = fopen(filename, "r");
-			/*
-			 * Try finding wal for the next lsn if there is a
-			 * gap in LSNs.
-			 */
-			if (f == NULL && errno == ENOENT &&
-			    current_lsn < wal_greatest_lsn)
-				goto find_next_wal;
-		}
-		next_wal = log_io_open(&r->wal_dir, LOG_READ, filename,
-				       &r->node_uuid, suffix, f);
+		suffix = current_lsn == wal_greatest_lsn ? INPROGRESS : NONE;
+		next_wal = log_io_open_for_read(&r->wal_dir, current_lsn,
+			&r->server_uuid, suffix);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
@@ -456,8 +409,8 @@ find_next_wal:
 				 * we failed to open it. Try to
 				 * delete it.
 				 */
-				say_warn("unlink broken %s WAL", filename);
-				if (inprogress_log_unlink(filename) != 0)
+				if (inprogress_log_unlink(format_filename(
+				    &r->wal_dir, current_lsn, INPROGRESS)) != 0)
 					panic("can't unlink 'inprogres' WAL");
 			}
 			result = 0;
@@ -939,25 +892,6 @@ wal_writer_pop(struct wal_writer *writer, struct wal_fifo *input)
 	}
 }
 
-int
-wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
-		 const struct vclock *vclock)
-{
-	/* Write SETLSN command */
-	struct iproto_header row;
-	struct iovec iov[XLOG_ROW_IOVMAX];
-	log_encode_vclock(&row, vclock);
-	int iovcnt = xlog_encode_row(&row, iov);
-	fio_batch_start(batch, 1);
-	fio_batch_add(batch, iov, iovcnt);
-	if (fio_batch_write(batch, fileno(wal->f)) != 1) {
-		say_error("wal_write_vclock failed");
-		return -1;
-	}
-
-	return 0;
-}
-
 /**
  * If there is no current WAL, try to open it, and close the
  * previous WAL. We close the previous WAL only after opening
@@ -973,8 +907,8 @@ wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
  * @return 0 in case of success, -1 on error.
  */
 static int
-wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
-	       struct recovery_state *r, struct vclock *vclock)
+wal_opt_rotate(struct log_io **wal, struct recovery_state *r,
+	       struct vclock *vclock)
 {
 	struct log_io *l = *wal, *wal_to_close = NULL;
 
@@ -990,13 +924,7 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 	}
 	if (l == NULL) {
 		/* Open WAL with '.inprogress' suffix. */
-		int64_t lsnsum = vclock_signature(vclock);
-		l = log_io_open_for_write(&r->wal_dir, lsnsum, &r->node_uuid,
-					  INPROGRESS);
-		if (l != NULL) {
-			if (wal_write_vclock(l, batch, vclock) != 0)
-				log_io_close(&l);
-		}
+		l = log_io_open_for_write(&r->wal_dir, &r->server_uuid, vclock);
 		/*
 		 * Close the file *after* we create the new WAL, since
 		 * this is when replication relays get an inotify alarm
@@ -1011,7 +939,6 @@ wal_opt_rotate(struct log_io **wal, struct fio_batch *batch,
 			 * A warning is written to the server
 			 * log file.
 			 */
-			wal_write_vclock(wal_to_close, batch, vclock);
 			log_io_close(&wal_to_close);
 		}
 	} else if (l->rows == 1) {
@@ -1072,7 +999,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 	struct wal_write_request *write_end = req;
 
 	while (req) {
-		if (wal_opt_rotate(wal, batch, r, &writer->vclock) != 0)
+		if (wal_opt_rotate(wal, r, &writer->vclock) != 0)
 			break;
 		struct wal_write_request *batch_end;
 		batch_end = wal_fill_batch(*wal, batch, r->rows_per_wal,
@@ -1120,10 +1047,8 @@ wal_writer_thread(void *worker_args)
 		ev_async_send(writer->txn_loop, &writer->write_event);
 	}
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-	if (r->current_wal != NULL) {
-		wal_write_vclock(r->current_wal, writer->batch, &writer->vclock);
+	if (r->current_wal != NULL)
 		log_io_close(&r->current_wal);
-	}
 	return NULL;
 }
 
@@ -1181,7 +1106,6 @@ wal_write(struct recovery_state *r, struct iproto_header *row)
 void
 snapshot_write_row(struct log_io *l, struct iproto_header *row)
 {
-	static int rows;
 	static uint64_t bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
@@ -1197,7 +1121,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	 * recovery_process().
 	 */
 	if (iproto_request_is_dml(row->type))
-		row->lsn = ++rows;
+		row->lsn = ++l->rows;
 	row->sync = 0; /* don't write sync to wal */
 
 	struct iovec iov[XLOG_ROW_IOVMAX];
@@ -1213,8 +1137,8 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 		bytes += iov[i].iov_len;
 	}
 
-	if (rows % 100000 == 0)
-		say_crit("%.1fM rows written", rows / 1000000.);
+	if (l->rows % 100000 == 0)
+		say_crit("%.1fM rows written", l->rows / 1000000.);
 
 	region_free_after(&fiber()->gc, 128 * 1024);
 
@@ -1260,10 +1184,8 @@ void
 snapshot_save(struct recovery_state *r)
 {
 	assert(r->snapshot_handler != NULL);
-	struct log_io *snap;
-	int64_t lsnsum = vclock_signature(&r->vclock);
-	snap = log_io_open_for_write(&r->snap_dir, lsnsum, &r->node_uuid,
-				     INPROGRESS);
+	struct log_io *snap = log_io_open_for_write(&r->snap_dir,
+		&r->server_uuid, &r->vclock);
 	if (snap == NULL)
 		panic_status(errno, "Failed to save snapshot: failed to open file in write mode.");
 	/*
@@ -1273,20 +1195,7 @@ snapshot_save(struct recovery_state *r)
 	 */
 	say_info("saving snapshot `%s'", snap->filename);
 
-	/* Write starting SETLSN (always empty table for snapshot) */
-	struct iproto_header row;
-	struct vclock vclock;
-	vclock_create(&vclock);
-	/* Add a surrogate server id for snapshot rows */
-	vclock_add_server(&vclock, 0);
-
-	log_encode_vclock(&row, &vclock);
-	snapshot_write_row(snap, &row);
 	r->snapshot_handler(snap);
-
-	/* Preserver cluster clock in the snapshot */
-	log_encode_vclock(&row, &r->vclock);
-	snapshot_write_row(snap, &row);
 
 	log_io_close(&snap);
 

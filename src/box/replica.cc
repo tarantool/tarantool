@@ -38,6 +38,7 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "tarantool.h"
+#include "scoped_guard.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
@@ -154,8 +155,8 @@ replica_bootstrap(struct recovery_state *r)
 	say_info("bootstrapping a replica");
 	assert(recovery_has_remote(r));
 
-	/* Generate Node-UUID */
-	tt_uuid_create(&r->node_uuid);
+	/* Generate Server-UUID */
+	tt_uuid_create(&r->server_uuid);
 
 	char greeting[IPROTO_GREETING_SIZE];
 
@@ -196,7 +197,7 @@ replica_bootstrap(struct recovery_state *r)
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
 	/* Greet the remote server with our server UUID */
-	data = iproto_encode_uuid(data, &recovery_state->node_uuid);
+	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
 
 	assert(data <= buf + sizeof(buf));
 	row.body[0].iov_base = buf;
@@ -206,19 +207,34 @@ replica_bootstrap(struct recovery_state *r)
 
 	sio_writev_all(master, iov, iovcnt);
 
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
+
 	while (true) {
 		remote_read_row_fd(master, &row);
 
-		/* Recv JOIN response (= end of stream) */
-		if (row.type == IPROTO_JOIN) {
+		if (iproto_request_is_dml(row.type)) {
+			/* Regular snapshot row  (IPROTO_INSERT) */
+			recovery_process(r, &row);
+		} else if (row.type == IPROTO_JOIN) {
+			/* End of stream */
 			say_info("done");
 			break;
+		} else {
+			iproto_decode_error(&row);  /* rethrow error */
 		}
-
-		recovery_process(r, &row);
 	}
 
-	recovery_end_recover_snapshot(r);
+	/* Decode end of stream packet */
+	struct vclock vclock;
+	vclock_create(&vclock);
+	auto vclock_guard = make_scoped_guard([&]{ vclock_destroy(&vclock); });
+	assert(row.type == IPROTO_JOIN);
+	iproto_decode_eos(&row, &vclock);
+
+	/* Replace server vclock using data from snapshot */
+	vclock_copy(&r->vclock, &vclock);
+
 	/* master socket closed by guard */
 }
 
@@ -266,7 +282,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
 	data = iproto_encode_uuid(data, &cluster_id);
 	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
-	data = iproto_encode_uuid(data, &recovery_state->node_uuid);
+	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
 	vclock_foreach(&r->vclock, server) {
@@ -313,6 +329,8 @@ pull_from_remote(va_list ap)
 			err = "can't read row";
 			struct iproto_header row;
 			remote_read_row(&coio, iobuf, &row);
+			if (!iproto_request_is_dml(row.type))
+				iproto_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;
 

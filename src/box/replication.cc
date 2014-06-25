@@ -47,6 +47,7 @@
 #include "evio.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
+#include "scoped_guard.h"
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
@@ -212,33 +213,11 @@ void
 replication_join(int fd, struct iproto_header *header)
 {
 	assert(header->type == IPROTO_JOIN);
-	if (header->bodycnt == 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
+	struct tt_uuid server_uuid = uuid_nil;
+	iproto_decode_join(header, &server_uuid);
 
-	const char *data = (const char *) header->body[0].iov_base;
-	const char *end = data + header->body[0].iov_len;
-	const char *d = data;
-	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "JOIN body");
-
-	struct tt_uuid node_uuid = uuid_nil;
-	d = data;
-	uint32_t map_size = mp_decode_map(&d);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-			mp_next(&d); /* key */
-			mp_next(&d); /* value */
-			continue;
-		}
-		uint8_t key = mp_decode_uint(&d);
-		if (key == IPROTO_SERVER_UUID) {
-			iproto_decode_uuid(&d, &node_uuid);
-		} else {
-			mp_next(&d); /* value */
-		}
-	}
 	/* Notify box about new cluster node */
-	recovery_state->join_handler(&node_uuid);
+	recovery_state->join_handler(&server_uuid);
 
 	struct replication_request *request = (struct replication_request *)
 			malloc(sizeof(*request));
@@ -260,45 +239,12 @@ replication_join(int fd, struct iproto_header *header)
 void
 replication_subscribe(int fd, struct iproto_header *packet)
 {
-	if (packet->bodycnt == 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
-	assert(packet->bodycnt == 1);
-	const char *data = (const char *) packet->body[0].iov_base;
-	const char *end = data + packet->body[0].iov_len;
-	const char *d = data;
-	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "subscribe body");
 	struct tt_uuid uu = uuid_nil, node_uuid = uuid_nil;
 
-	const char *lsnmap = NULL;
-	d = data;
-	uint32_t map_size = mp_decode_map(&d);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-			mp_next(&d); /* key */
-			mp_next(&d); /* value */
-			continue;
-		}
-		uint8_t key = mp_decode_uint(&d);
-		switch (key) {
-		case IPROTO_CLUSTER_UUID:
-			iproto_decode_uuid(&d, &uu);
-			break;
-		case IPROTO_SERVER_UUID:
-			iproto_decode_uuid(&d, &node_uuid);
-			break;
-		case IPROTO_VCLOCK:
-			if (mp_typeof(*d) != MP_MAP) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid VCLOCK");
-			}
-			lsnmap = d;
-			mp_next(&d);
-			break;
-		default:
-			mp_next(&d); /* value */
-		}
-	}
+	struct vclock vclock;
+	vclock_create(&vclock);
+	auto vclock_guard = make_scoped_guard([&]{ vclock_destroy(&vclock); });
+	iproto_decode_subscribe(packet, &uu, &node_uuid, &vclock);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
@@ -319,32 +265,15 @@ replication_subscribe(int fd, struct iproto_header *packet)
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
 			  tt_uuid_str(&node_uuid));
 	}
-	if (lsnmap == NULL)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
-	/* Check & save LSNMAP */
-	d = lsnmap;
-	uint32_t lsnmap_size = mp_decode_map(&d);
+
 	struct replication_request *request = (struct replication_request *)
 		calloc(1, sizeof(*request));
-
 	if (request == NULL) {
 		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*request),
 			  "iproto", "SUBSCRIBE");
 	}
 	vclock_create(&request->data.vclock);
-
-	for (uint32_t i = 0; i < lsnmap_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-		map_error:
-			free(request);
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
-		}
-		uint32_t id = mp_decode_uint(&d);
-		if (mp_typeof(*d) != MP_UINT)
-			goto map_error;
-		int64_t lsn = (int64_t) mp_decode_uint(&d);
-		vclock_follow(&request->data.vclock, id, lsn);
-	}
+	vclock_copy(&request->data.vclock, &vclock);
 
 	request->fd = fd;
 	request->io.data = request;
@@ -737,6 +666,24 @@ replication_relay_join(struct recovery_state *r)
 	packet.type = IPROTO_JOIN;
 	packet.sync = relay.sync;
 
+	/* Add vclock to response body */
+	uint32_t cluster_size = vclock_size(&r->vclock);
+	size_t size = 128 + cluster_size *
+		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_map(data, cluster_size);
+	vclock_foreach(&r->vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
+	}
+	assert(data <= buf + size);
+	packet.body[0].iov_base = buf;
+	packet.body[0].iov_len = (data - buf);
+	packet.bodycnt = 1;
+
 	struct iovec iov[IPROTO_ROW_IOVMAX];
 	int iovcnt = iproto_row_encode(&packet, iov);
 	sio_writev_all(relay.sock, iov, iovcnt);
@@ -818,7 +765,6 @@ replication_relay_loop()
 	recovery_init(cfg_snap_dir, cfg_wal_dir,
 		      replication_relay_send_row,
 		      NULL, NULL, NULL, INT32_MAX);
-	recovery_state->relay = true; /* recovery used in relay mode */
 
 	try {
 		switch (relay.type) {

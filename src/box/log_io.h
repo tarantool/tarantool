@@ -69,9 +69,6 @@ struct log_dir {
 	mode_t mode;
 
 	vclockset_t index; /* vclock set for this directory */
-#if !defined(SNAPSHOT_SETLSN_META)
-	int64_t greatest;
-#endif
 };
 
 int
@@ -86,12 +83,6 @@ log_dir_scan(struct log_dir *dir);
 char *
 format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
 
-void
-log_encode_vclock(struct iproto_header *packet, const struct vclock *vclock);
-
-void
-log_decode_vclock(struct iproto_header *packet, struct vclock *vclock);
-
 struct log_io {
 	struct log_dir *dir;
 	FILE *f;
@@ -102,17 +93,24 @@ struct log_io {
 	char filename[PATH_MAX + 1];
 
 	bool is_inprogress;
+
+	/* Meta information */
+	tt_uuid server_uuid;
+	struct vclock vclock;
 };
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
-		     enum log_suffix suffix);
+log_io_open_for_read(struct log_dir *dir, int64_t sign,
+		     const tt_uuid *server_uuid, enum log_suffix suffix);
+
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t sign,
-		      tt_uuid *node_uuid, enum log_suffix suffix);
+log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
+			    const tt_uuid *server_uuid, enum log_suffix suffix,
+			    FILE *file);
+
 struct log_io *
-log_io_open(struct log_dir *dir, enum log_mode mode, const char *filename,
-	    tt_uuid *node_uuid, enum log_suffix suffix, FILE *file);
+log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
+		      const struct vclock *vclock);
 int
 log_io_sync(struct log_io *l);
 int

@@ -101,10 +101,9 @@ static inline void
 log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 {
 	/*
-	 * Open xlog to find SETLSN
+	 * Open xlog and parse vclock
 	 */
-	tt_uuid uuid;
-	struct log_io *wal = log_io_open_for_read(dir, signature, &uuid,
+	struct log_io *wal = log_io_open_for_read(dir, signature, NULL,
 						  INPROGRESS);
 	if (wal == NULL)
 		tnt_raise(ClientError, ER_INVALID_XLOG, (long long) signature);
@@ -113,33 +112,9 @@ log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 	});
 
 	/*
-	 * Find SETLSN command for xlogs (must be the first)
-	 */
-	struct log_io_cursor cur;
-	log_io_cursor_open(&cur, wal);
-	struct iproto_header row;
-	if (log_io_cursor_next(&cur, &row) != 0 ||
-	    row.type != IPROTO_SETLSN)
-		tnt_raise(ClientError, ER_INVALID_XLOG, (long long) signature);
-
-	/*
-	 * Parse SETLSN
-	 */
-	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
-	if (vclock == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE,
-			  sizeof(*vclock), "log_dir", "vclockset");
-	}
-	auto vclock_guard = make_scoped_guard([&]{
-		vclock_destroy(vclock);
-		free(vclock);
-	});
-	log_decode_vclock(&row, vclock);
-	int64_t signature_check = vclock_signature(vclock);
-
-	/*
 	 * Check filename
 	 */
+	int64_t signature_check = vclock_signature(&wal->vclock);
 	if (signature_check != signature) {
 		tnt_raise(ClientError, ER_INVALID_XLOG_NAME,
 			  (long long) signature_check, (long long) signature);
@@ -148,7 +123,7 @@ log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 	/*
 	 * Check ordering
 	 */
-	struct vclock *dup = vclockset_search(&dir->index, vclock);
+	struct vclock *dup = vclockset_search(&dir->index, &wal->vclock);
 	if (dup != NULL) {
 		tnt_raise(ClientError, ER_INVALID_XLOG_ORDER,
 			  (long long) signature,
@@ -158,8 +133,14 @@ log_dir_add_to_index(struct log_dir *dir, int64_t signature)
 	/*
 	 * Update vclockset
 	 */
+	struct vclock *vclock = (struct vclock *) malloc(sizeof(*vclock));
+	if (vclock == NULL) {
+		tnt_raise(ClientError, ER_MEMORY_ISSUE,
+			  sizeof(*vclock), "log_dir", "vclockset");
+	}
+	vclock_create(vclock);
+	vclock_copy(vclock, &wal->vclock);
 	vclockset_insert(&dir->index, vclock);
-	vclock_guard.is_active = false;
 }
 
 static int
@@ -239,19 +220,10 @@ log_dir_scan(struct log_dir *dir)
 	if (signs_size == 0) {
 		/* Empty directory */
 		vclockset_clean(&dir->index);
-		dir->greatest = INT64_MAX;
 		return 0;
 	}
 
 	qsort(signs, signs_size, sizeof(*signs), cmp_i64);
-
-#if !defined(SNAPSHOT_SETLSN_META)
-	/* Snapshots don't have correct SETLSN command, ignore */
-	if (dir == &recovery_state->snap_dir) {
-		dir->greatest = signs[signs_size - 1];
-		return 0;
-	}
-#endif
 	struct vclock *cur = vclockset_first(&dir->index);
 	for (size_t i = 0; i < signs_size; i++) {
 		while (cur != NULL) {
@@ -293,84 +265,6 @@ format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
 	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
 		 dir->dirname, (long long)lsn, dir->filename_ext, suffix_str);
 	return filename;
-}
-
-void
-log_encode_vclock(struct iproto_header *row, const struct vclock *vclock)
-{
-	memset(row, 0, sizeof(*row));
-	row->type = IPROTO_SETLSN;
-
-	uint32_t cluster_size = vclock_size(vclock);
-	size_t size = 128 + cluster_size *
-		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	char *data = buf;
-	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, cluster_size);
-
-	vclock_foreach(vclock, server) {
-		data = mp_encode_uint(data, server.id);
-		data = mp_encode_uint(data, server.lsn);
-	}
-
-	assert(data <= buf + size);
-	row->body[0].iov_base = buf;
-	row->body[0].iov_len = (data - buf);
-	row->bodycnt = 1;
-}
-
-void
-log_decode_vclock(struct iproto_header *row, struct vclock *vclock)
-{
-	if (row->bodycnt == 0)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "SETLSN body");
-	const char *data = (const char *) row->body[0].iov_base;
-	const char *d = data;
-	if (mp_typeof(*data) != MP_MAP) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "SETLSN request body");
-	}
-	const char *lsnmap = NULL;
-	uint32_t map_size = mp_decode_map(&d);
-	for (uint32_t i = 0; i < map_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-			mp_next(&d); /* key */
-			mp_next(&d); /* value */
-			continue;
-		}
-		uint8_t key = mp_decode_uint(&d);
-		switch (key) {
-		case IPROTO_VCLOCK:
-			if (mp_typeof(*d) != MP_MAP) {
-				tnt_raise(ClientError, ER_INVALID_MSGPACK,
-					  "invalid LSN Map");
-			}
-			lsnmap = d;
-			mp_next(&d);
-			break;
-		default:
-			mp_next(&d); /* value */
-		}
-	}
-
-	if (lsnmap == NULL)
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "missing LSNMAP");
-
-	d = lsnmap;
-	uint32_t row_count = mp_decode_map(&d);
-
-	vclock_create(vclock);
-	for (uint32_t i = 0; i < row_count; i++) {
-		if (mp_typeof(*d) != MP_UINT)
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
-		uint32_t server_id = mp_decode_uint(&d);
-		if (mp_typeof(*d) != MP_UINT)
-			tnt_raise(ClientError, ER_INVALID_MSGPACK, "LSNMAP");
-		int64_t lsn = mp_decode_uint(&d);
-		vclock_follow(vclock, server_id, lsn);
-	}
 }
 
 /* }}} */
@@ -666,6 +560,8 @@ log_io_close(struct log_io **lptr)
 			log_io_sync(l);
 		if (l->is_inprogress && inprogress_log_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
+	} else if (l->mode == LOG_READ) {
+		vclock_destroy(&l->vclock);
 	}
 
 	r = fclose(l->f);
@@ -725,14 +621,19 @@ log_io_sync(struct log_io *l)
 	return 0;
 }
 
-#define NODE_UUID_KEY "Node"
+#define SERVER_UUID_KEY "Server"
+#define VCLOCK_KEY "VClock"
 
 static int
-log_io_write_meta(struct log_io *l, const tt_uuid *node_uuid)
+log_io_write_meta(struct log_io *l, const tt_uuid *server_uuid,
+		  const struct vclock *vclock)
 {
+	char *vstr = NULL;
 	if (fprintf(l->f, "%s%s", l->dir->filetype, v12) < 0 ||
-	    fprintf(l->f, NODE_UUID_KEY ": %s\n\n",
-		    tt_uuid_str(node_uuid)) < 0) {
+	    fprintf(l->f, SERVER_UUID_KEY ": %s\n", tt_uuid_str(server_uuid)) < 0 ||
+	    (vstr = vclock_to_string(vclock)) == NULL ||
+	    fprintf(l->f, VCLOCK_KEY ": %s\n\n", vstr) < 0) {
+		free(vstr);
 		return -1;
 	}
 
@@ -748,8 +649,7 @@ log_io_write_meta(struct log_io *l, const tt_uuid *node_uuid)
  * @return 0 if success, -1 on error.
  */
 static int
-log_io_verify_meta(struct log_io *l, tt_uuid *node_uuid,
-		   const char **errmsg)
+log_io_verify_meta(struct log_io *l, const tt_uuid *server_uuid)
 {
 	char filetype[32], version[32], buf[256];
 	struct log_dir *dir = l->dir;
@@ -757,22 +657,23 @@ log_io_verify_meta(struct log_io *l, tt_uuid *node_uuid,
 
 	if (fgets(filetype, sizeof(filetype), stream) == NULL ||
 	    fgets(version, sizeof(version), stream) == NULL) {
-		*errmsg = "failed to read log file header";
-		goto error;
+		say_error("%s: failed to read log file header", l->filename);
+		return -1;
 	}
 	if (strcmp(dir->filetype, filetype) != 0) {
-		*errmsg = "unknown filetype";
-		goto error;
+		say_error("%s: unknown filetype", l->filename);
+		return -1;
 	}
 
 	if (strcmp(v12, version) != 0) {
-		*errmsg = "unsupported file format version";
-		goto error;
+		say_error("%s: unsupported file format version", l->filename);
+		return -1;
 	}
 	for (;;) {
 		if (fgets(buf, sizeof(buf), stream) == NULL) {
-			*errmsg = "failed to read log file header";
-			goto error;
+			say_error("%s: failed to read log file header",
+				  l->filename);
+			return -1;
 		}
 		if (strcmp(buf, "\n") == 0)
 			break;
@@ -783,85 +684,95 @@ log_io_verify_meta(struct log_io *l, tt_uuid *node_uuid,
 		char *key = buf;
 		char *val = strchr(buf, ':');
 		if (val == NULL) {
-			*errmsg = "invalid meta";
-			goto error;
+			say_error("%s: invalid meta", l->filename);
+			return -1;
 		}
 		*(val++) = 0;
 		while (*val == ' ') ++val; /* skip starting spaces */
 
-		if (strcmp(key, NODE_UUID_KEY) == 0) {
+		if (strcmp(key, SERVER_UUID_KEY) == 0) {
 			if ((end - val) != UUID_STR_LEN ||
-			    tt_uuid_from_string(val, node_uuid) != 0) {
-				*errmsg = "can't parse node uuid";
-				goto error;
+			    tt_uuid_from_string(val, &l->server_uuid) != 0) {
+				say_error("%s: can't parse node uuid",
+					  l->filename);
+				return -1;
+			}
+		} else if (strcmp(key, VCLOCK_KEY) == 0){
+			size_t offset = vclock_from_string(&l->vclock, val);
+			if (offset != 0) {
+				say_error("%s: invalid vclock at offset %zd",
+					  l->filename, offset);
+				return -1;
 			}
 		} else {
 			/* Skip unknown key */
 		}
 	}
+
+	if (server_uuid != NULL && !tt_uuid_is_nil(server_uuid) &&
+	    tt_uuid_cmp(server_uuid, &l->server_uuid)) {
+		say_error("%s: invalid server uuid", l->filename);
+		return -1;
+	}
 	return 0;
-error:
-	return -1;
 }
 
 struct log_io *
-log_io_open(struct log_dir *dir, enum log_mode mode, const char *filename,
-	    tt_uuid *node_uuid, enum log_suffix suffix, FILE *file)
+log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
+			    const tt_uuid *server_uuid, enum log_suffix suffix,
+			    FILE *file)
 {
 	struct log_io *l = NULL;
 	int save_errno;
-	const char *errmsg = NULL;
 	/*
 	 * Check fopen() result the caller first thing, to
 	 * preserve the errno.
 	 */
 	if (file == NULL) {
-		errmsg = strerror(errno);
-		goto error;
+		save_errno = errno;
+		say_syserror("%s: failed to open file", filename);
+		goto error_1;
 	}
 	l = (struct log_io *) calloc(1, sizeof(*l));
 	if (l == NULL) {
-		errmsg = strerror(errno);
-		goto error;
+		save_errno = errno;
+		say_syserror("%s: memory error", filename);
+		goto error_2;
 	}
 	l->f = file;
 	strncpy(l->filename, filename, PATH_MAX);
-	l->mode = mode;
+	l->mode = LOG_READ;
 	l->dir = dir;
-	l->is_inprogress = suffix == INPROGRESS;
-	if (mode == LOG_READ) {
-		if (log_io_verify_meta(l, node_uuid, &errmsg) != 0)
-			goto error;
-	} else { /* LOG_WRITE */
-		setvbuf(l->f, NULL, _IONBF, 0);
-		if (log_io_write_meta(l, node_uuid) != 0) {
-			errmsg = strerror(errno);
-			goto error;
-		}
+	l->is_inprogress = (suffix == INPROGRESS);
+	vclock_create(&l->vclock);
+	if (log_io_verify_meta(l, server_uuid) != 0) {
+		save_errno = EINVAL;
+		goto error_3;
 	}
 	return l;
-error:
-	save_errno = errno;
-	say_error("%s: failed to open %s: %s", __func__, filename, errmsg);
-	if (file)
-		fclose(file);
-	if (l)
-		free(l);
+
+error_3:
+	vclock_destroy(&l->vclock);
+	free(l);
+error_2:
+	fclose(file);
+error_1:
 	errno = save_errno;
 	return NULL;
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
-		     enum log_suffix suffix)
+log_io_open_for_read(struct log_dir *dir, int64_t sign,
+		     const tt_uuid *server_uuid, enum log_suffix suffix)
 {
 	const char *filename = format_filename(dir, sign, suffix);
 	FILE *f = fopen(filename, "r");
 	if (suffix == INPROGRESS && f == NULL) {
 		filename = format_filename(dir, sign, NONE);
 		f = fopen(filename, "r");
+		suffix = NONE;
 	}
-	return log_io_open(dir, LOG_READ, filename, node_uuid, suffix, f);
+	return log_io_open_stream_for_read(dir, filename, server_uuid, suffix, f);
 }
 
 /**
@@ -869,36 +780,56 @@ log_io_open_for_read(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
  * and sets errno.
  */
 struct log_io *
-log_io_open_for_write(struct log_dir *dir, int64_t sign, tt_uuid *node_uuid,
-		      enum log_suffix suffix)
+log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
+		      const struct vclock *vclock)
 {
 	char *filename;
-	FILE *f;
+	FILE *f = NULL;
+	struct log_io *l = NULL;
+
+	int64_t sign = vclock_signature(vclock);
 	assert(sign >= 0);
 
-	if (suffix == INPROGRESS) {
-		/*
-		 * Check whether a file with this name already exists.
-		 * We don't overwrite existing files.
-		 */
-		filename = format_filename(dir, sign, NONE);
-		if (access(filename, F_OK) == 0) {
-			errno = EEXIST;
-			goto error;
-		}
+	/*
+	* Check whether a file with this name already exists.
+	* We don't overwrite existing files.
+	*/
+	filename = format_filename(dir, sign, NONE);
+	if (access(filename, F_OK) == 0) {
+		errno = EEXIST;
+		goto error;
 	}
-	filename = format_filename(dir, sign, suffix);
+
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
+	filename = format_filename(dir, sign, INPROGRESS);
 	f = fiob_open(filename, dir->open_wflags);
 	if (!f)
 		goto error;
 	say_info("creating `%s'", filename);
-	return log_io_open(dir, LOG_WRITE, filename, node_uuid, suffix, f);
+	l = (struct log_io *) calloc(1, sizeof(*l));
+	if (l == NULL)
+		goto error;
+	l->f = f;
+	strncpy(l->filename, filename, PATH_MAX);
+	l->mode = LOG_WRITE;
+	l->dir = dir;
+	l->is_inprogress = true;
+	setvbuf(l->f, NULL, _IONBF, 0);
+	if (log_io_write_meta(l, server_uuid, vclock) != 0)
+		goto error;
+
+	return l;
 error:
-	say_syserror("%s: failed to open `%s'", __func__, filename);
+	int save_errno = errno;
+	say_syserror("%s: failed to open", filename);
+	if (f != NULL) {
+		fclose(f);
+		unlink(filename); /* try to remove incomplete file */
+	}
+	errno = save_errno;
 	return NULL;
 }
 

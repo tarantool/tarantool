@@ -32,6 +32,7 @@
 #include "fiber.h"
 #include "crc32.h"
 #include "tt_uuid.h"
+#include "box/vclock.h"
 
 const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 {
@@ -354,4 +355,73 @@ iproto_decode_error(struct iproto_header *row)
 
 raise:
 	tnt_raise(ClientError, error, code);
+}
+
+void
+iproto_decode_subscribe(struct iproto_header *packet,
+			struct tt_uuid *cluster_uuid,
+			struct tt_uuid *server_uuid, struct vclock *vclock)
+{
+	if (packet->bodycnt == 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+	assert(packet->bodycnt == 1);
+	const char *data = (const char *) packet->body[0].iov_base;
+	const char *end = data + packet->body[0].iov_len;
+	const char *d = data;
+	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+
+	const char *lsnmap = NULL;
+	d = data;
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d); /* key */
+			mp_next(&d); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_CLUSTER_UUID:
+			if (cluster_uuid == NULL)
+				goto skip;
+			iproto_decode_uuid(&d, cluster_uuid);
+			break;
+		case IPROTO_SERVER_UUID:
+			if (server_uuid == NULL)
+				goto skip;
+			iproto_decode_uuid(&d, server_uuid);
+			break;
+		case IPROTO_VCLOCK:
+			if (vclock == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_MAP) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid VCLOCK");
+			}
+			lsnmap = d;
+			mp_next(&d);
+			break;
+		default: skip:
+			mp_next(&d); /* value */
+		}
+	}
+
+	if (lsnmap == NULL)
+		return;
+
+	/* Check & save LSNMAP */
+	d = lsnmap;
+	uint32_t lsnmap_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < lsnmap_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+		map_error:
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
+		}
+		uint32_t id = mp_decode_uint(&d);
+		if (mp_typeof(*d) != MP_UINT)
+			goto map_error;
+		int64_t lsn = (int64_t) mp_decode_uint(&d);
+		vclock_follow(vclock, id, lsn);
+	}
 }

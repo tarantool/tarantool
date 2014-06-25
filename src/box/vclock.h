@@ -122,6 +122,27 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 void
 vclock_merge(struct vclock *to, const struct vclock *with);
 
+/**
+ * \brief Format vclock to YAML-compatible string representation:
+ * { node_id: lsn, node_id:lsn })
+ * \param vclock vclock
+ * \return fomatted string. This pointer should be passed to free(3) to
+ * release the allocated storage when it is no longer needed.
+ */
+char *
+vclock_to_string(const struct vclock *vclock);
+
+/**
+ * \brief Fill vclock from string representation.
+ * \param vclock vclock
+ * \param str string to parse
+ * \retval 0 on sucess
+ * \retval error offset on error (indexed from 1)
+ * \sa vclock_to_string()
+ */
+size_t
+vclock_from_string(struct vclock *vclock, const char *str);
+
 enum { VCLOCK_ORDER_UNDEFINED = INT_MAX };
 
 /**

@@ -69,7 +69,7 @@ lbox_info_node(struct lua_State *L)
 	lua_pushinteger(L, recovery_state->server_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&recovery_state->node_uuid), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&recovery_state->server_uuid), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
 	luaL_pushnumber64(L, vclock_get(&recovery_state->vclock,

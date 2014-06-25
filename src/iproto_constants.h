@@ -116,8 +116,7 @@ enum iproto_request_type {
 	IPROTO_DML_REQUEST_MAX = 8,
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
-	IPROTO_SUBSCRIBE = 66,
-	IPROTO_SETLSN = 67
+	IPROTO_SUBSCRIBE = 66
 };
 
 extern const char *iproto_request_type_strs[];
@@ -187,6 +186,40 @@ iproto_row_encode(const struct iproto_header *row, struct iovec *out);
 
 void
 iproto_decode_error(struct iproto_header *row);
+
+/**
+ * \brief Decode SUBSCRIBE command
+ * \param packet
+ * \param[out] cluster_uuid
+ * \param[out] server_uuid
+ * \param[out] vclock
+ */
+void
+iproto_decode_subscribe(struct iproto_header *packet,
+			struct tt_uuid *cluster_uuid,
+			struct tt_uuid *server_uuid, struct vclock *vclock);
+
+/**
+ * \brief Decode JOIN command
+ * \param packet
+ * \param[out] server_uuid
+ */
+static inline void
+iproto_decode_join(struct iproto_header *packet, struct tt_uuid *server_uuid)
+{
+	return iproto_decode_subscribe(packet, NULL, server_uuid, NULL);
+}
+
+/**
+ * \brief Decode end of stream packet (a response to JOIN packet)
+ * \param packet
+ * \param[out] vclock
+ */
+static inline void
+iproto_decode_eos(struct iproto_header *packet, struct vclock *vclock)
+{
+	return iproto_decode_subscribe(packet, NULL, NULL, vclock);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

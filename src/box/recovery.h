@@ -73,7 +73,6 @@ struct recovery_state {
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
 	struct remote remote;
-	bool relay; /* true if recovery initialized for JOIN/SUBSCRIBE */
 	/**
 	 * row_handler is a module callback invoked during initial
 	 * recovery and when reading rows from the master.  It is
@@ -88,7 +87,7 @@ struct recovery_state {
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	enum wal_mode wal_mode;
-	struct tt_uuid node_uuid;
+	struct tt_uuid server_uuid;
 	uint32_t server_id;
 
 	bool finalize;
@@ -109,7 +108,6 @@ static inline bool
 recovery_has_data(struct recovery_state *r)
 {
 	return vclockset_first(&r->snap_dir.index) != NULL ||
-	       r->snap_dir.greatest != INT64_MAX ||
 	       vclockset_first(&r->wal_dir.index) != NULL;
 }
 void recovery_bootstrap(struct recovery_state *r);
@@ -122,18 +120,12 @@ int wal_write(struct recovery_state *r, struct iproto_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
 void recovery_process(struct recovery_state *r, struct iproto_header *packet);
-void recovery_end_recover_snapshot(struct recovery_state *r);
 
 struct fio_batch;
 
 void
 snapshot_write_row(struct log_io *l, struct iproto_header *packet);
 void snapshot_save(struct recovery_state *r);
-
-/* Only for tests */
-int
-wal_write_vclock(struct log_io *wal, struct fio_batch *batch,
-		 const struct vclock *vclock);
 
 #if defined(__cplusplus)
 } /* extern "C" */

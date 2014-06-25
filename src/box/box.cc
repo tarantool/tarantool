@@ -328,11 +328,16 @@ box_on_cluster_join(const tt_uuid *node_uuid)
 static void
 box_set_node_uuid()
 {
-	tt_uuid_create(&recovery_state->node_uuid);
-	vclock_del_server(&recovery_state->vclock, recovery_state->server_id);
-	recovery_state->server_id = 0;            /* please the assert */
+	tt_uuid_create(&recovery_state->server_uuid);
+	assert(recovery_state->server_id == 0);
+	if (vclock_has(&recovery_state->vclock, 1))
+		vclock_del_server(&recovery_state->vclock, 1);
 	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
-	     1, tt_uuid_str(&recovery_state->node_uuid));
+	     1, tt_uuid_str(&recovery_state->server_uuid));
+	/* Remove surrogate node */
+	vclock_del_server(&recovery_state->vclock, 0);
+	assert(recovery_state->server_id == 1);
+	assert(vclock_has(&recovery_state->vclock, 1));
 }
 
 /** Insert a new cluster into _schema */
@@ -404,7 +409,6 @@ box_init()
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
-		recovery_end_recover_snapshot(recovery_state);
 	} else if (recovery_has_remote(recovery_state)) {
 		/* Initialize a new replica */
 		replica_bootstrap(recovery_state);
@@ -414,7 +418,6 @@ box_init()
 		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();
 		box_set_node_uuid();
-		recovery_end_recover_snapshot(recovery_state);
 		snapshot_save(recovery_state);
 	}
 
