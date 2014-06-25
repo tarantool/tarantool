@@ -144,7 +144,7 @@ socket_methods.sysread = function(self, len)
     self._errno = nil
     local buf = ffi.new('char[?]', len)
     local res = ffi.C.read(self.fh, buf, len)
-    
+
     if res < 0 then
         self._errno = boxerrno()
         return nil
@@ -179,13 +179,27 @@ socket_methods.nonblock = function(self, nb)
     end
 end
 
+local function wait_safely(self, what, timeout)
+    local f = boxfiber.self()
+    local fid = f:id()
+
+    if self.waiters == nil then
+        self.waiters = {}
+    end
+
+    self.waiters[fid] = f
+    local res = internal.iowait(self.fh, what, timeout)
+    self.waiters[fid] = nil
+    return res
+end
+
 socket_methods.readable = function(self, timeout)
     self._errno = nil
     if timeout == nil then
         timeout = TIMEOUT_INFINITY
     end
 
-    local wres = internal.iowait(self.fh, 0, timeout)
+    local wres = wait_safely(self, 0, timeout)
 
     if wres == 0 then
         self._errno = boxerrno.ETIMEDOUT
@@ -200,7 +214,7 @@ socket_methods.wait = function(self, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
-    local wres = internal.iowait(self.fh, 2, timeout)
+    local wres = wait_safely(self, 2, timeout)
 
     if wres == 0 then
         self._errno = boxerrno.ETIMEDOUT
@@ -223,7 +237,7 @@ socket_methods.writable = function(self, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
-    local wres = internal.iowait(self.fh, 1, timeout)
+    local wres = wait_safely(self, 1, timeout)
 
     if wres == 0 then
         self._errno = boxerrno.ETIMEDOUT
@@ -265,13 +279,19 @@ socket_methods.bind = function(self, host, port)
 end
 
 socket_methods.close = function(self)
+    if self.waiters ~= nil then
+        for fid, fiber in pairs(self.waiters) do
+            fiber:wakeup()
+            self.waiters[fid] = nil
+        end
+    end
+
     self._errno = nil
     if ffi.C.close(self.fh) < 0 then
         self._errno = boxerrno()
         return false
-    else
-        return true
     end
+    return true
 end
 
 socket_methods.shutdown = function(self, how)
@@ -357,7 +377,7 @@ socket_methods.setsockopt = function(self, level, name, value)
         end
         return true
     end
-    
+
     if name == 'SO_LINGER' then
         error("Use s:linger(active[, timeout])")
     end
@@ -477,7 +497,7 @@ socket_methods.accept = function(self)
         self._errno = boxerrno()
         return nil
     end
-    
+
     -- Make socket to be non-blocked by default
     -- ignore result
     ffi.C.bsdsocket_nonblock(fh, 1)
@@ -495,7 +515,7 @@ socket_methods.read = function(self, size, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
     end
-    
+
     if size == nil then
         size = 4294967295
     end
@@ -509,13 +529,12 @@ socket_methods.read = function(self, size, timeout)
 
     while timeout > 0 do
         local started = boxfiber.time()
-        
+
         if not self:readable(timeout) then
-            self._errno = boxerrno()
             return nil
         end
-        
-        timeout = timeout - (boxfiber.time() - started )
+
+        timeout = timeout - ( boxfiber.time() - started )
 
         local data = self:sysread(4096)
         if data ~= nil then
@@ -577,7 +596,7 @@ socket_methods.readline = function(self, limit, eol, timeout)
             eol = { eol }
         end
     end
-    
+
     if timeout == nil then
         timeout = TIMEOUT_INFINITY
     end
@@ -624,7 +643,7 @@ socket_methods.readline = function(self, limit, eol, timeout)
                 self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
                 return data
             end
-           
+
             -- limit
             if string.len(self.rbuf) >= limit then
                data = string.sub(self.rbuf, 1, limit)
@@ -654,7 +673,7 @@ socket_methods.write = function(self, octets, timeout)
                 return false
             end
         end
-        
+
         if written == string.len(octets) then
             return true
         end
@@ -915,7 +934,7 @@ local function tcp_connect(host, port, timeout)
         s:close()
         boxerrno(save_errno)
     end
-   
+
     if timeout <= 0 then
         boxerrno(boxerrno.ETIMEDOUT)
     end 
