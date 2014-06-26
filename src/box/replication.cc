@@ -169,7 +169,7 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 	/*
 	 * Create UNIX sockets to communicate between the main and
 	 * spawner processes.
-         */
+	 */
 	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, sockpair) != 0)
 		panic_syserror("socketpair");
 
@@ -216,7 +216,7 @@ replication_join(int fd, struct iproto_header *header)
 	struct tt_uuid server_uuid = uuid_nil;
 	iproto_decode_join(header, &server_uuid);
 
-	/* Notify box about new cluster node */
+	/* Notify box about new cluster server */
 	recovery_state->join_handler(&server_uuid);
 
 	struct replication_request *request = (struct replication_request *)
@@ -239,16 +239,15 @@ replication_join(int fd, struct iproto_header *header)
 void
 replication_subscribe(int fd, struct iproto_header *packet)
 {
-	struct tt_uuid uu = uuid_nil, node_uuid = uuid_nil;
+	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
 	struct vclock vclock;
 	vclock_create(&vclock);
-	auto vclock_guard = make_scoped_guard([&]{ vclock_destroy(&vclock); });
-	iproto_decode_subscribe(packet, &uu, &node_uuid, &vclock);
+	iproto_decode_subscribe(packet, &uu, &server_uuid, &vclock);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
-	 * cluster this node belongs to. Used to handshake
+	 * cluster this server belongs to. Used to handshake
 	 * replica connect, and refuse a connection from a replica
 	 * which belongs to a different cluster.
 	 */
@@ -257,13 +256,13 @@ replication_subscribe(int fd, struct iproto_header *packet)
 			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
 	}
 
-	/* Check Node-UUID */
+	/* Check server uuid */
 	uint32_t server_id;
 	server_id = schema_find_id(SC_CLUSTER_ID, 1,
-				   tt_uuid_str(&node_uuid), UUID_STR_LEN);
+				   tt_uuid_str(&server_uuid), UUID_STR_LEN);
 	if (server_id == SC_ID_NIL) {
 		tnt_raise(ClientError, ER_UNKNOWN_SERVER,
-			  tt_uuid_str(&node_uuid));
+			  tt_uuid_str(&server_uuid));
 	}
 
 	struct replication_request *request = (struct replication_request *)

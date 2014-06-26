@@ -84,7 +84,6 @@ vclockset_clean(vclockset_t *set) {
 	while (cur != NULL) {
 		struct vclock *next = vclockset_next(set, cur);
 		vclockset_remove(set, cur);
-		vclock_destroy(cur);
 		free(cur);
 		cur = next;
 	}
@@ -167,8 +166,8 @@ log_dir_scan(struct log_dir *dir)
 		closedir(dh);
 	});
 
-	int64_t *signs = NULL;
-	size_t signs_capacity = 0, signs_size = 0;
+	int64_t *signts = NULL;
+	size_t signts_capacity = 0, signts_size = 0;
 
 	errno = 0;
 	struct dirent *dent;
@@ -193,62 +192,63 @@ log_dir_scan(struct log_dir *dir)
 		if (!ext_is_ok)
 			continue;
 
-		long long sign = strtoll(dent->d_name, &ext, 10);
+		long long signt = strtoll(dent->d_name, &ext, 10);
 		if (strncmp(ext, dir->filename_ext, ext_len) != 0) {
 			/* d_name doesn't parse entirely, ignore it */
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		if (sign == LLONG_MAX || sign == LLONG_MIN) {
+		if (signt == LLONG_MAX || signt == LLONG_MIN) {
 			say_warn("can't parse `%s', skipping", dent->d_name);
 			continue;
 		}
 
-		if (signs_size == signs_capacity) {
-			size_t capacity = signs_capacity > 0 ?
-					2 * signs_capacity : 16;
-			int64_t *new_signs = (int64_t *) region_alloc(
-				&fiber()->gc, sizeof(*signs) * capacity);
-			memcpy(new_signs, signs, sizeof(*signs) * signs_size);
-			signs = new_signs;
-			signs_capacity = capacity;
+		if (signts_size == signts_capacity) {
+			size_t capacity = signts_capacity > 0 ?
+					2 * signts_capacity : 16;
+			int64_t *new_signts = (int64_t *) region_alloc(
+				&fiber()->gc, sizeof(*signts) * capacity);
+			memcpy(new_signts, signts, sizeof(*signts) * signts_size);
+			signts = new_signts;
+			signts_capacity = capacity;
 		}
 
-		signs[signs_size++] = sign;
+		signts[signts_size++] = signt;
 	}
 
-	if (signs_size == 0) {
+	if (signts_size == 0) {
 		/* Empty directory */
 		vclockset_clean(&dir->index);
 		return 0;
 	}
 
-	qsort(signs, signs_size, sizeof(*signs), cmp_i64);
+	qsort(signts, signts_size, sizeof(*signts), cmp_i64);
 	struct vclock *cur = vclockset_first(&dir->index);
-	for (size_t i = 0; i < signs_size; i++) {
+	for (size_t i = 0; i < signts_size; i++) {
 		while (cur != NULL) {
-			int64_t sign = vclock_signature(cur);
-			if (sign < signs[i]) {
-				struct vclock *next = vclockset_next(&dir->index, cur);
+			int64_t signt = vclock_signature(cur);
+			if (signt < signts[i]) {
+				struct vclock *next =
+					vclockset_next(&dir->index, cur);
 				vclockset_remove(&dir->index, cur);
-				vclock_destroy(cur);
 				free(cur);
 				cur = next;
 				continue;
-			} else if (sign == signs[i]) {
+			} else if (signt == signts[i]) {
 				cur = vclockset_next(&dir->index, cur);
 				goto skip; /* already exists */
-			} else /* sign > lsns[i] */ {
+			} else /* signt > lsns[i] */ {
 				break;
 			}
 		}
 
 		try {
-			log_dir_add_to_index(dir, signs[i]);
+			log_dir_add_to_index(dir, signts[i]);
 		} catch (ClientError *e) {
 			e->log();
-			say_warn("failed to scan %s", format_filename(dir, signs[i], NONE));
+			say_warn("failed to scan %s",
+				 format_filename(dir, signts[i], NONE));
 			if (dir->panic_if_error)
 				throw;
 		}
@@ -259,12 +259,12 @@ log_dir_scan(struct log_dir *dir)
 }
 
 char *
-format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix)
+format_filename(struct log_dir *dir, int64_t signt, enum log_suffix suffix)
 {
 	static __thread char filename[PATH_MAX + 1];
 	const char *suffix_str = suffix == INPROGRESS ? inprogress_suffix : "";
 	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
-		 dir->dirname, (long long)lsn, dir->filename_ext, suffix_str);
+		 dir->dirname, (long long)signt, dir->filename_ext, suffix_str);
 	return filename;
 }
 
@@ -561,8 +561,6 @@ log_io_close(struct log_io **lptr)
 			log_io_sync(l);
 		if (l->is_inprogress && inprogress_log_rename(l) != 0)
 			panic("can't rename 'inprogress' WAL");
-	} else if (l->mode == LOG_READ) {
-		vclock_destroy(&l->vclock);
 	}
 
 	r = fclose(l->f);
@@ -753,7 +751,6 @@ log_io_open_stream_for_read(struct log_dir *dir, const char *filename,
 	return l;
 
 error_3:
-	vclock_destroy(&l->vclock);
 	free(l);
 error_2:
 	fclose(file);
@@ -763,13 +760,13 @@ error_1:
 }
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t sign,
+log_io_open_for_read(struct log_dir *dir, int64_t signature,
 		     const tt_uuid *server_uuid, enum log_suffix suffix)
 {
-	const char *filename = format_filename(dir, sign, suffix);
+	const char *filename = format_filename(dir, signature, suffix);
 	FILE *f = fopen(filename, "r");
 	if (suffix == INPROGRESS && f == NULL) {
-		filename = format_filename(dir, sign, NONE);
+		filename = format_filename(dir, signature, NONE);
 		f = fopen(filename, "r");
 		suffix = NONE;
 	}
@@ -788,14 +785,14 @@ log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
 	FILE *f = NULL;
 	struct log_io *l = NULL;
 
-	int64_t sign = vclock_signature(vclock);
-	assert(sign >= 0);
+	int64_t signt = vclock_signature(vclock);
+	assert(signt >= 0);
 
 	/*
 	* Check whether a file with this name already exists.
 	* We don't overwrite existing files.
 	*/
-	filename = format_filename(dir, sign, NONE);
+	filename = format_filename(dir, signt, NONE);
 	if (access(filename, F_OK) == 0) {
 		errno = EEXIST;
 		goto error;
@@ -805,7 +802,7 @@ log_io_open_for_write(struct log_dir *dir, const tt_uuid *server_uuid,
 	 * Open the <lsn>.<suffix>.inprogress file. If it exists,
 	 * open will fail.
 	 */
-	filename = format_filename(dir, sign, INPROGRESS);
+	filename = format_filename(dir, signt, INPROGRESS);
 	f = fiob_open(filename, dir->open_wflags);
 	if (!f)
 		goto error;

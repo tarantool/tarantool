@@ -67,12 +67,6 @@ vclock_create(struct vclock *vclock)
 	memset(vclock, 0xff, sizeof(*vclock));
 }
 
-static inline void
-vclock_destroy(struct vclock *vclock)
-{
-	(void) vclock;
-}
-
 static inline bool
 vclock_has(const struct vclock *vclock, uint32_t server_id)
 {
@@ -110,21 +104,18 @@ vclock_size(const struct vclock *vclock)
 static inline int64_t
 vclock_signature(const struct vclock *vclock)
 {
-	int64_t sum = 0;
+	int64_t signt = 0;
 	vclock_foreach(vclock, server)
-		sum += server.lsn;
-	return sum;
+		signt += server.lsn;
+	return signt;
 }
 
 int64_t
 vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn);
 
-void
-vclock_merge(struct vclock *to, const struct vclock *with);
-
 /**
  * \brief Format vclock to YAML-compatible string representation:
- * { node_id: lsn, node_id:lsn })
+ * { server_id: lsn, server_id:lsn })
  * \param vclock vclock
  * \return fomatted string. This pointer should be passed to free(3) to
  * release the allocated storage when it is no longer needed.
@@ -158,9 +149,9 @@ static inline int
 vclock_compare(const struct vclock *a, const struct vclock *b)
 {
 	bool le = true, ge = true;
-	for (uint32_t node_id = 0; node_id < VCLOCK_MAX; node_id++) {
-		int64_t lsn_a = vclock_get(a, node_id);
-		int64_t lsn_b = vclock_get(b, node_id);
+	for (uint32_t server_id = 0; server_id < VCLOCK_MAX; server_id++) {
+		int64_t lsn_a = vclock_get(a, server_id);
+		int64_t lsn_b = vclock_get(b, server_id);
 		le = le && lsn_a <= lsn_b;
 		ge = ge && lsn_a >= lsn_b;
 		if (!ge && !le)

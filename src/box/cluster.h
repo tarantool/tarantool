@@ -87,15 +87,12 @@ cluster_clock();
 
 /* }}} */
 
-/** {{{ Cluster node id API **/
-
-/** Cluster-local server identifier. */
-typedef uint32_t cserver_id_t;
+/** {{{ Cluster server id API **/
 
 static inline bool
-cserver_id_is_reserved(cserver_id_t id)
+cserver_id_is_reserved(uint32_t id)
 {
-	return id == 0;
+        return id == 0;
 }
 
 /**
@@ -106,7 +103,7 @@ cserver_id_is_reserved(cserver_id_t id)
  * The server is added to the cluster lsn table with LSN 0.
  */
 void
-cluster_add_server(const tt_uuid *server_uuid, cserver_id_t id);
+cluster_add_server(const tt_uuid *server_uuid, uint32_t id);
 
 /** }}} **/
 

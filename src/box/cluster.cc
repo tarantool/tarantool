@@ -39,22 +39,22 @@ tt_uuid cluster_id;
 extern "C" struct vclock *
 cluster_clock()
 {
-	return &recovery_state->vclock;
+        return &recovery_state->vclock;
 }
 
 void
-cluster_add_server(const tt_uuid *server_uuid, cserver_id_t server_id)
+cluster_add_server(const tt_uuid *server_uuid, uint32_t server_id)
 {
 	struct recovery_state *r = recovery_state;
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
 	assert(!cserver_id_is_reserved(server_id));
 
-	/* Add node */
+	/* Add server */
 	vclock_add_server(&r->vclock, server_id);
 
 	if (tt_uuid_cmp(&r->server_uuid, server_uuid) == 0) {
-		/* Assign local node id */
+		/* Assign local server id */
 		assert(r->server_id == 0);
 		r->server_id = server_id;
 	}

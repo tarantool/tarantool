@@ -300,33 +300,33 @@ boxk(enum iproto_request_type type, uint32_t space_id,
 }
 
 /**
- * @brief Called when recovery/replication wants to add a new node
+ * @brief Called when recovery/replication wants to add a new server
  * to cluster.
- * cluster_add_node() is called as a commit trigger on _cluster
- * space and actually adds the node to the cluster.
- * @param node_uuid
+ * cluster_add_server() is called as a commit trigger on _cluster
+ * space and actually adds the server to the cluster.
+ * @param server_uuid
  */
 static void
-box_on_cluster_join(const tt_uuid *node_uuid)
+box_on_cluster_join(const tt_uuid *server_uuid)
 {
-	/** Find the largest existing node id. */
+	/** Find the largest existing server id. */
 	struct space *space = space_cache_find(SC_CLUSTER_ID);
 	class Index *index = index_find(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
 	struct tuple *tuple = it->next(it);
-	/** Assign a new node id. */
+	/** Assign a new server id. */
 	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
 	if (server_id >= VCLOCK_MAX)
 		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
 
 	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
-	     (unsigned) server_id, tt_uuid_str(node_uuid));
+	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
 
-/** Replace the current node id in _cluster */
+/** Replace the current server id in _cluster */
 static void
-box_set_node_uuid()
+box_set_server_uuid()
 {
 	tt_uuid_create(&recovery_state->server_uuid);
 	assert(recovery_state->server_id == 0);
@@ -334,7 +334,7 @@ box_set_node_uuid()
 		vclock_del_server(&recovery_state->vclock, 1);
 	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
 	     1, tt_uuid_str(&recovery_state->server_uuid));
-	/* Remove surrogate node */
+	/* Remove surrogate server */
 	vclock_del_server(&recovery_state->vclock, 0);
 	assert(recovery_state->server_id == 1);
 	assert(vclock_has(&recovery_state->vclock, 1));
@@ -414,10 +414,10 @@ box_init()
 		replica_bootstrap(recovery_state);
 		snapshot_save(recovery_state);
 	} else {
-		/* Initialize a master node of a new cluster */
+		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();
-		box_set_node_uuid();
+		box_set_server_uuid();
 		snapshot_save(recovery_state);
 	}
 
