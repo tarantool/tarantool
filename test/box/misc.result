@@ -121,7 +121,7 @@ type(box.space);
 t = {};
 ---
 ...
-for i, v in pairs(space.index[0].parts[0]) do
+for i, v in pairs(space.index[0].parts[1]) do
     table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 ---
@@ -129,7 +129,7 @@ end;
 t;
 ---
 - - 'type : NUM'
-  - 'fieldno : 0'
+  - 'fieldno : 1'
 ...
 ----------------
 -- # box.space
@@ -185,12 +185,13 @@ t;
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.SOPHIA : 60'
   - 'box.error.NO_SUCH_INDEX : 35'
-  - 'box.error.TUPLE_FOUND : 3'
+  - 'box.error.TUPLE_IS_TOO_LONG : 27'
+  - 'box.error.UNKNOWN_SERVER : 62'
   - 'box.error.FUNCTION_EXISTS : 52'
   - 'box.error.NO_SUCH_FUNCTION : 51'
   - 'box.error.TUPLE_NOT_FOUND : 4'
-  - 'box.error.UNKNOWN_NODE : 62'
   - 'box.error.DROP_USER : 44'
+  - 'box.error.SERVER_ID_IS_RO : 66'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.PASSWORD_MISMATCH : 47'
   - 'box.error.NO_SUCH_ENGINE : 57'
@@ -198,7 +199,7 @@ t;
   - 'box.error.LAST_DROP : 15'
   - 'box.error.USER_EXISTS : 46'
   - 'box.error.WAL_IO : 40'
-  - 'box.error.LOCAL_NODE_IS_NOT_ACTIVE : 61'
+  - 'box.error.CREATE_USER : 43'
   - 'box.error.CREATE_SPACE : 9'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
@@ -206,30 +207,35 @@ t;
   - 'box.error.INVALID_MSGPACK : 20'
   - 'box.error.KEY_PART_COUNT : 31'
   - 'box.error.ALTER_SPACE : 12'
-  - 'box.error.NODE_ID_IS_RO : 66'
   - 'box.error.SPLICE : 25'
+  - 'box.error.NO_CONNECTION : 77'
+  - 'box.error.TUPLE_FOUND : 3'
+  - 'box.error.INVALID_XLOG_NAME : 75'
+  - 'box.error.INVALID_XLOG : 74'
+  - 'box.error.REPLICA_MAX : 73'
+  - 'box.error.ITERATOR_TYPE : 72'
   - 'box.error.NONMASTER : 6'
   - 'box.error.SPACE_EXISTS : 10'
-  - 'box.error.NO_CONNECTION : 71'
+  - 'box.error.MISSING_REQUEST_FIELD : 69'
   - 'box.error.IDENTIFIER : 70'
   - 'box.error.FIBER_STACK : 30'
-  - 'box.error.MISSING_REQUEST_FIELD : 69'
+  - 'box.error.DROP_FUNCTION : 71'
   - 'box.error.INVALID_ORDER : 68'
   - 'box.error.CFG : 59'
   - 'box.error.SPACE_FIELD_COUNT : 38'
-  - 'box.error.TUPLE_IS_TOO_LONG : 27'
-  - 'box.error.NO_SUCH_FIELD : 37'
   - 'box.error.SPACE_ACCESS_DENIED : 55'
+  - 'box.error.NO_SUCH_FIELD : 37'
+  - 'box.error.LOCAL_SERVER_IS_NOT_ACTIVE : 61'
   - 'box.error.RELOAD_CFG : 58'
   - 'box.error.PROC_RET : 21'
   - 'box.error.INJECTION : 8'
-  - 'box.error.FUNCTION_MAX : 54'
+  - 'box.error.PROC_LUA : 32'
   - 'box.error.ILLEGAL_PARAMS : 1'
   - 'box.error.TUPLE_NOT_ARRAY : 22'
   - 'box.error.TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.INVALID_UUID : 64'
   - 'box.error.DROP_SPACE : 11'
-  - 'box.error.TIMEOUT : 72'
+  - 'box.error.TIMEOUT : 78'
   - 'box.error.MORE_THAN_ONE_TUPLE : 41'
   - 'box.error.MEMORY_ISSUE : 2'
   - 'box.error.NO_SUCH_TRIGGER : 34'
@@ -238,10 +244,10 @@ t;
   - 'box.error.NO_SUCH_SPACE : 36'
   - 'box.error.INDEX_FIELD_COUNT : 39'
   - 'box.error.OK : 0'
-  - 'box.error.CREATE_USER : 43'
-  - 'box.error.UNKNOWN_REQUEST_TYPE : 48'
   - 'box.error.DROP_PRIMARY_KEY : 17'
-  - 'box.error.PROC_LUA : 32'
+  - 'box.error.UNKNOWN_REQUEST_TYPE : 48'
+  - 'box.error.INVALID_XLOG_ORDER : 76'
+  - 'box.error.FUNCTION_MAX : 54'
   - 'box.error.NO_SUCH_USER : 45'
   - 'box.error.USER_MAX : 56'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
@@ -389,7 +395,7 @@ dostring('return ...', 1, 2, 3)
 --  A test case for Bug#1043804 lua error() -> server crash
 error()
 ---
-- error: 
+- error: null
 ...
 --  A test case for bitwise operations 
 bit.lshift(1, 32)
@@ -455,35 +461,35 @@ fifomax
 ...
 fifo_push(space, 1, 1)
 ---
-- [1, 3, 4, 1, 0, 0, 0, 0]
+- [1, 4, 5, 1, 0, 0, 0, 0]
 ...
 fifo_push(space, 1, 2)
 ---
-- [1, 4, 5, 1, 2, 0, 0, 0]
+- [1, 5, 6, 1, 2, 0, 0, 0]
 ...
 fifo_push(space, 1, 3)
 ---
-- [1, 5, 6, 1, 2, 3, 0, 0]
+- [1, 6, 7, 1, 2, 3, 0, 0]
 ...
 fifo_push(space, 1, 4)
 ---
-- [1, 6, 7, 1, 2, 3, 4, 0]
+- [1, 7, 8, 1, 2, 3, 4, 0]
 ...
 fifo_push(space, 1, 5)
 ---
-- [1, 7, 3, 1, 2, 3, 4, 5]
+- [1, 8, 4, 1, 2, 3, 4, 5]
 ...
 fifo_push(space, 1, 6)
 ---
-- [1, 3, 4, 6, 2, 3, 4, 5]
+- [1, 4, 5, 6, 2, 3, 4, 5]
 ...
 fifo_push(space, 1, 7)
 ---
-- [1, 4, 5, 6, 7, 3, 4, 5]
+- [1, 5, 6, 6, 7, 3, 4, 5]
 ...
 fifo_push(space, 1, 8)
 ---
-- [1, 5, 6, 6, 7, 8, 4, 5]
+- [1, 6, 7, 6, 7, 8, 4, 5]
 ...
 fifo_top(space, 1)
 ---
@@ -491,7 +497,7 @@ fifo_top(space, 1)
 ...
 space:delete{1}
 ---
-- [1, 5, 6, 6, 7, 8, 4, 5]
+- [1, 6, 7, 6, 7, 8, 4, 5]
 ...
 fifo_top(space, 1)
 ---
@@ -499,7 +505,7 @@ fifo_top(space, 1)
 ...
 space:delete{1}
 ---
-- [1, 3, 3, 0, 0, 0, 0, 0]
+- [1, 4, 4, 0, 0, 0, 0, 0]
 ...
 space:drop()
 ---
@@ -587,7 +593,7 @@ ffi.cdef([[struct test { int a; }; ]])
 ...
 ffi.cast('struct test *', 0)
 ---
-- 'cdata<struct test *>: NULL'
+- null
 ...
 --# setopt delimiter ';'
 type(ffi.metatype('struct test', {
@@ -605,4 +611,29 @@ type(ffi.metatype('struct test', {
 ffi.new('struct test', { a = 15 })
 ---
 - - yaml totable test = 15
+...
+-------------------------------------------------------------------------------
+-- #346 yaml.null() crases server
+-------------------------------------------------------------------------------
+yaml = require('yaml')
+---
+...
+type(yaml.NULL)
+---
+- cdata
+...
+yaml.NULL
+---
+- null
+...
+yaml.NULL == nil
+---
+- true
+...
+yaml.null() -- for compatibility with luaYAML
+---
+- null
+...
+yaml = nil
+---
 ...
