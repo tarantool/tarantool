@@ -45,6 +45,11 @@ const uint32_t key_mp_type[] = {
 enum schema_object_type
 schema_object_type(const char *name)
 {
+	/**
+	 * There may be other places in which we look object type by
+	 * name, and they are case-sensitive, so be case-sensitive
+	 * here too.
+	 */
 	static const char *strs[] = {
 		"unknown", "universe", "space", "function" };
 	int index = strindex(strs, name, 4);

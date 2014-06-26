@@ -990,7 +990,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  (unsigned) space_id(old_space),
 				  "the space has indexes");
 		}
-		if (object_has_grants(old_space->access)) {
+		if (schema_find_grants("space", old_space->def.id)) {
 			tnt_raise(ClientError, ER_DROP_SPACE,
 				  (unsigned) space_id(old_space),
 				  "the space has grants");
@@ -1332,7 +1332,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 */
 		access_check_ddl(func.uid);
 		/* Can only delete func if it has no grants. */
-		if (object_has_grants(old_func->access)) {
+		if (schema_find_grants("function", old_func->fid)) {
 			tnt_raise(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) func.uid,
 				  "function has grants");

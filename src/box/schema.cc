@@ -421,3 +421,16 @@ func_by_id(uint32_t fid)
 		return NULL;
 	return (struct func_def *) mh_i32ptr_node(funcs, func)->val;
 }
+
+bool
+schema_find_grants(const char *type, uint32_t id)
+{
+	struct space *priv = space_cache_find(SC_PRIV_ID);
+	/** "object" index */
+	Index *index = index_find(priv, 2);
+	struct iterator *it = index->position();
+	char key[10 + BOX_NAME_MAX];
+	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
+	index->initIterator(it, ITER_EQ, key, 2);
+	return it->next(it);
+}

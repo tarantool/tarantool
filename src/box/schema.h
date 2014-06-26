@@ -153,4 +153,15 @@ func_by_name(const char *name, uint32_t name_len)
 	return func_by_id(fid);
 }
 
+/**
+ * Check whether or not an object has grants on it (restrict
+ * constraint in drop object).
+ * _priv space to look up by space id
+ * @retval true object has grants
+ * @retval false object has no grants
+ */
+bool
+schema_find_grants(const char *type, uint32_t id);
+
+
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */
