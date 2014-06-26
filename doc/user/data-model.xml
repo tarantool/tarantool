@@ -44,7 +44,7 @@ derived from distributed computing</alt></emphasis> -- 'space0' in the example -
 When Tarantool is being used to store data, there is always at least one space.
 There can be many spaces.
 Each space has a unique name specified by the user.
-Each space has a unique numeric identifier which can be specified the user but usually is assigned automatically by Tarantool.
+Each space has a unique numeric identifier which can be specified by the user but usually is assigned automatically by Tarantool.
 Spaces always contain one tuple set and one or more indexes.
 </para>
 
@@ -77,14 +77,8 @@ The identifier of a field is the field's number, base 1.
 For example <quote>1</quote> can be used in some contexts
 to refer to the first field of a tuple.
 </para>
-<note><para>This manual is following the tarantool client convention by
-using the names that are specified by the user at time of creation,
-which is the name that's stored on the server.
-Other clients follow different conventions,
-and may even have sophisticated ways of mapping meaningful names
-to numbers.</para></note>
 <para>
-When the tarantool client displays a tuple, it surrounds
+When Tarantool returns a tuple value, it surrounds
 strings with single quotes, separates fields with commas,
 and encloses the tuple inside square brackets. For example:
 <computeroutput>[ 3, 'length', 93 ]</computeroutput>.
@@ -155,33 +149,32 @@ when traversing TREE indexes.)
 <para>
 Five examples of basic operations:
 <programlisting>
-/* Add a new tuple to tuple set space0.
-   The first field, field[1], will be 999 (type is NUM).
-   The second field, field[2], will be 'Taranto' (type is STR). */
+-- Add a new tuple to tuple set space0.
+-- The first field, field[1], will be 999 (type is NUM).
+-- The second field, field[2], will be 'Taranto' (type is STR).
 box.space.space0:insert{999, 'Taranto'}
 
-/* Update the tuple, changing field field[2].
-   The clause "{999}", which has the value to look up in
-   the index of the tuple's primary-key field, is mandatory
-   because update() requests must always have a clause that
-   specifies the primary key, which in this case is field[1].
-   The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
-   will happen to field[2] with the new value.
-   */
+-- Update the tuple, changing field field[2].
+-- The clause "{999}", which has the value to look up in
+-- the index of the tuple's primary-key field, is mandatory
+-- because update() requests must always have a clause that
+-- specifies the primary key, which in this case is field[1].
+-- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
+-- will happen to field[2] with the new value.
 box.space.space0:update({999}, {{'=', 2, 'Tarantino'}})
 
-/* Replace the tuple, adding a new field.
-   This is also possible with the update() request but
-   the update() request is usually more complicated. */
+-- Replace the tuple, adding a new field.
+-- This is also possible with the update() request but
+-- the update() request is usually more complicated.
 box.space.space0:replace{999, 'Tarantella', 'Tarantula'}
 
-/* Retrieve the tuple.
-   The clause "{999}" is still mandatory, although it does not have to
-   mention the primary key. */
+-- Retrieve the tuple.
+-- The clause "{999}" is still mandatory, although it does not have to
+-- mention the primary key. */
 box.space.space0:select{999}
 
-/* Delete the tuple.
-   Once again the clause to identify the primary-key field is mandatory. */
+-- Delete the tuple.
+-- Once again the clause to identify the primary-key field is mandatory.
 box.space.space0:delete{999}
 </programlisting>
 </para>
@@ -251,9 +244,9 @@ Since all data-change operations end with an implicit yield and
 an implicit commit, and since no data-change operation can change
 more than one tuple, there is no need for any locking.
 Consider, for example, a Lua function that does three Tarantool operations:<programlisting>
-SELECT              /* this does not yield and does not commit */
-UPDATE              /* this yields and commits */
-SELECT              /* this does not yield and does not commit */</programlisting>
+s:sel...{999}                  -- this does not yield and does not commit
+s:update({...},{{...}})        -- this yields and commits
+s:select{999}                  -- this does not yield and does not commit */</programlisting>
 The combination <quote>SELECT plus UPDATE</quote> is an atomic transaction:
 the function holds a consistent view of the database
 until the UPDATE ends. For the combination <quote>UPDATE plus SELECT</quote>
@@ -273,7 +266,7 @@ server on the same processor without ill effects.
   xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of
-  supported data-manipulation functions is provided in the <olink targetdoc="tarantool-user-guide" targetptr="language-reference">Language reference</olink> chapter.
+  supported data-manipulation functions will come later in this chapter.
 </para>
 <para>
   Since not all Tarantool operations can be expressed with the

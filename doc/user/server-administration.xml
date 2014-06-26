@@ -364,7 +364,7 @@ To see more about the details of the algorithm for the purpose of writing a new 
 <para>
 <bridgehead renderas="sect4">Users and the _user space</bridgehead>
 The fields in the _user space are:
-a numeric id, a string, the user name, and the optional password.
+a numeric id, a number, the user name, and the optional password.
 </para>
 
 <para>
@@ -381,7 +381,7 @@ For example, here is what happens with a select for user id = 0,
 which is the 'guest' user, without a password:
 <programlisting><prompt>tarantool&gt;</prompt> box.space._user:select{0}
 ---
-- - [0, '', 'guest']
+- - [0, 1, 'guest']
 ...</programlisting></para>
 
 <para>
@@ -406,14 +406,14 @@ To drop a user, say
 For example, here is a session which creates a new user with
 a strong password, selects from the tuple in
 the _user space, and then drops the user.
-<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('Elizabeth Browning', {password = 'Iwtso65$SDS?'})
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})
 ---
 ...
 <prompt>tarantool&gt;</prompt> box.space._user:select{4}
 ---
-- - [4, '', 'Elizabeth Browning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+- - [4, 1, 'ElizabethBrowning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
 ...
-<prompt>tarantool&gt;</prompt> box.schema.user.drop('Elizabeth Browning')
+<prompt>tarantool&gt;</prompt> box.schema.user.drop('ElizabethBrowning')
 ---
 ...</programlisting></para>
 
@@ -491,16 +491,19 @@ The function for dropping a _func tuple is:
 In the following example, a function named 'f7' is created,
 then it is put in the _func space, then it is used in a
 box.schema.user.grant function, then it is dropped:
-<programlisting><prompt>tarantool&gt;</prompt> function f7() session.uid() end
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() session.uid() end</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> box.schema.func.create('f7')
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.func.create('f7')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'execute', 'function', 'f7')
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.grant('guest', 'execute', 'function', 'f7')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> box.schema.func.drop('f7')
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.revoke('guest', 'execute', 'function', 'f7')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.func.drop('f7')</userinput>
 ---
 ...</programlisting></para>
 
@@ -524,7 +527,7 @@ privileges. Typically an admin user will set up and configure objects, then
 grant privileges to appropriate non-admin users. Typically a guest user will
 use <code>session.su()</code> to change into a non-generic user to whom admin
 has granted more than the default privileges. For example, admin might say:<programlisting>
-box.space._user:insert{123456,'','manager'}
+box.space._user:insert{123456,0,'manager'}
 box.schema.user.grant('manager', 'read', 'space', '_space')
 box.schema.user.grant('manager', 'read', 'space', 'payroll')</programlisting>
 and later a guest user, who wishes to see the payroll, might say:<programlisting>

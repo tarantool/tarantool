@@ -138,15 +138,15 @@ Linking CXX shared library libmysql.so
 
 <prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
 ~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
-<prompt>tarantool&gt; </prompt>
-
+<prompt>tarantool&gt; </prompt> <userinput>box.cfg{}</userinput>
+...
 # Enter the following lines on the prompt (again, change "/home/pgulutzan"
 # to whatever the real directory is that contains tarantool):
 package.path = "/home/pgulutzan/tarantool/src/module/sql/?.lua;"..package.path
 require("sql")
 if type(box.net.sql) ~= "table" then error("net.sql load failed") end
 require("box.net.mysql")
-# ... Make sure that tarantool replies "true" for the calls to "require()".
+# ... Make sure that tarantool replies "true" for both calls to "require()".
 
 # Create a Lua function that will connect to the MySQL server,
 # (using some factory default values for the port and user and password),
@@ -261,7 +261,7 @@ Linking CXX shared library libpg.so
 
 <prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
 ~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
-<prompt>tarantool&gt; </prompt>
+<prompt>tarantool&gt; </prompt>  <userinput>box.cfg{}</userinput>
 
 # Enter the following lines on the prompt (again, change "/home/pgulutzan"
 # to whatever the real directory is that contains tarantool):
