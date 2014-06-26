@@ -650,6 +650,22 @@ local function object_resolve(object_type, object_name)
                       "Function '"..object_name.."' does not exist")
         end
     end
+    if object_type == 'role' then
+        local _user = box.space[box.schema.USER_ID]
+        local role
+        if type(object_name) == 'string' then
+            role = _user.index['name']:get{object_name}
+        else
+            role = _user.index['primary']:get{object_name}
+        end
+        if role then
+            return role[1]
+        else
+            box.raise(box.error.NO_SUCH_USER,
+                      "Role '"..object_name.."' does not exist")
+        end
+    end
+
     box.raise(box.error.UNKNOWN_SCHEMA_OBJECT,
               "Unknown object type '"..object_type.."'")
 end
@@ -692,7 +708,7 @@ box.schema.user.passwd = function(new_password)
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
-    _user:update({uid}, {"=", 3, auth_mech_list})
+    _user:update({uid}, {"=", 4, auth_mech_list})
 end
 
 box.schema.user.create = function(name, opts)
@@ -709,7 +725,7 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.uid(), name, auth_mech_list}
+    _user:auto_increment{session.uid(), name, 'user', auth_mech_list}
 end
 
 box.schema.user.drop = function(name)
@@ -773,5 +789,21 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     else
         _priv:delete{uid, object_type, oid}
     end
+end
+
+box.schema.role = {}
+
+box.schema.role.create = function(name)
+    local uid = user_resolve(name)
+    if uid then
+        box.raise(box.error.USER_EXISTS,
+                  "Role '"..name.."' already exists")
+    end
+    local _user = box.space[box.schema.USER_ID]
+    _user:auto_increment{session.uid(), name, 'role'}
+end
+
+box.schema.role.drop = function(name)
+    return box.schema.user.drop(name)
 end
 

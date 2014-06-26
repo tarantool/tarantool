@@ -1,6 +1,7 @@
 -- Super User ID
 GUEST = 0
 ADMIN = 1
+PUBLIC = 2
 _schema = box.space[box.schema.SCHEMA_ID]
 _space = box.space[box.schema.SPACE_ID]
 _index = box.space[box.schema.INDEX_ID]
@@ -58,5 +59,6 @@ _index:insert{_cluster.id, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
 
 -- 
 -- Pre-create user and grants
-_user:insert{GUEST, ADMIN, 'guest'}
-_user:insert{ADMIN, ADMIN, 'admin'}
+_user:insert{GUEST, ADMIN, 'guest', 'user'}
+_user:insert{ADMIN, ADMIN, 'admin', 'user'}
+_user:insert{PUBLIC, ADMIN, 'public', 'role'}
