@@ -62,7 +62,8 @@ enum {
  * even when there are more object types in the future.
  */
 enum schema_object_type {
-	SC_UNKNOWN = 0, SC_UNIVERSE = 1, SC_SPACE = 2, SC_FUNCTION = 3
+	SC_UNKNOWN = 0, SC_UNIVERSE = 1, SC_SPACE = 2, SC_FUNCTION = 3,
+	SC_USER = 4, SC_ROLE = 5
 };
 
 enum schema_object_type

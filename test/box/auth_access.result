@@ -247,7 +247,7 @@ box.space.admin_space:select()
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin']
+- - [1, 1, 'admin', 'user']
 ...
 box.space._space:select(280)
 ---
@@ -332,20 +332,20 @@ box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
-box.space._user:insert{3, session.uid(), 'someone'}
+box.space._user:insert{3, session.uid(), 'someone', 'user'}
 ---
-- [3, 2, 'someone']
+- [3, 2, 'someone', 'user']
 ...
 box.space._user:delete(3)
 ---
-- [3, 2, 'someone']
+- [3, 2, 'someone', 'user']
 ...
 session.su('admin')
 ---
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin']
+- - [1, 1, 'admin', 'user']
 ...
 box.space._user:delete(3)
 ---
@@ -368,9 +368,9 @@ box.space._user:delete(2)
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin']
+- - [1, 1, 'admin', 'user']
 ...
-box.space._user:insert{4,'','someone2'}
+box.space._user:insert{4,session.uid(),'someone2', 'user'}
 ---
 - error: Write access denied for user 'testuser' to space '_user'
 ...
@@ -555,9 +555,9 @@ s:drop()
 ...
 box.space._user:select()
 ---
-- - [0, 1, 'guest']
-  - [1, 1, 'admin']
-  - [2, 1, 'testuser', []]
+- - [0, 1, 'guest', 'user']
+  - [1, 1, 'admin', 'user']
+  - [2, 1, 'testuser', 'user', []]
 ...
 box.space._space:select()
 ---

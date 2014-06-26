@@ -54,7 +54,8 @@
 #define INDEX_PART_COUNT 5
 
 /** _user columns */
-#define AUTH_DATA        3
+#define USER_TYPE        3
+#define AUTH_MECH_LIST   4
 
 /** _priv columns */
 #define PRIV_OBJECT_TYPE 2
@@ -1170,6 +1171,8 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32(tuple, ID);
 	user->owner = tuple_field_u32(tuple, UID);
+	const char *user_type = tuple_field_cstr(tuple, USER_TYPE);
+	user->type= schema_object_type(user_type);
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
@@ -1184,8 +1187,13 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */
-	if (tuple_field_count(tuple) > AUTH_DATA) {
-		const char *auth_data = tuple_field(tuple, AUTH_DATA);
+	if (tuple_field_count(tuple) > AUTH_MECH_LIST) {
+		const char *auth_data = tuple_field(tuple, AUTH_MECH_LIST);
+		if (user->type == SC_ROLE && strlen(auth_data)) {
+			tnt_raise(ClientError, ER_CREATE_USER,
+				  "authentication data can not be set for "
+				  "a role");
+		}
 		user_fill_auth_data(user, auth_data);
 	}
 }
@@ -1235,7 +1243,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_user->owner);
 		/* Can't drop guest or super user */
-		if (uid == GUEST || uid == ADMIN) {
+		if (uid == GUEST || uid == ADMIN || uid == PUBLIC) {
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->name,
 				  "the user is a system user");

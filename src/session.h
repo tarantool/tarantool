@@ -34,7 +34,7 @@
 
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 /** Predefined user ids. */
-enum { GUEST = 0, ADMIN =  1 };
+enum { GUEST = 0, ADMIN =  1, PUBLIC = 2 /* role */ };
 
 /**
  * Abstraction of a single user session:

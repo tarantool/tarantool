@@ -59,6 +59,8 @@ struct user {
 	uint32_t uid;
 	/** Creator of the user */
 	uint32_t owner;
+	/** 'user' or 'role' */
+	enum schema_object_type type;
 	/** User password - hash2 */
 	char hash2[SCRAMBLE_SIZE];
 	/** User name - for error messages and debugging */

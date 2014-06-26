@@ -134,4 +134,13 @@ session.su('guest')
 box.space._user:select{0}
 box.space._user:select{1}
 session.su('admin')
+-- ----------------------------------------------------------
+-- A test case for gh-358 Change user does not work from lua
+-- Correct the update syntax in schema.lua
+-- ----------------------------------------------------------
+box.schema.user.create('user1')
+session.su('user1')
+box.schema.user.passwd('new_password')
+session.su('admin')
+box.schema.user.drop('user1')
 session = nil

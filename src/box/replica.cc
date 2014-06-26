@@ -37,14 +37,9 @@
 #include "fiber.h"
 #include "coio_buf.h"
 #include "recovery.h"
-#include "tarantool.h"
-#include "scoped_guard.h"
-#include "iproto.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
-#include "scramble.h"
-#include "third_party/base64.h"
 
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
@@ -116,39 +111,6 @@ error:
 	iproto_header_decode(row, &data, data + len);
 }
 
-static int
-request_encode_auth(const char *greeting, const char *login,
-		    const char *password, struct iovec *iov)
-{
-	uint32_t login_len = strlen(login);
-	uint32_t password_len = strlen(password);
-
-	enum { PACKET_LEN_MAX = 128 };
-	size_t buf_size = PACKET_LEN_MAX + login_len + SCRAMBLE_SIZE;
-	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
-
-	char salt[SCRAMBLE_SIZE];
-	char scramble[SCRAMBLE_SIZE];
-	if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
-			  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
-		panic("invalid salt: %64s", greeting + 64);
-	scramble_prepare(scramble, salt, password, password_len);
-
-	char *d = buf;
-	d = mp_encode_map(d, 2);
-	d = mp_encode_uint(d, IPROTO_USER_NAME);
-	d = mp_encode_str(d, login, login_len);
-	d = mp_encode_uint(d, IPROTO_TUPLE);
-	d = mp_encode_array(d, 2);
-	d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
-	d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
-
-	assert(d <= buf + buf_size);
-	iov[0].iov_base = buf;
-	iov[0].iov_len = (d - buf);
-	return 1;
-}
-
 void
 replica_bootstrap(struct recovery_state *r)
 {
@@ -173,12 +135,8 @@ replica_bootstrap(struct recovery_state *r)
 
 	if (*r->remote.uri.login) {
 		/* Authenticate */
-		memset(&row, sizeof(row), 0);
-		row.type = IPROTO_AUTH;
-		row.bodycnt =
-			request_encode_auth(greeting, r->remote.uri.login,
-					    r->remote.uri.password,
-					    row.body);
+		iproto_encode_auth(&row, greeting, r->remote.uri.login,
+				   r->remote.uri.password);
 		int iovcnt = iproto_row_encode(&row, iov);
 		sio_writev_all(master, iov, iovcnt);
 		remote_read_row_fd(master, &row);
@@ -188,21 +146,8 @@ replica_bootstrap(struct recovery_state *r)
 	}
 
 	/* Send JOIN request */
-	memset(&row, 0, sizeof(struct iproto_header));
-	row.type = IPROTO_JOIN;
+	iproto_encode_join(&row, &recovery_state->server_uuid);
 	row.sync = sync;
-
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
-	/* Greet the remote server with our server UUID */
-	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
-
-	assert(data <= buf + sizeof(buf));
-	row.body[0].iov_base = buf;
-	row.body[0].iov_len = (data - buf);
-	row.bodycnt = 1;
 	int iovcnt = iproto_row_encode(&row, iov);
 
 	sio_writev_all(master, iov, iovcnt);
@@ -242,6 +187,8 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	       struct iobuf *iobuf, const char **err)
 {
 	char greeting[IPROTO_GREETING_SIZE];
+	struct iovec iov[IPROTO_ROW_IOVMAX];
+
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	struct port_uri *uri = &r->remote.uri;
@@ -254,11 +201,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 		/* Authenticate */
 		say_debug("authenticating...");
 		struct iproto_header row;
-		memset(&row, sizeof(row), 0);
-		row.type = IPROTO_AUTH;
-		row.bodycnt = request_encode_auth(greeting, uri->login,
-						  uri->password, row.body);
-		struct iovec iov[IPROTO_ROW_IOVMAX];
+		iproto_encode_auth(&row, greeting, uri->login, uri->password);
 		int iovcnt = iproto_row_encode(&row, iov);
 		coio_writev(coio, iov, iovcnt, 0);
 		remote_read_row(coio, iobuf, &row);
@@ -269,30 +212,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 
 	/* Send SUBSCRIBE request */
 	struct iproto_header row;
-	memset(&row, 0, sizeof(row));
-	row.type = IPROTO_SUBSCRIBE;
-
-	uint32_t cluster_size = vclock_size(&r->vclock);
-	size_t size = 128 + cluster_size *
-		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	char *data = buf;
-	data = mp_encode_map(data, 3);
-	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = iproto_encode_uuid(data, &cluster_id);
-	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
-	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(&r->vclock, server) {
-		data = mp_encode_uint(data, server.id);
-		data = mp_encode_uint(data, server.lsn);
-	}
-	assert(data <= buf + size);
-	row.body[0].iov_base = buf;
-	row.body[0].iov_len = (data - buf);
-	row.bodycnt = 1;
-	struct iovec iov[IPROTO_ROW_IOVMAX];
+	iproto_encode_subscribe(&row, &cluster_id, &r->server_uuid, &r->vclock);
 	int iovcnt = iproto_row_encode(&row, iov);
 	coio_writev(coio, iov, iovcnt, 0);
 

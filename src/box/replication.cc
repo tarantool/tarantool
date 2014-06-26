@@ -46,8 +46,6 @@
 #include "log_io.h"
 #include "evio.h"
 #include "iproto_constants.h"
-#include "msgpuck/msgpuck.h"
-#include "scoped_guard.h"
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
@@ -660,31 +658,11 @@ replication_relay_join(struct recovery_state *r)
 	recover_snap(r);
 
 	/* Send response to JOIN command = end of stream */
-	struct iproto_header packet;
-	memset(&packet, 0, sizeof(packet));
-	packet.type = IPROTO_JOIN;
-	packet.sync = relay.sync;
-
-	/* Add vclock to response body */
-	uint32_t cluster_size = vclock_size(&r->vclock);
-	size_t size = 128 + cluster_size *
-		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	char *data = buf;
-	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(&r->vclock, server) {
-		data = mp_encode_uint(data, server.id);
-		data = mp_encode_uint(data, server.lsn);
-	}
-	assert(data <= buf + size);
-	packet.body[0].iov_base = buf;
-	packet.body[0].iov_len = (data - buf);
-	packet.bodycnt = 1;
-
+	struct iproto_header row;
+	iproto_encode_eos(&row, &r->vclock);
+	row.sync = relay.sync;
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&packet, iov);
+	int iovcnt = iproto_row_encode(&row, iov);
 	sio_writev_all(relay.sock, iov, iovcnt);
 
 	say_info("snapshot sent");
