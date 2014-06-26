@@ -81,7 +81,7 @@ int
 log_dir_scan(struct log_dir *dir);
 
 char *
-format_filename(struct log_dir *dir, int64_t lsn, enum log_suffix suffix);
+format_filename(struct log_dir *dir, int64_t signature, enum log_suffix suffix);
 
 struct log_io {
 	struct log_dir *dir;
@@ -100,7 +100,7 @@ struct log_io {
 };
 
 struct log_io *
-log_io_open_for_read(struct log_dir *dir, int64_t sign,
+log_io_open_for_read(struct log_dir *dir, int64_t signature,
 		     const tt_uuid *server_uuid, enum log_suffix suffix);
 
 struct log_io *

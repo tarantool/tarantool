@@ -166,7 +166,7 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 
 	r->row_handler = row_handler;
 	r->row_handler_param = row_handler_param;
-	r->lsnsum = -1;
+	r->signature = -1;
 
 	r->snapshot_handler = snapshot_handler;
 	r->join_handler = join_handler;
@@ -226,8 +226,6 @@ recovery_free()
 		log_io_close(&r->current_wal);
 	}
 
-	vclock_destroy(&r->vclock);
-
 	recovery_state = NULL;
 }
 
@@ -242,8 +240,8 @@ void
 recovery_process(struct recovery_state *r, struct iproto_header *row)
 {
 	/* Check lsn */
-	int64_t current_lsn = vclock_get(&r->vclock, row->server_id);
-	if (current_lsn >=0 && row->lsn <= current_lsn) {
+	int64_t current_signt = vclock_get(&r->vclock, row->server_id);
+	if (current_signt >=0 && row->lsn <= current_signt) {
 		say_debug("skipping too young row");
 		return;
 	}
@@ -357,7 +355,7 @@ recover_remaining_wals(struct recovery_state *r)
 {
 	int result = 0;
 	struct log_io *next_wal;
-	int64_t current_lsn, wal_greatest_lsn;
+	int64_t current_signt, last_signt;
 	struct vclock *current_vclock;
 	size_t rows_before;
 	enum log_suffix suffix;
@@ -366,8 +364,8 @@ recover_remaining_wals(struct recovery_state *r)
 		return -1;
 
 	current_vclock = vclockset_last(&r->wal_dir.index);
-	wal_greatest_lsn = current_vclock != NULL ?
-				vclock_signature(current_vclock) : -1;
+	last_signt = current_vclock != NULL ?
+		vclock_signature(current_vclock) : -1;
 	/* if the caller already opened WAL for us, recover from it first */
 	if (r->current_wal != NULL)
 		goto recover_current_wal;
@@ -377,12 +375,12 @@ recover_remaining_wals(struct recovery_state *r)
 		if (current_vclock == NULL)
 			break; /* No more WALs */
 
-		current_lsn = vclock_signature(current_vclock);
-		if (current_lsn == r->lsnsum) {
-			if (current_lsn != wal_greatest_lsn) {
+		current_signt = vclock_signature(current_vclock);
+		if (current_signt == r->signature) {
+			if (current_signt != last_signt) {
 				say_error("missing xlog between %020lld and %020lld",
-					  (long long) current_lsn,
-					  (long long) wal_greatest_lsn);
+					  (long long) current_signt,
+					  (long long) last_signt);
 			}
 			break;
 		}
@@ -393,16 +391,14 @@ recover_remaining_wals(struct recovery_state *r)
 		 * .xlog, with no risk of a concurrent
 		 * inprogress_log_rename().
 		 */
-		suffix = current_lsn == wal_greatest_lsn ? INPROGRESS : NONE;
-		next_wal = log_io_open_for_read(&r->wal_dir, current_lsn,
+		suffix = current_signt == last_signt ? INPROGRESS : NONE;
+		next_wal = log_io_open_for_read(&r->wal_dir, current_signt,
 			&r->server_uuid, suffix);
 		/*
 		 * When doing final recovery, and dealing with the
 		 * last file, try opening .<ext>.inprogress.
 		 */
 		if (next_wal == NULL) {
-			say_warn("open fail: %lld",
-				 (long long) current_lsn);
 			if (r->finalize && suffix == INPROGRESS) {
 				/*
 				 * There is an .inprogress file, but
@@ -410,14 +406,14 @@ recover_remaining_wals(struct recovery_state *r)
 				 * delete it.
 				 */
 				if (inprogress_log_unlink(format_filename(
-				    &r->wal_dir, current_lsn, INPROGRESS)) != 0)
+				    &r->wal_dir, current_signt, INPROGRESS)) != 0)
 					panic("can't unlink 'inprogres' WAL");
 			}
 			result = 0;
 			break;
 		}
 		assert(r->current_wal == NULL);
-		r->lsnsum = current_lsn;
+		r->signature = current_signt;
 		r->current_wal = next_wal;
 		say_info("recover from `%s'", r->current_wal->filename);
 
@@ -444,7 +440,7 @@ recover_current_wal:
 			say_info("done `%s'", r->current_wal->filename);
 			log_io_close(&r->current_wal);
 			/* goto find_next_wal; */
-		} else if (r->lsnsum == wal_greatest_lsn) {
+		} else if (r->signature == last_signt) {
 			/* last file is not finished */
 			break;
 		} else if (r->finalize && r->current_wal->is_inprogress) {
@@ -471,7 +467,7 @@ recover_current_wal:
 	 * It's not a fatal error when last WAL is empty, but if
 	 * we lose some logs it is a fatal error.
 	 */
-	if (wal_greatest_lsn > r->lsnsum) {
+	if (last_signt > r->signature) {
 		say_error("not all WALs have been successfully read");
 		result = -1;
 	}
@@ -510,7 +506,7 @@ recovery_finalize(struct recovery_state *r)
 			say_warn("unlink broken %s WAL", r->current_wal->filename);
 			if (inprogress_log_unlink(r->current_wal->filename) != 0)
 				panic("can't unlink 'inprogress' WAL");
-		} else if (r->current_wal->rows <= 2 /* SETLSN + one row */) {
+		} else if (r->current_wal->rows <= 1 /* one row */) {
 			/* Rename inprogress wal with one row */
 			say_warn("rename unfinished %s WAL", r->current_wal->filename);
 			if (inprogress_log_rename(r->current_wal) != 0)
@@ -702,7 +698,7 @@ wal_writer_child()
 static void
 wal_writer_init_once()
 {
-	(void) tt_pthread_atfork(NULL, NULL, wal_writer_child);
+        (void) tt_pthread_atfork(NULL, NULL, wal_writer_child);
 }
 
 /**
@@ -807,7 +803,6 @@ wal_writer_destroy(struct wal_writer *writer)
 	(void) tt_pthread_mutex_destroy(&writer->mutex);
 	(void) tt_pthread_cond_destroy(&writer->cond);
 	free(writer->batch);
-	vclock_destroy(&writer->vclock);
 }
 
 /** WAL writer thread routine. */

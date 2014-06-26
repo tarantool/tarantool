@@ -85,6 +85,9 @@
 ; the missing value is always assumed to be 0. If the
 ; missing key assumes a string value, the string is assumed
 ; to be empty.
+; If a body has no keys, entire msgpack map for the body
+; may be missing. Such is the case, for example, in <ping>
+; request.
 
 <key> ::= <header_key> | <body_key>
 

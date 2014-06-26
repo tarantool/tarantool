@@ -66,7 +66,7 @@ struct recovery_state {
 	struct log_io *current_wal;
 	struct log_dir snap_dir;
 	struct log_dir wal_dir;
-	int64_t lsnsum; /* used to find missing xlog files */
+	int64_t signature; /* used to find missing xlog files */
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
 	struct remote remote;

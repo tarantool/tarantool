@@ -49,24 +49,6 @@ vclock_follow(struct vclock *vclock, uint32_t server_id, int64_t lsn)
 	return prev_lsn;
 }
 
-void
-vclock_merge(struct vclock *to, const struct vclock *with)
-{
-	/* Botched logic:
-	 * - imagine there is 5.snap and 1.xlog
-	 * - 5.snap has 1: 5 vclock
-	 * - 1.xlog has 1: 1 vclock
-	 * We begin reading the xlog after snap,
-	 * but we don't skip setlsn (we never skip setlsn).
-	 * So we must not update server id 1 with lsn 1,
-	 * hence the code below only updates target if it
-	 * is less than the source.
-	 */
-	for (int i = 0; i < VCLOCK_MAX; i++)
-		if (with->lsn[i] > to->lsn[i])
-			to->lsn[i] = with->lsn[i];
-}
-
 static inline __attribute__ ((format(FORMAT_PRINTF, 4, 0))) int
 rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 {
@@ -112,11 +94,9 @@ vclock_to_string(const struct vclock *vclock)
 		return NULL;
 
 	const char *sep = "";
-	for (uint32_t node_id = 0; node_id < VCLOCK_MAX; node_id++) {
-		if (vclock->lsn[node_id] < 0)
-			continue;
-		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep, node_id,
-		    (long long) vclock->lsn[node_id]) != 0)
+	vclock_foreach(vclock, it) {
+		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep, it.id,
+		    (long long) it.lsn) != 0)
 			return NULL;
 		sep = ", ";
 	}
@@ -130,40 +110,43 @@ vclock_to_string(const struct vclock *vclock)
 size_t
 vclock_from_string(struct vclock *vclock, const char *str)
 {
-	long node_id;
+	long server_id;
 	long long lsn;
 
 	const char *p = str;
 	begin:
 		if (*p == '{') {
 			++p;
-			/* goto key; */
+			goto key;
 		} else if (isblank(*p)) {
 			++p;
 			goto begin;
-		} else goto error;
+		}
+		goto error;
 	key:
 		if (isdigit(*p)) {
 			errno = 0;
-			node_id = strtol(p, (char **) &p, 10);
-			if (errno != 0 || node_id < 0 || node_id >= VCLOCK_MAX)
+			server_id = strtol(p, (char **) &p, 10);
+			if (errno != 0 || server_id < 0 || server_id >= VCLOCK_MAX)
 				goto error;
-			/* goto sep; */
+			goto sep;
 		} else if (*p == '}') {
 			++p;
 			goto end;
 		} else if (isblank(*p)) {
 			++p;
 			goto key;
-		} else goto error;
+		}
+		goto error;
 	sep:
 		if (*p == ':') {
 			++p;
-			/* goto val; */
+			goto val;
 		} else if (isblank(*p)) {
 			++p;
 			goto sep;
-		} else goto error;
+		}
+		goto error;
 	val:
 		if (isblank(*p)) {
 			++p;
@@ -172,29 +155,32 @@ vclock_from_string(struct vclock *vclock, const char *str)
 			errno = 0;
 			lsn = strtoll(p, (char **)  &p, 10);
 			if (errno != 0 || lsn < 0 || lsn > INT64_MAX ||
-			    vclock->lsn[node_id] != -1)
+			    vclock->lsn[server_id] != -1)
 				goto error;
-			vclock->lsn[node_id] = lsn;
-			/* goto comma; */
-		} else goto error;
+			vclock->lsn[server_id] = lsn;
+			goto comma;
+		}
+		goto error;
 	comma:
 		if (isspace(*p)) {
 			++p;
 			goto comma;
 		} else if (*p == '}') {
 			++p;
-			/* goto end; */
+			goto end;
 		} else if (*p == ',') {
 			++p;
 			goto key;
-		} else goto error;
+		}
+		goto error;
 	end:
 		if (*p == '\0') {
 			return 0;
 		} else if (isblank(*p)) {
 			++p;
 			goto end;
-		} else goto error;
+		}
+		/* goto error; */
 	error:
 		return p - str + 1; /* error */
 }

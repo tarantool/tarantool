@@ -228,7 +228,6 @@ replica_bootstrap(struct recovery_state *r)
 	/* Decode end of stream packet */
 	struct vclock vclock;
 	vclock_create(&vclock);
-	auto vclock_guard = make_scoped_guard([&]{ vclock_destroy(&vclock); });
 	assert(row.type == IPROTO_JOIN);
 	iproto_decode_eos(&row, &vclock);
 

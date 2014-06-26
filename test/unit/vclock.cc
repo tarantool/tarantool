@@ -59,10 +59,7 @@ test_compare_one(uint32_t a_count, const int64_t *lsns_a,
 			vclock_follow(&b, node_id, lsns_b[node_id]);
 	}
 
-	int result = vclock_compare(&a, &b);
-	vclock_destroy(&a);
-	vclock_destroy(&b);
-	return result;
+	return vclock_compare(&a, &b);
 }
 
 #define test2(xa, xb, res) ({\
@@ -137,7 +134,6 @@ testset_destroy(vclockset_t *set)
 	while (cur != NULL) {
 		struct vclock *next = vclockset_next(set, cur);
 		vclockset_remove(set, cur);
-		vclock_destroy(cur);
 		free(cur);
 		cur = next;
 	}
@@ -239,8 +235,6 @@ test_isearch()
 		struct vclock *res = vclockset_isearch(&set, &vclock);
 		int64_t value = res != NULL ? vclock_signature(res) : INT64_MAX;
 		is(value, check, "query #%d", q + 1);
-
-		vclock_destroy(&vclock);
 	}
 
 	testset_destroy(&set);
@@ -260,7 +254,6 @@ test_tostring_one(uint32_t count, const int64_t *lsns, const char *res)
 	char *str = vclock_to_string(&vclock);
 	int result = strcmp(str, res) == 0;
 	free(str);
-	vclock_destroy(&vclock);
 	return result;
 }
 
@@ -301,11 +294,7 @@ test_fromstring_one(const char *str, uint32_t count, const int64_t *lsns)
 			check.lsn[node_id] = lsns[node_id];
 	}
 
-	int result = (rc != 0 || vclock_compare(&vclock, &check) != 0);
-
-	vclock_destroy(&vclock);
-	vclock_destroy(&check);
-	return result;
+	return (rc != 0 || vclock_compare(&vclock, &check) != 0);
 }
 
 #define test(s, xa) ({\
@@ -341,8 +330,7 @@ test_fromstring()
 	struct vclock tmp;						\
 	vclock_create(&tmp);						\
 	is(vclock_from_string(&tmp, str), offset,			\
-		"fromstring \"%s\" => %u", str, offset)			\
-	vclock_destroy(&tmp); })
+		"fromstring \"%s\" => %u", str, offset)})
 
 int
 test_fromstring_invalid()
