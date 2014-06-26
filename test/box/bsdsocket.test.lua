@@ -1,6 +1,9 @@
-json = require('json')
-pickle = require('pickle')
-socket = require('socket')
+json = require 'json'
+pickle = require 'pickle'
+socket = require 'socket'
+fiber = require 'fiber'
+msgpack = require 'msgpack'
+log = require 'log'
 type(socket)
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
@@ -11,8 +14,10 @@ type(s)
 s:errno()
 type(s:error())
 
+primary_port = string.gsub(box.cfg.primary_port, '^.*:', '')
+
 s:nonblock(false)
-s:sysconnect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
+s:sysconnect('127.0.0.1', primary_port)
 s:nonblock(true)
 s:nonblock()
 s:nonblock(false)
@@ -28,14 +33,22 @@ s:writable(.00000000000001)
 s:writable(0)
 s:wait(.01)
 
-s:syswrite(pickle.pack('iii', 65280, 0, 12334))
+handshake = s:sysread(128)
+string.len(handshake)
+string.sub(handshake, 1, 9)
+
+ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+ping = msgpack.encode(string.len(ping)) .. ping
+
+s:syswrite(ping)
 s:readable(1)
 s:wait(.01)
-pickle.unpack('iii', s:sysread(4096))
 
-s:syswrite(pickle.pack('iii', 65280, 0, 12335))
-s:readable(1)
-string.len(s:sysread(4096))
+pong = s:sysread(4096)
+string.len(pong)
+msgpack.decode(pong)
+msgpack.decode(pong, 6)
+
 s:close()
 
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
@@ -88,6 +101,7 @@ sc:readable()
 sc:sysconnect('127.0.0.1', 3457)
 sc:writable(10)
 sc:write('Hello, world')
+
 
 sa = s:accept()
 sa:nonblock(1)
@@ -202,7 +216,10 @@ s:recv(4096)
 
 sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
 s:readable(10)
-local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return json.encode{d, from}
+d, from = s:recvfrom(4096)
+from.port > 0
+from.port = 'Random port'
+json.encode{d, from}
 s:close()
 sc:close()
 
@@ -237,4 +254,20 @@ string.match(header, "\r\n\r\n$") ~= nil
 string.match(header, "200 [Oo][Kk]") ~= nil
 s:close()
 
-socket.tcp_connect('mail.ru', 80, 0.00000000001)
+socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
+
+-- close
+
+s = socket.tcp_connect('127.0.0.1', primary_port)
+string.sub(s:read(128), 1, 9)
+sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+tostring(sa)
+sa:readable(0)
+sa:writable(0)
+
+ch = fiber.channel()
+f = fiber.wrap(function() s:read(12) ch:put(true) end)
+fiber.sleep(.1)
+s:close()
+ch:get(1)
+s:error()

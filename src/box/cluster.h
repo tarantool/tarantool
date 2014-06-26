@@ -38,95 +38,75 @@
  * connected with asynchronous master-master replication.
  *
  * Each cluster has a globally unique identifier. Each
- * node in the cluster is identified as well. A node
+ * server in the cluster is identified as well. A server
  * which is part of one cluster can not join another
  * cluster.
  *
- * Cluster and node identifiers are stored in a system
- * space _cluster on all nodes. The node identifier
+ * Cluster and server identifiers are stored in a system
+ * space _cluster on all servers. The server identifier
  * is also stored in each snapshot header, this is how
- * the node knows which node id in the _cluster space is
+ * the server knows which server id in the _cluster space is
  * its own id.
  *
- * Cluster and node identifiers are globally unique
+ * Cluster and server identifiers are globally unique
  * (UUID, universally unique identifiers). In addition
  * to these unique but long identifiers, a short integer id
- * is used for pervasive node identification in a replication
+ * is used for pervasive server identification in a replication
  * stream, a snapshot, or internal data structures.
- * The mapping between 16-byte node globally unique id and
+ * The mapping between 16-byte globally unique id and
  * 4 byte cluster local id is stored in _cluster space. When
- * a node joins the cluster, it sends its globally unique
+ * a server joins the cluster, it sends its globally unique
  * identifier to one of the masters, and gets its cluster
  * local identifier as part of the reply to the JOIN request
  * (in fact, it gets it as a REPLACE request in _cluster
  * system space along with the rest of the replication
  * stream).
  *
- * Cluster state on each node is represented by a table
+ * Cluster state on each server is represented by a table
  * like below:
  *
  *   ----------------------------------
- *  | node id          | confirmed lsn |
+ *  | server id        | confirmed lsn |
  *   ----------------------------------
- *  | 1                |  1258         | <-- changes of the local node
+ *  | 1                |  1258         | <-- changes of the first server
  *   ----------------------------------
- *  | 2                |  1292         | <-- changes received from
- *   ----------------------------------       a remote node
+ *  | 2                |  1292         | <-- changes of the local server
+ *   ----------------------------------
  *
- * This table is called in the code "log sequence number map" or
- * "log sequence number table" or "cluster vector clock" and
- * is implemented in @file vclock.h
+ * This table is called in the code "cluster vector clock".
+ * and is implemented in @file vclock.h
  */
 
 /** {{{ Global cluster identifier API **/
 
-/**
- * Bootstrap a new cluster consisting of this node by
- * assigning it a new globally unique cluster id. Used
- * during bootstrapping in an empty data directory when no
- * existing cluster for joining has been provided in the
- * database configuration.
- */
-void
-cluster_set_id(const tt_uuid *uu);
+/** UUID of the cluster. */
+extern tt_uuid cluster_id;
 
-/**
- * Get a UUID of the cluster.
- */
-const tt_uuid *
-cluster_id();
-
-/**
- * Check that the given UUID matches the UUID of the
- * cluster this node belongs to. Used to handshake
- * replica connect, and refuse a connection from a replica
- * which belongs to a different cluster.
- */
-void
-cluster_check_id(const tt_uuid *uu);
+extern "C" struct vclock *
+cluster_clock();
 
 /* }}} */
 
 /** {{{ Cluster node id API **/
 
-/** Cluster-local node identifier. */
-typedef uint32_t cnode_id_t;
+/** Cluster-local server identifier. */
+typedef uint32_t cserver_id_t;
 
 static inline bool
-cnode_id_is_reserved(cnode_id_t id)
+cserver_id_is_reserved(cserver_id_t id)
 {
 	return id == 0;
 }
 
 /**
- * Register the universally unique identifier of a remote node and
+ * Register the universally unique identifier of a remote server and
  * a matching cluster-local identifier in the  cluster registry.
  * Called when a remote master joins the cluster.
  *
- * The node is added to the cluster lsn table with LSN 0.
+ * The server is added to the cluster lsn table with LSN 0.
  */
 void
-cluster_add_node(const tt_uuid *node_uu, cnode_id_t id);
+cluster_add_server(const tt_uuid *server_uuid, cserver_id_t id);
 
 /** }}} **/
 

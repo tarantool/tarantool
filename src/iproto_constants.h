@@ -50,7 +50,7 @@ enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
 	/* Replication keys (header) */
-	IPROTO_NODE_ID = 0x02,
+	IPROTO_SERVER_ID = 0x02,
 	IPROTO_LSN = 0x03,
 	IPROTO_TIMESTAMP = 0x04,
 	/* Leave a gap for other keys in the header. */
@@ -65,9 +65,9 @@ enum iproto_key {
 	IPROTO_FUNCTION_NAME = 0x22,
 	IPROTO_USER_NAME = 0x23,
 	/* Replication keys (body) */
-	IPROTO_NODE_UUID = 0x24,
+	IPROTO_SERVER_UUID = 0x24,
 	IPROTO_CLUSTER_UUID = 0x25,
-	IPROTO_LSNMAP = 0x26,
+	IPROTO_VCLOCK = 0x26,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -76,7 +76,7 @@ enum iproto_key {
 
 #define bit(c) (1ULL<<IPROTO_##c)
 
-#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(NODE_ID) |\
+#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(SERVER_ID) |\
 			  bit(LSN))
 #define IPROTO_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
@@ -116,8 +116,7 @@ enum iproto_request_type {
 	IPROTO_DML_REQUEST_MAX = 8,
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
-	IPROTO_SUBSCRIBE = 66,
-	IPROTO_SETLSN = 67
+	IPROTO_SUBSCRIBE = 66
 };
 
 extern const char *iproto_request_type_strs[];
@@ -153,9 +152,12 @@ enum {
 		IPROTO_PACKET_BODY_IOVMAX
 };
 
+enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
+
+
 struct iproto_header {
 	uint32_t type;
-	uint32_t node_id;
+	uint32_t server_id;
 	uint64_t sync;
 	uint64_t lsn;
 	double tm;
@@ -167,15 +169,57 @@ struct iproto_header {
 void
 iproto_header_decode(struct iproto_header *header,
 		     const char **pos, const char *end);
+struct tt_uuid;
+
+void
+iproto_decode_uuid(const char **pos, struct tt_uuid *out);
+
+char *
+iproto_encode_uuid(char *pos, const struct tt_uuid *in);
+
 int
 iproto_header_encode(const struct iproto_header *header,
 		     struct iovec *out);
 
-enum { IPROTO_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
-
 int
-iproto_row_encode(const struct iproto_header *row, struct iovec *out,
-		  char fixheader[IPROTO_FIXHEADER_SIZE]);
+iproto_row_encode(const struct iproto_header *row, struct iovec *out);
+
+void
+iproto_decode_error(struct iproto_header *row);
+
+/**
+ * \brief Decode SUBSCRIBE command
+ * \param packet
+ * \param[out] cluster_uuid
+ * \param[out] server_uuid
+ * \param[out] vclock
+ */
+void
+iproto_decode_subscribe(struct iproto_header *packet,
+			struct tt_uuid *cluster_uuid,
+			struct tt_uuid *server_uuid, struct vclock *vclock);
+
+/**
+ * \brief Decode JOIN command
+ * \param packet
+ * \param[out] server_uuid
+ */
+static inline void
+iproto_decode_join(struct iproto_header *packet, struct tt_uuid *server_uuid)
+{
+	return iproto_decode_subscribe(packet, NULL, server_uuid, NULL);
+}
+
+/**
+ * \brief Decode end of stream packet (a response to JOIN packet)
+ * \param packet
+ * \param[out] vclock
+ */
+static inline void
+iproto_decode_eos(struct iproto_header *packet, struct vclock *vclock)
+{
+	return iproto_decode_subscribe(packet, NULL, NULL, vclock);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

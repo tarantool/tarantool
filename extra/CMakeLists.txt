@@ -1,4 +1,3 @@
-
 #
 # Scripts for a RPM package
 #
@@ -23,7 +22,7 @@ if (ENABLE_RPM)
 		 WORLD_READ WORLD_EXECUTE)
 endif()
 
-configure_file(rpm.spec.in rpm.spec @ONLY)
+configure_file(rpm/tarantool.rpm.spec.in rpm/tarantool.rpm.spec @ONLY)
 
 if (TARGET_OS_DARWIN)
 	# NOTE: need add execution 'plutil -lint org.tarantool.tarantool.plist
@@ -42,10 +41,10 @@ if (TARGET_OS_DARWIN)
 	# chmod +x 644
 	install (FILES ${CMAKE_BINARY_DIR}/extra/${LUANCHD_PLIST}
                  DESTINATION share/tarantool
-		 PERMISSIONS
-		 OWNER_READ OWNER_WRITE
-		 GROUP_READ GROUP_READ
-		 WORLD_READ WORLD_READ)
+         PERMISSIONS
+         OWNER_READ OWNER_WRITE
+         GROUP_READ GROUP_READ
+         WORLD_READ WORLD_READ)
 endif()
 
 add_executable(txt2c txt2c.c)

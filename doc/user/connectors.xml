@@ -79,12 +79,12 @@ is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/
                           <entry>03</entry>
                         </row>
                         <row>
-                          <entry>1-character string: field[0]</entry>
+                          <entry>1-character string: field[1]</entry>
                           <entry>a1</entry>
                           <entry>41</entry>
                         </row>
                         <row>
-                          <entry>2-character string: field[1]</entry>
+                          <entry>2-character string: field[2]</entry>
                           <entry>a2</entry>
                           <entry>42</entry>
                           <entry>42</entry>
@@ -114,7 +114,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, say <code>./example</code>.
     The program will format a buffer for sending an INSERT request, then open a socket connection
     with the tarantool server at localhost:3303, then send the request, then check if the
@@ -137,8 +137,8 @@ int main()
   tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
   tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
   tp_tuple(&amp;request);                                          /* begin appending body */
-  tp_field(&amp;request, (char*) &amp;pk_field_value, 4);              /* append field[0] */
-  tp_sz(&amp;request, "BB");                                       /* append field[1] */
+  tp_field(&amp;request, (char*) &amp;pk_field_value, 4);              /* append field[1] */
+  tp_sz(&amp;request, "BB");                                       /* append field[2] */
   if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket, abort if failure */
     exit(1);
   memset(&amp;tt, 0, sizeof(tt));                                  /* connect to localhost:3303 */
@@ -227,7 +227,7 @@ sudo cpan install DR::Tarantool
     Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
@@ -250,7 +250,7 @@ my $tnt = tarantool
       name =&gt; 't0',                            #   space[0] name = 't0'
       default_type =&gt; 'STR',                   #   space[0] field type is 'STR' if undefined
       fields =&gt; [ {                            #   definition of space[0].fields ...
-          name =&gt; 'k0', type =&gt; 'NUM' } ],     #     space[0].field[0] name='k0',type='NUM'
+          name =&gt; 'k0', type =&gt; 'NUM' } ],     #     space[0].field[1] name='k0',type='NUM'
       indexes =&gt; {                             #   definition of space[0] indexes ...
         0 =&gt; {
           name =&gt; 'k0', fields =&gt; 'k0' } } } };
@@ -303,7 +303,7 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[0].type = "NUM" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
     with the tarantool server at localhost:3303, then send an INSERT request,
@@ -335,27 +335,34 @@ catch (Exception $e) {
   <section xml:id="connector-python">
     <title>Python</title>
     <para>
-    Here is a complete Python program that inserts [99999,'BB'] into space[0] via the high-level Python API.
+    Here is a complete Python program that inserts ['First Tuple','Value','Value'] into space99 via the high-level Python API.
     To prepare, paste the code into a file named example.py and install tarantool-python with either
     <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
     <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
-    Before trying to run, check that the server (tarantool) is running on localhost (127.0.0.1) and its primary port
-    is the default (3303) and space[0]'s primary key type is string (space[0].index[0].key_field[0].type = "STR" in configuration file).
-    To run, say <code>python example.py</code>.
+    The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its primary port is
+    the default (3303) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
+    and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
+    starting the tarantool server and executing these requests:<programlisting>
+box.cfg{primary_port = 3303}
+box.schema.create_space('space99') 
+box.space.space99:create_index('primary',{parts = {1,'STR'}})
+box.schema.user.grant('guest', 'read', 'space', '_space')
+box.schema.user.grant('guest', 'read,write', 'space', 'space99')</programlisting>
+    To run the program, say <code>python example.py</code>.
     The program will connect to the server, will send the request, and will not throw an exception if all went well.
-    If the row already exists, the program will throw DatabaseException(“Duplicate key exists in unique index 0”).
+    If the tuple already exists, the program will throw DatabaseException(“Duplicate key exists in unique index”).
     </para>
 <programlisting language="python">
 #!/usr/bin/python
 from tarantool import Connection
 
 c = Connection("127.0.0.1", 3303)
-result = c.insert(0,(99999,'BB'))
+result = c.insert("space99",('First Tuple','Value', 'Value'))
 print result
 </programlisting>
     <para>
-       The example program only shows one command and does not show all that's necessary for
+       The example program only shows one request and does not show all that's necessary for
        good practice. For that, please see
        <link xlink:href="http://tarantool-python.readthedocs.org/en/latest/"><filename>http://tarantool-python.readthedocs.org/en/latest/</filename></link>.
        For an example of a Python API for <link xlink:href="https://github.com/tarantool/queue">Queue managers on Tarantool</link>, see 

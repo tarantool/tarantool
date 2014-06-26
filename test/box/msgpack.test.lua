@@ -158,6 +158,12 @@ test(ffi.new('double', 12.121))
 --------------------------------------------------------------------------------
 
 test(nil)
+type(msgpack.NULL)
+type(msgpackffi.NULL)
+msgpack.NULL == nil
+msgpackffi.NULL == nil
+test(msgpack.NULL)
+test(msgpackffi.NULL)
 
 test(ffi.cast('void *', 0))
 

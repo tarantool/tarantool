@@ -17,6 +17,9 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 Makefile
 RPM
+*.src.rpm
+*.i386.rpm
+*.x86_64.rpm
 tags
 extra/txt2c
 extra/bin2c
@@ -34,6 +37,8 @@ doc/www-data/*.ru.html
 doc/www-data.in/_text/download.md
 doc/www-data.in/doc
 extra/rpm.spec
+extra/rpm/tarantool.rpm.spec
+include/tarantool/config.h
 src/trivia/config.h
 install_manifest.txt
 lcov

@@ -73,7 +73,7 @@ access_check_ddl(uint32_t owner_uid)
 	 */
 	if (owner_uid != user->uid && user->uid != ADMIN) {
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Write", user->name);
+			  "Create or drop", user->name);
 	}
 }
 
@@ -990,6 +990,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  (unsigned) space_id(old_space),
 				  "the space has indexes");
 		}
+		if (object_has_grants(old_space->access)) {
+			tnt_raise(ClientError, ER_DROP_SPACE,
+				  (unsigned) space_id(old_space),
+				  "the space has grants");
+		}
 		/* @todo lock space metadata until commit. */
 		/*
 		 * dd_space_delete() can't fail, any such
@@ -1164,6 +1169,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
 	user->uid = tuple_field_u32(tuple, ID);
+	user->owner = tuple_field_u32(tuple, UID);
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = snprintf(user->name, sizeof(user->name), "%s", name);
 	if (len >= sizeof(user->name)) {
@@ -1171,6 +1177,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 			  name, "user name is too long");
 	}
 	identifier_check(name);
+	access_check_ddl(user->owner);
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password)).
@@ -1226,7 +1233,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		(void) user_cache_replace(&user);
 		trigger_set(&txn->on_rollback, &drop_user_trigger);
 	} else if (new_tuple == NULL) { /* DELETE */
-		access_check_ddl(uid);
+		access_check_ddl(old_user->owner);
 		/* Can't drop guest or super user */
 		if (uid == GUEST || uid == ADMIN) {
 			tnt_raise(ClientError, ER_DROP_USER,
@@ -1268,6 +1275,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 			  name, "function name is too long");
 	}
 	snprintf(func->name, sizeof(func->name), "%s", name);
+	/** Nobody has access to the function but the owner. */
+	memset(func->access, 0, sizeof(func->access));
 }
 
 /** Remove a function from function cache */
@@ -1322,7 +1331,12 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		 * who created it or a superuser.
 		 */
 		access_check_ddl(func.uid);
-		/* @todo can only delete func if it has no grants */
+		/* Can only delete func if it has no grants. */
+		if (object_has_grants(old_func->access)) {
+			tnt_raise(ClientError, ER_DROP_FUNCTION,
+				  (unsigned) func.uid,
+				  "function has grants");
+		}
 		trigger_set(&txn->on_commit, &drop_func_trigger);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&func, new_tuple);
@@ -1530,27 +1544,27 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	const char *key = tuple_field_cstr(new_tuple ?
 					   new_tuple : old_tuple, 0);
 	if (strcmp(key, "cluster") == 0) {
-		if (old_tuple != NULL || new_tuple == NULL)
+		if (new_tuple == NULL)
 			tnt_raise(ClientError, ER_CLUSTER_ID_IS_RO);
 		tt_uuid uu = tuple_field_uuid(new_tuple, 1);
-		cluster_set_id(&uu);
+		cluster_id = uu;
 	}
 }
 
 /**
- * A record with id of the new node has been synced to the
- * write ahead log. Update the cluster configuration with
- * a new node.
+ * A record with id of the new server has been synced to the
+ * write ahead log. Update the cluster configuration cache
+ * with it.
  */
 static void
 on_commit_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	uint32_t node_id = tuple_field_u32(txn->new_tuple, 0);
-	tt_uuid node_uuid = tuple_field_uuid(txn->new_tuple, 1);
+	uint32_t id = tuple_field_u32(txn->new_tuple, 0);
+	tt_uuid uuid = tuple_field_uuid(txn->new_tuple, 1);
 
-	cluster_add_node(&node_uuid, node_id);
+	cluster_add_server(&uuid, id);
 }
 
 static struct trigger commit_cluster_trigger =
@@ -1564,13 +1578,13 @@ static struct trigger commit_cluster_trigger =
  * protocol.
  *
  * The trigger updates the cluster configuration cache
- * with uuid of the newly joined node.
+ * with uuid of the newly joined server.
  *
  * During recovery, it acts the same way, loading identifiers
- * of all nodes into the node cache. Node globally unique
+ * of all servers into the cache. Node globally unique
  * identifiers are used to keep track of cluster configuration,
- * so that a node that previously joined the cluster can
- * follow updates, and a node that belongs to a different
+ * so that a server that previously joined the cluster can
+ * follow updates, and a server that belongs to a different
  * cluster can not by mistake join/follow another cluster
  * without first being reset (emptied).
  */
@@ -1579,20 +1593,19 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
-	struct tuple *old_tuple = txn->old_tuple;
 	struct tuple *new_tuple = txn->new_tuple;
-	if (old_tuple != NULL || new_tuple == NULL)
-		tnt_raise(ClientError, ER_NODE_ID_IS_RO);
+	if (new_tuple == NULL)
+		tnt_raise(ClientError, ER_SERVER_ID_IS_RO);
 
 	/* Check fields */
-	uint32_t node_id = tuple_field_u32(new_tuple, 0);
-	if (cnode_id_is_reserved(node_id))
-		tnt_raise(ClientError, ER_NODE_ID_IS_RESERVED,
-			  (unsigned) node_id);
-	tt_uuid node_uuid = tuple_field_uuid(new_tuple, 1);
-	if (tt_uuid_is_nil(&node_uuid))
+	uint32_t server_id = tuple_field_u32(new_tuple, 0);
+	if (cserver_id_is_reserved(server_id))
+		tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
+			  (unsigned) server_id);
+	tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
+	if (tt_uuid_is_nil(&server_uuid))
 		tnt_raise(ClientError, ER_INVALID_UUID,
-			  tt_uuid_str(&node_uuid));
+			  tt_uuid_str(&server_uuid));
 
 	trigger_set(&txn->on_commit, &commit_cluster_trigger);
 }

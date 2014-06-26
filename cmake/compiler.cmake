@@ -126,6 +126,11 @@ macro(enable_tnt_compile_flags)
         )
     endif()
 
+    if (CMAKE_COMPILER_IS_GNUCC)
+        # A workaround for Redhat Developer Toolset 2.x on RHEL/CentOS 5.x
+        add_compile_flags("C" "-fno-gnu89-inline")
+    endif()
+
     add_definitions("-D__STDC_FORMAT_MACROS=1")
     add_definitions("-D__STDC_LIMIT_MACROS=1")
     add_definitions("-D__STDC_CONSTANT_MACROS=1")

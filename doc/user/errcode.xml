@@ -11,7 +11,7 @@ a file name, a detailed reason or operating system error code.
 All such messages, however, are logged in the error log. 
 Below follow only general descriptions
 of some popular codes. A complete list of errors can be found in
-file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h">errcode.h</filename> in the source tree.
+file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h">errcode.h</filename> in the source tree.
 
 </para>
 <variablelist>
@@ -19,8 +19,7 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/in
 
   <varlistentry>
     <term xml:id="ER_NONMASTER" xreflabel="ER_NONMASTER">ER_NONMASTER</term>
-    <listitem><para>Attempt to execute an update on a running
-    replica.
+    <listitem><para>Can't modify data on a replication slave.
     </para></listitem>
   </varlistentry>
 
@@ -39,33 +38,32 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/in
 
   <varlistentry>
     <term xml:id="ER_WAL_IO" xreflabel="ER_WAL_IO">ER_WAL_IO</term>
-    <listitem><para>Failed to record the change in the write-ahead
-    log. Some sort of disk error.
+    <listitem><para>Failed to write to disk. May mean: failed to record a change in
+    the write-ahead log. Some sort of disk error.
     </para></listitem>
   </varlistentry>
 
   <varlistentry>
     <term xml:id="ER_KEY_PART_COUNT" xreflabel="ER_KEY_PART_COUNT">ER_KEY_PART_COUNT</term>
-    <listitem><para>Key part count is greater than index part count
+    <listitem><para>Key part count is not the same as index part count
     </para></listitem>
   </varlistentry>
 
   <varlistentry>
     <term xml:id="ER_NO_SUCH_SPACE" xreflabel="ER_NO_SUCH_SPACE">ER_NO_SUCH_SPACE</term>
-    <listitem><para>Attempt to access a space that is not
-    configured (doesn't exist).
+    <listitem><para>Attempt to access a space that does not exist.
     </para></listitem>
   </varlistentry>
 
   <varlistentry>
     <term xml:id="ER_NO_SUCH_INDEX" xreflabel="ER_NO_SUCH_INDEX">ER_NO_SUCH_INDEX</term>
-    <listitem><para>No index with the given id exists.
+    <listitem><para>The specified index does not exist for the specified space.
     </para></listitem>
   </varlistentry>
 
   <varlistentry>
     <term xml:id="ER_PROC_LUA" xreflabel="ER_PROC_LUA">ER_PROC_LUA</term>
-    <listitem><para>An error inside Lua procedure.
+    <listitem><para>An error inside a Lua procedure.
     </para></listitem>
   </varlistentry>
 

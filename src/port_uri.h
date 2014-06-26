@@ -56,10 +56,10 @@ struct port_uri {
 
 /**
  * Parse a string and fill port_uri struct.
- * @retval port_uri success
- * @retval NULL error
+ * @retval 0 success
+ * @retval -1 error
  */
-struct port_uri *
+int
 port_uri_parse(struct port_uri *uri, const char *str);
 
 /** Convert an uri to string */

@@ -101,7 +101,7 @@
   <note><simpara>
     Replication parameters are "dynamic", which allows the
     replica to become a master and vice versa with the help of the
-    <olink targetptr="box.cfg.reload"/> statement.
+    <olink targetptr="box.cfg"/> statement.
   </simpara></note>
 
 </section>

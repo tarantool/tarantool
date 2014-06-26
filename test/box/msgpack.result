@@ -286,6 +286,30 @@ test(nil)
 ---
 - nil ok
 ...
+type(msgpack.NULL)
+---
+- cdata
+...
+type(msgpackffi.NULL)
+---
+- cdata
+...
+msgpack.NULL == nil
+---
+- true
+...
+msgpackffi.NULL == nil
+---
+- true
+...
+test(msgpack.NULL)
+---
+- 'cdata<void *>: NULL ok'
+...
+test(msgpackffi.NULL)
+---
+- 'cdata<void *>: NULL ok'
+...
 test(ffi.cast('void *', 0))
 ---
 - 'cdata<void *>: NULL ok'

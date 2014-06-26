@@ -16,7 +16,7 @@ box.schema.user.create('testus')
 box.schema.user.create('testus')
 
 s = box.schema.create_space('admin_space')
-s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 s:insert({1})
 s:insert({2})
 --
@@ -139,7 +139,7 @@ box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
 box.space._user:delete(2)
 box.space._user:select(1)
-box.space._user:insert{3,'','someone'}
+box.space._user:insert{3, session.uid(), 'someone'}
 box.space._user:delete(3)
 
 session.su('admin')
@@ -165,33 +165,6 @@ box.space._index:select(272)
 box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 
 
-session.su('admin')
---
--- Check max function limit
---
---# setopt delimiter ';'
-function func_limit()
-    local i = 1
-    while true do
-        box.schema.func.create('func'..i)
-        i = i + 1
-    end
-    return i
-end;
-function drop_limit_func()
-    local i = 1
-    while true do
-        box.schema.func.drop('func'..i)
-        i = i + 1
-    end
-end;
-func_limit();
-drop_limit_func();
-box.schema.user.grant('testuser', 'read, write, execute', 'universe');
-session.su('testuser');
-func_limit();
-drop_limit_func();
---# setopt delimiter ''
 
 session.su('admin')
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
@@ -200,7 +173,7 @@ box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 --
 s = box.schema.create_space('glade') 
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
-s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 s:insert({1, 'A'})
 s:insert({2, 'B'})
 s:insert({3, 'C'})

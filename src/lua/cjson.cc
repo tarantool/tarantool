@@ -41,6 +41,10 @@ int
 tarantool_lua_cjson_init(struct lua_State *L)
 {
 	luaopen_cjson(L);
+	/* Add NULL constant */
+	lua_pushlightuserdata(L, NULL);
+	lua_setfield(L, -2, "NULL");
+	/* Register module */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	lua_pushstring(L, jsonlib_name); /* add alias */
 	lua_pushvalue(L, -3);

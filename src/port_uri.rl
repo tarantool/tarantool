@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port-uri.h"
+#include "port_uri.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -84,7 +84,7 @@ port_uri_to_string(const struct port_uri * uri)
 	return str;
 }
 
-struct port_uri *
+int
 port_uri_parse(struct port_uri *uri, const char *p)
 {
 	(void) uri;
@@ -203,12 +203,12 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		uri->addr_len = sizeof(*un);
 		un->sun_family = AF_UNIX;
 		if (path.end - path.start >= sizeof(un->sun_path))
-			return NULL;
+			return -1;
 
 		snprintf(un->sun_path, sizeof(un->sun_path),
 			 "%.*s", (int) (path.end - path.start), path.start);
 		snprintf(uri->schema, sizeof(uri->schema), "unix");
-		return uri;
+		return 0;
 	}
 
 	if (schema.start && schema.end) {
@@ -227,7 +227,7 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		in->sin_family = AF_INET;
 		in->sin_port = htons(port);
 		in->sin_addr.s_addr = INADDR_ANY;
-		return uri;
+		return 0;
 	}
 
 
@@ -235,14 +235,14 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		port = 0;
 		if (service.start && service.end) {
 			if (service.end - service.start >= NI_MAXSERV)
-				return NULL;
+				return -1;
 			char sname[NI_MAXSERV];
 			snprintf(sname, sizeof(sname), "%.*s",
 				 (int) (service.end - service.start),
                  service.start);
 			struct servent *s = getservbyname(sname, NULL);
 			if (!s)
-				return NULL;
+				return -1;
 			port = ntohs(s->s_port);
 		}
 	}
@@ -262,8 +262,8 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		snprintf(sip4, sizeof(sip4), "%.*s", (int) (ip4.end - ip4.start),
 			 ip4.start);
 		if (inet_aton(sip4, &in->sin_addr))
-			return uri;
-		return NULL;
+			return 0;
+		return -1;
 	}
 
 	/* IPv6 uri */
@@ -282,17 +282,17 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		in6->sin6_port = htonl(port);
 
 		if (inet_pton(AF_INET6, sip6, (void *)&in6->sin6_addr))
-			return uri;
+			return 0;
 
-		return NULL;
+		return -1;
 	}
 
 
 	if (!host.start || !host.end)
-		return NULL;
+		return -1;
 
 	if (host.end - host.start >= NI_MAXHOST)
-		return NULL;
+		return -1;
 
 	char shost[NI_MAXHOST];
 	char sservice[NI_MAXSERV];
@@ -310,12 +310,12 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	hints.ai_protocol = getprotobyname("tcp")->p_proto;
 
 	if (getaddrinfo(shost, sservice, &hints, &res) != 0)
-		return NULL;
+		return -1;
 
 	uri->addr_len = res->ai_addrlen;
 	memcpy((void *)&uri->addr, (void *)res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
-	return uri;
+	return 0;
 }
 
 /* vim: set ft=ragel: */

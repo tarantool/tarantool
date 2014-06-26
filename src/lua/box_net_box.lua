@@ -312,7 +312,7 @@ local function index_metatable(self)
                     idx.space.name, idx.name)
                 local res = self:call(proc, key)
                 if #res > 0 then
-                    return res[1][0]
+                    return res[1][1]
                 end
             end
         }
@@ -695,10 +695,10 @@ local remote_methods = {
 
 
         for _, space in pairs(spaces) do
-            local name = space[2]
-            local id = space[0]
-            local engine = space[3]
-            local field_count = space[4]
+            local name = space[3]
+            local id = space[1]
+            local engine = space[4]
+            local field_count = space[5]
 
             local s = {
                 id              = id,
@@ -709,7 +709,7 @@ local remote_methods = {
                 index           = {}
 
             }
-            if #space > 5 and string.match(space[5], 'temporary') then
+            if #space > 5 and string.match(space[6], 'temporary') then
                 s.temporary = true
             else
                 s.temporary = false
@@ -724,22 +724,22 @@ local remote_methods = {
 
         for _, index in pairs(indexes) do
             local idx = {
-                space   = index[0],
-                id      = index[1],
-                name    = index[2],
-                type    = string.upper(index[3]),
+                space   = index[1],
+                id      = index[2],
+                name    = index[3],
+                type    = string.upper(index[4]),
                 parts   = {},
             }
 
-            if index[4] == 0 then
+            if index[5] == 0 then
                 idx.unique = false
             else
                 idx.unique = true
             end
 
-            for k = 0, index[5] - 1 do
-                local pktype = index[6 + k * 2 + 1]
-                local pkfield = index[6 + k * 2]
+            for k = 0, index[6] - 1 do
+                local pktype = index[7 + k * 2 + 1]
+                local pkfield = index[7 + k * 2]
 
                 local pk = {
                     type = string.upper(pktype),

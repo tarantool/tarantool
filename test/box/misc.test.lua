@@ -50,7 +50,7 @@ t;
 type(box);
 type(box.space);
 t = {};
-for i, v in pairs(space.index[0].parts[0]) do
+for i, v in pairs(space.index[0].parts[1]) do
     table.insert(t, tostring(i)..' : '..tostring(v))
 end;
 t;
@@ -202,3 +202,16 @@ type(ffi.metatype('struct test', {
 --# setopt delimiter ''
 -- custom totable function will be called by yaml.encode
 ffi.new('struct test', { a = 15 })
+
+
+
+-------------------------------------------------------------------------------
+-- #346 yaml.null() crases server
+-------------------------------------------------------------------------------
+
+yaml = require('yaml')
+type(yaml.NULL)
+yaml.NULL
+yaml.NULL == nil
+yaml.null() -- for compatibility with luaYAML
+yaml = nil

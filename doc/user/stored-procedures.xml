@@ -91,16 +91,16 @@ function is_expired(args, tuple)
    end
 
    local current_time = os.time()
-   local tuple_ts = box.unpack("i", field)
+   local tuple_ts = pickle.unpack("i", field)
    return current_time >= tuple_ts + args.ttl
 end
 function purge(args, tuple)
-    box.space.space0:delete(tuple[0])
+    box.space.space0:delete(tuple[1])
 end
 
 -- Run task
 expirationd.run_task("exprd space 0", 0, is_expired, purge,
-                    { field_no = 1, ttl = 30 * 60 })
+                    { field_no = 2, ttl = 30 * 60 })
 ]]>
     </programlisting>
     </para>
@@ -193,7 +193,7 @@ tarantool> <userinput>f1(1234)</userinput>
 tarantool> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
 ---
 ...
-tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {0, 'STR'}})</userinput>
+tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})</userinput>
 ---
 ...
 tarantool> <userinput>s:insert{'a', 'b', 'c'}</userinput>
@@ -224,7 +224,7 @@ tarantool> <userinput>f()</userinput>
 - error: '[string "function f()error(''!'') end"]:1: !'
 tarantool> <userinput>s:insert{5}</userinput>
 ---
-- error: 'Tuple field 0 type does not match one required by operation:
+- error: 'Tuple field 1 type does not match one required by operation:
   expected STR'
 ...
 tarantool> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</userinput>
@@ -233,7 +233,7 @@ tarantool> <userinput>function insert_without_colon(tuple) s:insert(tuple) end</
 tarantool> <userinput>pcall(insert_without_colon,{0, 'b', 'c'})</userinput>
 ---
 - false
-- 'Tuple field 0 type does not match one required by operation: expected STR'
+- 'Tuple field 1 type does not match one required by operation: expected STR'
 tarantool> <userinput>box.space[33]:drop()</userinput>
 ---
 ...
@@ -241,7 +241,7 @@ tarantool> <userinput>box.space[33]:drop()</userinput>
     </para>
 
 <variablelist>
- <title>Lua function <code>tonumber64</code></title>
+<title>Lua functions <code>tonumber64</code> and <code>dostring</code></title>
     <varlistentry>
         <term xml:id="tonumber64" xreflabel="tonumber64"> <emphasis role="lua">tonumber64(<replaceable>value</replaceable>)</emphasis></term>
         <listitem>
@@ -276,1187 +276,10 @@ tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinp
             </para>
         </listitem>
     </varlistentry>
-</variablelist>
-
-<section xml:id="sp-box-library">
-    <title>The <code>box</code> library</title>
-
-    <para>
-      As well as executing Lua chunks or defining their own functions,
-      users can exploit the Tarantool server's storage functionality
-      with the <code>box</code> Lua library.
-    </para>
-
-  <para>
-  <bridgehead renderas="sect4">Packages of the box library</bridgehead>
-  
-    The contents of the <code>box</code> library can be inspected at runtime with
-    <code>box</code>, with no arguments.
-    The packages inside the box library are: schema, box, box.tuple, box.cjson, box.space, box.index, box.fiber,
-    box.session, box.ipc, box.socket, box.net.box, box.cfg, box.info, box.slab, box.stat.
-    Every package contains one or more Lua functions. A few packages contain members as well as functions.
-    The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
-    creating or resuming or interrupting fibers,
-    introspection (inspecting contents of spaces, accessing server configuration),
-    and sending or receiving data over a network.
-    </para>
-
-    <para>
-      <table>
-      <title xml:id="function-types">Possible types of the values that a function in the box library can return</title>
-      <tgroup cols="4" align="left" colsep="1" rowsep="1">
-      <thead>
-      <row><entry>General type</entry>                   <entry>Specific type</entry><entry>What Lua type() would return</entry>                                         <entry>Example</entry></row>
-      </thead>
-      <tbody>
-      <row><entry xml:id="function-type-number">scalar     </entry><entry>number</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.3.html">"number"</link></entry>   <entry>12345</entry></row>
-      <row><entry xml:id="function-type-string">scalar     </entry><entry>string</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.4.html">"string"</link></entry>   <entry>'A B C'</entry></row>
-      <row><entry xml:id="function-type-nil">scalar        </entry><entry>nil</entry>         <entry><link xlink:href="http://www.lua.org/pil/2.1.html">"nil"</link></entry>      <entry>nil</entry></row>
-      <row><entry xml:id="function-type-lua-table">compound</entry><entry>Lua table</entry>   <entry><link xlink:href="http://www.lua.org/pil/2.5.html">"table"</link></entry>    <entry>table: 0x410f8b10</entry></row>
-      <row><entry xml:id="function-type-tuple">compound    </entry><entry>tuple</entry>       <entry><link xlink:href="http://www.lua.org/pil/28.1.html">"Userdata"</link></entry><entry>12345: {'A B C'}</entry></row>
-      </tbody>
-      </tgroup>                                   
-      </table>
-    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store as a float
-    if the value contains a decimal point. Although Tarantool can store signed
-    numbers, Lua cannot, and therefore an indexed field should not contain signed numbers.
-    </para>  
-    <para>
-      A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
-      A  few functions may return multiple tuples.
-      A scalar may be converted to a tuple with only one field.
-      A Lua table may contain all of a tuple's fields except the "key" (the primary-key fields).
-      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
-    </para>
-
-    <para>
-     <table>
-      <title xml:id="complexity-factors">Complexity Factors that may affect data manipulation functions in the box library</title>
-      <tgroup cols="2" align="left" colsep="1" rowsep="1">
-      <thead>
-      <row><entry>Factor</entry><entry>Explanation</entry></row>
-      </thead>
-      <tbody>
-      <row><entry>Index size</entry>     <entry>The number of index keys is the same as the number
-                                         of tuples in the data set. For a TREE index, if
-                                         there are more keys then the lookup time will be
-                                         greater, although of course the effect is not linear.
-                                         For a HASH index, if there are more keys then there
-                                         is more RAM use, but the number of low-level steps
-                                         tends to remain constant.</entry></row>
-      <row><entry>Index type</entry>      <entry>Typically a HASH index is faster than a TREE index
-                                         if the number of tuples in the tuple set is greater than one.</entry></row>
-      <row><entry>Number of indexes accessed</entry><entry>Ordinarily only one index is accessed to retrieve
-                                         one tuple. But to update the tuple, there must be
-                                         N accesses if the tuple set has N different indexes.</entry></row>
-      <row><entry>Number of tuples accessed</entry><entry>A few requests, for example select, can retrieve
-                                         multiple tuples. This factor is usually less
-                                         important than the others.</entry></row>
-      <row><entry>WAL settings</entry>   <entry>The important setting for the write-ahead log is
-                                         <olink targetptr="wal_mode"/>.
-                                         If the setting causes no writing or delayed writing,
-                                         this factor is unimportant. If the settings causes
-                                         every data-change request to wait for writing to
-                                         finish on a slow device, this factor is more
-                                         important than all the others.</entry></row>
-      </tbody>
-      </tgroup>                                   
-      </table>
-      In the discussion of each data-manipulation function there will be a note
-      about which Complexity Factors might affect the function's resource usage.
-     </para>
-      
-</section>
-
-<section xml:id="sp-box-schema">
-     <title>Package <code>box.schema</code></title>
-<variablelist xml:id="box.schema" xreflabel="box.schema">
-    <para>
-      The <code>box.schema</code> package has one data-definition
-      function: create_space().
-    </para>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.create_space">
-             box.schema.create_space(space-name [, {options} ])
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create a space.
-            </para>
-            <para>
-              Parameters: <code>space-name</code>, which should not be a number and should not contain special characters;
-              <code>options</code>.
-            </para>
-            <para>
-                <table>
-                    <title>Options for box.schema.create_space</title>
-                    <tgroup cols="4" align="left" colsep="1" rowsep="1">
-                      <tbody>
-                        <row>
-                         <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
-                        </row>
-                        <row>
-                         <entry>temporary</entry><entry>space is temporary</entry><entry>true|false</entry><entry>false</entry>
-                        </row>
-                        <row>
-                         <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last space's id, +1</entry>
-                        </row>
-                        <row>
-                         <entry>enabled</entry><entry>space is enabled</entry><entry>true|false</entry><entry>true</entry>
-                        </row>
-                        <row>
-                         <entry>field_count</entry><entry>fixed field count</entry><entry>number</entry><entry>0 i.e. not fixed</entry>
-                        </row>
-                        <row>
-                         <entry>if_not_exists</entry><entry>no error if duplicate name</entry><entry>true|false</entry><entry>false</entry>
-                        </row>
-                        <row>
-                         <entry>engine</entry><entry>storage package</entry><entry>string</entry><entry>'memtx'</entry>
-                        </row>
-                        <row>
-                         <entry>user</entry><entry>user name</entry><entry>string</entry><entry>current user's name</entry>
-                        </row>                        
-                      </tbody>
-                    </tgroup>
-                </table>
-            </para>
-            <para>
-              Returns: (type = tuple) the new space descriptor.
-            </para>
-            <para>
-              Possible errors: If a space with the same name already exists.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>s = box.schema.create_space('space55')</userinput>
----
-...
-tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporary = false})</userinput>
----
-- error: Space 'space55' already exists
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-
-</variablelist>
-
-</section>
-
-<section xml:id="sp-box-space">
-    <title>Package <code>box.space</code></title>
-<variablelist xml:id="box.space" xreflabel="box.space">
-    <para>
-      The <code>box.space</code> package has the data-manipulation
-      functions select(), insert(), replace(), update(), delete().
-      It also has members, such as id, and whether or not a space is
-      enabled.
-      Package source code is available in file <filename
-      xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/box.lua">src/box/lua/box.lua</filename>.
-    </para>
-
-    <para>
-       A list of all box.space functions follows, then comes a list of all <code>box.space</code> members.
-    </para>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.create_index">
-             box.space.<replaceable>space-name</replaceable>:create_index(index-name [, {options} ])
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create an index. It is mandatory to create an index for a tuple set before trying to
-              insert tuples into it, or select tuples from it. The first created index, which will
-              be used as the primary-key index, must be unique.
-            </para>
-            <para>
-              Parameters: <code>index-name</code>, which should not be a number and should not contain special characters;
-              <code>options</code>.
-            </para>
-            <para>
-                <table>
-                    <title>Options for box.space...create_index</title>
-                    <tgroup cols="4" align="left" colsep="1" rowsep="1">
-                      <tbody>
-                        <row>
-                         <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
-                        </row>
-                        <row>
-                         <entry>type</entry><entry>type of index</entry><entry>hash|tree|bitset</entry><entry>tree</entry>
-                        </row>
-                        <row>
-                         <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last index's id, +1</entry>
-                        </row>
-                        <row>
-                         <entry>unique</entry><entry>index is unique</entry><entry>true|false</entry><entry>true</entry>
-                        </row>
-                        <row>
-                         <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_no, 'NUM'|STR'}</entry><entry>{0, 'NUM'}</entry>
-                        </row>
-                      </tbody>
-                    </tgroup>
-                </table>
-            </para>
-            <para>
-              Returns: (type = tuple) the new index descriptor.
-            </para>
-            <para>
-              Possible errors: too many parts.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>s = box.space.space55</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
----
-...
-
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.insert">
-             box.space.<replaceable>space-name</replaceable>:insert{<replaceable>field-value [, field-value ...]</replaceable>}
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Insert a tuple into a space.
-            </para>
-            <para>
-              Parameters: <code>space-name</code>, <code> field-value(s)</code> = fields of the new tuple.
-            </para>
-            <para>
-              Returns: (type = tuple) the inserted tuple.
-            </para>
-            <para>
-              Possible errors: If a tuple with the same primary key already exists, returns ER_TUPLE_FOUND.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.select" xreflabel="box.select">
-             box.space.<replaceable>space-name</replaceable>:select(<replaceable>{field-value [, field-value ...]</replaceable>}
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-                Search for a tuple in the given space.
-            </para>
-            <para>
-                 Parameters: (type = tuple) <code>field-value(s)</code>&mdash;
-                 = values to be matched against the index key, which may be multipart.
-            </para>
-            <para>
-               Returns: (type = table of tuples) the selected tuple.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-               Possible Errors: No such space; wrong type.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space0:insert{101, 'test#1', 'my first tuple'}</userinput>
----
-- [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.space0:select{101}</userinput>
----
-- - [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.space0:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
----
-- [105, 'test#2', 'first_name', 'last_name']
-...
-tarantool> <userinput>table_of_tuples = box.space.space0:select{105}</userinput>
----
-...
-tarantool> <userinput>table_of_tuples[1]</userinput>
----
-- [105, 'test#2', 'first_name', 'last_name']
-...
-</programlisting>
-            For examples of complex select()s, which can return multiple tuples
-            via secondary indexes, see the later section <olink targetptr="box.index.iterator">box.space.space-name.index.index-name]:select</olink>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.drop">
-             box.space.<replaceable>space-name</replaceable>:drop()
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Drop a space.
-            </para>
-            <para>
-              Parameters: none.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
-            </para>
-            <para>
-              Possible errors: If space-name does not exist.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space_that_does_not_exist_drop()</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.rename">
-            box.space.<replaceable>space-name</replaceable>:rename(<replaceable>space-name</replaceable>)
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Rename a space.
-            </para>
-            <para>
-              Parameters: new name for space.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-              Possible errors: If space-name does not exist.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space55:rename('space56')</userinput>
----
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.space.alter">
-             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:alter({options})
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Alter an index.
-            </para>
-            <para>
-              Parameters: <code>options</code> -- see the options list for create_index().
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-              Possible errors: The first index cannot be changed to {unique = false}.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space55.index.primary:alter({type = 'hash'})</userinput>
----
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.space.drop">
-             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:drop()
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Drop an index.
-            </para>
-            <para>
-              Parameters: none.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-              Possible errors: If index-name doesn't exist.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space55.index.primary:drop()</userinput>
----
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
     
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.space.rename">
-             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:rename(index-name)
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Rename an index.
-            </para>
-            <para>
-              Parameters: new name for index.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-              Possible errors: If index-name doesn't exist.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</userinput>
----
-...
-</programlisting>
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of tuples accessed.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.replace">
-            box.space.<replaceable>space-name</replaceable>:replace{<replaceable>field-value [, field-value ...]</replaceable>}
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-                Insert a tuple into a space. If a tuple with
-                the same primary key already exists,
-                <code>box.space...:replace()</code> replaces the existing
-                tuple with a new one.
-            </para>
-            <para>
-              Parameters: <code>space-name</code>, <code> field-value(s)</code> = fields of the new tuple.
-            </para>
-            <para>
-            Returns: (type = tuple) the inserted tuple.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-          <emphasis role="lua" xml:id="box.update">
-          box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)
-          </emphasis>
-        </term>
-        <listitem>
-            <para>
-                Update a tuple.
-               </para>
-            <para>
-             Parameters: <code>space-name</code>,
-              <code>key</code> = primary-key field values, must be passed as a Lua table if key is multi-part,
-                <code>format</code> = a sequence of
-                pairs of characters, where the first character in each pair
-                is the operation specifier, and the second character in
-                each pair is the operation argument.
-                The <code>{field_no, value}</code> arguments are the
-                field numbers of affected fields and applicable values.
-                For some operations the field number can be -1, meaning
-                the last field in the tuple.
-                There must be a pair of {field_no, value} arguments
-                for each character pair in the format argument.
-                The format and {field_no, value} arguments are passed to
-                <code>box.pack()</code> and the result is sent
-                to <code>box.process()</code>.
-                Possible operation specifiers are: <quote>+</quote>
-                for addition, <quote>-</quote> for subtraction,
-                <quote>&amp;</quote> for bitwise AND,
-                <quote>|</quote> for bitwise OR, <quote>^</quote>
-                for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice, <quote>!</quote> for insertion.
-                Possible operation arguments are: <quote>p</quote>.
-                Thus in the instruction <code>s:update(0,44,'+p=p',1,55,3,'x')</code>
-                the primary-key value is 44,
-                the format is '+p=p' meaning "add a value to a field
-                and then assign a value to a field", the first affected field
-                is field 1 and the value which will be added to it is 55, the second affected field
-                is field 3 and the value which will be assigned to it is 'x'.
-               </para>
-               <para>
-               Returns: (type = tuple) the updated tuple.
-              </para>
-            <para>
-              Complexity Factors: Index size, Index type, number of indexes accessed, WAL settings.
-            </para>
-              <para>
-                <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-#Assume that the initial state of the database is ...
-#  space0 has one tuple set and one primary key whose type is 32-bit integer.
-#  There is one tuple, with field[0] = 999 and field[1] = 'A'.
-
-#In the following update ...
-#  The first argument is space0, that is, the affected space is space0
-#  The second argument is 999, that is, the affected tuple is identified by
-#    primary key value = 999
-#  The third argument is '=p', that is, there is one operation, assignment
-#    to a field
-#  The fourth argument is 1, that is, the affected field is field[1]
-#  The fifth argument is 'B', that is, field[1] contents change to 'B'
-#  Therefore, after the following update, field[0] = 999 and field[1] = 'B'.
-box.space.space0:update({999}, {{'=p', 1, 'B'}})
-
-#In the following update, the arguments are the same, except that ...
-#  the key is passed as a Lua table (inside braces). This is unnecessary
-#  when the primary key has only one field, but would be necessary if the
-#  primary key had more than one field.
-#  Therefore, after the following update, field[0] = 999 and field[1] = 'B'
-#    (no change).
-box.space.space0:update({999}, {{'=p', 1, 'B'}})
-
-#In the following update, the arguments are the same, except that ...
-#   The fourth argument is 2, that is the affected field is field[2].
-#   It is okay that, until now, field[2] has not existed. It gets added.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
-#     field[2] = 1.
-box.space.space0:update({999}, {{'=p', 2, 1}})
-
-#In the following update, the arguments are the same, except that ...
-#   The third argument is '+p', that is, the operation is addition rather
-#     than assignment.
-#   Since field[2] previously contained 10, this means we're adding 1 to 1.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'B',
-#     field[2] = 2.
-box.space.space0:update({999}, {{'+p', 2, 1}})
-
-#In the following update ...
-#   The idea is to modify two fields at once.
-#   The third argument is '|p=p', that is, there are two operations, OR and
-#     assignment.
-#   The fourth and fifth arguments mean that field[2] gets ORed with 1.
-#   The fifth and sixth arguments mean that field[1] gets assigned 'C'.
-#   Therefore, after the following update, field[0] = 999, field[1] = 'C',
-#     field[2] = 3.
-box.space.space0:update({999}, {{'|p', 2, 1}, {'=p', 1, 'C'}})
-
-#In the following update ...
-#   The idea is to delete field[1], then subtract 3 from field[2], but ...
-#   after the delete, there is a renumbering -- so field[2] becomes field[1]
-#   before we subtract 3 from it, and that's why the sixth argument is 1 not 2.
-#   Therefore, after the following update, field[0] = 999, field[1] = 0.
-box.space.space0:update({999}, {{'#p', 1, 0}, {'-p', 1, 3}})
-
-#In the following update ...
-#   We're making a long string so that splice will work in the next example.
-#   Therefore, after the following update, field[0[ = 999, field[1] = 'XYZ'.
-box.space.space0:update({999}, {{'=p', 1, 'XYZ'}})
-
-#In the following update ...
-#   The third argument is ':p', that is, this is the example of splice.
-#   The fifth argument is actually four arguments packed together ...
-#      a filler, an offset, the number of bytes to cut (1), and the string
-#      to add ('!')
-#   Therefore, after the following update, field[0[ = 999, field[1] = 'X!Z'.
-box.space.space0:update({999}, {{':p', 1, box.pack('ppp', 1, 1, '!')}})
-
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.delete">
-            box.space.<replaceable>space-name</replaceable>:delete{<replaceable>field-value [, field-value ...]</replaceable>}
-            </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Delete a tuple identified by a primary key.
-            </para>
-            <para>
-              Parameters: <code>space-name</code>, <code>field-value(s)</code> = values to match against keys in the primary index.
-            </para>
-            <para>
-              Returns: (type = tuple) the deleted tuple.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space0:delete(0)</userinput>
----
-- [0, 'My first tuple']
-...
-tarantool> <userinput>box.space.space0:delete(0)</userinput>
----
-...
-tarantool> <userinput>box.space.space0:delete('a')</userinput>
-- error: 'Supplied key type of part 0 does not match index part type:
-  expected NUM'
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.n</emphasis></term>
-        <listitem>
-            <para>
-              (type = number) Ordinal space number, usually called the "space id".
-            </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-
-        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.enabled</emphasis></term>
-        <listitem>
-            <para>
-              (type = boolean) Whether or not this space is enabled.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.field_count</emphasis>
-        </term>
-        <listitem>
-            <para>
-             (type = number) The required field count for all tuples in this space.
-             The field_count can be changed with <code>box.space.<replaceable>space-name</replaceable>.field_count = <replaceable>new-field-count-value</replaceable></code>.
-             The default value is 0, which means there is no required field count.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index[]</emphasis>
-        </term>
-        <listitem>
-            <para>
-              (type = table) A container for all defined indexes. An index is a Lua object
-              of type <code xlink:href="#box.index">box.index</code> with
-              methods to search tuples and iterate over them in predefined order.
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.id,box.space.space0.field_count,box.space.space0.index.primary.type</userinput>
----
-- 512
-- 0
-- HASH
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:len()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: (type = number) number of tuples in the space.
-              <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0:len()</userinput>
----
- - 2
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:truncate()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Deletes all tuples.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of tuples accessed.
-            </para>
-            <para>
-               Returns: nil.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0:truncate()</userinput>
----
-...
-tarantool&gt; <userinput>box.space.space0:len()</userinput>
----
- - 0
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:pairs()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              A helper function to prepare for iterating over all tuples in a space.
-            </para>
-            <para>
-              Returns: (type = function) function which can be used in a for/end loop.
-              Within the loop, a value (type = tuple) is returned for each iteration.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>tmp = ''; for k, v in box.space.space0:pairs() do tmp = tmp .. v[1] end</userinput>
----
-...
-tarantool> <userinput>tmp</userinput>
----
-- Hello My Lua world
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:on_replace(<replaceable>function-name</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create a "replace trigger". The <code>function-name</code> will be executed whenever a replace() or insert() happens to <code>space-name</code>.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following series of requests will create a space, create an index,
-              create a function which increments a counter, create a trigger,
-              do two inserts, drop the space, and display the counter value -- which is 2,
-              because the function is executed once after each insert.
-<programlisting>s = box.schema.create_space('space53')
-s:create_index('primary', {parts = {0, 'NUM'}})
-function replace_trigger() replace_counter = replace_counter + 1 end
-s:on_replace(replace_trigger)
-replace_counter = 0
-t = s:insert{1, 'First replace'}
-t = s:insert{2, 'Second replace'}
-s:drop()
-replace_counter</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space._schema</emphasis>
-        </term>
-        <listitem>
-            <para>
-              _schema is a system tuple set. Its single tuple contains these fields:
-              'version', major-version-number, minor-version-number.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following function will display all fields in all tuples of _schema.
-<programlisting>setopt delimiter='!'
-function example()
-  local ta = {}, i, line
-  for k, v in box.space._schema:pairs() do
-    i = 0
-    line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
-    table.insert(ta, line)
-  end
-  return ta
-end!
-setopt delimiter=''!</programlisting>
-              Here is what example() returns in a typical installation:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
----
-- - 'version 1 6 '
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space._space</emphasis>
-        </term>
-        <listitem>
-            <para>
-              _space is a system tuple set. Its tuples contain these fields:
-              id, uid, space-name, engine, field_count, temporary.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following function will display all fields in all tuples of _space.
-<programlisting>setopt delimiter='!'
-function example()
-  local ta = {}, i, line
-  for k, v in box.space._space:pairs() do
-    i = 0
-    line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
-    table.insert(ta, line)
-  end
-  return ta
-end!
-setopt delimiter=''!</programlisting>
-              Here is what example() returns in a typical installation:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
----
-- - '33 0 space0 sophia 0  '
-  - '272 1 _schema memtx 0 '
-  - '280 1 _space memtx 0 '
-  - '288 1 _index memtx 0 '
-  - '296 1 _func memtx 0 '
-  - '304 1 _user memtx 0 '
-  - '312 1 _priv memtx 0 '
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space._index</emphasis>
-        </term>
-        <listitem>
-            <para>
-              _index is a system tuple set. Its tuples contain these fields:
-              space-id index-id index-name index-type index-is-unique index-field-count
-              [tuple-field-no, tuple-field-type ...].
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following function will display all fields in all tuples of _index.
-<programlisting>setopt delimiter='!'
-function example()
-  local ta = {}, i, line
-  for k, v in box.space._index:pairs() do
-    i = 0
-    line = ''
-    while i &lt; #v do line = line .. v[i] .. ' ' i = i + 1 end
-    table.insert(ta, line)
-  end
-  return ta
-end!
-setopt delimiter=''!</programlisting>
-              Here is what example() returns in a typical installation:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
----
-- - '272 0 primary tree 1 1 0 str '
-  - '280 0 primary tree 1 1 0 num '
-  - '280 1 owner tree 0 1 1 num '
-  - '280 2 name tree 1 1 2 str '
-  - '288 0 primary tree 1 2 0 num 1 num '
-  - '288 2 name tree 1 2 0 num 2 str '
-  - '296 0 primary tree 1 1 0 num '
-  - '296 1 owner tree 0 1 1 num '
-  - '296 2 name tree 1 1 2 str '
-  - '304 0 primary tree 1 1 0 num '
-  - '304 2 name tree 1 1 2 str '
-  - '312 0 primary tree 1 3 1 num 2 str 3 num '
-  - '312 1 owner tree 0 1 1 num '
-...  
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space._user</emphasis>
-        </term>
-        <listitem>
-            <para>
-             _user is a new system tuple set for support of the authorization feature.
-            </para>
-        </listitem>
-    </varlistentry>
-    
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space._priv</emphasis>
-        </term>
-        <listitem>
-            <para>
-             _priv is a new system tuple set for support of the authorization feature.
-            </para>
-        </listitem>
-    </varlistentry>
-    
-</variablelist>
-
-<bridgehead renderas="sect4">Example showing use of the box.space functions</bridgehead>
-<para>
-This function will illustrate how to look at all the spaces,
-and for each display: approximately
-how many tuples it contains, and the first field of its first tuple.
-The function uses Tarantool box.space functions len() and pairs().
-The iteration through the spaces is coded as a scan of the
-_space system tuple set, which contains metadata. The third field in
-_space contains the space name, so the key instruction "space_name = v[2]"
-means "space_name = the space_name field in the tuple of _space
-that we've just fetched with pairs()". The function returns a table.
-</para>
-<programlisting>
-setopt delimiter='!'
-function example()
-  local tuple_count, space_name, line
-  local ta = {}
-  for k, v in box.space._space:pairs() do
-    space_name = v[2]
-    if box.space[space_name].index[0] ~= nil then
-      tuple_count = box.space[space_name]:len()
-    else
-      tuple_count = 0
-    end
-    line = space_name .. ' tuple_count =' .. tuple_count
-    if tuple_count > 0 then
-      for k1, v1 in box.space[space_name]:pairs() do
-        line = line .. '. first field in first tuple = ' .. v1[0]
-        break
-      end
-    end
-    table.insert(ta, line)
-  end
-  return ta
-end!
-setopt delimiter=''!
-</programlisting>
-<para>
-... And here is what happens when one invokes the function:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
----
-- - space1 tuple_count =0
-  - space0 tuple_count =3. first field in first tuple = 1
-  - _schema tuple_count =1. first field in first tuple = version
-  - _space tuple_count =7. first field in first tuple = 33
-  - _index tuple_count =13. first field in first tuple = 272
-  - _func tuple_count =0
-  - _user tuple_count =2. first field in first tuple = 0
-  - _priv tuple_count =0
-...
-</programlisting>
-</para>
-
-</section>
-
-
-<section xml:id="sp-box">
-    <title>Package <code>box</code></title>
-<variablelist xml:id="box" xreflabel="box">
-
-
-    <varlistentry>
-        <term><emphasis role="lua">box.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
-        <listitem><para>
-            To use Tarantool binary protocol primitives from Lua,
-            it's necessary to convert Lua variables to binary
-            format. The box.pack() helper function is prototyped after Perl
-            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
-             'pack'</link>.
-            </para>
-            <para>
-               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Format specifiers</bridgehead>
-            <simplelist>
-                <member><code>b</code> &mdash; converts Lua
-                variable to a 1-byte
-                integer, and stores the integer in the resulting
-                string
-                </member>
-                <member><code>s</code> &mdash; converts Lua
-                variable to a 2-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>i</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>l</code> &mdash; converts Lua
-                variable to a 8-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>n</code> &mdash; converts Lua
-                variable to a 2-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>N</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>Q</code> &mdash; converts Lua
-                variable to a 8-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>f</code> &mdash; converts Lua
-                variable to a 4-byte
-                float, and stores the float in the resulting
-                string,
-                </member>
-                <member><code>d</code> &mdash; converts Lua
-                variable to a 8-byte
-                double, and stores the double in the resulting
-                string,
-                </member>
-                <member><code>w</code> &mdash; converts Lua
-                integer to a BER-encoded integer,
-                </member>
-                <member><code>p</code> &mdash; stores the length
-                of the argument as a BER-encoded integer
-                followed by the argument itself (a little-endian 4-byte integer for integers,
-                and a binary blob for other types),
-                </member>
-                <member><code>=, +, &amp;, |, ^, : </code>&mdash;
-                stores the corresponding Tarantool UPDATE
-                operation code: field assignment, addition,
-                conjunction, disjunction, exclusive disjunction,
-                splice (from Perl SPLICE function). Expects
-                field number to update as an argument. These format
-                specifiers only store the corresponding operation
-                code and field number to update, but do not
-                describe operation arguments.
-                </member>
-            </simplelist>
-            </para>
-            <para>
-              Returns: a binary string containing all arguments, packed
-              according to the format specifiers.
-            </para>
-            <para>
-              Possible Errors: Unknown format specifier.
-            </para>
-            <para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
----
-- [0, 'hello world']
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
----
-- [0, 'bye world']
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, box.pack('ppp', 0, 3, 'hello')}})</userinput>
----
-- [0, !!binary AAOlaGVsbG8=]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
----
-- [0, 4]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
----
-- [0, 8]
-...
-tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
----
-- [0, 12]
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua">box.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Counterpart to <code>box.pack()</code>.
-            </para>
-            <para>
-              Parameters: <code>format</code>, <code>binary-string</code>.
-            </para>
-            <para>
-             Returns: (type = scalar) A list of strings or numbers.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>tarantool></prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
-<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>string.len(tuple[0])!</userinput>
----
-- 1
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('b', tuple[0])!</userinput>
----
-- 48
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('bsi', box.pack('bsi', 255, 65535, 4294967295))!</userinput>
----
-- 255
-- 65535
-- 4294967295
-...
-<prompt>tarantool></prompt> <userinput>box.unpack('ls', box.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
----
-- 18446744073709551615
-- 65535
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64 = box.unpack('spl', box.pack('spl', 666, 'string',</userinput>
-<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
----
-- 666
-- string
-- 666666666666666
-...
-<prompt>tarantool></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
+            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1480,75 +303,285 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool&gt; <userinput>box.dostring('abc')</userinput>
+tarantool&gt; <userinput>dostring('abc')</userinput>
 ---
 error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
 ...
-tarantool&gt; <userinput>box.dostring('return 1')</userinput>
+tarantool&gt; <userinput>dostring('return 1')</userinput>
 ---
 - 1
 ...
-tarantool&gt; <userinput>box.dostring('return ...', 'hello', 'world')</userinput>
+tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 ---
 - hello
 - world
 ...
-tarantool&gt; <userinput>setopt delimiter='!' #<link linkend="utility-tarantool-setopt">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>box.dostring('local f = function(key)</userinput>
+tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here.</userinput>
+tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
-        -&gt; <userinput>              if t ~= nil then return t[0] else return nil end</userinput>
+        -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
-        -&gt; <userinput>              return f(...)', 0)!</userinput>
+        -&gt; <userinput>              return f(...)]], 1)!</userinput>
 ---
-- nil
+- null
 ...
-tarantool&gt; <userinput>setopt delimiter=''!</userinput>
+tarantool&gt; <userinput>session.delimiter('')!</userinput>
 </programlisting>
             </para>
         </listitem>
     </varlistentry>
+    
+</variablelist>
+
+
+
+<section xml:id="sp-pickle">
+    <title>Package <code>pickle</code></title>
+<variablelist xml:id="x-pickle" xreflabel="x-pickle">
     <varlistentry>
-        <term>
-            <emphasis role="lua">box.time()</emphasis>
-        </term>
+        <term><emphasis role="lua">pickle.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
+        <listitem><para>
+            To use Tarantool binary protocol primitives from Lua,
+            it's necessary to convert Lua variables to binary
+            format. The pickle.pack() helper function is prototyped after Perl
+            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
+             'pack'</link>.
+            </para>
+            <para>
+               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Format specifiers</bridgehead>
+            <simplelist>
+                <member><code>b</code> or <code>B</code> &mdash; converts Lua
+                variable to a 1-byte
+                integer, and stores the integer in the resulting
+                string,
+                </member>
+                <member><code>s</code> or <code>S</code> &mdash; converts Lua
+                variable to a 2-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>i</code> or <code>I</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>l</code> or <code>L</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>n</code> or <code>N</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>q</code> or <code>Q</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>f</code> &mdash; converts Lua
+                variable to a 4-byte
+                float, and stores the float in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a 8-byte
+                double, and stores the double in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a sequence of bytes,
+                and stores the sequence in the resulting
+                string,
+                </member>
+            </simplelist>
+            </para>
+            <para>
+              Returns: a binary string containing all arguments, packed
+              according to the format specifiers.
+            </para>
+            <para>
+              Possible Errors: Unknown format specifier.
+            </para>
+            <para>
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> <userinput>pickle = require('pickle')</userinput>
+---
+...
+tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
+---
+- [0, 'hello world']
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 'bye world'}})</userinput>
+---
+- [0, 'bye world']
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
+---
+- [0, "\0\0\0\0\x03\0\0\0hello"]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'=p', 1, 4}})</userinput>
+---
+- [0, 4]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'+p', 1, 4}})</userinput>
+---
+- [0, 8]
+...
+tarantool> <userinput>box.space.space0:update({0}, {{'^p', 1, 4}})</userinput>
+---
+- [0, 12]
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">pickle.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                Returns: current system time (in seconds since the epoch) as a Lua
-                number.  The time is taken from the event loop
-                clock, which makes this call very cheap,
-                but still useful for constructing artificial
-                tuple keys.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.time(), box.time()</userinput>
----
- - 1385758759.2591
- - 1385758759.2591
-...
-</programlisting>
+              Counterpart to <code>pickle.pack()</code>.
             </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.time64()</emphasis>
-        </term>
-        <listitem>
             <para>
-              Returns: current system time (in microseconds since the epoch) as a 64-bit
-              integer. The time is taken from the event loop clock.
+              Parameters: <code>format</code>, <code>binary-string</code>.
+            </para>
+            <para>
+             Returns: (type = scalar) A list of strings or numbers.
+            </para>
+            <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.time(), box.time64()</userinput>
+<programlisting>
+<prompt>tarantool</prompt> <userinput>pickle = require('pickle')</userinput>
 ---
- - 1385758828.9825
- - 1385758828982485
 ...
+<prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
+<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>string.len(tuple[1])!</userinput>
+---
+- 1
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[1])!</userinput>
+---
+- 48
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!</userinput>
+---
+- 255
+- 65535
+- 4294967295
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
+---
+- 18446744073709551615
+- 65535
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',</userinput>
+<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
+---
+- 666
+- string
+- 666666666666666
+...
+<prompt>tarantool></prompt> <userinput>session.delimiter('')!  #back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
     </varlistentry>
+</variablelist>
+</section>
+
+<section xml:id="sp-digest">
+    <title>Package <code>digest</code></title>
+    <para>
+    A "digest" is a value which is returned by a
+
+    <link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash_function">Cryptographic hash function</link>
+    applied against a string.
+    Tarantool supports five types of cryptographic hash functions
+    (<link xlink:href="https://en.wikipedia.org/wiki/Md4">MD4</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Md5">MD5</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-0">SHA-0</link>,
+    
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-1">SHA-1</link>,
+    <link xlink:href="https://en.wikipedia.org/wiki/Sha-2">SHA-2</link>)
+
+    as well as a checksum function
+    (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
+    The functions in <code>digest</code> are:<programlisting><code>    digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
+    digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with crc32.
+    digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
+    digest.sha0_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha0.
+    digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
+    digest.sha1_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha1.
+    digest.sha224(<replaceable>string</replaceable>)                 Returns 224-bit digest made with SHA-2.
+    digest.sha224_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha224.
+    digest.sha256(<replaceable>string</replaceable>)                 Returns 256-bit digest made with SHA-2.
+    digest.sha256_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha256.
+    digest.sha384(<replaceable>string</replaceable>)                 Returns 384-bit digest made with SHA-2.
+    digest.sha384_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha384.
+-   digest.sha512(<replaceable>string</replaceable>)                 Returns 512-bit digest made with SHA-2.
+    digest.sha512_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha512.
+    digest.md4(<replaceable>string</replaceable>)                    Returns 128-bit digest made with MD4.
+    digest.md4_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md4.
+    digest.md5(<replaceable>string</replaceable>)                    Returns 256-bit digest made with MD5.
+    digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.</code></programlisting>
+   </para>
+<bridgehead renderas="sect4">Example</bridgehead>
+    <para>
+    In the following example, the user creates two functions, password_insert() 
+    which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a tuple set,
+    and password_check() which requires input of a password.<programlisting>
+<prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
+<prompt>localhost&gt;</prompt> <userinput>setopt delimiter='!' #this means following commands must end with '!'</userinput>
+<prompt>localhost&gt;</prompt> <userinput>function password_insert()</userinput>
+        <prompt>-&gt;</prompt> <userinput>  space0:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
+        <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
+        <prompt>-&gt;</prompt> <userinput>  end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput>function password_check(password)</userinput>
+        <prompt>-&gt;</prompt>  <userinput> local t</userinput>
+        <prompt>-&gt;</prompt>  <userinput> t=box.select{12345}</userinput>
+        <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[2]) then</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   print('Password is valid')</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   else</userinput>
+        <prompt>-&gt;</prompt>  <userinput>     print('Password is not valid')</userinput>
+        <prompt>-&gt;</prompt>  <userinput>   end</userinput>
+        <prompt>-&gt;</prompt> <userinput>end!</userinput>
+---
+...
+<prompt>localhost&gt;</prompt> <userinput>call password_insert()!</userinput>
+Call OK, 1 rows affected
+['OK']
+<prompt>localhost></prompt> <userinput>setopt delimiter=''  #back to normal: commands end with line feed!</userinput>
+</programlisting></para>
+<para>
+  If a later user calls
+  the password_check() function and enters the wrong password, the result is an
+  error.<programlisting><prompt>localhost&gt;</prompt> <userinput>lua password_check ('Secret Password')</userinput>
+---
+Password is not valid
+...</programlisting></para>
+</section>
+
+<section xml:id="sp-box-uuid">
+    <title>Package <code>uuid</code></title>
+<variablelist xml:id="x-uuid" xreflabel="x-uuid">
     <varlistentry>
         <term>
-            <emphasis role="lua">box.uuid()</emphasis>
+            <emphasis role="lua">uuid.bin()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1557,9 +590,12 @@ tarantool&gt; <userinput>setopt delimiter=''!</userinput>
             <para>
                 Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
                 when it starts. If the library is not available, which can happen if it was not
-                found when the server was built from source, then box.uuid() returns an error.
+                found when the server was built from source, then uuid.bin() returns an error.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.uuid() == box.uuid() -- Comment: == means "are they equal?"</userinput>
+<programlisting>tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
 ---
  - false
 ...
@@ -1569,7 +605,7 @@ tarantool&gt; <userinput>setopt delimiter=''!</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">box.uuid_hex()</emphasis>
+            <emphasis role="lua">uuid.hex()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1577,588 +613,33 @@ tarantool&gt; <userinput>setopt delimiter=''!</userinput>
                 unique id, as a string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.uuid_hex()</userinput>
+<programlisting>
+tarantool&gt; <userinput>require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid.hex()</userinput>
 ---
  - b8eadcb078b54bed8fa8425d129b10e8
 ...
 </programlisting>
         </listitem>
     </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.raise(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Raises a client error. The difference between this function
-                and the built-in <code>error()</code> function in Lua
-                is that when the error reaches the client, its error code
-                is preserved, whereas every Lua error is presented to the
-                client as <constant>ER_PROC_LUA</constant>. This function
-                makes it possible to emulate any kind of native exception,
-                such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/include/errcode.h"><filename>errcode.h</filename></link>
-                in the source tree.
-                Lua constants which correspond to Tarantool errors
-                are defined in the <code>box.error</code> module. The error
-                message can be arbitrary.
-                Lua function can use <code>box.raise()</code> to emulate
-                request errors (for example: unique key exception).
-                When called without arguments this function re-throws last
-                thrown error.
-            </para>
-            <para>
-              Parameters: <code>errcode-number</code> = number taken from the complete list of errors,
-              <code>errtext-string</code> = the message which will accompany the error.
-            </para>
-            <para>
-              Possible errors: whatever is specified in errcode-number.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.raise(box.error.ER_WAL_IO, 'WAL I/O error')</userinput>
----
-- error: 'WAL I/O error'
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Insert a new tuple using an auto-increment primary key.
-                The space specified by space-name must have a
-                NUM or NUM64 primary key index of type TREE.
-                The primary-key field will be incremented before the insert.
-            </para>
-            <para>
-               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values for the tuple's fields,
-               other than the primary-key field.
-            </para>
-            <para>
-               Returns: (type = tuple) the inserted tuple.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
-            </para>
-            <para>
-               Possible errors: index has wrong type or primary-key indexed field is not a number.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.space.space0:auto_increment{'Fld#1', 'Fld#2'}</userinput>
----
-- [1, 'Fld#1', 'Fld#2']
-...
-tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
----
-- [2, 'Fld#3']
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Increments a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is inserted
-                with initial counter value set to 1.
-            </para>
-                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-                which must match the primary key.
-            </para>
-            <para>
-               Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space18')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
----
-- 1
-...
-tarantool> <userinput>box.space.space18:inc{1,'a'}</userinput>
----
-- 2
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Decrements a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is not inserted.
-                If the counter value drops to zero, the tuple is deleted.
-            </para>
-            <para>
-               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-               which must match the primary key.
-            </para>
-            <para>
-              Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
----
-- [1, 'a', 1000]
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 999
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 998
-... </programlisting>
-        </listitem>
-    </varlistentry>
 </variablelist>
-
-<bridgehead renderas="sect4">Example showing use of the box functions</bridgehead>
-<para xml:id="box-function-example" xreflabel="box-function-example">
-This example will work with the sandbox configuration described in the preface.
-That is, there is a space named space0 with a numeric primary key.
-The example function will: (1) select a tuple the tuple whose key value is 1000;
-(2) return an error if the tuple already exists and already has 3 fields;
-(3) Insert or replace the tuple with: field[0] = 1000, field[1] = a uuid, field[2] = number of seconds since 1970-01-01;
-(4) Get field[2] from what was replaced;
-(5) Format the value from field[2] as yyyy-mm-dd hh:mm:ss.ffff;
-(6) Return the formatted value.
-The function uses Tarantool box functions box.space...select(), box.space...replace(), box.time(), box_uuid_hex().
-The function uses Lua functions
-<link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
-and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
-</para>
-<programlisting>
-setopt delimiter='!'
-function example()
-  local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
-  table_of_selected_tuples = box.space.space0:select(1000)
-  if table_of_selected_tuples ~= nil then
-    if table_of_selected_tuples[1] ~= nil then
-      if #table_of_selected_tuples[1] == 3 then
-        box.raise(1, 'This tuple already has 3 fields')
-      end
-    end
-  end
-  replaced_tuple = box.space.space0:replace
-                   {1000,  box.uuid_hex(), tostring(box.time())}
-  time_field = tonumber(replaced_tuple[2])
-  formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
-  c = time_field % 1
-  d = string.sub(c, 3, 6)
-  formatted_time_field = formatted_time_field .. '.' .. d
-  return formatted_time_field
-end!
-setopt delimiter=''!
-</programlisting>
-<para>
-... And here is what happens when one invokes the function:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>box.space.space0:delete(1000)</userinput>
----
-- 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}
-...
-<prompt>tarantool&gt;</prompt> <userinput>example(1000)</userinput>
----
-- 2014-01-29 16:11:51.1582
-...
-<prompt>tarantool&gt;</prompt> <userinput>example(1000)</userinput>
----
-- error: 'This tuple already has 3 fields'
-...
-</programlisting>
-</para>
-
-</section>
-
-<section xml:id="sp-box-tuple">
-    <title>Package <code>box.tuple</code></title>
-<variablelist xml:id="box.tuple" xreflabel="box.tuple">
-    <para>The <code>box.tuple</code> package provides read-only access for the <code>box.tuple</code> userdata
-    type. It allows, for a single tuple: selective retrieval of the
-    field contents, retrieval of information about size,
-    iteration over all the fields, and conversion to a Lua table.
-    </para>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.tuple.new(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Construct a new tuple from either a scalar or a Lua table.
-                Alternatively, one can get new tuples from tarantool's
-                SQL-like statements: SELECT, INSERT, UPDATE, REPLACE,
-                which can be regarded as statements that do new()
-                implicitly.
-            </para>
-            <para>
-               Parameters: <code>scalar-value | Lua-table-value</code> = the value that will become the tuple contents.
-            </para>
-            <para>
-              Returns: (type = tuple) a new tuple.
-            </para>
-            <para>
-              In the following example, x will be a new table object containing one tuple and t will be a new tuple object.
-              Saying <code>t</code> returns the entire tuple t.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>x = box.space.space0:insert{33,tonumber('1'),tonumber64('2')}:totable()</userinput>
----
-...
-tarantool> <userinput>t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})</userinput>
----
-...
-tarantool> <userinput>t</userinput>
----
-- ['abc', 'def', 'ghi', 'abc']
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua"># <replaceable>tuple-value</replaceable></emphasis>
-        </term>
-        <listitem>
-            <para>
-                The # operator in Lua means "return count of components".
-                So, if t is a tuple instance, <code>#t</code>
-                will return the number of
-                 fields.
-            </para>
-            <para>
-               Returns: (type = number) number of fields.
-            </para>
-            <para>
-                In the following example, a tuple named t is created
-                and then the number of fields in t is returned.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
----
-...
-tarantool&gt; <userinput>#t</userinput>
----
-- 4
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua"> <replaceable>tuple-value</replaceable> : bsize()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:bsize()</code>
-              will return the number of bytes in the tuple.
-              It is useful to check this number when making changes to data,
-              because there is a fixed maximum: one megabyte.
-              Every field has one or more "length" bytes preceding the
-              actual contents, so bsize() returns a value which is
-              slightly greater than the sum of the lengths of the contents.
-            </para>
-            <para>
-              Returns: (type = number) number of bytes.
-            </para>
-            <para>
-              In the following example, a tuple named t is created
-              which has three fields, and for each field it takes one byte
-              to store the length and three bytes to store the contents,
-              and a bit for overhead, so bsize() returns  3*(1+3)+1.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'aaa','bbb','ccc'})</userinput>
----
-...
-tarantool&gt; <userinput>t:bsize()</userinput>
----
- - 13
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">[ <replaceable>field-number</replaceable> ]</emphasis>
-        </term>
-        <listitem>
-            <para>
-                If t is a tuple instance, <code>t[<replaceable>field-number</replaceable>]</code>
-                will return the field numbered <code>field-number</code> in the tuple.
-                 The first field is t[0].
-            </para>
-            <para>
-              Returns: (type = scalar) field value.
-            </para>                
-            <para>
-              In the following example, a tuple named t is created
-              and then the second field in t is returned.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4'})</userinput>
----
-...
-tarantool&gt; <userinput>t[1]</userinput>
----
- - Fld#2
-...</programlisting>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">find(<replaceable>[field-number,] field-value) or findall([field-number,] field-value</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:find(<replaceable>field-value</replaceable>)</code>
-              will return the number of the first field in t that matches the field value), and
-              <code>t:findall(<replaceable>field-value [, field-value ...]</replaceable>)</code>
-              will return numbers of all fields in t that match the field value. Optionally
-              one can put a numeric argument field-number before the search-value to indicate
-              <quote>start searching at field number <code>field-number</code>.</quote>
-            </para>
-            <para>
-              Returns: (type = number) the number of the field in the tuple.
-            </para>
-            <para>
-              In the following example, a tuple named t is created
-              and then: the number of the first field in t which matches 'a' is returned,
-              then the numbers of all the fields in t which match 'a' are returned,
-              then the numbers of all the fields in t which match 'a' and are at or after the second field
-              are returned.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'a','b','c','a'})</userinput>
----
-...
-tarantool&gt; <userinput>t:find('a')</userinput>
----
-- 0
-...
-tarantool&gt; <userinput>t:findall('a')</userinput>
----
-- 0
-- 3
-...
-tarantool&gt; <userinput>t:findall(1, 'a')</userinput>
----
- - 3
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">transform(<replaceable>start-field-number, fields-to-remove [, field-value ...]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:transform(<replaceable>start-field-number</replaceable>,<replaceable>fields-to-remove</replaceable>)</code>
-              will return a tuple where, starting from field start-field-number, a number of fields (fields-to-remove) are removed.
-              Optionally one can add more arguments after fields-to-remove to indicate new values that will replace
-              what was removed.
-            </para>
-            <para>
-              Parameters: <code>start-field-number</code> = base 0, may be negative, <code>fields-to-remove</code>, <code>field-values(s)</code>.
-            </para>
-            <para>
-              Returns: (type = tuple) a new tuple.
-            </para>
-            <para>
-              In the following example, a tuple named t is created
-              and then, starting from the second field, two fields are removed
-              but one new one is added, then the result is returned.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
----
-...
-tarantool&gt; <userinput>t:transform(1,2,'x')</userinput>
----
-- ['Fld#1', 'x', 'Fld#4', 'Fld#5']
-...</programlisting>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">slice(<replaceable>start-field-number [, end-field-number]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:slice(<replaceable>n</replaceable>)</code>
-              will return all fields starting with field number n, and
-              <code>t:slice(<replaceable>n1</replaceable>,<replaceable>n2</replaceable>)</code>
-              will return all fields starting with field number n1, but
-              stopping <emphasis>before</emphasis> field number n2.
-              In the following example, a tuple named t is created
-              and then, starting from the second field, fields before the fourth field are selected,
-              then the result is returned.
-            </para>
-            <para>
-              Parameters: <code>start-field-number</code> = base 0, may be negative, <code>end-field-number</code> = optional, base 0, negative treated as positive.
-            </para>
-            <para>
-              Returns: (type = scalar) one or more field values.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
----
-...
-tarantool&gt; <userinput>t:slice(1, 3)</userinput>
----
- - Fld#2
- - Fld#3
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">unpack()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              If t is a tuple instance, <code>t:unpack(<replaceable>n</replaceable>)</code>
-              will return all fields. In effect, <code>unpack()</code> is the same as <code>slice(0, -1)</code>.
-            </para>
-            <para>
-              Returns: (type = scalar) field(s) from the tuple.
-            </para>
-            <para>
-              In the following example, a tuple named t is created
-              and then all its fields are selected,
-              then the result is returned.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
----
-...
-tarantool&gt; <userinput>t:unpack()</userinput>
----
- - Fld#1
- - Fld#2
- - Fld#3
- - Fld#4
- - Fld#5
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">pairs()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              In Lua, lua-table-value:pairs() is a method which returns: function, lua-table-value, nil.
-              Tarantool has extended this so that tuple-value:pairs() returns: function, tuple-value, nil.
-              It is useful for Lua iterators, because Lua iterators traverse
-              a value's components until an end marker is reached.
-            </para>
-            <para>
-              Returns: (type = function) function, (type = tuple) tuple-value, (type = nil) nil.
-            </para>
-            <para>
-              In the following example, a tuple named t is created
-              and then all its fields are selected using a Lua for-end loop.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
----
-...
-tarantool&gt; <userinput>tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end</userinput>
----
-...
-tarantool> <userinput>tmp</userinput>
----
-- Fld#1Fld#2Fld#3Fld#4Fld#5
-...</programlisting>
-        </listitem>
-    </varlistentry>
-
-</variablelist>
-
-<bridgehead renderas="sect4">Example showing use of the box.tuple functions</bridgehead>
-<para>
-This function will illustrate how to convert tuples to/from
-Lua tables and lists of scalars:
-<programlisting>
-  scalars to tuple:     tuple = box.tuple.new({scalar1, scalar2, ... scalar_n})
-  tuple to Lua table:   lua_table = {tuple:unpack()}
-  tuple to scalars:     scalar1, scalar2, ... scalar_n = tuple:unpack()
-  Lua table to tuple:   tuple = box.tuple.new(lua_table)
-</programlisting>
-Then it will find the field that contains 'b',
-remove that field from the tuple,
-and display how many bytes remain in the tuple.
-The function uses Tarantool box.tuple functions new(), unpack(), find(), transform(), bsize().
-</para>
-<programlisting>
-setopt delimiter='!'
-function example()
-  local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
-  tuple1 = box.tuple.new({'a', 'b', 'c'})
-  luatable1 = {tuple1:unpack()}
-  scalar1, scalar2, scalar3 = tuple1:unpack()
-  tuple2 = box.tuple.new(luatable1)
-  field_number = tuple2:find('b')
-  tuple2 = tuple2:transform(field_number, 1)
-  return 'tuple2 = ' , tuple2 , ' # of bytes = ' , tuple2:bsize()
-end!
-setopt delimiter=''!
-</programlisting>
-<para>
-... And here is what happens when one invokes the function:
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
----
-- 'tuple2 = '
-- ['a', 'c']
-- ' # of bytes = '
-- 5
-...
-</programlisting>
-</para>
-
 </section>
 
 <section xml:id="sp-box-cjson">
-    <title>Package <code>box.cjson</code></title>
+    <title>Package <code>json</code></title>
 
 <variablelist xml:id="box.cjson" xreflabel="box.cjson">
     <para>
-        The <code>box.cjson</code> package provides JSON manipulation routines.
+        The <code>json</code> package provides JSON manipulation routines.
         It is based on the <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson.php">
         Lua-CJSON package by Mark Pulford</link>.
 
         For a complete manual on Lua-CJSON please read <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">the official documentation</link>.
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.cjson.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">json.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Convert a Lua object to a JSON string.
@@ -2170,23 +651,27 @@ setopt delimiter=''!
               Returns: (type = string) the original value reformatted as a JSON string.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.cjson.encode(123)</userinput>
+<programlisting>
+tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+tarantool&gt; <userinput>json.encode(123)</userinput>
 ---
 - '123'
 ...
-tarantool&gt; <userinput>box.cjson.encode({123})</userinput>
+tarantool&gt; <userinput>json.encode({123})</userinput>
 ---
 - '[123]'
 ...
-tarantool&gt; <userinput>box.cjson.encode({123, 234, 345})</userinput>
+tarantool&gt; <userinput>json.encode({123, 234, 345})</userinput>
 ---
 - '[123,234,345]'
 ...
-tarantool&gt; <userinput>box.cjson.encode({abc = 234, cde = 345})</userinput>
+tarantool&gt; <userinput>json.encode({abc = 234, cde = 345})</userinput>
 ---
 - '{"cde":345,"abc":234}'
 ...
-tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
+tarantool&gt; <userinput>json.encode({hello = {'world'}})</userinput>
 ---
 - '{"hello":["world"]}'
 ...
@@ -2194,7 +679,7 @@ tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">box.cjson.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">json.decode(<replaceable>string-value</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Convert a JSON string to a Lua object.
@@ -2206,422 +691,230 @@ tarantool&gt; <userinput>box.cjson.encode({hello = {'world'}})</userinput>
               Returns: (type = Lua table) the original contents formatted as a Lua table.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.cjson.decode('123')</userinput>
+<programlisting>tarantool&gt; <userinput>require('json')</userinput>
+---
+...
+ tarantool&gt; <userinput>json.decode('123')</userinput>
 ---
 - 123
 ...
-tarantool&gt; <userinput>box.cjson.decode('[123, "hello"]')[2]</userinput>
+tarantool&gt; <userinput>json.decode('[123, "hello"]')[2]</userinput>
 ---
 - hello
 ...
-tarantool&gt; <userinput>box.cjson.decode('{"hello": "world"}').hello</userinput>
+tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
 ---
 - world
 ...
 </programlisting>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="json-null" xreflabel="json-null">json.NULL</emphasis></term>
+        <listitem>
+            <para>
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
+            </para>
+        </listitem>
+    </varlistentry>
 </variablelist>
 </section>
 
-<section xml:id="sp-box-index">
-    <title>Package <code >box.index</code></title>
-<variablelist xml:id="box.index" xreflabel="box.index">
-            <para>
-              The <code>box.index</code> package provides read-only access for index definitions and index keys.
-              Indexes are contained in <code
-              xlink:href="#box.space">box.space.<replaceable>space-name</replaceable>.index</code> array
-              within each space object. They provide an API for
-              ordered iteration over tuples. This API is a direct
-              binding to corresponding methods of index objects of type <code>box.index</code> in the
-              storage engine.
-            </para>
+<section xml:id="sp-yaml">
+    <title>Package <code>yaml</code></title>
+    <para>
+     The <code>yaml</code> package takes strings in YAML format and decodes them,
+     or takes a series of non-YAML values and encodes them.
+    </para>
+<variablelist xml:id="yaml">
     <varlistentry>
-        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.unique</emphasis></term>
+        <term><emphasis role="lua">yaml.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
         <listitem>
             <para>
-              (type = boolean) true if the index is unique.
+              Convert a Lua object to a YAML string.
+            </para>
+            <para>
+              Parameters: either a scalar value or a Lua table value.
+            </para>
+            <para>
+              Returns: (type = string) the original value reformatted as a YAML string.
+            </para>
+       </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">yaml.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a YAML string to a Lua object.
+            </para>
+            <para>
+              Parameters: <code>string-value</code> = a string formatted as YAML.
+            </para>
+            <para>
+              Returns: (type = Lua table) the original contents formatted as a Lua table.
             </para>
         </listitem>
     </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.type</emphasis>
-        </term>
+        <varlistentry>
+        <term><emphasis role="lua" xml:id="yaml-null" xreflabel="yaml-null">yaml.NULL</emphasis></term>
         <listitem>
             <para>
-              (type = string) index type,  'TREE' or 'HASH' or 'BITSET'.
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
             </para>
         </listitem>
     </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.key_field</emphasis>
-        </term>
-        <listitem>
-            <para>
-              An array describing index key fields.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.idx</emphasis>
-        </term>
-        <listitem>
-            <para>
-              A group of methods including max(), min(), count(), random(), next(),
-              next_equal(), prev(), prev_equal(). For each case there is an alternative syntax,
-              and use of the alternative syntax is recommended.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary</userinput>
----
-- unique: true
-  idx: ' index 0'
-  n: 1029
-  type: TREE
-  key_field:
-    0:
-      type: NUM
-      fieldno: 0
-  name: primary
-  id: 0
-...
-
-tarantool&gt; <userinput>box.space.space0.index.primary.idx:max()</userinput>
----
- - [ 999, 2, 'c']
-...</programlisting></listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-             <emphasis role="lua" xml:id="boxindexiterator" xreflabel="box.index.iterator(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:iterator(<replaceable>iterator-type, bitset-value | field-value...</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-                This method provides iteration support within an
-                index. Parameter <code>type</code> is used to
-                identify the semantics of iteration. Different
-                index types support different iterators. The
-                remaining arguments of the function are varying
-                and depend on the iteration type. For example,
-                a TREE index maintains a strict order of keys and
-                can return all tuples in ascending or descending
-                order, starting from the specified key. Other
-                index types, however, do not support ordering.
-            </para>
-            <para xml:id="iterator-consistency">
-                To understand consistency of tuples
-                returned by an iterator, it's essential to know
-                the principles of the Tarantool transaction processing
-                subsystem.
-                An iterator in Tarantool does not own a consistent
-                read view. Instead, each procedure is granted exclusive
-                access to all tuples and spaces until it
-                encounters a "context switch": by causing a write to
-                disk, network, or by an explicit call to <emphasis
-                role="lua" xlink:href="#box.fiber.yield">box.fiber.yield()</emphasis>.
-                When the execution flow returns to the yielded
-                procedure, the data set could have changed significantly.
-                Iteration, resumed after a yield point, does not
-                preserve the read view, but continues with the new
-                content of the database.
-            </para>
-            <para>
-                Parameters:
-                <code>type</code> &mdash; iteration strategy as defined in tables below.
-            </para>
-            <para>
-               Returns: this method returns an iterator closure, i.e.
-                    a <code>function</code> which can be used to
-                    get the next value on each invocation.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of tuples accessed.
-            </para>
-            <para>
-               Possible Errors:
-                    Selected iteration type is not supported in
-                    the subject index type, or supplied parameters
-                    do not match iteration type.
-            </para>
-
-            <xi:include href="iterator-types.xml"/>
-
-            <para>
-                <bridgehead renderas="sect4">Examples</bridgehead>
-<programlisting>
-# This example is not currently working. Use index select function instead.
-tarantool> <userinput>s = box.schema.create_space('space17')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {0, 'STR', 1, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>s:insert{'C', 'C'}</userinput>
----
-- ['C', 'C']
-...
-tarantool> <userinput>s:insert{'B', 'A'}</userinput>
----
-- ['B', 'A']
-...
-tarantool> <userinput>s:insert{'C', '!'}</userinput>
----
-- ['C', '!']
-...
-tarantool> <userinput>s:insert{'A', 'C'}</userinput>
----
-- ['A', 'C']
-...
-tarantool> <userinput>iterator_function = s.index.primary:iterator(box.index.GE, 'A')</userinput>
----
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['A', 'C']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['B', 'A']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['C', '!']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['C', 'C']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- null
-...
-tarantool> <userinput>box.space.space17:drop()</userinput>
----
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields][, {parameters}]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-             This is is an alternative to <olink targetptr="box.select">box.select()</olink>
-             which goes via a particular index and can make use of additional parameters that
-             specify the iterator type, and the limit (that is, the maximum number of tuples to
-             return).
-            </para>
-            <para>
-              Returns: (type = table of tuples) the tuple or tuples that match the field values.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-# Create a space named space0.
-# Create a unique index 'primary', which won't be needed for this example.
-# Create a non-unique index 'secondary' with an index on the second field.
-# Insert three tuples, values in field[1] equal to 'X', 'Y', and 'Z'.
-# Select all tuples where the secondary index keys are greater than 'X'.
-box.schema.create_space('space0')
-box.space.space0:create_index('primary', {parts = {0, 'NUM' }})
-box.space.space0:create_index('secondary', {type = 'tree', unique = false, parts = {1, 'STR'}})
-box.space.space0:insert{1,'X','Row with field[1]=X'}
-box.space.space0:insert{2,'Y','Row with field[1]=Y'}
-box.space.space0:insert{3,'Z','Row with field[1]=Z'}
-box.space.space0.index.secondary:select({'X'}, {iterator = 'GT'})
-</programlisting>
-The result will be a table of tuples and will look like this:
-<programlisting>
----
-- - [2, 'Y', 'Row with field[1]=Y']
-  - [3, 'Z', 'Row with field[1]=Z']
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find the minimum value in the specified index.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the first key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-              Possible errors: index is not of type 'TREE'.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:min()</userinput>
----
-- ['Alpha!', 55, 'This is the first tuple!']
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([key])</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find the maximum value in the specified index.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the last key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-              Possible errors: index is not of type 'TREE'.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:max()</userinput>
----
-- ['Gamma!', 55, 'This is the third tuple!']
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:random(<replaceable>random-value</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find a random value in the specified index.
-              This method is useful when it's important to get insight
-              into data distribution in an index without having to
-               iterate over the entire data set.
-            </para>
-            <para>
-              Parameters: <code>random-value</code> = an arbitrary non-negative integer.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the random key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.secondary:random(1)</userinput>
----
-- ['Beta!', 66, 'This is the second tuple!']
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:count(<replaceable>key-value</replaceable>, options)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Iterate over an index, counting the number of tuples which equal the
-              provided search criteria.
-            </para>
-            <para>
-              Parameters: <code>key-value</code> = the value which must match the key(s)
-              in the specified index. The type may be a list of field-values, or a tuple containing
-              only the field-values.
-            </para>
-            <para>
-              Returns: (type = number) the number of matching index keys.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count(999)</userinput>
----
-- 0
-...
-</programlisting>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
----
- - 1
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
 </variablelist>
+    <para>
+    <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> y =  yaml.encode({'a',1,'b',2})
+---
+...
+tarantool> z = yaml.decode(y)
+---
+...
+tarantool> z[1],z[2],z[3],z[4]
+---
+- a
+- 1
+- b
+- 2
+...
+tarantool> if yaml.NULL == nil then print('hi') end
+hi
+---
+...
+</programlisting>
+    </para>
+</section>
+
+<section xml:id="sp-msgpack">
+    <title>Package <code>msgpack</code></title>
+    <para>
+     The <code>yaml</code> package takes strings in MsgPack format and decodes them,
+     or takes a series of non-MsgPack values and encodes them.
+    </para>
+<variablelist xml:id="msgpack">
+    <varlistentry>
+        <term><emphasis role="lua">msgpack.encode(<replaceable>scalar-value | Lua-table-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a Lua object to a MsgPack string.
+            </para>
+            <para>
+              Parameters: either a scalar value or a Lua table value.
+            </para>
+            <para>
+              Returns: (type = string) the original value reformatted as a MsgPack string.
+            </para>
+       </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term><emphasis role="lua">msgpack.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a MsgPack string to a Lua object.
+            </para>
+            <para>
+              Parameters: <code>string-value</code> = a string formatted as MsgPack.
+            </para>
+            <para>
+              Returns: (type = Lua table) the original contents formatted as a Lua table.
+            </para>
+        </listitem>
+    </varlistentry>
+        <varlistentry>
+        <term><emphasis role="lua" xml:id="msgpack-null" xreflabel="msgpack-null">msgpack.NULL</emphasis></term>
+        <listitem>
+            <para>
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+            </para>
+            <para>
+              Parameters: none.
+            </para>
+            <para>
+              Returns: the comparable value.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+    <para>
+    <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> y =  msgpack.encode({'a',1,'b',2})
+---
+...
+tarantool> z = msgpack.decode(y)
+---
+...
+tarantool> z[1],z[2],z[3],z[4]
+---
+- a
+- 1
+- b
+- 2
+...
+tarantool> box.space.space0:insert{20,msgpack.NULL,20}
+---
+- [20, null, 20]
+...
+</programlisting>
+    </para>
 </section>
 
 <section xml:id="sp-box-fiber">
-    <title>Package <code>box.fiber</code></title>
+    <title>Package <code>fiber</code></title>
     <para>
-      The <code>box.fiber</code> package allows for creating, running and managing <emphasis>fibers</emphasis>.
+      The <code>fiber</code> package allows for creating, running and managing <emphasis>fibers</emphasis>.
     </para>
     <para>
       A fiber is a set of instructions which are executed
       with cooperative multitasking. Fibers managed by the
-      box.fiber package are associated with a user-supplied function
+      fiber package are associated with a user-supplied function
       called the <emphasis>fiber function</emphasis>.
 
       A fiber has three possible states: running, suspended or dead.
-      When a fiber is created with <code>box.fiber.create()</code>, it is suspended.
-      When a fiber is started with <code>box.fiber.resume()</code>, it is running.
-      When a fiber yields control with <code>box.fiber.yield()</code>, it is suspended.
+      When a fiber is created with <code>fiber.create()</code>, it is suspended.
+      When a fiber is started with <code>fiber.resume()</code>, it is running.
+      When a fiber yields control with <code>fiber.yield()</code>, it is suspended.
       When a fiber ends (because the fiber function ends), it is dead.
     </para>
     <para>
       A fiber can also be attached or detached.
       An attached fiber is a child of the creator,
       and is running only if the creator has called
-      <code>box.fiber.resume()</code>. A detached fiber is a child of
+      <code>fiber.resume()</code>. A detached fiber is a child of
       the Tarantool internal <quote>sched</quote> fiber, and gets
       scheduled only if there is a libev event associated
       with it.
-      To detach, a running fiber should invoke <code>box.fiber.wrap()</code>.
+      To detach, a running fiber should invoke <code>fiber.wrap()</code>.
       A detached fiber loses connection with its parent forever.
     </para>
     <para>
-      All fibers are part of the fiber registry, <code>box.fiber</code>.
-      This registry can be searched (<code>box.fiber.find()</code>)
+      All fibers are part of the fiber registry.
+      This registry can be searched (<code>fiber.find()</code>)
       either by fiber id (fid), which is numeric, or by fiber name,
       which is a string. If there is more than one fiber with the given
       name, the first fiber that matches is returned.
     </para>
     <para>
-      A runaway fiber can be stopped with <code>box.fiber.cancel()</code>.
-      However, <code>box.fiber.cancel()</code> is advisory &mdash; it works
-      only if the runaway fiber calls <code>box.fiber.testcancel()</code>
+      A runaway fiber can be stopped with <code>fiber.cancel()</code>.
+      However, <code>fiber.cancel()</code> is advisory &mdash; it works
+      only if the runaway fiber calls <code>fiber.testcancel()</code>
       once in a while. Most <code>box.*</code> hooks, such as <code>box.space...delete()</code>
-      or <code>box.space...update()</code>, do call <code>box.fiber.testcancel()</code>.
+      or <code>box.space...update()</code>, do call <code>fiber.testcancel()</code>.
       <code>box.space...select()</code> does not.
       In practice, a runaway fiber can only become unresponsive
       if it does many computations and does not check
@@ -2636,10 +929,10 @@ procedures.
       The other potential problem comes from detached
       fibers which never get scheduled, because they are not subscribed
       to any events, or because no relevant events occur. Such morphing fibers
-      can be killed with <code>box.fiber.cancel()</code> at any time,
-      since <code>box.fiber.cancel()</code>
+      can be killed with <code>fiber.cancel()</code> at any time,
+      since <code>fiber.cancel()</code>
       sends an asynchronous wakeup event to the fiber,
-      and <code>box.fiber.testcancel()</code> is checked whenever such an event occurs.
+      and <code>fiber.testcancel()</code> is checked whenever such an event occurs.
     </para>
     <para>
       Like all Lua objects, dead fibers are
@@ -2648,10 +941,10 @@ procedures.
       the fiber (now called a fiber carcass) to the fiber pool.
       The carcass can be reused when another fiber is created.
     </para>
-<variablelist xml:id="box.fiber">
+<variablelist xml:id="fiber">
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.id">box.fiber.id(<replaceable>fiber</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.id">fiber.id(<replaceable>fiber</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2662,11 +955,11 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.self">box.fiber.self() </emphasis>
+            <emphasis role="lua" xml:id="fiber.self">fiber.self() </emphasis>
         </term>
         <listitem>
             <para>
-              Returns: (type = userdata) <code>box.fiber</code>
+              Returns: (type = userdata) <code>require('fiber')</code>
               object for the currently scheduled fiber.
             </para>
         </listitem>
@@ -2674,21 +967,21 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.find">box.fiber.find(<replaceable>id</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.find">fiber.find(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
               Locate a fiber userdata object by id.
             </para>
             <para>
-              Returns: (type = userdata) box.fiber object for the specified fiber.
+              Returns: (type = userdata) require('fiber') object for the specified fiber.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.create">box.fiber.create(<replaceable>function-name</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function-name</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2698,7 +991,7 @@ procedures.
               Parameters: <code>function-name</code> = the function that the fiber is associated with.
             </para>
             <para>
-              Returns: (type = userdata) the box.fiber object of the new fiber.
+              Returns: (type = userdata) the require('fiber') object of the new fiber.
             </para>
             <para>
               Possible errors: the function does not exist or if a recursion limit is hit.
@@ -2708,7 +1001,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.resume">box.fiber.resume(<replaceable>fiber, ...</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.resume">fiber.resume(<replaceable>fiber, ...</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2720,7 +1013,7 @@ procedures.
 
     <varlistentry>
         <term>
-         <emphasis role="lua" xml:id="box.fiber.yield" xreflabel="box.fiber.yield">box.fiber.yield(<replaceable>yield-arguments</replaceable>) </emphasis>
+         <emphasis role="lua" xml:id="fiber.yield" xreflabel="fiber.yield">fiber.yield(<replaceable>yield-arguments</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -2730,9 +1023,9 @@ procedures.
             <para>
               Parameters: <code>yield-arguments</code>:  
               If the fiber is attached, arguments passed
-              to box.fiber.yield are passed on to the calling fiber.
-              If the fiber is detached, <code>box.fiber.yield()</code>
-              arguments passed to box.fiber.yield are returned after temporarily
+              to fiber.yield are passed on to the calling fiber.
+              If the fiber is detached, <code>fiber.yield()</code>
+              arguments passed to fiber.yield are returned after temporarily
               yielding control back to the scheduler.
             </para>
         </listitem>
@@ -2740,12 +1033,12 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.detach">box.fiber.detach()</emphasis>
+            <emphasis role="lua" xml:id="fiber.detach">fiber.detach()</emphasis>
         </term>
         <listitem>
             <para>
               Detach the current fiber. This is a cancellation point. This is a yield point.
-              It is usually more convenient to use <code>box.fiber.wrap()</code> to create
+              It is usually more convenient to use <code>fiber.wrap()</code> to create
               a fiber which is already detached when it is created.
             </para>
         </listitem>
@@ -2753,7 +1046,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.wrap">box.fiber.wrap(<replaceable>function, function-arguments</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.wrap">fiber.wrap(<replaceable>function, function-arguments</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2770,7 +1063,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.sleep">box.fiber.sleep(<replaceable>time</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.sleep">fiber.sleep(<replaceable>time</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2785,14 +1078,14 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.status">box.fiber.status(<replaceable>[fiber]</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.status">fiber.status(<replaceable>[fiber]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
               Return the status of the specified fiber.
             </para>
             <para>
-              Parameters: <code>fiber></code> = the fiber to be checked -- if this is not
+              Parameters: <code>fiber</code> = the fiber to be checked -- if this is not
               supplied, then the current fiber is to be checked.
             </para>
             <para>
@@ -2806,7 +1099,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.cancel">box.fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
+            <emphasis role="lua" xml:id="fiber.cancel">fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2824,7 +1117,7 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.testcancel">box.fiber.testcancel()</emphasis>
+            <emphasis role="lua" xml:id="fiber.testcancel">fiber.testcancel()</emphasis>
         </term>
         <listitem>
             <para>
@@ -2833,6 +1126,53 @@ procedures.
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">fiber.time()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: current system time (in seconds since the epoch) as a Lua
+                number.  The time is taken from the event loop
+                clock, which makes this call very cheap,
+                but still useful for constructing artificial
+                tuple keys.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput> fiber.time(), fiber.time()</userinput>
+---
+ - 1385758759.2591
+ - 1385758759.2591
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">fiber.time64()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: current system time (in microseconds since the epoch) as a 64-bit
+              integer. The time is taken from the event loop clock.
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>arantool&gt; <userinput>fiber = require('fiber')</userinput>
+---
+...
+tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
+---
+ - 1385758828.9825
+ - 1385758828982485
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
 </variablelist>
 
 <para>
@@ -2842,28 +1182,29 @@ This function contains an infinite loop
 ("while 0 == 0" is always true).
 Each iteration of the loop adds 1 to a global variable
 named gvar, then goes to sleep for 2 seconds.
-The sleep causes an implicit box.fiber.yield().<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
+The sleep causes an implicit fiber.yield().<programlisting>
+<prompt>tarantool&gt;</prompt><userinput> fiber = require('fiber')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function function_x()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
 <prompt>        -&gt;</prompt><userinput>     gvar = gvar + 1</userinput>
-<prompt>        -&gt;</prompt><userinput>     box.fiber.sleep(2)</userinput>
+<prompt>        -&gt;</prompt><userinput>     fiber.sleep(2)</userinput>
 <prompt>        -&gt;</prompt><userinput>     end</userinput>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput></programlisting>
+<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput></programlisting>
 Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.
 <programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = fiber.wrap(function_x)</userinput>
 ---
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fid = box.fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = fiber.wrap(function_x)</userinput>
 ---
 ...
 </programlisting>
@@ -2871,7 +1212,7 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2886,10 +1227,10 @@ Cancel the fiber. Then, once again ...
 Display the fiber id, the fiber status, and gvar (gvar will have
 gone up a bit more depending how long the pause lasted). This time
 the status is dead because the cancel worked.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> box.fiber.cancel(fiber_of_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber.cancel(fiber_of_x)</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',box.fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
 ---
 - '#'
 - 'userdata: 0x4133d340'
@@ -2902,131 +1243,28 @@ the status is dead because the cancel worked.<programlisting>
 
 </section>
 
-<!--   end of lib -->
-
-<section xml:id="sp-box-session">
-    <title>Package <code>box.session</code></title>
+<section xml:id="sp-fiber-ipc">
+    <title>Package <code>fiber-IPC</code> &mdash; inter-process communication</title>
     <para>
-    The <code>box.session</code> package allows querying the session state,
-    writing to a session-specific temporary Lua table, or setting up triggers
-    which will fire when a session starts or ends.
-    A <emphasis>session</emphasis> is an object associated with each client connection.
-    </para>
-<variablelist>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.id() </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: (type = number) the unique identifier
-              (ID) for the current session. The result can be 0 meaning
-              there is no session (for example because a function is
-              running in a detached fiber).
-            </para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.session.exists(<replaceable>id</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Returns: (type = number) 1 if the session exists,
-              0 if the session does not exist.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-        <emphasis role="lua">box.session.peer(<replaceable>id</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-               Parameters: <code>id</code> = the unique identifier of the session.
-            </para>
-            <para>
-              Returns: (type = string) If the specified session exists, the host
-              address and port of the session peer, for example "127.0.0.1:55457".
-              If the specified session does not exist, "0.0.0.0:0". The command is executed on the server,
-              so the "local name" is the server's host and administrative port,
-              and the "peer name" is the client's host and port.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-           <emphasis role="lua">box.session.storage</emphasis>
-        </term>
-        <listitem>
-            <para>
-              A Lua table that can hold arbitrary
-              unordered session-specific names and values, which will last until
-              the session ends.
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
-<para>
-<bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>tarantool&gt;</prompt><userinput> box.session.peer(box.session.id())</userinput>
----
- - 127.0.0.1:45129
-...
-<prompt>tarantool&gt;</prompt><userinput> box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
----
-...
-
-<prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> m</userinput>
----
-- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
-...</programlisting>
-</para>
-
-    <para>
-See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
-for instructions about defining triggers for connect and disconnect events
- with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
-    </para>
-</section>
-
-<!--   end of lib -->
-
-<section xml:id="sp-box-ipc">
-    <title>Package <code>box.ipc</code> &mdash; inter-process communication</title>
-    <para>
-      The <code>box.ipc</code> package allows sending and receiving messages between
+      The <code>fiber-IPC</code> package allows sending and receiving messages between
       different processes. The words "different processes" in this context mean
       different connections, different sessions, or different fibers.
     </para>
     <para>
-      Call <code>box.ipc.channel()</code> to allocate space and get a channel object, which will be
+      Call <code>fiber.channel()</code> to allocate space and get a channel object, which will be
       called <code>channel</code> for examples in this section.
-      Call the other box.ipc() routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
+      Call the other fiber-IPC routines, via <code>channel</code>, to send messages, receive messages, or check ipc status.
       Message exchange is synchronous.
       The channel is garbage collected when no one is using it, as with any
       other Lua object.
       Use object-oriented syntax, for example <code>channel:put(message)</code>
-      rather than <code>box.ipc.channel.put(message)</code>. 
+      rather than <code>fiber.channel.put(message)</code>. 
     </para>
-<variablelist xml:id="box.ipc">
+<variablelist xml:id="fiber.ipc">
     <para>
     </para>
     <varlistentry>
-        <term><emphasis role="lua">box.ipc.channel(<replaceable>capacity-number</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">fiber.channel(<replaceable>capacity-number</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Create a new communication channel.
@@ -3171,7 +1409,9 @@ for instructions about defining triggers for connect and disconnect events
 </variablelist>
 <para>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-local channel = box.ipc.channel(10)
+             
+fiber = require('fiber')            
+channel = fiber.channel(10)
 function consumer_fiber()
     while true do
         local task = channel:get()
@@ -3230,21 +1470,121 @@ end
 </para>
 </section>
 
-<!--   end of lib -->
+<section xml:id="sp-box-session">
+    <title>Package <code>session</code></title>
+    <para>
+    The <code>session</code> package allows querying the session state,
+    writing to a session-specific temporary Lua table, or setting up triggers
+    which will fire when a session starts or ends.
+    A <emphasis>session</emphasis> is an object associated with each client connection.
+    </para>
+<variablelist>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">session.id() </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: (type = number) the unique identifier
+              (ID) for the current session. The result can be 0 meaning
+              there is no session (for example because a function is
+              running in a detached fiber).
+            </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">session.exists(<replaceable>id</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Returns: (type = number) 1 if the session exists,
+              0 if the session does not exist.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+        <emphasis role="lua">session.peer(<replaceable>id</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+               Parameters: <code>id</code> = the unique identifier of the session.
+            </para>
+            <para>
+              Returns: (type = string) If the specified session exists, the host
+              address and port of the session peer, for example "127.0.0.1:55457".
+              If the specified session does not exist, "0.0.0.0:0". The command is executed on the server,
+              so the "local name" is the server's host and administrative port,
+              and the "peer name" is the client's host and port.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+           <emphasis role="lua">session.storage</emphasis>
+        </term>
+        <listitem>
+            <para>
+              A Lua table that can hold arbitrary
+              unordered session-specific names and values, which will last until
+              the session ends.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
+<para>
+<bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt><userinput> session = require('session')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.peer(session.id())</userinput>
+---
+ - 127.0.0.1:45129
+...
+<prompt>tarantool&gt;</prompt><userinput> session.storage.random_memorandum = "Don't forget the eggs."</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.storage.radius_of_mars = 3396</userinput>
+---
+...
+
+<prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> m</userinput>
+---
+- 'radius_of_mars=3396 random_memorandum=Don''t forget the eggs. '
+...</programlisting>
+</para>
+
+    <para>
+See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
+for instructions about defining triggers for connect and disconnect events
+ with <code>session.on_connect()</code> and <code>session.on_disconnect()</code>.
+    </para>
+</section>
 
 <section xml:id="sp-box-socket">
-    <title>Package <code>box.socket</code> &mdash; TCP and UDP sockets</title>
-<variablelist xml:id="box.socket">
+    <title>Package <code>socket</code> &mdash; TCP and UDP sockets</title>
+<variablelist xml:id="socket">
     <para>
-      The <code>box.socket</code> package allows exchanging data via BSD sockets
+      The <code>socket</code> package allows exchanging data via BSD sockets
       with a local or remote host in connection-oriented (TCP) or datagram-oriented (UDP) mode.
-      Semantics of the calls in the <code>box.socket</code> API closely follow
+      Semantics of the calls in the <code>socket</code> API closely follow
       semantics of the corresponding POSIX calls. Function names
       and signatures are mostly compatible with
       <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
     </para>
     <para>
-      Similarly to luasocket, <code>box.socket</code> doesn't throw exceptions
+      Similarly to luasocket, <code>socket</code> doesn't throw exceptions
       on errors. On success, most calls return a socket object.
       On error, a multiple return of <code>nil, status, errno, errstr</code>
       is produced.
@@ -3267,7 +1607,7 @@ end
     </para>
     <para>
       Calls which require a socket address and in POSIX expect
-      <code>struct sockaddr_in</code>, in <code>box.socket</code>
+      <code>struct sockaddr_in</code>, in <code>socket</code>
       simply accept host name and port as additional arguments.
       Name resolution is done automatically. If it fails,
       status is set to <code>"error"</code>, errno is set to <code>-1</code>
@@ -3282,9 +1622,8 @@ end
       a long time.
     </para>
     <para>
-      As with all other <code>box</code> functions, the API can be used
-      in procedural style (e.g. <code>box.socket.close(socket)</code>) as well
-      as in object-oriented style (<code>socket:close()</code>).
+      Most of the functions in the API are usually used
+      in object-oriented style, for example <code>socket:close()</code>.
     </para>
     <para>
       A closed socket should not be used any more. Alternatively, the
@@ -3293,7 +1632,7 @@ end
     </para>
 
     <varlistentry>
-        <term><emphasis role="lua">box.socket.tcp()</emphasis></term>
+        <term><emphasis role="lua">socket.tcp()</emphasis></term>
         <listitem>
             <para>
                 Create a new TCP socket.
@@ -3305,7 +1644,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">box.socket.udp()</emphasis></term>
+        <term><emphasis role="lua">socket.udp()</emphasis></term>
         <listitem>
             <para>
                 Create a new UDP socket.
@@ -3517,8 +1856,8 @@ end
                 Shutdown a reading, writing or both ends of a socket.
             </para>
             <para>
-               Parameters: <code>how</code> = box.socket.SHUT_RD, box.socket.SHUT_WR,
-               or box.socket.SHUT_RDWR.
+               Parameters: <code>how</code> = socket.SHUT_RD, socket.SHUT_WR,
+               or socket.SHUT_RDWR.
             </para>
             <para>
                Returns: (type = userdata) Socket on success, <code>nil, "error", errno, errstr</code> on error.
@@ -3548,11 +1887,23 @@ end
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term><emphasis role="lua">socket:setsockopt()</emphasis> etc.</term>
+        <listitem>
+            <para>
+                For examples of functions not listed here -- including setsockopt,
+                getsockopt, accept, wait, writable, and all the less-used functions --
+                see the files bsdsocket.test.lua and socket.test.py which are supplied
+                as part of the Tarantool source.
+            </para>
+        </listitem>
+    </varlistentry>
 
 </variablelist>
 
 
- <bridgehead renderas="sect4">Example showing use of box.socket over the Internet</bridgehead>
+ <bridgehead renderas="sect4">Example showing use of socket over the Internet</bridgehead>
  <para>
  In this example a connection is made over the internet between the Tarantool server
  and <link xlink:href="http://mail.ru">mail.ru</link>,
@@ -3560,7 +1911,10 @@ end
  This is not a useful way to communicate with this particular site,
  but shows that the system works.
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>sock = box.socket.tcp()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>sock = socket.tcp()</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>type(sock)</userinput>
@@ -3592,844 +1946,6 @@ end
 
 </section>
 
-<section xml:id="sp-box-net-box">
-    <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
-    <para>
-        The <code>box.net</code> package contains connectors to remote database systems.
-        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
-        &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
-        In this section the subject is the built-in variant, <code>box.net.box</code>.
-        This is for connecting to tarantool servers via a network.
-    </para>
-<variablelist xml:id="box.net.box">
-    <para>
-        Call <code>box.net.box.new()</code> to connect and get a connection object,
-        which will be called <code>conn</code> for examples in this section.
-        Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
-        to execute requests on the remote box.
-        Call <code>box.net.box.close(conn)</code> to disconnect.
-        Object-oriented and functional APIs are equivalent, so
-        <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
-    </para>
-
-    <para>
-        All <code>box.net.box</code> methods are fiber-safe, that is, it is
-        safe to share and use the same connection object across
-        multiple concurrent fibers. In fact, it's perhaps the
-        best programming practice with Tarantool. When multiple
-        fibers use the same connection, all requests are pipelined
-        through the same network socket, but each fiber gets back a
-        correct response. Reducing the number of active sockets
-        lowers the overhead of system calls and increases the
-        overall server performance. There are, however, cases when
-        a single connection is not enough &mdash; for example when it's necessary to
-        prioritize requests or to use different authentication ids.
-    </para>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.net.box.new">
-             conn = box.net.box.new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, <replaceable>reconnect_interval</replaceable>])</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Create a new connection. The connection is
-                established on demand, at the time of the first
-                request. It is re-established automatically after
-                a disconnect. The argument
-                <code>reconnect_interval</code> (in seconds)
-                specifies the amount of time the server
-                sleeps between failing attempts to reconnect.
-                The returned <code>conn</code> object supports methods for making remote
-                requests, such as select, update or delete.
-            </para>
-            <para>
-               For the local tarantool server there is a pre-created always-established
-               connection object named <code>box.net.self</code>.
-               Its purpose is to make polymorphic use of the
-               <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 3303)</code> can
-               be replaced by <code>conn = box.net.box.self</code>.
-               However, there is an important difference between the embedded
-               connection and a remote one. With the embedded connection,
-               requests which do not modify data do not yield. When using
-               a remote connection, any request can yield, and local database state may
-               have changed by the time it returns.
-            </para>
-            <para>
-               Parameters: <code>host</code>, <code>port</code>, <code>reconnect_interval</code>.
-            </para>
-            <para>
-               Returns: (type = userdata) conn object).
-            </para>
-            <para>
-               Example: <code>conn = box.net.box.new('localhost', 3303)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.ping">
-        conn:ping()</emphasis></term>
-        <listitem>
-            <para>
-                Execute a PING command.
-            </para>
-            <para>
-               Returns: (type = boolean) <code>true</code> on success,
-                 <code>false</code> on error. Example: <code>self:ping()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.close">
-        conn:close()</emphasis></term>
-        <listitem>
-            <para>
-            Close a connection.
-            </para>
-            <para>
-              Connection objects are garbage collected just like any other objects
-              in Lua, so an explicit destruction is not mandatory.
-              However, since <code>close()</code> is a system call, it
-              is good programming practice to close a connection
-              explicitly when it is no longer needed, to avoid lengthy
-              stalls of the garbage collector.
-            </para>
-            <para>
-              Example: <code>conn:close()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.select">
-         conn:select(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.select">box.space[<replaceable>space-number</replaceable>]:select(...)</code>.
-              Please note this difference: a local <code>box.space[<replaceable>space-number</replaceable>]:select(...)</code> does not yield,
-              but a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> call does yield,
-              so local data may change while a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is running.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.insert">
-         conn:insert(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:insert(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.insert">box.space[<replaceable>space-number</replaceable>]:insert(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.replace">
-         conn:replace(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:replace(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.replace">box.space[<replaceable>space-number</replaceable>]:replace(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.update">
-         conn:update(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:update(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.update">box.space[<replaceable>space-number</replaceable>]:update(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.delete">
-         conn:delete(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:delete(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.delete">box.space[<replaceable>space-number</replaceable>]:delete(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.call">
-         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
-              That is, box.net.box.call is a remote stored-procedure call.
-              Please keep in mind that the call is using
-              the binary protocol to pack procedure arguments,
-              and the binary protocol is type agnostic, so it's recommended
-              to pass all arguments of remote stored procedure calls as
-              strings.
-            </para>
-            <para>
-              Example: <code>conn:call('box.space.space0:insert',{2})</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.timeout">
-         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
-              Example: <code>conn:timeout(0.5):update({'1'}, {{'=p', 1, 15}})</code>.
-            </para>
-            <para>
-              All remote calls support execution timeouts.
-              Using a wrapper object makes the remote
-              connection API compatible with the local one, removing
-              the need for a separate <code>timeout</code> argument, which
-              the local version would ignore. Once a request is sent,
-              it cannot be revoked from the remote server even if
-              a timeout expires: the timeout expiration only aborts the
-              wait for the remote server response, not the request itself.
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
- <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
- <para>
- This example will work with the sandbox configuration described in the preface.
- That is, there is a space named space0 with a numeric primary key.
- Assume that the database is nearly empty.
- Assume that the tarantool server is running on localhost 127.0.0.1:3303.
-<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = '!'</userinput>
-<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3303 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3303 = default')</userinput>
-<prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3303')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.n, {800, 'data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on space0, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.n, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on space0, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.n, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.n, {800, 'New data', 'Extra data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.n, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
-<prompt>        -&gt;</prompt><userinput>   end!</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> setopt delimiter = ''!</userinput>
-<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
----
-- - self:ping() succeeded
-  - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 3303 = default
-  - conn:delete done on space0.
-  - conn:insert done on space0, index 0
-  - '  primary key value = 800.'
-  - conn:select done on space0, index 0
-  - '  number of fields = 2'
-  - conn:delete done on space0
-  - conn:replace done on space0
-  - conn:update done on space0
-  - conn:close done
-...
-<prompt>tarantool&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
----
-- [800, 'Fld#1', 'Extra data']
-...
-</programlisting>
-</para>
-</section>
-
-<section xml:id="sp-box-shard">
-    <title>Package <code>box.shard</code></title>
-
-<para>
-With <link xlink:href="https://en.wikipedia.org/wiki/Sharding">Sharding</link>,
-the tuples of a tuple set are distributed
-to multiple nodes, with a Tarantool database server on each node. With this arrangement,
-each server is handling only a subset of the total data, so larger loads can be
-handled by simply adding more computers to a network.
-</para>
-<para>
-The Tarantool box.shard package has facilities
-for creating or redistributing or cleaning up shards, as well as analogues for the
-data-manipulation functions of the box library (select, insert, replace, update, delete).
-The important new concept is that there must be a function which, given a key value,
-returns a Shard Identification Number so that the data-manipulation functions will know
-which location is relevant.
-In fact there must be two such functions, one for giving Shard Identification Number
-according to the current algorithm, and one for giving Shard Identification Number
-according to a previous algorithm. The former is called [curr], the latter is called [prev].
-When the algorithm has to be changed because new nodes are added or because the load
-must be balanced differently, the [curr] function becomes the [prev] function, a
-new [curr] function is introduced, and a function named box.shard.copy() redistributes
-all the tuples -- a process called "resharding".
-</para>
-<para>
-The shard package can be installed by
-putting a directive at the start of an init.lua file:<programlisting>
-  require 'shard'</programlisting>which brings in all the required functionality
-from a program file named shard.lua.
-</para>
-<para>
-For the original package description in Russian, see
-<link xlink:href="https://github.com/tarantool/shard/blob/master/README.md">
-https://github.com/tarantool/shard/blob/master/README.md</link>.
-</para>
-<variablelist>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.schema.config (<replaceable>{ key = value, ... }</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function configures or reconfigures the shard-host or proxy-host.
-        The parameters which are indicated by the "key = value" pairs are:
- <code>
-    * shard list - a list of shards and their types (see "List of shards", below)
-    * me -   each node has to know "which shard in the list is me?" so this is the node's number in the list
-             (or 0 if the shard is a proxy)
-    * mode - mode for the current shard (either 'ro' or 'rw')
-    * curr - the current function that returns, for a given space and key, the Shard Number.
-    * prev - the previous function that returns, for a given space and key, the Shard Number.
-</code>
-        The function reconfigures only those parameters that are transmitted during the call.
-        Other parameters' values remain the same.
-        </para>
-        <para>
-        The SHARD LIST is a Lua table, which is an array of arrays.
-        Each entry in the table describes one shard, with the following fields :
-<code>
-        1. Shard operation mode. Either 'ro' = read only, or 'rw' = read / write.
-        2. Shard weight (a number between 0 and 1000 )
-        3. Shard connection parameters (the host and port of the node that handles the shard)
-        ?. Implicitly, a Shard Number.
-</code>
-        </para>
-        <para>
-        Notes:
-        1. If there are multiple descriptions of the same shard, only one of them may have shard operation mode = 'rw'.
-        2. Operations which modify data must always go to hosts with shard operation mode = 'rw'.
-        Operations which do not modify data may go to either 'ro' or 'rw' shards, depending on the semantics of the call.
-        </para>
-        <para>
-        The <code> box.shard.schema.config()</code> function must be performed on each node,
-        before creating a sharded database, and whenever the configuration changes.
-        Care must be taken that the nodes' configurations are consistent with each other.
-        The administrator is responsible for determining the values that [curr] and [prev]
-        functions should return -- a simple example would be "if key is less than a million
-        then return Shard Identification Number = 1, else return Shard Identification Number = 2".
-        </para>
-        <para>
-        Given this configuration information, subsequent box.shard functions will all
-        know what to do. Simplifying slightly, a subroutine in the shard functions will:
-<programlisting>
-Get the space number and the primary-key value from the function's parameters.
-Pass the space number and the primary-key value to [curr] or [prev] to get a Shard Identification Number.
-If the number is equal to "me", perform the function directly because this is the responsible node.
-Otherwise, use the box.net.box package to pass the function to the host and port of
-  the node that, according to the Shard List, is responsible for handling this tuple.
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.copy()</code></emphasis></term>
-        <listitem>
-        <para>
-        This function reads all tuples, if necessary copying them to new shards.
-        </para>
-        <para>
-        Start conditions:
-        The 'me' shard, that is, the shard which this node is responsible for, must be marked as 'rw'.
-        The 'me' shard must have both a [curr] and a [prev] function.
-        </para>
-        <para>
-        For each space, for each tuple in the space: if the [prev] function says that the
-        tuple belongs in the 'me' node, and the [curr] function says that the tuple belongs
-        in a different node, then copy it by sending an "insert" request to the different node.
-        This is actually an "insert nothrow", that is, an insert without an error message,
-        because the insert is simply not performed if the different node already has a tuple
-        with the same primary key. The copied tuple is not deleted on the 'me' node at this stage;
-        that is a separate job which will be handled by a separate function, <code>box.shard.cleanup()</code>.
-        </para>
-        <para>
-        The function returns a list of tuples. Each tuple contains two fields:
-        1. ID Number of the space which was worked on
-        2. Count of tuples which are copied into the space (may be 0)
-        </para>
-        <para>
-        In order to perform resharding, the administrator must:
-<code>
-* For all hosts ,determine the functions [curr] and [prev]
-* Update the Shard List with box.shard.config
-* Run box.shard.copy() on all hosts -- this will find tuples
-  on nodes according to [prev], and move them to new nodes
-  according to [curr].
-* Delete the [prev] function on all shards.
-* Run box.shard.cleanup() on all hosts, to remove outdated data.
-</code>
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.cleanup()</code></emphasis></term>
-        <listitem>
-        <para>
-        This function reads all tuples, if necessary deleting tuples which don't fit.
-        </para>
-        <para>
-        Start conditions :
-        current shard marked as 'rw' (read/write)
-        shard specifies only one function - [curr], not [prev] (that is, resharding mode is disabled)
-        </para>
-        <para>
-        This function goes through all the Tarantool spaces and,
-        for each tuple in a space, invokes the [curr] function.
-        If the number returned by [curr] is not equal to the actual number that the shard is in (known as [me]),
-        the tuple is deleted.
-        </para>
-        <para>
-        The function returns a list of tuples. Each tuple contains two fields :
-        1. ID Number of the space which was worked on,
-        2. Count of tuples which are deleted from the space.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.select (<replaceable>space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function performs a query using a key. A key may have multiple fields.
-        </para>
-        <para>
-        If <code>box.shard.select()</code> is called while a resharding is taking place,
-        and the tuple is not found on the node which the [curr] function identifies,
-        then the request is forwarded to the node which the [prev] function identifies.
-        </para>
-        <para>
-        Notes:
-        if the key is multi-field key then all fields must be present -- sampling multiple nodes with partially-specified keys is not possible.
-        </para>
-        <para>
-        The box.shard.select() function is the only function which can access hosts that are marked "read only".
-        The host selection algorithm ([curr] or [prev]) may choose among multiple possible hosts that all contain
-        copies of the specific tuple. Usually the algorithm will choose the shard whose 'weight' field in the shard
-        list has the greatest value.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.eselect (<replaceable>mode, space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function is the same as <code>box.shard.select()</code> but has an additional parameter, "mode",
-        to indicate which hosts it is preferable to sample.
-        </para>
-        <para>
-        The mode parameter can have one of the following values:
-        'ro' (means that it is preferable to sample the hosts marked as "read only", but if there are none, then sampling an 'rw' node is okay),
-        'rw' (means that it is necessary to sample only the hosts marked as " read-write").
-        Thus, "call box.shard.eselect('ro', ...)" is the same as "call box.shard.select(...)".
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.insert (<replaceable>space, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This functions inserts a specified tuple into a given space.
-        </para>
-        <para>
-        The essential operation is:
-<code>
-* The local node -- call it Node#1 -- uses [curr] to determine the shard to go to,
-  and sends the request to the different node, call it Node#2.
-* Node#1 returns a duplicate-key error if the tuple already exists in its space.
-* If there is a [prev] function on the different node, then the different node
-  uses [prev] to determine another node to go to, and sends the request to the
-  other node, call it Node#3.
-* If Node#3 finds the row in its space, then that is an error, which eventually
-  gets returned to Node#1 and the user sees a duplicate-key error.
- </code>
-        This mechanism is a bit complex, but all the user has to know is:
-        if there's a duplicate, even if sharding or resharding is taking place when
-        the insert request happens, no problem -- Tarantool will detect the duplicate.
-</para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code><replaceable>box.shard.replace (space, ...)</replaceable></code></emphasis></term>
-        <listitem>
-        <para>
-        This function inserts, or possibly replaces, a tuple.
-        </para>
-        <para>
-        The initial part of the operation is the same as for box.shard.insert(),
-        but box.shard.replace() is simpler because it does not have to search for
-        duplicates.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.delete (<replaceable>space, key [, subkey, ...])</replaceable></code></emphasis></term>
-        <listitem>
-        <para>
-        This function deletes a tuple.
-        </para>
-        <para>
-        Control is transferred to the node which is responsible according to [curr].
-        That different node will delete the tuple from its own tuple set,
-        and also -- if that different node has a [prev] function in its Shard List --
-        will pass the delete request on to whatever node the [prev] function identifies.
-        </para>
-        <para>
-        Returns: exists_from_curr or exists_from_prev.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>box.shard.update (<replaceable>space, key, [subkey, ...] format, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function updates a tuple.
-        </para>
-        <para>
-        Control is transferred to the node which is responsible according to [curr].
-        If the tuple is present on that different node, the tuple is updated
-        and the new updated value is returned.
-        Otherwise, if that different node has a [prev] function in its Shard List,
-        then the request is passed on to whatever node the [prev[ function identifies,
-        and that node actually performs an insert(), then returns what looks like
-        an updated value.
-        </para>
-        <para>
-        Like <code>box.shard.insert()</code>, the operations for <code>box.shard.update()</code> look a bit
-        complex. But, again, the user only has to know that the box.shard package
-        has routines which ensure that the result is an updated tuple, even though
-        there are several remotely-possible scenarios which must be taken care of.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-    <term><emphasis role="lua"><code>box.shard.call (<replaceable>mode, procname, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function calls a remote function.
-        </para>
-        <para>
-        The host which receives box.shard.call() selects a random node from
-        the Shard List -- preferably a read-only node if the mode parameter says 'ro'.
-        The remote node will perform the function and return its result to the original
-        node, which will return it to the user.
-        </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-</section>
-
-<section xml:id="sp-box-cfg">
-    <title>Packages <code>box.cfg</code>,
-    <code>box.info</code>, <code>box.slab</code> and
-    <code>box.stat</code>: server introspection</title>
-
-<variablelist>
-    <title>Package <code xml:id="box.cfg">box.cfg</code></title>
-    <para>
-      The box.cfg package is for administrators to specify all the server configuration parameters;
-      the full description of the parameters is in section <olink targetptr="configuration-file">Configuration</olink>.
-      Use <code>box.cfg</code> without braces to get read-only access to those parameters.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.cfg</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.cfg</userinput>
----
-- io_collect_interval = 0
-  pid_file = box.pid
-  panic_on_wal_error = false
-  slab_alloc_factor = 2
-  slab_alloc_minimal = 64
-  admin_port = 3313
-  logger = cat - >> tarantool.log
-  ...
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<variablelist>
-    <title>Package <code>box.info</code></title>
-    <para>
-        The box.info package provides access to information about
-        server variables: pid, uptime, version and such.
-        Its contents are identical to the output from <olink
-        targetptr="box.info"/>.
-    </para>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.info()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Since box.info contents are dynamic, it's not
-              possible to iterate over keys with the Lua
-              <emphasis>pairs()</emphasis> function. For this
-              purpose, <emphasis>box.info()</emphasis> builds and
-              returns a Lua table with all keys and values provided
-              in the package.
-            </para>
-            <para>
-              Returns: (type = Lua table) keys and values in the package.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.info()</userinput>
----
-- version: 1.6.0-819-geefb2d0
-  status: primary
-  pid: 20978
-  lsn: 340
-  snapshot_pid: 0
-  recovery_last_update: 0
-  recovery_lag: 0
-  uptime: 16071
-  ...
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.info.status, box.info.pid, box.info.lsn, ...</emphasis>
-        </term>
-        <listitem>
-        <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.info.pid</userinput>
----
-- 1747
-...
-tarantool> <userinput>box.info.logger_pid</userinput>
----
-- 1748
-...
-tarantool> <userinput>box.info.version</userinput>
----
-- 1.6.0-819-geefb2d0
-...
-tarantool> <userinput>box.info.config</userinput>
----
-- /home/unera/work/tarantool/test/box/tarantool_good.cfg
-...
-tarantool> <userinput>box.info.uptime</userinput>
----
-- 3672
-...
-tarantool> <userinput>box.info.lsn</userinput>
----
-- 1712
-...
-tarantool> <userinput>box.info.status</userinput>
----
- - primary
-...
-tarantool> <userinput>box.info.recovery_lag</userinput>
----
- - 0.000
-...
-tarantool> <userinput>box.info.recovery_last_update</userinput>
----
- - 1306964594.980
-...
-tarantool> <userinput>box.info.snapshot_pid</userinput>
----
- - 0
-...
-tarantool> <userinput>box.info.build</userinput>
----
-- flags: ' -fno-omit-frame-pointer -fno-stack-protector -fexceptions
-         -funwind-tables -msse2 -std=gnu99 -Wall -Wextra -Wno-sign-compare
-         -Wno-strict-aliasing -fopenmp -pthread'
-  target: Linux-x86_64-Debug
-  compiler: /usr/bin/cc /usr/bin/c++
-  options: cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_STATIC=OFF
-    -DENABLE_TRACE=ON -DENABLE_BACKTRACE=ON -DENABLE_CLIENT=true
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-</variablelist>
-<variablelist>
-    <title>Package <code>box.slab</code></title>
-    <para>
-      The box.slab package provides access to slab allocator statistics.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.slab</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.slab.info().arena_used</userinput>
----
- - 4194304
-...
-tarantool> <userinput>box.slab.info().arena_size</userinput>
----
- - 104857600
-...
-tarantool> <userinput>box.slab.info().slabs</userinput>
----
- 64
- 128
-...
-tarantool> <userinput>box.slab.info().slabs[64]</userinput>
----
- items: 1
- bytes_used: 160
- item_size: 64
- slabs: 1
- bytes_free: 4194144
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<variablelist>
-    <title>Package <code xml:id="box.stat">box.stat</code></title>
-    <para>
-      The box.stat package provides access to request
-      statistics.
-    </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.stat</emphasis></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead><programlisting>
-tarantool> <userinput>box.stat, type(box.stat) -- a virtual table</userinput>
----
-- []
-- table
-...
-tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
----
-- DELETE:
-    total: 33
-    rps: 0
-  SELECT:
-    total: 4
-    rps: 0
-  REPLACE:
-    total: 4
-    rps: 0
-  INSERT:
-    total: 17
-    rps: 0
-  CALL:
-    total: 8
-    rps: 0
-  UPDATE:
-    total: 8
-    rps: 0
-...
-tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinput>
----
-- total: 33
-  rps: 0
-...
-</programlisting></listitem>
-    </varlistentry>
-</variablelist>
-
-<para>
-    Additional examples can be found in the open source <link
-    xlink:href="https://github.com/mailru/tntlua">Lua stored
-    procedures repository</link> and in the server test suite.
-</para>
-</section>
-
-<section xml:id="sp-limitations">
-<title>Limitations of stored procedures</title>
-
-<para>
-    There are two limitations in stored procedures support one should
-    be aware of: execution atomicity and lack of typing.
-</para>
-<bridgehead renderas="sect4">Cooperative multitasking environment</bridgehead>
-<para>
-    Tarantool core is built around a cooperative multi-tasking
-    paradigm: unless a running fiber deliberately yields control
-    to some other fiber, it is not preempted.
-    <quote>Yield points</quote> are built into all
-    calls from Tarantool core to the operating system.
-    Any system call which can block is performed in an
-    asynchronous manner and the fiber waiting
-    on the system call is preempted with a fiber ready to
-    run. This model makes all programmatic locks unnecessary:
-    cooperative multitasking ensures that there is no concurrency
-    around a resource, no race conditions and no memory
-    consistency issues.
-</para>
-<para>
-    When requests are small, e.g. simple UPDATE, INSERT, DELETE,
-    SELECT, fiber scheduling is fair: it takes only a little time
-    to process the request, schedule a disk write, and yield to
-    a fiber serving the next client.
-</para>
-<para>
-    A function, however, can perform complex computations,
-    or be written in such a way that control is not given away for a
-    long time. This can lead to unfair scheduling, when a single
-    client throttles the rest of the system, or to apparent stalls
-    in request processing.
-    Avoiding this situation is the responsibility of the function's
-    author. Most of the <code>box</code> calls, such as
-    <code>box.space...insert()</code>, <code>box.space...update()</code>,
-    <code>box.space...delete()</code> are yield points;
-    <code>box.space...select()</code>, however, is not.
-</para>
-<para>
-    It should also be noted that, in absence of transactions,
-    any yield in a function is a potential change in the
-    database state. Effectively, it's only possible
-    to have CAS (compare-and-swap) -like atomic stored
-    procedures: i.e. functions which select and then modify a record.
-
-    Multiple data change requests always run through a built-in
-    yield point.
-</para>
-<bridgehead renderas="sect4">Lack of field types</bridgehead>
-<para>
-   When invoking a function from the binary protocol,
-   it's not possible to convey types of arguments. Tuples are
-   type-agnostic. The conventional workaround is to use
-   strings to pass all (textual and numeric) data.
-</para>
-
-</section>
 </section>
 
 <!--

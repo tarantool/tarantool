@@ -40,7 +40,7 @@ _space:update({_space.id}, {{'+', 0, 2}})
 --
 t = _space:auto_increment{ADMIN, 'hello', 'memtx', 0}
 -- Check that a space exists
-space = box.space[t[0]]
+space = box.space[t[1]]
 space.id
 space.field_count
 space.index[0]
@@ -53,7 +53,7 @@ space:replace{0, 0}
 space:update({0}, {{'+', 0, 1}})
 space:delete{0}
 t = _space:delete{space.id}
-space_deleted = box.space[t[0]]
+space_deleted = box.space[t[1]]
 space_deleted
 space:replace{0}
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}

@@ -1,11 +1,11 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'tree', parts = {0, 'num'}, unique = true })
-space:create_index('i1', { type = 'tree', parts = {1, 'num'}, unique = false })
-space:create_index('i2', { type = 'tree', parts = {2, 'num'}, unique = false })
-space:create_index('i3', { type = 'tree', parts = {3, 'str', 4, 'str'}, unique = false })
-space:create_index('i4', { type = 'tree', parts = {6, 'str', 5, 'str'}, unique = false })
-space:create_index('i5', { type = 'tree', parts = {8, 'num'}, unique = false })
-space:create_index('i6', { type = 'tree', parts = {6, 'str', 5, 'str', 3, 'str', 4, 'str', 8, 'num'}, unique = true })
+space:create_index('primary', { type = 'tree', parts = {1, 'num'}, unique = true })
+space:create_index('i1', { type = 'tree', parts = {2, 'num'}, unique = false })
+space:create_index('i2', { type = 'tree', parts = {3, 'num'}, unique = false })
+space:create_index('i3', { type = 'tree', parts = {4, 'str', 5, 'str'}, unique = false })
+space:create_index('i4', { type = 'tree', parts = {7, 'str', 6, 'str'}, unique = false })
+space:create_index('i5', { type = 'tree', parts = {9, 'num'}, unique = false })
+space:create_index('i6', { type = 'tree', parts = {7, 'str', 6, 'str', 4, 'str', 5, 'str', 9, 'num'}, unique = true })
 
 space:insert{0, 0, 100, 'Joe', 'Sixpack', 'Drinks', 'Amstel', 'bar', 2000}
 space:insert{1, 1, 200, 'Joe', 'Sixpack', 'Drinks', 'Heineken', 'bar', 2001}

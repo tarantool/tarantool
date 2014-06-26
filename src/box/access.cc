@@ -150,6 +150,7 @@ user_cache_init()
 	struct user guest;
 	memset(&guest, 0, sizeof(guest));
 	snprintf(guest.name, sizeof(guest.name), "guest");
+	guest.owner = ADMIN;
 	user_cache_replace(&guest);
 	/* 0 is the auth token and user id by default. */
 	assert(guest.auth_token == GUEST &&
@@ -159,7 +160,7 @@ user_cache_init()
 	struct user admin;
 	memset(&admin, 0, sizeof(admin));
 	snprintf(admin.name, sizeof(admin.name), "admin");
-	admin.uid = ADMIN;
+	admin.uid = admin.owner = ADMIN;
 	user_cache_replace(&admin);
 	/* ADMIN is both the auth token and user id for 'admin' user. */
 	assert(admin.auth_token == ADMIN &&

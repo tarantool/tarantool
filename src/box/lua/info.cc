@@ -45,42 +45,35 @@ extern "C" {
 static int
 lbox_info_recovery_lag(struct lua_State *L)
 {
-	if (recovery_state->remote)
-		lua_pushnumber(L, recovery_state->remote->recovery_lag);
-	else
-		lua_pushnumber(L, 0);
+	lua_pushnumber(L, recovery_state->remote.recovery_lag);
 	return 1;
 }
 
 static int
 lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 {
-	if (recovery_state->remote)
-		lua_pushnumber(L,
-			recovery_state->remote->recovery_last_update_tstamp);
-	else
-		lua_pushnumber(L, 0);
+	lua_pushnumber(L, recovery_state->remote.recovery_last_update_tstamp);
 	return 1;
 }
 
 static int
 lbox_info_node(struct lua_State *L)
 {
-	if (recovery_state->node_id == 0) {
+	if (recovery_state->server_id == 0) {
 		lua_pushnil(L);
 		return 1;
 	}
 
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "id");
-	lua_pushinteger(L, recovery_state->node_id);
+	lua_pushinteger(L, recovery_state->server_id);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "uuid");
-	lua_pushlstring(L, tt_uuid_str(&recovery_state->node_uuid), UUID_STR_LEN);
+	lua_pushlstring(L, tt_uuid_str(&recovery_state->server_uuid), UUID_STR_LEN);
 	lua_settable(L, -3);
 	lua_pushliteral(L, "lsn");
 	luaL_pushnumber64(L, vclock_get(&recovery_state->vclock,
-					recovery_state->node_id));
+					recovery_state->server_id));
 	lua_settable(L, -3);
 
 	return 1;
@@ -91,7 +84,7 @@ lbox_info_vclock(struct lua_State *L)
 {
 	lua_createtable(L, 0, vclock_size(&recovery_state->vclock));
 	vclock_foreach(&recovery_state->vclock, it) {
-		lua_pushinteger(L, it.node_id);
+		lua_pushinteger(L, it.id);
 		luaL_pushnumber64(L, it.lsn);
 		lua_settable(L, -3);
 	}

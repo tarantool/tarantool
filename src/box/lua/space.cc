@@ -178,14 +178,14 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_newtable(L);
 
 		for (uint32_t j = 0; j < key_def->part_count; j++) {
-			lua_pushnumber(L, j);
+			lua_pushnumber(L, j + 1);
 			lua_newtable(L);
 
 			lua_pushstring(L,
 			       field_type_strs[key_def->parts[j].type]);
 			lua_setfield(L, -2, "type");
 
-			lua_pushnumber(L, key_def->parts[j].fieldno);
+			lua_pushnumber(L, key_def->parts[j].fieldno + 1);
 			lua_setfield(L, -2, "fieldno");
 
 			lua_settable(L, -3); /* index[k].parts[j] */
@@ -287,6 +287,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "FUNC_ID");
 	lua_pushnumber(L, SC_PRIV_ID);
 	lua_setfield(L, -2, "PRIV_ID");
+	lua_pushnumber(L, SC_CLUSTER_ID);
+	lua_setfield(L, -2, "CLUSTER_ID");
 	lua_pushnumber(L, SC_SYSTEM_ID_MIN);
 	lua_setfield(L, -2, "SYSTEM_ID_MIN");
 	lua_pushnumber(L, SC_SYSTEM_ID_MAX);

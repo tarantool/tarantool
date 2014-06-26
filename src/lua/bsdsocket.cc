@@ -629,8 +629,12 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 			lua_rawset(L, -3);
 
 			lua_pushliteral(L, "port");
-			lua_pushstring(L,
-				((struct sockaddr_un *)addr)->sun_path);
+			if (alen >= sizeof(struct sockaddr_un)) {
+				lua_pushstring(L,
+					((struct sockaddr_un *)addr)->sun_path);
+			} else {
+				lua_pushliteral(L, "");
+			}
 			lua_rawset(L, -3);
 			break;
 

@@ -316,37 +316,37 @@ request_encode(struct request *request, struct iovec *iov)
 	const int HEADER_LEN_MAX = 32;
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t len = HEADER_LEN_MAX + key_len;
-	char *data = (char *) region_alloc(&fiber()->gc, len);
-	char *d = (char *) data + 1; /* Skip 1 byte for MP_MAP */
+	char *begin = (char *) region_alloc(&fiber()->gc, len);
+	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (true) {
-		d = mp_encode_uint(d, IPROTO_SPACE_ID);
-		d = mp_encode_uint(d, request->space_id);
+		pos = mp_encode_uint(pos, IPROTO_SPACE_ID);
+		pos = mp_encode_uint(pos, request->space_id);
 		map_size++;
 	}
 	if (request->index_id) {
-		d = mp_encode_uint(d, IPROTO_INDEX_ID);
-		d = mp_encode_uint(d, request->index_id);
+		pos = mp_encode_uint(pos, IPROTO_INDEX_ID);
+		pos = mp_encode_uint(pos, request->index_id);
 		map_size++;
 	}
 	if (request->key) {
-		d = mp_encode_uint(d, IPROTO_KEY);
-		memcpy(d, request->key, key_len);
-		d += key_len;
+		pos = mp_encode_uint(pos, IPROTO_KEY);
+		memcpy(pos, request->key, key_len);
+		pos += key_len;
 		map_size++;
 	}
 	if (request->tuple) {
-		d = mp_encode_uint(d, IPROTO_TUPLE);
+		pos = mp_encode_uint(pos, IPROTO_TUPLE);
 		iov[1].iov_base = (void *) request->tuple;
 		iov[1].iov_len = (request->tuple_end - request->tuple);
-		iovcnt = 2;
+		iovcnt++;
 		map_size++;
 	}
 
-	assert(d <= data + len);
-	mp_encode_map(data, map_size);
-	iov[0].iov_base = data;
-	iov[0].iov_len = (d - data);
+	assert(pos <= begin + len);
+	mp_encode_map(begin, map_size);
+	iov[0].iov_base = begin;
+	iov[0].iov_len = pos - begin;
 
 	return iovcnt;
 }

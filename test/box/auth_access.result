@@ -34,7 +34,7 @@ box.schema.user.create('testus')
 s = box.schema.create_space('admin_space')
 ---
 ...
-s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})
+s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
 s:insert({1})
@@ -201,7 +201,7 @@ if session.uid() < 2 then return 'uid error' end
 --
 box.schema.user.drop('uniuser')
 ---
-- error: Write access denied for user 'uniuser'
+- error: Create or drop access denied for user 'uniuser'
 ...
 --
 --Check create, call and drop function
@@ -236,7 +236,6 @@ box.schema.user.create('uniuser_testus')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: Write access denied for user 'uniuser'
 ...
 --
 -- Check access system and any spaces
@@ -248,7 +247,7 @@ box.space.admin_space:select()
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._space:select(280)
 ---
@@ -277,19 +276,19 @@ session.su('someuser')
 --
 s:drop()
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 us:drop()
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 box.schema.func.drop('uniuser_func')
 ---
-- error: Write access denied for user 'someuser'
+- error: Create or drop access denied for user 'someuser'
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: Write access denied for user 'someuser'
+- error: User 'uniuser_testus' does not exist
 ...
 session.su('admin')
 ---
@@ -302,14 +301,13 @@ box.schema.user.drop('someuser')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
+- error: User 'uniuser_testus' does not exist
 ...
 box.schema.user.drop('uniuser')
 ---
-- error: Function '513' does not exist
 ...
 box.space._user:delete(2)
 ---
-- [2, '', 'uniuser', []]
 ...
 s:drop()
 ---
@@ -328,30 +326,29 @@ session.su('testuser')
 ...
 box.space._user:delete(2)
 ---
-- error: 'Failed to drop user ''testuser'': the user has objects'
+- error: Create or drop access denied for user 'testuser'
 ...
 box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
-box.space._user:insert{3,'','someone'}
+box.space._user:insert{3, session.uid(), 'someone'}
 ---
-- [3, '', 'someone']
+- [3, 2, 'someone']
 ...
 box.space._user:delete(3)
 ---
-- error: Write access denied for user 'testuser'
+- [3, 2, 'someone']
 ...
 session.su('admin')
 ---
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._user:delete(3)
 ---
-- [3, '', 'someone']
 ...
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 ---
@@ -371,7 +368,7 @@ box.space._user:delete(2)
 ...
 box.space._user:select(1)
 ---
-- - [1, '', 'admin']
+- - [1, 1, 'admin']
 ...
 box.space._user:insert{4,'','someone2'}
 ---
@@ -400,55 +397,6 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'num'}
 session.su('admin')
 ---
 ...
---
--- Check max function limit
---
---# setopt delimiter ';'
-function func_limit()
-    local i = 1
-    while true do
-        box.schema.func.create('func'..i)
-        i = i + 1
-    end
-    return i
-end;
----
-...
-function drop_limit_func()
-    local i = 1
-    while true do
-        box.schema.func.drop('func'..i)
-        i = i + 1
-    end
-end;
----
-...
-func_limit();
----
-- error: 'A limit on the total number of functions has been reached: 32000'
-...
-drop_limit_func();
----
-- error: Function 'func32001' does not exist
-...
-box.schema.user.grant('testuser', 'read, write, execute', 'universe');
----
-...
-session.su('testuser');
----
-...
-func_limit();
----
-- error: 'A limit on the total number of functions has been reached: 32000'
-...
-drop_limit_func();
----
-- error: Function 'func32001' does not exist
-...
---# setopt delimiter ''
-session.su('admin')
----
-...
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
 ...
@@ -461,7 +409,7 @@ s = box.schema.create_space('glade')
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
 ---
 ...
-s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 ---
 ...
 s:insert({1, 'A'})
@@ -609,9 +557,9 @@ s:drop()
 ...
 box.space._user:select()
 ---
-- - [0, '', 'guest']
-  - [1, '', 'admin']
-  - [2, '', 'testuser', []]
+- - [0, 1, 'guest']
+  - [1, 1, 'admin']
+  - [2, 1, 'testuser', []]
 ...
 box.space._space:select()
 ---

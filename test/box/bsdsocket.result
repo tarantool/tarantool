@@ -1,10 +1,19 @@
-json = require('json')
+json = require 'json'
 ---
 ...
-pickle = require('pickle')
+pickle = require 'pickle'
 ---
 ...
-socket = require('socket')
+socket = require 'socket'
+---
+...
+fiber = require 'fiber'
+---
+...
+msgpack = require 'msgpack'
+---
+...
+log = require 'log'
 ---
 ...
 type(socket)
@@ -34,11 +43,14 @@ type(s:error())
 ---
 - nil
 ...
+primary_port = string.gsub(box.cfg.primary_port, '^.*:', '')
+---
+...
 s:nonblock(false)
 ---
 - false
 ...
-s:sysconnect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
+s:sysconnect('127.0.0.1', primary_port)
 ---
 - true
 ...
@@ -94,9 +106,26 @@ s:wait(.01)
 ---
 - RW
 ...
-s:syswrite(pickle.pack('iii', 65280, 0, 12334))
+handshake = s:sysread(128)
 ---
-- 12
+...
+string.len(handshake)
+---
+- 128
+...
+string.sub(handshake, 1, 9)
+---
+- Tarantool
+...
+ping = msgpack.encode({ [0] = 64, [1] = 0 }) .. msgpack.encode({})
+---
+...
+ping = msgpack.encode(string.len(ping)) .. ping
+---
+...
+s:syswrite(ping)
+---
+- 7
 ...
 s:readable(1)
 ---
@@ -106,21 +135,23 @@ s:wait(.01)
 ---
 - RW
 ...
-pickle.unpack('iii', s:sysread(4096))
+pong = s:sysread(4096)
 ---
-- error: 'pickle.unpack(''iii''): too many bytes: unpacked 12, total 128'
 ...
-s:syswrite(pickle.pack('iii', 65280, 0, 12335))
+string.len(pong)
 ---
-- 12
+- 22
 ...
-s:readable(1)
+msgpack.decode(pong)
 ---
-- true
+- 17
+- 6
 ...
-string.len(s:sysread(4096))
+msgpack.decode(pong, 6)
 ---
-- 0
+- 0: 0
+  1: 0
+- 23
 ...
 s:close()
 ---
@@ -221,7 +252,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:311: Socket option SO_ACCEPTCONN
+- error: '[string "-- bsdsocket.lua (internal file)..."]:331: Socket option SO_ACCEPTCONN
     is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
@@ -646,7 +677,17 @@ s:readable(10)
 ---
 - true
 ...
-local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return json.encode{d, from}
+d, from = s:recvfrom(4096)
+---
+...
+from.port > 0
+---
+- true
+...
+from.port = 'Random port'
+---
+...
+json.encode{d, from}
 ---
 - '["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]'
 ...
@@ -761,7 +802,51 @@ s:close()
 ---
 - true
 ...
-socket.tcp_connect('mail.ru', 80, 0.00000000001)
+socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 ---
 - null
+...
+-- close
+s = socket.tcp_connect('127.0.0.1', primary_port)
+---
+...
+string.sub(s:read(128), 1, 9)
+---
+- Tarantool
+...
+sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+---
+...
+tostring(sa)
+---
+- fd 512
+...
+sa:readable(0)
+---
+- true
+...
+sa:writable(0)
+---
+- true
+...
+ch = fiber.channel()
+---
+...
+f = fiber.wrap(function() s:read(12) ch:put(true) end)
+---
+...
+fiber.sleep(.1)
+---
+...
+s:close()
+---
+- true
+...
+ch:get(1)
+---
+- true
+...
+s:error()
+---
+- Connection timed out
 ...

@@ -6,8 +6,8 @@ sql.sort = True
 admin("box.schema.user.create('test', { password = 'test' })")
 admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
-admin("s:create_index('primary', { type = 'tree', parts = { 0, 'str'} })")
-admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {1, 'str'}})")
+admin("s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })")
+admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})")
 
 print """#
 # A test case for Bug#729758
@@ -59,7 +59,7 @@ print """#
 # Test composite keys with trees
 #"""
 # Redefine the second key to be composite
-admin("s.index.secondary:alter{unique = true, parts = { 1, 'str', 2, 'str'}}")
+admin("s.index.secondary:alter{unique = true, parts = { 2, 'str', 3, 'str'}}")
 
 sql("insert into t0 values ('key1', 'part1', 'part2')")
 # Test a duplicate insert on unique index that once resulted in a crash (bug #926080)
@@ -83,7 +83,7 @@ sql("delete from t0 where k0='key2'")
 sql("delete from t0 where k0='key3'")
 admin("s:truncate()")
 # check non-unique multipart keys
-admin("s.index.primary:alter{type = 'tree', parts = { 0, 'num'}}")
+admin("s.index.primary:alter{type = 'tree', parts = { 1, 'num'}}")
 admin("s.index.secondary:alter{unique = false}")
 
 sql("insert into t0 values (01234567, 'part1', 'part2')")
@@ -113,7 +113,7 @@ admin("s:select{}")
 admin("s:truncate()")
 
 admin("s.index.primary:alter{type = 'hash'}")
-admin("s.index.secondary:alter{type = 'hash', unique = true, parts = { 1, 'str' }}")
+admin("s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'str' }}")
 
 sql("insert into t0 values (1, 'hello')")
 sql("insert into t0 values (2, 'brave')")
@@ -141,7 +141,7 @@ print """
 #
 """
 # clean data and restart with appropriate config
-admin("s.index.primary:alter{parts = {0, 'str'}}")
+admin("s.index.primary:alter{parts = {1, 'str'}}")
 admin("s.index.secondary:alter{type = 'tree', unique = false}")
 
 sql("insert into t0 values ('Spears', 'Britney')")
@@ -157,7 +157,7 @@ sql("delete from t0 where k0='Spears'")
 #
 # Test retrieval of duplicates via a secondary key
 #
-admin("s.index.primary:alter{parts = { 0, 'num'}}")
+admin("s.index.primary:alter{parts = { 1, 'num'}}")
 sql("insert into t0 values (1, 'duplicate one')")
 sql("insert into t0 values (2, 'duplicate one')")
 sql("insert into t0 values (3, 'duplicate one')")

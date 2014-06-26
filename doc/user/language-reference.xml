@@ -49,7 +49,7 @@
   <title>Data manipulation</title>
 
   <para>
-    The four basic "data-manipulation" types are: insert(),
+    The four basic "data-manipulation" requests are: insert() / replace(),
     update(), delete(), select(). They all, including
     insert() and update() and delete(), may return data.
     There are other request types for scanning multiple keys.
@@ -118,7 +118,7 @@
     It is encoded using YAML markup to simplify automated parsing.
   </para>
   <para>To learn which functions are considered to be administrative,
-    type <emphasis role="tntadmin">help()</emphasis> in the
+    type <emphasis role="lua">help()</emphasis> in the
     administrative console. A reference description also follows
     below:</para>
 
@@ -126,7 +126,7 @@
 
     <varlistentry>
       <term xml:id="box.snapshot" xreflabel="box.snapshot()">
-        <emphasis role="tntadmin">box.snapshot()</emphasis>
+        <emphasis role="lua">box.snapshot()</emphasis>
       </term>
       <listitem><para>
         Take a snapshot of all data and store it in
@@ -152,16 +152,15 @@
         is, on average, sufficient. This statement waits until a
         snapshot is taken and returns operation result. For
         example:
-<programlisting>localhost> <userinput>box.info.version, box.info.lsn</userinput>
+<programlisting>tarantool> <userinput>box.info.version</userinput>
 ---
 - 1.6.0-805-g4a7e71d
-- 843301
 ...
-localhost> <userinput>box.snapshot()</userinput>
+tarantool> <userinput>box.snapshot()</userinput>
 ---
 ok
 ...
-localhost> <userinput>box.snapshot()</userinput>
+tarantool> <userinput>box.snapshot()</userinput>
 ---
 fail: can't save snapshot, errno 17 (File exists)
 ...
@@ -172,9 +171,9 @@ fail: can't save snapshot, errno 17 (File exists)
         write-ahead log. Once a snapshot is taken, old WALs can be
         deleted as long as all replicas are up to date. But the
         WAL which was current at the time <emphasis
-        role="tntadmin">box.snapshot()</emphasis> started must be
+        role="lua">box.snapshot()</emphasis> started must be
         kept for recovery, since it still contains log records
-        written after the start of <emphasis role="tntadmin">
+        written after the start of <emphasis role="lua">
         box.snapshot()</emphasis>.
       </para>
       <para>
@@ -187,38 +186,13 @@ fail: can't save snapshot, errno 17 (File exists)
       </listitem>
     </varlistentry>
 
-
-    <varlistentry>
-      <term xml:id="box.cfg.reload" xreflabel="box.cfg.reload()">
-        <emphasis role="tntadmin">box.cfg.reload()</emphasis>
-      </term>
-      <listitem><para>
-        Re-read the configuration file. If the file contains
-        changes to dynamic parameters, update the runtime
-        settings. If configuration syntax is incorrect, or a
-        read-only parameter is changed, produce an error and do
-        nothing.
-      </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="box.cfg.show" xreflabel="box.cfg()">
-        <emphasis role="tntadmin">box.cfg()</emphasis>
-      </term>
-      <listitem><para>
-        Show the current settings. Displays all settings,
-        including those that have default values and thus are not
-        necessarily present in the configuration file.
-      </para></listitem>
-    </varlistentry>
-
     <varlistentry>
       <term xml:id="box.info" xreflabel="box.info()">
-        <emphasis role="tntadmin">box.info()</emphasis>
+        <emphasis role="lua">box.info()</emphasis>
       </term>
       <listitem><para>
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>box.info()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.info()</userinput>
 - version: 1.6.0-805-g4a7e71d
   status: primary
   pid: 12315
@@ -262,24 +236,15 @@ fail: can't save snapshot, errno 17 (File exists)
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="show-index" xreflabel="SHOW INDEX">
-       <emphasis role="tntadmin">show index</emphasis>
-     </term>
-     <listitem><para>
-     This is no longer supported.
-     </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="box.stat.show" xreflabel="box.stat.show()">
-        <emphasis role="tntadmin">box.stat()</emphasis>
+      <term xml:id="box.stat" xreflabel="box.stat">
+        <emphasis role="lua">box.stat()</emphasis>
       </term>
       <listitem><para>
       Show the average number of requests per second, and the
       total number of requests since startup, broken down by
       request type.
 <programlisting>
-localhost&gt; <userinput>box.stat()</userinput>
+tarantool&gt; <userinput>box.stat()</userinput>
 ---
 - DELETE:
     total: 48902544
@@ -293,6 +258,9 @@ localhost&gt; <userinput>box.stat()</userinput>
   INSERT:
     total: 48207694
     rps: 139
+  AUTH:
+    total: 0
+    rps: 0
   CALL:
     total: 0
     rps: 0
@@ -306,7 +274,7 @@ localhost&gt; <userinput>box.stat()</userinput>
 
     <varlistentry>
       <term xml:id="box.slab.info" xreflabel="box.slab.info()">
-        <emphasis role="tntadmin">box.slab()</emphasis>
+        <emphasis role="lua">box.slab()</emphasis>
       </term>
       <listitem>
         <para>
@@ -316,7 +284,7 @@ localhost&gt; <userinput>box.stat()</userinput>
           memory fragmentation. For example:
         </para>
 <programlisting>
-<prompt>localhost&gt;</prompt> <userinput>box.slab.info()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.slab.info()</userinput>
 ---
 - slabs:
     64:
@@ -360,8 +328,8 @@ localhost&gt; <userinput>box.stat()</userinput>
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="box.coredump" xreflabel="box.coredump()">
-        <emphasis role="tntadmin">box.coredump()</emphasis>
+      <term xml:id="coredump" xreflabel="coredump()">
+        <emphasis role="lua">coredump()</emphasis>
       </term>
       <listitem><para>
         Fork and dump a core. Since Tarantool stores all tuples
@@ -371,25 +339,12 @@ localhost&gt; <userinput>box.stat()</userinput>
     </varlistentry>
 
     <varlistentry>
-      <term xml:id="box.fiber.info" xreflabel="box.fiber.info()">
-        <emphasis role="tntadmin">box.fiber.info()</emphasis>
+      <term xml:id="fiber.info" xreflabel="fiber.info">
+        <emphasis role="lua">require('fiber').info()</emphasis>
       </term>
       <listitem><para>
         Show all running fibers, with their stack.
         Mainly useful for debugging.
-      </para></listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term xml:id="lua-command">
-        <emphasis role="tntadmin">...</emphasis>
-      </term>
-      <listitem><para>
-        Execute any chunk of Lua code. This can be used to define,
-        invoke, debug and drop <olink
-        targetptr="stored-procedures">Lua functions</olink>,
-        inspect server environment, perform automated
-        administrative tasks.
       </para></listitem>
     </varlistentry>
 

@@ -19,4 +19,8 @@ _func:truncate()
 _priv:run_triggers(false)
 _priv:truncate()
 _cluster:run_triggers(false)
+-- select server id 1 - self
+t = _cluster:get{1}
 _cluster:truncate()
+-- preserve self-identification
+_cluster:insert(t)

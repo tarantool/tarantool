@@ -31,7 +31,6 @@ void *ffi_symbols[] = {
 	(void *) port_ffi_destroy,
 	(void *) boxffi_select,
 	(void *) password_prepare,
-	(void *) tarantool_lua_interactive,
 	(void *) tarantool_error_message,
 	(void *) load_cfg,
 	(void *) box_set_replication_source,

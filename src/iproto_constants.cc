@@ -31,13 +31,15 @@
 #include "exception.h"
 #include "fiber.h"
 #include "crc32.h"
+#include "tt_uuid.h"
+#include "box/vclock.h"
 
 const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 {
 	/* {{{ header */
 		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
 		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_NODE_ID */
+		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
 		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 	/* }}} */
@@ -83,9 +85,9 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
-	/* 0x24 */	MP_STR, /* IPROTO_NODE_UUID */
+	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
 	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
-	/* 0x26 */	MP_MAP, /* IPROTO_LSNMAP */
+	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* }}} */
 };
 
@@ -117,7 +119,7 @@ const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
 const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"type",             /* 0x00 */
 	"sync",             /* 0x01 */
-	"node_id",          /* 0x02 */
+	"server_id",          /* 0x02 */
 	"lsn",              /* 0x03 */
 	"timestamp",        /* 0x04 */
 	"",                 /* 0x05 */
@@ -151,9 +153,9 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"tuple",            /* 0x21 */
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
-	"node uuid"         /* 0x24 */
-	"cluster uuid"      /* 0x25 */
-	"lsn map"           /* 0x26 */
+	"server UUID"       /* 0x24 */
+	"cluster UUID"      /* 0x25 */
+	"vector clock"      /* 0x26 */
 };
 
 void
@@ -184,8 +186,8 @@ error:
 		case IPROTO_SYNC:
 			header->sync = mp_decode_uint(pos);
 			break;
-		case IPROTO_NODE_ID:
-			header->node_id = mp_decode_uint(pos);
+		case IPROTO_SERVER_ID:
+			header->server_id = mp_decode_uint(pos);
 			break;
 		case IPROTO_LSN:
 			header->lsn = mp_decode_uint(pos);
@@ -205,6 +207,22 @@ error:
 		header->body[0].iov_len = (end - *pos);
 		*pos = end;
 	}
+}
+
+/**
+ * @pre pos points at a valid msgpack
+ */
+void
+iproto_decode_uuid(const char **pos, struct tt_uuid *out)
+{
+	if (mp_typeof(**pos) != MP_STR)
+error:
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+			  "UUID");
+	uint32_t len = mp_decode_strl(pos);
+	if (tt_uuid_from_strl(*pos, len, out) != 0)
+		goto error;
+	*pos += len;
 }
 
 int
@@ -230,9 +248,9 @@ iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 		map_size++;
 	}
 
-	if (header->node_id) {
-		d = mp_encode_uint(d, IPROTO_NODE_ID);
-		d = mp_encode_uint(d, header->node_id);
+	if (header->server_id) {
+		d = mp_encode_uint(d, IPROTO_SERVER_ID);
+		d = mp_encode_uint(d, header->server_id);
 		map_size++;
 	}
 
@@ -259,11 +277,19 @@ iproto_header_encode(const struct iproto_header *header, struct iovec *out)
 	return 1 + header->bodycnt; /* new iovcnt */
 }
 
+char *
+iproto_encode_uuid(char *pos, const struct tt_uuid *in)
+{
+	return mp_encode_str(pos, tt_uuid_str(in), UUID_STR_LEN);
+}
+
 int
 iproto_row_encode(const struct iproto_header *row,
-		  struct iovec *out, char fixheader[IPROTO_FIXHEADER_SIZE])
+		  struct iovec *out)
 {
 	int iovcnt = iproto_header_encode(row, out + 1) + 1;
+	char *fixheader = (char *)
+		region_alloc(&fiber()->gc, IPROTO_FIXHEADER_SIZE);
 	uint32_t len = 0;
 	for (int i = 1; i < iovcnt; i++)
 		len += out[i].iov_len;
@@ -288,4 +314,114 @@ iproto_row_encode(const struct iproto_header *row,
 
 	assert(iovcnt <= IPROTO_ROW_IOVMAX);
 	return iovcnt;
+}
+
+void
+iproto_decode_error(struct iproto_header *row)
+{
+	uint32_t code = row->type >> 8;
+	if (likely(code == 0))
+		return;
+	char error[TNT_ERRMSG_MAX] = { 0 };
+	const char *pos;
+	uint32_t map_size;
+
+	if (row->bodycnt == 0)
+		goto raise;
+	pos = (char *) row->body[0].iov_base;
+	if (mp_check(&pos, pos + row->body[0].iov_len))
+		goto raise;
+
+	pos = (char *) row->body[0].iov_base;
+	if (mp_typeof(*pos) != MP_MAP)
+		goto raise;
+	map_size = mp_decode_map(&pos);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*pos) != MP_UINT) {
+			mp_next(&pos); /* key */
+			mp_next(&pos); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&pos);
+		if (key != IPROTO_ERROR || mp_typeof(*pos) != MP_STR) {
+			mp_next(&pos); /* value */
+			continue;
+		}
+
+		uint32_t len;
+		const char *str = mp_decode_str(&pos, &len);
+		snprintf(error, sizeof(error), "%.*s", len, str);
+	}
+
+raise:
+	tnt_raise(ClientError, error, code);
+}
+
+void
+iproto_decode_subscribe(struct iproto_header *packet,
+			struct tt_uuid *cluster_uuid,
+			struct tt_uuid *server_uuid, struct vclock *vclock)
+{
+	if (packet->bodycnt == 0)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+	assert(packet->bodycnt == 1);
+	const char *data = (const char *) packet->body[0].iov_base;
+	const char *end = data + packet->body[0].iov_len;
+	const char *d = data;
+	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
+		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
+
+	const char *lsnmap = NULL;
+	d = data;
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d); /* key */
+			mp_next(&d); /* value */
+			continue;
+		}
+		uint8_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_CLUSTER_UUID:
+			if (cluster_uuid == NULL)
+				goto skip;
+			iproto_decode_uuid(&d, cluster_uuid);
+			break;
+		case IPROTO_SERVER_UUID:
+			if (server_uuid == NULL)
+				goto skip;
+			iproto_decode_uuid(&d, server_uuid);
+			break;
+		case IPROTO_VCLOCK:
+			if (vclock == NULL)
+				goto skip;
+			if (mp_typeof(*d) != MP_MAP) {
+				tnt_raise(ClientError, ER_INVALID_MSGPACK,
+					  "invalid VCLOCK");
+			}
+			lsnmap = d;
+			mp_next(&d);
+			break;
+		default: skip:
+			mp_next(&d); /* value */
+		}
+	}
+
+	if (lsnmap == NULL)
+		return;
+
+	/* Check & save LSNMAP */
+	d = lsnmap;
+	uint32_t lsnmap_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < lsnmap_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+		map_error:
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
+		}
+		uint32_t id = mp_decode_uint(&d);
+		if (mp_typeof(*d) != MP_UINT)
+			goto map_error;
+		int64_t lsn = (int64_t) mp_decode_uint(&d);
+		vclock_follow(vclock, id, lsn);
+	}
 }

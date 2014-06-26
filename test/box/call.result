@@ -357,11 +357,11 @@ call space:select(4)
 function field_x(key, field_index) return space:get(key)[field_index] end
 ---
 ...
-call field_x(4, 0)
+call field_x(4, 1)
 ---
 - [4]
 ...
-call field_x(4, 1)
+call field_x(4, 2)
 ---
 - ['new']
 ...

@@ -44,48 +44,42 @@ enum { UUID_LEN = 16, UUID_STR_LEN = 36 };
 
 #include <uuid/uuid.h>
 
-typedef struct tt_uuid {
+struct tt_uuid {
 	uuid_t id;
-} tt_uuid;
+};
 
 static inline void
-tt_uuid_create(tt_uuid *uu)
+tt_uuid_create(struct tt_uuid *uu)
 {
 	uuid_generate(uu->id);
 }
 
 static inline int
-tt_uuid_from_string(const char *in, tt_uuid *uu)
+tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 {
 	return uuid_parse((char *) in, uu->id);
 }
 
 static inline void
-tt_uuid_to_string(const tt_uuid *uu, char *out)
+tt_uuid_to_string(const struct tt_uuid *uu, char *out)
 {
 	uuid_unparse(uu->id, out);
 }
 
 static inline void
-tt_uuid_dec_be(const void *in, tt_uuid *uu)
-{
-	memcpy(uu->id, in, sizeof(uu->id));
-}
-
-static inline void
-tt_uuid_enc_be(const tt_uuid *uu, void *out)
+tt_uuid_bin(const struct tt_uuid *uu, void *out)
 {
 	memcpy(out, uu->id, sizeof(uu->id));
 }
 
 static inline bool
-tt_uuid_is_nil(const tt_uuid *uu)
+tt_uuid_is_nil(const struct tt_uuid *uu)
 {
 	return uuid_is_null(uu->id);
 }
 
 static inline bool
-tt_uuid_cmp(const tt_uuid *lhs, const tt_uuid *rhs)
+tt_uuid_cmp(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
 {
 	return uuid_compare(lhs->id, rhs->id);
 }
@@ -94,30 +88,32 @@ tt_uuid_cmp(const tt_uuid *lhs, const tt_uuid *rhs)
 
 #include <uuid.h>
 
-typedef struct uuid tt_uuid;
+struct tt_uuid {
+	struct uuid id;
+};
 
 static inline int
-tt_uuid_create(tt_uuid *uu)
+tt_uuid_create(struct tt_uuid *uu)
 {
 	uint32_t status;
-	uuid_create(uu, &status);
+	uuid_create(&uu->id, &status);
 	return status == uuid_s_ok;
 }
 
 static inline int
-tt_uuid_from_string(const char *in, tt_uuid *uu)
+tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 {
 	uint32_t status;
-	uuid_from_string(in, uu, &status);
+	uuid_from_string(in, &uu->id, &status);
 	return status == uuid_s_ok;
 }
 
 static inline void
-tt_uuid_to_string(const tt_uuid *uu, char *out)
+tt_uuid_to_string(const struct tt_uuid *uu, char *out)
 {
 	uint32_t status;
 	char *buf = NULL;
-	uuid_to_string(uu, &buf, &status);
+	uuid_to_string(&uu->id, &buf, &status);
 	assert(status == uuid_s_ok);
 	strncpy(out, buf, UUID_STR_LEN);
 	out[UUID_STR_LEN] = '\0';
@@ -125,39 +121,35 @@ tt_uuid_to_string(const tt_uuid *uu, char *out)
 }
 
 static inline bool
-tt_uuid_cmp(const tt_uuid *lhs, const tt_uuid *rhs)
+tt_uuid_cmp(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
 {
 	uint32_t status;
-	return uuid_compare(lhs, rhs, &status);
+	return uuid_compare(&lhs->id, &rhs->id, &status);
 }
 
 static inline bool
-tt_uuid_is_nil(const tt_uuid *uu)
+tt_uuid_is_nil(const struct tt_uuid *uu)
 {
 	uint32_t status;
-	return uuid_is_nil(uu, &status);
+	return uuid_is_nil(&uu->id, &status);
 }
 
 static inline void
-tt_uuid_dec_be(const void *in, tt_uuid *uu)
+tt_uuid_bin(const struct tt_uuid *uu, void *out)
 {
-	uuid_dec_be(in, uu);
-
-}
-
-static inline void
-tt_uuid_enc_be(const tt_uuid *uu, void *out)
-{
-	uuid_enc_be(out, uu);
+	uuid_enc_le(out, &uu->id);
 }
 #else
 #error Unsupported libuuid
 #endif /* HAVE_LIBUUID_XXX */
 
-extern const tt_uuid uuid_nil;
+extern const struct tt_uuid uuid_nil;
 
 char *
-tt_uuid_str(const tt_uuid *uu);
+tt_uuid_str(const struct tt_uuid *uu);
+
+int
+tt_uuid_from_strl(const char *in, size_t len, struct tt_uuid *uu);
 
 #if defined(__cplusplus)
 } /* extern "C" */

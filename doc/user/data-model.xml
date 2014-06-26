@@ -72,11 +72,9 @@ a <quote>dynamic</quote> data model.
 </para>
 <para>
 Any given tuple may have any number of fields and the
-fields may have either of these two types:
-NUM (64-bit unsigned integer between 18,446,744,073,709,551,615),
-or STR (string, any sequence of octets). 
-The identifier of a field is the field's number, base 0.
-For example <quote>0</quote> can be used in some contexts
+fields may have a variety of types.
+The identifier of a field is the field's number, base 1.
+For example <quote>1</quote> can be used in some contexts
 to refer to the first field of a tuple.
 </para>
 <note><para>This manual is following the tarantool client convention by
@@ -113,7 +111,8 @@ that it would be illegal to have the same key value twice.
 An index may have <emphasis>one of three types</emphasis>:
 HASH which is fastest and uses the least memory but must be unique,
 TREE which allows partial-key searching and ordered results,
-and BITSET which can be good for searches that contain '=' and 'AND' in the WHERE clause.
+and BITSET which can be good for searches that contain '=' and 
+multiple  ANDed conditions.
 The first index is called the <emphasis><quote>primary key</quote> index</emphasis>
 and it must be unique; all other indexes are called
 <quote>secondary</quote> indexes.
@@ -121,9 +120,10 @@ and it must be unique; all other indexes are called
 
 <para>
 An index definition may include identifiers of tuple fields and their expected types.
+The allowed types are NUM (64-bit unsigned integer between 0 and 18,446,744,073,709,551,615), or STR (string, any sequence of octets)
 Take our example, which has the request:
-<programlisting>i = s:create_index('primary', {type = 'hash', parts = {0, 'NUM'}})</programlisting>
-The effect is that, for all tuples in space0, field number 0
+<programlisting>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</programlisting>
+The effect is that, for all tuples in space0, field number 1
 must exist and must be a 64-bit unsigned integer.
 </para>
 
@@ -139,7 +139,7 @@ The syntax details for defining spaces and indexes are in chapter 4
 
 <para>
 The basic operations are: the four data-change operations
-(insert, update, update, replace), and the data-retrieval
+(insert, update, delete, replace), and the data-retrieval
 operation (select). There are also minor operations like <quote>ping</quote>
 which can only be used with the binary protocol.
 Also, there are  <olink
@@ -156,19 +156,19 @@ when traversing TREE indexes.)
 Five examples of basic operations:
 <programlisting>
 /* Add a new tuple to tuple set space0.
-   The first field, field[0], will be 999 (type is NUM).
-   The second field, field[1], will be 'Taranto' (type is STR). */
+   The first field, field[1], will be 999 (type is NUM).
+   The second field, field[2], will be 'Taranto' (type is STR). */
 box.space.space0:insert{999, 'Taranto'}
 
-/* Update the tuple, changing field field[1].
+/* Update the tuple, changing field field[2].
    The clause "{999}", which has the value to look up in
    the index of the tuple's primary-key field, is mandatory
    because update() requests must always have a clause that
-   specifies the primary key, which in this case is field[0].
-   The clause "{{'=', 1, 'Tarantino'}}" specifies that assignment
-   will happen to field[1] with the new value.
+   specifies the primary key, which in this case is field[1].
+   The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
+   will happen to field[2] with the new value.
    */
-box.space.space0:update({999}, {{'=', 1, 'Tarantino'}})
+box.space.space0:update({999}, {{'=', 2, 'Tarantino'}})
 
 /* Replace the tuple, adding a new field.
    This is also possible with the update() request but
@@ -189,10 +189,10 @@ box.space.space0:delete{999}
 <para>
 How does Tarantool do a basic operation? Let's take this example:
 <programlisting>
-box.space.space0:update({3}, {{'=', 1, 'size'}, {'=', 2, 0}})
+box.space.space0:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
 </programlisting>
 which, for those who know SQL, is equivalent to a statement like
-UPDATE space0 SET "field[1]" = 'size', "field[2]" = 0 WHERE "field[[0]" = 3
+UPDATE space0 SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
 </para>
 
 <para>
@@ -203,7 +203,7 @@ everything again. The client ships a packet to the server.
 </para>
 <para>
 STEP #2: the server's <quote>transaction processor</quote> thread uses the
-primary-key index on field[0] to find the location of the
+primary-key index on field[1] to find the location of the
 tuple in memory. It determines that the tuple can be updated
 (not much can go wrong when you're merely changing an unindexed
 field value to something shorter).
@@ -269,7 +269,7 @@ so advanced users may be able to start a second Tarantool
 server on the same processor without ill effects.
 </para>
 <para>
-  Additional examples of SQL statements can be found in the <citetitle
+  Additional examples of requests can be found in the <citetitle
   xlink:href="https://github.com/tarantool/tarantool/tree/master/test/box"
   xlink:title="Tarantool regression test suite">Tarantool
   regression test suite</citetitle>. A complete grammar of
@@ -283,7 +283,7 @@ server on the same processor without ill effects.
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename
-  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/protocol.txt</filename>.
+  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</filename>.
 </para>
 
 </section>

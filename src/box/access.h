@@ -57,6 +57,8 @@ priv_name(uint8_t access);
 struct user {
 	/** User id. */
 	uint32_t uid;
+	/** Creator of the user */
+	uint32_t owner;
 	/** User password - hash2 */
 	char hash2[SCRAMBLE_SIZE];
 	/** User name - for error messages and debugging */
@@ -149,5 +151,18 @@ user_cache_init();
 /** Cleanup the user cache and access control subsystem */
 void
 user_cache_free();
+
+/**
+ * This is a clutch until there is a proper index in
+ * _priv space to look up by space id
+ */
+static inline bool
+object_has_grants(uint8_t *access)
+{
+	for (int i = 0; i < BOX_USER_MAX; i++)
+		if (access[i])
+			return true;
+	return false;
+}
 
 #endif /* INCLUDES_TARANTOOL_BOX_ACCESS_H */

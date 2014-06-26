@@ -119,12 +119,9 @@ box.schema.user.revoke('rich', 'read,write', 'universe')
 ...
 box.space['_user']:delete{uid}
 ---
-- [3, '', 'rich', []]
+- [3, 1, 'rich', []]
 ...
 box.schema.user.drop('test')
----
-...
-session = nil
 ---
 ...
 --------------------------------------------------------------------------------
@@ -133,23 +130,23 @@ session = nil
 -- invalid identifiers
 box.schema.user.create('invalid.identifier')
 ---
-- error: Invalid identifier 'invalid.identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid.identifier' (expected letters, digits or an underscore)
 ...
 box.schema.user.create('invalid identifier')
 ---
-- error: Invalid identifier 'invalid identifier' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'invalid identifier' (expected letters, digits or an underscore)
 ...
 box.schema.user.create('user ')
 ---
-- error: Invalid identifier 'user ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier 'user ' (expected letters, digits or an underscore)
 ...
 box.schema.user.create('5')
 ---
-- error: Invalid identifier '5' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier '5' (expected letters, digits or an underscore)
 ...
 box.schema.user.create(' ')
 ---
-- error: Invalid identifier ' ' (expected [a-zA-Z_][a-zA-Z0-9_]*)
+- error: Invalid identifier ' ' (expected letters, digits or an underscore)
 ...
 -- valid identifiers
 box.schema.user.create('Петя_Иванов')
@@ -181,5 +178,107 @@ c:call('nosuchfunction')
 - error: Procedure 'nosuchfunction' is not defined
 ...
 c:close()
+---
+...
+-- Dropping a space recursively drops all grants - it's possible to 
+-- restore from a snapshot
+box.schema.user.create('testus')
+---
+...
+s = box.schema.create_space('admin_space')
+---
+...
+s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+---
+...
+box.schema.user.grant('testus', 'write', 'space', 'admin_space')
+---
+...
+s:drop()
+---
+...
+box.snapshot()
+---
+- ok
+...
+--# stop server default
+--# start server default
+box.schema.user.drop('testus')
+---
+...
+-- ------------------------------------------------------------
+-- a test case for gh-289
+-- box.schema.user.drop() with cascade doesn't work
+-- ------------------------------------------------------------
+session = require('session')
+---
+...
+box.schema.user.create('uniuser')
+---
+...
+box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+---
+...
+session.su('uniuser')
+---
+...
+us = box.schema.create_space('uniuser_space')
+---
+...
+session.su('admin')
+---
+...
+box.schema.user.drop('uniuser')
+---
+...
+-- ------------------------------------------------------------
+-- A test case for gh-253
+-- A user with universal grant has no access to drop oneself
+-- ------------------------------------------------------------
+-- This behaviour is expected, since an object may be destroyed
+-- only by its creator at the moment
+-- ------------------------------------------------------------
+box.schema.user.create('grantor')
+---
+...
+box.schema.user.grant('grantor', 'read, write, execute', 'universe')  
+---
+...
+session.su('grantor')
+---
+...
+box.schema.user.create('grantee')
+---
+...
+box.schema.user.grant('grantee', 'read, write, execute', 'universe')  
+---
+- error: Read access denied for user 'grantor'
+...
+session.su('grantee')
+---
+...
+-- fails - can't suicide - ask the creator to kill you
+box.schema.user.drop('grantee')
+---
+- error: Read access denied for user 'grantee' to space '_user'
+...
+session.su('grantor')
+---
+...
+box.schema.user.drop('grantee')
+---
+...
+-- fails, can't kill oneself
+box.schema.user.drop('grantor')
+---
+- error: Create or drop access denied for user 'grantor'
+...
+session.su('admin')
+---
+...
+box.schema.user.drop('grantor')
+---
+...
+session = nil
 ---
 ...

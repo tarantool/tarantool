@@ -3,7 +3,7 @@ os.execute("rm -rf sophia")
 --# start server default
 
 space = box.schema.create_space('tweedledum', { id = 123, engine = 'sophia' })
-space:create_index('primary', { type = 'tree', parts = {0, 'num'} })
+space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 
 for v=1, 10 do space:insert({v}) end
 
@@ -27,4 +27,5 @@ for v=1, 10 do table.insert(t, space:get({v})) end
 t
 
 space:drop()
+box.snapshot()
 os.execute("rm -rf sophia")

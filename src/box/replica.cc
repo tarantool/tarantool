@@ -38,10 +38,13 @@
 #include "coio_buf.h"
 #include "recovery.h"
 #include "tarantool.h"
+#include "scoped_guard.h"
 #include "iproto.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
+#include "scramble.h"
+#include "third_party/base64.h"
 
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
@@ -113,30 +116,78 @@ error:
 	iproto_header_decode(row, &data, data + len);
 }
 
+static int
+request_encode_auth(const char *greeting, const char *login,
+		    const char *password, struct iovec *iov)
+{
+	uint32_t login_len = strlen(login);
+	uint32_t password_len = strlen(password);
+
+	enum { PACKET_LEN_MAX = 128 };
+	size_t buf_size = PACKET_LEN_MAX + login_len + SCRAMBLE_SIZE;
+	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
+
+	char salt[SCRAMBLE_SIZE];
+	char scramble[SCRAMBLE_SIZE];
+	if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
+			  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
+		panic("invalid salt: %64s", greeting + 64);
+	scramble_prepare(scramble, salt, password, password_len);
+
+	char *d = buf;
+	d = mp_encode_map(d, 2);
+	d = mp_encode_uint(d, IPROTO_USER_NAME);
+	d = mp_encode_str(d, login, login_len);
+	d = mp_encode_uint(d, IPROTO_TUPLE);
+	d = mp_encode_array(d, 2);
+	d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
+	d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
+
+	assert(d <= buf + buf_size);
+	iov[0].iov_base = buf;
+	iov[0].iov_len = (d - buf);
+	return 1;
+}
+
 void
-replica_bootstrap(struct recovery_state *r, const char *replication_source)
+replica_bootstrap(struct recovery_state *r)
 {
 	say_info("bootstrapping a replica");
+	assert(recovery_has_remote(r));
 
-	recovery_begin_recover_snapshot(r);
-
-	/* Generate Node-UUID */
-	tt_uuid_create(&r->node_uuid);
+	/* Generate Server-UUID */
+	tt_uuid_create(&r->server_uuid);
 
 	char greeting[IPROTO_GREETING_SIZE];
 
-	port_uri uri;
-	if (!port_uri_parse(&uri, replication_source)) {
-		panic("Broken replication_source url: %s", replication_source);
-	}
+	uint64_t sync = rand();
+	struct iovec iov[IPROTO_ROW_IOVMAX];
+	struct iproto_header row;
 
-	int master = sio_socket(uri.addr.sa_family, SOCK_STREAM, IPPROTO_TCP);
+	int master = sio_socket(r->remote.uri.addr.sa_family,
+				SOCK_STREAM, IPPROTO_TCP);
 	FDGuard guard(master);
 
-	uint64_t sync = rand();
+	sio_connect(master, &r->remote.uri.addr, r->remote.uri.addr_len);
+	sio_readn(master, greeting, sizeof(greeting));
+
+	if (*r->remote.uri.login) {
+		/* Authenticate */
+		memset(&row, sizeof(row), 0);
+		row.type = IPROTO_AUTH;
+		row.bodycnt =
+			request_encode_auth(greeting, r->remote.uri.login,
+					    r->remote.uri.password,
+					    row.body);
+		int iovcnt = iproto_row_encode(&row, iov);
+		sio_writev_all(master, iov, iovcnt);
+		remote_read_row_fd(master, &row);
+		iproto_decode_error(&row); /* auth failed */
+		/* auth successed */
+		say_info("authenticated with master");
+	}
 
 	/* Send JOIN request */
-	struct iproto_header row;
 	memset(&row, 0, sizeof(struct iproto_header));
 	row.type = IPROTO_JOIN;
 	row.sync = sync;
@@ -144,48 +195,78 @@ replica_bootstrap(struct recovery_state *r, const char *replication_source)
 	char buf[128];
 	char *data = buf;
 	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_strl(data, UUID_LEN);
-	tt_uuid_enc_be(&recovery_state->node_uuid, data);
-	data += UUID_LEN;
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
+	/* Greet the remote server with our server UUID */
+	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
 
 	assert(data <= buf + sizeof(buf));
 	row.body[0].iov_base = buf;
 	row.body[0].iov_len = (data - buf);
 	row.bodycnt = 1;
-	char fixheader[IPROTO_FIXHEADER_SIZE];
-	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&row, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov);
 
-	sio_connect(master, &uri.addr, uri.addr_len);
-	sio_readn(master, greeting, sizeof(greeting));
 	sio_writev_all(master, iov, iovcnt);
+
+	/* Add a surrogate server id for snapshot rows */
+	vclock_add_server(&r->vclock, 0);
 
 	while (true) {
 		remote_read_row_fd(master, &row);
 
-		/* Recv JOIN response (= end of stream) */
-		if (row.type == IPROTO_JOIN) {
+		if (iproto_request_is_dml(row.type)) {
+			/* Regular snapshot row  (IPROTO_INSERT) */
+			recovery_process(r, &row);
+		} else if (row.type == IPROTO_JOIN) {
+			/* End of stream */
 			say_info("done");
 			break;
+		} else {
+			iproto_decode_error(&row);  /* rethrow error */
 		}
-
-		recovery_process(r, &row);
 	}
 
-	recovery_end_recover_snapshot(r);
+	/* Decode end of stream packet */
+	struct vclock vclock;
+	vclock_create(&vclock);
+	auto vclock_guard = make_scoped_guard([&]{ vclock_destroy(&vclock); });
+	assert(row.type == IPROTO_JOIN);
+	iproto_decode_eos(&row, &vclock);
+
+	/* Replace server vclock using data from snapshot */
+	vclock_copy(&r->vclock, &vclock);
+
 	/* master socket closed by guard */
 }
 
 static void
-remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
+remote_connect(struct recovery_state *r, struct ev_io *coio,
+	       struct iobuf *iobuf, const char **err)
 {
 	char greeting[IPROTO_GREETING_SIZE];
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
+	struct port_uri *uri = &r->remote.uri;
+
 	*err = "can't connect to master";
-	coio_connect(coio, &r->remote->uri.addr, r->remote->uri.addr_len);
+	coio_connect(coio, &uri->addr, uri->addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
+
+	if (*r->remote.uri.login) {
+		/* Authenticate */
+		say_debug("authenticating...");
+		struct iproto_header row;
+		memset(&row, sizeof(row), 0);
+		row.type = IPROTO_AUTH;
+		row.bodycnt = request_encode_auth(greeting, uri->login,
+						  uri->password, row.body);
+		struct iovec iov[IPROTO_ROW_IOVMAX];
+		int iovcnt = iproto_row_encode(&row, iov);
+		coio_writev(coio, iov, iovcnt, 0);
+		remote_read_row(coio, iobuf, &row);
+		iproto_decode_error(&row); /* auth failed */
+		/* auth successed */
+		say_info("authenticated");
+	}
 
 	/* Send SUBSCRIBE request */
 	struct iproto_header row;
@@ -199,26 +280,21 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,const char **err)
 	char *data = buf;
 	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = mp_encode_strl(data, UUID_LEN);
-	tt_uuid_enc_be(cluster_id(), data);
-	data += UUID_LEN;
-	data = mp_encode_uint(data, IPROTO_NODE_UUID);
-	data = mp_encode_strl(data, UUID_LEN);
-	tt_uuid_enc_be(&recovery_state->node_uuid, data);
-	data += UUID_LEN;
-	data = mp_encode_uint(data, IPROTO_LSNMAP);
+	data = iproto_encode_uuid(data, &cluster_id);
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
+	data = iproto_encode_uuid(data, &recovery_state->server_uuid);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_map(data, cluster_size);
-	vclock_foreach(&r->vclock, it) {
-		data = mp_encode_uint(data, it.node_id);
-		data = mp_encode_uint(data, it.lsn);
+	vclock_foreach(&r->vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
 	}
 	assert(data <= buf + size);
 	row.body[0].iov_base = buf;
 	row.body[0].iov_len = (data - buf);
 	row.bodycnt = 1;
-	char fixheader[IPROTO_FIXHEADER_SIZE];
 	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&row, iov, fixheader);
+	int iovcnt = iproto_row_encode(&row, iov);
 	coio_writev(coio, iov, iovcnt, 0);
 
 	say_crit("connected to master");
@@ -241,23 +317,25 @@ pull_from_remote(va_list ap)
 		try {
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
-				title("replica", "%s/%s", r->remote->source,
+				title("replica", "%s/%s", r->remote.source,
 				      "connecting");
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber()));
-				remote_connect(r, &coio, &err);
+				remote_connect(r, &coio, iobuf, &err);
 				warning_said = false;
-				title("replica", "%s/%s", r->remote->source,
+				title("replica", "%s/%s", r->remote.source,
 				      "connected");
 			}
 			err = "can't read row";
 			struct iproto_header row;
 			remote_read_row(&coio, iobuf, &row);
+			if (!iproto_request_is_dml(row.type))
+				iproto_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;
 
-			r->remote->recovery_lag = ev_now(loop) - row.tm;
-			r->remote->recovery_last_update_tstamp =
+			r->remote.recovery_lag = ev_now(loop) - row.tm;
+			r->remote.recovery_last_update_tstamp =
 				ev_now(loop);
 
 			recovery_process(r, &row);
@@ -265,12 +343,12 @@ pull_from_remote(va_list ap)
 			iobuf_reset(iobuf);
 			fiber_gc();
 		} catch (FiberCancelException *e) {
-			title("replica", "%s/%s", r->remote->source, "failed");
+			title("replica", "%s/%s", r->remote.source, "failed");
 			iobuf_delete(iobuf);
 			evio_close(loop, &coio);
 			throw;
 		} catch (Exception *e) {
-			title("replica", "%s/%s", r->remote->source, "failed");
+			title("replica", "%s/%s", r->remote.source, "failed");
 			e->log();
 			if (! warning_said) {
 				if (err != NULL)
@@ -300,15 +378,16 @@ pull_from_remote(va_list ap)
 }
 
 void
-recovery_follow_remote(struct recovery_state *r, const char *uri)
+recovery_follow_remote(struct recovery_state *r)
 {
 	char name[FIBER_NAME_MAX];
 	struct fiber *f;
 
-	assert(r->remote == NULL);
+	assert(r->remote.reader == NULL);
+	assert(recovery_has_remote(r));
 
-	say_crit("initializing the replica, WAL master %s", uri);
-	snprintf(name, sizeof(name), "replica/%s", uri);
+	say_crit("starting replication from %s", r->remote.source);
+	snprintf(name, sizeof(name), "replica/%s", r->remote.source);
 
 	try {
 		f = fiber_new(name, pull_from_remote);
@@ -316,18 +395,7 @@ recovery_follow_remote(struct recovery_state *r, const char *uri)
 		return;
 	}
 
-
-
-	static struct remote remote;
-	memset(&remote, 0, sizeof(remote));
-	if (!port_uri_parse(&remote.uri, uri)) {
-		say_error("Can't parse uri: %s", uri);
-		return;
-	}
-
-	remote.reader = f;
-	snprintf(remote.source, sizeof(remote.source), "%s", uri);
-	r->remote = &remote;
+	r->remote.reader = f;
 	fiber_call(f, r);
 }
 
@@ -335,6 +403,32 @@ void
 recovery_stop_remote(struct recovery_state *r)
 {
 	say_info("shutting down the replica");
-	fiber_cancel(r->remote->reader);
-	r->remote = NULL;
+	fiber_cancel(r->remote.reader);
+	r->remote.reader = NULL;
 }
+
+void
+recovery_set_remote(struct recovery_state *r, const char *uri)
+{
+	/* First, stop the reader, then set the source */
+	assert(r->remote.reader == NULL);
+	if (uri == NULL) {
+		r->remote.source[0] = '\0';
+		return;
+	}
+	/*
+	 * @todo: as long as DNS is involved, this may fail even
+	 * on a valid uri. Don't panic in this case.
+	 */
+	if (port_uri_parse(&r->remote.uri, uri))
+		panic("Can't parse uri: %s", uri);
+	snprintf(r->remote.source,
+		 sizeof(r->remote.source), "%s", uri);
+}
+
+bool
+recovery_has_remote(struct recovery_state *r)
+{
+	return r->remote.source[0];
+}
+

@@ -6,10 +6,8 @@ space:create_index('primary', { type = 'hash' })
 
 --# push filter 'primary_port: .*' to 'primary_port: <number>'
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
-box.stat()
 help()
 box.cfg
-box.stat()
 space:insert{1, 'tuple'}
 box.snapshot()
 space:delete{1}

@@ -32,7 +32,6 @@
 
 #include <errcode.h>
 #include "recovery.h"
-#include "replica.h"
 #include "log_io.h"
 #include <say.h>
 #include <admin.h>
@@ -119,18 +118,6 @@ recover_row(void *param __attribute__((unused)), struct iproto_header *row)
 	process_rw(&null_port, &request);
 }
 
-static void
-box_enter_master_or_replica_mode(const char *replication_source)
-{
-	box_process = process_rw;
-	if (replication_source != NULL) {
-		recovery_follow_remote(recovery_state, replication_source);
-	} else {
-		title("primary", NULL);
-		say_info("I am primary");
-	}
-}
-
 /* {{{ configuration bindings */
 
 void
@@ -138,16 +125,10 @@ box_check_replication_source(const char *source)
 {
 	if (source == NULL)
 		return;
-	/* check replication port */
-	char ip_addr[32];
-	int port;
-	if (sscanf(source, "%31[^:]:%i", ip_addr, &port) != 2) {
+	struct port_uri uri;
+	if (port_uri_parse(&uri, source)) {
 		tnt_raise(ClientError, ER_CFG,
-			  "replication source IP address is not recognized");
-	}
-	if (port <= 0 || port >= USHRT_MAX) {
-		tnt_raise(ClientError, ER_CFG,
-			  "invalid replication source port");
+			  "incorrect replication source");
 	}
 }
 
@@ -165,8 +146,6 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-	/* check replication mode */
-	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check primary port */
 	int primary_port = cfg_geti("primary_port");
@@ -185,17 +164,19 @@ extern "C" void
 box_set_replication_source(const char *source)
 {
 	box_check_replication_source(source);
-	bool old_is_replica = recovery_state->remote;
+	bool old_is_replica = recovery_state->remote.reader;
 	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(source, recovery_state->remote->source) != 0))) {
+	     (strcmp(source, recovery_state->remote.source) != 0))) {
 
 		if (recovery_state->finalize) {
-			if (recovery_state->remote)
+			if (old_is_replica)
 				recovery_stop_remote(recovery_state);
-			box_enter_master_or_replica_mode(source);
+			recovery_set_remote(recovery_state, source);
+			if (recovery_has_remote(recovery_state))
+				recovery_follow_remote(recovery_state);
 		} else {
 			/*
 			 * Do nothing, we're in local hot
@@ -262,10 +243,60 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	}
 
 	recovery_finalize(recovery_state);
+	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
-	box_enter_master_or_replica_mode(cfg_gets("replication_source"));
+	box_process = process_rw;
+	if (recovery_has_remote(recovery_state))
+		recovery_follow_remote(recovery_state);
+
+	title("primary", NULL);
+	say_info("I am primary");
+}
+
+/**
+ * Execute a request against a given space id with
+ * a variable-argument tuple described in format.
+ *
+ * @example: you want to insert 5 into space 1:
+ * boxk(IPROTO_INSERT, 1, "%u", 5);
+ *
+ * @note Since this is for internal use, it has
+ * no boundary or misuse checks.
+ */
+void
+boxk(enum iproto_request_type type, uint32_t space_id,
+     const char *format, ...)
+{
+	struct request req;
+	va_list ap;
+	request_create(&req, type);
+	req.space_id = space_id;
+	char buf[128];
+	char *data = buf;
+	data = mp_encode_array(data, strlen(format)/2);
+	va_start(ap, format);
+	while (*format) {
+		switch (*format++) {
+		case 'u':
+			data = mp_encode_uint(data, va_arg(ap, unsigned));
+			break;
+		case 's':
+		{
+			char *arg = va_arg(ap, char *);
+			data = mp_encode_str(data, arg, strlen(arg));
+			break;
+		}
+		default:
+			break;
+		}
+	}
+	va_end(ap);
+	assert(data <= buf + sizeof(buf));
+	req.tuple = buf;
+	req.tuple_end = data;
+	process_rw(&null_port, &req);
 }
 
 /**
@@ -278,48 +309,47 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 static void
 box_on_cluster_join(const tt_uuid *node_uuid)
 {
+	/** Find the largest existing node id. */
 	struct space *space = space_cache_find(SC_CLUSTER_ID);
 	class Index *index = index_find(space, 0);
 	struct iterator *it = index->position();
 	index->initIterator(it, ITER_LE, NULL, 0);
 	struct tuple *tuple = it->next(it);
-	uint32_t node_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	/** Assign a new node id. */
+	uint32_t server_id = tuple ? tuple_field_u32(tuple, 0) + 1 : 1;
+	if (server_id >= VCLOCK_MAX)
+		tnt_raise(ClientError, ER_REPLICA_MAX, server_id);
 
-	struct request req;
-	request_create(&req, IPROTO_INSERT);
-	req.space_id = SC_CLUSTER_ID;
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_array(data, 2);
-	data = mp_encode_uint(data, node_id);
-	data = mp_encode_str(data, tt_uuid_str(node_uuid), UUID_STR_LEN);
-	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
-	process_rw(&null_port, &req);
+	boxk(IPROTO_INSERT, SC_CLUSTER_ID, "%u%s",
+	     (unsigned) server_id, tt_uuid_str(node_uuid));
 }
 
+/** Replace the current node id in _cluster */
+static void
+box_set_node_uuid()
+{
+	tt_uuid_create(&recovery_state->server_uuid);
+	assert(recovery_state->server_id == 0);
+	if (vclock_has(&recovery_state->vclock, 1))
+		vclock_del_server(&recovery_state->vclock, 1);
+	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
+	     1, tt_uuid_str(&recovery_state->server_uuid));
+	/* Remove surrogate node */
+	vclock_del_server(&recovery_state->vclock, 0);
+	assert(recovery_state->server_id == 1);
+	assert(vclock_has(&recovery_state->vclock, 1));
+}
+
+/** Insert a new cluster into _schema */
 static void
 box_set_cluster_uuid()
 {
-	/* Save Cluster-UUID to _schema space */
-	tt_uuid cluster_uuid;
-	tt_uuid_create(&cluster_uuid);
-
-	const char *key = "cluster";
-	struct request req;
-	request_create(&req, IPROTO_INSERT);
-	req.space_id = SC_SCHEMA_ID;
-	char buf[128];
-	char *data = buf;
-	data = mp_encode_array(data, 2);
-	data = mp_encode_str(data, key, strlen(key));
-	data = mp_encode_str(data, tt_uuid_str(&cluster_uuid), UUID_STR_LEN);
-	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
-
-	process_rw(&null_port, &req);
+	tt_uuid uu;
+	/* Generate a new cluster UUID */
+	tt_uuid_create(&uu);
+	/* Save cluster UUID in _schema */
+	boxk(IPROTO_REPLACE, SC_SCHEMA_ID, "%s%s", "cluster",
+	     tt_uuid_str(&uu));
 }
 
 void
@@ -366,6 +396,7 @@ box_init()
 	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
 		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
 		      cfg_geti("rows_per_wal"));
+	recovery_set_remote(recovery_state, cfg_gets("replication_source"));
 	recovery_update_io_rate_limit(recovery_state,
 				      cfg_getd("snap_io_rate_limit"));
 	recovery_setup_panic(recovery_state,
@@ -375,25 +406,24 @@ box_init()
 	stat_base = stat_register(iproto_request_type_strs,
 				  IPROTO_DML_REQUEST_MAX);
 
-	const char *replication_source = cfg_gets("replication_source");
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
 		recover_snap(recovery_state);
-	} else if (replication_source != NULL) {
+	} else if (recovery_has_remote(recovery_state)) {
 		/* Initialize a new replica */
-		replica_bootstrap(recovery_state, replication_source);
+		replica_bootstrap(recovery_state);
 		snapshot_save(recovery_state);
 	} else {
 		/* Initialize a master node of a new cluster */
-		cluster_bootstrap(recovery_state);
+		recovery_bootstrap(recovery_state);
 		box_set_cluster_uuid();
+		box_set_node_uuid();
 		snapshot_save(recovery_state);
 	}
 
 	space_end_recover_snapshot();
 	space_end_recover();
 
-	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
 	title("orphan", NULL);
 	recovery_follow_local(recovery_state,
 			      cfg_getd("wal_dir_rescan_delay"));
