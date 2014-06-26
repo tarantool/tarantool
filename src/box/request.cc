@@ -38,18 +38,8 @@
 #include <fiber.h>
 #include <scoped_guard.h>
 #include <third_party/base64.h>
-#include "access.h"
 #include "authentication.h"
-
-static inline void
-access_check_space(uint8_t access, struct user *user, struct space *space)
-{
-	if (access && space->def.uid != user->uid && user->uid != ADMIN &&
-	    access & ~space->access[user->auth_token]) {
-		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->name, space->def.name);
-	}
-}
+#include "access.h"
 
 #if 0
 static const char *
@@ -93,17 +83,9 @@ static void
 execute_replace(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
-	struct user *user = user();
-	/*
-	 * If a user has a global permission, clear the respective
-	 * privilege from the list of privileges required
-	 * to execute the request.
-	 */
-	uint8_t access = PRIV_W & ~user->universal_access;
-
 	struct space *space = space_cache_find(request->space_id);
 
-	access_check_space(access, user, space);
+	space_check_access(space, PRIV_W);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
 	TupleGuard guard(new_tuple);
@@ -119,14 +101,12 @@ execute_update(struct request *request, struct txn *txn,
 	       struct port *port)
 {
 	(void) port;
-	struct user *user = user();
-	uint8_t access = PRIV_W & ~user->universal_access;
 
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
 
 	struct space *space = space_cache_find(request->space_id);
-	access_check_space(access, user, space);
+	space_check_access(space, PRIV_W);
 	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
 	const char *key = request->key;
@@ -153,11 +133,8 @@ static void
 execute_delete(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) port;
-	struct user *user = user();
-	uint8_t access = PRIV_W & ~user->universal_access;
-
 	struct space *space = space_cache_find(request->space_id);
-	access_check_space(access, user, space);
+	space_check_access(space, PRIV_W);
 
 	/* Try to find tuple by primary key */
 	Index *pk = index_find(space, 0);
@@ -177,10 +154,8 @@ static void
 execute_select(struct request *request, struct txn *txn, struct port *port)
 {
 	(void) txn;
-	struct user *user = user();
-	uint8_t access = PRIV_R & ~user->universal_access;
 	struct space *space = space_cache_find(request->space_id);
-	access_check_space(access, user, space);
+	space_check_access(space, PRIV_R);
 	Index *index = index_find(space, request->index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);

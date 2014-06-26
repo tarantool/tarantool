@@ -31,6 +31,7 @@
 #include "box/index.h"
 #include "box/space.h"
 #include "box/schema.h"
+#include "box/access.h"
 #include "box/lua/tuple.h"
 #include "fiber.h"
 #include "tbuf.h"
@@ -148,6 +149,7 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	enum iterator_type itype = (enum iterator_type) type;
 	try {
 		struct space *space = space_cache_find(space_id);
+		space_check_access(space, PRIV_R);
 		Index *index = index_find(space, index_id);
 		assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 		uint32_t part_count = mp_decode_array(&key);
@@ -155,7 +157,7 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
 		return it;
-	} catch(Exception *) {
+	} catch (Exception *) {
 		if (it)
 			it->free(it);
 		/* will be hanled by box.raise() in Lua */

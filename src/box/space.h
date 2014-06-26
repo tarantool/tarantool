@@ -81,6 +81,12 @@ struct space {
 	Index *index[];
 };
 
+/** Check whether or not the current user can be granted
+ * the requested access to the space.
+ */
+void
+space_check_access(struct space *space, uint8_t access);
+
 /** Get space ordinal number. */
 static inline uint32_t
 space_id(struct space *space) { return space->def.id; }

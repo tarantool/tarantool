@@ -478,13 +478,11 @@ s:select()
 ...
 for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
+- error: Read access denied for user 'testuser' to space 'glade'
 ...
 t
 ---
-- - [1, 'A']
-  - [2, 'B']
-  - [3, 'C']
-  - [4, 'D']
+- []
 ...
 t = {}
 ---
@@ -525,11 +523,11 @@ s:select()
 ...
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
+- error: Read access denied for user 'guest' to space 'glade'
 ...
 t
 ---
-- - [3, 'C']
-  - [4, 'D']
+- []
 ...
 t = {}
 ---
@@ -543,11 +541,11 @@ s:select()
 ...
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
 ---
+- error: Read access denied for user 'guest' to space 'glade'
 ...
 t
 ---
-- - [3, 'C']
-  - [4, 'D']
+- []
 ...
 session.su('admin')
 ---

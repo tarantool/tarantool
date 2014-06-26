@@ -33,6 +33,25 @@
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "trigger.h"
+#include "access.h"
+
+void
+space_check_access(struct space *space, uint8_t access)
+{
+	struct user *user = user();
+	/*
+	 * If a user has a global permission, clear the respective
+	 * privilege from the list of privileges required
+	 * to execute the request.
+	 */
+	access &= ~user->universal_access;
+	if (access && space->def.uid != user->uid && user->uid != ADMIN &&
+	    access & ~space->access[user->auth_token]) {
+		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
+			  priv_name(access), user->name, space->def.name);
+	}
+}
+
 
 void
 space_fill_index_map(struct space *space)
