@@ -78,7 +78,7 @@ s:select()
 box.schema.user.create('uniuser')
 box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 session.su('uniuser')
-if session.uid() < 2 then return 'uid error' end
+uid = session.uid()
 --
 -- Check universal user
 -- Check delete currently authenticated user
@@ -128,7 +128,7 @@ box.schema.func.drop('uniuser_func')
 box.schema.user.drop('someuser')
 box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
-box.space._user:delete(2)
+box.space._user:delete(uid)
 s:drop()
 --
 -- Check write grant on _user
@@ -137,14 +137,15 @@ box.schema.user.create('testuser')
 
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
+testuser_uid = session.uid()
 box.space._user:delete(2)
 box.space._user:select(1)
-box.space._user:insert{3, session.uid(), 'someone', 'user'}
-box.space._user:delete(3)
+uid = box.space._user:insert{4, session.uid(), 'someone', 'user'}[1]
+box.space._user:delete(4)
 
 session.su('admin')
 box.space._user:select(1)
-box.space._user:delete(3)
+box.space._user:delete(testuser_uid)
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 --
 -- Check read grant on _user
@@ -215,6 +216,7 @@ for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v)
 t
 
 session.su('admin')
+box.schema.user.drop('testuser')
 
 s:drop()
 

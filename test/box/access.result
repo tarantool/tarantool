@@ -82,7 +82,7 @@ end;
 ...
 usermax();
 ---
-- error: User 'user30' does not exist
+- error: User 'user29' does not exist
 ...
 --# setopt delimiter ''
 box.schema.user.create('rich')
@@ -119,7 +119,7 @@ box.schema.user.revoke('rich', 'read,write', 'universe')
 ...
 box.space['_user']:delete{uid}
 ---
-- [3, 1, 'rich', 'user', []]
+- [4, 1, 'rich', 'user', []]
 ...
 box.schema.user.drop('test')
 ---
@@ -299,6 +299,37 @@ box.space._user:select{1}
 ...
 session.su('admin')
 ---
+...
+-- ----------------------------------------------------------
+-- A test case for gh-358 Change user does not work from lua
+-- Correct the update syntax in schema.lua
+-- ----------------------------------------------------------
+box.schema.user.create('user1')
+---
+...
+box.space._user.index.name:select{'user1'}
+---
+- - [3, 1, 'user1', 'user', []]
+...
+session.su('user1')
+---
+...
+box.schema.user.passwd('new_password')
+---
+...
+session.su('admin')
+---
+...
+box.space._user.index.name:select{'user1'}
+---
+- - [3, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
+...
+box.schema.user.drop('user1')
+---
+...
+box.space._user.index.name:select{'user1'}
+---
+- []
 ...
 session = nil
 ---

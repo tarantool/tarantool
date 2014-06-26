@@ -192,7 +192,7 @@ box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 session.su('uniuser')
 ---
 ...
-if session.uid() < 2 then return 'uid error' end
+uid = session.uid()
 ---
 ...
 --
@@ -306,7 +306,7 @@ box.schema.user.drop('uniuser_testus')
 box.schema.user.drop('uniuser')
 ---
 ...
-box.space._user:delete(2)
+box.space._user:delete(uid)
 ---
 ...
 s:drop()
@@ -324,6 +324,9 @@ box.schema.user.grant('testuser', 'write', 'space', '_user')
 session.su('testuser')
 ---
 ...
+testuser_uid = session.uid()
+---
+...
 box.space._user:delete(2)
 ---
 - error: Create or drop access denied for user 'testuser'
@@ -332,13 +335,12 @@ box.space._user:select(1)
 ---
 - error: Read access denied for user 'testuser' to space '_user'
 ...
-box.space._user:insert{3, session.uid(), 'someone', 'user'}
+uid = box.space._user:insert{4, session.uid(), 'someone', 'user'}[1]
 ---
-- [3, 2, 'someone', 'user']
 ...
-box.space._user:delete(3)
+box.space._user:delete(4)
 ---
-- [3, 2, 'someone', 'user']
+- [4, 3, 'someone', 'user']
 ...
 session.su('admin')
 ---
@@ -347,8 +349,9 @@ box.space._user:select(1)
 ---
 - - [1, 1, 'admin', 'user']
 ...
-box.space._user:delete(3)
+box.space._user:delete(testuser_uid)
 ---
+- error: 'Failed to drop user ''testuser'': the user has objects'
 ...
 box.schema.user.revoke('testuser', 'write', 'space', '_user')
 ---
@@ -550,6 +553,9 @@ t
 session.su('admin')
 ---
 ...
+box.schema.user.drop('testuser')
+---
+...
 s:drop()
 ---
 ...
@@ -557,7 +563,7 @@ box.space._user:select()
 ---
 - - [0, 1, 'guest', 'user']
   - [1, 1, 'admin', 'user']
-  - [2, 1, 'testuser', 'user', []]
+  - [2, 1, 'public', 'role']
 ...
 box.space._space:select()
 ---

@@ -139,8 +139,11 @@ session.su('admin')
 -- Correct the update syntax in schema.lua
 -- ----------------------------------------------------------
 box.schema.user.create('user1')
+box.space._user.index.name:select{'user1'}
 session.su('user1')
 box.schema.user.passwd('new_password')
 session.su('admin')
+box.space._user.index.name:select{'user1'}
 box.schema.user.drop('user1')
+box.space._user.index.name:select{'user1'}
 session = nil
