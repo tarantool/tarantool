@@ -280,6 +280,26 @@ session.su('admin')
 box.schema.user.drop('grantor')
 ---
 ...
+-- ----------------------------------------------------------
+-- A test case for gh-299
+-- It appears to be too easy to read all fields in _user
+-- table
+-- guest can't read _user table, add a test case
+-- ----------------------------------------------------------
+session.su('guest')
+---
+...
+box.space._user:select{0}
+---
+- error: Read access denied for user 'guest' to space '_user'
+...
+box.space._user:select{1}
+---
+- error: Read access denied for user 'guest' to space '_user'
+...
+session.su('admin')
+---
+...
 session = nil
 ---
 ...

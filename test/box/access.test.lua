@@ -124,4 +124,14 @@ box.schema.user.drop('grantee')
 box.schema.user.drop('grantor')
 session.su('admin')
 box.schema.user.drop('grantor')
+-- ----------------------------------------------------------
+-- A test case for gh-299
+-- It appears to be too easy to read all fields in _user
+-- table
+-- guest can't read _user table, add a test case
+-- ----------------------------------------------------------
+session.su('guest')
+box.space._user:select{0}
+box.space._user:select{1}
+session.su('admin')
 session = nil
