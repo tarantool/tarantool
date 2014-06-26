@@ -33,6 +33,8 @@
 #include "crc32.h"
 #include "tt_uuid.h"
 #include "box/vclock.h"
+#include "scramble.h"
+#include "third_party/base64.h"
 
 const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 {
@@ -317,6 +319,42 @@ iproto_row_encode(const struct iproto_header *row,
 }
 
 void
+iproto_encode_auth(struct iproto_header *packet, const char *greeting,
+		   const char *login, const char *password)
+{
+	memset(packet, sizeof(*packet), 0);
+
+	uint32_t login_len = strlen(login);
+	uint32_t password_len = strlen(password);
+
+	enum { PACKET_LEN_MAX = 128 };
+	size_t buf_size = PACKET_LEN_MAX + login_len + SCRAMBLE_SIZE;
+	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
+
+	char salt[SCRAMBLE_SIZE];
+	char scramble[SCRAMBLE_SIZE];
+	if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
+			  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
+		panic("invalid salt: %64s", greeting + 64);
+	scramble_prepare(scramble, salt, password, password_len);
+
+	char *d = buf;
+	d = mp_encode_map(d, 2);
+	d = mp_encode_uint(d, IPROTO_USER_NAME);
+	d = mp_encode_str(d, login, login_len);
+	d = mp_encode_uint(d, IPROTO_TUPLE);
+	d = mp_encode_array(d, 2);
+	d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
+	d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
+
+	assert(d <= buf + buf_size);
+	packet->body[0].iov_base = buf;
+	packet->body[0].iov_len = (d - buf);
+	packet->bodycnt = 1;
+	packet->type = IPROTO_AUTH;
+}
+
+void
 iproto_decode_error(struct iproto_header *row)
 {
 	uint32_t code = row->type >> 8;
@@ -358,15 +396,44 @@ raise:
 }
 
 void
-iproto_decode_subscribe(struct iproto_header *packet,
-			struct tt_uuid *cluster_uuid,
+iproto_encode_subscribe(struct iproto_header *row,
+			const struct tt_uuid *cluster_uuid,
+			const struct tt_uuid *server_uuid,
+			const struct vclock *vclock)
+{
+	memset(row, 0, sizeof(*row));
+	uint32_t cluster_size = vclock_size(vclock);
+	size_t size = 128 + cluster_size *
+		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 3);
+	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
+	data = iproto_encode_uuid(data, cluster_uuid);
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
+	data = iproto_encode_uuid(data, server_uuid);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_map(data, cluster_size);
+	vclock_foreach(vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
+	}
+	assert(data <= buf + size);
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	row->type = IPROTO_SUBSCRIBE;
+}
+
+void
+iproto_decode_subscribe(struct iproto_header *row, struct tt_uuid *cluster_uuid,
 			struct tt_uuid *server_uuid, struct vclock *vclock)
 {
-	if (packet->bodycnt == 0)
+	if (row->bodycnt == 0)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
-	assert(packet->bodycnt == 1);
-	const char *data = (const char *) packet->body[0].iov_base;
-	const char *end = data + packet->body[0].iov_len;
+	assert(row->bodycnt == 1);
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
 	const char *d = data;
 	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP)
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -424,4 +491,49 @@ iproto_decode_subscribe(struct iproto_header *packet,
 		int64_t lsn = (int64_t) mp_decode_uint(&d);
 		vclock_follow(vclock, id, lsn);
 	}
+}
+
+void
+iproto_encode_join(struct iproto_header *row, const struct tt_uuid *server_uuid)
+{
+	memset(row, 0, sizeof(*row));
+
+	size_t size = 64;
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_SERVER_UUID);
+	/* Greet the remote server with our server UUID */
+	data = iproto_encode_uuid(data, server_uuid);
+	assert(data <= buf + size);
+
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	row->type = IPROTO_JOIN;
+}
+
+void
+iproto_encode_eos(struct iproto_header *row, const struct vclock *vclock)
+{
+	memset(row, 0, sizeof(*row));
+
+	/* Add vclock to response body */
+	uint32_t cluster_size = vclock_size(vclock);
+	size_t size = 8 + cluster_size *
+		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	char *data = buf;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_map(data, cluster_size);
+	vclock_foreach(vclock, server) {
+		data = mp_encode_uint(data, server.id);
+		data = mp_encode_uint(data, server.lsn);
+	}
+	assert(data <= buf + size);
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	row->type = IPROTO_JOIN;
 }
