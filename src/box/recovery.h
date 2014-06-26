@@ -60,9 +60,6 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
-void
-mh_cluster_clean(struct mh_cluster_t *hash);
-
 struct recovery_state {
 	struct vclock vclock;
 	/* The WAL we're currently reading/writing from/to. */
