@@ -69,40 +69,8 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       using a dedicated <filename xml:id="init.lua" xreflabel="init.lua">init.lua</filename> script,
       located in 
       <olink targetptr="script_dir"><filename>script_dir</filename></olink>.
-
-      An example of such a script is given below:
-    <programlisting>
-    <![CDATA[
--- Importing expirationd module
-dofile("expirationd.lua")
-
-function is_expired(args, tuple)
-   if tuple == nil then
-       return true
-   end
-
-   if #tuple <= args.field_no then
-       return true
-   end
-
-   field = tuple[args.field_no]
-   if field == nil or #field ~= 4 then
-       return true
-   end
-
-   local current_time = os.time()
-   local tuple_ts = pickle.unpack("i", field)
-   return current_time >= tuple_ts + args.ttl
-end
-function purge(args, tuple)
-    box.space.space0:delete(tuple[1])
-end
-
--- Run task
-expirationd.run_task("exprd space 0", 0, is_expired, purge,
-                    { field_no = 2, ttl = 30 * 60 })
-]]>
-    </programlisting>
+    An example and discussion of such a script will appear later in section
+    <link linkend="sp-expirationd">expirationd</link>.
     </para>
     <para>
       The initialization script can select and modify data. However,
@@ -334,7 +302,114 @@ tarantool&gt; <userinput>session.delimiter('')!</userinput>
     
 </variablelist>
 
+<section xml:id="sp-expirationd">
+ <title>expirationd -- the daemon that shifts expired tuples to a long-term archive</title>
 
+<para>
+For a commercial-grade example of a Lua rock that works with Tarantool,
+let us look at expirationd, which Tarantool supplies on
+<link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">GitHub</link>
+with an Artistic license. The expirationd.lua program is
+lengthy (about 500 lines), so here we will only highlight
+the matters that will be enhanced by studying the full source later.
+<programlisting>
+            task.worker_fiber = fiber.create(worker_loop)
+            task.worker_fiber:resume(task)
+            log.info("expiration: task %q restarted", task.name)
+            ...
+            fiber.sleep(expirationd.constants.check_interval)
+            ...
+</programlisting>
+Whenever one hears "daemon" in Tarantool, one should suspect it's
+being done with <olink targetptr="sp-box-fiber">fibers</olink>. The program is making a fiber
+and turning control over to it so it runs occasionally, goes to
+sleep, then comes back for more.
+<programlisting>
+    for _, tuple in scan_space.index[0]:pairs(nil, {iterator = box.index.ALL}) do
+    ...
+            if task.is_tuple_expired(task.args, tuple) then
+            task.expired_tuples_count = task.expired_tuples_count + 1
+            task.process_expired_tuple(task.space_id, task.args, tuple)
+    ...
+</programlisting>
+The "for" instruction can be translated as "iterate through the index of
+the space that is being scanned", and within it, if the tuple is "expired"
+(that is, if the tuple has a timestamp field which is less than the current
+time), process the tuple as an expired tuple.
+<programlisting>
+-- put expired tuple in archive
+local function put_tuple_to_archive(space_id, args, tuple)
+    -- delete expired tuple
+    box.space[space_id]:delete{tuple[0]}
+    local email = get_field(tuple, 1)
+    if args.archive_space_id ~= nil and email ~= nil then
+        box.space[args.archive_space_id]:replace{email, os.time()}
+    end
+end
+</programlisting>
+Ultimately the tuple-expiry process leads to put_tuple_to_archive()
+which does a "delete" of a tuple from its original space, and an
+"insert" of the same tuple into another space. Tarantool's "replace"
+function is the same as an "insert" function without an error message
+if a tuple with the same content already exists in the target space.
+<programlisting>
+function expirationd.do_test(space_id, archive_space_id)
+...
+</programlisting>
+At this point, if the above explanation is worthwhile, it's clear that
+expirationd.lua starts a background routine (fiber) which iterates
+through all the tuples in a space, sleeps cooperatively so that other
+fibers can operate at the same time, and -- whenever it finds a tuple
+that has expired -- deletes it from this space and puts it in another
+space. Now the "do_test()" function can be used to create some sample
+spaces, let the daemon run for a while, and print results.
+</para>
+<para>
+For those who like to see things run, here are the exact steps to
+get expirationd through the test.
+</para>
+<para>
+1. Get expirationd.lua.
+   There are standard ways -- it is after all part of a standard rock --
+   but for this purpose just copy the contents of
+   <link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">https://github.com/tarantool/expirationd/blob/master/expirationd.lua</link>
+   to a default directory.
+</para>
+<para>
+2. Start the Tarantool server as described <olink targetptr="getting-started-start-stop">before</olink>.
+</para>
+<para>
+3. Execute these requests:
+<programlisting>
+     box.cfg{}
+     a = box.schema.create_space('origin')
+     a:create_index('first', {type = 'tree', parts = {0, 'NUM'}})
+     b = box.schema.create_space('archive')
+     b:create_index('first', {type = 'tree', parts = {0, 'STR'}})
+     expd = require('expirationd')
+     expd._debug = true
+     expd.do_test('origin', 'archive')
+     os.exit()
+</programlisting>
+The database-specific requests (cfg, create_space, create_index)
+should already be familiar. The key for getting the rock rolling is
+<code>expd = require('expirationd')</code>.
+The "require" function is what reads in the program; it will appear
+in many later examples in this manual, when it's necessary to get a
+package that's not part of the Tarantool kernel. After the Lua
+variable expd has been assigned the value of the expirationd package,
+it's possible to invoke the package's <code>do_test()</code> function.
+</para>
+<para>
+After a while, when the task has had time to do its iterations through
+the spaces, do_test() will print out a report showing the tuples that
+were originally in the original space, the tuples that have now been
+moved to the archive space, and some statistics. Of course, expirationd
+can be customized to do different things by passing different parameters,
+which will be evident after looking in more detail at the source code.  
+</para> 
+
+</section>
 
 <section xml:id="sp-pickle">
     <title>Package <code>pickle</code></title>
