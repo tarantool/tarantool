@@ -29,6 +29,10 @@ class AppServer(Server):
         Server.__init__(self, ini)
         self.testdir = os.path.abspath(os.curdir)
         self.vardir = ini['vardir']
+        self.re_vardir_cleanup += [
+            "*.snap", "*.xlog", "*.inprogress",
+            "*.sup", "*.lua", "*.pid"]
+        self.cleanup()
         self.builddir = ini['builddir']
         self.debug = False
         self.lua_libs = ini['lua_libs']

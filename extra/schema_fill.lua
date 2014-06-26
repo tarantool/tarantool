@@ -47,8 +47,10 @@ _index:insert{_func.id, 2, 'name', 'tree', 1, 1, 2, 'str'}
 -- space schema is: grantor id, user id, object_type, object_id, privilege
 -- primary key: user id, object type, object id
 _index:insert{_priv.id, 0, 'primary', 'tree', 1, 3, 1, 'num', 2, 'str', 3, 'num'}
+-- owner index  - to quickly find all privileges granted to a user
 _index:insert{_priv.id, 1, 'owner', 'tree', 0, 1, 1, 'num'}
-
+-- object index - to quickly find all grants on a given object
+_index:insert{_priv.id, 2, 'object', 'tree', 0, 2, 2, 'str', 3, 'num'}
 -- primary key: node id
 _index:insert{_cluster.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 -- node uuid key: node uuid
