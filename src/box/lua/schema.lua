@@ -17,6 +17,10 @@ ffi.cdef[[
         void (*free)(struct iterator *);
         void (*close)(struct iterator *);
     };
+    size_t
+    boxffi_index_len(uint32_t space_id, uint32_t index_id);
+    struct tuple *
+    boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
@@ -305,7 +309,14 @@ local port_t = ffi.typeof('struct port *')
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
-    index_mt.len = function(index) return #index.idx end
+    index_mt.len = function(index)
+        local ret = builtin.boxffi_index_len(index.space.id, index.id)
+        if ret == -1 then
+            box.raise()
+        end
+        return tonumber(ret)
+    end
+    index_mt.__len = index_mt.len -- Lua 5.2 compatibility
     index_mt.__newindex = function(table, index)
         return error('Attempt to modify a read-only table') end
     index_mt.__index = index_mt
@@ -332,7 +343,17 @@ function box.schema.space.bless(space)
             return
         end
     end
-    index_mt.random = function(index, rnd) return index.idx:random(rnd) end
+    index_mt.random = function(index, rnd)
+        rnd = rnd or math.random()
+        local tuple = builtin.boxffi_index_random(index.space.id, index.id, rnd)
+        if tuple == ffi.cast('void *', -1) then
+            box.raise() -- error
+        elseif tuple ~= nil then
+            return box.tuple.bless(tuple)
+        else
+            return nil
+        end
+    end
     -- iteration
     index_mt.pairs = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
@@ -373,7 +394,7 @@ function box.schema.space.bless(space)
         end
 
         if key == nil or type(key) == "table" and #key == 0 then
-            return #index.idx
+            return index:len()
         end
 
         local state, tuple
@@ -564,7 +585,7 @@ function box.schema.space.bless(space)
         end
         check_index(space, 0)
         local pk = space.index[0]
-        while #pk.idx > 0 do
+        while pk:len() > 0 do
             local state, t
             for state, t in pk:pairs() do
                 local key = {}
@@ -597,7 +618,6 @@ function box.schema.space.bless(space)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
-                rawset(index, 'idx', box.index.bind(space.id, j))
                 setmetatable(index, index_mt)
             end
         end

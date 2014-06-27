@@ -639,7 +639,6 @@ s.index.primary
     fieldno: 1
   id: 0
   type: HASH
-  idx: ' index 0'
   space:
     index:
       0: *0
