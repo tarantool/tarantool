@@ -117,7 +117,7 @@ local function tuple_find(tuple, offset, val)
         offset = 0
     end
     local r = tuple:pairs(offset):index(val)
-    return r ~= nil and offset + r - 1 or nil -- tuple is zero-indexed
+    return r ~= nil and offset + r or nil
 end
 
 local function tuple_findall(tuple, offset, val)
@@ -126,7 +126,7 @@ local function tuple_findall(tuple, offset, val)
         offset = 0
     end
     return tuple:pairs(offset):indexes(val)
-        :map(function(i) return offset + i - 1 end) -- tuple is zero-indexed
+        :map(function(i) return offset + i end)
         :totable()
 end
 
