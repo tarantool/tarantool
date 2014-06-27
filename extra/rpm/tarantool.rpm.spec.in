@@ -2,8 +2,8 @@
 ################# MACROS AND DEFAULTS ##############
 ####################################################
 
-%{?scl:%{?scl_package:%scl_package tarantool}}
-%global scl_runtime tarantool-15-runtime
+%{?scl:%global _scl_prefix /opt/tarantool}
+%{?scl:%scl_package tarantool}
 
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
