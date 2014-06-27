@@ -1,12 +1,10 @@
-%global scl 16
+%global scl mailru-16
 
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
 
 %global _scl_prefix /opt/tarantool
 %scl_package
-
-%global scl_name tarantool-%scl
 
 BuildRequires: scl-utils-build
 BuildRequires: iso-codes
