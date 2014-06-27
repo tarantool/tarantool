@@ -10,6 +10,20 @@ s:update({1000004}, {{'#', 0, 1}})
 s:update({1000005}, {{'#', 0, 1}})
 s:truncate()
 
+-- test arithmetic
+s:insert{1, 0}
+s:update(1, {{'+', 1, 10}})
+s:update(1, {{'+', 1, 15}})
+s:update(1, {{'-', 1, 5}})
+s:update(1, {{'-', 1, 20}})
+s:update(1, {{'|', 1, 0x9}})
+s:update(1, {{'|', 1, 0x6}})
+s:update(1, {{'&', 1, 0xabcde}})
+s:update(1, {{'&', 1, 0x2}})
+s:update(1, {{'^', 1, 0xa2}})
+s:update(1, {{'^', 1, 0xa2}})
+s:truncate()
+
 -- test delete multiple fields
 s:insert{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 s:update({0}, {{'#', 42, 1}})

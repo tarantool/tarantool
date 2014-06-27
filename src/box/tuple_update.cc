@@ -294,9 +294,9 @@ do_op_arith(struct tuple_update *update, struct update_op *op,
 	case '+': arg->val += val; break;
 	case '&': arg->val &= val; break;
 	case '^': arg->val ^= val; break;
-	case '|': arg->val |= val;
-	case '-':
-	default:  arg->val = val - arg->val; break;
+	case '|': arg->val |= val; break;
+	case '-': arg->val = val - arg->val; break;
+	default: assert(false); /* checked by update_read_ops */
 	}
 	op->new_field_len = mp_sizeof_uint(arg->val);
 }
