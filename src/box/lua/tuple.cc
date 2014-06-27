@@ -231,12 +231,17 @@ lbox_tuple_transform(struct lua_State *L)
 
 	uint32_t field_count = tuple_field_count(tuple);
 	/* validate offset and len */
-	if (offset < 0) {
+	if (offset == 0) {
+		luaL_error(L, "tuple.transform(): offset is out of bound");
+	} else if (offset < 0) {
 		if (-offset > field_count)
 			luaL_error(L, "tuple.transform(): offset is out of bound");
 		offset += field_count;
-	} else if (offset > field_count) {
-		offset = field_count;
+	} else {
+		--offset; /* offset is one-indexed */
+		if (offset > field_count) {
+			offset = field_count;
+		}
 	}
 	if (len < 0)
 		luaL_error(L, "tuple.transform(): len is negative");
@@ -285,7 +290,8 @@ lbox_tuple_transform(struct lua_State *L)
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       tuple_update_region_alloc,
 					       &fiber()->gc,
-					       tuple, tbuf_str(b), tbuf_end(b));
+					       tuple, tbuf_str(b), tbuf_end(b),
+					       0);
 	lbox_pushtuple(L, new_tuple);
 	return 1;
 }

@@ -78,8 +78,8 @@ space:delete{'The Wolf!', 'Vincent', 0}
 space:delete{'The Wolf!', 'Vincent', 3}
 space:delete{'Vincent', 'The Wolf!', 0}
 
-space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 0, 'Updated' }, {'=', 4, 'New'}})
-space:update({'Updated', 'The Wolf!', 1}, {{ '=', 0, 'Vincent'}, { '#', 4, 1 }})
+space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 1, 'Updated' }, {'=', 5, 'New'}})
+space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 -- Checking Vincent's last messages
 space.index['primary']:select({'Vincent', 'The Wolf!'})
 -- Checking The Wolf's last messages
@@ -95,8 +95,8 @@ space:delete{'The Wolf!', 'Vincent', 1, 'Come again?'}
 --
 -- Update test
 --
-space:update({'The Wolf!', 'Vincent', 1}, {{'=', 3, '<ooops>'}})
-space:update({'Vincent', 'The Wolf!', 1}, {{'=', 3, '<ooops>'}})
+space:update({'The Wolf!', 'Vincent', 1}, {{'=', 4, '<ooops>'}})
+space:update({'Vincent', 'The Wolf!', 1}, {{'=', 4, '<ooops>'}})
 
 -- Checking Vincent's last messages
 space.index['primary']:select({'Vincent', 'The Wolf!'})
@@ -104,11 +104,11 @@ space.index['primary']:select({'Vincent', 'The Wolf!'})
 space.index['primary']:select({'The Wolf!', 'Vincent'})
 
 -- try to update a nonexistent message
-space:update({'Vincent', 'The Wolf!', 3}, {{'=', 3, '<ooops>'}})
+space:update({'Vincent', 'The Wolf!', 4}, {{'=', 4, '<ooops>'}})
 -- try to update patrial defined key
-space:update({'Vincent', 'The Wolf!'}, {{'=', 3, '<ooops>'}})
+space:update({'Vincent', 'The Wolf!'}, {{'=', 4, '<ooops>'}})
 -- try to update by invalid key
-space:update({'The Wolf!', 'Vincent', 1, 'Come again?'}, {{'=', 3, '<ooops>'}})
+space:update({'The Wolf!', 'Vincent', 1, 'Come again?'}, {{'=', 4, '<ooops>'}})
 space:len()
 space:truncate()
 space:len()

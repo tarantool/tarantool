@@ -66,7 +66,7 @@ slf, foo = require('box.internal').call_loadproc('box.net.self:select')
 type(slf)
 type(foo)
 
-space:update(123, {{'=', 1, 'test1-updated'}})
+space:update(123, {{'=', 2, 'test1-updated'}})
 remote:update(space.id, 123, {{'=', 2, 'test2-updated'}})
 
 space:insert{123, 'test1', 'test2'}

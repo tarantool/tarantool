@@ -8,9 +8,9 @@ function push_collection(space, size, cid, ...)
 	if #append == 0 then
 		return tuple
 	end
-	tuple = tuple:transform( #tuple, 0, unpack( append ) )
+	tuple = tuple:transform( #tuple + 1, 0, unpack( append ) )
 	if #tuple - 1 > tonumber(size) then
-		tuple = tuple:transform( 1, #tuple - 1 - tonumber(size) )
+		tuple = tuple:transform( 2, #tuple - 1 - tonumber(size) )
 	end
 	return space:replace{tuple:unpack()}
 end
