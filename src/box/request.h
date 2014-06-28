@@ -54,13 +54,14 @@ struct request
 	uint32_t offset;
 	uint32_t limit;
 	uint32_t iterator;
-	/* Search key or proc name. */
+	/** Search key or proc name. */
 	const char *key;
 	const char *key_end;
-	/* Insert/replace tuple or proc argument or update operations. */
+	/** Insert/replace tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
-	int field_base; /* base field id offset, e.g. 0 for C and 1 for Lua */
+	/** Base field offset, e.g. 0 for C and 1 for Lua */
+	int field_base;
 
 	request_execute_f execute;
 };
