@@ -239,8 +239,8 @@ space_dump_def(const struct space *space, struct rlist *key_list);
  * making sure the old index doesn't leak.
  */
 void
-space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
-		 uint32_t rhs_id, bool keep_key_def);
+space_swap_index(struct space *lhs, struct space *rhs,
+		 uint32_t lhs_id, uint32_t rhs_id);
 
 /** Rebuild index map in a space after a series of swap index. */
 void

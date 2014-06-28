@@ -138,6 +138,23 @@ key_def_dup(struct key_def *def)
 }
 
 /**
+ * Copy one key def into another, preserving the membership
+ * in rlist. This only works for key defs with equal number of
+ * parts.
+ */
+static inline void
+key_def_copy(struct key_def *to, const struct key_def *from)
+{
+	struct rlist save_link = to->link;
+	int part_count = (to->part_count < from->part_count ?
+			  to->part_count : from->part_count);
+	size_t size  = (sizeof(struct key_def) +
+			sizeof(struct key_part) * part_count);
+	memcpy(to, from, size);
+	to->link = save_link;
+}
+
+/**
  * Set a single key part in a key def.
  * @pre part_no < part_count
  */

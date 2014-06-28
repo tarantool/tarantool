@@ -127,3 +127,15 @@ box.schema.space.drop('auto')
 auto2
 box.schema.create_space('auto_original', {id = auto.id})
 auto:drop()
+
+-- ------------------------------------------------------------------
+-- gh-281 Crash after rename + replace + delete with multi-part index
+-- ------------------------------------------------------------------
+s = box.schema.create_space('space')
+s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+s:insert{1, 'a'}
+box.space.space.index.primary:rename('secondary')
+box.space.space:replace{1,'The rain in Spain'}
+box.space.space:delete{1,'The rain in Spain'}
+box.space.space:select{}
+s:drop()
