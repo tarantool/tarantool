@@ -213,7 +213,7 @@ type(foo)
 ---
 - table
 ...
-space:update(123, {{'=', 1, 'test1-updated'}})
+space:update(123, {{'=', 2, 'test1-updated'}})
 ---
 - [123, 'test1-updated', 'test2']
 ...

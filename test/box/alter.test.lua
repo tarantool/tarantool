@@ -33,8 +33,8 @@ _space:delete{_index.id}
 --
 -- Can't change properties of a space
 --
-_space:update({_space.id}, {{'+', 0, 1}})
-_space:update({_space.id}, {{'+', 0, 2}})
+_space:update({_space.id}, {{'+', 1, 1}})
+_space:update({_space.id}, {{'+', 1, 2}})
 --
 -- Create a space
 --
@@ -50,7 +50,7 @@ space.index[0]
 space:select{0}
 space:insert{0, 0}
 space:replace{0, 0}
-space:update({0}, {{'+', 0, 1}})
+space:update({0}, {{'+', 1, 1}})
 space:delete{0}
 t = _space:delete{space.id}
 space_deleted = box.space[t[1]]

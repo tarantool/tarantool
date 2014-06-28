@@ -18,7 +18,7 @@ space:get{1}
 errinj.set("ERRINJ_WAL_IO", false)
 space:insert{1}
 errinj.set("ERRINJ_WAL_IO", true)
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 space:get{1}
 space:get{2}
 errinj.set("ERRINJ_WAL_IO", false)
@@ -31,11 +31,11 @@ space:get{1}
 errinj.set("ERRINJ_WAL_ROTATE", false)
 space:insert{1}
 errinj.set("ERRINJ_WAL_ROTATE", true)
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 space:get{1}
 space:get{2}
 errinj.set("ERRINJ_WAL_ROTATE", false)
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 space:get{1}
 space:get{2}
 errinj.set("ERRINJ_WAL_ROTATE", true)

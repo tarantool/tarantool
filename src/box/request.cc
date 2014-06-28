@@ -123,7 +123,8 @@ execute_update(struct request *request, struct txn *txn,
 					       region_alloc_cb,
 					       &fiber()->gc,
 					       old_tuple, request->tuple,
-					       request->tuple_end);
+					       request->tuple_end,
+					       request->field_base);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);

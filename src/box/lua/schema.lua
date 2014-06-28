@@ -128,7 +128,7 @@ box.schema.space.drop = function(space_id)
 end
 box.schema.space.rename = function(space_id, space_name)
     local _space = box.space[box.schema.SPACE_ID]
-    _space:update(space_id, {{"=", 2, space_name}})
+    _space:update(space_id, {{"=", 3, space_name}})
 end
 
 box.schema.index = {}
@@ -179,7 +179,7 @@ box.schema.index.drop = function(space_id, index_id)
 end
 box.schema.index.rename = function(space_id, index_id, name)
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, {{"=", 2, name}})
+    _index:update({space_id, index_id}, {{"=", 3, name}})
 end
 box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
@@ -214,10 +214,10 @@ box.schema.index.alter = function(space_id, index_id, options)
                 table.insert(ops, {'=', field_no, value})
             end
         end
-        add_op(options.id, 1)
-        add_op(options.name, 2)
-        add_op(options.type, 3)
-        add_op(options.unique, 4)
+        add_op(options.id, 2)
+        add_op(options.name, 3)
+        add_op(options.type, 4)
+        add_op(options.unique, 5)
         _index:update({space_id, index_id}, ops)
         return
     end
@@ -537,7 +537,7 @@ function box.schema.space.bless(space)
     --
     space_mt.inc = function(space, key)
         local key = keify(key)
-        local cnt_index = #key
+        local cnt_index = #key + 1
         local tuple
         while true do
             tuple = space:update(key, {{'+', cnt_index, 1}})
@@ -547,7 +547,7 @@ function box.schema.space.bless(space)
             tuple = space:insert(data)
             if tuple ~= nil then break end
         end
-        return tuple[cnt_index + 1]
+        return tuple[cnt_index]
     end
 
     --
@@ -557,15 +557,15 @@ function box.schema.space.bless(space)
     --
     space_mt.dec = function(space, key)
         local key = keify(key)
-        local cnt_index = #key
+        local cnt_index = #key + 1
         local tuple = space:get(key)
         if tuple == nil then return 0 end
-        if tuple[cnt_index + 1] == 1 then
+        if tuple[cnt_index] == 1 then
             space:delete(key)
             return 0
         else
             tuple = space:update(key, {{'-', cnt_index, 1}})
-            return tuple[cnt_index + 1]
+            return tuple[cnt_index]
         end
     end
 
@@ -729,7 +729,7 @@ box.schema.user.passwd = function(new_password)
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
     require('session').su('admin')
-    _user:update({uid}, {{"=", 4, auth_mech_list}})
+    _user:update({uid}, {{"=", 5, auth_mech_list}})
     require('session').su(uid)
 end
 
@@ -807,7 +807,7 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     local old_privilege = tuple[5]
     if old_privilege ~= privilege then
         privilege = bit.band(old_privilege, bit.bnot(privilege))
-        _priv:update({uid, object_type, oid}, { "=", 4, privilege})
+        _priv:update({uid, object_type, oid}, { "=", 5, privilege})
     else
         _priv:delete{uid, object_type, oid}
     end

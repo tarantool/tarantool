@@ -1,6 +1,6 @@
 -- temporary spaces
 -- not a temporary
-FLAGS = 5
+FLAGS = 6
 s = box.schema.create_space('t', { temporary = true })
 s.temporary
 s:drop()
@@ -27,7 +27,7 @@ box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ''}})
 
 --# stop server default
 --# start server default
-FLAGS = 5
+FLAGS = 6
 
 s = box.space.t
 s:len()

@@ -326,7 +326,7 @@ call myinsert(3, 'old', 2)
     errcode: ER_TUPLE_FOUND
     errmsg: Duplicate key exists in unique index 0
 ...
-space:update({3}, {{'=', 0, 4}, {'=', 1, 'new'}})
+space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})
 ---
 - [4, 'new', 2]
 ...
@@ -338,11 +338,11 @@ call space:select(4)
 ---
 - [4, 'new', 2]
 ...
-space:update({4}, {{'+', 2, 1}})
+space:update({4}, {{'+', 3, 1}})
 ---
 - [4, 'new', 3]
 ...
-space:update({4}, {{'-', 2, 1}})
+space:update({4}, {{'-', 3, 1}})
 ---
 - [4, 'new', 2]
 ...

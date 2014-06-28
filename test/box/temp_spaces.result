@@ -1,6 +1,6 @@
 -- temporary spaces
 -- not a temporary
-FLAGS = 5
+FLAGS = 6
 ---
 ...
 s = box.schema.create_space('t', { temporary = true })
@@ -63,7 +63,7 @@ box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ''}})
 ...
 --# stop server default
 --# start server default
-FLAGS = 5
+FLAGS = 6
 ---
 ...
 s = box.space.t
@@ -79,7 +79,7 @@ s.temporary
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'no-temporary']
+- [512, 1, 't', 'memtx', 0, 'no-temporary', 'temporary']
 ...
 s.temporary
 ---
@@ -87,7 +87,7 @@ s.temporary
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, ',:asfda:temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, ',:asfda:temporary']
+- [512, 1, 't', 'memtx', 0, ',:asfda:temporary', 'temporary']
 ...
 s.temporary
 ---
@@ -95,7 +95,7 @@ s.temporary
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'a,b,c,d,e'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'a,b,c,d,e']
+- [512, 1, 't', 'memtx', 0, 'a,b,c,d,e', 'temporary']
 ...
 s.temporary
 ---
@@ -103,7 +103,7 @@ s.temporary
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'temporary']
+- [512, 1, 't', 'memtx', 0, 'temporary', 'temporary']
 ...
 s.temporary
 ---
@@ -118,7 +118,7 @@ s:insert{1, 2, 3}
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'temporary']
+- [512, 1, 't', 'memtx', 0, 'temporary', 'temporary']
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
@@ -130,7 +130,7 @@ s:delete{1}
 ...
 box.space[box.schema.SPACE_ID]:update(s.id, {{'=', FLAGS, 'no-temporary'}})
 ---
-- [512, 1, 't', 'memtx', 0, 'no-temporary']
+- [512, 1, 't', 'memtx', 0, 'no-temporary', 'temporary']
 ...
 s:drop()
 ---

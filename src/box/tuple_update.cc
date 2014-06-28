@@ -547,7 +547,7 @@ update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 
 static void
 update_read_ops(struct tuple_update *update, const char *expr,
-		const char *expr_end)
+		const char *expr_end, int field_base)
 {
 	/* number of operations */
 	update->op_count = mp_decode_array(&expr);
@@ -599,6 +599,14 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->field_no = mp_read_int(&expr, "expected a field no (integer)");
+		if (op->field_no != UINT32_MAX) {
+			/* Check that field_no is not zero for Lua (base = 1) */
+			if (op->field_no < field_base) {
+				tnt_raise(ClientError, ER_NO_SUCH_FIELD,
+					  op->field_no);
+			}
+			op->field_no -= field_base;
+		}
 		op->meta->do_op(update, op, &expr);
 	}
 
@@ -611,7 +619,7 @@ const char *
 tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 		     const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_tuple_len)
+		     uint32_t *p_tuple_len, int field_base)
 {
 	struct tuple_update *update = (struct tuple_update *)
 			alloc(alloc_ctx, sizeof(*update));
@@ -621,7 +629,7 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 	update->alloc_ctx = alloc_ctx;
 
 	update_create_rope(update, old_data, old_data_end);
-	update_read_ops(update, expr, expr_end);
+	update_read_ops(update, expr, expr_end, field_base);
 	uint32_t tuple_len = update_calc_tuple_length(update);
 
 	char *buffer = (char *) alloc(alloc_ctx, tuple_len);

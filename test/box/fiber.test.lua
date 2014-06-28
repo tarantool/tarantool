@@ -42,12 +42,12 @@ space:delete{1667655012}
 space:insert{1953719668, 'old', 1684234849}
 -- test that insert produces a duplicate key error
 space:insert{1953719668, 'old', 1684234849}
-space:update(1953719668, {{'=', 0, 1936941424}, {'=', 1, 'new'}})
-space:update(1234567890, {{'+', 2, 1}})
-space:update(1936941424, {{'+', 2, 1}})
-space:update(1936941424, {{'-', 2, 1}})
-space:update(1936941424, {{'-', 2, 1}})
-space:update(1936941424, {{'+', 2, 1}})
+space:update(1953719668, {{'=', 1, 1936941424}, {'=', 2, 'new'}})
+space:update(1234567890, {{'+', 3, 1}})
+space:update(1936941424, {{'+', 3, 1}})
+space:update(1936941424, {{'-', 3, 1}})
+space:update(1936941424, {{'-', 3, 1}})
+space:update(1936941424, {{'+', 3, 1}})
 space:delete{1936941424}
 -- must be read-only
 
@@ -56,7 +56,7 @@ space:insert{1684234849}
 space:delete{1953719668}
 space:delete{1684234849}
 space:insert{1953719668, 'hello world'}
-space:update(1953719668, {{'=', 1, 'bye, world'}})
+space:update(1953719668, {{'=', 2, 'bye, world'}})
 space:delete{1953719668}
 -- test tuple iterators
 t = space:insert{1953719668}

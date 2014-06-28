@@ -60,6 +60,7 @@ struct request
 	/* Insert/replace tuple or proc argument or update operations. */
 	const char *tuple;
 	const char *tuple_end;
+	int field_base; /* base field id offset, e.g. 0 for C and 1 for Lua */
 
 	request_execute_f execute;
 };
