@@ -244,6 +244,17 @@ tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporar
 ...
 </programlisting>
             </para>
+            <para>
+            <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
+            There are actually two storage engines for Tarantool: memtx (the in-memory storage engine)
+            and Sophia (the on-disk storage engine). To specify that the engine should be Sophia,
+            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtxt because it is
+            the default and has been around longer. But Sophia is a working key-value engine and will especially
+            appeal to users who like to see data go directly to disk, so that recovery time might be
+            shorter and database size might be larger. On the other hand, with Sophia the maximum
+            number of indexes is 1, and the maximum number of fields per index is 1.
+            For architectural explanations and benchmarks, see sphia.org.
+            </para>
         </listitem>
     </varlistentry>
 
