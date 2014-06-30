@@ -534,7 +534,7 @@ tarantool&gt; s = box.schema.create_space('space0')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
-tarantool&gt; i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+tarantool&gt; s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
 tarantool&gt; t = s:insert{1}

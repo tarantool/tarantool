@@ -623,13 +623,13 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 <programlisting>
 #Assume that the initial state of the database is ...
 #  space0 has one tuple set and one primary key whose type is 'NUM'.
-#  There is one tuple, with field[1] = 999 and field[1] = 'A'.
+#  There is one tuple, with field[1] = 999 and field[2] = 'A'.
 
 #In the following update ...
 #  The first argument is space0, that is, the affected space is space0
 #  The second argument is 999, that is, the affected tuple is identified by
 #    primary key value = 999
-#  The third argument is '=p', that is, there is one operation, assignment
+#  The third argument is '=', that is, there is one operation, assignment
 #    to a field
 #  The fourth argument is 2, that is, the affected field is field[2]
 #  The fifth argument is 'B', that is, field[2] contents change to 'B'
@@ -657,14 +657,14 @@ box.space.space0:update({999}, {{'=', 3, 1}})
 #   Since field[3] previously contained 1, this means we're adding 1 to 1.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'B',
 #     field[3] = 2.
-box.space.space0:update({999}, {{'+p', 3, 1}})
+box.space.space0:update({999}, {{'+', 3, 1}})
 
 #In the following update ...
 #   The idea is to modify two fields at once.
 #   The formats are '|' and '=', that is, there are two operations, OR and
 #     assignment.
 #   The fourth and fifth arguments mean that field[3] gets ORed with 1.
-#   The fifth and sixth arguments mean that field[2] gets assigned 'C'.
+#   The seventh and eighth arguments mean that field[2] gets assigned 'C'.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'C',
 #     field[3] = 3.
 box.space.space0:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
@@ -672,9 +672,9 @@ box.space.space0:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
 #In the following update ...
 #   The idea is to delete field[2], then subtract 3 from field[3], but ...
 #   after the delete, there is a renumbering -- so field[3] becomes field[2]
-#   before we subtract 3 from it, and that's why the sixth argument is 2 not 3.
+#   before we subtract 3 from it, and that's why the seventh argument is 2 not 3.
 #   Therefore, after the following update, field[1] = 999, field[2] = 0.
-box.space.space0:update({999}, {{'#', 2, 0}, {'-', 2, 3}})
+box.space.space0:update({999}, {{'#', 2, 1}, {'-', 2, 3}})
 
 #In the following update ...
 #   We're making a long string so that splice will work in the next example.
@@ -683,11 +683,12 @@ box.space.space0:update({999}, {{'=', 2, 'XYZ'}})
 
 #In the following update ...
 #   The third argument is ':', that is, this is the example of splice.
-#   The fifth argument is actually four arguments packed together ...
-#      a filler, an offset, the number of bytes to cut (1), and the string
-#      to add ('!')
-#   Therefore, after the following update, field[1] = 999, field[2] = 'X!Z'.
-box.space.space0:update({999}, {{':', 2, pickle.pack('iiA', 1, 1, '!')}})
+#   The fourth argument is 2 because the change will occur in field[2].
+#   The fifth argument is 1 because deletion will begin with the second byte.
+#   The sixth argument is 1 because the number of bytes to delete is 1.
+#   The seventh argument is '!!' because '!!' is to be added at this position.
+#   Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.
+box.space.space0:update({999}, {{':', 2, 1, 1, '!!'}})
 
 </programlisting>
             </para>
@@ -1502,7 +1503,7 @@ tarantool&gt; <userinput>t:findall('a')</userinput>
 ...
 tarantool&gt; <userinput>t:findall(2, 'a')</userinput>
 ---
- - 3
+ - 4
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -1797,55 +1798,52 @@ session.delimiter('')!
             <xi:include href="iterator-types.xml"/>
 
             <para>
-                <bridgehead renderas="sect4">Examples</bridgehead>
+                <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-# This example is not currently working. Use index select function instead.
-tarantool> <userinput>s = box.schema.create_space('space17')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s = box.schema.create_space('space17')</userinput>
 ---
 ...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'STR', 2, 'STR'}})</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})</userinput>
 ---
 ...
-tarantool> <userinput>s:insert{'C', 'C'}</userinput>
----
-- ['C', 'C']
-...
-tarantool> <userinput>s:insert{'B', 'A'}</userinput>
----
-- ['B', 'A']
-...
-tarantool> <userinput>s:insert{'C', '!'}</userinput>
----
-- ['C', '!']
-...
-tarantool> <userinput>s:insert{'A', 'C'}</userinput>
----
-- ['A', 'C']
-...
-tarantool> <userinput>iterator_function = s.index.primary:iterator(box.index.GE, 'A')</userinput>
----
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['A', 'C']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['B', 'A']
-...
-tarantool> <userinput>iterator_function()</userinput>
----
-- ['C', '!']
-...
-tarantool> <userinput>iterator_function()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', 'C'}</userinput>
 ---
 - ['C', 'C']
 ...
-tarantool> <userinput>iterator_function()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'B', 'A'}</userinput>
 ---
-- null
+- ['B', 'A']
 ...
-tarantool> <userinput>box.space.space17:drop()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', '!'}</userinput>
+---
+- ['C', '!']
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'A', 'C'}</userinput>
+---
+- ['A', 'C']
+...
+<prompt>tarantool&gt;</prompt> <userinput> session = require('session'); session.delimiter('!')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> function example()
+         &gt;   for _, tuple in
+         &gt;   s.index.primary:pairs(nil, {iterator = box.index.ALL}) do
+         &gt;     print(tuple)
+         &gt;   end
+         &gt; end!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> session.delimiter('')!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> example()</userinput>
+['A', 'C']
+['B', 'A']
+['C', '!']
+['C', 'C']
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>s:drop()</userinput>
 ---
 ...
 </programlisting>

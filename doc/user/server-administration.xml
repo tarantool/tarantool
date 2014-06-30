@@ -167,7 +167,7 @@ tarantool> s = box.schema.create_space('space0')
                 [ tarantool may display an in-progress message here ]
 ---
 ...
-tarantool> i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
 tarantool> box.space.space0:insert{1,'My first tuple'}
