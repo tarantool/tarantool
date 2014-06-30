@@ -307,8 +307,7 @@ alter_space_commit(struct trigger *trigger, void * /* event */)
 			space_swap_index(alter->old_space,
 					 alter->new_space,
 					 index_id(old_index),
-					 index_id(new_index),
-					 false);
+					 index_id(new_index));
 		}
 	}
 	/*
@@ -626,7 +625,8 @@ ModifyIndex::commit(struct alter_space *alter)
 {
 	/* Move the old index to the new place but preserve */
 	space_swap_index(alter->old_space, alter->new_space,
-			 old_key_def->iid, new_key_def->iid, true);
+			 old_key_def->iid, new_key_def->iid);
+	key_def_copy(old_key_def, new_key_def);
 }
 
 ModifyIndex::~ModifyIndex()

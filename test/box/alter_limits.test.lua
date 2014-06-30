@@ -52,7 +52,7 @@ s = box.schema.create_space('tweedledum')
 s:insert{0}
 s:select{}
 s:delete{0}
-s:update(0, {{"=", 0, 0}})
+s:update(0, {{"=", 1, 0}})
 s:insert{0}
 s.index[0]
 s:truncate()
@@ -91,19 +91,19 @@ s:select{}
 FIELD_COUNT = 4
 -- increase field_count -- error
 
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 s:select{}
 -- decrease field_count - error
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 1}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 1}})
 -- remove field_count - ok
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 0}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 0}})
 s:select{}
 -- increase field_count - error
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 s:truncate()
 s:select{}
 -- set field_count of an empty space
-box.space['_space']:update(s.id, {{"=", FIELD_COUNT, 3}})
+box.space['_space']:update(s.id, {{"=", FIELD_COUNT + 1, 3}})
 s:select{}
 -- field_count actually works
 s:insert{3, 4}
@@ -270,7 +270,7 @@ s:create_index('nodups', { type = 'tree', unique=true, parts = { 2, 'num'} })
 -- change of non-unique index to unique: same effect
 s.index.year:alter({unique=true})
 s.index.primary:select{}
-box.space['_index']:update({s.id, s.index.year.id}, {{"=", 7, 'num'}})
+box.space['_index']:update({s.id, s.index.year.id}, {{"=", 8, 'num'}})
 -- ambiguous field type
 s:create_index('str', { type = 'tree', unique =  false, parts = { 2, 'str'}})
 -- create index on a non-existing field

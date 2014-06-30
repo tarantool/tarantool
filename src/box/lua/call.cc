@@ -361,6 +361,7 @@ lbox_update(lua_State *L)
 	struct request *request = lbox_request_create(L, IPROTO_UPDATE,
 						      3, 4);
 	/* Ignore index_id for now */
+	request->field_base = 1; /* field ids are one-indexed */
 	box_process(port_lua_create(L), request);
 	return lua_gettop(L) - 4;
 }

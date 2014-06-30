@@ -25,6 +25,8 @@ void *ffi_symbols[] = {
 	(void *) tuple_seek,
 	(void *) tuple_next,
 	(void *) tuple_ref,
+	(void *) boxffi_index_len,
+	(void *) boxffi_index_random,
 	(void *) boxffi_index_iterator,
 	(void *) port_ffi_create,
 	(void *) port_ffi_destroy,

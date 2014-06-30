@@ -69,11 +69,11 @@ _space:delete{_index.id}
 --
 -- Can't change properties of a space
 --
-_space:update({_space.id}, {{'+', 0, 1}})
+_space:update({_space.id}, {{'+', 1, 1}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
-_space:update({_space.id}, {{'+', 0, 2}})
+_space:update({_space.id}, {{'+', 1, 2}})
 ---
 - error: 'Can''t modify space 280: space id is immutable'
 ...
@@ -114,7 +114,7 @@ space:replace{0, 0}
 ---
 - error: 'No index #0 is defined in space 321'
 ...
-space:update({0}, {{'+', 0, 1}})
+space:update({0}, {{'+', 1, 1}})
 ---
 - error: 'No index #0 is defined in space 321'
 ...
@@ -338,5 +338,36 @@ box.schema.create_space('auto_original', {id = auto.id})
 - error: Space 'auto_original' already exists
 ...
 auto:drop()
+---
+...
+-- ------------------------------------------------------------------
+-- gh-281 Crash after rename + replace + delete with multi-part index
+-- ------------------------------------------------------------------
+s = box.schema.create_space('space')
+---
+...
+s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+---
+...
+s:insert{1, 'a'}
+---
+- [1, 'a']
+...
+box.space.space.index.primary:rename('secondary')
+---
+...
+box.space.space:replace{1,'The rain in Spain'}
+---
+- [1, 'The rain in Spain']
+...
+box.space.space:delete{1,'The rain in Spain'}
+---
+- [1, 'The rain in Spain']
+...
+box.space.space:select{}
+---
+- - [1, 'a']
+...
+s:drop()
 ---
 ...

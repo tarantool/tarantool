@@ -23,7 +23,7 @@ function fifo_push(space, name, val)
     elseif bottom == top then
         bottom = bottom + 1
     end
-    return space:update({name}, {{'=', 1, top}, {'=', 2, bottom }, {'=', top - 1, val}})
+    return space:update({name}, {{'=', 2, top}, {'=', 3, bottom }, {'=', top, val}})
 end
 function fifo_top(space, name)
     fifo = find_or_create_fifo(space, name)

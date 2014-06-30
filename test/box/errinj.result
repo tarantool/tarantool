@@ -65,7 +65,7 @@ errinj.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 ---
 - error: Failed to write to disk
 ...
@@ -107,7 +107,7 @@ errinj.set("ERRINJ_WAL_ROTATE", true)
 ---
 - ok
 ...
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 ---
 - error: Failed to write to disk
 ...
@@ -122,7 +122,7 @@ errinj.set("ERRINJ_WAL_ROTATE", false)
 ---
 - ok
 ...
-space:update(1, {{'=', 0, 2}})
+space:update(1, {{'=', 1, 2}})
 ---
 - [2]
 ...

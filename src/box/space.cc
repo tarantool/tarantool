@@ -325,18 +325,12 @@ space_dump_def(const struct space *space, struct rlist *key_list)
 }
 
 void
-space_swap_index(struct space *lhs, struct space *rhs, uint32_t lhs_id,
-		 uint32_t rhs_id, bool keep_key_def)
+space_swap_index(struct space *lhs, struct space *rhs,
+		 uint32_t lhs_id, uint32_t rhs_id)
 {
 	Index *tmp = lhs->index_map[lhs_id];
 	lhs->index_map[lhs_id] = rhs->index_map[rhs_id];
 	rhs->index_map[rhs_id] = tmp;
-	if (keep_key_def) {
-		struct key_def *tmp = lhs->index_map[lhs_id]->key_def;
-		lhs->index_map[lhs_id]->key_def =
-			rhs->index_map[rhs_id]->key_def;
-		rhs->index_map[rhs_id]->key_def = tmp;
-	}
 }
 
 extern "C" void

@@ -17,6 +17,10 @@ ffi.cdef[[
         void (*free)(struct iterator *);
         void (*close)(struct iterator *);
     };
+    size_t
+    boxffi_index_len(uint32_t space_id, uint32_t index_id);
+    struct tuple *
+    boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
@@ -124,7 +128,7 @@ box.schema.space.drop = function(space_id)
 end
 box.schema.space.rename = function(space_id, space_name)
     local _space = box.space[box.schema.SPACE_ID]
-    _space:update(space_id, {{"=", 2, space_name}})
+    _space:update(space_id, {{"=", 3, space_name}})
 end
 
 box.schema.index = {}
@@ -175,7 +179,7 @@ box.schema.index.drop = function(space_id, index_id)
 end
 box.schema.index.rename = function(space_id, index_id, name)
     local _index = box.space[box.schema.INDEX_ID]
-    _index:update({space_id, index_id}, {{"=", 2, name}})
+    _index:update({space_id, index_id}, {{"=", 3, name}})
 end
 box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
@@ -210,10 +214,10 @@ box.schema.index.alter = function(space_id, index_id, options)
                 table.insert(ops, {'=', field_no, value})
             end
         end
-        add_op(options.id, 1)
-        add_op(options.name, 2)
-        add_op(options.type, 3)
-        add_op(options.unique, 4)
+        add_op(options.id, 2)
+        add_op(options.name, 3)
+        add_op(options.type, 4)
+        add_op(options.unique, 5)
         _index:update({space_id, index_id}, ops)
         return
     end
@@ -305,7 +309,14 @@ local port_t = ffi.typeof('struct port *')
 function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
-    index_mt.len = function(index) return #index.idx end
+    index_mt.len = function(index)
+        local ret = builtin.boxffi_index_len(index.space.id, index.id)
+        if ret == -1 then
+            box.raise()
+        end
+        return tonumber(ret)
+    end
+    index_mt.__len = index_mt.len -- Lua 5.2 compatibility
     index_mt.__newindex = function(table, index)
         return error('Attempt to modify a read-only table') end
     index_mt.__index = index_mt
@@ -332,7 +343,17 @@ function box.schema.space.bless(space)
             return
         end
     end
-    index_mt.random = function(index, rnd) return index.idx:random(rnd) end
+    index_mt.random = function(index, rnd)
+        rnd = rnd or math.random()
+        local tuple = builtin.boxffi_index_random(index.space.id, index.id, rnd)
+        if tuple == ffi.cast('void *', -1) then
+            box.raise() -- error
+        elseif tuple ~= nil then
+            return box.tuple.bless(tuple)
+        else
+            return nil
+        end
+    end
     -- iteration
     index_mt.pairs = function(index, key, opts)
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
@@ -373,7 +394,7 @@ function box.schema.space.bless(space)
         end
 
         if key == nil or type(key) == "table" and #key == 0 then
-            return #index.idx
+            return index:len()
         end
 
         local state, tuple
@@ -516,7 +537,7 @@ function box.schema.space.bless(space)
     --
     space_mt.inc = function(space, key)
         local key = keify(key)
-        local cnt_index = #key
+        local cnt_index = #key + 1
         local tuple
         while true do
             tuple = space:update(key, {{'+', cnt_index, 1}})
@@ -526,7 +547,7 @@ function box.schema.space.bless(space)
             tuple = space:insert(data)
             if tuple ~= nil then break end
         end
-        return tuple[cnt_index + 1]
+        return tuple[cnt_index]
     end
 
     --
@@ -536,15 +557,15 @@ function box.schema.space.bless(space)
     --
     space_mt.dec = function(space, key)
         local key = keify(key)
-        local cnt_index = #key
+        local cnt_index = #key + 1
         local tuple = space:get(key)
         if tuple == nil then return 0 end
-        if tuple[cnt_index + 1] == 1 then
+        if tuple[cnt_index] == 1 then
             space:delete(key)
             return 0
         else
             tuple = space:update(key, {{'-', cnt_index, 1}})
-            return tuple[cnt_index + 1]
+            return tuple[cnt_index]
         end
     end
 
@@ -564,7 +585,7 @@ function box.schema.space.bless(space)
         end
         check_index(space, 0)
         local pk = space.index[0]
-        while #pk.idx > 0 do
+        while pk:len() > 0 do
             local state, t
             for state, t in pk:pairs() do
                 local key = {}
@@ -597,7 +618,6 @@ function box.schema.space.bless(space)
     if type(space.index) == 'table' and space.enabled then
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
-                rawset(index, 'idx', box.index.bind(space.id, j))
                 setmetatable(index, index_mt)
             end
         end
@@ -709,7 +729,7 @@ box.schema.user.passwd = function(new_password)
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
     require('session').su('admin')
-    _user:update({uid}, {{"=", 4, auth_mech_list}})
+    _user:update({uid}, {{"=", 5, auth_mech_list}})
     require('session').su(uid)
 end
 
@@ -787,7 +807,7 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     local old_privilege = tuple[5]
     if old_privilege ~= privilege then
         privilege = bit.band(old_privilege, bit.bnot(privilege))
-        _priv:update({uid, object_type, oid}, { "=", 4, privilege})
+        _priv:update({uid, object_type, oid}, { "=", 5, privilege})
     else
         _priv:delete{uid, object_type, oid}
     end

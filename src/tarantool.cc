@@ -538,6 +538,7 @@ main(int argc, char **argv)
 	 */
 	__libc_stack_end = (void*) &argv;
 #endif
+	start_time = ev_time();
 	/* set locale to make iswXXXX function work */
 	if (setlocale(LC_CTYPE, "en_US.UTF-8") == NULL)
 		fprintf(stderr, "Failed to set locale to en_US.UTF-8\n");
@@ -650,7 +651,6 @@ main(int argc, char **argv)
 		if (start_loop) {
 			say_crit("entering the event loop");
 			ev_now_update(loop());
-			start_time = ev_now(loop());
 			signal_start();
 			ev_run(loop(), 0);
 		}

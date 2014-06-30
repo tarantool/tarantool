@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct lua_State;
@@ -40,6 +41,12 @@ box_lua_index_init(struct lua_State *L);
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+size_t
+boxffi_index_len(uint32_t space_id, uint32_t index_id);
+
+struct tuple *
+boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd);
 
 struct iterator *
 boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
