@@ -6,6 +6,7 @@ print[[
 --------------------------------------------------------------------------------
 ]]
 
+box.cfg{logger="tarantool.log"}
 function pcalltest()
     local ERRMSG = "module 'some_invalid_module' not found"
     local status, msg = pcall(require, 'some_invalid_module')
@@ -31,3 +32,4 @@ print('pcall with box.raise():', status, msg)
 
 print('pcall with no return:', select('#', pcall(function() end)))
 print('pcall with multireturn:', pcall(function() return 1, 2, 3 end))
+os.exit(0)

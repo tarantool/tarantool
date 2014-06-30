@@ -11,7 +11,6 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
-
 local function normalize_port_uri(port)
     if port == nil then
         return nil
@@ -88,6 +87,20 @@ local function reload_cfg(oldcfg, newcfg)
     end
 end
 
+local box = require('box')
+-- Move all box members to box_saved
+local box_configured = {}
+for k, v in pairs(box) do
+    box_configured[k] = v
+    box[k] = nil
+end
+
+setmetatable(box, {
+    __index = function(table, index)
+        error("Please call box.cfg{} first")
+     end
+})
+
 function box.cfg(cfg)
     if cfg == nil then
         cfg = {}
@@ -102,6 +115,12 @@ function box.cfg(cfg)
         -- options that can be number or string
         cfg[k] = wrapper_cfg[k](cfg[k])
     end
+    -- Restore box members from box_saved after initial configuration
+    for k, v in pairs(box_configured) do
+        box[k] = v
+    end
+    setmetatable(box, nil)
+    box_configured = nil
     box.cfg = setmetatable(cfg,
         {
 		    __newindex = function(table, index)
