@@ -515,7 +515,7 @@ Tarantool is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first index, try this:<programlisting>
-<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('space0')</userinput>
+<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('tester')</userinput>
 <prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -530,7 +530,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
-tarantool&gt; s = box.schema.create_space('space0')
+tarantool&gt; s = box.schema.create_space('tester')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...

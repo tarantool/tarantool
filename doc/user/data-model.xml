@@ -12,10 +12,10 @@ exercise from the last chapter, then your database looks like this:
 <programlisting>
 +--------------------------------------------+
 |                                            |
-| SPACE 'space0'                             |
+| SPACE 'tester'                             |
 | +----------------------------------------+ |
 | |                                        | |
-| | TUPLE SET 'space0'                     | |
+| | TUPLE SET 'tester'                     | |
 | | +-----------------------------------+  | |
 | | | Tuple: [ 1 ]                      |  | |
 | | | Tuple: [ 2, 'Music' ]             |  | |
@@ -38,7 +38,7 @@ exercise from the last chapter, then your database looks like this:
 
 <para>
 A <emphasis>space<alt>the paradigm of tuples and spaces is
-derived from distributed computing</alt></emphasis> -- 'space0' in the example -- is a container.
+derived from distributed computing</alt></emphasis> -- 'tester' in the example -- is a container.
 </para>
 <para>
 When Tarantool is being used to store data, there is always at least one space.
@@ -51,11 +51,11 @@ Spaces always contain one tuple set and one or more indexes.
 <bridgehead renderas="sect2">Tuple Set</bridgehead>
 
 <para>
-A <emphasis>tuple set<alt>There's a Wikipedia article about tuples: https://en.wikipedia.org/wiki/Tuple</alt></emphasis> -- 'space0' in the example -- is a group of tuples.
+A <emphasis>tuple set<alt>There's a Wikipedia article about tuples: https://en.wikipedia.org/wiki/Tuple</alt></emphasis> -- 'tester' in the example -- is a group of tuples.
 </para>
 <para>
 There is always one tuple set in a space.
-The identifier of a tuple set is the same as the space name -- 'space0' in the example.
+The identifier of a tuple set is the same as the space name -- 'tester' in the example.
 </para>
 <para>
 A tuple fills
@@ -117,7 +117,7 @@ An index definition may include identifiers of tuple fields and their expected t
 The allowed types are NUM (64-bit unsigned integer between 0 and 18,446,744,073,709,551,615), or STR (string, any sequence of octets)
 Take our example, which has the request:
 <programlisting>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</programlisting>
-The effect is that, for all tuples in space0, field number 1
+The effect is that, for all tuples in tester, field number 1
 must exist and must be a 64-bit unsigned integer.
 </para>
 
@@ -149,10 +149,10 @@ when traversing TREE indexes.)
 <para>
 Five examples of basic operations:
 <programlisting>
--- Add a new tuple to tuple set space0.
+-- Add a new tuple to tuple set tester.
 -- The first field, field[1], will be 999 (type is NUM).
 -- The second field, field[2], will be 'Taranto' (type is STR).
-box.space.space0:insert{999, 'Taranto'}
+box.space.tester:insert{999, 'Taranto'}
 
 -- Update the tuple, changing field field[2].
 -- The clause "{999}", which has the value to look up in
@@ -161,31 +161,31 @@ box.space.space0:insert{999, 'Taranto'}
 -- specifies the primary key, which in this case is field[1].
 -- The clause "{{'=', 2, 'Tarantino'}}" specifies that assignment
 -- will happen to field[2] with the new value.
-box.space.space0:update({999}, {{'=', 2, 'Tarantino'}})
+box.space.tester:update({999}, {{'=', 2, 'Tarantino'}})
 
 -- Replace the tuple, adding a new field.
 -- This is also possible with the update() request but
 -- the update() request is usually more complicated.
-box.space.space0:replace{999, 'Tarantella', 'Tarantula'}
+box.space.tester:replace{999, 'Tarantella', 'Tarantula'}
 
 -- Retrieve the tuple.
 -- The clause "{999}" is still mandatory, although it does not have to
 -- mention the primary key. */
-box.space.space0:select{999}
+box.space.tester:select{999}
 
 -- Delete the tuple.
 -- Once again the clause to identify the primary-key field is mandatory.
-box.space.space0:delete{999}
+box.space.tester:delete{999}
 </programlisting>
 </para>
 
 <para>
 How does Tarantool do a basic operation? Let's take this example:
 <programlisting>
-box.space.space0:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
+box.space.tester:update({3}, {{'=', 2, 'size'}, {'=', 3, 0}})
 </programlisting>
 which, for those who know SQL, is equivalent to a statement like
-UPDATE space0 SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
+UPDATE tester SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
 </para>
 
 <para>

@@ -287,7 +287,7 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
 tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
 tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
-        -&gt; <userinput>              t = box.space.space0:select(key);</userinput>
+        -&gt; <userinput>              t = box.space.tester:select(key);</userinput>
         -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
         -&gt; <userinput>              return f(...)]], 1)!</userinput>
@@ -383,9 +383,9 @@ get expirationd through the test.
 <programlisting>
      box.cfg{}
      a = box.schema.create_space('origin')
-     a:create_index('first', {type = 'tree', parts = {0, 'NUM'}})
+     a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})
      b = box.schema.create_space('archive')
-     b:create_index('first', {type = 'tree', parts = {0, 'STR'}})
+     b:create_index('first', {type = 'tree', parts = {1, 'STR'}})
      expd = require('expirationd')
      expd._debug = true
      expd.do_test('origin', 'archive')
@@ -489,27 +489,27 @@ which will be evident after looking in more detail at the source code.
 tarantool> <userinput>pickle = require('pickle')</userinput>
 ---
 ...
-tarantool> <userinput>box.space.space0:insert{0, 'hello world'}</userinput>
+tarantool> <userinput>box.space.tester:insert{0, 'hello world'}</userinput>
 ---
 - [0, 'hello world']
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, 'bye world'}})</userinput>
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 'bye world'}})</userinput>
 ---
 - [0, 'bye world']
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
 ---
 - [0, "\0\0\0\0\x03\0\0\0hello"]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'=', 2, 4}})</userinput>
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 4}})</userinput>
 ---
 - [0, 4]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'+', 2, 4}})</userinput>
+tarantool> <userinput>box.space.tester:update({0}, {{'+', 2, 4}})</userinput>
 ---
 - [0, 8]
 ...
-tarantool> <userinput>box.space.space0:update({0}, {{'^', 2, 4}})</userinput>
+tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 ---
 - [0, 12]
 ...
@@ -537,7 +537,7 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^', 2, 4}})</userinput>
 ---
 ...
 <prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
-<prompt>tarantool></prompt> <userinput>tuple = box.space.space0:replace{0}!</userinput>
+<prompt>tarantool></prompt> <userinput>tuple = box.space.tester:replace{0}!</userinput>
 ---
 ...
 <prompt>tarantool></prompt> <userinput>string.len(tuple[1])!</userinput>
@@ -621,14 +621,14 @@ tarantool> <userinput>box.space.space0:update({0}, {{'^', 2, 4}})</userinput>
 <prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
 <prompt>localhost&gt;</prompt> <userinput>session = require('session'); session.delimiter('!') --this means ignore line feeds until next '!'</userinput>
 <prompt>localhost&gt;</prompt> <userinput>function password_insert()</userinput>
-        <prompt>-&gt;</prompt> <userinput>  box.space.space0:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
+        <prompt>-&gt;</prompt> <userinput>  box.space.tester:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
         <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
         <prompt>-&gt;</prompt> <userinput>  end!</userinput>
 ---
 ...
 <prompt>localhost&gt;</prompt> <userinput>function password_check(password)</userinput>
         <prompt>-&gt;</prompt>  <userinput> local t</userinput>
-        <prompt>-&gt;</prompt>  <userinput> t=box.space.space0:select{12345}</userinput>
+        <prompt>-&gt;</prompt>  <userinput> t=box.space.tester:select{12345}</userinput>
         <prompt>-&gt;</prompt>  <userinput> if (digest.sha1(password)==t[2]) then</userinput>
         <prompt>-&gt;</prompt>  <userinput>   print('Password is valid')</userinput>
         <prompt>-&gt;</prompt>  <userinput>   else</userinput>
@@ -947,7 +947,7 @@ tarantool> z[1],z[2],z[3],z[4]
 - b
 - 2
 ...
-tarantool> box.space.space0:insert{20,msgpack.NULL,20}
+tarantool> box.space.tester:insert{20,msgpack.NULL,20}
 ---
 - [20, null, 20]
 ...

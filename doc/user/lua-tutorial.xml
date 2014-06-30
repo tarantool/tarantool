@@ -305,24 +305,24 @@ tarantool&gt;
 <bridgehead renderas="sect4">Modify main_function to insert a tuple into the database</bridgehead>
 
 Now that it's clear how to make a tuple that contains a number and a 10-letter random string,
-the only trick remaining is putting that tuple into space0. Remember that space0 is
+the only trick remaining is putting that tuple into tester. Remember that tester is
 the first space that was defined in the sandbox, so it's like a database table.
 <programlisting>
 function main_function()
   local string_value
   string_value = string_function()
   t = box.tuple.new({1,string_value})
-  box.space.space0:replace(t)
+  box.space.tester:replace(t)
   end!
 </programlisting>
-The new line here is box.space.space0:replace(t). The name contains 'space0' because the
-insertion is going to be to space0. The second parameter is the tuple value.
-To be perfectly correct we could have said box.space.space0:insert(t) here, rather than
-box.space.space0:replace(t), but "replace" means <quote>insert even if there is already a tuple
+The new line here is box.space.tester:replace(t). The name contains 'tester' because the
+insertion is going to be to tester. The second parameter is the tuple value.
+To be perfectly correct we could have said box.space.tester:insert(t) here, rather than
+box.space.tester:replace(t), but "replace" means <quote>insert even if there is already a tuple
 whose primary-key value is a duplicate</quote>, and that makes it easier to re-run
 the exercise even if the sandbox database isn't empty.
 
-Once this is done, space0 will contain a tuple with two fields. The first
+Once this is done, tester will contain a tuple with two fields. The first
 field will be 1. The second field will be a random 10-letter string.
 
 Once again the string_function() can be invoked from main_function() which can be invoked with
@@ -332,7 +332,7 @@ use a SELECT request.
 
 <programlisting>
 main_function()!
-box.space.space0:select(1)!
+box.space.tester:select(1)!
 </programlisting>
 </para>
 
@@ -348,14 +348,14 @@ tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>local string_value</userinput>
         -&gt;   <userinput>string_value = string_function()</userinput>
         -&gt;   <userinput>t = box.tuple.new({1,string_value})</userinput>
-        -&gt;   <userinput>box.space.space0:replace(t)</userinput>
+        -&gt;   <userinput>box.space.tester:replace(t)</userinput>
         -&gt;   <userinput>end!</userinput>
 ---
 ...
 tarantool&gt; <userinput>main_function()!</userinput>
 ---
 ...
-tarantool&gt; <userinput>box.space.space0:select(1)!</userinput>
+tarantool&gt; <userinput>box.space.tester:select(1)!</userinput>
 ---
 - - [1, 'EUJYVEECIL']
 ...
@@ -379,7 +379,7 @@ function main_function()
   for i = 1,1000000,1 do
     string_value = string_function()
     t = box.tuple.new({i,string_value})
-    box.space.space0:replace(t)
+    box.space.tester:replace(t)
     end
   end_time = os.clock()
   end!
@@ -430,7 +430,7 @@ function main_function()
   for i = 1,1000000,1 do
     string_value = string_function()
     t = box.tuple.new({i,string_value})
-    box.space.space0:replace(t)
+    box.space.tester:replace(t)
     end
   end_time = os.clock()
   end!
@@ -460,7 +460,7 @@ tarantool&gt; <userinput>function main_function()</userinput>
         -&gt;   <userinput>for i = 1,1000000,1 do</userinput>
         -&gt;     <userinput>string_value = string_function()</userinput>
         -&gt;     <userinput>t = box.tuple.new({i,string_value})</userinput>
-        -&gt;     <userinput>box.space.space0:replace(t)</userinput>
+        -&gt;     <userinput>box.space.tester:replace(t)</userinput>
         -&gt;     <userinput>end</userinput>
         -&gt;   <userinput>end_time = os.clock()</userinput>
         -&gt;   <userinput>end!</userinput>
@@ -511,7 +511,7 @@ function sum_json_field(field_name)
   json = require('json')
   local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
   sum = 0                                                               --[[2]]
-  for v, t in box.space.space0:pairs() do                               --[[3]]
+  for v, t in box.space.tester:pairs() do                               --[[3]]
     is_valid_json, lua_table = pcall(json.decode, t[2])                 --[[4]]
     if is_valid_json then                                               --[[5]]
       field_value = lua_table[field_name]                               --[[6]]
@@ -598,17 +598,17 @@ sandbox database that was introduced in
 targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your first database</quote></olink>,
 
 <programlisting>
-box.space.space0:drop()           -- if space0 is left over from some previous test, destroy it
-box.schema.create_space('space0')
-box.space.space0:create_index('primary', {parts = {1, 'NUM'}})
+box.space.tester:drop()           -- if tester is left over from some previous test, destroy it
+box.schema.create_space('tester')
+box.space.tester:create_index('primary', {parts = {1, 'NUM'}})
 </programlisting>
 then add some tuples where the first field is a number and the second field is a string.
 </para>
 <programlisting>
-box.space.space0:insert{444, '{"Item": "widget", "Quantity": 15}'}
-box.space.space0:insert{445, '{"Item": "widget", "Quantity": 7}'}
-box.space.space0:insert{446, '{"Item": "golf club", "Quantity": "sunshine"}'}
-box.space.space0:insert{447, '{"Item": "waffle iron", "Quantit": 3}'}
+box.space.tester:insert{444, '{"Item": "widget", "Quantity": 15}'}
+box.space.tester:insert{445, '{"Item": "widget", "Quantity": 7}'}
+box.space.tester:insert{446, '{"Item": "golf club", "Quantity": "sunshine"}'}
+box.space.tester:insert{447, '{"Item": "waffle iron", "Quantit": 3}'}
 </programlisting>
 <para>
 Since this is a test, there are deliberate errors. The "golf club" and

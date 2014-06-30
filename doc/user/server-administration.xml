@@ -163,22 +163,22 @@ Here is an example of an interactive-mode tarantool client session:
                 [ tarantool will display an introductory message including version number here ]
 tarantool> box.cfg{admin_port=3313, primary_port=3303}
                 [ tarantool will display configuration information here ]
-tarantool> s = box.schema.create_space('space0')
+tarantool> s = box.schema.create_space('tester')
                 [ tarantool may display an in-progress message here ]
 ---
 ...
 tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
-tarantool> box.space.space0:insert{1,'My first tuple'}
+tarantool> box.space.tester:insert{1,'My first tuple'}
 ---
 - [1, 'My first tuple']
 ...
-tarantool> box.space.space0:select(1)
+tarantool> box.space.tester:select(1)
 ---
 - - [1, 'My first tuple']
 ...
-tarantool> box.space.space0:drop()
+tarantool> box.space.tester:drop()
 ---
 ...
 tarantool> os.exit()

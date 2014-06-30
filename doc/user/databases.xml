@@ -373,19 +373,19 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
                Possible Errors: No such space; wrong type.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.space0:insert{101, 'test#1', 'my first tuple'}</userinput>
+tarantool> <userinput>box.space.tester:insert{101, 'test#1', 'my first tuple'}</userinput>
 ---
 - [101, 'test#1', 'my first tuple']
 ...
-tarantool> <userinput>box.space.space0:select{101}</userinput>
+tarantool> <userinput>box.space.tester:select{101}</userinput>
 ---
 - - [101, 'test#1', 'my first tuple']
 ...
-tarantool> <userinput>box.space.space0:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
+tarantool> <userinput>box.space.tester:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
 ---
 - [105, 'test#2', 'first_name', 'last_name']
 ...
-tarantool> <userinput>table_of_tuples = box.space.space0:select{105}</userinput>
+tarantool> <userinput>table_of_tuples = box.space.tester:select{105}</userinput>
 ---
 ...
 tarantool> <userinput>table_of_tuples[1]</userinput>
@@ -622,11 +622,11 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
 #Assume that the initial state of the database is ...
-#  space0 has one tuple set and one primary key whose type is 'NUM'.
+#  tester has one tuple set and one primary key whose type is 'NUM'.
 #  There is one tuple, with field[1] = 999 and field[2] = 'A'.
 
 #In the following update ...
-#  The first argument is space0, that is, the affected space is space0
+#  The first argument is tester, that is, the affected space is tester
 #  The second argument is 999, that is, the affected tuple is identified by
 #    primary key value = 999
 #  The third argument is '=', that is, there is one operation, assignment
@@ -634,7 +634,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
 #  The fourth argument is 2, that is, the affected field is field[2]
 #  The fifth argument is 'B', that is, field[2] contents change to 'B'
 #  Therefore, after the following update, field[1] = 999 and field[2] = 'B'.
-box.space.space0:update(999, {{'=', 2, 'B'}})
+box.space.tester:update(999, {{'=', 2, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #  the key is passed as a Lua table (inside braces). This is unnecessary
@@ -642,14 +642,14 @@ box.space.space0:update(999, {{'=', 2, 'B'}})
 #  primary key had more than one field.
 #  Therefore, after the following update, field[1] = 999 and field[2] = 'B'
 #    (no change).
-box.space.space0:update({999}, {{'=', 2, 'B'}})
+box.space.tester:update({999}, {{'=', 2, 'B'}})
 
 #In the following update, the arguments are the same, except that ...
 #   The fourth argument is 3, that is, the affected field is field[3].
 #   It is okay that, until now, field[3] has not existed. It gets added.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'B',
 #     field[3] = 1.
-box.space.space0:update({999}, {{'=', 3, 1}})
+box.space.tester:update({999}, {{'=', 3, 1}})
 
 #In the following update, the arguments are the same, except that ...
 #   The third argument is '+', that is, the operation is addition rather
@@ -657,7 +657,7 @@ box.space.space0:update({999}, {{'=', 3, 1}})
 #   Since field[3] previously contained 1, this means we're adding 1 to 1.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'B',
 #     field[3] = 2.
-box.space.space0:update({999}, {{'+', 3, 1}})
+box.space.tester:update({999}, {{'+', 3, 1}})
 
 #In the following update ...
 #   The idea is to modify two fields at once.
@@ -667,19 +667,19 @@ box.space.space0:update({999}, {{'+', 3, 1}})
 #   The seventh and eighth arguments mean that field[2] gets assigned 'C'.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'C',
 #     field[3] = 3.
-box.space.space0:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
+box.space.tester:update({999}, {{'|', 3, 1}, {'=', 2, 'C'}})
 
 #In the following update ...
 #   The idea is to delete field[2], then subtract 3 from field[3], but ...
 #   after the delete, there is a renumbering -- so field[3] becomes field[2]
 #   before we subtract 3 from it, and that's why the seventh argument is 2 not 3.
 #   Therefore, after the following update, field[1] = 999, field[2] = 0.
-box.space.space0:update({999}, {{'#', 2, 1}, {'-', 2, 3}})
+box.space.tester:update({999}, {{'#', 2, 1}, {'-', 2, 3}})
 
 #In the following update ...
 #   We're making a long string so that splice will work in the next example.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'XYZ'.
-box.space.space0:update({999}, {{'=', 2, 'XYZ'}})
+box.space.tester:update({999}, {{'=', 2, 'XYZ'}})
 
 #In the following update ...
 #   The third argument is ':', that is, this is the example of splice.
@@ -688,7 +688,7 @@ box.space.space0:update({999}, {{'=', 2, 'XYZ'}})
 #   The sixth argument is 1 because the number of bytes to delete is 1.
 #   The seventh argument is '!!' because '!!' is to be added at this position.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.
-box.space.space0:update({999}, {{':', 2, 1, 1, '!!'}})
+box.space.tester:update({999}, {{':', 2, 1, 1, '!!'}})
 
 </programlisting>
             </para>
@@ -715,14 +715,14 @@ box.space.space0:update({999}, {{':', 2, 1, 1, '!!'}})
               Complexity Factors: Index size, Index type
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.space0:delete(0)</userinput>
+tarantool> <userinput>box.space.tester:delete(0)</userinput>
 ---
 - [0, 'My first tuple']
 ...
-tarantool> <userinput>box.space.space0:delete(0)</userinput>
+tarantool> <userinput>box.space.tester:delete(0)</userinput>
 ---
 ...
-tarantool> <userinput>box.space.space0:delete('a')</userinput>
+tarantool> <userinput>box.space.tester:delete('a')</userinput>
 - error: 'Supplied key type of part 0 does not match index part type:
   expected NUM'
 </programlisting>
@@ -735,7 +735,7 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
         <listitem>
             <para>
               (type = number) Ordinal space number. Spaces can be referenced by either name or number.
-              Thus, if space 'space0' has id = 800, then "box.space.space0:insert{0}" and "box.space[800]:insert{0}"
+              Thus, if space 'tester' has id = 800, then "box.space.tester:insert{0}" and "box.space[800]:insert{0}"
               are equivalent requests.
             </para>
         </listitem>
@@ -773,7 +773,7 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
               of type <code xlink:href="#box.index">box.index</code> with
               methods to search tuples and iterate over them in predefined order.
         <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.id,box.space.space0.field_count,box.space.space0.index.primary.type</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.id,box.space.tester.field_count,box.space.tester.index.primary.type</userinput>
 ---
 - 512
 - 0
@@ -792,7 +792,7 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
             <para>
               Returns: (type = number) number of tuples in the space.
               <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0:len()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester:len()</userinput>
 ---
  - 2
 ...
@@ -817,10 +817,10 @@ tarantool> <userinput>box.space.space0:delete('a')</userinput>
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0:truncate()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester:truncate()</userinput>
 ---
 ...
-tarantool&gt; <userinput>box.space.space0:len()</userinput>
+tarantool&gt; <userinput>box.space.tester:len()</userinput>
 ---
  - 0
 ...
@@ -956,7 +956,7 @@ session.delimiter('')!</programlisting>
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
-- - '33 0 space0 sophia 0  '
+- - '33 0 tester sophia 0  '
   - '272 1 _schema memtx 0 '
   - '280 1 _space memtx 0 '
   - '288 1 _index memtx 0 '
@@ -1099,7 +1099,7 @@ session.delimiter('')!
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
 ---
 - - space1 tuple_count =0
-  - space0 tuple_count =3. first field in first tuple = 1
+  - tester tuple_count =3. first field in first tuple = 1
   - _schema tuple_count =1. first field in first tuple = version
   - _space tuple_count =7. first field in first tuple = 33
   - _index tuple_count =13. first field in first tuple = 272
@@ -1181,11 +1181,11 @@ session.delimiter('')!
                Possible errors: index has wrong type or primary-key indexed field is not a number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>box.space.space0:auto_increment{'Fld#1', 'Fld#2'}</userinput>
+<programlisting>tarantool> <userinput>box.space.tester:auto_increment{'Fld#1', 'Fld#2'}</userinput>
 ---
 - [1, 'Fld#1', 'Fld#2']
 ...
-tarantool> <userinput>box.space.space0:auto_increment{'Fld#3'}</userinput>
+tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
 ---
 - [2, 'Fld#3']
 ...
@@ -1276,7 +1276,7 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
 <bridgehead renderas="sect4">Example showing use of the box functions</bridgehead>
 <para xml:id="box-function-example" xreflabel="box-function-example">
 This example will work with the sandbox configuration described in the preface.
-That is, there is a space named space0 with a numeric primary key.
+That is, there is a space named tester with a numeric primary key.
 The example function will: (1) select a tuple whose key value is 1000;
 (2) return an error if the tuple already exists and already has 3 fields;
 (3) Insert or replace the tuple with: field[1] = 1000, field[2] = a uuid, field[3] = number of seconds since 1970-01-01;
@@ -1294,7 +1294,7 @@ function example()
   local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
   local formatted_time_field
   local fiber = require('fiber')
-  table_of_selected_tuples = box.space.space0:select(1000)
+  table_of_selected_tuples = box.space.tester:select(1000)
   if table_of_selected_tuples ~= nil then
     if table_of_selected_tuples[1] ~= nil then
       if #table_of_selected_tuples[1] == 3 then
@@ -1302,7 +1302,7 @@ function example()
       end
     end
   end
-  replaced_tuple = box.space.space0:replace
+  replaced_tuple = box.space.tester:replace
             {1000,  require('uuid').hex(), tostring(fiber.time())}
   time_field = tonumber(replaced_tuple[3])
   formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
@@ -1316,7 +1316,7 @@ session.delimiter('')!
 <para>
 ... And here is what happens when one invokes the function:
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>box.space.space0:delete(1000)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>box.space.tester:delete(1000)</userinput>
 ---
 - 1000: {'264ee2da03634f24972be76c43808254', '1391037015.6809'}
 ...
@@ -1364,7 +1364,7 @@ session.delimiter('')!
               Saying <code>t</code> returns the entire tuple t.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-            <programlisting>tarantool&gt; <userinput>x = box.space.space0:insert{33,tonumber('1'),tonumber64('2')}:totable()</userinput>
+            <programlisting>tarantool&gt; <userinput>x = box.space.tester:insert{33,tonumber('1'),tonumber64('2')}:totable()</userinput>
 ---
 ...
 tarantool> <userinput>t = box.tuple.new({'abc', 'def', 'ghi', 'abc'})</userinput>
@@ -1727,7 +1727,7 @@ session.delimiter('')!
     <varlistentry>
         <term></term>
         <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary</userinput>
 ---
   unique: true
   parts:
@@ -1869,18 +1869,18 @@ session.delimiter('')!
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-# Create a space named space0.
+# Create a space named tester.
 # Create a unique index 'primary', which won't be needed for this example.
 # Create a non-unique index 'secondary' with an index on the second field.
 # Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
 # Select all tuples where the secondary index keys are greater than 'X'.
-box.schema.create_space('space0')
-box.space.space0:create_index('primary', {parts = {1, 'NUM' }})
-box.space.space0:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
-box.space.space0:insert{1,'X','Row with field[2]=X'}
-box.space.space0:insert{2,'Y','Row with field[2]=Y'}
-box.space.space0:insert{3,'Z','Row with field[2]=Z'}
-box.space.space0.index.secondary:select({'X'}, {iterator = 'GT'})
+box.schema.create_space('tester')
+box.space.tester:create_index('primary', {parts = {1, 'NUM' }})
+box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
+box.space.tester:insert{1,'X','Row with field[2]=X'}
+box.space.tester:insert{2,'Y','Row with field[2]=Y'}
+box.space.tester:insert{3,'Z','Row with field[2]=Z'}
+box.space.tester.index.secondary:select({'X'}, {iterator = 'GT'})
 </programlisting>
 The result will be a table of tuples and will look like this:
 <programlisting>
@@ -1912,7 +1912,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:min()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:min()</userinput>
 ---
 - ['Alpha!', 55, 'This is the first tuple!']
 ...
@@ -1940,7 +1940,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:max()</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:max()</userinput>
 ---
 - ['Gamma!', 55, 'This is the third tuple!']
 ...
@@ -1971,7 +1971,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.secondary:random(1)</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.secondary:random(1)</userinput>
 ---
 - ['Beta!', 66, 'This is the second tuple!']
 ...
@@ -1999,12 +1999,12 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count(999)</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count(999)</userinput>
 ---
 - 0
 ...
 </programlisting>
-<programlisting>tarantool&gt; <userinput>box.space.space0.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
 ---
  - 1
 ...
@@ -2207,7 +2207,7 @@ The result will be a table of tuples and will look like this:
               strings.
             </para>
             <para>
-              Example: <code>conn:call('box.space.space0:insert',{2})</code>.
+              Example: <code>conn:call('box.space.tester:insert',{2})</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -2237,14 +2237,14 @@ The result will be a table of tuples and will look like this:
  <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
  <para>
  This example will work with the sandbox configuration described in the preface.
- That is, there is a space named space0 with a numeric primary key.
+ That is, there is a space named tester with a numeric primary key.
  Assume that the database is nearly empty.
  Assume that the tarantool server is running on localhost 127.0.0.1:3303.
 <programlisting>
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'space0')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'tester')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
 <prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
@@ -2259,20 +2259,20 @@ The result will be a table of tuples and will look like this:
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3303)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.space0.id, {800, 'data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on space0, index 0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.tester.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on tester.')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.tester.id, {800, 'data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on tester, index 0')</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on space0, index 0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.tester.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on tester, index 0')</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.space0.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.space0.id, {800, 'New data', 'Extra data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on space0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.space0.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on space0')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.tester.id, 800)</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on tester')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.tester.id, {800, 'New data', 'Extra data'})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on tester')</userinput>
+<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.tester.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
+<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on tester')</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
 <prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
@@ -2287,17 +2287,17 @@ The result will be a table of tuples and will look like this:
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
   - The local server primary port number = 3303 = default
-  - conn:delete done on space0.
-  - conn:insert done on space0, index 0
+  - conn:delete done on tester.
+  - conn:insert done on tester, index 0
   - '  primary key value = 800.'
-  - conn:select done on space0, index 0
+  - conn:select done on tester, index 0
   - '  number of fields = 2'
-  - conn:delete done on space0
-  - conn:replace done on space0
-  - conn:update done on space0
+  - conn:delete done on tester
+  - conn:replace done on tester
+  - conn:update done on tester
   - conn:close done
 ...
-<prompt>tarantool&gt;</prompt><userinput> box.space.space0:select(800) -- Prove that the update succeeded.</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.space.tester:select(800) -- Prove that the update succeeded.</userinput>
 ---
 - [800, 'Fld#1', 'Extra data']
 ...
@@ -2940,11 +2940,11 @@ error: can't save snapshot, errno 17 (File exists)
 </section>
 
 <section xml:id="sp-limitations">
-<title>Limitations of stored procedures</title>
+<title>A limitation that affects long-running Lua functions</title>
 
 <para>
-    There are two limitations in stored procedures support one should
-    be aware of: execution atomicity and lack of typing.
+    There is a limitation in stored procedures support one should
+    be aware of: execution atomicity.
 </para>
 <bridgehead renderas="sect4">Cooperative multitasking environment</bridgehead>
 <para>
@@ -2989,16 +2989,7 @@ error: can't save snapshot, errno 17 (File exists)
     Multiple data change requests always run through a built-in
     yield point.
 </para>
-<bridgehead renderas="sect4">Lack of field types</bridgehead>
-<para>
-   When invoking a function from the binary protocol,
-   it's not possible to convey types of arguments. Tuples are
-   type-agnostic. The conventional workaround is to use
-   strings to pass all (textual and numeric) data.
-</para>
-
 </section>
-
 
 </chapter>
 <!--
