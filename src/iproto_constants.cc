@@ -322,7 +322,7 @@ void
 iproto_encode_auth(struct iproto_header *packet, const char *greeting,
 		   const char *login, const char *password)
 {
-	memset(packet, sizeof(*packet), 0);
+	memset(packet, 0, sizeof(*packet));
 
 	uint32_t login_len = strlen(login);
 	uint32_t password_len = strlen(password);
