@@ -166,6 +166,12 @@ replica_bootstrap(struct recovery_state *r)
 }
 
 static void
+remote_set_status(struct remote *remote, const char *status)
+{
+	title("replica", "%s/%s", port_uri_to_string(&remote->uri), status);
+}
+
+static void
 pull_from_remote(va_list ap)
 {
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
@@ -183,8 +189,7 @@ pull_from_remote(va_list ap)
 			struct iproto_header row;
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
-				title("replica", "%s/%s", r->remote.source,
-				      "connecting");
+				remote_set_status(&r->remote, "connecting");
 				if (iobuf == NULL)
 					iobuf = iobuf_new(fiber_name(fiber()));
 				err = "can't connect to master";
@@ -195,8 +200,7 @@ pull_from_remote(va_list ap)
 					&r->server_uuid, &r->vclock);
 				remote_write_row(&coio, &row);
 				warning_said = false;
-				title("replica", "%s/%s", r->remote.source,
-				      "connected");
+				remote_set_status(&r->remote, "connected");
 			}
 			err = "can't read row";
 			remote_read_row(&coio, iobuf, &row);
@@ -214,12 +218,12 @@ pull_from_remote(va_list ap)
 			iobuf_reset(iobuf);
 			fiber_gc();
 		} catch (FiberCancelException *e) {
-			title("replica", "%s/%s", r->remote.source, "failed");
+			remote_set_status(&r->remote, "failed");
 			iobuf_delete(iobuf);
 			evio_close(loop, &coio);
 			throw;
 		} catch (Exception *e) {
-			title("replica", "%s/%s", r->remote.source, "failed");
+			remote_set_status(&r->remote, "failed");
 			e->log();
 			if (! warning_said) {
 				if (err != NULL)
@@ -257,8 +261,9 @@ recovery_follow_remote(struct recovery_state *r)
 	assert(r->remote.reader == NULL);
 	assert(recovery_has_remote(r));
 
-	say_crit("starting replication from %s", r->remote.source);
-	snprintf(name, sizeof(name), "replica/%s", r->remote.source);
+	const char *uri = port_uri_to_string(&r->remote.uri);
+	say_crit("starting replication from %s", uri);
+	snprintf(name, sizeof(name), "replica/%s", uri);
 
 	try {
 		f = fiber_new(name, pull_from_remote);

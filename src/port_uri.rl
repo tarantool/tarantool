@@ -61,12 +61,23 @@ port_uri_to_string(const struct port_uri * uri)
 			    shost, sizeof(shost),
 			    sservice, sizeof(sservice),
 			    NI_NUMERICHOST|NI_NUMERICSERV);
-		if (uri->addr.sa_family == AF_INET)
-			snprintf(str, sizeof(str), "%s://%s:%s",
-				 uri->schema, shost, sservice);
-		else
-			snprintf(str, sizeof(str), "%s://[%s]:%s",
-				 uri->schema, shost, sservice);
+		if (uri->addr.sa_family == AF_INET) {
+			if (strncmp(uri->schema, "tcp", 3) == 0) {
+				snprintf(str, sizeof(str), "%s:%s",
+					 shost, sservice);
+			} else {
+				snprintf(str, sizeof(str), "%s://%s:%s",
+					 uri->schema, shost, sservice);
+			}
+		} else {
+			if (strncmp(uri->schema, "tcp", 3) == 0) {
+				snprintf(str, sizeof(str), "%s:%s",
+					 shost, sservice);
+			} else {
+				snprintf(str, sizeof(str), "%s://[%s]:%s",
+					 uri->schema, shost, sservice);
+			}
+		}
                 break;
 	}
 	case AF_UNIX:
@@ -117,9 +128,9 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		hex1_4 = ([0-9a-fA-F]{1,4});
 
 
-		schema		= (alpha+)
+		schema		= ((alpha+) "://")
 			>{ schema.start = p; }
-		    %{ schema.end   = p; };
+		    %{ schema.end   = p - 3; };
 
 		login		= (alnum+)
 			>{ login.start  = p; }
@@ -174,7 +185,7 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		    ("unix://"
 		      ((login ":" password "@") ?) file) |
 
-		     ((schema "://")?
+		     ((schema)?
 			((login ":" password "@")?)
 			host
 			((":" service)?))		    |
