@@ -941,29 +941,34 @@ local remote_methods = {
 
 setmetatable(remote, { __index = remote_methods })
 
-box.ping = function() return true end
-box.close = function() return true end
-box.wait_connected = function() return true end
-box.call = function(_box, proc_name, ...)
-    local proc = { package.loaded['box.internal'].call_loadproc(proc_name) }
-    local result
-    if #proc == 2 then
-        result = { proc[1](proc[2], ...) }
-    else
-        result = { proc[1](...) }
-    end
+remote.self = {
+    ping = function() return true end,
+    close = function() end,
+    timeout = function(self) return self end,
+    wait_connected = function(self) return true end,
+    call = function(_box, proc_name, ...)
+            local proc = { package.loaded['box.internal']
+                .call_loadproc(proc_name) }
+            local result
+            if #proc == 2 then
+                result = { proc[1](proc[2], ...) }
+            else
+                result = { proc[1](...) }
+            end
 
-    if #result == 1 and type(result[1]) == 'table' then
-        result = result[1]
-    end
+            if #result == 1 and type(result[1]) == 'table' then
+                result = result[1]
+            end
 
-    for i, v in pairs(result) do
-        result[i] = box.tuple.new(v)
+            for i, v in pairs(result) do
+                result[i] = box.tuple.new(v)
+            end
+        return result
     end
-    return result
-end
+}
 
-box.timeout = function() return box end
+setmetatable(remote.self, { __index = box })
+
 
 return remote
 
