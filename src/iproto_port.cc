@@ -80,7 +80,7 @@ iproto_reply_error(struct obuf *out, const ClientError *e, uint64_t sync)
 
 	uint32_t len = sizeof(header) - 5 + sizeof(body) + msg_len;
 	header.v_len = mp_bswap_u32(len);
-	header.v_code = mp_bswap_u32(tnt_errcode_val(e->errcode()));
+	header.v_code = mp_bswap_u32(iproto_encode_error(e->errcode()));
 	header.v_sync = mp_bswap_u64(sync);
 
 	body.v_data_len = mp_bswap_u32(msg_len);

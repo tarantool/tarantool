@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <sys/uio.h> /* struct iovec */
 #include <msgpuck/msgpuck.h>
+#include "errcode.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -106,6 +107,7 @@ iproto_key_bit(unsigned char key)
 extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 enum iproto_request_type {
+	IPROTO_OK = 0,
 	IPROTO_SELECT = 1,
 	IPROTO_INSERT = 2,
 	IPROTO_REPLACE = 3,
@@ -116,7 +118,9 @@ enum iproto_request_type {
 	IPROTO_DML_REQUEST_MAX = 8,
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
-	IPROTO_SUBSCRIBE = 66
+	IPROTO_SUBSCRIBE = 66,
+	IPROTO_ERROR_RECOVERABLE = 1 << 14,
+	IPROTO_ERROR_UNRECOVERABLE = 1 << 15
 };
 
 extern const char *iproto_request_type_strs[];
@@ -143,6 +147,12 @@ static inline bool
 iproto_request_is_dml(uint32_t type)
 {
 	return type < IPROTO_DML_REQUEST_MAX;
+}
+
+static inline bool
+iproto_request_is_error(uint32_t type)
+{
+	return type >= IPROTO_ERROR_RECOVERABLE;
 }
 
 enum {
@@ -176,6 +186,19 @@ iproto_decode_uuid(const char **pos, struct tt_uuid *out);
 
 char *
 iproto_encode_uuid(char *pos, const struct tt_uuid *in);
+
+#include <say.h>
+
+/** Return a 4-byte numeric error code, with status flags. */
+static inline uint32_t
+iproto_encode_error(uint32_t error)
+{
+	if (iproto_request_is_error(error))
+		return error; /* box.raise() can raise arbitrary error code */
+	if (tnt_error_codes[error].errflags & 1)
+		return error | IPROTO_ERROR_RECOVERABLE;
+	return error | IPROTO_ERROR_UNRECOVERABLE;
+}
 
 int
 iproto_header_encode(const struct iproto_header *header,

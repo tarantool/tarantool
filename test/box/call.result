@@ -48,7 +48,7 @@ call f1()
 call dostring('box.raise(33333, "Hey!")')
 ---
 - error:
-    errcode: ER_UNKNOWN (33333)
+    errcode: ER_UNKNOWN (565)
     errmsg: Hey!
 ...
 
