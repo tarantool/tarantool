@@ -178,19 +178,15 @@ s:update({1}, {{'+', 3, 16}, {'&', 4, 0xffff0000}, {'|', 4, 0x0000a0a0}, {'^', 4
 - error: 'Field 3 UPDATE error: double update of the same field'
 ...
 -- test update splice operation
-s:update({1}, {{':', 2, 0, 3, 'the newest'}})
----
-- [1, 'the newest field string value', 42, 3735928559]
-...
 s:replace{1953719668, 'something to splice'}
 ---
 - [1953719668, 'something to splice']
 ...
-s:update(1953719668, {{':', 2, 0, 4, 'no'}})
+s:update(1953719668, {{':', 2, 1, 4, 'no'}})
 ---
 - [1953719668, 'nothing to splice']
 ...
-s:update(1953719668, {{':', 2, 0, 2, 'every'}})
+s:update(1953719668, {{':', 2, 1, 2, 'every'}})
 ---
 - [1953719668, 'everything to splice']
 ...
@@ -227,6 +223,30 @@ s:update(1953719668, {{'=', 2, 'bye, world'}})
 s:delete{1953719668}
 ---
 - [1953719668, 'bye, world']
+...
+s:replace({10, 'abcde'})
+---
+- [10, 'abcde']
+...
+s:update(10,  {{':', 2, 0, 0, '!'}})
+---
+- error: 'Field SPLICE error: offset is out of bound'
+...
+s:update(10,  {{':', 2, 1, 0, '('}})
+---
+- [10, '(abcde']
+...
+s:update(10,  {{':', 2, 2, 0, '({'}})
+---
+- [10, '(({abcde']
+...
+s:update(10,  {{':', 2, -1, 0, ')'}})
+---
+- [10, '(({abcde)']
+...
+s:update(10,  {{':', 2, -2, 0, '})'}})
+---
+- [10, '(({abcde}))']
 ...
 -- test update delete operations
 s:update({1}, {{'#', 4, 1}, {'#', 3, 1}})

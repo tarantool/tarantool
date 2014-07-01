@@ -57,11 +57,9 @@ s:update({1}, {{'=', 2, 'new field string value'}, {'=', 3, 42}, {'=', 4, 0xdead
 s:update({1}, {{'+', 3, 16}, {'&', 4, 0xffff0000}, {'|', 4, 0x0000a0a0}, {'^', 4, 0xffff00aa}})
 
 -- test update splice operation
-s:update({1}, {{':', 2, 0, 3, 'the newest'}})
-
 s:replace{1953719668, 'something to splice'}
-s:update(1953719668, {{':', 2, 0, 4, 'no'}})
-s:update(1953719668, {{':', 2, 0, 2, 'every'}})
+s:update(1953719668, {{':', 2, 1, 4, 'no'}})
+s:update(1953719668, {{':', 2, 1, 2, 'every'}})
 -- check an incorrect offset
 s:update(1953719668, {{':', 2, 100, 2, 'every'}})
 s:update(1953719668, {{':', 2, -100, 2, 'every'}})
@@ -71,6 +69,13 @@ s:truncate()
 s:insert{1953719668, 'hello world'}
 s:update(1953719668, {{'=', 2, 'bye, world'}})
 s:delete{1953719668}
+
+s:replace({10, 'abcde'})
+s:update(10,  {{':', 2, 0, 0, '!'}})
+s:update(10,  {{':', 2, 1, 0, '('}})
+s:update(10,  {{':', 2, 2, 0, '({'}})
+s:update(10,  {{':', 2, -1, 0, ')'}})
+s:update(10,  {{':', 2, -2, 0, '})'}})
 
 -- test update delete operations
 s:update({1}, {{'#', 4, 1}, {'#', 3, 1}})
