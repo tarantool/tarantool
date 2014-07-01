@@ -38,7 +38,7 @@ struct iproto_header_bin {
 	uint8_t m_code;                         /* MP_UINT32 */
 	uint32_t v_code;                        /* response status */
 	uint8_t k_sync;                         /* IPROTO_SYNC */
-	uint8_t m_sync;                         /* MP_UIN32 */
+	uint8_t m_sync;                         /* MP_UIN64 */
 	uint64_t v_sync;                        /* sync */
 } __attribute__((packed));
 
