@@ -161,3 +161,4 @@ download:
         [https://github.com/tarantool/tarantool-php]: https://github.com/tarantool/tarantool-php
         [https://github.com/devgru/node-tarantool]: https://github.com/devgru/node-tarantool
         [https://github.com/rtsisyk/etarantool]: https://github.com/rtsisyk/etarantool
+        [https://github.com/tarantool/tarantool-c]: https://github.com/tarantool/tarantool-c
