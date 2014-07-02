@@ -18,28 +18,18 @@ Tarantool is started by entering the command:
 
 <programlisting><prompt>$ </prompt><userinput>tarantool</userinput></programlisting>
 or
-<programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>Lua-initialization-file</replaceable></userinput></programlisting>
-or
 <programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>options</replaceable></userinput></programlisting>
+or
+<programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>Lua-initialization-file</replaceable> [<replaceable>arguments</replaceable>]</userinput></programlisting>
 
 </para>
 
 <section xml:id="command-line-options">
-<title>Command line parameter and options</title>
+<title>Command options</title>
   <para>
 
   </para>
   <itemizedlist>
-    <listitem xml:id="lua-file-option">
-     <para><option><replaceable>lua-initialization-file</replaceable></option></para>
-     <para>Invoke the Lua program in this file,
-      which by convention may have the name "script.lua",
-      when starting tarantool.
-      If the program invokes <code>box.cfg{}</code>,
-      see the reference for a
-      <olink targetptr="configuration-file">configuration file</olink>.</para>
-     </listitem>
-    
     <listitem xml:id="help-option">
       <para><option>--help</option>, <option>-h</option></para>
       <para>Print an annotated list of all available options and exit.</para>
@@ -93,24 +83,17 @@ Target: Linux-x86_64-Debug
 </section>
 
 <section xml:id="configuration-file" xreflabel="configuration file">
-<title>Configuration</title>
-  <para>
-     Configuration parameters should be done with
-     <code>box.cfg{<replaceable> key = value [, key_value ...]</replaceable>}</code>
-     which should be one of the first things called, if the database
-     server will be used or if ports need to be opened.
-  </para>
-  <para>
-    Since box.cfg may contain many configuration parameters
-    and since some of the parameters (such as directory addresses)
-    are semi-permanent, it's best to keep box.cfg in a Lua file.
-    Typically this Lua file is the initialization file
-    which is specified on the tarantool command line.
-    A simple example of such a file is <filename>test/box/box.lua</filename>:
-<programlisting>
-#!/usr/bin/env tarantool
-os = require('os')
+<title>Configuration file</title>
+<para>
+If the command to start Tarantool includes <option><replaceable>lua-initialization-file</replaceable></option>,
+then Tarantool begins by invoking the Lua program in the file,
+which by convention may have the name <filename>"script.lua"</filename>.
 
+The Lua program may get further arguments from the command line
+or may use operating-system functions, such as getenv().
+The Lua program almost always begins by invoking <code>box.cfg()</code>,
+if the database server will be used or if ports need to be opened.
+For example, suppose <filename>script.lua</filename> contains the lines<programlisting>#!/usr/bin/env tarantool
 box.cfg{
     primary_port        = os.getenv("PRIMARY_PORT"),
     admin_port          = os.getenv("ADMIN_PORT"),
@@ -118,7 +101,33 @@ box.cfg{
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50
 }
-</programlisting>
+print('Starting ',arg[1])</programlisting>
+and suppose the command line is <code>~/tarantool/src/tarantool script.lua ARG</code>.
+Then the screen might look like this:<programlisting>
+<prompt>$</prompt> <userinput>export PRIMARY_PORT=3303</userinput>
+<prompt>$</prompt> <userinput>~/tarantool/src/tarantool script.lua ARG</userinput>
+2014-07-02 10:19:29.078 ... version 1.6.0-1471-g663694c
+2014-07-02 10:19:29.078 ... log level 5
+2014-07-02 10:19:29.078 ... mapping 107374184 bytes for a shared arena...
+2014-07-02 10:19:29.086 ... initialized
+2014-07-02 10:19:29.101 ... recovery start
+2014-07-02 10:19:29.107 ...  bound to primary port tcp://0.0.0.0:3303
+2014-07-02 10:19:29.108 ... I am primary
+Starting  ARG
+2014-07-02 10:19:29.108 ... entering the event loop</programlisting>
+</para>
+</section>
+
+<section xml:id="configuration-parameters" xreflabel="configuration parameters">
+<title>Configuration parameters</title>
+<para>
+    Configuration parameters have the form
+     <code>box.cfg{<replaceable> key = value [, key_value ...]</replaceable>}</code>.
+    Since box.cfg may contain many configuration parameters
+    and since some of the parameters (such as directory addresses)
+    are semi-permanent, it's best to keep box.cfg in a Lua file.
+    Typically this Lua file is the initialization file
+    which is specified on the tarantool command line.
   </para>
   <para>
     Most configuration parameters are for allocating resources,

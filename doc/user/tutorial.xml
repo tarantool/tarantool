@@ -62,12 +62,11 @@ start a shell (terminal) and enter one of the following sets of command-line ins
 </para>
 
 <para>
-<programlisting>
-# DEBIAN commands for Tarantool master binary download:
-# There is always an up-to-date Debian repository at
-# <link xlink:href="http://tarantool.org/dist/master/debian">http://tarantool.org/dist/master/debian</link>
-# The repository contains builds for Debian unstable "Sid", stable "Wheezy",
-# forthcoming "Jessie", ...
+<emphasis>DEBIAN commands for Tarantool master binary download</emphasis>:
+There is always an up-to-date Debian repository at
+<link xlink:href="http://tarantool.org/dist/master/debian">http://tarantool.org/dist/master/debian</link>
+The repository contains builds for Debian unstable "Sid", stable "Wheezy",
+forthcoming "Jessie", ...<programlisting>
 # add the tarantool.org repository to your apt sources list:
 # ($release is an environment variable which will contain the Debian version
 # code e.g. "Wheezy")
@@ -86,12 +85,11 @@ release=`lsb_release -c -s`
 </para>
 
 <para>
-<programlisting>
-# UBUNTU commands for Tarantool master binary download:
-# There is always an up-to-date Ubuntu repository at
-# <link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
-# The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
-# 13.04 "raring", 13.10 "saucy", 14.04 "trusty" ...
+<emphasis>UBUNTU commands for Tarantool master binary download</emphasis>:
+There is always an up-to-date Ubuntu repository at
+<link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
+The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
+13.04 "raring", 13.10 "saucy", 14.04 "trusty" ...<programlisting>
 # add the tarantool.org repository to your apt sources list:
 # ($release is an environment variable which will contain the Ubuntu version
 # code e.g. "precise")
@@ -113,10 +111,9 @@ release=`lsb_release -c -s`
 </para>
 
 <para>
-<programlisting>
-# CENTOS commands for Tarantool master binary download:
-# These instructions are applicable for CentOS version 5 or 6,
-# and RHEL version 5 or 6
+<emphasis>CENTOS commands for Tarantool master binary download</emphasis>:
+These instructions are applicable for CentOS version 5 or 6,
+and RHEL version 5 or 6.<programlisting>
 # Pick the CentOS repository which fits your CentOS/RHEL version
 # and your x86 platform:
 # <link xlink:href="http://tarantool.org/dist/master/centos/5/os/i386">http://tarantool.org/dist/master/centos/5/os/i386 for version 5, x86-32</link>
@@ -147,9 +144,8 @@ release=`lsb_release -c -s`
 </para>
 
 <para>
-<programlisting>
-# FEDORA commands for Tarantool master binary download:
-# These instructions are applicable for Fedora 20.
+<emphasis>FEDORA commands for Tarantool master binary download</emphasis>:
+# These instructions are applicable for Fedora 20.<programlisting>
 # Pick the Fedora repository:
 # <link xlink:href="http://tarantool.org/dist/master/fedora/20/x86_64">http://tarantool.org/dist/master/fedora/20/x86_64 for version 20, x86-64</link>
 # Add the following section to your yum repository list
@@ -176,9 +172,8 @@ release=`lsb_release -c -s`
 </para>
 
 <para>
-<programlisting>
-# GENTOO commands for Tarantool master binary download:
-# Tarantool is available from tarantool portage overlay.
+<emphasis>GENTOO commands for Tarantool master binary download</emphasis>:
+Tarantool is available from tarantool portage overlay.<programlisting>
 # Use layman to add the overlay to your system:
 <command>layman</command> <option>-S</option>
 <command>layman</command> <option>-a</option> tarantool
@@ -187,20 +182,17 @@ release=`lsb_release -c -s`
 </para>
 
 <para>
-<programlisting>
-# FREEBSD commands for Tarantool master binary download:
+<emphasis>FREEBSD commands for Tarantool master binary download</emphasis>:
 # With your browser go to the FreeBSD ports page
 # <link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
 # Enter the search term: tarantool
 # Choose the package you want.
-</programlisting>
 </para>
 
 <para>
-<programlisting>
-# MAC OS X commands for Tarantool master binary download:
-# This is actually a <quote><productname>homebrew</productname></quote> recipe
-# so it's not a true binary download, some source code is involved.
+<emphasis>MAC OS X commands for Tarantool master binary download</emphasis>:
+This is actually a <quote><productname>homebrew</productname></quote> recipe
+so it's not a true binary download, some source code is involved.<programlisting>
 # First upgrade Clang (the C compiler) to version 3.2 or later using
 # Command Line Tools for Xcode disk image version 4.6+ from
 # Apple Developer web-site.
@@ -240,9 +232,8 @@ github.com, and from github one gets with git.
  <listitem>
    <para>
 A C/C++ compiler.
-	Ordinarily the compiler is <productname>GCC</productname> version 4.5 or later,
-		on Mac OS X it should be <productname>Clang</productname> version 3.2 or later.
-   There may be some benefit in rebuilding gcc to suit tarantool requirements.
+	Ordinarily the compiler is <productname>GCC</productname> version 4.6 or later,
+  on Mac OS X it should be <productname>Clang</productname> version 3.2 or later.
  </para>
  </listitem>
  <listitem>
@@ -257,31 +248,32 @@ A program for managing the build process.
 
 <para>
 Here are names of tools and libraries which may have to be installed in advance,
-	using <quote><computeroutput>sudo apt-get</computeroutput></quote> (for Ubuntu), <quote><computeroutput>sudo yum install</computeroutput></quote> (for CentOS),
+using <quote><computeroutput>sudo apt-get</computeroutput></quote> (for Ubuntu), <quote><computeroutput>sudo yum install</computeroutput></quote> (for CentOS),
 or the equivalent on other platforms. Different platforms may use slightly
-	different names. Do not worry about the <quote>optional, for build with -DENABLE_DOC</quote>
-ones unless you intend to work on the documentation.
-<programlisting> binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces
- gcc or clang                        # see above
- git                                 # see above
- uuid-dev                            # for uuid_* functions and replication
- cmake                               # see above
- libreadline-dev                     # for interactive mode
- libncurses5-dev or ncurses-devel    # see above
- xsltproc                            # optional, for build with -DENABLE_DOC
- lynx                                # optional, for build with -DENABLE_DOC
- jing                                # optional, for build with -DENABLE_DOC
- libxml2-utils                       # optional, for build with -DENABLE_DOC
- docbook5-xml                        # optional, for build with -DENABLE_DOC
- docbook-xsl-ns                      # optional, for build with -DENABLE_DOC
- w3c-sgml-lib                        # optional, for build with -DENABLE_DOC
- libsaxon-java                       # optional, for build with -DENABLE_DOC
- libxml-commons-resolver1.1-java     # optional, for build with -DENABLE_DOC
- libxerces2-java                     # optional, for build with -DENABLE_DOC
- libxslthl-java                      # optional, for build with -DENABLE_DOC
- autoconf                            # optional, appears only in Mac OS scripts
- zlib1g or zlib                      # optional, appears only in Mac OS scripts</programlisting>
-</para>
+different names. Do not worry about the <quote>optional, for build with -DENABLE_DOC</quote>
+ones unless you intend to work on the documentation.</para>
+<itemizedlist>
+ <listitem><para>binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces</para></listitem>
+ <listitem><para> gcc or clang                        # see above</para></listitem>
+ <listitem><para> git                                 # see above</para></listitem>
+ <listitem><para> uuid-dev                            # for uuid_* functions and replication</para></listitem>
+ <listitem><para> cmake                               # see above</para></listitem>
+ <listitem><para> libreadline-dev                     # for interactive mode</para></listitem>
+ <listitem><para> libncurses5-dev or ncurses-devel    # see above</para></listitem>
+ <listitem><para> xsltproc                            # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> lynx                                # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> jing                                # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> libxml2-utils                       # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> docbook5-xml                        # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> docbook-xsl-ns                      # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> w3c-sgml-lib                        # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> libsaxon-java                       # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> libxml-commons-resolver1.1-java     # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> libxerces2-java                     # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> libxslthl-java                      # optional, for build with -DENABLE_DOC</para></listitem>
+ <listitem><para> autoconf                            # optional, appears only in Mac OS scripts</para></listitem>
+ <listitem><para> zlib1g or zlib                      # optional, appears only in Mac OS scripts</para></listitem>
+</itemizedlist>
 
 <para>
 2. Set up python modules for running the test suite or creating documentation.
@@ -418,7 +410,8 @@ subdirectory:<programlisting><command>rm</command> ~/tarantool/bin/python
 <para>
 9. Make an rpm.
    This step is optional. It's only for people who want to redistribute Tarantool.
-   Package maintainers who want to build with rpmbuild should consult the Tarantool developer guide.
+   Package maintainers who want to build with rpmbuild should consult the
+   <productname xlink:href="http://tarantool.org/tarantool_developer_guide.html">Tarantool developer guide</productname>.
 </para>
 
 <para>

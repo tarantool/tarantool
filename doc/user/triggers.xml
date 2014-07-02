@@ -9,32 +9,31 @@
   <title>Defining triggers in Lua</title>
 <blockquote>
     <para>
-        Triggers are Lua scripts invoked by the system upon
-        a certain event. As well as on_replace triggers,
-        Tarantool currently supports
-        system-wide triggers which are run when a new connection
-        is established or dropped. Since trigger body is
-        a Lua script, it is external to the server, and
-        a trigger must be set up on each server start.
-        This is most commonly done in <olink
-        targetptr="init.lua">the initialization script</olink>.
-        Once a trigger for an event exists, it is automatically
-        invoked whenever an event occurs.  The performance
-        overhead of triggers, as long as they are not defined, is
-        minimal: merely a pointer dereference and check. If a
-        trigger is defined, its overhead is equivalent to the
-        overhead of calling a stored procedure.
+    Triggers are Lua scripts which are executed by the server
+    when certain events happen. Currently the two types of
+    triggers are <link linkend="on_replace">on_replace</link> triggers
+    which for database events, and connection triggers,
+    which are executed when a new connection
+    is created or dropped.
+    Triggers must be set up when the server starts.
+    This is most commonly done in <olink
+    targetptr="init.lua">the initialization script</olink>.
+    The performance
+    overhead of triggers, as long as they are not defined, is
+    minimal: merely a pointer dereference and check. If a
+    trigger is defined, its overhead is equivalent to the
+    overhead of calling a stored procedure.
     </para>
 </blockquote>
 <section xml:id="sp-box-session-triggers" xreflabel="session triggers">
-    <title>Triggers on connect and disconnect</title>
+    <title>Connection triggers</title>
 <variablelist>
     <varlistentry>
         <term>
             <emphasis role="lua">session.on_connect(chunk) </emphasis>
         </term>
         <listitem><para>
-		Set a callback (trigger) invoked on each connected session.
+	      	Set a callback (trigger) for invoking on each connected session.
         The callback doesn't get any arguments, but is the first
         thing invoked in the scope of the newly created session.
         If the trigger fails by raising an error, the error

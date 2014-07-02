@@ -6,31 +6,8 @@
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:xlink="http://www.w3.org/1999/xlink"
       xml:id="stored-procedures">
-    <title>Writing stored procedures in Lua</title>
-<blockquote>
-    <para>
-        <link xlink:href="http://www.lua.org">Lua</link>
-        is a light-weight, multi-paradigm, embeddable language.
-        Stored procedures in Lua can be used to implement
-        data manipulation patterns or data structures. A
-        server-side routine written in Lua can select and modify
-        data, access configuration and perform administrative
-        tasks. It is possible to dynamically define, invoke,
-        alter and drop Lua functions. Lua functions can run
-        in the background and perform administrative tasks,
-        such as data expiration or re-sharding.
+    <title>Writing and running Lua code</title>
 
-    </para>
-    <para>
-        Tarantool uses the <link
-        xlink:href="http://www.luajit.org">LuaJIT</link>
-        just-in-time Lua compiler and virtual machine.
-        Apart from increased performance, this provides such
-        features as <link
-        xlink:href="http://bitop.luajit.org/">bitwise
-        operations</link> and <link xlink:href="#tonumber64">64-bit integer arithmetic.</link>
-    </para>
-</blockquote>
     <para>
       Procedures can be defined and invoked interactively, for example::
       <programlisting><computeroutput>tarantool> <userinput>function f1() return 'hello' end</userinput>
@@ -42,9 +19,8 @@ tarantool> <userinput>f1()</userinput>
 ...
 </computeroutput>
 </programlisting>
-      In the above example, the requests are being sent, via either the
-      <olink targetptr="primary_port">primary port</olink> or the <olink targetptr="admin_port">administrative port</olink>,
-      using the text or binary protocol, for evaluation as a chunk of Lua code.
+      In the above example, the requests are being handled in interactive mode
+      for evaluation as a chunk of Lua code.
     </para>
     <para>
       Thus, the request "<code>function f1() return 'hello' end</code>"
@@ -65,18 +41,13 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
 </computeroutput></programlisting>
     </para>
     <para>
-      Lua functions could also be called at the time of initialization
-      using a dedicated <filename xml:id="init.lua" xreflabel="init.lua">init.lua</filename> script,
-      located in 
-      <olink targetptr="script_dir"><filename>script_dir</filename></olink>.
+    Lua functions could also be called at the time of initialization with a script in a
+    <olink targetptr="configuration-file">configuration file</olink>.
     An example and discussion of such a script will appear later in section
     <link linkend="sp-expirationd">expirationd</link>.
     </para>
     <para>
-      The initialization script can select and modify data. However,
-      if the server is a running replica, data change requests from
-      the start script fail just the same way they would fail if they
-      were sent from a remote client.
+      The initialization script can select and modify data.
     </para>
     <para>
      Another common task to perform in the initialization script
@@ -104,13 +75,6 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       definitions, as described in the 
       <link xlink:href="http://www.lua.org/pil/6.1.html">
       <emphasis>closure</emphasis> section</link> of the Lua manual. 
-    </para>
-    <para>
-      The interpreter environment is not restricted when
-      <olink targetptr="init.lua"/> is loaded. But before the
-      server starts accepting requests, it disables access to
-      some of the standard Lua APIs for file I/O, process control,
-      and module management. This prevents trivial security attacks.
     </para>
     <para>
       The
@@ -301,115 +265,6 @@ tarantool&gt; <userinput>session.delimiter('')!</userinput>
     </varlistentry>
     
 </variablelist>
-
-<section xml:id="sp-expirationd">
- <title>expirationd -- the daemon that shifts expired tuples to a long-term archive</title>
-
-<para>
-For a commercial-grade example of a Lua rock that works with Tarantool,
-let us look at expirationd, which Tarantool supplies on
-<link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">GitHub</link>
-with an Artistic license. The expirationd.lua program is
-lengthy (about 500 lines), so here we will only highlight
-the matters that will be enhanced by studying the full source later.
-<programlisting>
-            task.worker_fiber = fiber.create(worker_loop)
-            task.worker_fiber:resume(task)
-            log.info("expiration: task %q restarted", task.name)
-            ...
-            fiber.sleep(expirationd.constants.check_interval)
-            ...
-</programlisting>
-Whenever one hears "daemon" in Tarantool, one should suspect it's
-being done with <olink targetptr="sp-box-fiber">fibers</olink>. The program is making a fiber
-and turning control over to it so it runs occasionally, goes to
-sleep, then comes back for more.
-<programlisting>
-    for _, tuple in scan_space.index[0]:pairs(nil, {iterator = box.index.ALL}) do
-    ...
-            if task.is_tuple_expired(task.args, tuple) then
-            task.expired_tuples_count = task.expired_tuples_count + 1
-            task.process_expired_tuple(task.space_id, task.args, tuple)
-    ...
-</programlisting>
-The "for" instruction can be translated as "iterate through the index of
-the space that is being scanned", and within it, if the tuple is "expired"
-(that is, if the tuple has a timestamp field which is less than the current
-time), process the tuple as an expired tuple.
-<programlisting>
--- put expired tuple in archive
-local function put_tuple_to_archive(space_id, args, tuple)
-    -- delete expired tuple
-    box.space[space_id]:delete{tuple[0]}
-    local email = get_field(tuple, 1)
-    if args.archive_space_id ~= nil and email ~= nil then
-        box.space[args.archive_space_id]:replace{email, os.time()}
-    end
-end
-</programlisting>
-Ultimately the tuple-expiry process leads to put_tuple_to_archive()
-which does a "delete" of a tuple from its original space, and an
-"insert" of the same tuple into another space. Tarantool's "replace"
-function is the same as an "insert" function without an error message
-if a tuple with the same content already exists in the target space.
-<programlisting>
-function expirationd.do_test(space_id, archive_space_id)
-...
-</programlisting>
-At this point, if the above explanation is worthwhile, it's clear that
-expirationd.lua starts a background routine (fiber) which iterates
-through all the tuples in a space, sleeps cooperatively so that other
-fibers can operate at the same time, and -- whenever it finds a tuple
-that has expired -- deletes it from this space and puts it in another
-space. Now the "do_test()" function can be used to create some sample
-spaces, let the daemon run for a while, and print results.
-</para>
-<para>
-For those who like to see things run, here are the exact steps to
-get expirationd through the test.
-</para>
-<para>
-1. Get expirationd.lua.
-   There are standard ways -- it is after all part of a standard rock --
-   but for this purpose just copy the contents of
-   <link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">https://github.com/tarantool/expirationd/blob/master/expirationd.lua</link>
-   to a default directory.
-</para>
-<para>
-2. Start the Tarantool server as described <olink targetptr="getting-started-start-stop">before</olink>.
-</para>
-<para>
-3. Execute these requests:
-<programlisting>
-     box.cfg{}
-     a = box.schema.create_space('origin')
-     a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})
-     b = box.schema.create_space('archive')
-     b:create_index('first', {type = 'tree', parts = {1, 'STR'}})
-     expd = require('expirationd')
-     expd._debug = true
-     expd.do_test('origin', 'archive')
-     os.exit()
-</programlisting>
-The database-specific requests (cfg, create_space, create_index)
-should already be familiar. The key for getting the rock rolling is
-<code>expd = require('expirationd')</code>.
-The "require" function is what reads in the program; it will appear
-in many later examples in this manual, when it's necessary to get a
-package that's not part of the Tarantool kernel. After the Lua
-variable expd has been assigned the value of the expirationd package,
-it's possible to invoke the package's <code>do_test()</code> function.
-</para>
-<para>
-After a while, when the task has had time to do its iterations through
-the spaces, do_test() will print out a report showing the tuples that
-were originally in the original space, the tuples that have now been
-moved to the archive space, and some statistics. Of course, expirationd
-can be customized to do different things by passing different parameters,
-which will be evident after looking in more detail at the source code.  
-</para> 
-
-</section>
 
 <section xml:id="sp-pickle">
     <title>Package <code>pickle</code></title>
@@ -2026,6 +1881,116 @@ for instructions about defining triggers for connect and disconnect events
 ...
 </programlisting>
 </para>
+
+</section>
+
+
+<section xml:id="sp-expirationd">
+ <title>expirationd -- the daemon that shifts expired tuples to a long-term archive</title>
+
+<para>
+For a commercial-grade example of a Lua rock that works with Tarantool,
+let us look at expirationd, which Tarantool supplies on
+<link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">GitHub</link>
+with an Artistic license. The expirationd.lua program is
+lengthy (about 500 lines), so here we will only highlight
+the matters that will be enhanced by studying the full source later.
+<programlisting>
+            task.worker_fiber = fiber.create(worker_loop)
+            task.worker_fiber:resume(task)
+            log.info("expiration: task %q restarted", task.name)
+            ...
+            fiber.sleep(expirationd.constants.check_interval)
+            ...
+</programlisting>
+Whenever one hears "daemon" in Tarantool, one should suspect it's
+being done with <olink targetptr="sp-box-fiber">fibers</olink>. The program is making a fiber
+and turning control over to it so it runs occasionally, goes to
+sleep, then comes back for more.
+<programlisting>
+    for _, tuple in scan_space.index[0]:pairs(nil, {iterator = box.index.ALL}) do
+    ...
+            if task.is_tuple_expired(task.args, tuple) then
+            task.expired_tuples_count = task.expired_tuples_count + 1
+            task.process_expired_tuple(task.space_id, task.args, tuple)
+    ...
+</programlisting>
+The "for" instruction can be translated as "iterate through the index of
+the space that is being scanned", and within it, if the tuple is "expired"
+(that is, if the tuple has a timestamp field which is less than the current
+time), process the tuple as an expired tuple.
+<programlisting>
+-- put expired tuple in archive
+local function put_tuple_to_archive(space_id, args, tuple)
+    -- delete expired tuple
+    box.space[space_id]:delete{tuple[0]}
+    local email = get_field(tuple, 1)
+    if args.archive_space_id ~= nil and email ~= nil then
+        box.space[args.archive_space_id]:replace{email, os.time()}
+    end
+end
+</programlisting>
+Ultimately the tuple-expiry process leads to put_tuple_to_archive()
+which does a "delete" of a tuple from its original space, and an
+"insert" of the same tuple into another space. Tarantool's "replace"
+function is the same as an "insert" function without an error message
+if a tuple with the same content already exists in the target space.
+<programlisting>
+function expirationd.do_test(space_id, archive_space_id)
+...
+</programlisting>
+At this point, if the above explanation is worthwhile, it's clear that
+expirationd.lua starts a background routine (fiber) which iterates
+through all the tuples in a space, sleeps cooperatively so that other
+fibers can operate at the same time, and -- whenever it finds a tuple
+that has expired -- deletes it from this space and puts it in another
+space. Now the "do_test()" function can be used to create some sample
+spaces, let the daemon run for a while, and print results.
+</para>
+<para>
+For those who like to see things run, here are the exact steps to
+get expirationd through the test.
+</para>
+<para>
+1. Get expirationd.lua.
+   There are standard ways -- it is after all part of a standard rock --
+   but for this purpose just copy the contents of
+   <link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">https://github.com/tarantool/expirationd/blob/master/expirationd.lua</link>
+   to a default directory.
+</para>
+<para>
+2. Start the Tarantool server as described <olink targetptr="getting-started-start-stop">before</olink>.
+</para>
+<para>
+3. Execute these requests:
+<programlisting>
+     box.cfg{}
+     a = box.schema.create_space('origin')
+     a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})
+     b = box.schema.create_space('archive')
+     b:create_index('first', {type = 'tree', parts = {1, 'STR'}})
+     expd = require('expirationd')
+     expd._debug = true
+     expd.do_test('origin', 'archive')
+     os.exit()
+</programlisting>
+The database-specific requests (cfg, create_space, create_index)
+should already be familiar. The key for getting the rock rolling is
+<code>expd = require('expirationd')</code>.
+The "require" function is what reads in the program; it will appear
+in many later examples in this manual, when it's necessary to get a
+package that's not part of the Tarantool kernel. After the Lua
+variable expd has been assigned the value of the expirationd package,
+it's possible to invoke the package's <code>do_test()</code> function.
+</para>
+<para>
+After a while, when the task has had time to do its iterations through
+the spaces, do_test() will print out a report showing the tuples that
+were originally in the original space, the tuples that have now been
+moved to the archive space, and some statistics. Of course, expirationd
+can be customized to do different things by passing different parameters,
+which will be evident after looking in more detail at the source code.  
+</para> 
 
 </section>
 

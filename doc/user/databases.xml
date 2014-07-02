@@ -40,10 +40,12 @@
     merge multiple update() invocations into a single one, with no
     change in semantics.
   </para>
+
   <para>Tarantool protocol was designed with focus on asynchronous
     I/O and easy integration with proxies. Each client
-    request starts with a 12-byte binary header, containing three
-    fields: request type, length, and a numeric id.
+    request starts with a variable-length binary header, containing
+    request id, request type, server id, log sequence number, and
+    so on.
   </para>
  <para>
     The mandatory length, present in request header simplifies
@@ -87,13 +89,11 @@
   
     The contents of the <code>box</code> library can be inspected at runtime with
     <code>box</code>, with no arguments.
-    The packages inside the box library are: schema, box, box.tuple, box.space, box.index, 
+    The packages inside the box library are: schema, box.tuple, box.space, box.index, 
     box.net.box, box.cfg, box.info, box.slab, box.stat.
     Every package contains one or more Lua functions. A few packages contain members as well as functions.
     The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
-    creating or resuming or interrupting fibers,
-    introspection (inspecting contents of spaces, accessing server configuration),
-    and sending or receiving data over a network.
+    and introspection (inspecting contents of spaces, accessing server configuration).
     </para>
 
     <para>
@@ -119,7 +119,7 @@
     <para>
     A "nil" type has only one possible value, also called "nil", but often displayed
     as "null". Nils may be compared to values of any types with == (is-equal) or ~=
-    (is-not-equal), but other operations will not work. Nils may not be used in tuples;
+    (is-not-equal), but other operations will not work. Nils may not be used in Lua tables;
     the workaround is to use
     <link linkend="yaml-null"><code>yaml.NULL</code></link>
     or <link linkend="json-null"><code>json.NULL</code></link>
@@ -127,10 +127,9 @@
     </para>
     <para>
       A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
-      A  few functions may return multiple tuples.
+      A  few functions may return tables with multiple tuples.
       A scalar may be converted to a tuple with only one field.
-      A tuple may not contain nil.
-      A Lua table may contain all of a tuple's fields except the "key" (the primary-key fields).
+      A Lua table may contain all of a tuple's fields, but not nil.
       For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
     </para>
 
@@ -241,6 +240,9 @@ tarantool> <userinput>s = box.schema.create_space('space55')</userinput>
 tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporary = false})</userinput>
 ---
 - error: Space 'space55' already exists
+...
+tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = true})</userinput>
+---
 ...
 </programlisting>
             </para>
@@ -873,7 +875,7 @@ tarantool&gt; <userinput>box.space.tester:len()</userinput>
     </varlistentry>
 
     <varlistentry>
-        <term>
+        <term xml:id="on_replace">
          <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:on_replace(<replaceable>function-name</replaceable>)</emphasis>
         </term>
         <listitem>
@@ -1123,14 +1125,348 @@ session.delimiter('')!
 
 </section>
 
-
-<section xml:id="sp-box">
-    <title>Package <code>box</code></title>
-<variablelist xml:id="box" xreflabel="box">
+<section xml:id="sp-box-index">
+    <title>Package <code >box.index</code></title>
+<variablelist xml:id="box.index" xreflabel="box.index">
+            <para>
+              The <code>box.index</code> package provides read-only access for index definitions and index keys.
+              Indexes are contained in <code
+              xlink:href="#box.space">box.space.<replaceable>space-name</replaceable>.index</code> array
+              within each space object. They provide an API for
+              ordered iteration over tuples. This API is a direct
+              binding to corresponding methods of index objects of type <code>box.index</code> in the
+              storage engine.
+            </para>
+    <varlistentry>
+        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.unique</emphasis></term>
+        <listitem>
+            <para>
+              (type = boolean) true if the index is unique.
+            </para>
+        </listitem>
+    </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.raise(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.type</emphasis>
+        </term>
+        <listitem>
+            <para>
+              (type = string) index type,  'TREE' or 'HASH' or 'BITSET'.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.key_field</emphasis>
+        </term>
+        <listitem>
+            <para>
+              An array describing index key fields.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term></term>
+        <listitem><bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary</userinput>
+---
+  unique: true
+  parts:
+    0:
+      type: NUM
+      fieldno: 1
+  id: 0
+  type: TREE
+  idx: ' index 0'
+  etc.
+...</programlisting></listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+             <emphasis role="lua" xml:id="boxindexiterator" xreflabel="box.index.iterator(type, ...)">
+            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:iterator(<replaceable>iterator-type, bitset-value | field-value...</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                This method provides iteration support within an
+                index. Parameter <code>type</code> is used to
+                identify the semantics of iteration. Different
+                index types support different iterators. The
+                remaining arguments of the function are varying
+                and depend on the iteration type. For example,
+                a TREE index maintains a strict order of keys and
+                can return all tuples in ascending or descending
+                order, starting from the specified key. Other
+                index types, however, do not support ordering.
+            </para>
+            <para xml:id="iterator-consistency">
+                To understand consistency of tuples
+                returned by an iterator, it's essential to know
+                the principles of the Tarantool transaction processing
+                subsystem.
+                An iterator in Tarantool does not own a consistent
+                read view. Instead, each procedure is granted exclusive
+                access to all tuples and spaces until it
+                encounters a "context switch": by causing a write to
+                disk, network, or by an explicit call to <emphasis
+                role="lua" xlink:href="#fiber.yield">fiber.yield()</emphasis>.
+                When the execution flow returns to the yielded
+                procedure, the data set could have changed significantly.
+                Iteration, resumed after a yield point, does not
+                preserve the read view, but continues with the new
+                content of the database.
+            </para>
+            <para>
+                Parameters:
+                <code>type</code> &mdash; iteration strategy as defined in tables below.
+            </para>
+            <para>
+               Returns: this method returns an iterator closure, i.e.
+                    a <code>function</code> which can be used to
+                    get the next value on each invocation.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, Number of tuples accessed.
+            </para>
+            <para>
+               Possible Errors:
+                    Selected iteration type is not supported in
+                    the subject index type, or supplied parameters
+                    do not match iteration type.
+            </para>
+
+            <xi:include href="iterator-types.xml"/>
+
+            <para>
+                <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+<prompt>tarantool&gt;</prompt> <userinput> s = box.schema.create_space('space17')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', 'C'}</userinput>
+---
+- ['C', 'C']
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'B', 'A'}</userinput>
+---
+- ['B', 'A']
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', '!'}</userinput>
+---
+- ['C', '!']
+...
+<prompt>tarantool&gt;</prompt> <userinput> s:insert{'A', 'C'}</userinput>
+---
+- ['A', 'C']
+...
+<prompt>tarantool&gt;</prompt> <userinput> session = require('session'); session.delimiter('!')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> function example()
+         &gt;   for _, tuple in
+         &gt;   s.index.primary:pairs(nil, {iterator = box.index.ALL}) do
+         &gt;     print(tuple)
+         &gt;   end
+         &gt; end!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> session.delimiter('')!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput> example()</userinput>
+['A', 'C']
+['B', 'A']
+['C', '!']
+['C', 'C']
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>s:drop()</userinput>
+---
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term>
+             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
+            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+             This is is an alternative to <olink targetptr="box.select">box.space...select()</olink>
+             which goes via a particular index and can make use of additional parameters that
+             specify the iterator type, and the limit (that is, the maximum number of tuples to
+             return) and the offset (that is, which tuple to start with in the list).
+            </para>
+            <para>
+              Returns: (type = table of tuples) the tuple or tuples that match the field values.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+# Create a space named tester.
+# Create a unique index 'primary', which won't be needed for this example.
+# Create a non-unique index 'secondary' with an index on the second field.
+# Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
+# Select all tuples where the secondary index keys are greater than 'X'.
+box.schema.create_space('tester')
+box.space.tester:create_index('primary', {parts = {1, 'NUM' }})
+box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
+box.space.tester:insert{1,'X','Row with field[2]=X'}
+box.space.tester:insert{2,'Y','Row with field[2]=Y'}
+box.space.tester:insert{3,'Z','Row with field[2]=Z'}
+box.space.tester.index.secondary:select({'X'}, {iterator = 'GT'})
+</programlisting>
+The result will be a table of tuples and will look like this:
+<programlisting>
+---
+- - [2, 'Y', 'Row with field[2]=Y']
+  - [3, 'Z', 'Row with field[2]=Z']
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Find the minimum value in the specified index.
+            </para>
+            <para>
+              Returns: (type = tuple) the tuple for the first key in the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
+              Possible errors: index is not of type 'TREE'.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:min()</userinput>
+---
+- ['Alpha!', 55, 'This is the first tuple!']
+...
+</programlisting>
+        </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([key])</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Find the maximum value in the specified index.
+            </para>
+            <para>
+              Returns: (type = tuple) the tuple for the last key in the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
+              Possible errors: index is not of type 'TREE'.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:max()</userinput>
+---
+- ['Gamma!', 55, 'This is the third tuple!']
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:random(<replaceable>random-value</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Find a random value in the specified index.
+              This method is useful when it's important to get insight
+              into data distribution in an index without having to
+               iterate over the entire data set.
+            </para>
+            <para>
+              Parameters: <code>random-value</code> = an arbitrary non-negative integer.
+            </para>
+            <para>
+              Returns: (type = tuple) the tuple for the random key in the index.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.secondary:random(1)</userinput>
+---
+- ['Beta!', 66, 'This is the second tuple!']
+...
+</programlisting>
+        </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:count(<replaceable>key-value</replaceable>, options)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Iterate over an index, counting the number of tuples which equal the
+              provided search criteria.
+            </para>
+            <para>
+              Parameters: <code>key-value</code> = the value which must match the key(s)
+              in the specified index. The type may be a list of field-values, or a tuple containing
+              only the field-values.
+            </para>
+            <para>
+              Returns: (type = number) the number of matching index keys.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count(999)</userinput>
+---
+- 0
+...
+</programlisting>
+<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
+---
+ - 1
+...
+</programlisting>
+        </para>
+        </listitem>
+    </varlistentry>
+
+</variablelist>
+</section>
+
+<section xml:id="sp-error">
+    <title>Package <code>error</code></title>
+<variablelist xml:id="error" xreflabel="error">
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">error.raise(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1144,9 +1480,9 @@ session.delimiter('')!
                 etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
                 in the source tree.
                 Lua constants which correspond to Tarantool errors
-                are defined in the <code>box.error</code> module. The error
+                are defined in the <code>error.error</code> module. The error
                 message can be arbitrary.
-                Lua function can use <code>box.raise()</code> to emulate
+                Lua function can use <code>error.raise()</code> to emulate
                 request errors (for example: unique key exception).
                 When called without arguments this function re-throws the last
                 thrown error.
@@ -1159,7 +1495,7 @@ session.delimiter('')!
               Possible errors: whatever is specified in errcode-number.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.raise(box.error.NO_SUCH_SPACE, 'Error: No such space')</userinput>
+<programlisting>tarantool&gt; <userinput>error.raise(box.error.NO_SUCH_SPACE, 'Error: No such space')</userinput>
 ---
 - error: 'Error: No such space'
 ...
@@ -1691,342 +2027,6 @@ session.delimiter('')!
 </para>
 
 </section>
-
-<section xml:id="sp-box-index">
-    <title>Package <code >box.index</code></title>
-<variablelist xml:id="box.index" xreflabel="box.index">
-            <para>
-              The <code>box.index</code> package provides read-only access for index definitions and index keys.
-              Indexes are contained in <code
-              xlink:href="#box.space">box.space.<replaceable>space-name</replaceable>.index</code> array
-              within each space object. They provide an API for
-              ordered iteration over tuples. This API is a direct
-              binding to corresponding methods of index objects of type <code>box.index</code> in the
-              storage engine.
-            </para>
-    <varlistentry>
-        <term><emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.unique</emphasis></term>
-        <listitem>
-            <para>
-              (type = boolean) true if the index is unique.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.type</emphasis>
-        </term>
-        <listitem>
-            <para>
-              (type = string) index type,  'TREE' or 'HASH' or 'BITSET'.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.key_field</emphasis>
-        </term>
-        <listitem>
-            <para>
-              An array describing index key fields.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term></term>
-        <listitem><bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary</userinput>
----
-  unique: true
-  parts:
-    0:
-      type: NUM
-      fieldno: 1
-  id: 0
-  type: TREE
-  idx: ' index 0'
-  etc.
-...</programlisting></listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-             <emphasis role="lua" xml:id="boxindexiterator" xreflabel="box.index.iterator(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:iterator(<replaceable>iterator-type, bitset-value | field-value...</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-                This method provides iteration support within an
-                index. Parameter <code>type</code> is used to
-                identify the semantics of iteration. Different
-                index types support different iterators. The
-                remaining arguments of the function are varying
-                and depend on the iteration type. For example,
-                a TREE index maintains a strict order of keys and
-                can return all tuples in ascending or descending
-                order, starting from the specified key. Other
-                index types, however, do not support ordering.
-            </para>
-            <para xml:id="iterator-consistency">
-                To understand consistency of tuples
-                returned by an iterator, it's essential to know
-                the principles of the Tarantool transaction processing
-                subsystem.
-                An iterator in Tarantool does not own a consistent
-                read view. Instead, each procedure is granted exclusive
-                access to all tuples and spaces until it
-                encounters a "context switch": by causing a write to
-                disk, network, or by an explicit call to <emphasis
-                role="lua" xlink:href="#fiber.yield">fiber.yield()</emphasis>.
-                When the execution flow returns to the yielded
-                procedure, the data set could have changed significantly.
-                Iteration, resumed after a yield point, does not
-                preserve the read view, but continues with the new
-                content of the database.
-            </para>
-            <para>
-                Parameters:
-                <code>type</code> &mdash; iteration strategy as defined in tables below.
-            </para>
-            <para>
-               Returns: this method returns an iterator closure, i.e.
-                    a <code>function</code> which can be used to
-                    get the next value on each invocation.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, Number of tuples accessed.
-            </para>
-            <para>
-               Possible Errors:
-                    Selected iteration type is not supported in
-                    the subject index type, or supplied parameters
-                    do not match iteration type.
-            </para>
-
-            <xi:include href="iterator-types.xml"/>
-
-            <para>
-                <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-<prompt>tarantool&gt;</prompt> <userinput> s = box.schema.create_space('space17')</userinput>
----
-...
-<prompt>tarantool&gt;</prompt> <userinput> s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})</userinput>
----
-...
-<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', 'C'}</userinput>
----
-- ['C', 'C']
-...
-<prompt>tarantool&gt;</prompt> <userinput> s:insert{'B', 'A'}</userinput>
----
-- ['B', 'A']
-...
-<prompt>tarantool&gt;</prompt> <userinput> s:insert{'C', '!'}</userinput>
----
-- ['C', '!']
-...
-<prompt>tarantool&gt;</prompt> <userinput> s:insert{'A', 'C'}</userinput>
----
-- ['A', 'C']
-...
-<prompt>tarantool&gt;</prompt> <userinput> session = require('session'); session.delimiter('!')</userinput>
----
-...
-<prompt>tarantool&gt;</prompt> <userinput> function example()
-         &gt;   for _, tuple in
-         &gt;   s.index.primary:pairs(nil, {iterator = box.index.ALL}) do
-         &gt;     print(tuple)
-         &gt;   end
-         &gt; end!</userinput>
----
-...
-<prompt>tarantool&gt;</prompt> <userinput> session.delimiter('')!</userinput>
----
-...
-<prompt>tarantool&gt;</prompt> <userinput> example()</userinput>
-['A', 'C']
-['B', 'A']
-['C', '!']
-['C', 'C']
----
-...
-<prompt>tarantool&gt;</prompt> <userinput>s:drop()</userinput>
----
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-             This is is an alternative to <olink targetptr="box.select">box.select()</olink>
-             which goes via a particular index and can make use of additional parameters that
-             specify the iterator type, and the limit (that is, the maximum number of tuples to
-             return).
-            </para>
-            <para>
-              Returns: (type = table of tuples) the tuple or tuples that match the field values.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-# Create a space named tester.
-# Create a unique index 'primary', which won't be needed for this example.
-# Create a non-unique index 'secondary' with an index on the second field.
-# Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
-# Select all tuples where the secondary index keys are greater than 'X'.
-box.schema.create_space('tester')
-box.space.tester:create_index('primary', {parts = {1, 'NUM' }})
-box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
-box.space.tester:insert{1,'X','Row with field[2]=X'}
-box.space.tester:insert{2,'Y','Row with field[2]=Y'}
-box.space.tester:insert{3,'Z','Row with field[2]=Z'}
-box.space.tester.index.secondary:select({'X'}, {iterator = 'GT'})
-</programlisting>
-The result will be a table of tuples and will look like this:
-<programlisting>
----
-- - [2, 'Y', 'Row with field[2]=Y']
-  - [3, 'Z', 'Row with field[2]=Z']
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find the minimum value in the specified index.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the first key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-              Possible errors: index is not of type 'TREE'.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:min()</userinput>
----
-- ['Alpha!', 55, 'This is the first tuple!']
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([key])</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find the maximum value in the specified index.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the last key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-              Possible errors: index is not of type 'TREE'.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:max()</userinput>
----
-- ['Gamma!', 55, 'This is the third tuple!']
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:random(<replaceable>random-value</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Find a random value in the specified index.
-              This method is useful when it's important to get insight
-              into data distribution in an index without having to
-               iterate over the entire data set.
-            </para>
-            <para>
-              Parameters: <code>random-value</code> = an arbitrary non-negative integer.
-            </para>
-            <para>
-              Returns: (type = tuple) the tuple for the random key in the index.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.secondary:random(1)</userinput>
----
-- ['Beta!', 66, 'This is the second tuple!']
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:count(<replaceable>key-value</replaceable>, options)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Iterate over an index, counting the number of tuples which equal the
-              provided search criteria.
-            </para>
-            <para>
-              Parameters: <code>key-value</code> = the value which must match the key(s)
-              in the specified index. The type may be a list of field-values, or a tuple containing
-              only the field-values.
-            </para>
-            <para>
-              Returns: (type = number) the number of matching index keys.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count(999)</userinput>
----
-- 0
-...
-</programlisting>
-<programlisting>tarantool&gt; <userinput>box.space.tester.index.primary:count('Alpha!', { iterator = 'LE' })</userinput>
----
- - 1
-...
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-
-</variablelist>
-</section>
-
 
 <!--   end of lib -->
 
@@ -2950,6 +2950,69 @@ error: can't save snapshot, errno 17 (File exists)
 
 </section>
 
+<section xml:id="limitations">
+
+<title>Limitations</title>
+
+<variablelist>
+
+  <varlistentry>
+    <term xml:id="limitations-index-field-count" xreflabel="limitations-index-field-count">Number of fields in an index</term>
+    <listitem><para>For BITSET indexes, the maximum is 1.
+    For TREE indexes, the theoretical maximum is about 4 billion (BOX_FIELD_MAX)
+    but the practical maximum is the number of fields in a tuple.
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-index-count" xreflabel="limitations-index-count">Number of indexes in a space</term>
+    <listitem><para>10 (BOX_INDEX_MAX).
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-tuple-field-count" xreflabel="limitations-tuple-field-count">Number of fields in a tuple</term>
+    <listitem><para>There is no theoretical maximum.
+    The practical maximum is whatever is specified by space.cardinality in the configuration file,
+    or the maximum tuple length.
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-space-count" xreflabel="limitations-space-count">Number of spaces</term>
+    <listitem><para>65535.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-connections-count" xreflabel="limitations-connections-count">Number of connections</term>
+    <listitem><para>The practical limit is the number of file descriptors that one can set with
+    the operating system.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-slab-alloc-arena-size" xreflabel="limitations-slab-alloc-arena-size">Space size</term>
+    <listitem><para>The total maximum size for all spaces is in effect set by the slab_alloc_arena_size
+    parameter in the configuration file, which in turn is limited by the total available memory.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="limitations-update-count" xreflabel="limitations-updae-count">Update operations count</term>
+    <listitem><para>The maximum number of operations that can be in a single update is 4000 (BOX_UPDATE_OP_CNT_MAX).
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-user-count" xreflabel="limitations-user-count">Number of users</term>
+    <listitem><para>32.
+    </para></listitem>
+  </varlistentry>
+
+</variablelist>
+</section>
+
 <section xml:id="sp-limitations">
 <title>A limitation that affects long-running Lua functions</title>
 
@@ -3001,6 +3064,326 @@ error: can't save snapshot, errno 17 (File exists)
     yield point.
 </para>
 </section>
+
+<section xml:id="errcode">
+
+<title>List of error codes</title>
+
+<para>In the current version of the binary protocol, error message,
+which is normally more descriptive than error code,
+is not present in server response. The actual message may contain
+a file name, a detailed reason or operating system error code.
+All such messages, however, are logged in the error log. 
+Below follow only general descriptions
+of some popular codes. A complete list of errors can be found in
+file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h">errcode.h</filename> in the source tree.
+
+</para>
+<variablelist>
+<title>List of error codes</title>
+
+  <varlistentry>
+    <term xml:id="ER_NONMASTER" xreflabel="ER_NONMASTER">ER_NONMASTER</term>
+    <listitem><para>Can't modify data on a replication slave.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_ILLEGAL_PARAMS" xreflabel="ER_ILLEGAL_PARAMS">ER_ILLEGAL_PARAMS</term>
+    <listitem><para>Illegal parameters. Malformed protocol
+    message.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_MEMORY_ISSUE" xreflabel="ER_MEMORY_ISSUE">ER_MEMORY_ISSUE</term>
+    <listitem><para>Out of memory: <olink targetptr="slab_alloc_arena"/> limit is reached.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_WAL_IO" xreflabel="ER_WAL_IO">ER_WAL_IO</term>
+    <listitem><para>Failed to write to disk. May mean: failed to record a change in
+    the write-ahead log. Some sort of disk error.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_KEY_PART_COUNT" xreflabel="ER_KEY_PART_COUNT">ER_KEY_PART_COUNT</term>
+    <listitem><para>Key part count is not the same as index part count
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_NO_SUCH_SPACE" xreflabel="ER_NO_SUCH_SPACE">ER_NO_SUCH_SPACE</term>
+    <listitem><para>Attempt to access a space that does not exist.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_NO_SUCH_INDEX" xreflabel="ER_NO_SUCH_INDEX">ER_NO_SUCH_INDEX</term>
+    <listitem><para>The specified index does not exist for the specified space.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_PROC_LUA" xreflabel="ER_PROC_LUA">ER_PROC_LUA</term>
+    <listitem><para>An error inside a Lua procedure.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_FIBER_STACK" xreflabel="ER_FIBER_STACK">ER_FIBER_STACK</term>
+    <listitem><para>Recursion limit reached when creating a new fiber. This is
+    usually an indicator of a bug in a stored procedure, recursively invoking itself
+    ad infinitum.
+    </para></listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term xml:id="ER_UPDATE_FIELD" xreflabel="ER_UPDATE_FIELD">ER_UPDATE_FIELD</term>
+    <listitem><para>An error occurred during update of a field.
+    </para></listitem>
+  </varlistentry>
+
+</variablelist>
+</section>
+
+<section xml:id="authentication">
+<title>Authentication and access control</title>
+
+<para>
+Understanding the details of security is primarily an issue for administrators,
+but ordinary users should at least skim this section so that they will have an
+idea of how Tarantool makes it possible for administrators to prevent
+unauthorized access to the database and to certain functions.
+</para>
+
+
+<para>
+Briefly: there is a method to guarantee with password checks that users really
+are who they say they are ("authentication"). There is a _user space where
+user names and password-hashes are stored. There are functions for saying
+that certain users are allowed to do certain things ("privileges"). There
+is a _priv space where privileges are stored. Whenever a user tries to do
+an operation, there is a check whether the user has the privilege to do
+the operation ("access control").
+</para>
+
+<para>
+<bridgehead renderas="sect4">Passwords</bridgehead>
+Each user may have a password.
+The password is any alphanumeric string.
+Administrators should advise users to choose long unobvious passwords,
+but it is ultimately up to the users to choose or change
+their own passwords.
+</para>
+
+<para>
+Tarantool passwords are stored in the _user space with a
+<link xlink:href="https://en.wikipedia.org/wiki/Cryptographic_hash">Cryptographic hash function</link>
+so that, if the password is 'x', the stored hashed-password is a long string like
+'lL3OvhkIPOKh+Vn9Avlkx69M/Ck='.
+When a client connects to a Tarantool server, the server sends a random
+<link xlink:href="https://en.wikipedia.org/wiki/Salt_%28cryptography%29">Salt Value</link>
+which the client must mix with the hashed-password before sending
+to the server.
+Thus the original value 'x' is never stored anywhere except in the
+user's head, and the hashed value is never passed passed down a
+network wire except when mixed with a random salt.
+This system prevents malicious onlookers from finding passwords
+by snooping in the log files or snooping on the wire.
+It is the same system that <link xlink:href="http://dev.mysql.com/doc/refman/4.1/en/password-hashing.html">MySQL introduced several years ago</link>
+which has proved adequate for medium-security installations.
+Nevertheless administrators should warn users that no system
+is foolproof against determined long-term attacks, so passwords
+should be guarded and changed occasionally.
+</para>
+
+<para>
+Notes: To get the hash-password of a string 'X', say <code>box.schema.user.password('X')</code>.
+To see more about the details of the algorithm for the purpose of writing a new client application, read 
+<link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/scramble.h">the scramble.h header file</link>.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Users and the _user space</bridgehead>
+The fields in the _user space are:
+a numeric id, a number, the user name, and the optional password.
+</para>
+
+<para>
+There are two special users: 'guest' (user id = 0) and  'admin' (user id = 1).
+They are defined in advance.
+They cannot be dropped.
+(The 'guest' user is a default which usually has minimum privileges;
+the 'admin' user is an administrator which always has maximum privileges.)
+</para>
+
+<para>
+To select a row from the _user space, use <code>box.select</code>.
+For example, here is what happens with a select for user id = 0,
+which is the 'guest' user, without a password:
+<programlisting><prompt>tarantool&gt;</prompt> box.space._user:select{0}
+---
+- - [0, 1, 'guest']
+...</programlisting></para>
+
+<para>
+To change tuples in the user space, do not use ordinary <code>box.space</code> functions
+for insert or update or delete -- the _user space is special so
+there are special functions which have appropriate error checking.
+</para>
+
+<para>
+To create a new user, say
+<code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
+or
+<code>box.schema.user.create(<replaceable>user-name</replaceable>', {password=<replaceable>password</replaceable>})</code>.
+</para>
+
+<para>
+To drop a user, say
+<code>box.schema.user.drop(<replaceable>user-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session which creates a new user with
+a strong password, selects from the tuple in
+the _user space, and then drops the user.
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})
+---
+...
+<prompt>tarantool&gt;</prompt> box.space._user:select{4}
+---
+- - [4, 1, 'ElizabethBrowning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.drop('ElizabethBrowning')
+---
+...</programlisting></para>
+
+<para>
+Notes: The maximum number of users is 32.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Privileges and the _priv space</bridgehead>
+The fields in the _priv space are:
+the numeric id of the user who gave the privilege ("grantor_id"),
+the numeric id of the user who received the privilege ("grantee_id"),
+the id of the object,
+the type of object -- "space" or "function" or "universe",
+the type of operation -- "read" or "write" or "execute" or a combination such as "read,write,execute".
+</para>
+
+<para>
+The function for granting a privilege is:
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>
+or
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.
+</para>
+
+<para>
+The function for revoking a privilege is:
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>.
+</para>
+
+<para>
+For example, here is a session where the admin user gave
+the guest user the privilege to read from a
+space named space55, and then took the privilege away:
+<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'read', 'space', 'space55')
+---
+...
+<prompt>tarantool&gt;</prompt> box.schema.user.revoke('guest', 'read', 'space', 'space55')
+---
+...</programlisting></para>
+
+<para>
+Notes: Generally privileges are granted or revoked by the owner of the object
+(the user who created it), or by the 'admin' user.
+Before dropping any objects or users, steps should be taken to ensure
+that all their associated privileges have been revoked.
+Only the 'admin' user can grant privileges for the 'universe'.
+</para>
+
+<para>
+<bridgehead renderas="sect4">Functions and the _func space</bridgehead>
+The fields in the _func space are:
+the numeric function id, a number, and the function name.
+</para>
+
+<para>
+The _func space does not include the function's body.
+One continues to create Lua functions in the usual way,
+by saying "<code>function <replaceable>function_name</replaceable> () ... end</code>", without
+adding anything in the _func space. The _func space only
+exists for storing function tuples so that their names
+can be used within grant/revoke functions.
+</para>
+
+<para>
+The function for creating a _func tuple is:
+<code>box.schema.func.create(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+The function for dropping a _func tuple is:
+<code>box.schema.func.drop(<replaceable>function-name</replaceable>)</code>.
+</para>
+
+<para>
+In the following example, a function named 'f7' is created,
+then it is put in the _func space, then it is used in a
+box.schema.user.grant function, then it is dropped:
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() session.uid() end</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.func.create('f7')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.grant('guest', 'execute', 'function', 'f7')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.revoke('guest', 'execute', 'function', 'f7')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.func.drop('f7')</userinput>
+---
+...</programlisting></para>
+
+<para>
+<bridgehead renderas="sect4">"session=require('session')" and security</bridgehead>
+
+After a connection has taken place, the user has access to a "session" object
+which has several functions. The ones which are of interest for security
+purposes are:
+<programlisting>session.uid()           #returns the id of the current user
+session.user()          #returns the name of the current user
+session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
+
+<para>
+If a user types requests directly on the Tarantool server in its interactive mode,
+or if a user connects via telnet to the administrative port (using
+<olink targetptr="admin_port"/> instead of primary_port), then the user by default is 'admin' and has
+many privileges. If a user connects from an application program via one of the
+<olink targetptr="connectors">connectors</olink>, then the user by default is 'guest' and has few
+privileges. Typically an admin user will set up and configure objects, then
+grant privileges to appropriate non-admin users. Typically a guest user will
+use <code>session.su()</code> to change into a non-generic user to whom admin
+has granted more than the default privileges. For example, admin might say:<programlisting>
+box.space._user:insert{123456,0,'manager'}
+box.schema.user.grant('manager', 'read', 'space', '_space')
+box.schema.user.grant('manager', 'read', 'space', 'payroll')</programlisting>
+and later a guest user, who wishes to see the payroll, might say:<programlisting>
+session = require('session')
+session.su('manager')
+box.space.payroll:select{'Jones'}</programlisting>
+</para>
+
+
+</section>
+
 
 </chapter>
 <!--

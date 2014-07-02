@@ -8,12 +8,11 @@
 <section xml:id="tarantool-overview">
   <title>Tarantool: an overview</title>
   <para>   
-    <productname>Tarantool</productname> is a scalable software platform integrated with a database management system.
-    It handles Lua functions asynchronously which makes it appropriate for real-time applications.
+    <productname>Tarantool</productname> is a Lua application server integrated with a database management system.
     It has a "fiber" model which means that many applications can run simultaneously on a single
     thread, while the Tarantool server can run multiple threads for input-output and background maintenance.
     It integrates the LuaJIT -- "Just In Time" -- Lua compiler, Lua libraries for most common
-    applications, socket support, and the Tarantool Database Server which is an established
+    applications, and the Tarantool Database Server which is an established
     NoSQL DBMS. Thus it serves all the purposes that have made node.js and Twisted popular in
     other environments, with the additional twist that it has a data persistence level.
   </para>
@@ -56,9 +55,9 @@
     environment that Tarantool itself uses.
     A key feature is that the functions
     can access and modify databases atomically.
-    Thus some developers look at it as "a DBMS with a popular stored procedure language",
+    Thus some developers look at it as a DBMS with a popular stored procedure language,
     while others look at it as a replacement for multiple components
-    of "multi-tier Web application architectures".
+    of multi-tier Web application architectures.
     Performance is a few thousand transactions per second
     on a laptop, scalable upwards or outwards to server farms.
   </para>
@@ -87,8 +86,7 @@
   <para>
     Ordinarily the server <emphasis role="strong">keeps all the data in
     random-access memory</emphasis>, and therefore has very low read
-    latency. (There is also a conventional disk-based storage engine
-    named Sophia but we will defer discussion of it to a later section.)
+    latency.
     The server <emphasis role="strong">keeps persistent copies of
     the data in non-volatile storage</emphasis>, such as disk,
     when users request "snapshots". The server <emphasis role="strong">
@@ -123,10 +121,7 @@
   <para>
     Tarantool supports
     <emphasis role="strong">asynchronous replication</emphasis>,
-    locally or to a remote host. Replication does not
-    cause blocking of writes to the master database.
-    If the master becomes unavailable, a replica can assume the
-    master role without requiring a restart.
+    locally or to remote hosts. 
     In this latest version the replication architecture can be
     <emphasis role="strong">master-master</emphasis>, that is,
     many nodes may both handle the loads and receive what others

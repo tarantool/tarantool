@@ -9,6 +9,18 @@
 
 <title>Lua and the Tarantool Lua Packages</title>
 
+<blockquote>
+    <para>
+        <link xlink:href="http://www.lua.org">Lua</link>
+        is a light-weight, multi-paradigm, embeddable language.
+        Stored procedures in Lua can be used to implement
+        data manipulation patterns or data structures.
+        It is possible to dynamically define, invoke,
+        alter and drop Lua functions. Lua functions can run
+        in the background and perform administrative tasks.
+    </para>
+</blockquote>
+
 <para>
 <bridgehead renderas="sect4">The "Batteries Included" Lua Software Distribution</bridgehead>
 Tarantool incorporates open-source
@@ -34,22 +46,28 @@ This differs from the original Lua interpreter from
 <link xlink:href="http://www.puc-rio.br/index.html">Pontifícia Universidade Católica do Rio de Janeiro</link>
 ("RIO-PUC" <link xlink:href="http://www.lua.org/">Lua</link>) 
 because the JIT stands for "Just In Time" compiling, that
-is, it can compile some Lua code into executable form the
-first time it encounters the code. The result is that some
+is, it can compile some Lua code into machine executable form the
+after a few executions of the code.
+The result is that some
 loops will run as quickly as an equivalent C program.
 Also some precompiled C code can be brought in using
 LuaJIT's FFI (<link xlink:href="https://en.wikipedia.org/wiki/Foreign_function_interface">Foreign Function Interface</link>).
-Examples for using FFI exist on the Internet.
+Examples for using FFI exist on the Internet, for example 
+<link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/tuple.lua">tuple.lua</link> on the tarantool.org site.
 </para>
 
 <para>
 LuaJIT has been compared to competitive implementations
 and found to be reliable and efficient,
 provided one takes advantage of it where <link xlink:href="http://wiki.luajit.org/Numerical-Computing-Performance-Guide">performance</link> counts. 
-A potential FFI defect is that some routines can cause
-crashes and breaches, which is why Tarantool has a "sandbox"
-to stop some types of access.
 </para>
+
+    <para>
+        Apart from increased performance, LuaJIT provides such
+        features as <link
+        xlink:href="http://bitop.luajit.org/">bitwise
+        operations</link> and <link xlink:href="#tonumber64">64-bit integer arithmetic.</link>
+    </para>
 
 <para>
 FIBERS = like Lua coroutines, but as <link xlink:href="http://members.chello.nl/~w.couwenberg/fibers.htm">one fiber developer</link>
@@ -60,9 +78,6 @@ chain, regardless of its C and Lua call stack nesting levels."
 
 <para>
 <link xlink:href="http://msgpack.org">MSGPACK</link> = a relatively new way to serialize data.                    
-As the developer who handled the interface (named MsgPuck)
-puts it: "MsgPuck was written to use within Tarantool -
-the world's first full-featured MsgPack-based database."
 The point of MsgPack is that it can
 handle Lua types and C types, with structures and nesting,
 without the overhead of an SGML-style markup language.
@@ -72,7 +87,9 @@ without the overhead of an SGML-style markup language.
 DIGEST = a cryptography package for CRC32, SHA, and MDA.
 Nothing new here -- except that Tarantool has made them into a
 package, so that one doesn't have to get each one of these
-things individually from the <link xlink:href="http://lua-users.org/wiki/CryptographyStuff">many that are available</link>. 
+things individually from the <link xlink:href="http://lua-users.org/wiki/CryptographyStuff">many that are available</link>.
+And, since Tarantool is binding with FFI rather than a traditional Lua C
+API, the routines should run faster on LuaJIT.
 </para>
 
 <para>
@@ -91,10 +108,8 @@ underlying information about typing, arrays, and structures.
 </para>
 
 <para>
-<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> -- Inter-Process Communication. The primary application       
-is communication between fibers within a Tarantool instance,
-but the senders and receivers who ultimately control those
-fibers may be remote from each other.
+<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> -- Inter-Process Communication.
+this is useful for implementations of task queues and long polling.
 </para>
 
 <para>

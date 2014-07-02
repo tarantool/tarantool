@@ -125,7 +125,7 @@ must exist and must be a 64-bit unsigned integer.
 Space definitions and index definitions are stored permanently in <emphasis>system spaces</emphasis>.
 It is possible to add, drop, or alter the definitions at runtime, with some restrictions.
 The syntax details for defining spaces and indexes are in chapter 4
- <olink targetdoc="tarantool-user-guide" targetptr="stored-procedures">Language reference</olink>.
+<link linkend="sp-box-schema">Databases</link>.
 </para>
 
 
@@ -189,7 +189,8 @@ UPDATE tester SET "field[2]" = 'size', "field[3]" = 0 WHERE "field[[1]" = 3
 </para>
 
 <para>
-STEP #1: the client parses the statement and changes it to a
+STEP #1: if this is happening on a remote client, then
+the client parses the statement and changes it to a
 binary-protocol instruction which has already been checked,
 and which the server can understand without needing to parse
 everything again. The client ships a packet to the server.
