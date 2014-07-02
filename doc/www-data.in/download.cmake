@@ -67,9 +67,9 @@ download:
         sudo apt-get install tarantool
         ```
         
-        ### CentOS 5-6 and RHEL 5-6
+        ### CentOS 5-7 and RHEL 5-7
 
-        CentOS repository is available at [http://tarantool.org/dist/master/centos]
+        CentOS and RHEL repository is available at [http://tarantool.org/dist/master/centos]
 
         Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
         to enable it:
@@ -82,7 +82,7 @@ download:
         gpgcheck=0
         ```
         
-        ### Fedora
+        ### Fedora 19, 20 and Rawhide
 
         Fedora repository is available at [http://tarantool.org/dist/master/fedora]
 
@@ -120,7 +120,7 @@ download:
         You can install Tarantool using homebrew:
         
         ```
-        $ brew install https://raw.githubusercontent.com/tarantool/tarantool/stable/extra/tarantool.rb
+        $ brew install https://raw.githubusercontent.com/tarantool/tarantool/stable/extra/tarantool.rb --devel
         ```
         
         Please upgrade `clang` to version 3.2 or later using

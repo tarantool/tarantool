@@ -6,9 +6,9 @@ This manual explains how to manually build tarantool from sources.
 Supporting kinds of build with default Apple developer software and external as
 homebrew as MacPorts.
 
-If you want to build at the Homebrew environment execute just:
+If you want to build at the Homebrew environment execute:
 
-    brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
+    brew install https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb --devel
 
 Possible flags are:
 
@@ -56,15 +56,15 @@ the directory the module's archive deflates into.
 
 NOTE: If you want to get DMG package go to section 6.
 
-git clone --recursive git://github.com/tarantool/tarantool.git
+    git clone --recursive git://github.com/tarantool/tarantool.git
 
-cd tarantool
-mkdir build && cd build
-CC=clang CXX=clang++ cmake .. \
-	-DCMAKE_BUILD_TYPE=RelWithDebugInfo \
-	-DENABLE_CLIENT=true \
-	-DDARWIN_BUILD_TYPE=Ports
-make
+    cd tarantool
+    mkdir build && cd build
+    CC=clang CXX=clang++ cmake .. \
+        -DCMAKE_BUILD_TYPE=RelWithDebugInfo \
+        -DENABLE_CLIENT=true \
+        -DDARWIN_BUILD_TYPE=Ports
+    make
 
 5. Run tarantool test suite
 -------------
