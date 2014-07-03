@@ -74,7 +74,8 @@ box.schema.user.create('Петя_Иванов')
 box.schema.user.drop('Петя_Иванов')
 
 -- gh-300: misleading error message if a function does not exist
-c = box.net.box.new("localhost", box.cfg.primary_port)
+c = (require 'net.box'):new("127.0.0.1", box.cfg.primary_port)
+
 c:call('nosuchfunction')
 function nosuchfunction() end
 c:call('nosuchfunction')

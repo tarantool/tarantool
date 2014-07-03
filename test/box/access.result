@@ -156,7 +156,7 @@ box.schema.user.drop('Петя_Иванов')
 ---
 ...
 -- gh-300: misleading error message if a function does not exist
-c = box.net.box.new("localhost", box.cfg.primary_port)
+c = (require 'net.box'):new("127.0.0.1", box.cfg.primary_port)
 ---
 ...
 c:call('nosuchfunction')
@@ -179,7 +179,6 @@ c:call('nosuchfunction')
 ...
 c:close()
 ---
-- true
 ...
 -- Dropping a space recursively drops all grants - it's possible to 
 -- restore from a snapshot

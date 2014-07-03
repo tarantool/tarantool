@@ -126,6 +126,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 74 */_(ER_INVALID_XLOG,		2, "Failed to read xlog: %lld") \
 	/* 75 */_(ER_INVALID_XLOG_NAME,		2, "Invalid xlog name: expected %lld got %lld") \
 	/* 76 */_(ER_INVALID_XLOG_ORDER,	2, "Invalid xlog order: %lld and %lld") \
+	/* 77 */_(ER_NO_CONNECTION,		2, "Connection is not established") \
+	/* 78 */_(ER_TIMEOUT,			2, "Timeout exceeded") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

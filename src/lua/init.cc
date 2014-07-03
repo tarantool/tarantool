@@ -31,7 +31,7 @@
 #include "tarantool.h"
 #include "box/box.h"
 #include "tbuf.h"
-#if defined(__FreeBSD__) || defined(__APPLE__)   
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #include "libgen.h"
 #endif
 
@@ -69,14 +69,33 @@ extern "C" {
 struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
-extern char uuid_lua[], session_lua[], msgpackffi_lua[], fun_lua[],
-       console_lua[], digest_lua[], init_lua[],
-       log_lua[];
-static const char *lua_sources[] = { init_lua, session_lua, NULL };
-static const char *lua_modules[] = { "msgpackffi", msgpackffi_lua,
-	"fun", fun_lua, "digest", digest_lua,
+extern char uuid_lua[],
+	session_lua[],
+	msgpackffi_lua[],
+	fun_lua[],
+	digest_lua[],
+	init_lua[],
+	log_lua[],
+	console_lua[],
+	box_net_box_lua[];
+
+static const char *lua_sources[] = {
+	init_lua,
+	session_lua,
+	NULL
+};
+
+static const char *lua_modules[] = {
+	"msgpackffi", msgpackffi_lua,
+	"fun", fun_lua,
+	"digest", digest_lua,
 	"console", console_lua,
-	"uuid", uuid_lua, "log", log_lua, NULL };
+	"uuid", uuid_lua,
+	"log", log_lua,
+	"net.box", box_net_box_lua,
+	NULL
+};
+
 /*
  * {{{ box Lua library: common functions
  */

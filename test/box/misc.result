@@ -16,18 +16,22 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - cfg
+- - call
+  - cfg
+  - close
   - error
   - index
   - info
-  - net
+  - ping
   - raise
   - schema
   - slab
   - snapshot
   - space
   - stat
+  - timeout
   - tuple
+  - wait_connected
 ...
 t = nil
 ---
@@ -203,6 +207,8 @@ t;
   - 'box.error.INVALID_MSGPACK : 20'
   - 'box.error.KEY_PART_COUNT : 31'
   - 'box.error.ALTER_SPACE : 12'
+  - 'box.error.SPLICE : 25'
+  - 'box.error.NO_CONNECTION : 77'
   - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
@@ -229,7 +235,7 @@ t;
   - 'box.error.TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.INVALID_UUID : 64'
   - 'box.error.DROP_SPACE : 11'
-  - 'box.error.SPLICE : 25'
+  - 'box.error.TIMEOUT : 78'
   - 'box.error.MORE_THAN_ONE_TUPLE : 41'
   - 'box.error.MEMORY_ISSUE : 2'
   - 'box.error.NO_SUCH_TRIGGER : 34'
