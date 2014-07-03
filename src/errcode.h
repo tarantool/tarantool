@@ -74,8 +74,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		2, "Tuple/Key must be MsgPack array") \
 	/* 23 */_(ER_FIELD_TYPE,		2, "Tuple field %u type does not match one required by operation: expected %s") \
 	/* 24 */_(ER_FIELD_TYPE_MISMATCH,	2, "Ambiguous field type in index %u, key part %u. Requested type is %s but the field has previously been defined as %s") \
-	/* 25 */_(ER_SPLICE,			2, "Field SPLICE error: %s") \
-	/* 26 */_(ER_ARG_TYPE,			2, "Argument type in operation on field %u does not match field type: expected a %s") \
+	/* 25 */_(ER_SPLICE,			2, "SPLICE error on field %u: %s") \
+	/* 26 */_(ER_ARG_TYPE,			2, "Argument type in operation '%c' on field %u does not match field type: expected a %s") \
 	/* 27 */_(ER_TUPLE_IS_TOO_LONG,		2, "Tuple is too long %u") \
 	/* 28 */_(ER_UNKNOWN_UPDATE_OP,		2, "Unknown UPDATE operation") \
 	/* 29 */_(ER_UPDATE_FIELD,		2, "Field %u UPDATE error: %s") \

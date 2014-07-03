@@ -87,11 +87,11 @@ s:insert{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 ...
 s:update({0}, {{'#', 42, 1}})
 ---
-- error: Field 41 was not found in the tuple
+- error: Field 42 was not found in the tuple
 ...
 s:update({0}, {{'#', 4, 'abirvalg'}})
 ---
-- error: 'Argument type in operation on field 3 does not match field type: expected
+- error: 'Argument type in operation ''#'' on field 4 does not match field type: expected
     a UINT'
 ...
 s:update({0}, {{'#', 2, 1}, {'#', 4, 2}, {'#', 6, 1}})
@@ -112,7 +112,7 @@ s:update({0}, {{'#', 3, 4294967295}})
 ...
 s:update({0}, {{'#', 2, 0}})
 ---
-- error: 'Field 1 UPDATE error: cannot delete 0 fields'
+- error: 'Field 2 UPDATE error: cannot delete 0 fields'
 ...
 s:truncate()
 ---
@@ -175,22 +175,18 @@ s:update({1}, {{'=', 2, 'new field string value'}, {'=', 3, 42}, {'=', 4, 0xdead
 -- test multiple update opearations on the same field
 s:update({1}, {{'+', 3, 16}, {'&', 4, 0xffff0000}, {'|', 4, 0x0000a0a0}, {'^', 4, 0xffff00aa}})
 ---
-- error: 'Field 3 UPDATE error: double update of the same field'
+- error: 'Field 4 UPDATE error: double update of the same field'
 ...
 -- test update splice operation
-s:update({1}, {{':', 2, 0, 3, 'the newest'}})
----
-- [1, 'the newest field string value', 42, 3735928559]
-...
 s:replace{1953719668, 'something to splice'}
 ---
 - [1953719668, 'something to splice']
 ...
-s:update(1953719668, {{':', 2, 0, 4, 'no'}})
+s:update(1953719668, {{':', 2, 1, 4, 'no'}})
 ---
 - [1953719668, 'nothing to splice']
 ...
-s:update(1953719668, {{':', 2, 0, 2, 'every'}})
+s:update(1953719668, {{':', 2, 1, 2, 'every'}})
 ---
 - [1953719668, 'everything to splice']
 ...
@@ -201,7 +197,7 @@ s:update(1953719668, {{':', 2, 100, 2, 'every'}})
 ...
 s:update(1953719668, {{':', 2, -100, 2, 'every'}})
 ---
-- error: 'Field SPLICE error: offset is out of bound'
+- error: 'SPLICE error on field 2: offset is out of bound'
 ...
 s:truncate()
 ---
@@ -227,6 +223,30 @@ s:update(1953719668, {{'=', 2, 'bye, world'}})
 s:delete{1953719668}
 ---
 - [1953719668, 'bye, world']
+...
+s:replace({10, 'abcde'})
+---
+- [10, 'abcde']
+...
+s:update(10,  {{':', 2, 0, 0, '!'}})
+---
+- error: 'SPLICE error on field 2: offset is out of bound'
+...
+s:update(10,  {{':', 2, 1, 0, '('}})
+---
+- [10, '(abcde']
+...
+s:update(10,  {{':', 2, 2, 0, '({'}})
+---
+- [10, '(({abcde']
+...
+s:update(10,  {{':', 2, -1, 0, ')'}})
+---
+- [10, '(({abcde)']
+...
+s:update(10,  {{':', 2, -2, 0, '})'}})
+---
+- [10, '(({abcde}))']
 ...
 -- test update delete operations
 s:update({1}, {{'#', 4, 1}, {'#', 3, 1}})
@@ -258,7 +278,7 @@ s:insert{1684234849}
 ...
 s:update({1684234849}, {{'#', 2, 1}})
 ---
-- error: Field 1 was not found in the tuple
+- error: Field 2 was not found in the tuple
 ...
 s:update({1684234849}, {{'=', -1, 'push1'}})
 ---
