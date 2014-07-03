@@ -2,7 +2,7 @@
 #include <port_uri.h>
 #include <string.h>
 
-#define PLAN	34
+#define PLAN	40
 
 int
 main(void)
@@ -25,7 +25,7 @@ main(void)
 
 	is(port_uri_parse(&uri, "123"), 0, "123");
 	is(strcmp(uri.schema, "tcp"), 0, "tcp://");
-	is(strcmp(port_uri_to_string(&uri), "tcp://0.0.0.0:123"), 0,
+	is(strcmp(port_uri_to_string(&uri), "0.0.0.0:123"), 0,
 		"to_string");
 
 
@@ -41,8 +41,11 @@ main(void)
 	is(strcmp(uri.schema, "http"), 0, "http://");
 	is(strcmp(port_uri_to_string(&uri), "http://11.2.3.4:123"), 0,
 		"to_string");
-
-
+	is(port_uri_parse(&uri, "http://user:pass@127.0.0.1:12345"), 0,
+		"http://user:pass@127.0.0.1:12345");
+	is(strcmp(uri.login, "user"), 0, "user");
+	is(strcmp(uri.password, "pass"), 0, "pass");
+	is(strcmp(uri.schema, "http"), 0, "http");
 
 
 	is(port_uri_parse(&uri, "schema://[2001:0db8:11a3:09d7::1]"),
@@ -56,23 +59,26 @@ main(void)
 
 
 
+
 	is(port_uri_parse(&uri, "128.0.0.1"), 0, "127.0.0.1");
-	is(strcmp(port_uri_to_string(&uri), "tcp://128.0.0.1:0"), 0,
+	is(strcmp(port_uri_to_string(&uri), "128.0.0.1:0"), 0,
 		"to_string");
 
 	is(port_uri_parse(&uri, "128.0.0.1:22"), 0, "127.0.0.1:22");
-	is(strcmp(port_uri_to_string(&uri), "tcp://128.0.0.1:22"), 0,
+	is(strcmp(port_uri_to_string(&uri), "128.0.0.1:22"), 0,
 		"to_string");
 
 	is(port_uri_parse(&uri, "login:password@127.0.0.1"), 0,
 	   "login:password@127.0.0.1");
 	is(strcmp(uri.login, "login"), 0, "login");
 	is(strcmp(uri.password, "password"), 0, "password");
+	is(strcmp(uri.schema, "tcp"), 0, "default schema");
 
 	is(port_uri_parse(&uri, "unix://login:password@/path/to"), 0,
 	   "unix://login:password@/path/to");
 	is(strcmp(uri.login, "login"), 0, "login");
 	is(strcmp(uri.password, "password"), 0, "password");
+	is(strcmp(uri.schema, "unix"), 0, "unix");
 	is(strcmp(port_uri_to_string(&uri), "unix:///path/to"), 0,
 		"to_string");
 
