@@ -49,8 +49,8 @@
 #include "box/schema.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char schema_lua[];
-static const char *lua_sources[] = { schema_lua, NULL };
+extern char schema_lua[], load_cfg_lua[];
+static const char *lua_sources[] = { schema_lua, load_cfg_lua, NULL };
 
 /*
  * Functions, exported in box_lua.h should have prefix
