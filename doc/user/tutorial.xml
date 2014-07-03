@@ -60,16 +60,21 @@ that there are source files and subdirectories for the packages that will be des
 To download and install the package that's appropriate for your environment,
 start a shell (terminal) and enter one of the following sets of command-line instructions.
 </para>
-
 <para>
-<emphasis>DEBIAN commands for Tarantool master binary download</emphasis>:
+More advice for binary downloads is at <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link>.
+</para>
+
+
+<simplesect>
+<title>Debian GNU/Linux</title>
+<para>
 There is always an up-to-date Debian repository at
 <link xlink:href="http://tarantool.org/dist/master/debian">http://tarantool.org/dist/master/debian</link>
 The repository contains builds for Debian unstable "Sid", stable "Wheezy",
-forthcoming "Jessie", ...<programlisting>
-# add the tarantool.org repository to your apt sources list:
-# ($release is an environment variable which will contain the Debian version
-# code e.g. "Wheezy")
+forthcoming "Jessie". Add the tarantool.org repository to your apt
+sources list. $release is an environment variable which will
+contain the Debian version code e.g. "Wheezy":
+<programlisting>
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
@@ -83,18 +88,20 @@ release=`lsb_release -c -s`
 <command>sudo apt-get install</command> tarantool
 </programlisting>
 </para>
+</simplesect>
 
+<simplesect>
+<title>Ubuntu</title>
 <para>
-<emphasis>UBUNTU commands for Tarantool master binary download</emphasis>:
 There is always an up-to-date Ubuntu repository at
 <link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
 The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
-13.04 "raring", 13.10 "saucy", 14.04 "trusty" ...<programlisting>
-# add the tarantool.org repository to your apt sources list:
-# ($release is an environment variable which will contain the Ubuntu version
-# code e.g. "precise")
-# (if you want the version that comes with Ubuntu, start with the lines that
-# follow the '# install' comment)
+13.04 "raring", 13.10 "saucy", 14.04 "Trusty".
+Add the tarantool.org repository to your apt sources list
+$release is an environment variable which will contain the Ubuntu version
+code e.g. "precise". If you want the version that comes with
+Ubuntu, start with the lines that follow the '# install' comment:
+<programlisting>
 <command>cd</command> ~
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
@@ -109,30 +116,44 @@ release=`lsb_release -c -s`
 <command>sudo apt-get install</command> tarantool
 </programlisting>
 </para>
+</simplesect>
 
+<simplesect>
+<title>CentOS</title>
 <para>
-<emphasis>CENTOS commands for Tarantool master binary download</emphasis>:
 These instructions are applicable for CentOS version 5 or 6,
-and RHEL version 5 or 6.<programlisting>
-# Pick the CentOS repository which fits your CentOS/RHEL version
-# and your x86 platform:
-# <link xlink:href="http://tarantool.org/dist/master/centos/5/os/i386">http://tarantool.org/dist/master/centos/5/os/i386 for version 5, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/master/centos/6/os/i386">http://tarantool.org/dist/master/centos/6/os/i386 for version 6, x86-32</link>
-# <link xlink:href="http://tarantool.org/dist/master/centos/5/os/x86_64">http://tarantool.org/dist/master/centos/5/os/x86_64 for version 5, x86-64</link>
-# <link xlink:href="http://tarantool.org/dist/master/centos/6/os/x86_64">http://tarantool.org/dist/master/centos/6/os/x86_64 for version 6, x86-64</link>
-# Add the following section to your yum repository list
-# (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
-# (in the following instructions,
-#     $releasever i.e. CentOS release version must be either 5 or 6)
-# (in the following instructions,
-#     $basearch i.e. base architecture must be either i386 or x86_64)
+and RHEL version 5 or 6.
+Pick the CentOS repository which fits your CentOS/RHEL version
+and your x86 platform:
+<itemizedlist>
+<listitem><simpara>
+<link xlink:href="http://tarantool.org/dist/master/centos/5/os/i386">http://tarantool.org/dist/master/centos/5/os/i386</link> for version 5, x86-32
+</simpara></listitem>
+<listitem><simpara>
+<link xlink:href="http://tarantool.org/dist/master/centos/6/os/i386">http://tarantool.org/dist/master/centos/6/os/i386</link> for version 6, x86-32
+</simpara></listitem>
+<listitem><simpara>
+<link xlink:href="http://tarantool.org/dist/master/centos/5/os/x86_64">http://tarantool.org/dist/master/centos/5/os/x86_64</link> for version 5, x86-64
+</simpara></listitem>
+<listitem><simpara>
+<link xlink:href="http://tarantool.org/dist/master/centos/6/os/x86_64">http://tarantool.org/dist/master/centos/6/os/x86_64</link> for version 6, x86-64
+</simpara></listitem>
+</itemizedlist>
+Add the following section to your yum repository list
+(<filename>/etc/yum.repos.d/tarantool.repo</filename>)
+(in the following instructions, $releasever i.e. CentOS release
+version must be either 5 or 6 and  $basearch i.e. base
+architecture must be either i386 or x86_64):
+<programlisting>
 # [tarantool]
-# name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
-# baseurl=http://tarantool.org/dist/master/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
-# enabled=1
-# gpgcheck=0
-# For example, if you have CentOS version 6 and x86-64, you can
-# add the new section thus:
+name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
+baseurl=http://tarantool.org/dist/master/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
+enabled=1
+gpgcheck=0
+</programlisting>
+For example, if you have CentOS version 6 and x86-64, you can
+add the new section thus:
+<programlisting>
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -142,25 +163,26 @@ and RHEL version 5 or 6.<programlisting>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 </programlisting>
 </para>
+</simplesect>
 
+<simplesect>
+<title>Fedora</title>
 <para>
-<emphasis>FEDORA commands for Tarantool master binary download</emphasis>:
-# These instructions are applicable for Fedora 20.<programlisting>
-# Pick the Fedora repository:
-# <link xlink:href="http://tarantool.org/dist/master/fedora/20/x86_64">http://tarantool.org/dist/master/fedora/20/x86_64 for version 20, x86-64</link>
-# Add the following section to your yum repository list
-# (<filename>/etc/yum.repos.d/tarantool.repo</filename>):
-# (in the following instructions,
-#     $releasever i.e. Fedora release version must be 20)
-# (in the following instructions,
-#     $basearch i.e. base architecture must be x86_64)
-# [tarantool]
-# name=Fedora-<replaceable>$releasever</replaceable> - Tarantool
-# baseurl=http://tarantool.org/dist/master/fedora/<replaceable>$releasever</replaceable><replaceable>$basearch</replaceable>/
-# enabled=1
-# gpgcheck=0
-# For example, if you have Fedora version 20, you can
-# add the new section thus:
+These instructions are applicable for Fedora 20.
+Pick the Fedora repository, for example <link xlink:href="http://tarantool.org/dist/master/fedora/20/x86_64">http://tarantool.org/dist/master/fedora/20/x86_64</link> for version 20, x86-64.
+Add the following section to your yum repository list
+(<filename>/etc/yum.repos.d/tarantool.repo</filename>)
+(in the following instructions, $releasever i.e. Fedora release
+version must be 2 and $basearch i.e. base architecture must be x86_64):
+<programlisting>
+[tarantool]
+name=Fedora-<replaceable>$releasever</replaceable> - Tarantool
+baseurl=http://tarantool.org/dist/master/fedora/<replaceable>$releasever</replaceable><replaceable>$basearch</replaceable>/
+enabled=1
+gpgcheck=0
+</programlisting>
+For example, if you have Fedora version 20, you can add the new section thus:
+<programlisting>
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=Fedora - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -170,41 +192,46 @@ and RHEL version 5 or 6.<programlisting>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 </programlisting>
 </para>
+</simplesect>
 
+<simplesect>
+<title>Gentoo</title>
 <para>
-<emphasis>GENTOO commands for Tarantool master binary download</emphasis>:
-Tarantool is available from tarantool portage overlay.<programlisting>
-# Use layman to add the overlay to your system:
+Tarantool is available from tarantool portage overlay.
+Use layman to add the overlay to your system:
+<programlisting>
 <command>layman</command> <option>-S</option>
 <command>layman</command> <option>-a</option> tarantool
 <command>emerge</command> <filename>dev-db/tarantool</filename> <option>-av</option>
 </programlisting>
 </para>
+</simplesect>
 
+<simplesect>
+<title>FreeBSD</title>
 <para>
-<emphasis>FREEBSD commands for Tarantool master binary download</emphasis>:
-# With your browser go to the FreeBSD ports page
-# <link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
-# Enter the search term: tarantool
-# Choose the package you want.
+With your browser go to the FreeBSD ports page
+<link xlink:href="http://www.freebsd.org/ports/index.html">http://www.freebsd.org/ports/index.html</link>
+Enter the search term: tarantool.
+Choose the package you want.
 </para>
 
+</simplesect>
+<simplesect>
+<title>Mac OS X</title>
 <para>
-<emphasis>MAC OS X commands for Tarantool master binary download</emphasis>:
 This is actually a <quote><productname>homebrew</productname></quote> recipe
-so it's not a true binary download, some source code is involved.<programlisting>
-# First upgrade Clang (the C compiler) to version 3.2 or later using
-# Command Line Tools for Xcode disk image version 4.6+ from
-# Apple Developer web-site.
+so it's not a true binary download, some source code is involved.
+First upgrade Clang (the C compiler) to version 3.2 or later using
+Command Line Tools for Xcode disk image version 4.6+ from
+Apple Developer web-site. Then use <command>brew</command>:
+<programlisting>
 <command>brew install</command> --use-clang https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
 # or
 <command>brew install</command> https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
 </programlisting>
 </para>
-
-<para>
-More advice for binary downloads is at <link xlink:href="http://tarantool.org/download.html">http://tarantool.org/download.html</link>.
-</para>
+</simplesect>
 
 </section>
 
