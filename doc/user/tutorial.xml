@@ -308,7 +308,7 @@ ones unless you intend to work on the documentation.</para>
  itself, unless one intends to use the -DENABLE_DOC option in step 6 or the
  "Run the test suite" option in step 8.</para>
 <para>Say:<programlisting><command>python --version</command></programlisting>
-... You should see that the python version is greater than or equal to 2.6 -- preferably 2.7 -- and less than 3.</para>
+... You should see that the python version is greater than 2.6 -- preferably 2.7 -- and less than 3.</para>
 <para>On Ubuntu you can get modules from the repository:
 <programlisting>
 # For test suite
