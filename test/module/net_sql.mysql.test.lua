@@ -12,15 +12,15 @@ require("box.net.mysql")
 do
     stat, err = pcall(box.net.sql.connect, 'abcd')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:29: Unknown driver \'abcd\''
+    return err == 'error: src/module/sql/sql.lua:35: Unknown driver \'abcd\''
 end;
 do
     stat, err = pcall(box.net.sql.connect, 'mysql')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:64: Usage: box.net.sql.connect(\'mysql\', host, port, user, password, db, ...)'
+    return err == 'error: src/module/sql/sql.lua:70: Usage: box.net.sql.connect(\'mysql\', host, port, user, password, db, ...)'
 end;
 --# setopt delimiter ''
-function dump(v) return box.cjson.encode(v) end
+function dump(v) return require('json').encode(v) end
 
 connect = {}
 for tk in string.gmatch(os.getenv('MYSQL')..':', '(.-):') do table.insert(connect, tk) end
@@ -33,7 +33,7 @@ for k, v in pairs(c) do print(k, ': ', type(v)) end
 do
     stat, err = pcall(c.execute, c, 'SEL ECT 1')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:105: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near \'SEL ECT 1\' at line 1'
+    return err == 'error: src/module/sql/sql.lua:111: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near \'SEL ECT 1\' at line 1'
 end;
 --# setopt delimiter ''
 dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
