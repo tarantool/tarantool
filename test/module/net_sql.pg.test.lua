@@ -12,10 +12,10 @@ require("box.net.pg")
 do
     stat, err = pcall(box.net.sql.connect, 'abcd')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:29: Unknown driver \'abcd\''
+    return err == 'error: src/module/sql/sql.lua:35: Unknown driver \'abcd\''
 end;
 --# setopt delimiter ''
-dump = function(v) return box.cjson.encode(v) end
+function dump(v) return require('json').encode(v) end
 
 connect = {}
 for tk in string.gmatch(os.getenv('PG')..':', '(.-):') do table.insert(connect, tk) end
@@ -39,7 +39,7 @@ dump({c:select('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 do
     stat, err = pcall(c.single, c, 'SELECT * FROM (VALUES (1,2), (2,3)) t')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:156: SQL request returned multiply rows'
+    return err == 'error: src/module/sql/sql.lua:162: SQL request returned multiply rows'
 end;
 --# setopt delimiter ''
 dump({c:single('SELECT * FROM (VALUES (1,2)) t')})
@@ -48,7 +48,7 @@ dump({c:perform('SELECT * FROM (VALUES (1,2), (2,3)) t')})
 do
     stat, err = pcall(c.execute, c, 'SELEC T')
     err, _ = err:gsub('.*/src/module/sql/sql.lua', 'error: src/module/sql/sql.lua')
-    return err == 'error: src/module/sql/sql.lua:105: ERROR:  syntax error at or near "SELEC"\nLINE 1: SELEC T\n        ^\n'
+    return err == 'error: src/module/sql/sql.lua:111: ERROR:  syntax error at or near "SELEC"\nLINE 1: SELEC T\n        ^\n'
 end;
 --# setopt delimiter ''
 

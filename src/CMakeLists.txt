@@ -161,13 +161,15 @@ add_dependencies(tarantool build_bundled_libs)
 target_link_libraries(tarantool
     box
     ${sophia_lib}
-    ${common_libraries}
-    -rdynamic)
+    ${common_libraries})
 
-# Necessary to make LuaJIT work on Darwin, see
-# http://luajit.org/install.html
 if (TARGET_OS_DARWIN)
+    # Necessary to make LuaJIT work on Darwin, see
+    # http://luajit.org/install.html
     set_target_properties(tarantool PROPERTIES
         LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
+elseif (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
+    # Helps symbol resolution of plug-ins
+    set_target_properties(tarantool LINK_FLAGS "-rdynamic")
 endif()
 install (TARGETS tarantool DESTINATION bin)

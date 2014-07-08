@@ -105,7 +105,7 @@ port_lua_create(struct lua_State *L)
 }
 
 static void
-port_lua_process_add_tuple(struct port *port, struct tuple *tuple)
+port_lua_table_add_tuple(struct port *port, struct tuple *tuple)
 {
 	lua_State *L = port_lua(port)->L;
 	try {
@@ -118,17 +118,20 @@ port_lua_process_add_tuple(struct port *port, struct tuple *tuple)
 	}
 }
 
+/** Add all tuples to a Lua table. */
 static struct port *
-port_lua_process_create(struct lua_State *L)
+port_lua_table_create(struct lua_State *L)
 {
 	static struct port_vtab port_lua_vtab = {
-		port_lua_process_add_tuple,
+		port_lua_table_add_tuple,
 		null_port_eof,
 	};
 	struct port_lua *port = (struct port_lua *)
 			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
+	/* The destination table to append tuples to. */
+	lua_newtable(L);
 	return (struct port *) port;
 }
 
@@ -216,11 +219,8 @@ lbox_process(lua_State *L)
 		 */
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
-	int top = lua_gettop(L); /* to know how much is added by rw_callback */
-	lua_newtable(L);
-
 	size_t allocated_size = region_used(&fiber()->gc);
-	struct port *port_lua = port_lua_process_create(L);
+	struct port *port_lua = port_lua_table_create(L);
 	try {
 		struct request request;
 		request_create(&request, op);
@@ -236,7 +236,7 @@ lbox_process(lua_State *L)
 		region_truncate(&fiber()->gc, allocated_size);
 		throw;
 	}
-	return lua_gettop(L) - top;
+	return 1;
 }
 
 static struct request *
@@ -490,7 +490,6 @@ access_check_func(const char *name, uint32_t name_len,
 	struct func_def *func = func_by_name(name, name_len);
 	if (func == NULL || (func->uid != user->uid && user->uid != ADMIN &&
 			     access & ~func->access[user->auth_token])) {
-
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
 
