@@ -318,6 +318,20 @@ bit_rotr_u64(uint64_t x, int r)
 }
 
 /**
+ * @copydoc bswap_u32
+ */
+inline uint16_t
+bswap_u16(uint16_t x)
+{
+#if defined(HAVE_BUILTIN_BSWAP16)
+	return __builtin_bswap16(x);
+#else /* !defined(HAVE_BUILTIN_BSWAP16) */
+	return	((x << 8) & UINT16_C(0xff00)) |
+		((x >> 8) & UINT16_C(0x00ff));
+#endif
+}
+
+/**
  * @brief Returns a byte order swapped integer @a x.
  * This function does not take into account host architecture
  * (as it done by htonl / ntohl functions) and always returns @a x

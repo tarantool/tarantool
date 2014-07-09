@@ -249,7 +249,7 @@ replication_subscribe(int fd, struct iproto_header *packet)
 	 * replica connect, and refuse a connection from a replica
 	 * which belongs to a different cluster.
 	 */
-	if (tt_uuid_cmp(&uu, &cluster_id) != 0) {
+	if (!tt_uuid_is_equal(&uu, &cluster_id)) {
 		tnt_raise(ClientError, ER_CLUSTER_ID_MISMATCH,
 			  tt_uuid_str(&uu), tt_uuid_str(&cluster_id));
 	}

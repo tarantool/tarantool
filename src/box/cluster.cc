@@ -53,7 +53,7 @@ cluster_add_server(const tt_uuid *server_uuid, uint32_t server_id)
 	/* Add server */
 	vclock_add_server(&r->vclock, server_id);
 
-	if (tt_uuid_cmp(&r->server_uuid, server_uuid) == 0) {
+	if (tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
 		/* Assign local server id */
 		assert(r->server_id == 0);
 		r->server_id = server_id;

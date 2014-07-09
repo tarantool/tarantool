@@ -709,7 +709,7 @@ log_io_verify_meta(struct log_io *l, const tt_uuid *server_uuid)
 	}
 
 	if (server_uuid != NULL && !tt_uuid_is_nil(server_uuid) &&
-	    tt_uuid_cmp(server_uuid, &l->server_uuid)) {
+	    !tt_uuid_is_equal(server_uuid, &l->server_uuid)) {
 		say_error("%s: invalid server uuid", l->filename);
 		return -1;
 	}
