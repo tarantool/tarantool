@@ -77,11 +77,13 @@ extern char uuid_lua[],
 	init_lua[],
 	log_lua[],
 	console_lua[],
-	box_net_box_lua[];
+	box_net_box_lua[],
+	help_lua[];
 
 static const char *lua_sources[] = {
 	init_lua,
 	session_lua,
+	help_lua,
 	NULL
 };
 
@@ -392,7 +394,8 @@ run_script(va_list ap)
 		if (luaL_loadfile(L, NULL) != 0)
 			panic("%s", lua_tostring(L, -1));
 	} else {
-		say_crit("version %s", tarantool_version());
+		say_crit("version %s\ntype 'help' for interactive help",
+			 tarantool_version());
 		/* get console.repl from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		lua_getfield(L, -1, "console");
