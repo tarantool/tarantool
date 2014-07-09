@@ -926,6 +926,7 @@ local function tcp_connect(host, port, timeout)
             end
 
             if s:writable(timeout) then
+                boxerrno(0)
                 return s
             end
         end

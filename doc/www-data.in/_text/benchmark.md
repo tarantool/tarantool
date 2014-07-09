@@ -8,8 +8,8 @@ benchmark:
         Comparing Tarantool with other systems, apples to apples, is
         not strictly correct: the server networking subsystem is fully
         asynchronous and it's possible to proxy all clients via a single
-        socket. In this case, responses to queries are sent as soon they
-        are ready. Most production application use asynchronous and
+        socket. In this case, responses to queries are sent as soon as they
+        are ready. Most production applications use asynchronous and
         batched I/O with Tarantool.
 
         As long as the overhead of system calls and context switches is
@@ -17,7 +17,7 @@ benchmark:
         request, use of batched and multiplexed I/O produces an order of
         magnitude better results, when compared with traditional
         multi-threaded workloads. A tool we developed for our own use,
-        [nosqlbench](http://github.com/mailru/nosqlbench), is utilizing
+        [nosqlbench](http://github.com/mailru/nosqlbench), utilizes
         this approach at full.
 
         However, to compare with the rest of the world, a standardized
