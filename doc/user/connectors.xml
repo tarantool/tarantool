@@ -106,7 +106,7 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
   <section xml:id="connector-c">
     <title>C</title>
     <para>
-    Here is a complete C program that inserts [99999,'BB'] into space[0] via the C API for the
+    Here is a complete C program that inserts [99999,'BB'] into space[513] via the C API for the
     binary protocol. To compile, paste the code into a file named example.c and say <code>
     gcc -o example example.c -I/<replaceable>tarantool-directory</replaceable>/connector/c/include</code>
     where tarantool-directory = the directory that contains
@@ -114,72 +114,65 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
+    space[513]'s primary key type is numeric (space[513].index[0].key_field[1].type = "NUM").
     To run, say <code>./example</code>.
-    The program will format a buffer for sending an INSERT request, then open a socket connection
-    with the tarantool server at localhost:3303, then send the request, then check if the
+    The program will open a socket connection with the tarantool server at localhost:3303,
+    then format a buffer for sending an INSERT request, then send the request, then check if the
     server returned an error, then &mdash; if all is well &mdash; print "Insert succeeded". If the
     row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
     </para>
 <programlisting language="cpp">
 #include &lt;arpa/inet.h&gt;
 #include &lt;stdio.h&gt;
-#include &lt;unistd.h&gt;
+#define MP_SOURCE 1   
 #include &lt;tp.h&gt;                                                /* the usual Tarantool include */
 
 int main()
 {
   struct tp request;                                           /* area for sending to server */
-  struct tp reply;                                             /* area for getting server reply */
+  struct tpgreeting greet;                                     /* area for the server's greeting */
+  struct tpresponse response;                                  /* area for translation of reply */
   int fd;                                                      /* file descriptor for socket */
-  int pk_field_value = 99999;
-  struct sockaddr_in tt;                                       /* the usual socket address info */
-  tp_init(&amp;request, NULL, 0, tp_realloc, NULL);                /* initialize request buffer */
-  tp_insert(&amp;request, 0, 2);                                   /* append INSERT header */
-  tp_tuple(&amp;request);                                          /* begin appending body */
-  tp_field(&amp;request, (char*) &amp;pk_field_value, 4);              /* append field[1] */
+  struct sockaddr_in sock;                                     /* the usual socket address info */
+  if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket. abort if failure */
+    exit(1);
+  memset(&amp;sock, 0, sizeof(sock));                              /* connect to localhost:3303 */
+  sock.sin_family = AF_INET;
+  sock.sin_addr.s_addr = inet_addr("127.0.0.1");
+  sock.sin_port = htons(3303);
+  if (connect(fd, (struct sockaddr *)&amp;sock, sizeof(sock)) &lt; 0) /* connect, abort if failure */
+    exit(1);
+  const int greeting_buffer_size = 128;                        /* handle the server's greeting */
+  char greeting_buffer[greeting_buffer_size];
+  if (read(fd, greeting_buffer, greeting_buffer_size) != 128)  /* greeting must be 128 bytes long */
+    exit(1);
+  tp_greeting(&amp;greet, greeting_buffer, 128);                   /* 
+  char request_buffer[1024];                                   /* initialize request buffer */
+  tp_init(&amp;request, request_buffer, 1024, 0, 0);
+  tp_insert(&amp;request, 513);                                    /* append INSERT header. space_no=513 */
+  tp_tuple(&amp;request, 2);                                       /* begin appending body, field count = 2 */
+  tp_encode_uint(&amp;request, 99999);                             /* append field[1] */
   tp_sz(&amp;request, "BB");                                       /* append field[2] */
-  if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket, abort if failure */
-    exit(1);
-  memset(&amp;tt, 0, sizeof(tt));                                  /* connect to localhost:3303 */
-  tt.sin_family = AF_INET;
-  tt.sin_addr.s_addr = inet_addr("127.0.0.1");
-  tt.sin_port = htons(3303);
-  if (connect(fd, (struct sockaddr *) &amp;tt, sizeof(tt)) &lt; 0)    /* connect, abort if failure */
-    exit(1);
   int rc = write(fd, tp_buf(&amp;request), tp_used(&amp;request));     /* send the INSERT request */
   if (rc != tp_used(&amp;request))                                 /* abort if send failed */
     exit(1);
-  tp_init(&amp;reply, NULL, 0, tp_realloc, NULL);                  /* initialize reply buffer */
-  while (1) {
-    ssize_t to_read = tp_req(&amp;reply);
-    if (to_read &lt;= 0)
-      break;
-    ssize_t new_size = tp_ensure(&amp;reply, to_read);
-    if (new_size == -1)                                        /* abort if error e.g. no memory */
-      exit(1);
-    ssize_t res = read(fd, reply.p, to_read);                  /* get reply */
-    if (res &lt;= 0)                                              /* abort if error e.g. no reply */
-      exit(1);
-    tp_use(&amp;reply, res);
-  }
-  ssize_t server_code = tp_reply(&amp;reply);                      /* display+abort if error e.g. duplicate key */
-  if (server_code != 0) {
-    printf("error: %-.*s\n", tp_replyerrorlen(&amp;reply),
-           tp_replyerror(&amp;reply));
-    tp_free(&amp;reply);
+  char reply_buffer[1024];
+  int rres = read(fd, reply_buffer, 1024);                     /* get reply */
+  if (rres &lt;= 0) exit(1);
+  if (tp_reply(&amp;response, reply_buffer, rres) &lt; 0) exit(1);
+  if (response.error != 0) {                                   /* display+abort if error e.g. duplicate key */
+    printf("Error: %*s\n",
+    (int) (response.error_end-response.error),response.error);
     exit(1);
   }
-  tp_free(&amp;request);                                           /* clean up */
-  tp_free(&amp;reply);
-  close(fd);
+  close(fd);                                                   /* clean up */
   printf("Insert succeeded\n");                                /* congratulate self */
   exit(0);
 }
 </programlisting>
     <para>
        The example program only shows one command and does not show all that's necessary for
-       good practice. For that, please see <link
+       good practice. For that, please see the <link
        xlink:href="https://github.com/tarantool/tarantool-c"><filename>connector/c</filename></link> source tree.
     </para>
   </section>
