@@ -170,6 +170,6 @@ if (TARGET_OS_DARWIN)
         LINK_FLAGS "-pagezero_size 10000 -image_base 100000000")
 elseif (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
     # Helps symbol resolution of plug-ins
-    set_target_properties(tarantool LINK_FLAGS "-rdynamic")
+    set_target_properties(tarantool PROPERTIES LINK_FLAGS "-rdynamic")
 endif()
 install (TARGETS tarantool DESTINATION bin)
