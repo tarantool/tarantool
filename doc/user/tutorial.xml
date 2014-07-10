@@ -283,7 +283,6 @@ ones unless you intend to work on the documentation.</para>
  <listitem><para>binutils-dev or binutils-devel       # contains GNU bfd for printing stack traces</para></listitem>
  <listitem><para> gcc or clang                        # see above</para></listitem>
  <listitem><para> git                                 # see above</para></listitem>
- <listitem><para> uuid-dev                            # for uuid_* functions and replication</para></listitem>
  <listitem><para> cmake                               # see above</para></listitem>
  <listitem><para> libreadline-dev                     # for interactive mode</para></listitem>
  <listitem><para> libncurses5-dev or ncurses-devel    # see above</para></listitem>
@@ -459,7 +458,7 @@ the server (but not the documentation), and run tests after build.
 
 <para>
 To build with SUSE 13.1, the steps are as described above, except that the appropriate YaST2 package names are:
-binutils-devel, libuuid-devel, cmake, ncurses-devel, lynx, jing, libxml2-devel, docbook_5, saxon, libxslt-devel.
+binutils-devel, cmake, ncurses-devel, lynx, jing, libxml2-devel, docbook_5, saxon, libxslt-devel.
 The python connector can be installed with <code>sudo easy_install pip</code> and <code>sudo pip install tarantool</code>.
 </para>
 
