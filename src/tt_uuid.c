@@ -28,9 +28,7 @@
  */
 #include "tt_uuid.h"
 #include "msgpuck/msgpuck.h"
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include <random.h>
 #include <trivia/config.h>
 
 /* Zeroed by the linker. */
@@ -45,69 +43,16 @@ CT_ASSERT(sizeof(struct tt_uuid) == UUID_LEN);
 CT_ASSERT(sizeof(struct tt_uuid) == sizeof(struct uuid));
 
 void
-tt_uuid_init(void) {}
-
-void
-tt_uuid_free(void) {}
-
-void
 tt_uuid_create(struct tt_uuid *uu)
 {
 	uuidgen((struct uuid *) uu, 1); /* syscall */
 }
 #else
 
-static int rfd;
-
-void
-tt_uuid_init(void)
-{
-	rfd = open("/dev/urandom", O_RDONLY);
-	if (rfd == -1)
-		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
-	if (rfd == -1)
-		return;
-	int flags = fcntl(rfd, F_GETFD);
-	if (flags < 0)
-		return;
-	fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
-}
-
-void
-tt_uuid_free(void)
-{
-	if (rfd == -1)
-		return;
-	close(rfd);
-}
-
 void
 tt_uuid_create(struct tt_uuid *uu)
 {
-	char *raw = (char *) uu;
-
-	if (rfd == -1)
-		goto prng;
-
-	int generated = 0;
-	int attempt = 0;
-	while (generated < sizeof(*uu)) {
-		ssize_t n = read(rfd, raw + generated, sizeof(*uu) - generated);
-		if (n <= 0) {
-			if (attempt++ > 5)
-				break;
-			continue;
-		}
-		generated += n;
-		attempt = 0;
-	}
-prng:
-	/* fill remaining bytes with PRNG */
-	generated -= generated % sizeof(int);
-	while (generated < sizeof(*uu)) {
-		*(int *)(raw + generated) = rand();
-		generated += sizeof(int);
-	}
+	random_bytes((char *) uu, sizeof(*uu));
 
 	uu->clock_seq_hi_and_reserved &= 0x3f;
 	uu->clock_seq_hi_and_reserved |= 0x80; /* variant 1 = RFC4122 */

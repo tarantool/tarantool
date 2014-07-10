@@ -53,12 +53,6 @@ struct tt_uuid {
 	uint8_t node[6];
 };
 
-void
-tt_uuid_init(void);
-
-void
-tt_uuid_free(void);
-
 /**
  * \brief Generate new UUID
  * \param uu[out] UUID

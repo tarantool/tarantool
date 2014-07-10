@@ -512,7 +512,7 @@ tarantool_free(void)
 	session_free();
 	fiber_free();
 	memory_free();
-	tt_uuid_free();
+	random_free();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif
@@ -618,7 +618,6 @@ main(int argc, char **argv)
 	}
 
 	random_init();
-	tt_uuid_init();
 	say_init(argv[0]);
 
 	crc32_init();

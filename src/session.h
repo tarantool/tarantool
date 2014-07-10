@@ -53,7 +53,7 @@ struct session {
 	/** Peer cookie - description of the peer. */
 	uint64_t cookie;
 	/** Authentication salt. */
-	int salt[SESSION_SEED_SIZE/sizeof(int)];
+	char salt[SESSION_SEED_SIZE];
 	/** A look up key to quickly find session user. */
 	uint8_t auth_token;
 	/** User id of the authenticated user. */
