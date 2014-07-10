@@ -21,7 +21,7 @@ find_path(const char *argv0)
 		return path;
 
 	char buf[PATH_MAX];
-	uint32_t size = PATH_MAX - 1;
+	size_t size = PATH_MAX - 1;
 	if (argv0[0] == '/')
 		snprintf(buf, size, "%s", argv0);
 	else {
@@ -35,7 +35,8 @@ find_path(const char *argv0)
 		snprintf(buf, size, "%s", getexecname());
 		rc = 0;
 #elif defined(__APPLE__)
-		rc = _NSGetExecutablePath(buf, &size);
+		uint32_t usize = size;
+		rc = _NSGetExecutablePath(buf, &usize);
 #endif
 		if (rc == -1)
 			snprintf(buf, sizeof(buf) - 1, "%s", getenv("_"));

@@ -51,9 +51,8 @@ random_init(void)
 	}
 
 	int flags = fcntl(rfd, F_GETFD);
-	if (flags < 0)
-		goto srand;
-	fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
+	if (flags != -1)
+		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
 
 	read(rfd, &seed, sizeof(seed));
 srand:
@@ -72,10 +71,11 @@ random_free(void)
 void
 random_bytes(char *buf, size_t size)
 {
+	size_t generated = 0;
+
 	if (rfd == -1)
 		goto rand;
 
-	size_t generated = 0;
 	int attempt = 0;
 	while (generated < size) {
 		ssize_t n = read(rfd, buf + generated, size - generated);
