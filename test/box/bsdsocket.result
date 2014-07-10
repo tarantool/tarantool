@@ -724,10 +724,6 @@ lua s:close()
 ---
  - true
 ...
-lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)
----
- - nil
-...
 lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
 ---
 ...

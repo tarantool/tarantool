@@ -226,7 +226,8 @@ exec admin "lua string.match(header, '\\r\\n\\r\\n$') ~= nil"
 exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
 exec admin "lua s:close()"
 
-exec admin "lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)"
+# exec admin "lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)"
+# exec admin "lua box.socket.tcp_connect('mail.ru', 12345)"
 
 
 exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
