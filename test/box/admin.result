@@ -10,17 +10,12 @@ space:create_index('primary', { type = 'hash' })
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
 help()
 ---
-- server admin commands
-- - box.snapshot()
-  - box.info()
-  - box.stat()
-  - box.slab.info()
-  - box.slab.check()
-  - box.fiber.info()
-  - box.plugin.info()
-  - box.cfg()
-  - box.cfg.reload()
-  - box.coredump()
+- - Help topics:
+    - Tutorial
+    - Basics
+    - Administration
+  - To get help on a topic, type help('topic') (with quotes)
+  - To get help on a function/object, type help(function) (without quotes)
 ...
 box.cfg
 ---
