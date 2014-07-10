@@ -745,13 +745,12 @@ iproto_request_new(struct iproto_connection *con,
 }
 
 const char *
-iproto_greeting(int *salt)
+iproto_greeting(const char *salt)
 {
 	static __thread char greeting[IPROTO_GREETING_SIZE + 1];
 	char base64buf[SESSION_SEED_SIZE * 4 / 3 + 5];
 
-	base64_encode((char *) salt, SESSION_SEED_SIZE,
-		      base64buf, sizeof(base64buf));
+	base64_encode(salt, SESSION_SEED_SIZE, base64buf, sizeof(base64buf));
 	snprintf(greeting, sizeof(greeting),
 		 "Tarantool %-20s %-32s\n%-63s\n",
 		 tarantool_version(), custom_proc_title, base64buf);

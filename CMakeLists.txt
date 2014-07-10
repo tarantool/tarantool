@@ -79,6 +79,7 @@ endif()
 check_function_exists(open_memstream HAVE_OPEN_MEMSTREAM)
 check_function_exists(fmemopen HAVE_FMEMOPEN)
 check_function_exists(funopen HAVE_FUNOPEN)
+check_function_exists(uuidgen HAVE_UUIDGEN)
 
 #
 # Some versions of GNU libc define non-portable __libc_stack_end
@@ -304,13 +305,6 @@ add_dependencies(build_bundled_libs cjson)
 include(BuildLibYAML)
 libyaml_build()
 add_dependencies(build_bundled_libs yaml)
-
-#
-# LibUUID
-#
-
-set(LIBUUID_FIND_REQUIRED ON)
-find_package(LibUUID)
 
 #
 # Third-Party misc

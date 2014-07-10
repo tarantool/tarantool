@@ -68,6 +68,9 @@ bit_rotr_u32(uint32_t x, int r);
 extern inline uint64_t
 bit_rotr_u64(uint64_t x, int r);
 
+extern inline uint16_t
+bswap_u16(uint16_t x);
+
 extern inline uint32_t
 bswap_u32(uint32_t x);
 

@@ -23,12 +23,6 @@ BuildRequires: gcc >= 4.5
 BuildRequires: binutils-devel
 %endif
 
-%if 0%{?rhel} < 6 && 0%{?rhel} > 0
-BuildRequires: e2fsprogs-devel
-%else
-BuildRequires: libuuid-devel
-%endif
-
 %if 0%{?fedora} > 0
 BuildRequires: perl-podlators
 %endif
@@ -45,11 +39,6 @@ Vendor: tarantool.org
 License: BSD
 Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 Requires: readline
-%if 0%{?rhel} <= 5 && 0%{?rhel} > 0
-Requires: e2fsprogs-libs
-%else
-Requires: libuuid
-%endif
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description

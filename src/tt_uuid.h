@@ -28,11 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <trivia/config.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdbool.h>
-#include <stdlib.h>
-#include <assert.h>
+#include <string.h>
+#include <stdio.h> /* snprintf */
+#include <lib/bit/bit.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -40,108 +41,102 @@ extern "C" {
 
 enum { UUID_LEN = 16, UUID_STR_LEN = 36 };
 
-#if defined(HAVE_LIBUUID_LINUX)
-
-#include <uuid/uuid.h>
-
+/**
+ * \brief UUID structure struct
+ */
 struct tt_uuid {
-	uuid_t id;
+	uint32_t time_low;
+	uint16_t time_mid;
+	uint16_t time_hi_and_version;
+	uint8_t clock_seq_hi_and_reserved;
+	uint8_t clock_seq_low;
+	uint8_t node[6];
 };
 
-static inline void
-tt_uuid_create(struct tt_uuid *uu)
-{
-	uuid_generate(uu->id);
-}
+/**
+ * \brief Generate new UUID
+ * \param uu[out] UUID
+ */
+void
+tt_uuid_create(struct tt_uuid *uu);
 
-static inline int
+/**
+ * \brief Parse UUID from string.
+ * \param in string
+ * \param uu[out] UUID
+ * \return
+ */
+inline int
 tt_uuid_from_string(const char *in, struct tt_uuid *uu)
 {
-	return uuid_parse((char *) in, uu->id);
+	if (strlen(in) != UUID_STR_LEN ||
+	    sscanf(in, "%8x-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+		   &uu->time_low, &uu->time_mid, &uu->time_hi_and_version,
+		   &uu->clock_seq_hi_and_reserved, &uu->clock_seq_low,
+		   &uu->node[0], &uu->node[1], &uu->node[2], &uu->node[3],
+		   &uu->node[4], &uu->node[5]) != 11)
+		return 1;
+
+	/* Check variant (NCS, RFC4122, MSFT) */
+	uint8_t n = uu->clock_seq_hi_and_reserved;
+	if ((n & 0x80) != 0x00 && (n & 0xc0) != 0x80 &&	(n & 0xe0) != 0xc0)
+		return 1;
+	return 0;
 }
 
-static inline void
+/**
+ * \brief Format UUID to RFC 4122 string.
+ * \param uu uuid
+ * \param[out] out buffer, must be at least UUID_STR_LEN + 1 length
+ */
+inline void
 tt_uuid_to_string(const struct tt_uuid *uu, char *out)
 {
-	uuid_unparse(uu->id, out);
+	sprintf(out, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		uu->time_low, uu->time_mid, uu->time_hi_and_version,
+		uu->clock_seq_hi_and_reserved, uu->clock_seq_low, uu->node[0],
+		uu->node[1], uu->node[2], uu->node[3], uu->node[4], uu->node[5]);
 }
 
-static inline void
-tt_uuid_bin(const struct tt_uuid *uu, void *out)
+/**
+ * \brief Return byte order swapped UUID (LE -> BE and vice versa)
+ * \param uu
+ */
+inline void
+tt_uuid_bswap(struct tt_uuid *uu)
 {
-	memcpy(out, uu->id, sizeof(uu->id));
+	uu->time_low = bswap_u32(uu->time_low);
+	uu->time_mid = bswap_u16(uu->time_mid);
+	uu->time_hi_and_version = bswap_u16(uu->time_hi_and_version);
 }
 
-static inline bool
+/**
+ * \brief Test that uuid is nil
+ * \param uu UUID
+ * \retval true if all members of \a uu 0
+ * \retval false otherwise
+ */
+inline bool
 tt_uuid_is_nil(const struct tt_uuid *uu)
 {
-	return uuid_is_null(uu->id);
+	const uint64_t *p = (const uint64_t *) uu;
+	return !p[0] && !p[1];
 }
 
-static inline bool
-tt_uuid_cmp(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
+/**
+ * \brief Test that \a lhs equal \a rhs
+ * \param lhs UUID
+ * \param rhs UUID
+ * \retval true if \a lhs equal \a rhs
+ * \retval false otherwise
+ */
+inline bool
+tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
 {
-	return uuid_compare(lhs->id, rhs->id);
+	const uint64_t *lp = (const uint64_t *) lhs;
+	const uint64_t *rp = (const uint64_t *) rhs;
+	return lp[0] == rp[0] && lp[1] == rp[1];
 }
-
-#elif defined(HAVE_LIBUUID_BSD)
-
-#include <uuid.h>
-
-struct tt_uuid {
-	struct uuid id;
-};
-
-static inline int
-tt_uuid_create(struct tt_uuid *uu)
-{
-	uint32_t status;
-	uuid_create(&uu->id, &status);
-	return status == uuid_s_ok;
-}
-
-static inline int
-tt_uuid_from_string(const char *in, struct tt_uuid *uu)
-{
-	uint32_t status;
-	uuid_from_string(in, &uu->id, &status);
-	return status == uuid_s_ok;
-}
-
-static inline void
-tt_uuid_to_string(const struct tt_uuid *uu, char *out)
-{
-	uint32_t status;
-	char *buf = NULL;
-	uuid_to_string(&uu->id, &buf, &status);
-	assert(status == uuid_s_ok);
-	strncpy(out, buf, UUID_STR_LEN);
-	out[UUID_STR_LEN] = '\0';
-	free(buf);
-}
-
-static inline bool
-tt_uuid_cmp(const struct tt_uuid *lhs, const struct tt_uuid *rhs)
-{
-	uint32_t status;
-	return uuid_compare(&lhs->id, &rhs->id, &status);
-}
-
-static inline bool
-tt_uuid_is_nil(const struct tt_uuid *uu)
-{
-	uint32_t status;
-	return uuid_is_nil(&uu->id, &status);
-}
-
-static inline void
-tt_uuid_bin(const struct tt_uuid *uu, void *out)
-{
-	uuid_enc_le(out, &uu->id);
-}
-#else
-#error Unsupported libuuid
-#endif /* HAVE_LIBUUID_XXX */
 
 extern const struct tt_uuid uuid_nil;
 

@@ -30,22 +30,68 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <stdlib.h>
 
-#ifdef __linux__
-#define DEV_RANDOM "/dev/urandom"
-#else
-#define DEV_RANDOM "/dev/random"
-#endif
+static int rfd;
 
 void
 random_init(void)
 {
-	int fd = open(DEV_RANDOM, O_RDONLY);
-	long int seed;
-	read(fd, &seed, sizeof(seed));
-	close(fd);
+	int seed;
+	rfd = open("/dev/urandom", O_RDONLY);
+	if (rfd == -1)
+		rfd = open("/dev/random", O_RDONLY | O_NONBLOCK);
+	if (rfd == -1) {
+		struct timeval tv;
+		gettimeofday(&tv, 0);
+		seed = (getpid() << 16) ^ getuid() ^ tv.tv_sec ^ tv.tv_usec;
+		goto srand;
+	}
+
+	int flags = fcntl(rfd, F_GETFD);
+	if (flags != -1)
+		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
+
+	read(rfd, &seed, sizeof(seed));
+srand:
 	srandom(seed);
 	srand(seed);
+}
+
+void
+random_free(void)
+{
+	if (rfd == -1)
+		return;
+	close(rfd);
+}
+
+void
+random_bytes(char *buf, size_t size)
+{
+	size_t generated = 0;
+
+	if (rfd == -1)
+		goto rand;
+
+	int attempt = 0;
+	while (generated < size) {
+		ssize_t n = read(rfd, buf + generated, size - generated);
+		if (n <= 0) {
+			if (attempt++ > 5)
+				break;
+			continue;
+		}
+		generated += n;
+		attempt = 0;
+	}
+rand:
+	/* fill remaining bytes with PRNG */
+	generated -= generated % sizeof(int);
+	while (generated < size) {
+		*(int *)(buf + generated) = rand();
+		generated += sizeof(int);
+	}
 }

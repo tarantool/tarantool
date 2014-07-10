@@ -47,7 +47,6 @@ CMake is used for configuration management.
 The build depends on the following external libraries:
 
 - libreadline and libreadline-dev
-- uuid and uuid-dev.
 - GNU bfd (part of GNU binutils).
 
 Please follow these steps to compile Tarantool:

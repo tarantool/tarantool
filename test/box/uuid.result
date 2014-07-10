@@ -2,17 +2,247 @@
 uuid = require('uuid')
 ---
 ...
-string.len(uuid.bin())
+--
+-- RFC4122 compliance
+--
+uu = uuid.new()
+---
+...
+-- new()always generates RFC4122 variant
+bit.band(uu.clock_seq_hi_and_reserved, 0xc0) == 0x80
+---
+- true
+...
+vsn = bit.rshift(uu.time_hi_and_version, 12)
+---
+...
+-- new() generates time-based or random-based version
+vsn == 1 or vsn == 4
+---
+- true
+...
+--
+-- to/from string
+--
+uu = uuid()
+---
+...
+#uu:str()
+---
+- 36
+...
+string.match(uu:str(), '^[a-f0-9%-]+$') ~= nil
+---
+- true
+...
+uu == uuid.fromstr(uu:str())
+---
+- true
+...
+uu = uuid.fromstr('ba90d815-14e0-431d-80c0-ce587885bb78')
+---
+...
+uu:str()
+---
+- ba90d815-14e0-431d-80c0-ce587885bb78
+...
+tostring(uu)
+---
+- ba90d815-14e0-431d-80c0-ce587885bb78
+...
+tostring(uu) == uu:str()
+---
+- true
+...
+uu.time_low;
+---
+- 3130054677
+...
+uu.time_mid;
+---
+- 5344
+...
+uu.time_hi_and_version;
+---
+- 17181
+...
+uu.clock_seq_hi_and_reserved;
+---
+- 128
+...
+uu.clock_seq_low;
+---
+- 192
+...
+uu.node[0]
+---
+- 206
+...
+uu.node[1]
+---
+- 88
+...
+uu.node[2]
+---
+- 120
+...
+uu.node[3]
+---
+- 133
+...
+uu.node[4]
+---
+- 187
+...
+uu.node[5]
+---
+- 120
+...
+-- aliases
+#uuid.str()
+---
+- 36
+...
+-- invalid values
+uuid.fromstr(nil)
+---
+- error: 'builtin/uuid.lua:44: fromstr(str)'
+...
+uuid.fromstr('')
+---
+- null
+...
+uuid.fromstr('blablabla')
+---
+- null
+...
+uuid.fromstr(string.rep(' ', 36))
+---
+- null
+...
+uuid.fromstr('ba90d81514e0431d80c0ce587885bb78')
+---
+- null
+...
+uuid.fromstr('ba90d815-14e0-431d-80c0')
+---
+- null
+...
+uuid.fromstr('ba90d815-14e0-431d-80c0-tt587885bb7')
+---
+- null
+...
+--
+-- to/from binary
+--
+uu = uuid()
+---
+...
+#uu:bin()
 ---
 - 16
 ...
-string.len(uuid.hex())
+#uu:bin('h')
 ---
-- 32
+- 16
 ...
-string.match(uuid.hex(), '^[a-f0-9]+$') ~= nil
+#uu:bin('l')
+---
+- 16
+...
+#uu:bin('n')
+---
+- 16
+...
+#uu:bin('b')
+---
+- 16
+...
+uu:bin() == uu:bin('h')
 ---
 - true
+...
+uu:bin('n') ~= uu:bin('h')
+---
+- true
+...
+uu:bin('b') ~= uu:bin('l')
+---
+- true
+...
+uu == uuid.frombin(uu:bin())
+---
+- true
+...
+uu == uuid.frombin(uu:bin('b'), 'b')
+---
+- true
+...
+uu == uuid.frombin(uu:bin('l'), 'l')
+---
+- true
+...
+uu = uuid.fromstr('adf9d02e-0756-11e4-b5cf-525400123456')
+---
+...
+uu:bin('l')
+---
+- !!binary LtD5rVYH5BG1z1JUABI0Vg==
+...
+uu:bin('b')
+---
+- !!binary rfnQLgdWEeS1z1JUABI0Vg==
+...
+-- aliases
+#uuid.bin()
+---
+- 16
+...
+#uuid.bin('l')
+---
+- 16
+...
+--
+-- eq and nil
+--
+uu = uuid.new()
+---
+...
+uuid.NULL
+---
+- 00000000-0000-0000-0000-000000000000
+...
+uuid.NULL:isnil()
+---
+- true
+...
+uuid.NULL ~= uu
+---
+- true
+...
+uu:isnil()
+---
+- false
+...
+uu ==  uu
+---
+- true
+...
+uu == uu
+---
+- true
+...
+uu == nil
+---
+- false
+...
+uu == 12345
+---
+- false
+...
+uu == "blablabla"
+---
+- false
 ...
 uuid = nil
 ---

@@ -61,6 +61,7 @@
 #include "box/box.h"
 #include "scoped_guard.h"
 #include "random.h"
+#include "tt_uuid.h"
 #include "iobuf.h"
 #include <third_party/gopt/gopt.h>
 #include "cfg.h"
@@ -511,6 +512,7 @@ tarantool_free(void)
 	session_free();
 	fiber_free();
 	memory_free();
+	random_free();
 #ifdef ENABLE_GCOV
 	__gcov_flush();
 #endif

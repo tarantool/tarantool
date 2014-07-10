@@ -28,11 +28,20 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <stddef.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 void
 random_init(void);
+
+void
+random_free(void);
+
+void
+random_bytes(char *buf, size_t size);
 
 #if defined(__cplusplus)
 }

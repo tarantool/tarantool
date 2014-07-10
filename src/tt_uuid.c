@@ -28,10 +28,53 @@
  */
 #include "tt_uuid.h"
 #include "msgpuck/msgpuck.h"
-#include <stdio.h>
+#include <random.h>
+#include <trivia/config.h>
 
 /* Zeroed by the linker. */
 const struct tt_uuid uuid_nil;
+
+#define CT_ASSERT(e) typedef char __ct_assert_##__LINE__[(e) ? 1 : -1]
+CT_ASSERT(sizeof(struct tt_uuid) == UUID_LEN);
+
+#if defined(HAVE_UUIDGEN)
+#include <sys/uuid.h>
+
+CT_ASSERT(sizeof(struct tt_uuid) == sizeof(struct uuid));
+
+void
+tt_uuid_create(struct tt_uuid *uu)
+{
+	uuidgen((struct uuid *) uu, 1); /* syscall */
+}
+#else
+
+void
+tt_uuid_create(struct tt_uuid *uu)
+{
+	random_bytes((char *) uu, sizeof(*uu));
+
+	uu->clock_seq_hi_and_reserved &= 0x3f;
+	uu->clock_seq_hi_and_reserved |= 0x80; /* variant 1 = RFC4122 */
+	uu->time_hi_and_version &= 0x0FFF;
+	uu->time_hi_and_version |= (4 << 12);  /* version 4 = random */
+}
+#endif
+
+extern inline int
+tt_uuid_from_string(const char *in, struct tt_uuid *uu);
+
+extern inline void
+tt_uuid_to_string(const struct tt_uuid *uu, char *out);
+
+extern inline void
+tt_uuid_bswap(struct tt_uuid *uu);
+
+extern inline bool
+tt_uuid_is_nil(const struct tt_uuid *uu);
+
+extern inline bool
+tt_uuid_is_equal(const struct tt_uuid *lhs, const struct tt_uuid *rhs);
 
 static __thread char buf[UUID_STR_LEN + 1];
 

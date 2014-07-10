@@ -925,9 +925,29 @@ local function tcp_connect(host, port, timeout)
                 break
             end
 
-            if s:writable(timeout) then
-                boxerrno(0)
-                return s
+            while true do
+
+                if s:writable(timeout) then
+                    if s:peer(self) ~= nil then
+                        boxerrno(0)
+                        return s
+
+                    elseif boxerrno() ~= boxerrno.EAGAIN then
+                        break
+                    end
+
+                    timeout = timeout - (boxfiber.time() - started)
+                    started = boxfiber.time()
+
+                    if timeout <= 0 then
+                        s:close()
+                        break
+                    end
+
+                else
+                    break
+                end
+
             end
         end
 

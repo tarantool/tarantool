@@ -33,6 +33,7 @@
 #include "assoc.h"
 #include "trigger.h"
 #include "exception.h"
+#include "random.h"
 #include <sys/socket.h>
 
 static struct mh_i32ptr_t *session_registry;
@@ -67,8 +68,7 @@ session_create(int fd, uint64_t cookie)
 	 * to make sure triggers run correctly.
 	 */
 	session_set_user(session, ADMIN, ADMIN);
-	for (int i = 0; i < SESSION_SEED_SIZE/sizeof(*session->salt); i++)
-		session->salt[i] = rand();
+	random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
