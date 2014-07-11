@@ -62,6 +62,7 @@ session_create(int fd, uint64_t cookie)
 	session->fd =  fd;
 	session->cookie = cookie;
 	session->delim[0] = '\0';
+	session->txn = NULL;
 
 	/*
 	 * At first the session user is a superuser,
@@ -107,6 +108,7 @@ session_destroy(struct session *session)
 		/* catch all. */
 	}
 	session_storage_cleanup(session->id);
+	assert(session->txn == NULL);
 	struct mh_i32ptr_node_t node = { session->id, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
 	mempool_free(&session_pool, session);

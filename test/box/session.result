@@ -31,7 +31,7 @@ session.id() > 0
 ---
 - true
 ...
-f = fiber.create(function() fiber.detach() failed = session.id() ~= 0 end)
+f = fiber.create(function() fiber.detach() failed = session.id() == 0 end)
 ---
 ...
 fiber.resume(f)

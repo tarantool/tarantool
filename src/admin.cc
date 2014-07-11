@@ -61,8 +61,9 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 				 fiber()->session->delim);
 
 	char *eol;
-	while ((eol = (char *) memmem(in->pos, in->end - in->pos, delim,
-				      delim_len)) == NULL) {
+	while (in->pos == NULL ||
+	       (eol = (char *) memmem(in->pos, in->end - in->pos, delim,
+					 delim_len)) == NULL) {
 		if (coio_bread(coio, in, 1) <= 0)
 			return -1;
 	}
@@ -99,22 +100,19 @@ admin_handler(va_list ap)
 	struct iobuf *iobuf = va_arg(ap, struct iobuf *);
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_guard(tarantool_L);
-
-	auto scoped_guard = make_scoped_guard([&] {
-		evio_close(loop(), &coio);
-		iobuf_delete(iobuf);
-		session_destroy(fiber()->session);
-	});
-
 	/*
 	 * Admin and iproto connections must have a
 	 * session object, representing the state of
 	 * a remote client: it's used in Lua
 	 * stored procedures.
 	 */
+	SessionGuard sesion_guard(coio.fd, *(uint64_t *) addr);
 
-	struct session *session = session_create(coio.fd, *(uint64_t *) addr);
-	session_set_user(session, ADMIN, ADMIN);
+	auto scoped_guard = make_scoped_guard([&] {
+		evio_close(loop(), &coio);
+		iobuf_delete(iobuf);
+	});
+
 	trigger_run(&session_on_connect, NULL);
 
 	for (;;) {

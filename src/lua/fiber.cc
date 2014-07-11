@@ -30,6 +30,7 @@
 
 #include <fiber.h>
 #include "lua/utils.h"
+#include <session.h>
 
 extern "C" {
 #include <lua.h>
@@ -376,8 +377,6 @@ lbox_fiber_detach(struct lua_State *L)
 	/* Clear the caller, to avoid a reference leak. */
 	/* Request a detach. */
 	lua_pushinteger(L, DETACH);
-	/* A detached fiber has no associated session. */
-	fiber_set_session(fiber(), NULL);
 	fiber_yield_to(caller);
 	return 0;
 }
@@ -395,6 +394,7 @@ box_lua_fiber_run(va_list ap __attribute__((unused)))
 	 */
 	lua_pushthread(L);
 	LuarefGuard coro_guard(L);
+        SessionGuard session_guard(-1, 0);
 	/*
 	 * Lua coroutine.resume() returns true/false for
 	 * completion status plus whatever the coroutine main
@@ -470,8 +470,6 @@ lbox_fiber_create(struct lua_State *L)
 			   " reached");
 
 	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
-	/* Preserve the session in a child fiber. */
-	fiber_set_session(f, fiber()->session);
 	/* Initially the fiber is cancellable */
 	f->flags |= FIBER_USER_MODE | FIBER_CANCELLABLE;
 
@@ -557,6 +555,8 @@ box_lua_fiber_run_detached(va_list ap)
 {
 	LuarefGuard coro_guard(va_arg(ap, int));
 	struct lua_State *L = va_arg(ap, struct lua_State *);
+        SessionGuard session_guard(-1, 0);
+
 	try {
 		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 	} catch (FiberCancelException *e) {

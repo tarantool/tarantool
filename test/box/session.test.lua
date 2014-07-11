@@ -11,7 +11,7 @@ session.exists(1234567890)
 
 -- check session.id()
 session.id() > 0
-f = fiber.create(function() fiber.detach() failed = session.id() ~= 0 end)
+f = fiber.create(function() fiber.detach() failed = session.id() == 0 end)
 fiber.resume(f)
 failed
 f1 = fiber.create(function() if session.id() == 0 then failed = true end end)
