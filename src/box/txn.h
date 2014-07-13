@@ -48,10 +48,14 @@ struct txn {
 	struct iproto_header *row;
 };
 
+/* pointer to the current multithreaded transaction (if any) */
+#define in_txn() (fiber()->session->txn)
+
 struct txn *txn_begin();
-void txn_commit(struct txn *txn);
+void txn_commit(struct txn *txn, struct port *port);
 void txn_finish(struct txn *txn);
-void txn_rollback(struct txn *txn);
+void txn_rollback();
+
 void txn_replace(struct txn *txn, struct space *space,
 		 struct tuple *old_tuple, struct tuple *new_tuple,
 		 enum dup_replace_mode mode);

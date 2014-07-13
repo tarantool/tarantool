@@ -73,27 +73,15 @@ struct request_replace_body {
 	uint8_t k_tuple;
 } __attribute__((packed));
 
-void
-port_send_tuple(struct port *port, struct txn *txn)
-{
-	struct tuple *tuple;
-	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
-		port_add_tuple(port, tuple);
-}
-
 static void
 process_rw(struct port *port, struct request *request)
 {
-	struct txn *txn = txn_begin();
 	try {
 		stat_collect(stat_base, request->type, 1);
-		request->execute(request, txn, port);
-		txn_commit(txn);
-		port_send_tuple(port, txn);
+		request->execute(request, port);
 		port_eof(port);
-		txn_finish(txn);
 	} catch (Exception *e) {
-		txn_rollback(txn);
+		txn_rollback();
 		throw;
 	}
 }

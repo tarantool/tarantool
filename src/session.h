@@ -115,10 +115,19 @@ session_set_user(struct session *session, uint8_t auth_token, uint32_t uid)
 	session->uid = uid;
 }
 
-/* The global on-connect trigger. */
+/** Global on-connect triggers. */
 extern struct rlist session_on_connect;
-/* The global on-disconnect trigger. */
+
+/** Run on-connect triggers */
+void
+session_run_on_connect_triggers(struct session *session);
+
+/** Global on-disconnect triggers. */
 extern struct rlist session_on_disconnect;
+
+/** Run on-disconnect triggers */
+void
+session_run_on_disconnect_triggers(struct session *session);
 
 void
 session_init();
@@ -132,8 +141,15 @@ session_storage_cleanup(int sid);
 /** A helper class to create and set session in single-session fibers. */
 struct SessionGuard
 {
+	struct session *session;
 	SessionGuard(int fd, uint64_t cookie);
         ~SessionGuard();
+};
+
+struct SessionGuardWithTriggers: public SessionGuard
+{
+	SessionGuardWithTriggers(int fd, uint64_t cookie);
+	~SessionGuardWithTriggers();
 };
 
 #endif /* INCLUDES_TARANTOOL_SESSION_H */

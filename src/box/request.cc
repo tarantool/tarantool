@@ -41,38 +41,6 @@
 #include "authentication.h"
 #include "access.h"
 
-#if 0
-static const char *
-read_tuple(const char **reqpos, const char *reqend)
-{
-	const char *tuple = *reqpos;
-	if (unlikely(mp_check(reqpos, reqend))) {
-		say_error("\n"
-			  "********************************************\n"
-			  "* Found a corrupted tuple in a request!    *\n"
-			  "* This can be either due to a memory       *\n"
-			  "* corruption or a bug in the server.       *\n"
-			  "* The tuple can not be loaded.             *\n"
-			  "********************************************\n"
-			  "Request tail, BASE64 encoded:               \n");
-
-		uint32_t tuple_len = reqend - tuple;
-		int base64_buflen = base64_bufsize(tuple_len);
-		char *base64_buf = (char *) malloc(base64_buflen);
-		int len = base64_encode(tuple, tuple_len,
-					base64_buf, base64_buflen);
-		write(STDERR_FILENO, base64_buf, len);
-		free(base64_buf);
-		tnt_raise(ClientError, ER_INVALID_MSGPACK, "tuple");
-	}
-
-	if (unlikely(mp_typeof(*tuple) != MP_ARRAY))
-		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-
-	return tuple;
-}
-#endif
-
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)
 {
@@ -80,9 +48,9 @@ dup_replace_mode(uint32_t op)
 }
 
 static void
-execute_replace(struct request *request, struct txn *txn, struct port *port)
+execute_replace(struct request *request, struct port *port)
 {
-	(void) port;
+	struct txn *txn = txn_begin();
 	struct space *space = space_cache_find(request->space_id);
 
 	space_check_access(space, PRIV_W);
@@ -94,13 +62,13 @@ execute_replace(struct request *request, struct txn *txn, struct port *port)
 
 	txn_add_redo(txn, request);
 	txn_replace(txn, space, NULL, new_tuple, mode);
+	txn_commit(txn, port);
 }
 
 static void
-execute_update(struct request *request, struct txn *txn,
-	       struct port *port)
+execute_update(struct request *request, struct port *port)
 {
-	(void) port;
+	struct txn *txn = txn_begin();
 
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
@@ -115,8 +83,10 @@ execute_update(struct request *request, struct txn *txn,
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	txn_add_redo(txn, request);
-	if (old_tuple == NULL)
+	if (old_tuple == NULL) {
+		txn_commit(txn, port);
 		return;
+	}
 
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
@@ -128,11 +98,13 @@ execute_update(struct request *request, struct txn *txn,
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
+	txn_commit(txn, port);
 }
 
 static void
-execute_delete(struct request *request, struct txn *txn, struct port *port)
+execute_delete(struct request *request, struct port *port)
 {
+	struct txn *txn = txn_begin();
 	(void) port;
 	struct space *space = space_cache_find(request->space_id);
 	space_check_access(space, PRIV_W);
@@ -145,16 +117,16 @@ execute_delete(struct request *request, struct txn *txn, struct port *port)
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
 	txn_add_redo(txn, request);
-	if (old_tuple == NULL)
-		return;
-	txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	if (old_tuple != NULL)
+		txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
+	txn_commit(txn, port);
 }
 
 
 static void
-execute_select(struct request *request, struct txn *txn, struct port *port)
+execute_select(struct request *request, struct port *port)
 {
-	(void) txn;
+	struct txn *txn = txn_begin();
 	struct space *space = space_cache_find(request->space_id);
 	space_check_access(space, PRIV_R);
 	Index *index = index_find(space, request->index_id);
@@ -187,11 +159,11 @@ execute_select(struct request *request, struct txn *txn, struct port *port)
 			break;
 		port_add_tuple(port, tuple);
 	}
+	txn_commit(txn, port);
 }
 
 void
-execute_auth(struct request *request, struct txn * /* txn */,
-	     struct port * /* port */)
+execute_auth(struct request *request, struct port * /* port */)
 {
 	const char *user = request->key;
 	uint32_t len = mp_decode_strl(&user);

@@ -63,11 +63,6 @@ session_create(int fd, uint64_t cookie)
 	session->cookie = cookie;
 	session->delim[0] = '\0';
 	session->txn = NULL;
-
-	/*
-	 * At first the session user is a superuser,
-	 * to make sure triggers run correctly.
-	 */
 	session_set_user(session, ADMIN, ADMIN);
 	random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
@@ -81,23 +76,12 @@ session_create(int fd, uint64_t cookie)
 		tnt_raise(ClientError, ER_MEMORY_ISSUE,
 			  "session hash", "new session");
 	}
-	/*
-	 * Run the trigger *after* setting the current
-	 * fiber sid.
-	 */
-	fiber_set_session(fiber(), session);
-
-	/* Set session user to guest, until it is authenticated. */
-	session_set_user(session, GUEST, GUEST);
 	return session;
 }
 
 void
-session_destroy(struct session *session)
+session_run_on_disconnect_triggers(struct session *session)
 {
-	if (session == NULL) /* no-op for a dead session. */
-		return;
-	fiber_set_session(fiber(), session);
 	/* For triggers. */
 	session_set_user(session, ADMIN, ADMIN);
 	try {
@@ -108,6 +92,17 @@ session_destroy(struct session *session)
 		/* catch all. */
 	}
 	session_storage_cleanup(session->id);
+}
+
+void
+session_run_on_connect_triggers(struct session *session)
+{
+	trigger_run(&session_on_connect, NULL);
+}
+
+void
+session_destroy(struct session *session)
+{
 	assert(session->txn == NULL);
 	struct mh_i32ptr_node_t node = { session->id, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
@@ -143,11 +138,23 @@ session_free()
 
 SessionGuard::SessionGuard(int fd, uint64_t cookie)
 {
-	session_set_user(session_create(fd, cookie), ADMIN, ADMIN);
+	session = session_create(fd, cookie);
+	fiber_set_session(fiber(), session);
 }
 
 SessionGuard::~SessionGuard()
 {
-	session_destroy(fiber()->session);
+	assert(session == fiber()->session);
+	session_destroy(session);
 }
 
+SessionGuardWithTriggers::SessionGuardWithTriggers(int fd, uint64_t cookie)
+	:SessionGuard(fd, cookie)
+{
+	session_run_on_connect_triggers(session);
+}
+
+SessionGuardWithTriggers::~SessionGuardWithTriggers()
+{
+	session_run_on_disconnect_triggers(session);
+}

@@ -31,6 +31,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <string.h>
 #include "small/slab_cache.h"
 #define RB_COMPACT 1
 #include "third_party/rb.h"
@@ -247,6 +248,9 @@ mslab_free(struct mempool *pool, struct mslab *slab, void *ptr);
 static inline void
 mempool_free(struct mempool *pool, void *ptr)
 {
+#ifndef NDEBUG
+	memset(ptr, '#', pool->objsize);
+#endif
 	struct mslab *slab = (struct mslab *)
 		slab_from_ptr(pool->cache, ptr, pool->slab_order);
 	pool->slabs.stats.used -= pool->objsize;

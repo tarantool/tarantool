@@ -34,7 +34,7 @@
 struct txn;
 struct port;
 
-typedef void (*request_execute_f)(struct request *, struct txn *, struct port *);
+typedef void (*request_execute_f)(struct request *, struct port *);
 enum { REQUEST_IOVMAX = IPROTO_PACKET_BODY_IOVMAX };
 
 struct request
