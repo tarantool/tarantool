@@ -3209,16 +3209,34 @@ To see more about the details of the algorithm for the purpose of writing a new 
 <para>
 <bridgehead renderas="sect4">Users and the _user space</bridgehead>
 The fields in the _user space are:
-a numeric id, a number, the user name, and the optional password.
+a numeric id, a number, the user name, the type, and the optional password.
 </para>
 
 <para>
-There are two special users: 'guest' (user id = 0) and  'admin' (user id = 1).
-They are defined in advance.
-They cannot be dropped.
-(The 'guest' user is a default which usually has minimum privileges;
-the 'admin' user is an administrator which always has maximum privileges.)
+There are three special users: 'guest', 'admin', and 'public'.
 </para>
+
+            <para>
+                <table>
+                    <title>The system users</title>
+                    <tgroup cols="4" align="left" colsep="1" rowsep="1">
+                      <tbody>
+                        <row>
+                         <entry>NAME</entry><entry>ID</entry><entry>TYPE</entry><entry>DESCRIPTION</entry>
+                        </row>
+                        <row>
+                         <entry>guest</entry><entry>0</entry><entry>user</entry><entry>Default when connecting remotely. Usually an untrusted user with few privileges.</entry>
+                        </row>
+                        <row>
+                         <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using sys/tarantool as a console. Usually an administrative user with all privileges.</entry>
+                        </row>
+                        <row>
+                         <entry>public</entry><entry>2</entry><entry>role</entry><entry>Not a user in the usual sense. A role is a container for privileges which can be granted to regular users. </entry>
+                        </row>
+                        </tbody>
+                    </tgroup>
+                </table>
+            </para>
 
 <para>
 To select a row from the _user space, use <code>box.select</code>.
@@ -3239,7 +3257,12 @@ there are special functions which have appropriate error checking.
 To create a new user, say
 <code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
 or
-<code>box.schema.user.create(<replaceable>user-name</replaceable>', {password=<replaceable>password</replaceable>})</code>.
+<code>box.schema.user.create(<replaceable>user-name</replaceable>, {password=<replaceable>password</replaceable>})</code>.
+</para>
+
+<para>
+To change the current user's password, say
+<code>box.schema.user.passwd(<replaceable>password</replaceable>)</code>.
 </para>
 
 <para>
@@ -3249,7 +3272,7 @@ To drop a user, say
 
 <para>
 For example, here is a session which creates a new user with
-a strong password, selects from the tuple in
+a strong password, selects a tuple in
 the _user space, and then drops the user.
 <programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})
 ---
