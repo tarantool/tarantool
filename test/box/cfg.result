@@ -2,7 +2,7 @@
 --# push filter 'admin_port: .*' to 'admin_port: <number>'
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:127: Attempt to modify a read-only
+- error: '[string "-- load_cfg.lua - internal file..."]:126: Attempt to modify a read-only
     table'
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end

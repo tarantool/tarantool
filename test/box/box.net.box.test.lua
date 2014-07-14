@@ -149,6 +149,9 @@ cn:timeout(.01):call('ret_after', 1)
 cn = remote:timeout(0.0000000001):new('127.0.0.1', port, { user = 'netbox', password = '123' })
 cn = remote:timeout(1):new('127.0.0.1', port, { user = 'netbox', password = '123' })
 
+
+
+
 remote.self:ping()
 remote.self.space.net_box_test_space:select{234}
 remote.self:timeout(123).space.net_box_test_space:select{234}

@@ -268,7 +268,7 @@ index_find(struct space *space, uint32_t index_id)
 	Index *index = space_index(space, index_id);
 	if (index == NULL)
 		tnt_raise(LoggedError, ER_NO_SUCH_INDEX, index_id,
-			  space_id(space));
+			  space->def.name);
 	return index;
 }
 

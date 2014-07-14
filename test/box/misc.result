@@ -20,7 +20,6 @@ t
   - error
   - index
   - info
-  - raise
   - schema
   - slab
   - snapshot
@@ -32,36 +31,25 @@ t = nil
 ---
 ...
 ----------------
--- # box.raise
+-- # box.error
 ----------------
 --# stop server default
 --# start server default
--- during server starting there could be exceptions,
--- therefore box.raise() call can throw and can not throw,
--- that's why we can't test box.raise() result
-1 + 1
----
-- 2
-...
-box.raise(123, 'test')
+box.error({code = 123, reason = 'test'})
 ---
 - error: test
 ...
-box.raise(0, 'the other test')
+box.error(box.error.ILLEGAL_PARAMS, "bla bla")
 ---
-- error: 'box.raise(): unknown error code'
+- error: Illegal parameters, bla bla
 ...
-box.raise(12, 345)
+box.error()
 ---
-- error: '345'
+- error: Illegal parameters, bla bla
 ...
-box.raise()
+box.error()
 ---
-- error: '345'
-...
-box.raise()
----
-- error: '345'
+- error: Illegal parameters, bla bla
 ...
 space = box.space.tweedledum
 ---

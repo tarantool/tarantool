@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "exception.h"
+#include <stdio.h> /* snprintf */
 
 enum schema_id {
 	/** Start of the reserved range of system spaces. */
@@ -81,7 +82,9 @@ space_cache_find(uint32_t id)
 	if (space)
 		return space;
 
-	tnt_raise(ClientError, ER_NO_SUCH_SPACE, id);
+	char name[12];
+	snprintf(name, sizeof(name), "#%u", id);
+	tnt_raise(ClientError, ER_NO_SUCH_SPACE, name);
 }
 
 /**

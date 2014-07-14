@@ -168,19 +168,19 @@ select * from t1 where k0 = 0
 ---
 - error:
     errcode: ER_NO_SUCH_SPACE
-    errmsg: Space 1 does not exist
+    errmsg: Space '#1' does not exist
 ...
 select * from t65537 where k0 = 0
 ---
 - error:
     errcode: ER_NO_SUCH_SPACE
-    errmsg: Space 65537 does not exist
+    errmsg: Space '#65537' does not exist
 ...
 select * from t4294967295 where k0 = 0
 ---
 - error:
     errcode: ER_NO_SUCH_SPACE
-    errmsg: Space 4294967295 does not exist
+    errmsg: Space '#4294967295' does not exist
 ...
 box.space[0]:drop()
 ---
