@@ -39,6 +39,7 @@ struct remote {
 	struct port_uri uri;
 	struct fiber *reader;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+	bool warning_said;
 	char source[REMOTE_SOURCE_MAXLEN];
 };
 

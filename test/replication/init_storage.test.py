@@ -52,6 +52,33 @@ for i in range(1, 20):
 replica.stop()
 replica.cleanup(True)
 
+print '-------------------------------------------------------------'
+print 'reconnect on JOIN/SUBSCRIBE'
+print '-------------------------------------------------------------'
+
+server.stop()
+replica = TarantoolServer(server.ini)
+replica.script = 'replication/replica.lua'
+replica.vardir = os.path.join(server.vardir, 'replica')
+replica.rpl_master = master
+replica.deploy(wait=False)
+
+print 'waiting reconnect on JOIN...'
+server.start()
+replica.wait_until_started()
+print 'ok'
+
+replica.stop()
+server.stop()
+
+print 'waiting reconnect on SUBSCRIBE...'
+replica.start(wait=False)
+server.start()
+replica.wait_until_started()
+print 'ok'
+
+replica.stop()
+replica.cleanup(True)
+
 server.stop()
 server.deploy()
-
