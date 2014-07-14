@@ -89,7 +89,7 @@ process_rw(struct port *port, struct request *request)
 static void
 process_ro(struct port *port, struct request *request)
 {
-	if (!iproto_request_is_select(request->type))
+	if (!iproto_type_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, request);
 }
@@ -231,7 +231,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	}
 
 	recovery_finalize(recovery_state);
-	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
+	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
@@ -254,8 +254,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
  * no boundary or misuse checks.
  */
 void
-boxk(enum iproto_request_type type, uint32_t space_id,
-     const char *format, ...)
+boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 {
 	struct request req;
 	va_list ap;
@@ -391,8 +390,7 @@ box_init()
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	stat_base = stat_register(iproto_request_type_strs,
-				  IPROTO_DML_REQUEST_MAX);
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
 
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */

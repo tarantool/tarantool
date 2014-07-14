@@ -227,7 +227,7 @@ lbox_process(lua_State *L)
 
 void
 lbox_request_create(struct request *request,
-		    struct lua_State *L, enum iproto_request_type type,
+		    struct lua_State *L, enum iproto_type type,
 		    int key, int tuple)
 {
 	request_create(request, type);
@@ -382,7 +382,7 @@ lbox_raise(lua_State *L)
 	if (lua_gettop(L) < 2)
 		luaL_error(L, "box.raise(): bad arguments");
 	uint32_t code = lua_tointeger(L, 1);
-	if (!code)
+	if (code >= tnt_error_codes_enum_MAX)
 		luaL_error(L, "box.raise(): unknown error code");
 	const char *str = lua_tostring(L, 2);
 	tnt_raise(ClientError, str, code);

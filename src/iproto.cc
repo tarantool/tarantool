@@ -499,7 +499,7 @@ error:
 		 * as well as in->pos must not be advanced, to
 		 * stay in sync.
 		 */
-		if (iproto_request_is_dml(ireq->header.type)) {
+		if (iproto_type_is_dml(ireq->header.type)) {
 			if (ireq->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "request type");

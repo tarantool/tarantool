@@ -105,7 +105,13 @@ iproto_key_bit(unsigned char key)
 
 extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
-enum iproto_request_type {
+/**
+ * IPROTO command codes
+ */
+enum iproto_type {
+	/* command is successful */
+	IPROTO_OK = 0,
+	/* dml command codes */
 	IPROTO_SELECT = 1,
 	IPROTO_INSERT = 2,
 	IPROTO_REPLACE = 3,
@@ -113,36 +119,46 @@ enum iproto_request_type {
 	IPROTO_DELETE = 5,
 	IPROTO_CALL = 6,
 	IPROTO_AUTH = 7,
-	IPROTO_DML_REQUEST_MAX = 8,
+	IPROTO_TYPE_DML_MAX = IPROTO_AUTH + 1,
+	/* admin command codes */
 	IPROTO_PING = 64,
 	IPROTO_JOIN = 65,
-	IPROTO_SUBSCRIBE = 66
+	IPROTO_SUBSCRIBE = 66,
+	IPROTO_TYPE_ADMIN_MAX = IPROTO_SUBSCRIBE + 1,
+	/* command failed = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h) */
+	IPROTO_TYPE_ERROR = 1 << 15
 };
 
-extern const char *iproto_request_type_strs[];
+extern const char *iproto_type_strs[];
 /** Key names. */
 extern const char *iproto_key_strs[];
 /** A map of mandatory members of an iproto DML request. */
 extern const uint64_t iproto_body_key_map[];
 
 static inline const char *
-iproto_request_name(uint32_t type)
+iproto_type_name(uint32_t type)
 {
-	if (type >= IPROTO_DML_REQUEST_MAX)
+	if (type >= IPROTO_TYPE_DML_MAX)
 		return "unknown";
-	return iproto_request_type_strs[type];
+	return iproto_type_strs[type];
 }
 
 static inline bool
-iproto_request_is_select(uint32_t type)
+iproto_type_is_select(uint32_t type)
 {
 	return type <= IPROTO_SELECT || type == IPROTO_CALL;
 }
 
 static inline bool
-iproto_request_is_dml(uint32_t type)
+iproto_type_is_dml(uint32_t type)
 {
-	return type < IPROTO_DML_REQUEST_MAX;
+	return type >= IPROTO_SELECT && type < IPROTO_TYPE_DML_MAX;
+}
+
+static inline bool
+iproto_type_is_error(uint32_t type)
+{
+	return (type & IPROTO_TYPE_ERROR) != 0;
 }
 
 enum {
@@ -176,6 +192,13 @@ iproto_decode_uuid(const char **pos, struct tt_uuid *out);
 
 char *
 iproto_encode_uuid(char *pos, const struct tt_uuid *in);
+
+/** Return a 4-byte numeric error code, with status flags. */
+static inline uint32_t
+iproto_encode_error(uint32_t error)
+{
+	return error | IPROTO_TYPE_ERROR;
+}
 
 int
 iproto_header_encode(const struct iproto_header *header,

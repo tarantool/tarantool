@@ -136,8 +136,7 @@ txn_commit(struct txn *txn, struct port *port)
 
 		if (stop - start > too_long_threshold && txn->row != NULL) {
 			say_warn("too long %s: %.3f sec",
-				iproto_request_name(txn->row->type),
-					stop - start);
+				iproto_type_name(txn->row->type), stop - start);
 		}
 
 		if (res)

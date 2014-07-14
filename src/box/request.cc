@@ -173,16 +173,10 @@ execute_auth(struct request *request, struct port * /* port */)
 /** }}} */
 
 void
-request_check_type(uint32_t type)
-{
-	if (type < IPROTO_SELECT || type >= IPROTO_DML_REQUEST_MAX)
-		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
-}
-
-void
 request_create(struct request *request, uint32_t type)
 {
-	request_check_type(type);
+	if (!iproto_type_is_dml(type))
+		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete, box_lua_call,
