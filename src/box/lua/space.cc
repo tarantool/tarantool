@@ -48,16 +48,16 @@ extern "C" {
 static void
 lbox_space_on_replace_trigger(struct trigger *trigger, void *event)
 {
-	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_stmt((struct txn *) event);
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_guard(tarantool_L);
 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
 
-	lbox_pushtuple(L, txn->old_tuple);
-	lbox_pushtuple(L, txn->new_tuple);
+	lbox_pushtuple(L, stmt->old_tuple);
+	lbox_pushtuple(L, stmt->new_tuple);
 	/* @todo: maybe the space object has to be here */
-	lua_pushstring(L, txn->space->def.name);
+	lua_pushstring(L, stmt->space->def.name);
 
 	lbox_call(L, 3, 0);
 }

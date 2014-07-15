@@ -175,6 +175,11 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 void
 SophiaFactory::txnFinish(struct txn *txn)
 {
-	if (txn->new_tuple)
-		tuple_ref(txn->new_tuple, -1);
+	/**
+	 * @todo: support multi-statement transactions
+	 * here when sophia supports them.
+	 */
+	struct txn_stmt *stmt = txn_stmt(txn);
+	if (stmt->new_tuple)
+		tuple_ref(stmt->new_tuple, -1);
 }
