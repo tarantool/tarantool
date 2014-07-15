@@ -357,9 +357,8 @@ iproto_encode_auth(struct iproto_header *packet, const char *greeting,
 void
 iproto_decode_error(struct iproto_header *row)
 {
-	uint32_t code = row->type >> 8;
-	if (likely(code == 0))
-		return;
+	uint32_t code = row->type & (IPROTO_ERROR_RECOVERABLE - 1);
+
 	char error[TNT_ERRMSG_MAX] = { 0 };
 	const char *pos;
 	uint32_t map_size;
@@ -535,5 +534,5 @@ iproto_encode_eos(struct iproto_header *row, const struct vclock *vclock)
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
-	row->type = IPROTO_JOIN;
+	row->type = IPROTO_OK;
 }

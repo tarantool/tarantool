@@ -106,7 +106,8 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	iproto_encode_auth(&row, greeting, uri->login, uri->password);
 	remote_write_row(coio, &row);
 	remote_read_row(coio, iobuf, &row);
-	iproto_decode_error(&row); /* auth failed */
+	if (row.type != IPROTO_OK)
+		iproto_decode_error(&row); /* auth failed */
 
 	/* auth successed */
 	say_info("authenticated");
@@ -142,14 +143,14 @@ replica_bootstrap(struct recovery_state *r)
 	while (true) {
 		remote_read_row(&coio, iobuf, &row);
 
-		if (iproto_request_is_dml(row.type)) {
-			/* Regular snapshot row  (IPROTO_INSERT) */
-			recovery_process(r, &row);
-		} else if (row.type == IPROTO_JOIN) {
+		if (row.type == IPROTO_OK) {
 			/* End of stream */
 			say_info("done");
 			break;
-		} else {
+		} else if (iproto_request_is_dml(row.type)) {
+			/* Regular snapshot row  (IPROTO_INSERT) */
+			recovery_process(r, &row);
+		} else /* error or unexpected packet */ {
 			iproto_decode_error(&row);  /* rethrow error */
 		}
 	}
@@ -157,7 +158,7 @@ replica_bootstrap(struct recovery_state *r)
 	/* Decode end of stream packet */
 	struct vclock vclock;
 	vclock_create(&vclock);
-	assert(row.type == IPROTO_JOIN);
+	assert(row.type == IPROTO_OK);
 	iproto_decode_eos(&row, &vclock);
 
 	/* Replace server vclock using data from snapshot */

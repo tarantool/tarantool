@@ -149,20 +149,7 @@ static inline const char *tnt_errcode_str(uint32_t errcode)
 	return tnt_error_codes[errcode].errstr;
 }
 
-
-/** Return a 4-byte numeric error code, with status flags. */
-
-
-static inline uint32_t tnt_errcode_val(uint32_t errcode)
-{
-	uint32_t errflags = errcode < tnt_error_codes_enum_MAX ?
-		tnt_error_codes[errcode].errflags : 2; /* non-recoverable */
-	return (errcode << 8) | errflags;
-}
-
-
 /** Return a description of the error. */
-
 static inline const char *tnt_errcode_desc(uint32_t errcode)
 {
 	if (errcode >= tnt_error_codes_enum_MAX)

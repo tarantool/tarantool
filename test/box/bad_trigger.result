@@ -11,7 +11,7 @@ require('session').on_connect(f1)
 ...
 greeting:  True
 fixheader:  True
-error code: 8194
+error code: 32800
 error message:  [string "function f1() nosuchfunction() end"]:1: attempt to call global 'nosuchfunction' (a nil value)
 eof: True
 require('session').on_connect(nil, f1)
