@@ -97,6 +97,7 @@ session_run_on_disconnect_triggers(struct session *session)
 void
 session_run_on_connect_triggers(struct session *session)
 {
+	(void) session;
 	trigger_run(&session_on_connect, NULL);
 }
 
