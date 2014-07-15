@@ -47,6 +47,7 @@
 #include "scoped_guard.h"
 #include "box/cluster.h"
 #include "vclock.h"
+#include "session.h"
 
 /*
  * Recovery subsystem
@@ -531,6 +532,7 @@ recovery_finalize(struct recovery_state *r)
  * locally or send to the replica.
  */
 struct wal_watcher {
+	struct session *session;
 	/**
 	 * Rescan the WAL directory in search for new WAL files
 	 * every wal_dir_rescan_delay seconds.
@@ -572,7 +574,10 @@ recovery_rescan_dir(ev_loop * loop, ev_timer *w, int /* revents */)
 	struct wal_watcher *watcher = r->watcher;
 	struct log_io *save_current_wal = r->current_wal;
 
+	/** To process transactions, we need a working session. */
+	fiber_set_session(fiber(), r->watcher->session);
 	int result = recover_remaining_wals(r);
+	fiber_set_session(fiber(), NULL);
 	if (result < 0)
 		panic("recover failed: %i", result);
 	if (save_current_wal != r->current_wal) {
@@ -588,7 +593,9 @@ recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 {
 	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
+	fiber_set_session(fiber(), r->watcher->session);
 	int result = recover_wal(r, r->current_wal);
+	fiber_set_session(fiber(), NULL);
 	if (result < 0)
 		panic("recover failed");
 	if (result == LOG_EOF) {
@@ -608,6 +615,8 @@ recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_delay)
 	ev_loop *loop = loop();
 
 	struct wal_watcher  *watcher = r->watcher= &wal_watcher;
+
+	r->watcher->session = session_create(-1, 0);
 
 	ev_timer_init(&watcher->dir_timer, recovery_rescan_dir,
 		      wal_dir_rescan_delay, wal_dir_rescan_delay);
@@ -629,6 +638,8 @@ recovery_stop_local(struct recovery_state *r)
 	ev_timer_stop(loop(), &watcher->dir_timer);
 	if (ev_is_active(&watcher->stat))
 		ev_stat_stop(loop(), &watcher->stat);
+	session_destroy(watcher->session);
+	watcher->session = NULL;
 
 	r->watcher = NULL;
 }

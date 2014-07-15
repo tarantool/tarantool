@@ -212,7 +212,6 @@ restart:
 		request->process(request);
 	}
 	/** Put the current fiber into a queue fiber cache. */
-	fiber_gc();
 	rlist_add_entry(&i_queue->fiber_cache, fiber(), state);
 	fiber_yield();
 	goto restart;
@@ -345,7 +344,10 @@ iproto_connection_delete(struct iproto_connection *con)
 {
 	assert(iproto_connection_is_idle(con));
 	assert(!evio_is_active(&con->output));
-	session_destroy(con->session); /* Never throws. No-op if sid is 0. */
+	if (con->session) {
+		session_run_on_disconnect_triggers(con->session);
+		session_destroy(con->session);
+	}
 	iobuf_delete(con->iobuf[0]);
 	iobuf_delete(con->iobuf[1]);
 	if (con->disconnect)
@@ -772,7 +774,9 @@ iproto_process_connect(struct iproto_request *request)
 		con->session = session_create(fd, con->cookie);
 		coio_write(&con->input, iproto_greeting(con->session->salt),
 			   IPROTO_GREETING_SIZE);
-		trigger_run(&session_on_connect, NULL);
+		session_run_on_connect_triggers(con->session);
+		/* Set session user to guest, until it is authenticated. */
+		session_set_user(con->session, GUEST, GUEST);
 	} catch (ClientError *e) {
 		iproto_reply_error(&iobuf->out, e, request->header.type);
 		try {

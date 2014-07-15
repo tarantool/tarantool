@@ -34,8 +34,19 @@
 #include "recovery.h"
 #include <fiber.h>
 #include "request.h" /* for request_name */
+#include "session.h"
+#include "port.h"
 
 double too_long_threshold;
+
+void
+port_send_tuple(struct port *port, struct txn *txn)
+{
+	struct tuple *tuple;
+	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
+		port_add_tuple(port, tuple);
+}
+
 
 void
 txn_add_redo(struct txn *txn, struct request *request)
@@ -80,16 +91,39 @@ txn_replace(struct txn *txn, struct space *space,
 struct txn *
 txn_begin()
 {
+	assert(! in_txn());
 	struct txn *txn = (struct txn *)
 		region_alloc0(&fiber()->gc, sizeof(*txn));
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
+	in_txn() = txn;
 	return txn;
 }
 
+/**
+ * txn_finish() follows txn_commit() on success.
+ * It's moved to a separate call to be able to send
+ * old tuple to the user before it's deleted.
+ */
 void
-txn_commit(struct txn *txn)
+txn_finish(struct txn *txn)
 {
+	assert(txn == in_txn());
+	if (txn->old_tuple)
+		tuple_ref(txn->old_tuple, -1);
+	if (txn->space)
+		txn->space->engine->factory->txnFinish(txn);
+	TRASH(txn);
+	/** Free volatile txn memory. */
+	fiber_gc();
+	in_txn() = NULL;
+}
+
+
+void
+txn_commit(struct txn *txn, struct port *port)
+{
+	assert(txn == in_txn());
 	if ((txn->old_tuple || txn->new_tuple) &&
 	    !space_is_temporary(txn->space)) {
 		int res = 0;
@@ -110,26 +144,16 @@ txn_commit(struct txn *txn)
 			tnt_raise(LoggedError, ER_WAL_IO);
 	}
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
-}
-
-/**
- * txn_finish() follows txn_commit() on success.
- * It's moved to a separate call to be able to send
- * old tuple to the user before it's deleted.
- */
-void
-txn_finish(struct txn *txn)
-{
-	if (txn->old_tuple)
-		tuple_ref(txn->old_tuple, -1);
-	if (txn->space)
-		txn->space->engine->factory->txnFinish(txn);
-	TRASH(txn);
+	port_send_tuple(port, txn);
+	txn_finish(txn);
 }
 
 void
-txn_rollback(struct txn *txn)
+txn_rollback()
 {
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		return;
 	if (txn->old_tuple || txn->new_tuple) {
 		space_replace(txn->space, txn->new_tuple,
 			      txn->old_tuple, DUP_INSERT);
@@ -138,4 +162,7 @@ txn_rollback(struct txn *txn)
 			tuple_ref(txn->new_tuple, -1);
 	}
 	TRASH(txn);
+	/** Free volatile txn memory. */
+	fiber_gc();
+	in_txn() = NULL;
 }

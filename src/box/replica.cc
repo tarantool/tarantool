@@ -40,6 +40,7 @@
 #include "recovery.h"
 #include "iproto_constants.h"
 #include "msgpuck/msgpuck.h"
+#include "session.h"
 #include "box/cluster.h"
 
 static void
@@ -180,6 +181,8 @@ pull_from_remote(va_list ap)
 	bool warning_said = false;
 	const int reconnect_delay = 1;
 	ev_loop *loop = loop();
+	/** This fiber executes transactions. */
+	SessionGuard session_guard(-1, 0);
 
 	coio_init(&coio);
 

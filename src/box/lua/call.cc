@@ -89,19 +89,15 @@ port_lua_add_tuple(struct port *port, struct tuple *tuple)
 	}
 }
 
-
-static struct port *
-port_lua_create(struct lua_State *L)
+void
+port_lua_create(struct port_lua *port, struct lua_State *L)
 {
 	static struct port_vtab port_lua_vtab = {
 		port_lua_add_tuple,
 		null_port_eof,
 	};
-	struct port_lua *port = (struct port_lua *)
-			region_alloc(&fiber()->gc, sizeof(struct port_lua));
 	port->vtab = &port_lua_vtab;
 	port->L = L;
-	return (struct port *) port;
 }
 
 static void
@@ -219,32 +215,21 @@ lbox_process(lua_State *L)
 		 */
 		return luaL_error(L, "box.process(CALL, ...) is not allowed");
 	}
-	size_t allocated_size = region_used(&fiber()->gc);
+	/* Capture all output into a Lua table. */
 	struct port *port_lua = port_lua_table_create(L);
-	try {
-		struct request request;
-		request_create(&request, op);
-		request_decode(&request, req, sz);
-		box_process(port_lua, &request);
+	struct request request;
+	request_create(&request, op);
+	request_decode(&request, req, sz);
+	box_process(port_lua, &request);
 
-		/*
-		 * This only works as long as port_lua doesn't
-		 * use fiber->cleanup and fiber->gc.
-		 */
-		region_truncate(&fiber()->gc, allocated_size);
-	} catch (Exception *e) {
-		region_truncate(&fiber()->gc, allocated_size);
-		throw;
-	}
 	return 1;
 }
 
-static struct request *
-lbox_request_create(struct lua_State *L, enum iproto_request_type type,
+void
+lbox_request_create(struct request *request,
+		    struct lua_State *L, enum iproto_request_type type,
 		    int key, int tuple)
 {
-	struct request *request = (struct request *)
-		region_alloc(&fiber()->gc, sizeof(struct request));
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
 	if (key > 0) {
@@ -263,7 +248,6 @@ lbox_request_create(struct lua_State *L, enum iproto_request_type type,
 		if (mp_typeof(*request->tuple) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
-	return request;
 }
 
 static void
@@ -331,10 +315,11 @@ lbox_insert(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:insert(tuple)");
 
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_INSERT,
-						      -1, 2);
-	box_process(port_lua_create(L), request);
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_INSERT, -1, 2);
+	port_lua_create(&port, L);
+	box_process((struct port *) &port, &request);
 	return lua_gettop(L) - 2;
 }
 
@@ -344,10 +329,11 @@ lbox_replace(lua_State *L)
 	if (lua_gettop(L) != 2 || !lua_isnumber(L, 1))
 		return luaL_error(L, "Usage space:replace(tuple)");
 
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_REPLACE,
-						      -1, 2);
-	box_process(port_lua_create(L), request);
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_REPLACE, -1, 2);
+	port_lua_create(&port, L);
+	box_process((struct port *) &port, &request);
 	return lua_gettop(L) - 2;
 }
 
@@ -357,12 +343,13 @@ lbox_update(lua_State *L)
 	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "Usage space:update(key, ops)");
 
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_UPDATE,
-						      3, 4);
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_UPDATE, 3, 4);
+	request.field_base = 1; /* field ids are one-indexed */
+	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	request->field_base = 1; /* field ids are one-indexed */
-	box_process(port_lua_create(L), request);
+	box_process((struct port *) &port, &request);
 	return lua_gettop(L) - 4;
 }
 
@@ -372,11 +359,12 @@ lbox_delete(lua_State *L)
 	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2))
 		return luaL_error(L, "Usage space:delete(key)");
 
-	RegionGuard region_guard(&fiber()->gc);
-	struct request *request = lbox_request_create(L, IPROTO_DELETE,
-						      3, -1);
+	struct request request;
+	struct port_lua port;
+	lbox_request_create(&request, L, IPROTO_DELETE, 3, -1);
+	port_lua_create(&port, L);
 	/* Ignore index_id for now */
-	box_process(port_lua_create(L), request);
+	box_process((struct port *) &port, &request);
 	return lua_gettop(L) - 3;
 }
 
@@ -503,10 +491,9 @@ access_check_func(const char *name, uint32_t name_len,
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(struct request *request, struct txn *txn, struct port *port)
+box_lua_call(struct request *request, struct port *port)
 {
 	struct user *user = user();
-	(void) txn;
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;

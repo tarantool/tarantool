@@ -412,11 +412,6 @@ run_script(va_list ap)
 	/* clear the stack from return values. */
 	lua_settop(L, 0);
 	/*
-	 * The file doesn't exist. It's OK, tarantool may
-	 * have no init file.
-	 */
-
-	/*
 	 * Lua script finished. Stop the auxiliary event loop and
 	 * return control back to tarantool_lua_run_script.
 	 */

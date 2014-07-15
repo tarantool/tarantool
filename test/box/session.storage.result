@@ -31,7 +31,7 @@ all = getmetatable(session).aggregate_storage
 ...
 dump(all)
 ---
-- '''[null,null,{"abc":"cde"}]'''
+- '''[null,null,null,{"abc":"cde"}]'''
 ...
 --# create connection second to default
 --# set connection second

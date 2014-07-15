@@ -31,7 +31,6 @@
 
 #include <stdint.h>
 
-struct txn;
 struct request;
 struct port;
 
@@ -40,7 +39,7 @@ struct port;
  * (implementation of 'CALL' command code).
  */
 void
-box_lua_call(struct request *request, struct txn *txn, struct port *port);
+box_lua_call(struct request *request, struct port *port);
 
 extern "C" {
 struct port_ffi
