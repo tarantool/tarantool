@@ -3,8 +3,8 @@
 -- Testing init script
 --
 box.cfg{
-    admin_port = 3313,
-    primary_port = 3314,
+    admin  = 3313,
+    listen = 3314,
     pid_file = "box.pid",
     logger="tarantool.log"
 }

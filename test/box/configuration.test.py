@@ -24,8 +24,8 @@ server.cfgfile_source = old_cfgfile
 old_script = server.script
 server.script = "box/lua/test_init.lua"
 server.deploy()
-sys.stdout.push_filter("admin_port: .*", "admin_port: <number>")
-sys.stdout.push_filter("primary_port: .*", "primary_port: <number>")
+sys.stdout.push_filter("admin: .*", "admin: <uri>")
+sys.stdout.push_filter("listen: .*", "listen: <uri>")
 admin("print_config()")
 sys.stdout.pop_filter()
 sys.stdout.pop_filter()

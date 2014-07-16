@@ -1,8 +1,8 @@
 #!/usr/bin/env tarantool
 os = require('os')
 box.cfg({
-    primary_port        = os.getenv("MASTER_PORT"),
-    admin_port          = os.getenv("ADMIN_PORT"),
+    listen              = os.getenv("MASTER"),
+    admin               = os.getenv("ADMIN"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
     logger              = "tarantool.log",

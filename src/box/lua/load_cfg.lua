@@ -20,14 +20,14 @@ end
 
 -- arguments that can be number or string
 local wrapper_cfg = {
-    admin_port          = normalize_port_uri,
-    primary_port        = normalize_port_uri,
+    admin              = normalize_port_uri,
+    listen             = normalize_port_uri,
 }
 
 -- all available options
 local default_cfg = {
-    admin_port          = nil,
-    primary_port        = nil,
+    admin               = nil,
+    listen              = nil,
     slab_alloc_arena    = 1.0,
     slab_alloc_minimal  = 64,
     slab_alloc_factor   = 2.0,

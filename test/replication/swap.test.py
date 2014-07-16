@@ -25,7 +25,7 @@ master.admin("box.schema.user.create('%s', { password = '%s'})" % (LOGIN, PASSWO
 master.admin("box.schema.user.grant('%s', 'read,write,execute', 'universe')" % LOGIN)
 master.sql.py_con.authenticate(LOGIN, PASSWORD)
 master.uri = '%s:%s@%s:%s' % (LOGIN, PASSWORD, HOST, master.sql.port)
-os.putenv('MASTER_PORT', master.uri)
+os.putenv('MASTER', master.uri)
 
 # replica server
 replica = TarantoolServer()
