@@ -16,11 +16,14 @@ t = {} for n in pairs(box) do table.insert(t, tostring(n)) end table.sort(t)
 ...
 t
 ---
-- - cfg
+- - begin
+  - cfg
+  - commit
   - error
   - index
   - info
   - raise
+  - rollback
   - schema
   - slab
   - snapshot
@@ -197,12 +200,14 @@ t;
   - 'box.error.CREATE_USER : 43'
   - 'box.error.CREATE_SPACE : 9'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.NO_ACTIVE_TRANSACTION : 80'
+  - 'box.error.SPLICE : 25'
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
   - 'box.error.UNSUPPORTED : 5'
   - 'box.error.INVALID_MSGPACK : 20'
   - 'box.error.KEY_PART_COUNT : 31'
   - 'box.error.ALTER_SPACE : 12'
-  - 'box.error.SPLICE : 25'
+  - 'box.error.ACTIVE_TRANSACTION : 79'
   - 'box.error.NO_CONNECTION : 77'
   - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.INVALID_XLOG_NAME : 75'

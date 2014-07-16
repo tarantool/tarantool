@@ -128,6 +128,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 76 */_(ER_INVALID_XLOG_ORDER,	2, "Invalid xlog order: %lld and %lld") \
 	/* 77 */_(ER_NO_CONNECTION,		2, "Connection is not established") \
 	/* 78 */_(ER_TIMEOUT,			2, "Timeout exceeded") \
+	/* 79 */_(ER_ACTIVE_TRANSACTION,	2, "Operation is not permitted when there is an active transaction ") \
+	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	2, "Operation is not permitted when there is no active transaction ") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

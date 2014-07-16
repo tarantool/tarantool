@@ -81,7 +81,7 @@ process_rw(struct port *port, struct request *request)
 		request->execute(request, port);
 		port_eof(port);
 	} catch (Exception *e) {
-		txn_rollback();
+		txn_rollback_stmt();
 		throw;
 	}
 }
