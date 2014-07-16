@@ -167,10 +167,11 @@ class StatementSelect(Statement):
             self.key = [self.key]
         self.offset = 0
         self.limit = limit
+        self.iterator = 0
 
     def pack(self, connection):
         return RequestSelect(connection, self.space_no, self.index_no,
-                self.key, self.offset, self.limit)
+                self.key, self.offset, self.limit, self.iterator)
 
     def unpack(self, response):
         if response.return_code:
