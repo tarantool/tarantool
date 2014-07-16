@@ -50,7 +50,7 @@ dup_replace_mode(uint32_t op)
 static void
 execute_replace(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin();
+	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
 
 	space_check_access(space, PRIV_W);
@@ -60,15 +60,14 @@ execute_replace(struct request *request, struct port *port)
 	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
 
-	txn_add_redo(txn, request);
 	txn_replace(txn, space, NULL, new_tuple, mode);
-	txn_commit(txn, port);
+	txn_commit_stmt(txn, port);
 }
 
 static void
 execute_update(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin();
+	struct txn *txn = txn_begin_stmt(request);
 
 	/* Parse UPDATE request. */
 	/** Search key  and key part count. */
@@ -82,9 +81,8 @@ execute_update(struct request *request, struct port *port)
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
-	txn_add_redo(txn, request);
 	if (old_tuple == NULL) {
-		txn_commit(txn, port);
+		txn_commit_stmt(txn, port);
 		return;
 	}
 
@@ -98,13 +96,13 @@ execute_update(struct request *request, struct port *port)
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
-	txn_commit(txn, port);
+	txn_commit_stmt(txn, port);
 }
 
 static void
 execute_delete(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin();
+	struct txn *txn = txn_begin_stmt(request);
 	(void) port;
 	struct space *space = space_cache_find(request->space_id);
 	space_check_access(space, PRIV_W);
@@ -116,17 +114,15 @@ execute_delete(struct request *request, struct port *port)
 	primary_key_validate(pk->key_def, key, part_count);
 	struct tuple *old_tuple = pk->findByKey(key, part_count);
 
-	txn_add_redo(txn, request);
 	if (old_tuple != NULL)
 		txn_replace(txn, space, old_tuple, NULL, DUP_REPLACE_OR_INSERT);
-	txn_commit(txn, port);
+	txn_commit_stmt(txn, port);
 }
 
 
 static void
 execute_select(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin();
 	struct space *space = space_cache_find(request->space_id);
 	space_check_access(space, PRIV_R);
 	Index *index = index_find(space, request->index_id);
@@ -159,7 +155,6 @@ execute_select(struct request *request, struct port *port)
 			break;
 		port_add_tuple(port, tuple);
 	}
-	txn_commit(txn, port);
 }
 
 void
@@ -173,16 +168,10 @@ execute_auth(struct request *request, struct port * /* port */)
 /** }}} */
 
 void
-request_check_type(uint32_t type)
-{
-	if (type < IPROTO_SELECT || type >= IPROTO_DML_REQUEST_MAX)
-		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
-}
-
-void
 request_create(struct request *request, uint32_t type)
 {
-	request_check_type(type);
+	if (!iproto_type_is_dml(type))
+		tnt_raise(LoggedError, ER_UNKNOWN_REQUEST_TYPE, type);
 	static const request_execute_f execute_map[] = {
 		NULL, execute_select, execute_replace, execute_replace,
 		execute_update, execute_delete, box_lua_call,

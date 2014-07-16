@@ -101,7 +101,7 @@ lbox_trigger_reset(struct lua_State *L, int top,
 				luaL_error(L, "failed to allocate trigger");
 			trg->run = run;
 			trg->destroy = lbox_trigger_destroy;
-			trigger_set(list, trg);
+			trigger_add(list, trg);
 		}
 		/*
 		 * Make the new trigger occupy the top

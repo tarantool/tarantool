@@ -35,7 +35,7 @@
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
-#include "port_uri.h"
+#include "uri.h"
 /**
  * Exception-aware way to add a listening socket to the event
  * loop. Callbacks are invoked on bind and accept events.
@@ -65,7 +65,7 @@ struct evio_service
 	char name[SERVICE_NAME_MAXLEN];
 
 	/** Interface/port to bind to */
-	struct port_uri port;
+	struct uri port;
 
 	/** A callback invoked upon a successful bind, optional.
 	 * If on_bind callback throws an exception, it's

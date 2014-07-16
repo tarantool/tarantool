@@ -3,7 +3,7 @@ fiber = require 'fiber'
 log = require 'log'
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-port = box.cfg.primary_port
+port = box.cfg.listen
 space = box.schema.create_space('net_box_test_space')
 space:create_index('primary', { type = 'tree' })
 

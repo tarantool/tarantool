@@ -187,7 +187,7 @@ sc_space_new(struct space_def *space_def,
 	struct space *space = space_new(space_def, &key_list);
 	(void) space_cache_replace(space);
 	if (trigger)
-		trigger_set(&space->on_replace, trigger);
+		trigger_add(&space->on_replace, trigger);
 	/*
 	 * Data dictionary spaces are fully built since:
 	 * - they contain data right from the start

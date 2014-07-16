@@ -516,7 +516,7 @@ packet = require('msgpack').encode({[0] = 64, [1] = 0})
 packet = require('msgpack').encode(packet:len())..packet
 function bug1160869()
     local s = socket.tcp()
-    s:connect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
+    s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))
     s:recv(128)
     require('fiber').wrap(function()
         while true do
@@ -549,7 +549,7 @@ function iostart()
         return
     end
     s = socket.tcp()
-    s:connect('127.0.0.1', string.gsub(box.cfg.primary_port, '^.*:', ''))
+    s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))
     s:recv(128)
     require('fiber').wrap(function()
         while true do

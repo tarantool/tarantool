@@ -35,30 +35,92 @@ extern double too_long_threshold;
 struct tuple;
 struct space;
 
-struct txn {
-	/* Undo info. */
+/**
+ * A single statement of a multi-statement
+ * transaction: undo and redo info.
+ */
+struct txn_stmt {
+	/** Doubly linked list of all statements. */
+	struct rlist next;
+
+	/** Undo info. */
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
 
-	struct rlist on_commit;
-	struct rlist on_rollback;
-
-	/* Redo log row: binary packet */
+	/** Redo info: the binary log row */
 	struct iproto_header *row;
 };
 
-/* pointer to the current multithreaded transaction (if any) */
+struct txn {
+	/** Pre-allocated first statement. */
+	struct txn_stmt stmt;
+	/** List of statements in a transaction. */
+	struct rlist stmts;
+	 /** Commit and rollback triggers */
+	struct rlist on_commit, on_rollback;
+	/** Total number of statements in this txn. */
+	int n_stmts;
+	/**
+	 * True if this transaction is running in autocommit mode
+	 * (statement end causes an automatic transaction commit).
+	 */
+	bool autocommit;
+};
+
+/* Pointer to the current transaction (if any) */
 #define in_txn() (fiber()->session->txn)
 
-struct txn *txn_begin();
-void txn_commit(struct txn *txn, struct port *port);
-void txn_finish(struct txn *txn);
-void txn_rollback();
+/**
+ * Start a new statement. If no current transaction,
+ * start a new transaction with autocommit = true.
+ */
+struct txn *
+txn_begin_stmt(struct request *request);
 
-void txn_replace(struct txn *txn, struct space *space,
-		 struct tuple *old_tuple, struct tuple *new_tuple,
-		 enum dup_replace_mode mode);
-void txn_add_redo(struct txn *txn, struct request *request);
+/**
+ * End a statement. In autocommit mode, end
+ * the current transaction as well.
+ */
+void
+txn_commit_stmt(struct txn *txn, struct port *port);
+
+/**
+ * Start a transaction explicitly.
+ * @pre no transaction is active
+ */
+struct txn *
+txn_begin(bool autocommit);
+
+/**
+ * Commit a transaction.
+ * @pre txn == in_txn()
+ */
+void
+txn_commit(struct txn *txn);
+
+/** Rollback a transaction, if any. */
+void
+txn_rollback();
+
+/**
+ * Raise an error if this is a multi-statement
+ * transaction: DDL can not be part of a multi-statement
+ * transaction and must be run in autocommit mode.
+ */
+void
+txn_check_autocommit(struct txn *txn, const char *where);
+
+void
+txn_replace(struct txn *txn, struct space *space,
+	    struct tuple *old_tuple, struct tuple *new_tuple,
+	    enum dup_replace_mode mode);
+
+/** Last statement of the transaction. */
+static inline struct txn_stmt *
+txn_stmt(struct txn *txn)
+{
+	return rlist_last_entry(&txn->stmts, struct txn_stmt, next);
+}
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

@@ -39,19 +39,10 @@
 
 double too_long_threshold;
 
-void
-port_send_tuple(struct port *port, struct txn *txn)
+static void
+txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
-	struct tuple *tuple;
-	if ((tuple = txn->new_tuple) || (tuple = txn->old_tuple))
-		port_add_tuple(port, tuple);
-}
-
-
-void
-txn_add_redo(struct txn *txn, struct request *request)
-{
-	txn->row = request->header;
+	stmt->row = request->header;
 	if (recovery_state->wal_mode == WAL_NONE || request->header != NULL)
 		return;
 
@@ -60,7 +51,7 @@ txn_add_redo(struct txn *txn, struct request *request)
 		region_alloc0(&fiber()->gc, sizeof(struct iproto_header));
 	row->type = request->type;
 	row->bodycnt = request_encode(request, row->body);
-	txn->row = row;
+	stmt->row = row;
 }
 
 void
@@ -68,18 +59,20 @@ txn_replace(struct txn *txn, struct space *space,
 	    struct tuple *old_tuple, struct tuple *new_tuple,
 	    enum dup_replace_mode mode)
 {
+	struct txn_stmt *stmt;
+	stmt = txn_stmt(txn);
 	assert(old_tuple || new_tuple);
 	/*
 	 * Remember the old tuple only if we replaced it
 	 * successfully, to not remove a tuple inserted by
 	 * another transaction in rollback().
 	 */
-	txn->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
+	stmt->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
 	if (new_tuple) {
-		txn->new_tuple = new_tuple;
-		tuple_ref(txn->new_tuple, 1);
+		stmt->new_tuple = new_tuple;
+		tuple_ref(stmt->new_tuple, 1);
 	}
-	txn->space = space;
+	stmt->space = space;
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -88,64 +81,97 @@ txn_replace(struct txn *txn, struct space *space,
 		trigger_run(&space->on_replace, txn);
 }
 
+/** Initialize a new stmt object within txn. */
+static struct txn_stmt *
+txn_stmt_new(struct txn *txn)
+{
+	assert(txn->n_stmts == 0 || !txn->autocommit);
+	struct txn_stmt *stmt;
+	if (txn->n_stmts++ == 1) {
+		stmt = &txn->stmt;
+	} else {
+		stmt = (struct txn_stmt *)
+			region_alloc0(&fiber()->gc, sizeof(struct txn_stmt));
+	}
+	rlist_add_tail_entry(&txn->stmts, stmt, next);
+	return stmt;
+}
+
 struct txn *
-txn_begin()
+txn_begin(bool autocommit)
 {
 	assert(! in_txn());
 	struct txn *txn = (struct txn *)
 		region_alloc0(&fiber()->gc, sizeof(*txn));
+	rlist_create(&txn->stmts);
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
+	txn->autocommit = autocommit;
 	in_txn() = txn;
 	return txn;
 }
 
-/**
- * txn_finish() follows txn_commit() on success.
- * It's moved to a separate call to be able to send
- * old tuple to the user before it's deleted.
- */
-void
-txn_finish(struct txn *txn)
+struct txn *
+txn_begin_stmt(struct request *request)
 {
-	assert(txn == in_txn());
-	if (txn->old_tuple)
-		tuple_ref(txn->old_tuple, -1);
-	if (txn->space)
-		txn->space->engine->factory->txnFinish(txn);
-	TRASH(txn);
-	/** Free volatile txn memory. */
-	fiber_gc();
-	in_txn() = NULL;
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		txn = txn_begin(true);
+	struct txn_stmt *stmt = txn_stmt_new(txn);
+	txn_add_redo(stmt, request);
+	return txn;
 }
 
+void
+txn_commit_stmt(struct txn *txn, struct port *port)
+{
+	struct txn_stmt *stmt;
+	struct tuple *tuple;
+	stmt = txn_stmt(txn);
+	if ((tuple = stmt->new_tuple) || (tuple = stmt->old_tuple))
+		port_add_tuple(port, tuple);
+	if (txn->autocommit)
+		txn_commit(txn);
+}
 
 void
-txn_commit(struct txn *txn, struct port *port)
+txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
-	if ((txn->old_tuple || txn->new_tuple) &&
-	    !space_is_temporary(txn->space)) {
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if ((!stmt->old_tuple && !stmt->new_tuple) ||
+		    space_is_temporary(stmt->space))
+			continue;
+
 		int res = 0;
 		/* txn_commit() must be done after txn_add_redo() */
 		assert(recovery_state->wal_mode == WAL_NONE ||
-		       txn->row != NULL);
+		       stmt->row != NULL);
 		ev_tstamp start = ev_now(loop()), stop;
-		res = wal_write(recovery_state, txn->row);
+		res = wal_write(recovery_state, stmt->row);
 		stop = ev_now(loop());
 
-		if (stop - start > too_long_threshold && txn->row != NULL) {
+		if (stop - start > too_long_threshold && stmt->row != NULL) {
 			say_warn("too long %s: %.3f sec",
-				iproto_request_name(txn->row->type),
-					stop - start);
+				 iproto_type_name(stmt->row->type),
+				 stop - start);
 		}
 
 		if (res)
 			tnt_raise(LoggedError, ER_WAL_IO);
 	}
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
-	port_send_tuple(port, txn);
-	txn_finish(txn);
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->old_tuple)
+			tuple_ref(stmt->old_tuple, -1);
+		if (stmt->space)
+			stmt->space->engine->factory->txnFinish(txn);
+	}
+	TRASH(txn);
+	/** Free volatile txn memory. */
+	fiber_gc();
+	in_txn() = NULL;
 }
 
 void
@@ -154,15 +180,29 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	if (txn->old_tuple || txn->new_tuple) {
-		space_replace(txn->space, txn->new_tuple,
-			      txn->old_tuple, DUP_INSERT);
-		trigger_run(&txn->on_rollback, txn); /* must not throw. */
-		if (txn->new_tuple)
-			tuple_ref(txn->new_tuple, -1);
+	struct txn_stmt *stmt;
+	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
+		if (stmt->old_tuple || stmt->new_tuple) {
+			space_replace(stmt->space, stmt->new_tuple,
+				      stmt->old_tuple, DUP_INSERT);
+		}
+	}
+	trigger_run(&txn->on_rollback, txn); /* must not throw. */
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->new_tuple)
+			tuple_ref(stmt->new_tuple, -1);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
 	in_txn() = NULL;
+}
+
+void
+txn_check_autocommit(struct txn *txn, const char *where)
+{
+	if (txn->autocommit == false) {
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  where, "multi-statement transactions");
+	}
 }

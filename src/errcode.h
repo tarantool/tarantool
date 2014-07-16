@@ -49,7 +49,7 @@ enum { TNT_ERRMSG_MAX = 512 };
  */
 
 #define ERROR_CODES(_)					    \
-	/*  0 */_(ER_OK,			0, "OK") \
+	/*  0 */_(ER_UNKNOWN,			2, "Unknown error") \
 	/*  1 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  2 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index %u") \
@@ -149,20 +149,7 @@ static inline const char *tnt_errcode_str(uint32_t errcode)
 	return tnt_error_codes[errcode].errstr;
 }
 
-
-/** Return a 4-byte numeric error code, with status flags. */
-
-
-static inline uint32_t tnt_errcode_val(uint32_t errcode)
-{
-	uint32_t errflags = errcode < tnt_error_codes_enum_MAX ?
-		tnt_error_codes[errcode].errflags : 2; /* non-recoverable */
-	return (errcode << 8) | errflags;
-}
-
-
 /** Return a description of the error. */
-
 static inline const char *tnt_errcode_desc(uint32_t errcode)
 {
 	if (errcode >= tnt_error_codes_enum_MAX)

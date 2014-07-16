@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #include "unit.h"
 #include "sptree.h"
@@ -13,7 +14,8 @@
 
 SPTREE_DEF(test, realloc, qsort_arg);
 
-typedef long type_t;
+typedef int64_t type_t;
+#define TYPE_F "%" PRId64
 
 static int
 compare(type_t a, type_t b);
@@ -93,7 +95,7 @@ simple_check()
 			fail("element already in tree (1)", "true");
 		bps_tree_test_insert(&tree, v, 0);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -106,7 +108,7 @@ simple_check()
 			fail("element in tree (1)", "false");
 		bps_tree_test_delete(&tree, v);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -120,7 +122,7 @@ simple_check()
 			fail("element already in tree (2)", "true");
 		bps_tree_test_insert(&tree, v, 0);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -133,7 +135,7 @@ simple_check()
 			fail("element in tree (2)", "false");
 		bps_tree_test_delete(&tree, v);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -147,7 +149,7 @@ simple_check()
 			fail("element already in tree (3)", "true");
 		bps_tree_test_insert(&tree, v, 0);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -160,7 +162,7 @@ simple_check()
 			fail("element in tree (3)", "false");
 		bps_tree_test_delete(&tree, v);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -175,7 +177,7 @@ simple_check()
 		bps_tree_test_insert(&tree, v, 0);
 		if (bps_tree_test_debug_check(&tree)) {
 			fail("debug check nonzero", "true");
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 		}
 	}
 	if (bps_tree_test_size(&tree) != rounds)
@@ -187,7 +189,7 @@ simple_check()
 			fail("element in tree (4)", "false");
 		bps_tree_test_delete(&tree, v);
 		if (bps_tree_test_debug_check(&tree)) {
-			bps_tree_test_print(&tree, "%ld");
+			bps_tree_test_print(&tree, TYPE_F);
 			fail("debug check nonzero", "true");
 		}
 	}
@@ -554,13 +556,13 @@ printing_test()
 
 	for (type_t i = 0; i < rounds; i++) {
 		type_t v = rounds + i;
-		printf("Inserting %ld\n", v);
+		printf("Inserting " TYPE_F "\n", v);
 		bps_tree_test_insert(&tree, v, 0);
-		bps_tree_test_print(&tree, "%ld");
+		bps_tree_test_print(&tree, TYPE_F);
 		v = rounds - i - 1;
-		printf("Inserting %ld\n", v);
+		printf("Inserting " TYPE_F "\n", v);
 		bps_tree_test_insert(&tree, v, 0);
-		bps_tree_test_print(&tree, "%ld");
+		bps_tree_test_print(&tree, TYPE_F);
 	}
 
 	bps_tree_test_destroy(&tree);
@@ -583,31 +585,31 @@ white_box_test()
 	for (type_t i = 0; i < 14; i++) {
 		bps_tree_test_insert(&tree, i, 0);
 	}
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
 	bps_tree_test_insert(&tree, 14, 0);
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("full 2 leafs:\n");
 	for (type_t i = 15; i < 28; i++) {
 		bps_tree_test_insert(&tree, i, 0);
 	}
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
 	bps_tree_test_insert(&tree, 28, 0);
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("full 3 leafs:\n");
 	for (type_t i = 29; i < 42; i++) {
 		bps_tree_test_insert(&tree, i, 0);
 	}
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("split now:\n");
 	bps_tree_test_insert(&tree, 42, 0);
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	bps_tree_test_destroy(&tree);
 	bps_tree_test_create(&tree, 0, extent_alloc, extent_free);
@@ -616,11 +618,11 @@ white_box_test()
 		arr[i] = i;
 	bps_tree_test_build(&tree, arr, 140);
 	printf("full 10 leafs:\n");
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	printf("2-level split now:\n");
 	bps_tree_test_insert(&tree, 140, 0);
-	bps_tree_test_print(&tree, "%ld");
+	bps_tree_test_print(&tree, TYPE_F);
 
 	bps_tree_test_destroy(&tree);
 

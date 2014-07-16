@@ -89,7 +89,7 @@ process_rw(struct port *port, struct request *request)
 static void
 process_ro(struct port *port, struct request *request)
 {
-	if (!iproto_request_is_select(request->type))
+	if (!iproto_type_is_select(request->type))
 		tnt_raise(LoggedError, ER_SECONDARY);
 	return process_rw(port, request);
 }
@@ -113,8 +113,8 @@ box_check_replication_source(const char *source)
 {
 	if (source == NULL)
 		return;
-	struct port_uri uri;
-	if (port_uri_parse(&uri, source)) {
+	struct uri uri;
+	if (uri_parse(&uri, source)) {
 		tnt_raise(ClientError, ER_CFG,
 			  "incorrect replication source");
 	}
@@ -134,12 +134,6 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
-
-	/* check primary port */
-	int primary_port = cfg_geti("primary_port");
-	if (primary_port < 0 || primary_port >= USHRT_MAX)
-		tnt_raise(ClientError, ER_CFG,
-			  "invalid primary port value");
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
@@ -231,7 +225,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	}
 
 	recovery_finalize(recovery_state);
-	stat_cleanup(stat_base, IPROTO_DML_REQUEST_MAX);
+	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
@@ -254,8 +248,7 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
  * no boundary or misuse checks.
  */
 void
-boxk(enum iproto_request_type type, uint32_t space_id,
-     const char *format, ...)
+boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 {
 	struct request req;
 	va_list ap;
@@ -391,8 +384,7 @@ box_init()
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
-	stat_base = stat_register(iproto_request_type_strs,
-				  IPROTO_DML_REQUEST_MAX);
+	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
 
 	if (recovery_has_data(recovery_state)) {
 		/* Process existing snapshot */
@@ -417,18 +409,18 @@ box_init()
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
-	const char *primary_port = cfg_gets("primary_port");
-	const char *admin_port = cfg_gets("admin_port");
+	const char *listen = cfg_gets("listen");
+	const char *admin = cfg_gets("admin");
 
 	/*
 	 * application server configuration).
 	 */
-	if (!primary_port && !admin_port)
+	if (!listen && !admin)
 		box_leave_local_standby_mode(NULL);
 	else {
 		void (*on_bind)(void *) = NULL;
-		if (primary_port) {
-			iproto_init(primary_port);
+		if (listen) {
+			iproto_init(listen);
 		} else {
 			/*
 			 * If no prmary port is given, leave local
@@ -438,8 +430,8 @@ box_init()
 			 */
 			on_bind = box_leave_local_standby_mode;
 		}
-		if (admin_port)
-			admin_init(admin_port, on_bind);
+		if (admin)
+			admin_init(admin, on_bind);
 	}
 	if (cfg_getd("io_collect_interval") > 0) {
 		ev_set_io_collect_interval(loop(),

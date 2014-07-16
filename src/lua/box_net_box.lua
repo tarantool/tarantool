@@ -9,8 +9,8 @@ local ffi = require 'ffi'
 local digest = require 'digest'
 local yaml = require 'yaml'
 
-local CODE              = 0
-local PING              = 64
+-- packet codes
+local OK                = 0
 local SELECT            = 1
 local INSERT            = 2
 local REPLACE           = 3
@@ -18,6 +18,10 @@ local UPDATE            = 4
 local DELETE            = 5
 local CALL              = 6
 local AUTH              = 7
+local PING              = 64
+local ERROR_TYPE        = 65536
+
+-- packet keys
 local TYPE              = 0x00
 local SYNC              = 0x01
 local SPACE_ID          = 0x10
@@ -375,7 +379,7 @@ local remote_methods = {
             return false
         end
 
-        if res.hdr[CODE] == 0 then
+        if res.hdr[TYPE] == OK then
             return true
         end
         return false
@@ -470,8 +474,7 @@ local remote_methods = {
         for sync, channel in pairs(waiters) do
             channel:put{
                 hdr = {
-                    [TYPE] = ERROR,
-                    [CODE] = box.error.NO_CONNECTION,
+                    [TYPE] = bit.bor(ERROR_TYPE, box.error.NO_CONNECTION),
                     [SYNC] = sync
                 },
                 body = {
@@ -644,7 +647,7 @@ local remote_methods = {
         local auth_res = self:_request_internal('auth',
             false, self.opts.user, self.opts.password, self.handshake)
 
-        if auth_res.hdr[CODE] ~= 0 then
+        if auth_res.hdr[TYPE] ~= OK then
             self:_fatal(auth_res.body[ERROR])
             return
         end
@@ -853,7 +856,7 @@ local remote_methods = {
                 box.raise(box.error.TIMEOUT, 'Timeout exceeded')
             else
                 return {
-                    hdr = { [CODE] = box.error.TIMEOUT },
+                    hdr = { [TYPE] = bit.bor(ERROR_TYPE, box.error.TIMEOUT) },
                     body = { [ERROR] = 'Timeout exceeded' }
                 }
             end
@@ -893,14 +896,15 @@ local remote_methods = {
                 box.raise(box.error.TIMEOUT, 'Timeout exceeded')
             else
                 return {
-                    hdr = { [CODE] = box.error.TIMEOUT },
+                    hdr = { [TYPE] = bit.bor(ERROR_TYPE, box.error.TIMEOUT) },
                     body = { [ERROR] = 'Timeout exceeded' }
                 }
             end
         end
 
-        if raise and response.hdr[CODE] ~= 0 then
-            box.raise(response.hdr[CODE], response.body[ERROR])
+        if raise and response.hdr[TYPE] ~= OK then
+            local errcode = bit.band(response.hdr[TYPE], ERROR - 1)
+            box.raise(errcode, response.body[ERROR])
         end
 
         if response.body[DATA] ~= nil then

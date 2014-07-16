@@ -1,5 +1,5 @@
---# push filter 'primary_port: .*' to 'primary_port: <number>'
---# push filter 'admin_port: .*' to 'admin_port: <number>'
+--# push filter 'listen: .*' to 'primary: <uri>'
+--# push filter 'admin: .*' to 'admin: <uri>'
 box.cfg.nosuchoption = 1
 ---
 - error: '[string "-- load_cfg.lua - internal file..."]:127: Attempt to modify a read-only
@@ -13,21 +13,21 @@ t
 - - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
   - 'rows_per_wal: 50'
-  - 'admin_port: <number>
+  - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'wal_dir: .'
+  - 'primary: <uri>
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
   - 'wal_mode: write'
-  - 'log_level: 5'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
+  - 'log_level: 5'
+  - 'admin: <uri>
   - 'readahead: 16320'
-  - 'primary_port: <number>
   - 'pid_file: tarantool.pid'
   - 'slab_alloc_minimal: 64'
-  - 'background: false'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 -- must be read-only
@@ -42,21 +42,21 @@ t
 - - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
   - 'rows_per_wal: 50'
-  - 'admin_port: <number>
+  - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'wal_dir: .'
+  - 'primary: <uri>
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
   - 'wal_mode: write'
-  - 'log_level: 5'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
+  - 'log_level: 5'
+  - 'admin: <uri>
   - 'readahead: 16320'
-  - 'primary_port: <number>
   - 'pid_file: tarantool.pid'
   - 'slab_alloc_minimal: 64'
-  - 'background: false'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 --# clear filter

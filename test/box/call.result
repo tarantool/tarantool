@@ -48,8 +48,8 @@ call f1()
 call dostring('box.raise(33333, "Hey!")')
 ---
 - error:
-    errcode: ER_UNKNOWN (33333)
-    errmsg: Hey!
+    errcode: ER_PROC_LUA
+    errmsg: [string "box.raise(33333, "Hey!")"]:1: box.raise(): unknown error code
 ...
 
 # A test case for Bug#103491

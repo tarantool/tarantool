@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_PORT_URI_H_INCLUDED
-#define TARANTOOL_PORT_URI_H_INCLUDED
+#ifndef TARANTOOL_URI_H_INCLUDED
+#define TARANTOOL_URI_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -35,10 +35,10 @@
 #include <netdb.h>
 #include <sys/un.h>
 
-enum { PORT_URI_STR_LEN = 32 };
+enum { URI_STR_LEN = 32 };
 
 /** A parsed representation of an URI */
-struct port_uri {
+struct uri {
 
 	union {
 		struct sockaddr addr;
@@ -49,22 +49,22 @@ struct port_uri {
 	};
 	socklen_t addr_len;
 
-	char schema[PORT_URI_STR_LEN];
-	char login[PORT_URI_STR_LEN];
-	char password[PORT_URI_STR_LEN];
+	char schema[URI_STR_LEN];
+	char login[URI_STR_LEN];
+	char password[URI_STR_LEN];
 };
 
 /**
- * Parse a string and fill port_uri struct.
+ * Parse a string and fill uri struct.
  * @retval 0 success
  * @retval -1 error
  */
 int
-port_uri_parse(struct port_uri *uri, const char *str);
+uri_parse(struct uri *uri, const char *str);
 
 /** Convert an uri to string */
 const char *
-port_uri_to_string(const struct port_uri * uri);
+uri_to_string(const struct uri * uri);
 
 
-#endif /* TARANTOOL_PORT_URI_H_INCLUDED */
+#endif /* TARANTOOL_URI_H_INCLUDED */

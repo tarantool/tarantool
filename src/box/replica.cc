@@ -59,13 +59,11 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 			  "invalid fixed header");
 	}
 
-	const char *data = in->pos;
-	uint32_t len = mp_decode_uint(&data);
+	uint32_t len = mp_decode_uint((const char **) &in->pos);
 	if (len > IPROTO_BODY_LEN_MAX) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			  "received packet is too big");
 	}
-	in->pos += IPROTO_FIXHEADER_SIZE;
 
 	/* Read header and body */
 	ssize_t to_read = len - ibuf_size(in);
@@ -91,7 +89,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	struct port_uri *uri = &r->remote.uri;
+	struct uri *uri = &r->remote.uri;
 
 	coio_connect(coio, &uri->addr, uri->addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
@@ -106,7 +104,8 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 	iproto_encode_auth(&row, greeting, uri->login, uri->password);
 	remote_write_row(coio, &row);
 	remote_read_row(coio, iobuf, &row);
-	iproto_decode_error(&row); /* auth failed */
+	if (row.type != IPROTO_OK)
+		iproto_decode_error(&row); /* auth failed */
 
 	/* auth successed */
 	say_info("authenticated");
@@ -142,14 +141,14 @@ replica_bootstrap(struct recovery_state *r)
 	while (true) {
 		remote_read_row(&coio, iobuf, &row);
 
-		if (iproto_request_is_dml(row.type)) {
-			/* Regular snapshot row  (IPROTO_INSERT) */
-			recovery_process(r, &row);
-		} else if (row.type == IPROTO_JOIN) {
+		if (row.type == IPROTO_OK) {
 			/* End of stream */
 			say_info("done");
 			break;
-		} else {
+		} else if (iproto_type_is_dml(row.type)) {
+			/* Regular snapshot row  (IPROTO_INSERT) */
+			recovery_process(r, &row);
+		} else /* error or unexpected packet */ {
 			iproto_decode_error(&row);  /* rethrow error */
 		}
 	}
@@ -157,7 +156,7 @@ replica_bootstrap(struct recovery_state *r)
 	/* Decode end of stream packet */
 	struct vclock vclock;
 	vclock_create(&vclock);
-	assert(row.type == IPROTO_JOIN);
+	assert(row.type == IPROTO_OK);
 	iproto_decode_eos(&row, &vclock);
 
 	/* Replace server vclock using data from snapshot */
@@ -169,7 +168,7 @@ replica_bootstrap(struct recovery_state *r)
 static void
 remote_set_status(struct remote *remote, const char *status)
 {
-	title("replica", "%s/%s", port_uri_to_string(&remote->uri), status);
+	title("replica", "%s/%s", uri_to_string(&remote->uri), status);
 }
 
 static void
@@ -207,7 +206,7 @@ pull_from_remote(va_list ap)
 			}
 			err = "can't read row";
 			remote_read_row(&coio, iobuf, &row);
-			if (!iproto_request_is_dml(row.type))
+			if (!iproto_type_is_dml(row.type))
 				iproto_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;
@@ -264,7 +263,7 @@ recovery_follow_remote(struct recovery_state *r)
 	assert(r->remote.reader == NULL);
 	assert(recovery_has_remote(r));
 
-	const char *uri = port_uri_to_string(&r->remote.uri);
+	const char *uri = uri_to_string(&r->remote.uri);
 	say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
@@ -299,7 +298,7 @@ recovery_set_remote(struct recovery_state *r, const char *uri)
 	 * @todo: as long as DNS is involved, this may fail even
 	 * on a valid uri. Don't panic in this case.
 	 */
-	if (port_uri_parse(&r->remote.uri, uri))
+	if (uri_parse(&r->remote.uri, uri))
 		panic("Can't parse uri: %s", uri);
 	snprintf(r->remote.source,
 		 sizeof(r->remote.source), "%s", uri);

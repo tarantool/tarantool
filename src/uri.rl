@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port_uri.h"
+#include "uri.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,7 +39,7 @@
 #include <netdb.h>
 
 const char *
-port_uri_to_string(const struct port_uri * uri)
+uri_to_string(const struct uri * uri)
 {
 	static __thread char
 		str[NI_MAXSERV + NI_MAXHOST + sizeof(uri->schema)];
@@ -96,7 +96,7 @@ port_uri_to_string(const struct port_uri * uri)
 }
 
 int
-port_uri_parse(struct port_uri *uri, const char *p)
+uri_parse(struct uri *uri, const char *p)
 {
 	(void) uri;
 	const char *pe = p + strlen(p);
@@ -122,7 +122,7 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	unsigned port = 0;
 
 	%%{
-		machine port_uri;
+		machine uri;
 		write data;
 
 		hex1_4 = ([0-9a-fA-F]{1,4});
@@ -197,9 +197,9 @@ port_uri_parse(struct port_uri *uri, const char *p)
 		write exec;
 	}%%
 
-	(void)port_uri_first_final;
-	(void)port_uri_error;
-	(void)port_uri_en_main;
+	(void)uri_first_final;
+	(void)uri_error;
+	(void)uri_en_main;
 
 	if (login.start && login.end && password.start && password.end) {
 		snprintf(uri->login, sizeof(uri->login),

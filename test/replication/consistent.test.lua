@@ -35,7 +35,7 @@ do
 end;
 --# setopt delimiter ''
 --# set connection default
---# set variable replica_port to 'replica.primary_port'
+--# set variable replica_port to 'replica.listen'
 
 -- set begin lsn on master and replica.
 begin_lsn = box.info.lsn

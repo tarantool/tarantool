@@ -30,8 +30,8 @@ class TestState(object):
         # curcon is an array since we may have many connections
         self.curcon = [self.connections['default']]
         nmsp = Namespace()
-        setattr(nmsp, 'admin_port', default_server.admin.port)
-        setattr(nmsp, 'primary_port', default_server.sql.port)
+        setattr(nmsp, 'admin', default_server.admin.port)
+        setattr(nmsp, 'listen', default_server.sql.port)
         setattr(self.environ, 'default', nmsp)
 
     def parse_preprocessor(self, string):
@@ -143,10 +143,10 @@ class TestState(object):
             self.servers[sname] = temp
             self.servers[sname].deploy(silent=True)
             nmsp = Namespace()
-            setattr(nmsp, 'admin_port', temp.admin.port)
-            setattr(nmsp, 'primary_port', temp.sql.port)
+            setattr(nmsp, 'admin', temp.admin.port)
+            setattr(nmsp, 'listen', temp.sql.port)
             if temp.rpl_master:
-                setattr(nmsp, 'master_port', temp.rpl_master.sql.port)
+                setattr(nmsp, 'master', temp.rpl_master.sql.port)
             setattr(self.environ, sname, nmsp)
         elif ctype == 'start':
             if sname not in self.servers:

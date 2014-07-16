@@ -53,7 +53,7 @@ end;
 --# set connection default
 
 -- set begin lsn on master, replica and hot_standby.
---# set variable replica_port to 'replica.primary_port'
+--# set variable replica_port to 'replica.listen'
 a = (require 'net.box'):new('127.0.0.1', replica_port)
 a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
 a:close()
@@ -71,9 +71,9 @@ _select(1, 10)
 --# stop server default
 require('fiber').sleep(0.2)
 
--- hot_standby.primary_port is garbage, since hot_standby.lua
--- uses MASTER_PORT environment variable for its primary_port
---# set variable hot_standby_port to 'hot_standby.master_port'
+-- hot_standby.listen is garbage, since hot_standby.lua
+-- uses MASTER environment variable for its listen
+--# set variable hot_standby_port to 'hot_standby.master'
 a = (require 'net.box'):new('127.0.0.1', hot_standby_port)
 a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
 a:close()

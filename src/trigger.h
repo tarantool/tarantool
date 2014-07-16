@@ -61,7 +61,7 @@ trigger_run(struct rlist *list, void *event)
 }
 
 static inline void
-trigger_set(struct rlist *list, struct trigger *trigger)
+trigger_add(struct rlist *list, struct trigger *trigger)
 {
 	/*
 	 * New triggers are pushed to the beginning of the list.
@@ -73,6 +73,17 @@ trigger_set(struct rlist *list, struct trigger *trigger)
 	 * to an arbitrary position on the list.
 	 */
 	rlist_add_entry(list, trigger, link);
+}
+
+static inline void
+trigger_add_unique(struct rlist *list, struct trigger *trigger)
+{
+	struct trigger *trg;
+	rlist_foreach_entry(trg, list, link) {
+		if (trg->data == trigger->data && trg->run == trigger->run)
+			return;
+	}
+	trigger_add(list, trigger);
 }
 
 static inline void
