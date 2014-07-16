@@ -49,7 +49,7 @@ enum { TNT_ERRMSG_MAX = 512 };
  */
 
 #define ERROR_CODES(_)					    \
-	/*  0 */_(ER_OK,			0, "OK") \
+	/*  0 */_(ER_UNKNOWN,			2, "Unknown error") \
 	/*  1 */_(ER_ILLEGAL_PARAMS,		2, "Illegal parameters, %s") \
 	/*  2 */_(ER_MEMORY_ISSUE,		1, "Failed to allocate %u bytes in %s for %s") \
 	/*  3 */_(ER_TUPLE_FOUND,		2, "Duplicate key exists in unique index %u") \

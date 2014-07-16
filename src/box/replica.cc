@@ -147,7 +147,7 @@ replica_bootstrap(struct recovery_state *r)
 			/* End of stream */
 			say_info("done");
 			break;
-		} else if (iproto_request_is_dml(row.type)) {
+		} else if (iproto_type_is_dml(row.type)) {
 			/* Regular snapshot row  (IPROTO_INSERT) */
 			recovery_process(r, &row);
 		} else /* error or unexpected packet */ {
@@ -208,7 +208,7 @@ pull_from_remote(va_list ap)
 			}
 			err = "can't read row";
 			remote_read_row(&coio, iobuf, &row);
-			if (!iproto_request_is_dml(row.type))
+			if (!iproto_type_is_dml(row.type))
 				iproto_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;

@@ -93,7 +93,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* }}} */
 };
 
-const char *iproto_request_type_strs[] =
+const char *iproto_type_strs[] =
 {
 	NULL,
 	"SELECT",
@@ -106,7 +106,7 @@ const char *iproto_request_type_strs[] =
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
+const uint64_t iproto_body_key_map[IPROTO_TYPE_DML_MAX] = {
 	0,                                                     /* unused */
 	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
@@ -357,7 +357,7 @@ iproto_encode_auth(struct iproto_header *packet, const char *greeting,
 void
 iproto_decode_error(struct iproto_header *row)
 {
-	uint32_t code = row->type & (IPROTO_ERROR_RECOVERABLE - 1);
+	uint32_t code = row->type & (IPROTO_TYPE_ERROR - 1);
 
 	char error[TNT_ERRMSG_MAX] = { 0 };
 	const char *pos;

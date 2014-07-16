@@ -629,6 +629,7 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 static void
 replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 {
+	assert(iproto_type_is_dml(packet->type));
 	struct recovery_state *r = recovery_state;
 
 	/* Don't duplicate data */
@@ -639,14 +640,12 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 		sio_writev_all(relay.sock, iov, iovcnt);
 	}
 
-	if (iproto_request_is_dml(packet->type)) {
-		/*
-		 * Update local vclock. During normal operation wal_write()
-		 * updates local vclock. In relay mode we have to update
-		 * it here.
-		 */
-		vclock_follow(&r->vclock, packet->server_id, packet->lsn);
-	}
+	/*
+	 * Update local vclock. During normal operation wal_write()
+	 * updates local vclock. In relay mode we have to update
+	 * it here.
+	 */
+	vclock_follow(&r->vclock, packet->server_id, packet->lsn);
 }
 
 static void

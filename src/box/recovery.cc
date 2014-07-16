@@ -1126,8 +1126,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	 * WAL. @sa the place which skips old rows in
 	 * recovery_process().
 	 */
-	if (iproto_request_is_dml(row->type))
-		row->lsn = ++l->rows;
+	row->lsn = ++l->rows;
 	row->sync = 0; /* don't write sync to wal */
 
 	struct iovec iov[XLOG_ROW_IOVMAX];

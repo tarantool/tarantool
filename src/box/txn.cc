@@ -154,8 +154,8 @@ txn_commit(struct txn *txn)
 
 		if (stop - start > too_long_threshold && stmt->row != NULL) {
 			say_warn("too long %s: %.3f sec",
-				iproto_request_name(stmt->row->type),
-					stop - start);
+				 iproto_type_name(stmt->row->type),
+				 stop - start);
 		}
 
 		if (res)

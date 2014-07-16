@@ -1,6 +1,7 @@
 from lib.box_connection import BoxConnection
 from tarantool import NetworkError
-from tarantool.const import IPROTO_GREETING_SIZE, IPROTO_CODE, IPROTO_ERROR
+from tarantool.const import IPROTO_GREETING_SIZE, IPROTO_CODE, IPROTO_ERROR, \
+    REQUEST_TYPE_ERROR
 import socket
 import msgpack
 
@@ -33,7 +34,7 @@ unpacker.feed(packet)
 # Parse packet
 header = unpacker.unpack()
 body = unpacker.unpack()
-print 'error code:', header[IPROTO_CODE]
+print 'error code', (header[IPROTO_CODE] & (REQUEST_TYPE_ERROR - 1))
 print 'error message: ', body[IPROTO_ERROR]
 print 'eof:', len(s.recv(1024)) == 0
 s.close()
