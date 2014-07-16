@@ -423,10 +423,10 @@ class TarantoolServer(Server):
             self._admin = find_port(port)
         self._sql = find_port(port + 1)
 
-    def deploy(self, silent=True):
+    def deploy(self, silent=True, wait = True):
         self.install(silent)
         if not self._start_and_exit:
-            self.start(silent)
+            self.start(silent=silent, wait=wait)
         else:
             self.start_and_exit()
 
@@ -451,7 +451,7 @@ class TarantoolServer(Server):
             self.start()
             self.process.wait()
 
-    def start(self, silent=True):
+    def start(self, silent=True, wait = True):
         if self.status == 'started':
             if not silent:
                 color_stdout('The server is already started.\n', schema='lerror')
@@ -474,7 +474,8 @@ class TarantoolServer(Server):
                 cwd = self.vardir,
                 stdout=self.log_des,
                 stderr=self.log_des)
-        self.wait_until_started()
+        if wait:
+            self.wait_until_started()
         self.status = 'started'
 
     def wait_stop(self):
