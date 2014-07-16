@@ -59,13 +59,11 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 			  "invalid fixed header");
 	}
 
-	const char *data = in->pos;
-	uint32_t len = mp_decode_uint(&data);
+	uint32_t len = mp_decode_uint((const char **) &in->pos);
 	if (len > IPROTO_BODY_LEN_MAX) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			  "received packet is too big");
 	}
-	in->pos += IPROTO_FIXHEADER_SIZE;
 
 	/* Read header and body */
 	ssize_t to_read = len - ibuf_size(in);

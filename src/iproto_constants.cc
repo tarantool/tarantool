@@ -297,19 +297,11 @@ iproto_row_encode(const struct iproto_header *row,
 		len += out[i].iov_len;
 
 	/* Encode length */
+	assert(IPROTO_FIXHEADER_SIZE == mp_sizeof_uint(UINT32_MAX));
 	char *data = fixheader;
-	data = mp_encode_uint(data, len);
-	/* Encode padding */
-	ssize_t padding = IPROTO_FIXHEADER_SIZE - (data - fixheader);
-	if (padding > 0) {
-		data = mp_encode_strl(data, padding - 1);
-#if defined(NDEBUG)
-		data += padding - 1;
-#else
-		while (--padding > 0)
-			*(data++) = 0; /* valgrind */
-#endif
-	}
+	*(data++) = 0xce; /* MP_UINT32 */
+	*(uint32_t *) data = mp_bswap_u32(len);
+	data += sizeof(uint32_t);
 	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
 	out[0].iov_base = fixheader;
 	out[0].iov_len = IPROTO_FIXHEADER_SIZE;
