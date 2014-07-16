@@ -89,7 +89,7 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 
 	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	struct port_uri *uri = &r->remote.uri;
+	struct uri *uri = &r->remote.uri;
 
 	coio_connect(coio, &uri->addr, uri->addr_len);
 	coio_readn(coio, greeting, sizeof(greeting));
@@ -168,7 +168,7 @@ replica_bootstrap(struct recovery_state *r)
 static void
 remote_set_status(struct remote *remote, const char *status)
 {
-	title("replica", "%s/%s", port_uri_to_string(&remote->uri), status);
+	title("replica", "%s/%s", uri_to_string(&remote->uri), status);
 }
 
 static void
@@ -263,7 +263,7 @@ recovery_follow_remote(struct recovery_state *r)
 	assert(r->remote.reader == NULL);
 	assert(recovery_has_remote(r));
 
-	const char *uri = port_uri_to_string(&r->remote.uri);
+	const char *uri = uri_to_string(&r->remote.uri);
 	say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
@@ -298,7 +298,7 @@ recovery_set_remote(struct recovery_state *r, const char *uri)
 	 * @todo: as long as DNS is involved, this may fail even
 	 * on a valid uri. Don't panic in this case.
 	 */
-	if (port_uri_parse(&r->remote.uri, uri))
+	if (uri_parse(&r->remote.uri, uri))
 		panic("Can't parse uri: %s", uri);
 	snprintf(r->remote.source,
 		 sizeof(r->remote.source), "%s", uri);

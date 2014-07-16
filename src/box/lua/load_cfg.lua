@@ -11,7 +11,7 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
-local function normalize_port_uri(port)
+local function normalize_uri(port)
     if port == nil then
         return nil
     end
@@ -20,8 +20,8 @@ end
 
 -- arguments that can be number or string
 local wrapper_cfg = {
-    admin              = normalize_port_uri,
-    listen             = normalize_port_uri,
+    admin              = normalize_uri,
+    listen             = normalize_uri,
 }
 
 -- all available options

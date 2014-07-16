@@ -113,8 +113,8 @@ box_check_replication_source(const char *source)
 {
 	if (source == NULL)
 		return;
-	struct port_uri uri;
-	if (port_uri_parse(&uri, source)) {
+	struct uri uri;
+	if (uri_parse(&uri, source)) {
 		tnt_raise(ClientError, ER_CFG,
 			  "incorrect replication source");
 	}

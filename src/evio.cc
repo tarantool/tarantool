@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "evio.h"
-#include "port_uri.h"
+#include "uri.h"
 #include "scoped_guard.h"
 #include <stdio.h>
 #include <netinet/in.h>
@@ -228,7 +228,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 			return -1;
 		}
 		say_info("bound to %s port %s", evio_service_name(service),
-			port_uri_to_string(&service->port));
+			uri_to_string(&service->port));
 
 		/* Invoke on_bind callback if it is set. */
 		if (service->on_bind)
@@ -273,7 +273,7 @@ evio_service_init(ev_loop *loop,
 	service->loop = loop;
 
 
-	if (port_uri_parse(&service->port, uri))
+	if (uri_parse(&service->port, uri))
 		tnt_raise(SocketError, -1,
 			  "invalid address for bind: %s", uri);
 
@@ -303,7 +303,7 @@ evio_service_start(struct evio_service *service)
 		say_warn("%s port %s is already in use, will "
 			 "retry binding after %lf seconds.",
 			 evio_service_name(service),
-			 port_uri_to_string(&service->port), BIND_RETRY_DELAY);
+			 uri_to_string(&service->port), BIND_RETRY_DELAY);
 
 		ev_timer_set(&service->timer,
 			     BIND_RETRY_DELAY, BIND_RETRY_DELAY);
