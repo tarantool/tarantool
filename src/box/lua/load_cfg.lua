@@ -11,7 +11,7 @@ void box_set_too_long_threshold(double threshold);
 void box_set_snap_io_rate_limit(double limit);
 ]])
 
-local function normalize_port_uri(port)
+local function normalize_uri(port)
     if port == nil then
         return nil
     end
@@ -20,14 +20,14 @@ end
 
 -- arguments that can be number or string
 local wrapper_cfg = {
-    admin_port          = normalize_port_uri,
-    primary_port        = normalize_port_uri,
+    admin              = normalize_uri,
+    listen             = normalize_uri,
 }
 
 -- all available options
 local default_cfg = {
-    admin_port          = nil,
-    primary_port        = nil,
+    admin               = nil,
+    listen              = nil,
     slab_alloc_arena    = 1.0,
     slab_alloc_minimal  = 64,
     slab_alloc_factor   = 2.0,

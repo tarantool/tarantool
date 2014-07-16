@@ -1,5 +1,5 @@
 
-#line 1 "src/port_uri.rl"
+#line 1 "src/uri.rl"
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "port_uri.h"
+#include "uri.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,7 +41,7 @@
 #include <netdb.h>
 
 const char *
-port_uri_to_string(const struct port_uri * uri)
+uri_to_string(const struct uri * uri)
 {
 	static __thread char
 		str[NI_MAXSERV + NI_MAXHOST + sizeof(uri->schema)];
@@ -98,7 +98,7 @@ port_uri_to_string(const struct port_uri * uri)
 }
 
 int
-port_uri_parse(struct port_uri *uri, const char *p)
+uri_parse(struct uri *uri, const char *p)
 {
 	(void) uri;
 	const char *pe = p + strlen(p);
@@ -124,20 +124,20 @@ port_uri_parse(struct port_uri *uri, const char *p)
 	unsigned port = 0;
 
 	
-#line 128 "src/port_uri.cc"
-static const int port_uri_start = 1;
-static const int port_uri_first_final = 74;
-static const int port_uri_error = 0;
+#line 128 "src/uri.cc"
+static const int uri_start = 1;
+static const int uri_first_final = 74;
+static const int uri_error = 0;
 
-static const int port_uri_en_main = 1;
+static const int uri_en_main = 1;
 
 
-#line 136 "src/port_uri.cc"
+#line 136 "src/uri.cc"
 	{
-	cs = port_uri_start;
+	cs = uri_start;
 	}
 
-#line 141 "src/port_uri.cc"
+#line 141 "src/uri.cc"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -162,46 +162,46 @@ case 1:
 		goto tr5;
 	goto tr0;
 tr0:
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st74;
 tr82:
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st74;
 st74:
 	if ( ++p == pe )
 		goto _test_eof74;
 case 74:
-#line 179 "src/port_uri.cc"
+#line 179 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr94;
 		case 63: goto st0;
 	}
 	goto st74;
 tr94:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st2;
 tr144:
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st2;
 tr157:
-#line 154 "src/port_uri.rl"
+#line 154 "src/uri.rl"
 	{ ip6.end   = p - 1; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st2;
 st2:
 	if ( ++p == pe )
 		goto _test_eof2;
 case 2:
-#line 205 "src/port_uri.cc"
+#line 205 "src/uri.cc"
 	if ( (*p) < 65 ) {
 		if ( 49 <= (*p) && (*p) <= 57 )
 			goto tr8;
@@ -215,34 +215,34 @@ st0:
 cs = 0;
 	goto _out;
 tr8:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st75;
 tr95:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st75;
 st75:
 	if ( ++p == pe )
 		goto _test_eof75;
 case 75:
-#line 234 "src/port_uri.cc"
+#line 234 "src/uri.cc"
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr95;
 	goto st0;
 tr9:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st76;
 st76:
 	if ( ++p == pe )
 		goto _test_eof76;
 case 76:
-#line 246 "src/port_uri.cc"
+#line 246 "src/uri.cc"
 	if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
 			goto st77;
@@ -395,16 +395,16 @@ st91:
 case 91:
 	goto st0;
 tr1:
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 176 "src/port_uri.rl"
+#line 176 "src/uri.rl"
 	{ path.start = p; }
 	goto st92;
 st92:
 	if ( ++p == pe )
 		goto _test_eof92;
 case 92:
-#line 408 "src/port_uri.cc"
+#line 408 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr112;
 		case 63: goto st95;
@@ -420,14 +420,14 @@ case 93:
 	}
 	goto st93;
 tr112:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st94;
 st94:
 	if ( ++p == pe )
 		goto _test_eof94;
 case 94:
-#line 431 "src/port_uri.cc"
+#line 431 "src/uri.cc"
 	if ( (*p) < 65 ) {
 		if ( 49 <= (*p) && (*p) <= 57 )
 			goto tr114;
@@ -443,34 +443,34 @@ st95:
 case 95:
 	goto st95;
 tr114:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st96;
 tr116:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st96;
 st96:
 	if ( ++p == pe )
 		goto _test_eof96;
 case 96:
-#line 462 "src/port_uri.cc"
+#line 462 "src/uri.cc"
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr116;
 	goto st95;
 tr115:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st97;
 st97:
 	if ( ++p == pe )
 		goto _test_eof97;
 case 97:
-#line 474 "src/port_uri.cc"
+#line 474 "src/uri.cc"
 	if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
 			goto st98;
@@ -623,28 +623,28 @@ st112:
 case 112:
 	goto st95;
 tr2:
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st113;
 tr83:
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st113;
 st113:
 	if ( ++p == pe )
 		goto _test_eof113;
 case 113:
-#line 648 "src/port_uri.cc"
+#line 648 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st114;
 		case 58: goto tr134;
@@ -828,18 +828,18 @@ case 127:
 		goto st128;
 	goto st74;
 tr84:
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st128;
 st128:
 	if ( ++p == pe )
 		goto _test_eof128;
 case 128:
-#line 843 "src/port_uri.cc"
+#line 843 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr134;
 		case 63: goto st0;
@@ -854,16 +854,16 @@ case 128:
 		goto st128;
 	goto st74;
 tr134:
-#line 137 "src/port_uri.rl"
+#line 137 "src/uri.rl"
 	{ login.end    = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st3;
 st3:
 	if ( ++p == pe )
 		goto _test_eof3;
 case 3:
-#line 867 "src/port_uri.cc"
+#line 867 "src/uri.cc"
 	if ( (*p) == 48 )
 		goto tr10;
 	if ( (*p) < 65 ) {
@@ -876,14 +876,14 @@ case 3:
 		goto tr12;
 	goto st0;
 tr10:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
 	goto st4;
 st4:
 	if ( ++p == pe )
 		goto _test_eof4;
 case 4:
-#line 887 "src/port_uri.cc"
+#line 887 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr14;
 	if ( (*p) < 65 ) {
@@ -896,14 +896,14 @@ case 4:
 		goto st4;
 	goto st0;
 tr14:
-#line 141 "src/port_uri.rl"
+#line 141 "src/uri.rl"
 	{ password.end   = p; }
 	goto st5;
 st5:
 	if ( ++p == pe )
 		goto _test_eof5;
 case 5:
-#line 907 "src/port_uri.cc"
+#line 907 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st0;
 		case 63: goto st0;
@@ -913,16 +913,16 @@ case 5:
 		goto tr15;
 	goto tr0;
 tr15:
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st129;
 st129:
 	if ( ++p == pe )
 		goto _test_eof129;
 case 129:
-#line 926 "src/port_uri.cc"
+#line 926 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st114;
 		case 58: goto tr94;
@@ -954,24 +954,24 @@ case 131:
 	}
 	goto st74;
 tr6:
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 153 "src/port_uri.rl"
+#line 153 "src/uri.rl"
 	{ ip6.start = p + 1; }
 	goto st132;
 tr85:
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 153 "src/port_uri.rl"
+#line 153 "src/uri.rl"
 	{ ip6.start = p + 1; }
 	goto st132;
 st132:
 	if ( ++p == pe )
 		goto _test_eof132;
 case 132:
-#line 975 "src/port_uri.cc"
+#line 975 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr152;
 		case 63: goto st0;
@@ -1046,14 +1046,14 @@ case 136:
 	}
 	goto st74;
 tr154:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 1057 "src/port_uri.cc"
+#line 1057 "src/uri.cc"
 	switch( (*p) ) {
 		case 48: goto st7;
 		case 58: goto st11;
@@ -1671,18 +1671,18 @@ case 137:
 		goto tr157;
 	goto st0;
 tr17:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st138;
 st138:
 	if ( ++p == pe )
 		goto _test_eof138;
 case 138:
-#line 1686 "src/port_uri.cc"
+#line 1686 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st11;
 		case 93: goto st137;
@@ -1697,14 +1697,14 @@ case 138:
 		goto st8;
 	goto st0;
 tr158:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st139;
 st139:
 	if ( ++p == pe )
 		goto _test_eof139;
 case 139:
-#line 1708 "src/port_uri.cc"
+#line 1708 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st11;
 		case 93: goto st137;
@@ -1719,14 +1719,14 @@ case 139:
 		goto st9;
 	goto st0;
 tr159:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st140;
 st140:
 	if ( ++p == pe )
 		goto _test_eof140;
 case 140:
-#line 1730 "src/port_uri.cc"
+#line 1730 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st11;
 		case 93: goto st137;
@@ -1741,14 +1741,14 @@ case 140:
 		goto st10;
 	goto st0;
 tr160:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st141;
 st141:
 	if ( ++p == pe )
 		goto _test_eof141;
 case 141:
-#line 1752 "src/port_uri.cc"
+#line 1752 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st11;
 		case 93: goto st137;
@@ -1757,14 +1757,14 @@ case 141:
 		goto tr95;
 	goto st0;
 tr19:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st142;
 st142:
 	if ( ++p == pe )
 		goto _test_eof142;
 case 142:
-#line 1768 "src/port_uri.cc"
+#line 1768 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st11;
 		case 93: goto st137;
@@ -1845,14 +1845,14 @@ case 145:
 		goto st80;
 	goto st0;
 tr152:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st46;
 st46:
 	if ( ++p == pe )
 		goto _test_eof46;
 case 46:
-#line 1856 "src/port_uri.cc"
+#line 1856 "src/uri.cc"
 	switch( (*p) ) {
 		case 48: goto st7;
 		case 58: goto st47;
@@ -1976,14 +1976,14 @@ case 52:
 		goto st17;
 	goto st0;
 tr64:
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st53;
 st53:
 	if ( ++p == pe )
 		goto _test_eof53;
 case 53:
-#line 1987 "src/port_uri.cc"
+#line 1987 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st54;
 		case 58: goto st21;
@@ -2063,14 +2063,14 @@ case 61:
 		goto tr75;
 	goto st0;
 tr75:
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
 	goto st146;
 st146:
 	if ( ++p == pe )
 		goto _test_eof146;
 case 146:
-#line 2074 "src/port_uri.cc"
+#line 2074 "src/uri.cc"
 	if ( (*p) == 58 )
 		goto tr94;
 	goto st0;
@@ -2143,24 +2143,24 @@ case 67:
 		goto st20;
 	goto st0;
 tr11:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st147;
 tr164:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st147;
 st147:
 	if ( ++p == pe )
 		goto _test_eof147;
 case 147:
-#line 2164 "src/port_uri.cc"
+#line 2164 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr14;
 	if ( (*p) < 65 ) {
@@ -2173,16 +2173,16 @@ case 147:
 		goto st4;
 	goto st0;
 tr12:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st148;
 st148:
 	if ( ++p == pe )
 		goto _test_eof148;
 case 148:
-#line 2186 "src/port_uri.cc"
+#line 2186 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr14;
 	if ( (*p) < 65 ) {
@@ -2420,22 +2420,22 @@ case 163:
 		goto st4;
 	goto st0;
 tr3:
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
-#line 171 "src/port_uri.rl"
+#line 171 "src/uri.rl"
 	{ sport.start   = p; port = 0; }
-#line 172 "src/port_uri.rl"
+#line 172 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st164;
 st164:
 	if ( ++p == pe )
 		goto _test_eof164;
 case 164:
-#line 2439 "src/port_uri.cc"
+#line 2439 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st114;
 		case 58: goto tr134;
@@ -2451,14 +2451,14 @@ case 164:
 		goto st128;
 	goto st74;
 tr180:
-#line 172 "src/port_uri.rl"
+#line 172 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st165;
 st165:
 	if ( ++p == pe )
 		goto _test_eof165;
 case 165:
-#line 2462 "src/port_uri.cc"
+#line 2462 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st114;
 		case 58: goto tr134;
@@ -2474,14 +2474,14 @@ case 165:
 		goto st128;
 	goto st74;
 tr181:
-#line 172 "src/port_uri.rl"
+#line 172 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st166;
 st166:
 	if ( ++p == pe )
 		goto _test_eof166;
 case 166:
-#line 2485 "src/port_uri.cc"
+#line 2485 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st114;
 		case 58: goto tr134;
@@ -2497,14 +2497,14 @@ case 166:
 		goto st128;
 	goto st74;
 tr182:
-#line 172 "src/port_uri.rl"
+#line 172 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st167;
 st167:
 	if ( ++p == pe )
 		goto _test_eof167;
 case 167:
-#line 2508 "src/port_uri.cc"
+#line 2508 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr134;
 		case 63: goto st0;
@@ -2519,18 +2519,18 @@ case 167:
 		goto st128;
 	goto st74;
 tr5:
-#line 132 "src/port_uri.rl"
+#line 132 "src/uri.rl"
 	{ schema.start = p; }
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st168;
 st168:
 	if ( ++p == pe )
 		goto _test_eof168;
 case 168:
-#line 2534 "src/port_uri.cc"
+#line 2534 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr183;
 		case 63: goto st0;
@@ -2545,16 +2545,16 @@ case 168:
 		goto st168;
 	goto st74;
 tr183:
-#line 137 "src/port_uri.rl"
+#line 137 "src/uri.rl"
 	{ login.end    = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st68;
 st68:
 	if ( ++p == pe )
 		goto _test_eof68;
 case 68:
-#line 2558 "src/port_uri.cc"
+#line 2558 "src/uri.cc"
 	switch( (*p) ) {
 		case 47: goto st69;
 		case 48: goto tr10;
@@ -2594,18 +2594,18 @@ case 70:
 		goto tr84;
 	goto tr82;
 tr7:
-#line 132 "src/port_uri.rl"
+#line 132 "src/uri.rl"
 	{ schema.start = p; }
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st169;
 st169:
 	if ( ++p == pe )
 		goto _test_eof169;
 case 169:
-#line 2609 "src/port_uri.cc"
+#line 2609 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr183;
 		case 63: goto st0;
@@ -2674,16 +2674,16 @@ case 172:
 		goto st168;
 	goto st74;
 tr188:
-#line 137 "src/port_uri.rl"
+#line 137 "src/uri.rl"
 	{ login.end    = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st71;
 st71:
 	if ( ++p == pe )
 		goto _test_eof71;
 case 71:
-#line 2687 "src/port_uri.cc"
+#line 2687 "src/uri.cc"
 	switch( (*p) ) {
 		case 47: goto st72;
 		case 48: goto tr10;
@@ -2723,50 +2723,50 @@ case 73:
 		goto tr91;
 	goto tr88;
 tr88:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st173;
 tr232:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st173;
 st173:
 	if ( ++p == pe )
 		goto _test_eof173;
 case 173:
-#line 2744 "src/port_uri.cc"
+#line 2744 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr190;
 		case 63: goto st175;
 	}
 	goto st173;
 tr190:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st174;
 tr222:
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st174;
 tr285:
-#line 154 "src/port_uri.rl"
+#line 154 "src/uri.rl"
 	{ ip6.end   = p - 1; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st174;
 st174:
 	if ( ++p == pe )
 		goto _test_eof174;
 case 174:
-#line 2770 "src/port_uri.cc"
+#line 2770 "src/uri.cc"
 	if ( (*p) < 65 ) {
 		if ( 49 <= (*p) && (*p) <= 57 )
 			goto tr192;
@@ -2777,44 +2777,44 @@ case 174:
 		goto tr193;
 	goto st175;
 tr90:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
 	goto st175;
 st175:
 	if ( ++p == pe )
 		goto _test_eof175;
 case 175:
-#line 2788 "src/port_uri.cc"
+#line 2788 "src/uri.cc"
 	goto st175;
 tr192:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st176;
 tr194:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st176;
 st176:
 	if ( ++p == pe )
 		goto _test_eof176;
 case 176:
-#line 2806 "src/port_uri.cc"
+#line 2806 "src/uri.cc"
 	if ( 48 <= (*p) && (*p) <= 57 )
 		goto tr194;
 	goto st175;
 tr193:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st177;
 st177:
 	if ( ++p == pe )
 		goto _test_eof177;
 case 177:
-#line 2818 "src/port_uri.cc"
+#line 2818 "src/uri.cc"
 	if ( (*p) > 90 ) {
 		if ( 97 <= (*p) && (*p) <= 122 )
 			goto st178;
@@ -2967,22 +2967,22 @@ st192:
 case 192:
 	goto st175;
 tr89:
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st193;
 st193:
 	if ( ++p == pe )
 		goto _test_eof193;
 case 193:
-#line 2986 "src/port_uri.cc"
+#line 2986 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st194;
 		case 58: goto tr212;
@@ -3166,20 +3166,20 @@ case 207:
 		goto st208;
 	goto st173;
 tr91:
-#line 136 "src/port_uri.rl"
+#line 136 "src/uri.rl"
 	{ login.start  = p; }
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
 	goto st208;
 st208:
 	if ( ++p == pe )
 		goto _test_eof208;
 case 208:
-#line 3183 "src/port_uri.cc"
+#line 3183 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr212;
 		case 63: goto st175;
@@ -3194,16 +3194,16 @@ case 208:
 		goto st208;
 	goto st173;
 tr212:
-#line 137 "src/port_uri.rl"
+#line 137 "src/uri.rl"
 	{ login.end    = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st209;
 st209:
 	if ( ++p == pe )
 		goto _test_eof209;
 case 209:
-#line 3207 "src/port_uri.cc"
+#line 3207 "src/uri.cc"
 	if ( (*p) == 48 )
 		goto tr227;
 	if ( (*p) < 65 ) {
@@ -3216,14 +3216,14 @@ case 209:
 		goto tr229;
 	goto st175;
 tr227:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
 	goto st210;
 st210:
 	if ( ++p == pe )
 		goto _test_eof210;
 case 210:
-#line 3227 "src/port_uri.cc"
+#line 3227 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr231;
 	if ( (*p) < 65 ) {
@@ -3236,14 +3236,14 @@ case 210:
 		goto st210;
 	goto st175;
 tr231:
-#line 141 "src/port_uri.rl"
+#line 141 "src/uri.rl"
 	{ password.end   = p; }
 	goto st211;
 st211:
 	if ( ++p == pe )
 		goto _test_eof211;
 case 211:
-#line 3247 "src/port_uri.cc"
+#line 3247 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr90;
 		case 63: goto tr90;
@@ -3253,18 +3253,18 @@ case 211:
 		goto tr233;
 	goto tr232;
 tr233:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st212;
 st212:
 	if ( ++p == pe )
 		goto _test_eof212;
 case 212:
-#line 3268 "src/port_uri.cc"
+#line 3268 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st194;
 		case 58: goto tr190;
@@ -3296,28 +3296,28 @@ case 214:
 	}
 	goto st173;
 tr92:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 133 "src/port_uri.rl"
+#line 133 "src/uri.rl"
 	{ schema.end   = p - 3; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 153 "src/port_uri.rl"
+#line 153 "src/uri.rl"
 	{ ip6.start = p + 1; }
 	goto st215;
 tr234:
-#line 180 "src/port_uri.rl"
+#line 180 "src/uri.rl"
 	{ path.start = p; }
-#line 157 "src/port_uri.rl"
+#line 157 "src/uri.rl"
 	{ host.start   = p; }
-#line 153 "src/port_uri.rl"
+#line 153 "src/uri.rl"
 	{ ip6.start = p + 1; }
 	goto st215;
 st215:
 	if ( ++p == pe )
 		goto _test_eof215;
 case 215:
-#line 3321 "src/port_uri.cc"
+#line 3321 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto tr238;
 		case 63: goto st175;
@@ -3392,14 +3392,14 @@ case 219:
 	}
 	goto st173;
 tr240:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st220;
 st220:
 	if ( ++p == pe )
 		goto _test_eof220;
 case 220:
-#line 3403 "src/port_uri.cc"
+#line 3403 "src/uri.cc"
 	switch( (*p) ) {
 		case 48: goto st221;
 		case 58: goto st225;
@@ -4017,18 +4017,18 @@ case 260:
 		goto tr285;
 	goto st175;
 tr244:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st261;
 st261:
 	if ( ++p == pe )
 		goto _test_eof261;
 case 261:
-#line 4032 "src/port_uri.cc"
+#line 4032 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st225;
 		case 93: goto st260;
@@ -4043,14 +4043,14 @@ case 261:
 		goto st222;
 	goto st175;
 tr286:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st262;
 st262:
 	if ( ++p == pe )
 		goto _test_eof262;
 case 262:
-#line 4054 "src/port_uri.cc"
+#line 4054 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st225;
 		case 93: goto st260;
@@ -4065,14 +4065,14 @@ case 262:
 		goto st223;
 	goto st175;
 tr287:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st263;
 st263:
 	if ( ++p == pe )
 		goto _test_eof263;
 case 263:
-#line 4076 "src/port_uri.cc"
+#line 4076 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st225;
 		case 93: goto st260;
@@ -4087,14 +4087,14 @@ case 263:
 		goto st224;
 	goto st175;
 tr288:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st264;
 st264:
 	if ( ++p == pe )
 		goto _test_eof264;
 case 264:
-#line 4098 "src/port_uri.cc"
+#line 4098 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st225;
 		case 93: goto st260;
@@ -4103,14 +4103,14 @@ case 264:
 		goto tr194;
 	goto st175;
 tr246:
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st265;
 st265:
 	if ( ++p == pe )
 		goto _test_eof265;
 case 265:
-#line 4114 "src/port_uri.cc"
+#line 4114 "src/uri.cc"
 	switch( (*p) ) {
 		case 58: goto st225;
 		case 93: goto st260;
@@ -4191,14 +4191,14 @@ case 268:
 		goto st181;
 	goto st175;
 tr238:
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	goto st269;
 st269:
 	if ( ++p == pe )
 		goto _test_eof269;
 case 269:
-#line 4202 "src/port_uri.cc"
+#line 4202 "src/uri.cc"
 	switch( (*p) ) {
 		case 48: goto st221;
 		case 58: goto st270;
@@ -4322,14 +4322,14 @@ case 275:
 		goto st231;
 	goto st175;
 tr298:
-#line 144 "src/port_uri.rl"
+#line 144 "src/uri.rl"
 	{ ip4.start = p; }
 	goto st276;
 st276:
 	if ( ++p == pe )
 		goto _test_eof276;
 case 276:
-#line 4333 "src/port_uri.cc"
+#line 4333 "src/uri.cc"
 	switch( (*p) ) {
 		case 46: goto st277;
 		case 58: goto st235;
@@ -4409,14 +4409,14 @@ case 284:
 		goto tr309;
 	goto st175;
 tr309:
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
 	goto st285;
 st285:
 	if ( ++p == pe )
 		goto _test_eof285;
 case 285:
-#line 4420 "src/port_uri.cc"
+#line 4420 "src/uri.cc"
 	if ( (*p) == 58 )
 		goto tr190;
 	goto st175;
@@ -4489,24 +4489,24 @@ case 291:
 		goto st234;
 	goto st175;
 tr228:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
-#line 161 "src/port_uri.rl"
+#line 161 "src/uri.rl"
 	{ dport.start   = p; port = 0; }
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st292;
 tr314:
-#line 162 "src/port_uri.rl"
+#line 162 "src/uri.rl"
 	{ port = port * 10 + (int)(*p - '0'); }
 	goto st292;
 st292:
 	if ( ++p == pe )
 		goto _test_eof292;
 case 292:
-#line 4510 "src/port_uri.cc"
+#line 4510 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr231;
 	if ( (*p) < 65 ) {
@@ -4519,16 +4519,16 @@ case 292:
 		goto st210;
 	goto st175;
 tr229:
-#line 140 "src/port_uri.rl"
+#line 140 "src/uri.rl"
 	{ password.start = p; }
-#line 166 "src/port_uri.rl"
+#line 166 "src/uri.rl"
 	{ service.start = p; }
 	goto st293;
 st293:
 	if ( ++p == pe )
 		goto _test_eof293;
 case 293:
-#line 4532 "src/port_uri.cc"
+#line 4532 "src/uri.cc"
 	if ( (*p) == 64 )
 		goto tr231;
 	if ( (*p) < 65 ) {
@@ -5107,7 +5107,7 @@ case 308:
 	case 170: 
 	case 171: 
 	case 172: 
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 76: 
@@ -5146,12 +5146,12 @@ case 308:
 	case 161: 
 	case 162: 
 	case 163: 
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
 	break;
 	case 94: 
 	case 95: 
-#line 177 "src/port_uri.rl"
+#line 177 "src/uri.rl"
 	{ path.end   = p; }
 	break;
 	case 174: 
@@ -5221,36 +5221,36 @@ case 308:
 	case 289: 
 	case 290: 
 	case 291: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
 	break;
 	case 119: 
 	case 120: 
 	case 121: 
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 137: 
-#line 154 "src/port_uri.rl"
+#line 154 "src/uri.rl"
 	{ ip6.end   = p - 1; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 164: 
 	case 165: 
 	case 166: 
 	case 167: 
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
-#line 173 "src/port_uri.rl"
+#line 173 "src/uri.rl"
 	{ sport.end     = p; }
 	break;
 	case 93: 
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
-#line 177 "src/port_uri.rl"
+#line 177 "src/uri.rl"
 	{ path.end   = p; }
 	break;
 	case 75: 
@@ -5259,9 +5259,9 @@ case 308:
 	case 140: 
 	case 141: 
 	case 147: 
-#line 163 "src/port_uri.rl"
+#line 163 "src/uri.rl"
 	{ dport.end	 = p; }
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
 	break;
 	case 97: 
@@ -5280,9 +5280,9 @@ case 308:
 	case 110: 
 	case 111: 
 	case 112: 
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
-#line 177 "src/port_uri.rl"
+#line 177 "src/uri.rl"
 	{ path.end   = p; }
 	break;
 	case 173: 
@@ -5308,9 +5308,9 @@ case 308:
 	case 218: 
 	case 219: 
 	case 285: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 177: 
@@ -5349,35 +5349,35 @@ case 308:
 	case 306: 
 	case 307: 
 	case 308: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
 	break;
 	case 96: 
-#line 163 "src/port_uri.rl"
+#line 163 "src/uri.rl"
 	{ dport.end	 = p; }
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
-#line 177 "src/port_uri.rl"
+#line 177 "src/uri.rl"
 	{ path.end   = p; }
 	break;
 	case 199: 
 	case 200: 
 	case 201: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
-#line 145 "src/port_uri.rl"
+#line 145 "src/uri.rl"
 	{ ip4.end   = p; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 260: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
-#line 154 "src/port_uri.rl"
+#line 154 "src/uri.rl"
 	{ ip6.end   = p - 1; }
-#line 158 "src/port_uri.rl"
+#line 158 "src/uri.rl"
 	{ host.end     = p; }
 	break;
 	case 176: 
@@ -5386,26 +5386,26 @@ case 308:
 	case 263: 
 	case 264: 
 	case 292: 
-#line 181 "src/port_uri.rl"
+#line 181 "src/uri.rl"
 	{ path.end   = p; }
-#line 163 "src/port_uri.rl"
+#line 163 "src/uri.rl"
 	{ dport.end	 = p; }
-#line 167 "src/port_uri.rl"
+#line 167 "src/uri.rl"
 	{ service.end   = p; }
 	break;
-#line 5397 "src/port_uri.cc"
+#line 5397 "src/uri.cc"
 	}
 	}
 
 	_out: {}
 	}
 
-#line 198 "src/port_uri.rl"
+#line 198 "src/uri.rl"
 
 
-	(void)port_uri_first_final;
-	(void)port_uri_error;
-	(void)port_uri_en_main;
+	(void)uri_first_final;
+	(void)uri_error;
+	(void)uri_en_main;
 
 	if (login.start && login.end && password.start && password.end) {
 		snprintf(uri->login, sizeof(uri->login),

@@ -93,7 +93,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* }}} */
 };
 
-const char *iproto_request_type_strs[] =
+const char *iproto_type_strs[] =
 {
 	NULL,
 	"SELECT",
@@ -106,7 +106,7 @@ const char *iproto_request_type_strs[] =
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_DML_REQUEST_MAX + 1] = {
+const uint64_t iproto_body_key_map[IPROTO_TYPE_DML_MAX] = {
 	0,                                                     /* unused */
 	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
 	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
@@ -297,19 +297,11 @@ iproto_row_encode(const struct iproto_header *row,
 		len += out[i].iov_len;
 
 	/* Encode length */
+	assert(IPROTO_FIXHEADER_SIZE == mp_sizeof_uint(UINT32_MAX));
 	char *data = fixheader;
-	data = mp_encode_uint(data, len);
-	/* Encode padding */
-	ssize_t padding = IPROTO_FIXHEADER_SIZE - (data - fixheader);
-	if (padding > 0) {
-		data = mp_encode_strl(data, padding - 1);
-#if defined(NDEBUG)
-		data += padding - 1;
-#else
-		while (--padding > 0)
-			*(data++) = 0; /* valgrind */
-#endif
-	}
+	*(data++) = 0xce; /* MP_UINT32 */
+	*(uint32_t *) data = mp_bswap_u32(len);
+	data += sizeof(uint32_t);
 	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
 	out[0].iov_base = fixheader;
 	out[0].iov_len = IPROTO_FIXHEADER_SIZE;
@@ -357,7 +349,7 @@ iproto_encode_auth(struct iproto_header *packet, const char *greeting,
 void
 iproto_decode_error(struct iproto_header *row)
 {
-	uint32_t code = row->type & (IPROTO_ERROR_RECOVERABLE - 1);
+	uint32_t code = row->type & (IPROTO_TYPE_ERROR - 1);
 
 	char error[TNT_ERRMSG_MAX] = { 0 };
 	const char *pos;

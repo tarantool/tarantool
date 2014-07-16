@@ -35,14 +35,14 @@ add_custom_target(generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/port_uri.cc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/uri.cc
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	COMMAND ragel -G2 src/port_uri.rl -o src/port_uri.cc
-	DEPENDS ${CMAKE_SOURCE_DIR}/src/port_uri.rl)
+	COMMAND ragel -G2 src/uri.rl -o src/uri.cc
+	DEPENDS ${CMAKE_SOURCE_DIR}/src/uri.rl)
 execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/port_uri.cc)
-add_custom_target(generate_port_uri_cc
-    DEPENDS ${CMAKE_SOURCE_DIR}/src/port_uri.cc)
+    ${CMAKE_SOURCE_DIR}/src/uri.cc)
+add_custom_target(generate_uri_cc
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/uri.cc)
 
 set (common_sources
      memory.cc
@@ -81,7 +81,7 @@ set (common_sources
      fiob.c
      tt_uuid.c
      ffisyms.cc
-     port_uri.cc
+     uri.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc

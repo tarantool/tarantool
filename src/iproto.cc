@@ -471,18 +471,12 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
-error:
 			tnt_raise(ClientError, ER_INVALID_MSGPACK,
 				  "packet length");
 		}
 		if (mp_check_uint(pos, in->end) >= 0)
 			break;
 		uint32_t len = mp_decode_uint(&pos);
-		/* Skip optional request padding. */
-		if (pos < in->end && mp_typeof(*pos) == MP_STR &&
-		    mp_check(&pos, in->end)) {
-			goto error;
-		}
 		const char *reqend = pos + len;
 		if (reqend > in->end)
 			break;
@@ -499,7 +493,7 @@ error:
 		 * as well as in->pos must not be advanced, to
 		 * stay in sync.
 		 */
-		if (iproto_request_is_dml(ireq->header.type)) {
+		if (iproto_type_is_dml(ireq->header.type)) {
 			if (ireq->header.bodycnt == 0) {
 				tnt_raise(ClientError, ER_INVALID_MSGPACK,
 					  "request type");

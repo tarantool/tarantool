@@ -48,11 +48,11 @@ t = nil
 ...
 box.raise(123, 'test')
 ---
-- error: test
+- error: 'box.raise(): unknown error code'
 ...
 box.raise(0, 'the other test')
 ---
-- error: 'box.raise(): unknown error code'
+- error: the other test
 ...
 box.raise(12, 345)
 ---
@@ -209,7 +209,7 @@ t;
   - 'box.error.ALTER_SPACE : 12'
   - 'box.error.ACTIVE_TRANSACTION : 79'
   - 'box.error.NO_CONNECTION : 77'
-  - 'box.error.TUPLE_FOUND : 3'
+  - 'box.error.DROP_SPACE : 11'
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
   - 'box.error.REPLICA_MAX : 73'
@@ -234,16 +234,16 @@ t;
   - 'box.error.TUPLE_NOT_ARRAY : 22'
   - 'box.error.TUPLE_FORMAT_LIMIT : 16'
   - 'box.error.INVALID_UUID : 64'
-  - 'box.error.DROP_SPACE : 11'
+  - 'box.error.UNKNOWN : 0'
   - 'box.error.TIMEOUT : 78'
-  - 'box.error.MORE_THAN_ONE_TUPLE : 41'
+  - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.MEMORY_ISSUE : 2'
   - 'box.error.NO_SUCH_TRIGGER : 34'
   - 'box.error.UPDATE_FIELD : 29'
   - 'box.error.ARG_TYPE : 26'
   - 'box.error.NO_SUCH_SPACE : 36'
   - 'box.error.INDEX_FIELD_COUNT : 39'
-  - 'box.error.OK : 0'
+  - 'box.error.MORE_THAN_ONE_TUPLE : 41'
   - 'box.error.DROP_PRIMARY_KEY : 17'
   - 'box.error.UNKNOWN_REQUEST_TYPE : 48'
   - 'box.error.INVALID_XLOG_ORDER : 76'

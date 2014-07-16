@@ -14,10 +14,10 @@ type(s)
 s:errno()
 type(s:error())
 
-primary_port = string.gsub(box.cfg.primary_port, '^.*:', '')
+port = string.gsub(box.cfg.listen, '^.*:', '')
 
 s:nonblock(false)
-s:sysconnect('127.0.0.1', primary_port)
+s:sysconnect('127.0.0.1', port)
 s:nonblock(true)
 s:nonblock()
 s:nonblock(false)
@@ -258,7 +258,7 @@ socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 
 -- close
 
-s = socket.tcp_connect('127.0.0.1', primary_port)
+s = socket.tcp_connect('127.0.0.1', port)
 string.sub(s:read(128), 1, 9)
 sa = { fh = 512 } setmetatable(sa, getmetatable(s))
 tostring(sa)
