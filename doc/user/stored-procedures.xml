@@ -508,53 +508,150 @@ Password is not valid
 
 <section xml:id="sp-box-uuid">
     <title>Package <code>uuid</code></title>
+
+<para>
+  A "UUID" is a 
+  <link xlink:href="https://en.wikipedia.org/wiki/Universally_unique_identifier">Universally unique identifier</link>.
+  If an application requires that a value be unique only within a single computer or
+  on a single database, then a simple counter is better than a UUID, because getting
+  a UUID is time-consuming (it requires a
+  <link xlink:href="https://en.wikipedia.org/wiki/Syscall">syscall</link>).
+  For clusters of computers, or widely distributed applications, UUIDs are better.
+</para>
+<para>
+  The functions that can return a UUID are: <code>uuid()</code>, <code>uuid.bin()</code>, <code>uuid.str()</code>.
+  The functions that can convert between different types of UUID are: <code>:bin()</code>, <code>:str()</code>, <code>uuid.fromstr()</code>, <code>uuid.frombin()</code>.
+  The function that can determine whether a UUID is an all-zero value is: <code>:isnil()</code>.
+</para>
+
 <variablelist xml:id="x-uuid" xreflabel="x-uuid">
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">uuid()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: a UUID with type = cdata.
+            </para>
+        </listitem>
+    </varlistentry>
+
     <varlistentry>
         <term>
             <emphasis role="lua">uuid.bin()</emphasis>
         </term>
         <listitem>
             <para>
-                Returns: a 128-bit (16-byte) unique id in binary form.
-            </para>
-            <para>
-                Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
-                when it starts. If the library is not available, which can happen if it was not
-                found when the server was built from source, then uuid.bin() returns an error.
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>uuid=require('uuid')</userinput>
----
-...
-tarantool&gt; <userinput>uuid.bin() == uuid.bin() -- Comment: == means "are they equal?"</userinput>
----
- - false
-...
-</programlisting>
+                Returns: a UUID with type = 16-byte binary string.
             </para>
         </listitem>
     </varlistentry>
+
     <varlistentry>
         <term>
-            <emphasis role="lua">uuid.hex()</emphasis>
+            <emphasis role="lua">uuid.str()</emphasis>
         </term>
         <listitem>
             <para>
-                Returns: a 32-byte hexadecimal conversion of a 128-bit
-                unique id, as a string.
+                Returns: a UUID with type = 36-byte hexadecimal string.
             </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool&gt; <userinput>uuid=require('uuid')</userinput>
----
-...
-tarantool&gt; <userinput>uuid.hex()</userinput>
----
- - b8eadcb078b54bed8fa8425d129b10e8
-...
-</programlisting>
         </listitem>
     </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua"><replaceable>uuid_with_type_cdata</replaceable>:bin([<replaceable>byte-order</replaceable>])</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Parameters: byte-order can be 'l' (little-endian), 'b' (big-endian), 'h' (endianness depends on host) (default), or 'n' (endiannes depends on network).
+            </para>         
+            <para>
+                Returns: UUID with type = 16-byte binary string converted from cdata input value.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">  <replaceable>uuid_with_type_cdata</replaceable>:str()</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: UUID with type = 36-byte hexadecimal string converted from cdata input value.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">  uuid.fromstr(<replaceable>uuid_with_type_string</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: UUID with type = cdata converted from 36-byte hexadecimal string input value.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">uuid.frombin(<replaceable>uuid_with_type_binary_string</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: UUID with type = cdata converted from 16-byte binary string input value.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">:isnil(<replaceable>uuid_with_type_cdata</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Returns: true if the value is all zero, otherwise false.
+                The all-zero UUID value can be expressed as <code>uuid.NULL</code>, or as
+                uuid.fromstr('00000000-0000-0000-0000-000000000000').
+                The comparison with an all-zero value can also be expressed as
+                <replaceable>uuid_with_type_cdata</replaceable> == uuid.NULL.
+            </para>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
+<para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool&gt; <userinput>uuid = require('uuid')</userinput>
+---
+...
+tarantool&gt; <userinput>uuid(), uuid.bin(), uuid.str()</userinput>
+---
+- 16ffedc8-cbae-4f93-a05e-349f3ab70baa
+- !!binary FvG+Vy1MfUC6kIyeM81DYw==
+- 67c999d2-5dce-4e58-be16-ac1bcb93160f
+...
+tarantool&gt; <userinput>uu = uuid()</userinput>
+---
+...
+tarantool&gt; <userinput>#uu:bin(), #uu:str(), type(uu), uu:isnil()</userinput>
+---
+- 16
+- 36
+- cdata
+- false
+...
+</programlisting>
+</para>
+<para>
+  Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
+  when it starts. If the library is not available, which can happen if it was not
+  found when the server was built from source, then require('uuid') returns an error.
+</para>
+
 </section>
 
 <section xml:id="sp-box-cjson">
