@@ -31,22 +31,11 @@ session.id() > 0
 ---
 - true
 ...
-f = fiber.create(function() fiber.detach() failed = session.id() == 0 end)
+f = fiber.create(function() failed = session.id() == 0 end)
 ---
 ...
-fiber.resume(f)
+while f:status() ~= 'dead' do fiber.sleep(0) end
 ---
-...
-failed
----
-- false
-...
-f1 = fiber.create(function() if session.id() == 0 then failed = true end end)
----
-...
-fiber.resume(f1)
----
-- true
 ...
 failed
 ---

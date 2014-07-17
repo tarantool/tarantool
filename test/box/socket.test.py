@@ -518,7 +518,7 @@ function bug1160869()
     local s = socket.tcp()
     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))
     s:recv(128)
-    require('fiber').wrap(function()
+    require('fiber').create(function()
         while true do
             _, status =  s:recv(18)
             if status == "eof" then
@@ -551,7 +551,7 @@ function iostart()
     s = socket.tcp()
     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))
     s:recv(128)
-    require('fiber').wrap(function()
+    require('fiber').create(function()
         while true do
             s:recv(18)
             if status == "eof" then
@@ -598,7 +598,7 @@ function server()
     end
 end
 
-fbr = require('fiber').wrap(server)
+fbr = require('fiber').create(server)
 """
 admin("test_listen_done = false")
 admin(test.replace('\n', ' '))

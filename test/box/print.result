@@ -4,9 +4,8 @@ print("Hello, world")
 io = require('io')
 ---
 ...
-require('fiber').wrap(function() print('Ehllo, world') io.flush() end)
+local f = require('fiber').create(function() print('Ehllo, world') io.flush() end)
 ---
-- null
 ...
 require('fiber').sleep(0.1)
 ---

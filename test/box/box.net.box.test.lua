@@ -109,7 +109,7 @@ cn:_fatal 'Test error'
 cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- error while waiting for response
-type(fiber.wrap(function() fiber.sleep(.5) cn:_fatal('Test error') end))
+type(fiber.create(function() fiber.sleep(.5) cn:_fatal('Test error') end))
 function pause() fiber.sleep(10) return true end
 
 cn:call('pause')

@@ -45,7 +45,7 @@ function sloppy()
 end;
 ---
 ...
-f = fiber.wrap(sloppy);
+f = fiber.create(sloppy);
 ---
 ...
 -- when the sloppy fiber ends, its session has an active transction

@@ -21,7 +21,7 @@ fiber = require('fiber');
 function sloppy()
     box.begin()
 end;
-f = fiber.wrap(sloppy);
+f = fiber.create(sloppy);
 -- when the sloppy fiber ends, its session has an active transction
 -- ensure it's rolled back automatically
 fiber.sleep(0);

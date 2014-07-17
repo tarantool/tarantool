@@ -822,21 +822,9 @@ tarantool> box.space.tester:insert{20,msgpack.NULL,20}
       called the <emphasis>fiber function</emphasis>.
 
       A fiber has three possible states: running, suspended or dead.
-      When a fiber is created with <code>fiber.create()</code>, it is suspended.
-      When a fiber is started with <code>fiber.resume()</code>, it is running.
-      When a fiber yields control with <code>fiber.yield()</code>, it is suspended.
+      When a fiber is created with <code>fiber.create()</code>, it is running.
+      When a fiber yields control with <code>fiber.sleep()</code>, it is suspended.
       When a fiber ends (because the fiber function ends), it is dead.
-    </para>
-    <para>
-      A fiber can also be attached or detached.
-      An attached fiber is a child of the creator,
-      and is running only if the creator has called
-      <code>fiber.resume()</code>. A detached fiber is a child of
-      the Tarantool internal <quote>sched</quote> fiber, and gets
-      scheduled only if there is a libev event associated
-      with it.
-      To detach, a running fiber should invoke <code>fiber.wrap()</code>.
-      A detached fiber loses connection with its parent forever.
     </para>
     <para>
       All fibers are part of the fiber registry.
@@ -862,7 +850,7 @@ procedures.
 -->
     </para>
     <para>
-      The other potential problem comes from detached
+      The other potential problem comes from
       fibers which never get scheduled, because they are not subscribed
       to any events, or because no relevant events occur. Such morphing fibers
       can be killed with <code>fiber.cancel()</code> at any time,
@@ -895,7 +883,7 @@ procedures.
         </term>
         <listitem>
             <para>
-              Returns: (type = userdata) <code>require('fiber')</code>
+              Returns: (type = userdata) <code>fiber</code>
               object for the currently scheduled fiber.
             </para>
         </listitem>
@@ -910,85 +898,19 @@ procedures.
               Locate a fiber userdata object by id.
             </para>
             <para>
-              Returns: (type = userdata) require('fiber') object for the specified fiber.
+              Returns: (type = userdata) fiber object for the specified fiber.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function-name</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function, function-arguments</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
-              Create a fiber.
-            </para>
-            <para>
-              Parameters: <code>function-name</code> = the function that the fiber is associated with.
-            </para>
-            <para>
-              Returns: (type = userdata) the require('fiber') object of the new fiber.
-            </para>
-            <para>
-              Possible errors: the function does not exist or if a recursion limit is hit.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="fiber.resume">fiber.resume(<replaceable>fiber, ...</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-              Resume a created
-              or suspended fiber.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-         <emphasis role="lua" xml:id="fiber.yield" xreflabel="fiber.yield">fiber.yield(<replaceable>yield-arguments</replaceable>) </emphasis>
-        </term>
-        <listitem>
-            <para>
-              If the fiber is attached, yield control to the calling fiber if the fiber
-              is attached; otherwise, yield to sched.
-            </para>
-            <para>
-              Parameters: <code>yield-arguments</code>:  
-              If the fiber is attached, arguments passed
-              to fiber.yield are passed on to the calling fiber.
-              If the fiber is detached, <code>fiber.yield()</code>
-              arguments passed to fiber.yield are returned after temporarily
-              yielding control back to the scheduler.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="fiber.detach">fiber.detach()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Detach the current fiber. This is a cancellation point. This is a yield point.
-              It is usually more convenient to use <code>fiber.wrap()</code> to create
-              a fiber which is already detached when it is created.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="fiber.wrap">fiber.wrap(<replaceable>function, function-arguments</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              This is a quick way to create and start a detached
-              fiber. The fiber is
-              created, detached, and resumed immediately.
+              Create and start a fiber. The fiber is
+              created and resumed immediately.
             </para>
             <para>
               Parameters: <code>function</code> = the function to be associated with the fiber,
@@ -1008,6 +930,20 @@ procedures.
             </para>
             <para>
               Parameters: <code>time</code> = number of seconds to sleep.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+         <emphasis role="lua" xml:id="fiber.yield" xreflabel="fiber.yield">fiber.yield() </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Yield control to the scheduler. Equivalent to <code>fiber.sleep(0)</code>.
+            </para>
+            <para>
+              Parameters: <code>none</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -1135,12 +1071,12 @@ Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.
 <programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fiber_of_x = fiber.create(function_x)</userinput>
 ---
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fid = fiber.wrap(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = fiber.create(function_x)</userinput>
 ---
 ...
 </programlisting>
@@ -1425,8 +1361,7 @@ end
             <para>
               Returns: (type = number) the unique identifier
               (ID) for the current session. The result can be 0 meaning
-              there is no session (for example because a function is
-              running in a detached fiber).
+              there is no session.
             </para>
       </listitem>
     </varlistentry>
@@ -1896,8 +1831,7 @@ with an Artistic license. The expirationd.lua program is
 lengthy (about 500 lines), so here we will only highlight
 the matters that will be enhanced by studying the full source later.
 <programlisting>
-            task.worker_fiber = fiber.create(worker_loop)
-            task.worker_fiber:resume(task)
+            task.worker_fiber = fiber.create(worker_loop, task)
             log.info("expiration: task %q restarted", task.name)
             ...
             fiber.sleep(expirationd.constants.check_interval)

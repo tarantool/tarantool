@@ -902,7 +902,7 @@ ping
 s:close()
 ---
 ...
- replies = 0 packet = require('msgpack').encode({[0] = 64, [1] = 0}) packet = require('msgpack').encode(packet:len())..packet function bug1160869()     local s = socket.tcp()     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))     s:recv(128)     require('fiber').wrap(function()         while true do             _, status =  s:recv(18)             if status == "eof" then                 error("unexpected eof")             end             replies = replies + 1         end     end)     return s:send(packet) end 
+ replies = 0 packet = require('msgpack').encode({[0] = 64, [1] = 0}) packet = require('msgpack').encode(packet:len())..packet function bug1160869()     local s = socket.tcp()     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))     s:recv(128)     require('fiber').create(function()         while true do             _, status =  s:recv(18)             if status == "eof" then                 error("unexpected eof")             end             replies = replies + 1         end     end)     return s:send(packet) end 
 ---
 ...
 bug1160869()
@@ -924,7 +924,7 @@ replies
 ---
 - 3
 ...
- s = nil syncno = 0 reps = 0 packet = require('msgpack').encode({[0] = 64, [1] = 0}) packet = require('msgpack').encode(packet:len())..packet function iostart()     if s ~= nil then         return     end     s = socket.tcp()     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))     s:recv(128)     require('fiber').wrap(function()         while true do             s:recv(18)             if status == "eof" then                 error("unexpected eof")             end             reps = reps + 1         end     end) end  function iotest()     iostart()     syncno = syncno + 1     packet = require('msgpack').encode({[0] = 64, [1] = syncno})     packet = require('msgpack').encode(packet:len())..packet     return s:send(packet) end 
+ s = nil syncno = 0 reps = 0 packet = require('msgpack').encode({[0] = 64, [1] = 0}) packet = require('msgpack').encode(packet:len())..packet function iostart()     if s ~= nil then         return     end     s = socket.tcp()     s:connect('127.0.0.1', string.gsub(box.cfg.listen, '^.*:', ''))     s:recv(128)     require('fiber').create(function()         while true do             s:recv(18)             if status == "eof" then                 error("unexpected eof")             end             reps = reps + 1         end     end) end  function iotest()     iostart()     syncno = syncno + 1     packet = require('msgpack').encode({[0] = 64, [1] = syncno})     packet = require('msgpack').encode(packet:len())..packet     return s:send(packet) end 
 ---
 ...
 iotest()
@@ -949,7 +949,7 @@ reps
 test_listen_done = false
 ---
 ...
- function server()     ms = socket.tcp()     ms:bind('127.0.0.1', 8181)     ms:listen()     test_listen_done = true      while true do         local s = ms:accept( .5 )         if s ~= 'timeout' then             print("accepted connection ", s)             s:send('Hello world')             s:shutdown(socket.SHUT_RDWR)         end     end end  fbr = require('fiber').wrap(server) 
+ function server()     ms = socket.tcp()     ms:bind('127.0.0.1', 8181)     ms:listen()     test_listen_done = true      while true do         local s = ms:accept( .5 )         if s ~= 'timeout' then             print("accepted connection ", s)             s:send('Hello world')             s:shutdown(socket.SHUT_RDWR)         end     end end  fbr = require('fiber').create(server) 
 ---
 ...
 wait_cout = 100 while not test_listen_done and wait_cout > 0 do require('fiber').sleep(0.001) wait_cout = wait_cout - 1 end

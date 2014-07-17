@@ -12,7 +12,7 @@ log = server.logfile
 f = open(log, "r")
 f.seek(0, 2)
 
-admin("require('fiber').wrap(function() print('Ehllo, world') io.flush() end)")
+admin("local f = require('fiber').create(function() print('Ehllo, world') io.flush() end)")
 admin("require('fiber').sleep(0.1)")
 line = f.readline()
 print("Check log line")

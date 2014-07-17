@@ -99,6 +99,9 @@ struct fiber {
 	struct rlist link;
 	struct rlist state;
 
+	/** Triggers invoked before this fiber yields. Must not throw. */
+	struct rlist on_yield;
+
 	/* This struct is considered as non-POD when compiling by g++.
 	 * You can safetly ignore all offset_of-related warnings.
 	 * See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=31488

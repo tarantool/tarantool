@@ -34,12 +34,10 @@ for k,v in pairs(t) do print(k, v) end
 -- Insert tests
 --
 local function do_insert()
-    fiber.detach()
     space:insert{1, 2, 4, 8}
 end
 
 fiber1 = fiber.create(do_insert)
-fiber.resume(fiber1)
 
 print[[
 --

@@ -1,3 +1,4 @@
+local fiber = require('fiber')
 -- -------------------------------------------------------------------------- --
 -- Local functions
 -- -------------------------------------------------------------------------- --
@@ -18,7 +19,7 @@ local result = {}
 -- odd printer
 local function odd(x)
 	table.insert(result,'A: odd  '..tostring(x))
-    fiber.yield(x)
+    fiber.sleep(0.0)
 	table.insert(result,'B: odd  '..tostring(x))
 end
 
@@ -26,18 +27,16 @@ end
 local function even(x)
 	table.insert(result,'C: event  '..tostring(x))
     if x == 2 then
-        return x
+        return
     end
 	table.insert(result,'D: event  '..tostring(x))
 end
 
 -- printer task routine main function
 local function printer_task_routine(x)
-	table.insert(result, "printer: tester status = " .. fiber.status(tester_task))
-	table.insert(result, "printer: printer status = " .. fiber.status(printer_task))
     for i = 1, x do
         if i == 3 then
-            fiber.yield(-1)
+            fiber.sleep(0)
         end
         if i % 2 == 0 then
             even(i)
@@ -48,21 +47,20 @@ local function printer_task_routine(x)
 end
 
 
--- -------------------------------------------------------------------------- --
+------------------------------------------------------------------------
 -- tester task routines
--- -------------------------------------------------------------------------- --
+------------------------------------------------------------------------
 
 -- tester task routine main function
 local function tester_task_routine()
-    printer_task = fiber.create(printer_task_routine)
-	table.insert(result, "tester: status(tester) = " .. fiber.status(tester_task))
-	table.insert(result, "tester: status(printer) = " .. fiber.status(printer_task))
+    printer_task = fiber.create(printer_task_routine, 5)
+	table.insert(result, "tester: status(printer) = " .. printer_task:status())
     count = 1
-    while fiber.status(printer_task) ~= "dead" do
+    while printer_task:status() ~= "dead" do
 		table.insert(result, "count: " .. tostring(count))
-        fiber.resume(printer_task, 5)
-		table.insert(result, "status: " .. fiber.status(printer_task))
+		table.insert(result, "status: " .. printer_task:status())
         count = count + 1
+        fiber.sleep(0)
     end
 end
 
@@ -75,6 +73,8 @@ end
 function box_fiber_run_test()
     -- run tester
     tester_task = fiber.create(tester_task_routine)
-    fiber.resume(tester_task)
+    while tester_task:status() ~= 'dead' do
+        fiber.sleep(0)
+    end
 	return result
 end

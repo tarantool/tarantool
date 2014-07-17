@@ -58,7 +58,7 @@ s:bind('127.0.0.1', 3457)
 s:error()
 s:listen(128)
 sevres = {}
-type(require('fiber').wrap(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
+type(require('fiber').create(function() s:readable() do local sc = s:accept() table.insert(sevres, sc) sc:syswrite('ok') sc:close() end end))
 #sevres
 
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
@@ -266,7 +266,7 @@ sa:readable(0)
 sa:writable(0)
 
 ch = fiber.channel()
-f = fiber.wrap(function() s:read(12) ch:put(true) end)
+f = fiber.create(function() s:read(12) ch:put(true) end)
 fiber.sleep(.1)
 s:close()
 ch:get(1)

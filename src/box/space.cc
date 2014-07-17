@@ -119,13 +119,7 @@ space_delete(struct space *space)
 	if (space->engine)
 		delete space->engine;
 
-	struct trigger *trigger, *tmp;
-	rlist_foreach_entry_safe(trigger, &space->on_replace, link, tmp) {
-		trigger_clear(trigger);
-		if (trigger->destroy)
-			trigger->destroy(trigger);
-
-	}
+	trigger_destroy(&space->on_replace);
 	free(space);
 }
 

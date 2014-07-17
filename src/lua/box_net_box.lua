@@ -353,9 +353,9 @@ local remote_methods = {
         self.timeouts = {}
 
 
-        fiber.wrap(function() self:_connect_worker() end)
-        fiber.wrap(function() self:_read_worker() end)
-        fiber.wrap(function() self:_write_worker() end)
+        fiber.create(function() self:_connect_worker() end)
+        fiber.create(function() self:_read_worker() end)
+        fiber.create(function() self:_write_worker() end)
 
         if self.opts.wait_connected == nil or self.opts.wait_connected then
             self:wait_connected()
