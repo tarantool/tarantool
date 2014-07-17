@@ -24,8 +24,10 @@ end;
 f = fiber.create(sloppy);
 -- when the sloppy fiber ends, its session has an active transction
 -- ensure it's rolled back automatically
+f:status();
 fiber.sleep(0);
 fiber.sleep(0);
+f:status();
 -- transactions and system spaces
 box.begin() box.schema.space.create('test');
 box.rollback();
@@ -74,3 +76,48 @@ end;
 multi();
 t;
 s:select{};
+s:truncate();
+--
+-- Test that fiber yield causes a transaction rollback
+-- but only if the transaction has changed any data
+--
+-- Test admin console
+box.begin();
+-- should be ok - active transaction, and we don't
+-- know, maybe it will use sophia engine, which
+-- may support yield() in the future, so we don't roll
+-- back a transction with no statements.
+box.commit();
+box.begin() s:insert{1, 'Must be rolled back'};
+-- error: no active transaction because of yield
+box.commit();
+-- nothing - the transaction was rolled back
+s:select{}
+-- Test background fiber
+--
+function sloppy()
+    box.begin()
+    s:insert{1, 'From background fiber'}
+end;
+f = fiber.create(sloppy);
+while f:status() == 'running' do
+    fiber.sleep(0)
+end;
+-- When the sloppy fiber ends, its session has an active transction
+-- It's rolled back automatically
+s:select{};
+function sloppy()
+    box.begin()
+    s:insert{1, 'From background fiber'}
+    fiber.sleep(0)
+    pcall(box.commit)
+    t = s:select{}
+end;
+f = fiber.create(sloppy);
+while f:status() == 'running' do
+    fiber.sleep(0)
+end;
+t;
+s:select{};
+s:drop();
+--# setopt delimiter ''

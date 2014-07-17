@@ -34,6 +34,13 @@
 struct space;
 struct tuple;
 
+enum engine_flags {
+	ENGINE_TRANSACTIONAL = 1,
+	ENGINE_NO_YIELD = 2,
+};
+
+extern uint32_t engine_flags[BOX_ENGINE_MAX];
+
 /** Reflects what space_replace() is supposed to do. */
 enum engine_recovery_state {
 	/**
@@ -117,6 +124,10 @@ public:
 public:
 	/** Name of the engine. */
 	const char *name;
+	/** Engine id. */
+	uint32_t id;
+	/** Engine flags */
+	uint32_t flags;
 	struct engine_recovery recovery;
 	/** Used for search for engine by name. */
 	struct rlist link;
@@ -161,5 +172,25 @@ EngineFactory *engine_find(const char *name);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();
+
+static inline bool
+engine_transactional(uint32_t id)
+{
+	assert(id);
+	return engine_flags[id] & ENGINE_TRANSACTIONAL;
+}
+
+static inline bool
+engine_no_yield(uint32_t id)
+{
+	assert(id);
+	return engine_flags[id] & ENGINE_NO_YIELD;
+}
+
+static inline uint32_t
+engine_id(Engine *engine)
+{
+	return engine->factory->id;
+}
 
 #endif /* TARANTOOL_BOX_ENGINE_H_INCLUDED */

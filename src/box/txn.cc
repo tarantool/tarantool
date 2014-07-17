@@ -54,6 +54,16 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	stmt->row = row;
 }
 
+extern "C" void
+txn_on_yield(struct trigger * /* trigger */, void * /* event */)
+{
+	txn_rollback(); /* doesn't throw */
+}
+
+struct trigger on_yield = {
+	rlist_nil, txn_on_yield, NULL, NULL
+};
+
 void
 txn_replace(struct txn *txn, struct space *space,
 	    struct tuple *old_tuple, struct tuple *new_tuple,
@@ -73,6 +83,27 @@ txn_replace(struct txn *txn, struct space *space,
 		tuple_ref(stmt->new_tuple, 1);
 	}
 	stmt->space = space;
+	/**
+	 * Various checks of the used storage engine:
+	 * - check if it supports transactions
+	 * - only one engine can be used in a multi-statement
+	 *   transaction
+	 * - memtx doesn't allow yields between statements of
+	 *   a transaction. For this engine, set a trigger which
+	 *   would roll back the transaction if there is a yield.
+	 */
+	if (txn->autocommit == false) {
+		if (txn->n_stmts == 1) {
+			txn->engine = engine_id(space->engine);
+			if (engine_no_yield(txn->engine))
+				trigger_add(&fiber()->on_yield, &on_yield);
+		} else if (txn->engine != engine_id(space->engine))
+			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+		if (! engine_transactional(txn->engine)) {
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  space->def.engine_name, "transactions");
+		}
+	}
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -139,6 +170,8 @@ txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
 	struct txn_stmt *stmt;
+	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
+		trigger_clear(&on_yield);
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if ((!stmt->old_tuple && !stmt->new_tuple) ||
 		    space_is_temporary(stmt->space))
@@ -218,6 +251,8 @@ txn_rollback()
 		if (stmt->new_tuple)
 			tuple_ref(stmt->new_tuple, -1);
 	}
+	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
+		trigger_clear(&on_yield);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();

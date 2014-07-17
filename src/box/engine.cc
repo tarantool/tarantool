@@ -34,6 +34,8 @@
 #include <string.h>
 
 static RLIST_HEAD(engines);
+uint32_t engine_flags[BOX_ENGINE_MAX];
+int n_engines;
 
 EngineFactory::EngineFactory(const char *engine_name)
 	:name(engine_name),
@@ -63,6 +65,8 @@ Engine::Engine(EngineFactory *f)
 void engine_register(EngineFactory *engine)
 {
 	rlist_add_entry(&engines, engine, link);
+	engine->id = ++n_engines;
+	engine_flags[engine->id] = engine->flags;
 }
 
 /** Find factory engine by name. */

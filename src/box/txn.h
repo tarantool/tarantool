@@ -66,6 +66,8 @@ struct txn {
 	 * (statement end causes an automatic transaction commit).
 	 */
 	bool autocommit;
+	/** Id of the engine involved in multi-statement transaction. */
+	uint8_t engine;
 };
 
 /* Pointer to the current transaction (if any) */

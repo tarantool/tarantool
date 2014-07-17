@@ -37,6 +37,7 @@
 #include <wctype.h>
 
 enum {
+	BOX_ENGINE_MAX = 3, /* + 1 to the actual number of engines */
 	BOX_SPACE_MAX = INT32_MAX,
 	BOX_FUNCTION_MAX = 32000,
 	BOX_INDEX_MAX = 10,
