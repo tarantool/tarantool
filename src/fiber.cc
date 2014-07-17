@@ -36,6 +36,7 @@
 #include "stat.h"
 #include "assoc.h"
 #include "memory.h"
+#include "trigger.h"
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -200,6 +201,10 @@ fiber_yield(void)
 	struct cord *cord = cord();
 	struct fiber *callee = *(--cord->sp);
 	struct fiber *caller = cord->fiber;
+
+	/** By convention, these triggers must not throw. */
+	if (! rlist_empty(&caller->on_yield))
+		trigger_run(&caller->on_yield, NULL);
 
 	cord->fiber = callee;
 	update_last_stack_frame(caller);
@@ -441,6 +446,7 @@ fiber_new(const char *name, void (*f) (va_list))
 
 		rlist_add_entry(&cord->fibers, fiber, link);
 		rlist_create(&fiber->state);
+		rlist_create(&fiber->on_yield);
 	}
 
 	fiber->f = f;
@@ -472,6 +478,7 @@ fiber_destroy(struct fiber *f)
 	if (strcmp(fiber_name(f), "sched") == 0)
 		return;
 
+	trigger_destroy(&f->on_yield);
 	rlist_del(&f->state);
 	region_destroy(&f->gc);
 	tarantool_coro_destroy(&f->coro);

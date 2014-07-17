@@ -1,0 +1,180 @@
+--# setopt delimiter ';'
+-- empty transaction - ok
+box.begin() box.commit();
+---
+...
+-- double begin
+box.begin() box.begin();
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+-- no active transaction since exception rolled it back
+box.commit();
+---
+...
+-- double commit - error
+box.begin() box.commit() box.commit();
+---
+- error: 'Operation is not permitted when there is no active transaction '
+...
+-- commit if not started - error
+box.commit();
+---
+- error: 'Operation is not permitted when there is no active transaction '
+...
+-- rollback if not started - ok
+-- double rollback - ok
+box.rollback()
+box.begin() box.rollback() box.rollback();
+---
+...
+-- rollback of an empty trans - ends transaction
+box.begin() box.rollback();
+---
+...
+-- no current transaction - error
+box.commit();
+---
+- error: 'Operation is not permitted when there is no active transaction '
+...
+fiber = require('fiber');
+---
+...
+function sloppy()
+    box.begin()
+end;
+---
+...
+f = fiber.create(sloppy);
+---
+...
+-- when the sloppy fiber ends, its session has an active transction
+-- ensure it's rolled back automatically
+fiber.sleep(0);
+---
+...
+fiber.sleep(0);
+---
+...
+-- transactions and system spaces
+box.begin() box.schema.space.create('test');
+---
+- error: Space _space does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.schema.func.create('test');
+---
+- error: Space _func does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.schema.user.create('test');
+---
+- error: Space _user does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.schema.user.grant('guest', 'read', 'universe');
+---
+- error: Space _priv does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.space._schema:insert{'test'};
+---
+- error: Space _schema does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.space._cluster:insert{123456789, 'abc'};
+---
+- error: Space _cluster does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+s = box.schema.space.create('test');
+---
+...
+box.begin() s:create_index('primary');
+---
+- error: Space _index does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+s:create_index('primary');
+---
+...
+function multi()
+    box.begin()
+    s:auto_increment{'first row'}
+    s:auto_increment{'second row'}
+    t = s:select{}
+    box.commit()
+end;
+---
+...
+multi();
+---
+...
+t;
+---
+- - [1, 'first row']
+  - [2, 'second row']
+...
+s:select{};
+---
+- - [1, 'first row']
+  - [2, 'second row']
+...
+s:truncate();
+---
+...
+function multi()
+    box.begin()
+    s:auto_increment{'first row'}
+    s:auto_increment{'second row'}
+    t = s:select{}
+    box.rollback()
+end;
+---
+...
+multi();
+---
+...
+t;
+---
+- - [1, 'first row']
+  - [2, 'second row']
+...
+s:select{};
+---
+- []
+...
+function multi()
+    box.begin()
+    s:insert{1, 'first row'}
+    pcall(s.insert, s, {1, 'duplicate'})
+    t = s:select{}
+    box.commit()
+end;
+---
+...
+multi();
+---
+...
+t;
+---
+- - [1, 'first row']
+...
+s:select{};
+---
+- - [1, 'first row']
+...

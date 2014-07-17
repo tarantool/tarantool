@@ -86,6 +86,13 @@ void
 txn_commit_stmt(struct txn *txn, struct port *port);
 
 /**
+ * Rollback a statement. In autocommit mode,
+ * rolls back the entire transaction.
+ */
+void
+txn_rollback_stmt();
+
+/**
  * Start a transaction explicitly.
  * @pre no transaction is active
  */
@@ -122,5 +129,31 @@ txn_stmt(struct txn *txn)
 {
 	return rlist_last_entry(&txn->stmts, struct txn_stmt, next);
 }
+
+/**
+ * FFI bindings: do not throw exceptions, do not accept extra
+ * arguments
+ */
+extern "C" {
+
+/**
+ * @retval 0 - success
+ * @retval -1 - failed, perhaps a transaction has already been
+ * started
+ */
+int
+boxffi_txn_begin();
+
+/**
+ * @retval 0 - success
+ * @retval -1 - commit failed
+ */
+int
+boxffi_txn_commit();
+
+void
+boxffi_txn_rollback();
+
+} /* extern  "C" */
 
 #endif /* TARANTOOL_BOX_TXN_H_INCLUDED */

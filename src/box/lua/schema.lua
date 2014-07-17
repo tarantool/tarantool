@@ -45,6 +45,14 @@ ffi.cdef[[
               const char *key, const char *key_end);
     void password_prepare(const char *password, int len,
 		                  char *out, int out_len);
+    int
+    boxffi_txn_begin();
+
+    int
+    boxffi_txn_commit();
+
+    void
+    boxffi_txn_rollback();
 ]]
 
 local function user_resolve(user)
@@ -60,6 +68,10 @@ local function user_resolve(user)
     end
     return tuple[1]
 end
+
+box.begin = function() if ffi.C.boxffi_txn_begin() == -1 then box.raise() end end
+box.commit = function() if ffi.C.boxffi_txn_commit() == -1 then box.raise() end end
+box.rollback = ffi.C.boxffi_txn_rollback;
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)

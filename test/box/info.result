@@ -38,7 +38,7 @@ box.info.recovery_last_update
 ...
 box.info.status
 ---
-- primary
+- running
 ...
 string.len(box.info.build.target) > 0
 ---

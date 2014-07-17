@@ -81,7 +81,7 @@ process_rw(struct port *port, struct request *request)
 		request->execute(request, port);
 		port_eof(port);
 	} catch (Exception *e) {
-		txn_rollback();
+		txn_rollback_stmt();
 		throw;
 	}
 }
@@ -233,8 +233,8 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	if (recovery_has_remote(recovery_state))
 		recovery_follow_remote(recovery_state);
 
-	title("primary", NULL);
-	say_info("I am primary");
+	title("running", NULL);
+	say_info("ready to accept requests");
 }
 
 /**

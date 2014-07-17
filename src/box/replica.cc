@@ -43,6 +43,8 @@
 #include "session.h"
 #include "box/cluster.h"
 
+static const int RECONNECT_DELAY = 1.0;
+
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 		struct iproto_header *row)
@@ -128,7 +130,26 @@ replica_bootstrap(struct recovery_state *r)
 		evio_close(loop(), &coio);
 	});
 
-	remote_connect(r, &coio, iobuf);
+	for (;;) {
+		try {
+			remote_connect(r, &coio, iobuf);
+			r->remote.warning_said = false;
+			break;
+		} catch (FiberCancelException *e) {
+			throw;
+		} catch (Exception *e) {
+			if (! r->remote.warning_said) {
+				say_error("can't connect to master");
+				e->log();
+				say_info("will retry every %i second",
+					 RECONNECT_DELAY);
+				r->remote.warning_said = true;
+			}
+			iobuf_reset(iobuf);
+			evio_close(loop(), &coio);
+		}
+		fiber_sleep(RECONNECT_DELAY);
+	}
 
 	/* Send JOIN request */
 	struct iproto_header row;
@@ -168,7 +189,9 @@ replica_bootstrap(struct recovery_state *r)
 static void
 remote_set_status(struct remote *remote, const char *status)
 {
-	title("replica", "%s/%s", uri_to_string(&remote->uri), status);
+	(void) remote;
+	(void) status;
+	/* title("replica", "%s/%s", uri_to_string(&remote->uri), status); */
 }
 
 static void
@@ -177,8 +200,6 @@ pull_from_remote(va_list ap)
 	struct recovery_state *r = va_arg(ap, struct recovery_state *);
 	struct ev_io coio;
 	struct iobuf *iobuf = NULL;
-	bool warning_said = false;
-	const int reconnect_delay = 1;
 	ev_loop *loop = loop();
 	/** This fiber executes transactions. */
 	SessionGuard session_guard(-1, 0);
@@ -201,7 +222,7 @@ pull_from_remote(va_list ap)
 				iproto_encode_subscribe(&row, &cluster_id,
 					&r->server_uuid, &r->vclock);
 				remote_write_row(&coio, &row);
-				warning_said = false;
+				r->remote.warning_said = false;
 				remote_set_status(&r->remote, "connected");
 			}
 			err = "can't read row";
@@ -226,12 +247,13 @@ pull_from_remote(va_list ap)
 			throw;
 		} catch (Exception *e) {
 			remote_set_status(&r->remote, "failed");
-			e->log();
-			if (! warning_said) {
+			if (! r->remote.warning_said) {
 				if (err != NULL)
 					say_info("%s", err);
-				say_info("will retry every %i second", reconnect_delay);
-				warning_said = true;
+				e->log();
+				say_info("will retry every %i second",
+					 RECONNECT_DELAY);
+				r->remote.warning_said = true;
 			}
 			evio_close(loop, &coio);
 		}
@@ -250,7 +272,7 @@ pull_from_remote(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 		if (! evio_is_active(&coio))
-			fiber_sleep(reconnect_delay);
+			fiber_sleep(RECONNECT_DELAY);
 	}
 }
 

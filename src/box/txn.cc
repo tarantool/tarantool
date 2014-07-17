@@ -174,6 +174,32 @@ txn_commit(struct txn *txn)
 	in_txn() = NULL;
 }
 
+/**
+ * Void all effects of the statement, but
+ * keep it in the list - to maintain
+ * limit on the number of statements in a
+ * trasnaction.
+ */
+void
+txn_rollback_stmt()
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		return;
+	if (txn->autocommit)
+		return txn_rollback();
+	struct txn_stmt *stmt = txn_stmt(txn);
+	if (stmt->old_tuple || stmt->new_tuple) {
+		space_replace(stmt->space, stmt->new_tuple,
+			      stmt->old_tuple, DUP_INSERT);
+		if (stmt->new_tuple)
+			tuple_ref(stmt->new_tuple, -1);
+	}
+	stmt->old_tuple = stmt->new_tuple = NULL;
+	stmt->space = NULL;
+	stmt->row = NULL;
+}
+
 void
 txn_rollback()
 {
@@ -206,3 +232,40 @@ txn_check_autocommit(struct txn *txn, const char *where)
 			  where, "multi-statement transactions");
 	}
 }
+
+extern "C" {
+
+int
+boxffi_txn_begin()
+{
+	try {
+		if (in_txn())
+			tnt_raise(ClientError, ER_ACTIVE_TRANSACTION);
+		(void) txn_begin(false);
+	} catch (Exception  *e) {
+		return -1; /* pass exception  through FFI */
+	}
+	return 0;
+}
+
+int
+boxffi_txn_commit()
+{
+	try {
+		struct txn *txn = in_txn();
+		if (txn == NULL)
+			tnt_raise(ClientError, ER_NO_ACTIVE_TRANSACTION);
+		txn_commit(txn);
+	} catch (Exception  *e) {
+		return -1; /* pass exception through FFI */
+	}
+	return 0;
+}
+
+void
+boxffi_txn_rollback()
+{
+	txn_rollback(); /* doesn't throw */
+}
+
+} /* extern "C" */

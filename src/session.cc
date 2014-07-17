@@ -35,6 +35,7 @@
 #include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
+#include "box/txn.h"
 
 static struct mh_i32ptr_t *session_registry;
 
@@ -104,6 +105,10 @@ session_run_on_connect_triggers(struct session *session)
 void
 session_destroy(struct session *session)
 {
+	if (session->txn) {
+		assert(session->txn == in_txn());
+		txn_rollback();
+	}
 	assert(session->txn == NULL);
 	struct mh_i32ptr_node_t node = { session->id, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);

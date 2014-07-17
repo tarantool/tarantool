@@ -15,7 +15,7 @@ ch:is_full()
 ch:is_empty()
 buffer = {}
 --# setopt delimiter ';'
-tfbr = fiber.wrap(
+tfbr = fiber.create(
     function()
         while true do
             table.insert(buffer, ch:get())
@@ -48,7 +48,7 @@ ch:get()
 ch:is_full()
 ch:is_empty()
 --# setopt delimiter ';'
-tfbr = fiber.wrap(
+tfbr = fiber.create(
     function()
         while true do
             local v = ch:get()
@@ -56,7 +56,7 @@ tfbr = fiber.wrap(
         end
     end
 );
-tfbr2 = fiber.wrap(
+tfbr2 = fiber.create(
     function()
         while true do
             local v = ch:get()
@@ -85,7 +85,7 @@ buffer
 ch = fiber.channel(1)
 ch:is_closed()
 passed = false
-type(fiber.wrap(function() if ch:get() == nil then passed = true end end))
+type(fiber.create(function() if ch:get() == nil then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -97,7 +97,7 @@ ch = fiber.channel(1)
 ch:put(true)
 ch:is_closed()
 passed = false
-type(fiber.wrap(function() if ch:put(true) == false then passed = true end end))
+type(fiber.create(function() if ch:put(true) == false then passed = true end end))
 ch:close()
 passed
 ch:get()
@@ -116,7 +116,7 @@ for i = 1, 10 do table.insert(chs, fiber.channel()) end;
 
 
 for i = 1, 10 do
-    local no = i fiber.wrap(
+    local no = i fiber.create(
         function()
             fiber.self():name('pusher')
             while true do
@@ -128,7 +128,7 @@ for i = 1, 10 do
 end;
 
 for i = 1, 10 do
-    local no = i fiber.wrap(
+    local no = i fiber.create(
         function()
             fiber.self():name('receiver')
             while true do

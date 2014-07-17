@@ -92,4 +92,16 @@ trigger_clear(struct trigger *trigger)
 	rlist_del_entry(trigger, link);
 }
 
+
+static inline void
+trigger_destroy(struct rlist *list)
+{
+	struct trigger *trigger, *tmp;
+	rlist_foreach_entry_safe(trigger, list, link, tmp) {
+		trigger_clear(trigger);
+		if (trigger->destroy)
+			trigger->destroy(trigger);
+	}
+}
+
 #endif /* INCLUDES_TARANTOOL_TRIGGER_H */

@@ -106,3 +106,10 @@ space:get{19}
 ---
 - [19, 6859]
 ...
+-------------------------------------------------------------
+reconnect on JOIN/SUBSCRIBE
+-------------------------------------------------------------
+waiting reconnect on JOIN...
+ok
+waiting reconnect on SUBSCRIBE...
+ok
