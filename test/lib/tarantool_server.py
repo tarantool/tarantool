@@ -525,7 +525,7 @@ class TarantoolServer(Server):
             try:
                 temp = AdminConnection('localhost', self.admin.port)
                 ans = yaml.load(temp.execute('box.info.status'))[0]
-                if ans in ('primary', 'hot_standby', 'orphan') or ans.startswith('replica'):
+                if ans in ('running', 'hot_standby', 'orphan'):
                     return True
                 else:
                     raise Exception("Strange output for `box.info.status`: %s" % (ans))
