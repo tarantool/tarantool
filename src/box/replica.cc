@@ -189,7 +189,9 @@ replica_bootstrap(struct recovery_state *r)
 static void
 remote_set_status(struct remote *remote, const char *status)
 {
-	title("replica", "%s/%s", uri_to_string(&remote->uri), status);
+	(void) remote;
+	(void) status;
+	/* title("replica", "%s/%s", uri_to_string(&remote->uri), status); */
 }
 
 static void
