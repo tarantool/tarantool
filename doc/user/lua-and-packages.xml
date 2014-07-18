@@ -5,7 +5,7 @@
 <chapter xmlns="http://docbook.org/ns/docbook" version="5.0"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xmlns:xi="http://www.w3.org/2001/XInclude"
-         xml:id="language-reference">
+         xml:id="lua-and-packages">
 
 <title>Lua and the Tarantool Lua Packages</title>
 

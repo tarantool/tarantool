@@ -490,7 +490,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
     The server starts in interactive mode and outputs a command prompt.
     To turn on the database, configure it:
-<programlisting><prompt>tarantool></prompt> <userinput>box.cfg{admin_port=3313}</userinput></programlisting>
+<programlisting><prompt>tarantool></prompt> <userinput>box.cfg{admin=3313}</userinput></programlisting>
     (this minimal example is sufficient).
 </para>
 
@@ -508,7 +508,7 @@ If all goes well, you will see the server displaying progress as it initializes,
 2014-06-10 11:53:41.095 ... 0.0M rows written
 2014-06-10 11:53:41.126 ... done
 2014-06-10 11:53:41.126 ... bound to admin port tcp://0.0.0.0:3313
-2014-06-10 11:53:41.127 ... I am primary
+2014-06-10 11:53:41.127 ... ready to accept requests
 </programlisting>
 </para>
 
@@ -637,8 +637,8 @@ inserted and selected tuples.
     "script_dir" no longer exists, use #! instead (see below re "Tarantool = a shell script processor").
   </para>
   <para>CHANGES IN PORT CONFIGURATION.
-    "secondary_port" no longer exists; use "primary_port".
-    "replication_port" no longer exists; use "primary_port".
+    "secondary_port" no longer exists; use "listen".
+    "replication_port" no longer exists; use "listen".
     "memcached" no longer exists (memcached is not supported).
     The admin port is Lua-only now, and the lua prefix is gone. 
   </para>
