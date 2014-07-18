@@ -45,11 +45,11 @@ call f1()
     errcode: ER_PROC_RET
     errmsg: msgpack.encode: can not encode Lua type 'function'
 ...
-call dostring('box.raise(33333, "Hey!")')
+call dostring('box.error(33333, "Hey!")')
 ---
 - error:
-    errcode: ER_PROC_LUA
-    errmsg: [string "box.raise(33333, "Hey!")"]:1: box.raise(): unknown error code
+    errcode: ER_UNKNOWN (565)
+    errmsg: Unknown error
 ...
 
 # A test case for Bug#103491

@@ -86,7 +86,6 @@ set (common_sources
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
-     lua/errinj.cc
      lua/ipc.cc
      lua/socket.cc
      lua/session.cc

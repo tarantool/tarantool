@@ -66,7 +66,7 @@ s:drop()
 -- no such space
 s:drop()
 ---
-- error: Space 512 does not exist
+- error: Space '#512' does not exist
 ...
 -- no such engine
 box.schema.create_space('tweedleedee', { engine = 'unknown' })
@@ -135,23 +135,23 @@ s = box.schema.create_space('tweedledum')
 ...
 s:insert{0}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
 s:select{}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
 s:delete{0}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
 s:update(0, {{"=", 1, 0}})
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
 s:insert{0}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''tweedledum'''
 ...
 s.index[0]
 ---
@@ -898,7 +898,7 @@ primary.id
 ...
 primary:select{}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''test'''
 ...
 s:drop()
 ---

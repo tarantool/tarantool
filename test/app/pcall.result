@@ -4,7 +4,7 @@
 
 pcall inside xpcall:	true	pcall is ok
 pcall with Lua error():	false	some message
-pcall with box.raise():	false	some message
+pcall with box.error():	false	Illegal parameters, some message
 pcall with no return:	1
 pcall with multireturn:	true	1	2	3
 --------------------------------------------------------------------------------

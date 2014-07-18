@@ -19,7 +19,7 @@ s:drop()
 ...
 s:drop()
 ---
-- error: Space 512 does not exist
+- error: Space '#512' does not exist
 ...
 --
 -- Check double create user
@@ -131,7 +131,7 @@ box.schema.user.drop('testus')
 ...
 box.schema.user.drop('testus')
 ---
-- error: User 'testus' does not exist
+- error: User 'testus' is not found
 ...
 --
 -- Check 'guest' user
@@ -288,7 +288,7 @@ box.schema.func.drop('uniuser_func')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: User 'uniuser_testus' does not exist
+- error: User 'uniuser_testus' is not found
 ...
 session.su('admin')
 ---
@@ -301,7 +301,7 @@ box.schema.user.drop('someuser')
 ...
 box.schema.user.drop('uniuser_testus')
 ---
-- error: User 'uniuser_testus' does not exist
+- error: User 'uniuser_testus' is not found
 ...
 box.schema.user.drop('uniuser')
 ---

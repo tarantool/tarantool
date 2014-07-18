@@ -53,7 +53,7 @@ boxffi_index_len(uint32_t space_id, uint32_t index_id)
 	try {
 		return check_index(space_id, index_id)->size();
 	} catch (Exception *) {
-		return (size_t) -1; /* handled by box.raise() in Lua */
+		return (size_t) -1; /* handled by box.error() in Lua */
 	}
 }
 
@@ -63,7 +63,7 @@ boxffi_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd)
 	try {
 		return check_index(space_id, index_id)->random(rnd);
 	}  catch (Exception *) {
-		return (struct tuple *) -1; /* handled by box.raise() in Lua */
+		return (struct tuple *) -1; /* handled by box.error() in Lua */
 	}
 }
 
@@ -99,7 +99,7 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	} catch (Exception *) {
 		if (it)
 			it->free(it);
-		/* will be hanled by box.raise() in Lua */
+		/* will be hanled by box.error() in Lua */
 		return NULL;
 	}
 }

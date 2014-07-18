@@ -48,7 +48,6 @@ extern "C" {
 #include <scoped_guard.h>
 #include "coeio.h"
 #include "lua/fiber.h"
-#include "lua/errinj.h"
 #include "lua/ipc.h"
 #include "lua/errno.h"
 #include "lua/socket.h"
@@ -176,25 +175,6 @@ lbox_coredump(struct lua_State *L __attribute__((unused)))
 	return 1;
 }
 
-static const struct luaL_reg errorlib [] = {
-	{NULL, NULL}
-};
-
-static void
-tarantool_lua_error_init(struct lua_State *L) {
-	luaL_register(L, "box.error", errorlib);
-	for (int i = 0; i < tnt_error_codes_enum_MAX; i++) {
-		const char *name = tnt_error_codes[i].errstr;
-		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
-			continue;
-		assert(strncmp(name, "ER_", 3) == 0);
-		lua_pushnumber(L, i);
-		/* cut ER_ prefix from constant */
-		lua_setfield(L, -2, name + 3);
-	}
-	lua_pop(L, 1);
-}
-
 /* }}} */
 
 /*
@@ -296,7 +276,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_register(L, "tonumber64", lbox_tonumber64);
 	lua_register(L, "coredump", lbox_coredump);
 
-	tarantool_lua_errinj_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_cjson_init(L);
 	tarantool_lua_yaml_init(L);
@@ -305,7 +284,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_socket_init(L);
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_session_init(L);
-	tarantool_lua_error_init(L);
 	tarantool_lua_pickle_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
