@@ -79,8 +79,6 @@ extern "C" {
 
 static const char *fiberlib_name = "fiber";
 
-enum fiber_state { DONE, YIELD };
-
 /**
  * @pre: stack top contains a table
  * @post: sets table field specified by name of the table on top
@@ -189,66 +187,13 @@ lbox_fiber_id(struct lua_State *L)
 	return 1;
 }
 
-static struct lua_State *
-box_lua_fiber_get_coro(struct lua_State *L, struct fiber *f)
-{
-	lua_pushlightuserdata(L, f);
-	lua_gettable(L, LUA_REGISTRYINDEX);
-	struct lua_State *child_L = lua_tothread(L, -1);
-	lua_pop(L, 1);
-	return child_L;
-}
-
-static void
-box_lua_fiber_clear_coro(struct lua_State *L, struct fiber *f)
-{
-	lua_pushlightuserdata(L, f);
-	lua_pushnil(L);
-	lua_settable(L, LUA_REGISTRYINDEX);
-}
-
 static int
 lbox_fiber_gc(struct lua_State *L)
 {
 	if (lua_gettop(L) == 0)
 		return 0;
 	struct fiber *f = lbox_isfiber(L, 1);
-	if (f == NULL)
-		return 0;
-	struct lua_State *child_L = box_lua_fiber_get_coro(L, f);
-	/*
-	 * A non-NULL coro is an indicator of a 1) alive,
-	 * 2) suspended and 3) attached fiber. The coro is
-	 * an outlet to pass arguments in and out the Lua
-	 * routine being executed by the fiber (see fiber.resume()
-	 * and fiber.yield()), and as soon as the Lua routine
-	 * completes, the "plug" is shut down (see
-	 * box_lua_fiber_run()). When its routine completes,
-	 * the fiber recycles itself.
-	 * Likewise, when a fiber becomes detached, this plug is
-	 * removed, since we no longer need to pass arguments
-	 * to and from it, and 'sched' garbage collects all detached
-	 * fibers (see lbox_fiber_detach()).
-	 * We also know that the fiber is suspended, not running,
-	 * because any running and attached fiber is referenced,
-	 * if only by the fiber which called lbox_lua_resume()
-	 * on it. lbox_lua_resume() is the only entry point
-	 * to resume an attached fiber.
-	 */
-	if (child_L) {
-		assert(f != fiber() && child_L != L);
-		/*
-		 * Garbage collect the associated coro.
-		 * Do it first, since the cancelled fiber
-		 * can get recycled quickly.
-		 */
-		box_lua_fiber_clear_coro(L, f);
-		/*
-		 * Cancel and recycle the fiber. This
-		 * returns only after the fiber has died.
-		 */
-		fiber_cancel(f);
-	}
+	(void) f;
 	return 0;
 }
 
