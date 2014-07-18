@@ -62,8 +62,4 @@ third_party/luajit/src/lj_libdef.h
 third_party/luajit/src/lj_recdef.h
 third_party/luajit/src/lj_vm.s
 VERSION
-debian/*.debhelper
-debian/*.log
-debian/*.substvars
-*.cdbs-orig
 src/00000000000000000001.snap

@@ -189,9 +189,9 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_mandir}/man1/tarantool.1.gz"
 
 "%{_bindir}/tarantool"
-%{!?scl:"%{_bindir}/tarantool_multi.sh"}
-%{!?scl:"%{_bindir}/tarantool_deploy.sh"}
-%{!?scl:"%{_sysconfdir}/init.d/tarantool"}
+# %{!?scl:"%{_bindir}/tarantool_multi.sh"}
+# %{!?scl:"%{_bindir}/tarantool_deploy.sh"}
+# %{!?scl:"%{_sysconfdir}/init.d/tarantool"}
 
 %files sql-module
 %defattr(-,root,root,-)
