@@ -111,6 +111,7 @@ struct fiber {
 	uint32_t flags;
 	struct fiber *waiter;
 	uint64_t cookie;
+	int lua_storage;
 };
 
 enum { FIBER_CALL_STACK = 16 };

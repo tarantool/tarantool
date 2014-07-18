@@ -212,4 +212,67 @@ f:cancel()
 fib_id = fiber.create(testfun):id()
 fiber.find(fib_id):cancel()
 fiber.find(fib_id)
+
+--
+-- Test local storage
+--
+
+fiber.self().storage
+fiber.self().storage.key = 48
+fiber.self().storage.key
+
+--# setopt delimiter ';'
+function testfun(ch)
+    while fiber.self().storage.key == nil do
+        print('wait')
+        fiber.sleep(0)
+    end
+    ch:put(fiber.self().storage.key)
+end;
+--# setopt delimiter ''
+ch = fiber.channel(1)
+f = fiber.create(testfun, ch)
+f.storage.key = 'some value'
+ch:get()
+ch:close()
+ch = nil
+fiber.self().storage.key -- our local storage is not affected by f
+-- attempt to access local storage of dead fiber raises error
+pcall(function(f) return f.storage end, f)
+
+--
+-- Test that local storage is garbage collected when fiber is died
+--
+ffi = require('ffi')
+ch = fiber.channel(1)
+--# setopt delimiter ';'
+function testfun()
+    fiber.self().storage.x = ffi.gc(ffi.new('char[1]'),
+         function() ch:put('gc ok') end)
+end;
+--# setopt delimiter ''
+f = fiber.create(testfun)
+collectgarbage('collect')
+ch:get()
+ch:close()
+ch = nil
+
+
+
+--
+-- Test that local storage is not garbage collected with fiber object
+--
+--# setopt delimiter ';'
+function testfun(ch)
+    fiber.self().storage.x = 'ok'
+    collectgarbage('collect')
+    ch:put(fiber.self().storage.x or 'failed')
+end;
+--# setopt delimiter ''
+ch = fiber.channel(1)
+fiber.create(testfun, ch):status()
+ch:get()
+ch:close()
+ch = nil
+
 fiber = nil

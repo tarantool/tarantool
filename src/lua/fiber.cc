@@ -31,6 +31,7 @@
 #include <fiber.h>
 #include "lua/utils.h"
 #include <session.h>
+#include <scoped_guard.h>
 
 extern "C" {
 #include <lua.h>
@@ -261,6 +262,12 @@ box_lua_fiber_run_detached(va_list ap)
 	LuarefGuard coro_guard(va_arg(ap, int));
 	struct lua_State *L = va_arg(ap, struct lua_State *);
         SessionGuard session_guard(-1, 0);
+	auto storage_guard = make_scoped_guard([=] {
+		/* Destroy local storage */
+		if (fiber()->lua_storage != LUA_NOREF)
+			lua_unref(L, fiber()->lua_storage);
+		fiber()->lua_storage = LUA_NOREF;
+	});
 
 	try {
 		lbox_call(L, lua_gettop(L) - 1, LUA_MULTRET);
@@ -355,6 +362,33 @@ lbox_fiber_name(struct lua_State *L)
 		lua_pushstring(L, fiber_name(f));
 		return 1;
 	}
+}
+
+static int
+lbox_fiber_storage(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	if (f->lua_storage == LUA_NOREF) {
+		lua_newtable(L); /* create local storage on demand */
+		f->lua_storage = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	lua_rawgeti(L, LUA_REGISTRYINDEX, f->lua_storage);
+	return 1;
+}
+
+static int
+lbox_fiber_index(struct lua_State *L)
+{
+	if (lua_gettop(L) < 2)
+		return 0;
+	if (lua_isstring(L, 2) && strcmp(lua_tostring(L, 2), "storage") == 0)
+		return lbox_fiber_storage(L);
+
+	/* Get value from metatable */
+	lua_getmetatable(L, 1);
+	lua_pushvalue(L, 2);
+	lua_gettable(L, -2);
+	return 1;
 }
 
 /**
@@ -456,6 +490,7 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{"cancel", lbox_fiber_cancel},
 	{"status", lbox_fiber_status},
 	{"testcancel", lbox_fiber_testcancel},
+	{"__index", lbox_fiber_index},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };

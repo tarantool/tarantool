@@ -458,6 +458,7 @@ fiber_new(const char *name, void (*f) (va_list))
 	fiber->session = NULL;
 	fiber->flags = 0;
 	fiber->waiter = NULL;
+	fiber->lua_storage = -2; /* LUA_NOREF */;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 
