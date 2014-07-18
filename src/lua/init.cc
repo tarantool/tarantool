@@ -78,7 +78,8 @@ extern char uuid_lua[],
 	log_lua[],
 	console_lua[],
 	box_net_box_lua[],
-	help_lua[];
+	help_lua[],
+	tap_lua[];
 
 static const char *lua_sources[] = {
 	init_lua,
@@ -95,6 +96,7 @@ static const char *lua_modules[] = {
 	"uuid", uuid_lua,
 	"log", log_lua,
 	"net.box", box_net_box_lua,
+	"tap", tap_lua,
 	NULL
 };
 
