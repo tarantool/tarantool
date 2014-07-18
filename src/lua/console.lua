@@ -26,7 +26,7 @@ local function format(status, ...)
     return formatter.encode(res)
 end
 
-local function local_eval(self, line, ...)
+local function local_eval(self, line)
     --
     -- Attempt to append 'return ' before the chunk: if the chunk is
     -- an expression, this pushes results of the expression onto the
@@ -40,7 +40,7 @@ local function local_eval(self, line, ...)
     if not fun then
         return format(false, errmsg)
     end
-    return format(pcall(fun, ...))
+    return format(pcall(fun))
 end
 
 local function eval(line)
@@ -55,7 +55,7 @@ local local_mt = {
     }
 }
 
-local function remote_eval(self, line, ...)
+local function remote_eval(self, line)
     --
     -- call remote 'console.eval' function using 'dostring' and return result
     --
@@ -66,7 +66,7 @@ local function remote_eval(self, line, ...)
         return format(status, res)
     end
     -- return formatted output from remote
-    return res[1][0]
+    return res[1][1]
 end
 
 local function remote_close(self)
@@ -136,7 +136,7 @@ local function connect(...)
     if not session.storage.console then
         error("console.connect() works only in interactive mode")
     end
-    local conn = box.net.box.new(...)
+    local conn = require('net.box'):new(...)
     conn:ping() -- test connection
     table.insert(session.storage.console.handlers, setmetatable(
         { conn =  conn}, remote_mt))
