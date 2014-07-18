@@ -187,7 +187,7 @@ local function wait_safely(self, what, timeout)
         self.waiters = {}
     end
 
-    self.waiters[fid] = f
+    self.waiters[fid] = true
     local res = internal.iowait(self.fh, what, timeout)
     self.waiters[fid] = nil
     return res
@@ -280,8 +280,8 @@ end
 
 socket_methods.close = function(self)
     if self.waiters ~= nil then
-        for fid, fiber in pairs(self.waiters) do
-            fiber:wakeup()
+        for fid in pairs(self.waiters) do
+            internal.abort(fid)
             self.waiters[fid] = nil
         end
     end

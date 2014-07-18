@@ -255,14 +255,6 @@ lbox_fiber_info(struct lua_State *L)
 	return 1;
 }
 
-static int
-lbox_fiber_wakeup(struct lua_State *L)
-{
-	struct fiber *f = lbox_checkfiber(L, 1);
-	fiber_wakeup(f);
-	return 0;
-}
-
 static void
 box_lua_fiber_run_detached(va_list ap)
 {
@@ -461,7 +453,6 @@ lbox_fiber_time64(struct lua_State *L)
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
-	{"wakeup", lbox_fiber_wakeup},
 	{"cancel", lbox_fiber_cancel},
 	{"status", lbox_fiber_status},
 	{"testcancel", lbox_fiber_testcancel},

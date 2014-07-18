@@ -832,6 +832,21 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 	return 2;
 }
 
+/**
+ * A special method to abort fiber blocked by iowait() by fid.
+ * Used only by socket:close().
+ */
+static int
+lbox_bsdsocket_abort(struct lua_State *L)
+{
+	int fid = lua_tointeger(L, 1);
+	struct fiber *fiber = fiber_find(fid);
+	if (fiber == NULL || !(fiber->flags & FIBER_USER_MODE))
+		return 0;
+	fiber_wakeup(fiber);
+	return 0;
+}
+
 void
 tarantool_lua_bsdsocket_init(struct lua_State *L)
 {
@@ -841,6 +856,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ "name",		lbox_bsdsocket_soname		},
 		{ "peer",		lbox_bsdsocket_peername		},
 		{ "recvfrom",		lbox_bsdsocket_recvfrom		},
+		{ "abort",		lbox_bsdsocket_abort		},
 		{ NULL,			NULL				}
 	};
 
