@@ -110,7 +110,6 @@ struct fiber {
 	va_list f_data;
 	uint32_t flags;
 	struct fiber *waiter;
-	uint64_t cookie;
 	int lua_storage;
 };
 
