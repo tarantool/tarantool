@@ -162,6 +162,9 @@ void symbols_load(const char *name);
 void symbols_free();
 #endif /* HAVE_BFD */
 
+char *find_path(const char *argv0);
+
+
 #ifdef NDEBUG
 #  define assert(pred) (void)(0)
 #else

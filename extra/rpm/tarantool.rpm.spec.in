@@ -8,6 +8,11 @@
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
 
+%global debug_package %{nil}
+%global _enable_debug_package %{nil}
+%global __debug_install_post %{nil}
+%global __debug_package %{nil}
+
 %bcond_without postgresql
 %bcond_without mysql
 %bcond_without client
@@ -26,7 +31,8 @@ BuildRequires: binutils-devel
 BuildRequires: perl-podlators
 %endif
 
-# Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+# Strange bug.
+# Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Name: %{?scl_prefix}tarantool
@@ -36,7 +42,9 @@ Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
-Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+
+Provides: %{?scl_prefix}tarantool-debuginfo
+Provides: %{?scl_prefix}tarantool-debug
 %if 0%{?rhel} <= 5 && 0%{?rhel} > 0
 Requires: e2fsprogs-libs
 %else

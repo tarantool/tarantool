@@ -223,7 +223,7 @@ exec admin "lua string.match(tostring(s), ', peer') ~= nil"
 exec admin "lua s:write('GET / HTTP/1.0\\r\\nHost: mail.ru\\r\\n\\r\\n')"
 exec admin "lua header = s:readline(4000, { '\\n\\n', '\\r\\n\\r\\n' }, 1)"
 exec admin "lua string.match(header, '\\r\\n\\r\\n$') ~= nil"
-exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
+# exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
 exec admin "lua s:close()"
 
 # exec admin "lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)"

@@ -716,10 +716,6 @@ lua string.match(header, '\r\n\r\n$') ~= nil
 ---
  - true
 ...
-lua string.match(header, '200 [Oo][Kk]') ~= nil
----
- - true
-...
 lua s:close()
 ---
  - true
