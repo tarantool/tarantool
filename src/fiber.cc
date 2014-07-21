@@ -42,6 +42,14 @@ static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
 pthread_t main_thread_id;
 
+/*
+ * Local storage finalizers
+ */
+static struct {
+	fiber_key_gc_cb cb;
+	void *arg;
+} key_gc[FIBER_KEY_MAX]; /* zeroed by linker */
+
 static void
 update_last_stack_frame(struct fiber *fiber)
 {
@@ -364,9 +372,11 @@ fiber_zombificate()
 		fiber_wakeup(fiber->waiter);
 	rlist_del(&fiber->state);
 	fiber->waiter = NULL;
-	fiber->session = NULL;
 	fiber_set_name(fiber, "zombie");
 	fiber->f = NULL;
+#if !defined(NDEBUG)
+	memset(fiber->fls, '#', sizeof(fiber->fls));
+#endif /* !defined(NDEBUG) */
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	fiber->flags = 0;
@@ -397,6 +407,17 @@ fiber_loop(void *data __attribute__((unused)))
 				fiber_name(fiber()));
 			panic("fiber `%s': exiting", fiber_name(fiber()));
 		}
+		for (int i = 0; i < FIBER_KEY_MAX; i++) {
+			enum fiber_key key = (enum fiber_key) i;
+			if (key_gc[key].cb == NULL)
+				continue;
+			try {
+				key_gc[key].cb(key, key_gc[key].arg);
+			} catch(Exception *e) {
+				say_error("exception raised on fiber stop");
+				e->log();
+			}
+		}
 		fiber_zombificate();
 		fiber_yield();	/* give control back to scheduler */
 	}
@@ -413,6 +434,19 @@ fiber_set_name(struct fiber *fiber, const char *name)
 {
 	assert(name != NULL);
 	region_set_name(&fiber->gc, name);
+}
+
+extern inline void
+fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value);
+
+extern inline void *
+fiber_get_key(struct fiber *fiber, enum fiber_key key);
+
+void
+fiber_key_on_gc(enum fiber_key key, fiber_key_gc_cb cb, void *arg)
+{
+	key_gc[key].cb = cb;
+	key_gc[key].arg = arg;
 }
 
 /**
@@ -455,10 +489,9 @@ fiber_new(const char *name, void (*f) (va_list))
 	if (++cord->max_fid < 100)
 		cord->max_fid = 100;
 	fiber->fid = cord->max_fid;
-	fiber->session = NULL;
+	memset(fiber->fls, 0, sizeof(fiber->fls)); /* clear local storage */
 	fiber->flags = 0;
 	fiber->waiter = NULL;
-	fiber->lua_storage = -2; /* LUA_NOREF */;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 

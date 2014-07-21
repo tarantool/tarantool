@@ -58,7 +58,7 @@ admin_dispatch(struct ev_io *coio, struct iobuf *iobuf, lua_State *L)
 	char delim[SESSION_DELIM_SIZE + 1];
 	/* \n must folow user-specified delimiter */
 	int delim_len = snprintf(delim, sizeof(delim), "%s\n",
-				 fiber()->session->delim);
+				 session()->delim);
 
 	char *eol;
 	while (in->pos == NULL ||

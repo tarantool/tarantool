@@ -39,7 +39,7 @@ authenticate(const char *user_name, uint32_t len,
 		snprintf(name, sizeof(name), "%.*s", len, user_name);
 		tnt_raise(ClientError, ER_NO_SUCH_USER, name);
 	}
-	struct session *session = fiber()->session;
+	struct session *session = session();
 	uint32_t part_count = mp_decode_array(&tuple);
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */

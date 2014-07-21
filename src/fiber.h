@@ -75,6 +75,17 @@ public:
 };
 #endif /* defined(__cplusplus) */
 
+/**
+ * \brief Pre-defined key for fiber local storage
+ */
+enum fiber_key {
+	/** box.session */
+	FIBER_KEY_SESSION = 0,
+	/** Lua fiber.storage */
+	FIBER_KEY_LUA_STORAGE = 1,
+	FIBER_KEY_MAX = 2
+};
+
 struct fiber {
 #ifdef ENABLE_BACKTRACE
 	void *last_stack_frame;
@@ -85,16 +96,6 @@ struct fiber {
 	struct region gc;
 	/** Fiber id. */
 	uint32_t fid;
-	/**
-	 * The logical user session the fiber is running
-	 * on behalf of. The concept of an associated session
-	 * is similar to the concept of controlling tty
-	 * in a UNIX process. When a fiber is created,
-	 * it has no session. If it's running a request on behalf
-	 * of a user connection, it's session is changed
-	 * to represent this connection.
-	 */
-	struct session *session;
 
 	struct rlist link;
 	struct rlist state;
@@ -110,7 +111,7 @@ struct fiber {
 	va_list f_data;
 	uint32_t flags;
 	struct fiber *waiter;
-	int lua_storage;
+	void *fls[FIBER_KEY_MAX]; /* fiber local storage */
 };
 
 enum { FIBER_CALL_STACK = 16 };
@@ -233,12 +234,46 @@ void fiber_sleep(ev_tstamp s);
 struct tbuf;
 void fiber_schedule(ev_watcher *watcher, int event __attribute__((unused)));
 
-/** Set or clear this fiber's session. */
-static inline void
-fiber_set_session(struct fiber *f, struct session *session)
+/**
+ * \brief Associate \a value with \a key in fiber local storage
+ * \param fiber fiber
+ * \param key pre-defined key
+ * \param value value to set
+ */
+inline void
+fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
 {
-	f->session = session;
+	assert(key < FIBER_KEY_MAX);
+	fiber->fls[key] = value;
 }
+
+/**
+ * \brief Retrieve value by \a key from fiber local storage
+ * \param fiber fiber
+ * \param key pre-defined key
+ * \return value from from fiber local storage
+ */
+inline void *
+fiber_get_key(struct fiber *fiber, enum fiber_key key)
+{
+	assert(key < FIBER_KEY_MAX);
+	return fiber->fls[key];
+}
+
+/**
+ * Finalizer callback
+ * \sa fiber_key_on_gc()
+ */
+typedef void (*fiber_key_gc_cb)(enum fiber_key key, void *arg);
+
+/**
+ * \brief Set finalizing callback invoked on destroy local storage value
+ * \param key key
+ * \param cb callback
+ * Finalizers are global (i.e. are not cord/thread-local).
+ */
+void
+fiber_key_on_gc(enum fiber_key key, fiber_key_gc_cb cb, void *arg);
 
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 

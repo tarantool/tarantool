@@ -54,7 +54,7 @@ static const char *sessionlib_name = "session";
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, fiber()->session ? fiber()->session->id : 0);
+	lua_pushnumber(L, session()->id);
 	return 1;
 }
 
@@ -62,8 +62,7 @@ lbox_session_id(struct lua_State *L)
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, fiber()->session ?
-		       fiber()->session->uid : (int) GUEST);
+	lua_pushnumber(L, session()->uid);
 	return 1;
 }
 
@@ -71,9 +70,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = NULL;
-	if (fiber()->session)
-		user = user_cache_find(fiber()->session->uid);
+	struct user *user = user_cache_find(session()->uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -87,7 +84,7 @@ lbox_session_su(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "session.su(): bad arguments");
-	struct session *session = fiber()->session;
+	struct session *session = session();
 	if (session == NULL)
 		luaL_error(L, "session.su(): session does not exit");
 	struct user *user;
@@ -148,7 +145,7 @@ lbox_session_peer(struct lua_State *L)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
 	uint32_t sid = lua_gettop(L) == 1 ?
-		luaL_checkint(L, -1) : fiber()->session->id;
+		luaL_checkint(L, -1) : session()->id;
 
 	int fd = session_fd(sid);
 	struct sockaddr_storage addr;
@@ -162,12 +159,12 @@ lbox_session_peer(struct lua_State *L)
 static int
 lbox_session_delimiter(struct lua_State *L)
 {
-	if (fiber()->session == NULL)
+	if (session() == NULL)
 		luaL_error(L, "session.delimiter(): session does not exit");
 
 	if (lua_gettop(L) < 1) {
 		/* Get delimiter */
-		lua_pushstring(L, fiber()->session->delim);
+		lua_pushstring(L, session()->delim);
 		return 1;
 	}
 
@@ -175,7 +172,7 @@ lbox_session_delimiter(struct lua_State *L)
 	if (lua_type(L, 1) != LUA_TSTRING)
 		luaL_error(L, "session.delimiter(string): expected a string");
 
-	snprintf(fiber()->session->delim, SESSION_DELIM_SIZE, "%s",
+	snprintf(session()->delim, SESSION_DELIM_SIZE, "%s",
 		 lua_tostring(L, 1));
 	return 0;
 }

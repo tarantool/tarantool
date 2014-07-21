@@ -31,6 +31,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include "trigger.h"
+#include "fiber.h"
 
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 /** Predefined user ids. */
@@ -137,6 +138,22 @@ session_free();
 
 void
 session_storage_cleanup(int sid);
+
+static inline void
+fiber_set_session(struct fiber *fiber, struct session *session)
+{
+	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
+}
+
+#define session() ({\
+	struct session *s = (struct session *) fiber_get_key(fiber(),		\
+		FIBER_KEY_SESSION);						\
+	/* Create session on demand */						\
+	if (s == NULL) {							\
+		s = session_create(-1, 0);					\
+		fiber_set_session(fiber(), s);					\
+	}									\
+	s; })
 
 /** A helper class to create and set session in single-session fibers. */
 struct SessionGuard

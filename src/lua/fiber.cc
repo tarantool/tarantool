@@ -30,7 +30,6 @@
 
 #include <fiber.h>
 #include "lua/utils.h"
-#include <session.h>
 #include <scoped_guard.h>
 
 extern "C" {
@@ -261,12 +260,13 @@ box_lua_fiber_run_detached(va_list ap)
 {
 	LuarefGuard coro_guard(va_arg(ap, int));
 	struct lua_State *L = va_arg(ap, struct lua_State *);
-        SessionGuard session_guard(-1, 0);
 	auto storage_guard = make_scoped_guard([=] {
 		/* Destroy local storage */
-		if (fiber()->lua_storage != LUA_NOREF)
-			lua_unref(L, fiber()->lua_storage);
-		fiber()->lua_storage = LUA_NOREF;
+		int storage_ref = (int)(intptr_t)
+			fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
+		if (storage_ref > 0)
+			lua_unref(L, storage_ref);
+		fiber_set_key(fiber(), FIBER_KEY_LUA_STORAGE, NULL);
 	});
 
 	try {
@@ -368,11 +368,15 @@ static int
 lbox_fiber_storage(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	if (f->lua_storage == LUA_NOREF) {
+	int storage_ref = (int)(intptr_t)
+		fiber_get_key(f, FIBER_KEY_LUA_STORAGE);
+	if (storage_ref <= 0) {
 		lua_newtable(L); /* create local storage on demand */
-		f->lua_storage = luaL_ref(L, LUA_REGISTRYINDEX);
+		storage_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		fiber_set_key(f, FIBER_KEY_LUA_STORAGE,
+			      (void *)(intptr_t) storage_ref);
 	}
-	lua_rawgeti(L, LUA_REGISTRYINDEX, f->lua_storage);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, storage_ref);
 	return 1;
 }
 

@@ -30,6 +30,7 @@
  */
 #include "index.h"
 #include "trigger.h"
+#include "session.h"
 
 extern double too_long_threshold;
 struct tuple;
@@ -71,7 +72,7 @@ struct txn {
 };
 
 /* Pointer to the current transaction (if any) */
-#define in_txn() (fiber()->session->txn)
+#define in_txn() (session()->txn)
 
 /**
  * Start a new statement. If no current transaction,
