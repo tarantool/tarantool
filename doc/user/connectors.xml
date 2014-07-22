@@ -113,10 +113,10 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the necessary file <filename>tp.h</filename>, and the default library path contains
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[513]'s primary key type is numeric (space[513].index[0].key_field[1].type = "NUM").
     To run, say <code>./example</code>.
-    The program will open a socket connection with the tarantool server at localhost:3303,
+    The program will open a socket connection with the tarantool server at localhost:3301,
     then format a buffer for sending an INSERT request, then send the request, then check if the
     server returned an error, then &mdash; if all is well &mdash; print "Insert succeeded". If the
     row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
@@ -136,10 +136,10 @@ int main()
   struct sockaddr_in sock;                                     /* the usual socket address info */
   if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket. abort if failure */
     exit(1);
-  memset(&amp;sock, 0, sizeof(sock));                              /* connect to localhost:3303 */
+  memset(&amp;sock, 0, sizeof(sock));                              /* connect to localhost:3301 */
   sock.sin_family = AF_INET;
   sock.sin_addr.s_addr = inet_addr("127.0.0.1");
-  sock.sin_port = htons(3303);
+  sock.sin_port = htons(3301);
   if (connect(fd, (struct sockaddr *)&amp;sock, sizeof(sock)) &lt; 0) /* connect, abort if failure */
     exit(1);
   const int greeting_buffer_size = 128;                        /* handle the server's greeting */
@@ -219,14 +219,14 @@ sudo cpan install DR::Tarantool
     <para>
     Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
-    with the tarantool server at localhost:3303, then send an INSERT request,
+    with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; end without displaying any messages.
-    If tarantool is not running on localhost with primary port = 3303, the program will print
+    If tarantool is not running on localhost with primary port = 3301, the program will print
     <quote>Connection refused</quote>.
     </para>
     <para>
@@ -237,7 +237,7 @@ use DR::Tarantool ':all';
 
 my $tnt = tarantool
   host    =&gt; '127.0.0.1',                      # look for tarantool on localhost
-  port    =&gt; 3303,                             # assume tarantool primary port = default
+  port    =&gt; 3301,                             # assume tarantool primary port = default
   spaces  =&gt; {
     0 =&gt; {                                     # definition of space[0] ...
       name =&gt; 't0',                            #   space[0] name = 't0'
@@ -295,18 +295,18 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     <para>
     Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3303) and
+    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
-    with the tarantool server at localhost:3303, then send an INSERT request,
+    with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; print "Insert succeeded".
     If the tuple already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
     </para>
     <para>
     <programlisting>
 &lt;?php
-$tarantool = new Tarantool("localhost", 3303, 33015);
+$tarantool = new Tarantool("localhost", 3301, 3313);
 try {
   $tarantool-&gt;insert(0, array(99999, "BB"), TARANTOOL_FLAGS_ADD);
   print "Insert succeeded\n";
@@ -334,10 +334,10 @@ catch (Exception $e) {
     or
     <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
     The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its primary port is
-    the default (3303) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
+    the default (3301) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
     and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
     starting the tarantool server and executing these requests:<programlisting>
-box.cfg{primary_port = 3303}
+box.cfg{primary_port = 3301}
 box.schema.create_space('space99') 
 box.space.space99:create_index('primary',{parts = {1,'STR'}})
 box.schema.user.grant('guest', 'read', 'space', '_space')
@@ -350,7 +350,7 @@ box.schema.user.grant('guest', 'read,write', 'space', 'space99')</programlisting
 #!/usr/bin/python
 from tarantool import Connection
 
-c = Connection("127.0.0.1", 3303)
+c = Connection("127.0.0.1", 3301)
 result = c.insert("space99",('First Tuple','Value', 'Value'))
 print result
 </programlisting>

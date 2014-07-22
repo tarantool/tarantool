@@ -161,7 +161,7 @@ Here is an example of an interactive-mode tarantool client session:
 <programlisting>
 <prompt>$ </prompt>tarantool
                 [ tarantool will display an introductory message including version number here ]
-tarantool> box.cfg{admin_port=3313, primary_port=3303}
+tarantool> box.cfg{admin_port=3313, primary_port=3301}
                 [ tarantool will display configuration information here ]
 tarantool> s = box.schema.create_space('tester')
                 [ tarantool may display an in-progress message here ]
@@ -189,10 +189,10 @@ Explanatory notes about what tarantool displayed in the above example:
 </para>
 <para>
 * Many requests return typed objects.
-    In the case of "box.cfg{admin_port=3313, primary_port=3303}",
+    In the case of "box.cfg{admin_port=3313, primary_port=3301}",
     this result is displayed on the screen.
     If the request had assigned the result to a variable, for example
-    "c = box.cfg{admin_port=3313, primary_port=3303}", then
+    "c = box.cfg{admin_port=3313, primary_port=3301}", then
     the result would not have been displayed on the screen.
 </para>
 <para>

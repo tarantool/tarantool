@@ -104,14 +104,14 @@ box.cfg{
 print('Starting ',arg[1])</programlisting>
 and suppose the command line is <code>~/tarantool/src/tarantool script.lua ARG</code>.
 Then the screen might look like this:<programlisting>
-<prompt>$</prompt> <userinput>export PRIMARY_PORT=3303</userinput>
+<prompt>$</prompt> <userinput>export PRIMARY_PORT=3301</userinput>
 <prompt>$</prompt> <userinput>~/tarantool/src/tarantool script.lua ARG</userinput>
 2014-07-02 10:19:29.078 ... version 1.6.0-1471-g663694c
 2014-07-02 10:19:29.078 ... log level 5
 2014-07-02 10:19:29.078 ... mapping 107374184 bytes for a shared arena...
 2014-07-02 10:19:29.086 ... initialized
 2014-07-02 10:19:29.101 ... recovery start
-2014-07-02 10:19:29.107 ...  bound to primary port tcp://0.0.0.0:3303
+2014-07-02 10:19:29.107 ...  bound to primary port tcp://0.0.0.0:3301
 2014-07-02 10:19:29.108 ... I am primary
 Starting  ARG
 2014-07-02 10:19:29.108 ... entering the event loop</programlisting>
@@ -224,7 +224,7 @@ Starting  ARG
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.
-          A typical value is 3303.</entry>
+          A typical value is 3301.</entry>
         </row>
 
         <row>
@@ -266,11 +266,11 @@ Starting  ARG
              ordinarily <command>ps</command> shows the Tarantool server process thus:
             </para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: primary pri: 3303 adm: 33135</programlisting>
+tarantool: primary pri: 3301 adm: 3313</programlisting>
           <para>But if the configuration file contains custom_proc_title=sessions then
           the output looks like:</para>
 <programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: primary@sessions pri: 3303 adm: 3313</programlisting>
+tarantool: primary@sessions pri: 3301 adm: 3313</programlisting>
           </entry>
         </row>
 
