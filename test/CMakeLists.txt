@@ -13,13 +13,3 @@ add_custom_target(test-force
 add_subdirectory(unit)
 # Disable connector_c for 1.6
 #add_subdirectory(connector_c)
-
-if (ENABLE_RPM)
-    install (FILES ${CMAKE_SOURCE_DIR}/src/box/bootstrap.snap
-             DESTINATION ${CMAKE_INSTALL_DATADIR}/tarantool
-             RENAME 00000000000000000001.snap)
-elseif(NOT ENABLE_RPM_SCL)
-    install (FILES ${CMAKE_SOURCE_DIR}/src/box/bootstrap.snap
-             DESTINATION "${CMAKE_INSTALL_LOCALSTATEDIR}/lib/tarantool"
-             RENAME 00000000000000000001.snap)
-endif()

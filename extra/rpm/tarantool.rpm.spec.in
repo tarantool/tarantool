@@ -153,7 +153,7 @@ tarantool-sql-module.
         .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
-	.. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
+        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
         .. ' %{!?scl:-DENABLE_RPM=ON}'
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
@@ -169,29 +169,19 @@ tarantool-sql-module.
 make DESTDIR=%{buildroot} install
 
 %post
-groupadd tarantool > /dev/null 2>&1
-useradd -r -g tarantool tarantool > /dev/null 2>&1
-# Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
 
 %preun
 
 %files
 %defattr(-,root,root,-)
 
-%dir "%{_datadir}/tarantool"
-%{!?scl:"%{_datadir}/tarantool/00000000000000000001.snap"}
+"%{_bindir}/tarantool"
 
 %dir "%{_datadir}/doc/tarantool"
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
 "%{_datadir}/doc/tarantool/box-protocol.txt"
 "%{_mandir}/man1/tarantool.1.gz"
-
-"%{_bindir}/tarantool"
-# %{!?scl:"%{_bindir}/tarantool_multi.sh"}
-# %{!?scl:"%{_bindir}/tarantool_deploy.sh"}
-# %{!?scl:"%{_sysconfdir}/init.d/tarantool"}
 
 %files sql-module
 %defattr(-,root,root,-)
