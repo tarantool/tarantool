@@ -54,7 +54,7 @@
     updates from the master having identical LSNs would
     not be applied. In fact, if replication is ON, Tarantool
     does not accept updates, even on its <olink
-    targetptr="primary_port"/>.
+    targetptr="primary_port">"listen" address</olink>.
   </para>
 </section>
 

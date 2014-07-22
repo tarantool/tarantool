@@ -1188,7 +1188,7 @@ session.delimiter('')!
     <varlistentry>
         <term>
              <emphasis role="lua" xml:id="boxindexiterator" xreflabel="box.index.iterator(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:iterator(<replaceable>iterator-type, bitset-value | field-value...</replaceable>)</emphasis>
+            box.space.<replaceable>space-name</replaceable>.index[.<replaceable>index-name</replaceable>]:pairs(<replaceable>bitset-value | field-value..., iterator-type</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1298,7 +1298,7 @@ session.delimiter('')!
     <varlistentry>
      <term>
              <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
+            box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1334,9 +1334,15 @@ The result will be a table of tuples and will look like this:
 ...
 </programlisting>
             </para>
+            <para>
+            Note: <code>[.index.<replaceable>index-name</replaceable>]</code> is optional. If it is
+            omitted, then the assumed index is the first (primary-key) index. Therefore, for
+            the example above, <code>box.space.tester:select(1, {iterator = 'GT'})</code>
+            would have returned the same two rows, via the 'primary' index.
+            </para>
         </listitem>
     </varlistentry>
-    
+
     <varlistentry>
         <term>
             <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
@@ -2262,11 +2268,11 @@ session.delimiter('')!
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.primary_port == 3301 then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server primary port number = 3301')</userinput>
+<prompt>        -&gt;</prompt><userinput>     if box.cfg.listen == '3301' then</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server listen address = 3301')</userinput>
 <prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server primary port number is not 3301')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...primary_port=3301...} was not stated)')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server listen address is not 3301')</userinput>
+<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
 <prompt>        -&gt;</prompt><userinput>       end</userinput>
 <prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3301)</userinput>
@@ -2297,7 +2303,7 @@ session.delimiter('')!
 ---
 - - self:ping() succeeded
   - '  (no surprise -- self connection is pre-established)'
-  - The local server primary port number = 3301 = default
+  - The local server's listen address's port number = 3301 = default
   - conn:delete done on tester.
   - conn:insert done on tester, index 0
   - '  primary key value = 800.'
@@ -3013,12 +3019,13 @@ error: can't save snapshot, errno 17 (File exists)
 </variablelist>
 </section>
 
-<section xml:id="sp-limitations">
-<title>A limitation that affects long-running Lua functions</title>
+<section xml:id="multitasking">
+<title>Atomic execution</title>
 
 <para>
-    There is a limitation in stored procedures support one should
-    be aware of: execution atomicity.
+    In several places it's been noted that Lua processes occur in
+    fibers on a single thread. That is why there
+    can be a guarantee of execution atomicity. That requires emphasis.
 </para>
 <bridgehead renderas="sect4">Cooperative multitasking environment</bridgehead>
 <para>
@@ -3059,9 +3066,66 @@ error: can't save snapshot, errno 17 (File exists)
     database state. Effectively, it's only possible
     to have CAS (compare-and-swap) -like atomic stored
     procedures: i.e. functions which select and then modify a record.
-
     Multiple data change requests always run through a built-in
     yield point.
+</para>
+<para>
+    At this point an objection could arise: "It's good that a single
+    data-change request will commit and yield, but surely there are
+    times when multiple data-change requests must happen without
+    yielding." The standard example is the money-transfer, where
+    $1 is withdrawn from account #1 and deposited into account #2.
+    If something interrupted after the withdrawal, then the
+    institution would be out of balance. For such cases, the
+    <code>begin ... commit|rollback</code> block was designed.
+</para>
+  <variablelist>
+    <varlistentry>
+      <term xml:id="begin" xreflabel="begin()">
+        <emphasis role="lua">box.begin()</emphasis>
+      </term>
+      <listitem><para>
+        From this point, implicit yields are suspended.
+        In effect the fiber which executes <code>box.begin()</code>
+        is starting an "active multi-request transaction", blocking all
+        other fibers until the transaction ends.
+      </para></listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term xml:id="commit" xreflabel="commit()">
+        <emphasis role="lua">box.commit()</emphasis>
+      </term>
+      <listitem><para>
+        End the currently active transaction, and make
+        all its data-change operations permanent.
+       </para></listitem>
+    </varlistentry>
+    
+    <varlistentry>
+      <term xml:id="rollback" xreflabel="rollback()">
+        <emphasis role="lua">box.rollback()</emphasis>
+      </term>
+      <listitem><para>
+        End the currently active transaction, but cancel
+        all its data-change operations. An explicit call
+        to fiber.yield() will have the same effect.
+       </para></listitem>
+    </varlistentry>
+    
+  </variablelist>
+
+<para>
+Example:
+Assuming that in tuple set 'tester' there are tuples
+in which the third field represents a positive dollar amount ...
+Start a transaction, withdraw from tuple#1, deposit in tuple#2,
+and end the transaction, making its effects permanent.<programlisting>
+box.begin()
+amount_of_money = 1.00
+box.space.tester:update({999}, {{'-', 3, amount_of_money}})
+box.space.tester:update({1000}, {{'+', 3, amount_of_money}})
+box.commit()</programlisting>
 </para>
 </section>
 
@@ -3388,7 +3452,7 @@ session.su(<replaceable>user-name</replaceable>)   #allows changing current user
 <para>
 If a user types requests directly on the Tarantool server in its interactive mode,
 or if a user connects via telnet to the administrative port (using
-<olink targetptr="admin_port"/> instead of primary_port), then the user by default is 'admin' and has
+<olink targetptr="admin_port">admin</olink> instead of listen), then the user by default is 'admin' and has
 many privileges. If a user connects from an application program via one of the
 <olink targetptr="connectors">connectors</olink>, then the user by default is 'guest' and has few
 privileges. Typically an admin user will set up and configure objects, then

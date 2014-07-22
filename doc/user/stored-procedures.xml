@@ -451,8 +451,8 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
     (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
     The functions in <code>digest</code> are:<programlisting><code>    digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
     digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with crc32.
-    digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
-    digest.sha0_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha0.
+    digest.sha(<replaceable>string</replaceable>)                    Returns 160-bit digest made with SHA-0. Not recommended.
+    digest.sha_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with sha.
     digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
     digest.sha1_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha1.
     digest.sha224(<replaceable>string</replaceable>)                 Returns 224-bit digest made with SHA-2.

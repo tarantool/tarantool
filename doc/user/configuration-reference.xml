@@ -95,8 +95,8 @@ The Lua program almost always begins by invoking <code>box.cfg()</code>,
 if the database server will be used or if ports need to be opened.
 For example, suppose <filename>script.lua</filename> contains the lines<programlisting>#!/usr/bin/env tarantool
 box.cfg{
-    primary_port        = os.getenv("PRIMARY_PORT"),
-    admin_port          = os.getenv("ADMIN_PORT"),
+    listen              = os.getenv("LISTEN"),
+    admin               = os.getenv("ADMIN"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50
@@ -112,7 +112,7 @@ Then the screen might look like this:<programlisting>
 2014-07-02 10:19:29.086 ... initialized
 2014-07-02 10:19:29.101 ... recovery start
 2014-07-02 10:19:29.107 ...  bound to primary port tcp://0.0.0.0:3301
-2014-07-02 10:19:29.108 ... I am primary
+2014-07-02 10:19:29.108 ... ready to accept requests
 Starting  ARG
 2014-07-02 10:19:29.108 ... entering the event loop</programlisting>
 </para>
@@ -138,7 +138,7 @@ Starting  ARG
   </para>
   <para>
     To see all the non-null parameters, say <code>box.cfg</code> (no parentheses).
-    To see a particular parameter, for example the primary port, say <code>box.cfg.primary_port</code>.
+    To see a particular parameter, for example the listen address, say <code>box.cfg.listen</code>.
   </para>
   <para>
     The following tables describe all parameters for basic operation,
@@ -212,7 +212,7 @@ Starting  ARG
           <entry>Deprecated. Do not use.</entry>
         </row>
         <row>
-          <entry xml:id="primary_port" xreflabel="primary_port">primary_port</entry>
+          <entry xml:id="primary_port" xreflabel="primary_port">listen</entry>
           <entry>integer or string</entry>
           <entry>null</entry>
           <entry>no</entry>
@@ -220,7 +220,7 @@ Starting  ARG
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
           if connections will occur from remote clients
-          that do not use admin_port.
+          that do not use "admin address" (the administrative host and port).
           Note: a replica also binds to this port, and accepts
           connections, but these connections can only serve
           reads until the replica becomes a master.
@@ -228,7 +228,7 @@ Starting  ARG
         </row>
 
         <row>
-          <entry xml:id="admin_port" xreflabel="admin_port">admin_port</entry>
+          <entry xml:id="admin_port" xreflabel="admin_port">admin</entry>
           <entry>integer or string</entry>
           <entry>null</entry>
           <entry>no</entry>
@@ -472,7 +472,7 @@ tarantool: primary@sessions pri: 3301 adm: 3313</programlisting>
           For example, if replication_source = "1.2.3.4:55555" then
           the replica server tries to connect to 1.2.3.4 port 55555.
           A replica server does not accept updates
-          on <olink targetptr="primary_port"/>. This parameter is
+          on <olink targetptr="primary_port">listen</olink>. This parameter is
           dynamic, that is, to enter master mode, simply set
           replication_source to an empty string and issue
           "box.cfg{replication_source=new-value}".</entry>
@@ -643,8 +643,8 @@ tarantool: primary@sessions pri: 3301 adm: 3313</programlisting>
           instances of the server using the same configuration file.
           The first one to start will be the "primary" instance.
           The second one to start will be the "standby" instance.
-          The standby instance will initialize and will try to connect on primary_port
-          and admin_port, but will fail because the
+          The standby instance will initialize and will try to connect on listen
+          address and admin address, but will fail because the
           primary instance has already taken them.
           So the standby instance goes into a loop, reading the write
           ahead log which the primary instance is writing (so the

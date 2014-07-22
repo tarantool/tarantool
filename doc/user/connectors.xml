@@ -113,7 +113,8 @@ And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on
     the necessary file <filename>tp.h</filename>, and the default library path contains
     the directory where Tarantool library files were placed at installation time.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
+    (local host, port 3301) and
     space[513]'s primary key type is numeric (space[513].index[0].key_field[1].type = "NUM").
     To run, say <code>./example</code>.
     The program will open a socket connection with the tarantool server at localhost:3301,
@@ -219,14 +220,15 @@ sudo cpan install DR::Tarantool
     <para>
     Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
+    (local host, port 3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
     with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; end without displaying any messages.
-    If tarantool is not running on localhost with primary port = 3301, the program will print
+    If tarantool is not running on localhost with listen address = port 3301, the program will print
     <quote>Connection refused</quote>.
     </para>
     <para>
@@ -237,7 +239,7 @@ use DR::Tarantool ':all';
 
 my $tnt = tarantool
   host    =&gt; '127.0.0.1',                      # look for tarantool on localhost
-  port    =&gt; 3301,                             # assume tarantool primary port = default
+  port    =&gt; 3301,                             # assume tarantool listen address = default
   spaces  =&gt; {
     0 =&gt; {                                     # definition of space[0] ...
       name =&gt; 't0',                            #   space[0] name = 't0'
@@ -295,7 +297,8 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     <para>
     Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
     Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its primary port is the default (3301) and
+    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
+    (local host, port 3301) and
     space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
@@ -333,11 +336,11 @@ catch (Exception $e) {
     <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
     <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
-    The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its primary port is
-    the default (3301) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
+    The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its listen address is
+    the default (local host, port 3301) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
     and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
     starting the tarantool server and executing these requests:<programlisting>
-box.cfg{primary_port = 3301}
+box.cfg{listen = 3301}
 box.schema.create_space('space99') 
 box.space.space99:create_index('primary',{parts = {1,'STR'}})
 box.schema.user.grant('guest', 'read', 'space', '_space')
