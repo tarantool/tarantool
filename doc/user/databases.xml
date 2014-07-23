@@ -90,7 +90,7 @@
     The contents of the <code>box</code> library can be inspected at runtime with
     <code>box</code>, with no arguments.
     The packages inside the box library are: schema, box.tuple, box.space, box.index, 
-    box.net.box, box.cfg, box.info, box.slab, box.stat.
+    net.box, box.cfg, box.info, box.slab, box.stat.
     Every package contains one or more Lua functions. A few packages contain members as well as functions.
     The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
     and introspection (inspecting contents of spaces, accessing server configuration).
@@ -2041,287 +2041,6 @@ session.delimiter('')!
 
 <!--   end of lib -->
 
-<section xml:id="sp-box-net-box">
-    <title>Package <code>box.net.box</code> &mdash; working with networked Tarantool peers</title>
-    <para>
-        The <code>box.net</code> package contains connectors to remote database systems.
-        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
-        &mdash; that variant is the subject of the <quote>SQL DBMS plugins</quote> appendix.
-        In this section the subject is the built-in variant, <code>box.net.box</code>.
-        This is for connecting to tarantool servers via a network.
-    </para>
-<variablelist xml:id="box.net.box">
-    <para>
-        Call <code>box.net.box.new()</code> to connect and get a connection object,
-        which will be called <code>conn</code> for examples in this section.
-        Call the other <code>box.net.box()</code> routines, passing <code>conn</code>,
-        to execute requests on the remote box.
-        Call <code>box.net.box.close(conn)</code> to disconnect.
-        Object-oriented and functional APIs are equivalent, so
-        <code>conn:close()</code> is the same as <code>box.net.box.close(conn)</code>.
-    </para>
-
-    <para>
-        All <code>box.net.box</code> methods are fiber-safe, that is, it is
-        safe to share and use the same connection object across
-        multiple concurrent fibers. In fact, it's perhaps the
-        best programming practice with Tarantool. When multiple
-        fibers use the same connection, all requests are pipelined
-        through the same network socket, but each fiber gets back a
-        correct response. Reducing the number of active sockets
-        lowers the overhead of system calls and increases the
-        overall server performance. There are, however, cases when
-        a single connection is not enough &mdash; for example when it's necessary to
-        prioritize requests or to use different authentication ids.
-    </para>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="box.net.box.new">
-             conn = box.net.box.new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, <replaceable>reconnect_interval</replaceable>])</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Create a new connection. The connection is
-                established on demand, at the time of the first
-                request. It is re-established automatically after
-                a disconnect. The argument
-                <code>reconnect_interval</code> (in seconds)
-                specifies the amount of time the server
-                sleeps between failing attempts to reconnect.
-                The returned <code>conn</code> object supports methods for making remote
-                requests, such as select, update or delete.
-            </para>
-            <para>
-               For the local tarantool server there is a pre-created always-established
-               connection object named <code>box.net.self</code>.
-               Its purpose is to make polymorphic use of the
-               <code>box.net.box</code> API easier. Therefore
-               <code>conn = box.net.box.new('localhost', 3301)</code> can
-               be replaced by <code>conn = box.net.box.self</code>.
-               However, there is an important difference between the embedded
-               connection and a remote one. With the embedded connection,
-               requests which do not modify data do not yield. When using
-               a remote connection, any request can yield, and local database state may
-               have changed by the time it returns.
-            </para>
-            <para>
-               Parameters: <code>host</code>, <code>port</code>, <code>reconnect_interval</code>.
-            </para>
-            <para>
-               Returns: (type = userdata) conn object).
-            </para>
-            <para>
-               Example: <code>conn = box.net.box.new('localhost', 3301)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.ping">
-        conn:ping()</emphasis></term>
-        <listitem>
-            <para>
-                Execute a PING command.
-            </para>
-            <para>
-               Returns: (type = boolean) <code>true</code> on success,
-                 <code>false</code> on error. Example: <code>self:ping()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.close">
-        conn:close()</emphasis></term>
-        <listitem>
-            <para>
-            Close a connection.
-            </para>
-            <para>
-              Connection objects are garbage collected just like any other objects
-              in Lua, so an explicit destruction is not mandatory.
-              However, since <code>close()</code> is a system call, it
-              is good programming practice to close a connection
-              explicitly when it is no longer needed, to avoid lengthy
-              stalls of the garbage collector.
-            </para>
-            <para>
-              Example: <code>conn:close()</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.select">
-         conn:select(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.select">box.space[<replaceable>space-number</replaceable>]:select(...)</code>.
-              Please note this difference: a local <code>box.space[<replaceable>space-number</replaceable>]:select(...)</code> does not yield,
-              but a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> call does yield,
-              so local data may change while a remote <code>conn:select(<replaceable>space-number</replaceable>, ...)</code> is running.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.insert">
-         conn:insert(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:insert(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.insert">box.space[<replaceable>space-number</replaceable>]:insert(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.replace">
-         conn:replace(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:replace(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.replace">box.space[<replaceable>space-number</replaceable>]:replace(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.update">
-         conn:update(<replaceable>space-number</replaceable>, <replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:update(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.update">box.space[<replaceable>space-number</replaceable>]:update(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.delete">
-         conn:delete(<replaceable>space-number</replaceable>, ...)</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:delete(<replaceable>space-number</replaceable>, ...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.delete">box.space[<replaceable>space-number</replaceable>]:delete(...)</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.call">
-         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
-        <listitem>
-            <para>
-              <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
-              That is, box.net.box.call is a remote stored-procedure call.
-              Please keep in mind that the call is using
-              the binary protocol to pack procedure arguments,
-              and the binary protocol is type agnostic, so it's recommended
-              to pass all arguments of remote stored procedure calls as
-              strings.
-            </para>
-            <para>
-              Example: <code>conn:call('box.space.tester:insert',{2})</code>.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua" xml:id="box.net.box.timeout">
-         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
-              Example: <code>conn:timeout(0.5):update({'1'}, {{'=p', 1, 15}})</code>.
-            </para>
-            <para>
-              All remote calls support execution timeouts.
-              Using a wrapper object makes the remote
-              connection API compatible with the local one, removing
-              the need for a separate <code>timeout</code> argument, which
-              the local version would ignore. Once a request is sent,
-              it cannot be revoked from the remote server even if
-              a timeout expires: the timeout expiration only aborts the
-              wait for the remote server response, not the request itself.
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-
- <bridgehead renderas="sect4">Example showing use of most of the box.net.box methods</bridgehead>
- <para>
- This example will work with the sandbox configuration described in the preface.
- That is, there is a space named tester with a numeric primary key.
- Assume that the database is nearly empty.
- Assume that the tarantool server is running on localhost 127.0.0.1:3301.
-<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'space', 'tester')</userinput>
-<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
-<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.net.self:ping() then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'self:ping() succeeded')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     if box.cfg.listen == '3301' then</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta,'The local server listen address = 3301')</userinput>
-<prompt>        -&gt;</prompt><userinput>     else</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, 'The local server listen address is not 3301')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       table.insert(ta, '(  (so connect will fail)')</userinput>
-<prompt>        -&gt;</prompt><userinput>       end</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn = box.net.box.new('127.0.0.1', 3301)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.tester.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on tester.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:insert(box.space.tester.id, {800, 'data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:insert done on tester, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>        -&gt;</prompt><userinput>     wtuple = conn:select(box.space.tester.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:select done on tester, index 0')</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:delete(box.space.tester.id, 800)</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:delete done on tester')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:replace(box.space.tester.id, {800, 'New data', 'Extra data'})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:replace done on tester')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:timeout(1):update(box.space.tester.id, {800}, {{'=p', 1, 'Fld#1'}})</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:update done on tester')</userinput>
-<prompt>        -&gt;</prompt><userinput>     conn:close()</userinput>
-<prompt>        -&gt;</prompt><userinput>     table.insert(ta, 'conn:close done')</userinput>
-<prompt>        -&gt;</prompt><userinput>   end!</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
-<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
----
-- - self:ping() succeeded
-  - '  (no surprise -- self connection is pre-established)'
-  - The local server's listen address's port number = 3301 = default
-  - conn:delete done on tester.
-  - conn:insert done on tester, index 0
-  - '  primary key value = 800.'
-  - conn:select done on tester, index 0
-  - '  number of fields = 2'
-  - conn:delete done on tester
-  - conn:replace done on tester
-  - conn:update done on tester
-  - conn:close done
-...
-<prompt>tarantool&gt;</prompt><userinput> box.space.tester:select(800) -- Prove that the update succeeded.</userinput>
----
-- [800, 'Fld#1', 'Extra data']
-...
-</programlisting>
-</para>
-</section>
-
 <section xml:id="sp-box-cfg">
     <title>Packages <code>box.cfg</code>,
     <code>box.info</code>, <code>box.slab</code> and
@@ -2573,6 +2292,288 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 </para>
 </section>
 
+<section xml:id="sp-net-box">
+    <title>Package <code>net.box</code> &mdash; working with networked Tarantool peers</title>
+    <para>
+        The <code>net.box</code> package contains connectors to remote database systems.
+        One variant, <code>box.net.sql</code>, is for connecting to MySQL or MariaDB or PostgreSQL
+        &mdash; that variant is the subject of the <olink targetptr="plugins"><quote>SQL DBMS plugins</quote></olink> appendix.
+        In this section the subject is the built-in variant, <code>box.net</code>.
+        This is for connecting to tarantool servers via a network.
+    </para>
+<variablelist xml:id="net.box">
+    <para>
+        Call <code>require('net.box')</code> to get a net.box object, which will be called <code>net_box</code>
+        for examples in this section.
+        Call <code><replaceable>net_box</replaceable>:new()</code> to connect and get a connection object,
+        which will be called <code>conn</code> for examples in this section.
+        Call the other <code>net.box()</code> routines, passing <code>conn:</code>,
+        to execute requests on the remote box.
+        Call <code>conn:close</code> to disconnect.
+    </para>
+
+    <para>
+        All <code>net.box</code> methods are fiber-safe, that is, it is
+        safe to share and use the same connection object across
+        multiple concurrent fibers. In fact, it's perhaps the
+        best programming practice with Tarantool. When multiple
+        fibers use the same connection, all requests are pipelined
+        through the same network socket, but each fiber gets back a
+        correct response. Reducing the number of active sockets
+        lowers the overhead of system calls and increases the
+        overall server performance. There are, however, cases when
+        a single connection is not enough &mdash; for example when it's necessary to
+        prioritize requests or to use different authentication ids.
+    </para>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="net.box.new">
+             conn = <replaceable>net_box</replaceable>:new(<replaceable>host</replaceable>, <replaceable>port</replaceable> [, {<replaceable>other parameter[s]</replaceable>}])</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Create a new connection. The connection is
+                established on demand, at the time of the first
+                request. It is re-established automatically after
+                a disconnect.
+                The returned <code>conn</code> object supports methods for making remote
+                requests, such as select, update or delete.
+            </para>
+            <para>
+               For the local tarantool server there is a pre-created always-established
+               connection object named <code><replaceable>net_box</replaceable>.self</code>.
+               Its purpose is to make polymorphic use of the
+               <code>net.box</code> API easier. Therefore
+               <code>conn = <replaceable>net_box</replaceable>:new('localhost', 3301)</code> can
+               be replaced by <code>conn = <replaceable>net.box</replaceable>.self</code>.
+               However, there is an important difference between the embedded
+               connection and a remote one. With the embedded connection,
+               requests which do not modify data do not yield. When using
+               a remote connection, any request can yield, and local database state may
+               have changed by the time it returns.
+            </para>
+            <para>
+             Parameters: <code>host</code>, <code>port</code>, <code>wait_connect</code>, <code>user</code>, <code>password</code>.
+            </para>
+            <para>
+               Returns: (type = userdata) conn object).
+            </para>
+            <para>
+               Examples: <code>conn = net_box:new('localhost', 3301)</code>,
+               <code>conn = net_box:new('127.0.0.1', box.cfg.listen, {wait_connect = false, user = 'guest', password = ''})</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.ping">
+        conn:ping()</emphasis></term>
+        <listitem>
+            <para>
+                Execute a PING command.
+            </para>
+            <para>
+               Returns: (type = boolean) <code>true</code> on success,
+               <code>false</code> on error. Example: <code>net_box.self:ping()</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.close">
+        conn:close()</emphasis></term>
+        <listitem>
+            <para>
+            Close a connection.
+            </para>
+            <para>
+              Connection objects are garbage collected just like any other objects
+              in Lua, so an explicit destruction is not mandatory.
+              However, since <code>close()</code> is a system call, it
+              is good programming practice to close a connection
+              explicitly when it is no longer needed, to avoid lengthy
+              stalls of the garbage collector.
+            </para>
+            <para>
+              Example: <code>conn:close()</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.select">
+         conn.space.<replaceable>space-name</replaceable>:select(<replaceable>field-value</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.select">box.space.<replaceable>space-name</replaceable>:select(...)</code>.
+              Please note this difference: a local <code>box.space.<replaceable>space-name</replaceable>:select(...)</code> does not yield,
+              but a remote <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> call does yield,
+              so local data may change while a remote <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> is running.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.insert">
+         conn.space.<replaceable>space-name</replaceable>:insert{field-value, ...}</emphasis></term>
+        <listitem>
+            <para>
+             <code>conn.space.<replaceable>space-name</replaceable>:insert(...)</code> is the remote-call equivalent of the local call
+             <code xlink:href="#box.insert">box.space.<replaceable>space-name</replaceable>:insert(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.replace">
+         conn.space.<replaceable>space-name</replaceable>:replace{field-value, ...}</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn.space.<replaceable>space-name</replaceable>:replace(...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.replace">box.space.<replaceable>space-name</replaceable>:replace(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.update">
+         conn.space.<replaceable>space-name</replaceable>:update(<replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
+        <listitem>
+            <para>
+             <code>conn.space.<replaceable>space-name</replaceable>:update(...)</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.update">box.space.<replaceable>space-name</replaceable>:update(...)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.delete">
+         conn.space.<replaceable>space-name</replaceable>:delete{key}</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn.space.<replaceable>space-name</replaceable>:delete{...}</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.delete">box.space.<replaceable>space-name</replaceable>:delete{...}</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.call">
+         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+              <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
+              That is, conn:call is a remote stored-procedure call.
+            </para>
+            <para>
+              Example: <code>conn:call('box.space.tester:insert',{2})</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.timeout">
+         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.
+              Example: <code>conn:timeout(0.5).space.tester:update({1}, {{'=', 2, 15}})</code>.
+            </para>
+            <para>
+              All remote calls support execution timeouts.
+              Using a wrapper object makes the remote
+              connection API compatible with the local one, removing
+              the need for a separate <code>timeout</code> argument, which
+              the local version would ignore. Once a request is sent,
+              it cannot be revoked from the remote server even if
+              a timeout expires: the timeout expiration only aborts the
+              wait for the remote server response, not the request itself.
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+
+ <bridgehead renderas="sect4">Example showing use of most of the net.box methods</bridgehead>
+ <para>
+ This example will work with the sandbox configuration described in the preface.
+ That is, there is a space named tester with a numeric primary key.
+ Assume that the database is nearly empty.
+ Assume that the tarantool server is running on localhost 127.0.0.1:3301.
+<programlisting>
+<prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'universe')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> net_box = require('net.box')!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> function example()</userinput>
+<prompt>         &gt;</prompt><userinput> if net_box.self:ping() then</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta, 'self:ping() succeeded')</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta, '  (no surprise -- self connection is pre-established)')</userinput>
+<prompt>         &gt;</prompt><userinput> end</userinput>
+<prompt>         &gt;</prompt><userinput> if box.cfg.listen == '3301' then</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta,'The local server listen address = 3301')</userinput>
+<prompt>         &gt;</prompt><userinput> else</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta, 'The local server listen address is not 3301')</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta, '(  (maybe box.cfg{...listen="3301"...} was not stated)')</userinput>
+<prompt>         &gt;</prompt><userinput>   table.insert(ta, '(  (so connect will fail)')</userinput>
+<prompt>         &gt;</prompt><userinput> end</userinput>
+<prompt>         &gt;</prompt><userinput> conn = net_box:new('127.0.0.1', 3301)</userinput>
+<prompt>         &gt;</prompt><userinput> conn.space.tester:delete{800}</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn delete done on tester.')</userinput>
+<prompt>         &gt;</prompt><userinput> conn.space.tester:insert{800, 'data'}</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn insert done on tester, index 0')</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, '  primary key value = 800.')</userinput>
+<prompt>         &gt;</prompt><userinput> wtuple = conn.space.tester:select(800)</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn select done on tester, index 0')</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
+<prompt>         &gt;</prompt><userinput> conn.space.tester:delete{800}</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn delete done on tester')</userinput>
+<prompt>         &gt;</prompt><userinput> conn.space.tester:replace{800, 'New data', 'Extra data'}</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn:replace done on tester')</userinput>
+<prompt>         &gt;</prompt><userinput> conn:timeout(0.5).space.tester:update({800}, {{'=', 2, 'Fld#1'}})</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn update done on tester')</userinput>
+<prompt>         &gt;</prompt><userinput> conn:close()</userinput>
+<prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn close done')</userinput>
+<prompt>         &gt;</prompt><userinput> end!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> example()</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt><userinput> ta</userinput>
+---
+- - self:ping() succeeded
+  - '  (no surprise -- self connection is pre-established)'
+  - The local server listen address = 3301
+  - conn delete done on tester.
+  - conn insert done on tester, index 0
+  - '  primary key value = 800.'
+  - conn select done on tester, index 0
+  - '  number of fields = 1'
+  - conn delete done on tester
+  - conn:replace done on tester
+  - conn update done on tester
+  - conn close done
+...
+<prompt>tarantool&gt;</prompt><userinput> box.space.tester:select(800) -- Prove that the update succeeded.</userinput>
+---
+- [800, 'Fld#1', 'Extra data']
+...
+</programlisting>
+</para>
+</section>
 
 <section xml:id="sp-shard">
     <title>Package <code>shard</code></title>
@@ -2659,8 +2660,8 @@ https://github.com/tarantool/shard/blob/master/README.md</link>.
 Get the space number and the primary-key value from the function's parameters.
 Pass the space number and the primary-key value to [curr] or [prev] to get a Shard Identification Number.
 If the number is equal to "me", perform the function directly because this is the responsible node.
-Otherwise, use the box.net.box package to pass the function to the host and port of
-  the node that, according to the Shard List, is responsible for handling this tuple.
+Otherwise, use the box.net package to pass the function to the host and port of
+the node that, according to the Shard List, is responsible for handling this tuple.
 </programlisting>
         </para>
         </listitem>
