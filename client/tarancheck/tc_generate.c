@@ -452,16 +452,6 @@ int tc_generate(struct tc_options *opts)
 	struct tnt_dir snap_dir;
 	tnt_dir_init(&snap_dir, TNT_DIR_SNAPSHOT);
 
-	if (opts->cfg.snap_dir == NULL) {
-		printf("snapshot directory is not specified\n");
-		tc_space_free(&s);
-		return -1;
-	}
-	if (opts->cfg.wal_dir == NULL) {
-		printf("xlog directory is not specified\n");
-		tc_space_free(&s);
-		return -1;
-	}
 	rc = tnt_dir_scan(&snap_dir, opts->cfg.snap_dir);
 	if (rc == -1) {
 		printf("failed to open snapshot directory\n");
