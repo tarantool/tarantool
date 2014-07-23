@@ -162,8 +162,8 @@ if os.path.exists('/tmp/tarantool-test-socket'):
 exec admin "lua function aexitst(ai, host, port) for i, a in pairs(ai) do if a.host == host and a.port == port then return true end end return false end"
 
 exec admin "lua aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp', type = 'SOCK_STREAM'}), '127.0.0.1', 80 )"
-exec admin "lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0"
-exec admin "lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0"
+exec admin "lua #(box.socket.getaddrinfo('tarantool.org', 'http', {})) > 0"
+exec admin "lua #(box.socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})) == 0"
 
 exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')"
@@ -217,17 +217,17 @@ exec admin "lua sc:close()"
 
 print("tcp_connect")
 
-exec admin "lua s = box.socket.tcp_connect('mail.ru', 80)"
+exec admin "lua s = box.socket.tcp_connect('tarantool.org', 80)"
 exec admin "lua string.match(tostring(s), ', aka') ~= nil"
 exec admin "lua string.match(tostring(s), ', peer') ~= nil"
-exec admin "lua s:write('GET / HTTP/1.0\\r\\nHost: mail.ru\\r\\n\\r\\n')"
+exec admin "lua s:write('HEAD / HTTP/1.0\\r\\nHost: tarantool.org\\r\\n\\r\\n')"
 exec admin "lua header = s:readline(4000, { '\\n\\n', '\\r\\n\\r\\n' }, 1)"
 exec admin "lua string.match(header, '\\r\\n\\r\\n$') ~= nil"
 # exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
 exec admin "lua s:close()"
 
-# exec admin "lua box.socket.tcp_connect('mail.ru', 80, 0.00000000001)"
-# exec admin "lua box.socket.tcp_connect('mail.ru', 12345)"
+exec admin "lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)"
+exec admin "lua box.socket.tcp_connect('tarantool.org', 12345)"
 
 
 exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"

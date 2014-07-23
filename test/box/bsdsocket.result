@@ -516,11 +516,11 @@ lua aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp', ty
 ---
  - true
 ...
-lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
+lua #(box.socket.getaddrinfo('tarantool.org', 'http', {})) > 0
 ---
  - true
 ...
-lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+lua #(box.socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})) == 0
 ---
  - true
 ...
@@ -694,7 +694,7 @@ lua sc:close()
  - true
 ...
 tcp_connect
-lua s = box.socket.tcp_connect('mail.ru', 80)
+lua s = box.socket.tcp_connect('tarantool.org', 80)
 ---
 ...
 lua string.match(tostring(s), ', aka') ~= nil
@@ -705,7 +705,7 @@ lua string.match(tostring(s), ', peer') ~= nil
 ---
  - true
 ...
-lua s:write('GET / HTTP/1.0\r\nHost: mail.ru\r\n\r\n')
+lua s:write('HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n')
 ---
  - true
 ...
@@ -719,6 +719,14 @@ lua string.match(header, '\r\n\r\n$') ~= nil
 lua s:close()
 ---
  - true
+...
+lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)
+---
+ - nil
+...
+lua box.socket.tcp_connect('tarantool.org', 12345)
+---
+ - nil
 ...
 lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
 ---
