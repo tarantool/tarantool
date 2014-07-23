@@ -54,15 +54,11 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	stmt->row = row;
 }
 
-extern "C" void
+static void
 txn_on_yield(struct trigger * /* trigger */, void * /* event */)
 {
 	txn_rollback(); /* doesn't throw */
 }
-
-struct trigger on_yield = {
-	rlist_nil, txn_on_yield, NULL, NULL
-};
 
 void
 txn_replace(struct txn *txn, struct space *space,
@@ -95,8 +91,10 @@ txn_replace(struct txn *txn, struct space *space,
 	if (txn->autocommit == false) {
 		if (txn->n_stmts == 1) {
 			txn->engine = engine_id(space->engine);
-			if (engine_no_yield(txn->engine))
-				trigger_add(&fiber()->on_yield, &on_yield);
+			if (engine_no_yield(txn->engine)) {
+				trigger_add(&fiber()->on_yield,
+					    &txn->fiber_on_yield);
+			}
 		} else if (txn->engine != engine_id(space->engine))
 			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 		if (! engine_transactional(txn->engine)) {
@@ -137,6 +135,10 @@ txn_begin(bool autocommit)
 	rlist_create(&txn->stmts);
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
+	txn->fiber_on_yield = {
+		rlist_nil, txn_on_yield, NULL, NULL
+	};
+
 	txn->autocommit = autocommit;
 	in_txn() = txn;
 	return txn;
@@ -171,7 +173,7 @@ txn_commit(struct txn *txn)
 	assert(txn == in_txn());
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-		trigger_clear(&on_yield);
+		trigger_clear(&txn->fiber_on_yield);
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if ((!stmt->old_tuple && !stmt->new_tuple) ||
 		    space_is_temporary(stmt->space))
@@ -252,7 +254,7 @@ txn_rollback()
 			tuple_ref(stmt->new_tuple, -1);
 	}
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
-		trigger_clear(&on_yield);
+		trigger_clear(&txn->fiber_on_yield);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();

@@ -69,6 +69,8 @@ struct txn {
 	bool autocommit;
 	/** Id of the engine involved in multi-statement transaction. */
 	uint8_t engine;
+	/** Trigger on fiber yield to abort transaction for in-memory engine */
+	struct trigger fiber_on_yield;
 };
 
 /* Pointer to the current transaction (if any) */
