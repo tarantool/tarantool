@@ -61,6 +61,8 @@ struct session {
 	uint32_t uid;
 	/** Current transaction, if started. */
 	struct txn *txn;
+	/** Trigger for fiber on_stop to cleanup created on-demand session */
+	struct trigger fiber_on_stop;
 	/** Command delimiter - used by admin console and interactive mode */
 	char delim[SESSION_DELIM_SIZE];
 };
@@ -139,6 +141,12 @@ session_free();
 void
 session_storage_cleanup(int sid);
 
+static inline struct session *
+fiber_get_session(struct fiber *fiber)
+{
+	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
+}
+
 static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
@@ -146,12 +154,13 @@ fiber_set_session(struct fiber *fiber, struct session *session)
 }
 
 #define session() ({\
-	struct session *s = (struct session *) fiber_get_key(fiber(),		\
-		FIBER_KEY_SESSION);						\
+	struct session *s = fiber_get_session(fiber());				\
 	/* Create session on demand */						\
 	if (s == NULL) {							\
 		s = session_create(-1, 0);					\
 		fiber_set_session(fiber(), s);					\
+		/* Add a trigger to destroy session on fiber stop */		\
+		trigger_add(&fiber()->on_stop, &s->fiber_on_stop);		\
 	}									\
 	s; })
 

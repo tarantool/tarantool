@@ -102,6 +102,8 @@ struct fiber {
 
 	/** Triggers invoked before this fiber yields. Must not throw. */
 	struct rlist on_yield;
+	/** Triggers invoked before this fiber stops.  Must not throw. */
+	struct rlist on_stop;
 
 	/* This struct is considered as non-POD when compiling by g++.
 	 * You can safetly ignore all offset_of-related warnings.
@@ -265,15 +267,6 @@ fiber_get_key(struct fiber *fiber, enum fiber_key key)
  * \sa fiber_key_on_gc()
  */
 typedef void (*fiber_key_gc_cb)(enum fiber_key key, void *arg);
-
-/**
- * \brief Set finalizing callback invoked on destroy local storage value
- * \param key key
- * \param cb callback
- * Finalizers are global (i.e. are not cord/thread-local).
- */
-void
-fiber_key_on_gc(enum fiber_key key, fiber_key_gc_cb cb, void *arg);
 
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 

@@ -54,6 +54,20 @@ sid_max()
 	return sid_max;
 }
 
+static void
+session_on_stop(struct trigger * trigger, void *event)
+{
+	(void) event;
+	/* Remove on_stop trigger from fiber */
+	trigger_clear(trigger);
+	struct session *session = fiber_get_session(fiber());
+	if (session == NULL)
+		return;
+	/* Destroy session */
+	session_destroy(session);
+	fiber_set_session(fiber(), NULL);
+}
+
 struct session *
 session_create(int fd, uint64_t cookie)
 {
@@ -64,6 +78,9 @@ session_create(int fd, uint64_t cookie)
 	session->cookie = cookie;
 	session->delim[0] = '\0';
 	session->txn = NULL;
+	session->fiber_on_stop = {
+		rlist_nil, session_on_stop, NULL, NULL
+	};
 	session_set_user(session, ADMIN, ADMIN);
 	random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
@@ -126,23 +143,12 @@ session_fd(uint32_t sid)
 	return session->fd;
 }
 
-static void
-fiber_key_session_gc(enum fiber_key key, void *arg)
-{
-	(void) arg;
-	struct session *session = (struct session *) fiber_get_key(fiber(), key);
-	if (session == NULL)
-		return;
-	session_destroy(session);
-}
-
 void
 session_init()
 {
 	session_registry = mh_i32ptr_new();
 	if (session_registry == NULL)
 		panic("out of memory");
-	fiber_key_on_gc(FIBER_KEY_SESSION, fiber_key_session_gc, NULL);
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 }
 
@@ -161,8 +167,7 @@ SessionGuard::SessionGuard(int fd, uint64_t cookie)
 
 SessionGuard::~SessionGuard()
 {
-	assert(session == (struct session *) fiber_get_key(fiber(),
-							   FIBER_KEY_SESSION));
+	assert(session == fiber_get_session(fiber()));
 	session_destroy(session);
 	fiber_set_session(fiber(), NULL);
 }
