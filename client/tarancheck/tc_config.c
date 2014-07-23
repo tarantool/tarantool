@@ -33,6 +33,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <unistd.h>
 
 #include <cfg/prscfg.h>
 #include <cfg/tarantool_box_cfg.h>
@@ -60,5 +62,25 @@ int tc_config_load(struct tc_options *opts)
 	rc = check_cfg_tarantool_cfg(&opts->cfg);
 	if (rc == -1)
 		return -1;
+
+	char workdir[PATH_MAX];
+
+	if (opts->cfg.work_dir == NULL) {
+		getcwd(workdir, PATH_MAX);
+		opts->cfg.work_dir = strndup(opts->cfg.work_dir, PATH_MAX);
+	}
+	if (opts->cfg.snap_dir == NULL) {
+		free(opts->cfg.snap_dir);
+		opts->cfg.snap_dir = strndup(opts->cfg.work_dir, PATH_MAX);
+		if (!opts->cfg.snap_dir)
+			return -1;
+	}
+	if (opts->cfg.wal_dir == NULL) {
+		free(opts->cfg.wal_dir);
+		opts->cfg.wal_dir = strndup(opts->cfg.work_dir, PATH_MAX);
+		if (!opts->cfg.wal_dir)
+			return -1;
+	}
+
 	return 0;
 }
