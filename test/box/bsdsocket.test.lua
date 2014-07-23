@@ -182,8 +182,8 @@ aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
     type = 'SOCK_STREAM'}), '127.0.0.1', 80 );
 --# setopt delimiter ''
 
-#(socket.getaddrinfo('mail.ru', 'http', {})) > 0
-wrong_addr = socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+#(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
+wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
 wrong_addr == nil or #wrong_addr == 0
 
 sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
@@ -245,10 +245,10 @@ sc:close()
 
 -- tcp_connect
 
-s = socket.tcp_connect('mail.ru', 80)
+s = socket.tcp_connect('tarantool.org', 80)
 string.match(tostring(s), ', aka') ~= nil
 string.match(tostring(s), ', peer') ~= nil
-s:write("GET / HTTP/1.0\r\nHost: mail.ru\r\n\r\n")
+s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
 header = s:readline(4000, { "\n\n", "\r\n\r\n" }, 1)
 string.match(header, "\r\n\r\n$") ~= nil
 string.match(header, "200 [Oo][Kk]") ~= nil

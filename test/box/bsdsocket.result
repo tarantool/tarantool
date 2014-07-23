@@ -569,11 +569,11 @@ aexitst( socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp',
 - true
 ...
 --# setopt delimiter ''
-#(socket.getaddrinfo('mail.ru', 'http', {})) > 0
+#(socket.getaddrinfo('tarantool.org', 'http', {})) > 0
 ---
 - true
 ...
-wrong_addr = socket.getaddrinfo('mail12211alklkl.ru', 'http', {})
+wrong_addr = socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})
 ---
 ...
 wrong_addr == nil or #wrong_addr == 0
@@ -772,7 +772,7 @@ sc:close()
 - true
 ...
 -- tcp_connect
-s = socket.tcp_connect('mail.ru', 80)
+s = socket.tcp_connect('tarantool.org', 80)
 ---
 ...
 string.match(tostring(s), ', aka') ~= nil
@@ -783,7 +783,7 @@ string.match(tostring(s), ', peer') ~= nil
 ---
 - true
 ...
-s:write("GET / HTTP/1.0\r\nHost: mail.ru\r\n\r\n")
+s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
 ---
 - true
 ...
