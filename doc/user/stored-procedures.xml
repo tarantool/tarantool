@@ -1916,6 +1916,62 @@ for instructions about defining triggers for connect and disconnect events
 
 </section>
 
+<section xml:id="sp-console">
+ <title>package <code>console</code></title>
+<variablelist xml:id="console">
+    <para>
+    The console package allows one Tarantool server,
+    in interactive mode, to access another Tarantool
+    server over a TCP connection. Subsequent requests
+    will appear to be handled locally, but in reality
+    the requests are being sent to the remote server
+    and the local server is acting as a client.
+    There is a single function in the package: connect().
+    Once connection is successful, the prompt
+    will change and subsequent requests are sent
+    to, and executed on, the remote server.
+    Results are displayed on the local server.
+    To return to local mode, enter control-D.
+    </para>
+    <para>
+    There are no restrictions on the types of requests
+    that can be entered, except those which are due to
+    privilege restrictions -- the login to the remote
+    server is done with user name = 'guest'. The remote
+    server should allow for this by granting at least
+    one privilege:
+    <code>box.schema.user.grant('guest','execute','universe')</code>.
+    </para>
+    <varlistentry>
+        <term><emphasis role="lua">console:connect(<replaceable>host</replaceable>,<replaceable>port</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+                Connect to the server at host:port, change the prompt from
+                'tarantool' to 'host:port', and act henceforth as a client
+                until the user ends the session or types control-D.
+            </para>
+            <para>
+                Parameters: <code>host</code>, <code>port</code>.
+            </para>
+            <para>
+                Returns: nothing.
+            </para>
+            <para>
+             <bridgehead renderas="sect4">Example showing use of console</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>console = require('console')</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>console.connect('198.18.44.44', 3301)</userinput>
+---
+...
+<prompt>198.18.44.44:3301&gt;</prompt> <userinput>-- prompt is telling us that server is remote</userinput></programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+</variablelist>
+
+</section>
 
 <section xml:id="sp-expirationd">
  <title>expirationd -- the daemon that shifts expired tuples to a long-term archive</title>
