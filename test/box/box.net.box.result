@@ -254,7 +254,7 @@ cn:ping()
 ...
 cn:call('test_foo')
 ---
-- error: Connection was closed
+- error: Connection is not established
 ...
 -- -- 2 reconnect
 cn = remote:new('127.0.0.1', port, { reconnect_after = .1 })

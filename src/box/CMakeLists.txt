@@ -50,4 +50,5 @@ add_library(box
     lua/space.cc
     lua/info.cc
     lua/stat.cc
+    lua/error.cc
     ${bin_sources})

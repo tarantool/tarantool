@@ -1,3 +1,5 @@
+#ifndef INCLUDES_TARANTOOL_LUA_ERROR_H
+#define INCLUDES_TARANTOOL_LUA_ERROR_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -27,60 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#include "lua/errinj.h"
+struct lua_State;
 
-#include <errinj.h>
-
-extern "C" {
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-} /* extern "C" */
-
-static int
-lbox_errinj_set(struct lua_State *L)
-{
-	char *name = (char*)luaL_checkstring(L, 1);
-	bool state = lua_toboolean(L, 2);
-	if (errinj_set_byname(name, state)) {
-		lua_pushfstring(L, "error: can't find error injection '%s'", name);
-		return 1;
-	}
-	lua_pushstring(L, "ok");
-	return 1;
-}
-
-static inline int
-lbox_errinj_cb(struct errinj *e, void *cb_ctx)
-{
-	struct lua_State *L = (struct lua_State*)cb_ctx;
-	lua_pushstring(L, e->name);
-	lua_newtable(L);
-	lua_pushstring(L, "state");
-	lua_pushboolean(L, e->state);
-	lua_settable(L, -3);
-	lua_settable(L, -3);
-	return 0;
-}
-
-static int
-lbox_errinj_info(struct lua_State *L)
-{
-	lua_newtable(L);
-	errinj_foreach(lbox_errinj_cb, L);
-	return 1;
-}
-
-static const struct luaL_reg errinjlib[] = {
-	{"info", lbox_errinj_info},
-	{"set", lbox_errinj_set},
-	{NULL, NULL}
-};
-
-/** Initialize box.errinj package. */
 void
-tarantool_lua_errinj_init(struct lua_State *L)
-{
-	luaL_register(L, "errinj", errinjlib);
-	lua_pop(L, 1);
-}
+box_lua_error_init(struct lua_State *L);
+
+#endif /* INCLUDES_TARANTOOL_LUA_ERROR_H */

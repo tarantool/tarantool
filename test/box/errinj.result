@@ -1,4 +1,4 @@
-errinj = require('errinj')
+errinj = require('box.error.injection')
 ---
 ...
 space = box.schema.create_space('tweedledum')
@@ -196,7 +196,7 @@ s_disabled.enabled
 ...
 s_disabled:insert{0}
 ---
-- error: 'No index #0 is defined in space 512'
+- error: 'No index #0 is defined in space ''disabled'''
 ...
 s_withindex:create_index('secondary', { type = 'tree', parts = { 2, 'num'} })
 ---
@@ -271,7 +271,7 @@ box.space['withdata']
 ...
 s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
 ---
-- error: Space 514 does not exist
+- error: Space '#514' does not exist
 ...
 s_withdata.index.another
 ---

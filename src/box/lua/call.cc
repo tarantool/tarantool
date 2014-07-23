@@ -29,6 +29,7 @@
 #include "box/lua/call.h"
 #include "pickle.h"
 
+#include "box/lua/error.h"
 #include "box/lua/tuple.h"
 #include "box/lua/index.h"
 #include "box/lua/space.h"
@@ -304,7 +305,7 @@ boxffi_select(struct port *port, uint32_t space_id, uint32_t index_id,
 		box_process(port, &request);
 		return 0;
 	} catch (Exception *e) {
-		/* will be hanled by box.raise() in Lua */
+		/* will be hanled by box.error() in Lua */
 		return -1;
 	}
 }
@@ -366,27 +367,6 @@ lbox_delete(lua_State *L)
 	/* Ignore index_id for now */
 	box_process((struct port *) &port, &request);
 	return lua_gettop(L) - 3;
-}
-
-static int
-lbox_raise(lua_State *L)
-{
-	if (lua_gettop(L) == 0) {
-		/* re-throw saved exceptions (if any) */
-		if (cord()->exception == NULL)
-			return 0;
-		cord()->exception->raise();
-		return 0;
-	}
-
-	if (lua_gettop(L) < 2)
-		luaL_error(L, "box.raise(): bad arguments");
-	uint32_t code = lua_tointeger(L, 1);
-	if (code >= tnt_error_codes_enum_MAX)
-		luaL_error(L, "box.raise(): unknown error code");
-	const char *str = lua_tostring(L, 2);
-	tnt_raise(ClientError, str, code);
-	return 0;
 }
 
 /**
@@ -537,7 +517,6 @@ lbox_snapshot(struct lua_State *L)
 }
 
 static const struct luaL_reg boxlib[] = {
-	{"raise", lbox_raise},
 	{"snapshot", lbox_snapshot},
 	{NULL, NULL}
 };
@@ -560,6 +539,7 @@ box_lua_init(struct lua_State *L)
 	luaL_register_module(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 
+	box_lua_error_init(L);
 	box_lua_tuple_init(L);
 	box_lua_index_init(L);
 	box_lua_space_init(L);

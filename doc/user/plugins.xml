@@ -46,7 +46,7 @@ can work on both SQL and Tarantool inside the same Lua routine.
 <para>
 The connection method is
 <code>box.net.sql.connect('mysql'|'pg', <replaceable>host</replaceable>, <replaceable>port</replaceable>, <replaceable>user</replaceable>, <replaceable>password</replaceable>, <replaceable>database</replaceable>)</code>.
-The methods for select/insert/etc. are the same as the ones in <olink targetptr="sp-box-net-box">the box.net library</olink>.
+The methods for select/insert/etc. are the same as the ones in <link linkend="sp-net-box">the net.box package</link>.
 </para>
 
 <para xml:id="plugin-mysql-example">

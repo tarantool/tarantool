@@ -8,7 +8,8 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
-while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end;
+fiber = require('fiber')
+while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
 do
     local pri_id = ''
     local begin_lsn = 0
@@ -44,7 +45,7 @@ do
 
     function _wait_lsn(_lsnd)
         while _get_pri_lsn() < _lsnd + begin_lsn do
-            require('fiber').sleep(0.001)
+            fiber.sleep(0.001)
         end
         begin_lsn = begin_lsn + _lsnd
     end
@@ -69,7 +70,9 @@ _wait_lsn(10)
 _select(1, 10)
 
 --# stop server default
-require('fiber').sleep(0.2)
+--# set connection hot_standby
+while box.info.status ~= 'running' do fiber.sleep(0.001) end
+--# set connection replica
 
 -- hot_standby.listen is garbage, since hot_standby.lua
 -- uses MASTER environment variable for its listen

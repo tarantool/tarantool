@@ -10,21 +10,15 @@ t
 t = nil
 
 ----------------
--- # box.raise
+-- # box.error
 ----------------
 
 --# stop server default
 --# start server default
--- during server starting there could be exceptions,
--- therefore box.raise() call can throw and can not throw,
--- that's why we can't test box.raise() result
-
-1 + 1
-box.raise(123, 'test')
-box.raise(0, 'the other test')
-box.raise(12, 345)
-box.raise()
-box.raise()
+box.error({code = 123, reason = 'test'})
+box.error(box.error.ILLEGAL_PARAMS, "bla bla")
+box.error()
+box.error()
 
 space = box.space.tweedledum
 

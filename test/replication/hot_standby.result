@@ -9,7 +9,8 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 --# set connection default
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
-while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end;
+fiber = require('fiber')
+while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
 ---
 ...
 do
@@ -47,7 +48,7 @@ do
 
     function _wait_lsn(_lsnd)
         while _get_pri_lsn() < _lsnd + begin_lsn do
-            require('fiber').sleep(0.001)
+            fiber.sleep(0.001)
         end
         begin_lsn = begin_lsn + _lsnd
     end
@@ -118,9 +119,11 @@ _select(1, 10)
 - [10, 'the tuple 10']
 ...
 --# stop server default
-require('fiber').sleep(0.2)
+--# set connection hot_standby
+while box.info.status ~= 'running' do fiber.sleep(0.001) end
 ---
 ...
+--# set connection replica
 -- hot_standby.listen is garbage, since hot_standby.lua
 -- uses MASTER environment variable for its listen
 --# set variable hot_standby_port to 'hot_standby.master'

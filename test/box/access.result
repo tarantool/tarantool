@@ -82,7 +82,7 @@ end;
 ...
 usermax();
 ---
-- error: User 'user29' does not exist
+- error: User 'user29' is not found
 ...
 --# setopt delimiter ''
 box.schema.user.create('rich')

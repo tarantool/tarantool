@@ -8,6 +8,11 @@
 %define _source_filedigest_algorithm 0
 %define _binary_filedigest_algorithm 0
 
+%global debug_package %{nil}
+%global _enable_debug_package %{nil}
+%global __debug_install_post %{nil}
+%global __debug_package %{nil}
+
 %bcond_without postgresql
 %bcond_without mysql
 
@@ -27,7 +32,8 @@ BuildRequires: binutils-devel
 BuildRequires: perl-podlators
 %endif
 
-# Strange bug. Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+# Strange bug.
+# Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 Name: %{?scl_prefix}tarantool
@@ -37,8 +43,9 @@ Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
-Requires: %{?scl_prefix}tarantool-debuginfo = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 Requires: readline
+Provides: %{?scl_prefix}tarantool-debuginfo
+Provides: %{?scl_prefix}tarantool-debug
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -153,7 +160,7 @@ tarantool-sql-module.
         .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
         .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
         .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
-	.. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
+        .. ' %{!?scl:-DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir}}'
         .. ' %{!?scl:-DENABLE_RPM=ON}'
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
@@ -169,29 +176,19 @@ tarantool-sql-module.
 make DESTDIR=%{buildroot} install
 
 %post
-groupadd tarantool > /dev/null 2>&1
-useradd -r -g tarantool tarantool > /dev/null 2>&1
-# Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
 
 %preun
 
 %files
 %defattr(-,root,root,-)
 
-%dir "%{_datadir}/tarantool"
-%{!?scl:"%{_datadir}/tarantool/00000000000000000001.snap"}
+"%{_bindir}/tarantool"
 
 %dir "%{_datadir}/doc/tarantool"
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
 "%{_datadir}/doc/tarantool/box-protocol.txt"
 "%{_mandir}/man1/tarantool.1.gz"
-
-"%{_bindir}/tarantool"
-%{!?scl:"%{_bindir}/tarantool_multi.sh"}
-%{!?scl:"%{_bindir}/tarantool_deploy.sh"}
-%{!?scl:"%{_sysconfdir}/init.d/tarantool"}
 
 %files sql-module
 %defattr(-,root,root,-)

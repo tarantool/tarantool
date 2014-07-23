@@ -171,15 +171,11 @@ local proto = {
             opts = {}
         end
         if spaceno == nil or type(spaceno) ~= 'number' then
-            box.raise(box.error.NO_SUCH_SPACE,
-                string.format("Space %s does not exist", tostring(spaceno)))
+            box.error(box.error.NO_SUCH_SPACE, '#'..tostring(spaceno))
         end
 
         if indexno == nil or type(indexno) ~= 'number' then
-            box.raise(box.error.NO_SUCH_INDEX,
-                string.format("No index #%s is defined in space %s",
-                    tostring(spaceno),
-                    tostring(indexno)))
+            box.error(box.error.NO_SUCH_INDEX, indexno, '#'..tostring(spaceno))
         end
 
         local body = {
@@ -203,8 +199,7 @@ local proto = {
             if type(opts.iterator) == 'string' then
                 local iterator = box.index[ opts.iterator ]
                 if iterator == nil then
-                    box.raise(box.error.INVALID_MSGPACK,
-                        "Wrong iterator " .. opts.iterator)
+                    box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
                 end
                 body[ITERATOR] = iterator
             else
@@ -266,8 +261,7 @@ local function space_metatable(self)
                 if #res == 1 then
                     return res[1]
                 end
-                box.raise(box.error.MORE_THAN_ONE_TUPLE,
-                    "More than one tuple found by get()")
+                box.error(box.error.MORE_THAN_ONE_TUPLE)
             end
         }
     }
@@ -291,8 +285,7 @@ local function index_metatable(self)
                 if #res == 1 then
                     return res[1]
                 end
-                box.raise(box.error.MORE_THAN_ONE_TUPLE,
-                    "More than one tuple found by get()")
+                box.error(box.error.MORE_THAN_ONE_TUPLE)
             end,
 
             min = function(idx, key)
@@ -425,7 +418,7 @@ local remote_methods = {
 
                 if not cn:wait_connected(timeout) then
                     cn:close()
-                    box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+                    box.error(box.error.TIMEOUT)
                 end
                 return cn
             end
@@ -845,15 +838,14 @@ local remote_methods = {
 
         if self.state == 'closed' then
             if raise then
-                box.raise(box.error.NO_CONNECTION,
-                    "Connection was closed")
+                box.error(box.error.NO_CONNECTION)
             end
         end
 
         if self.timeouts[fid] <= 0 then
             self.timeouts[fid] = nil
             if raise then
-                box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+                box.error(box.error.TIMEOUT)
             else
                 return {
                     hdr = { [TYPE] = bit.bor(ERROR_TYPE, box.error.TIMEOUT) },
@@ -893,7 +885,7 @@ local remote_methods = {
 
         if response == nil then
             if raise then
-                box.raise(box.error.TIMEOUT, 'Timeout exceeded')
+                box.error(box.error.TIMEOUT)
             else
                 return {
                     hdr = { [TYPE] = bit.bor(ERROR_TYPE, box.error.TIMEOUT) },
@@ -903,8 +895,10 @@ local remote_methods = {
         end
 
         if raise and response.hdr[TYPE] ~= OK then
-            local errcode = bit.band(response.hdr[TYPE], ERROR - 1)
-            box.raise(errcode, response.body[ERROR])
+            box.error({
+                code = response.hdr[TYPE],
+                reason = response.body[ERROR]
+            })
         end
 
         if response.body[DATA] ~= nil then
@@ -971,8 +965,16 @@ remote.self = {
     end
 }
 
-setmetatable(remote.self, { __index = box })
 
+setmetatable(remote.self, {
+    __index = function(self, key)
+        if key == 'space' then
+            -- proxy self.space to box.space
+            return require('box').space
+        end
+        return nil
+    end
+})
 
 return remote
 

@@ -104,23 +104,23 @@ space.index[0]
 --
 space:select{0}
 ---
-- error: 'No index #0 is defined in space 321'
+- error: 'No index #0 is defined in space ''hello'''
 ...
 space:insert{0, 0}
 ---
-- error: 'No index #0 is defined in space 321'
+- error: 'No index #0 is defined in space ''hello'''
 ...
 space:replace{0, 0}
 ---
-- error: 'No index #0 is defined in space 321'
+- error: 'No index #0 is defined in space ''hello'''
 ...
 space:update({0}, {{'+', 1, 1}})
 ---
-- error: 'No index #0 is defined in space 321'
+- error: 'No index #0 is defined in space ''hello'''
 ...
 space:delete{0}
 ---
-- error: 'No index #0 is defined in space 321'
+- error: 'No index #0 is defined in space ''hello'''
 ...
 t = _space:delete{space.id}
 ---
@@ -134,7 +134,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space 321 does not exist
+- error: Space '#321' does not exist
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---

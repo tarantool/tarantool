@@ -59,7 +59,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  7 */_(ER_SECONDARY,			2, "Can't modify data upon a request on the secondary port.") \
 	/*  8 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/*  9 */_(ER_CREATE_SPACE,		2, "Failed to create space %u: %s") \
-	/* 10 */_(ER_SPACE_EXISTS,		2, "Space %u already exists") \
+	/* 10 */_(ER_SPACE_EXISTS,		2, "Space '%s' already exists") \
 	/* 11 */_(ER_DROP_SPACE,		2, "Can't drop space %u: %s") \
 	/* 12 */_(ER_ALTER_SPACE,		2, "Can't modify space %u: %s") \
 	/* 13 */_(ER_INDEX_TYPE,		2, "Unsupported index type supplied for index %u in space %u") \
@@ -84,13 +84,13 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 32 */_(ER_PROC_LUA,			2, "%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		2, "Procedure '%.*s' is not defined") \
 	/* 34 */_(ER_NO_SUCH_TRIGGER,		2, "Trigger is not found") \
-	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space %u") \
-	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space %u does not exist") \
+	/* 35 */_(ER_NO_SUCH_INDEX,		2, "No index #%u is defined in space '%s'") \
+	/* 36 */_(ER_NO_SUCH_SPACE,		2, "Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		2, "Field %u was not found in the tuple") \
 	/* 38 */_(ER_SPACE_FIELD_COUNT,		2, "Tuple field count %u does not match space %u field count %u") \
 	/* 39 */_(ER_INDEX_FIELD_COUNT,		2, "Tuple field count %u is less than required by a defined index (expected %u)") \
 	/* 40 */_(ER_WAL_IO,			2, "Failed to write to disk") \
-	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found") \
+	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	2, "More than one tuple found by get()") \
 	/* 42 */_(ER_ACCESS_DENIED,		2, "%s access denied for user '%s'") \
 	/* 43 */_(ER_CREATE_USER,		2, "Failed to create user '%s': %s") \
 	/* 44 */_(ER_DROP_USER,			2, "Failed to drop user '%s': %s") \
@@ -121,7 +121,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
 	/* 70 */_(ER_IDENTIFIER,		2, "Invalid identifier '%s' (expected letters, digits or an underscore)") \
 	/* 71 */_(ER_DROP_FUNCTION,		2, "Can't drop function %u: %s") \
-	/* 72 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type %s") \
+	/* 72 */_(ER_ITERATOR_TYPE,		2, "Unknown iterator type '%s'") \
 	/* 73 */_(ER_REPLICA_MAX,		2, "Replica count limit reached: %u") \
 	/* 74 */_(ER_INVALID_XLOG,		2, "Failed to read xlog: %lld") \
 	/* 75 */_(ER_INVALID_XLOG_NAME,		2, "Invalid xlog name: expected %lld got %lld") \
@@ -146,7 +146,7 @@ extern struct errcode_record tnt_error_codes[];
 static inline const char *tnt_errcode_str(uint32_t errcode)
 {
 	if (errcode >= tnt_error_codes_enum_MAX) {
-		/* Unknown error code - can be triggered using box.raise() */
+		/* Unknown error code - can be triggered using box.error() */
 		return "ER_UNKNOWN";
 	}
 	return tnt_error_codes[errcode].errstr;
