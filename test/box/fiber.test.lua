@@ -77,12 +77,19 @@ f = fiber.create(y);
 fiber.sleep(0.002);
 fiber.cancel(f);
 -- fiber garbage collection
-for k = 1, 1000, 1 do
+n = 1000;
+ch = fiber.channel(n);
+for k = 1, n, 1 do
     fiber.create(
         function()
             fiber.sleep(0)
+            ch:put(k)
         end
     )
+end;
+
+for k = 1, n, 1 do
+    ch:get()
 end;
 --# setopt delimiter ''
 
@@ -174,12 +181,6 @@ res
 f=fiber.create(r, 'hello', 'world', 'wide')
 while f:status() == 'running' do fiber.sleep(0) end
 res
-for k=1, 10000, 1 do fiber.create(function() fiber.sleep(0) end) end
-collectgarbage('collect')
--- check that these newly created fibers are garbage collected
-fiber.find(9000)
-fiber.find(9010)
-fiber.find(9020)
 --  test fiber.status functions: invalid arguments
 fiber.status(1)
 fiber.status('fafa-gaga')
