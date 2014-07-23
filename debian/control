@@ -31,8 +31,9 @@ Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-lts-common
 Conflicts: tarantool-dbg (<< 1.5.2),
  tarantool (<< 1.6)
+ tarantool-client (<< 1.5.0)
 Replaces: tarantool (<< 1.6)
-Suggests: tarantool-lts-client, libdr-tarantool-perl
+Suggests: tarantool-lts-client (>= 1.5.0), libdr-tarantool-perl
 Description: In-memory database with Lua application server
  Tarantool is an in-memory database and Lua application server.
  Its key properties include:
