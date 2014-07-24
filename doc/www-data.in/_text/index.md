@@ -37,7 +37,7 @@ index:
             local host = self.req.peer.host
             local response = {{
                 host = host;
-                counter = space:inc(host);
+                counter = hosts:inc(host);
             }}
             self:render({{ json = response }})
         end
