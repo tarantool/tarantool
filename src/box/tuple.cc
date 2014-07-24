@@ -289,9 +289,6 @@ static void
 print_field(struct tbuf *buf, const char *field, uint32_t len)
 {
 	switch (len) {
-	case 2:
-		tbuf_printf(buf, "%hu", *(uint16_t *)field);
-		break;
 	case 4:
 		tbuf_printf(buf, "%u", *(uint32_t *)field);
 		break;
