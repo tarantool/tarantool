@@ -30,7 +30,7 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, tarantool-lts-common
 Conflicts: tarantool-dbg (<< 1.5.2),
- tarantool (<< 1.6)
+ tarantool (<< 1.6),
  tarantool-client (<< 1.5.0)
 Replaces: tarantool (<< 1.6)
 Suggests: tarantool-lts-client (>= 1.5.0), libdr-tarantool-perl
