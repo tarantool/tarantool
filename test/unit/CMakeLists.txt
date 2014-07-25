@@ -1,5 +1,5 @@
 add_compile_flags("C;CXX" "-Wno-unused")
-file(GLOB all_sources *.c *.m *.mm)
+file(GLOB all_sources *.c *.cc)
 set_source_files_compile_flags(${all_sources})
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
