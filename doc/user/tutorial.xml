@@ -546,7 +546,7 @@ try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>t = s:insert(
 </programlisting>
 
 To select a tuple from the first space of the database,
-using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select({3})</userinput></programlisting>
+using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select{3}</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting>
 tarantool&gt; s = box.schema.create_space('tester')
@@ -574,7 +574,7 @@ tarantool&gt;</programlisting>
 </para>
 
 <para>
-You can repeat box.space...:insert() and box.space...:select() indefinitely.
+You can repeat box.space...:insert{} and box.space...:select{} indefinitely.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop tarantool: <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
@@ -675,7 +675,7 @@ inserted and selected tuples.
     The _space system space has information about existing spaces.
     The _index system space has information about existing indexes.
     Old syntax "show ..." no longer exists.
-    New syntax is box.space._space:select(<replaceable>Lua-table</replaceable>)
+    New syntax is box.space._space:select{<replaceable>Lua-table</replaceable>}
     or other Lua functions.
   </para>
   <para>NEW TRIGGERS FOR REPLACE.
@@ -714,7 +714,7 @@ inserted and selected tuples.
     for example, replace
     <computeroutput>SELECT * FROM t0 WHERE k0 = 2</computeroutput>
     with
-    <computeroutput>box.space.t0:select{2}</computeroutput>.
+    <computeroutput>box.space.t0:selec(2)</computeroutput>.
   </para>
 
 </section>

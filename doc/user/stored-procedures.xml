@@ -251,7 +251,7 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
 tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
 tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
-        -&gt; <userinput>              t = box.space.tester:select(key);</userinput>
+        -&gt; <userinput>              t = box.space.tester:select{key};</userinput>
         -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
         -&gt; <userinput>              end</userinput>
         -&gt; <userinput>              return f(...)]], 1)!</userinput>
@@ -936,7 +936,7 @@ tarantool> box.space.tester:insert{20,msgpack.NULL,20}
       only if the runaway fiber calls <code>fiber.testcancel()</code>
       once in a while. Most <code>box.*</code> hooks, such as <code>box.space...delete()</code>
       or <code>box.space...update()</code>, do call <code>fiber.testcancel()</code>.
-      <code>box.space...select()</code> does not.
+      <code>box.space...select{}</code> does not.
       In practice, a runaway fiber can only become unresponsive
       if it does many computations and does not check
       whether it's been canceled.
@@ -1403,7 +1403,7 @@ end
 
 function producer_fiber()
     while true do
-        task = box.space...:select(...)
+        task = box.space...:select{...}
         ...
         if channel:is_empty() then
             # channel is empty
@@ -1428,7 +1428,7 @@ end
 
 function producer2_fiber()
     while true do
-        task = box.space...select(...)
+        task = box.space...select{...}
 
         if channel:put(task, 10) then       -- 10 seconds
             ...

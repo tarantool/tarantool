@@ -332,7 +332,7 @@ use a SELECT request.
 
 <programlisting>
 main_function()!
-box.space.tester:select(1)!
+box.space.tester:select{1}!
 </programlisting>
 </para>
 
@@ -355,7 +355,7 @@ tarantool&gt; <userinput>function main_function()</userinput>
 tarantool&gt; <userinput>main_function()!</userinput>
 ---
 ...
-tarantool&gt; <userinput>box.space.tester:select(1)!</userinput>
+tarantool&gt; <userinput>box.space.tester:select{1}!</userinput>
 ---
 - - [1, 'EUJYVEECIL']
 ...

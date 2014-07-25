@@ -19,60 +19,69 @@
   <title>Data manipulation</title>
 
   <para>
-    The four basic "data-manipulation" requests are: insert() / replace(),
-    update(), delete(), select(). They all, including
-    insert() and update() and delete(), may return data.
-    There are other request types for scanning multiple keys.
+    The basic "data-manipulation" requests are:
+    <code>insert</code>, <code>replace</code>,
+    <code>update</code>, <code>delete</code>, <code>select</code>.
+    They all are part of the <code>box</code> library.
+    They all may return data.
+    Usually both inputs and outputs may be Lua tables.
  </para>
+ <para>
+   The Lua syntax for data-manipulation functions can vary.
+   Here are examples of the variations with <code>select</code> examples;
+   the same rules exist for the other data-manipulation functions.
+   Every one of the examples does the same thing: select a tuple set
+   from a space named tester where the primary-key field value equals 1.
+  </para>
   <para>
-    The update() function supports operations on fields &mdash;
-    assignment, arithmetic operations (the field must be numeric),
-    cutting and pasting fragments of a field, &mdash; as well as
-    operations on a tuple: push and pop of a field at the tail of
-    a tuple, deletion and insertion of a field.  Multiple
-    operations can be combined into a single update, and in this
-    case they are performed atomically. Each operation expects
-    field number as its first argument. When a sequence of changes
-    is present, field identifier in each operation is assumed to
-    be relative to the most recent state of the tuple, i.e. as if
-    all previous operations in a multi-operation update have
-    already been applied. In other words, it's always safe to
-    merge multiple update() invocations into a single one, with no
-    change in semantics.
+    First there are "naming variations":
+    <orderedlist xml:id="name-syntaxes" xreflabel="name-syntaxes">
+      <listitem><para><code>box.space.tester:select{1}</code></para></listitem>
+      <listitem><para><code>box.space['tester']:select{1}</code></para></listitem>
+      <listitem><para><code>box.space[512]:select{1}</code></para></listitem>
+    <listitem><para><code>variable = 'tester'; box.space[variable]:select{1}</code></para></listitem>
+   </orderedlist>
+   ... There is an assumption that
+   the numeric id of 'tester' is 512, which happens to be the
+   case in our sandbox example only. Literal values such as
+   'tester' may be replaced by variable names.
+   Examples and descriptions in this manual have the "box.space.space.tester:" form;
+   however, this is a matter of user preference and
+   all the variants exist in the wild.
+  </para>
+  <para>
+    Then there are "parameter variations":
+    <orderedlist xml:id="parameter-syntaxes" xreflabel="parameter-syntaxes">
+      <listitem><para><code>box.space.tester:select{1}</code></para></listitem>
+      <listitem><para><code>box.space.tester:select({1})</code></para></listitem>
+      <listitem><para><code>box.space.tester:select(1)</code></para></listitem>
+      <listitem><para><code>box.space.tester:select({1},{iterator='EQ'})</code></para></listitem>
+      <listitem><para><code>variable = 1; box.space.tester:select{variable}</code></para></listitem>
+      <listitem><para><code>variable = {1}; box.space.tester:select(variable)</code></para></listitem>
+    </orderedlist>
+    ... The primary-key value is enclosed in braces, and if it was a
+    multi-part primary key then the value would be multi-part,
+    for example "...select{1,2,3}". The braces can be enclosed
+    inside parentheses -- "...select({...}) -- which is
+    optional unless it is necessary to pass something besides
+    the primary-key value, as in the fourth example.
+    Literal values such as 1 (a scalar value) or {1}
+    (a Lua table value) may be replaced by variable names,
+    as in examples [5] and [6].
+    Although there are special cases where braces can be omitted,
+    they are preferable because they signal "Lua table".
+    Examples and descriptions in this manual have the "{1}" form; however, this
+    too is a matter of user preference and all the variants
+    exist in the wild.
+  </para>
+ 
+  <para>
+    All the data-manipulation functions operate on tuple sets but,
+    since primary keys are unique, the number of tuples in the tuple set is always 1.
+    The only exception is <code>box.space...select</code>, which may accept either a
+    primary-key value or a secondary-key value.
   </para>
 
-  <para>Tarantool protocol was designed with focus on asynchronous
-    I/O and easy integration with proxies. Each client
-    request starts with a variable-length binary header, containing
-    request id, request type, server id, log sequence number, and
-    so on.
-  </para>
- <para>
-    The mandatory length, present in request header simplifies
-    client or proxy I/O.  A response to a request is sent to the
-    client as soon as it is ready. It always carries in its header
-    the same type and id as in the request. The id makes it
-    possible to match a request to a response, even if the latter
-    arrived out of order.
-  </para>
-  <para>For the insert() and update() and delete() operations,
-    it is mandatory to pass the primary-key value.
-    For the select() operation, either a primary-key value or a
-    secondary-key value (possibly multi-part) may be passed.
-    All the data-manipulation functions operate on whole tuple(s),
-    except update() -- for update() one only needs
-    to list the fields that are actually changed.
-  </para>
-  <para>Unless implementing a client driver, one needn't
-    concern oneself with the complications of the binary
-    protocol. <olink targetptr="connectors">Language-specific
-    drivers</olink> provide a friendly way to store domain
-    language data structures in Tarantool.
-    A complete description of the binary protocol
-    is maintained in annotated Backus-Naur
-    form in the source tree: please see
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>.
-  </para>
 </section>
 
 <section xml:id="sp-box-library">
@@ -270,7 +279,8 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
 <variablelist xml:id="box.space" xreflabel="box.space">
     <para>
       The <code>box.space</code> package has the data-manipulation
-      functions select(), insert(), replace(), update(), delete().
+      functions <code>select</code>, <code>insert</code>, <code>replace</code>, <code>update</code>,
+      <code>delete</code>, <code>get</code>, <code>put</code>.
       It also has members, such as id, and whether or not a space is
       enabled.
       Package source code is available in file <filename
@@ -365,7 +375,7 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.select" xreflabel="box.select">
-             box.space.<replaceable>space-name</replaceable>:select(<replaceable>{field-value [, field-value ...]</replaceable>}
+             box.space.<replaceable>space-name</replaceable>:select{<replaceable>field-value [, field-value ...]</replaceable>}
             </emphasis>
         </term>
         <listitem>
@@ -373,11 +383,11 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
                 Search for a tuple in the given space.
             </para>
             <para>
-                 Parameters: (type = tuple) <code>field-value(s)</code>&mdash;
-                 = values to be matched against the index key, which may be multipart.
+                 Parameters: (type = tuple, as a Lua table) <code>field-value(s)</code>&mdash;
+                 = values to be matched against the index key, which may be multi-part.
             </para>
             <para>
-               Returns: (type = table of tuples) the selected tuple.
+               Returns: (type = tuple set, as a Lua table) the selected tuple.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -406,9 +416,43 @@ tarantool> <userinput>table_of_tuples[1]</userinput>
 - [105, 'test#2', 'first_name', 'last_name']
 ...
 </programlisting>
-            For examples of complex select()s, which can return multiple tuples
+            For examples of complex <code>select</code>s, which can return multiple tuples
             via secondary indexes, see the later section <olink targetptr="box.index.iterator">box.space.space-name.index.index-name]:select</olink>.
             </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="box.get" xreflabel="box.get">
+             box.space.<replaceable>space-name</replaceable>:get{<replaceable>field-value [, field-value ...]</replaceable>}
+            </emphasis>
+        </term>
+        <listitem>
+            <para>
+                Search for a tuple in the given space.
+            </para>
+            <para>
+                 Parameters: (type = tuple, as a Lua table) <code>field-value(s)</code>&mdash;
+                 = values to be matched against the index key, which may be multi-part.
+            </para>
+            <para>
+               Returns: (type = tuple) the selected tuple.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type.
+            </para>
+            <para>
+               Possible Errors: No such space; wrong type.
+            </para>
+            <para>
+               The <code>box.space...select</code> function returns a set of tuples as a Lua
+               table; the <code>box.space...get</code> function returns a single tuple.
+               And it is possible to get the first tuple in a tuple set by appending "[1]".
+               Therefore <code>box.space.tester:get{1}</code> has the same effect as
+               <code>box.space.tester:select{1}[1]</code>, and may serve as a convenient
+               shorthand.
+             </para>
         </listitem>
     </varlistentry>
 
@@ -564,13 +608,19 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             <emphasis role="lua" xml:id="box.replace">
             box.space.<replaceable>space-name</replaceable>:replace{<replaceable>field-value [, field-value ...]</replaceable>}
             </emphasis>
+            or
+            <emphasis role="lua" xml:id="box.put">
+            box.space.<replaceable>space-name</replaceable>:put{<replaceable>field-value [, field-value ...]</replaceable>}
+           </emphasis>
         </term>
         <listitem>
             <para>
                 Insert a tuple into a space. If a tuple with
                 the same primary key already exists,
                 <code>box.space...:replace()</code> replaces the existing
-                tuple with a new one.
+                tuple with a new one. The syntax variants <code>box.space...:replace()</code>
+                and <code>box.space...:put()</code> have the same effect; the latter is sometimes
+                 used to show that the effect is the converse of <code>box.space...:get()</code>.
             </para>
             <para>
               Parameters: <code>space-name</code>, <code> field-value(s)</code> = fields of the new tuple.
@@ -594,6 +644,22 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             <para>
                 Update a tuple.
                </para>
+  <para>
+   The <code>update</code> function supports operations on fields &mdash;
+    assignment, arithmetic operations (the field must be numeric),
+    cutting and pasting fragments of a field, &mdash; as well as
+    operations on a tuple: push and pop of a field at the tail of
+    a tuple, deletion and insertion of a field.  Multiple
+    operations can be combined into a single update, and in this
+    case they are performed atomically. Each operation expects
+    field number as its first argument. When a sequence of changes
+    is present, field identifier in each operation is assumed to
+    be relative to the most recent state of the tuple, i.e. as if
+    all previous operations in a multi-operation update have
+    already been applied. In other words, it's always safe to
+    merge multiple <code>update</code> invocations into a single invocation, with no
+    change in semantics.
+  </para>
             <para>
              Parameters: <code>space-name</code>,
               <code>key</code> = primary-key field values, must be passed as a Lua table if key is multi-part,
@@ -1298,7 +1364,7 @@ session.delimiter('')!
     <varlistentry>
      <term>
              <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select(<replaceable>{fields, {parameters}]</replaceable>)</emphasis>
+            box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select({<replaceable>{fields}, {parameters}]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1308,7 +1374,7 @@ session.delimiter('')!
              return) and the offset (that is, which tuple to start with in the list).
             </para>
             <para>
-              Returns: (type = table of tuples) the tuple or tuples that match the field values.
+              Returns: (type = tuple set, as a Lua table) the tuple or tuples that match the field values.
             </para>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
@@ -1337,8 +1403,15 @@ The result will be a table of tuples and will look like this:
             <para>
             Note: <code>[.index.<replaceable>index-name</replaceable>]</code> is optional. If it is
             omitted, then the assumed index is the first (primary-key) index. Therefore, for
-            the example above, <code>box.space.tester:select(1, {iterator = 'GT'})</code>
+            the example above, <code>box.space.tester:select({1}, {iterator = 'GT'})</code>
             would have returned the same two rows, via the 'primary' index.
+            </para>
+            <para>
+             Note: <code>box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:select(...)[1]</code>.
+             can be replaced by <code>box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:get(...)</code>.
+             That is, <code>get</code> can be used as a convenient shorthand to get the first
+             tuple in the tuple set that would be returned by <code>select</code>.
+             However, if there is more than one tuple in the tuple set, then <code>get</code> returns an error.
             </para>
         </listitem>
     </varlistentry>
@@ -1636,7 +1709,7 @@ The example function will: (1) select a tuple whose key value is 1000;
 (4) Get field[3] from what was replaced;
 (5) Format the value from field[3] as yyyy-mm-dd hh:mm:ss.ffff;
 (6) Return the formatted value.
-The function uses Tarantool box functions box.space...select(), box.space...replace(), fiber.time(), uuid.hex().
+The function uses Tarantool box functions <code>box.space...select</code>, <code>box.space...replace</code>, <code>fiber.time</code>, <code>uuid.hex()</code>.
 The function uses Lua functions
 <link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
@@ -1647,7 +1720,7 @@ function example()
   local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
   local formatted_time_field
   local fiber = require('fiber')
-  table_of_selected_tuples = box.space.tester:select(1000)
+  table_of_selected_tuples = box.space.tester:select{1000}
   if table_of_selected_tuples ~= nil then
     if table_of_selected_tuples[1] ~= nil then
       if #table_of_selected_tuples[1] == 3 then
@@ -2403,14 +2476,14 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.select">
-         conn.space.<replaceable>space-name</replaceable>:select(<replaceable>field-value</replaceable>, ...)</emphasis></term>
+         conn.space.<replaceable>space-name</replaceable>:select{<replaceable>field-value</replaceable>, ...}</emphasis></term>
         <listitem>
             <para>
-              <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> is the remote-call equivalent of the local call
-              <code xlink:href="#box.select">box.space.<replaceable>space-name</replaceable>:select(...)</code>.
-              Please note this difference: a local <code>box.space.<replaceable>space-name</replaceable>:select(...)</code> does not yield,
-              but a remote <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> call does yield,
-              so local data may change while a remote <code>conn.space.<replaceable>space-name</replaceable>:select(...)</code> is running.
+              <code>conn.space.<replaceable>space-name</replaceable>:select{...}</code> is the remote-call equivalent of the local call
+              <code xlink:href="#box.select">box.space.<replaceable>space-name</replaceable>:select{...}</code>.
+              Please note this difference: a local <code>box.space.<replaceable>space-name</replaceable>:select{...}</code> does not yield,
+              but a remote <code>conn.space.<replaceable>space-name</replaceable>:select{...}</code> call does yield,
+              so local data may change while a remote <code>conn.space.<replaceable>space-name</replaceable>:select{...}</code> is running.
             </para>
         </listitem>
     </varlistentry>
@@ -2529,7 +2602,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 <prompt>         &gt;</prompt><userinput> conn.space.tester:insert{800, 'data'}</userinput>
 <prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn insert done on tester, index 0')</userinput>
 <prompt>         &gt;</prompt><userinput> table.insert(ta, '  primary key value = 800.')</userinput>
-<prompt>         &gt;</prompt><userinput> wtuple = conn.space.tester:select(800)</userinput>
+<prompt>         &gt;</prompt><userinput> wtuple = conn.space.tester:select{800}</userinput>
 <prompt>         &gt;</prompt><userinput> table.insert(ta, 'conn select done on tester, index 0')</userinput>
 <prompt>         &gt;</prompt><userinput> table.insert(ta, '  number of fields = ' .. #wtuple)</userinput>
 <prompt>         &gt;</prompt><userinput> conn.space.tester:delete{800}</userinput>
@@ -2567,7 +2640,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
   - conn update done on tester
   - conn close done
 ...
-<prompt>tarantool&gt;</prompt><userinput> box.space.tester:select(800) -- Prove that the update succeeded.</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.space.tester:select{800} -- Prove that the update succeeded.</userinput>
 ---
 - [800, 'Fld#1', 'Extra data']
 ...
@@ -3057,9 +3130,9 @@ error: can't save snapshot, errno 17 (File exists)
     in request processing.
     Avoiding this situation is the responsibility of the function's
     author. Most of the <code>box</code> calls, such as
-    <code>box.space...insert()</code>, <code>box.space...update()</code>,
-    <code>box.space...delete()</code> are yield points;
-    <code>box.space...select()</code>, however, is not.
+    <code>box.space...insert</code>, <code>box.space...update</code>,
+    <code>box.space...delete</code> are yield points;
+    <code>box.space...select</code>, however, is not.
 </para>
 <para>
     It should also be noted that, in absence of transactions,
