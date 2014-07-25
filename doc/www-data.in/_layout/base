@@ -5,8 +5,9 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <link rel="shortcut icon" href="favicon.ico" />
     {% if not docs %}
-    <link rel="stylesheet" type="text/css" href="/global.css" />
+    <link rel="stylesheet" type="text/css" href="global.css" />
     {% endif %}
+    <link rel="stylesheet" type="text/css" href="styles/default.css" />
     {% include "script" ignore missing %}
   </head>
   <body id="tarantool" class ="{{ page_name }}">

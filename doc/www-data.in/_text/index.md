@@ -2,39 +2,50 @@ index:
     main: |
         # Introduction
 
-        Tarantool is a NoSQL database running inside a Lua program. It's
-        created to store and process the most volatile and highly accessible
-        Web data. Tarantool has been extensively used in production since 2009.
-        It's **open source**, BSD licensed.
+        Tarantool is a NoSQL database running inside a Lua program. It
+        combines the network programming power of Node.JS with data
+        persistency capabilities of Redis. It's **open source**, BSD licensed.
+        The latest release is Tarantool 1.6.3, published on July 20, 2014.
 
         # Features
 
         - a drop-in replacement for Lua 5.1, based on LuaJIT 2.0;
           simply use *#!/usr/bin/tarantool* instead of *#!/usr/bin/lua* in your script,
+        - Lua packages for non-blocking I/O, fibers and HTTP,
         - [MsgPack](http://msgpack.org) data format and MsgPack based client-server
           protocol,
         - two data engines: 100% in-memory with optional persistence and a
           [2-level disk-based B-tree](http://sphia.org), to use with large data
           sets,
-        - secondary key and index iterators support,
+        - *secondary key* and index iterators support,
         - asynchronous master-master replication,
-        - authentication and access control,
-        - [lowest CPU overhead](benchmark.html) to store or serve a
-        piece of content.
+        - authentication and access control.
 
-        # Get started
+        # Example
 
-        ``` bash
-        # apt-get install tarantool
-        # tarantool
-        # tarantool> box.cfg{{admin_port=3313}}
-        # tarantool> myspace = box.schema.create_space('myspace')
-        # tarantool> myspace:create_index('primary')
-        # tarantool> tuple = {{ name = 'Tarantool', release = box.info.version,
-        #            type = {{ 'NoSQL database', 'Lua interpreter'}}}}
-        # tarantool> myspace:auto_increment{{tuple}}
-        #   - [1, {{'release': '1.6.1-445-ge8d3201', 'name': 'Tarantool'
-        #          'type': ['NoSQL database', 'Lua interpreter']}}]
+        ``` lua
+        #!/usr/bin/env tarantool
+
+        box.cfg{{}}
+        hosts = box.space.hosts
+        if not hosts then
+            hosts = box.schema.create_space('hosts')
+            hosts:create_index('primary', {{ parts = {{1, 'STR'}} }})
+        end
+
+        local function handler(self)
+            local host = self.req.peer.host
+            local response = {{
+                host = host;
+                counter = hosts:inc(host);
+            }}
+            self:render({{ json = response }})
+        end
+
+        httpd = require('http.server')
+        server = httpd.new('127.0.0.1', 8080)
+        server:route({{ path = '/' }}, handler)
+        server:start()
         ```
 
         # Learn more
