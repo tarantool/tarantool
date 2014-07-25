@@ -14,47 +14,48 @@
   modify its title, which otherwise contains the program name.
   Tarantool uses this feature to help meet the needs of system
   administration, such as figuring out what services are running
-  on a host, what TCP/IP ports are in use, and so on.
+  on a host, their status, and so on.
 </para>
 <para>
-  Tarantool process title follows the following naming scheme:
-  <command><replaceable>program_name</replaceable>: <replaceable>role</replaceable>[@<olink targetptr="custom_proc_title"/>] [ports in use]</command>
+  A Tarantool server process title follows the following naming scheme:
+  <command><replaceable>program_name</replaceable>: <replaceable>role</replaceable>[@<olink targetptr="custom_proc_title"/>]</command>
 </para>
 <para>
   <emphasis role="strong">program_name</emphasis> is typically
   <command>tarantool</command>. The role can be one of the
   following:
   <itemizedlist>
+   
     <listitem><para>
-      <emphasis role="strong">primary</emphasis> -- the master node,
+      <emphasis role="strong">running</emphasis> -- ordinary node "ready to accept requests",
     </para></listitem>
     <listitem><para>
-      <emphasis role="strong">replica/<constant>IP</constant>:<constant>port</constant></emphasis> -- a replication node,
+      <emphasis role="strong">loading</emphasis> -- ordinary node recovering from old snap and wal files,
     </para></listitem>
     <listitem><para>
-      <emphasis role="strong">replication_server </emphasis>--
-      runs only if <olink targetptr="replication_port"/> is set,
-      accepts connections on this port and creates a 
+      <emphasis role="strong">orphan</emphasis> -- not in a cluster,
     </para></listitem>
     <listitem><para>
-      <emphasis role="strong">replication_relay </emphasis>-- a
-      process that servers a single replication connection.
+     <emphasis role="strong">hot_standby</emphasis> -- see section <olink targetptr="local_hot_standby"/>,
+    </para></listitem>
+    <listitem><para>
+      <emphasis role="strong">dumper + process-id</emphasis> -- saving files before exiting,
+    </para></listitem>
+    <listitem><para>
+      <emphasis role="strong">spawner</emphasis> -- controls other processes,
+    </para></listitem>
+    <listitem><para>
+      <emphasis role="strong">replica + uri/status</emphasis> -- replication node accepting connections on <olink targetptr="replication_port"/>,
+    </para></listitem>
+    <listitem><para>
+      <emphasis role="strong">relay + sockaddr</emphasis> -- serves a single replication connection,
     </para></listitem>
   </itemizedlist>
-  Possible port names are: <quote>pri</quote> for
-  <olink targetptr="primary_port">listen</olink>, and <quote>adm</quote> for <olink
-  targetptr="admin_port"/>.
 </para>
 <para>
-  For example:
-  <itemizedlist>
-    <listitem><para>
-      <command>tarantool: primary pri: 50000 adm: 50002</command>
-    </para></listitem>
-    <listitem><para>
-      <command>tarantool: primary@infobox pri: 15013 adm: 10012</command>
-    </para></listitem>
-  </itemizedlist>
+For example:<programlisting><prompt>$</prompt> <userinput>ps -A -f | grep tarantool</userinput>
+1000     17701  2778  0 08:27 pts/0    00:00:00 tarantool: running                            
+1000     17704 17701  0 08:27 pts/0    00:00:00 tarantool: spawner</programlisting>
 </para>
 </appendix>
 
@@ -62,3 +63,4 @@
 vim: tw=66 syntax=docbk
 vim: spell spelllang=en_us
 -->
+

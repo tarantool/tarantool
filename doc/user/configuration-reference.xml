@@ -264,13 +264,16 @@ Starting  ARG
             (what's shown in the COMMAND column for <command>ps</command>
             and <command>top</command> commands). For example,
              ordinarily <command>ps</command> shows the Tarantool server process thus:
-            </para>
-<programlisting>kostja@shmita:~$ ps -a -o command | grep box
+            </para><programlisting><prompt>$</prompt> <userinput>ps -ef | grep tarantoool</userinput>
+1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running                  
+1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner
 tarantool: primary pri: 3301 adm: 3313</programlisting>
-          <para>But if the configuration file contains custom_proc_title=sessions then
+          <para>But if the configuration file contains custom_proc_title='sessions' then
           the output looks like:</para>
-<programlisting>kostja@shmita:~$ ps -a -o command | grep box
-tarantool: primary@sessions pri: 3301 adm: 3313</programlisting>
+<programlisting><prompt>$</prompt> <userinput>ps -ef | grep tarantoool</userinput>
+1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions          
+1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner@sessions
+tarantool: primary pri: 3301 adm: 3313</programlisting>
           </entry>
         </row>
 
