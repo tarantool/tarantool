@@ -1536,52 +1536,6 @@ The result will be a table of tuples and will look like this:
         </listitem>
     </varlistentry>
 
-</variablelist>
-</section>
-
-<section xml:id="sp-error">
-    <title>Package <code>error</code></title>
-<variablelist xml:id="error" xreflabel="error">
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua">error.raise(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Raises a client error. The difference between this function
-                and the built-in <code>error()</code> function in Lua
-                is that when the error reaches the client, its error code
-                is preserved, whereas every Lua error is presented to the
-                client as <constant>ER_PROC_LUA</constant>. This function
-                makes it possible to emulate any kind of native exception,
-                such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
-                in the source tree.
-                Lua constants which correspond to Tarantool errors
-                are defined in the <code>error.error</code> module. The error
-                message can be arbitrary.
-                Lua function can use <code>error.raise()</code> to emulate
-                request errors (for example: unique key exception).
-                When called without arguments this function re-throws the last
-                thrown error.
-            </para>
-            <para>
-              Parameters: <code>errcode-number</code> = number taken from the complete list of errors,
-              <code>errtext-string</code> = the message which will accompany the error.
-            </para>
-            <para>
-              Possible errors: whatever is specified in errcode-number.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>error.raise(box.error.NO_SUCH_SPACE, 'Error: No such space')</userinput>
----
-- error: 'Error: No such space'
-...
-</programlisting>
-        </listitem>
-    </varlistentry>
-
     <varlistentry>
         <term>
          <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
@@ -1757,6 +1711,59 @@ session.delimiter('')!
 </programlisting>
 </para>
 
+</section>
+
+<section xml:id="sp-error">
+    <title>Package <code>box.error</code></title>
+<variablelist xml:id="error" xreflabel="error">
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.error(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Raises a client error. The difference between this function
+                and the built-in <code>error()</code> function in Lua
+                is that when the error reaches the client, its error code
+                is preserved, whereas every Lua error is presented to the
+                client as <constant>ER_PROC_LUA</constant>. This function
+                makes it possible to emulate any kind of native exception,
+                such as unique constraint violation, no such space/index,
+                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
+                in the source tree.
+                Lua constants which correspond to Tarantool errors
+                are defined as members of <code>box.error</code>. The error
+                message can be arbitrary.
+                Lua function can use <code>box.error(...)</code> to emulate
+                request errors (for example: unique key exception).
+                When called without arguments this function re-throws the last
+                thrown error.
+            </para>
+            <para>
+              Parameters: <code>errcode-number</code> = number taken from the complete list of errors,
+              <code>errtext-string</code> = the message which will accompany the error.
+            </para>
+            <para>
+              Possible errors: whatever is specified in errcode-number.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>tarantool> box.error(box.error,,'Tuple/Key must be MsgPack array')</userinput>
+---
+- error: Tuple/Key must be MsgPack array
+</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.error.rethrow()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Rethrow previous error.
+             </para>
+        </listitem>
+     </varlistentry>
+</variablelist>
 </section>
 
 <section xml:id="sp-box-tuple">
