@@ -63,8 +63,6 @@ struct session {
 	struct txn *txn;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
-	/** Command delimiter - used by admin console and interactive mode */
-	char delim[SESSION_DELIM_SIZE];
 };
 
 /**
@@ -169,7 +167,7 @@ struct SessionGuard
 {
 	struct session *session;
 	SessionGuard(int fd, uint64_t cookie);
-        ~SessionGuard();
+	~SessionGuard();
 };
 
 struct SessionGuardWithTriggers: public SessionGuard

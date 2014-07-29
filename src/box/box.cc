@@ -34,7 +34,6 @@
 #include "recovery.h"
 #include "log_io.h"
 #include <say.h>
-#include <admin.h>
 #include <iproto.h>
 #include "replication.h"
 #include <stat.h>
@@ -410,28 +409,14 @@ box_init()
 	title("hot_standby", NULL);
 
 	const char *listen = cfg_gets("listen");
-	const char *admin = cfg_gets("admin");
 
 	/*
 	 * application server configuration).
 	 */
-	if (!listen && !admin)
+	if (listen) {
+		iproto_init(listen);
+	} else {
 		box_leave_local_standby_mode(NULL);
-	else {
-		void (*on_bind)(void *) = NULL;
-		if (listen) {
-			iproto_init(listen);
-		} else {
-			/*
-			 * If no prmary port is given, leave local
-			 * host standby mode as soon as bound to the
-			 * admin port. Otherwise, wait till we're
-			 * bound to the master port.
-			 */
-			on_bind = box_leave_local_standby_mode;
-		}
-		if (admin)
-			admin_init(admin, on_bind);
 	}
 	if (cfg_getd("io_collect_interval") > 0) {
 		ev_set_io_collect_interval(loop(),

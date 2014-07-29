@@ -59,7 +59,6 @@ set (common_sources
      pickle.cc
      coro.cc
      stat.cc
-     admin.cc
      iproto.cc
      iproto_constants.cc
      iproto_port.cc

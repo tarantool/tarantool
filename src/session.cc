@@ -76,7 +76,6 @@ session_create(int fd, uint64_t cookie)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;
-	session->delim[0] = '\0';
 	session->txn = NULL;
 	session->fiber_on_stop = {
 		rlist_nil, session_on_stop, NULL, NULL

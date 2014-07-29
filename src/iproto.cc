@@ -345,6 +345,7 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(iproto_connection_is_idle(con));
 	assert(!evio_is_active(&con->output));
 	if (con->session) {
+		fiber_set_session(fiber(), con->session);
 		session_run_on_disconnect_triggers(con->session);
 		session_destroy(con->session);
 	}
@@ -768,6 +769,7 @@ iproto_process_connect(struct iproto_request *request)
 		con->session = session_create(fd, con->cookie);
 		coio_write(&con->input, iproto_greeting(con->session->salt),
 			   IPROTO_GREETING_SIZE);
+		fiber_set_session(fiber(), con->session);
 		session_run_on_connect_triggers(con->session);
 		/* Set session user to guest, until it is authenticated. */
 		session_set_user(con->session, GUEST, GUEST);

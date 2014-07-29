@@ -394,27 +394,15 @@ fiber.sleep(box, 0.001)
 - error: 'fiber.sleep(delay): bad arguments'
 ...
 -- test fiber.self()
-fiber.cancel(fiber.self())
----
-- error: 'fiber.cancel(): subject fiber does not permit cancel'
-...
 f = fiber.self()
 ---
 ...
 old_id = f:id()
 ---
 ...
-fiber.cancel(f)
----
-- error: 'fiber.cancel(): subject fiber does not permit cancel'
-...
 fiber.self():id() - old_id < 3
 ---
 - true
-...
-fiber.cancel(fiber.self())
----
-- error: 'fiber.cancel(): subject fiber does not permit cancel'
 ...
 fiber.self():id() - old_id < 5
 ---
@@ -586,9 +574,9 @@ fiber.find(fib_id)
 --
 -- Test local storage
 --
-fiber.self().storage
+type(fiber.self().storage)
 ---
-- []
+- table
 ...
 fiber.self().storage.key = 48
 ---

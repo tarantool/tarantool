@@ -1,0 +1,18 @@
+TAP version 13
+1..16
+ok - console.listen started
+ok - connect to console
+ok - eval
+ok - state.socker:peer().host
+ok - state.socker:peer().port
+ok - set delimiter to ';'
+ok - state.delimiter is ';'
+ok - get delimiter is ';'
+ok - clear delimiter
+ok - remote connect
+ok - remote eval
+ok - remote state.remote.host
+ok - remote state.remote.port
+ok - remote state.prompt
+ok - remote disconnect
+ok - console.listen stopped

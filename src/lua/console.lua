@@ -3,6 +3,9 @@
 local internal = require('console')
 local formatter = require('yaml')
 local session = require('session')
+local fiber = require('fiber')
+local socket = require('socket')
+local log = require('log')
 
 local function format(status, ...)
     -- When storing a nil in a Lua table, there is no way to
@@ -26,7 +29,13 @@ local function format(status, ...)
     return formatter.encode(res)
 end
 
+--
+-- Evaluate command on local server
+--
 local function local_eval(self, line)
+    if not line then
+        return nil
+    end
     --
     -- Attempt to append 'return ' before the chunk: if the chunk is
     -- an expression, this pushes results of the expression onto the
@@ -47,19 +56,21 @@ local function eval(line)
     return local_eval(nil, line)
 end
 
-local local_mt = {
-    __index = {
-        eval = local_eval;
-        close = function() end;
-        prompt = function() return 'tarantool' end;
-    }
-}
-
+--
+-- Evaluate command on remote server
+--
 local function remote_eval(self, line)
+    if not line then
+        pcall(self.remote.close, self.remote)
+        self.remote = nil
+        self.eval = nil
+        self.prompt = nil
+        return ""
+    end
     --
     -- call remote 'console.eval' function using 'dostring' and return result
     --
-    local status, res = pcall(self.conn.call, self.conn, "dostring",
+    local status, res = pcall(self.remote.call, self.remote, "dostring",
         "return require('console').eval(...)", line)
     if not status then
         -- remote request failed
@@ -69,81 +80,225 @@ local function remote_eval(self, line)
     return res[1][1]
 end
 
-local function remote_close(self)
-    pcall(self.conn.close, self.conn) -- ignore errors
-end
-
-local function remote_prompt(self)
-    return string.format("%s:%s", self.conn.host, self.conn.port)
-end
-
-local remote_mt = {
-    __index = {
-        eval = remote_eval;
-        close = remote_close;
-        prompt = remote_prompt;
-    }
-}
-
-local function read(host)
-    local delim = session.delimiter()
-    local linenum = 0
+--
+-- Read command from stdin
+--
+local function local_read(self)
     local buf = ""
+    local prompt = self.prompt
     while true do
-        local prompt = (linenum == 0 and host or string.rep(' ', #host)).. "> "
-        local line = internal.readline(prompt)
+        local delim = self.delimiter
+        local line = internal.readline(prompt.. "> ")
         if not line then
             return nil
         end
         buf = buf..line
         if #buf >= #delim and buf:sub(#buf - #delim + 1) == delim then
-            return buf:sub(0, #buf - #delim)
+            buf = buf:sub(0, #buf - #delim)
+            break
         end
         buf = buf.."\n"
-        linenum = linenum + 1
+        prompt = string.rep(' ', #self.prompt)
+    end
+    internal.add_history(buf)
+    return buf
+end
+
+--
+-- Print result to stdout
+--
+local function local_print(self, output)
+    if output == nil then
+        self.running = nil
+        return
+    end
+    print(output)
+end
+
+--
+-- Read command from connected client console.listen()
+--
+local function client_read(self)
+    local delim = self.delimiter.."\n"
+    local buf = self.client:readline({ delim })
+    if buf == nil then
+        return nil
+    elseif buf == "" then
+        return nil -- gh-412 buf socket:readline() should return nil on eof
+    elseif buf == "~.\n" then
+        -- Escape sequence to close current connection (like SSH)
+        return nil
+    end
+    -- remove trailing delimiter
+    return buf:match("^(.*)"..delim)
+end
+
+--
+-- Print result to connected client from console.listen()
+--
+local function client_print(self, output)
+    if not self.client then
+        return
+    elseif not output then
+        -- disconnect peer
+        local peer = self.client:peer()
+        log.info("console: client %s:%s disconnected", peer.host, peer.port)
+        self.client:shutdown()
+        self.client:close()
+        self.client = nil
+        self.running = nil
+        return
+    end
+    self.client:write(output)
+end
+
+--
+-- REPL state
+--
+local repl_mt = {
+    __index = {
+        running = false;
+        delimiter = "";
+        prompt = "tarantool";
+        read = local_read;
+        eval = local_eval;
+        print = local_print;
+    };
+}
+
+--
+-- REPL = read-eval-print-loop
+--
+local function repl(self)
+    fiber.self().storage.console = self
+    while self.running do
+        local command = self:read()
+        local output = self:eval(command)
+        self:print(output)
+    end
+    fiber.self().storage.console = nil
+end
+
+--
+-- Set delimiter
+--
+local function delimiter(delim)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.delimiter(): need existing console")
+    end
+    if delim == nil then
+        return self.delimiter
+    elseif type(delim) == 'string' then
+        self.delimiter = delim
+    else
+        error('invalid delimiter')
     end
 end
 
-local function repl()
-    if session.storage.console ~= nil then
-        return -- REPL is already enabled
+--
+-- Start REPL on stdin
+--
+local started = false
+local function start()
+    if started then
+        error("console is already started")
     end
-    session.storage.console = {}
-    local handlers = {}
-    table.insert(handlers, setmetatable({}, local_mt))
-    session.storage.console.handlers = handlers
-    local line
-    while #handlers > 0 do
-        local handler = handlers[#handlers]
-        -- read
-        local line = read(handler:prompt())
-        if line == nil then
-            -- remove handler
-            io.write("\n")
-            handler:close()
-            table.remove(handlers)
-        else
-            -- eval
-            local out = handler:eval(line)
-            -- print
-            io.write(out)
-            internal.add_history(line)
+    started = true
+    local self = setmetatable({ running = true }, repl_mt)
+    repl(self)
+    started = false
+end
+
+--
+-- Connect to remove server
+--
+local function connect(...)
+    local self = fiber.self().storage.console
+    if self == nil then
+        error("console.connect() need existing console")
+    end
+    -- connect to remote host
+    local remote = require('net.box'):new(...)
+    -- check permissions
+    remote:call('dostring', 'return true')
+    -- override methods
+    self.remote = remote
+    self.eval = remote_eval
+    self.prompt = string.format("%s:%s", self.remote.host, self.remote.port)
+    log.info("connected to %s:%s", self.remote.host, self.remote.port)
+end
+
+local function server_loop(server)
+    while server:readable() do
+        local client = server:accept()
+        if client then
+            local peer = client:peer()
+            log.info("console: client %s:%s connected", peer.host, peer.port)
+            local state = setmetatable({
+                running = true;
+                read = client_read;
+                print = client_print;
+                client = client;
+            }, repl_mt)
+            fiber.create(repl, state)
         end
     end
+    log.info("console: stopped")
 end
 
-local function connect(...)
-    if not session.storage.console then
-        error("console.connect() works only in interactive mode")
+--
+-- Start admin server
+--
+local function listen(uri)
+    local host, port
+    if uri == nil then
+        host = 'unix/'
+    elseif type(uri) == 'number' or uri:match("^%d+$") then
+        port = tonumber(uri)
+    elseif uri:match("^/") then
+        host = 'unix/'
+        port = uri
+    else
+        host, port = uri:match("^(.*):(.*)$")
+        if not host then
+            port = uri
+        end
     end
-    local conn = require('net.box'):new(...)
-    conn:ping() -- test connection
-    table.insert(session.storage.console.handlers, setmetatable(
-        { conn =  conn}, remote_mt))
+    local server
+    if host == 'unix/' then
+        port = port or '/tmp/tarantool-console.sock'
+        os.remove(port)
+        server = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+    else
+        host = host or '127.0.0.1'
+        port = port or 3313
+        server = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+    end
+    if not server then
+        error('failed to create socket: ' .. server:error())
+    end
+    server:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+
+    if not server:bind(host, port) then
+        local msg = string.format('failed to bind: %s', server:error())
+        server:close()
+        error(msg)
+    end
+    if not server:listen() then
+        local msg = string.format('failed to listen: %s', server:error())
+        server:close()
+        error(msg)
+    end
+    log.info("console: started on %s:%s", host, port)
+    fiber.create(server_loop, server)
+    return server
 end
 
 return {
-    repl = repl;
+    start = start;
     eval = eval;
+    delimiter = delimiter;
     connect = connect;
+    listen = listen;
 }

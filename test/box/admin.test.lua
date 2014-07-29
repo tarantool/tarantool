@@ -5,7 +5,6 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 space:create_index('primary', { type = 'hash' })
 
 --# push filter 'listen: .*' to 'listen: <uri>'
---# push filter 'admin: .*' to 'admin: <uri>'
 help()
 box.cfg
 space:insert{1, 'tuple'}

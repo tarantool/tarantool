@@ -31,7 +31,7 @@ all = getmetatable(session).aggregate_storage
 ...
 dump(all)
 ---
-- '''[null,null,null,{"abc":"cde"}]'''
+- '''[null,null,{"abc":"cde"}]'''
 ...
 --# create connection second to default
 --# set connection second
@@ -93,7 +93,7 @@ dump(tres1)
 ...
 dump(tres2)
 ---
-- '''["cde"]'''
+- '''["cde","def"]'''
 ...
 session = nil
 ---
