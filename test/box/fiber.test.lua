@@ -276,4 +276,11 @@ ch:get()
 ch:close()
 ch = nil
 
+-- # gh-125 box.fiber.cancel() by numeric id
+--
+function y() while true do fiber.sleep(0.001) end end
+f = fiber.create(y)
+fiber.kill(f:id())
+while f:status() ~= 'dead' do fiber.sleep(0.01) end
+
 fiber = nil

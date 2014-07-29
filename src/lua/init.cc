@@ -139,7 +139,6 @@ tarantool_lua_tointeger64(struct lua_State *L, int idx)
 
 	return result;
 }
-
 const char *
 tarantool_lua_tostring(struct lua_State *L, int index)
 {

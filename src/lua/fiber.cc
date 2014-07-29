@@ -458,6 +458,23 @@ lbox_fiber_cancel(struct lua_State *L)
 	return 0;
 }
 
+/** Kill a fiber by id. */
+static int
+lbox_fiber_kill(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.kill(): bad arguments");
+	int fid = lua_tointeger(L, -1);
+	struct fiber *f = fiber_find(fid);
+	if (f == NULL)
+		luaL_error(L, "fiber.kill(): fiber not found");
+	if (! (f->flags & FIBER_USER_MODE))
+		luaL_error(L, "fiber.kill(): subject fiber does "
+			   "not permit cancel");
+	fiber_cancel(f);
+	return 0;
+}
+
 /**
  * Check if this current fiber has been cancelled and
  * throw an exception if this is the case.
@@ -506,6 +523,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"self", lbox_fiber},
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
+	{"kill", lbox_fiber_kill},
 	{"cancel", lbox_fiber_cancel},
 	{"testcancel", lbox_fiber_testcancel},
 	{"create", lbox_fiber_create},

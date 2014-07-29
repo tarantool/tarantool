@@ -18,6 +18,7 @@ base64_test(const char *str)
 	fail_unless(strlen(base64_buf) == res);
 
 	base64_decode(base64_buf, strlen(base64_buf), strbuf, len + 1);
+	strbuf[len] = '\0';
 
 	fail_unless(strcmp(str, strbuf) == 0);
 

@@ -1086,6 +1086,26 @@ procedures.
 
     <varlistentry>
         <term>
+            <emphasis role="lua" xml:id="box.fiber.kill">box.fiber.kill(<replaceable>id</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Locate a fiber by its numeric id and cancel it. In
+              other words, combines <emphasis
+              role="lua">box.fiber.find()</emphasis> and <emphasis
+              role="lua">box.fiber.cancel()</emphasis> into one
+            </para>
+            <para>
+              Parameters: <code>id</code> = the id of the fiber to be canceled.
+            </para>
+            <para>
+              Possible errors: the specified fiber does not exist or does not permit cancel.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
             <emphasis role="lua" xml:id="fiber.testcancel">fiber.testcancel()</emphasis>
         </term>
         <listitem>

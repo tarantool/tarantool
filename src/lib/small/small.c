@@ -202,10 +202,13 @@ smalloc_nothrow(struct small_alloc *alloc, size_t size)
 	struct mempool *pool;
 	if (size <= alloc->step_pool_objsize_max) {
 		/* Allocate in a stepped pool. */
-		int idx = (size + STEP_SIZE - 1) >> STEP_SIZE_LB;
-		const int objsize_min_lb =
-			alloc->step_pools[0].objsize >> STEP_SIZE_LB;
-		idx = idx > objsize_min_lb ? idx - objsize_min_lb : 0;
+		int idx;
+		if (size <= alloc->step_pools[0].objsize)
+			idx = 0;
+		else {
+			idx = (size - alloc->step_pools[0].objsize
+			       + STEP_SIZE - 1) >> STEP_SIZE_LB;
+		}
 		pool = &alloc->step_pools[idx];
 		assert(size <= pool->objsize &&
 		       (size + STEP_SIZE > pool->objsize || idx == 0));

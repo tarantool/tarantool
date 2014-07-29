@@ -36,11 +36,7 @@
 
 #if defined (__x86_64__) || defined (__i386__)
 
-#ifdef HAVE_CPUID_H
 #include <cpuid.h>
-#else
-#include <third_party/compat/sys/cpuid.h>
-#endif
 
 #define SCALE_F		sizeof(unsigned long)
 
