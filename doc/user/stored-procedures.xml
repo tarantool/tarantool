@@ -1574,97 +1574,98 @@ for instructions about defining triggers for connect and disconnect events
       <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
     </para>
     <para>
-      Similarly to luasocket, <code>socket</code> doesn't throw exceptions
-      on errors. On success, most calls return a socket object.
-      On error, a multiple return of <code>nil, status, errno, errstr</code>
-      is produced.
-      <code>Status</code> can be one of <code>"error"</code>, <code>"timeout"</code>,
-      <code>"eof"</code> or <code>"limit"</code>. On
-      success, status is always <code>nil</code>.
-      A call which returns data (<code>recv()</code>, <code>recvfrom()</code>,
-      <code>readline()</code>) on success returns a Lua string of
-      the requested size and <code>nil</code> status. On error or timeout,
-      an empty string is followed by the corresponding status, error number and message.
-      A call which sends data (<code>send()</code>, <code>sendto()</code>) on
-      success returns the number of bytes sent, and the <code>status</code> is, again,
-      <code>nil</code>. On error or timeout <code>0</code> is returned,
-      followed by status, error number and message.
+     The functions for setting up and connecting are <code>socket</code>, <code>sysconnect</code>.
+     The functions for sending data are <code>send</code>, <code>sendto</code>, <code>write</code>, <code>syswrite</code>.
+     The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>, <code>readline</code>.
+      The functions for waiting before sending/receiving data are <code>wait</code>, <code>readable</code>, <code>writable</code>.
+     The functions for setting flags are <code>nonblock</code>, <code>setsockopt</code>.
+     The functions for stopping and disconnecting are <code>shutdown</code>, <code>close</code>.
+     The functions for error checking are <code>errno</code>, <code>error</code>.
     </para>
     <para>
-      The last error can be retrieved from the socket using
-      <code>socket:error()</code>. Any call except <code>error()</code> clears
-      the last error first (but may set a new one).
+      <table>
+      <title xml:id="socket-functions">Socket functions: Names, Purposes</title>
+      <tgroup cols="2" align="left" colsep="1" rowsep="1">
+      <thead>
+      <row><entry>Name</entry><entry>Purpose</entry></row>
+      </thead>
+      <tbody>
+       <row><entry>socket</entry><entry>setup</entry></row>
+       <row><entry>sysconnect</entry><entry>setup</entry></row>
+       <row><entry>send</entry><entry>sending</entry></row>
+       <row><entry>sendto</entry><entry>sending</entry></row>
+       <row><entry>write</entry><entry>sending</entry></row>
+       <row><entry>syswrite</entry><entry>sending</entry></row>
+       <row><entry>recv</entry><entry>receiving</entry></row>
+       <row><entry>recvfrom</entry><entry>receiving</entry></row>
+       <row><entry>read</entry><entry>receiving</entry></row>
+       <row><entry>readline</entry><entry>receiving</entry></row>
+       <row><entry>nonblock  </entry><entry>flag setting  </entry></row>
+       <row><entry>setsockopt</entry><entry>flag setting  </entry></row>
+       <row><entry>linger</entry><entry>flag setting</entry></row>
+       <row><entry>listen</entry><entry>client/server</entry></row>
+       <row><entry>accept</entry><entry>client/server</entry></row>
+       <row><entry>shutdown</entry><entry>teardown</entry></row>
+       <row><entry>close</entry><entry>teardown</entry></row>
+       <row><entry>errno</entry><entry>serror checking</entry></row>
+       <row><entry>error</entry><entry>error checking</entry></row>
+       <row><entry>getaddrinfo</entry><entry>information</entry></row>
+       <row><entry>getsockopt</entry><entry>information</entry></row>
+       </tbody>
+      </tgroup>                                   
+      </table>
     </para>
     <para>
-      Calls which require a socket address and in POSIX expect
-      <code>struct sockaddr_in</code>, in <code>socket</code>
-      simply accept host name and port as additional arguments.
-      Name resolution is done automatically. If it fails,
-      status is set to <code>"error"</code>, errno is set to <code>-1</code>
-      and error string is set to <code>"Host name resolution failed"</code>.
+      Typically a socket session will begin with the setup functions,
+      will set one or more flags, will have a loop with sending and receiving functions,
+      will end with the teardown functions -- as an example at the end of this section will show.
+      Throughout, there may be error-checking and waiting functions for synchronization.
+      Many functions may "block" (wait for input until an optional timeout period expires),
+      therefore the fiber that they are in will yield so that other processes may take
+      over, as is the norm for cooperative multitasking.
     </para>
     <para>
-      All calls that can take time block the calling fiber
-      and can get it preempted. The implementation, however, uses
-      non-blocking cooperative I/O, so Tarantool continues processing
-      queries while a call is blocked.
-      A timeout can be provided for any socket call which can take
-      a long time.
-    </para>
-    <para>
-      Most of the functions in the API are usually used
-      in object-oriented style, for example <code>socket:close()</code>.
-    </para>
-    <para>
-      A closed socket should not be used any more. Alternatively, the
-      socket will be closed when its userdata is garbage collected
-      by Lua.
+     For all examples in this section the socket name will be <code>sock</code>
+     and the function invocations will look like <code>sock:<replaceable>function_name</replaceable>(...)</code>.
     </para>
 
     <varlistentry>
-        <term><emphasis role="lua">socket.tcp()</emphasis></term>
+        <term><emphasis role="lua">socket(<replaceable>domain</replaceable>, <replaceable>type</replaceable>, <replaceable>protocol</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                Create a new TCP socket.
+                Create a new TCP or UDP socket.
+                The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/socket.2.html">Linux man page</link>.
             </para>
             <para>
                 Returns: (type = userdata) a new socket, or <code>nil</code>.
             </para>
+            <para>
+                Example: <code>socket = require('socket'); sock = socket('AF_INET', 'SOCK_STREAM', 'tcp')</code>
+            </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket.udp()</emphasis></term>
+        <term><emphasis role="lua">sock:sysconnect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
-                Create a new UDP socket.
+                Connect a socket to a remote host.
+                The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/connect.2.html">Linux man page</link>.
             </para>
             <para>
-                Returns: (type = userdata) a new socket, or <code>nil</code>.
+                Parameters: <code>host</code>, <code>port</code> -- which must correspond to an IPv4 address, an IPv6 address, or a UNIX path.
+            </para>
+            <para>
+                Returns: (type = userdata) a connected socket, if no error.
+            </para>
+            <para>
+                Example: <code>sock:sysconnect('127.0.0.1', 80)</code>
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:connect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
-        <listitem>
-            <para>
-                Connect a socket to a remote host. Can be used with IPv6 and IPv4
-                addresses, as well as domain names. If multiple addresses
-                correspond to a domain, tries them all until connection succeeds.
-               </para>
-               <para>
-                Parameters: <code>host</code>, <code>port</code>, <code>timeout</code>.
-               </para>
-               <para>
-                Returns: (type = userdata) a connected socket on success,
-                <code>nil, status, errno, errstr</code> on error or timeout.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term><emphasis role="lua">socket:send(<replaceable>data, [timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:send(<replaceable>data, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Send data over a connected socket.
@@ -1673,16 +1674,26 @@ for instructions about defining triggers for connect and disconnect events
              Parameters: <code>data</code>, <code>timeout</code>.
             </para>
             <para>
-             Returns: (type = number) the number of bytes sent. On success, this is exactly
-             the length of <code>data</code>. In case of error or timeout,
-             returns the number of bytes sent before error,
-             followed by <code>status, errno, errstr</code>.
+             Returns: true if success, false if error.
+            </para>
+            <para>
+             Notes: The function <code>sock:write(...)</code> has the same parameters and same effect.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term><emphasis role="lua">sock:syswrite(<replaceable>size</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Write data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
+              Rarely used. For details see  <link xlink:href="https://github.com/tarantool/tarantool/wiki/sockets%201.6">this description</link>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:recv(<replaceable>size, [timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:recv(<replaceable>size, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Read <code>size</code> bytes from a connected socket.
@@ -1706,13 +1717,13 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:readline(<replaceable>[limit] [, separator list] [, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list] [, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Read a line from a connected socket.
             </para>
             <para>
-                <code>socket:readline()</code> with no arguments reads data from a socket
+                <code>sock:readline()</code> with no arguments reads data from a socket
                 until '\n' (line feed) or eof (end of transmission).
             </para>
             <para>
@@ -1754,7 +1765,28 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:bind(<replaceable>host, port[, timeout]</replaceable>)</emphasis></term>
+     <term><emphasis role="lua">sock:read(<replaceable>size</replaceable>, [<replaceable>timeout</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+             Read data on a socket, until <code>size</code> bytes have been read, or until <code>timeout</code> expires,
+             or until there is nothing more to read, or until an error occurs.
+             Similar to sock:readline(), except for the fact that there is no list of separators.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">sock:sysread(<replaceable>size</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Read data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
+              Rarely used. For details see  <link xlink:href="https://github.com/tarantool/tarantool/wiki/sockets%201.6">this description</link>.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">sock:bind(<replaceable>host, port[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Bind a socket to the given host/port.
@@ -1763,7 +1795,7 @@ for instructions about defining triggers for connect and disconnect events
                 can be used to accept new connections, after it's
                 been put in listen mode.
                 The timeout is used for name resolution only. If host
-                name is an IP address, <code>socket:bind</code> never yields and
+                name is an IP address, <code>sock:bind</code> never yields and
                 the timeout is unused.
             </para>
             <para>
@@ -1776,38 +1808,37 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:listen()</emphasis></term>
+        <term><emphasis role="lua">sock:listen(backlog)</emphasis></term>
         <listitem>
             <para>
-                Start listening for incoming connections. The listen
-                backlog, on Linux, is taken from <filename>/proc/sys/net/core/somaxconn</filename>,
-                whereas on BSD it is set to <constant>SOMAXCONN</constant>.
+                Start listening for incoming connections.
             </para>
             <para>
-               Returns: (type = userdata) a socket object on success, <code>nil, "error", errno, errstr</code> on error.
+                On Linux the listen <code>backlog</code>
+                backlog may be from <filename>/proc/sys/net/core/somaxconn</filename>,
+                on BSD the backlog may be <constant>SOMAXCONN</constant>.
+            </para>
+            <para>
+               Returns: true for success, false for error.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:accept(<replaceable>[timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:accept()</emphasis></term>
         <listitem>
             <para>
-                Wait for a new client connection and create a connected
-                socket.
+                Accept a new client connection and create a new connected socket.
+                It is good practice to set the socket's blocking mode explicitly affer accepting.
             </para>
             <para>
-               Parameters: <code>timeout</code>.
-            </para>
-            <para>
-               Returns: (type = userdata) <code>peer_socket, nil, peer_host, peer_port</code> on success.
-               <code>nil, status, errno, errstr</code> on error.
+               Returns: new socket if success, null if error.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:sendto(<replaceable>data, host, port, [timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:sendto(<replaceable>data, host, port, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
@@ -1823,7 +1854,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:recvfrom(<replaceable>limit[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:recvfrom(<replaceable>limit[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Receive a message on a UDP socket.
@@ -1838,54 +1869,132 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
 
-
     <varlistentry>
-        <term><emphasis role="lua">socket:shutdown(<replaceable>how</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">sock:shutdown(<replaceable>how</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                Shutdown a reading, writing or both ends of a socket.
+                Shutdown a reading end, a writing end, or both ends of a socket.
             </para>
             <para>
                Parameters: <code>how</code> = socket.SHUT_RD, socket.SHUT_WR,
                or socket.SHUT_RDWR.
             </para>
             <para>
-               Returns: (type = userdata) Socket on success, <code>nil, "error", errno, errstr</code> on error.
+               Returns: true or false.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:close()</emphasis></term>
+        <term><emphasis role="lua">sock:close()</emphasis></term>
         <listitem>
             <para>
-                Close (destroy) a socket. A closed socket should not
-                be used any more.
+                Close (destroy) a socket.
+                A closed socket should not be used any more.
+                A socket is closed automatically 
+                when its userdata is garbage collected by Lua.
+            </para>
+            <para>
+               Returns: (type = boolean) true on success, false on error.
+               For example, if sock is already closed, sock:close() returns false.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">socket:error()</emphasis></term>
+        <term><emphasis role="lua">sock:error() and sock:errno()</emphasis></term>
         <listitem>
             <para>
-                Retrieve the last error that occurred on a socket.
+                Retrieve information about the last error that occurred on a socket, if any.
+                Errors do not cause throwing of exceptions so these functions are usually necessary.
             </para>
             <para>
-                Returns:(type = number) <code>errno, errstr</code>. <code>0, "Success"</code>
-                if there is no error.
+             Returns:(type = number) result for sock:errno(), (type = string) result for sock:error().
+             If there is no error, then sock:errno() will return 0 and sock:error() will return null.
+            </para>
+            <para>
             </para>
         </listitem>
     </varlistentry>
     
     <varlistentry>
-        <term><emphasis role="lua">socket:setsockopt()</emphasis> etc.</term>
+        <term><emphasis role="lua">sock:setsockopt(<replaceable>level, name, value</replaceable>)</emphasis></term>
         <listitem>
             <para>
-                For examples of functions not listed here -- including setsockopt,
-                getsockopt, accept, wait, writable, and all the less-used functions --
-                see the files bsdsocket.test.lua and socket.test.py which are supplied
-                as part of the Tarantool source.
+             Set socket flags. The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/setsockopt.2.html">Linux man page</link>.
+             The ones that Tarantool accepts are            
+             SO_ACCEPTCONN, SO_BINDTODEVICE, SO_BROADCAST, SO_BSDCOMPAT, SO_DEBUG,
+             SO_DOMAIN, SO_ERROR, SO_DONTROUTE, SO_KEEPALIVE, SO_MARK, SO_OOBINLINE,
+             SO_PASSCRED, SO_PEERCRED, SO_PRIORITY, SO_PROTOCOL, SO_RCVBUF, SO_RCVBUFFORCE,
+             SO_RCVLOWAT, SO_SNDLOWAT, SO_RCVTIMEO, SO_SNDTIMEO, SO_REUSEADDR, SO_SNDBUF,
+             SO_SNDBUFFORCE, SO_TIMESTAMP, and SO_TYPE.
+             Setting SO_LINGER is done with sock:linger(active, timeout), see below.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">sock:getsockopt(<replaceable>level, name</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Get socket flags. For a list of possible flags see description of the previous function,
+              sock:setsockopt().
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">sock:linger([<replaceable>active, timeout</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+              Set or clear the SO_LINGER flag. For a description of the flag, see  <link xlink:href="http://man7.org/linux/man-pages/man1/loginctl.1.html">Linux man page</link>.
+            </para>
+            <para>
+              Parameters: <code>active, timeout</code>.
+            </para>
+            <para>
+              Returns: new active and timeout values.
+             </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term><emphasis role="lua">sock:nonblock([<replaceable>flag</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+             <code>sock:nonblock()</code> returns the current flag value.
+             <code>sock:nonblock(true)</code> sets the flag to false and returns false.
+             <code>sock:nonblock(true)</code> sets the flag to true and returns true.
+             This function may be useful before invoking a function which might otherwise block indefinitely.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+     <term><emphasis role="lua">sock:readable([timeout])</emphasis>, <emphasis>sock:writable([timeout])</emphasis>, <emphasis>sock:wait([timeout])</emphasis></term>
+        <listitem>
+            <para>
+               <code>sock:readable()</code> waits until something is readable, or until a timeout value expires.
+               <code>sock:writable()</code> waits until something is writable, or until a timeout value expires.
+               <code>sock:wait()</code> waits until something is either readable or writable, or until a timeout value expires.
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+     <term><emphasis role="lua">socket.getaddrinfo(<replaceable>host</replaceable>, <replaceable>type</replaceable> [, <replaceable>{option-list}</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+             The <code>socket.getaddrinfo()</code> function is useful for finding
+             information about a remote site so that the correct arguments for
+             <code>sock:sysconnect()</code> can be passed.
+            </para>
+            <para>
+             Returns: An array containing "host:", "family", "type:", "protocol:", and "port:" fields.
+            </para>
+            <para>
+             Example: <code>socket.getaddrinfo('tarantool.org', 'http')</code> will return variable information
+             such as "- - host: 188.93.56.70, family: AF_INET, type: SOCK_STREAM, protocol: tcp, port: 80".
             </para>
         </listitem>
     </varlistentry>
@@ -1904,14 +2013,14 @@ for instructions about defining triggers for connect and disconnect events
 <prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock = socket.tcp()</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock = socket('AF_INET', 'SOCK_STREAM', 'tcp')</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>type(sock)</userinput>
 ---
 - userdata
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock:connect('mail.ru', 80)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>sock:sysconnect('mail.ru', 80)</userinput>
 ---
 - fd 22, aka 192.168.1.72:49488, peer of 94.100.180.199:80
 ...
@@ -1935,6 +2044,8 @@ for instructions about defining triggers for connect and disconnect events
 </para>
 
 </section>
+
+
 
 <section xml:id="sp-console">
  <title>package <code>console</code></title>
