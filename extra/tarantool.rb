@@ -86,7 +86,7 @@ class Tarantool < Formula
     end
   end
 
-  def test
-    system bin/"tarantool", "--version"
+  test do
+      system bin/"tarantool", "--version"
   end
 end
