@@ -35,6 +35,7 @@
 
 #include "schema.h"
 #include "space.h"
+#include "engine_sophia.h"
 
 #include <sophia.h>
 #include <stdio.h>
@@ -73,33 +74,28 @@ sophia_gettuple(void *db, const char *key, size_t keysize)
 SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	: Index(key_def_arg)
 {
-	env = sp_env();
-	if (env == NULL)
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(void*),
-			  "SophiaIndex", "env");
+	struct space *space = space_cache_find(key_def->space_id);
+	SophiaFactory *factory =
+		(SophiaFactory*)space->engine->factory;
+	env = factory->env;
 
-	auto env_freer =
-		make_scoped_guard([=] { sp_destroy(env); });
-
-	int rc = sp_ctl(env, SPCMP, sophia_index_compare, key_def);
-	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "sophia/%04d", key_def->space_id);
-	rc = sp_ctl(env, SPDIR, SPO_RDWR|SPO_CREAT, path);
-	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	say_info("start sophia space '%s' recover", path);
-
-	db = sp_open(env);
-	if (db == NULL)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	say_info("recover complete");
-
-	env_freer.is_active = false;
+	db = sp_use(env, space->def.name);
+	if (db == NULL) {
+		void *cmp = sp_use(env, "cmp");
+		sp_set(cmp, "tarantool_cmp", sophia_index_compare, key_def);
+		sp_destroy(cmp);
+		char name[64];
+		snprintf(name, sizeof(name), "%s.cmp", space->def.name);
+		void *scheme = sp_use(env, "scheme");
+		void *stx = sp_begin(scheme);
+		sp_set(stx, name, "tarantool_cmp");
+		int rc = sp_commit(stx);
+		sp_destroy(scheme);
+		if (rc == -1)
+			tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
+		db = sp_use(env, space->def.name);
+		assert(db != NULL);
+	}
 }
 
 SophiaIndex::~SophiaIndex()
@@ -108,15 +104,11 @@ SophiaIndex::~SophiaIndex()
 		m_position->free(m_position);
 		m_position = NULL;
 	}
-
 	if (db) {
 		int rc = sp_destroy(db);
 		if (rc == -1)
 			say_info("sophia space %d close error: %s", key_def->space_id,
 			         sp_error(env));
-	}
-	if (env) {
-		sp_destroy(env);
 	}
 }
 
@@ -268,7 +260,7 @@ sophia_iterator_next(struct iterator *ptr)
 	if (rc == 0)
 		return NULL;
 	size_t valuesize = sp_valuesize(it->cursor);
-	const char *value = sp_value(it->cursor);
+	const char *value = (const char*)sp_value(it->cursor);
 	struct tuple *ret =
 		tuple_new(tuple_format_ber, value, value + valuesize);
 	tuple_ref(ret, 1);
@@ -329,19 +321,18 @@ SophiaIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	it->keysize = keysize;
 	it->part_count = part_count;
 	it->db = db;
-
-	sporder compare;
+	const char *compare;
 	switch (type) {
 	case ITER_EQ: it->base.next = sophia_iterator_eq;
 		return;
 	case ITER_ALL:
-	case ITER_GE: compare = SPGTE;
+	case ITER_GE: compare = ">=";
 		break;
-	case ITER_GT: compare = SPGT;
+	case ITER_GT: compare = ">";
 		break;
-	case ITER_LE: compare = SPLTE;
+	case ITER_LE: compare = "<=";
 		break;
-	case ITER_LT: compare = SPLT;
+	case ITER_LT: compare = "<";
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,

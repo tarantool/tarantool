@@ -94,12 +94,16 @@ SophiaFactory::SophiaFactory()
 void
 SophiaFactory::init()
 {
-	int rc = mkdir("sophia", 0755);
-
-	if (rc == -1 && errno != EEXIST) {
-		say_error("failed to create directory: 'sophia', %d, %s",
-		          errno, strerror(errno));
-	}
+	env = sp_env();
+	if (env == NULL)
+		panic("failed to create sophia environment");
+	void *conf = sp_use(env, "conf");
+	sp_set(conf, "env.logdir", "sophia_wal");
+	sp_set(conf, "env.dir", "sophia");
+	sp_destroy(conf);
+	int rc = sp_open(env);
+	if (rc == -1)
+		panic("sophia recovery failed");
 }
 
 Engine*

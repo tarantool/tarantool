@@ -38,6 +38,7 @@ struct SophiaFactory: public EngineFactory {
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void txnFinish(struct txn *txn);
 	virtual void recoveryEvent(enum engine_recovery_event event);
+	void *env;
 };
 
 #endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */
