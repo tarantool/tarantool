@@ -67,11 +67,10 @@ function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
 session.on_connect(audit_connect)
 session.on_disconnect(audit_disconnect)
 
---# create connection con_three to default
---# set connection con_three
-space:get{session.id()}[1] == session.id()
---# set connection default
---# drop connection con_three
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+a = (require 'net.box'):new('127.0.0.1', box.cfg.listen)
+a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
+a:close()
 
 -- cleanup
 session.on_connect(nil, audit_connect)

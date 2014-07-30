@@ -90,10 +90,10 @@ static const char *lua_modules[] = {
 	"msgpackffi", msgpackffi_lua,
 	"fun", fun_lua,
 	"digest", digest_lua,
-	"console", console_lua,
 	"uuid", uuid_lua,
 	"log", log_lua,
 	"net.box", box_net_box_lua,
+	"console", console_lua,
 	"tap", tap_lua,
 	NULL
 };
@@ -371,10 +371,10 @@ run_script(va_list ap)
 	} else {
 		say_crit("version %s\ntype 'help' for interactive help",
 			 tarantool_version());
-		/* get console.repl from package.loaded */
+		/* get console.start from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 		lua_getfield(L, -1, "console");
-		lua_getfield(L, -1, "repl");
+		lua_getfield(L, -1, "start");
 		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
 	}

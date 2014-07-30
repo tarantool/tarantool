@@ -156,12 +156,9 @@ fiber.sleep(0.0001)
 fiber.sleep('hello')
 fiber.sleep(box, 0.001)
 -- test fiber.self()
-fiber.cancel(fiber.self())
 f = fiber.self()
 old_id = f:id()
-fiber.cancel(f)
 fiber.self():id() - old_id < 3
-fiber.cancel(fiber.self())
 fiber.self():id() - old_id < 5
 g = fiber.self()
 f==g
@@ -218,7 +215,7 @@ fiber.find(fib_id)
 -- Test local storage
 --
 
-fiber.self().storage
+type(fiber.self().storage)
 fiber.self().storage.key = 48
 fiber.self().storage.key
 
