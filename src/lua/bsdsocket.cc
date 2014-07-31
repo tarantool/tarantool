@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "bsdsocket.h"
 
 #include <errno.h>
@@ -254,13 +253,13 @@ static const struct { char name[32]; int value, type, rw; } so_opts[] = {
 #ifdef SO_PROTOCOL
 	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
 #else
-	#define SO_PROTOCOL	38
+#define SO_PROTOCOL	38
 #endif
 
 #ifdef SO_TYPE
 	{"SO_TYPE",		SO_TYPE,		1,	0, },
 #else
-	#define SO_TYPE		3
+#define SO_TYPE		3
 #endif
 
 	{"",			0,			0,	0, }
@@ -409,18 +408,18 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 	int events = lua_tointeger(L, 2);
 	ev_tstamp timeout = lua_tonumber(L, 3);
 
-	switch(events) {
-		case 0:
-			events = EV_READ;
-			break;
-		case 1:
-			events = EV_WRITE;
-			break;
-		case 2:
-			events = EV_READ | EV_WRITE;
-			break;
-		default:
-			assert(false);
+	switch (events) {
+	case 0:
+		events = EV_READ;
+		break;
+	case 1:
+		events = EV_WRITE;
+		break;
+	case 2:
+		events = EV_READ | EV_WRITE;
+		break;
+	default:
+		assert(false);
 	}
 
 	struct ev_io io;
@@ -454,79 +453,79 @@ bsdsocket_getaddrinfo_cb(va_list ap)
 
 	int rc = getaddrinfo(host, port, hints, res);
 
-	switch(rc) {
-		case EAI_NONAME:
-			*res = NULL;
-		case 0:
-			return 0;
+	switch (rc) {
+	case EAI_NONAME:
+		*res = NULL;
+	case 0:
+		return 0;
 
-		case EAI_SYSTEM:
-			*res_errno = errno;
-			return -1;
-		default:
-			*res_errno = rc;
-			return -1;
+	case EAI_SYSTEM:
+		*res_errno = errno;
+		return -1;
+	default:
+		*res_errno = rc;
+		return -1;
 	}
 }
 
 static int
 lbox_bsdsocket_push_family(struct lua_State *L, int family)
 {
-	switch(family) {
+	switch (family) {
 #ifdef	AF_UNIX
-		case AF_UNIX:
-			lua_pushliteral(L, "AF_UNIX");
-			break;
+	case AF_UNIX:
+		lua_pushliteral(L, "AF_UNIX");
+		break;
 #endif
 #ifdef	AF_INET
-		case AF_INET:
-			lua_pushliteral(L, "AF_INET");
-			break;
+	case AF_INET:
+		lua_pushliteral(L, "AF_INET");
+		break;
 #endif
 #ifdef	AF_INET6
-		case AF_INET6:
-			lua_pushliteral(L, "AF_INET6");
-			break;
+	case AF_INET6:
+		lua_pushliteral(L, "AF_INET6");
+		break;
 #endif
 #ifdef	AF_IPX
-		case AF_IPX:
-			lua_pushliteral(L, "AF_IPX");
-			break;
+	case AF_IPX:
+		lua_pushliteral(L, "AF_IPX");
+		break;
 #endif
 #ifdef	AF_NETLINK
-		case AF_NETLINK:
-			lua_pushliteral(L, "AF_NETLINK");
-			break;
+	case AF_NETLINK:
+		lua_pushliteral(L, "AF_NETLINK");
+		break;
 #endif
 #ifdef AF_X25
-		case AF_X25:
-			lua_pushliteral(L, "AF_X25");
-			break;
+	case AF_X25:
+		lua_pushliteral(L, "AF_X25");
+		break;
 #endif
 #ifdef	AF_AX25
-		case AF_AX25:
-			lua_pushliteral(L, "AF_AX25");
-			break;
+	case AF_AX25:
+		lua_pushliteral(L, "AF_AX25");
+		break;
 #endif
 #ifdef	AF_ATMPVC
-		case AF_ATMPVC:
-			lua_pushliteral(L, "AF_ATMPVC");
-			break;
+	case AF_ATMPVC:
+		lua_pushliteral(L, "AF_ATMPVC");
+		break;
 #endif
 #ifdef	AF_APPLETALK
-		case AF_APPLETALK:
-			lua_pushliteral(L, "AF_APPLETALK");
-			break;
+	case AF_APPLETALK:
+		lua_pushliteral(L, "AF_APPLETALK");
+		break;
 #endif
 #ifdef	AF_PACKET
-		case AF_PACKET:
-			lua_pushliteral(L, "AF_PACKET");
-			break;
+	case AF_PACKET:
+		lua_pushliteral(L, "AF_PACKET");
+		break;
 #endif
 
-		default:
-			lua_pushinteger(L, family);
-			break;
+	default:
+		lua_pushinteger(L, family);
+		break;
 	}
 	return 1;
 }
@@ -547,50 +546,50 @@ static int
 lbox_bsdsocket_push_sotype(struct lua_State *L, int sotype)
 {
 	/* man 7 socket says that sotype can contain some flags */
-	#if defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
-		sotype &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
-	#endif
-	switch(sotype) {
+#if defined(SOCK_NONBLOCK) && defined(SOCK_CLOEXEC)
+	sotype &= ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
+#endif
+	switch (sotype) {
 #ifdef SOCK_STREAM
-		case SOCK_STREAM:
-			lua_pushliteral(L, "SOCK_STREAM");
-			break;
+	case SOCK_STREAM:
+		lua_pushliteral(L, "SOCK_STREAM");
+		break;
 #endif
 #ifdef SOCK_DGRAM
-		case SOCK_DGRAM:
-			lua_pushliteral(L, "SOCK_DGRAM");
-			break;
+	case SOCK_DGRAM:
+		lua_pushliteral(L, "SOCK_DGRAM");
+		break;
 #endif
 #ifdef SOCK_SEQPACKET
-		case SOCK_SEQPACKET:
-			lua_pushliteral(L, "SOCK_SEQPACKET");
-			break;
+	case SOCK_SEQPACKET:
+		lua_pushliteral(L, "SOCK_SEQPACKET");
+		break;
 #endif
 #ifdef SOCK_RAW
-		case SOCK_RAW:
-			lua_pushliteral(L, "SOCK_RAW");
-			break;
+	case SOCK_RAW:
+		lua_pushliteral(L, "SOCK_RAW");
+		break;
 #endif
 #ifdef SOCK_RDM
-		case SOCK_RDM:
-			lua_pushliteral(L, "SOCK_RDM");
-			break;
+	case SOCK_RDM:
+		lua_pushliteral(L, "SOCK_RDM");
+		break;
 #endif
 #ifdef SOCK_PACKET
-		case SOCK_PACKET:
-			lua_pushliteral(L, "SOCK_PACKET");
-			break;
+	case SOCK_PACKET:
+		lua_pushliteral(L, "SOCK_PACKET");
+		break;
 #endif
-		default:
-			lua_pushinteger(L, sotype);
-			break;
+	default:
+		lua_pushinteger(L, sotype);
+		break;
 	}
 	return 1;
 }
 
 static int
 lbox_bsdsocket_push_addr(struct lua_State *L,
-	const struct sockaddr *addr, socklen_t alen)
+			 const struct sockaddr *addr, socklen_t alen)
 {
 	lua_newtable(L);
 
@@ -598,50 +597,46 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 	lbox_bsdsocket_push_family(L, addr->sa_family);
 	lua_rawset(L, -3);
 
-	switch(addr->sa_family) {
-		case PF_INET:
-		case PF_INET6: {
-			char shost[NI_MAXHOST];
-			char sservice[NI_MAXSERV];
-			int rc = getnameinfo(addr,
-				alen,
-				shost, sizeof(shost),
-				sservice, sizeof(sservice),
-				NI_NUMERICHOST|NI_NUMERICSERV
-			);
+	switch (addr->sa_family) {
+	case PF_INET:
+	case PF_INET6: {
+		char shost[NI_MAXHOST];
+		char sservice[NI_MAXSERV];
+		int rc = getnameinfo(addr,
+				     alen,
+				     shost, sizeof(shost),
+				     sservice, sizeof(sservice),
+				     NI_NUMERICHOST|NI_NUMERICSERV
+				    );
 
-			if (rc == 0) {
-				lua_pushliteral(L, "host");
-				lua_pushstring(L, shost);
-				lua_rawset(L, -3);
-
-				lua_pushliteral(L, "port");
-				lua_pushinteger(L, atol(sservice));
-				lua_rawset(L, -3);
-			}
-
-			break;
-		}
-
-		case PF_UNIX:
+		if (rc == 0) {
 			lua_pushliteral(L, "host");
-			lua_pushliteral(L, "unix/");
+			lua_pushstring(L, shost);
 			lua_rawset(L, -3);
 
 			lua_pushliteral(L, "port");
-			if (alen >= sizeof(struct sockaddr_un)) {
-				lua_pushstring(L,
-					((struct sockaddr_un *)addr)->sun_path);
-			} else {
-				lua_pushliteral(L, "");
-			}
+			lua_pushinteger(L, atol(sservice));
 			lua_rawset(L, -3);
-			break;
+		}
 
-		default:	/* unknown family */
-			lua_pop(L, 1);
-			lua_pushnil(L);
-			break;
+		break;
+	}
+
+	case PF_UNIX:
+		lua_pushliteral(L, "host");
+		lua_pushliteral(L, "unix/");
+		lua_rawset(L, -3);
+
+		lua_pushliteral(L, "port");
+		lua_pushstring(L,
+			       ((struct sockaddr_un *)addr)->sun_path);
+		lua_rawset(L, -3);
+		break;
+
+	default:	/* unknown family */
+		lua_pop(L, 1);
+		lua_pushnil(L);
+		break;
 	}
 
 	return 1;
@@ -685,7 +680,7 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 
 	int res_errno = 0;
 	int dns_res = coeio_custom(bsdsocket_getaddrinfo_cb, timeout,
-		host, port, &hints, &result, &res_errno);
+				   host, port, &hints, &result, &res_errno);
 	lua_pop(L, 2);	/* host, port */
 
 	if (dns_res != 0) {
@@ -701,8 +696,8 @@ lbox_bsdsocket_getaddrinfo(struct lua_State *L)
 	}
 
 	auto scope_guard = make_scoped_guard([&]{
-		freeaddrinfo(result);
-	});
+					     freeaddrinfo(result);
+					     });
 
 	lua_newtable(L);
 	int i = 1;
@@ -821,7 +816,7 @@ lbox_bsdsocket_recvfrom(struct lua_State *L)
 	auto scope_guard = make_scoped_guard([&]{ free(buf); });
 
 	ssize_t res = recvfrom(fh, buf, size, flags,
-		(struct sockaddr*)&fa, &len);
+			       (struct sockaddr*)&fa, &len);
 
 	if (res < 0) {
 		lua_pushnil(L);
