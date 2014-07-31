@@ -142,6 +142,10 @@ title(const char *role, const char *fmt, ...)
 		if (*pptr)
 			bufptr += snprintf(bufptr, bufend - bufptr,
 					   " %s: %i", *nptr, *pptr);
+	if (strlen(cfg.bind_ipaddr)) {
+		bufptr += snprintf(bufptr, bufend - bufptr,
+				   ", ip: %s", cfg.bind_ipaddr);
+	}
 
 	set_proc_title(buf);
 }

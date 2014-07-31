@@ -62,6 +62,8 @@ struct evio_service
 {
 	/** Service name. E.g. 'primary', 'secondary', etc. */
 	char name[SERVICE_NAME_MAXLEN];
+	/** Bind IP address, useful for logging */
+	char host[SERVICE_NAME_MAXLEN];
 
 	/** Interface/port to bind to */
 	struct sockaddr_in addr;
