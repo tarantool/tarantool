@@ -43,7 +43,7 @@ So we <link linkend="utility-tarantool-delim">declare a delimiter</link>.
 This means <quote>Do not send to the server until you see an exclamation mark.</quote>
 
 <programlisting>
-tarantool> <userinput>session = require('session'); session.delimiter('!')</userinput>
+tarantool> <userinput>console = require('console'); console.delimiter('!')</userinput>
 </programlisting>
 From now on it will be possible to use multiple-line statements,
 but it will be necessary to end all statements with exclamation marks.
@@ -405,13 +405,13 @@ For more on Lua print() see Lua manual chapter 5 "Functions"
 
 <para>
 Since this is the grand finale, we will redo the final versions of all the necessary
-requests: the session.delimiter('!') request, the request that created string_function(),
+requests: the console.delimiter('!') request, the request that created string_function(),
 the request that created main_function(), and the request that invokes main_function().
 
 
 <programlisting>
-#Skip the following statement if you have already said "session.delimiter('!')"
-session = require('session'); session.delimiter('!')
+#Skip the following statement if you have already said "console.delimiter('!')"
+console = require('console'); console.delimiter('!')
 
 function string_function()
   local random_number
@@ -506,7 +506,7 @@ to read and process tuples.
 </para>
 
 <programlisting language="lua">
-session = require('session'); session.delimiter('!')
+console = require('console'); console.delimiter('!')
 function sum_json_field(field_name)
   json = require('json')
   local v, t, sum, field_value, is_valid_json, lua_table                --[[1]]
@@ -520,7 +520,7 @@ function sum_json_field(field_name)
   end                                                                   --[[9]]
   return sum                                                            --[[10]]
   end!
-session.delimiter('')!
+console.delimiter('')!
 </programlisting>
 
 <para>

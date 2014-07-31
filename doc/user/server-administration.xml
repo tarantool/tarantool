@@ -132,16 +132,16 @@ by default a newline (line feed).
 </para>
 <para>
 For multi-line requests, it is possible to change the end-of-request marker.
-Syntax: <code>session = require('session'); session.delimiter(<replaceable>string-literal</replaceable>)</code>.
+Syntax: <code>console = require('console'); console.delimiter(<replaceable>string-literal</replaceable>)</code>.
 The string-literal must be a value in single quotes.
 Effect: string becomes end-of-request delimiter, so newline alone is not treated as end of request.
-To go back to normal mode: <code>session.delimiter('')<replaceable>string-literal</replaceable></code>.
-Example:<programlisting>session = require('session'); session.delimiter('!')
+To go back to normal mode: <code>console.delimiter('')<replaceable>string-literal</replaceable></code>.
+Example:<programlisting>console = require('console'); console.delimiter('!')
 function f ()
   statement_1 = 'a'
   statement_2 = 'b'
   end!
-session.delimiter('')!</programlisting>
+console.delimiter('')!</programlisting>
 </para>
 
 <para>
