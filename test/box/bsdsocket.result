@@ -16,6 +16,9 @@ msgpack = require 'msgpack'
 log = require 'log'
 ---
 ...
+errno = require 'errno'
+---
+...
 type(socket)
 ---
 - table
@@ -252,7 +255,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:331: Socket option SO_ACCEPTCONN
+- error: '[string "-- bsdsocket.lua (internal file)..."]:325: Socket option SO_ACCEPTCONN
     is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
@@ -322,7 +325,7 @@ sc:readable()
 ---
 - true
 ...
-sc:sysconnect('127.0.0.1', 3457)
+sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
 ---
 - true
 ...
@@ -599,7 +602,7 @@ sc:readable()
 ---
 - true
 ...
-sc:sysconnect('127.0.0.1', 3458)
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
 ---
 - true
 ...
@@ -806,15 +809,142 @@ socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 ---
 - null
 ...
+-- AF_INET
+port = 35490
+---
+...
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:bind('127.0.0.1', port)
+---
+- true
+...
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('127.0.0.1', port), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e == 0
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('127.0.0.1', porrt), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+-- AF_UNIX
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+s:listen()
+---
+- true
+...
+sc, e = socket.tcp_connect('unix/', path), errno()
+---
+...
+sc ~= nil
+---
+- true
+...
+e == 0
+---
+- true
+...
+sc:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
+- true
+...
+os.remove(path)
+---
+- true
+...
+socket.tcp_connect('unix/', path), errno() == errno.ENOENT
+---
+- null
+- true
+...
 -- close
+port = 65454
+---
+...
+serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+serv:bind('127.0.0.1', port)
+---
+- true
+...
+serv:listen()
+---
+- true
+...
+--# setopt delimiter ';'
+f = fiber.create(function(serv)
+    serv:readable()
+    sc = serv:accept()
+    sc:write("Tarantool test server")
+    sc:shutdown()
+    sc:close()
+    serv:close()
+end, serv);
+---
+...
+--# setopt delimiter ''
 s = socket.tcp_connect('127.0.0.1', port)
 ---
 ...
-string.sub(s:read(128), 1, 9)
+s:read(9)
 ---
 - Tarantool
 ...
-sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+sa = setmetatable({ fh = 512 }, getmetatable(s))
 ---
 ...
 tostring(sa)
@@ -835,9 +965,6 @@ ch = fiber.channel()
 f = fiber.create(function() s:read(12) ch:put(true) end)
 ---
 ...
-fiber.sleep(.1)
----
-...
 s:close()
 ---
 - true
@@ -848,5 +975,5 @@ ch:get(1)
 ...
 s:error()
 ---
-- Connection timed out
+- null
 ...

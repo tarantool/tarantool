@@ -4,6 +4,7 @@ socket = require 'socket'
 fiber = require 'fiber'
 msgpack = require 'msgpack'
 log = require 'log'
+errno = require 'errno'
 type(socket)
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
@@ -98,7 +99,7 @@ sc = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 
 sc:writable()
 sc:readable()
-sc:sysconnect('127.0.0.1', 3457)
+sc:sysconnect('127.0.0.1', 3457) or errno() == errno.EINPROGRESS
 sc:writable(10)
 sc:write('Hello, world')
 
@@ -191,7 +192,7 @@ sc ~= nil
 sc:getsockopt('SOL_SOCKET', 'SO_ERROR')
 sc:nonblock(true)
 sc:readable()
-sc:sysconnect('127.0.0.1', 3458)
+sc:sysconnect('127.0.0.1', 3458) or errno() == errno.EINPROGRESS
 string.match(tostring(sc), ', peer') == nil
 sc:writable()
 string.match(tostring(sc), ', peer') == nil
@@ -256,18 +257,60 @@ s:close()
 
 socket.tcp_connect('127.0.0.1', 80, 0.00000000001)
 
+-- AF_INET
+port = 35490
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+s:bind('127.0.0.1', port)
+socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
+s:listen()
+sc, e = socket.tcp_connect('127.0.0.1', port), errno()
+sc ~= nil
+e == 0
+sc:close()
+s:close()
+socket.tcp_connect('127.0.0.1', porrt), errno() == errno.ECONNREFUSED
+
+-- AF_UNIX
+path = '/tmp/tarantool-test-socket'
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s:bind('unix/', path)
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+s:listen()
+sc, e = socket.tcp_connect('unix/', path), errno()
+sc ~= nil
+e == 0
+sc:close()
+s:close()
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+os.remove(path)
+socket.tcp_connect('unix/', path), errno() == errno.ENOENT
+
 -- close
+port = 65454
+serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+serv:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+serv:bind('127.0.0.1', port)
+serv:listen()
+--# setopt delimiter ';'
+f = fiber.create(function(serv)
+    serv:readable()
+    sc = serv:accept()
+    sc:write("Tarantool test server")
+    sc:shutdown()
+    sc:close()
+    serv:close()
+end, serv);
+--# setopt delimiter ''
 
 s = socket.tcp_connect('127.0.0.1', port)
-string.sub(s:read(128), 1, 9)
-sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+s:read(9)
+sa = setmetatable({ fh = 512 }, getmetatable(s))
 tostring(sa)
 sa:readable(0)
 sa:writable(0)
 
 ch = fiber.channel()
 f = fiber.create(function() s:read(12) ch:put(true) end)
-fiber.sleep(.1)
 s:close()
 ch:get(1)
 s:error()
