@@ -300,7 +300,7 @@ socket_methods.shutdown = function(self, how)
     local ihow = hvariants[how]
 
     if ihow == nil then
-        ihow = 3
+        ihow = 2
     end
     self._errno = nil
     if ffi.C.shutdown(self.fh, ihow) < 0 then
