@@ -314,3 +314,24 @@ f = fiber.create(function() s:read(12) ch:put(true) end)
 s:close()
 ch:get(1)
 s:error()
+
+-- random port
+port = 33123
+master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+master:bind('127.0.0.1', port)
+master:listen()
+--# setopt delimiter ';'
+function gh361()
+    local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+    s:sysconnect('127.0.0.1', port)
+    s:wait()
+    res = s:read(1200)
+end;
+
+--# setopt delimiter ''
+f = fiber.create(gh361)
+fiber.cancel(f)
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+master:close()
+f = nil

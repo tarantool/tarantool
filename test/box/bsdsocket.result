@@ -255,7 +255,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:325: Socket option SO_ACCEPTCONN
+- error: '[string "-- bsdsocket.lua (internal file)..."]:326: Socket option SO_ACCEPTCONN
     is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
@@ -976,4 +976,49 @@ ch:get(1)
 s:error()
 ---
 - null
+...
+-- random port
+port = 33123
+---
+...
+master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+master:bind('127.0.0.1', port)
+---
+- true
+...
+master:listen()
+---
+- true
+...
+--# setopt delimiter ';'
+function gh361()
+    local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
+    s:sysconnect('127.0.0.1', port)
+    s:wait()
+    res = s:read(1200)
+end;
+---
+...
+--# setopt delimiter ''
+f = fiber.create(gh361)
+---
+...
+fiber.cancel(f)
+---
+...
+while f:status() ~= 'dead' do fiber.sleep(0.001) end
+---
+...
+master:close()
+---
+- true
+...
+f = nil
+---
 ...

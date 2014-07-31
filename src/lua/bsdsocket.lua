@@ -7,7 +7,7 @@ local TIMEOUT_INFINITY      = 500 * 365 * 86400
 local ffi = require('ffi')
 local boxerrno = require('errno')
 local internal = require('socket.internal')
-local boxfiber = require('fiber')
+local fiber = require('fiber')
 
 ffi.cdef[[
     typedef uint32_t socklen_t;
@@ -174,7 +174,7 @@ socket_methods.nonblock = function(self, nb)
 end
 
 local function wait_safely(self, what, timeout)
-    local f = boxfiber.self()
+    local f = fiber.self()
     local fid = f:id()
 
     if self.waiters == nil then
@@ -184,6 +184,7 @@ local function wait_safely(self, what, timeout)
     self.waiters[fid] = true
     local res = internal.iowait(self.fh, what, timeout)
     self.waiters[fid] = nil
+    fiber.testcancel()
     return res
 end
 
@@ -522,13 +523,13 @@ socket_methods.read = function(self, size, timeout)
     end
 
     while timeout > 0 do
-        local started = boxfiber.time()
+        local started = fiber.time()
 
         if not self:readable(timeout) then
             return nil
         end
 
-        timeout = timeout - ( boxfiber.time() - started )
+        timeout = timeout - ( fiber.time() - started )
 
         local data = self:sysread(4096)
         if data ~= nil then
@@ -610,16 +611,16 @@ socket_methods.readline = function(self, limit, eol, timeout)
         return data
     end
 
-    local started = boxfiber.time()
+    local started = fiber.time()
     while timeout > 0 do
-        local started = boxfiber.time()
+        local started = fiber.time()
         
         if not self:readable(timeout) then
             self._errno = boxerrno()
             return nil
         end
         
-        timeout = timeout - ( boxfiber.time() - started )
+        timeout = timeout - ( fiber.time() - started )
 
         local data = self:sysread(4096)
         if data ~= nil then
@@ -657,9 +658,9 @@ socket_methods.write = function(self, octets, timeout)
         timeout = TIMEOUT_INFINITY
     end
 
-    local started = boxfiber.time()
+    local started = fiber.time()
     while timeout > 0 and self:writable(timeout) do
-        timeout = timeout - ( boxfiber.time() - started )
+        timeout = timeout - ( fiber.time() - started )
 
         local written = self:syswrite(octets)
         if written == nil then
@@ -913,14 +914,14 @@ local function tcp_connect(host, port, timeout)
             family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
-    local stop = boxfiber.time() + timeout
+    local stop = fiber.time() + timeout
     local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
     if dns == nil then
         return nil
     end
     for i, remote in pairs(dns) do
-        timeout = stop - boxfiber.time()
+        timeout = stop - fiber.time()
         if timeout <= 0 then
             boxerrno(boxerrno.ETIMEDOUT)
             return nil
