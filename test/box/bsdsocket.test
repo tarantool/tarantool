@@ -88,7 +88,8 @@ exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 
 exec admin "lua sc:writable()"
 exec admin "lua sc:readable()"
-exec admin "lua sc:sysconnect('127.0.0.1', 3457)"
+exec admin "lua r = sc:sysconnect('127.0.0.1', 3457); errno = box.errno()"
+exec admin "lua r or errno == box.errno.EINPROGRESS"
 exec admin "lua sc:writable(10)"
 exec admin "lua sc:write('Hello, world')"
 
@@ -169,7 +170,8 @@ exec admin "lua sc = box.socket('PF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua sc:getsockopt('SOL_SOCKET', 'SO_ERROR')"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:readable()"
-exec admin "lua sc:sysconnect('127.0.0.1', 3458)"
+exec admin "lua r = sc:sysconnect('127.0.0.1', 3458); errno = box.errno()"
+exec admin "lua r or errno == box.errno.EINPROGRESS"
 exec admin "lua string.match(tostring(sc), ', peer') == nil"
 exec admin "lua sc:writable()"
 exec admin "lua string.match(tostring(sc), ', peer') == nil"
@@ -227,8 +229,36 @@ exec admin "lua string.match(header, '\\r\\n\\r\\n$') ~= nil"
 exec admin "lua s:close()"
 
 exec admin "lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)"
-exec admin "lua box.socket.tcp_connect('tarantool.org', 12345)"
 
+# AF_INET
+port = 35490
+exec admin "lua s = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')"
+exec admin "lua s:bind('127.0.0.1', {})".format(port)
+exec admin "lua box.socket.tcp_connect('127.0.0.1', {}), box.errno() == box.errno.ECONNREFUSED".format(port)
+exec admin "lua s:listen()"
+exec admin "lua sc, errno = box.socket.tcp_connect('127.0.0.1', {}), box.errno()".format(port)
+exec admin "lua sc ~= nil"
+exec admin "lua errno == 0"
+exec admin "lua sc:close()"
+exec admin "lua s:close()"
+exec admin "lua box.socket.tcp_connect('127.0.0.1', {}), box.errno() == box.errno.ECONNREFUSED".format(port)
+
+# AF_UNIX
+path = '/tmp/tarantool-test-socket'
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua box.socket.tcp_connect('unix/', '{}'), box.errno() == box.errno.ECONNREFUSED".format(path)
+exec admin "lua s:listen()"
+exec admin "lua sc, errno = box.socket.tcp_connect('unix/', '{}'), box.errno()".format(path)
+exec admin "lua sc ~= nil"
+exec admin "lua errno == 0"
+exec admin "lua sc:close()"
+exec admin "lua s:close()"
+exec admin "lua box.socket.tcp_connect('unix/', '{}'), box.errno() == box.errno.ECONNREFUSED".format(path)
+print('remove unix socket')
+if os.path.exists(path):
+        os.unlink(path)
+exec admin "lua box.socket.tcp_connect('unix/', '{}'), box.errno() == box.errno.ENOENT".format(path)
 
 exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
 exec admin "lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))"

@@ -112,17 +112,11 @@ socket_methods.sysconnect = function(self, host, port)
     local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.connect(self.fh, addr, addr_len[0]);
+        if res == 0 then
+            return true
+        end
     end
-    if res == 0 then
-        return true
-    end
-
-    local errno = box.errno()
-    if errno == box.errno.EINPROGRESS then
-        return true
-    end
-
-    self._errno = errno
+    self._errno = box.errno()
     return false
 end
 
@@ -758,7 +752,7 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     return true
 end
 
-local function create_socket(self, domain, stype, proto)
+local function create_socket(domain, stype, proto)
     local idomain = get_ivalue(box.socket.internal.DOMAIN, domain)
     if idomain == nil then
         box.errno(box.errno.EINVAL)
@@ -878,90 +872,61 @@ socket_methods.peer = function(self)
 end
 
 -- tcp connector
-local function tcp_connect(host, port, timeout)
-    if host == 'unix/' and port ~= nil then
-        local s = package.loaded.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
-        if s == nil then
-            return nil
-        end
-        if s:sysconnect(host, port) then
-            return s
-        else
-            local errno = box.errno()
-            s:close()
-            box.errno(errno)
-            return nil
-        end
+local function tcp_connect_remote(remote, timeout)
+    local s = create_socket(remote.family, remote.type, remote.protocol)
+    if not s then
+        -- Address family is not supported by the host
+        return nil
     end
+    local res = s:sysconnect(remote.host, remote.port)
+    if res then
+        -- Even through the socket is nonblocking, if the server to which we
+        -- are connecting is on the same host, the connect is normally
+        -- established immediately when we call connect (Stevens UNP).
+        return s
+    end
+    local save_errno = s:errno()
+    if save_errno ~= box.errno.EINPROGRESS then
+        s:close()
+        box.errno(save_errno)
+        return nil
+    end
+    if s:wait(timeout) ~= 'W' then
+        -- When the connection completes succesfully, the descriptor becomes
+        -- writable. When the connection establishment encounters and error,
+        -- the descriptor becomes both readable and writable (Stevens UNP).
+        save_errno = s:getsockopt('SOL_SOCKET', 'SO_ERROR')
+        s:close()
+        box.errno(save_errno)
+        return nil
+    end
+    -- Connected
+    box.errno(0)
+    return s
+end
 
-    if timeout == nil then
-        timeout = TIMEOUT_INFINITY
+local function tcp_connect(host, port, timeout)
+    if host == 'unix/' then
+        return tcp_connect_remote({ host = host, port = port, protocol = 'ip',
+            family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
     end
-    local started = box.time()
-    local dns = box.socket.getaddrinfo(host, port, timeout,
-                                    { type = 'SOCK_STREAM', protocol = 'tcp' })
+    local timeout = timeout or TIMEOUT_INFINITY
+    local stop = box.time() + timeout
+    local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
+        protocol = 'tcp' })
     if dns == nil then
         return nil
     end
-
-
-
     for i, remote in pairs(dns) do
-
-        timeout = timeout - (box.time() - started)
+        timeout = stop - box.time()
         if timeout <= 0 then
             box.errno(box.errno.ETIMEDOUT)
             return nil
         end
-
-        started = box.time()
-
-        local s = box.socket(remote.family, remote.type, 'tcp')
-        if s == nil then
-            return nil
+        local s = tcp_connect_remote(remote, timeout)
+        if s then
+            return s
         end
-
-        if s:sysconnect(remote.host, remote.port) then
-
-            timeout = timeout - (box.time() - started)
-            if timeout <= 0 then
-                s:close()
-                break
-            end
-
-            while true do
-
-                if s:writable(timeout) then
-                    if s:peer(self) ~= nil then
-                        box.errno(0)
-                        return s
-
-                    elseif box.errno() ~= box.errno.EAGAIN then
-                        break
-                    end
-
-                    timeout = timeout - (box.time() - started)
-                    started = box.time()
-
-                    if timeout <= 0 then
-                        s:close()
-                        break
-                    end
-
-                else
-                    break
-                end
-
-            end
-        end
-
-        local save_errno = box.errno()
-        s:close()
-        box.errno(save_errno)
-    end
-
-    if timeout <= 0 then
-        box.errno(box.errno.ETIMEDOUT)
     end
     return nil
 end
@@ -987,7 +952,7 @@ box.socket.internal = {
 }
 
 setmetatable(box.socket, {
-    __call = create_socket,
+    __call = function(self, ...) return create_socket(...) end,
     __index = {
         getaddrinfo = getaddrinfo,
         tcp_connect = tcp_connect

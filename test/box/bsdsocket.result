@@ -219,7 +219,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:327: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:321: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -288,7 +288,10 @@ lua sc:readable()
 ---
  - true
 ...
-lua sc:sysconnect('127.0.0.1', 3457)
+lua r = sc:sysconnect('127.0.0.1', 3457); errno = box.errno()
+---
+...
+lua r or errno == box.errno.EINPROGRESS
 ---
  - true
 ...
@@ -539,7 +542,10 @@ lua sc:readable()
 ---
  - true
 ...
-lua sc:sysconnect('127.0.0.1', 3458)
+lua r = sc:sysconnect('127.0.0.1', 3458); errno = box.errno()
+---
+...
+lua r or errno == box.errno.EINPROGRESS
 ---
  - true
 ...
@@ -724,9 +730,91 @@ lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)
 ---
  - nil
 ...
-lua box.socket.tcp_connect('tarantool.org', 12345)
+lua s = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua s:bind('127.0.0.1', 35490)
+---
+ - true
+...
+lua box.socket.tcp_connect('127.0.0.1', 35490), box.errno() == box.errno.ECONNREFUSED
 ---
  - nil
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua sc, errno = box.socket.tcp_connect('127.0.0.1', 35490), box.errno()
+---
+...
+lua sc ~= nil
+---
+ - true
+...
+lua errno == 0
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua box.socket.tcp_connect('127.0.0.1', 35490), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua sc, errno = box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno()
+---
+...
+lua sc ~= nil
+---
+ - true
+...
+lua errno == 0
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+remove unix socket
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ENOENT
+---
+ - nil
+ - true
 ...
 lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
 ---
