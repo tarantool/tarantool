@@ -1663,7 +1663,7 @@ The example function will: (1) select a tuple whose key value is 1000;
 (4) Get field[3] from what was replaced;
 (5) Format the value from field[3] as yyyy-mm-dd hh:mm:ss.ffff;
 (6) Return the formatted value.
-The function uses Tarantool box functions <code>box.space...select</code>, <code>box.space...replace</code>, <code>fiber.time</code>, <code>uuid.hex()</code>.
+The function uses Tarantool box functions <code>box.space...select</code>, <code>box.space...replace</code>, <code>fiber.time</code>, <code>uuid.str()</code>.
 The function uses Lua functions
 <link xlink:href="http://www.lua.org/pil/22.1.html">os.date()</link>
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
@@ -1678,12 +1678,12 @@ function example()
   if table_of_selected_tuples ~= nil then
     if table_of_selected_tuples[1] ~= nil then
       if #table_of_selected_tuples[1] == 3 then
-        box.raise(1, 'This tuple already has 3 fields')
+        box.error({code=1, reason='This tuple already has 3 fields'})
       end
     end
   end
   replaced_tuple = box.space.tester:replace
-            {1000,  require('uuid').hex(), tostring(fiber.time())}
+            {1000,  require('uuid').str(), tostring(fiber.time())}
   time_field = tonumber(replaced_tuple[3])
   formatted_time_field = os.date("%Y-%m-%d %H:%M:%S", time_field)
   c = time_field % 1
@@ -1715,54 +1715,79 @@ console.delimiter('')!
 
 <section xml:id="sp-error">
     <title>Package <code>box.error</code></title>
+    <para>
+                The <code>box.error</code> function is for raising an error.
+                The difference between this function
+                and Lua's built-in <code>error()</code> function
+                is that when the error reaches the client, its error code
+                is preserved. In contrast, a Lua error would always be
+                presented to the client as <constant>ER_PROC_LUA</constant>.
+    </para>
 <variablelist xml:id="error" xreflabel="error">
+
     <varlistentry>
         <term>
-            <emphasis role="lua">box.error(<replaceable>errcode-number, errtext-string</replaceable>)</emphasis>
+         <emphasis role="lua">box.error({[code=<replaceable>errcode-number</replaceable>,] reason=<replaceable>errtext-string</replaceable>})</emphasis>
         </term>
         <listitem>
             <para>
-                Raises a client error. The difference between this function
-                and the built-in <code>error()</code> function in Lua
-                is that when the error reaches the client, its error code
-                is preserved, whereas every Lua error is presented to the
-                client as <constant>ER_PROC_LUA</constant>. This function
-                makes it possible to emulate any kind of native exception,
-                such as unique constraint violation, no such space/index,
-                etc. A complete list of errors is present in the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
-                in the source tree.
-                Lua constants which correspond to Tarantool errors
-                are defined as members of <code>box.error</code>. The error
-                message can be arbitrary.
-                Lua function can use <code>box.error(...)</code> to emulate
-                request errors (for example: unique key exception).
-                When called without arguments this function re-throws the last
-                thrown error.
+             When called with a Lua-table argument, the errorcode-number and errtext-string have any user-desired values.
+             The result will be those values.
+             </para>
+        </listitem>
+     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.error()</emphasis>
+        </term>
+        <listitem>
+            <para>
+             When called without arguments, <code>box.error()</code> re-throws whatever the last error was.
+             </para>
+        </listitem>
+     </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua">box.error(<replaceable>errcode-number, errtext-string [, errtext-string ...]</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Emulate a request error, with text based on one of the pre-defined Tarantool errors defined in
+                the file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/errcode.h"><filename>errcode.h</filename></link>
+                in the source tree. Lua constants which correspond to those Tarantool errors
+                are defined as members of <code>box.error</code>, for example <code>box.error.NO_SUCH_USER</code> == 45.
             </para>
             <para>
-              Parameters: <code>errcode-number</code> = number taken from the complete list of errors,
-              <code>errtext-string</code> = the message which will accompany the error.
+              Parameters: <code>errcode-number</code> = number of a pre-defined error,
+              <code>errtext-string</code> = part of the message which will accompany the error.
+              For example the NO_SUCH_USER message is "User '%s' is not found" -- it includes one
+              "%s" component which will be replaced with <code>errtext-string</code>. Thus a call to
+              <code>box.error(box.error.NO_SUCH_USER, 'joe')</code> or
+              <code>box.error(45, 'joe')</code> will result in an error with the accomplanying
+              message "User 'joe' is not found".
             </para>
             <para>
               Possible errors: whatever is specified in errcode-number.
             </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool&gt; <userinput>tarantool> box.error(box.error,,'Tuple/Key must be MsgPack array')</userinput>
+            <bridgehead renderas="sect4">Example</bridgehead><programlisting><prompt>tarantool&gt;</prompt> <userinput>box.error({code=555, reason='Arbitrary message'})</userinput>
 ---
-- error: Tuple/Key must be MsgPack array
-</programlisting>
+- error: Arbitrary message
+...
+
+<prompt>tarantool&gt;</prompt> <userinput>box.error()</userinput>
+---
+- error: Arbitrary message
+...
+
+<prompt>tarantool&gt;</prompt> <userinput>box.error(box.error.FUNCTION_ACCESS_DENIED, 'A', 'B', 'C')</userinput>
+---
+- error: A access denied for user 'B' to function 'C'
+...</programlisting> 
         </listitem>
     </varlistentry>
-    <varlistentry>
-        <term>
-            <emphasis role="lua">box.error.rethrow()</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Rethrow previous error.
-             </para>
-        </listitem>
-     </varlistentry>
+
 </variablelist>
 </section>
 
