@@ -427,7 +427,9 @@ lbox_bsdsocket_iowait(struct lua_State *L)
 	ev_set_priority(&io, EV_MAXPRI);
 	ev_io_start(&io);
 
+	fiber_setcancellable(true);
 	fiber_yield_timeout(timeout);
+	fiber_setcancellable(false);
 	ev_io_stop(&io);
 
 	int ret = 0;

@@ -180,6 +180,7 @@ local function wait_safely(self, what, timeout)
     self.waiters[fid] = f
     local res = box.socket.internal.iowait(self.fh, what, timeout)
     self.waiters[fid] = nil
+    box.fiber.testcancel()
     return res
 end
 
