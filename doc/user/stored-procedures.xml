@@ -248,7 +248,7 @@ tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
 - hello
 - world
 ...
-tarantool&gt; <userinput>session = require('session'); session.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>console = require('console'); console.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
 tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
 tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
         -&gt; <userinput>              t = box.space.tester:select{key};</userinput>
@@ -258,7 +258,7 @@ tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
 ---
 - null
 ...
-tarantool&gt; <userinput>session.delimiter('')!</userinput>
+tarantool&gt; <userinput>console.delimiter('')!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -391,7 +391,7 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 <prompt>tarantool</prompt> <userinput>pickle = require('pickle')</userinput>
 ---
 ...
-<prompt>tarantool></prompt> <userinput>session = require('session'); session.delimiter('!') -- this means following commands must end with '!'</userinput>
+<prompt>tarantool></prompt> <userinput>console = require('console'); console.delimiter('!') -- this means following commands must end with '!'</userinput>
 <prompt>tarantool></prompt> <userinput>tuple = box.space.tester:replace{0}!</userinput>
 ---
 ...
@@ -424,7 +424,7 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 - string
 - 666666666666666
 ...
-<prompt>tarantool></prompt> <userinput>session.delimiter('') -- back to normal: commands end with line feed!</userinput>
+<prompt>tarantool></prompt> <userinput>console.delimiter('') -- back to normal: commands end with line feed!</userinput>
 </programlisting>
             </para>
         </listitem>
@@ -474,7 +474,7 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
     which inserts a SHA-1 digest of the word "^S^e^c^ret Wordpass" into a tuple set,
     and password_check() which requires input of a password.<programlisting>
 <prompt>localhost&gt;</prompt> <userinput>digest = require('digest')</userinput>
-<prompt>localhost&gt;</prompt> <userinput>session = require('session'); session.delimiter('!') --this means ignore line feeds until next '!'</userinput>
+<prompt>localhost&gt;</prompt> <userinput>console = require('console'); console.delimiter('!') --this means ignore line feeds until next '!'</userinput>
 <prompt>localhost&gt;</prompt> <userinput>function password_insert()</userinput>
         <prompt>-&gt;</prompt> <userinput>  box.space.tester:insert{12345,digest.sha1('^S^e^c^ret Wordpass')}</userinput>
         <prompt>-&gt;</prompt> <userinput>  return 'OK'</userinput>
@@ -495,7 +495,7 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 <prompt>localhost&gt;</prompt> <userinput>password_insert()!</userinput>
 Call OK, 1 rows affected
 ['OK']
-<prompt>localhost></prompt> <userinput>session.delimiter('') --  back to normal: commands end with line feed!</userinput>
+<prompt>localhost></prompt> <userinput>console.delimiter('') --  back to normal: commands end with line feed!</userinput>
 </programlisting></para>
 <para>
   If a later user calls
@@ -1173,7 +1173,7 @@ Each iteration of the loop adds 1 to a global variable
 named gvar, then goes to sleep for 2 seconds.
 The sleep causes an implicit fiber.yield().<programlisting>
 <prompt>tarantool&gt;</prompt><userinput> fiber = require('fiber')</userinput>
-<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> console = require('console'); console.delimiter('!')</userinput>
 <prompt>tarantool&gt;</prompt><userinput> function function_x()</userinput>
 <prompt>        -&gt;</prompt><userinput>   gvar = 0</userinput>
 <prompt>        -&gt;</prompt><userinput>   while 0 == 0 do</userinput>
@@ -1183,7 +1183,7 @@ The sleep causes an implicit fiber.yield().<programlisting>
 <prompt>        -&gt;</prompt><userinput>   end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput></programlisting>
+<prompt>tarantool&gt;</prompt><userinput> console.delimiter('')!</userinput></programlisting>
 Make a fiber, associate function_x with the fiber,
 and start function_x. It will immediately "detach"
 so it will be running independently of the caller.

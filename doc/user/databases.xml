@@ -983,7 +983,7 @@ replace_counter</programlisting>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _schema.
 <programlisting>
-session = require('session'); session.delimiter('!')
+console = require('console'); console.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._schema:pairs() do
@@ -994,7 +994,7 @@ function example()
   end
   return ta
 end!
-session.delimiter('')!</programlisting>
+console.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1019,7 +1019,7 @@ session.delimiter('')!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _space.
-<programlisting>session = require('session'); session.delimiter('!')
+<programlisting>console = require('console'); console.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._space:pairs() do
@@ -1030,7 +1030,7 @@ function example()
   end
   return ta
 end!
-session.delimiter('')!</programlisting>
+console.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1062,7 +1062,7 @@ session.delimiter('')!</programlisting>
             <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following function will display all fields in all tuples of _index.
-<programlisting>session = require('session'); session.delimiter('!')
+<programlisting>console = require('console'); console.delimiter('!')
 function example()
   local ta = {}, i, line
   for k, v in box.space._index:pairs() do
@@ -1073,7 +1073,7 @@ function example()
   end
   return ta
 end!
-session.delimiter('')!</programlisting>
+console.delimiter('')!</programlisting>
               Here is what example() returns in a typical installation:
 <programlisting>
 <prompt>tarantool&gt;</prompt> <userinput>example()</userinput>
@@ -1148,7 +1148,7 @@ means "space_name = the space_name field in the tuple of _space
 that we've just fetched with pairs()". The function returns a table.
 </para>
 <programlisting>
-session = require('session'); session.delimiter('!')
+console = require('console'); console.delimiter('!')
 function example()
   local tuple_count, space_name, line
   local ta = {}
@@ -1170,7 +1170,7 @@ function example()
   end
   return ta
 end!
-session.delimiter('')!
+console.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -1332,7 +1332,7 @@ session.delimiter('')!
 ---
 - ['A', 'C']
 ...
-<prompt>tarantool&gt;</prompt> <userinput> session = require('session'); session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> console = require('console'); console.delimiter('!')</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput> function example()
@@ -1343,7 +1343,7 @@ session.delimiter('')!
          &gt; end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput> session.delimiter('')!</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> console.delimiter('')!</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput> example()</userinput>
@@ -1669,7 +1669,7 @@ The function uses Lua functions
 and <link xlink:href="http://www.lua.org/pil/20.html">string.sub()</link>.
 </para>
 <programlisting>
-session = require('session'); session.delimiter('!')
+console = require('console'); console.delimiter('!')
 function example()
   local a, b, c, table_of_selected_tuples, replaced_tuple, time_field
   local formatted_time_field
@@ -1691,7 +1691,7 @@ function example()
   formatted_time_field = formatted_time_field .. '.' .. d
   return formatted_time_field
 end!
-session.delimiter('')!
+console.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2086,7 +2086,7 @@ and display how many bytes remain in the tuple.
 The function uses Tarantool box.tuple functions new(), unpack(), find(), transform(), bsize().
 </para>
 <programlisting>
-session = require('session'); session.delimiter('!')
+console = require('console'); console.delimiter('!')
 function example()
   local tuple1, tuple2, lua_table_1, scalar1, scalar2, scalar3, field_number
   tuple1 = box.tuple.new({'a', 'b', 'c'})
@@ -2097,7 +2097,7 @@ function example()
   tuple2 = tuple2:transform(field_number, 1)
   return 'tuple2 = ' , tuple2 , ' # of bytes = ' , tuple2:bsize()
 end!
-session.delimiter('')!
+console.delimiter('')!
 </programlisting>
 <para>
 ... And here is what happens when one invokes the function:
@@ -2585,7 +2585,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 <prompt>tarantool&gt;</prompt><userinput> box.schema.user.grant('guest', 'read,write,execute', 'universe')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> session = require('session'); session.delimiter('!')</userinput>
+<prompt>tarantool&gt;</prompt><userinput> console = require('console'); console.delimiter('!')</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt><userinput> net_box = require('net.box')!</userinput>
@@ -2623,7 +2623,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 <prompt>         &gt;</prompt><userinput> end!</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> session.delimiter('')!</userinput>
+<prompt>tarantool&gt;</prompt><userinput> console.delimiter('')!</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt><userinput> ta = {}</userinput>
