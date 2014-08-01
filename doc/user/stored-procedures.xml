@@ -1574,7 +1574,7 @@ for instructions about defining triggers for connect and disconnect events
       <link xlink:href="http://w3.impa.br/~diego/software/luasocket/">luasocket</link>.
     </para>
     <para>
-     The functions for setting up and connecting are <code>socket</code>, <code>sysconnect</code>.
+     The functions for setting up and connecting are <code>socket</code>, <code>sysconnect</code>, <code>tcp_connect</code>.
      The functions for sending data are <code>send</code>, <code>sendto</code>, <code>write</code>, <code>syswrite</code>.
      The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>, <code>readline</code>.
       The functions for waiting before sending/receiving data are <code>wait</code>, <code>readable</code>, <code>writable</code>.
@@ -1591,28 +1591,29 @@ for instructions about defining triggers for connect and disconnect events
       </thead>
       <tbody>
        <row><entry>socket</entry><entry>setup</entry></row>
-       <row><entry>sysconnect</entry><entry>setup</entry></row>
-       <row><entry>send</entry><entry>sending</entry></row>
-       <row><entry>sendto</entry><entry>sending</entry></row>
-       <row><entry>write</entry><entry>sending</entry></row>
-       <row><entry>syswrite</entry><entry>sending</entry></row>
-       <row><entry>recv</entry><entry>receiving</entry></row>
-       <row><entry>recvfrom</entry><entry>receiving</entry></row>
-       <row><entry>read</entry><entry>receiving</entry></row>
-       <row><entry>readline</entry><entry>receiving</entry></row>
-       <row><entry>nonblock  </entry><entry>flag setting  </entry></row>
-       <row><entry>setsockopt</entry><entry>flag setting  </entry></row>
-       <row><entry>linger</entry><entry>flag setting</entry></row>
-       <row><entry>listen</entry><entry>client/server</entry></row>
-       <row><entry>accept</entry><entry>client/server</entry></row>
-       <row><entry>shutdown</entry><entry>teardown</entry></row>
-       <row><entry>close</entry><entry>teardown</entry></row>
-       <row><entry>errno</entry><entry>serror checking</entry></row>
-       <row><entry>error</entry><entry>error checking</entry></row>
-       <row><entry>getaddrinfo</entry><entry>information</entry></row>
-       <row><entry>getsockopt</entry><entry>information</entry></row>
+       <row><entry><link linkend="socket-sysconnect">sysconnect</link></entry><entry>setup</entry></row>
+       <row><entry><link linkend="socket-tcpconnect">tcp_connect</link></entry><entry>setup</entry></row>
+       <row><entry><link linkend="socket-send">send</link></entry><entry>sending</entry></row>
+       <row><entry><link linkend="socket-sendto">sendto</link></entry><entry>sending</entry></row>
+       <row><entry><link linkend="socket-send">write</link></entry><entry>sending</entry></row>
+       <row><entry><link linkend="socket-syswrite">syswrite</link></entry><entry>sending</entry></row>
+       <row><entry><link linkend="socket-recv">recv</link></entry><entry>receiving</entry></row>
+       <row><entry><link linkend="socket-recvfrom">recvfrom</link></entry><entry>receiving</entry></row>
+       <row><entry><link linkend="socket-read">read</link></entry><entry>receiving</entry></row>
+       <row><entry><link linkend="socket-readline">readline</link></entry><entry>receiving</entry></row>
+       <row><entry><link linkend="socket-nonblock">nonblock</link></entry><entry>flag setting  </entry></row>
+       <row><entry><link linkend="socket-setsockopt">setsockopt</link></entry><entry>flag setting  </entry></row>
+       <row><entry><link linkend="socket-linger">linger</link></entry><entry>flag setting</entry></row>
+       <row><entry><link linkend="socket-listen">listen</link></entry><entry>client/server</entry></row>
+       <row><entry><link linkend="socket-accept">accept</link></entry><entry>client/server</entry></row>
+       <row><entry><link linkend="socket-shutdown">shutdown</link></entry><entry>teardown</entry></row>
+       <row><entry><link linkend="socket-close">close</link></entry><entry>teardown</entry></row>
+       <row><entry><link linkend="socket-error">errno</link></entry><entry>serror checking</entry></row>
+       <row><entry><link linkend="socket-error">error</link></entry><entry>error checking</entry></row>
+       <row><entry><link linkend="socket-getaddrinfo">getaddrinfo</link></entry><entry>information</entry></row>
+       <row><entry><link linkend="socket-getsockopt">getsockopt</link></entry><entry>information</entry></row>
        </tbody>
-      </tgroup>                                   
+      </tgroup>
       </table>
     </para>
     <para>
@@ -1630,7 +1631,7 @@ for instructions about defining triggers for connect and disconnect events
     </para>
 
     <varlistentry>
-        <term><emphasis role="lua">socket(<replaceable>domain</replaceable>, <replaceable>type</replaceable>, <replaceable>protocol</replaceable>)</emphasis></term>
+        <term xml:id="socket-socket" xreflabel="socket-socket"><emphasis role="lua">socket(<replaceable>domain</replaceable>, <replaceable>type</replaceable>, <replaceable>protocol</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Create a new TCP or UDP socket.
@@ -1646,11 +1647,12 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:sysconnect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
+        <term xml:id="socket-sysconnect" xreflabel="socket-sysconnect"><emphasis role="lua">sock:sysconnect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
                 The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/connect.2.html">Linux man page</link>.
+                The host must be an IP address.
             </para>
             <para>
                 Parameters: <code>host</code>, <code>port</code> -- which must correspond to an IPv4 address, an IPv6 address, or a UNIX path.
@@ -1663,9 +1665,27 @@ for instructions about defining triggers for connect and disconnect events
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua">sock:tcp_connect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+                Connect a socket to a remote host.
+            </para>
+            <para>
+                Parameters: <code>host</code>, <code>port</code>. The host may be a URL rather than an IP address.
+            </para>
+            <para>
+                Returns: (type = userdata) a connected socket, if no error.
+            </para>
+            <para>
+                Example: <code>sock:tcp_connect('tarantool.org', 80)</code>
+            </para>
+        </listitem>
+    </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:send(<replaceable>data, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-send" xreflabel="socket-send"><emphasis role="lua">sock:send(<replaceable>data, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Send data over a connected socket.
@@ -1683,7 +1703,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-        <term><emphasis role="lua">sock:syswrite(<replaceable>size</replaceable>)</emphasis></term>
+        <term xml:id="socket-syswrite" xreflabel="socket-syswrite"><emphasis role="lua">sock:syswrite(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Write data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
@@ -1693,7 +1713,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:recv(<replaceable>size, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-recv" xreflabel="socket-recv"><emphasis role="lua">sock:recv(<replaceable>size, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Read <code>size</code> bytes from a connected socket.
@@ -1717,7 +1737,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list] [, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list] [, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Read a line from a connected socket.
@@ -1765,7 +1785,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-     <term><emphasis role="lua">sock:read(<replaceable>size</replaceable>, [<replaceable>timeout</replaceable>])</emphasis></term>
+     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua">sock:read(<replaceable>size</replaceable>, [<replaceable>timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
              Read data on a socket, until <code>size</code> bytes have been read, or until <code>timeout</code> expires,
@@ -1776,7 +1796,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:sysread(<replaceable>size</replaceable>)</emphasis></term>
+        <term xml:id="socket-sysread" xreflabel="socket-sysread"><emphasis role="lua">sock:sysread(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Read data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
@@ -1786,7 +1806,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:bind(<replaceable>host, port[, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua">sock:bind(<replaceable>host, port[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Bind a socket to the given host/port.
@@ -1808,7 +1828,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:listen(backlog)</emphasis></term>
+        <term xml:id="socket-listen" xreflabel="socket-listen"><emphasis role="lua">sock:listen(backlog)</emphasis></term>
         <listitem>
             <para>
                 Start listening for incoming connections.
@@ -1825,7 +1845,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:accept()</emphasis></term>
+        <term xml:id="socket-accept" xreflabel="socket-accept"><emphasis role="lua">sock:accept()</emphasis></term>
         <listitem>
             <para>
                 Accept a new client connection and create a new connected socket.
@@ -1838,7 +1858,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:sendto(<replaceable>data, host, port, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua">sock:sendto(<replaceable>data, host, port, [timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
@@ -1854,7 +1874,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:recvfrom(<replaceable>limit[, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-recvfrom" xreflabel="socket-recvfrom"><emphasis role="lua">sock:recvfrom(<replaceable>limit[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Receive a message on a UDP socket.
@@ -1870,7 +1890,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:shutdown(<replaceable>how</replaceable>)</emphasis></term>
+        <term xml:id="socket-shutdown" xreflabel="socket-shutdown"><emphasis role="lua">sock:shutdown(<replaceable>how</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Shutdown a reading end, a writing end, or both ends of a socket.
@@ -1886,7 +1906,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:close()</emphasis></term>
+        <term xml:id="socket-close" xreflabel="socket-close"><emphasis role="lua">sock:close()</emphasis></term>
         <listitem>
             <para>
                 Close (destroy) a socket.
@@ -1902,7 +1922,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:error() and sock:errno()</emphasis></term>
+        <term xml:id="socket-error" xreflabel="socket-error"><emphasis role="lua">sock:error() and sock:errno()</emphasis></term>
         <listitem>
             <para>
                 Retrieve information about the last error that occurred on a socket, if any.
@@ -1918,7 +1938,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-        <term><emphasis role="lua">sock:setsockopt(<replaceable>level, name, value</replaceable>)</emphasis></term>
+        <term xml:id="socket-setsockopt" xreflabel="socket-setsockopt"><emphasis role="lua">sock:setsockopt(<replaceable>level, name, value</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Set socket flags. The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/setsockopt.2.html">Linux man page</link>.
@@ -1934,7 +1954,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:getsockopt(<replaceable>level, name</replaceable>)</emphasis></term>
+        <term xml:id="socket-getsockopt" xreflabel="socket-getsockopt"><emphasis role="lua">sock:getsockopt(<replaceable>level, name</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Get socket flags. For a list of possible flags see description of the previous function,
@@ -1944,7 +1964,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term><emphasis role="lua">sock:linger([<replaceable>active, timeout</replaceable>])</emphasis></term>
+        <term xml:id="socket-linger" xreflabel="socket-linger"><emphasis role="lua">sock:linger([<replaceable>active, timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
               Set or clear the SO_LINGER flag. For a description of the flag, see  <link xlink:href="http://man7.org/linux/man-pages/man1/loginctl.1.html">Linux man page</link>.
@@ -1959,7 +1979,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-        <term><emphasis role="lua">sock:nonblock([<replaceable>flag</replaceable>])</emphasis></term>
+        <term xml:id="socket-nonblock" xreflabel="socket-nonblock"><emphasis role="lua">sock:nonblock([<replaceable>flag</replaceable>])</emphasis></term>
         <listitem>
             <para>
              <code>sock:nonblock()</code> returns the current flag value.
@@ -1971,7 +1991,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-     <term><emphasis role="lua">sock:readable([timeout])</emphasis>, <emphasis>sock:writable([timeout])</emphasis>, <emphasis>sock:wait([timeout])</emphasis></term>
+     <term xml:id="socket-readable" xreflabel="socket-readable"><emphasis role="lua">sock:readable([timeout])</emphasis>, <emphasis>sock:writable([timeout])</emphasis>, <emphasis>sock:wait([timeout])</emphasis></term>
         <listitem>
             <para>
                <code>sock:readable()</code> waits until something is readable, or until a timeout value expires.
@@ -1982,7 +2002,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-     <term><emphasis role="lua">socket.getaddrinfo(<replaceable>host</replaceable>, <replaceable>type</replaceable> [, <replaceable>{option-list}</replaceable>)</emphasis></term>
+     <term xml:id="socket-getaddrinfo" xreflabel="socket-getaddrinfo"><emphasis role="lua">socket.getaddrinfo(<replaceable>host</replaceable>, <replaceable>type</replaceable> [, <replaceable>{option-list}</replaceable>)</emphasis></term>
         <listitem>
             <para>
              The <code>socket.getaddrinfo()</code> function is useful for finding
@@ -2005,40 +2025,42 @@ for instructions about defining triggers for connect and disconnect events
  <bridgehead renderas="sect4">Example showing use of socket over the Internet</bridgehead>
  <para>
  In this example a connection is made over the internet between the Tarantool server
- and <link xlink:href="http://mail.ru">mail.ru</link>,
- then an HTTP "get" message is sent, and a response is received: "HTTP/1.0 200 OK".
+ and <link xlink:href="http://tarantool.org">tarantool.org</link>,
+ then an HTTP "head" message is sent, and a response is received: "HTTP/1.1 200 OK".
  This is not a useful way to communicate with this particular site,
  but shows that the system works.
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
+ <prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock = socket('AF_INET', 'SOCK_STREAM', 'tcp')</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>sock = socket.tcp_connect('tarantool.org', 80)</userinput>
 ---
 ...
+
 <prompt>tarantool&gt;</prompt> <userinput>type(sock)</userinput>
 ---
-- userdata
+- table
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock:sysconnect('mail.ru', 80)</userinput>
----
-- fd 22, aka 192.168.1.72:49488, peer of 94.100.180.199:80
-...
+
 <prompt>tarantool&gt;</prompt> <userinput>sock:error()</userinput>
 ---
-- 0
- - Success
+- null
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock:send('GET / HTTP/1.0\n\n')</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>sock:send("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")</userinput>
 ---
-- 16
+- true
 ...
-<prompt>tarantool&gt;</prompt> <userinput>sock:recv(17)</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>sock:read(17)</userinput>
 ---
-- "HTTP/1.0 200 OK\r\n"
+- "HTTP/1.1 200 OK\r\n"
 ...
- <prompt>tarantool&gt;</prompt> <userinput>sock:close()</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>sock:close()</userinput>
 ---
+- true
 ...
 </programlisting>
 </para>
