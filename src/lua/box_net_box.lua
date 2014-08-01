@@ -229,30 +229,43 @@ local proto = {
 }
 
 
+local function check_if_space(space)
+    if type(space) == 'table' and space.id ~= nil then
+        return
+    end
+    error("Use space:method(...) instead space.method(...)")
+end
+
 local function space_metatable(self)
     return {
         __index = {
             insert  = function(space, tuple)
+                check_if_space(space)
                 return self:_insert(space.id, tuple)
             end,
 
             replace = function(space, tuple)
+                check_if_space(space)
                 return self:_replace(space.id, tuple)
             end,
 
             select = function(space, key, opts)
+                check_if_space(space)
                 return self:_select(space.id, 0, key, opts)
             end,
 
             delete = function(space, key)
+                check_if_space(space)
                 return self:_delete(space.id, key)
             end,
 
             update = function(space, key, oplist)
+                check_if_space(space)
                 return self:_update(space.id, key, oplist)
             end,
 
             get = function(space, key)
+                check_if_space(space)
                 local res = self:_select(space.id, 0, key,
                                     { limit = 2, iterator = 'EQ' })
                 if #res == 0 then
@@ -267,16 +280,23 @@ local function space_metatable(self)
     }
 end
 
+local function check_if_index(idx)
+    if type(idx) == 'table' and idx.id ~= nil and type(idx.space) == 'table' then
+        return
+    end
+    error('Use index:method(...) instead index.method(...)')
+end
+
 local function index_metatable(self)
     return {
         __index = {
             select = function(idx, key, opts)
+                check_if_index(idx)
                 return self:_select(idx.space.id, idx.id, key, opts)
             end,
 
-
-
             get = function(idx, key)
+                check_if_index(idx)
                 local res = self:_select(idx.space.id, idx.id, key,
                                     { limit = 2, iterator = 'EQ' })
                 if #res == 0 then
@@ -289,6 +309,7 @@ local function index_metatable(self)
             end,
 
             min = function(idx, key)
+                check_if_index(idx)
                 local res = self:_select(idx.space.id, idx.id, key,
                     { limit = 1, iterator = 'GE' })
                 if #res > 0 then
@@ -297,6 +318,7 @@ local function index_metatable(self)
             end,
 
             max = function(idx, key)
+                check_if_index(idx)
                 local res = self:_select(idx.space.id, idx.id, key,
                     { limit = 1, iterator = 'LE' })
                 if #res > 0 then
@@ -305,6 +327,7 @@ local function index_metatable(self)
             end,
 
             count = function(idx, key)
+                check_if_index(idx)
                 local proc = string.format('box.space.%s.index.%s:count',
                     idx.space.name, idx.name)
                 local res = self:call(proc, key)
@@ -378,8 +401,9 @@ local remote_methods = {
         return false
     end,
 
-    call    = function(self, proc, ...)
-        local res = self:_request('call', true, proc, {...})
+    call    = function(self, proc_name, ...)
+        proc_name = tostring(proc_name)
+        local res = self:_request('call', true, proc_name, {...})
         return res.body[DATA]
     end,
 
@@ -945,22 +969,23 @@ remote.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     call = function(_box, proc_name, ...)
-            local proc = { package.loaded['box.internal']
-                .call_loadproc(proc_name) }
-            local result
-            if #proc == 2 then
-                result = { proc[1](proc[2], ...) }
-            else
-                result = { proc[1](...) }
-            end
+        proc_name = tostring(proc_name)
+        local proc = { package.loaded['box.internal']
+            .call_loadproc(proc_name) }
+        local result
+        if #proc == 2 then
+            result = { proc[1](proc[2], ...) }
+        else
+            result = { proc[1](...) }
+        end
 
-            if #result == 1 and type(result[1]) == 'table' then
-                result = result[1]
-            end
+        if #result == 1 and type(result[1]) == 'table' then
+            result = result[1]
+        end
 
-            for i, v in pairs(result) do
-                result[i] = box.tuple.new(v)
-            end
+        for i, v in pairs(result) do
+            result[i] = box.tuple.new(v)
+        end
         return result
     end
 }

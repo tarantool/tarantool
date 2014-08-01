@@ -27,7 +27,7 @@ cn:call('unexists_procedure')
 function test_foo(a,b,c) return { {{ [a] = 1 }}, {{ [b] = 2 }}, c } end
 
 cn:call('test_foo', 'a', 'b', 'c')
-
+cn:call(nil, 'a', 'b', 'c')
 
 cn:_select(space.id, space.index.primary.id, 123)
 space:insert{123, 345}
@@ -49,6 +49,7 @@ cn.space.net_box_test_space.index.primary:select(123, { limit = 0 })
 cn.space.net_box_test_space.index.primary:select(nil, { limit = 1, })
 cn.space.net_box_test_space:insert{234, 1,2,3}
 cn.space.net_box_test_space:insert{234, 1,2,3}
+cn.space.net_box_test_space.insert{234, 1,2,3}
 
 cn.space.net_box_test_space:replace{354, 1,2,3}
 cn.space.net_box_test_space:replace{354, 1,2,4}

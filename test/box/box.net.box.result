@@ -64,6 +64,10 @@ cn:call('test_foo', 'a', 'b', 'c')
   - [{'b': 2}]
   - ['c']
 ...
+cn:call(nil, 'a', 'b', 'c')
+---
+- error: Procedure 'nil' is not defined
+...
 cn:_select(space.id, space.index.primary.id, 123)
 ---
 - []
@@ -131,6 +135,10 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 cn.space.net_box_test_space:insert{234, 1,2,3}
 ---
 - error: Duplicate key exists in unique index 0
+...
+cn.space.net_box_test_space.insert{234, 1,2,3}
+---
+- error: 'builtin/net.box.lua:236: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
