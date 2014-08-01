@@ -3,6 +3,7 @@
 import os
 from os.path import abspath
 import shutil
+import yaml
 
 # cleanup vardir
 server.stop()
@@ -122,6 +123,36 @@ server.start()
 exec admin "lua box.space[0]:select(0, 1)"
 exec admin "lua box.space[0]:select(0, 2)"
 exec admin "lua #box.space[0]"
+
+#
+# gh-167: Replica can't find next xlog file if there is a gap in LSN
+#
+
+server.stop()
+server.cfgfile_source = "box/panic_on_wal_error.cfg"
+server.deploy()
+
+# Create wal#1
+exec admin "lua box.space[0]:insert{1, 'first tuple'}"
+exec admin "lua box.space[0]:insert{2, 'second tuple'}"
+lsn = yaml.load(server.admin.execute("lua box.info.lsn", True))[0] + 1
+wal = os.path.join(server.vardir, str(lsn).zfill(20) + ".xlog")
+server.stop()
+server.start()
+exec admin "lua box.space[0]:insert{3, 'third tuple'}"
+server.stop()
+server.start()
+exec admin "lua box.space[0]:insert{4, 'fourth tuple'}"
+server.stop()
+# Remove xlog with {3, 'third tuple'} to simulate gap in LSNs
+os.unlink(wal)
+server.start()
+
+exec admin "lua box.space[0]:select(0, 1)"
+exec admin "lua box.space[0]:select(0, 2)"
+# missing tuple from removed xlog
+exec admin "lua box.space[0]:select(0, 3)"
+exec admin "lua box.space[0]:select(0, 4)"
 
 # cleanup
 server.stop()
