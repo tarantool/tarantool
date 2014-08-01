@@ -21,6 +21,12 @@ index:
         - asynchronous master-master replication,
         - authentication and access control.
 
+        # News 
+
+        * **Meet with Tarantool developers at [Lua Workshop 2014](http://luaconf.ru)!**
+        * *2014-08-01* Tarantool 1.5.4 is released
+        * *2014-07-20* Tarantool 1.6.3 is released
+
         # Example
 
         ``` lua
@@ -50,8 +56,10 @@ index:
 
         # Learn more
 
-        - [YCSB benchmark results](benchmark.html)
-        - [FAQ](faq.html)
-        - [Source repository](http://github.com/tarantool/tarantool)
-        - [Tarantool Lua rocks](http://rocks.tarantool.org)
-        - [1.5 web site and downloads](http://stable.tarantool.org)
+        * [YCSB benchmark results](benchmark.html)
+        * [FAQ](faq.html)
+        * [Source repository](http://github.com/tarantool/tarantool)
+        * [Tarantool Lua rocks](http://rocks.tarantool.org)
+        * [1.5 web site and downloads](http://stable.tarantool.org)
+
+
