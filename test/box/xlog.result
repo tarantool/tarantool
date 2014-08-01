@@ -85,3 +85,35 @@ box.space['test']:len()
 ---
 - 2
 ...
+space = box.schema.create_space('test')
+---
+...
+box.space.test:create_index('primary')
+---
+...
+box.space.test:insert{1, 'first tuple'}
+---
+- [1, 'first tuple']
+...
+box.space.test:insert{2, 'second tuple'}
+---
+- [2, 'second tuple']
+...
+box.space.test:insert{3, 'third tuple'}
+---
+- [3, 'third tuple']
+...
+box.space.test:insert{4, 'fourth tuple'}
+---
+- [4, 'fourth tuple']
+...
+check log line for 'ignoring missing WAL'
+
+'ignoring missing WAL' exists in server log
+
+box.space.test:select{}
+---
+- - [1, 'first tuple']
+  - [2, 'second tuple']
+  - [4, 'fourth tuple']
+...

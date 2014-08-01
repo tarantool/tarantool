@@ -378,12 +378,21 @@ recover_remaining_wals(struct recovery_state *r)
 
 		current_signt = vclock_signature(current_vclock);
 		if (current_signt == r->signature) {
-			if (current_signt != last_signt) {
-				say_error("missing xlog between %020lld and %020lld",
-					  (long long) current_signt,
-					  (long long) last_signt);
-			}
-			break;
+			if (current_signt == last_signt)
+				break;
+			say_error("missing xlog between %020lld and %020lld",
+				  (long long) current_signt,
+				  (long long) last_signt);
+			if (r->wal_dir.panic_if_error)
+				break;
+
+			/* Ignore missing WALs */
+			say_warn("ignoring missing WALs");
+			current_vclock = vclockset_next(&r->wal_dir.index,
+							current_vclock);
+			/* current_signt != last_signt */
+			assert(current_vclock != NULL);
+			current_signt = vclock_signature(current_vclock);
 		}
 
 		/*
