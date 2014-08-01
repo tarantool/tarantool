@@ -48,3 +48,34 @@ lua #box.space[0]
 ---
  - 0
 ...
+lua box.space[0]:insert{1, 'first tuple'}
+---
+ - 1: {'first tuple'}
+...
+lua box.space[0]:insert{2, 'second tuple'}
+---
+ - 2: {'second tuple'}
+...
+lua box.space[0]:insert{3, 'third tuple'}
+---
+ - 3: {'third tuple'}
+...
+lua box.space[0]:insert{4, 'fourth tuple'}
+---
+ - 4: {'fourth tuple'}
+...
+lua box.space[0]:select(0, 1)
+---
+ - 1: {'first tuple'}
+...
+lua box.space[0]:select(0, 2)
+---
+ - 2: {'second tuple'}
+...
+lua box.space[0]:select(0, 3)
+---
+...
+lua box.space[0]:select(0, 4)
+---
+ - 4: {'fourth tuple'}
+...
