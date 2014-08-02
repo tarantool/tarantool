@@ -97,10 +97,8 @@ SophiaFactory::init()
 	env = sp_env();
 	if (env == NULL)
 		panic("failed to create sophia environment");
-	void *conf = sp_use(env, "conf");
-	sp_set(conf, "env.logdir", "sophia_wal");
+	void *conf = sp_ctl(env, "conf");
 	sp_set(conf, "env.dir", "sophia");
-	sp_destroy(conf);
 	int rc = sp_open(env);
 	if (rc == -1)
 		panic("sophia recovery failed");

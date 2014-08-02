@@ -79,22 +79,15 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 		(SophiaFactory*)space->engine->factory;
 	env = factory->env;
 
-	db = sp_use(env, space->def.name);
-	if (db == NULL) {
-		void *cmp = sp_use(env, "cmp");
-		sp_set(cmp, "tarantool_cmp", sophia_index_compare, key_def);
-		sp_destroy(cmp);
-		char name[64];
-		snprintf(name, sizeof(name), "%s.cmp", space->def.name);
-		void *scheme = sp_use(env, "scheme");
-		void *stx = sp_begin(scheme);
-		sp_set(stx, name, "tarantool_cmp");
-		int rc = sp_commit(stx);
-		sp_destroy(scheme);
-		if (rc == -1)
-			tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-		db = sp_use(env, space->def.name);
-		assert(db != NULL);
+	db = sp_database(env);
+	if (db == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
+	void *c = sp_ctl(db, "conf");
+	sp_set(c, "db.cmp", sophia_index_compare, key_def);
+	sp_set(c, "db.id", space->def.id);
+	int rc = sp_open(db);
+	if (rc == -1) {
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 	}
 }
 
