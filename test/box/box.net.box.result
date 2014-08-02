@@ -181,7 +181,11 @@ cn.space.net_box_test_space:select{123}
 ---
 - - [123, 345]
 ...
-cn.space.net_box_test_space:update({123}, { { '+', 1, 2 } })
+cn.space.net_box_test_space:update({123}, { { '+', 1, 1 } })
+---
+- [123, 346]
+...
+cn.space.net_box_test_space:update(123, { { '+', 1, 1 } })
 ---
 - [123, 347]
 ...
