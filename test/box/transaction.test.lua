@@ -35,7 +35,7 @@ box.begin() box.schema.func.create('test');
 box.rollback();
 box.begin() box.schema.user.create('test');
 box.rollback();
-box.begin() box.schema.user.grant('guest', 'read', 'universe');
+box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv');
 box.rollback();
 box.begin() box.space._schema:insert{'test'};
 box.rollback();

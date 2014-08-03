@@ -147,4 +147,24 @@ session.su('admin')
 box.space._user.index.name:select{'user1'}
 box.schema.user.drop('user1')
 box.space._user.index.name:select{'user1'}
+-- ----------------------------------------------------------
+-- A test case for gh-421 Granting a privilege revokes an
+-- existing grant
+-- ----------------------------------------------------------
+box.schema.user.create('user')
+id = box.space._user.index.name:get{'user'}[1]
+box.schema.user.grant('user', 'read,write', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.grant('user', 'read', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.revoke('user', 'write', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.revoke('user', 'read', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.grant('user', 'write', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.grant('user', 'read', 'universe')
+box.space._priv.index.owner:select{id}
+box.schema.user.drop('user')
+box.space._priv.index.owner:select{id}
 session = nil

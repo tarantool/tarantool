@@ -783,7 +783,20 @@ box.schema.user.grant = function(user_name, privilege, object_type,
         grantor = user_resolve(grantor)
     end
     local _priv = box.space[box.schema.PRIV_ID]
-    _priv:replace{grantor, uid, object_type, oid, privilege}
+    -- add the granted privilege to the current set
+    local tuple = _priv:get{uid, object_type, oid}
+    local old_privilege
+    if tuple ~= nil then
+        old_privilege = tuple[5]
+    else
+        old_privilege = 0
+    end
+    privilege = bit.bor(privilege, old_privilege)
+    -- do not execute a replace if it does not change anything
+    -- XXX bug: new grantor replaces the old one, old grantor is lost
+    if privilege ~= old_privilege then
+        _priv:replace{grantor, uid, object_type, oid, privilege}
+    end
 end
 
 box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
@@ -799,9 +812,12 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
         return
     end
     local old_privilege = tuple[5]
-    if old_privilege ~= privilege then
+    local grantor = tuple[1]
+    -- XXX bug: the privilege may be removed by someone who did 
+    -- not grant it
+    if privilege ~= old_privilege then
         privilege = bit.band(old_privilege, bit.bnot(privilege))
-        _priv:update({uid, object_type, oid}, { "=", 5, privilege})
+        _priv:replace{grantor, uid, object_type, oid, privilege}
     else
         _priv:delete{uid, object_type, oid}
     end

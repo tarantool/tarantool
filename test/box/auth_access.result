@@ -469,6 +469,9 @@ t = {}
 session.su('admin')
 ---
 ...
+box.schema.user.revoke('testuser', 'read', 'space', 'glade')
+---
+...
 box.schema.user.grant('testuser', 'write', 'space', 'glade')
 ---
 ...

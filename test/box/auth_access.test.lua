@@ -190,6 +190,7 @@ for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v)
 t
 t = {}
 session.su('admin')
+box.schema.user.revoke('testuser', 'read', 'space', 'glade')
 box.schema.user.grant('testuser', 'write', 'space', 'glade')
 session.su('testuser')
 s:select()
