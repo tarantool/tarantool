@@ -62,7 +62,8 @@ cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1 })
 cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1, offset = 1 })
 
 cn.space.net_box_test_space:select{123}
-cn.space.net_box_test_space:update({123}, { { '+', 1, 2 } })
+cn.space.net_box_test_space:update({123}, { { '+', 1, 1 } })
+cn.space.net_box_test_space:update(123, { { '+', 1, 1 } })
 cn.space.net_box_test_space:select{123}
 
 cn.space.net_box_test_space:update({123}, { { '=', 0, 2 } })

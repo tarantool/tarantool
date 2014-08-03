@@ -152,7 +152,7 @@ local proto = {
     delete = function(sync, spaceno, key)
         return request(
             { [SYNC] = sync, [TYPE] = DELETE },
-            { [SPACE_ID] = spaceno, [KEY] = key }
+            { [SPACE_ID] = spaceno, [KEY] = keyfy(key) }
         )
     end,
 
@@ -160,7 +160,7 @@ local proto = {
     update = function(sync, spaceno, key, oplist)
         return request(
             { [SYNC] = sync, [TYPE] = UPDATE },
-            { [KEY] = key,   [TUPLE]  = oplist, [SPACE_ID] = spaceno }
+            { [KEY] = keyfy(key),   [TUPLE]  = oplist, [SPACE_ID] = spaceno }
         )
     end,
 
