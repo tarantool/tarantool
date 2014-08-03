@@ -330,7 +330,10 @@ box.space._user.index.name:select{'user1'}
 ---
 - []
 ...
--- A test case for gh-??? Granting a privilege revokes an existing grant
+-- ----------------------------------------------------------
+-- A test case for gh-421 Granting a privilege revokes an
+-- existing grant
+-- ----------------------------------------------------------
 box.schema.user.create('user')
 ---
 ...
