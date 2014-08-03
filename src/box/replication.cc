@@ -215,7 +215,7 @@ replication_join(int fd, struct iproto_header *header)
 	iproto_decode_join(header, &server_uuid);
 
 	/* Notify box about new cluster server */
-	recovery_state->join_handler(&server_uuid);
+	recovery->join_handler(&server_uuid);
 
 	struct replication_request *request = (struct replication_request *)
 			malloc(sizeof(*request));
@@ -630,7 +630,7 @@ static void
 replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 {
 	assert(iproto_type_is_dml(packet->type));
-	struct recovery_state *r = recovery_state;
+	struct recovery_state *r = recovery;
 
 	/* Don't duplicate data */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
@@ -745,10 +745,10 @@ replication_relay_loop()
 	try {
 		switch (relay.type) {
 		case IPROTO_JOIN:
-			replication_relay_join(recovery_state);
+			replication_relay_join(recovery);
 			break;
 		case IPROTO_SUBSCRIBE:
-			replication_relay_subscribe(recovery_state);
+			replication_relay_subscribe(recovery);
 			break;
 		default:
 			assert(false);

@@ -111,7 +111,7 @@
  * R -> S           # snapshot()
  */
 
-struct recovery_state *recovery_state;
+struct recovery_state *recovery;
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
@@ -158,9 +158,9 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	      snapshot_handler snapshot_handler, join_handler join_handler,
 	      int rows_per_wal)
 {
-	assert(recovery_state == NULL);
-	recovery_state = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
-	struct recovery_state *r = recovery_state;
+	assert(recovery == NULL);
+	recovery = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
+	struct recovery_state *r = recovery;
 	recovery_update_mode(r, WAL_NONE);
 
 	assert(rows_per_wal > 1);
@@ -207,7 +207,7 @@ recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 void
 recovery_free()
 {
-	struct recovery_state *r = recovery_state;
+	struct recovery_state *r = recovery;
 	if (r == NULL)
 		return;
 
@@ -227,11 +227,12 @@ recovery_free()
 		log_io_close(&r->current_wal);
 	}
 
-	recovery_state = NULL;
+	recovery= NULL;
 }
 
 void
-recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error)
+recovery_setup_panic(struct recovery_state *r, bool on_snap_error,
+		     bool on_wal_error)
 {
 	r->wal_dir.panic_if_error = on_wal_error;
 	r->snap_dir.panic_if_error = on_snap_error;
@@ -697,7 +698,7 @@ static struct wal_writer wal_writer;
 static void
 wal_writer_child()
 {
-	log_io_atfork(&recovery_state->current_wal);
+	log_io_atfork(&recovery->current_wal);
 	if (wal_writer.batch) {
 		free(wal_writer.batch);
 		wal_writer.batch = NULL;
@@ -707,7 +708,7 @@ wal_writer_child()
 	 * not try to stop the non-existent thread.
 	 * The writer is not used in the child.
 	 */
-	recovery_state->writer = NULL;
+	recovery->writer = NULL;
 }
 
 /**
@@ -1125,6 +1126,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 	ev_loop *loop = loop();
+	struct recovery_state *r = recovery;
 
 	row->tm = last;
 	row->server_id = 0;
@@ -1156,7 +1158,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 
 	region_free_after(&fiber()->gc, 128 * 1024);
 
-	if (recovery_state->snap_io_rate_limit != UINT64_MAX) {
+	if (r->snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {
 			/*
 			 * Remember the time of first
@@ -1170,10 +1172,10 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 		 * filesystem cache, otherwise the limit is
 		 * not really enforced.
 		 */
-		if (bytes > recovery_state->snap_io_rate_limit)
+		if (bytes > r->snap_io_rate_limit)
 			fdatasync(fileno(l->f));
 	}
-	while (bytes > recovery_state->snap_io_rate_limit) {
+	while (bytes > r->snap_io_rate_limit) {
 		ev_now_update(loop);
 		/*
 		 * How much time have passed since
@@ -1190,7 +1192,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 
 		ev_now_update(loop);
 		last = ev_now(loop);
-		bytes -= recovery_state->snap_io_rate_limit;
+		bytes -= r->snap_io_rate_limit;
 	}
 }
 

@@ -43,7 +43,7 @@ static void
 txn_add_redo(struct txn_stmt *stmt, struct request *request)
 {
 	stmt->row = request->header;
-	if (recovery_state->wal_mode == WAL_NONE || request->header != NULL)
+	if (recovery->wal_mode == WAL_NONE || request->header != NULL)
 		return;
 
 	/* Create a redo log row for Lua requests */
@@ -181,10 +181,10 @@ txn_commit(struct txn *txn)
 
 		int res = 0;
 		/* txn_commit() must be done after txn_add_redo() */
-		assert(recovery_state->wal_mode == WAL_NONE ||
+		assert(recovery->wal_mode == WAL_NONE ||
 		       stmt->row != NULL);
 		ev_tstamp start = ev_now(loop()), stop;
-		res = wal_write(recovery_state, stmt->row);
+		res = wal_write(recovery, stmt->row);
 		stop = ev_now(loop());
 
 		if (stop - start > too_long_threshold && stmt->row != NULL) {

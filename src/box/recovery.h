@@ -90,7 +90,7 @@ struct recovery_state {
 	bool finalize;
 };
 
-extern struct recovery_state *recovery_state;
+extern struct recovery_state *recovery;
 
 void recovery_init(const char *snap_dirname, const char *xlog_dirname,
 		   row_handler row_handler, void *row_handler_param,

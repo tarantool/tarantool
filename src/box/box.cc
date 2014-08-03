@@ -145,19 +145,19 @@ extern "C" void
 box_set_replication_source(const char *source)
 {
 	box_check_replication_source(source);
-	bool old_is_replica = recovery_state->remote.reader;
+	bool old_is_replica = recovery->remote.reader;
 	bool new_is_replica = source != NULL;
 
 	if (old_is_replica != new_is_replica ||
 	    (old_is_replica &&
-	     (strcmp(source, recovery_state->remote.source) != 0))) {
+	     (strcmp(source, recovery->remote.source) != 0))) {
 
-		if (recovery_state->finalize) {
+		if (recovery->finalize) {
 			if (old_is_replica)
-				recovery_stop_remote(recovery_state);
-			recovery_set_remote(recovery_state, source);
-			if (recovery_has_remote(recovery_state))
-				recovery_follow_remote(recovery_state);
+				recovery_stop_remote(recovery);
+			recovery_set_remote(recovery, source);
+			if (recovery_has_remote(recovery))
+				recovery_follow_remote(recovery);
 		} else {
 			/*
 			 * Do nothing, we're in local hot
@@ -177,12 +177,12 @@ box_set_wal_mode(const char *mode_name)
 	box_check_wal_mode(mode_name);
 	enum wal_mode mode = (enum wal_mode)
 		strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
-	if (mode != recovery_state->wal_mode &&
-	    (mode == WAL_FSYNC || recovery_state->wal_mode == WAL_FSYNC)) {
+	if (mode != recovery->wal_mode &&
+	    (mode == WAL_FSYNC || recovery->wal_mode == WAL_FSYNC)) {
 		tnt_raise(ClientError, ER_CFG,
 			  "wal_mode cannot switch to/from fsync");
 	}
-	recovery_update_mode(recovery_state, mode);
+	recovery_update_mode(recovery, mode);
 }
 
 extern "C" void
@@ -200,7 +200,7 @@ box_set_io_collect_interval(double interval)
 extern "C" void
 box_set_snap_io_rate_limit(double limit)
 {
-	recovery_update_io_rate_limit(recovery_state, limit);
+	recovery_update_io_rate_limit(recovery, limit);
 }
 
 extern "C" void
@@ -214,7 +214,7 @@ box_set_too_long_threshold(double threshold)
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)))
 {
-	if (recovery_state->finalize) {
+	if (recovery->finalize) {
 		/*
 		 * Nothing to do: this happens when the server
 		 * binds to both ports, and one of the callbacks
@@ -223,14 +223,14 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		return;
 	}
 
-	recovery_finalize(recovery_state);
+	recovery_finalize(recovery);
 	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	box_process = process_rw;
-	if (recovery_has_remote(recovery_state))
-		recovery_follow_remote(recovery_state);
+	if (recovery_has_remote(recovery))
+		recovery_follow_remote(recovery);
 
 	title("running", NULL);
 	say_info("ready to accept requests");
@@ -308,16 +308,17 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 static void
 box_set_server_uuid()
 {
-	tt_uuid_create(&recovery_state->server_uuid);
-	assert(recovery_state->server_id == 0);
-	if (vclock_has(&recovery_state->vclock, 1))
-		vclock_del_server(&recovery_state->vclock, 1);
+	struct recovery_state *r = recovery;
+	tt_uuid_create(&r->server_uuid);
+	assert(r->server_id == 0);
+	if (vclock_has(&r->vclock, 1))
+		vclock_del_server(&r->vclock, 1);
 	boxk(IPROTO_REPLACE, SC_CLUSTER_ID, "%u%s",
-	     1, tt_uuid_str(&recovery_state->server_uuid));
+	     1, tt_uuid_str(&r->server_uuid));
 	/* Remove surrogate server */
-	vclock_del_server(&recovery_state->vclock, 0);
-	assert(recovery_state->server_id == 1);
-	assert(vclock_has(&recovery_state->vclock, 1));
+	vclock_del_server(&r->vclock, 0);
+	assert(r->server_id == 1);
+	assert(vclock_has(&r->vclock, 1));
 }
 
 /** Insert a new cluster into _schema */
@@ -376,35 +377,35 @@ box_init()
 	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
 		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
 		      cfg_geti("rows_per_wal"));
-	recovery_set_remote(recovery_state, cfg_gets("replication_source"));
-	recovery_update_io_rate_limit(recovery_state,
+	recovery_set_remote(recovery, cfg_gets("replication_source"));
+	recovery_update_io_rate_limit(recovery,
 				      cfg_getd("snap_io_rate_limit"));
-	recovery_setup_panic(recovery_state,
+	recovery_setup_panic(recovery,
 			     cfg_geti("panic_on_snap_error"),
 			     cfg_geti("panic_on_wal_error"));
 
 	stat_base = stat_register(iproto_type_strs, IPROTO_TYPE_DML_MAX);
 
-	if (recovery_has_data(recovery_state)) {
+	if (recovery_has_data(recovery)) {
 		/* Process existing snapshot */
-		recover_snap(recovery_state);
-	} else if (recovery_has_remote(recovery_state)) {
+		recover_snap(recovery);
+	} else if (recovery_has_remote(recovery)) {
 		/* Initialize a new replica */
-		replica_bootstrap(recovery_state);
-		snapshot_save(recovery_state);
+		replica_bootstrap(recovery);
+		snapshot_save(recovery);
 	} else {
 		/* Initialize the first server of a new cluster */
-		recovery_bootstrap(recovery_state);
+		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
-		snapshot_save(recovery_state);
+		snapshot_save(recovery);
 	}
 
 	space_end_recover_snapshot();
 	space_end_recover();
 
 	title("orphan", NULL);
-	recovery_follow_local(recovery_state,
+	recovery_follow_local(recovery,
 			      cfg_getd("wal_dir_rescan_delay"));
 	title("hot_standby", NULL);
 
@@ -503,7 +504,7 @@ box_snapshot(void)
 	 * parent stdio buffers at exit().
 	 */
 	close_all_xcpt(1, log_fd);
-	snapshot_save(recovery_state);
+	snapshot_save(recovery);
 
 	exit(EXIT_SUCCESS);
 	return 0;
