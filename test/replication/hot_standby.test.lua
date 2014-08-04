@@ -8,7 +8,8 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
-fiber = require('fiber')
+fiber = require('fiber');
+while box.info.node == nil do fiber.sleep(0.01) end;
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
 do
     local pri_id = ''

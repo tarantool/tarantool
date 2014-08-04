@@ -43,9 +43,11 @@ space_check_access(struct space *space, uint8_t access)
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
 	 * to execute the request.
+	 * No special check for ADMIN user is necessary
+	 * since ADMIN has universal access.
 	 */
 	access &= ~user->universal_access;
-	if (access && space->def.uid != user->uid && user->uid != ADMIN &&
+	if (access && space->def.uid != user->uid &&
 	    access & ~space->access[user->auth_token]) {
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
 			  priv_name(access), user->name, space->def.name);

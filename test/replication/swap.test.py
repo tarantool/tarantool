@@ -32,6 +32,7 @@ replica = TarantoolServer()
 replica.script = "replication/replica.lua"
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.deploy()
+replica.admin("while box.info.node == nil do require('fiber').sleep(0.01) end")
 replica.uri = '%s:%s@%s:%s' % (LOGIN, PASSWORD, HOST, replica.sql.port)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.sql.py_con.authenticate(LOGIN, PASSWORD)

@@ -62,3 +62,4 @@ _index:insert{_cluster.id, 1, 'uuid', 'tree', 1, 1, 1, 'str'}
 _user:insert{GUEST, ADMIN, 'guest', 'user'}
 _user:insert{ADMIN, ADMIN, 'admin', 'user'}
 _user:insert{PUBLIC, ADMIN, 'public', 'role'}
+_priv:insert{1, 1, 'universe', 0, 7}
