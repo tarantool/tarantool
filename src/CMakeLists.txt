@@ -35,14 +35,9 @@ add_custom_target(generate_lua_sources
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/src/uri.cc
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	COMMAND ragel -G2 src/uri.rl -o src/uri.cc
-	DEPENDS ${CMAKE_SOURCE_DIR}/src/uri.rl)
-execute_process(COMMAND ${CMAKE_COMMAND} -E touch_nocreate
-    ${CMAKE_SOURCE_DIR}/src/uri.cc)
-add_custom_target(generate_uri_cc
-    DEPENDS ${CMAKE_SOURCE_DIR}/src/uri.cc)
+add_custom_target(ragel
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMAND ragel -G2 src/uri.rl -o src/uri.cc)
 
 set (common_sources
      memory.cc
