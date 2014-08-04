@@ -345,13 +345,8 @@ do_op_splice(struct tuple_update *update, struct update_op *op,
 				  op->field_no, "offset is out of bound");
 		}
 		arg->offset = arg->offset + str_len + 1;
-	} else if (arg->offset >= update->index_base){
-		arg->offset -= update->index_base;
-		if (arg->offset > str_len)
-			arg->offset = str_len;
-	} else {
-		tnt_raise(ClientError, ER_SPLICE, update->index_base +
-			  op->field_no, "offset is out of bound");
+	} else if (arg->offset > str_len) {
+		arg->offset = str_len;
 	}
 
 	assert(arg->offset >= 0 && arg->offset <= str_len);
@@ -615,14 +610,6 @@ update_read_ops(struct tuple_update *update, const char *expr,
 		if (args != op->meta->args)
 			tnt_raise(ClientError, ER_UNKNOWN_UPDATE_OP);
 		op->field_no = mp_read_int(update, op, &expr);
-		if (op->field_no != UINT32_MAX) {
-			/* Check that field_no is not zero for Lua (base = 1) */
-			if (op->field_no < update->index_base) {
-				tnt_raise(ClientError, ER_NO_SUCH_FIELD,
-					  op->field_no);
-			}
-			op->field_no -= update->index_base;
-		}
 		op->meta->do_op(update, op, &expr);
 	}
 
@@ -643,6 +630,10 @@ tuple_update_execute(region_alloc_func alloc, void *alloc_ctx,
 	memset(update, 0, sizeof(*update));
 	update->alloc = alloc;
 	update->alloc_ctx = alloc_ctx;
+	/*
+	 * Base field offset, e.g. 0 for C and 1 for Lua. Used only for
+	 * error messages. All fields numbers must be zero-based!
+	 */
 	update->index_base = index_base;
 
 	update_create_rope(update, old_data, old_data_end);
