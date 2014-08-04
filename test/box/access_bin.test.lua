@@ -3,7 +3,7 @@
 -- connection to the server
 --
 box.schema.user.grant('guest','read,write,execute','universe')
-session = require('session')
+session = box.session
 net = { box = require('net.box') }
 c = net.box:new(0, box.cfg.listen)
 c:call("dostring", "session.su('admin')")

@@ -5,7 +5,7 @@
 box.schema.user.grant('guest','read,write,execute','universe')
 ---
 ...
-session = require('session')
+session = box.session
 ---
 ...
 net = { box = require('net.box') }
