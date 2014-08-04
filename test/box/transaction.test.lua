@@ -121,3 +121,9 @@ t;
 s:select{};
 s:drop();
 --# setopt delimiter ''
+tester = box.schema.create_space('tester')
+tester:create_index('primary')
+box.begin() tester:insert{1} box.rollback()
+tester:select{1}
+box.begin() tester:insert{1} box.commit()
+tester:select{1}
