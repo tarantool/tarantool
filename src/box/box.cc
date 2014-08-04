@@ -353,6 +353,15 @@ engine_init()
 	SophiaFactory *sophia = new SophiaFactory();
 	sophia->init();
 	engine_register(sophia);
+
+	/* Prepare storage and recover data.
+	 *
+	 * This is first phase of recover, schema is not known yet.
+	 * Internal sophia spaces (databases) are created in
+	 * recover-delay mode and not accessible yet.
+	 * Recover completes on first engine index creation.
+	*/
+	sophia->recover();
 }
 
 void
@@ -468,6 +477,8 @@ static void
 snapshot_space(struct space *sp, void *udata)
 {
 	if (space_is_temporary(sp))
+		return;
+	if (space_is_sophia(sp))
 		return;
 	struct tuple *tuple;
 	struct log_io *l = (struct log_io *)udata;

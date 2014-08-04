@@ -99,9 +99,18 @@ SophiaFactory::init()
 		panic("failed to create sophia environment");
 	void *conf = sp_ctl(env, "conf");
 	sp_set(conf, "env.dir", "sophia");
+}
+
+void
+SophiaFactory::recover()
+{
+	say_info("start sophia recover");
+
 	int rc = sp_open(env);
 	if (rc == -1)
 		panic("sophia recovery failed");
+
+	say_info("complete");
 }
 
 Engine*

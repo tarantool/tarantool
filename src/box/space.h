@@ -100,6 +100,10 @@ space_name(struct space *space) { return space->def.name; }
 static inline bool
 space_is_temporary(struct space *space) { return space->def.temporary; }
 
+/** Return true if space is run under sophia engine. */
+static inline bool
+space_is_sophia(struct space *space) { return strcmp(space->engine->factory->name, "sophia") == 0; }
+
 /**
  * @brief A single method to handle REPLACE, DELETE and UPDATE.
  *

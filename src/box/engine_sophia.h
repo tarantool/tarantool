@@ -32,6 +32,7 @@
 struct SophiaFactory: public EngineFactory {
 	SophiaFactory();
 	virtual void init();
+	virtual void recover();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
