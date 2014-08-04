@@ -110,6 +110,11 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 cn:_fatal 'Test error'
 cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 
+-- -- dot-new-method
+
+cn1 = remote:new('127.0.0.1', port)
+cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
+
 -- -- error while waiting for response
 type(fiber.create(function() fiber.sleep(.5) cn:_fatal('Test error') end))
 function pause() fiber.sleep(10) return true end
