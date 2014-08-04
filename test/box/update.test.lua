@@ -83,12 +83,9 @@ s:update({1}, {{'#', 4, 1}, {'#', 3, 1}})
 -- test update insert operations
 s:update({1}, {{'!', 2, 1}, {'!', 2, 2}, {'!', 2, 3}, {'!', 2, 4}})
 
-s:truncate()
-
 -- s:update: zero field
 s:insert{48}
 s:update(48, {{'=', 0, 'hello'}})
-s:truncate()
 
 -- s:update: push/pop fields
 s:insert{1684234849}
@@ -103,4 +100,13 @@ s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop1'}})
 s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop2'}})
 s:update({1684234849}, {{'#', -1, 1}, {'=', -1, 'noop3'}})
 
+--
+-- #416: UPDATEs from Lua can't be properly restored due to one based indexing
+--
+--# stop server default
+--# start server default
+
+s = box.space.tweedledum
+s:select{}
+s:truncate()
 s:drop()
