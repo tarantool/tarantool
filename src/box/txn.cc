@@ -290,9 +290,14 @@ boxffi_txn_commit()
 {
 	try {
 		struct txn *txn = in_txn();
-		if (txn == NULL)
-			tnt_raise(ClientError, ER_NO_ACTIVE_TRANSACTION);
-		txn_commit(txn);
+		/**
+		 * COMMIT is like BEGIN or ROLLBACK
+		 * a "transaction-initiating statement".
+		 * Do nothing if transaction is not started,
+		 * it's the same as BEGIN + COMMIT.
+		 */
+		if (txn)
+			txn_commit(txn);
 	} catch (Exception  *e) {
 		return -1; /* pass exception through FFI */
 	}

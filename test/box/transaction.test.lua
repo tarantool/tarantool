@@ -5,9 +5,9 @@ box.begin() box.commit();
 box.begin() box.begin();
 -- no active transaction since exception rolled it back
 box.commit();
--- double commit - error
+-- double commit - implicit start of transaction 
 box.begin() box.commit() box.commit();
--- commit if not started - error
+-- commit if not started - implicit start of transaction
 box.commit();
 -- rollback if not started - ok
 box.rollback()
@@ -15,7 +15,7 @@ box.rollback()
 box.begin() box.rollback() box.rollback();
 -- rollback of an empty trans - ends transaction
 box.begin() box.rollback();
--- no current transaction - error
+-- no current transaction - implicit begin 
 box.commit();
 fiber = require('fiber');
 function sloppy()
@@ -89,7 +89,7 @@ box.begin();
 -- back a transction with no statements.
 box.commit();
 box.begin() s:insert{1, 'Must be rolled back'};
--- error: no active transaction because of yield
+-- nothing to commit because of yield
 box.commit();
 -- nothing - the transaction was rolled back
 s:select{}

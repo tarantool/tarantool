@@ -12,15 +12,13 @@ box.begin() box.begin();
 box.commit();
 ---
 ...
--- double commit - error
+-- double commit - implicit start of transaction 
 box.begin() box.commit() box.commit();
 ---
-- error: 'Operation is not permitted when there is no active transaction '
 ...
--- commit if not started - error
+-- commit if not started - implicit start of transaction
 box.commit();
 ---
-- error: 'Operation is not permitted when there is no active transaction '
 ...
 -- rollback if not started - ok
 -- double rollback - ok
@@ -32,10 +30,9 @@ box.begin() box.rollback() box.rollback();
 box.begin() box.rollback();
 ---
 ...
--- no current transaction - error
+-- no current transaction - implicit begin 
 box.commit();
 ---
-- error: 'Operation is not permitted when there is no active transaction '
 ...
 fiber = require('fiber');
 ---
@@ -207,10 +204,9 @@ box.commit();
 box.begin() s:insert{1, 'Must be rolled back'};
 ---
 ...
--- error: no active transaction because of yield
+-- nothing to commit because of yield
 box.commit();
 ---
-- error: 'Operation is not permitted when there is no active transaction '
 ...
 -- nothing - the transaction was rolled back
 -- Test background fiber
