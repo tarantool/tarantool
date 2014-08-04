@@ -51,7 +51,6 @@ extern "C" {
 #include "lua/errno.h"
 #include "lua/socket.h"
 #include "lua/bsdsocket.h"
-#include "lua/session.h"
 #include "lua/cjson.h"
 #include "lua/yaml.h"
 #include "lua/msgpack.h"
@@ -68,7 +67,6 @@ struct lua_State *tarantool_L;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[],
-	session_lua[],
 	msgpackffi_lua[],
 	fun_lua[],
 	digest_lua[],
@@ -81,7 +79,6 @@ extern char uuid_lua[],
 
 static const char *lua_sources[] = {
 	init_lua,
-	session_lua,
 	help_lua,
 	NULL
 };
@@ -281,7 +278,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_errno_init(L);
 	tarantool_lua_socket_init(L);
 	tarantool_lua_bsdsocket_init(L);
-	tarantool_lua_session_init(L);
 	tarantool_lua_pickle_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);

@@ -57,7 +57,6 @@
 #include "trivia/util.h"
 #include "tt_pthread.h"
 #include "lua/init.h"
-#include "session.h"
 #include "box/box.h"
 #include "scoped_guard.h"
 #include "random.h"
@@ -488,7 +487,6 @@ tarantool_free(void)
 		free(pid_file);
 	}
 
-	session_free();
 	fiber_free();
 	memory_free();
 	random_free();
@@ -614,7 +612,6 @@ main(int argc, char **argv)
 	iobuf_init();
 	coeio_init();
 	signal_init();
-	session_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	bool start_loop = false;

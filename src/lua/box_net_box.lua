@@ -347,7 +347,13 @@ local remote_methods = {
 
     new = function(cls, host, port, opts)
         local self = {}
-        setmetatable(self, getmetatable(cls))
+
+        if type(cls) == 'table' then
+            setmetatable(self, getmetatable(cls))
+        else
+            host, port, opts = cls, host, port
+            setmetatable(self, getmetatable(remote))
+        end
 
         self.is_instance = true
         self.host = host

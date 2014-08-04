@@ -1,5 +1,5 @@
 print('session.storage')
-session = require('session')
+session = box.session
 
 dump = function(data) return "'" .. require('json').encode(data) .. "'" end
 

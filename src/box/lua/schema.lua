@@ -1,9 +1,9 @@
 -- schema.lua (internal file)
 --
 local ffi = require('ffi')
-local session = require('session')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
+local session = box.session
 local internal = require('box.internal')
 
 local builtin = ffi.C
@@ -726,9 +726,9 @@ box.schema.user.passwd = function(new_password)
     local _user = box.space[box.schema.USER_ID]
     auth_mech_list = {}
     auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
-    require('session').su('admin')
+    box.session.su('admin')
     _user:update({uid}, {{"=", 5, auth_mech_list}})
-    require('session').su(uid)
+    box.session.su(uid)
 end
 
 box.schema.user.create = function(name, opts)

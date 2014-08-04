@@ -24,6 +24,7 @@ t
   - info
   - rollback
   - schema
+  - session
   - slab
   - snapshot
   - space

@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "lua/session.h"
+#include "session.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
 #include "box/access.h"
@@ -38,10 +38,11 @@ extern "C" {
 }
 
 #include <fiber.h>
-#include <session.h>
 #include <sio.h>
 
-static const char *sessionlib_name = "session";
+#include "box/session.h"
+
+static const char *sessionlib_name = "box.session";
 
 /**
  * Return a unique monotonic session
@@ -214,7 +215,7 @@ exit:
 }
 
 void
-tarantool_lua_session_init(struct lua_State *L)
+box_lua_session_init(struct lua_State *L)
 {
 	static const struct luaL_reg sessionlib[] = {
 		{"id", lbox_session_id},
@@ -228,6 +229,6 @@ tarantool_lua_session_init(struct lua_State *L)
 		{"on_disconnect", lbox_session_on_disconnect},
 		{NULL, NULL}
 	};
-	luaL_register_module(L, sessionlib_name, sessionlib);
+	luaL_register(L, sessionlib_name, sessionlib);
 	lua_pop(L, 1);
 }

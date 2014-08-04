@@ -35,6 +35,7 @@
 #include "box/lua/space.h"
 #include "box/lua/stat.h"
 #include "box/lua/info.h"
+#include "box/lua/session.h"
 #include "box/tuple.h"
 
 #include "lua/utils.h"
@@ -50,8 +51,8 @@
 #include "box/schema.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char schema_lua[], load_cfg_lua[];
-static const char *lua_sources[] = { schema_lua, load_cfg_lua, NULL };
+extern char session_lua[], schema_lua[], load_cfg_lua[];
+static const char *lua_sources[] = { session_lua, schema_lua, load_cfg_lua, NULL };
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -549,6 +550,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_space_init(L);
 	box_lua_info_init(L);
 	box_lua_stat_init(L);
+	box_lua_session_init(L);
 
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s++) {

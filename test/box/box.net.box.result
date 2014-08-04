@@ -313,6 +313,15 @@ cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
 ...
+-- -- dot-new-method
+cn1 = remote.new('127.0.0.1', port)
+---
+...
+cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
+---
+- - [234, 1, 2, 3]
+  - [354, 1, 2, 4]
+...
 -- -- error while waiting for response
 type(fiber.create(function() fiber.sleep(.5) cn:_fatal('Test error') end))
 ---

@@ -6,6 +6,7 @@ set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/tuple.lua)
+lua_source(lua_sources lua/session.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
@@ -30,6 +31,7 @@ add_library(box
     space.cc
     alter.cc
     schema.cc
+    session.cc
     port.cc
     request.cc
     txn.cc
@@ -51,4 +53,5 @@ add_library(box
     lua/info.cc
     lua/stat.cc
     lua/error.cc
+    lua/session.cc
     ${bin_sources})

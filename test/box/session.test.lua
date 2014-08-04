@@ -1,4 +1,4 @@
-session = require('session')
+session = box.session
 fiber = require('fiber')
 
 space = box.schema.create_space('tweedledum')

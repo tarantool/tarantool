@@ -19,13 +19,9 @@ box.cfg{
 --
 local EOL = {"\n%.%.%.\n"}
 
--- Add permissions to execute `dostring` for `guest`
-box.schema.func.create('dostring')
-box.schema.user.grant('guest', 'execute', 'function', 'dostring')
-
 test = tap.test("console")
 
-test:plan(16)
+test:plan(18)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -58,6 +54,21 @@ client:write("require('console').delimiter('');\n")
 test:is(yaml.decode(client:readline(EOL)), '', "clear delimiter")
 
 -- Connect to iproto console (CALL)
+client:write(string.format("require('console').connect('unix/', '/')\n"))
+-- error: Connection is not established
+test:ok(yaml.decode(client:readline(EOL))[1].error:find('not established'),
+    'remote network error')
+
+client:write(string.format("require('console').connect('unix/', '%s')\n",
+    IPROTO_SOCKET))
+-- error: Execute access denied for user 'guest' to function 'dostring
+test:ok(yaml.decode(client:readline(EOL))[1].error:find('access denied'),
+    'remote access denied')
+
+-- Add permissions to execute `dostring` for `guest`
+box.schema.func.create('dostring')
+box.schema.user.grant('guest', 'execute', 'function', 'dostring')
+
 client:write(string.format("require('console').connect('unix/', '%s')\n",
     IPROTO_SOCKET))
 test:is(yaml.decode(client:readline(EOL)), '', "remote connect")

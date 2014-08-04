@@ -31,5 +31,5 @@
 struct lua_State;
 
 void
-tarantool_lua_session_init(struct lua_State *L);
+box_lua_session_init(struct lua_State *L);
 #endif /* INCLUDES_TARANTOOL_LUA_SESSION_H */
