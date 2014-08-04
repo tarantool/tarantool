@@ -217,10 +217,8 @@ smalloc_nothrow(struct small_alloc *alloc, size_t size)
 		pattern.pool.objsize = size;
 		struct factor_pool *upper_bound =
 			factor_tree_nsearch(&alloc->factor_pools, &pattern);
-		if (upper_bound == NULL) {
-			assert(false);
+		if (upper_bound == NULL)
 			return NULL; /* The requested size is too large. */
-		}
 
 		if (size < upper_bound->objsize_min)
 			upper_bound = factor_pool_create(alloc, upper_bound,
@@ -242,6 +240,7 @@ small_recycle_pool(struct small_alloc *alloc, struct mempool *pool)
 			((char *) pool - (intptr_t)
 			 &((struct factor_pool *) NULL)->pool);
 		factor_tree_remove(&alloc->factor_pools, factor_pool);
+		mempool_destroy(pool);
 		alloc->factor_pool_next = factor_pool;
 	}
 }
