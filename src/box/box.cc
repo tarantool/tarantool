@@ -40,6 +40,7 @@
 #include <tarantool.h>
 #include "tuple.h"
 #include "lua/call.h"
+#include "session.h"
 #include "schema.h"
 #include "engine.h"
 #include "engine_memtx.h"
@@ -342,6 +343,7 @@ box_free(void)
 	recovery_free();
 	engine_shutdown();
 	stat_free();
+	session_free();
 }
 
 static void
@@ -361,6 +363,7 @@ box_init()
 	box_check_config();
 	title("loading", NULL);
 
+	session_init();
 	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
 

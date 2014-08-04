@@ -39,11 +39,11 @@
 #include "fiber.h"
 #include "say.h"
 #include "evio.h"
-#include "session.h"
 #include "scoped_guard.h"
 #include "memory.h"
 #include "msgpuck/msgpuck.h"
 #include "box/replication.h"
+#include "box/session.h"
 #include "third_party/base64.h"
 #include "coio.h"
 

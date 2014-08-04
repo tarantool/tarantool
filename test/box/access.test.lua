@@ -1,5 +1,5 @@
 
-session = require('session')
+session = box.session
 -- user id for a Lua session is admin - 1
 session.uid()
 -- extra arguments are ignored
@@ -97,7 +97,7 @@ box.schema.user.drop('testus')
 -- a test case for gh-289
 -- box.schema.user.drop() with cascade doesn't work
 -- ------------------------------------------------------------
-session = require('session')
+session = box.session
 box.schema.user.create('uniuser')
 box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
 session.su('uniuser')

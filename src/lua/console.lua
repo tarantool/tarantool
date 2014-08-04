@@ -2,7 +2,6 @@
 
 local internal = require('console')
 local formatter = require('yaml')
-local session = require('session')
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')

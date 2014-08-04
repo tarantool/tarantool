@@ -1,4 +1,4 @@
-session = require('session')
+session = box.session
 session.su('admin')
 --
 -- Check max function limit

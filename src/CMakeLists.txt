@@ -19,7 +19,6 @@ set(lua_sources)
 lua_source(lua_sources lua/init.lua)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/digest.lua)
-lua_source(lua_sources lua/session.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
 lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
@@ -62,7 +61,6 @@ set (common_sources
      iproto.cc
      iproto_constants.cc
      iproto_port.cc
-     session.cc
      object.cc
      exception.cc
      ipc.cc
@@ -87,7 +85,6 @@ set (common_sources
      lua/trigger.cc
      lua/ipc.cc
      lua/socket.cc
-     lua/session.cc
      lua/cjson.cc
      lua/yaml.cc
      lua/msgpack.cc

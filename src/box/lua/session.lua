@@ -1,6 +1,6 @@
 -- session.lua
 
-local session = require('session')
+local session = require('box.session')
 
 setmetatable(session, {
     __index = function(tbl, idx)
