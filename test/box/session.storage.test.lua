@@ -44,4 +44,5 @@ table.sort(tres2)
 dump(tres1)
 dump(tres2)
 
+getmetatable(session).aggregate_storage = {}
 session = nil

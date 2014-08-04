@@ -95,6 +95,9 @@ dump(tres2)
 ---
 - '''["cde","def"]'''
 ...
+getmetatable(session).aggregate_storage = {}
+---
+...
 session = nil
 ---
 ...

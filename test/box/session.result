@@ -112,6 +112,9 @@ function inc() active_connections = active_connections + 1 end
 function dec() active_connections = active_connections - 1 end
 ---
 ...
+net = { box = require('net.box') }
+---
+...
 session.on_connect(inc)
 ---
 ...
@@ -121,19 +124,33 @@ session.on_disconnect(dec)
 active_connections = 0
 ---
 ...
---# create connection con_one to default
+c = net.box:new(0, box.cfg.listen)
+---
+...
+while active_connections < 1 do fiber.sleep(0.001) end
+---
+...
 active_connections
 ---
-- 0
+- 1
 ...
---# create connection con_two to default
+c1 = net.box:new(0, box.cfg.listen)
+---
+...
+while active_connections < 2 do fiber.sleep(0.001) end
+---
+...
 active_connections
 ---
-- 0
+- 2
 ...
---# drop connection con_one
---# drop connection con_two
-fiber.sleep(0) -- yield
+c:close()
+---
+...
+c1:close()
+---
+...
+while active_connections > 0 do fiber.sleep(0.001) end
 ---
 ...
 active_connections
@@ -162,7 +179,7 @@ session.on_disconnect(audit_disconnect)
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
-a = (require 'net.box'):new('127.0.0.1', box.cfg.listen)
+a = net.box:new('127.0.0.1', box.cfg.listen)
 ---
 ...
 a:call('dostring', 'return space:get{session.id()}[1] == session.id()')[1][1]
