@@ -181,7 +181,16 @@ SophiaFactory::txnFinish(struct txn *txn)
 	 * @todo: support multi-statement transactions
 	 * here when sophia supports them.
 	 */
+
+	/* single-stmt case:
+	 *
+	 * no need to unref tuple here, since it will be done by
+	 * TupleGuard in execute_replace().
+	*/
+	(void)txn;
+#if 0
 	struct txn_stmt *stmt = txn_stmt(txn);
 	if (stmt->new_tuple)
 		tuple_ref(stmt->new_tuple, -1);
+#endif
 }
