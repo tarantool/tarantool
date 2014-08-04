@@ -112,7 +112,7 @@ cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- dot-new-method
 
-cn1 = remote:new('127.0.0.1', port)
+cn1 = remote.new('127.0.0.1', port)
 cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- error while waiting for response
