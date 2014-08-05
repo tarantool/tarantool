@@ -924,11 +924,9 @@ tarantool> box.space.tester:insert{20,msgpack.NULL,20}
       When a fiber ends (because the fiber function ends), it is dead.
     </para>
     <para>
-      All fibers are part of the fiber registry.
-      This registry can be searched (<code>fiber.find()</code>)
-      either by fiber id (fid), which is numeric, or by fiber name,
-      which is a string. If there is more than one fiber with the given
-      name, the first fiber that matches is returned.
+       All fibers are part of the fiber registry.
+       This registry can be searched (<code>fiber.find()</code>)
+-      via fiber id (fid), which is numeric.
     </para>
     <para>
       A runaway fiber can be stopped with <code>fiber.cancel()</code>.
@@ -963,13 +961,50 @@ procedures.
       The carcass can be reused when another fiber is created.
     </para>
 <variablelist xml:id="fiber">
+ 
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function, function-arguments</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Create and start a fiber. The fiber is
+              created and begins to run immediately.
+            </para>
+            <para>
+              Parameters: <code>function</code> = the function to be associated with the fiber,
+              <code>function-arguments</code> = what will be passed to the function.
+            </para>
+            <para>
+             Returns: (type = userdata) created fiber object.
+            </para>
+        </listitem>
+    </varlistentry>
+
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="fiber.id">fiber.id(<replaceable>fiber</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
+              Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
+            </para>
+            <para>
               Returns: (type = number) id of the fiber.
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term>
+            <emphasis role="lua" xml:id="fiber.name">fiber.name(<replaceable>fiber</replaceable>) </emphasis>
+        </term>
+        <listitem>
+            <para>
+              Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
+            </para>
+            <para>
+              Returns: (type = string) name of the fiber.
             </para>
         </listitem>
     </varlistentry>
@@ -996,22 +1031,6 @@ procedures.
             </para>
             <para>
               Returns: (type = userdata) fiber object for the specified fiber.
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-        <term>
-            <emphasis role="lua" xml:id="fiber.create">fiber.create(<replaceable>function, function-arguments</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create and start a fiber. The fiber is
-              created and resumed immediately.
-            </para>
-            <para>
-              Parameters: <code>function</code> = the function to be associated with the fiber,
-              <code>function-arguments</code> = what will be passed to the function.
             </para>
         </listitem>
     </varlistentry>
@@ -1068,6 +1087,20 @@ procedures.
 
     <varlistentry>
         <term>
+            <emphasis role="lua">fiber.info()</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Return information about all fibers.
+            </para>
+            <para>
+              Returns: (type = table) the name, id, and backtrace of all fibers.
+            </para>
+        </listitem>
+    </varlistentry>
+ 
+    <varlistentry>
+        <term>
             <emphasis role="lua" xml:id="fiber.cancel">fiber.cancel(<replaceable>fiber</replaceable>)</emphasis>
         </term>
         <listitem>
@@ -1086,14 +1119,14 @@ procedures.
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.fiber.kill">box.fiber.kill(<replaceable>id</replaceable>) </emphasis>
+            <emphasis role="lua" xml:id="fiber.kill">fiber.kill(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
               Locate a fiber by its numeric id and cancel it. In
-              other words, combines <emphasis
-              role="lua">box.fiber.find()</emphasis> and <emphasis
-              role="lua">box.fiber.cancel()</emphasis> into one
+              other words, <code>fiber.kill()</code> combines <emphasis
+              role="lua">fiber.find()</emphasis> and <emphasis
+              role="lua">fiber.cancel()</emphasis>.
             </para>
             <para>
               Parameters: <code>id</code> = the id of the fiber to be canceled.
@@ -1161,7 +1194,7 @@ tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
             </para>
         </listitem>
     </varlistentry>
-    
+
 </variablelist>
 
 <para>
@@ -1193,7 +1226,7 @@ so it will be running independently of the caller.
 ...</programlisting>
 
 Get the id of the fiber (fid), to be used in later displays.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> fid = fiber.create(function_x)</userinput>
+<prompt>tarantool&gt;</prompt><userinput> fid = fiber.id(fiber_of_x)</userinput>
 ---
 ...
 </programlisting>
@@ -1201,14 +1234,9 @@ Pause for a while, while the detached function runs. Then ...
 Display the fiber id, the fiber status, and gvar  (gvar will have
 gone up a bit depending how long the pause lasted). The status is
 suspended because the fiber spends almost all its time sleeping or yielding.<programlisting>
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+# 102 .  suspended . gvar= 399
 ---
-- '#'
-- 'userdata: 0x4133d340'
-- '. '
-- suspended
-- . gvar=
-- 181
 ...
 </programlisting>
 Pause for a while, while the detached function runs. Then ...
@@ -1221,14 +1249,9 @@ the status is dead because the cancel worked.<programlisting>
 ... fiber `lua': exiting
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> '#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar</userinput>
+<prompt>tarantool&gt;</prompt><userinput> print('#',fid,'. ',fiber.status(fiber_of_x),'. gvar=',gvar)</userinput>
+# 102 .  dead . gvar= 421
 ---
-- '#'
-- 'userdata: 0x4133d340'
-- '. '
-- dead
-- . gvar=
-- 257
 ...</programlisting>
 </para>
 
