@@ -154,8 +154,7 @@ bitset_index_destroy(struct bitset_index *index);
 
 /**
  * @brief Insert (\a key, \a value) pair into \a index.
- * Only one pair with a given value can exist in the index.
- * If a pair with the same \a value exists, it is updated quietly.
+ * \a value must be unique in the index.
  * This method is atomic, i.e. \a index will be in a consistent
  * state after a return even in case of error.
  *
