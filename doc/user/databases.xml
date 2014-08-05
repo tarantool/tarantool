@@ -2220,15 +2220,22 @@ tarantool> <userinput>box.cfg</userinput>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool> <userinput>box.info()</userinput>
 ---
-- version: 1.6.0-819-geefb2d0
-  status: primary
-  pid: 20978
-  lsn: 340
-  snapshot_pid: 0
+- version: 1.6.0-1663-g7bbb330
+  status: running
+  vclock:
+  - 0
+  pid: 10316
+  logger_pid: 0
   recovery_last_update: 0
   recovery_lag: 0
-  uptime: 16071
-  ...
+  build:
+    [ build flags and options are omitted from this example ]
+  uptime: 2880
+  snapshot_pid: 0
+  node:
+    lsn: 0
+    uuid: e8530a1a-d450-4598-bcc9-6efc842dfe20
+    id: 1
 ...
 </programlisting>
         </listitem>
@@ -2257,7 +2264,7 @@ tarantool> <userinput>box.info.uptime</userinput>
 ...
 tarantool> <userinput>box.info.status</userinput>
 ---
- - primary
+ - running
 ...
 tarantool> <userinput>box.info.recovery_lag</userinput>
 ---
@@ -3215,11 +3222,22 @@ error: can't save snapshot, errno 17 (File exists)
       <listitem><para>
         End the currently active transaction, but cancel
         all its data-change operations. An explicit call
-        to fiber.yield() will have the same effect.
+        to functions outside box.space that always yield,
+        such as <code>fiber.yield</code> or
+        <code>fiber.sleep</code>, will have the same effect.
        </para></listitem>
     </varlistentry>
-    
   </variablelist>
+<para>
+    <emphasis>The requests in a transaction must be
+    sent to the server as a single block.</emphasis>
+    It is not enough to enclose them
+    between <code>begin</code> and <code>commit</code>
+    or <code>rollback</code>. To ensure they are sent
+    as a single block: put them in a function, or put
+    them all on one line, or use a delimiter so that
+    multi-line requests are handled together.
+</para>
 
 <para>
 Example:
@@ -3227,11 +3245,13 @@ Assuming that in tuple set 'tester' there are tuples
 in which the third field represents a positive dollar amount ...
 Start a transaction, withdraw from tuple#1, deposit in tuple#2,
 and end the transaction, making its effects permanent.<programlisting>
+console = require('console'); console.delimiter('!')
 box.begin()
 amount_of_money = 1.00
 box.space.tester:update({999}, {{'-', 3, amount_of_money}})
 box.space.tester:update({1000}, {{'+', 3, amount_of_money}})
-box.commit()</programlisting>
+box.commit()
+console.delimiter('')!</programlisting>
 </para>
 </section>
 
