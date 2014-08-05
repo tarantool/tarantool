@@ -51,20 +51,12 @@ Sophia::Sophia(EngineFactory *e)
 	:Engine(e)
 { }
 
-static struct tuple *
-sophia_replace_noop(struct space*,
-                    struct tuple*, struct tuple*,
-                    enum dup_replace_mode)
-{
-	return NULL;
-}
-
 static void
 sophia_end_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
 	/* enable replace */
-	r->state = READY_ALL_KEYS;
+	r->state   = READY_ALL_KEYS;
 	r->replace = space_replace_primary_key;
 	r->recover = space_noop;
 }
@@ -73,8 +65,8 @@ static void
 sophia_begin_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
-	r->replace = sophia_replace_noop;
 	r->recover = sophia_end_build_primary_key;
+	r->replace = sophia_index_recover_replace;
 }
 
 static inline void
@@ -82,7 +74,9 @@ sophia_recovery_prepare(struct engine_recovery *r)
 {
 	r->state   = READY_NO_KEYS;
 	r->recover = sophia_begin_build_primary_key;
-	r->replace = space_replace_no_keys;
+	/* no sophia data during snapshot recover is
+	 * expected */
+	r->replace = sophia_index_recover_replace;
 }
 
 SophiaFactory::SophiaFactory()
@@ -124,8 +118,9 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 {
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
-		recovery.replace = sophia_replace_noop;
+		recovery.replace = sophia_index_recover_replace;
 		break;
+
 	case END_RECOVERY:
 		recovery.state   = READY_NO_KEYS;
 		recovery.replace = space_replace_primary_key;

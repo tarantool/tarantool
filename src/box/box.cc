@@ -223,10 +223,14 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		 */
 		return;
 	}
-
 	recovery_finalize(recovery_state);
-	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 
+	/*
+	 * notify engines about end of recovery.
+	*/
+	space_end_recover();
+
+	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	box_process = process_rw;
@@ -411,7 +415,6 @@ box_init()
 	}
 
 	space_end_recover_snapshot();
-	space_end_recover();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery_state,

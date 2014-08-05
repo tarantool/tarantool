@@ -40,6 +40,45 @@
 #include <sophia.h>
 #include <stdio.h>
 
+static inline void
+sophia_delete(void *db, struct key_def *key_def, struct tuple *tuple)
+{
+	const char *key = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *keyptr = key;
+	mp_next(&keyptr);
+	size_t keysize = keyptr - key;
+	int rc = sp_delete(db, key, keysize);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+}
+
+static inline void
+sophia_set(void *db, struct key_def *key_def, struct tuple *tuple)
+{
+	const char *key = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *keyptr = key;
+	mp_next(&keyptr);
+	size_t keysize = keyptr - key;
+	int rc = sp_set(db, key, keysize, tuple->data, tuple->bsize);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+}
+
+struct tuple*
+sophia_index_recover_replace(struct space *space,
+                             struct tuple *old_tuple, struct tuple *new_tuple,
+                             enum dup_replace_mode)
+{
+	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
+	assert(index != NULL);
+	if (old_tuple) {
+		sophia_delete(index->db, index->key_def, old_tuple);
+		return NULL;
+	}
+	sophia_set(index->db, index->key_def, new_tuple);
+	return NULL;
+}
+
 static inline int
 sophia_index_compare(char *a, size_t asz __attribute__((unused)),
                      char *b, size_t bsz __attribute__((unused)),
@@ -203,16 +242,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			return dup_tuple;
 	}
 
-	if (old_tuple) {
-		/* delete */
-		const char *key = tuple_field(old_tuple, key_def->parts[0].fieldno);
-		const char *keyptr = key;
-		mp_next(&keyptr);
-		size_t keysize = keyptr - key;
-		int rc = sp_delete(db, key, keysize);
-		if (rc == -1)
-			tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
-	}
+	if (old_tuple)
+		sophia_delete(db, key_def, old_tuple);
 
 	return old_tuple;
 }
