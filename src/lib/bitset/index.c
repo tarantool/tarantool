@@ -162,7 +162,10 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 	if (rc < 0)
 		return -1;
 
-	/* if 1 then the value is new in the index */
+	assert(rc == 0); /* if 1 then the value is already exist in the index */
+	if (key_size == 0) /* optimization for empty key */
+		return 0;
+
 	index->rollback_buf[0] = (char) rc;
 
 	/*
@@ -186,23 +189,6 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 			goto rollback;
 
 		index->rollback_buf[b] = (char) rc;
-	}
-
-	/* Finish here if the value is new in the index */
-	if (index->rollback_buf[0] == 0)
-		return 0;
-
-	/*
-	 * Step 3: Iterate over 'unset' bits and cleanup other bitsets
-	 * This step is needed if the value was already existed in the index.
-	 * Nothing can fail here because current implementation of
-	 * bitset_clear never fails.
-	 */
-	bit_iterator_init(&bit_it, key, key_size, false);
-	while ((pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
-		size_t b = pos + 1;
-		rc = bitset_clear(index->bitsets[b], value);
-		assert(rc >= 0); /* bitset_clear never fails */
 	}
 
 	return 0;
@@ -308,6 +294,9 @@ bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
 	if (bitset_expr_add_conj(expr) != 0)
 		return -1;
 
+	if (key_size == 0)
+		return 0; /* optimization for empty key */
+
 	struct bit_iterator bit_it;
 	bit_iterator_init(&bit_it, key, key_size, true);
 	size_t pos;
@@ -325,6 +314,9 @@ bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
 			  size_t key_size)
 {
 	bitset_expr_clear(expr);
+
+	if (key_size == 0)
+		return 0; /* optimization for empty key */
 
 	struct bit_iterator bit_it;
 	bit_iterator_init(&bit_it, key, key_size, true);
@@ -350,6 +342,9 @@ bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
 
 	if (bitset_expr_add_param(expr, 0, false) != 0)
 		return -1;
+
+	if (key_size == 0)
+		return 0; /* optimization for empty key */
 
 	struct bit_iterator bit_it;
 	bit_iterator_init(&bit_it, key, key_size, true);

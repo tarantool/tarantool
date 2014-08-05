@@ -44,3 +44,5 @@ space:truncate()
 space:insert{0, 'test'}
 space.index['primary']:get{0}
 space:drop()
+t = nil
+collectgarbage('collect')
