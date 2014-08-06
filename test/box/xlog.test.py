@@ -8,7 +8,7 @@ from os.path import abspath
 # cleanup server.vardir
 server.stop()
 server.deploy()
-lsn = int(yaml.load(server.admin("box.info.node.lsn", silent=True))[0])
+lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
 server.stop()
 
 print """
@@ -138,7 +138,7 @@ lsn += 1
 
 server.stop()
 server.deploy()
-lsn = int(yaml.load(server.admin("box.info.node.lsn", silent=True))[0])
+lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
 filename = str(lsn).zfill(20) + ".xlog"
 wal_old = os.path.join(server.vardir, "old_" + filename)
 wal = os.path.join(server.vardir, filename)
@@ -210,7 +210,7 @@ server.admin("space = box.schema.create_space('test')")
 server.admin("box.space.test:create_index('primary')")
 server.admin("box.space.test:insert{1, 'first tuple'}")
 server.admin("box.space.test:insert{2, 'second tuple'}")
-lsn = int(yaml.load(server.admin("box.info.node.lsn", silent=True))[0])
+lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])
 wal = os.path.join(server.vardir, str(lsn).zfill(20) + ".xlog")
 server.stop()
 server.start()

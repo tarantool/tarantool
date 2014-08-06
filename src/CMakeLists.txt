@@ -77,6 +77,7 @@ set (common_sources
      ffisyms.cc
      uri.cc
      disk_fiber_io.cc
+     lua/digest.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc

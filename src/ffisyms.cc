@@ -8,6 +8,7 @@
 #include <lua/init.h>
 #include <tarantool.h>
 #include "lua/bsdsocket.h"
+#include "lua/digest.h"
 #include "base64.h"
 
 /*
@@ -43,5 +44,6 @@ void *ffi_symbols[] = {
 	(void *) box_set_too_long_threshold,
 	(void *) bsdsocket_local_resolve,
 	(void *) bsdsocket_nonblock,
-	(void *) base64_decode
+	(void *) base64_decode,
+	(void *) SHA1internal
 };

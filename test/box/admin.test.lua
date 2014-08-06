@@ -23,10 +23,10 @@ function test_box_info()
     local buildstr = {'flags', 'target', 'compiler', 'options'}
     local str = {'version', 'status' }
     local failed = {}
-    if check_type(tmp.node, 'table') == false then
-        table.insert(failed1, 'box.info().node')
+    if check_type(tmp.server, 'table') == false then
+        table.insert(failed1, 'box.info().server')
     else
-        tmp.node = nil
+        tmp.server = nil
     end
     for k, v in ipairs(num) do
         if check_type(tmp[v], 'number') == false then

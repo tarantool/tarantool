@@ -155,3 +155,10 @@ space.index['primary']:get{0}
 space:drop()
 ---
 ...
+t = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...

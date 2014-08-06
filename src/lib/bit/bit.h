@@ -435,6 +435,11 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 	it->start = (const char *) data;
 	it->next = it->start;
 	it->end = it->next + size;
+	if (bit_unlikely(size == 0)) {
+		it->word = 0;
+		return;
+	}
+
 	it->word_xor = set ? 0 : (ITER_UINT) -1;
 	it->word_base = 0;
 
