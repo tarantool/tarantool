@@ -32,7 +32,7 @@ replica.cleanup(True)
 master.admin('box.snapshot()')
 master.restart()
 master.admin('for k = 10, 19 do box.space[42]:insert{k, k*k*k} end')
-master_id = master.get_param('node')['id']
+master_id = master.get_param('server')['id']
 lsn = master.get_lsn(master_id)
 print '-------------------------------------------------------------'
 print 'replica test 2 (must be ok)'
