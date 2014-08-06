@@ -24,7 +24,7 @@ string.match(box.info.logger_pid, '^[0-9]+$') ~= nil
 ---
 - true
 ...
-#box.info.node > 0
+#box.info.server > 0
 ---
 - false
 ...
@@ -77,10 +77,10 @@ t
 ---
 - - build
   - logger_pid
-  - node
   - pid
   - recovery_lag
   - recovery_last_update
+  - server
   - snapshot_pid
   - status
   - uptime

@@ -9,7 +9,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 --# setopt delimiter ';'
 --# set connection default, hot_standby, replica
 fiber = require('fiber');
-while box.info.node == nil do fiber.sleep(0.01) end;
+while box.info.server == nil do fiber.sleep(0.01) end;
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
 do
     local pri_id = ''
@@ -57,7 +57,7 @@ end;
 -- set begin lsn on master, replica and hot_standby.
 --# set variable replica_port to 'replica.listen'
 a = (require 'net.box'):new('127.0.0.1', replica_port)
-a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
+a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
 space = box.schema.create_space('tweedledum')
@@ -79,7 +79,7 @@ while box.info.status ~= 'running' do fiber.sleep(0.001) end
 -- uses MASTER environment variable for its listen
 --# set variable hot_standby_port to 'hot_standby.master'
 a = (require 'net.box'):new('127.0.0.1', hot_standby_port)
-a:call('_set_pri_lsn', box.info.node.id, box.info.node.lsn)
+a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
 --# set connection hot_standby

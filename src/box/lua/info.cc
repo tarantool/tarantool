@@ -57,7 +57,7 @@ lbox_info_recovery_last_update_tstamp(struct lua_State *L)
 }
 
 static int
-lbox_info_node(struct lua_State *L)
+lbox_info_server(struct lua_State *L)
 {
 	if (recovery->server_id == 0) {
 		lua_pushnil(L);
@@ -127,7 +127,7 @@ lbox_info_dynamic_meta [] =
 	{"recovery_lag", lbox_info_recovery_lag},
 	{"recovery_last_update", lbox_info_recovery_last_update_tstamp},
 	{"vclock", lbox_info_vclock},
-	{"node", lbox_info_node},
+	{"server", lbox_info_server},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},

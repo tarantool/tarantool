@@ -224,6 +224,39 @@ test(-2147483647LL)
 ---
 - -2147483647LL ok
 ...
+-- 1e53 - maximum integer that can be stored to double without losing precision
+test(9007199254740991)
+---
+- 9.007199254741e+15 ok
+...
+test(9007199254740991ULL)
+---
+- 9007199254740991ULL ok
+...
+test(9007199254740991LL)
+---
+- 9007199254740991LL ok
+...
+test(9007199254740992)
+---
+- 9.007199254741e+15 ok
+...
+test(9007199254740992ULL)
+---
+- 9007199254740992ULL ok
+...
+test(9007199254740992LL)
+---
+- 9007199254740992LL ok
+...
+test(-9007199254740991)
+---
+- -9.007199254741e+15 ok
+...
+test(-9007199254740991LL)
+---
+- -9007199254740991LL ok
+...
 test(-9007199254740992)
 ---
 - -9.007199254741e+15 ok
@@ -639,5 +672,5 @@ offset
 ...
 a, offset = msgpackffi.decode_unchecked(dump, offset)
 ---
-- error: 'builtin/msgpackffi.lua:460: offset = 9 is out of bounds [1..8]'
+- error: 'builtin/msgpackffi.lua:457: offset = 9 is out of bounds [1..8]'
 ...

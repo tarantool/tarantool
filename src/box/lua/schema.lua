@@ -284,6 +284,7 @@ local function normalize_update_ops(ops)
     end
     return ops
 end
+internal.normalize_update_ops = normalize_update_ops -- export for net.box
 
 local iterator_t = ffi.typeof('struct iterator')
 ffi.metatype(iterator_t, {
