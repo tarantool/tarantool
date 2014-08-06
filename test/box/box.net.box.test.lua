@@ -62,19 +62,28 @@ cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1 })
 cn.space.net_box_test_space:select({123}, { iterator = 'GT', limit = 1, offset = 1 })
 
 cn.space.net_box_test_space:select{123}
-cn.space.net_box_test_space:update({123}, { { '+', 1, 1 } })
-cn.space.net_box_test_space:update(123, { { '+', 1, 1 } })
+cn.space.net_box_test_space:update({123}, { { '+', 2, 1 } })
+cn.space.net_box_test_space:update(123, { { '+', 2, 1 } })
 cn.space.net_box_test_space:select{123}
 
-cn.space.net_box_test_space:update({123}, { { '=', 0, 2 } })
+cn.space.net_box_test_space:update({123}, { { '=', 1, 2 } })
 cn.space.net_box_test_space:select{2}
 cn.space.net_box_test_space:select({234}, { iterator = 'LT' })
 
-cn.space.net_box_test_space:update({1}, { { '+', 1, 2 } })
+cn.space.net_box_test_space:update({1}, { { '+', 2, 2 } })
 
 cn.space.net_box_test_space:delete{1}
 cn.space.net_box_test_space:delete{2}
 cn.space.net_box_test_space:delete{2}
+
+-- test one-based indexing in splice operation (see update.test.lua)
+cn.space.net_box_test_space:replace({10, 'abcde'})
+cn.space.net_box_test_space:update(10,  {{':', 2, 0, 0, '!'}})
+cn.space.net_box_test_space:update(10,  {{':', 2, 1, 0, '('}})
+cn.space.net_box_test_space:update(10,  {{':', 2, 2, 0, '({'}})
+cn.space.net_box_test_space:update(10,  {{':', 2, -1, 0, ')'}})
+cn.space.net_box_test_space:update(10,  {{':', 2, -2, 0, '})'}})
+cn.space.net_box_test_space:delete{10}
 
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 
