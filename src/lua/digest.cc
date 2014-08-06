@@ -36,7 +36,7 @@ extern "C" {
 unsigned char *
 SHA1internal(const unsigned char *d, size_t n, unsigned char *md)
 {
-	static unsigned char result[20];
+	static __thread unsigned char result[20];
 	SHA1_CTX ctx;
 	SHA1Init(&ctx);
 	SHA1Update(&ctx, d, n);
