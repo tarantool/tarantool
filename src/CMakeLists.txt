@@ -75,6 +75,7 @@ set (common_sources
      tt_uuid.c
      ffisyms.cc
      uri.cc
+     lua/digest.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
