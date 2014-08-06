@@ -127,7 +127,7 @@ socket_methods.syswrite = function(self, octets)
         self._errno = box.errno()
         return nil
     end
-    return done
+    return tonumber(done)
 end
 
 socket_methods.sysread = function(self, len)
@@ -413,7 +413,7 @@ socket_methods.getsockopt = function(self, level, name)
         if len[0] ~= 4 then
             error(sprintf("Internal error: unexpected optlen: %d", len[0]))
         end
-        return value[0]
+        return tonumber(value[0])
     end
 
     if info.type == 2 then
@@ -424,7 +424,7 @@ socket_methods.getsockopt = function(self, level, name)
             self._errno = box.errno()
             return nil
         end
-        return ffi.string(value, len[0])
+        return ffi.string(value, tonumber(len[0]))
     end
 
     if name == 'SO_LINGER' then
@@ -488,6 +488,8 @@ socket_methods.accept = function(self)
         self._errno = box.errno()
         return nil
     end
+
+    fh = tonumber(fh)
 
     -- Make socket to be non-blocked by default
     -- ignore result
@@ -777,6 +779,8 @@ local function create_socket(domain, stype, proto)
     if fh < 0 then
         return nil
     end
+
+    fh = tonumber(fh)
 
     -- Make socket to be non-blocked by default
     if ffi.C.bsdsocket_nonblock(fh, 1) < 0 then
