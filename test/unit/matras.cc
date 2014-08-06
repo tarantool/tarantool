@@ -66,7 +66,6 @@ void matras_alloc_test()
 	unsigned int maxCapacity =  PROV_EXTENT_SIZE / PROV_BLOCK_SIZE;
 	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
 	maxCapacity *= PROV_EXTENT_SIZE / sizeof(void *);
-	std::cout << "matras capacity : " << maxCapacity << std::endl;
 
 	struct matras pta;
 
