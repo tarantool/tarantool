@@ -109,7 +109,7 @@ end
 local function encode_u64(buf, code, num)
     buf:reserve(9)
     buf.p[0] = code
-    ffi.cast(uint64_ptr_t, buf.p + 1)[0] = bswap_u64(num)
+    ffi.cast(uint64_ptr_t, buf.p + 1)[0] = bswap_u64(ffi.cast('uint64_t', num))
     buf.p = buf.p + 9
 end
 
@@ -137,10 +137,8 @@ local function encode_int(buf, num)
             encode_u16(buf, 0xcd, num)
         elseif num <= 0xffffffff then
             encode_u32(buf, 0xce, num)
-        elseif num <= 18446744073709551615ULL then
-            encode_u64(buf, 0xcf, num)
         else
-            encode_double(buf, num)
+            encode_u64(buf, 0xcf, 0ULL + num)
         end
     else
         if num >= -0x20 then
@@ -151,10 +149,8 @@ local function encode_int(buf, num)
             encode_u16(buf, 0xd1, num)
         elseif num >= -0x7fffffff then
             encode_u32(buf, 0xd2, num)
-        elseif num >= -9223372036854775807LL then
-            encode_u64(buf, 0xd3, num)
         else
-            encode_double(buf, num)
+            encode_u64(buf, 0xd3, 0LL + num)
         end
     end
 end
@@ -211,7 +207,8 @@ end
 
 local function encode_r(buf, obj, level)
     if type(obj) == "number" then
-        if obj % 1 == 0 then -- Lua-way to check that number is an integer
+        -- Lua-way to check that number is an integer
+        if obj % 1 == 0 and obj > -1e63 and obj < 1e64 then
             encode_int(buf, obj)
         else
             encode_double(buf, obj)
