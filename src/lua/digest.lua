@@ -13,6 +13,7 @@ ffi.cdef[[
     unsigned char *SHA384(const unsigned char *d, size_t n,unsigned char *md);
     unsigned char *SHA512(const unsigned char *d, size_t n,unsigned char *md);
     unsigned char *MD4(const unsigned char *d, size_t n, unsigned char *md);
+    unsigned char *SHA1internal(const unsigned char *d, size_t n, unsigned char *md);
 
     /* from openssl/md5.h */
     unsigned char *MD5(const unsigned char *d, size_t n, unsigned char *md);
@@ -28,13 +29,25 @@ ffi.cdef[[
 
 local ssl
 if ssl == nil then
-    pcall(function() ssl = ffi.load('ssl') end)
+    local variants = {
+        'libssl.so.1.0.0',
+        'libssl.so.0.9.8',
+        'libssl.so',
+        'ssl',
+    }
+
+    for _, libname in pairs(variants) do
+        pcall(function() ssl = ffi.load(libname) end)
+        if ssl ~= nil then
+            break
+        end
+    end
 end
 
 
 local def = {
     sha     = { 'SHA',    20 },
-    sha1    = { 'SHA1',   20 },
+--     sha1    = { 'SHA1',   20 },
     sha224  = { 'SHA224', 28 },
     sha256  = { 'SHA256', 32 },
     sha384  = { 'SHA384', 48 },
@@ -42,6 +55,16 @@ local def = {
     md5     = { 'MD5',    16 },
     md4     = { 'MD4',    16 }
 }
+
+local hexres = ffi.new('char[129]')
+
+local function tohex(r, size)
+    for i = 0, size - 1 do
+        ffi.C.snprintf(hexres + i * 2, 3, "%02x",
+            ffi.cast('unsigned int', r[i]))
+    end
+    return ffi.string(hexres, size * 2)
+end
 
 local m = {
     crc32 = function(str)
@@ -60,11 +83,30 @@ local m = {
             str = tostring(str)
         end
         return ffi.C.crc32_calc(tonumber(crc), str, string.len(str))
+    end,
+
+    sha1 = function(str)
+        if str == nil then
+            str = ''
+        else
+            str = tostring(str)
+        end
+        local r = ffi.C.SHA1internal(str, #str, nil)
+        return ffi.string(r, 20)
+    end,
+
+    sha1_hex = function(str)
+        if str == nil then
+            str = ''
+        else
+            str = tostring(str)
+        end
+        local r = ffi.C.SHA1internal(str, #str, nil)
+        return tohex(r, 20)
     end
 }
 
 if ssl ~= nil then
-    local hexres = ffi.new('char[129]')
 
     for pname, df in pairs(def) do
         local hfunction = df[1]
@@ -87,12 +129,7 @@ if ssl ~= nil then
                 str = tostring(str)
             end
             local r = ssl[hfunction](str, string.len(str), nil)
-            
-            for i = 0, hsize - 1 do
-                ffi.C.snprintf(hexres + i * 2, 3, "%02x",
-                                ffi.cast('unsigned int', r[i]))
-            end
-            return ffi.string(hexres, hsize * 2)
+            return tohex(r, hsize)
         end
     end
 else
