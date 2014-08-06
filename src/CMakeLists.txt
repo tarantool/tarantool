@@ -27,6 +27,7 @@ lua_source(lua_sources lua/log.lua)
 lua_source(lua_sources lua/box_net_box.lua)
 lua_source(lua_sources lua/help.lua)
 lua_source(lua_sources lua/tap.lua)
+lua_source(lua_sources lua/fio.lua)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/third_party/luafun)
 lua_source(lua_sources ../third_party/luafun/fun.lua)
 
@@ -75,6 +76,7 @@ set (common_sources
      tt_uuid.c
      ffisyms.cc
      uri.cc
+     disk_fiber_io.cc
      lua/init.cc
      lua/fiber.cc
      lua/trigger.cc
@@ -87,6 +89,7 @@ set (common_sources
      lua/errno.c
      lua/bsdsocket.cc
      lua/pickle.cc
+     lua/fio.cc
      ${lua_sources}
 )
 

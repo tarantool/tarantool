@@ -1,0 +1,146 @@
+fio = require 'fio'
+---
+...
+errno = require 'errno'
+---
+...
+fh1 = fio.open("/tmp/tarantool-test.fio.1", { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, { 'S_IRUSR', 'S_IWUSR' })
+---
+...
+fh2 = fio.open("/tmp/tarantool-test.fio.2", { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, { 'S_IRUSR', 'S_IWUSR' })
+---
+...
+type(fh1)
+---
+- table
+...
+type(fh2)
+---
+- table
+...
+fh1:seek(123)
+---
+- 123
+...
+fh1:write('Hello, world')
+---
+- true
+...
+fh1:fdatasync()
+---
+- true
+...
+fh1:fsync()
+---
+- true
+...
+fio.stat("/tmp/tarantool-test.fio.1").size
+---
+- 135
+...
+fh1:seek(123)
+---
+- 123
+...
+fh1:read(500)
+---
+- Hello, world
+...
+fh1:truncate(128)
+---
+- true
+...
+fh1:seek(123)
+---
+- 123
+...
+fh1:read(3)
+---
+- Hel
+...
+fh1:read(500)
+---
+- lo
+...
+fh1:seek(123)
+---
+- 123
+...
+fio.truncate("/tmp/tarantool-test.fio.1", 127)
+---
+- true
+...
+fio.stat("/tmp/tarantool-test.fio.1").size
+---
+- 127
+...
+fh1:stat().size
+---
+- 127
+...
+fh1:read(500)
+---
+- Hell
+...
+fh1:close()
+---
+- true
+...
+fh1:close()
+---
+- false
+...
+fh2:close()
+---
+- true
+...
+fio.symlink("/tmp/tarantool-test.fio.1", "/tmp/tarantool-test.fio.3")
+---
+- true
+...
+fio.readlink("/tmp/tarantool-test.fio.3")
+---
+- /tmp/tarantool-test.fio.1
+...
+fio.symlink("/tmp/tarantool-test.fio.1", "/tmp/tarantool-test.fio.3")
+---
+- false
+...
+errno.strerror(errno())
+---
+- File exists
+...
+fio.rename("/tmp/tarantool-test.fio.3", "/tmp/tarantool-test.fio.4")
+---
+- true
+...
+fio.glob("/tmp/tarantool-test.fio.[1-4]")
+---
+- - /tmp/tarantool-test.fio.1
+  - /tmp/tarantool-test.fio.2
+  - /tmp/tarantool-test.fio.4
+...
+fio.unlink("/tmp/tarantool-test.fio.1")
+---
+- true
+...
+fio.unlink("/tmp/tarantool-test.fio.2")
+---
+- true
+...
+fio.unlink("/tmp/tarantool-test.fio.3")
+---
+- false
+...
+fio.unlink("/tmp/tarantool-test.fio.4")
+---
+- true
+...
+fio.stat("/tmp/tarantool-test.fio.1")
+---
+- null
+...
+fio.glob("/tmp/tarantool-test.fio.[12]")
+---
+- []
+...

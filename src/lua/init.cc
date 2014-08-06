@@ -55,6 +55,7 @@ extern "C" {
 #include "lua/yaml.h"
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
+#include "lua/fio.h"
 
 #include <ctype.h>
 #include "small/region.h"
@@ -75,7 +76,8 @@ extern char uuid_lua[],
 	console_lua[],
 	box_net_box_lua[],
 	help_lua[],
-	tap_lua[];
+	tap_lua[],
+	fio_lua[];
 
 static const char *lua_sources[] = {
 	init_lua,
@@ -92,6 +94,7 @@ static const char *lua_modules[] = {
 	"net.box", box_net_box_lua,
 	"console", console_lua,
 	"tap", tap_lua,
+	"fio", fio_lua,
 	NULL
 };
 
@@ -313,6 +316,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 
 	box_lua_init(L);
+	fio_lua_init(L);
 
 
 	lua_newtable(L);
