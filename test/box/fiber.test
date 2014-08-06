@@ -113,3 +113,8 @@ exec admin "lua f = box.fiber.wrap(y)"
 exec admin "lua box.fiber.kill(f:id())"
 exec admin "lua while box.fiber.status(f) ~= 'dead' do box.fiber.sleep(0.01) end"
 exec admin "lua box.space[0]:truncate()"
+
+exec admin "lua done = false"
+exec admin "lua function test() box.fiber.name('cancel_bug'); local fun, errmsg = loadstring('box.fiber.cancel(box.fiber.self())'); xpcall(fun, function() end); xpcall(fun, function() end); done = true; fun(); end"
+exec admin "lua box.fiber.wrap(test)"
+exec admin "lua done"
