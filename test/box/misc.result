@@ -147,9 +147,11 @@ end;
 ...
 t;
 ---
-- - slabs
-  - arena_size
+- - arena_used_%
   - arena_used
+  - items_used_%
+  - arena_size
+  - slabs
 ...
 ----------------
 -- # box.error
