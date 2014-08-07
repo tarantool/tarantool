@@ -32,12 +32,14 @@
 struct SophiaFactory: public EngineFactory {
 	SophiaFactory();
 	virtual void init();
+	virtual void recover();
 	virtual Engine *open();
 	virtual Index *createIndex(struct key_def *key_def);
 	virtual void dropIndex(Index *index);
 	virtual void keydefCheck(struct key_def *key_def);
 	virtual void txnFinish(struct txn *txn);
 	virtual void recoveryEvent(enum engine_recovery_event event);
+	void *env;
 };
 
 #endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */

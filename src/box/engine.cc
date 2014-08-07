@@ -45,6 +45,9 @@ EngineFactory::EngineFactory(const char *engine_name)
 void EngineFactory::init()
 {}
 
+void EngineFactory::recover()
+{}
+
 void EngineFactory::shutdown()
 {}
 

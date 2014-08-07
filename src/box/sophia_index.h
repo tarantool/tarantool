@@ -50,9 +50,13 @@ public:
 				  const char *key, uint32_t part_count) const;
 	virtual size_t memsize() const;
 
-protected:
 	void *env;
 	void *db;
 };
+
+struct tuple *
+sophia_index_recover_replace(struct space*,
+                             struct tuple*, struct tuple*,
+                             enum dup_replace_mode);
 
 #endif /* TARANTOOL_BOX_SOPHIA_INDEX_H_INCLUDED */
