@@ -51,20 +51,12 @@ Sophia::Sophia(EngineFactory *e)
 	:Engine(e)
 { }
 
-static struct tuple *
-sophia_replace_noop(struct space*,
-                    struct tuple*, struct tuple*,
-                    enum dup_replace_mode)
-{
-	return NULL;
-}
-
 static void
 sophia_end_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
 	/* enable replace */
-	r->state = READY_ALL_KEYS;
+	r->state   = READY_ALL_KEYS;
 	r->replace = space_replace_primary_key;
 	r->recover = space_noop;
 }
@@ -73,8 +65,8 @@ static void
 sophia_begin_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
-	r->replace = sophia_replace_noop;
 	r->recover = sophia_end_build_primary_key;
+	r->replace = sophia_index_recover_replace;
 }
 
 static inline void
@@ -82,7 +74,9 @@ sophia_recovery_prepare(struct engine_recovery *r)
 {
 	r->state   = READY_NO_KEYS;
 	r->recover = sophia_begin_build_primary_key;
-	r->replace = space_replace_no_keys;
+	/* no sophia data during snapshot recover is
+	 * expected */
+	r->replace = sophia_index_recover_replace;
 }
 
 SophiaFactory::SophiaFactory()
@@ -94,12 +88,23 @@ SophiaFactory::SophiaFactory()
 void
 SophiaFactory::init()
 {
-	int rc = mkdir("sophia", 0755);
+	env = sp_env();
+	if (env == NULL)
+		panic("failed to create sophia environment");
+	void *conf = sp_ctl(env, "conf");
+	sp_set(conf, "env.dir", "sophia");
+}
 
-	if (rc == -1 && errno != EEXIST) {
-		say_error("failed to create directory: 'sophia', %d, %s",
-		          errno, strerror(errno));
-	}
+void
+SophiaFactory::recover()
+{
+	say_info("start sophia recover");
+
+	int rc = sp_open(env);
+	if (rc == -1)
+		panic("sophia recovery failed");
+
+	say_info("complete");
 }
 
 Engine*
@@ -113,8 +118,9 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 {
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
-		recovery.replace = sophia_replace_noop;
+		recovery.replace = sophia_index_recover_replace;
 		break;
+
 	case END_RECOVERY:
 		recovery.state   = READY_NO_KEYS;
 		recovery.replace = space_replace_primary_key;
@@ -179,7 +185,16 @@ SophiaFactory::txnFinish(struct txn *txn)
 	 * @todo: support multi-statement transactions
 	 * here when sophia supports them.
 	 */
+
+	/* single-stmt case:
+	 *
+	 * no need to unref tuple here, since it will be done by
+	 * TupleGuard in execute_replace().
+	*/
+	(void)txn;
+#if 0
 	struct txn_stmt *stmt = txn_stmt(txn);
 	if (stmt->new_tuple)
 		tuple_ref(stmt->new_tuple, -1);
+#endif
 }
