@@ -57,7 +57,7 @@ sophia_end_build_primary_key(struct space *space)
 	engine_recovery *r = &space->engine->recovery;
 	/* enable replace */
 	r->state   = READY_ALL_KEYS;
-	r->replace = space_replace_primary_key;
+	r->replace = sophia_replace;
 	r->recover = space_noop;
 }
 
@@ -66,7 +66,7 @@ sophia_begin_build_primary_key(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
 	r->recover = sophia_end_build_primary_key;
-	r->replace = sophia_index_recover_replace;
+	r->replace = sophia_replace_recover;
 }
 
 static inline void
@@ -76,7 +76,7 @@ sophia_recovery_prepare(struct engine_recovery *r)
 	r->recover = sophia_begin_build_primary_key;
 	/* no sophia data during snapshot recover is
 	 * expected */
-	r->replace = sophia_index_recover_replace;
+	r->replace = sophia_replace_recover;
 }
 
 SophiaFactory::SophiaFactory()
@@ -118,12 +118,12 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 {
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
-		recovery.replace = sophia_index_recover_replace;
+		recovery.replace = sophia_replace_recover;
 		break;
 
 	case END_RECOVERY:
 		recovery.state   = READY_NO_KEYS;
-		recovery.replace = space_replace_primary_key;
+		recovery.replace = sophia_replace;
 		recovery.recover = space_noop;
 		break;
 	}
@@ -143,7 +143,12 @@ SophiaFactory::createIndex(struct key_def *key_def)
 void
 SophiaFactory::dropIndex(Index *index)
 {
-	(void)index;
+	SophiaIndex *i = (SophiaIndex*)index;
+	int rc = sp_drop(i->db);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(i->db));
+	i->db  = NULL;
+	i->env = NULL;
 }
 
 void
