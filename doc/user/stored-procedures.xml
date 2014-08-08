@@ -646,11 +646,6 @@ tarantool&gt; <userinput>#uu:bin(), #uu:str(), type(uu), uu:isnil()</userinput>
 ...
 </programlisting>
 </para>
-<para>
-  Possible errors: The server tries to load the <emphasis>libuuid</emphasis> library
-  when it starts. If the library is not available, which can happen if it was not
-  found when the server was built from source, then require('uuid') returns an error.
-</para>
 
 </section>
 
@@ -740,7 +735,7 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
         <term><emphasis role="lua" xml:id="json-null" xreflabel="json-null">json.NULL</emphasis></term>
         <listitem>
             <para>
-              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple.
+              Return a value comparable to Lua "nil" which may be useful as a placeholder in a tuple or Lua table.
             </para>
             <para>
               Parameters: none.
@@ -748,9 +743,30 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
             <para>
               Returns: the comparable value.
             </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>-- When nil is assigned to a Lua-table field, the field disappears</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>{nil, 'a', 'b'}</userinput>
+---
+- 2: a
+  3: b
+...
+<prompt>tarantool&gt;</prompt> <userinput> -- When json.NULL is assigned to a Lua-table field, the field is json.NULL</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>{json.NULL, 'a', 'b'}</userinput>
+---
+- - null
+  - a
+  - b
+...
+<prompt>tarantool&gt;</prompt> <userinput>-- When json.NULL is assigned to a JSON field, the field is null</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>json.encode({field2 = json.NULL, field1 = 'a',  field3 = 'c'})</userinput>
+---
+- '{"field2":null,"field1":"a","field3":"c"}'
+...</programlisting>
         </listitem>
     </varlistentry>
 </variablelist>
+
 </section>
 
 <section xml:id="sp-yaml">
@@ -833,7 +849,7 @@ hi
 <section xml:id="sp-msgpack">
     <title>Package <code>msgpack</code></title>
     <para>
-     The <code>yaml</code> package takes strings in MsgPack format and decodes them,
+     The <code>msgpack</code> package takes strings in MsgPack format and decodes them,
      or takes a series of non-MsgPack values and encodes them.
     </para>
 <variablelist xml:id="msgpack">
@@ -852,13 +868,14 @@ hi
        </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">msgpack.decode(<replaceable>string-value</replaceable>)</emphasis></term>
+        <term><emphasis role="lua">msgpack.decode(<replaceable>string-value</replaceable>[, <replaceable>field-number</replaceable>])</emphasis></term>
         <listitem>
             <para>
               Convert a MsgPack string to a Lua object.
             </para>
             <para>
               Parameters: <code>string-value</code> = a string formatted as MsgPack.
+              <code>field-number</code> = a number of a particular field to decode.
             </para>
             <para>
               Returns: (type = Lua table) the original contents formatted as a Lua table.
@@ -1644,7 +1661,7 @@ for instructions about defining triggers for connect and disconnect events
       will set one or more flags, will have a loop with sending and receiving functions,
       will end with the teardown functions -- as an example at the end of this section will show.
       Throughout, there may be error-checking and waiting functions for synchronization.
-      Many functions may "block" (wait for input until an optional timeout period expires),
+      Some functions may "block" if a non-default option flag is set,
       therefore the fiber that they are in will yield so that other processes may take
       over, as is the norm for cooperative multitasking.
     </para>
@@ -1670,7 +1687,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sysconnect" xreflabel="socket-sysconnect"><emphasis role="lua">sock:sysconnect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
+        <term xml:id="socket-sysconnect" xreflabel="socket-sysconnect"><emphasis role="lua">sock:sysconnect(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
@@ -1678,7 +1695,10 @@ for instructions about defining triggers for connect and disconnect events
                 The host must be an IP address.
             </para>
             <para>
-                Parameters: <code>host</code>, <code>port</code> -- which must correspond to an IPv4 address, an IPv6 address, or a UNIX path.
+                Parameters: Either: <code>host</code> -- a string representation of an IPv4 address or an IPv6 address; <code>port</code> -- a number.
+                Or: <code>host</code> -- a string containing "unix/"; <code>port</code> -- a string containing a path to a unix socket.
+                Or: <code>host</code> -- a number, 0 (zero), meaning "all local interfaces"; <code>port</code> -- a number.
+                If a port number is 0 (zero), the socket will be bound to a random local port.
             </para>
             <para>
                 Returns: (type = userdata) a connected socket, if no error.
@@ -1688,9 +1708,9 @@ for instructions about defining triggers for connect and disconnect events
             </para>
         </listitem>
     </varlistentry>
-    
+
     <varlistentry>
-        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua">sock:tcp_connect(<replaceable>host, port, [timeout</replaceable>])</emphasis></term>
+        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua">sock:tcp_connect(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
@@ -1708,13 +1728,13 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-send" xreflabel="socket-send"><emphasis role="lua">sock:send(<replaceable>data, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-send" xreflabel="socket-send"><emphasis role="lua">sock:send(<replaceable>data</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Send data over a connected socket.
             </para>
             <para>
-             Parameters: <code>data</code>, <code>timeout</code>.
+             Parameters: <code>data</code>.
             </para>
             <para>
              Returns: true if success, false if error.
@@ -1729,14 +1749,14 @@ for instructions about defining triggers for connect and disconnect events
         <term xml:id="socket-syswrite" xreflabel="socket-syswrite"><emphasis role="lua">sock:syswrite(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
-              Write data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
+              Write as much as possible data to the socket buffer if non-blocking.
               Rarely used. For details see  <link xlink:href="https://github.com/tarantool/tarantool/wiki/sockets%201.6">this description</link>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-recv" xreflabel="socket-recv"><emphasis role="lua">sock:recv(<replaceable>size, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-recv" xreflabel="socket-recv"><emphasis role="lua">sock:recv(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Read <code>size</code> bytes from a connected socket.
@@ -1744,14 +1764,12 @@ for instructions about defining triggers for connect and disconnect events
               of this call.
             </para>
             <para>
-              Parameters: <code>size</code>, <code>timeout</code>.
+              Parameters: <code>size</code>.
             </para>
             <para>
               Returns: (type = string) a string of the requested length on success.
-              On error or timeout, returns an empty string, followed
+              On error, returns an empty string, followed
               by <code>status, errno, errstr</code>.
-              If there was some data read before a timeout occurred, it
-              will be available on the next call.
               In case the writing side has closed its end, returns the remainder
               read from the socket (possibly an empty string),
               followed by <code>"eof"</code> status.
@@ -1760,7 +1778,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list] [, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Read a line from a connected socket.
@@ -1774,7 +1792,6 @@ for instructions about defining triggers for connect and disconnect events
               until a separator is seen, or until (limit) bytes have been read. The default is "no limit".
               <code>separator list</code> &mdash; a Lua table containing one or more separators.
               The function reads until one of the separators is seen. The default is a Lua table containing '\n'.
-              <code>timeout</code> &mdash; number of seconds to wait before returning an error.
             </para>
             <para>
                 Returns:
@@ -1808,10 +1825,10 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua">sock:read(<replaceable>size</replaceable>, [<replaceable>timeout</replaceable>])</emphasis></term>
+     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua">sock:read(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
-             Read data on a socket, until <code>size</code> bytes have been read, or until <code>timeout</code> expires,
+             Read data on a socket, until <code>size</code> bytes have been read,
              or until there is nothing more to read, or until an error occurs.
              Similar to sock:readline(), except for the fact that there is no list of separators.
             </para>
@@ -1822,14 +1839,14 @@ for instructions about defining triggers for connect and disconnect events
         <term xml:id="socket-sysread" xreflabel="socket-sysread"><emphasis role="lua">sock:sysread(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
-              Read data on a socket, without timeout (will block indefinitely unless nonblocking flag is set).
+              Return all available data from the socket buffer if non-blocking.
               Rarely used. For details see  <link xlink:href="https://github.com/tarantool/tarantool/wiki/sockets%201.6">this description</link>.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua">sock:bind(<replaceable>host, port[, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua">sock:bind(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Bind a socket to the given host/port.
@@ -1837,12 +1854,9 @@ for instructions about defining triggers for connect and disconnect events
                 to receive data (see <code>recvfrom()</code>). A TCP socket
                 can be used to accept new connections, after it's
                 been put in listen mode.
-                The timeout is used for name resolution only. If host
-                name is an IP address, <code>sock:bind</code> never yields and
-                the timeout is unused.
             </para>
             <para>
-              Parameters: <code>host</code>, <code>port</code>, <code>timeout</code>.
+              Parameters: <code>host</code>, <code>port</code>.
             </para>
             <para>
                Returns: (type = userdata) a socket object on success, <code>nil, status, errno, errstr</code> on error.
@@ -1881,23 +1895,23 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua">sock:sendto(<replaceable>data, host, port, [timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua">sock:sendto(<replaceable>data, host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
             </para>
             <para>
-               Parameters: <code>data</code>, <code>host</code>, <code>timeout</code>.
+               Parameters: <code>data</code>, <code>host</code>.
             </para>
             <para>
                Returns: (type = number) the number of bytes sent on success, <code>0, status, errno, errstr</code>
-                on error or timeout.
+                on error.
             </para>
         </listitem>
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-recvfrom" xreflabel="socket-recvfrom"><emphasis role="lua">sock:recvfrom(<replaceable>limit[, timeout]</replaceable>)</emphasis></term>
+        <term xml:id="socket-recvfrom" xreflabel="socket-recvfrom"><emphasis role="lua">sock:recvfrom(<replaceable>limit</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Receive a message on a UDP socket.
@@ -1971,7 +1985,7 @@ for instructions about defining triggers for connect and disconnect events
              SO_PASSCRED, SO_PEERCRED, SO_PRIORITY, SO_PROTOCOL, SO_RCVBUF, SO_RCVBUFFORCE,
              SO_RCVLOWAT, SO_SNDLOWAT, SO_RCVTIMEO, SO_SNDTIMEO, SO_REUSEADDR, SO_SNDBUF,
              SO_SNDBUFFORCE, SO_TIMESTAMP, and SO_TYPE.
-             Setting SO_LINGER is done with sock:linger(active, timeout), see below.
+             Setting SO_LINGER is done with sock:linger(active), see below.
             </para>
         </listitem>
     </varlistentry>
@@ -1987,13 +2001,13 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-linger" xreflabel="socket-linger"><emphasis role="lua">sock:linger([<replaceable>active, timeout</replaceable>])</emphasis></term>
+        <term xml:id="socket-linger" xreflabel="socket-linger"><emphasis role="lua">sock:linger([<replaceable>active</replaceable>])</emphasis></term>
         <listitem>
             <para>
               Set or clear the SO_LINGER flag. For a description of the flag, see  <link xlink:href="http://man7.org/linux/man-pages/man1/loginctl.1.html">Linux man page</link>.
             </para>
             <para>
-              Parameters: <code>active, timeout</code>.
+              Parameters: <code>active</code>.
             </para>
             <para>
               Returns: new active and timeout values.
@@ -2014,7 +2028,7 @@ for instructions about defining triggers for connect and disconnect events
     </varlistentry>
     
     <varlistentry>
-     <term xml:id="socket-readable" xreflabel="socket-readable"><emphasis role="lua">sock:readable([timeout])</emphasis>, <emphasis>sock:writable([timeout])</emphasis>, <emphasis>sock:wait([timeout])</emphasis></term>
+     <term xml:id="socket-readable" xreflabel="socket-readable"><emphasis role="lua">sock:readable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:writable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:wait([<replaceable>timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
                <code>sock:readable()</code> waits until something is readable, or until a timeout value expires.
@@ -2094,15 +2108,32 @@ for instructions about defining triggers for connect and disconnect events
 
 <section xml:id="sp-console">
  <title>package <code>console</code></title>
-<variablelist xml:id="console">
+ 
+     <para>
+    The console package allows one Tarantool server
+    to access another Tarantool server, and allows
+    one Tarantool server to start listening on an
+    administrative host/port.
+    </para> 
+    
+ 
+<variablelist>
+ 
+    <varlistentry>
+     <term><emphasis role="lua">console.connect(<replaceable>host</replaceable>,<replaceable>port</replaceable>[, <replaceable>options</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+                Connect to the server at host:port, change the prompt from
+                'tarantool' to 'host:port', and act henceforth as a client
+                until the user ends the session or types control-D.
+            </para>
     <para>
-    The console package allows one Tarantool server,
+    The console.connect function allows one Tarantool server,
     in interactive mode, to access another Tarantool
     server over a TCP connection. Subsequent requests
     will appear to be handled locally, but in reality
     the requests are being sent to the remote server
     and the local server is acting as a client.
-    There is a single function in the package: connect().
     Once connection is successful, the prompt
     will change and subsequent requests are sent
     to, and executed on, the remote server.
@@ -2112,25 +2143,24 @@ for instructions about defining triggers for connect and disconnect events
     <para>
     There are no restrictions on the types of requests
     that can be entered, except those which are due to
-    privilege restrictions -- the login to the remote
+    privilege restrictions -- by default the login to the remote
     server is done with user name = 'guest'. The remote
-    server should allow for this by granting at least
+    server could allow for this by granting at least
     one privilege:
     <code>box.schema.user.grant('guest','execute','universe')</code>.
     </para>
-    <varlistentry>
-        <term><emphasis role="lua">console:connect(<replaceable>host</replaceable>,<replaceable>port</replaceable>)</emphasis></term>
-        <listitem>
             <para>
-                Connect to the server at host:port, change the prompt from
-                'tarantool' to 'host:port', and act henceforth as a client
-                until the user ends the session or types control-D.
+             Parameters: <code>host</code>, <code>port</code>, <code>options</code>.
+             The options may be necessary if the Tarantool server at host:port requires
+             authentication. In such a case the connection might look something like:
+             <code>console.connect('127.0.0.1', port, { user = 'netbox', password = '123' })</code>.
             </para>
             <para>
-                Parameters: <code>host</code>, <code>port</code>.
+             Returns: nothing.
             </para>
             <para>
-                Returns: nothing.
+             Possible errors: the connection will fail if the target Tarantool server
+             was not initiated with <code>box.cfg{listen=...}</code>.
             </para>
             <para>
              <bridgehead renderas="sect4">Example showing use of console</bridgehead><programlisting>
@@ -2145,7 +2175,42 @@ for instructions about defining triggers for connect and disconnect events
         </listitem>
     </varlistentry>
 
-</variablelist>
+    <varlistentry>
+     <term><emphasis role="lua">console.listen(<replaceable>host</replaceable>,<replaceable>port</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+                Listen on host:port. The primary way of listening for incoming
+                requests is via the host and port, or uri, specified in
+                <code>box.cfg{listen=...}</code>. The alternative way of
+                listening is via the host and port, or uri, specified in
+                <code>console.listen(...)</code>. This alternative way is
+                called "administrative" or simply "admin port".
+           </para>
+           <para>
+                Parameters: <code>host</code>, <code>port</code>.
+                The listening is usually over a local host with a Unix socket,
+                specified as host = 'unix/', port = 'path/to/something.sock'.
+           </para>
+           <para xml:id="admin_port" xreflabel="admin_port">
+           The "admin" address is the port or URI to listen on for administrative
+           connections. It has no default value, so it must be specified
+          if connections will occur via telnet. It is not used unless
+          assigned a value. The parameters may be expressed with URI = Universal
+          Resource Identifier format, for example "unix://unix_domain_socket",
+          or as a numeric TCP port. Connections are often made with telnet.
+          A typical port value is 3313.
+          </para>
+        </listitem>
+    </varlistentry>
+
+
+
+   </variablelist>
+
+
+
+
+
 
 </section>
 

@@ -96,7 +96,6 @@ if the database server will be used or if ports need to be opened.
 For example, suppose <filename>script.lua</filename> contains the lines<programlisting>#!/usr/bin/env tarantool
 box.cfg{
     listen              = os.getenv("LISTEN"),
-    admin               = os.getenv("ADMIN"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50
@@ -225,20 +224,6 @@ Starting  ARG
           connections, but these connections can only serve
           reads until the replica becomes a master.
           A typical value is 3301.</entry>
-        </row>
-
-        <row>
-          <entry xml:id="admin_port" xreflabel="admin_port">admin</entry>
-          <entry>integer or string</entry>
-          <entry>null</entry>
-          <entry>no</entry>
-          <entry>The port or URI to listen on for administrative
-          connections. Has no default value, so must be specified
-          if connections will occur via telnet. Not used unless
-          assigned a value. This may be expressed with URI = Universal
-          Resource Identifier format, for example "unix://unix_domain_socket",
-          or as a numeric TCP port. Connections are often made with telnet.
-          A typical value is 3313.</entry>
         </row>
 
         <row>

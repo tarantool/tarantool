@@ -490,26 +490,25 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
     The server starts in interactive mode and outputs a command prompt.
     To turn on the database, configure it:
-<programlisting><prompt>tarantool></prompt> <userinput>box.cfg{admin=3313}</userinput></programlisting>
+<programlisting><prompt>tarantool></prompt> <userinput>box.cfg{listen=3301}</userinput></programlisting>
     (this minimal example is sufficient).
 </para>
 
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
-2014-06-10 11:53:41.078 ... version 1.6.0-1326-gd5544f2
-2014-06-10 11:53:41.078 ... log level 5
-2014-06-10 11:53:41.080 ... mapping 1073741824 bytes for a shared arena...
-2014-06-10 11:53:41.080 ... initialized
-2014-06-10 11:53:41.081 ... initializing cluster
-2014-06-10 11:53:41.094 ... synchronized with cluster
-2014-06-10 11:53:41.095 ... done
-2014-06-10 11:53:41.095 ... creating `./00000000000000000001.snap.inprogress'
-2014-06-10 11:53:41.095 ... saving snapshot `./00000000000000000001.snap.inprogress'
-2014-06-10 11:53:41.095 ... 0.0M rows written
-2014-06-10 11:53:41.126 ... done
-2014-06-10 11:53:41.126 ... bound to admin port tcp://0.0.0.0:3313
-2014-06-10 11:53:41.127 ... ready to accept requests
-</programlisting>
+tarantool> box.cfg{listen=3301}
+2014-08-07 09:41:41.077 ... version 1.6.0-1691-g95435d4
+2014-08-07 09:41:41.077 ... log level 5
+2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
+2014-08-07 09:41:41.079 ... start sophia recover
+2014-08-07 09:41:41.079 ... initialized
+2014-08-07 09:41:41.079 ... complete
+2014-08-07 09:41:41.081 ... initializing an empty data directory
+2014-08-07 09:41:41.095 ... creating `./00000000000000000000.snap.inprogress'
+2014-08-07 09:41:41.095 ... saving snapshot `./00000000000000000000.snap.inprogress'
+2014-08-07 09:41:41.127 ... done
+2014-08-07 09:41:41.128 ... bound to primary port 0.0.0.0:3301
+2014-08-07 09:41:41.128 ... ready to accept requests</programlisting>
 </para>
 
 <para>
@@ -521,8 +520,8 @@ Tarantool instances on your operating system.
   
 <para>
 	Now that the server is up, you could start up a different shell and
- connect to its administrative port with<programlisting>
-  <command>telnet 0 3313</command></programlisting>
+ connect to its primary port with<programlisting>
+  <command>telnet 0 3301</command></programlisting>
 but for example purposes it is simpler to just leave the
 server running in "interactive mode".
 On production machines the interactive mode is just

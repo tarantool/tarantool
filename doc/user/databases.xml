@@ -907,6 +907,85 @@ tarantool&gt; <userinput>box.space.tester:len()</userinput>
             </para>
         </listitem>
     </varlistentry>
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Increments a counter in a tuple whose primary key matches the field-value(s).
+                The field following the primary-key fields will be the counter.
+                If there is no tuple matching the field-value(s), a new one is inserted
+                with initial counter value set to 1.
+            </para>
+                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
+                which must match the primary key.
+            </para>
+            <para>
+               Returns: (type = number) the new counter value.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
+---
+- 1
+...
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
+---
+- 2
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Decrements a counter in a tuple whose primary key matches the field-value(s).
+                The field following the primary-key fields will be the counter.
+                If there is no tuple matching the field-value(s), a new one is not inserted.
+                If the counter value drops to zero, the tuple is deleted.
+            </para>
+            <para>
+               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
+               which must match the primary key.
+            </para>
+            <para>
+              Returns: (type = number) the new counter value.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
+---
+- [1, 'a', 1000]
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 999
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 998
+... </programlisting>
+        </listitem>
+    </varlistentry>
 
     <varlistentry>
         <term>
@@ -1570,85 +1649,6 @@ tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
 - [2, 'Fld#3']
 ...
 </programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Increments a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is inserted
-                with initial counter value set to 1.
-            </para>
-                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-                which must match the primary key.
-            </para>
-            <para>
-               Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
----
-- 1
-...
-tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
----
-- 2
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Decrements a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is not inserted.
-                If the counter value drops to zero, the tuple is deleted.
-            </para>
-            <para>
-               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-               which must match the primary key.
-            </para>
-            <para>
-              Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
----
-- [1, 'a', 1000]
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 999
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 998
-... </programlisting>
         </listitem>
     </varlistentry>
 </variablelist>
