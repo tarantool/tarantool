@@ -143,7 +143,12 @@ SophiaFactory::createIndex(struct key_def *key_def)
 void
 SophiaFactory::dropIndex(Index *index)
 {
-	(void)index;
+	SophiaIndex *i = (SophiaIndex*)index;
+	int rc = sp_drop(i->db);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(i->db));
+	i->db  = NULL;
+	i->env = NULL;
 }
 
 void
