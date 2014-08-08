@@ -206,7 +206,7 @@ say_init_file()
  * Initialize logging subsystem to use in daemon mode.
  */
 void
-say_logger_init(const char *path, int level, int nonblock)
+say_logger_init(const char *path, int level, int nonblock, int background)
 {
 	*log_level = level;
 	logger_nonblock = nonblock;
@@ -220,10 +220,10 @@ say_logger_init(const char *path, int level, int nonblock)
 			snprintf(log_path, sizeof(log_path), "%s", path);
 			say_init_file();
 		}
-		dup2(log_fd, STDERR_FILENO);
-#if 0
-		dup2(log_fd, STDOUT_FILENO);
-#endif
+		if (background) {
+			dup2(log_fd, STDERR_FILENO);
+			dup2(log_fd, STDOUT_FILENO);
+		}
 	}
 	if (nonblock) {
 		int flags = fcntl(log_fd, F_GETFL, 0);

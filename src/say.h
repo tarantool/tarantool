@@ -61,7 +61,8 @@ say_set_log_level(int new_level);
 void say_init(const char *argv0);
 
 /* Move logging to a separate process. */
-void say_logger_init(const char *logger, int log_level, int nonblock);
+void say_logger_init(const char *logger, int log_level, int nonblock,
+		     int background);
 
 void vsay(int level, const char *filename, int line, const char *error,
           const char *format, va_list ap)
