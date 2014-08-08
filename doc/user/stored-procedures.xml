@@ -1502,9 +1502,9 @@ end
 </section>
 
 <section xml:id="sp-box-session">
-    <title>Package <code>session</code></title>
+    <title>Package <code>box.session</code></title>
     <para>
-    The <code>session</code> package allows querying the session state,
+    The <code>box.session</code> package allows querying the session state,
     writing to a session-specific temporary Lua table, or setting up triggers
     which will fire when a session starts or ends.
     A <emphasis>session</emphasis> is an object associated with each client connection.
@@ -1512,7 +1512,7 @@ end
 <variablelist>
     <varlistentry>
         <term>
-            <emphasis role="lua">session.id() </emphasis>
+            <emphasis role="lua">box.session.id() </emphasis>
         </term>
         <listitem>
             <para>
@@ -1525,7 +1525,7 @@ end
 
     <varlistentry>
         <term>
-            <emphasis role="lua">session.exists(<replaceable>id</replaceable>) </emphasis>
+            <emphasis role="lua">box.session.exists(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -1537,7 +1537,7 @@ end
 
     <varlistentry>
         <term>
-        <emphasis role="lua">session.peer(<replaceable>id</replaceable>) </emphasis>
+        <emphasis role="lua">box.session.peer(<replaceable>id</replaceable>) </emphasis>
         </term>
         <listitem>
             <para>
@@ -1555,7 +1555,7 @@ end
 
     <varlistentry>
         <term>
-           <emphasis role="lua">session.storage</emphasis>
+           <emphasis role="lua">box.session.storage</emphasis>
         </term>
         <listitem>
             <para>
@@ -1569,24 +1569,21 @@ end
 
 <para>
 <bridgehead renderas="sect4">Example</bridgehead><programlisting>
-<prompt>tarantool&gt;</prompt><userinput> session = require('session')</userinput>
----
-...
-<prompt>tarantool&gt;</prompt><userinput> session.peer(session.id())</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.peer(session.id())</userinput>
 ---
  - 127.0.0.1:45129
 ...
-<prompt>tarantool&gt;</prompt><userinput> session.storage.random_memorandum = "Don't forget the eggs."</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.storage.random_memorandum = "Don't forget the eggs."</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> session.storage.radius_of_mars = 3396</userinput>
+<prompt>tarantool&gt;</prompt><userinput> box.session.storage.radius_of_mars = 3396</userinput>
 ---
 ...
 
 <prompt>tarantool&gt;</prompt><userinput> m = ''</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
+<prompt>tarantool&gt;</prompt><userinput> for k, v in pairs(box.session.storage) do m = m .. k .. '=' .. v .. ' ' end</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt><userinput> m</userinput>
@@ -1596,9 +1593,11 @@ end
 </para>
 
     <para>
-See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
-for instructions about defining triggers for connect and disconnect events
- with <code>session.on_connect()</code> and <code>session.on_disconnect()</code>.
+    See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
+    for instructions about defining triggers for connect and disconnect events
+    with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
+    See <olink targetptr="authentication">the section "Authentication and access control"</olink>
+    for instructions about <code>box.session</code> functions that affect user identification and security.
     </para>
 </section>
 

@@ -30,7 +30,7 @@
 <variablelist>
     <varlistentry>
         <term>
-            <emphasis role="lua">session.on_connect(chunk) </emphasis>
+            <emphasis role="lua">box.session.on_connect(chunk) </emphasis>
         </term>
         <listitem><para>
 	      	Set a callback (trigger) for invoking on each connected session.
@@ -51,7 +51,7 @@
 
     <varlistentry>
         <term>
-            <emphasis role="lua">session.on_disconnect(chunk)</emphasis>
+            <emphasis role="lua">box.session.on_disconnect(chunk)</emphasis>
         </term>
         <listitem><simpara>Set a trigger invoked after a client has
         disconnected. Returns the old value of the trigger. If

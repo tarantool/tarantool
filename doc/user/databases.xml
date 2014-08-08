@@ -3549,7 +3549,7 @@ The function for dropping a _func tuple is:
 In the following example, a function named 'f7' is created,
 then it is put in the _func space, then it is used in a
 box.schema.user.grant function, then it is dropped:
-<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() session.uid() end</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() box.session.uid() end</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>box.schema.func.create('f7')</userinput>
@@ -3566,14 +3566,14 @@ box.schema.user.grant function, then it is dropped:
 ...</programlisting></para>
 
 <para>
-<bridgehead renderas="sect4">"session=require('session')" and security</bridgehead>
+<bridgehead renderas="sect4">"box.session" and security</bridgehead>
 
 After a connection has taken place, the user has access to a "session" object
 which has several functions. The ones which are of interest for security
 purposes are:
-<programlisting>session.uid()           #returns the id of the current user
-session.user()          #returns the name of the current user
-session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
+<programlisting>box.session.uid()           #returns the id of the current user
+box.session.user()          #returns the name of the current user
+box.session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
 
 <para>
 If a user types requests directly on the Tarantool server in its interactive mode,
@@ -3583,14 +3583,13 @@ many privileges. If a user connects from an application program via one of the
 <olink targetptr="connectors">connectors</olink>, then the user by default is 'guest' and has few
 privileges. Typically an admin user will set up and configure objects, then
 grant privileges to appropriate non-admin users. Typically a guest user will
-use <code>session.su()</code> to change into a non-generic user to whom admin
+use <code>box.session.su()</code> to change into a non-generic user to whom admin
 has granted more than the default privileges. For example, admin might say:<programlisting>
 box.space._user:insert{123456,0,'manager'}
 box.schema.user.grant('manager', 'read', 'space', '_space')
 box.schema.user.grant('manager', 'read', 'space', 'payroll')</programlisting>
 and later a guest user, who wishes to see the payroll, might say:<programlisting>
-session = require('session')
-session.su('manager')
+box.session.su('manager')
 box.space.payroll:select{'Jones'}</programlisting>
 </para>
 
