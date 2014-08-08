@@ -28,7 +28,7 @@ space:drop()
 box.snapshot()
 
 --
--- gh-238: Sophia: hang after three creates and drops
+-- gh-283: Sophia: hang after three creates and drops
 --
 
 s = box.schema.create_space('space0', {id = 33, engine='sophia'})
@@ -48,6 +48,14 @@ i = s:create_index('space0', {type = 'tree', parts = {1, 'STR'}})
 s:insert{'a', 'b', 'c'}
 t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
+s:drop()
+
+--
+-- gh-280: Sophia: crash if insert without index
+--
+
+s = box.schema.create_space('test', {engine='sophia'})
+s:insert{'a'}
 s:drop()
 
 os.execute("rm -rf sophia")

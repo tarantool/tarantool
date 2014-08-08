@@ -112,7 +112,7 @@ box.snapshot()
 - ok
 ...
 --
--- gh-238: Sophia: hang after three creates and drops
+-- gh-283: Sophia: hang after three creates and drops
 --
 s = box.schema.create_space('space0', {id = 33, engine='sophia'})
 ---
@@ -163,6 +163,19 @@ t = s.index[0]:select({}, {iterator = box.index.ALL})
 t
 ---
 - - ['a', 'b', 'c']
+...
+s:drop()
+---
+...
+--
+-- gh-280: Sophia: crash if insert without index
+--
+s = box.schema.create_space('test', {engine='sophia'})
+---
+...
+s:insert{'a'}
+---
+- error: 'No index #0 is defined in space ''test'''
 ...
 s:drop()
 ---

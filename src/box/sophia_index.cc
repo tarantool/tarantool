@@ -64,10 +64,20 @@ sophia_set(void *db, struct key_def *key_def, struct tuple *tuple)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
 }
 
+struct tuple *
+sophia_replace(struct space *space,
+               struct tuple *old_tuple, struct tuple *new_tuple,
+               enum dup_replace_mode mode)
+{
+	Index *index = index_find(space, 0);
+	return index->replace(old_tuple, new_tuple, mode);
+}
+
+
 struct tuple*
-sophia_index_recover_replace(struct space *space,
-                             struct tuple *old_tuple, struct tuple *new_tuple,
-                             enum dup_replace_mode)
+sophia_replace_recover(struct space *space,
+                       struct tuple *old_tuple, struct tuple *new_tuple,
+                       enum dup_replace_mode)
 {
 	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
 	assert(index != NULL);
