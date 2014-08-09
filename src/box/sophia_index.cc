@@ -222,8 +222,6 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
 	if (new_tuple) {
-		assert(new_tuple->refs == 0);
-
 		const char *key = tuple_field(new_tuple, key_def->parts[0].fieldno);
 		const char *keyptr = key;
 		mp_next(&keyptr);

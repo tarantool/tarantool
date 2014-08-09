@@ -58,4 +58,17 @@ s = box.schema.create_space('test', {engine='sophia'})
 s:insert{'a'}
 s:drop()
 
+---
+--- gh-431: Sophia: assertion if box.begin
+---
+
+box.cfg{}
+s = box.schema.create_space('tester',{engine='sophia'})
+s:create_index('sophia_index', {})
+s:insert{10000, 'Hilton'}
+box.begin()
+s:delete{10000} -- exception
+s:select{10000}
+s:drop()
+
 os.execute("rm -rf sophia")

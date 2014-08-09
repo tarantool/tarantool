@@ -83,6 +83,7 @@ SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
 {
 	sophia_recovery_prepare(&recovery);
+	flags = 0;
 }
 
 void
