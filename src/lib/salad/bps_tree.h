@@ -4101,7 +4101,8 @@ bps_tree_debug_set_elem_inner(bps_inner_path_elem *path_elem,
 {
 	assert(pos >= 0);
 	assert(pos < path_elem->block->header.size);
-	if (pos < path_elem->block->header.size - 1)
+	if (pos < path_elem->block->header.size - 1
+	    && pos < BPS_TREE_MAX_COUNT_IN_INNER - 1) /* fix gcc-4.9 warning */
 		bps_tree_debug_set_elem(path_elem->block->elems + pos, c);
 	else
 		bps_tree_debug_set_elem(path_elem->max_elem_copy, c);
@@ -4117,7 +4118,8 @@ bps_tree_debug_get_elem_inner(const bps_inner_path_elem *path_elem,
 {
 	assert(pos >= 0);
 	assert(pos < path_elem->block->header.size);
-	if (pos < path_elem->block->header.size - 1)
+	if (pos < path_elem->block->header.size - 1
+	    && pos < BPS_TREE_MAX_COUNT_IN_INNER - 1) /* fix gcc-4.9 warning */
 		return bps_tree_debug_get_elem(path_elem->block->elems + pos);
 	else
 		return bps_tree_debug_get_elem(path_elem->max_elem_copy);
