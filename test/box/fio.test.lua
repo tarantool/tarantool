@@ -1,56 +1,98 @@
 fio = require 'fio'
 errno = require 'errno'
 
-fh1 = fio.open("/tmp/tarantool-test.fio.1", { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, { 'S_IRUSR', 'S_IWUSR' })
-fh2 = fio.open("/tmp/tarantool-test.fio.2", { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, { 'S_IRUSR', 'S_IWUSR' })
+-- pathjoin
 
-type(fh1)
-type(fh2)
+fio.pathjoin('abc', 'cde')
+fio.pathjoin('/', 'abc')
+fio.pathjoin('abc/', '/cde')
+fio.pathjoin('/', '/cde')
 
-fh1:seek(123)
-fh1:write('Hello, world')
+-- basename
 
-fh1:fdatasync()
-fh1:fsync()
+fio.basename('/')
+fio.basename('abc')
+fio.basename('abc.cde', '.cde')
+fio.basename('abc^cde', '.cde')
+fio.basename('/path/to/file.cde', '.cde')
 
-fio.stat("/tmp/tarantool-test.fio.1").size
 
-fh1:seek(123)
-fh1:read(500)
 
-fh1:truncate(128)
-fh1:seek(123)
-fh1:read(3)
-fh1:read(500)
+-- other tests
 
-fh1:seek(123)
-fio.truncate("/tmp/tarantool-test.fio.1", 127)
-fio.stat("/tmp/tarantool-test.fio.1").size
+tmpdir = fio.tempdir()
+
+file1 = fio.pathjoin(tmpdir, 'file.1')
+file2 = fio.pathjoin(tmpdir, 'file.2')
+file3 = fio.pathjoin(tmpdir, 'file.3')
+file4 = fio.pathjoin(tmpdir, 'file.4')
+
+
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 ~= nil
 fh1:stat().size
-fh1:read(500)
+fh1:seek(121)
+fh1:stat().size
+fh1:write("Hello, world")
+fh1:stat().size
+fh1:fsync()
+fh1:fdatasync()
+fio.sync()
+fh1:pread(512, 121)
+fh1:pread(5, 121)
+
+fh1:write("; Ehllo, again")
+fh1:seek(121)
+fh1:read(13)
+fh1:read(512)
+fh1:pread(512, 14 + 121)
+fh1:pwrite("He", 14 + 121)
+fh1:pread(512, 14 + 121)
+
+{ fh1:stat().size, fio.stat(file1).size }
+fh1:seek(121)
+fh1:read(512)
+
+fio.link(file1, file2)
+
+glob = fio.glob(fio.pathjoin(tmpdir, '*'))
+#glob
+{ string.match(glob[1], '^.*/(.*)'), string.match(glob[2], '^.*/(.*)') }
+fio.stat(file1).inode == fio.stat(file2).inode
+
+fh3 = fio.open(file3, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0x1FD)
+fh1:stat().inode ~= fh3:stat().inode
+0775
+bit.band(fh3:stat().mode, 0x1FF) == 0x1FD
+fh3:write("abc")
 
 
+fio.rename(file3, file4)
+fio.symlink(file4, file3)
+fio.stat(file3).size
+fio.lstat(file3).size ~= fio.stat(file3).size
+fio.lstat(file3).mode ~= fio.stat(file3).mode
+fio.basename(fio.readlink(file3))
 
-fh1:close()
-fh1:close()
-fh2:close()
-
-fio.symlink("/tmp/tarantool-test.fio.1", "/tmp/tarantool-test.fio.3")
-fio.readlink("/tmp/tarantool-test.fio.3")
-fio.symlink("/tmp/tarantool-test.fio.1", "/tmp/tarantool-test.fio.3")
-errno.strerror(errno())
-
-fio.rename("/tmp/tarantool-test.fio.3", "/tmp/tarantool-test.fio.4")
-fio.glob("/tmp/tarantool-test.fio.[1-4]")
-
-fio.unlink("/tmp/tarantool-test.fio.1")
-fio.unlink("/tmp/tarantool-test.fio.2")
-fio.unlink("/tmp/tarantool-test.fio.3")
-fio.unlink("/tmp/tarantool-test.fio.4")
-
-fio.stat("/tmp/tarantool-test.fio.1")
-
-fio.glob("/tmp/tarantool-test.fio.[12]")
+bit.band(fio.stat(file4).mode, 0x1FF) == 0x1FD
+fio.chmod(file4, 0x1F8) -- 0x770
+bit.band(fh3:stat().mode, 0x1FF) == 0x1F8
+bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
 
 
-fio
+fio.mkdir(fio.pathjoin(tmpdir, "dir"))
+
+-- cleanup directories
+
+{ fh1:close(), fh3:close() }
+{ fh1:close(), errno.strerror(), fh3:close(), errno.strerror() }
+
+fio.rmdir(fio.pathjoin(tmpdir, "dir"))
+
+{ fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
+{ fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
+fio.rmdir(tmpdir)
+{ fio.rmdir(tmpdir), errno.strerror() }
+
+fio.unlink()
+fio.unlink(nil)

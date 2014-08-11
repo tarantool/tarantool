@@ -1,33 +1,4 @@
-local ffi = require 'ffi'
-local log = require 'log'
-
 local fio = {}
-
-ffi.cdef[[
-    
-    typedef ssize_t off_t;
-
-    int open(const char *pathname, int flags, int mode);
-    int unlink(const char *pathname);
-    int close(int fd);
-
-    int fsync(int fd);
-    int fdatasync(int fd);
-    ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
-    int symlink(const char *target, const char *linkpath);
-    int link(const char *oldpath, const char *newpath);
-    int rename(const char *oldpath, const char *newpath);
-    off_t lseek(int fd, off_t offset, int whence);
-    
-    ssize_t read(int fd, void *buf, size_t count);
-    ssize_t write(int fd, const void *buf, size_t count);
-
-    int truncate(const char *path, off_t length);
-    int ftruncate(int fd, off_t length);
-]]
-
-local bsize = 4096
-local buffer = ffi.new('char[?]', bsize)
 
 local function sprintf(fmt, ...)
     if select('#', ...) == 0 then
@@ -40,29 +11,26 @@ local fio_methods = {}
 
 
 fio_methods.read = function(self, size)
-    local b = ffi.new('char[?]', size)
-    if b == nil then
-        return nil
+    if size == nil then
+        return ''
     end
-    local res = ffi.C.read(self.fh, b, size)
-    if res < 0 then
-        return nil
-    end
-    return ffi.string(b, res)
+
+    return fio.internal.read(self.fh, tonumber(size))
 end
 
 fio_methods.write = function(self, data)
     data = tostring(data)
-    local res = ffi.C.write(self.fh, data, #data)
---     local res = fio.internal.write(self.fh, data, #data)
+    local res = fio.internal.write(self.fh, data, #data)
     return res >= 0
 end
 
-fio_methods.pwrite = function(self, data, len, offset)
+fio_methods.pwrite = function(self, data, offset)
     data = tostring(data)
-    if len == nil then
-        len = #data
+    local len = #data
+    if len == 0 then
+        return true
     end
+
     if offset == nil then
         offset = 0
     else
@@ -86,11 +54,10 @@ end
 
 
 fio_methods.truncate = function(self, length)
-    local res = ffi.C.ftruncate(self.fh, length)
-    if res < 0 then
-        return nil
+    if length == nil then
+        length = 0
     end
-    return true
+    return fio.internal.ftruncate(self.fh, length)
 end
 
 fio_methods.seek = function(self, offset, whence)
@@ -106,7 +73,7 @@ fio_methods.seek = function(self, offset, whence)
         whence = tonumber(whence)
     end
 
-    local res = ffi.C.lseek(self.fh, tonumber(offset), whence)
+    local res = fio.internal.lseek(self.fh, tonumber(offset), whence)
 
     if res < 0 then
         return nil
@@ -115,34 +82,20 @@ fio_methods.seek = function(self, offset, whence)
 end
 
 fio_methods.close = function(self)
-    local res = ffi.C.close(self.fh)
-    if res < 0 then
-        return false
-    end
-    return true
+    return fio.internal.close(self.fh)
 end
 
 fio_methods.fsync = function(self)
-    local res = ffi.C.fsync(self.fh)
-
-    if res < 0 then
-        return false
-    end
-    return true
+    return fio.internal.fsync(self.fh)
 end
 
 fio_methods.fdatasync = function(self)
-    local res = ffi.C.fdatasync(self.fh)
-
-    if res < 0 then
-        return false
-    end
-    return true
+    return fio.internal.fdatasync(self.fh)
 end
 
 
 fio_methods.stat = function(self)
-    return fio.fstat(self.fh)
+    return fio.internal.fstat(self.fh)
 end
 
 
@@ -182,9 +135,6 @@ fio.open = function(path, flags, mode)
         end
     end
 
-    log.info("File: %s flag: %s, mode: %s", path, iflag, imode)
-
-    
     local fh = fio.internal.open(tostring(path), iflag, imode)
     if fh < 0 then
         return nil
@@ -195,53 +145,59 @@ fio.open = function(path, flags, mode)
     return fh
 end
 
-fio.readlink = function(path)
-    local res = ffi.C.readlink(tostring(path), buffer, bsize)
-    if res < 0 then
+fio.pathjoin = function(path, ...)
+    path = tostring(path)
+    if path == nil or path == '' then
+        error("Empty path part")
+    end
+    for i = 1, select('#', ...) do
+        if string.match(path, '/$') ~= nil then
+            path = string.gsub(path, '/$', '')
+        end
+
+        local sp = select(i, ...)
+        if sp == nil then
+            error("Undefined path part")
+        end
+        if sp == '' or sp == '/' then
+            error("Empty path part")
+        end
+        if string.match(sp, '^/') ~= nil then
+            sp = string.gsub(sp, '^/', '')
+        end
+        if sp ~= '' then
+            path = path .. '/' .. sp
+        end
+    end
+    if string.match(path, '/$') ~= nil and #path > 1 then
+        path = string.gsub(path, '/$', '')
+    end
+
+    return path
+end
+
+
+fio.basename = function(path, suffix)
+    if path == nil then
         return nil
     end
-    return ffi.string(buffer, res)
-end
 
-fio.symlink = function(path, linkpath)
-    local res = ffi.C.symlink(tostring(path), tostring(linkpath))
-    if res < 0 then
-        return false
+    path = tostring(path)
+    path = string.gsub(path, '.*/', '')
+
+    if suffix ~= nil then
+        suffix = tostring(suffix)
+        if #suffix > 0 then
+            suffix = string.gsub(suffix, '(.)', '[%1]')
+            path = string.gsub(path, suffix, '')
+        end
     end
-    return true
-end
 
-fio.link = function(path, newpath)
-    local res = ffi.C.link(tostring(path), tostring(linkpath))
-    if res < 0 then
-        return false
-    end
-    return true
-end
-
-fio.unlink = function(path)
-    local res = ffi.C.unlink(tostring(path))
-    if res == 0 then
-        return true
-    end
-    return false
-end
-
-fio.rename = function(path, newpath)
-    local res = ffi.C.rename(path, newpath)
-    if res < 0 then
-        return false
-    end
-    return true
+    return path
 end
 
 
-fio.truncate = function(path, length)
-    local res = ffi.C.truncate(tostring(path), tonumber(length))
-    if res < 0 then
-        return false
-    end
-    return true
-end
+
+
 
 return fio
