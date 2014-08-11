@@ -68,6 +68,7 @@ s:create_index('sophia_index', {})
 s:insert{10000, 'Hilton'}
 box.begin()
 s:delete{10000} -- exception
+box.rollback()
 s:select{10000}
 s:drop()
 

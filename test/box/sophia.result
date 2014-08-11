@@ -203,13 +203,15 @@ s:delete{10000} -- exception
 ---
 - error: sophia does not support transactions
 ...
+box.rollback()
+---
+...
 s:select{10000}
 ---
 - - [10000, 'Hilton']
 ...
 s:drop()
 ---
-- error: A multi-statement transaction can not use multiple storage engines
 ...
 os.execute("rm -rf sophia")
 ---
