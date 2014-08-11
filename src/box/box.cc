@@ -223,10 +223,14 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 		 */
 		return;
 	}
-
 	recovery_finalize(recovery);
-	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 
+	/*
+	 * notify engines about end of recovery.
+	*/
+	space_end_recover();
+
+	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
 	box_process = process_rw;
@@ -355,6 +359,15 @@ engine_init()
 	SophiaFactory *sophia = new SophiaFactory();
 	sophia->init();
 	engine_register(sophia);
+
+	/* Prepare storage and recover data.
+	 *
+	 * This is first phase of recover, schema is not known yet.
+	 * Internal sophia spaces (databases) are created in
+	 * recover-delay mode and not accessible yet.
+	 * Recover completes on first engine index creation.
+	*/
+	sophia->recover();
 }
 
 void
@@ -405,7 +418,6 @@ box_init()
 	}
 
 	space_end_recover_snapshot();
-	space_end_recover();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
@@ -457,6 +469,8 @@ static void
 snapshot_space(struct space *sp, void *udata)
 {
 	if (space_is_temporary(sp))
+		return;
+	if (space_is_sophia(sp))
 		return;
 	struct tuple *tuple;
 	struct log_io *l = (struct log_io *)udata;

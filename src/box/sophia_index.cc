@@ -35,9 +35,59 @@
 
 #include "schema.h"
 #include "space.h"
+#include "engine_sophia.h"
 
 #include <sophia.h>
 #include <stdio.h>
+
+static inline void
+sophia_delete(void *db, struct key_def *key_def, struct tuple *tuple)
+{
+	const char *key = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *keyptr = key;
+	mp_next(&keyptr);
+	size_t keysize = keyptr - key;
+	int rc = sp_delete(db, key, keysize);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+}
+
+static inline void
+sophia_set(void *db, struct key_def *key_def, struct tuple *tuple)
+{
+	const char *key = tuple_field(tuple, key_def->parts[0].fieldno);
+	const char *keyptr = key;
+	mp_next(&keyptr);
+	size_t keysize = keyptr - key;
+	int rc = sp_set(db, key, keysize, tuple->data, tuple->bsize);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+}
+
+struct tuple *
+sophia_replace(struct space *space,
+               struct tuple *old_tuple, struct tuple *new_tuple,
+               enum dup_replace_mode mode)
+{
+	Index *index = index_find(space, 0);
+	return index->replace(old_tuple, new_tuple, mode);
+}
+
+
+struct tuple*
+sophia_replace_recover(struct space *space,
+                       struct tuple *old_tuple, struct tuple *new_tuple,
+                       enum dup_replace_mode)
+{
+	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
+	assert(index != NULL);
+	if (old_tuple) {
+		sophia_delete(index->db, index->key_def, old_tuple);
+		return NULL;
+	}
+	sophia_set(index->db, index->key_def, new_tuple);
+	return NULL;
+}
 
 static inline int
 sophia_index_compare(char *a, size_t asz __attribute__((unused)),
@@ -52,7 +102,8 @@ sophia_index_compare(char *a, size_t asz __attribute__((unused)),
 }
 
 static struct tuple *
-sophia_gettuple(void *db, const char *key, size_t keysize)
+sophia_gettuple(void *db, const char *key, size_t keysize,
+                struct tuple_format *format)
 {
 	size_t valuesize = 0;
 	char *value = NULL;
@@ -63,7 +114,7 @@ sophia_gettuple(void *db, const char *key, size_t keysize)
 		return NULL;
 	auto scoped_guard = make_scoped_guard([=] { free(value); });
 	struct tuple *ret =
-		tuple_new(tuple_format_ber, value, value + valuesize);
+		tuple_new(format, value, value + valuesize);
 	tuple_ref(ret, 1);
 	return ret;
 }
@@ -73,33 +124,21 @@ sophia_gettuple(void *db, const char *key, size_t keysize)
 SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	: Index(key_def_arg)
 {
-	env = sp_env();
-	if (env == NULL)
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(void*),
-			  "SophiaIndex", "env");
+	struct space *space = space_cache_find(key_def->space_id);
+	SophiaFactory *factory =
+		(SophiaFactory*)space->engine->factory;
+	env = factory->env;
 
-	auto env_freer =
-		make_scoped_guard([=] { sp_destroy(env); });
-
-	int rc = sp_ctl(env, SPCMP, sophia_index_compare, key_def);
-	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	char path[PATH_MAX];
-	snprintf(path, sizeof(path), "sophia/%04d", key_def->space_id);
-	rc = sp_ctl(env, SPDIR, SPO_RDWR|SPO_CREAT, path);
-	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	say_info("start sophia space '%s' recover", path);
-
-	db = sp_open(env);
+	db = sp_database(env);
 	if (db == NULL)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
-	say_info("recover complete");
-
-	env_freer.is_active = false;
+	void *c = sp_ctl(db, "conf");
+	sp_set(c, "db.cmp", sophia_index_compare, key_def);
+	sp_set(c, "db.id", space->def.id);
+	int rc = sp_open(db);
+	if (rc == -1)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
+	tuple_format_ref(space->format, 1);
 }
 
 SophiaIndex::~SophiaIndex()
@@ -108,15 +147,11 @@ SophiaIndex::~SophiaIndex()
 		m_position->free(m_position);
 		m_position = NULL;
 	}
-
 	if (db) {
 		int rc = sp_destroy(db);
 		if (rc == -1)
 			say_info("sophia space %d close error: %s", key_def->space_id,
 			         sp_error(env));
-	}
-	if (env) {
-		sp_destroy(env);
 	}
 }
 
@@ -146,7 +181,8 @@ SophiaIndex::findByKey(const char *key, uint32_t part_count) const
 	const char *keyptr = key;
 	mp_next(&keyptr);
 	size_t keysize = keyptr - key;
-	struct tuple *ret = sophia_gettuple(db, key, keysize);
+	struct space *space = space_cache_find(key_def->space_id);
+	struct tuple *ret = sophia_gettuple(db, key, keysize, space->format);
 	return ret;
 }
 
@@ -186,14 +222,14 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		   enum dup_replace_mode mode)
 {
 	if (new_tuple) {
-		assert(new_tuple->refs == 0);
-
 		const char *key = tuple_field(new_tuple, key_def->parts[0].fieldno);
 		const char *keyptr = key;
 		mp_next(&keyptr);
 		size_t keysize = keyptr - key;
 
-		struct tuple *dup_tuple = sophia_gettuple(db, key, keysize);
+		struct space *space = space_cache_find(key_def->space_id);
+		struct tuple *dup_tuple =
+			sophia_gettuple(db, key, keysize, space->format);
 
 		uint32_t errcode =
 			sophia_check_dup(key_def, old_tuple, dup_tuple, mode);
@@ -214,16 +250,8 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			return dup_tuple;
 	}
 
-	if (old_tuple) {
-		/* delete */
-		const char *key = tuple_field(old_tuple, key_def->parts[0].fieldno);
-		const char *keyptr = key;
-		mp_next(&keyptr);
-		size_t keysize = keyptr - key;
-		int rc = sp_delete(db, key, keysize);
-		if (rc == -1)
-			tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
-	}
+	if (old_tuple)
+		sophia_delete(db, key_def, old_tuple);
 
 	return old_tuple;
 }
@@ -233,6 +261,7 @@ struct sophia_iterator {
 	const char *key;
 	int keysize;
 	uint32_t part_count;
+	struct space *space;
 	void *db;
 	void *cursor;
 };
@@ -268,9 +297,9 @@ sophia_iterator_next(struct iterator *ptr)
 	if (rc == 0)
 		return NULL;
 	size_t valuesize = sp_valuesize(it->cursor);
-	const char *value = sp_value(it->cursor);
+	const char *value = (const char*)sp_value(it->cursor);
 	struct tuple *ret =
-		tuple_new(tuple_format_ber, value, value + valuesize);
+		tuple_new(it->space->format, value, value + valuesize);
 	tuple_ref(ret, 1);
 	return ret;
 }
@@ -287,7 +316,8 @@ sophia_iterator_eq(struct iterator *ptr)
 	ptr->next = sophia_iterator_last;
 	struct sophia_iterator *it = (struct sophia_iterator *) ptr;
 	assert(it->cursor == NULL);
-	return sophia_gettuple(it->db, it->key, it->keysize);
+	return sophia_gettuple(it->db, it->key, it->keysize,
+	                       it->space->format);
 }
 
 struct iterator *
@@ -329,19 +359,19 @@ SophiaIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	it->keysize = keysize;
 	it->part_count = part_count;
 	it->db = db;
-
-	sporder compare;
+	it->space  = space_cache_find(key_def->space_id);
+	const char *compare;
 	switch (type) {
 	case ITER_EQ: it->base.next = sophia_iterator_eq;
 		return;
 	case ITER_ALL:
-	case ITER_GE: compare = SPGTE;
+	case ITER_GE: compare = ">=";
 		break;
-	case ITER_GT: compare = SPGT;
+	case ITER_GT: compare = ">";
 		break;
-	case ITER_LE: compare = SPLTE;
+	case ITER_LE: compare = "<=";
 		break;
-	case ITER_LT: compare = SPLT;
+	case ITER_LT: compare = "<";
 		break;
 	default:
 		tnt_raise(ClientError, ER_UNSUPPORTED,

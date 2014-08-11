@@ -13,9 +13,10 @@
 [submodule "src/lib/msgpuck"]
 	path = src/lib/msgpuck
 	url = https://github.com/tarantool/msgpuck.git
-[submodule "third_party/sophia"]
-	path = third_party/sophia
-	url = git://github.com/tarantool/sophia.git
 [submodule "third_party/luafun"]
 	path = third_party/luafun
 	url = https://github.com/rtsisyk/luafun.git
+[submodule "sophia"]
+	path = third_party/sophia
+	url = https://github.com/pmwkaa/sophia.git
+	branch = dev

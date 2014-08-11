@@ -99,6 +99,8 @@ public:
 	virtual ~EngineFactory() {}
 	/** Called once at startup. */
 	virtual void init();
+	/** Recover engine, called once at startup. */
+	virtual void recover();
 	/** Called at server shutdown. */
 	virtual void shutdown();
 	/** Create a new engine instance for a space. */
