@@ -386,20 +386,20 @@ lua sc:send("\nnew line")
 ---
  - true
 ...
-lua sa:readline({'\n'}, 1)
+lua sa:read('\n', 1)
 ---
  - Hello, world
 
 ...
-lua sa:readline(1, {'ine'}, 1)
+lua sa:read({chunk = 1, line = 'ine'}, 1)
 ---
  - n
 ...
-lua sa:readline({'ine'}, 1)
+lua sa:read('ine', 1)
 ---
  - ew line
 ...
-lua sa:readline({'ine'}, 0.1)
+lua sa:read('ine', 0.1)
 ---
  - nil
 ...
@@ -407,7 +407,7 @@ lua sc:send('Hello, world')
 ---
  - true
 ...
-lua sa:readline({','}, 1)
+lua sa:read(',', 1)
 ---
  - Hello,
 ...
@@ -715,7 +715,7 @@ lua s:write('HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n')
 ---
  - true
 ...
-lua header = s:readline(4000, { '\n\n', '\r\n\r\n' }, 1)
+lua header = s:read({chunk = 4000, line = { '\n\n', '\r\n\r\n' }}, 1)
 ---
 ...
 lua string.match(header, '\r\n\r\n$') ~= nil
@@ -854,4 +854,146 @@ lua ch:get(1)
 lua s:error()
 ---
  - Connection timed out
+...
+lua path = '/tmp/tarantool-test-socket'
+---
+...
+lua s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:bind('unix/', path)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:listen(128)
+---
+ - true
+...
+lua f = box.fiber.wrap(function() for i=1,2 do s:readable() local sc = s:accept(); sc:write('ok!'); sc:shutdown(); sc:close() end end)
+---
+...
+lua c = box.socket.tcp_connect('unix/', path)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x = c:read('!')
+---
+...
+lua x, type(x), #x
+---
+ - ok!
+ - string
+ - 3
+...
+lua x = c:read('!')
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:read('!')
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua c:close()
+---
+ - true
+...
+lua c = box.socket.tcp_connect('unix/', path)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x = c:read(3)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - ok!
+ - string
+ - 3
+...
+lua x = c:read(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:read(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:sysread(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua c:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
 ...

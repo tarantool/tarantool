@@ -500,17 +500,9 @@ socket_methods.accept = function(self)
     return socket
 end
 
-socket_methods.read = function(self, size, timeout)
-    if timeout == nil then
-        timeout = TIMEOUT_INFINITY
-    end
-
+local function readchunk(self, size, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
-    end
-
-    if size == nil then
-        size = 4294967295
     end
 
     if string.len(self.rbuf) >= size then
@@ -574,32 +566,9 @@ local function readline_check(self, eols, limit)
     return nil
 end
 
-socket_methods.readline = function(self, limit, eol, timeout)
-    if type(limit) == 'table' then -- :readline({eol}[, timeout ])
-        if eol ~= nil then
-            timeout = eol
-            eol = limit
-            limit = nil
-        else
-            eol = limit
-            limit = nil
-        end
-    elseif eol ~= nil then
-        if type(eol) ~= 'table' then
-            eol = { eol }
-        end
-    end
-
-    if timeout == nil then
-        timeout = TIMEOUT_INFINITY
-    end
-
+local function readline(self, limit, eol, timeout)
     if self.rbuf == nil then
         self.rbuf = ''
-    end
-
-    if limit == nil then
-        limit = 4294967295
     end
 
     self._errno = nil
@@ -649,6 +618,26 @@ socket_methods.readline = function(self, limit, eol, timeout)
             return nil
         end
     end
+end
+
+socket_methods.read = function(self, opts, timeout)
+    timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
+    if type(opts) == 'number' then
+        return readchunk(self, opts, timeout)
+    elseif type(opts) == 'string' then
+        return readline(self, 4294967295, { opts }, timeout)
+    elseif type(opts) == 'table' then
+        local chunk = opts.chunk or opts.size or 4294967295
+        local delimiter = opts.delimiter or opts.line
+        if delimiter == nil then
+            return readchunk(self, chunk, timeout)
+        elseif type(delimiter) == 'string' then
+            return readline(self, chunk, { delimiter }, timeout)
+        elseif type(delimiter) == 'table' then
+            return readline(self, chunk, delimiter, timeout)
+        end
+    end
+    error('Usage: s:read(delimiter|chunk|{delimiter = x, chunk = x}, timeout)')
 end
 
 socket_methods.write = function(self, octets, timeout)
