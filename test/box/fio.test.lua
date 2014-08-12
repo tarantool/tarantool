@@ -2,14 +2,12 @@ fio = require 'fio'
 errno = require 'errno'
 
 -- pathjoin
-
 fio.pathjoin('abc', 'cde')
 fio.pathjoin('/', 'abc')
 fio.pathjoin('abc/', '/cde')
 fio.pathjoin('/', '/cde')
 
 -- basename
-
 fio.basename('/')
 fio.basename('abc')
 fio.basename('abc.cde', '.cde')
@@ -19,7 +17,6 @@ fio.basename('/path/to/file.cde', '.cde')
 
 
 -- other tests
-
 tmpdir = fio.tempdir()
 
 file1 = fio.pathjoin(tmpdir, 'file.1')
@@ -83,7 +80,6 @@ bit.band(fio.stat(file4).mode, 0x1FF) == 0x1F8
 fio.mkdir(fio.pathjoin(tmpdir, "dir"))
 
 -- cleanup directories
-
 { fh1:close(), fh3:close() }
 { fh1:close(), errno.strerror(), fh3:close(), errno.strerror() }
 

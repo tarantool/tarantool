@@ -1,3 +1,31 @@
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
@@ -18,8 +46,6 @@ extern "C" {
 #include "lua/utils.h"
 
 #include <disk_fiber_io.h>
-
-
 
 static int
 fio_eio_open(struct lua_State *L)
@@ -81,7 +107,6 @@ fio_eio_pread(struct lua_State *L)
 	lua_remove(L, -2);
 	return 1;
 }
-
 
 static int
 fio_eio_rename(struct lua_State *L)
@@ -231,7 +256,6 @@ fio_eio_read(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 fio_eio_lseek(struct lua_State *L)
 {
@@ -252,64 +276,30 @@ lua_pushtimespec(struct lua_State *L, const struct timespec *ts)
 	return 1;
 }
 
+#define PUSHTABLE(name, method, value)	{	\
+	lua_pushliteral(L, name);		\
+	method(L, value);			\
+	lua_settable(L, -3);			\
+}
+
 static int
 lua_pushstat(struct lua_State *L, const struct stat *stat)
 {
 	lua_newtable(L);
 
-	lua_pushliteral(L, "dev");
-	lua_pushinteger(L, stat->st_dev);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "inode");
-	lua_pushinteger(L, stat->st_ino);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "mode");
-	lua_pushinteger(L, stat->st_mode);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "nlink");
-	lua_pushinteger(L, stat->st_nlink);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "uid");
-	lua_pushinteger(L, stat->st_uid);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "gid");
-	lua_pushinteger(L, stat->st_gid);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "rdev");
-	lua_pushinteger(L, stat->st_rdev);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "size");
-	lua_pushinteger(L, stat->st_size);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "blksize");
-	lua_pushinteger(L, stat->st_blksize);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "blocks");
-	lua_pushinteger(L, stat->st_blocks);
-	lua_settable(L, -3);
-
-
-	lua_pushliteral(L, "ctime");
-	lua_pushtimespec(L, &stat->st_ctim);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "mtime");
-	lua_pushtimespec(L, &stat->st_mtim);
-	lua_settable(L, -3);
-
-	lua_pushliteral(L, "atime");
-	lua_pushtimespec(L, &stat->st_atim);
-	lua_settable(L, -3);
-
+	PUSHTABLE("dev", lua_pushinteger, stat->st_dev);
+	PUSHTABLE("inode", lua_pushinteger, stat->st_ino);
+	PUSHTABLE("mode", lua_pushinteger, stat->st_mode);
+	PUSHTABLE("nlink", lua_pushinteger, stat->st_nlink);
+	PUSHTABLE("uid", lua_pushinteger, stat->st_uid);
+	PUSHTABLE("gid", lua_pushinteger, stat->st_gid);
+	PUSHTABLE("rdev", lua_pushinteger, stat->st_rdev);
+	PUSHTABLE("size", lua_pushinteger, stat->st_size);
+	PUSHTABLE("blksize", lua_pushinteger, stat->st_blksize);
+	PUSHTABLE("blocks", lua_pushinteger, stat->st_blocks);
+	PUSHTABLE("ctime", lua_pushtimespec, &stat->st_ctim);
+	PUSHTABLE("mtime", lua_pushtimespec, &stat->st_mtim);
+	PUSHTABLE("atime", lua_pushtimespec, &stat->st_atim);
 	return 1;
 }
 
@@ -463,7 +453,6 @@ fio_eio_readlink(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 fio_eio_tempdir(struct lua_State *L)
 {
@@ -474,7 +463,6 @@ fio_eio_tempdir(struct lua_State *L)
 		lua_pushnil(L);
 	return 1;
 }
-
 
 static int
 fio_eio_fsync(struct lua_State *L)
@@ -499,7 +487,6 @@ fio_eio_sync(struct lua_State *L)
 	return 1;
 }
 
-
 static int
 fio_eio_close(struct lua_State *L)
 {
@@ -507,16 +494,6 @@ fio_eio_close(struct lua_State *L)
 	lua_pushboolean(L, dfio_close(fd) == 0);
 	return 1;
 }
-
-#define ADD_CONST(c)	{			\
-		lua_pushliteral(L, # c);	\
-		lua_pushinteger(L, c);		\
-		lua_settable(L, -3);		\
-	}
-
-
-
-
 
 void
 fio_lua_init(struct lua_State *L)
@@ -575,88 +552,88 @@ fio_lua_init(struct lua_State *L)
 	lua_pushliteral(L, "flag");
 	lua_newtable(L);
 	#ifdef O_APPEND
-		ADD_CONST(O_APPEND)
+		PUSHTABLE("O_APPEND", lua_pushinteger, O_APPEND);
 	#endif
 	#ifdef O_ASYNC
-		ADD_CONST(O_ASYNC)
+		PUSHTABLE("O_ASYNC", lua_pushinteger, O_ASYNC);
 	#endif
 	#ifdef O_CLOEXEC
-		ADD_CONST(O_CLOEXEC)
+		PUSHTABLE("O_CLOEXEC", lua_pushinteger, O_CLOEXEC);
 	#endif
 	#ifdef O_CREAT
-		ADD_CONST(O_CREAT)
+		PUSHTABLE("O_CREAT", lua_pushinteger, O_CREAT);
 	#endif
 	#ifdef O_DIRECT
-		ADD_CONST(O_DIRECT)
+		PUSHTABLE("O_DIRECT", lua_pushinteger, O_DIRECT);
 	#endif
 	#ifdef O_DIRECTORY
-		ADD_CONST(O_DIRECTORY)
+		PUSHTABLE("O_DIRECTORY", lua_pushinteger, O_DIRECTORY);
 	#endif
 	#ifdef O_EXCL
-		ADD_CONST(O_EXCL)
+		PUSHTABLE("O_EXCL", lua_pushinteger, O_EXCL);
 	#endif
 	#ifdef O_LARGEFILE
-		ADD_CONST(O_LARGEFILE)
+		PUSHTABLE("O_LARGEFILE", lua_pushinteger, O_LARGEFILE);
 	#endif
 	#ifdef O_NOATIME
-		ADD_CONST(O_NOATIME)
+		PUSHTABLE("O_NOATIME", lua_pushinteger, O_NOATIME);
 	#endif
 	#ifdef O_NOCTTY
-		ADD_CONST(O_NOCTTY)
+		PUSHTABLE("O_NOCTTY", lua_pushinteger, O_NOCTTY);
 	#endif
 	#ifdef O_NOFOLLOW
-		ADD_CONST(O_NOFOLLOW)
+		PUSHTABLE("O_NOFOLLOW", lua_pushinteger, O_NOFOLLOW);
 	#endif
 	#ifdef O_NONBLOCK
-		ADD_CONST(O_NONBLOCK)
+		PUSHTABLE("O_NONBLOCK", lua_pushinteger, O_NONBLOCK);
 	#endif
 	#ifdef O_NDELAY
-		ADD_CONST(O_NDELAY)
+		PUSHTABLE("O_NDELAY", lua_pushinteger, O_NDELAY);
 	#endif
 	#ifdef O_PATH
-		ADD_CONST(O_PATH)
+		PUSHTABLE("O_PATH", lua_pushinteger, O_PATH);
 	#endif
 	#ifdef O_SYNC
-		ADD_CONST(O_SYNC)
+		PUSHTABLE("O_SYNC", lua_pushinteger, O_SYNC);
 	#endif
 	#ifdef O_TMPFILE
-		ADD_CONST(O_TMPFILE)
+		PUSHTABLE("O_TMPFILE", lua_pushinteger, O_TMPFILE);
 	#endif
 	#ifdef O_TRUNC
-		ADD_CONST(O_TRUNC)
+		PUSHTABLE("O_TRUNC", lua_pushinteger, O_TRUNC);
 	#endif
-	ADD_CONST(O_RDONLY);
-	ADD_CONST(O_WRONLY);
-	ADD_CONST(O_RDWR);
+	PUSHTABLE("O_RDONLY", lua_pushinteger, O_RDONLY);
+	PUSHTABLE("O_WRONLY", lua_pushinteger, O_WRONLY);
+	PUSHTABLE("O_RDWR", lua_pushinteger, O_RDWR);
 	lua_settable(L, -3);
 
 	lua_pushliteral(L, "mode");
 	lua_newtable(L);
-	ADD_CONST(S_IRWXU);
-	ADD_CONST(S_IRUSR);
-	ADD_CONST(S_IWUSR);
-	ADD_CONST(S_IXUSR);
-	ADD_CONST(S_IRWXG);
-	ADD_CONST(S_IRGRP);
-	ADD_CONST(S_IWGRP);
-	ADD_CONST(S_IXGRP);
-	ADD_CONST(S_IRWXO);
-	ADD_CONST(S_IROTH);
-	ADD_CONST(S_IWOTH);
-	ADD_CONST(S_IXOTH);
+	PUSHTABLE("S_IRWXU", lua_pushinteger, S_IRWXU);
+	PUSHTABLE("S_IRUSR", lua_pushinteger, S_IRUSR);
+	PUSHTABLE("S_IWUSR", lua_pushinteger, S_IWUSR);
+	PUSHTABLE("S_IXUSR", lua_pushinteger, S_IXUSR);
+	PUSHTABLE("S_IRWXG", lua_pushinteger, S_IRWXG);
+	PUSHTABLE("S_IRGRP", lua_pushinteger, S_IRGRP);
+	PUSHTABLE("S_IWGRP", lua_pushinteger, S_IWGRP);
+	PUSHTABLE("S_IXGRP", lua_pushinteger, S_IXGRP);
+	PUSHTABLE("S_IRWXO", lua_pushinteger, S_IRWXO);
+	PUSHTABLE("S_IROTH", lua_pushinteger, S_IROTH);
+	PUSHTABLE("S_IWOTH", lua_pushinteger, S_IWOTH);
+	PUSHTABLE("S_IXOTH", lua_pushinteger, S_IXOTH);
 	lua_settable(L, -3);
 
 
 	lua_pushliteral(L, "seek");
 	lua_newtable(L);
-	ADD_CONST(SEEK_SET);
-	ADD_CONST(SEEK_CUR);
-	ADD_CONST(SEEK_END);
+	PUSHTABLE("SEEK_SET", lua_pushinteger, SEEK_SET);
+	PUSHTABLE("SEEK_CUR", lua_pushinteger, SEEK_CUR);
+	PUSHTABLE("SEEK_END", lua_pushinteger, SEEK_END);
 	#ifdef SEEK_DATA
-		ADD_CONST(SEEK_DATA);
+		PUSHTABLE("SEEK_DATA", lua_pushinteger, SEEK_DATA);
 	#endif
 	#ifdef SEEK_HOLE
-		ADD_CONST(SEEK_HOLE);
+		PUSHTABLE("SEEK_HOLE", lua_pushinteger, SEEK_HOLE);
 	#endif
 	lua_settable(L, -3);
 

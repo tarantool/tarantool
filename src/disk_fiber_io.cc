@@ -121,7 +121,6 @@ dfio_wait_done(eio_req *req, struct fiber_eio *eio)
 		fiber_yield();
 
 	errno = eio->errorno;
-
 	return eio->result;
 }
 

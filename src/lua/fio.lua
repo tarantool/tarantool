@@ -1,3 +1,5 @@
+-- fio.lua (internal file)
+
 local fio = {}
 
 local function sprintf(fmt, ...)
