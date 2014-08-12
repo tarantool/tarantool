@@ -85,7 +85,6 @@ struct fiber_eio {
 
 		struct {
 			char *tpl;
-			char *res;
 		} tempdir;
 	};
 };
@@ -409,23 +408,25 @@ dfio_do_tempdir(eio_req *req)
 		req->result = -1;
 	} else {
 		req->result = 0;
-		eio->tempdir.res = res;
 	}
 }
 
-const char *
-dfio_tempdir()
+
+int
+dfio_tempdir(char *path, size_t path_len)
 {
-	static __thread char path[PATH_MAX];
 	INIT_EIO(eio);
 
-	snprintf(path, PATH_MAX, "/tmp/XXXXXX");
+	if (path_len < sizeof("/tmp/XXXXXX") + 1) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	snprintf(path, path_len, "/tmp/XXXXXX");
 
 	eio.tempdir.tpl = path;
 	eio_req *req = eio_custom(dfio_do_tempdir, 0, dfio_complete, &eio);
-	if (dfio_wait_done(req, &eio) == 0)
-		return eio.tempdir.res;
-	return NULL;
+	return dfio_wait_done(req, &eio);
 }
 
 int

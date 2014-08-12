@@ -111,10 +111,13 @@ fio_eio_pread(struct lua_State *L)
 static int
 fio_eio_rename(struct lua_State *L)
 {
-	if (lua_gettop(L) < 2)
+	const char *oldpath, *newpath;
+	int top = lua_gettop(L);
+	if (top < 2 || !(oldpath = lua_tostring(L, 1)) ||
+					!(newpath = lua_tostring(L, 2))) {
 		luaL_error(L, "Usage: fio.rename(oldpath, newpath)");
-	const char *oldpath = lua_tostring(L, 1);
-	const char *newpath = lua_tostring(L, 2);
+		return 0;
+	}
 	int res = dfio_rename(oldpath, newpath);
 	lua_pushboolean(L, res == 0);
 	return 1;
@@ -353,11 +356,13 @@ fio_eio_fstat(struct lua_State *L)
 static int
 fio_eio_mkdir(struct lua_State *L)
 {
+	const char *pathname;
 	int top = lua_gettop(L);
-	if (top < 1)
-		luaL_error(L, "usage fio.mkdir(pathname[, mode])");
 
-	const char *pathname = lua_tostring(L, 1);
+	if (top < 1 || !(pathname = lua_tostring(L, 1))) {
+		luaL_error(L, "Usage fio.mkdir(pathname[, mode])");
+		return 0;
+	}
 
 	mode_t mode;
 
@@ -372,10 +377,12 @@ fio_eio_mkdir(struct lua_State *L)
 static int
 fio_eio_rmdir(struct lua_State *L)
 {
-	if (lua_gettop(L) < 1)
-		luaL_error(L, "usage: fio.rmdir(pathname)");
+	const char *pathname;
+	if (lua_gettop(L) < 1 || !(pathname = lua_tostring(L, 1))) {
+		luaL_error(L, "Usage: fio.rmdir(pathname)");
+		return 0;
+	}
 
-	const char *pathname = lua_tostring(L, 1);
 	lua_pushboolean(L, dfio_rmdir(pathname) == 0);
 	return 1;
 }
@@ -442,25 +449,36 @@ fio_eio_readlink(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "Usage: fio.readlink(pathname)");
-	static __thread char path[PATH_MAX];
+
+	char *path = (char *)lua_newuserdata(L, PATH_MAX);
 	const char *pathname = lua_tostring(L, 1);
-	int res = dfio_readlink(pathname, path, sizeof(path));
+	int res = dfio_readlink(pathname, path, PATH_MAX);
 	if (res < 0) {
 		lua_pushnil(L);
 		return 1;
 	}
 	lua_pushlstring(L, path, res);
+	lua_remove(L, -2);
 	return 1;
 }
 
 static int
 fio_eio_tempdir(struct lua_State *L)
 {
-	const char *path = dfio_tempdir();
-	if (path)
-		lua_pushstring(L, path);
-	else
+	char *buf = (char *)lua_newuserdata(L, PATH_MAX);
+	if (!buf) {
+		errno = ENOMEM;
 		lua_pushnil(L);
+		return 1;
+	}
+
+
+	if (dfio_tempdir(buf, PATH_MAX) == 0) {
+		lua_pushstring(L, buf);
+		lua_remove(L, -2);
+	} else {
+		lua_pushnil(L);
+	}
 	return 1;
 }
 

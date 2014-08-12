@@ -65,6 +65,6 @@ int     dfio_fsync(int fd);
 int     dfio_fdatasync(int fd);
 
 
-const char *dfio_tempdir();
+int	dfio_tempdir(char *path, size_t path_len);
 
 #endif /* INCLUDES_TARANTOOL_LUA_DISK_FIBER_IO_H */
