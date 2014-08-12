@@ -259,7 +259,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
             <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
             There are actually two storage engines for Tarantool: memtx (the in-memory storage engine)
             and Sophia (the on-disk storage engine). To specify that the engine should be Sophia,
-            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtxt because it is
+            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtx because it is
             the default and has been around longer. But Sophia is a working key-value engine and will especially
             appeal to users who like to see data go directly to disk, so that recovery time might be
             shorter and database size might be larger. On the other hand, with Sophia the maximum
@@ -1765,7 +1765,7 @@ console.delimiter('')!
               For example the NO_SUCH_USER message is "User '%s' is not found" -- it includes one
               "%s" component which will be replaced with <code>errtext-string</code>. Thus a call to
               <code>box.error(box.error.NO_SUCH_USER, 'joe')</code> or
-              <code>box.error(45, 'joe')</code> will result in an error with the accomplanying
+              <code>box.error(45, 'joe')</code> will result in an error with the accompanying
               message "User 'joe' is not found".
             </para>
             <para>
@@ -3339,7 +3339,7 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/sr
 </variablelist>
 </section>
 
-<section xml:id="authentication">
+<section xml:id="authentication" xreflabel="authentication">
 <title>Authentication and access control</title>
 
 <para>

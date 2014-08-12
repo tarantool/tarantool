@@ -713,7 +713,7 @@ inserted and selected tuples.
     for example, replace
     <computeroutput>SELECT * FROM t0 WHERE k0 = 2</computeroutput>
     with
-    <computeroutput>box.space.t0:selec(2)</computeroutput>.
+    <computeroutput>box.space.t0:select(2)</computeroutput>.
   </para>
 
 </section>

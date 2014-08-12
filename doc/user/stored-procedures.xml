@@ -565,7 +565,7 @@ Password is not valid
         </term>
         <listitem>
             <para>
-                Parameters: byte-order can be 'l' (little-endian), 'b' (big-endian), 'h' (endianness depends on host) (default), or 'n' (endiannes depends on network).
+                Parameters: byte-order can be 'l' (little-endian), 'b' (big-endian), 'h' (endianness depends on host) (default), or 'n' (endianness depends on network).
             </para>         
             <para>
                 Returns: UUID with type = 16-byte binary string converted from cdata input value.
@@ -1199,7 +1199,7 @@ tarantool&gt; <userinput> fiber.time(), fiber.time()</userinput>
               Returns: current system time (in microseconds since the epoch) as a 64-bit
               integer. The time is taken from the event loop clock.
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>arantool&gt; <userinput>fiber = require('fiber')</userinput>
+<programlisting>tarantool&gt; <userinput>fiber = require('fiber')</userinput>
 ---
 ...
 tarantool&gt; <userinput>fiber.time(), fiber.time64()</userinput>
@@ -1596,7 +1596,7 @@ end
     See <olink targetptr="sp-box-session-triggers">the section "Triggers on connect and disconnect"</olink>
     for instructions about defining triggers for connect and disconnect events
     with <code>box.session.on_connect()</code> and <code>box.session.on_disconnect()</code>.
-    See <olink targetptr="authentication">the section "Authentication and access control"</olink>
+    See <link linkend="authentication">the section "Authentication and access control"</link>
     for instructions about <code>box.session</code> functions that affect user identification and security.
     </para>
 </section>
