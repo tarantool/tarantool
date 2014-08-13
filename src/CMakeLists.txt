@@ -76,7 +76,7 @@ set (common_sources
      tt_uuid.c
      ffisyms.cc
      uri.cc
-     disk_fiber_io.cc
+     coeio_file.cc
      lua/digest.cc
      lua/init.cc
      lua/fiber.cc
