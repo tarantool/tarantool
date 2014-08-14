@@ -420,19 +420,19 @@ sc:send("\\nnew line")
 ---
 - true
 ...
-sa:readline({'\\n'}, 1)
+sa:read('\\n', 1)
 ---
 - Hello, world\n
 ...
-sa:readline(1, {'ine'}, 1)
+sa:read({ chunk = 1, delimiter = 'ine'}, 1)
 ---
 - n
 ...
-sa:readline({'ine'}, 1)
+sa:read('ine', 1)
 ---
 - ew line
 ...
-sa:readline({'ine'}, 0.1)
+sa:read('ine', 0.1)
 ---
 - null
 ...
@@ -440,7 +440,7 @@ sc:send('Hello, world')
 ---
 - true
 ...
-sa:readline({','}, 1)
+sa:read(',', 1)
 ---
 - Hello,
 ...
@@ -790,7 +790,7 @@ s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
 ---
 - true
 ...
-header = s:readline(4000, { "\n\n", "\r\n\r\n" }, 1)
+header = s:read({chunk = 4000, delimiter = {"\n\n", "\r\n\r\n" }}, 1)
 ---
 ...
 string.match(header, "\r\n\r\n$") ~= nil
@@ -1021,4 +1021,160 @@ master:close()
 ...
 f = nil
 ---
+...
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:error()
+---
+- null
+...
+s:listen(128)
+---
+- true
+...
+--# setopt delimiter ';'
+f = fiber.create(function()
+    for i=1,2 do
+        s:readable()
+        local sc = s:accept()
+        sc:write('ok!')
+        sc:shutdown()
+        sc:close()
+    end
+end);
+---
+...
+--# setopt delimiter ''
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read('!')
+---
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read('!')
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+c = socket.tcp_connect('unix/', path)
+---
+...
+c:error()
+---
+- null
+...
+x = c:read(3)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- ok!
+- string
+- 3
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:read(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+x = c:sysread(1)
+---
+...
+c:error()
+---
+- null
+...
+x, type(x), #x
+---
+- 
+- string
+- 0
+...
+c:close()
+---
+- true
+...
+s:close()
+---
+- true
+...
+os.remove(path)
+---
+- true
 ...

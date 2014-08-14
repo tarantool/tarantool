@@ -294,6 +294,6 @@ function test()
 end;
 --# setopt delimiter ''
 f = fiber.create(test)
-while f:status() ~= 'dead' do fiber.sleep(0.01) end
 done
+
 fiber = nil

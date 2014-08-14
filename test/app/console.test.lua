@@ -17,7 +17,7 @@ box.cfg{
 }
 
 --
-local EOL = {"\n%.%.%.\n"}
+local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
@@ -31,11 +31,11 @@ test:ok(client ~= nil, "connect to console")
 
 -- Execute some command
 client:write("1\n")
-test:is(yaml.decode(client:readline(EOL))[1], 1, "eval")
+test:is(yaml.decode(client:read(EOL))[1], 1, "eval")
 
 -- Check internal state of `console` module
 client:write("require('fiber').id()\n")
-local fid1 = yaml.decode(client:readline(EOL))[1]
+local fid1 = yaml.decode(client:read(EOL))[1]
 local state = fiber.find(fid1).storage.console
 local server_info = state.client:peer()
 local client_info = state.client:name()
@@ -46,23 +46,23 @@ client_info = nil
 
 -- Check console.delimiter()
 client:write("require('console').delimiter(';')\n")
-test:is(yaml.decode(client:readline(EOL)), '', "set delimiter to ';'")
+test:is(yaml.decode(client:read(EOL)), '', "set delimiter to ';'")
 test:is(state.delimiter, ';', "state.delimiter is ';'")
 client:write("require('console').delimiter();\n")
-test:is(yaml.decode(client:readline(EOL))[1], ';', "get delimiter is ';'")
+test:is(yaml.decode(client:read(EOL))[1], ';', "get delimiter is ';'")
 client:write("require('console').delimiter('');\n")
-test:is(yaml.decode(client:readline(EOL)), '', "clear delimiter")
+test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
 
 -- Connect to iproto console (CALL)
 client:write(string.format("require('console').connect('unix/', '/')\n"))
 -- error: Connection is not established
-test:ok(yaml.decode(client:readline(EOL))[1].error:find('not established'),
+test:ok(yaml.decode(client:read(EOL))[1].error:find('not established'),
     'remote network error')
 
 client:write(string.format("require('console').connect('unix/', '%s')\n",
     IPROTO_SOCKET))
 -- error: Execute access denied for user 'guest' to function 'dostring
-test:ok(yaml.decode(client:readline(EOL))[1].error:find('access denied'),
+test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
     'remote access denied')
 
 -- Add permissions to execute `dostring` for `guest`
@@ -71,11 +71,11 @@ box.schema.user.grant('guest', 'execute', 'function', 'dostring')
 
 client:write(string.format("require('console').connect('unix/', '%s')\n",
     IPROTO_SOCKET))
-test:is(yaml.decode(client:readline(EOL)), '', "remote connect")
+test:is(yaml.decode(client:read(EOL)), '', "remote connect")
 
 -- Execute some command
 client:write("require('fiber').id()\n")
-local fid2 = yaml.decode(client:readline(EOL))[1]
+local fid2 = yaml.decode(client:read(EOL))[1]
 test:isnt(fid1, fid2, "remote eval")
 
 test:is(state.remote.host, "unix/", "remote state.remote.host")
@@ -87,7 +87,7 @@ test:is(state.prompt, string.format("%s:%s", "unix/", IPROTO_SOCKET),
 client:write("~.\n")
 -- Check that iproto console has been disconnected
 client:write("require('fiber').id()\n")
-local fid1x = yaml.decode(client:readline(EOL))[1]
+local fid1x = yaml.decode(client:read(EOL))[1]
 test:is(fid1, fid1x, "remote disconnect")
 
 -- Disconect from console

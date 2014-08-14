@@ -722,9 +722,6 @@ end;
 f = fiber.create(test)
 ---
 ...
-while f:status() ~= 'dead' do fiber.sleep(0.01) end
----
-...
 done
 ---
 - true
