@@ -1,6 +1,8 @@
 -- fio.lua (internal file)
 
-local fio = {}
+local fio = require('fio')
+local internal = fio.internal
+fio.internal = nil
 
 local function sprintf(fmt, ...)
     if select('#', ...) == 0 then
@@ -11,18 +13,17 @@ end
 
 local fio_methods = {}
 
-
 fio_methods.read = function(self, size)
     if size == nil then
         return ''
     end
 
-    return fio.internal.read(self.fh, tonumber(size))
+    return internal.read(self.fh, tonumber(size))
 end
 
 fio_methods.write = function(self, data)
     data = tostring(data)
-    local res = fio.internal.write(self.fh, data, #data)
+    local res = internal.write(self.fh, data, #data)
     return res >= 0
 end
 
@@ -39,7 +40,7 @@ fio_methods.pwrite = function(self, data, offset)
         offset = tonumber(offset)
     end
 
-    local res = fio.internal.pwrite(self.fh, data, len, offset)
+    local res = internal.pwrite(self.fh, data, len, offset)
     return res >= 0
 end
 
@@ -51,7 +52,7 @@ fio_methods.pread = function(self, len, offset)
         offset = 0
     end
 
-    return fio.internal.pread(self.fh, tonumber(len), tonumber(offset))
+    return internal.pread(self.fh, tonumber(len), tonumber(offset))
 end
 
 
@@ -59,7 +60,7 @@ fio_methods.truncate = function(self, length)
     if length == nil then
         length = 0
     end
-    return fio.internal.ftruncate(self.fh, length)
+    return internal.ftruncate(self.fh, length)
 end
 
 fio_methods.seek = function(self, offset, whence)
@@ -75,7 +76,7 @@ fio_methods.seek = function(self, offset, whence)
         whence = tonumber(whence)
     end
 
-    local res = fio.internal.lseek(self.fh, tonumber(offset), whence)
+    local res = internal.lseek(self.fh, tonumber(offset), whence)
 
     if res < 0 then
         return nil
@@ -84,20 +85,20 @@ fio_methods.seek = function(self, offset, whence)
 end
 
 fio_methods.close = function(self)
-    return fio.internal.close(self.fh)
+    return internal.close(self.fh)
 end
 
 fio_methods.fsync = function(self)
-    return fio.internal.fsync(self.fh)
+    return internal.fsync(self.fh)
 end
 
 fio_methods.fdatasync = function(self)
-    return fio.internal.fdatasync(self.fh)
+    return internal.fdatasync(self.fh)
 end
 
 
 fio_methods.stat = function(self)
-    return fio.internal.fstat(self.fh)
+    return internal.fstat(self.fh)
 end
 
 
@@ -137,7 +138,7 @@ fio.open = function(path, flags, mode)
         end
     end
 
-    local fh = fio.internal.open(tostring(path), iflag, imode)
+    local fh = internal.open(tostring(path), iflag, imode)
     if fh < 0 then
         return nil
     end
@@ -178,7 +179,6 @@ fio.pathjoin = function(path, ...)
     return path
 end
 
-
 fio.basename = function(path, suffix)
     if path == nil then
         return nil
@@ -197,9 +197,5 @@ fio.basename = function(path, suffix)
 
     return path
 end
-
-
-
-
 
 return fio

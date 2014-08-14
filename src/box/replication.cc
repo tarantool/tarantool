@@ -170,6 +170,7 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 	 */
 	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, sockpair) != 0)
 		panic_syserror("socketpair");
+	assert(sockpair[0] != STDOUT_FILENO && sockpair[0] != STDERR_FILENO);
 
 	/* create spawner */
 	pid_t pid = fork();

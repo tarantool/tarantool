@@ -41,38 +41,38 @@
  * system calls, i.e. it doesn't throw exceptions either.
  */
 
-int     coeio_file_open(const char *path, int flags, mode_t mode);
-int     coeio_file_close(int fd);
+int     coeio_open(const char *path, int flags, mode_t mode);
+int     coeio_close(int fd);
 
-ssize_t coeio_file_pwrite(int fd, const void *buf, size_t count, off_t offset);
-ssize_t coeio_file_pread(int fd, void *buf, size_t count, off_t offset);
-ssize_t coeio_file_read(int fd, void *buf, size_t count);
-ssize_t coeio_file_write(int fd, const void *buf, size_t count);
-off_t   coeio_file_lseek(int fd, off_t offset, int whence);
+ssize_t coeio_pwrite(int fd, const void *buf, size_t count, off_t offset);
+ssize_t coeio_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t coeio_read(int fd, void *buf, size_t count);
+ssize_t coeio_write(int fd, const void *buf, size_t count);
+off_t   coeio_lseek(int fd, off_t offset, int whence);
 
-int     coeio_file_stat(const char *pathname, struct stat *buf);
-int     coeio_file_lstat(const char *pathname, struct stat *buf);
-int     coeio_file_fstat(int fd, struct stat *buf);
-int     coeio_file_rename(const char *oldpath, const char *newpath);
-int     coeio_file_unlink(const char *pathname);
-int     coeio_file_mkdir(const char *pathname, mode_t mode);
-int     coeio_file_rmdir(const char *pathname);
-int     coeio_file_ftruncate(int fd, off_t length);
-int     coeio_file_truncate(const char *path, off_t length);
-int     coeio_file_glob(const char *pattern, int flags,
-			int (*errfunc) (const char *epath, int eerrno),
-			glob_t *pglob);
-int     coeio_file_chown(const char *path, uid_t owner, gid_t group);
-int     coeio_file_chmod(const char *path, mode_t mode);
+int     coeio_stat(const char *pathname, struct stat *buf);
+int     coeio_lstat(const char *pathname, struct stat *buf);
+int     coeio_fstat(int fd, struct stat *buf);
+int     coeio_rename(const char *oldpath, const char *newpath);
+int     coeio_unlink(const char *pathname);
+int     coeio_mkdir(const char *pathname, mode_t mode);
+int     coeio_rmdir(const char *pathname);
+int     coeio_ftruncate(int fd, off_t length);
+int     coeio_truncate(const char *path, off_t length);
+int     coeio_glob(const char *pattern, int flags,
+		   int (*errfunc) (const char *epath, int eerrno),
+		   glob_t *pglob);
+int     coeio_chown(const char *path, uid_t owner, gid_t group);
+int     coeio_chmod(const char *path, mode_t mode);
 
-int     coeio_file_link(const char *oldpath, const char *newpath);
-int     coeio_file_symlink(const char *target, const char *linkpath);
-int     coeio_file_readlink(const char *pathname, char *buf, size_t bufsiz);
+int     coeio_link(const char *oldpath, const char *newpath);
+int     coeio_symlink(const char *target, const char *linkpath);
+int     coeio_readlink(const char *pathname, char *buf, size_t bufsiz);
 
-int     coeio_file_sync();
-int     coeio_file_fsync(int fd);
-int     coeio_file_fdatasync(int fd);
+int     coeio_sync();
+int     coeio_fsync(int fd);
+int     coeio_fdatasync(int fd);
 
-int	coeio_file_tempdir(char *path, size_t path_len);
+int	coeio_tempdir(char *path, size_t path_len);
 
 #endif /* INCLUDES_TARANTOOL_COEIO_FILE_H */
