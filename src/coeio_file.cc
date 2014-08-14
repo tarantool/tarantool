@@ -27,14 +27,18 @@
  * SUCH DAMAGE.
  */
 
-#include <coeio_file.h>
-#include <coeio.h>
-#include <fiber.h>
-#include <say.h>
+#include "coeio_file.h"
+#include "coeio.h"
+#include "fiber.h"
+#include "say.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 
+/**
+ * A context of libeio request for any
+ * coeio_file task.
+ */
 struct coeio_file_task {
 	ssize_t result;
 	int errorno;
@@ -91,10 +95,10 @@ struct coeio_file_task {
 
 #define INIT_COEIO_FILE(name)			\
 	struct coeio_file_task name;		\
-	memset(&name, 0, sizeof(name));	\
-	name.fiber = fiber();		\
+	memset(&name, 0, sizeof(name));		\
+	name.fiber = fiber();			\
 
-
+/** A callback invoked by eio when a task is complete. */
 static int
 coeio_file_complete(eio_req *req)
 {
@@ -108,6 +112,10 @@ coeio_file_complete(eio_req *req)
 	return 0;
 }
 
+/**
+ * Synchronously (from cooperative multitasking point of view)
+ * wait for task completion.
+ */
 static ssize_t
 coeio_file_wait_done(eio_req *req, struct coeio_file_task *eio)
 {
@@ -127,8 +135,8 @@ int
 coeio_file_open(const char *path, int flags, mode_t mode)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req =
-		eio_open(path, flags, mode, 0, coeio_file_complete, &eio);
+	eio_req *req = eio_open(path, flags, mode, 0,
+				coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -144,8 +152,8 @@ ssize_t
 coeio_file_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
 	INIT_COEIO_FILE(eio);
-	eio_req *req = eio_write(fd,
-		(void *)buf, count, offset, 0, coeio_file_complete, &eio);
+	eio_req *req = eio_write(fd, (void *) buf, count, offset,
+				 0, coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -154,7 +162,7 @@ coeio_file_pread(int fd, void *buf, size_t count, off_t offset)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_read(fd, buf, count,
-		offset, 0, coeio_file_complete, &eio);
+				offset, 0, coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -174,7 +182,7 @@ coeio_file_write(int fd, const void *buf, size_t count)
 	eio.write.count = count;
 	eio.write.fd = fd;
 	eio_req *req = eio_custom(coeio_file_do_write, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -194,7 +202,7 @@ coeio_file_read(int fd, void *buf, size_t count)
 	eio.read.count = count;
 	eio.read.fd = fd;
 	eio_req *req = eio_custom(coeio_file_do_read, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -218,7 +226,7 @@ coeio_file_lseek(int fd, off_t offset, int whence)
 	eio.lseek.fd = fd;
 
 	eio_req *req = eio_custom(coeio_file_do_lseek, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -230,7 +238,6 @@ coeio_file_do_lstat(eio_req *req)
 	req->errorno = errno;
 }
 
-
 int
 coeio_file_lstat(const char *pathname, struct stat *buf)
 {
@@ -238,7 +245,7 @@ coeio_file_lstat(const char *pathname, struct stat *buf)
 	eio.lstat.pathname = pathname;
 	eio.lstat.buf = buf;
 	eio_req *req = eio_custom(coeio_file_do_lstat, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -257,7 +264,7 @@ coeio_file_stat(const char *pathname, struct stat *buf)
 	eio.lstat.pathname = pathname;
 	eio.lstat.buf = buf;
 	eio_req *req = eio_custom(coeio_file_do_stat, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -277,7 +284,7 @@ coeio_file_fstat(int fd, struct stat *stat)
 	eio.fstat.buf = stat;
 
 	eio_req *req = eio_custom(coeio_file_do_fstat, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -286,7 +293,7 @@ coeio_file_rename(const char *oldpath, const char *newpath)
 {
 	INIT_COEIO_FILE(eio);
 	eio_req *req = eio_rename(oldpath, newpath, 0,
-		coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 
 }
@@ -320,7 +327,7 @@ coeio_file_do_glob(eio_req *req)
 {
 	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
 	req->result = glob(eio->glob.pattern,
-		eio->glob.flags, eio->glob.errfunc, eio->glob.pglob);
+			   eio->glob.flags, eio->glob.errfunc, eio->glob.pglob);
 	req->errorno = errno;
 }
 
@@ -394,7 +401,7 @@ coeio_file_do_readlink(eio_req *req)
 {
 	struct coeio_file_task *eio = (struct coeio_file_task *)req->data;
 	req->result = readlink(eio->readlink.pathname,
-		eio->readlink.buf, eio->readlink.bufsize);
+			       eio->readlink.buf, eio->readlink.bufsize);
 	req->errorno = errno;
 }
 
@@ -406,7 +413,7 @@ coeio_file_readlink(const char *pathname, char *buf, size_t bufsize)
 	eio.readlink.buf = buf;
 	eio.readlink.bufsize = bufsize;
 	eio_req *req = eio_custom(coeio_file_do_readlink, 0,
-					coeio_file_complete, &eio);
+				  coeio_file_complete, &eio);
 	return coeio_file_wait_done(req, &eio);
 }
 
@@ -422,7 +429,6 @@ coeio_file_do_tempdir(eio_req *req)
 		req->result = 0;
 	}
 }
-
 
 int
 coeio_file_tempdir(char *path, size_t path_len)

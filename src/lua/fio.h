@@ -30,6 +30,6 @@
  */
 
 struct lua_State;
-void fio_lua_init(struct lua_State *L);
+void tarantool_lua_fio_init(struct lua_State *L);
 
 #endif /* INCLUDES_TARANTOOL_LUA_FIO_H */

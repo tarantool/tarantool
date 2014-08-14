@@ -32,6 +32,15 @@
 #include <sys/types.h>
 #include <glob.h>
 
+/**
+ * Cooperative file I/O.
+ * Unlike the rest of coeio API, this implementation
+ * doesn't support timeouts or cancellation.
+ *
+ * It follows the error reporting convention of the respective
+ * system calls, i.e. it doesn't throw exceptions either.
+ */
+
 int     coeio_file_open(const char *path, int flags, mode_t mode);
 int     coeio_file_close(int fd);
 
@@ -51,8 +60,8 @@ int     coeio_file_rmdir(const char *pathname);
 int     coeio_file_ftruncate(int fd, off_t length);
 int     coeio_file_truncate(const char *path, off_t length);
 int     coeio_file_glob(const char *pattern, int flags,
-		int (*errfunc) (const char *epath, int eerrno),
-		glob_t *pglob);
+			int (*errfunc) (const char *epath, int eerrno),
+			glob_t *pglob);
 int     coeio_file_chown(const char *path, uid_t owner, gid_t group);
 int     coeio_file_chmod(const char *path, mode_t mode);
 
@@ -63,7 +72,6 @@ int     coeio_file_readlink(const char *pathname, char *buf, size_t bufsiz);
 int     coeio_file_sync();
 int     coeio_file_fsync(int fd);
 int     coeio_file_fdatasync(int fd);
-
 
 int	coeio_file_tempdir(char *path, size_t path_len);
 

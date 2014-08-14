@@ -282,6 +282,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_socket_init(L);
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_pickle_init(L);
+	tarantool_lua_fio_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 
@@ -316,7 +317,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 
 	box_lua_init(L);
-	fio_lua_init(L);
 
 
 	lua_newtable(L);

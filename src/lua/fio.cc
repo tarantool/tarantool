@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "lua/fio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
@@ -34,9 +35,8 @@
 #include <unistd.h>
 #include <glob.h>
 #include <time.h>
-#include "lua/fio.h"
-#include <coeio.h>
-#include <fiber.h>
+#include "coeio.h"
+#include "fiber.h"
 
 extern "C" {
 #include <lua.h>
@@ -44,11 +44,10 @@ extern "C" {
 #include <lualib.h>
 }
 #include "lua/utils.h"
-
-#include <coeio_file.h>
+#include "coeio_file.h"
 
 static int
-fio_lua_open(struct lua_State *L)
+lbox_fio_open(struct lua_State *L)
 {
 	const char *path = lua_tostring(L, 1);
 	int flags = lua_tointeger(L, 2);
@@ -59,9 +58,8 @@ fio_lua_open(struct lua_State *L)
 	return 1;
 }
 
-
 static int
-fio_lua_pwrite(struct lua_State *L)
+lbox_fio_pwrite(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
@@ -73,9 +71,8 @@ fio_lua_pwrite(struct lua_State *L)
 	return 1;
 }
 
-
 static int
-fio_lua_pread(struct lua_State *L)
+lbox_fio_pread(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	size_t len = lua_tonumber(L, 2);
@@ -109,12 +106,12 @@ fio_lua_pread(struct lua_State *L)
 }
 
 static int
-fio_lua_rename(struct lua_State *L)
+lbox_fio_rename(struct lua_State *L)
 {
 	const char *oldpath, *newpath;
 	int top = lua_gettop(L);
 	if (top < 2 || !(oldpath = lua_tostring(L, 1)) ||
-					!(newpath = lua_tostring(L, 2))) {
+	    !(newpath = lua_tostring(L, 2))) {
 		luaL_error(L, "Usage: fio.rename(oldpath, newpath)");
 		return 0;
 	}
@@ -124,7 +121,7 @@ fio_lua_rename(struct lua_State *L)
 }
 
 static int
-fio_lua_unlink(struct lua_State *L)
+lbox_fio_unlink(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "Usage: fio.unlink(pathname)");
@@ -140,7 +137,7 @@ fio_lua_unlink(struct lua_State *L)
 }
 
 static int
-fio_lua_ftruncate(struct lua_State *L)
+lbox_fio_ftruncate(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	off_t length = lua_tonumber(L, 2);
@@ -150,7 +147,7 @@ fio_lua_ftruncate(struct lua_State *L)
 }
 
 static int
-fio_lua_truncate(struct lua_State *L)
+lbox_fio_truncate(struct lua_State *L)
 {
 	int top = lua_gettop(L);
 	if (top < 1)
@@ -168,7 +165,7 @@ fio_lua_truncate(struct lua_State *L)
 }
 
 static int
-fio_lua_write(struct lua_State *L)
+lbox_fio_write(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	const char *buf = lua_tostring(L, 2);
@@ -179,7 +176,7 @@ fio_lua_write(struct lua_State *L)
 }
 
 static int
-fio_lua_chown(struct lua_State *L)
+lbox_fio_chown(struct lua_State *L)
 {
 	if (lua_gettop(L) < 3)
 		luaL_error(L, "Usage: fio.chown(pathname, owner, group)");
@@ -217,7 +214,7 @@ fio_lua_chown(struct lua_State *L)
 }
 
 static int
-fio_lua_chmod(struct lua_State *L)
+lbox_fio_chmod(struct lua_State *L)
 {
 	if (lua_gettop(L) < 2)
 		luaL_error(L, "Usage: fio.chmod(pathname, mode)");
@@ -228,7 +225,7 @@ fio_lua_chmod(struct lua_State *L)
 }
 
 static int
-fio_lua_read(struct lua_State *L)
+lbox_fio_read(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	size_t len = lua_tonumber(L, 2);
@@ -260,7 +257,7 @@ fio_lua_read(struct lua_State *L)
 }
 
 static int
-fio_lua_lseek(struct lua_State *L)
+lbox_fio_lseek(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
 	off_t offset = lua_tonumber(L, 2);
@@ -271,7 +268,7 @@ fio_lua_lseek(struct lua_State *L)
 }
 
 static int
-fio_lua_pushtimespec(struct lua_State *L, const struct timespec *ts)
+lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 {
 	double nsec = ts->tv_nsec;
 	nsec /= 1000000000;
@@ -286,7 +283,7 @@ fio_lua_pushtimespec(struct lua_State *L, const struct timespec *ts)
 }
 
 static int
-fio_lua_pushstat(struct lua_State *L, const struct stat *stat)
+lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
 {
 	lua_newtable(L);
 
@@ -300,15 +297,14 @@ fio_lua_pushstat(struct lua_State *L, const struct stat *stat)
 	PUSHTABLE("size", lua_pushinteger, stat->st_size);
 	PUSHTABLE("blksize", lua_pushinteger, stat->st_blksize);
 	PUSHTABLE("blocks", lua_pushinteger, stat->st_blocks);
-	PUSHTABLE("ctime", fio_lua_pushtimespec, &stat->st_ctim);
-	PUSHTABLE("mtime", fio_lua_pushtimespec, &stat->st_mtim);
-	PUSHTABLE("atime", fio_lua_pushtimespec, &stat->st_atim);
+	PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
+	PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
+	PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atim);
 	return 1;
 }
 
-
 static int
-fio_lua_lstat(struct lua_State *L)
+lbox_fio_lstat(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "pathname is absent");
@@ -320,11 +316,11 @@ fio_lua_lstat(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	return fio_lua_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, &stat);
 }
 
 static int
-fio_lua_stat(struct lua_State *L)
+lbox_fio_stat(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "pathname is absent");
@@ -336,11 +332,11 @@ fio_lua_stat(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	return fio_lua_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, &stat);
 }
 
 static int
-fio_lua_fstat(struct lua_State *L)
+lbox_fio_fstat(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	struct stat stat;
@@ -349,12 +345,12 @@ fio_lua_fstat(struct lua_State *L)
 		lua_pushnil(L);
 		return 1;
 	}
-	return fio_lua_pushstat(L, &stat);
+	return lbox_fio_pushstat(L, &stat);
 }
 
 
 static int
-fio_lua_mkdir(struct lua_State *L)
+lbox_fio_mkdir(struct lua_State *L)
 {
 	const char *pathname;
 	int top = lua_gettop(L);
@@ -375,7 +371,7 @@ fio_lua_mkdir(struct lua_State *L)
 }
 
 static int
-fio_lua_rmdir(struct lua_State *L)
+lbox_fio_rmdir(struct lua_State *L)
 {
 	const char *pathname;
 	if (lua_gettop(L) < 1 || !(pathname = lua_tostring(L, 1))) {
@@ -388,7 +384,7 @@ fio_lua_rmdir(struct lua_State *L)
 }
 
 static int
-fio_lua_glob(struct lua_State *L)
+lbox_fio_glob(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "Usage: fio.glob(pattern)");
@@ -397,17 +393,17 @@ fio_lua_glob(struct lua_State *L)
 
 	glob_t globbuf;
 	switch (glob(pattern, GLOB_NOESCAPE, NULL, &globbuf)) {
-		case 0:
-			break;
-		case GLOB_NOMATCH:
-			lua_newtable(L);
-			return 1;
+	case 0:
+		break;
+	case GLOB_NOMATCH:
+		lua_newtable(L);
+		return 1;
 
-		default:
-		case GLOB_NOSPACE:
-			errno = ENOMEM;
-			lua_pushnil(L);
-			return 1;
+	default:
+	case GLOB_NOSPACE:
+		errno = ENOMEM;
+		lua_pushnil(L);
+		return 1;
 	}
 
 	lua_newtable(L);
@@ -423,7 +419,7 @@ fio_lua_glob(struct lua_State *L)
 }
 
 static int
-fio_lua_link(struct lua_State *L)
+lbox_fio_link(struct lua_State *L)
 {
 	if (lua_gettop(L) < 2)
 		luaL_error(L, "Usage: fio.link(target, linkpath)");
@@ -434,7 +430,7 @@ fio_lua_link(struct lua_State *L)
 }
 
 static int
-fio_lua_symlink(struct lua_State *L)
+lbox_fio_symlink(struct lua_State *L)
 {
 	if (lua_gettop(L) < 2)
 		luaL_error(L, "Usage: fio.symlink(target, linkpath)");
@@ -445,7 +441,7 @@ fio_lua_symlink(struct lua_State *L)
 }
 
 static int
-fio_lua_readlink(struct lua_State *L)
+lbox_fio_readlink(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "Usage: fio.readlink(pathname)");
@@ -463,7 +459,7 @@ fio_lua_readlink(struct lua_State *L)
 }
 
 static int
-fio_lua_tempdir(struct lua_State *L)
+lbox_fio_tempdir(struct lua_State *L)
 {
 	char *buf = (char *)lua_newuserdata(L, PATH_MAX);
 	if (!buf) {
@@ -483,7 +479,7 @@ fio_lua_tempdir(struct lua_State *L)
 }
 
 static int
-fio_lua_fsync(struct lua_State *L)
+lbox_fio_fsync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	lua_pushboolean(L, coeio_file_fsync(fd) == 0);
@@ -491,7 +487,7 @@ fio_lua_fsync(struct lua_State *L)
 }
 
 static int
-fio_lua_fdatasync(struct lua_State *L)
+lbox_fio_fdatasync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	lua_pushboolean(L, coeio_file_fdatasync(fd) == 0);
@@ -499,14 +495,14 @@ fio_lua_fdatasync(struct lua_State *L)
 }
 
 static int
-fio_lua_sync(struct lua_State *L)
+lbox_fio_sync(struct lua_State *L)
 {
 	lua_pushboolean(L, coeio_file_sync() == 0);
 	return 1;
 }
 
 static int
-fio_lua_close(struct lua_State *L)
+lbox_fio_close(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
 	lua_pushboolean(L, coeio_file_close(fd) == 0);
@@ -514,25 +510,24 @@ fio_lua_close(struct lua_State *L)
 }
 
 void
-fio_lua_init(struct lua_State *L)
+tarantool_lua_fio_init(struct lua_State *L)
 {
 	static const struct luaL_Reg fio_methods[] = {
-		{ "lstat",		fio_lua_lstat			},
-		{ "stat",		fio_lua_stat			},
-		{ "mkdir",		fio_lua_mkdir			},
-		{ "rmdir",		fio_lua_rmdir			},
-		{ "glob",		fio_lua_glob			},
-		{ "link",		fio_lua_link			},
-		{ "symlink",		fio_lua_symlink			},
-		{ "readlink",		fio_lua_readlink		},
-		{ "unlink",		fio_lua_unlink			},
-		{ "rename",		fio_lua_rename			},
-		{ "chown",		fio_lua_chown			},
-		{ "chmod",		fio_lua_chmod			},
-		{ "truncate",		fio_lua_truncate		},
-		{ "tempdir",		fio_lua_tempdir			},
-		{ "sync",		fio_lua_sync			},
-
+		{ "lstat",		lbox_fio_lstat			},
+		{ "stat",		lbox_fio_stat			},
+		{ "mkdir",		lbox_fio_mkdir			},
+		{ "rmdir",		lbox_fio_rmdir			},
+		{ "glob",		lbox_fio_glob			},
+		{ "link",		lbox_fio_link			},
+		{ "symlink",		lbox_fio_symlink		},
+		{ "readlink",		lbox_fio_readlink		},
+		{ "unlink",		lbox_fio_unlink			},
+		{ "rename",		lbox_fio_rename			},
+		{ "chown",		lbox_fio_chown			},
+		{ "chmod",		lbox_fio_chmod			},
+		{ "truncate",		lbox_fio_truncate		},
+		{ "tempdir",		lbox_fio_tempdir		},
+		{ "sync",		lbox_fio_sync			},
 		{ NULL,			NULL				}
 	};
 
@@ -544,19 +539,17 @@ fio_lua_init(struct lua_State *L)
 	lua_pushliteral(L, "internal");
 	lua_newtable(L);
 	static const struct luaL_Reg internal_methods[] = {
-		{ "open",		fio_lua_open			},
-		{ "close",		fio_lua_close			},
-		{ "pwrite",		fio_lua_pwrite			},
-		{ "pread",		fio_lua_pread			},
-		{ "read",		fio_lua_read			},
-		{ "write",		fio_lua_write			},
-		{ "lseek",		fio_lua_lseek			},
-		{ "ftruncate",		fio_lua_ftruncate		},
-		{ "fsync",		fio_lua_fsync			},
-		{ "fdatasync",		fio_lua_fdatasync		},
-
-		{ "fstat",		fio_lua_fstat			},
-
+		{ "open",		lbox_fio_open			},
+		{ "close",		lbox_fio_close			},
+		{ "pwrite",		lbox_fio_pwrite			},
+		{ "pread",		lbox_fio_pread			},
+		{ "read",		lbox_fio_read			},
+		{ "write",		lbox_fio_write			},
+		{ "lseek",		lbox_fio_lseek			},
+		{ "ftruncate",		lbox_fio_ftruncate		},
+		{ "fsync",		lbox_fio_fsync			},
+		{ "fdatasync",		lbox_fio_fdatasync		},
+		{ "fstat",		lbox_fio_fstat			},
 		{ NULL,			NULL				}
 	};
 	luaL_register(L, NULL, internal_methods);
@@ -569,57 +562,57 @@ fio_lua_init(struct lua_State *L)
 
 	lua_pushliteral(L, "flag");
 	lua_newtable(L);
-	#ifdef O_APPEND
-		PUSHTABLE("O_APPEND", lua_pushinteger, O_APPEND);
-	#endif
-	#ifdef O_ASYNC
-		PUSHTABLE("O_ASYNC", lua_pushinteger, O_ASYNC);
-	#endif
-	#ifdef O_CLOEXEC
-		PUSHTABLE("O_CLOEXEC", lua_pushinteger, O_CLOEXEC);
-	#endif
-	#ifdef O_CREAT
-		PUSHTABLE("O_CREAT", lua_pushinteger, O_CREAT);
-	#endif
-	#ifdef O_DIRECT
-		PUSHTABLE("O_DIRECT", lua_pushinteger, O_DIRECT);
-	#endif
-	#ifdef O_DIRECTORY
-		PUSHTABLE("O_DIRECTORY", lua_pushinteger, O_DIRECTORY);
-	#endif
-	#ifdef O_EXCL
-		PUSHTABLE("O_EXCL", lua_pushinteger, O_EXCL);
-	#endif
-	#ifdef O_LARGEFILE
-		PUSHTABLE("O_LARGEFILE", lua_pushinteger, O_LARGEFILE);
-	#endif
-	#ifdef O_NOATIME
-		PUSHTABLE("O_NOATIME", lua_pushinteger, O_NOATIME);
-	#endif
-	#ifdef O_NOCTTY
-		PUSHTABLE("O_NOCTTY", lua_pushinteger, O_NOCTTY);
-	#endif
-	#ifdef O_NOFOLLOW
-		PUSHTABLE("O_NOFOLLOW", lua_pushinteger, O_NOFOLLOW);
-	#endif
-	#ifdef O_NONBLOCK
-		PUSHTABLE("O_NONBLOCK", lua_pushinteger, O_NONBLOCK);
-	#endif
-	#ifdef O_NDELAY
-		PUSHTABLE("O_NDELAY", lua_pushinteger, O_NDELAY);
-	#endif
-	#ifdef O_PATH
-		PUSHTABLE("O_PATH", lua_pushinteger, O_PATH);
-	#endif
-	#ifdef O_SYNC
-		PUSHTABLE("O_SYNC", lua_pushinteger, O_SYNC);
-	#endif
-	#ifdef O_TMPFILE
-		PUSHTABLE("O_TMPFILE", lua_pushinteger, O_TMPFILE);
-	#endif
-	#ifdef O_TRUNC
-		PUSHTABLE("O_TRUNC", lua_pushinteger, O_TRUNC);
-	#endif
+#ifdef O_APPEND
+	PUSHTABLE("O_APPEND", lua_pushinteger, O_APPEND);
+#endif
+#ifdef O_ASYNC
+	PUSHTABLE("O_ASYNC", lua_pushinteger, O_ASYNC);
+#endif
+#ifdef O_CLOEXEC
+	PUSHTABLE("O_CLOEXEC", lua_pushinteger, O_CLOEXEC);
+#endif
+#ifdef O_CREAT
+	PUSHTABLE("O_CREAT", lua_pushinteger, O_CREAT);
+#endif
+#ifdef O_DIRECT
+	PUSHTABLE("O_DIRECT", lua_pushinteger, O_DIRECT);
+#endif
+#ifdef O_DIRECTORY
+	PUSHTABLE("O_DIRECTORY", lua_pushinteger, O_DIRECTORY);
+#endif
+#ifdef O_EXCL
+	PUSHTABLE("O_EXCL", lua_pushinteger, O_EXCL);
+#endif
+#ifdef O_LARGEFILE
+	PUSHTABLE("O_LARGEFILE", lua_pushinteger, O_LARGEFILE);
+#endif
+#ifdef O_NOATIME
+	PUSHTABLE("O_NOATIME", lua_pushinteger, O_NOATIME);
+#endif
+#ifdef O_NOCTTY
+	PUSHTABLE("O_NOCTTY", lua_pushinteger, O_NOCTTY);
+#endif
+#ifdef O_NOFOLLOW
+	PUSHTABLE("O_NOFOLLOW", lua_pushinteger, O_NOFOLLOW);
+#endif
+#ifdef O_NONBLOCK
+	PUSHTABLE("O_NONBLOCK", lua_pushinteger, O_NONBLOCK);
+#endif
+#ifdef O_NDELAY
+	PUSHTABLE("O_NDELAY", lua_pushinteger, O_NDELAY);
+#endif
+#ifdef O_PATH
+	PUSHTABLE("O_PATH", lua_pushinteger, O_PATH);
+#endif
+#ifdef O_SYNC
+	PUSHTABLE("O_SYNC", lua_pushinteger, O_SYNC);
+#endif
+#ifdef O_TMPFILE
+	PUSHTABLE("O_TMPFILE", lua_pushinteger, O_TMPFILE);
+#endif
+#ifdef O_TRUNC
+	PUSHTABLE("O_TRUNC", lua_pushinteger, O_TRUNC);
+#endif
 	PUSHTABLE("O_RDONLY", lua_pushinteger, O_RDONLY);
 	PUSHTABLE("O_WRONLY", lua_pushinteger, O_WRONLY);
 	PUSHTABLE("O_RDWR", lua_pushinteger, O_RDWR);
@@ -647,12 +640,12 @@ fio_lua_init(struct lua_State *L)
 	PUSHTABLE("SEEK_SET", lua_pushinteger, SEEK_SET);
 	PUSHTABLE("SEEK_CUR", lua_pushinteger, SEEK_CUR);
 	PUSHTABLE("SEEK_END", lua_pushinteger, SEEK_END);
-	#ifdef SEEK_DATA
-		PUSHTABLE("SEEK_DATA", lua_pushinteger, SEEK_DATA);
-	#endif
-	#ifdef SEEK_HOLE
-		PUSHTABLE("SEEK_HOLE", lua_pushinteger, SEEK_HOLE);
-	#endif
+#ifdef SEEK_DATA
+	PUSHTABLE("SEEK_DATA", lua_pushinteger, SEEK_DATA);
+#endif
+#ifdef SEEK_HOLE
+	PUSHTABLE("SEEK_HOLE", lua_pushinteger, SEEK_HOLE);
+#endif
 	lua_settable(L, -3);
 
 
