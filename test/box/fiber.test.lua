@@ -280,4 +280,20 @@ f = fiber.create(y)
 fiber.kill(f:id())
 while f:status() ~= 'dead' do fiber.sleep(0.01) end
 
+-- # gh-420 fiber.cancel() assertion `!(f->flags & (1 << 2))' failed
+--
+done = false
+--# setopt delimiter ';'
+function test()
+    fiber.name('gh-420')
+    local fun, errmsg = loadstring('fiber.cancel(fiber.self())')
+    xpcall(fun, function() end)
+    xpcall(fun, function() end)
+    done = true
+    fun()
+end;
+--# setopt delimiter ''
+f = fiber.create(test)
+while f:status() ~= 'dead' do fiber.sleep(0.01) end
+done
 fiber = nil
