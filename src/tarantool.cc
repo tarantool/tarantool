@@ -455,7 +455,8 @@ load_cfg()
 	}
 	say_logger_init(cfg_gets("logger"),
 			cfg_geti("log_level"),
-			cfg_geti("logger_nonblock"));
+			cfg_geti("logger_nonblock"),
+			cfg_geti("background"));
 
 	say_crit("version %s", tarantool_version());
 	say_crit("log level %i", cfg_geti("log_level"));
