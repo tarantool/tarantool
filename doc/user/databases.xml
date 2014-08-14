@@ -259,7 +259,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
             <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
             There are actually two storage engines for Tarantool: memtx (the in-memory storage engine)
             and Sophia (the on-disk storage engine). To specify that the engine should be Sophia,
-            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtxt because it is
+            add a clause: <code>engine = 'sophia'</code>. The manual concentrates on memtx because it is
             the default and has been around longer. But Sophia is a working key-value engine and will especially
             appeal to users who like to see data go directly to disk, so that recovery time might be
             shorter and database size might be larger. On the other hand, with Sophia the maximum
@@ -905,6 +905,85 @@ tarantool&gt; <userinput>box.space.tester:len()</userinput>
 ...
 </programlisting>
             </para>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Increments a counter in a tuple whose primary key matches the field-value(s).
+                The field following the primary-key fields will be the counter.
+                If there is no tuple matching the field-value(s), a new one is inserted
+                with initial counter value set to 1.
+            </para>
+                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
+                which must match the primary key.
+            </para>
+            <para>
+               Returns: (type = number) the new counter value.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
+---
+- 1
+...
+tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
+---
+- 2
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    <varlistentry>
+        <term>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+        </term>
+        <listitem>
+            <para>
+                Decrements a counter in a tuple whose primary key matches the field-value(s).
+                The field following the primary-key fields will be the counter.
+                If there is no tuple matching the field-value(s), a new one is not inserted.
+                If the counter value drops to zero, the tuple is deleted.
+            </para>
+            <para>
+               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
+               which must match the primary key.
+            </para>
+            <para>
+              Returns: (type = number) the new counter value.
+            </para>
+            <para>
+              Complexity Factors: Index size, Index type, WAL settings.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
+---
+...
+tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
+---
+...
+tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
+---
+- [1, 'a', 1000]
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 999
+...
+tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
+---
+- 998
+... </programlisting>
         </listitem>
     </varlistentry>
 
@@ -1572,85 +1651,6 @@ tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
 </programlisting>
         </listitem>
     </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:inc{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Increments a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is inserted
-                with initial counter value set to 1.
-            </para>
-                <para>Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-                which must match the primary key.
-            </para>
-            <para>
-               Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
----
-- 1
-...
-tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
----
-- 2
-...</programlisting>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:dec{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
-        </term>
-        <listitem>
-            <para>
-                Decrements a counter in a tuple whose primary key matches the field-value(s).
-                The field following the primary-key fields will be the counter.
-                If there is no tuple matching the field-value(s), a new one is not inserted.
-                If the counter value drops to zero, the tuple is deleted.
-            </para>
-            <para>
-               Parameters: <code>space-name</code>, <code>field-value(s)</code> = values
-               which must match the primary key.
-            </para>
-            <para>
-              Returns: (type = number) the new counter value.
-            </para>
-            <para>
-              Complexity Factors: Index size, Index type, WAL settings.
-            </para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
----
-...
-tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
----
-...
-tarantool> <userinput>box.space.space19:insert{1,'a',1000}</userinput>
----
-- [1, 'a', 1000]
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 999
-...
-tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
----
-- 998
-... </programlisting>
-        </listitem>
-    </varlistentry>
 </variablelist>
 
 <bridgehead renderas="sect4">Example showing use of the box functions</bridgehead>
@@ -1765,7 +1765,7 @@ console.delimiter('')!
               For example the NO_SUCH_USER message is "User '%s' is not found" -- it includes one
               "%s" component which will be replaced with <code>errtext-string</code>. Thus a call to
               <code>box.error(box.error.NO_SUCH_USER, 'joe')</code> or
-              <code>box.error(45, 'joe')</code> will result in an error with the accomplanying
+              <code>box.error(45, 'joe')</code> will result in an error with the accompanying
               message "User 'joe' is not found".
             </para>
             <para>
@@ -2220,15 +2220,22 @@ tarantool> <userinput>box.cfg</userinput>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool> <userinput>box.info()</userinput>
 ---
-- version: 1.6.0-819-geefb2d0
-  status: primary
-  pid: 20978
-  lsn: 340
-  snapshot_pid: 0
+- version: 1.6.0-1663-g7bbb330
+  status: running
+  vclock:
+  - 0
+  pid: 10316
+  logger_pid: 0
   recovery_last_update: 0
   recovery_lag: 0
-  uptime: 16071
-  ...
+  build:
+    [ build flags and options are omitted from this example ]
+  uptime: 2880
+  snapshot_pid: 0
+  node:
+    lsn: 0
+    uuid: e8530a1a-d450-4598-bcc9-6efc842dfe20
+    id: 1
 ...
 </programlisting>
         </listitem>
@@ -2257,7 +2264,7 @@ tarantool> <userinput>box.info.uptime</userinput>
 ...
 tarantool> <userinput>box.info.status</userinput>
 ---
- - primary
+ - running
 ...
 tarantool> <userinput>box.info.recovery_lag</userinput>
 ---
@@ -3215,11 +3222,22 @@ error: can't save snapshot, errno 17 (File exists)
       <listitem><para>
         End the currently active transaction, but cancel
         all its data-change operations. An explicit call
-        to fiber.yield() will have the same effect.
+        to functions outside box.space that always yield,
+        such as <code>fiber.yield</code> or
+        <code>fiber.sleep</code>, will have the same effect.
        </para></listitem>
     </varlistentry>
-    
   </variablelist>
+<para>
+    <emphasis>The requests in a transaction must be
+    sent to the server as a single block.</emphasis>
+    It is not enough to enclose them
+    between <code>begin</code> and <code>commit</code>
+    or <code>rollback</code>. To ensure they are sent
+    as a single block: put them in a function, or put
+    them all on one line, or use a delimiter so that
+    multi-line requests are handled together.
+</para>
 
 <para>
 Example:
@@ -3227,11 +3245,13 @@ Assuming that in tuple set 'tester' there are tuples
 in which the third field represents a positive dollar amount ...
 Start a transaction, withdraw from tuple#1, deposit in tuple#2,
 and end the transaction, making its effects permanent.<programlisting>
+console = require('console'); console.delimiter('!')
 box.begin()
 amount_of_money = 1.00
 box.space.tester:update({999}, {{'-', 3, amount_of_money}})
 box.space.tester:update({1000}, {{'+', 3, amount_of_money}})
-box.commit()</programlisting>
+box.commit()
+console.delimiter('')!</programlisting>
 </para>
 </section>
 
@@ -3319,7 +3339,7 @@ file <filename xlink:href="https://github.com/tarantool/tarantool/blob/master/sr
 </variablelist>
 </section>
 
-<section xml:id="authentication">
+<section xml:id="authentication" xreflabel="authentication">
 <title>Authentication and access control</title>
 
 <para>
@@ -3529,7 +3549,7 @@ The function for dropping a _func tuple is:
 In the following example, a function named 'f7' is created,
 then it is put in the _func space, then it is used in a
 box.schema.user.grant function, then it is dropped:
-<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() session.uid() end</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>function f7() box.session.uid() end</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>box.schema.func.create('f7')</userinput>
@@ -3546,14 +3566,14 @@ box.schema.user.grant function, then it is dropped:
 ...</programlisting></para>
 
 <para>
-<bridgehead renderas="sect4">"session=require('session')" and security</bridgehead>
+<bridgehead renderas="sect4">"box.session" and security</bridgehead>
 
 After a connection has taken place, the user has access to a "session" object
 which has several functions. The ones which are of interest for security
 purposes are:
-<programlisting>session.uid()           #returns the id of the current user
-session.user()          #returns the name of the current user
-session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
+<programlisting>box.session.uid()           #returns the id of the current user
+box.session.user()          #returns the name of the current user
+box.session.su(<replaceable>user-name</replaceable>)   #allows changing current user to 'user-name'</programlisting></para>
 
 <para>
 If a user types requests directly on the Tarantool server in its interactive mode,
@@ -3563,14 +3583,13 @@ many privileges. If a user connects from an application program via one of the
 <olink targetptr="connectors">connectors</olink>, then the user by default is 'guest' and has few
 privileges. Typically an admin user will set up and configure objects, then
 grant privileges to appropriate non-admin users. Typically a guest user will
-use <code>session.su()</code> to change into a non-generic user to whom admin
+use <code>box.session.su()</code> to change into a non-generic user to whom admin
 has granted more than the default privileges. For example, admin might say:<programlisting>
 box.space._user:insert{123456,0,'manager'}
 box.schema.user.grant('manager', 'read', 'space', '_space')
 box.schema.user.grant('manager', 'read', 'space', 'payroll')</programlisting>
 and later a guest user, who wishes to see the payroll, might say:<programlisting>
-session = require('session')
-session.su('manager')
+box.session.su('manager')
 box.space.payroll:select{'Jones'}</programlisting>
 </para>
 
