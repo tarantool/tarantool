@@ -285,7 +285,7 @@ while f:status() ~= 'dead' do fiber.sleep(0.01) end
 done = false
 --# setopt delimiter ';'
 function test()
-    fiber.name('cancel_bug')
+    fiber.name('gh-420')
     local fun, errmsg = loadstring('fiber.cancel(fiber.self())')
     xpcall(fun, function() end)
     xpcall(fun, function() end)
