@@ -128,13 +128,13 @@ sa:recv()
 sc:send('Hello')
 sc:send(', world')
 sc:send("\\nnew line")
-sa:readline({'\\n'}, 1)
-sa:readline(1, {'ine'}, 1)
-sa:readline({'ine'}, 1)
-sa:readline({'ine'}, 0.1)
+sa:read('\\n', 1)
+sa:read({ chunk = 1, delimiter = 'ine'}, 1)
+sa:read('ine', 1)
+sa:read('ine', 0.1)
 
 sc:send('Hello, world')
-sa:readline({','}, 1)
+sa:read(',', 1)
 sc:shutdown('W')
 sa:read(100, 1)
 sa:read(100, 1)
@@ -250,7 +250,7 @@ s = socket.tcp_connect('tarantool.org', 80)
 string.match(tostring(s), ', aka') ~= nil
 string.match(tostring(s), ', peer') ~= nil
 s:write("HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
-header = s:readline(4000, { "\n\n", "\r\n\r\n" }, 1)
+header = s:read({chunk = 4000, delimiter = {"\n\n", "\r\n\r\n" }}, 1)
 string.match(header, "\r\n\r\n$") ~= nil
 string.match(header, "200 [Oo][Kk]") ~= nil
 s:close()
@@ -335,3 +335,55 @@ fiber.cancel(f)
 while f:status() ~= 'dead' do fiber.sleep(0.001) end
 master:close()
 f = nil
+
+
+path = '/tmp/tarantool-test-socket'
+s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+s:error()
+s:bind('unix/', path)
+s:error()
+s:listen(128)
+--# setopt delimiter ';'
+f = fiber.create(function()
+    for i=1,2 do
+        s:readable()
+        local sc = s:accept()
+        sc:write('ok!')
+        sc:shutdown()
+        sc:close()
+    end
+end);
+--# setopt delimiter ''
+
+c = socket.tcp_connect('unix/', path)
+c:error()
+x = c:read('!')
+x, type(x), #x
+x = c:read('!')
+c:error()
+x, type(x), #x
+x = c:read('!')
+c:error()
+x, type(x), #x
+c:close()
+
+c = socket.tcp_connect('unix/', path)
+c:error()
+x = c:read(3)
+c:error()
+x, type(x), #x
+x = c:read(1)
+c:error()
+x, type(x), #x
+x = c:read(1)
+c:error()
+x, type(x), #x
+x = c:sysread(1)
+c:error()
+x, type(x), #x
+c:close()
+
+s:close()
+
+os.remove(path)

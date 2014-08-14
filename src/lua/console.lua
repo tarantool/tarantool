@@ -119,11 +119,11 @@ end
 --
 local function client_read(self)
     local delim = self.delimiter.."\n"
-    local buf = self.client:readline({ delim })
+    local buf = self.client:read(delim)
     if buf == nil then
         return nil
     elseif buf == "" then
-        return nil -- gh-412 buf socket:readline() should return nil on eof
+        return nil -- EOF
     elseif buf == "~.\n" then
         -- Escape sequence to close current connection (like SSH)
         return nil
