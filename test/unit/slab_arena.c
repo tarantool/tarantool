@@ -25,7 +25,7 @@ int main()
 	void *ptr = slab_map(&arena);
 	slab_arena_print(&arena);
 	void *ptr1 = slab_map(&arena);
-	printf("going beyond the limit: %p\n", ptr1);
+	printf("going beyond the limit: %s\n", ptr1 ? "(ptr)" : "(nil)");
 	slab_arena_print(&arena);
 	slab_unmap(&arena, ptr);
 	slab_unmap(&arena, ptr1);
