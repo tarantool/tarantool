@@ -115,6 +115,10 @@ say_init_pipe()
 		goto error;
 	}
 
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	logger_pid = fork();
 	if (logger_pid == -1) {
 		say_syserror("pipe");

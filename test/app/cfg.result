@@ -1,3 +1,2 @@
 false	[string "-- load_cfg.lua - internal file..."]:97: Please call box.cfg{} first
 true	table
-false	[string "-- load_cfg.lua - internal file..."]:97: Please call box.cfg{} first
