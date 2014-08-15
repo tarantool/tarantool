@@ -54,9 +54,10 @@ munmap_checked(void *addr, size_t size)
 static void *
 mmap_checked(size_t size, size_t align, int flags)
 {
-	/* The size must be a power of two. */
-	assert((size & (size - 1)) == 0);
+	/* The alignment must be a power of two. */
 	assert((align & (align - 1)) == 0);
+	/* The size must be a multiple of alignment */
+	assert((size & (align - 1)) == 0);
 	/*
 	 * mmap twice the requested amount to be able to align
 	 * the mapped address.
@@ -101,6 +102,7 @@ pow2round(size_t size)
 #endif
 
 #define MAX(a, b) (a) > (b) ? (a) : (b)
+#define MIN(a, b) (a) < (b) ? (a) : (b)
 
 int
 slab_arena_create(struct slab_arena *arena,
@@ -116,18 +118,13 @@ slab_arena_create(struct slab_arena *arena,
 	 */
 	arena->slab_size = small_round(MAX(slab_size, SLAB_MIN_SIZE));
 
-	if (maxalloc) {
-		arena->maxalloc = small_round(MAX(maxalloc,
-						      arena->slab_size));
-	} else {
-		arena->maxalloc = 0;
-	}
-
-	/* Align arena around a fixed number of slabs. */
-	arena->prealloc = small_align(small_round(prealloc),
-				      arena->slab_size);
-	if (arena->maxalloc < arena->prealloc)
-		arena->prealloc = arena->maxalloc;
+	arena->maxalloc = maxalloc;
+	/** Prealloc can not be greater than maxalloc */
+	prealloc = MIN(prealloc, maxalloc);
+	/** Extremely large sizes can not be aligned properly */
+	prealloc = MIN(prealloc, SIZE_MAX - arena->slab_size);
+	/* Align prealloc around a fixed number of slabs. */
+	arena->prealloc = small_align(prealloc, arena->slab_size);
 
 	arena->used = 0;
 

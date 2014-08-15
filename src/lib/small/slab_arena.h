@@ -36,8 +36,12 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum { SLAB_MIN_SIZE = USHRT_MAX,
-       SMALL_UNLIMITED = SIZE_MAX/2 + 1};
+enum {
+	/* Smallest possible slab size. */
+	SLAB_MIN_SIZE = USHRT_MAX,
+	/** The largest allowed amount of memory of a single arena. */
+       SMALL_UNLIMITED = SIZE_MAX/2 + 1
+};
 
 /**
  * slab_arena -- a source of large aligned blocks of memory.
@@ -121,7 +125,11 @@ slab_arena_mprotect(struct slab_arena *arena);
 static inline size_t
 small_align(size_t size, size_t alignment)
 {
-	return (size + alignment - 1) & ~(alignment - 1);
+	/* Must be a power of two */
+	assert((alignment & (alignment - 1)) == 0);
+	/* Bit arithmetics won't work for a large size */
+	assert(size <= SIZE_MAX - alignment);
+	return (size - 1 + alignment) & ~(alignment - 1);
 }
 
 /** Round a number to the nearest power of two. */
