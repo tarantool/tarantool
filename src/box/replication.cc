@@ -617,7 +617,7 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 	int rc = recv(replica_sock, &data, sizeof(data), 0);
 
 	if (rc == 0 || (rc < 0 && errno == ECONNRESET)) {
-		say_info("the client has closed its replication socket, exiting");
+		say_info("the replica has closed its socket, exiting");
 		exit(EXIT_SUCCESS);
 	}
 	if (rc < 0)
