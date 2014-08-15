@@ -110,6 +110,10 @@ coredump(int dump_interval)
 
 	last_coredump = now;
 
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	if (fork() == 0) {
 		close_all_xcpt(0);
 #ifdef ENABLE_GCOV

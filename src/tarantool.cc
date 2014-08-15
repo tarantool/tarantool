@@ -352,6 +352,10 @@ create_pid(void)
 static void
 background()
 {
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	switch (fork()) {
 	case -1:
 		goto error;

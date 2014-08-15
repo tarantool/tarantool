@@ -496,6 +496,10 @@ box_snapshot(void)
 	if (snapshot_pid)
 		return EINPROGRESS;
 
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	pid_t p = fork();
 	if (p < 0) {
 		say_syserror("fork");

@@ -7,7 +7,3 @@ pcall with Lua error():	false	some message
 pcall with box.error():	false	Illegal parameters, some message
 pcall with no return:	1
 pcall with multireturn:	true	1	2	3
---------------------------------------------------------------------------------
--- #267: Bad exception catching
---------------------------------------------------------------------------------
-

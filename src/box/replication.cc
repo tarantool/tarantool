@@ -172,6 +172,10 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 		panic_syserror("socketpair");
 	assert(sockpair[0] != STDOUT_FILENO && sockpair[0] != STDERR_FILENO);
 
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	/* create spawner */
 	pid_t pid = fork();
 	if (pid == -1)
@@ -513,6 +517,10 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 static int
 spawner_create_replication_relay()
 {
+	/* flush buffers to avoid multiple output */
+	/* https://github.com/tarantool/tarantool/issues/366 */
+	fflush(stdout);
+	fflush(stderr);
 	pid_t pid = fork();
 
 	if (pid < 0) {
