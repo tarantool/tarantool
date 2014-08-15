@@ -211,7 +211,7 @@ make DESTDIR=%{buildroot} install
 groupadd tarantool > /dev/null 2>&1
 useradd -r -g tarantool tarantool > /dev/null 2>&1
 # Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
+{!?scl:/usr/bin/tarantool_deploy.sh --yes --quiet 1.1}
 
 %preun
 
