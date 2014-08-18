@@ -20,7 +20,7 @@ test.trace = false
 -- ok, fail and skip predicates
 --
 
-test:plan(30) -- plan to run 3 test
+test:plan(31) -- plan to run 3 test
 test:ok(true, 'true') -- basic function
 local extra = { state = 'some userful information to debug on failure',
         details = 'a table argument formatted using yaml.encode()' }
@@ -115,9 +115,25 @@ test:test("failed subtest", function(t)
     t:fail("failed subtest")
 end)
 
+
+
+test:test('isdeeply', function(t)
+    t:plan(6)
+
+    t:isdeeply(1, 1, '1 and 1')
+    t:isdeeply('abc', 'abc', 'abc and abc')
+    t:isdeeply({}, {}, 'empty tables')
+    t:isdeeply({1}, {1}, '{1} and {1}')
+    t:isdeeply({1}, {2}, '{1} and {2}')
+    t:isdeeply({1, 2, { 3, 4 }}, {1, 2, { 3, 5 }}, '{1,2,{3,4}} and {1,2,{3,5}}')
+
+end)
+
 --
 -- Finish root test. Since we used non-callback variant, we have to
 -- call check explicitly.
 --
 test:check() -- call check() explicitly
 os.exit(0)
+
+

@@ -1,5 +1,5 @@
 TAP version 13
-1..30
+1..31
 ok - true
 ok - extra information is not printed on success
 not ok - extra printed using yaml only on failure
@@ -118,4 +118,28 @@ not ok - failed subtests
   planned: 1
   failed: 1
   ...
-# failed subtest: 14
+    # isdeeply
+    1..6
+    ok - 1 and 1
+    ok - abc and abc
+    ok - empty tables
+    ok - {1} and {1}
+    not ok - {1} and {2}
+      ---
+      path: //1
+      expected: 2
+      got: 1
+      ...
+    not ok - {1,2,{3,4}} and {1,2,{3,5}}
+      ---
+      path: //3/2
+      expected: 5
+      got: 4
+      ...
+    # isdeeply: end
+not ok - failed subtests
+  ---
+  planned: 6
+  failed: 2
+  ...
+# failed subtest: 15

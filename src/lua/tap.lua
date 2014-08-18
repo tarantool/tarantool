@@ -68,6 +68,43 @@ local function skip(test, message, extra)
     ok(test, true, message.." # skip", extra)
 end
 
+
+
+local function cmpdeeply(got, expected, extra)
+
+    if type(got) ~= type(expected) then
+        extra.got = type(got)
+        extra.expected = type(expected)
+        return false
+    end
+
+    if type(got) ~= 'table' then
+        extra.got = got
+        extra.expected = expected
+        return got == expected
+    end
+
+    local path = extra.path or '/'
+
+    for i, v in pairs(got) do
+        extra.path = path .. '/' .. i
+        if not cmpdeeply(v, expected[i], extra) then
+            return false
+        end
+    end
+
+    for i, v in pairs(expected) do
+        extra.path = path .. '/' .. i
+        if not cmpdeeply(got[i], v, extra) then
+            return false
+        end
+    end
+
+    extra.path = path
+
+    return true
+end
+
 local function is(test, got, expected, message, extra)
     extra = extra or {}
     extra.got = got
@@ -80,6 +117,14 @@ local function isnt(test, got, unexpected, message, extra)
     extra.got = got
     extra.unexpected = unexpected
     return ok(test, got ~= unexpected, message, extra)
+end
+
+
+local function isdeeply(test, got, expected, message, extra)
+    extra = extra or {}
+    extra.got = got
+    extra.expected = expected
+    return ok(test, cmpdeeply(got, expected, extra), message, extra)
 end
 
 local function isnil(test, v, message, extra)
@@ -202,6 +247,7 @@ test_mt = {
         isboolean = isboolean;
         isudata   = isudata;
         iscdata   = iscdata;
+        isdeeply  = isdeeply;
     }
 }
 
