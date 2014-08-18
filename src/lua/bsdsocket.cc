@@ -627,10 +627,16 @@ lbox_bsdsocket_push_addr(struct lua_State *L,
 		lua_pushliteral(L, "unix/");
 		lua_rawset(L, -3);
 
-		lua_pushliteral(L, "port");
-		lua_pushstring(L,
-			       ((struct sockaddr_un *)addr)->sun_path);
-		lua_rawset(L, -3);
+		if (alen > sizeof(addr->sa_family)) {
+			lua_pushliteral(L, "port");
+			lua_pushstring(L,
+				       ((struct sockaddr_un *)addr)->sun_path);
+			lua_rawset(L, -3);
+		} else {
+			lua_pushliteral(L, "port");
+			lua_pushliteral(L, "");
+			lua_rawset(L, -3);
+		}
 		break;
 
 	default:	/* unknown family */
