@@ -4,6 +4,15 @@ fio = require 'fio'
 errno = require 'errno'
 ---
 ...
+-- umask
+type(fio.umask(0))
+---
+- number
+...
+fio.umask()
+---
+- 0
+...
 -- pathjoin
 fio.pathjoin('abc', 'cde')
 ---

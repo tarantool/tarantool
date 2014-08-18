@@ -1,6 +1,11 @@
 fio = require 'fio'
 errno = require 'errno'
 
+-- umask
+
+type(fio.umask(0))
+fio.umask()
+
 -- pathjoin
 fio.pathjoin('abc', 'cde')
 fio.pathjoin('/', 'abc')

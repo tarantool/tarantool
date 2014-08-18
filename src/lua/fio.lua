@@ -1,6 +1,12 @@
 -- fio.lua (internal file)
 
 local fio = require('fio')
+local ffi = require('ffi')
+
+ffi.cdef[[
+    int umask(int mask);
+]]
+
 local internal = fio.internal
 fio.internal = nil
 
@@ -196,6 +202,20 @@ fio.basename = function(path, suffix)
     end
 
     return path
+end
+
+fio.umask = function(umask)
+
+    if umask == nil then
+        local old = ffi.C.umask(0)
+        ffi.C.umask(old)
+        return old
+    end
+
+    umask = tonumber(umask)
+
+    return ffi.C.umask(tonumber(umask))
+
 end
 
 return fio
