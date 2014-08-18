@@ -878,6 +878,7 @@ local function tcp_connect_remote(remote, timeout)
         -- Even through the socket is nonblocking, if the server to which we
         -- are connecting is on the same host, the connect is normally
         -- established immediately when we call connect (Stevens UNP).
+        boxerrno(0)
         return s
     end
     local save_errno = s:errno()

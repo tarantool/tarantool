@@ -278,7 +278,7 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 s:listen()
 sc, e = socket.tcp_connect('unix/', path), errno()
 sc ~= nil
-e == 0
+e
 sc:close()
 s:close()
 socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
