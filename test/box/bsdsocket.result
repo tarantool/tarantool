@@ -464,7 +464,7 @@ sc:close()
 ---
 - true
 ...
-s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
@@ -505,7 +505,7 @@ s:listen(1234)
 ---
 - true
 ...
-sc = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+sc = socket('PF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
 sc:nonblock(true)
@@ -857,7 +857,7 @@ socket.tcp_connect('127.0.0.1', porrt), errno() == errno.ECONNREFUSED
 path = '/tmp/tarantool-test-socket'
 ---
 ...
-s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
 s:bind('unix/', path)
@@ -880,9 +880,9 @@ sc ~= nil
 ---
 - true
 ...
-e == 0
+e
 ---
-- true
+- 0
 ...
 sc:close()
 ---
@@ -1025,7 +1025,7 @@ f = nil
 path = '/tmp/tarantool-test-socket'
 ---
 ...
-s = socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+s = socket('PF_UNIX', 'SOCK_STREAM', 0)
 ---
 ...
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)

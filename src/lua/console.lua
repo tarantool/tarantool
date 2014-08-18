@@ -5,6 +5,7 @@ local formatter = require('yaml')
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
+local errno = require('errno')
 
 local function format(status, ...)
     -- When storing a nil in a Lua table, there is no way to
@@ -268,14 +269,15 @@ local function listen(uri)
     if host == 'unix/' then
         port = port or '/tmp/tarantool-console.sock'
         os.remove(port)
-        server = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+        server = socket('AF_UNIX', 'SOCK_STREAM', 0)
     else
         host = host or '127.0.0.1'
         port = port or 3313
         server = socket('AF_INET', 'SOCK_STREAM', 'tcp')
     end
     if not server then
-        error('failed to create socket: ' .. server:error())
+	error(string.format('failed to create socket %s%s : %s',
+			    host, port, errno.strerror()))
     end
     server:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 

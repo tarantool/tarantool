@@ -761,12 +761,17 @@ local function create_socket(domain, stype, proto)
         return nil
     end
 
-    local p = ffi.C.getprotobyname(proto)
-    if p == nil then
-        boxerrno(boxerrno.EINVAL)
-        return nil
+    local iproto
+    if type(proto) == 'string' then
+        local p = ffi.C.getprotobyname(proto)
+        if p == nil then
+            boxerrno(boxerrno.EINVAL)
+            return nil
+        end
+        iproto = p.p_proto
+    else
+        iproto = tonumber(proto)
     end
-    local iproto = p.p_proto
 
     local fh = ffi.C.socket(idomain, itype, iproto)
     if fh < 0 then
@@ -873,6 +878,7 @@ local function tcp_connect_remote(remote, timeout)
         -- Even through the socket is nonblocking, if the server to which we
         -- are connecting is on the same host, the connect is normally
         -- established immediately when we call connect (Stevens UNP).
+        boxerrno(0)
         return s
     end
     local save_errno = s:errno()
@@ -903,7 +909,7 @@ end
 
 local function tcp_connect(host, port, timeout)
     if host == 'unix/' then
-        return tcp_connect_remote({ host = host, port = port, protocol = 'ip',
+        return tcp_connect_remote({ host = host, port = port, protocol = 0,
             family = 'PF_UNIX', type = 'SOCK_STREAM' }, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
