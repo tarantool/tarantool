@@ -59,9 +59,9 @@ local function user_resolve(user)
     local _user = box.space[box.schema.USER_ID]
     local tuple
     if type(user) == 'string' then
-        tuple = _user.index['name']:get{user}
+        tuple = _user.index.name:get{user}
     else
-        tuple = _user.index['primary']:get{user}
+        tuple = _user:get{user}
     end
     if tuple == nil then
         return nil
@@ -69,8 +69,16 @@ local function user_resolve(user)
     return tuple[1]
 end
 
-box.begin = function() if ffi.C.boxffi_txn_begin() == -1 then box.error() end end
-box.commit = function() if ffi.C.boxffi_txn_commit() == -1 then box.error() end end
+box.begin = function()
+    if ffi.C.boxffi_txn_begin() == -1 then
+        box.error()
+    end
+end
+box.commit = function()
+    if ffi.C.boxffi_txn_commit() == -1 then
+        box.error()
+    end
+end
 box.rollback = ffi.C.boxffi_txn_rollback;
 
 box.schema.space = {}
@@ -670,6 +678,20 @@ local function privilege_resolve(privilege)
     return numeric
 end
 
+local function privilege_name(privilege)
+    local names = {}
+    if bit.band(privilege, 1) ~= 0 then
+        table.insert(names, "read")
+    end
+    if bit.band(privilege, 2) ~= 0 then
+        table.insert(names, "write")
+    end
+    if bit.band(privilege, 4) ~= 0 then
+        table.insert(names, "execute")
+    end
+    return table.concat(names, ",")
+end
+
 local function object_resolve(object_type, object_name)
     if object_type == 'universe' then
         return 0
@@ -685,9 +707,9 @@ local function object_resolve(object_type, object_name)
         local _func = box.space[box.schema.FUNC_ID]
         local func
         if type(object_name) == 'string' then
-            func = _func.index['name']:get{object_name}
+            func = _func.index.name:get{object_name}
         else
-            func = _func.index['primary']:get{object_name}
+            func = _func:get{object_name}
         end
         if func then
             return func[1]
@@ -699,24 +721,41 @@ local function object_resolve(object_type, object_name)
         local _user = box.space[box.schema.USER_ID]
         local role
         if type(object_name) == 'string' then
-            role = _user.index['name']:get{object_name}
+            role = _user.index.name:get{object_name}
         else
-            role = _user.index['primary']:get{object_name}
+            role = _user:get{object_name}
         end
-        if role then
+        if role and role[4] == 'role' then
             return role[1]
         else
-            box.error(box.error.NO_SUCH_USER, object_name)
+            box.error(box.error.NO_SUCH_ROLE, object_name)
         end
     end
 
     box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
 end
 
+local function object_name(object_type, object_id)
+    if object_type == 'universe' then
+        return ""
+    end
+    local space
+    if object_type == 'space' then
+        space = box.space._space
+    elseif object_type == 'function' then
+        space = box.space._func
+    elseif object_type == 'role' or object_type == 'user' then
+        space = box.space._user
+    else
+        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
+    end
+    return space:get{object_id}[3]
+end
+
 box.schema.func = {}
 box.schema.func.create = function(name)
     local _func = box.space[box.schema.FUNC_ID]
-    local func = _func.index['name']:get{name}
+    local func = _func.index.name:get{name}
     if func then
             box.error(box.error.FUNCTION_EXISTS, name)
     end
@@ -778,15 +817,15 @@ box.schema.user.drop = function(name)
     end
     -- recursive delete of user data
     local _priv = box.space[box.schema.PRIV_ID]
-    local privs = _priv.index['owner']:select{uid}
+    local privs = _priv.index.primary:select{uid}
     for k, tuple in pairs(privs) do
         box.schema.user.revoke(uid, tuple[5], tuple[3], tuple[4])
     end
-    local spaces = box.space[box.schema.SPACE_ID].index['owner']:select{uid}
+    local spaces = box.space[box.schema.SPACE_ID].index.owner:select{uid}
     for k, tuple in pairs(spaces) do
         box.space[tuple[1]]:drop()
     end
-    local funcs = box.space[box.schema.FUNC_ID].index['owner']:select{uid}
+    local funcs = box.space[box.schema.FUNC_ID].index.owner:select{uid}
     for k, tuple in pairs(funcs) do
         box.schema.func.drop(tuple[1])
     end
@@ -837,7 +876,7 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     end
     local old_privilege = tuple[5]
     local grantor = tuple[1]
-    -- XXX bug: the privilege may be removed by someone who did 
+    -- XXX gh-449: the privilege may be removed by someone who did
     -- not grant it
     if privilege ~= old_privilege then
         privilege = bit.band(old_privilege, bit.bnot(privilege))
@@ -847,18 +886,44 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     end
 end
 
+box.schema.user.info = function(user_name)
+    local uid
+    if user_name == nil then
+        uid = box.session.uid()
+    else
+        uid = user_resolve(user_name)
+        if uid == nil then
+            box.error(box.error.NO_SUCH_USER, user_name)
+        end
+    end
+    local _priv = box.space._priv
+    local _user = box.space._priv
+    local privs = {}
+    for _, v in pairs(_priv:select{uid}) do
+        table.insert(privs,
+                     {privilege_name(v[5]), v[3], object_name(v[3], v[4])})
+    end
+    return privs
+end
+
 box.schema.role = {}
 
 box.schema.role.create = function(name)
     local uid = user_resolve(name)
     if uid then
-        box.error(box.error.USER_EXISTS, name)
+        box.error(box.error.ROLE_EXISTS, name)
     end
     local _user = box.space[box.schema.USER_ID]
     _user:auto_increment{session.uid(), name, 'role'}
 end
 
 box.schema.role.drop = function(name)
+    local uid = user_resolve(name)
+    if uid == nil then
+        box.error(box.error.NO_SUCH_ROLE, name)
+    end
     return box.schema.user.drop(name)
 end
-
+box.schema.role.grant = box.schema.user.grant
+box.schema.role.revoke = box.schema.user.revoke
+box.schema.role .info = box.schema.user.info

@@ -36,7 +36,7 @@
 #include "access.h"
 
 void
-space_check_access(struct space *space, uint8_t access)
+access_check_space(struct space *space, uint8_t access)
 {
 	struct user *user = user();
 	/*
@@ -46,9 +46,9 @@ space_check_access(struct space *space, uint8_t access)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	access &= ~user->universal_access;
+	access &= ~user->universal_access.effective;
 	if (access && space->def.uid != user->uid &&
-	    access & ~space->access[user->auth_token]) {
+	    access & ~space->access[user->auth_token].effective) {
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
 			  priv_name(access), user->name, space->def.name);
 	}

@@ -35,7 +35,7 @@
 #include <exception.h>
 
 struct space {
-	uint8_t access[BOX_USER_MAX];
+	struct access access[BOX_USER_MAX];
 	/**
 	 * Reflects the current space state and is also a vtab
 	 * with methods. Unlike a C++ vtab, changes during space
@@ -85,7 +85,7 @@ struct space {
  * the requested access to the space.
  */
 void
-space_check_access(struct space *space, uint8_t access);
+access_check_space(struct space *space, uint8_t access);
 
 /** Get space ordinal number. */
 static inline uint32_t
