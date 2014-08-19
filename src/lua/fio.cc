@@ -268,6 +268,14 @@ lbox_fio_lseek(struct lua_State *L)
 	return 1;
 }
 
+#if defined(__APPLE__)
+static int
+lbox_fio_pushtimespec(struct lua_State *L, const time_t *ts)
+{
+	lua_pushnumber(L, *ts);
+	return 1;
+}
+#else
 static int
 lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 {
@@ -276,6 +284,7 @@ lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 	lua_pushnumber(L, ts->tv_sec + nsec);
 	return 1;
 }
+#endif
 
 #define PUSHTABLE(name, method, value)	{	\
 	lua_pushliteral(L, name);		\
