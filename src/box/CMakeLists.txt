@@ -7,6 +7,7 @@ lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
 lua_source(lua_sources lua/tuple.lua)
 lua_source(lua_sources lua/session.lua)
+lua_source(lua_sources lua/snap_daemon.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 

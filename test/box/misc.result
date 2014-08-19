@@ -26,6 +26,7 @@ t
   - schema
   - session
   - slab
+  - snap_daemon
   - snapshot
   - space
   - stat
