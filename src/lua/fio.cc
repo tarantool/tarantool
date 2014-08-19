@@ -298,9 +298,15 @@ lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
 	PUSHTABLE("size", lua_pushinteger, stat->st_size);
 	PUSHTABLE("blksize", lua_pushinteger, stat->st_blksize);
 	PUSHTABLE("blocks", lua_pushinteger, stat->st_blocks);
-	PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
-	PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
-	PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atim);
+	#if defined(__APPLE__)
+		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctime);
+		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtime);
+		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atime);
+	#else
+		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
+		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
+		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atim);
+	#endif
 	return 1;
 }
 
