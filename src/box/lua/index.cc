@@ -95,6 +95,9 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		key_validate(index->key_def, itype, key, part_count);
 		it = index->allocIterator();
 		index->initIterator(it, itype, key, part_count);
+		it->sc_version = sc_version;
+		it->space_id = space_id;
+		it->index_id = index_id;
 		return it;
 	} catch (Exception *) {
 		if (it)
@@ -102,6 +105,23 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		/* will be hanled by box.error() in Lua */
 		return NULL;
 	}
+}
+
+struct tuple*
+boxffi_iterator_next(struct iterator *itr)
+{
+	if (itr->sc_version != sc_version) {
+		try {
+			Index *index = check_index(itr->space_id, itr->index_id);
+			if (index->sc_version > itr->sc_version)
+				return NULL;
+			itr->sc_version = sc_version;
+		} catch (Exception *) {
+			/* will be hanled by box.error() in Lua */
+			return NULL;
+		}
+	}
+	return itr->next(itr);
 }
 
 /* }}} */

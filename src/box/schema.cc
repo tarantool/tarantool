@@ -153,6 +153,7 @@ space_cache_replace(struct space *space)
 		panic_syserror("Out of memory for the data "
 			       "dictionary cache.");
 	}
+	sc_version++;
 	/*
 	 * Must be after the space is put into the hash, since
 	 * box.schema.space.bless() uses hash look up to find the

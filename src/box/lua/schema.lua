@@ -16,6 +16,9 @@ ffi.cdef[[
         struct tuple *(*next)(struct iterator *);
         void (*free)(struct iterator *);
         void (*close)(struct iterator *);
+        int sc_version;
+        uint32_t space_id;
+        uint32_t index_id;
     };
     size_t
     boxffi_index_len(uint32_t space_id, uint32_t index_id);
@@ -24,6 +27,8 @@ ffi.cdef[[
     struct iterator *
     boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
                   const char *key);
+    struct tuple *
+    boxffi_iterator_next(struct iterator *itr);
 
     struct port;
     struct port_ffi
@@ -319,7 +324,7 @@ local iterator_gen = function(param, state)
         error('usage gen(param, state)')
     end
     -- next() modifies state in-place
-    local tuple = state.next(state)
+    local tuple = builtin.boxffi_iterator_next(state)
     if tuple ~= nil then
         return state, box.tuple.bless(tuple) -- new state, value
     else

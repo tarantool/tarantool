@@ -893,6 +893,21 @@ space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 ---
 - error: 'builtin/msgpackffi.lua:258: can not encode Lua type: ''function'''
 ...
+-- Check that iterators successfully invalidated when index deleted
+gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
+---
+...
+index_space = box.space[box.schema.INDEX_ID]
+---
+...
+index_space:delete{space.id, space.index['i1'].id}
+---
+- [512, 1, 'i1', 'tree', 0, 1, 1, 'str']
+...
+gen(param, state)
+---
+- null
+...
 space:drop()
 ---
 ...

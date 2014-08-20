@@ -161,4 +161,11 @@ iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995', 'a')
 space.index['primary']:pairs({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
+
+-- Check that iterators successfully invalidated when index deleted
+gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
+index_space = box.space[box.schema.INDEX_ID]
+index_space:delete{space.id, space.index['i1'].id}
+gen(param, state)
+
 space:drop()

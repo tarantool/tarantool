@@ -52,6 +52,9 @@ struct iterator *
 boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		      const char *key);
 
+struct tuple*
+boxffi_iterator_next(struct iterator *itr);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

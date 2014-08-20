@@ -34,6 +34,7 @@
 #include "tuple.h"
 #include "say.h"
 #include "exception.h"
+#include "schema.h"
 
 STRS(iterator_type, ITERATOR_TYPE);
 
@@ -102,6 +103,7 @@ primary_key_validate(struct key_def *key_def, const char *key,
 
 Index::Index(struct key_def *key_def_arg)
 	:key_def(key_def_dup(key_def_arg)),
+	sc_version(::sc_version++),
 	m_position(NULL)
 {}
 
@@ -128,6 +130,7 @@ Index::~Index()
 	if (m_position != NULL)
 		m_position->free(m_position);
 	key_def_delete(key_def);
+	::sc_version++;
 }
 
 struct tuple *
