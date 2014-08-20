@@ -1,0 +1,10 @@
+
+
+SNAPS=/var/lib/tarantool
+XLOGS=/var/lib/tarantool
+LOGS=/var/log/tarantool
+PIDS=/var/pid/tarantool
+USERNAME=tarantool
+
+
+# vim: set ft=sh :
