@@ -94,6 +94,7 @@ SophiaFactory::init()
 		panic("failed to create sophia environment");
 	void *conf = sp_ctl(env, "conf");
 	sp_set(conf, "env.dir", "sophia");
+	sp_set(conf, "env.create_on_write", 1);
 }
 
 void
