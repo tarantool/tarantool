@@ -117,7 +117,7 @@ boxffi_iterator_next(struct iterator *itr)
 				return NULL;
 			itr->sc_version = sc_version;
 		} catch (Exception *) {
-			/* will be hanled by box.error() in Lua */
+			/* space or index does not exist, nothing to fetch */
 			return NULL;
 		}
 	}
