@@ -508,8 +508,7 @@ ModifySpace::prepare(struct alter_space *alter)
 			  "can not change field count on a non-empty space");
 	}
 
-	EngineFactory * factory =
-		alter->old_space->engine->factory;
+	EngineFactory *factory = alter->old_space->engine->factory;
 	if (def.temporary && !engine_can_be_temporary(factory->id)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
