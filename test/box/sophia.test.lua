@@ -83,4 +83,11 @@ s.index[0]:len() -- exception
 box.error()
 s:drop()
 
+---
+--- gh-436: No error when creating temporary sophia space
+---
+
+box.cfg{}
+s = box.schema.create_space('tester',{engine='sophia', temporary=true})
+
 os.execute("rm -rf sophia")

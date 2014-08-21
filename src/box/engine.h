@@ -37,6 +37,7 @@ struct tuple;
 enum engine_flags {
 	ENGINE_TRANSACTIONAL = 1,
 	ENGINE_NO_YIELD = 2,
+	ENGINE_CAN_BE_TEMPORARY = 4
 };
 
 extern uint32_t engine_flags[BOX_ENGINE_MAX];
@@ -187,6 +188,13 @@ engine_no_yield(uint32_t id)
 {
 	assert(id);
 	return engine_flags[id] & ENGINE_NO_YIELD;
+}
+
+static inline bool
+engine_can_be_temporary(uint32_t id)
+{
+	assert(id);
+	return engine_flags[id] & ENGINE_CAN_BE_TEMPORARY;
 }
 
 static inline uint32_t

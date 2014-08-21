@@ -213,6 +213,39 @@ s:select{10000}
 s:drop()
 ---
 ...
+---
+--- gh-456: Sophia: index size() is unsupported
+---
+box.cfg{}
+---
+...
+s = box.schema.create_space('tester',{engine='sophia'})
+---
+...
+s:create_index('sophia_index', {})
+---
+...
+s.index[0]:len() -- exception
+---
+- 4294967295
+...
+box.error()
+---
+- error: SophiaIndex does not support size operation
+...
+s:drop()
+---
+...
+---
+--- gh-436: No error when creating temporary sophia space
+---
+box.cfg{}
+---
+...
+s = box.schema.create_space('tester',{engine='sophia', temporary=true})
+---
+- error: 'Can''t modify space 512: space does not support temporary flag'
+...
 os.execute("rm -rf sophia")
 ---
 - 0

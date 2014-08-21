@@ -74,7 +74,8 @@ memtx_recovery_prepare(struct engine_recovery *r)
 MemtxFactory::MemtxFactory()
 	:EngineFactory("memtx")
 {
-	flags = ENGINE_TRANSACTIONAL | ENGINE_NO_YIELD;
+	flags = ENGINE_TRANSACTIONAL | ENGINE_NO_YIELD |
+	        ENGINE_CAN_BE_TEMPORARY;
 	memtx_recovery_prepare(&recovery);
 }
 

@@ -224,6 +224,14 @@ space_def_check(struct space_def *def, uint32_t namelen, uint32_t engine_namelen
 			  "space engine name is too long");
 	}
 	identifier_check(def->engine_name);
+
+	if (def->temporary) {
+		EngineFactory *factory = engine_find(def->engine_name);
+		if (! engine_can_be_temporary(factory->id))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+			         (unsigned) def->id,
+			         "space does not support temporary flag");
+	}
 }
 
 bool
