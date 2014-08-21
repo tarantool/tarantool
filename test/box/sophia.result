@@ -227,7 +227,7 @@ s:create_index('sophia_index', {})
 ...
 s.index[0]:len() -- exception
 ---
-- 4294967295
+- error: SophiaIndex does not support size operation
 ...
 box.error()
 ---
