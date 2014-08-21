@@ -72,4 +72,15 @@ box.rollback()
 s:select{10000}
 s:drop()
 
+---
+--- gh-456: Sophia: index size() is unsupported
+---
+
+box.cfg{}
+s = box.schema.create_space('tester',{engine='sophia'})
+s:create_index('sophia_index', {})
+s.index[0]:len() -- exception
+box.error()
+s:drop()
+
 os.execute("rm -rf sophia")

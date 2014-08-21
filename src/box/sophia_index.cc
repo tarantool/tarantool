@@ -163,6 +163,8 @@ SophiaIndex::endBuild()
 size_t
 SophiaIndex::size() const
 {
+	tnt_raise(ClientError, ER_UNSUPPORTED,
+	          "SophiaIndex", "size operation");
 	return 0;
 }
 
