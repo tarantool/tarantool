@@ -62,11 +62,10 @@
   <title>Setting up the master</title>
   <para>
     To prepare the master for connections from the replica, it's only
-    necessary to enable <olink targetptr="replication_port"/> in
-    the configuration file. An example configuration file can be
-    found in <link
-    xlink:href="http://github.com/tarantool/tarantool/blob/master/test/replication/cfg/master.cfg"><filename>test/replication/cfg/master.cfg</filename></link>. A master with enabled replication_port can accept connections
-    from as many replicas as necessary on that port. Each replica
+    necessary to include "listen" in the initil <code>box.cfg</code>
+    request, for example <code>box.cfg{listen=3301}</code>.
+    A master with enabled "listen" uri can accept connections
+    from as many replicas as necessary on that uri. Each replica
     has its own replication state.
   </para>
 </section>
@@ -75,7 +74,7 @@
   <para>
     A server, whether master or replica, always requires a valid
     snapshot file to boot from. For a master, a snapshot file is usually
-    prepared with with the <olink targetptr="init-storage-option"/> option.
+    prepared as soon as <code>box.cfg</code> occurs.
     For a replica, it's usually copied from the master.
   </para>
   <para>
@@ -183,6 +182,647 @@
       </listitem>
     </itemizedlist>
   </para>
+  
+<para>
+Replication allows multiple Tarantool servers to work on
+copies of the same databases. The databases are kept in
+synch because each server can communicate its changes to
+all the other servers. Servers which share the same databases
+are a "cluster".
+</para>
+
+
+<para>
+ <bridgehead renderas="sect4">Instructions for quick startup of a new two-server simple cluster</bridgehead>
+Step 1. Start the first server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#1</replaceable>}</userinput>
+<userinput>box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request</userinput>
+<userinput>box.snapshot()</userinput></programlisting>... Now a new cluster exists.
+</para>
+<para>
+Step 2. Check where the second server's files will go by looking at
+   its directories (snap_dir, wal_dir). They must be empty --
+   when the second server joins for the first time, it has to
+   be working with a clean slate so that the initial copy of
+   the first server's databases can happen without conflicts.
+</para>
+<para>
+Step 3. Start the second server thus:<programlisting><userinput>box.cfg{listen=uri#2, replication_source=<replaceable>uri#1</replaceable>}</userinput></programlisting>
+... where uri#1 = the primary port that the first server is listening on.
+</para>
+<para>
+That's all.
+</para>
+<para>
+In this configuration, the first server is the "master" and
+the second server is the "replica". Henceforth every change
+that happens on the master will be visible on the replica.
+A simple two-server cluster with the master on one computer
+and the replica on a different computer is very common and
+provides two benefits: FAILOVER (because if the master goes
+down then the replica can take over), or LOAD BALANCING
+(because clients can connect to either the master or the
+replica for select requests).
+</para>
+
+  <para>
+  <bridgehead renderas="sect4">Master-master</bridgehead>
+  In the simple master-replica configuration, the master's
+  changes are seen by the replica, but not vice versa,
+  because the master was specified as the sole replication source.
+  Starting with Tarantool 1.6, it's possible to go both ways.
+  Starting with the simple configuration, the first server has to say:
+  <code>box.cfg{replication_source=<replaceable>uri#2</replaceable>}</code>.
+  This request can be performed at any time.
+  </para>
+  <para>
+  In this configuration, both servers are "masters" and
+  both servers are "replicas". Henceforth every change
+  that happens on either server will be visible on the other.
+  The failover benefit is still present, and the load-balancing
+  benefit is enhanced (because clients can connect to either
+  server for data-change requests as well as select requests).
+  </para>
+  <para>
+  If two operations for the same tuple take place "concurrently"
+  (which can involve a long interval because replication is asynchronous),
+  and one of the operations is <code>delete</code> or <code>replace</code>,
+  there is a possibility that servers will end up with different
+  contents.
+  </para>
+  <para>
+  <bridgehead renderas="sect4">All the "What If?" Questions</bridgehead>
+  <emphasis>What if there are more than two servers with master-master?</emphasis>
+  ... On each server, specify the replication_source for all
+  the others. For example, server #3 would have a request:
+  <code>box.cfg{replication_source=<replaceable>uri#1</replaceable>, replication_source=<replaceable>uri#2</replaceable>}</code>.
+  </para>
+  <para>
+  <emphasis>What if a a server should be taken out of the cluster?</emphasis>
+  ... Run box.cfg{} again specifying a blank replication source:
+  <code>box.cfg{replication_source=''}</code>.
+  </para>
+  <para>
+  <emphasis>What if a server leaves the cluster?</emphasis>
+  ... The other servers carry on. If the wayward server rejoins,
+  it will receive all the updates that the other servers made
+  while it was away.
+  </para>
+  <para>
+  <emphasis>What if two servers both change the same tuple?</emphasis>
+  ... The last changer wins. For example, suppose that server#1 changes
+  the tuple, then server#2 changes the tuple. In that case server#2's
+  change overrides whatever server#1 did. In order to 
+  keep track of who came last, Tarantool implements a
+  <link xlink:href="https://en.wikipedia.org/wiki/Vector_clock">vector clock</link>.
+  </para>
+  <para>
+  <emphasis>What if a master disappears and the replica must take over?</emphasis>
+  ... A message will appear on the replica stating that the
+  connection is lost. The replica must now become independent,
+  which can be done by saying
+  <code>box.cfg{replication_source=''}</code>.
+  </para>
+  <para>
+  <emphasis>What if it's necessary to know what cluster a server is in?</emphasis>
+  ... The identification of the cluster is a UUID which is generated
+  when the first master starts for the first time. This UUID is
+  stored in the system space <code>_cluster</code>, in the first tuple. So to
+  see it, say:
+  <code>box.space._cluster:select{1}</code>
+  </para>
+  <para>
+  <emphasis>What if one of the server's files is corrupted or deleted?</emphasis>
+  ... Stop the other servers, copy all the database files (the
+  ones with extension "snap" or "xlog") over to the server with
+  the problem, and then restart all servers.
+  </para>
+
+  <para>
+  <bridgehead renderas="sect4">Hands-On (Tutorial)</bridgehead>
+  After following the steps here,
+  an administrator will have experience
+  creating a cluster and adding a replica.
+  </para>
+  <para>
+  Start two shells. Put them side by side on the screen.
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry>__________TERMINAL #1__________</entry><entry>__________TERMINAL #2__________</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>$</prompt></programlisting></entry>
+          <entry><programlisting><prompt>$</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+  On the first shell, which we'll call Terminal #1,
+  execute these commands:
+<programlisting>
+<userinput># Terminal 1</userinput>
+<userinput>mkdir -p ~/tarantool_test_node_1</userinput>
+<userinput>cd ~/tarantool_test_node_1</userinput>
+<userinput>rm -R ~/tarantool_test_node_1/*</userinput>
+<userinput>~/tarantool-master/src/tarantool</userinput>
+<userinput>box.cfg{listen=3301, logger='filename.log'}</userinput>
+<userinput>box.schema.user.grant('guest','read,write,execute','universe')</userinput>
+<userinput>box.space._cluster:select({0},{iterator='GE'})</userinput>
+</programlisting>
+</para>
+<para>
+The result is that a new cluster is set up, and
+the UUID is displayed.
+Now the screen looks like this: (except that UUID values are always different):
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting>$ # Terminal 1
+$ mkdir -p ~/tarantool_test_node_1
+$ cd ~/tarantool_test_node_1
+~/tarantool_test_node_1$ rm -R ~/tarantool_test_node_1/*
+~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+~/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+type 'help' for interactive help
+tarantool&gt; box.cfg{listen=3301}
+... ...
+tarantool&gt; box.schema.user.grant('guest','read,write,execute','universe')
+2014-08-14 13:39:57.712 [24956] wal I> creating `./00000000000000000000.xlog.inprogress'
+---
+...
+tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+---
+- - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
+...
+</programlisting></entry>
+          <entry><programlisting>$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+On the second shell, which we'll call Terminal #2,
+execute these commands:<programlisting>
+<userinput># Terminal 2</userinput>
+<userinput>mkdir -p ~/tarantool_test_node_2</userinput>
+<userinput>cd ~/tarantool_test_node_2</userinput>
+<userinput>rm -R ~/tarantool_test_node_2/*</userinput>
+<userinput>~/tarantool-master/src/tarantool</userinput>
+<userinput>box.cfg{listen=3302, replication_source=3301}</userinput>
+<userinput>box.space._cluster:select({0},{iterator='GE'})</userinput></programlisting>
+The result is that a replica is set up.
+Messages appear on Terminal #1 confirming that the
+replica has connected and that the WAL contents
+have been shipped to the replica.
+Messages appear on Terminal #2 showing that
+replication is starting.
+Also on Terminal#2 the _cluster UUID value is displayed, and it is
+the same as the _cluster UUID value that
+was displayed on Terminal #1, because both
+servers are in the same cluster.
+
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting>... ...
+tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+---
+- - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
+...
+tarantool> 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replication relay: pid = 25148
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovery start
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovering from `./00000000000000000000.snap'
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> snapshot sent
+2014-08-14 13:41:31.190 [24958] main/101/spawner I> created a replication relay: pid = 25150
+2014-08-14 13:41:31.291 [25150] main/101/relay/127.0.0.1:42759 I> recover from `./00000000000000000000.xlog'</programlisting></entry>
+          <entry><programlisting><prompt>$ # Terminal 2
+~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
+~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
+~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
+~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+type 'help' for interactive help
+tarantool&gt; box.cfg{listen=3302, replication_source=3301}
+... ...
+---
+...
+tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+2014-08-14 13:41:31.189 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
+2014-08-14 13:41:31.291 [25139] wal I> creating `./00000000000000000000.xlog.inprogress'
+---
+- - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
+  - [2, 'ea7d17d7-6690-4334-b09c-f38ffa305d36']
+...
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+On Terminal #1, execute these requests:
+<programlisting><userinput>s = box.schema.create_space('tester')</userinput>
+<userinput>s:create_index('primary', {})</userinput>
+<userinput>s:insert{1,'Tuple inserted on Terminal #1'}</userinput></programlisting>
+Now the screen looks like this:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+tarantool&gt; 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replication relay: pid = 25148
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovery start
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovering from `./00000000000000000000.snap'
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> snapshot sent
+2014-08-14 13:41:31.190 [24958] main/101/spawner I> created a replication relay: pid = 25150
+2014-08-14 13:41:31.291 [25150] main/101/relay/127.0.0.1:42759 I> recover from `./00000000000000000000.xlog'
+s = box.schema.create_space('tester')
+---
+...
+tarantool&gt; s:create_index('primary', {})
+---
+...
+tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+---
+- [1, 'Tuple inserted on Terminal #1']
+...
+</prompt></programlisting></entry>
+          <entry><programlisting><prompt>$ # Terminal 2
+~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
+~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
+~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
+~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+type 'help' for interactive help
+tarantool&gt; box.cfg{listen=3302, replication_source=3301}
+... ...
+---
+...
+tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+2014-08-14 13:41:31.189 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
+2014-08-14 13:41:31.291 [25139] wal I> creating `./00000000000000000000.xlog.inprogress'
+---
+- - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
+  - [2, 'ea7d17d7-6690-4334-b09c-f38ffa305d36']
+...</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+The creation and insertion were successful on Terminal #1.
+Nothing has happened on Terminal #2.
+</para>
+<para>
+On Terminal #2, execute these requests:<programlisting>
+<userinput>s = box.space.tester</userinput>
+<userinput>s:select({1},{iterator='GE'})</userinput>
+<userinput>s:insert{2,'Tuple inserted on Terminal #2'}</userinput></programlisting>
+Now the screen looks like this:
+
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+tarantool&gt; 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replication relay: pid = 25148
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovery start
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovering from `./00000000000000000000.snap'
+2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> snapshot sent
+2014-08-14 13:41:31.190 [24958] main/101/spawner I> created a replication relay: pid = 25150
+2014-08-14 13:41:31.291 [25150] main/101/relay/127.0.0.1:42759 I> recover from `./00000000000000000000.xlog'
+s = box.schema.create_space('tester')
+---
+...
+tarantool&gt; s:create_index('primary', {})
+---
+...
+tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+---
+- [1, 'Tuple inserted on Terminal #1']
+...</prompt></programlisting></entry>
+          <entry><programlisting><prompt>... ...
+tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+2014-08-14 13:41:31.189 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
+2014-08-14 13:41:31.291 [25139] wal I> creating `./00000000000000000000.xlog.inprogress'
+---
+- - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
+  - [2, 'ea7d17d7-6690-4334-b09c-f38ffa305d36']
+...
+tarantool&gt; s = box.space.tester
+---
+...
+tarantool&gt; s:select({1},{iterator='GE'})
+---
+- - [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+---
+- [2, 'Tuple inserted on Terminal #2']
+...
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+The selection and insertion were successful on Terminal #2.
+Nothing has happened on Terminal #1.
+</para>
+<para>
+On Terminal #1, execute these Tarantool requests and shell commands:<programlisting>
+<userinput>os.exit()</userinput>
+<userinput>ls -l ~/tarantool_test_node_1</userinput>
+<userinput>ls -l ~/tarantool_test_node_2</userinput></programlisting>
+Now Tarantool #1 is stopped.
+Messages appear on Terminal #2 announcing that fact.
+The "ls -l" commands show that both servers have
+made snapshots, which have the same size because
+they both contain the same tuples.
+
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+---
+- [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; os.exit()
+2014-08-14 15:08:40.376 [25150] main/101/relay/127.0.0.1:42759 I> done `./00000000000000000000.xlog'
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> Exiting: master shutdown
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> sending signal 15 to 1 children
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> waiting for children for up to 5 seconds
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_1
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:39 00000000000000000000.snap
+-rw-rw-r-- 1   416 Aug 14 15:08 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:39 sophia
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_2
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:41 00000000000000000000.snap
+-rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:41 sophia
+</prompt></programlisting></entry>
+          <entry><programlisting><prompt>... ...
+tarantool&gt; s:select({1},{iterator='GE'})
+---
+- - [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+---
+- [2, 'Tuple inserted on Terminal #2']
+...
+tarantool&gt; 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> can't read row
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 !> SystemError
+unexpected EOF when reading from socket,
+called on fd 11, aka 127.0.0.1:42759, peer of 127.0.0.1:3301: Broken pipe
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> will retry every 1 second
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+On Terminal #2, execute these requests:<programlisting>
+<userinput>box.space.tester:select({0},{iterator='GE'})</userinput>
+<userinput>box.space.tester:insert{3,'Another'}</userinput></programlisting>
+Now the screen looks like this:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+---
+- [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; os.exit()
+2014-08-14 15:08:40.376 [25150] main/101/relay/127.0.0.1:42759 I> done `./00000000000000000000.xlog'
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> Exiting: master shutdown
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> sending signal 15 to 1 children
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> waiting for children for up to 5 seconds
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_1
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:39 00000000000000000000.snap
+-rw-rw-r-- 1   416 Aug 14 15:08 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:39 sophia
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_2
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:41 00000000000000000000.snap
+-rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:41 sophia
+</prompt></programlisting></entry>
+          <entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+---
+- [2, 'Tuple inserted on Terminal #2']
+...
+tarantool&gt; 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> can't read row
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 !> SystemError
+unexpected EOF when reading from socket,
+called on fd 11, aka 127.0.0.1:42759, peer of 127.0.0.1:3301: Broken pipe
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> will retry every 1 second
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+---
+- - [1, 'Tuple inserted on Terminal #1']
+  - [2, 'Tuple inserted on Terminal #2']
+...
+
+tarantool&gt; box.space.tester:insert{3,'Another'}
+---
+- [3, 'Another']
+...
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+Terminal #2 has done a select and an insert,
+even though Terminal #1 is down.
+</para>
+<para>
+On Terminal #1 execute these commands:<programlisting>
+<userinput>~/tarantool-master/src/tarantool</userinput>
+<userinput>box.cfg{listen=3301}</userinput>
+<userinput>box.space.tester:select({0},{iterator='GE'})</userinput></programlisting>
+Now the screen looks like this:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+---
+- [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; os.exit()
+2014-08-14 15:08:40.376 [25150] main/101/relay/127.0.0.1:42759 I> done `./00000000000000000000.xlog'
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> Exiting: master shutdown
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> sending signal 15 to 1 children
+2014-08-14 15:08:40.414 [24958] main/101/spawner I> waiting for children for up to 5 seconds
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_1
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:39 00000000000000000000.snap
+-rw-rw-r-- 1   416 Aug 14 15:08 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:39 sophia
+~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_2
+total 12
+-rw-rw-r-- 1  1781 Aug 14 13:41 00000000000000000000.snap
+-rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
+drwxr-x--- 2  4096 Aug 14 13:41 sophia
+~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+~/tarantool: version 1.6.0-1724-g033ed69
+type 'help' for interactive help
+tarantool&gt; box.cfg{listen=3301}
+... ...
+---
+...
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+2014-08-14 15:22:22.883 [14305] main/101/spawner I> created a replication relay: pid = 14313
+2014-08-14 15:22:22.983 [14313] main/101/relay/127.0.0.1:43646 I> recover from `./00000000000000000000.xlog'
+2014-08-14 15:22:22.984 [14313] main/101/relay/127.0.0.1:43646 I> done `./00000000000000000000.xlog'
+---
+- - [1, 'Tuple inserted on Terminal #1']
+...
+</prompt></programlisting></entry>
+          <entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+---
+- [2, 'Tuple inserted on Terminal #2']
+...
+tarantool&gt; 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> can't read row
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 !> SystemError
+unexpected EOF when reading from socket,
+called on fd 11, aka 127.0.0.1:42759, peer of 127.0.0.1:3301: Broken pipe
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> will retry every 1 second
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+---
+- - [1, 'Tuple inserted on Terminal #1']
+  - [2, 'Tuple inserted on Terminal #2']
+...
+
+tarantool&gt; box.space.tester:insert{3,'Another'}
+---
+- [3, 'Another']
+...
+tarantool&gt;
+2014-08-14 15:22:22.881 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+
+The master has reconnected to the cluster,
+and has NOT found what the replica wrote
+while the master was away. That is not a
+surprise -- the replica has not been asked
+to act as a replication source.
+</para>
+<para>
+On Terminal #1, say:<programlisting>
+<userinput>box.cfg{replication_source='3302'}</userinput>
+<userinput>box.space.tester:select({0},{iterator='GE'})</userinput></programlisting>
+The screen now looks like this:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
+     </thead>
+    <tbody>
+     <row><entry><programlisting><prompt>... ...
+~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+~/tarantool: version 1.6.0-1724-g033ed69
+type 'help' for interactive help
+tarantool&gt; box.cfg{listen=3301}
+... ...
+---
+...
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+2014-08-14 15:22:22.883 [14305] main/101/spawner I> created a replication relay: pid = 14313
+2014-08-14 15:22:22.983 [14313] main/101/relay/127.0.0.1:43646 I> recover from `./00000000000000000000.xlog'
+2014-08-14 15:22:22.984 [14313] main/101/relay/127.0.0.1:43646 I> done `./00000000000000000000.xlog'
+---
+- - [1, 'Tuple inserted on Terminal #1']
+...
+tarantool&gt; box.cfg{replication_source='3302'}
+2014-08-14 15:35:47.567 [14303] main/101/interactive C> starting replication from 0.0.0.0:3302
+---
+...
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+2014-08-14 15:35:47.568 [14303] main/103/replica/0.0.0.0:3302 C> connected to master
+2014-08-14 15:35:47.670 [14303] wal I> creating `./00000000000000000005.xlog.inprogress'
+2014-08-14 15:35:47.684 [14313] main/101/relay/127.0.0.1:43646 I> recover from `./00000000000000000005.xlog'
+</prompt></programlisting></entry>
+          <entry><programlisting><prompt>... ...
+tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+---
+- [2, 'Tuple inserted on Terminal #2']
+...
+tarantool&gt; 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> can't read row
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 !> SystemError
+unexpected EOF when reading from socket,
+called on fd 11, aka 127.0.0.1:42759, peer of 127.0.0.1:3301: Broken pipe
+2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> will retry every 1 second
+tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+---
+- - [1, 'Tuple inserted on Terminal #1']
+  - [2, 'Tuple inserted on Terminal #2']
+...
+
+tarantool&gt; box.space.tester:insert{3,'Another'}
+---
+- [3, 'Another']
+...
+tarantool&gt;
+2014-08-14 15:22:22.881 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
+tarantool&gt; 2014-08-14 15:35:47.569 [25141] main/101/spawner I> created a replication relay: pid = 15585
+2014-08-14 15:35:47.670 [15585] main/101/relay/127.0.0.1:51915 I> recover from `./00000000000000000000.xlog'
+</prompt></programlisting></entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
+This shows that the two servers are once
+again in synch, and that each server sees
+what the other server wrote.
+</para>
+<para>
+To clean up, say "os.exit()" on both
+Terminal #1 and Terminal #2, and then
+on either terminal say:<programlisting>
+<userinput>cd ~</userinput>
+<userinput>rm -R ~/tarantool_test_node_1</userinput>
+<userinput>rm -R ~/tarantool_test_node_2</userinput></programlisting>
+</para>
+
+
 </section>
 
 </chapter>
