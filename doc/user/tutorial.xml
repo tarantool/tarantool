@@ -75,6 +75,7 @@ forthcoming "Jessie". Add the tarantool.org repository to your apt
 sources list. $release is an environment variable which will
 contain the Debian version code e.g. "Wheezy":
 <programlisting>
+<userinput>
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
 release=`lsb_release -c -s`
@@ -86,6 +87,7 @@ release=`lsb_release -c -s`
 # install
 <command>sudo apt-get update</command>
 <command>sudo apt-get install</command> tarantool
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -102,6 +104,7 @@ $release is an environment variable which will contain the Ubuntu version
 code e.g. "precise". If you want the version that comes with
 Ubuntu, start with the lines that follow the '# install' comment:
 <programlisting>
+<userinput>
 <command>cd</command> ~
 <command>wget</command> http://tarantool.org/dist/public.key
 <command>sudo apt-key add</command> <filename>./public.key</filename>
@@ -114,6 +117,7 @@ release=`lsb_release -c -s`
 # install
 <command>sudo apt-get update</command>
 <command>sudo apt-get install</command> tarantool
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -145,15 +149,16 @@ Add the following section to your yum repository list
 version must be either 5 or 6 and  $basearch i.e. base
 architecture must be either i386 or x86_64):
 <programlisting>
+<userinput>
 # [tarantool]
 name=CentOS-<replaceable>$releasever</replaceable> - Tarantool
 baseurl=http://tarantool.org/dist/master/centos/<replaceable>$releasever</replaceable>/os/<replaceable>$basearch</replaceable>/
 enabled=1
 gpgcheck=0
-</programlisting>
+</userinput></programlisting>
 For example, if you have CentOS version 6 and x86-64, you can
 add the new section thus:
-<programlisting>
+<programlisting><userinput>
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=CentOS-6 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -161,6 +166,7 @@ add the new section thus:
 <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -175,14 +181,17 @@ Add the following section to your yum repository list
 (in the following instructions, $releasever i.e. Fedora release
 version must be 2 and $basearch i.e. base architecture must be x86_64):
 <programlisting>
+<userinput>
 [tarantool]
 name=Fedora-<replaceable>$releasever</replaceable> - Tarantool
 baseurl=http://tarantool.org/dist/master/fedora/<replaceable>$releasever</replaceable><replaceable>$basearch</replaceable>/
 enabled=1
 gpgcheck=0
+</userinput>
 </programlisting>
 For example, if you have Fedora version 20, you can add the new section thus:
 <programlisting>
+<userinput>
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "name=Fedora - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
@@ -190,6 +199,7 @@ For example, if you have Fedora version 20, you can add the new section thus:
 <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -200,9 +210,11 @@ For example, if you have Fedora version 20, you can add the new section thus:
 Tarantool is available from tarantool portage overlay.
 Use layman to add the overlay to your system:
 <programlisting>
+<userinput>
 <command>layman</command> <option>-S</option>
 <command>layman</command> <option>-a</option> tarantool
 <command>emerge</command> <filename>dev-db/tarantool</filename> <option>-av</option>
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -226,9 +238,11 @@ First upgrade Clang (the C compiler) to version 3.2 or later using
 Command Line Tools for Xcode disk image version 4.6+ from
 Apple Developer web-site. Then use <command>brew</command>:
 <programlisting>
+<userinput>
 <command>brew install</command> --use-clang https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
 # or
 <command>brew install</command> https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
+</userinput>
 </programlisting>
 </para>
 </simplesect>
@@ -259,14 +273,14 @@ github.com, and from github one gets with git.
  <listitem>
    <para>
 A C/C++ compiler.
-	Ordinarily the compiler is <productname>GCC</productname> version 4.6 or later,
+ Ordinarily the compiler is <productname>GCC</productname> version 4.6 or later,
   on Mac OS X it should be <productname>Clang</productname> version 3.2 or later.
  </para>
  </listitem>
  <listitem>
    <para>
 A program for managing the build process.
-	This is always <productname>CMake</productname> for GNU/Linux and FreeBSD.
+ This is always <productname>CMake</productname> for GNU/Linux and FreeBSD.
  The CMake version should be 2.8 or later.
  </para>
  </listitem>
@@ -310,10 +324,12 @@ ones unless you intend to work on the documentation.</para>
 ... You should see that the python version is greater than 2.6 -- preferably 2.7 -- and less than 3.</para>
 <para>On Ubuntu you can get modules from the repository:
 <programlisting>
+<userinput>
 # For test suite
 <command>sudo apt-get install</command> python-daemon python-yaml python-argparse
 # For documentation
 <command>sudo apt-get install</command> python-jinja2 python-markdown
+</userinput>
 </programlisting></para>
 <para>On CentOS too you can get modules from the repository:<programlisting><command>sudo yum install</command> python26 python26-PyYAML python26-argparse</programlisting></para>
 <para>But in general it is best to set up the modules by getting
@@ -321,35 +337,43 @@ ones unless you intend to work on the documentation.</para>
 <programlisting># python module for parsing YAML (pyYAML): For test suite:
 # (If wget fails, check the <citetitle xlink:href="http://pyyaml.org/wiki/PyYAML" xlink:title="Python YAML parser">PyYAML</citetitle> web site
 # to see what the current version is.)
+<userinput>
 <command>cd</command> ~
 <command>wget</command> http://pyyaml.org/download/pyyaml/PyYAML-3.10.tar.gz
 <command>tar</command> <option>-xzf</option> PyYAML-3.10.tar.gz
 <command>cd</command> PyYAML-3.10
 <command>sudo python</command> setup.py install
+</userinput>
 # python module for helping programs become daemons (daemon): For test suite:
 # (if wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/python-daemon" xlink:title="Python daemon">python-daemon</citetitle> web site
 # to see what the current version is.)
+<userinput>
 <command>cd</command> ~
 <command>wget</command> http://pypi.python.org/packages/source/p/python-daemon/python-daemon-1.5.5.tar.gz
 <command>tar</command> <option>-xzvf</option> python-daemon-1.5.5.tar.gz
 <command>cd</command> python-daemon-1.5.5
 <command>sudo python</command> setup.py install
+</userinput>
 # python module for template engine (jinja2): For documentation:
 # (If wget fails, check the <citetitle xlink:href="https://pypi.python.org/pypi/Jinja2" xlink:title="Python Jinja2">python-jinja2</citetitle> web site
 # to see what the current version is.)
+<userinput>
 <command>cd</command> ~
 <command>wget</command> https://pypi.python.org/packages/source/J/Jinja2/Jinja2-2.7.2.tar.gz
 <command>tar</command> <option>-xzvf</option> Jinja2-2.7.2.tar.gz
 <command>cd</command> Jinja2-2.7.2
 <command>sudo python</command> setup.py install
+</userinput>
 # python module for text-to-html conversion (markdown): For documentation:
 # (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/Markdown/" xlink:title="Python implementation of Markdown">python-markdown</citetitle> web site
 # to see what the current version is.)
+<userinput>
 <command>cd</command> ~
 <command>wget</command> https://pypi.python.org/packages/source/M/Markdown/Markdown-2.3.1.tar.gz
 <command>tar</command> <option>-xzvf</option> Markdown-2.3.1.tar.gz
 <command>cd</command> Markdown-2.3.1
 <command>sudo python</command> setup.py install
+</userinput>
 </programlisting>
 </para>
 
@@ -360,9 +384,9 @@ the tarantool download will go inside it, as <computeroutput><filename>~/taranto
 </para>
 
 <para>
-4. Use <productname>git</productname> to download from github.com.<programlisting>
+4. Use <productname>git</productname> to download from github.com.<programlisting><userinput>
 <command>cd</command> ~
-<command>git clone</command> <option>-b master</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></programlisting>
+<command>git clone</command> <option>-b master</option> https://github.com/tarantool/tarantool.git <option>tarantool</option></userinput></programlisting>
 The optional argument <quote>-b master</quote> causes download from the master branch instead of the stable branch,
 and the optional last word on the line, <quote>tarantool</quote>, means download is to <computeroutput>~/tarantool</computeroutput>.
 </para>
@@ -371,34 +395,34 @@ and the optional last word on the line, <quote>tarantool</quote>, means download
 5. Use <productname>git</productname> again so that third-party contributions will be seen as well.
 This step is only necessary once, the first time you do a download.
 There is an alternative -- say <quote><computeroutput><command>git clone</command> --recursive</computeroutput></quote> in step 3 --
-but we prefer this method because it works with older versions of <productname>git</productname>.<programlisting><command>cd</command> ~/tarantool
+but we prefer this method because it works with older versions of <productname>git</productname>.<programlisting><userinput><command>cd</command> ~/tarantool
 <command>git submodule init</command>
 <command>git submodule update</command>
-<command>cd</command> ../</programlisting>
+<command>cd</command> ../</userinput></programlisting>
 On rare occasions, the submodules will need to be updated again with the command: <userinput>git submodule update --init</userinput>.
 </para>
 
 <para>
-6. Use CMake to initiate the build.<programlisting><command>cd</command> ~/tarantool
+6. Use CMake to initiate the build.<programlisting><userinput><command>cd</command> ~/tarantool
 <command>make clean</command>         # unnecessary, added for good luck
 <command>rm CMakeCache.txt</command>  # unnecessary, added for good luck
-<command>cmake .</command>            # Start build with build type=Debug, no doc</programlisting>
+<command>cmake .</command>            # Start build with build type=Debug, no doc</userinput></programlisting>
 
 The option for specifying build type is <option>-DCMAKE_BUILD_TYPE=</option><replaceable>type</replaceable> where
    type = {None | Debug | Release | RelWithDebInfo | MinSizeRel} and a reasonable
-				choice for production is <option>-DCMAKE_BUILD_TYPE=RelWithDebInfo</option> (<quote>Debug</quote>
-				is used only by project maintainers and <quote>Release</quote> is used only when the
+    choice for production is <option>-DCMAKE_BUILD_TYPE=RelWithDebInfo</option> (<quote>Debug</quote>
+    is used only by project maintainers and <quote>Release</quote> is used only when the
    highest performance is required).
-	The option for asking to build documentation is <computeroutput><option>-DENABLE_DOC=</option><replaceable>{true|false}</replaceable></computeroutput>
+ The option for asking to build documentation is <computeroutput><option>-DENABLE_DOC=</option><replaceable>{true|false}</replaceable></computeroutput>
    and the assumption is that only a minority will need to rebuild the
    documentation (such as what you're reading now), so details about
    documentation are in the developer manual, and the reasonable choice
-				is <computeroutput><option>-DENABLE_DOC=false</option></computeroutput> or just don't use the <computeroutput><option>-DENABLE_DOC</option></computeroutput> clause at all.
+    is <computeroutput><option>-DENABLE_DOC=false</option></computeroutput> or just don't use the <computeroutput><option>-DENABLE_DOC</option></computeroutput> clause at all.
 </para>
 
 <para>
-	7. Use make to complete the build.<programlisting><command>make</command></programlisting>
-	It's possible to say <quote><computeroutput><command>make install</command></computeroutput></quote> too, but that's not generally done.
+ 7. Use make to complete the build.<programlisting><userinput><command>make</command></userinput></programlisting>
+ It's possible to say <quote><computeroutput><command>make install</command></computeroutput></quote> too, but that's not generally done.
 </para>
 
 <para>
@@ -408,10 +432,10 @@ The option for specifying build type is <option>-DCMAKE_BUILD_TYPE=</option><rep
 Tarantool's developers always run the test suite before they publish new versions. You should run the test suite too, if you
    make any changes in the code.
 Assuming you downloaded to <filename>~/tarantool</filename>,
-the principal steps are:<programlisting><command>mkdir</command> ~/tarantool/bin    # make a subdirectory named <filename>bin</filename>
+the principal steps are:<programlisting><userinput><command>mkdir</command> ~/tarantool/bin    # make a subdirectory named <filename>bin</filename>
 <command>ln</command> /usr/bin/python ~/tarantool/bin/python # link python to bin (this may require superuser privilege)
 <command>cd</command> ~/tarantool/test #get on the test subdirectory
-PATH=~/tarantool/bin:$PATH ./run #run tests using python</programlisting>
+PATH=~/tarantool/bin:$PATH ./run #run tests using python</userinput></programlisting>
  
 
 The output should contain reassuring reports, for example
@@ -427,9 +451,9 @@ box/auth_access.test.lua                        [ pass ]
 ... etc.</computeroutput></programlisting>
 There are more than 70 tests in the suite.
 
-   To prevent later confusion, clean up what's in the <filename>bin</filename>
-subdirectory:<programlisting><command>rm</command> ~/tarantool/bin/python
-<command>rmdir</command> ~/tarantool/bin</programlisting>
+To prevent later confusion, clean up what's in the <filename>bin</filename>
+subdirectory:<programlisting><userinput><command>rm</command> ~/tarantool/bin/python
+<command>rmdir</command> ~/tarantool/bin</userinput></programlisting>
 </para>
 
 
@@ -471,20 +495,20 @@ Here is how to create a simple test database after installing.
 </para>
 
 <para>
-1. Create a new directory. It's just for tests, you can delete it when the tests are over.<programlisting>
-<command>mkdir</command> ~/tarantool_sandbox
-<command>cd</command> ~/tarantool_sandbox </programlisting>
+1. Create a new directory. It's just for tests, you can delete it when the tests are over.<programlisting><userinput>
+<command>mkdir</command> <replaceable>~/tarantool_sandbox</replaceable>
+<command>cd</command> <replaceable>~/tarantool_sandbox</replaceable> </userinput></programlisting>
 </para>
 
 <para>
 2. Start the server.
-The server name is <computeroutput><filename>tarantool</filename></computeroutput>.<programlisting>
+The server name is <computeroutput><filename>tarantool</filename></computeroutput>.<programlisting><userinput>
 #if you downloaded a binary with apt-get or yum, say this:
   <command>/usr/bin/tarantool</command>
 #if you downloaded and untarred a binary tarball to ~/tarantool, say this:
   <command>~/tarantool/bin/tarantool</command>
 #if you built from a source download, say this:
-  <command>~/tarantool/src/tarantool</command> </programlisting>
+  <command>~/tarantool/src/tarantool</command> </userinput></programlisting>
 </para>
 
 <para>
@@ -495,7 +519,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 </para>
 
 <para>
-If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting>
+If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting><computeroutput>
 tarantool> box.cfg{listen=3301}
 2014-08-07 09:41:41.077 ... version 1.6.0-1691-g95435d4
 2014-08-07 09:41:41.077 ... log level 5
@@ -508,7 +532,7 @@ tarantool> box.cfg{listen=3301}
 2014-08-07 09:41:41.095 ... saving snapshot `./00000000000000000000.snap.inprogress'
 2014-08-07 09:41:41.127 ... done
 2014-08-07 09:41:41.128 ... bound to primary port 0.0.0.0:3301
-2014-08-07 09:41:41.128 ... ready to accept requests</programlisting>
+2014-08-07 09:41:41.128 ... ready to accept requests</computeroutput></programlisting>
 </para>
 
 <para>
@@ -547,7 +571,7 @@ try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>t = s:insert(
 To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select{3}</userinput></programlisting>
 
-Your terminal screen should now look like this:<programlisting>
+Your terminal screen should now look like this:<programlisting><computeroutput>
 tarantool&gt; s = box.schema.create_space('tester')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
@@ -569,7 +593,7 @@ tarantool&gt; s:select{3}
 - - [3, 'Length', 93]
 ...
 
-tarantool&gt;</programlisting>
+tarantool&gt;</computeroutput></programlisting>
 </para>
 
 <para>

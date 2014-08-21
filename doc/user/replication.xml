@@ -100,7 +100,7 @@
   <note><simpara>
     Replication parameters are "dynamic", which allows the
     replica to become a master and vice versa with the help of the
-    <olink targetptr="box.cfg"/> statement.
+    <olink targetptr="box.cfg">box.cfg</olink> statement.
   </simpara></note>
 
 </section>
@@ -206,7 +206,7 @@ Step 2. Check where the second server's files will go by looking at
    the first server's databases can happen without conflicts.
 </para>
 <para>
-Step 3. Start the second server thus:<programlisting><userinput>box.cfg{listen=uri#2, replication_source=<replaceable>uri#1</replaceable>}</userinput></programlisting>
+Step 3. Start the second server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#2</replaceable>, replication_source=<replaceable>uri#1</replaceable>}</userinput></programlisting>
 ... where uri#1 = the primary port that the first server is listening on.
 </para>
 <para>
@@ -339,20 +339,20 @@ Now the screen looks like this: (except that UUID values are always different):
       <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
      </thead>
     <tbody>
-     <row><entry><programlisting>$ # Terminal 1
-$ mkdir -p ~/tarantool_test_node_1
-$ cd ~/tarantool_test_node_1
-~/tarantool_test_node_1$ rm -R ~/tarantool_test_node_1/*
-~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+     <row><entry><programlisting>$ <userinput># Terminal 1</userinput>
+$ <userinput>mkdir -p ~/tarantool_test_node_1</userinput>
+$ <userinput>cd ~/tarantool_test_node_1</userinput>
+~/tarantool_test_node_1$ <userinput>rm -R ~/tarantool_test_node_1/*</userinput>
+~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
 ~/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
 type 'help' for interactive help
-tarantool&gt; box.cfg{listen=3301}
+tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
-tarantool&gt; box.schema.user.grant('guest','read,write,execute','universe')
+tarantool&gt; <userinput>box.schema.user.grant('guest','read,write,execute','universe')</userinput>
 2014-08-14 13:39:57.712 [24956] wal I> creating `./00000000000000000000.xlog.inprogress'
 ---
 ...
-tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+tarantool&gt; <userinput>box.space._cluster:select({0},{iterator='GE'})</userinput>
 ---
 - - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
 ...
@@ -414,25 +414,25 @@ tarantool> 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replica
 2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> snapshot sent
 2014-08-14 13:41:31.190 [24958] main/101/spawner I> created a replication relay: pid = 25150
 2014-08-14 13:41:31.291 [25150] main/101/relay/127.0.0.1:42759 I> recover from `./00000000000000000000.xlog'</programlisting></entry>
-          <entry><programlisting><prompt>$ # Terminal 2
-~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
-~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
-~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
-~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
+<entry><programlisting><prompt>$</prompt> <userinput># Terminal 2</userinput>
+~/tarantool_test_node_2$ <userinput>mkdir -p ~/tarantool_test_node_2</userinput>
+~/tarantool_test_node_2$ <userinput>cd ~/tarantool_test_node_2</userinput>
+~/tarantool_test_node_2$ <userinput>rm -R ~/tarantool_test_node_2/*</userinput>
+~/tarantool_test_node_2$ <userinput>~/tarantool-master/src/tarantool</userinput>
 /home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
 type 'help' for interactive help
-tarantool&gt; box.cfg{listen=3302, replication_source=3301}
+tarantool&gt; <userinput>box.cfg{listen=3302, replication_source=3301}</userinput>
 ... ...
 ---
 ...
-tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
+tarantool&gt; <userinput>box.space._cluster:select({0},{iterator='GE'})</userinput>
 2014-08-14 13:41:31.189 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
 2014-08-14 13:41:31.291 [25139] wal I> creating `./00000000000000000000.xlog.inprogress'
 ---
 - - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
   - [2, 'ea7d17d7-6690-4334-b09c-f38ffa305d36']
 ...
-</prompt></programlisting></entry></row>
+</programlisting></entry></row>
     </tbody>
     </tgroup>                                   
     </informaltable>
@@ -448,24 +448,24 @@ Now the screen looks like this:
       <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
      </thead>
     <tbody>
-     <row><entry><programlisting><prompt>... ...
+     <row><entry><programlisting>... ...
 tarantool&gt; 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replication relay: pid = 25148
 2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovery start
 2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> recovering from `./00000000000000000000.snap'
 2014-08-14 13:41:31.098 [25148] main/101/relay/127.0.0.1:42758 I> snapshot sent
 2014-08-14 13:41:31.190 [24958] main/101/spawner I> created a replication relay: pid = 25150
 2014-08-14 13:41:31.291 [25150] main/101/relay/127.0.0.1:42759 I> recover from `./00000000000000000000.xlog'
-s = box.schema.create_space('tester')
+<userinput>s = box.schema.create_space('tester')</userinput>
 ---
 ...
-tarantool&gt; s:create_index('primary', {})
+tarantool&gt; <userinput>s:create_index('primary', {})</userinput>
 ---
 ...
-tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
+tarantool&gt; <userinput>s:insert{1,'Tuple inserted on Terminal #1'}</userinput>
 ---
 - [1, 'Tuple inserted on Terminal #1']
 ...
-</prompt></programlisting></entry>
+</programlisting></entry>
           <entry><programlisting><prompt>$ # Terminal 2
 ~/tarantool_test_node_2$ mkdir -p ~/tarantool_test_node_2
 ~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
@@ -521,7 +521,7 @@ tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
 ---
 - [1, 'Tuple inserted on Terminal #1']
 ...</prompt></programlisting></entry>
-          <entry><programlisting><prompt>... ...
+          <entry><programlisting>... ...
 tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
 2014-08-14 13:41:31.189 [25139] main/102/replica/0.0.0.0:3301 C> connected to master
 2014-08-14 13:41:31.291 [25139] wal I> creating `./00000000000000000000.xlog.inprogress'
@@ -529,18 +529,18 @@ tarantool&gt; box.space._cluster:select({0},{iterator='GE'})
 - - [1, 'd3de1435-5e26-4122-95e5-3e2d40e6e1df']
   - [2, 'ea7d17d7-6690-4334-b09c-f38ffa305d36']
 ...
-tarantool&gt; s = box.space.tester
+tarantool&gt; <userinput>s = box.space.tester</userinput>
 ---
 ...
-tarantool&gt; s:select({1},{iterator='GE'})
+tarantool&gt; <userinput>s:select({1},{iterator='GE'})</userinput>
 ---
 - - [1, 'Tuple inserted on Terminal #1']
 ...
-tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
+tarantool&gt; <userinput>s:insert{2,'Tuple inserted on Terminal #2'}</userinput>
 ---
 - [2, 'Tuple inserted on Terminal #2']
 ...
-</prompt></programlisting></entry></row>
+</programlisting></entry></row>
     </tbody>
     </tgroup>                                   
     </informaltable>
@@ -565,27 +565,27 @@ they both contain the same tuples.
       <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
      </thead>
     <tbody>
-     <row><entry><programlisting><prompt>... ...
+     <row><entry><programlisting>... ...
 tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
 ---
 - [1, 'Tuple inserted on Terminal #1']
 ...
-tarantool&gt; os.exit()
+tarantool&gt; <userinput>os.exit()</userinput>
 2014-08-14 15:08:40.376 [25150] main/101/relay/127.0.0.1:42759 I> done `./00000000000000000000.xlog'
 2014-08-14 15:08:40.414 [24958] main/101/spawner I> Exiting: master shutdown
 2014-08-14 15:08:40.414 [24958] main/101/spawner I> sending signal 15 to 1 children
 2014-08-14 15:08:40.414 [24958] main/101/spawner I> waiting for children for up to 5 seconds
-~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_1
+~/tarantool_test_node_1$ <userinput>ls -l ~/tarantool_test_node_1</userinput>
 total 12
 -rw-rw-r-- 1  1781 Aug 14 13:39 00000000000000000000.snap
 -rw-rw-r-- 1   416 Aug 14 15:08 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:39 sophia
-~/tarantool_test_node_1$ ls -l ~/tarantool_test_node_2
+~/tarantool_test_node_1$ <userinput>ls -l ~/tarantool_test_node_2</userinput>
 total 12
 -rw-rw-r-- 1  1781 Aug 14 13:41 00000000000000000000.snap
 -rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:41 sophia
-</prompt></programlisting></entry>
+</programlisting></entry>
           <entry><programlisting><prompt>... ...
 tarantool&gt; s:select({1},{iterator='GE'})
 ---
@@ -636,7 +636,7 @@ total 12
 -rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:41 sophia
 </prompt></programlisting></entry>
-          <entry><programlisting><prompt>... ...
+          <entry><programlisting>... ...
 tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
 ---
 - [2, 'Tuple inserted on Terminal #2']
@@ -646,17 +646,17 @@ tarantool&gt; 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> c
 unexpected EOF when reading from socket,
 called on fd 11, aka 127.0.0.1:42759, peer of 127.0.0.1:3301: Broken pipe
 2014-08-14 15:08:40.417 [25139] main/102/replica/0.0.0.0:3301 I> will retry every 1 second
-tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+tarantool&gt; <userinput>box.space.tester:select({0},{iterator='GE'})</userinput>
 ---
 - - [1, 'Tuple inserted on Terminal #1']
   - [2, 'Tuple inserted on Terminal #2']
 ...
 
-tarantool&gt; box.space.tester:insert{3,'Another'}
+tarantool&gt; <userinput>box.space.tester:insert{3,'Another'}</userinput>
 ---
 - [3, 'Another']
 ...
-</prompt></programlisting></entry></row>
+</programlisting></entry></row>
     </tbody>
     </tgroup>                                   
     </informaltable>
@@ -676,7 +676,7 @@ Now the screen looks like this:
       <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
      </thead>
     <tbody>
-     <row><entry><programlisting><prompt>... ...
+     <row><entry><programlisting>... ...
 tarantool&gt; s:insert{1,'Tuple inserted on Terminal #1'}
 ---
 - [1, 'Tuple inserted on Terminal #1']
@@ -696,21 +696,21 @@ total 12
 -rw-rw-r-- 1  1781 Aug 14 13:41 00000000000000000000.snap
 -rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:41 sophia
-~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
+~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
 ~/tarantool: version 1.6.0-1724-g033ed69
 type 'help' for interactive help
-tarantool&gt; box.cfg{listen=3301}
+tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
 ---
 ...
-tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+tarantool&gt; <userinput>box.space.tester:select({0},{iterator='GE'})</userinput>
 2014-08-14 15:22:22.883 [14305] main/101/spawner I> created a replication relay: pid = 14313
 2014-08-14 15:22:22.983 [14313] main/101/relay/127.0.0.1:43646 I> recover from `./00000000000000000000.xlog'
 2014-08-14 15:22:22.984 [14313] main/101/relay/127.0.0.1:43646 I> done `./00000000000000000000.xlog'
 ---
 - - [1, 'Tuple inserted on Terminal #1']
 ...
-</prompt></programlisting></entry>
+</programlisting></entry>
           <entry><programlisting><prompt>... ...
 tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
 ---
@@ -756,7 +756,7 @@ The screen now looks like this:
       <row><entry align="center">TERMINAL #1</entry><entry align="center">TERMINAL #2</entry></row>
      </thead>
     <tbody>
-     <row><entry><programlisting><prompt>... ...
+     <row><entry><programlisting>... ...
 ~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
 ~/tarantool: version 1.6.0-1724-g033ed69
 type 'help' for interactive help
@@ -771,15 +771,15 @@ tarantool&gt; box.space.tester:select({0},{iterator='GE'})
 ---
 - - [1, 'Tuple inserted on Terminal #1']
 ...
-tarantool&gt; box.cfg{replication_source='3302'}
+tarantool&gt; <userinput>box.cfg{replication_source='3302'}</userinput>
 2014-08-14 15:35:47.567 [14303] main/101/interactive C> starting replication from 0.0.0.0:3302
 ---
 ...
-tarantool&gt; box.space.tester:select({0},{iterator='GE'})
+tarantool&gt; <userinput>box.space.tester:select({0},{iterator='GE'})</userinput>
 2014-08-14 15:35:47.568 [14303] main/103/replica/0.0.0.0:3302 C> connected to master
 2014-08-14 15:35:47.670 [14303] wal I> creating `./00000000000000000005.xlog.inprogress'
 2014-08-14 15:35:47.684 [14313] main/101/relay/127.0.0.1:43646 I> recover from `./00000000000000000005.xlog'
-</prompt></programlisting></entry>
+</programlisting></entry>
           <entry><programlisting><prompt>... ...
 tarantool&gt; s:insert{2,'Tuple inserted on Terminal #2'}
 ---

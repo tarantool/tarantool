@@ -192,7 +192,7 @@
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.create_space">
-             box.schema.create_space(space-name [, {options} ])
+             box.schema.create_space(<replaceable>space-name</replaceable> [, {<replaceable>options</replaceable>} ])
             </emphasis>
         </term>
         <listitem>
@@ -294,7 +294,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.create_index">
-             box.space.<replaceable>space-name</replaceable>:create_index(index-name [, {options} ])
+             box.space.<replaceable>space-name</replaceable>:create_index(<replaceable>index-name</replaceable> [, {<replaceable>options</replaceable>} ])
             </emphasis>
         </term>
         <listitem>
@@ -508,7 +508,7 @@ tarantool> <userinput>box.space.space_that_does_not_exist:drop()</userinput>
 tarantool> <userinput>box.space.space55:rename('space56')</userinput>
 ---
 ...
-tarantool> box.space.space56:rename('space55')
+tarantool> <userinput>box.space.space56:rename('space55')</userinput>
 ---
 ...
 </programlisting>
@@ -519,7 +519,7 @@ tarantool> box.space.space56:rename('space55')
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.space.alter">
-             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:alter({options})
+             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:alter({<replaceable>options</replaceable>})
             </emphasis>
         </term>
         <listitem>
@@ -575,7 +575,7 @@ tarantool> <userinput>box.space.space55.index.primary:drop()</userinput>
     <varlistentry>
         <term>
             <emphasis role="lua" xml:id="box.space.rename">
-             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:rename(index-name)
+             box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:rename(<replaceable>index-name</replaceable>)
             </emphasis>
         </term>
         <listitem>
@@ -1497,7 +1497,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([key])</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([<replaceable>key</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -1525,7 +1525,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([key])</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([<replaceable>key</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -1584,7 +1584,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:count(<replaceable>key-value</replaceable>, options)</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:count(<replaceable>key-value</replaceable>, <replaceable>options</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -3432,7 +3432,7 @@ There are three special users: 'guest', 'admin', and 'public'.
 To select a row from the _user space, use <code>box.select</code>.
 For example, here is what happens with a select for user id = 0,
 which is the 'guest' user, without a password:
-<programlisting><prompt>tarantool&gt;</prompt> box.space._user:select{0}
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{0}</userinput>
 ---
 - - [0, 1, 'guest']
 ...</programlisting></para>
@@ -3464,14 +3464,14 @@ To drop a user, say
 For example, here is a session which creates a new user with
 a strong password, selects a tuple in
 the _user space, and then drops the user.
-<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> box.space._user:select{4}
+<prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{4}</userinput>
 ---
 - - [4, 1, 'ElizabethBrowning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
 ...
-<prompt>tarantool&gt;</prompt> box.schema.user.drop('ElizabethBrowning')
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.drop('ElizabethBrowning')</userinput>
 ---
 ...</programlisting></para>
 
@@ -3491,24 +3491,24 @@ the type of operation -- "read" or "write" or "execute" or a combination such as
 
 <para>
 The function for granting a privilege is:
-<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>
+<code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>
 or
 <code>box.schema.user.grant(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.
 </para>
 
 <para>
 The function for revoking a privilege is:
-<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, '<replaceable>>object-name</replaceable>)</code>.
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>.
 </para>
 
 <para>
 For example, here is a session where the admin user gave
 the guest user the privilege to read from a
 space named space55, and then took the privilege away:
-<programlisting><prompt>tarantool&gt;</prompt> box.schema.user.grant('guest', 'read', 'space', 'space55')
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.grant('guest', 'read', 'space', 'space55')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> box.schema.user.revoke('guest', 'read', 'space', 'space55')
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.revoke('guest', 'read', 'space', 'space55')</userinput>
 ---
 ...</programlisting></para>
 

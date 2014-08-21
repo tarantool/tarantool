@@ -124,8 +124,8 @@ must exist and must be a 64-bit unsigned integer.
 <para>
 Space definitions and index definitions are stored permanently in <emphasis>system spaces</emphasis>.
 It is possible to add, drop, or alter the definitions at runtime, with some restrictions.
-The syntax details for defining spaces and indexes are in chapter 4
-<link linkend="sp-box-schema">Databases</link>.
+The syntax details for defining spaces and indexes are in section
+<link linkend="sp-box-library">The box library</link>.
 </para>
 
 

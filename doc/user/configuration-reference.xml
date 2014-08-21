@@ -38,7 +38,7 @@ or
     <listitem xml:id="version-option">
       <para><option>--version</option>, <option>-V</option></para>
       <para>Print product name and version, for example:
-        <programlisting><prompt>$ </prompt> ./tarantool --version
+       <programlisting><prompt>$ </prompt> <userinput>./tarantool --version</userinput>
 Tarantool 1.6.0-1084-ge067689
 Target: Linux-x86_64-Debug
 ...

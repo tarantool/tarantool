@@ -822,23 +822,23 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
     <para>
     <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> yaml = require('yaml')
+<prompt>tarantool></prompt> <userinput>yaml = require('yaml')</userinput>
 ---
 ...
-tarantool> y =  yaml.encode({'a',1,'b',2})
+<prompt>tarantool></prompt> <userinput>y =  yaml.encode({'a',1,'b',2})</userinput>
 ---
 ...
-tarantool> z = yaml.decode(y)
+<prompt>tarantool></prompt> <userinput>z = yaml.decode(y)</userinput>
 ---
 ...
-tarantool> z[1],z[2],z[3],z[4]
+<prompt>tarantool></prompt> <userinput>z[1],z[2],z[3],z[4]</userinput>
 ---
 - a
 - 1
 - b
 - 2
 ...
-tarantool> if yaml.NULL == nil then print('hi') end
+<prompt>tarantool></prompt> <userinput>if yaml.NULL == nil then print('hi') end</userinput>
 hi
 ---
 ...
@@ -900,23 +900,23 @@ hi
     <para>
     <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> msgpack = require('msgpack')
+<prompt>tarantool></prompt> <userinput>msgpack = require('msgpack')</userinput>
 ---
 ...
-tarantool> y =  msgpack.encode({'a',1,'b',2})
+<prompt>tarantool></prompt> <userinput> y =  msgpack.encode({'a',1,'b',2})</userinput>
 ---
 ...
-tarantool> z = msgpack.decode(y)
+<prompt>tarantool></prompt> <userinput> z = msgpack.decode(y)</userinput>
 ---
 ...
-tarantool> z[1],z[2],z[3],z[4]
+<prompt>tarantool></prompt> <userinput> z[1],z[2],z[3],z[4]</userinput>
 ---
 - a
 - 1
 - b
 - 2
 ...
-tarantool> box.space.tester:insert{20,msgpack.NULL,20}
+<prompt>tarantool></prompt> <userinput> box.space.tester:insert{20,msgpack.NULL,20}</userinput>
 ---
 - [20, null, 20]
 ...
@@ -1439,7 +1439,7 @@ the status is dead because the cancel worked.<programlisting>
     </varlistentry>
 </variablelist>
 <para>
-            <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+           <bridgehead renderas="sect4">Example</bridgehead><programlisting><userinput>
              
 fiber = require('fiber')            
 channel = fiber.channel(10)
@@ -1497,7 +1497,7 @@ function producer2_fiber()
         end
     end
 end
-</programlisting>
+</userinput></programlisting>
 </para>
 </section>
 
@@ -2290,7 +2290,7 @@ get expirationd through the test.
 </para>
 <para>
 3. Execute these requests:
-<programlisting>
+<programlisting><userinput>
      box.cfg{}
      a = box.schema.create_space('origin')
      a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})
@@ -2300,7 +2300,7 @@ get expirationd through the test.
      expd._debug = true
      expd.do_test('origin', 'archive')
      os.exit()
-</programlisting>
+</userinput></programlisting>
 The database-specific requests (cfg, create_space, create_index)
 should already be familiar. The key for getting the rock rolling is
 <code>expd = require('expirationd')</code>.

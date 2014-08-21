@@ -159,29 +159,29 @@ are typed in by the user following prompts.
 Here is an example of an interactive-mode tarantool client session:
 
 <programlisting>
-<prompt>$ </prompt>tarantool
+<prompt>$ </prompt><userinput>tarantool</userinput>
                 [ tarantool will display an introductory message including version number here ]
-tarantool> box.cfg{listen=3301}
+tarantool> <userinput>box.cfg{listen=3301}</userinput>
                 [ tarantool will display configuration information here ]
-tarantool> s = box.schema.create_space('tester')
+tarantool> <userinput>s = box.schema.create_space('tester')</userinput>
                 [ tarantool may display an in-progress message here ]
 ---
 ...
-tarantool> s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+tarantool> <userinput>s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput>
 ---
 ...
-tarantool> box.space.tester:insert{1,'My first tuple'}
+tarantool> <userinput>box.space.tester:insert{1,'My first tuple'}</userinput>
 ---
 - [1, 'My first tuple']
 ...
-tarantool> box.space.tester:select(1)
+tarantool> <userinput>box.space.tester:select(1)</userinput>
 ---
 - - [1, 'My first tuple']
 ...
-tarantool> box.space.tester:drop()
+tarantool> <userinput>box.space.tester:drop()</userinput>
 ---
 ...
-tarantool> os.exit()
+tarantool> <userinput>os.exit()</userinput>
 2014-04-30 10:28:00.886 [20436] main/101/spawner I> Exiting: master shutdown
 <prompt>$ </prompt>
 </programlisting>
@@ -244,10 +244,10 @@ for example tarantool should be in <filename>/usr/bin</filename>.
 The only necessary argument is the "instance", which is an
 arbitrary numeric identification formatted as digit.digit.
 The following is a sample run:
-<programlisting><prompt>$ </prompt>tarantool_deploy.sh 0.1
+<programlisting><prompt>$ </prompt><userinput>tarantool_deploy.sh 0.1</userinput>
 tarantool_deploy.sh: About to deploy Tarantool instance 0.1.
 tarantool_deploy.sh: Continue? [n/y]
-y
+<userinput>y</userinput>
 tarantool_deploy.sh: &gt;&gt;&gt; deploy instance 0.1
 tarantool_deploy.sh: &gt;&gt;&gt; updating deployment config
 tarantool_deploy.sh: done
