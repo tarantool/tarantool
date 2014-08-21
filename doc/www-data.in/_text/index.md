@@ -21,6 +21,9 @@ index:
         - asynchronous master-master replication,
         - authentication and access control.
 
+        Our [online shell](http://try.tarantool.org) gives a taste
+        of these features and is a [Tarantool Lua script](http://github.com/tarantool/try).
+
         # News 
 
         * **Meet with Tarantool developers at [Lua Workshop 2014](http://luaconf.ru)!**
