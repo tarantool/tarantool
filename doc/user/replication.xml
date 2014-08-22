@@ -7,9 +7,22 @@
          xml:id="replication">
 
 <title>Replication</title>
+
+<para>
+Replication allows multiple Tarantool servers to work on
+copies of the same databases. The databases are kept in
+synch because each server can communicate its changes to
+all the other servers. Servers which share the same databases
+are a "cluster". Each server in a cluster also has a numeric
+identifier which is unique within the cluster, known as the
+"server id".
+</para>
+
 <blockquote><para>
-  To set up replication, it's necessary to prepare the master,
-  configure a replica, and establish procedures for recovery from
+  To set up replication, it's necessary to set up the master
+  servers which make the original data-change requests,
+  set up the replica servers which copy data-change requests
+  from masters, and establish procedures for recovery from
   a degraded state.
 </para></blockquote>
 
@@ -46,23 +59,14 @@
     to replicate CALLs as statements.
   </para>
 -->
-  <para>
-    For replication to work correctly, the latest LSN
-    on the replica must match or fall behind the latest LSN
-    on the master. If the replica had its own updates,
-    this would lead to it getting out of sync, since
-    updates from the master having identical LSNs would
-    not be applied. In fact, if replication is ON, Tarantool
-    does not accept updates, even on its <olink
-    targetptr="primary_port">"listen" address</olink>.
-  </para>
+
 </section>
 
 <section xml:id="setting-up-the-master">
   <title>Setting up the master</title>
   <para>
     To prepare the master for connections from the replica, it's only
-    necessary to include "listen" in the initil <code>box.cfg</code>
+    necessary to include "listen" in the initial <code>box.cfg</code>
     request, for example <code>box.cfg{listen=3301}</code>.
     A master with enabled "listen" uri can accept connections
     from as many replicas as necessary on that uri. Each replica
@@ -72,30 +76,29 @@
 <section xml:id="settin-up-a-replica">
   <title>Setting up a replica</title>
   <para>
-    A server, whether master or replica, always requires a valid
-    snapshot file to boot from. For a master, a snapshot file is usually
-    prepared as soon as <code>box.cfg</code> occurs.
-    For a replica, it's usually copied from the master.
-  </para>
-  <para>
-    To start replication, configure <olink
-    targetptr="replication_source"/>.
-    Other parameters can also be changed, but existing spaces and
-    their primary keys on the replica must be identical to the ones on the
-    master.
+    A server requires a valid snapshot (.snap) file.
+    A snapshot file is created for a server the first time that
+    <code>box.cfg</code> occurs for it.
+    If this first <code>box.cfg</code> request occurs without
+    a "replication_source" clause, then the server is a master
+    and starts its own new cluster with a new unique UUID.
+    If this first <code>box.cfg</code> request occurs with
+    a "replication_source" clause, then the server is a replica
+    and its snapshot file, along with the cluster information,
+    is copied from the master. Therefore,
+    to start replication, specify <olink
+    targetptr="replication_source"/> in a <code>box.cfg</code> request.
+    When a replica contacts a master for the first time, it becomes part of a cluster.
+    On subsequent occasions, it should always contact a master in the same cluster.
   </para>
   <para>
     Once connected to the master, the replica requests all changes
     that happened after the latest local LSN. It is therefore
     necessary to keep WAL files on the master host as long as
-    there are replicas that haven't applied them yet. An example
-    configuration can be found in <link
-    xlink:href="https://github.com/tarantool/tarantool/blob/master/test/replication/cfg/replica.cfg"><filename>test/replication/cfg/replica.cfg</filename></link>.
-  </para>
-  <para>
-    If required WAL files are absent, a replica can be "re-seeded" at
-    any time with a newer snapshot file, manually copied from the
-    master.
+    there are replicas that haven't applied them yet.
+    A replica can be "re-seeded" by deleting all its files (the snapshot .snap file
+    and the WAL .xlog files), then starting replication again -- the replica will
+    then catch up with the master by retrieving all the master's tuples.
   </para>
   <note><simpara>
     Replication parameters are "dynamic", which allows the
@@ -109,101 +112,32 @@
   <para>
     "Degraded state" is a situation when the master becomes
     unavailable -- due to hardware or network failure, or due to a
-    programming bug. There is no reliable way for a replica to detect
+    programming bug. There is no automatic way for a replica to detect
     that the master is gone for good, since sources of failure and
     replication environments vary significantly.
+    So the detection of degraded state requires a human inspection.
   </para>
   <para>
-    A separate monitoring script (or scripts, if a decision-making
-    quorum is desirable) is necessary to detect a master failure.
-    Such a script would typically try to update a tuple in an
-    auxiliary space on the master, and raise an alarm if a
-    network or disk error persists for longer than is acceptable.
+    However, once a master failure is detected, the recovery
+    is simple: declare that the replica is now the new master,
+    by saying <code>box.cfg{... listen=uri}</code>.
+    Then, if there are updates on the old master that were not
+    propagated before the old master went down, they would have
+    to be re-applied manually.
   </para>
-  <para>
-    When a master failure is detected, the following needs
-    to be done:
-    <itemizedlist>
-      <listitem>
-        <para>
-          First and foremost, make sure that the master does not
-          accept updates. This is necessary to prevent the
-          situation when, should the master failure end up being
-          transient, some updates still go to the master, while
-          others already end up on the replica.
-        </para>
-        <para>
-          If the master is available, the easiest way to turn
-          on read-only mode is to turn Tarantool into a replica of
-          itself. This can be done by setting the master's <olink
-          targetptr="replication_source"/> to point to self.
-        </para>
-        <para>
-          If the master is not available, best bet is to log into
-          the machine and kill the server, or change the
-          machine's network configuration (DNS, IP address).
-        </para>
-        <para>
-          If the machine is not available, it's perhaps prudent
-          to power it off.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          Record the replica's LSN, by issuing <olink
-          targetptr="box.info"/>. This LSN may prove useful if
-          there are updates on the master that never reached
-          the replica.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          Propagate the replica to become a master. This is done
-          by setting <olink targetptr="replication_source"/>
-          on replica to an empty string.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          Change the application configuration to point to the new
-          master. This can be done either by changing the
-          application's internal routing table, or by setting up
-          the old master's IP address on the new master's machine, or
-          using some other approach.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          Recover the old master. If there are updates that didn't
-          make it to the new master, they have to be applied
-          manually. You can use the Tarantool command line client
-          to read the server log files.
-        </para>
-      </listitem>
-    </itemizedlist>
-  </para>
-  
-<para>
-Replication allows multiple Tarantool servers to work on
-copies of the same databases. The databases are kept in
-synch because each server can communicate its changes to
-all the other servers. Servers which share the same databases
-are a "cluster".
-</para>
-
 
 <para>
- <bridgehead renderas="sect4">Instructions for quick startup of a new two-server simple cluster</bridgehead>
-Step 1. Start the first server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#1</replaceable>}</userinput>
+  <bridgehead renderas="sect4">Instructions for quick startup of a new two-server simple cluster</bridgehead>Step 1. Start the first server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#1</replaceable>}</userinput>
 <userinput>box.schema.user.grant('guest','read,write,execute','universe') -- replace with more restrictive request</userinput>
 <userinput>box.snapshot()</userinput></programlisting>... Now a new cluster exists.
 </para>
 <para>
 Step 2. Check where the second server's files will go by looking at
-   its directories (snap_dir, wal_dir). They must be empty --
-   when the second server joins for the first time, it has to
-   be working with a clean slate so that the initial copy of
-   the first server's databases can happen without conflicts.
+its directories (<olink targetptr="snap_dir">snap_dir</olink> for snapshot files,
+<olink targetptr="wal_dir">wal_dir</olink> for .xlog files). They must be empty --
+when the second server joins for the first time, it has to
+be working with a clean slate so that the initial copy of
+the first server's databases can happen without conflicts.
 </para>
 <para>
 Step 3. Start the second server thus:<programlisting><userinput>box.cfg{listen=<replaceable>uri#2</replaceable>, replication_source=<replaceable>uri#1</replaceable>}</userinput></programlisting>
@@ -223,9 +157,8 @@ down then the replica can take over), or LOAD BALANCING
 (because clients can connect to either the master or the
 replica for select requests).
 </para>
-
-  <para>
-  <bridgehead renderas="sect4">Master-master</bridgehead>
+<para>
+  <bridgehead renderas="sect4">master-master</bridgehead>
   In the simple master-replica configuration, the master's
   changes are seen by the replica, but not vice versa,
   because the master was specified as the sole replication source.
@@ -250,6 +183,7 @@ replica for select requests).
   contents.
   </para>
   <para>
+
   <bridgehead renderas="sect4">All the "What If?" Questions</bridgehead>
   <emphasis>What if there are more than two servers with master-master?</emphasis>
   ... On each server, specify the replication_source for all
@@ -286,15 +220,17 @@ replica for select requests).
   <emphasis>What if it's necessary to know what cluster a server is in?</emphasis>
   ... The identification of the cluster is a UUID which is generated
   when the first master starts for the first time. This UUID is
-  stored in the system space <code>_cluster</code>, in the first tuple. So to
+  stored in a tuple of the _<code>_cluster</code> system space,
+  and in a tuple of the <code>_schema</code> system space. So to
   see it, say:
-  <code>box.space._cluster:select{1}</code>
+  <code>box.space._schema:select{'cluster'}</code>
   </para>
   <para>
   <emphasis>What if one of the server's files is corrupted or deleted?</emphasis>
-  ... Stop the other servers, copy all the database files (the
-  ones with extension "snap" or "xlog") over to the server with
-  the problem, and then restart all servers.
+  ... Stop the server, destroy all the database files (the
+  ones with extension "snap" or "xlog" or ".inprogress"),
+  restart the server, and catch up with the master by contacting it again
+  (just sqy <code>box.cfg{...replication_source=...}</code>).
   </para>
 
   <para>
