@@ -933,22 +933,114 @@ local function tcp_connect(host, port, timeout)
     return nil
 end
 
-socket_mt = {
-        __index     = socket_methods,
-        __tostring  = function(self)
-            local save_errno = self._errno
-            local name = sprintf("fd %d", self.fh)
-            local aka = self:name()
-            if aka ~= nil then
-                name = sprintf("%s, aka %s:%s", name, aka.host, aka.port)
+local function tcp_server_remote(list, prepare, handler)
+    local slist = {}
+
+    -- bind/create sockets
+    for _, addr in pairs(list) do
+        local s = create_socket(addr.family, addr.type, addr.protocol)
+
+        local ok = false
+        if s ~= nil then
+            if s:bind(addr.host, addr.port) then
+                local prepared, backlog = pcall(prepare, s)
+                if prepared and s:listen(backlog) then
+                    ok = true
+                end
             end
-            local peer = self:peer(self)
-            if peer ~= nil then
-                name = sprintf("%s, peer %s:%s", name, peer.host, peer.port)
-            end
-            self._errno = save_errno
-            return name
         end
+
+        -- errors
+        if not ok then
+            if s ~= nil then
+                s:close()
+            end
+            local save_errno = boxerrno()
+            for _, s in pairs(slist) do
+                s:close()
+            end
+            boxerrno(save_errno)
+            return nil
+        end
+
+        table.insert(slist, s)
+    end
+    
+    local server = { s = slist }
+
+    server.stop = function()
+        if #server.s == 0 then
+            return false
+        end
+        for _, s in pairs(server.s) do
+            s:close()
+        end
+        server.s = {}
+        return true
+    end
+
+    for _, s in pairs(server.s) do
+        fiber.create(function(s)
+            fiber.name(sprintf("listen_fd=%d",s.fh))
+
+            while s:readable() do
+                
+                local sc = s:accept()
+
+                if sc == nil then
+                    break
+                end
+
+                fiber.create(function(sc)
+                    pcall(handler, sc)
+                    sc:close()
+                end, sc)
+            end
+        end, s)
+    end
+
+    return server
+end
+
+local function tcp_server(host, port, prepare, handler, timeout)
+    if handler == nil then
+        handler = prepare
+        prepare = function() end
+    end
+
+    if type(prepare) ~= 'function' or type(handler) ~= 'function' then
+        error("Usage: socket.tcp_server(host, port[, prepare], handler)")
+    end
+
+    if host == 'unix/' then
+        return tcp_server_remote({{host = host, port = port, protocol = 0,
+            family = 'PF_UNIX', type = 'SOCK_STREAM' }}, prepare, handler)
+    end
+
+    local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
+        protocol = 'tcp' })
+    if dns == nil then
+        return nil
+    end
+    return tcp_server_remote(dns, prepare, handler)
+end
+
+socket_mt   = {
+    __index     = socket_methods,
+    __tostring  = function(self)
+        local save_errno = self._errno
+        local name = sprintf("fd %d", self.fh)
+        local aka = self:name()
+        if aka ~= nil then
+            name = sprintf("%s, aka %s:%s", name, aka.host, aka.port)
+        end
+        local peer = self:peer(self)
+        if peer ~= nil then
+            name = sprintf("%s, peer %s:%s", name, peer.host, peer.port)
+        end
+        self._errno = save_errno
+        return name
+    end
 }
 
 if package.loaded.socket == nil then
@@ -956,7 +1048,7 @@ if package.loaded.socket == nil then
 end
 
 package.loaded.socket.tcp_connect = tcp_connect
--- package.loaded.socket.tcp_server = tcp_server
+package.loaded.socket.tcp_server = tcp_server
 
 setmetatable(package.loaded.socket, {
     __call = function(self, ...) return create_socket(...) end,

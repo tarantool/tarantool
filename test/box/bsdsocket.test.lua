@@ -387,3 +387,20 @@ c:close()
 s:close()
 
 os.remove(path)
+
+
+server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+
+server ~= nil
+
+fiber.sleep(.5)
+
+client = socket.tcp_connect('unix/', path)
+
+client ~= nil
+
+client:read(123)
+
+server:stop()
+
+os.remove(path)

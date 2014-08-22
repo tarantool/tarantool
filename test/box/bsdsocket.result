@@ -1178,3 +1178,32 @@ os.remove(path)
 ---
 - true
 ...
+server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+---
+...
+server ~= nil
+---
+- true
+...
+fiber.sleep(.5)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client ~= nil
+---
+- true
+...
+client:read(123)
+---
+- Hello, world
+...
+server:stop()
+---
+- true
+...
+os.remove(path)
+---
+- true
+...
