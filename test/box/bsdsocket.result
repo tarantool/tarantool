@@ -726,10 +726,6 @@ lua s:close()
 ---
  - true
 ...
-lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)
----
- - nil
-...
 lua s = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
 ...
@@ -994,6 +990,31 @@ lua c:close()
  - true
 ...
 lua s:close()
+---
+ - true
+...
+lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+---
+...
+lua server ~= nil
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua client = box.socket.tcp_connect('unix/', path)
+---
+...
+lua client ~= nil
+---
+ - true
+...
+lua client:read(123)
+---
+ - Hello, world
+...
+lua server:stop()
 ---
  - true
 ...

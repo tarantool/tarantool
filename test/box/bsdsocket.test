@@ -228,7 +228,8 @@ exec admin "lua string.match(header, '\\r\\n\\r\\n$') ~= nil"
 # exec admin "lua string.match(header, '200 [Oo][Kk]') ~= nil"
 exec admin "lua s:close()"
 
-exec admin "lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)"
+# The test can be enabled if the ticket #364 is closed
+# exec admin "lua box.socket.tcp_connect('tarantool.org', 80, 0.00000000001)"
 
 # AF_INET
 port = 35490
@@ -314,5 +315,15 @@ exec admin "lua x, type(x), #x"
 exec admin "lua c:close()"
 
 exec admin "lua s:close()"
+
+os.unlink(path)
+
+exec admin "lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)"
+exec admin "lua server ~= nil"
+exec admin "lua box.fiber.sleep(.5)"
+exec admin "lua client = box.socket.tcp_connect('unix/', path)"
+exec admin "lua client ~= nil"
+exec admin "lua client:read(123)"
+exec admin "lua server:stop()"
 
 os.unlink(path)
