@@ -1047,13 +1047,13 @@ if package.loaded.socket == nil then
     package.loaded.socket = {}
 end
 
-package.loaded.socket.tcp_connect = tcp_connect
-package.loaded.socket.tcp_server = tcp_server
 
 setmetatable(package.loaded.socket, {
     __call = function(self, ...) return create_socket(...) end,
     __index = {
         getaddrinfo = getaddrinfo,
+        tcp_connect = tcp_connect,
+        tcp_server = tcp_server
     }
 })
 
