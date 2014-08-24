@@ -369,6 +369,9 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
             <para>
               Possible errors: If a tuple with the same primary key already exists, returns ER_TUPLE_FOUND.
             </para>
+            <para>
+              Example: <code>box.space.tester:insert{5000,'tuple number five thousand'}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -478,6 +481,9 @@ tarantool&gt; <userinput> s:select{}      -- must equal 0 fields, so returns all
                <code>box.space.tester:select{1}[1]</code>, and may serve as a convenient
                shorthand.
              </para>
+            <para>
+              Example: <code>box.space.tester:get{1}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -655,6 +661,9 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             </para>
             <para>
               Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
+              Example: <code>box.space.tester:replace{5000,'New value'}</code>.
             </para>
         </listitem>
     </varlistentry>
