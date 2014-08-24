@@ -91,7 +91,7 @@ main(void)
 
 		is(ftell(f), 12, "current position");
 		is(fseek(f, 0L, SEEK_SET), 0, "set new position");
-		is(ftell(f), 0, "current position %zu", ftell(f));
+		is(ftell(f), 0, "current position %zu", (size_t) ftell(f));
 
 
 		done = fread(buf, 1, 12, f);

@@ -219,7 +219,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:307: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:322: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -288,7 +288,10 @@ lua sc:readable()
 ---
  - true
 ...
-lua sc:sysconnect('127.0.0.1', 3457)
+lua r = sc:sysconnect('127.0.0.1', 3457); errno = box.errno()
+---
+...
+lua r or errno == box.errno.EINPROGRESS
 ---
  - true
 ...
@@ -383,20 +386,20 @@ lua sc:send("\nnew line")
 ---
  - true
 ...
-lua sa:readline({'\n'}, 1)
+lua sa:read('\n', 1)
 ---
  - Hello, world
 
 ...
-lua sa:readline(1, {'ine'}, 1)
+lua sa:read({chunk = 1, line = 'ine'}, 1)
 ---
  - n
 ...
-lua sa:readline({'ine'}, 1)
+lua sa:read('ine', 1)
 ---
  - ew line
 ...
-lua sa:readline({'ine'}, 0.1)
+lua sa:read('ine', 0.1)
 ---
  - nil
 ...
@@ -404,7 +407,7 @@ lua sc:send('Hello, world')
 ---
  - true
 ...
-lua sa:readline({','}, 1)
+lua sa:read(',', 1)
 ---
  - Hello,
 ...
@@ -516,11 +519,11 @@ lua aexitst( box.socket.getaddrinfo('localhost', 'http', {  protocol = 'tcp', ty
 ---
  - true
 ...
-lua #(box.socket.getaddrinfo('mail.ru', 'http', {})) > 0
+lua #(box.socket.getaddrinfo('tarantool.org', 'http', {})) > 0
 ---
  - true
 ...
-lua #(box.socket.getaddrinfo('mail12211alklkl.ru', 'http', {})) == 0
+lua #(box.socket.getaddrinfo('non-existing-domain-name-12211alklkl.com', 'http', {})) == 0
 ---
  - true
 ...
@@ -539,7 +542,10 @@ lua sc:readable()
 ---
  - true
 ...
-lua sc:sysconnect('127.0.0.1', 3458)
+lua r = sc:sysconnect('127.0.0.1', 3458); errno = box.errno()
+---
+...
+lua r or errno == box.errno.EINPROGRESS
 ---
  - true
 ...
@@ -690,6 +696,325 @@ lua s:close()
  - true
 ...
 lua sc:close()
+---
+ - true
+...
+tcp_connect
+lua s = box.socket.tcp_connect('tarantool.org', 80)
+---
+...
+lua string.match(tostring(s), ', aka') ~= nil
+---
+ - true
+...
+lua string.match(tostring(s), ', peer') ~= nil
+---
+ - true
+...
+lua s:write('HEAD / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n')
+---
+ - true
+...
+lua header = s:read({chunk = 4000, line = { '\n\n', '\r\n\r\n' }}, 1)
+---
+...
+lua string.match(header, '\r\n\r\n$') ~= nil
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua s = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+lua s:bind('127.0.0.1', 35490)
+---
+ - true
+...
+lua box.socket.tcp_connect('127.0.0.1', 35490), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua sc, errno = box.socket.tcp_connect('127.0.0.1', 35490), box.errno()
+---
+...
+lua sc ~= nil
+---
+ - true
+...
+lua errno == 0
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua box.socket.tcp_connect('127.0.0.1', 35490), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua sc, errno = box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno()
+---
+...
+lua sc ~= nil
+---
+ - true
+...
+lua errno == 0
+---
+ - true
+...
+lua sc:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ECONNREFUSED
+---
+ - nil
+ - true
+...
+remove unix socket
+lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() == box.errno.ENOENT
+---
+ - nil
+ - true
+...
+lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+---
+...
+lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+---
+...
+lua tostring(sa)
+---
+ - fd 512
+...
+lua sa:readable(0)
+---
+ - true
+...
+lua sa:writable(0)
+---
+ - true
+...
+lua ch = box.ipc.channel()
+---
+...
+lua f = box.fiber.wrap(function() s:read(12) ch:put(true) end)
+---
+...
+lua box.fiber.sleep(.1)
+---
+...
+lua s:close()
+---
+ - true
+...
+lua ch:get(1)
+---
+ - true
+...
+lua s:error()
+---
+ - Connection timed out
+...
+lua path = '/tmp/tarantool-test-socket'
+---
+...
+lua s = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:bind('unix/', path)
+---
+ - true
+...
+lua s:error()
+---
+ - nil
+...
+lua s:listen(128)
+---
+ - true
+...
+lua f = box.fiber.wrap(function() for i=1,2 do s:readable() local sc = s:accept(); sc:write('ok!'); sc:shutdown(); sc:close() end end)
+---
+...
+lua c = box.socket.tcp_connect('unix/', path)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x = c:read('!')
+---
+...
+lua x, type(x), #x
+---
+ - ok!
+ - string
+ - 3
+...
+lua x = c:read('!')
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:read('!')
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua c:close()
+---
+ - true
+...
+lua c = box.socket.tcp_connect('unix/', path)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x = c:read(3)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - ok!
+ - string
+ - 3
+...
+lua x = c:read(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:read(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua x = c:sysread(1)
+---
+...
+lua c:error()
+---
+ - nil
+...
+lua x, type(x), #x
+---
+ - 
+ - string
+ - 0
+...
+lua c:close()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+---
+...
+lua server ~= nil
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua client = box.socket.tcp_connect('unix/', path)
+---
+...
+lua client ~= nil
+---
+ - true
+...
+lua client:read(123)
+---
+ - Hello, world
+...
+lua server:stop()
 ---
  - true
 ...

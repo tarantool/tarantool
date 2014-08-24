@@ -1,3 +1,12 @@
+tarantool-lts (1.5.3.146.g343028d-1) unstable; urgency=medium
+
+  * Rename tarantool-1.5 to tarantool-lts (Long time support).
+    New tarantool (>> 1.6) have incompatible protocol and database format,
+    so tarantool 1.5 will be supported for a long time (until 2017), so
+    its packages are renamed.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 23 Jun 2014 15:24:34 +0400
+
 tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
 
   * New Debian snapshot

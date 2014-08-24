@@ -12,7 +12,7 @@ DEB_CMAKE_EXTRA_FLAGS := \
 	-DWITH_MYSQL=ON \
 	-DWITH_POSTGRESQL=ON
 
-DEB_DH_INSTALLINIT_ARGS := --name=tarantool
+DEB_DH_INSTALLINIT_ARGS := --name=tarantool-lts
 
 DEB_CMAKE_INSTALL_PREFIX := /usr
 DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
@@ -61,13 +61,13 @@ clean::
 # install/tarantool-dbg::
 #         rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
 
-install/tarantool::
+install/tarantool-lts::
 	pod2man -c 'tarantar' \
 		debian/tarantar.pod > build-area/tarantar.1
 #         make -C build-area test-force || /bin/true
 
 
-install/tarantool-common::
+install/tarantool-lts-common::
 	pod2man -c 'tarantool instances control' \
 	    debian/tarantool_instance.pod > build-area/tarantool_instance.1
 	pod2man -c 'tarantool log rotation' \
@@ -77,4 +77,4 @@ install/tarantool-common::
 	    debian/scripts/tarantool_snapshot_rotate \
 	    	> build-area/tarantool_snapshot_rotate.1
 	install -m0755 extra/logger.pl \
-	    debian/tarantool-common/usr/lib/tarantool/logger
+	    debian/tarantool-lts-common/usr/lib/tarantool/logger

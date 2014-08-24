@@ -403,7 +403,7 @@ recover_remaining_wals(struct recovery_state *r)
 	if (r->current_wal != NULL)
 		goto recover_current_wal;
 
-	while (r->confirmed_lsn < wal_greatest_lsn) {
+	while (current_lsn <= wal_greatest_lsn) {
 		/*
 		 * If a newer WAL appeared in the directory before
 		 * current_wal was fully read, try re-reading
@@ -421,8 +421,6 @@ recover_remaining_wals(struct recovery_state *r)
 			}
 		}
 
-		/* TODO: find a better way of finding the next xlog */
-		current_lsn = r->confirmed_lsn + 1;
 		/*
 		 * For the last WAL, first try to open .inprogress
 		 * file: if it doesn't exist, we can safely try an
@@ -458,8 +456,18 @@ recover_remaining_wals(struct recovery_state *r)
 				say_warn("unlink broken %s WAL", filename);
 				if (inprogress_log_unlink(filename) != 0)
 					panic("can't unlink 'inprogres' WAL");
+				result = 0;
+				break;
 			}
-			result = 0;
+			/* Missing xlog or gap in LSN */
+			say_error("not all WALs have been successfully read");
+			if (!r->wal_dir->panic_if_error) {
+				/* Ignore missing WALs */
+				say_warn("ignoring missing WALs");
+				current_lsn++;
+				continue;
+			}
+			result = -1;
 			break;
 		}
 		assert(r->current_wal == NULL);
@@ -491,6 +499,8 @@ recover_current_wal:
 				 r->confirmed_lsn);
 			log_io_close(&r->current_wal);
 		}
+
+		current_lsn = r->confirmed_lsn + 1;
 	}
 
 	/*
@@ -498,7 +508,7 @@ recover_current_wal:
 	 * we lose some logs it is a fatal error.
 	 */
 	if (wal_greatest_lsn > r->confirmed_lsn + 1) {
-		say_error("not all WALs have been successfully read");
+		say_error("can't recover WALs");
 		result = -1;
 	}
 

@@ -600,31 +600,31 @@ lua push_collection(0, 1038784, 'hello')
 ...
 lua push_collection(1, 1038784, 'hi')
 ---
- - 1038784: {26984}
+ - 1038784: {'hi'}
 ...
 lua push_collection(2, 1038784, 'hi')
 ---
- - 1038784: {26984, 26984}
+ - 1038784: {'hi', 'hi'}
 ...
 lua push_collection(2, 1038784, 'hi')
 ---
- - 1038784: {26984, 26984}
+ - 1038784: {'hi', 'hi'}
 ...
 lua push_collection(5, 1038784, 'hey')
 ---
- - 1038784: {26984, 26984, 'hey'}
+ - 1038784: {'hi', 'hi', 'hey'}
 ...
 lua push_collection(5, 1038784, 'hey')
 ---
- - 1038784: {26984, 26984, 'hey', 'hey'}
+ - 1038784: {'hi', 'hi', 'hey', 'hey'}
 ...
 lua push_collection(5, 1038784, 'hey')
 ---
- - 1038784: {26984, 26984, 'hey', 'hey', 'hey'}
+ - 1038784: {'hi', 'hi', 'hey', 'hey', 'hey'}
 ...
 lua push_collection(5, 1038784, 'hey')
 ---
- - 1038784: {26984, 'hey', 'hey', 'hey', 'hey'}
+ - 1038784: {'hi', 'hey', 'hey', 'hey', 'hey'}
 ...
 # A test case for Bug#1060967: truncation of 64-bit numbers
 lua box.space[5]:insert(2^51, 'hello', 'world')

@@ -89,6 +89,7 @@ set (common_sources
      tbuf.c
      palloc.cc
      util.cc
+     find_path.c
      sio.cc
      evio.cc
      coio.cc

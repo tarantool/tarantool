@@ -133,7 +133,6 @@ void
 fiber_cancel(struct fiber *f)
 {
 	assert(f->fid != 0);
-	assert(!(f->flags & FIBER_CANCEL));
 
 	f->flags |= FIBER_CANCEL;
 
@@ -180,6 +179,12 @@ fiber_is_cancelled()
 void
 fiber_testcancel(void)
 {
+	/*
+	 * Fiber can catch FiberCancelException using try..catch block in C or
+	 * pcall()/xpcall() in Lua. However, FIBER_CANCEL flag is still set
+	 * and the subject fiber will be killed by subsequent unprotected call
+	 * of this function.
+	 */
 	if (fiber_is_cancelled())
 		tnt_raise(FiberCancelException);
 }

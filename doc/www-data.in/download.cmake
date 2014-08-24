@@ -2,8 +2,7 @@ download:
     main: |
         # All downloads
 
-        All published releases are available at
-        [http://tarantool.org/dist/stable].
+        All published releases are available at [http://tarantool.org/dist/stable](http://tarantool.org/dist/stable).
 
         # How to choose the right version for download
 
@@ -27,8 +26,7 @@ download:
         The latest source archive is [tarantool-@PACKAGE_VERSION@-src.tar.gz]
         Please consult with README for build instructions on your system.
         
-        [tarantool-@PACKAGE_VERSION@-src.tar.gz]:
-        http://tarantool.org/dist/stable/tarantool-@PACKAGE_VERSION@-src.tar.gz 
+        [tarantool-@PACKAGE_VERSION@-src.tar.gz]: http://tarantool.org/dist/stable/tarantool-@PACKAGE_VERSION@-src.tar.gz
 
         ## Binary downloads
 
@@ -68,9 +66,9 @@ download:
         sudo apt-get install tarantool tarantool-client
         ```
         
-        ### CentOS 5-6 and RHEL 5-6
+        ### CentOS 5-7 and RHEL 5-7
 
-        CentOS repository is available at [http://tarantool.org/dist/stable/centos]
+        CentOS and RHEL repository is available at [http://tarantool.org/dist/stable/centos]
 
         Add the following section to your yum repository list (/etc/yum.repos.d/tarantool.repo)
         to enable it:
@@ -83,7 +81,7 @@ download:
         gpgcheck=0
         ```
         
-        ### Fedora
+        ### Fedora 19, 20 and Rawhide
 
         Fedora repository is available at [http://tarantool.org/dist/stable/fedora]
 

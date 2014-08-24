@@ -34,28 +34,28 @@ def translate_command(token_buffer, token_stream):
     object = next(token_stream)
     if token_is_identifier(object):
         # translate operator
-        translate_operator(token_buffer, operator, object)
-        translate_operands(token_buffer, operator, token_stream)
+        translate_operator(token_buffer, operator, object, token_stream)
     else:
         token_buffer.append(operator)
         token_buffer.append(object)
 
 
-def translate_operator(token_buffer, operator, object):
+def translate_operator(token_buffer, operator, object, token_stream):
     # operator object -> object.method
     # put object
     token_buffer.append(object[:2] + operator[2:])
+    (_, _, _, (end_row, end_col), line) = operator
+    # Token positions must be in increasing order
+    tail = ((end_row, end_col), (end_row, end_col), line)
     # put comma
-    token_buffer.append((tokenize.OP, '.') + operator[2:])
+    token_buffer.append((tokenize.OP, '.') + tail)
     # put method
     operator_name = operator[1]
     method_name = TARANTOOL_METHODS[operator_name]
-    token_buffer.append((tokenize.NAME, method_name) + operator[2:])
+    token_buffer.append((tokenize.NAME, method_name) + tail)
 
-
-def translate_operands(token_buffer, operator, token_stream):
     # put open bracket
-    token_buffer.append((tokenize.OP, '(') + operator[2:])
+    token_buffer.append((tokenize.OP, '(') + tail)
 
     # put all operatands
     token = next(token_stream)
@@ -66,23 +66,34 @@ def translate_operands(token_buffer, operator, token_stream):
         token = next(token_stream)
 
     comma_needed = False
-    while not token_is_separator(token):
-        token_buffer.append(token[:2] + operator[2:])
+    quote = None
+    while True:
+        if quote is None:
+            if token_is_quote(token):
+                quote = token[1]
+            elif token_is_separator(token):
+                break
+        elif token[1] == quote:
+            quote = None
         comma_needed = True
+        token_buffer.append(token)
         token = next(token_stream)
+
+    (_, _, (start_row, start_col), (end_row, end_col), line) = token
+    tail = ((end_row, end_col), (end_row, end_col), line)
 
     # set verbose flag
     if comma_needed:
         # we have operatands, put comma before silent
-        token_buffer.append((tokenize.OP, ',') + operator[2:])
-    token_buffer.append((tokenize.NAME, 'silent') + operator[2:])
-    token_buffer.append((tokenize.OP, '=') + operator[2:])
-    token_buffer.append((tokenize.NAME, '%s' % silent) + operator[2:])
+        token_buffer.append((tokenize.OP, ',') + tail)
+    token_buffer.append((tokenize.NAME, 'silent') + tail)
+    token_buffer.append((tokenize.OP, '=') + tail)
+    token_buffer.append((tokenize.NAME, '%s' % silent) + tail)
 
     # put close bracket
-    token_buffer.append((tokenize.OP, ')') + operator[2:])
+    token_buffer.append((tokenize.OP, ')') + tail)
     # new line
-    token_buffer.append((tokenize.NEWLINE, '\n') + operator[2:])
+    token_buffer.append((tokenize.NEWLINE, '\n') + tail)
 
 
 def modifier_to_value(name):
@@ -114,6 +125,9 @@ def token_is_separator(token):
     if token_type == tokenize.NEWLINE or token_type == tokenize.ENDMARKER:
         return True
     return False
+
+def token_is_quote(token):
+    return token[1] == '"' or token[1] == "'"
 
 
 class TarantoolStreamReader(utf_8.StreamReader):

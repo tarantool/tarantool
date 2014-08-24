@@ -190,6 +190,22 @@ test_bit_iter(void)
 	footer();
 }
 
+static void
+test_bit_iter_empty(void)
+{
+	header();
+
+	struct bit_iterator it;
+
+	bit_iterator_init(&it, NULL, 0, true);
+	fail_unless(bit_iterator_next(&it) == SIZE_MAX);
+
+	bit_iterator_init(&it, NULL, 0, false);
+	fail_unless(bit_iterator_next(&it) == SIZE_MAX);
+
+	footer();
+}
+
 int
 main(void)
 {
@@ -199,4 +215,5 @@ main(void)
 	test_bswap();
 	test_index();
 	test_bit_iter();
+	test_bit_iter_empty();
 }

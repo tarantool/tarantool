@@ -11,7 +11,8 @@ set (CPACK_SOURCE_GENERATOR "TGZ")
 set (CPACK_SOURCE_IGNORE_FILES
     "\\\\.git" "_CPack_Packages"
     "CMakeCache.txt" "CPackSourceConfig.cmake" "CPackConfig.cmake"
-    "CMakeFiles" "\\\\.gz" "\\\\.Z" "\\\\.zip" "\\\\.rpm"
+    "CMakeFiles" "\\\\.gz" "\\\\.Z" "\\\\.zip"
+    "x86_64\\\\.rpm" "i386\\\\.rpm" "i686\\\\.rpm"
     "\\\\.o" "\\\\.so" "\\\\.a"
     "client/tarantool/tarantool"
     "src/box/tarantool_box"

@@ -626,6 +626,14 @@ lbox_fiber_create(struct lua_State *L)
 }
 
 static int
+lbox_fiber_wakeup(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	fiber_wakeup(f);
+	return 0;
+}
+
+static int
 lbox_fiber_resume(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
@@ -910,6 +918,26 @@ lbox_fiber_cancel(struct lua_State *L)
 }
 
 /**
+ * Running and suspended fibers can be cancelled.
+ * Zombie fibers can't.
+ */
+static int
+lbox_fiber_kill(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1)
+		luaL_error(L, "fiber.kill(): bad arguments");
+	int fid = lua_tointeger(L, -1);
+	struct fiber *f = fiber_find(fid);
+	if (f == NULL)
+		luaL_error(L, "fiber.kill(): fiber not found");
+	if (! (f->flags & FIBER_USER_MODE))
+		luaL_error(L, "fiber.kill(): subject fiber does "
+			   "not permit cancel");
+	fiber_cancel(f);
+	return 0;
+}
+
+/**
  * Check if this current fiber has been cancelled and
  * throw an exception if this is the case.
  */
@@ -928,6 +956,7 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{"name", lbox_fiber_name},
 	{"cancel", lbox_fiber_cancel},
 	{"resume", lbox_fiber_resume},
+	{"wakeup", lbox_fiber_wakeup},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}
 };
@@ -938,6 +967,7 @@ static const struct luaL_reg fiberlib[] = {
 	{"id", lbox_fiber_id},
 	{"find", lbox_fiber_find},
 	{"cancel", lbox_fiber_cancel},
+	{"kill", lbox_fiber_kill},
 	{"testcancel", lbox_fiber_testcancel},
 	{"create", lbox_fiber_create},
 	{"resume", lbox_fiber_resume},

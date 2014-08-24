@@ -1,18 +1,55 @@
-%define _topdir @RPM_ROOT@
-%define _rpmdir @RPM_ROOT@
+####################################################
+################# MACROS AND DEFAULTS ##############
+####################################################
 
-# Require for libbfd (backtrace support)
+%{?scl:%global _scl_prefix /opt/tarantool}
+%{?scl:%scl_package tarantool}
+
+%define _source_filedigest_algorithm 0
+%define _binary_filedigest_algorithm 0
+
+%global debug_package %{nil}
+%global _enable_debug_package %{nil}
+%global __debug_install_post %{nil}
+%global __debug_package %{nil}
+
+%bcond_without postgresql
+%bcond_without mysql
+%bcond_without client
+
+%if 0%{?rhel} < 7 && 0%{?rhel} > 0
+BuildRequires: cmake28
+BuildRequires: devtoolset-2-toolchain
+BuildRequires: devtoolset-2-binutils-devel
+%else
+BuildRequires: cmake >= 2.8
+BuildRequires: gcc >= 4.5
 BuildRequires: binutils-devel
-BuildRoot: @RPM_BUILDROOT@
+%endif
 
-Name: tarantool
+%if 0%{?fedora} > 0
+BuildRequires: perl-podlators
+%endif
+
+# Strange bug.
+# Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
 Summary: Tarantool - an efficient in-memory data store
 Vendor: tarantool.org
 License: BSD
-Requires: libgcc >= 4.1.2-50 tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
+
+Provides: %{?scl_prefix}tarantool-debuginfo
+Provides: %{?scl_prefix}tarantool-debug
+%if 0%{?rhel} <= 5 && 0%{?rhel} > 0
+Requires: e2fsprogs-libs
+%else
+Requires: libuuid
+%endif
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -22,124 +59,151 @@ replication, online backup, stored procedures in Lua.
 This package provides the server daemon and administration
 scripts.
 
-# Tarantool sql module
-
-%package sql-module
-Summary: Tarantool common sql interface
+# Tarantool dev spec
+%package dev
+Summary: Tarantool C connector and header files
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: tarantool-sql-module
-Obsoletes: tarantool-sql-module
-%description -n tarantool-sql-module
+%description dev
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
-This package provides a common sql interface to use with
-tarantool-pg-module or by tarantool-mysql-module.
-
-%package pg-module
-Summary: Tarantool common sql interface
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: tarantool-pg-module
-Obsoletes: tarantool-pg-module
-%description -n tarantool-pg-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a PostgreSQL interface to use with
-tarantool-sql-module.
-
-%package mysql-module
-Summary: Tarantool common sql interface
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: tarantool-mysql-module
-Obsoletes: tarantool-mysql-module
-%description -n tarantool-mysql-module
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides a MySQL interface to use with
-tarantool-sql-module.
+This package provides Tarantool client libraries.
 
 # Tarantool sophia module
-
 %package sophia-module
 Summary: Tarantool sophia bindings
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: tarantool-sophia-module
-Obsoletes: tarantool-sophia-module
-%description -n tarantool-sophia-module
+%description sophia-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
 This package provides tarantool lua bindings to the
 sophia database.
 
-# Tarantool client spec
+# Tarantool sql module
+%package sql-module
+Summary: Tarantool common sql interface
+Vendor: tarantool.org
+Group: Applications/Databases
+%description sql-module
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
 
+This package provides a common sql interface to use with
+tarantool-pg-module or by tarantool-mysql-module.
+
+%if %{with postgresql}
+%package pg-module
+Summary: Tarantool common sql interface
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: %{?scl_prefix}tarantool-pg-module
+BuildRequires: postgresql-devel >= 9.0
+Requires: postgresql-libs >= 9.0
+%description pg-module
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides a PostgreSQL interface to use with
+tarantool-sql-module.
+%endif
+
+%if %{with mysql}
+%package mysql-module
+Summary: Tarantool common sql interface
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: %{?scl_prefix}tarantool-mysql-module
+BuildRequires: mysql-devel >= 5.0
+Requires: mysql-libs >= 5.0
+%description mysql-module
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides a MySQL interface to use with
+tarantool-sql-module.
+%endif
+
+# Tarantool client spec
+%if %{with client}
 %package client
 Summary: Tarantool command line client with history support
 Vendor: tarantool.org
 Group: Applications/Databases
-Provides: tarantool-client
-Obsoletes: tarantool-client
-%description -n tarantool-client
+BuildRequires: readline-devel
+Requires: readline
+%description client
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
 
 This package provides a command line client for Tarantool
 with history support.
-
-# Tarantool dev spec
-
-%package dev
-Summary: Tarantool C connector and header files
-Vendor: tarantool.org
-Group: Applications/Databases
-#Requires: /sbin/ldconfig
-#Requires: tarantool-debug = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
-Provides: tarantool-dev
-Obsoletes: tarantool-dev
-%description -n tarantool-dev
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides Tarantool client libraries.
-
-# Tarantool debug package
-
-%if 0%{?fedora}
-# Fedora includes debug package by default.
-%else
-%debug_package
 %endif
 
-###
+##################################################################
 
 %prep
 %setup -n @RPM_SOURCE_DIRECTORY_NAME@
 
 %build
 # https://fedoraproject.org/wiki/Packaging:RPMMacros
-cmake . -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DENABLE_CLIENT=ON -DENABLE_RPM=ON \
-    -DENABLE_BACKTRACE=ON -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-    -DCMAKE_INSTALL_SYSCONFDIR=%{_sysconfdir} \
-    -DCMAKE_INSTALL_BINDIR=%{_bindir} \
-    -DCMAKE_INSTALL_LIBDIR=%{_libdir}   \
-    -DCMAKE_INSTALL_LIBEXECDIR=%{_libexecdir} \
-    -DCMAKE_INSTALL_SBINDIR=%{_sbindir} \
-    -DCMAKE_INSTALL_SHAREDSTATEDIR=%{_sharedstatedir} \
-    -DCMAKE_INSTALL_DATADIR=%{_datadir} \
-    -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} \
-    -DCMAKE_INSTALL_INFODIR=%{_infodir} \
-    -DCMAKE_INSTALL_MANDIR=%{_mandir} \
-    -DCMAKE_INSTALL_LOCALSTATEDIR=%{_localstatedir}
 
-make %{?_smp_mflags}
+%{lua:
+    local function is_rhel_old()
+        local version = tonumber(rpm.expand('0%{?rhel}'))
+        return (version < 7 and version > 0)
+    end
+    function wrap_with_toolset(cmd)
+        local cmd = rpm.expand(cmd)
+        local devtoolset = 'scl enable devtoolset-2 %q\n'
+        if is_rhel_old() then
+            return string.format(devtoolset, cmd)
+        end
+        return cmd
+    end
+    local function cmake_key_value(key, value)
+        return " -D"..key.."="..value
+    end
+    local function dev_with (obj, flag)
+        local status = "OFF"
+        if rpm.expand("%{with "..obj.."}") then
+            status = "ON"
+        end
+        return " -D"..flag.."="..status
+    end
+    local cmd = 'cmake'
+    if is_rhel_old() then
+        cmd = 'cmake28'
+    end
+    cmd = cmd .. ' . '
+        .. cmake_key_value('CMAKE_BUILD_TYPE', 'RelWithDebugInfo')
+        .. cmake_key_value('ENABLE_BACKTRACE', 'ON')
+        .. cmake_key_value('CMAKE_INSTALL_PREFIX', '%{_prefix}')
+        .. cmake_key_value('CMAKE_INSTALL_SYSCONFDIR', '%{?scl:%_root_sysconfdir}%{!?scl:%_sysconfdir}')
+        .. cmake_key_value('CMAKE_INSTALL_BINDIR', '%{_bindir}')
+        .. cmake_key_value('CMAKE_INSTALL_LIBDIR', '%{_libdir}')
+        .. cmake_key_value('CMAKE_INSTALL_LIBEXECDIR', '%{_libexecdir}')
+        .. cmake_key_value('CMAKE_INSTALL_SBINDIR', '%{_sbindir}')
+        .. cmake_key_value('CMAKE_INSTALL_SHAREDSTATEDIR', '%{_sharedstatedir}')
+        .. cmake_key_value('CMAKE_INSTALL_DATADIR', '%{_datadir}')
+        .. cmake_key_value('CMAKE_INSTALL_INCLUDEDIR', '%{_includedir}')
+        .. cmake_key_value('CMAKE_INSTALL_INFODIR', '%{_infodir}')
+        .. cmake_key_value('CMAKE_INSTALL_MANDIR', '%{_mandir}')
+        .. cmake_key_value('CMAKE_INSTALL_LOCALSTATEDIR', '%{_localstatedir}')
+        .. ' %{!?scl:-DENABLE_RPM=ON}'
+        .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
+        .. dev_with('client', 'ENABLE_CLIENT')
+        .. dev_with('postgresql', 'WITH_POSTGRESQL')
+        .. dev_with('mysql', 'WITH_MYSQL')
 
+    print(wrap_with_toolset(cmd))
+}
+
+%{lua:
+    print(wrap_with_toolset('make %{?_smp_mflags}\n'))
+}
 %install
 make DESTDIR=%{buildroot} install
 
@@ -147,7 +211,7 @@ make DESTDIR=%{buildroot} install
 groupadd tarantool > /dev/null 2>&1
 useradd -r -g tarantool tarantool > /dev/null 2>&1
 # Performe a single instance setup
-/usr/bin/tarantool_deploy.sh --yes --quiet 1.1
+{!?scl:/usr/bin/tarantool_deploy.sh --yes --quiet 1.1}
 
 %preun
 
@@ -155,7 +219,7 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %defattr(-,root,root,-)
 
 %dir "%{_datadir}/tarantool"
-"%{_datadir}/tarantool/00000000000000000001.snap"
+%{!?scl:"%{_datadir}/tarantool/00000000000000000001.snap"}
 
 %dir "%{_datadir}/doc/tarantool"
 "%{_datadir}/doc/tarantool/README.md"
@@ -164,12 +228,13 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_mandir}/man1/tarantool_box.1.gz"
 
 "%{_bindir}/tarantool_box"
-"%{_bindir}/tarantool_multi.sh"
-"%{_bindir}/tarantool_deploy.sh"
-"/etc/init.d/tarantool_box"
+%{!?scl:"%{_bindir}/tarantool_multi.sh"}
+%{!?scl:"%{_bindir}/tarantool_deploy.sh"}
+%{!?scl:"%{_sysconfdir}/init.d/tarantool_box"}
 
-%dir "%{_sysconfdir}/tarantool"
-%config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"
+
+%{!?scl:%dir "%{_sysconfdir}/tarantool"}
+%{!?scl:%config(noreplace) "%{_sysconfdir}/tarantool/tarantool.cfg"}
 
 %files sql-module
 %defattr(-,root,root,-)
@@ -178,17 +243,21 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 %dir "%{_datadir}/tarantool/box/net"
 "%{_datadir}/tarantool/box/net/sql.lua"
 
+%if %{with postgresql}
 %files pg-module
 %defattr(-,root,root,-)
 %dir "%{_libdir}/tarantool/"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/pg.so"
+%endif
 
+%if %{with mysql}
 %files mysql-module
 %defattr(-,root,root,-)
 %dir "%{_libdir}/tarantool"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/mysql.so"
+%endif
 
 %files sophia-module
 %defattr(-,root,root,-)
@@ -253,13 +322,19 @@ useradd -r -g tarantool tarantool > /dev/null 2>&1
 "%{_includedir}/tarantool/luajit.h"
 "%{_includedir}/tarantool/lualib.h"
 
+%if %{with client}
 %files client
 %defattr(-,root,root,-)
 "%{_mandir}/man1/tarantool.1.gz"
 "%{_bindir}/tarantool"
 "%{_bindir}/tarancheck"
 "%{_bindir}/tarantar"
+%endif
 
 %changelog
+* Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2
+- Add SCL support
+- Add --with support
+- Add dependencies
 * Mon May 20 2013 Dmitry Simonenko <support@tarantool.org> 1.0-1
 - Initial version of the RPM spec

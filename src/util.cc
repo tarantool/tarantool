@@ -315,6 +315,7 @@ compare_symbol(const void *_a, const void *_b)
 void
 symbols_load(const char *name)
 {
+	char *path = find_path(name);
 	long storage_needed;
 	asymbol **symbol_table = NULL;
 	long number_of_symbols;
@@ -323,7 +324,7 @@ symbols_load(const char *name)
 	int j;
 
 	bfd_init();
-	h = bfd_openr (name, NULL);
+	h = bfd_openr(path, NULL);
 	if (h == NULL)
 		goto out;
 
