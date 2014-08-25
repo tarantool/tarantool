@@ -942,9 +942,9 @@ local function tcp_server_remote(list, prepare, handler)
 
         local ok = false
         if s ~= nil then
+            local backlog = prepare(s)
             if s:bind(addr.host, addr.port) then
-                local prepared, backlog = pcall(prepare, s)
-                if prepared and s:listen(backlog) then
+                if s:listen(backlog) then
                     ok = true
                 end
             end
