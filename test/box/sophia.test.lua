@@ -90,4 +90,26 @@ s:drop()
 box.cfg{}
 s = box.schema.create_space('tester',{engine='sophia', temporary=true})
 
+---
+--- gh-432: Sophia: ignored limit
+---
+
+s = box.schema.create_space('tester',{id = 89, engine='sophia'})
+s:create_index('sophia_index', {})
+for v=1, 100 do s:insert({v}) end
+t = s:select({''},{iterator='GT', limit =1})
+t
+t = s:select({},{iterator='GT', limit =1})
+t
+s:drop()
+
+s = box.schema.create_space('tester', {id = 90, engine='sophia'})
+s:create_index('sophia_index', {type = 'tree', parts = {1, 'STR'}})
+for v=1, 100 do s:insert({tostring(v)}) end
+t = s:select({''},{iterator='GT', limit =1})
+t
+t = s:select({},{iterator='GT', limit =1})
+t
+s:drop()
+
 os.execute("rm -rf sophia")
