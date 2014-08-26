@@ -82,7 +82,6 @@ set (common_sources
      lua/fiber.cc
      lua/trigger.cc
      lua/ipc.cc
-     lua/socket.cc
      lua/cjson.cc
      lua/yaml.cc
      lua/msgpack.cc

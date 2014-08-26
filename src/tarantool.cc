@@ -48,7 +48,6 @@
 #endif
 #include <fiber.h>
 #include <coeio.h>
-#include "mutex.h"
 #include <crc32.h>
 #include "memory.h"
 #include <say.h>
