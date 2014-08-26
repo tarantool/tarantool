@@ -159,7 +159,7 @@ lbox_tuple_slice(struct lua_State *L)
 	uint32_t field_no = start;
 	field = tuple_seek(&it, start);
 	while (field && field_no < end) {
-		luamp_decode(L, &field);
+		luamp_decode(L, luaL_msgpack_default, &field);
 		++field_no;
 		field = tuple_next(&it);
 	}
@@ -168,17 +168,16 @@ lbox_tuple_slice(struct lua_State *L)
 }
 
 /* A MsgPack extensions handler that supports tuples */
-static void
+static int
 luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
 {
 	struct tuple *tuple = lua_istuple(L, idx);
 	if (tuple != NULL) {
 		tuple_to_tbuf(tuple, b);
-		return;
+		return 0;
 	}
 
-	tnt_raise(ClientError, ER_PROC_RET,
-		  lua_typename(L, lua_type(L, idx)));
+	return 1;
 }
 
 /*
@@ -190,14 +189,14 @@ luamp_encodestack(struct lua_State *L, struct tbuf *b, int first, int last)
 {
 	if (first == last && (lua_istable(L, first) || lua_istuple(L, first))) {
 		/* New format */
-		luamp_encode(L, b, first);
+		luamp_encode(L, luaL_msgpack_default, b, first);
 		return 1;
 	} else {
 		/* Backward-compatible format */
 		/* sic: if arg_count is 0, first > last */
-		luamp_encode_array(b, last + 1 - first);
+		luamp_encode_array(luaL_msgpack_default, b, last + 1 - first);
 		for (int k = first; k <= last; ++k) {
-			luamp_encode(L, b, k);
+			luamp_encode(L, luaL_msgpack_default, b, k);
 		}
 		return last + 1 - first;
 	}
@@ -271,19 +270,19 @@ lbox_tuple_transform(struct lua_State *L)
 	 * Prepare UPDATE expression
 	 */
 	struct tbuf *b = tbuf_new(&fiber()->gc);
-	luamp_encode_array(b, op_cnt);
+	luamp_encode_array(luaL_msgpack_default,b, op_cnt);
 	if (len > 0) {
-		luamp_encode_array(b, 3);
-		luamp_encode_str(b, "#", 1);
-		luamp_encode_uint(b, offset);
-		luamp_encode_uint(b, len);
+		luamp_encode_array(luaL_msgpack_default, b, 3);
+		luamp_encode_str(luaL_msgpack_default, b, "#", 1);
+		luamp_encode_uint(luaL_msgpack_default, b, offset);
+		luamp_encode_uint(luaL_msgpack_default, b, len);
 	}
 
 	for (int i = argc ; i > 3; i--) {
-		luamp_encode_array(b, 3);
-		luamp_encode_str(b, "!", 1);
-		luamp_encode_uint(b, offset);
-		luamp_encode(L, b, i);
+		luamp_encode_array(luaL_msgpack_default, b, 3);
+		luamp_encode_str(luaL_msgpack_default, b, "!", 1);
+		luamp_encode_uint(luaL_msgpack_default, b, offset);
+		luamp_encode(L, luaL_msgpack_default, b, i);
 	}
 
 	/* Execute tuple_update */

@@ -152,8 +152,7 @@ msgpack.decode(pong)
 ...
 msgpack.decode(pong, 6)
 ---
-- 0: 0
-  1: 0
+- {0: 0, 1: 0}
 - 23
 ...
 s:close()
@@ -626,14 +625,14 @@ require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 ---
-- '{}'
+- '[]'
 ...
 --# setopt delimiter ''
 json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 
 ---
-- '{}'
+- '[]'
 ...
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---

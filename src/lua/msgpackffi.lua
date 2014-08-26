@@ -232,6 +232,10 @@ local function encode_r(buf, obj, level)
             for key, val in pairs(obj) do -- goodbye, JIT
                 size = size + 1
             end
+            if size == 0 then
+                encode_array(buf, 0) -- encode empty table as an array
+                return
+            end
             encode_map(buf, size)
             for key, val in pairs(obj) do
                 encode_r(buf, key, level + 1)
@@ -509,5 +513,6 @@ return {
     encode = encode;
     on_encode = on_encode;
     decode_unchecked = decode_unchecked;
+    decode = decode_unchecked; -- just for tests
     encode_tuple = encode_tuple;
 }

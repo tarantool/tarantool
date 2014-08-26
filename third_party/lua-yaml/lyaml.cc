@@ -1,6 +1,6 @@
 /*
  * lyaml.c, LibYAML binding for Lua
- * 
+ *
  * Copyright (c) 2009, Andrew Danforth <acd@weirdness.net>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -9,10 +9,10 @@
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,11 +20,13 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- * 
- * Portions of this software were inspired by Perl's YAML::LibYAML module by 
+ *
+ * Portions of this software were inspired by Perl's YAML::LibYAML module by
  * Ingy döt Net <ingy@cpan.org>
- * 
+ *
  */
+
+#include "lyaml.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -46,14 +48,6 @@ extern "C" {
 } /* extern "C" */
 #include "lua/utils.h"
 
-/* configurable flags */
-static char Dump_Auto_Array = 1;
-static char Dump_Error_on_Unsupported = 0;
-static char Dump_Check_Metatables = 1;
-static char Load_Set_Metatables = 1;
-static char Load_Numeric_Scalars = 1;
-static char Load_Nulls_As_Nil = 0;
-
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
 #define RETURN_ERRMSG(s, msg) do { \
@@ -64,9 +58,8 @@ static char Load_Nulls_As_Nil = 0;
 
 struct lua_yaml_loader {
    lua_State *L;
+   struct luaL_serializer *cfg;
    int anchortable_index;
-   int sequencemt_index;
-   int mapmt_index;
    int document_count;
    yaml_parser_t parser;
    yaml_event_t event;
@@ -76,6 +69,7 @@ struct lua_yaml_loader {
 
 struct lua_yaml_dumper {
    lua_State *L;
+   struct luaL_serializer *cfg;
    int anchortable_index;
    unsigned int anchor_number;
    yaml_emitter_t emitter;
@@ -84,8 +78,6 @@ struct lua_yaml_dumper {
    lua_State *outputL;
    luaL_Buffer yamlbuf;
 };
-
-static int l_null(lua_State *);
 
 static void generate_error_message(struct lua_yaml_loader *loader) {
    char buf[256];
@@ -149,11 +141,9 @@ static void handle_anchor(struct lua_yaml_loader *loader) {
 }
 
 static void load_map(struct lua_yaml_loader *loader) {
-   lua_newtable(loader->L);
-   if (loader->mapmt_index != 0) {
-      lua_pushvalue(loader->L, loader->mapmt_index);
-      lua_setmetatable(loader->L, -2);
-   }
+   lua_createtable(loader->L, 0, 5);
+   if (loader->cfg->decode_save_metatables)
+      luaL_setmaphint(loader->L, -1);
 
    handle_anchor(loader);
    while (1) {
@@ -175,11 +165,9 @@ static void load_map(struct lua_yaml_loader *loader) {
 static void load_sequence(struct lua_yaml_loader *loader) {
    int index = 1;
 
-   lua_newtable(loader->L);
-   if (loader->sequencemt_index != 0) {
-      lua_pushvalue(loader->L, loader->sequencemt_index);
-      lua_setmetatable(loader->L, -2);
-   }
+   lua_createtable(loader->L, 5, 0);
+   if (loader->cfg->decode_save_metatables)
+      luaL_setarrayhint(loader->L, -1);
 
    handle_anchor(loader);
    while (load_node(loader) == 1 && !loader->error)
@@ -201,7 +189,9 @@ static void load_scalar(struct lua_yaml_loader *loader) {
          lua_pushinteger(loader->L, strtol(str, NULL, 10));
          return;
       } else if (!strcmp(tag, "float")) {
-         lua_pushnumber(loader->L, strtod(str, NULL));
+         double dval = fpconv_strtod(str, NULL);
+         luaL_checkfinite(loader->L, loader->cfg, dval);
+         lua_pushnumber(loader->L, dval);
          return;
       } else if (!strcmp(tag, "bool")) {
          lua_pushboolean(loader->L, !strcmp(str, "true") || !strcmp(str, "yes"));
@@ -214,10 +204,7 @@ static void load_scalar(struct lua_yaml_loader *loader) {
 
    if (loader->event.data.scalar.style == YAML_PLAIN_SCALAR_STYLE) {
       if (!strcmp(str, "~")) {
-         if (Load_Nulls_As_Nil)
-            lua_pushnil(loader->L);
-         else
-            l_null(loader->L);
+         luaL_pushnull(loader->L);
          return;
       } else if (!strcmp(str, "true") || !strcmp(str, "yes")) {
          lua_pushboolean(loader->L, 1);
@@ -225,19 +212,35 @@ static void load_scalar(struct lua_yaml_loader *loader) {
       } else if (!strcmp(str, "false") || !strcmp(str, "no")) {
          lua_pushboolean(loader->L, 0);
          return;
+      } else if (!strcmp(str, "null")) {
+         luaL_pushnull(loader->L);
+         return;
+      } else if (!length) {
+         lua_pushliteral(loader->L, "");
+         return;
+      }
+
+      /* plain scalar and Lua can convert it to a number?  make it so... */
+      char *endptr = NULL;
+      long long ival = strtol(str, &endptr, 10);
+      if (endptr == str + length && ival != LLONG_MAX) {
+         luaL_pushinumber64(loader->L, ival);
+         return;
+      }
+      unsigned long long uval = strtoull(str, &endptr, 10);
+      if (endptr == str + length) {
+         luaL_pushnumber64(loader->L, uval);
+         return;
+      }
+      double dval = fpconv_strtod(str, &endptr);
+      if (endptr == str + length) {
+         luaL_checkfinite(loader->L, loader->cfg, dval);
+         lua_pushnumber(loader->L, dval);
+         return;
       }
    }
 
    lua_pushlstring(loader->L, str, length);
-
-   /* plain scalar and Lua can convert it to a number?  make it so... */
-   if (Load_Numeric_Scalars
-      && loader->event.data.scalar.style == YAML_PLAIN_SCALAR_STYLE
-      && lua_isnumber(loader->L, -1)) {
-      lua_Number n = lua_tonumber(loader->L, -1);
-      lua_pop(loader->L, 1);
-      lua_pushnumber(loader->L, n);
-   }
 
    handle_anchor(loader);
 }
@@ -316,7 +319,7 @@ static void load(struct lua_yaml_loader *loader) {
       if (loader->event.type != YAML_DOCUMENT_END_EVENT)
          RETURN_ERRMSG(loader, "expected DOCUMENT_END_EVENT");
 
-      /* reset anchor table */ 
+      /* reset anchor table */
       lua_newtable(loader->L);
       lua_replace(loader->L, loader->anchortable_index);
    }
@@ -324,31 +327,14 @@ static void load(struct lua_yaml_loader *loader) {
 
 static int l_load(lua_State *L) {
    struct lua_yaml_loader loader;
-   int top = lua_gettop(L);
 
    luaL_argcheck(L, lua_isstring(L, 1), 1, "must provide a string argument");
 
    loader.L = L;
+   loader.cfg = luaL_checkserializer(L);
    loader.validevent = 0;
    loader.error = 0;
    loader.document_count = 0;
-   loader.mapmt_index = loader.sequencemt_index = 0;
-
-   if (Load_Set_Metatables) {
-      /* create sequence metatable */
-      lua_newtable(L);
-      lua_pushliteral(L, "_yaml");
-      lua_pushliteral(L, "sequence");
-      lua_rawset(L, -3);
-      loader.sequencemt_index = top + 1;
-
-      /* create map metatable */
-      lua_newtable(L);
-      lua_pushliteral(L, "_yaml");
-      lua_pushliteral(L, "map");
-      lua_rawset(L, -3);
-      loader.mapmt_index = top + 2;
-   }
 
    /* create table used to track anchors */
    lua_newtable(L);
@@ -440,18 +426,6 @@ static int is_utf8(const char *data, size_t len)
     return 1;
 }
 
-static inline const char *
-dump_tostring(struct lua_State *L, int index)
-{
-	if (index < 0)
-		index = lua_gettop(L) + index + 1;
-	lua_getglobal(L, "tostring");
-	lua_pushvalue(L, index);
-	lua_call(L, 1, 1);
-	lua_replace(L, index);
-	return lua_tostring(L, index);
-}
-
 static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    const char *s = "";
    lua_pushvalue(dumper->L, -1);
@@ -487,7 +461,7 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
    if (anchor && !*anchor) return 1;
 
    yaml_mapping_style_t yaml_style = (field->compact)
-		   ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
+      ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
    yaml_mapping_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
    yaml_emitter_emit(&dumper->emitter, &ev);
 
@@ -516,7 +490,7 @@ static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
       return 1;
 
    yaml_sequence_style_t yaml_style = (field->compact)
-		   ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
+      ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
    yaml_sequence_start_event_initialize(&ev, anchor, NULL, 0, yaml_style);
    yaml_emitter_emit(&dumper->emitter, &ev);
 
@@ -540,166 +514,113 @@ static int dump_null(struct lua_yaml_dumper *dumper) {
    return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
-static int
-dump_node(struct lua_yaml_dumper *dumper)
+static int dump_node(struct lua_yaml_dumper *dumper)
 {
-	size_t len;
-	const char *str = NULL;
-	yaml_char_t *tag = NULL;
-	yaml_event_t ev;
-	yaml_event_t *evp;
-	yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
-	int is_binary = 0;
-	char buf[25];
-	struct luaL_field field;
+   size_t len;
+   const char *str = NULL;
+   yaml_char_t *tag = NULL;
+   yaml_event_t ev;
+   yaml_event_t *evp;
+   yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
+   int is_binary = 0;
+   char buf[FPCONV_G_FMT_BUFSIZE];
+   struct luaL_field field;
 
-	int top = lua_gettop(dumper->L);
-	luaL_tofield(dumper->L, top, &field);
+   int top = lua_gettop(dumper->L);
+   luaL_checkfield(dumper->L, dumper->cfg, top, &field);
+   switch(field.type) {
+   case MP_UINT:
+      snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
+      buf[sizeof(buf) - 1] = 0;
+      str = buf;
+      len = strlen(buf);
+      break;
+   case MP_INT:
+      snprintf(buf, sizeof(buf) - 1, "%" PRIi64, field.ival);
+      buf[sizeof(buf) - 1] = 0;
+      str = buf;
+      len = strlen(buf);
+      break;
+   case MP_FLOAT:
+      fpconv_g_fmt(buf, field.fval, dumper->cfg->encode_number_precision);
+      str = buf;
+      len = strlen(buf);
+      break;
+   case MP_DOUBLE:
+      fpconv_g_fmt(buf, field.dval, dumper->cfg->encode_number_precision);
+      str = buf;
+      len = strlen(buf);
+      break;
+   case MP_ARRAY:
+      return dump_array(dumper, &field);
+   case MP_MAP:
+      return dump_table(dumper, &field);
+   case MP_BIN:
+   case MP_STR:
+      str = lua_tolstring(dumper->L, -1, &len);
+      if (field.type == MP_BIN || !is_utf8(str, len)) {
+         is_binary = 1;
+         tobase64(dumper->L, -1);
+         str = lua_tolstring(dumper->L, -1, &len);
+         tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
+         break;
+      }
 
-	/* Unknown type on the stack, try to call 'totable' from metadata */
-	int type = lua_type(dumper->L, top);
-	if (field.type == MP_EXT &&
-	    (type == LUA_TUSERDATA || type == LUA_TCDATA)) {
-		/* try to call 'totable' method on udata/cdata */
-		try {
-			/*
-			 * LuaJIT specific: lua_getfield raises exception on
-			 * cdata objects if field doesn't exist.
-			 */
-			lua_getfield(dumper->L, top, "totable");
-			if (lua_isfunction(dumper->L, -1)) {
-				/* copy object itself */
-				lua_pushvalue(dumper->L, top);
-				lua_call(dumper->L, 1, 1);
-				if (lua_istable(dumper->L, -1)) {
-					/* replace obj with the unpacked table*/
-					lua_replace(dumper->L, top);
-					luaL_tofield(dumper->L, -1, &field);
-				}
-			}
-		} catch (...) {
-			/* ignore lua_getfield exceptions */
-		}
-		lua_settop(dumper->L, top); /* remove temporary objects */
-	}
+      /*
+       * Always quote strings in FLOW SEQUENCE
+       * Flow: [1, 'a', 'testing']
+       * Block:
+       * - 1
+       * - a
+       * - testing
+       */
+      if (dumper->emitter.flow_level > 0) {
+         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+         break;
+      }
 
-	/* Still have unknown type on the stack,
-	 * try to call 'tostring' */
-	if (field.type == MP_EXT) {
-		lua_getglobal(dumper->L, "tostring");
-		lua_pushvalue(dumper->L, top);
-		lua_call(dumper->L, 1, 1);
-		lua_replace(dumper->L, top);
-		lua_settop(dumper->L, top);
-		luaL_tofield(dumper->L, -1, &field);
-	}
+      for (evp = dumper->emitter.events.head;
+         evp != dumper->emitter.events.tail; evp++) {
+         if (evp->type == YAML_SEQUENCE_START_EVENT &&
+             evp->data.sequence_start.style == YAML_FLOW_SEQUENCE_STYLE) {
+            style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+            goto strbreak;
+         }
+      }
 
-	switch(field.type) {
-	case MP_UINT:
-		snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
-		buf[sizeof(buf) - 1] = 0;
-		str = buf;
-		len = strlen(buf);
-		break;
-	case MP_INT:
-		snprintf(buf, sizeof(buf) - 1, "%" PRIi64, field.ival);
-		buf[sizeof(buf) - 1] = 0;
-		str = buf;
-		len = strlen(buf);
-		break;
-	case MP_FLOAT:
-		snprintf(buf, sizeof(buf) - 1, "%.14g", field.fval);
-		buf[sizeof(buf) - 1] = 0;
-		str = buf;
-		len = strlen(buf);
-		break;
-	case MP_DOUBLE:
-		snprintf(buf, sizeof(buf) - 1, "%.14lg", field.dval);
-		buf[sizeof(buf) - 1] = 0;
-		str = buf;
-		len = strlen(buf);
-		break;
-	case MP_ARRAY:
-		return dump_array(dumper, &field);
-	case MP_MAP:
-		return dump_table(dumper, &field);
-	case MP_BIN:
-	case MP_STR:
-		str = lua_tolstring(dumper->L, -1, &len);
-		if (field.type == MP_BIN || !is_utf8(str, len)) {
-			is_binary = 1;
-			tobase64(dumper->L, -1);
-			str = lua_tolstring(dumper->L, -1, &len);
-			tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
-			break;
-		}
+      if (len <= 5 && (!strcmp(str, "true")
+          || !strcmp(str, "false")
+          || !strcmp(str, "~")
+          || !strcmp(str, "null"))) {
+          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+      } else if (lua_isnumber(dumper->L, -1)) {
+         /* string is convertible to number, quote it to preserve type */
+         style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+      }
+      strbreak:
+      break;
+   case MP_BOOL:
+      if (field.bval) {
+         str = "true";
+         len = 4;
+      } else {
+         str = "false";
+         len = 5;
+      }
+      break;
+   case MP_NIL:
+      return dump_null(dumper);
+   case MP_EXT:
+      assert(false);
+      break;
+    }
 
-		/*
-		 * Always quote strings in FLOW SEQUENCE
-		 * Flow: [1, 'a', 'testing']
-		 * Block:
-		 * - 1
-		 * - a
-		 * - testing
-		 */
-		if (dumper->emitter.flow_level > 0) {
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-			break;
-		}
+   yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
+                                !is_binary, !is_binary, style);
+   if (is_binary)
+      lua_pop(dumper->L, 1);
 
-		for (evp = dumper->emitter.events.head;
-		     evp != dumper->emitter.events.tail; evp++) {
-			if (evp->type == YAML_SEQUENCE_START_EVENT &&
-			     evp->data.sequence_start.style ==
-			     YAML_FLOW_SEQUENCE_STYLE) {
-				style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-				goto strbreak;
-			}
-		}
-
-		if (len <= 5 && (!strcmp(str, "true")
-			|| !strcmp(str, "false")
-			|| !strcmp(str, "~")
-			|| !strcmp(str, "null"))) {
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-		} else if (lua_isnumber(dumper->L, -1)) {
-			/* string is convertible to number, quote it to preserve type */
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-		}
-		strbreak:
-		break;
-	case MP_BOOL:
-		if (field.bval) {
-			str = "true";
-			len = 4;
-		} else {
-			str = "false";
-			len = 5;
-		}
-		break;
-	case MP_NIL:
-		return dump_null(dumper);
-	case MP_EXT:
-		if (Dump_Error_on_Unsupported) {
-			char buf[256];
-			snprintf(buf, sizeof(buf),
-				 "cannot dump object of type: %s",
-				 lua_typename(dumper->L, lua_type(dumper->L, -1)));
-			lua_pushstring(dumper->L, buf);
-			dumper->error = 1;
-			return 0;
-		} else {
-			return dump_null(dumper);
-		}
-		break;
-	}
-
-	yaml_scalar_event_initialize(&ev, NULL, tag, (unsigned char *)str, len,
-		!is_binary, !is_binary, style);
-	if (is_binary)
-		lua_pop(dumper->L, 1);
-
-	return yaml_emitter_emit(&dumper->emitter, &ev);
+   return yaml_emitter_emit(&dumper->emitter, &ev);
 }
 
 static void dump_document(struct lua_yaml_dumper *dumper) {
@@ -756,6 +677,7 @@ static int l_dump(lua_State *L) {
    yaml_event_t ev;
 
    dumper.L = L;
+   dumper.cfg = luaL_checkserializer(L);
    dumper.error = 0;
    /* create thread to use for YAML buffer */
    dumper.outputL = lua_newthread(L);
@@ -800,75 +722,31 @@ static int l_dump(lua_State *L) {
    return 1;
 }
 
-static int handle_config_option(lua_State *L) {
-   const char *attr;
-   int i;
-   static const struct {
-      const char *attr;
-      char *val;
-   } args[] = {
-      { "dump_auto_array", &Dump_Auto_Array },
-      { "dump_check_metatables", &Dump_Check_Metatables },
-      { "dump_error_on_unsupported", &Dump_Error_on_Unsupported },
-      { "load_set_metatables", &Load_Set_Metatables },
-      { "load_numeric_scalars", &Load_Numeric_Scalars },
-      { "load_nulls_as_nil", &Load_Nulls_As_Nil },
-      { NULL, NULL }
-   };
+static int
+l_new(lua_State *L);
 
-   luaL_argcheck(L, lua_isstring(L, -2), 1, "config attribute must be string");
-   luaL_argcheck(L, lua_isboolean(L, -1) || lua_isnil(L, -1), 1,
-      "value must be boolean or nil");
+const luaL_reg yamllib[] = {
+   { "encode", l_dump },
+   { "decode", l_load },
+   { "new",    l_new },
+   { NULL, NULL}
+};
 
-   attr = lua_tostring(L, -2);
-   for (i = 0; args[i].attr; i++) {
-      if (!strcmp(attr, args[i].attr)) {
-         if (!lua_isnil(L, -1))
-            *(args[i].val) = lua_toboolean(L, -1);
-         lua_pushboolean(L, *(args[i].val));
-         return 1;
-      }
-   }
-
-   luaL_error(L, "unrecognized config option: %s", attr);
-   return 0; /* never reached */
-}
-
-static int l_config(lua_State *L) {
-   if (lua_istable(L, -1)) {
-      lua_pushnil(L);
-      while (lua_next(L, -2) != 0) {
-         handle_config_option(L);
-         lua_pop(L, 2);
-      }
-      return 0;
-   }
-
-   return handle_config_option(L);
-}
-
-static int l_null(lua_State *L) {
-   lua_getglobal(L, "yaml");
-   lua_pushliteral(L, "null");
-   lua_rawget(L, -2);
-   lua_replace(L, -2);
-
+static int
+l_new(lua_State *L)
+{
+   struct luaL_serializer *parent = luaL_checkserializer(L);
+   luaL_newserializer(L, yamllib, parent);
    return 1;
 }
 
-extern "C" int luaopen_yaml(lua_State *L) {
-   const luaL_reg yamllib[] = {
-      { "decode", l_load },
-      { "encode", l_dump },
-      { "configure", l_config },
-      { "null", l_null },
-      { NULL, NULL}
-   };
-
-   luaL_openlib(L, "yaml", yamllib, 0);
+int
+luaopen_yaml(lua_State *L) {
+   struct luaL_serializer *s = luaL_newserializer(L, yamllib, NULL);
+   s->has_compact = 1;
+   luaL_register_module(L, "yaml", NULL);
    return 1;
 }
 
-extern "C" int yamlL_encode(lua_State *L) {
-	return l_dump(L);
-}
+/* vim: et sw=3 ts=3 sts=3:
+*/

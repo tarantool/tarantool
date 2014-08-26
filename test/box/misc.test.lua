@@ -90,7 +90,7 @@ tonumber64(1), 1
 -- Testing 64bit
 tonumber64(123)
 tonumber64('123')
-type(tonumber64('123')) == 'cdata'
+type(tonumber64('4294967296')) == 'cdata'
 tonumber64('9223372036854775807') == tonumber64('9223372036854775807')
 tonumber64('9223372036854775807') - tonumber64('9223372036854775800')
 tonumber64('18446744073709551615') == tonumber64('18446744073709551615')
@@ -152,60 +152,3 @@ fifo_top(space, 1)
 space:delete{1}
 
 space:drop()
-
-----------------
--- # yaml encode/decode on cdata
-----------------
-
-ffi = require('ffi')
-
-ffi.new('uint8_t', 128)
-ffi.new('int8_t', -128)
-ffi.new('uint16_t', 128)
-ffi.new('int16_t', -128)
-ffi.new('uint32_t', 128)
-ffi.new('int32_t', -128)
-ffi.new('uint64_t', 128)
-ffi.new('int64_t', -128)
-
-ffi.new('char', 128)
-ffi.new('char', -128)
-ffi.new('bool', true)
-ffi.new('bool', false)
-
-ffi.new('float', 1.23456)
-ffi.new('float', 1e10)
-ffi.new('double', 1.23456)
-ffi.new('double', 1e10)
-
-ffi.cast('void *', 0)
-ffi.cast('void *', 0xabcdef)
-
-ffi.cdef([[struct test { int a; }; ]])
-ffi.cast('struct test *', 0)
-
---# setopt delimiter ';'
-type(ffi.metatype('struct test', {
-    __index = {
-        totable = function(test)
-            return { 'yaml totable test = ' .. test.a }
-        end
-    }
-}));
-
---# setopt delimiter ''
--- custom totable function will be called by yaml.encode
-ffi.new('struct test', { a = 15 })
-
-
-
--------------------------------------------------------------------------------
--- #346 yaml.null() crases server
--------------------------------------------------------------------------------
-
-yaml = require('yaml')
-type(yaml.NULL)
-yaml.NULL
-yaml.NULL == nil
-yaml.null() -- for compatibility with luaYAML
-yaml = nil

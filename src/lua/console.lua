@@ -1,11 +1,19 @@
 -- console.lua -- internal file
 
 local internal = require('console')
-local formatter = require('yaml')
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
+
+-- admin formatter must be able to encode any Lua variable
+local formatter = require('yaml').new()
+formatter.cfg{
+    encode_invalid_numbers = true;
+    encode_load_metatables = true;
+    encode_use_tostring    = true;
+    encode_invalid_as_nil  = true;
+}
 
 local function format(status, ...)
     -- When storing a nil in a Lua table, there is no way to

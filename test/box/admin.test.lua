@@ -102,7 +102,7 @@ function test_box_slab_info()
         tmp.slabs = nil
     end
     for k, v in ipairs(cdata) do
-        if check_type(tmp[v], 'cdata') == false then
+        if check_type(tmp[v], 'number') == false then
             table.insert(failed, 'box.slab.info().'..v)
         else
             tmp[v] = nil
