@@ -18,26 +18,25 @@ help()
 ...
 box.cfg
 ---
-- too_long_threshold: 0.5
+- snapshot_count: 6
+  too_long_threshold: 0.5
   slab_alloc_factor: 2
   slab_alloc_minimal: 64
   background: false
   slab_alloc_arena: 0.1
   log_level: 5
-  snap_count: 6
   listen: <uri>
   logger_nonblock: true
   snap_dir: .
   coredump: false
   wal_mode: write
-  pid_file: tarantool.pid
   panic_on_snap_error: true
   panic_on_wal_error: false
-  rows_per_wal: 50
-  wal_dir: .
-  snap_period: 14400
+  pid_file: tarantool.pid
   readahead: 16320
-  snap_check_period: 60
+  wal_dir: .
+  snapshot_period: 14400
+  rows_per_wal: 50
   wal_dir_rescan_delay: 0.1
 ...
 space:insert{1, 'tuple'}

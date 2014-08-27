@@ -97,7 +97,7 @@ end
 
 local function mkdir(dirname)
     log.info("mkdir %s", dirname)
-    if not fio.mkdir(dirname, 0x1C0) then
+    if not fio.mkdir(dirname, tonumber('0750', 8)) then
         log.error("Can't mkdir %s: %s", dirname, errno.strerror())
         os.exit(-1)
     end

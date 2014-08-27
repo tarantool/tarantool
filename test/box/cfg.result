@@ -2,7 +2,7 @@
 --# push filter 'admin: .*' to 'admin: <uri>'
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:134: Attempt to modify a read-only
+- error: '[string "-- load_cfg.lua - internal file..."]:132: Attempt to modify a read-only
     table'
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
@@ -10,26 +10,25 @@ t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'functi
 ...
 t
 ---
-- - 'too_long_threshold: 0.5'
+- - 'snapshot_count: 6'
+  - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
-  - 'snap_count: 6'
   - 'primary: <uri>
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
   - 'wal_mode: write'
-  - 'pid_file: tarantool.pid'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
-  - 'rows_per_wal: 50'
-  - 'wal_dir: .'
-  - 'snap_period: 14400'
+  - 'pid_file: tarantool.pid'
   - 'readahead: 16320'
-  - 'snap_check_period: 60'
+  - 'wal_dir: .'
+  - 'snapshot_period: 14400'
+  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 -- must be read-only
@@ -41,26 +40,25 @@ t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'functi
 ...
 t
 ---
-- - 'too_long_threshold: 0.5'
+- - 'snapshot_count: 6'
+  - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
   - 'slab_alloc_minimal: 64'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
-  - 'snap_count: 6'
   - 'primary: <uri>
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
   - 'wal_mode: write'
-  - 'pid_file: tarantool.pid'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
-  - 'rows_per_wal: 50'
-  - 'wal_dir: .'
-  - 'snap_period: 14400'
+  - 'pid_file: tarantool.pid'
   - 'readahead: 16320'
-  - 'snap_check_period: 60'
+  - 'wal_dir: .'
+  - 'snapshot_period: 14400'
+  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 --# clear filter

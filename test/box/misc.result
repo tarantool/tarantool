@@ -22,11 +22,11 @@ t
   - error
   - index
   - info
+  - internal
   - rollback
   - schema
   - session
   - slab
-  - snap_daemon
   - snapshot
   - space
   - stat
