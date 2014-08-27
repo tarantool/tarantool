@@ -3,7 +3,7 @@
 -- Test floating points values (too_long_treshold) with fractional part
 --
 box.cfg{
-    admin = 3313,
+    listen = 3313,
     slab_alloc_arena = 0.1,
     pid_file = "box.pid",
     rows_per_wal = 50,

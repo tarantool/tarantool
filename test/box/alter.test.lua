@@ -139,3 +139,15 @@ box.space.space:replace{1,'The rain in Spain'}
 box.space.space:delete{1,'The rain in Spain'}
 box.space.space:select{}
 s:drop()
+
+-- ------------------------------------------------------------------
+-- gh-362 Appropriate error messages in create_index
+-- ------------------------------------------------------------------
+s = box.schema.create_space(42)
+s = box.schema.create_space("test", "bug")
+s = box.schema.create_space("test", {unknown = 'param'})
+s = box.schema.create_space("test")
+s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+s:create_index('primary', {unique = true, parts = 'bug'})
+s:drop()

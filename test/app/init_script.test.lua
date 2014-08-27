@@ -3,7 +3,6 @@
 -- Testing init script
 --
 box.cfg{
-    admin  = 3313,
     listen = 3314,
     pid_file = "box.pid",
     logger="tarantool.log"

@@ -327,7 +327,7 @@ auto2 = box.schema.create_space('auto', {id = auto.id})
 ...
 box.schema.space.drop('auto')
 ---
-- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+- error: Illegal parameters, space_id should be a number
 ...
 auto2
 ---
@@ -367,6 +367,40 @@ box.space.space:delete{1,'The rain in Spain'}
 box.space.space:select{}
 ---
 - - [1, 'a']
+...
+s:drop()
+---
+...
+-- ------------------------------------------------------------------
+-- gh-362 Appropriate error messages in create_index
+-- ------------------------------------------------------------------
+s = box.schema.create_space(42)
+---
+- error: Illegal parameters, name should be a string
+...
+s = box.schema.create_space("test", "bug")
+---
+- error: Illegal parameters, options should be a table
+...
+s = box.schema.create_space("test", {unknown = 'param'})
+---
+- error: Illegal parameters, options parameter 'unknown' is unexpected
+...
+s = box.schema.create_space("test")
+---
+...
+s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+---
+- error: 'Illegal parameters, invalid index parts: field_no must be one-based'
+...
+s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+---
+- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+    pairs'
+...
+s:create_index('primary', {unique = true, parts = 'bug'})
+---
+- error: Illegal parameters, options parameter 'parts' should be of type table
 ...
 s:drop()
 ---

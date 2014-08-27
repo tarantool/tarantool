@@ -74,22 +74,122 @@ local function user_resolve(user)
     return tuple[1]
 end
 
+--[[
+ @brief Common function to check table with parameters (like options)
+ @param table - table with parameters
+ @param template - table with expected types of expected parameters
+  type could be comma separated string with lua types (number, string etc),
+  or 'any' if any type is allowed
+ The function checks following:
+ 1)that parameters table is a table (or nil)
+ 2)all keys in parameters are present in template
+ 3)type of every parameter fits (one of) types described in template
+ Check (2) and (3) could be disabled by adding {, dont_check = <smth is true>, }
+  into parameters table
+ The functions calls box.error(box.error.ILLEGAL_PARAMS, ..) on error
+ @example
+ check_param_table(options, { user = 'string',
+                              port = 'string, number',
+                              data = 'any' } )
+--]]
+local function check_param_table(table, template)
+    if table == nil then
+        return
+    end
+    if type(table) ~= 'table' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "options should be a table")
+    end
+    -- just pass {.. dont_check = true, ..} to disable checks below
+    if table.dont_check then
+        return
+    end
+    for k,v in pairs(table) do
+        if template[k] == nil then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options parameter '" .. k .. "' is unexpected")
+        elseif template[k] == 'any' then
+            -- any type is ok
+        elseif (string.find(template[k], ',') == nil) then
+            -- one type
+            if type(v) ~= template[k] then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options parameter '" .. k ..
+                          "' should be of type " .. template[k])
+            end
+        else
+            local good_types = string.gsub(template[k], ' ', '')
+            local haystack = ',' .. good_types .. ','
+            local needle = ',' .. type(v) .. ','
+            if (string.find(haystack, needle) == nil) then
+                good_types = string.gsub(good_types, ',', ', ')
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options parameter '" .. k ..
+                          "' should be one of types: " .. template[k])
+            end
+        end
+    end
+end
+
+--[[
+ @brief Common function to check type parameter (of function)
+ Calls box.error(box.error.ILLEGAL_PARAMS, ) on error
+ @example: check_param(user, 'user', 'string')
+--]]
+local function check_param(param, name, should_be_type)
+    if type(param) ~= should_be_type then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  name .. " should be a " .. should_be_type)
+    end
+end
+
+--[[
+ Adds to a table key-value pairs from defaults table
+  that is not present in original table.
+ Returns updated table.
+ If nil is passed instead of table, it's treated as empty table {}
+ For example update_param_table({ type = 'hash', temporary = true },
+                                { type = 'tree', unique = true })
+  will return table { type = 'hash', temporary = true, unique = true }
+--]]
+local function update_param_table(table, defaults)
+    if table == nil then
+        table = {}
+    end
+    if (defaults == nil) then
+        return table
+    end
+    for k,v in pairs(defaults) do
+        if table[k] == nil then
+            table[k] = v
+        end
+    end
+    return table
+end
+
 box.begin = function() if ffi.C.boxffi_txn_begin() == -1 then box.error() end end
 box.commit = function() if ffi.C.boxffi_txn_commit() == -1 then box.error() end end
 box.rollback = ffi.C.boxffi_txn_rollback;
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
+    check_param(name, 'name', 'string')
+    local options_template = {
+        if_not_exists = 'boolean',
+        temporary = 'boolean',
+        engine = 'string',
+        id = 'number',
+        field_count = 'number',
+        user = 'user',
+    }
+    local options_defaults = {
+        engine = 'memtx',
+        field_count = 0,
+    }
+    check_param_table(options, options_template)
+    options = update_param_table(options, options_defaults)
+
     local _space = box.space[box.schema.SPACE_ID]
-    if options == nil then
-        options = {}
-    end
-    local if_not_exists = options.if_not_exists
-    local temporary = options.temporary and "temporary" or ""
-    local engine = "memtx"
-	if options.engine then
-		engine = options.engine
-	end
     if box.space[name] then
         if options.if_not_exists then
             return box.space[name], "not created"
@@ -97,19 +197,14 @@ box.schema.space.create = function(name, options)
             box.error(box.error.SPACE_EXISTS, name)
         end
     end
-    local id
-    if options.id then
-        id = options.id
-    else
+    local id = options.id
+    if not id then
         id = _space.index[0]:max()[1]
         if id < box.schema.SYSTEM_ID_MAX then
             id = box.schema.SYSTEM_ID_MAX + 1
         else
             id = id + 1
         end
-    end
-    if options.field_count == nil then
-        options.field_count = 0
     end
     local uid = nil
     if options.user then
@@ -118,11 +213,16 @@ box.schema.space.create = function(name, options)
     if uid == nil then
         uid = session.uid()
     end
-    _space:insert{id, uid, name, engine, options.field_count, temporary}
+    local temporary = options.temporary and "temporary" or ""
+    _space:insert{id, uid, name, options.engine, options.field_count, temporary}
     return box.space[id], "created"
 end
+
 box.schema.create_space = box.schema.space.create
+
 box.schema.space.drop = function(space_id)
+    check_param(space_id, 'space_id', 'number')
+
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _priv = box.space[box.schema.PRIV_ID]
@@ -141,35 +241,73 @@ box.schema.space.drop = function(space_id)
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
 end
+
 box.schema.space.rename = function(space_id, space_name)
+    check_param(space_id, 'space_id', 'number')
+    check_param(space_name, 'space_name', 'string')
+
     local _space = box.space[box.schema.SPACE_ID]
     _space:update(space_id, {{"=", 3, space_name}})
 end
 
 box.schema.index = {}
 
-box.schema.index.create = function(space_id, name, options)
-    local _index = box.space[box.schema.INDEX_ID]
-    if options == nil then
-        options = {}
+local function check_index_parts(parts)
+    if type(parts) ~= "table" then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "options.parts parameter should be a table")
     end
-    if options.type == nil then
-        options.type = "tree"
+    if #parts % 2 ~= 0 then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "options.parts: expected filed_no (number), type (string) pairs")
     end
-    if options.parts == nil then
-        options.parts = { 0, "num" }
-    else
-        for i=1,#options.parts,2 do
+    for i=1,#parts,2 do
+        if type(parts[i]) ~= "number" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts: expected filed_no (number), type (string) pairs")
+        elseif parts[i] == 0 then
             -- Lua uses one-based field numbers but _space is zero-based
-            if type(options.parts[i]) == "number" then
-                options.parts[i] = options.parts[i] - 1
-            end
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "invalid index parts: field_no must be one-based")
         end
     end
-    if options.unique == nil then
-        options.unique = true
+    for i=2,#parts,2 do
+        if type(parts[i]) ~= "string" then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "options.parts: expected filed_no (number), type (string) pairs")
+        end
     end
-    local index_type = options.type
+end
+
+local function update_index_parts(parts)
+    for i=1,#parts,2 do
+        -- Lua uses one-based field numbers but _space is zero-based
+        parts[i] = parts[i] - 1
+    end
+    return parts
+end
+
+box.schema.index.create = function(space_id, name, options)
+    check_param(space_id, 'space_id', 'number')
+    check_param(name, 'name', 'string')
+    local options_template = {
+        type = 'string',
+        parts = 'table',
+        unique = 'boolean',
+        id = 'number',
+    }
+    local options_defaults = {
+        type = 'tree',
+        parts = { 1, "num" },
+        unique = true,
+    }
+    check_param_table(options, options_template)
+    options = update_param_table(options, options_defaults)
+    check_index_parts(options.parts)
+    options.parts = update_index_parts(options.parts)
+
+    local _index = box.space[box.schema.INDEX_ID]
+
     local unique = options.unique and 1 or 0
     local part_count = bit.rshift(#options.parts, 1)
     local parts = options.parts
@@ -186,16 +324,27 @@ box.schema.index.create = function(space_id, name, options)
     if options.id then
         iid = options.id
     end
-    _index:insert{space_id, iid, name, index_type, unique, part_count, unpack(parts)}
+    _index:insert{space_id, iid, name, options.type,
+                  unique, part_count, unpack(options.parts)}
 end
+
 box.schema.index.drop = function(space_id, index_id)
+    check_param(space_id, 'space_id', 'number')
+    check_param(index_id, 'index_id', 'number')
+
     local _index = box.space[box.schema.INDEX_ID]
     _index:delete{space_id, index_id}
 end
+
 box.schema.index.rename = function(space_id, index_id, name)
+    check_param(space_id, 'space_id', 'number')
+    check_param(index_id, 'index_id', 'number')
+    check_param(name, 'name', 'string')
+
     local _index = box.space[box.schema.INDEX_ID]
     _index:update({space_id, index_id}, {{"=", 3, name}})
 end
+
 box.schema.index.alter = function(space_id, index_id, options)
     if box.space[space_id] == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
@@ -206,10 +355,20 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options == nil then
         return
     end
-    if type(space_id) == "string" then
+
+    local options_template = {
+        type = 'string',
+        name = 'string',
+        parts = 'table',
+        unique = 'boolean',
+        id = 'number',
+    }
+    check_param_table(options, options_template)
+
+    if type(space_id) ~= "number" then
         space_id = box.space[space_id].id
     end
-    if type(index_id) == "string" then
+    if type(index_id) ~= "number" then
         index_id = box.space[space_id].index[index_id].id
     end
     local _index = box.space[box.schema.INDEX_ID]
@@ -247,12 +406,8 @@ box.schema.index.alter = function(space_id, index_id, options)
     if options.parts == nil then
         options.parts = {tuple:slice(6)} -- not part count
     else
-        for i=1,#options.parts,2 do
-            -- Lua uses one-based field numbers but _space is zero-based
-            if type(options.parts[i]) == "number" then
-                options.parts[i] = options.parts[i] - 1
-            end
-        end
+        check_index_parts(options.parts)
+        options.parts = update_index_parts(options.parts)
     end
     _index:replace{space_id, index_id, options.name, options.type,
                    options.unique, #options.parts/2, unpack(options.parts)}
