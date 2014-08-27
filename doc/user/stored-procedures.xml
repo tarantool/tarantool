@@ -1885,7 +1885,7 @@ end
         <listitem>
             <para>
                 Accept a new client connection and create a new connected socket.
-                It is good practice to set the socket's blocking mode explicitly affer accepting.
+                It is good practice to set the socket's blocking mode explicitly after accepting.
             </para>
             <para>
                Returns: new socket if success, null if error.

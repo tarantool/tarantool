@@ -369,6 +369,9 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
             <para>
               Possible errors: If a tuple with the same primary key already exists, returns ER_TUPLE_FOUND.
             </para>
+            <para>
+              Example: <code>box.space.tester:insert{5000,'tuple number five thousand'}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -380,14 +383,17 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
         </term>
         <listitem>
             <para>
-                Search for a tuple in the given space.
+                Search for a tuple or a set of tuples in the given space.
             </para>
             <para>
                  Parameters: (type = tuple, as a Lua table) <code>field-value(s)</code>&mdash;
                  = values to be matched against the index key, which may be multi-part.
             </para>
             <para>
-               Returns: (type = tuple set, as a Lua table) the selected tuple.
+               Returns: (type = tuple set, as a Lua table) the tuples whose primary-key fields
+               are equal to the passed field-values. If the number of passed field-values is
+               less than the number of fields in the primary key, then only the passed field-values are
+               compared, so <code>select{1,2}</code> will match a tuple whose primary key  is {1,2,3}.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -396,28 +402,50 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
                Possible Errors: No such space; wrong type.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.tester:insert{101, 'test#1', 'my first tuple'}</userinput>
----
-- [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.tester:select{101}</userinput>
----
-- - [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.tester:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
----
-- [105, 'test#2', 'first_name', 'last_name']
-...
-tarantool> <userinput>table_of_tuples = box.space.tester:select{105}</userinput>
+tarantool&gt; <userinput>s = box.schema.create_space('tmp', {temporary=true})</userinput>
 ---
 ...
-tarantool> <userinput>table_of_tuples[1]</userinput>
+tarantool&gt; <userinput> s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})</userinput>
 ---
-- [105, 'test#2', 'first_name', 'last_name']
 ...
-</programlisting>
-            For examples of complex <code>select</code>s, which can return multiple tuples
-            via secondary indexes, see the later section <olink targetptr="box.index.iterator">box.space.space-name.index.index-name]:select</olink>.
+tarantool&gt; <userinput> s:insert{1,'A'}</userinput>
+---
+- [1, 'A']
+...
+tarantool&gt; <userinput> s:insert{1,'B'}</userinput>
+---
+- [1, 'B']
+...
+tarantool&gt; <userinput> s:insert{1,'C'}</userinput>
+---
+- [1, 'C']
+...
+tarantool&gt; <userinput> s:insert{2,'D'}</userinput>
+---
+- [2, 'D']
+...
+tarantool&gt; <userinput> s:select{1,'B'} -- must equal both primary-key fields</userinput>
+---
+- - [1, 'B']
+...
+
+tarantool&gt; <userinput> s:select{1}     -- must equal only one primary-key field</userinput>
+---
+- - [1, 'A']
+  - [1, 'B']
+  - [1, 'C']
+...
+tarantool&gt; <userinput> s:select{}      -- must equal 0 fields, so returns all tuples</userinput>
+---
+- - [1, 'A']
+  - [1, 'B']
+  - [1, 'C']
+  - [2, 'D']
+...</programlisting>
+            For examples of complex <code>select</code>s, where one can specify which
+            index to search and what condition to use (for example "greater than"
+            instead of "equal to") and how many tuples to return, see the later section
+            <link linkend="box.index.iterator.select">box.space.space-name[.index.index-name]:select</link>.
             </para>
         </listitem>
     </varlistentry>
@@ -453,6 +481,9 @@ tarantool> <userinput>table_of_tuples[1]</userinput>
                <code>box.space.tester:select{1}[1]</code>, and may serve as a convenient
                shorthand.
              </para>
+            <para>
+              Example: <code>box.space.tester:get{1}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -630,6 +661,9 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             </para>
             <para>
               Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
+              Example: <code>box.space.tester:replace{5000,'New value'}</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -1442,8 +1476,8 @@ console.delimiter('')!
 
     <varlistentry>
      <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select({<replaceable>{fields}, {parameters}]</replaceable>)</emphasis>
+             <emphasis role="lua" xml:id="box.index.iterator.select" xreflabel="box.index.select(type, ...)">
+             box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select({<replaceable>[field-value [, field-value ...]]</replaceable>}, {<replaceable>[option [, option ...]]</replaceable>})</emphasis>
         </term>
         <listitem>
             <para>
@@ -1451,6 +1485,12 @@ console.delimiter('')!
              which goes via a particular index and can make use of additional parameters that
              specify the iterator type, and the limit (that is, the maximum number of tuples to
              return) and the offset (that is, which tuple to start with in the list).
+            </para>
+            <para>
+             Parameters: <code>field-value(s)</code> = values to be matched against the index key.
+             <code>option(s)</code> = any or all of <code>iterator=<replaceable>iterator-type</replaceable></code>,
+             <code>limit=<replaceable>maximum-number-of-tuples</replaceable></code>,
+             <code>offset=<replaceable>start-tuple-number</replaceable></code>.
             </para>
             <para>
               Returns: (type = tuple set, as a Lua table) the tuple or tuples that match the field values.
@@ -1469,7 +1509,7 @@ box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts
 box.space.tester:insert{1,'X','Row with field[2]=X'}
 box.space.tester:insert{2,'Y','Row with field[2]=Y'}
 box.space.tester:insert{3,'Z','Row with field[2]=Z'}
-box.space.tester.index.secondary:select({'X'}, {iterator = 'GT'})
+box.space.tester.index.secondary:select({'X'}, {iterator = 'GT', limit = 1000})
 </programlisting>
 The result will be a table of tuples and will look like this:
 <programlisting>

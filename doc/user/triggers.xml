@@ -16,8 +16,8 @@
     which are executed when a new connection
     is created or dropped.
     Triggers must be set up when the server starts.
-    This is most commonly done in <olink
-    targetptr="init.lua">the initialization script</olink>.
+    This is most commonly done in an initialization script
+    written in Lua.
     The performance
     overhead of triggers, as long as they are not defined, is
     minimal: merely a pointer dereference and check. If a
