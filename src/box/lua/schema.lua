@@ -615,17 +615,15 @@ function box.schema.space.bless(space)
         if space.index[0] == nil then
             return -- empty space without indexes, nothing to truncate
         end
-        check_index(space, 0)
-        local pk = space.index[0]
-        while pk:len() > 0 do
-            local state, t
-            for state, t in pk:pairs() do
-                local key = {}
-                for _k2, parts in ipairs(pk.parts) do
-                    table.insert(key, t[parts.fieldno])
-                end
-                space:delete(key)
-            end
+        local _index = box.space[box.schema.INDEX_ID]
+        -- drop and create all indexes
+        local keys = _index:select(space.id)
+        for i = #keys, 1, -1 do
+            local v = keys[i]
+            _index:delete{v[1], v[2]}
+        end
+        for i = 1, #keys, 1 do
+            _index:insert(keys[i])
         end
     end
     space_mt.drop = function(space)
