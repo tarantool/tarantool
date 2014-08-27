@@ -168,4 +168,27 @@ space:replace{1, 1}
 
 space:drop()
 
+-- test deletion of data one by one
+space = box.schema.space.create('test')
+space:create_index('primary', { type = 'tree', parts = {1, 'str'}, unique = true })
+space:create_index('second', { type  = 'tree', parts = {2, 'str', 3, 'str'}, unique = true })
+--# setopt delimiter ';'
+for i = 1, 100 do
+    v = tostring(i)
+    space:insert{v, string.rep(v, 2) , string.rep(v, 3)}
+end;
+local pk = space.index[0]
+while pk:len() > 0 do
+    local state, t
+    for state, t in pk:pairs() do
+        local key = {}
+        for _k2, parts in ipairs(pk.parts) do
+            table.insert(key, t[parts.fieldno])
+        end
+        space:delete(key)
+    end
+end;
+--# setopt delimiter ''
+space:drop()
+
 space = nil
