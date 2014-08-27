@@ -22,6 +22,7 @@ t
   - error
   - index
   - info
+  - internal
   - rollback
   - schema
   - session

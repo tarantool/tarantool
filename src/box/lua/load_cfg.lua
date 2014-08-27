@@ -50,6 +50,10 @@ local default_cfg = {
     background          = false,
     username            = nil ,
     coredump            = false,
+
+    -- snap_daemon
+    snapshot_period     = 3600 * 4,
+    snapshot_count      = 6,
 }
 
 -- dynamically settable options
@@ -60,6 +64,10 @@ local dynamic_cfg = {
     io_collect_interval     = ffi.C.box_set_io_collect_interval,
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
+
+    -- snap_daemon
+    snapshot_period         = box.internal.snap_daemon.set_snapshot_period,
+    snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
 }
 
 local function reload_cfg(oldcfg, newcfg)
@@ -120,12 +128,14 @@ function box.cfg(cfg)
     box_configured = nil
     box.cfg = setmetatable(cfg,
         {
-		    __newindex = function(table, index)
-		        error('Attempt to modify a read-only table')
-		    end,
-            __call = reload_cfg
+            __newindex = function(table, index)
+                error('Attempt to modify a read-only table')
+            end,
+            __call = reload_cfg,
         })
     ffi.C.load_cfg()
+
+    box.internal.snap_daemon.start()
 end
 jit.off(box.cfg)
 jit.off(reload_cfg)
