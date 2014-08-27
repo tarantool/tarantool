@@ -52,9 +52,8 @@ local default_cfg = {
     coredump            = false,
 
     -- snap_daemon
-    snap_period         = 3600 * 4,
-    snap_check_period   = 60,
-    snap_count          = 6,
+    snapshot_period     = 3600 * 4,
+    snapshot_count      = 6,
 }
 
 -- dynamically settable options
@@ -67,9 +66,8 @@ local dynamic_cfg = {
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
 
     -- snap_daemon
-    snap_period             = box.snap_daemon.set_snap_period,
-    snap_count              = box.snap_daemon.set_snap_count,
-    snap_check_period       = box.snap_daemon.set_snap_check_period,
+    snapshot_period         = box.internal.snap_daemon.set_snapshot_period,
+    snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
 }
 
 local function reload_cfg(oldcfg, newcfg)
@@ -137,7 +135,7 @@ function box.cfg(cfg)
         })
     ffi.C.load_cfg()
 
-    box.snap_daemon.start()
+    box.internal.snap_daemon.start()
 end
 jit.off(box.cfg)
 jit.off(reload_cfg)

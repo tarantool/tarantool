@@ -31,11 +31,11 @@ do
     -- create snapshot by several options
     local function make_snapshot(last_snap)
 
-        if box.cfg.snap_period == nil then
+        if box.cfg.snapshot_period == nil then
             return false
         end
 
-        if not(box.cfg.snap_period > 0) then
+        if not(box.cfg.snapshot_period > 0) then
             return false
         end
 
@@ -62,7 +62,7 @@ do
                 PREFIX, snaps[#snaps], errno.strerror())
             return false
         end
-        if snstat.mtime <= fiber.time() + box.cfg.snap_period then
+        if snstat.mtime <= fiber.time() + box.cfg.snapshot_period then
             return snapshot(snaps)
         end
     end
@@ -81,15 +81,15 @@ do
         end
 
         -- cleanup code
-        if box.cfg.snap_count == nil then
+        if box.cfg.snapshot_count == nil then
             return
         end
 
-        if not (box.cfg.snap_count > 0) then
+        if not (box.cfg.snapshot_count > 0) then
             return
         end
 
-        
+
         -- reload snap list after snapshot
         snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
         local xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
@@ -98,7 +98,7 @@ do
             return
         end
 
-        while #snaps > box.cfg.snap_count do
+        while #snaps > box.cfg.snapshot_count do
             local rm = snaps[1]
             table.remove(snaps, 1)
 
@@ -109,7 +109,7 @@ do
                 return
             end
         end
-        
+
 
         local snapno = fio.basename(snaps[1], '.snap')
 
@@ -130,7 +130,7 @@ do
             local rm = xlogs[1]
             table.remove(xlogs, 1)
             log.info("%s: Removing old xlog %s", PREFIX, rm)
-            
+
             if not fio.unlink(rm) then
                 log.error("%s: Error while removing %s: %s",
                     PREFIX, rm, errno.strerror())
@@ -141,11 +141,13 @@ do
 
 
     local function next_snap_interval()
-        local interval = box.cfg.snap_check_period or 15
-
-        if box.cfg.snap_period == nil or box.cfg.snap_period <= 0 then
+        local interval
+        
+        if box.cfg.snapshot_period == nil or box.cfg.snapshot_period <= 0 then
             return interval
         end
+
+        local interval = box.cfg.snapshot_period / 10
 
         local time = fiber.time()
         local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
@@ -162,11 +164,11 @@ do
 
 
         -- there is no activity in xlogs
-        if box.cfg.snap_period * 2 + stat.mtime < time then
+        if box.cfg.snapshot_period * 2 + stat.mtime < time then
             return interval
         end
 
-        local time_left = box.cfg.snap_period + stat.mtime - time
+        local time_left = box.cfg.snapshot_period + stat.mtime - time
         if time_left > 0 then
             return time_left
         end
@@ -198,7 +200,7 @@ do
     setmetatable(daemon, {
         __index = {
             start = function()
-                local daemon = box[PREFIX] or daemon
+                local daemon = box.internal[PREFIX] or daemon
                 if daemon.status == 'started' then
                     error(
                         sprintf("%s: %s", PREFIX, "Daemon is already started"))
@@ -208,7 +210,7 @@ do
             end,
 
             stop = function()
-                local daemon = box[PREFIX] or daemon
+                local daemon = box.internal[PREFIX] or daemon
                 if daemon.status == 'stopped' then
                     error(
                         sprintf('%s: %s', PREFIX, "Daemon is already stopped"))
@@ -220,39 +222,32 @@ do
                 daemon.fiber = nil
             end,
 
-            set_snap_period = function(snap_period)
-                local daemon = box[PREFIX] or daemon
-                log.info("%s: new snap_period: %s", PREFIX,
-                    tostring(snap_period))
+            set_snapshot_period = function(snapshot_period)
+                local daemon = box.internal[PREFIX] or daemon
+                log.info("%s: new snapshot_period: %s", PREFIX,
+                    tostring(snapshot_period))
                 if daemon.fiber ~= nil then
                     daemon.fiber:wakeup()
                 end
-                return snap_period
+                return snapshot_period
             end,
 
-            set_snap_count = function(snap_count)
-                local daemon = box[PREFIX] or daemon
-                log.info("%s: new snap_count: %s", PREFIX, tostring(snap_count))
-                
+            set_snapshot_count = function(snapshot_count)
+                local daemon = box.internal[PREFIX] or daemon
+                log.info("%s: new snapshot_count: %s",
+                    PREFIX, tostring(snapshot_count))
+
                 if daemon.fiber ~= nil then
                     daemon.fiber:wakeup()
                 end
-                return snap_period
-
-            end,
-
-            set_snap_check_period = function(snap_check_period)
-                local daemon = box[PREFIX] or daemon
-                log.info("%s: new snap_check_period: %s", PREFIX,
-                    tostring(snap_check_period))
-                
-                if daemon.fiber ~= nil then
-                    daemon.fiber:wakeup()
-                end
-                return snap_period
+                return snapshot_period
             end
         }
     })
 
-    box[PREFIX] = daemon
+    if box.internal == nil then
+        box.internal = { [PREFIX] = daemon }
+    else
+        box.internal[PREFIX] = daemon
+    end
 end

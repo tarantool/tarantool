@@ -49,7 +49,7 @@ space = box.schema.create_space('snap_daemon')
 space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
 ---
 ...
-box.cfg{snap_period = PERIOD, snap_check_period = PERIOD, snap_count = 2 }
+box.cfg{snapshot_period = PERIOD, snapshot_count = 2 }
 ---
 ...
 no = 1
@@ -98,7 +98,7 @@ fio.basename(snaps[1], '.snap') >= fio.basename(xlogs[1], '.xlog')
 - true
 ...
 -- restore default options
-box.cfg{snap_period = 3600 * 4, snap_check_period = 15, snap_count = 4 }
+box.cfg{snapshot_period = 3600 * 4, snapshot_count = 4 }
 ---
 ...
 space:drop()
