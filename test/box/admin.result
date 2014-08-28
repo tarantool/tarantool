@@ -15,6 +15,7 @@ help()
     - Administration
   - To get help on a topic, type help('topic') (with quotes)
   - To get help on a function/object, type help(function) (without quotes)
+  - To start tutorial, type tutorial()
 ...
 box.cfg
 ---
