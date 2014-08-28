@@ -16,15 +16,14 @@ box.cfg
 11	snap_dir:.
 12	coredump:false
 13	wal_mode:write
-14	too_long_threshold:0.5
-15	panic_on_snap_error:true
-16	panic_on_wal_error:false
+14	panic_on_snap_error:true
+15	panic_on_wal_error:false
+16	too_long_threshold:0.5
 17	readahead:16320
-18	admin:3313
-19	rows_per_wal:500000
-20	wal_dir:.
-21	snapshot_period:14400
-22	wal_dir_rescan_delay:0.1
+18	rows_per_wal:500000
+19	wal_dir:.
+20	snapshot_period:14400
+21	wal_dir_rescan_delay:0.1
 --
 -- Test insert from detached fiber
 --
