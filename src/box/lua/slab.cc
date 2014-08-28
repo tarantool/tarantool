@@ -99,19 +99,19 @@ lbox_slab_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	char value[32];
-	double items_used_perc = 100
+	double items_used_ratio = 100
 		* ((double)totals.used)
 		/ ((double)talloc.cache->arena->prealloc + 0.0001);
-	snprintf(value, sizeof(value), "%0.1lf%%", items_used_perc);
-	lua_pushstring(L, "items_used_%");
+	snprintf(value, sizeof(value), "%0.1lf%%", items_used_ratio);
+	lua_pushstring(L, "items_used_ratio");
 	lua_pushstring(L, value);
 	lua_settable(L, -3);
 
-	double arena_used_perc = 100
+	double arena_used_ratio = 100
 		* ((double)talloc.cache->arena->used)
 		/ ((double)talloc.cache->arena->prealloc + 0.0001);
-	snprintf(value, sizeof(value), "%0.1lf%%", arena_used_perc);
-	lua_pushstring(L, "arena_used_%");
+	snprintf(value, sizeof(value), "%0.1lf%%", arena_used_ratio);
+	lua_pushstring(L, "arena_used_ratio");
 	lua_pushstring(L, value);
 	lua_settable(L, -3);
 

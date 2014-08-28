@@ -147,9 +147,9 @@ end;
 ...
 t;
 ---
-- - arena_used_%
+- - arena_used_ratio
+  - items_used_ratio
   - arena_used
-  - items_used_%
   - arena_size
   - slabs
 ...
