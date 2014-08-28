@@ -463,16 +463,16 @@ static inline void
 access_check_func(const char *name, uint32_t name_len,
 		  struct user *user, uint8_t access)
 {
+	access &= ~user->universal_access.effective;
 	 /*
 	  * No special check for ADMIN user is necessary
 	  * since ADMIN has universal access.
 	  */
 	if (access == 0)
 		return;
-
 	struct func_def *func = func_by_name(name, name_len);
 	if (func == NULL || (func->uid != user->uid &&
-			     access & ~func->access[user->auth_token])) {
+		     access & ~func->access[user->auth_token].effective)) {
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
 
@@ -494,8 +494,6 @@ box_lua_call(struct request *request, struct port *port)
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
 
-	uint8_t access = PRIV_X & ~user->universal_access;
-
 	/* Try to find a function by name */
 	int oc = box_lua_find(L, name, name + name_len);
 	/**
@@ -504,7 +502,7 @@ box_lua_call(struct request *request, struct port *port)
 	 * https://github.com/tarantool/tarantool/issues/300
 	 * - if a function does not exist, say it first.
 	 */
-	access_check_func(name, name_len, user, access);
+	access_check_func(name, name_len, user, PRIV_X);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

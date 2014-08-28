@@ -343,49 +343,49 @@ id = box.space._user.index.name:get{'user'}[1]
 box.schema.user.grant('user', 'read,write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 1]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - []
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 2]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.drop('user')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - []
 ...

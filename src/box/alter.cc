@@ -1467,27 +1467,30 @@ grant_or_revoke(struct priv_def *priv)
 	struct user *grantee = user_cache_find(priv->grantee_id);
 	if (grantee == NULL)
 		return;
+	struct access *access;
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		grantee->universal_access = priv->access;
+		access = &grantee->universal_access;
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_by_id(priv->object_id);
 		if (space)
-			space->access[grantee->auth_token] = priv->access;
+			access = &space->access[grantee->auth_token];
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func_def *func = func_by_id(priv->object_id);
 		if (func)
-			func->access[grantee->auth_token] = priv->access;
+			access = &func->access[grantee->auth_token];
 		break;
 	}
 	default:
 		break;
 	}
+	if (access)
+		access->granted = access->effective = priv->access;
 }
 
 /** A trigger called on rollback of grant, or on commit of revoke. */

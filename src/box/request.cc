@@ -53,7 +53,7 @@ execute_replace(struct request *request, struct port *port)
 	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
 
-	space_check_access(space, PRIV_W);
+	access_check_space(space, PRIV_W);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
 					    request->tuple_end);
 	TupleGuard guard(new_tuple);
@@ -73,7 +73,7 @@ execute_update(struct request *request, struct port *port)
 	/** Search key  and key part count. */
 
 	struct space *space = space_cache_find(request->space_id);
-	space_check_access(space, PRIV_W);
+	access_check_space(space, PRIV_W);
 	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
 	const char *key = request->key;
@@ -105,7 +105,7 @@ execute_delete(struct request *request, struct port *port)
 	struct txn *txn = txn_begin_stmt(request);
 	(void) port;
 	struct space *space = space_cache_find(request->space_id);
-	space_check_access(space, PRIV_W);
+	access_check_space(space, PRIV_W);
 
 	/* Try to find tuple by primary key */
 	Index *pk = index_find(space, 0);
@@ -124,7 +124,7 @@ static void
 execute_select(struct request *request, struct port *port)
 {
 	struct space *space = space_cache_find(request->space_id);
-	space_check_access(space, PRIV_R);
+	access_check_space(space, PRIV_R);
 	Index *index = index_find(space, request->index_id);
 
 	ERROR_INJECT_EXCEPTION(ERRINJ_TESTING);

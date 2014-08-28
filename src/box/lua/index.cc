@@ -43,7 +43,7 @@ static inline Index *
 check_index(uint32_t space_id, uint32_t index_id)
 {
 	struct space *space = space_cache_find(space_id);
-	space_check_access(space, PRIV_R);
+	access_check_space(space, PRIV_R);
 	return index_find(space, index_id);
 }
 
