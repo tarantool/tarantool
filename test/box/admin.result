@@ -10,7 +10,6 @@ space:create_index('primary', { type = 'hash' })
 help()
 ---
 - - Help topics:
-    - Tutorial
     - Basics
     - Administration
   - To get help on a topic, type help('topic') (with quotes)

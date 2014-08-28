@@ -2,7 +2,7 @@ local doc = require('help.en_US')
 
 help = {}
 help[1] = {}
-help[1]["Help topics"] = { "Tutorial", "Basics", "Administration" }
+help[1]["Help topics"] = { "Basics", "Administration" }
 help[2] = "To get help on a topic, type help('topic') (with quotes)"
 help[3] = "To get help on a function/object, type help(function) (without quotes)"
 help[4] = "To start tutorial, type tutorial()"
