@@ -75,12 +75,12 @@ extern char uuid_lua[],
 	console_lua[],
 	box_net_box_lua[],
 	help_lua[],
+	help_en_US_lua[],
 	tap_lua[],
 	fio_lua[];
 
 static const char *lua_sources[] = {
 	init_lua,
-	help_lua,
 	NULL
 };
 
@@ -94,6 +94,8 @@ static const char *lua_modules[] = {
 	"console", console_lua,
 	"tap", tap_lua,
 	"fio", fio_lua,
+	"help.en_US", help_en_US_lua,
+	"help", help_lua,
 	NULL
 };
 
