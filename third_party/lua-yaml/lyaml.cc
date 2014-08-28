@@ -665,6 +665,9 @@ dump_node(struct lua_yaml_dumper *dumper)
 		} else if (lua_isnumber(dumper->L, -1)) {
 			/* string is convertible to number, quote it to preserve type */
 			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		} else if (strchr(str, '\n') != NULL) {
+			/* use LITERAL style for multiline strings */
+			style = YAML_LITERAL_SCALAR_STYLE;
 		}
 		strbreak:
 		break;
