@@ -12,7 +12,11 @@ space:create_index('primary', { type = 'hash' })
 ...
 session.exists(session.id())
 ---
-- 0
+- true
+...
+session.peer(session.id())
+---
+- null
 ...
 session.exists()
 ---
@@ -24,7 +28,7 @@ session.exists(1, 2, 3)
 ...
 session.exists(1234567890)
 ---
-- 0
+- false
 ...
 -- check session.id()
 session.id() > 0

@@ -131,15 +131,14 @@ session_destroy(struct session *session)
 	mempool_free(&session_pool, session);
 }
 
-int
-session_fd(uint32_t sid)
+struct session *
+session_find(uint32_t sid)
 {
 	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
 	if (k == mh_end(session_registry))
-		return -1;
-	struct session *session = (struct session *)
+		return NULL;
+	return (struct session *)
 		mh_i32ptr_node(session_registry, k)->val;
-	return session->fd;
 }
 
 void
