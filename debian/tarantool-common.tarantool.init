@@ -17,8 +17,8 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
 DAEMON=/usr/bin/tarantool
-INSTANCES=`find $CONF_DIR -xtype f -name '*.cfg'`
-INSTSCRIPT=/usr/sbin/tarantool_instance
+INSTANCES=`find $CONF_DIR -xtype f -name '*lua'`
+DIST_LUA=/usr/lib/tarantool/dist.lua
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -26,7 +26,7 @@ INSTSCRIPT=/usr/sbin/tarantool_instance
 . /lib/init/vars.sh
 
 if test -z "$INSTANCES"; then
-    echo "tarantool: There are no instances in $CONF_DIR"
+    echo "tarantool: There are no instances  (*.lua) in $CONF_DIR"
     exit 0
 fi
 
@@ -35,9 +35,9 @@ fi
 # Function that starts the daemon/service
 #
 do_start() {
-    echo "tarantool: Staring instances"
+    echo "tarantool: Starting instances"
     for inst in $INSTANCES; do
-        $INSTSCRIPT $inst start
+        $DAEMON $DIST_LUA start `basename $inst .lua`
     done
     return 0
 }
@@ -48,7 +48,7 @@ do_start() {
 do_stop() {
     echo "tarantool: Stopping instances"
     for inst in $INSTANCES; do
-        $INSTSCRIPT $inst stop
+        $DAEMON $DIST_LUA stop `basename $inst .lua`
     done
     return 0
 }
