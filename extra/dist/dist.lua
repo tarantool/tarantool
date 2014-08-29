@@ -1,22 +1,5 @@
 #!env tarantool
 
-local DEFAULTS  = '/etc/default/tarantool'
-local DEFAULT_CFG = {
-    PIDS        = '/var/pid/tarantool',
-    SNAPS       = '/var/lib/tarantool',
-    XLOGS       = '/var/lib/tarantool',
-    LOGS        = '/var/log/tarantool',
-    USERNAME    = 'tarantool',
-    INSTDIR     = '/etc/tarantool/instances.enabled',
-}
-
-if os.getenv('TARANTOOL_DEFAULTS') ~= nil then
-    local nd = os.getenv('TARANTOOL_DEFAULTS')
-    if #nd then
-        DEFAULTS = nd
-    end
-end
-
 local fio = require 'fio'
 local log = require 'log'
 local errno = require 'errno'
@@ -27,6 +10,19 @@ local ffi = require 'ffi'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
+local DEFAULTS  = '/etc/sysconfig/tarantool'
+local DEFAULT_CFG = {
+    PIDS        = '/var/pid/tarantool',
+    SNAPS       = '/var/lib/tarantool',
+    XLOGS       = '/var/lib/tarantool',
+    LOGS        = '/var/log/tarantool',
+    USERNAME    = 'tarantool',
+    INSTDIR     = '/etc/tarantool/instances.enabled',
+}
+
+if fio.stat(DEFAULTS) == nil then
+    DEFAULTS = '/etc/default/tarantool'
+end
 
 function read_cfg(name)
     if name == nil then

@@ -1,0 +1,10 @@
+# Options for Tarantool
+
+SNAPS=/var/lib/tarantool
+XLOGS=/var/lib/tarantool
+LOGS=/var/log/tarantool
+PIDS=/var/pid/tarantool
+USERNAME=tarantool
+INSTDIR=/etc/tarantool/instances.enabled
+
+# vim: set ft=sh :

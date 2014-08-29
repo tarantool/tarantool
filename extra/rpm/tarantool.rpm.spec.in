@@ -40,7 +40,7 @@ Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
-Summary: Tarantool - an efficient in-memory data store
+Summary: Tarantool - an efficient in-memory data storage
 Vendor: tarantool.org
 License: BSD
 Requires: readline
@@ -173,11 +173,16 @@ tarantool-sql-module.
     print(wrap_with_toolset('make %{?_smp_mflags}\n'))
 }
 %install
+mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/tarantool/instances.enabled
 make DESTDIR=%{buildroot} install
 
 %post
+chkconfig tarantool on
+service tarantool start
 
 %preun
+service tarantool stop
+chkconfig tarantool off
 
 %files
 %defattr(-,root,root,-)
@@ -188,7 +193,16 @@ make DESTDIR=%{buildroot} install
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
 "%{_datadir}/doc/tarantool/box-protocol.txt"
+
 "%{_mandir}/man1/tarantool.1.gz"
+
+"%{_sysconfdir}/sysconfig/tarantool"
+"%{_sysconfdir}/init.d/tarantool"
+%dir "%{_sysconfdir}/tarantool"
+%dir "%{_sysconfdir}/tarantool/instances.enabled"
+
+%dir "%{_libdir}/tarantool/"
+"%{_libdir}/tarantool/dist.lua"
 
 %files sql-module
 %defattr(-,root,root,-)
@@ -200,7 +214,6 @@ make DESTDIR=%{buildroot} install
 %if %{with postgresql}
 %files pg-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/pg.so"
 %endif
@@ -208,7 +221,6 @@ make DESTDIR=%{buildroot} install
 %if %{with mysql}
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/mysql.so"
 %endif
