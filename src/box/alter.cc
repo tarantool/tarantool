@@ -1467,7 +1467,7 @@ grant_or_revoke(struct priv_def *priv)
 	struct user *grantee = user_cache_find(priv->grantee_id);
 	if (grantee == NULL)
 		return;
-	struct access *access;
+	struct access *access = NULL;
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 		access = &grantee->universal_access;
