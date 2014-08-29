@@ -7,6 +7,7 @@ local DEFAULT_CFG = {
     XLOGS       = '/var/lib/tarantool',
     LOGS        = '/var/log/tarantool',
     USERNAME    = 'tarantool',
+    INSTDIR     = '/etc/tarantool/instances.enabled',
 }
 
 if os.getenv('TARANTOOL_DEFAULTS') ~= nil then
@@ -83,7 +84,7 @@ function read_cfg(name)
 end
 
 if arg[1] == nil or arg[2] == nil then
-    log.error("Usage: dist.lua {start|stop} user_script.lua [ ... ]")
+    log.error("Usage: dist.lua {start|stop|logrotate} instance")
     os.exit(-1)
 end
 
@@ -97,7 +98,7 @@ end
 
 local function mkdir(dirname)
     log.info("mkdir %s", dirname)
-    if not fio.mkdir(dirname, tonumber('0750', 8)) then
+    if not fio.mkdir(dirname, 0x1C0) then
         log.error("Can't mkdir %s: %s", dirname, errno.strerror())
         os.exit(-1)
     end
@@ -109,7 +110,8 @@ local function mkdir(dirname)
 end
 
 local cmd = arg[1]
-local main_lua = arg[2]
+local instance = fio.basename(arg[2], '.lua')
+local main_lua = fio.pathjoin(cfg.INSTDIR, instance .. '.lua')
 for i = 0, 128 do
     arg[i] = arg[i + 2]
     if arg[i] == nil then
@@ -117,13 +119,11 @@ for i = 0, 128 do
     end
 end
 
-local instance = fio.basename(main_lua, '.lua')
-
 local force_cfg = {
     pid_file    = fio.pathjoin(cfg.PIDS, instance .. '.pid'),
     wal_dir     = fio.pathjoin(cfg.XLOGS, instance),
-    snap_dir    = fio.pathjoin(cfg.SNAPS, instance),
     work_dir    = fio.pathjoin(cfg.XLOGS, instance),
+    snap_dir    = fio.pathjoin(cfg.SNAPS, instance),
     username    = cfg.USERNAME,
     logger      = fio.pathjoin(cfg.LOGS, instance .. '.log'),
     console     = fio.pathjoin(cfg.PIDS, instance .. '.control'),
@@ -194,14 +194,14 @@ elseif cmd == 'stop' then
 
 elseif cmd == 'logrotate' then
     if fio.stat(force_cfg.console) == nil then
-        log.error("Process is not running (pid: %s)", force_cfg.pid_file)
-        os.exit(-1)
+        -- process is not running, do nothing
+        os.exit(0)
     end
 
     local s = socket.tcp_connect('unix/', force_cfg.console)
     if s == nil then
-        log.error("Can't connect to %s: %s",
-            force_cfg.console, errno.strerror())
+        -- socket is not opened, do nothing
+        os.exit(0)
     end
 
     s:write[[
@@ -209,7 +209,9 @@ elseif cmd == 'logrotate' then
         require('log').info("Rotate log file")
     ]]
 
-    os.exit(-1)
+    s:read({ '[.][.][.]' }, 2)
+
+    os.exit(0)
 else
     log.error("Unknown command '%s'", cmd)
     os.exit(-1)
