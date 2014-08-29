@@ -40,7 +40,7 @@ Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
-Summary: Tarantool - an efficient in-memory data storage
+Summary: Tarantool - a NoSQL database in a Lua script
 Vendor: tarantool.org
 License: BSD
 Requires: readline
