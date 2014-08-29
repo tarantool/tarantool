@@ -14,30 +14,29 @@ Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
 
-# Package: tarantool-common
-# Architecture: all
-# Priority: optional
-# Depends: ${misc:Depends}, adduser
-# Description: Tarantool in-memory database - common files
-#  Tarantool is an in-memory database and Lua application server.
-#  This package provides scripts to work with tarantool configuration
-#  and log files.
+Package: tarantool-common
+Architecture: all
+Priority: optional
+Depends: ${misc:Depends}, adduser
+Description: Tarantool in-memory database - common files
+ Tarantool is an in-memory database and Lua application server.
+ This package provides scripts to work with tarantool configuration
+ and log files.
 
 Package: tarantool
 Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: tarantool-dbg (<< 1.5.2),
-#  tarantool-common (<< 1.6~),
+ tarantool-common (<< 1.6~),
  tarantool-client (<< 1.6~),
  tarantool-client-dbg (<< 1.6~),
  tarantool-plugins (<< 1.6~),
  tarantool-mysql-plugin (<< 1.6~),
  tarantool-postgresql-plugin (<< 1.6~),
  libtarantool-dev (<< 1.6~)
-# Recommends: tarantool-common (>= 1.6),
-#  tarantool-modules
-Recommends: tarantool-modules
+Recommends: tarantool-common (>= 1.6),
+ tarantool-modules
 Description: In-memory database with Lua application server
  Tarantool is an in-memory database and Lua application server.
  Its key properties include:

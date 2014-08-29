@@ -62,8 +62,8 @@ clean::
 #         rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
 
 install/tarantool::
-	pod2man -c 'tarantar' \
-		debian/tarantar.pod > build-area/tarantar.1
+# 	pod2man -c 'tarantar' \
+# 		debian/tarantar.pod > build-area/tarantar.1
 #         make -C build-area test-force || /bin/true
 
 
