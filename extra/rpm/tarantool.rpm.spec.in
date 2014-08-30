@@ -15,6 +15,7 @@
 
 %bcond_without postgresql
 %bcond_without mysql
+%bcond_with    systemd
 
 BuildRequires: readline-devel
 
@@ -30,6 +31,13 @@ BuildRequires: binutils-devel
 
 %if 0%{?fedora} > 0
 BuildRequires: perl-podlators
+%endif
+
+%if %{with systemd}
+Requires(post): systemd
+Requires(preun): systemd
+Requires(postun): systemd
+BuildRequires: systemd
 %endif
 
 # Strange bug.
@@ -140,8 +148,22 @@ tarantool-sql-module.
         if rpm.expand("%{with "..obj.."}") then
             status = "ON"
         end
-        return " -D"..flag.."="..status
+        return cmake_key_value(flag, status)
     end
+    local function dev_with_kv (obj, key, value)
+        if rpm.expand("%{with "..obj.."}") then
+            return cmake_key_value(key, value)
+        end
+        return ""
+    end
+    local function dev_without (obj, flag)
+        local status = "ON"
+        if rpm.expand("%{without "..obj.."}") then
+            status = "OFF"
+        end
+        return cmake_key_value(flag, status)
+    end
+
     local cmd = 'cmake'
     if is_rhel_old() then
         cmd = 'cmake28'
@@ -165,6 +187,8 @@ tarantool-sql-module.
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
         .. dev_with('mysql', 'WITH_MYSQL')
+        .. dev_without('systemd', 'WITH_SYSTEMD')
+        .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
 
     print(wrap_with_toolset(cmd))
 }
@@ -173,16 +197,34 @@ tarantool-sql-module.
     print(wrap_with_toolset('make %{?_smp_mflags}\n'))
 }
 %install
-mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/tarantool/instances.enabled
-make DESTDIR=%{buildroot} install
+make VERBOSE=1 DESTDIR=%{buildroot} install
 
 %post
-chkconfig tarantool on
+%if %{with systemd}
+%systemd_post tarantool.service
+%else
+chkconfig --add tarantool
 service tarantool start
+%endif
+mkdir -m 0755 -p %{_varrun}/tarantool/
+chown tarantool:tarantool %{_varrun}/tarantool/
+mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
+chown tarantool:tarantool %{_sysconfdir}/tarantool/instances.enabled/
+mkdir -m 0755 -p %{_sharedstatedir}/tarantool/
+chown tarantool:tarantool %{_sharedstatedir}/tarantool/
 
 %preun
+%if %{with systemd}
+%systemd_preun tarantool.service
+%else
 service tarantool stop
-chkconfig tarantool off
+chkconfig --del tarantool
+%endif
+
+# %%postun
+# %%if %%{with systemd}
+# %%systemd_postun_with_restart tarantool.service
+# %%endif
 
 %files
 %defattr(-,root,root,-)
@@ -196,13 +238,17 @@ chkconfig tarantool off
 
 "%{_mandir}/man1/tarantool.1.gz"
 
-"%{_sysconfdir}/sysconfig/tarantool"
+%if %{with systemd}
+"%{_unitdir}/tarantool.service"
+"%{_libdir}/tarantool/tarantool.init"
+%else
 "%{_sysconfdir}/init.d/tarantool"
-%dir "%{_sysconfdir}/tarantool"
-%dir "%{_sysconfdir}/tarantool/instances.enabled"
+%endif
+
+"%{_sysconfdir}/sysconfig/tarantool"
 
 %dir "%{_libdir}/tarantool/"
-"%{_libdir}/tarantool/dist.lua"
+"%{_bindir}/tarantool_ctl"
 
 %files sql-module
 %defattr(-,root,root,-)

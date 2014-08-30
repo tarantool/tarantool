@@ -52,6 +52,7 @@ include(cmake/compiler.cmake)
 include(cmake/simd.cmake)
 include(cmake/profile.cmake)
 include(cmake/FindReadline.cmake)
+include(cmake/systemd.cmake)
 
 if (NOT READLINE_FOUND)
     message(FATAL_ERROR "readline library not found.")
