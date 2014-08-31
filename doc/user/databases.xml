@@ -254,6 +254,10 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
 ---
 ...
 </programlisting>
+            After a space is created, usually the next step is to
+            <link linkend="box.create_index">create an index</link> for it, and
+            then it is available for insert, select, and all the other
+            <link linkend="box.space">box.space</link> functions.
             </para>
             <para>
             <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
@@ -264,7 +268,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
             appeal to users who like to see data go directly to disk, so that recovery time might be
             shorter and database size might be larger. On the other hand, with Sophia the maximum
             number of indexes is 1, and the maximum number of fields per index is 1.
-            For architectural explanations and benchmarks, see sphia.org.
+            For architectural explanations and benchmarks, see <link xlink:href="http://sphia.org">sphia.org</link>.
             </para>
         </listitem>
     </varlistentry>

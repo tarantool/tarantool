@@ -156,6 +156,59 @@
     <programlisting><prompt>$ </prompt><userinput>tarantool <replaceable>--option</replaceable></userinput></programlisting>
   </para>
 </section>
+
+<section xml:id="how-to-read">
+ <title>How to read the documentation</title>
+ <para>
+   To get started, one can either download the whole package as described in
+   the first part of Chapter 2 "Getting started", or one can initially skip
+   the download and connect to the online Tarantool server running on the web at
+   <link xlink:href="http://try.tarantool.org">http://try.tarantool.org</link>.
+   Either way, the first tryout can be a matter of following the example
+   in the second part of chapter 2: "Starting Tarantool and making your first
+   database".
+ </para>
+ <para>
+   Chapter 3 "Lua and the Tarantool Lua packages" begins with explanations
+   about Lua and Tarantool's connection with Lua. Those explanations are
+   necessary; however, the detailed instructions about each package can be
+   regarded as reference material, skip over them lightly until their
+   functionality is needed.
+ </para>
+ <para>
+    Chapter 4 "Databases" is about the Tarantool NoSQL DBMS.
+    If the only intent is to use Tarantool as a Lua application server,
+    most of the material in this chapter and in the following chapter
+    (Chapter 5 "Replication") will not be necessary. Once again, the
+    detailed instructions about each package can be regarded as reference
+    material.
+ </para>
+ <para>
+    Chapter 6 "Server administration" and Chapter 7 "Configuration reference"
+    are primarily for administrators; however, every user should know
+    something about how the server is configured so the section about
+    <code>box.cfg</code> is not skippable. Chapter 8 is strictly for
+    users who are connecting from a different language such as C or Perl or
+    Python -- other users will find no immediate need for this chapter.
+ </para>
+ <para>
+    The two long tutorials in Appendix B -- "Insert one million tuples with a Lua
+    stored procedure" and "Sum a JSON field for all tuples" -- start
+    slowly and contain commentary that is especially aimed at users
+    who may not consider themselves experts at either Lua or NoSQL
+    database management.
+ </para>
+ <para>
+    Finally, Appendix C "Plugins" has examples that will be essential
+    for those users who want to connect the Tarantool server to another
+    DBMS: MySQL or PostgreSQL.
+ </para>
+ <para>
+   For experienced users, there is also a developer's guide
+   and an extensive set of comments in the source code.
+ </para>
+</section>
+
 <section xml:id="reporting-bugs">
   <title>Reporting bugs</title>
   <para>
