@@ -69,6 +69,7 @@ tuple set in the configuration file, and that's
 why each tuple can have a different number of
 elements, and that's why we say that Tarantool has
 a <quote>dynamic</quote> data model.
+Tuples are stored as <link xlink:href="http://en.wikipedia.org/wiki/MessagePack">MsgPack</link> arrays.
 </para>
 <para>
 Any given tuple may have any number of fields and the
@@ -86,7 +87,7 @@ and encloses the tuple inside square brackets. For example:
 
 <bridgehead renderas="sect2">Index</bridgehead>
 
-<para>
+<para xml:id="an-index">
 An index -- 'primary' in the example -- is a group of key values and pointers.
 </para>
 <para>
@@ -127,6 +128,61 @@ It is possible to add, drop, or alter the definitions at runtime, with some rest
 The syntax details for defining spaces and indexes are in section
 <link linkend="sp-box-library">The box library</link>.
 </para>
+
+<bridgehead renderas="sect2">Data types</bridgehead>
+
+    <para>
+      Tarantool can work with numbers, strings, booleans, tables, and userdata.
+    </para>
+
+    <para>
+      <informaltable>
+      <tgroup cols="4" align="left" colsep="1" rowsep="1">
+      <thead>
+      <row><entry>General type</entry>                   <entry>Specific type</entry><entry>What Lua type() would return</entry>                                         <entry>Example</entry></row>
+      </thead>
+      <tbody>
+      <row><entry xml:id="function-type-number">scalar     </entry><entry>number</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.3.html">"number"</link></entry>   <entry>12345</entry></row>
+      <row><entry xml:id="function-type-string">scalar     </entry><entry>string</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.4.html">"string"</link></entry>   <entry>'A B C'</entry></row>
+      <row><entry xml:id="function-type-boolean">scalar    </entry><entry>boolean</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.2.html">"boolean"</link></entry>   <entry>true</entry></row>
+      <row><entry xml:id="function-type-nil">scalar        </entry><entry>nil</entry>         <entry><link xlink:href="http://www.lua.org/pil/2.1.html">"nil"</link></entry>      <entry>nil</entry></row>
+      <row><entry xml:id="function-type-lua-table">compound</entry><entry>Lua table</entry>   <entry><link xlink:href="http://www.lua.org/pil/2.5.html">"table"</link></entry>    <entry>table: 0x410f8b10</entry></row>
+      <row><entry xml:id="function-type-tuple">compound    </entry><entry>tuple</entry>       <entry><link xlink:href="http://www.lua.org/pil/28.1.html">"Userdata"</link></entry><entry>12345: {'A B C'}</entry></row>
+      </tbody>
+      </tgroup>                                   
+      </informaltable>
+    In Lua a "number" is double-precision floating-point;
+    however, for database storage Tarantool uses MsgPack rules,
+    and MsgPack allows for both integer and floating-point values.
+    So Tarantool will store a number as a float if the value contains a decimal point, and otherwise will store as an integer.
+    Tarantool can store signed numbers, but not in indexed fields -- when a field has a 'NUM' index, the values must be unsigned 64-bit integers.
+    Large numbers can be entered with exponential notation, for example 9e99.
+    Large integers greater than 100,000,000,000,000 (1e14) should be entered with the <link linkend="tonumber64">tonumber64</link> function.
+    Storage is variable-length, so the smallest number requires only one byte but the largest number requires nine bytes.
+    </para>
+    <para>
+    A "string" a variable-length sequence of bytes, usually represented with alphanumeric
+    characters inside single quotes.
+    </para>
+    <para>
+    A "boolean" is either <code>true</code> or <code>false</code>.
+    </para>
+    <para>
+    A "nil" type has only one possible value, also called "nil", but often displayed
+    as "null". Nils may be compared to values of any types with == (is-equal) or ~=
+    (is-not-equal), but other operations will not work. Nils may not be used in Lua tables;
+    the workaround is to use
+    <link linkend="yaml-null"><code>yaml.NULL</code></link>
+    or <link linkend="json-null"><code>json.NULL</code></link>
+    or <link linkend="msgpack-null"><code>msgpack.NULL</code></link>.
+    </para>
+    <para>
+      A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
+      A  few functions may return tables with multiple tuples.
+      A scalar may be converted to a tuple with only one field.
+      A Lua table may contain all of a tuple's fields, but not nil.
+      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
+    </para>
 
 
 <bridgehead renderas="sect2">Operations</bridgehead>

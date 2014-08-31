@@ -106,43 +106,6 @@
     </para>
 
     <para>
-      <table>
-      <title xml:id="function-types">Possible types of the values that a function in the box library can return</title>
-      <tgroup cols="4" align="left" colsep="1" rowsep="1">
-      <thead>
-      <row><entry>General type</entry>                   <entry>Specific type</entry><entry>What Lua type() would return</entry>                                         <entry>Example</entry></row>
-      </thead>
-      <tbody>
-      <row><entry xml:id="function-type-number">scalar     </entry><entry>number</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.3.html">"number"</link></entry>   <entry>12345</entry></row>
-      <row><entry xml:id="function-type-string">scalar     </entry><entry>string</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.4.html">"string"</link></entry>   <entry>'A B C'</entry></row>
-      <row><entry xml:id="function-type-nil">scalar        </entry><entry>nil</entry>         <entry><link xlink:href="http://www.lua.org/pil/2.1.html">"nil"</link></entry>      <entry>nil</entry></row>
-      <row><entry xml:id="function-type-lua-table">compound</entry><entry>Lua table</entry>   <entry><link xlink:href="http://www.lua.org/pil/2.5.html">"table"</link></entry>    <entry>table: 0x410f8b10</entry></row>
-      <row><entry xml:id="function-type-tuple">compound    </entry><entry>tuple</entry>       <entry><link xlink:href="http://www.lua.org/pil/28.1.html">"Userdata"</link></entry><entry>12345: {'A B C'}</entry></row>
-      </tbody>
-      </tgroup>                                   
-      </table>
-    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store a number
-    as a float if the value contains a decimal point. Tarantool can store signed
-    numbers, but not in indexed fields.
-    </para>
-    <para>
-    A "nil" type has only one possible value, also called "nil", but often displayed
-    as "null". Nils may be compared to values of any types with == (is-equal) or ~=
-    (is-not-equal), but other operations will not work. Nils may not be used in Lua tables;
-    the workaround is to use
-    <link linkend="yaml-null"><code>yaml.NULL</code></link>
-    or <link linkend="json-null"><code>json.NULL</code></link>
-    or <link linkend="msgpack-null"><code>msgpack.NULL</code></link>.
-    </para>
-    <para>
-      A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
-      A  few functions may return tables with multiple tuples.
-      A scalar may be converted to a tuple with only one field.
-      A Lua table may contain all of a tuple's fields, but not nil.
-      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
-    </para>
-
-    <para>
      <table>
       <title xml:id="complexity-factors">Complexity Factors that may affect data manipulation functions in the box library</title>
       <tgroup cols="2" align="left" colsep="1" rowsep="1">
