@@ -15,6 +15,10 @@
 
 %bcond_without postgresql
 %bcond_without mysql
+
+%if 0%{?fedora} >= 15 || 0%{?rhel} >= 7
+%global   _with_systemd 1
+%endif
 %bcond_with    systemd
 
 BuildRequires: readline-devel
@@ -33,11 +37,18 @@ BuildRequires: binutils-devel
 BuildRequires: perl-podlators
 %endif
 
+Requires(pre): /usr/sbin/useradd
+Requires(pre): /usr/sbin/groupadd
 %if %{with systemd}
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 BuildRequires: systemd
+%else
+Requires(post): chkconfig
+Requires(post): initscripts
+Requires(preun): chkconfig
+Requires(preun): initscripts
 %endif
 
 # Strange bug.
@@ -187,7 +198,7 @@ tarantool-sql-module.
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
         .. dev_with('mysql', 'WITH_MYSQL')
-        .. dev_without('systemd', 'WITH_SYSTEMD')
+        .. dev_with('systemd', 'WITH_SYSTEMD')
         .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
 
     print(wrap_with_toolset(cmd))
@@ -199,25 +210,37 @@ tarantool-sql-module.
 %install
 make VERBOSE=1 DESTDIR=%{buildroot} install
 
+%pre
+/usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
+%if 0%{?rhel} < 6
+/usr/sbin/useradd -M -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
+%else
+/usr/sbin/useradd -M -N -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
+%endif
+
 %post
+mkdir -m 0755 -p %{_var}/run/tarantool/
+chown tarantool:tarantool %{_var}/run/tarantool/
+mkdir -m 0755 -p %{_var}/log/tarantool/
+chown tarantool:tarantool %{_var}/log/tarantool/
+mkdir -m 0755 -p %{_var}/lib/tarantool/
+chown tarantool:tarantool %{_var}/lib/tarantool/
+mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
+chown tarantool:tarantool %{_sysconfdir}/tarantool/instances.enabled/
 %if %{with systemd}
 %systemd_post tarantool.service
 %else
 chkconfig --add tarantool
-service tarantool start
+/sbin/service tarantool start
 %endif
-mkdir -m 0755 -p %{_varrun}/tarantool/
-chown tarantool:tarantool %{_varrun}/tarantool/
-mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
-chown tarantool:tarantool %{_sysconfdir}/tarantool/instances.enabled/
-mkdir -m 0755 -p %{_sharedstatedir}/tarantool/
-chown tarantool:tarantool %{_sharedstatedir}/tarantool/
 
 %preun
 %if %{with systemd}
 %systemd_preun tarantool.service
 %else
-service tarantool stop
+/sbin/service tarantool stop
 chkconfig --del tarantool
 %endif
 
@@ -238,14 +261,14 @@ chkconfig --del tarantool
 
 "%{_mandir}/man1/tarantool.1.gz"
 
+"%{_sysconfdir}/sysconfig/tarantool"
+
 %if %{with systemd}
 "%{_unitdir}/tarantool.service"
 "%{_libdir}/tarantool/tarantool.init"
 %else
 "%{_sysconfdir}/init.d/tarantool"
 %endif
-
-"%{_sysconfdir}/sysconfig/tarantool"
 
 %dir "%{_libdir}/tarantool/"
 "%{_bindir}/tarantool_ctl"

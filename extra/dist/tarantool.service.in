@@ -26,6 +26,8 @@ Documentation=man:tarantool(1)
 
 [Service]
 Type=forking
+User=tarantool
+Group=tarantool
 OOMScoreAdjust=-1000
 
 ExecStart=@SYSV_INITD_PATH@ start
