@@ -14,6 +14,7 @@ if (PKG_CONFIG_FOUND)
     endif()
 
     if (SYSTEMD_FOUND)
+        set(WITH_SYSTEMD "ON")
         message(STATUS "SYSTEMD_SERVICES_INSTALL_DIR: ${SYSTEMD_SERVICES_INSTALL_DIR}")
     else()
         set(WITH_SYSTEMD "OFF")

@@ -125,6 +125,7 @@ local force_cfg = {
     username    = cfg.USERNAME,
     logger      = fio.pathjoin(cfg.LOGS, instance .. '.log'),
     background  = true,
+    custom_proc_title = instance
 }
 
 

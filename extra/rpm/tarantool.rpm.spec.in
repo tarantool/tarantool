@@ -218,6 +218,8 @@ mkdir -m 0755 -p %{_var}/lib/tarantool/
 chown tarantool:tarantool %{_var}/lib/tarantool/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
 chown tarantool:tarantool %{_sysconfdir}/tarantool/instances.enabled/
+mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.available/
+chown tarantool:tarantool %{_sysconfdir}/tarantool/instances.available/
 %if %{with systemd}
 %systemd_post tarantool.service
 %else
@@ -285,7 +287,6 @@ chkconfig --del tarantool
 
 %files dev
 %defattr(-,root,root,-)
-%dir "%{_includedir}/tarantool"
 %dir "%{_includedir}/tarantool"
 "%{_includedir}/tarantool/config.h"
 "%{_includedir}/tarantool/lauxlib.h"
