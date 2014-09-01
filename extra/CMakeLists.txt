@@ -1,36 +1,4 @@
-#
-# Scripts for a RPM package
-#
-if (ENABLE_RPM)
-	# chmod +x 655
- 	install (FILES dist/tarantool DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d/
- 		 PERMISSIONS
- 		 OWNER_READ OWNER_WRITE
- 		 GROUP_READ GROUP_EXECUTE
- 		 WORLD_READ WORLD_EXECUTE)
-	install (FILES dist/default.rpm/tarantool DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/sysconfig/
-		 PERMISSIONS
- 		 OWNER_READ OWNER_WRITE
- 		 GROUP_READ GROUP_EXECUTE
- 		 WORLD_READ WORLD_EXECUTE)
-	install (FILES dist/dist.lua DESTINATION ${CMAKE_INSTALL_LIBDIR}/tarantool/
-		 PERMISSIONS
- 		 OWNER_READ OWNER_WRITE
- 		 GROUP_READ GROUP_EXECUTE
- 		 WORLD_READ WORLD_EXECUTE)
-# 	# chmod +x 755
-# 	install (FILES tarantool_multi.sh DESTINATION bin
-# 		 PERMISSIONS
-# 		 OWNER_READ OWNER_WRITE OWNER_EXECUTE
-# 		 GROUP_READ GROUP_EXECUTE
-# 		 WORLD_READ WORLD_EXECUTE)
-# 	# chmod +x 755
-# 	install (FILES tarantool_deploy.sh DESTINATION bin
-# 		 PERMISSIONS
-# 		 OWNER_READ OWNER_WRITE OWNER_EXECUTE
-# 		 GROUP_READ GROUP_EXECUTE
-# 		 WORLD_READ WORLD_EXECUTE)
-endif()
+add_subdirectory(dist)
 
 configure_file(rpm/tarantool.rpm.spec.in rpm/tarantool.rpm.spec @ONLY)
 
@@ -40,7 +8,7 @@ if (TARGET_OS_DARWIN)
 	# Also cmake doesn't support changing package id from 'com.' to 'org.'
 	# Need chage to 'org.' after update lines this file:
 	# https://github.com/Kitware/CMake/blob/v2.8.11.2/Source/CPack/cmCPackPackageMakerGenerator.cxx#L763
-	# 
+	#
 	# ^^^ DO NOT CHANGE DARWIN_PACKAGE_ID BEFORE SEE URL ABOVE ^^^
 	#
 	set (DARWIN_PACKAGE_ID "com")
