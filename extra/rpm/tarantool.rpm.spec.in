@@ -13,12 +13,12 @@
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
 
+%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7) && %{undefined _with_systemd}
+%global _with_systemd 1
+%endif
+
 %bcond_without postgresql
 %bcond_without mysql
-
-%if 0%{?fedora} >= 15 || 0%{?rhel} >= 7
-%global   _with_systemd 1
-%endif
 %bcond_with    systemd
 
 BuildRequires: readline-devel
@@ -156,25 +156,17 @@ tarantool-sql-module.
     end
     local function dev_with (obj, flag)
         local status = "OFF"
-        if rpm.expand("%{with "..obj.."}") then
+        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
             status = "ON"
         end
         return cmake_key_value(flag, status)
     end
     local function dev_with_kv (obj, key, value)
-        if rpm.expand("%{with "..obj.."}") then
+        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
             return cmake_key_value(key, value)
         end
         return ""
     end
-    local function dev_without (obj, flag)
-        local status = "ON"
-        if rpm.expand("%{without "..obj.."}") then
-            status = "OFF"
-        end
-        return cmake_key_value(flag, status)
-    end
-
     local cmd = 'cmake'
     if is_rhel_old() then
         cmd = 'cmake28'
@@ -201,12 +193,9 @@ tarantool-sql-module.
         .. dev_with('systemd', 'WITH_SYSTEMD')
         .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
 
-    print(wrap_with_toolset(cmd))
-}
+    print(wrap_with_toolset(cmd))}
+%{lua:print(wrap_with_toolset('make %{?_smp_mflags}\n'))}
 
-%{lua:
-    print(wrap_with_toolset('make %{?_smp_mflags}\n'))
-}
 %install
 make VERBOSE=1 DESTDIR=%{buildroot} install
 
