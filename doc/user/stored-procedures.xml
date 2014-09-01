@@ -80,9 +80,9 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       The
       CALL request packet contains the command code for CALL (22), the name
       of a procedure to be called, and a tuple for procedure
-      arguments. Currently, Tarantool tuples are type-agnostic,
-      thus each field of the tuple is passed into the function
-      as an argument of type <quote>string</quote>. For example:
+      arguments. Fields of the tuple are passed into the function
+      as arguments of type <quote>string</quote> or <quote>number</quote>
+      or <quote>boolean</quote>.. For example:
 <programlisting><computeroutput>kostja@atlas:~<prompt>$</prompt> <userinput>cat arg.lua</userinput>
 function f1(a)
     local s = a
@@ -110,7 +110,7 @@ tarantool> <userinput>f1(1234)</userinput>
 ...</computeroutput></programlisting>
       In the above example, the function finds out the type of the
       argument (Lua 'string' or 'number') at runtime, gets the byte codes
-      if it's a string, and returns the type plus the string or number.
+      if it's a string, and returns the type plus the value.
     </para>
     <para>
       In addition to conventional method invocation,

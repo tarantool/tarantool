@@ -513,7 +513,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 
 <para>
     The server starts in interactive mode and outputs a command prompt.
-    To turn on the database, configure it:
+    To turn on the database, <link linkend="configuration-parameters">configure it</link>:
 <programlisting><prompt>tarantool></prompt> <userinput>box.cfg{listen=3301}</userinput></programlisting>
     (this minimal example is sufficient).
 </para>
@@ -536,13 +536,6 @@ tarantool> box.cfg{listen=3301}
 </para>
 
 <para>
-Please follow
-<olink targetptr="os-install-notes">distribution-specific
-instructions</olink> to find out how to manage
-Tarantool instances on your operating system.
-</para>
-  
-<para>
 	Now that the server is up, you could start up a different shell and
  connect to its primary port with<programlisting>
   <command>telnet 0 3301</command></programlisting>
@@ -556,7 +549,7 @@ Tarantool is waiting for the user to type instructions.
 </para>
 
 <para>
-To create the first space and the first index, try this:<programlisting>
+To create the first space and the first <link linkend="an-index">index</link>, try this:<programlisting>
 <prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('tester')</userinput>
 <prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
@@ -597,7 +590,73 @@ tarantool&gt;</computeroutput></programlisting>
 </para>
 
 <para>
-You can repeat box.space...:insert{} and box.space...:select{} indefinitely.
+Now, to prepare for the example in the next section,
+try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>box.schema.user.grant('guest','read,write,execute','universe')</userinput></programlisting>
+</para>
+
+</section>
+<section xml:id="getting-started-connecting-remotely">
+<title>Starting another Tarantool instance and connecting remotely</title>
+
+<para>
+In the previous section the first request was
+with "box.cfg{listen=3301}". The "listen" value can be
+any form of URI (uniform resource identifier); in this
+case it's just a local port: port 3301. It's possible
+to send requests to the listen URI via (a) telnet,
+(b) a connector (which will be the subject of Chapter 8), or
+(c) another instance of Tarantool. Let's try (c).
+</para>
+<para>
+1. Switch to another terminal. On Linux, for example, this
+means starting another instance of a Bash shell.
+There will be no usage of the database this time,
+so feel free to use <computeroutput><command>cd</command></computeroutput> to switch to another default directory.
+</para>
+<para>
+2. Start the second instance of Tarantool.
+The server name is <computeroutput><filename>tarantool</filename></computeroutput>.<programlisting><userinput>
+#if you downloaded a binary with apt-get or yum, say this:
+  <command>/usr/bin/tarantool</command>
+#if you downloaded and untarred a binary tarball to ~/tarantool, say this:
+  <command>~/tarantool/bin/tarantool</command>
+#if you built from a source download, say this:
+  <command>~/tarantool/src/tarantool</command> </userinput></programlisting>
+</para>
+<para>
+3. Try these requests:<programlisting><userinput>box.cfg{}
+console = require('console')
+console.connect('localhost', 3301)
+box.space.tester:select{2}</userinput></programlisting>
+</para>
+<para>
+The requests are saying "use the <link linkend="sp-console">console package</link> to connect to the
+Tarantool server that's listening on localhost:3301, send a request
+to that server, and display the result." The result in this case is one of
+the tuples that was inserted earlier.
+Your terminal screen should now look like this:<programlisting><computeroutput>
+...
+
+tarantool&gt; console = require('console')
+---
+...
+
+tarantool&gt; console.connect('localhost', 3301)
+2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
+---
+...
+
+localhost:3301&gt; box.space.tester:select{2}
+---
+- - [2, 'Music']
+...
+
+localhost:3301&gt;</computeroutput></programlisting>
+</para>
+
+<para>
+You can repeat box.space...:insert{} and box.space...:select{} indefinitely,
+on either Tarantool instance.
 When the testing is over:
 To drop the space: <computeroutput>s:drop()</computeroutput>.
 To stop tarantool: <keycombo><keysym>Ctrl</keysym><keysym>C</keysym></keycombo>.
@@ -617,6 +676,7 @@ inserted and selected tuples.
 </sidebar>
 
 </section>
+
 
 <section xml:id="differences-from-older-versions">
   <title>Differences between Tarantool 1.6 and older versions</title>
