@@ -115,6 +115,8 @@ for i = 0, 128 do
     end
 end
 
+local force_cfg_console = fio.pathjoin(cfg.PIDS, instance .. '.control')
+
 local force_cfg = {
     pid_file    = fio.pathjoin(cfg.PIDS, instance .. '.pid'),
     wal_dir     = fio.pathjoin(cfg.XLOGS, instance),
@@ -122,7 +124,6 @@ local force_cfg = {
     snap_dir    = fio.pathjoin(cfg.SNAPS, instance),
     username    = cfg.USERNAME,
     logger      = fio.pathjoin(cfg.LOGS, instance .. '.log'),
-    console     = fio.pathjoin(cfg.PIDS, instance .. '.control'),
     background  = true,
 }
 
@@ -135,8 +136,8 @@ box.cfg = function(cfg)
     end
     local res = orig_cfg(cfg)
 
-    log.info('Run console at %s', force_cfg.console)
-    console.listen(force_cfg.console)
+    log.info('Run console at %s', force_cfg_console)
+    console.listen(force_cfg_console)
     
     return res
 end

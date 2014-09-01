@@ -13,21 +13,33 @@
 
 # Author: Dmitry E. Oboukhov <unera@debian.org>
 
-PATH=/sbin:/usr/sbin:/bin:/usr/bin
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:@CMAKE_INSTALL_BINDIR@
 CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
-DAEMON=/usr/bin/tarantool
-INSTANCES=`find $CONF_DIR -xtype f -name '*lua'`
-DIST_LUA=/usr/lib/tarantool/dist.lua
+DAEMON=@CMAKE_INSTALL_BINDIR@/tarantool
+DIST_LUA=@CMAKE_INSTALL_BINDIR@/tarantool_ctl
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
+
+if [ -e "/lib/init/vars.sh" ]; then
+    . /lib/init/vars.sh
+elif [ -e "/etc/rc.d/init.d/functions" ]; then
+    . /etc/rc.d/init.d/functions
+fi
+
+if [ -e "/etc/sysconfig/tarantool" ]; then
+    . /etc/sysconfig/tarantool
+elif [ -e "/etc/default/tarantool" ]; then
+    . /etc/default/tarantool
+fi
+
+INSTANCES=`find $CONF_DIR -xtype f -name '*lua'`
 
 if test -z "$INSTANCES"; then
     echo "tarantool: There are no instances  (*.lua) in $CONF_DIR"
     exit 0
 fi
-
 
 #
 # Function that starts the daemon/service
@@ -75,10 +87,10 @@ case "$1" in
         do_stop
         do_start
     ;;
-    
+
     *)
-	echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
-	exit 3
+    echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+    exit 3
     ;;
 esac
 
