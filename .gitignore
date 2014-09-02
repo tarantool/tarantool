@@ -39,7 +39,6 @@ doc/www-data.in/doc
 extra/rpm.spec
 extra/rpm/tarantool.rpm.spec
 extra/dist/tarantool.service
-extra/dist/tarantool.init
 include/tarantool/config.h
 src/trivia/config.h
 install_manifest.txt

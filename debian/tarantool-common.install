@@ -1,2 +1,2 @@
-extra/dist/default.deb/tarantool /etc/default
-extra/dist/dist.lua          /usr/bin/tarantool_ctl
+/etc/default/tarantool
+/usr/bin/tarantoolctl

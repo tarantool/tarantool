@@ -13,11 +13,11 @@
 
 # Author: Dmitry E. Oboukhov <unera@debian.org>
 
-PATH=/sbin:/usr/sbin:/bin:/usr/bin:@CMAKE_INSTALL_BINDIR@
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:bin
 CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
-DAEMON=@CMAKE_INSTALL_BINDIR@/tarantool
-DIST_LUA=@CMAKE_INSTALL_BINDIR@/tarantool_ctl
+DAEMON=/usr/bin/tarantool
+DIST_LUA=/usr/bin/tarantool_ctl
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
