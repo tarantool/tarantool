@@ -329,7 +329,7 @@ tonumber64(tonumber64(2))
 ...
 tostring(tonumber64(tonumber64(3)))
 ---
-- '3'
+- 3ULL
 ...
 --  A test case for Bug#1131108 'tonumber64 from negative int inconsistency'
 tonumber64(-1)

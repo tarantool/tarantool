@@ -99,6 +99,35 @@ luaL_setcdatagc(struct lua_State *L, int idx);
 uint32_t
 luaL_ctypeid(struct lua_State *L, const char *ctypename);
 
+static inline lua_Integer
+luaL_arrlen(struct lua_State *L, int idx)
+{
+	lua_Integer max = 0;
+	lua_pushnil(L);
+	while (lua_next(L, idx)) {
+		lua_pop(L, 1); /* pop the value */
+		if (lua_type(L, -1) != LUA_TNUMBER)
+			continue;
+		lua_Number k = lua_tonumber(L, -1);
+		if (k <= max || floor(k) != k)
+			continue;
+		max = k;
+	}
+	return max;
+}
+
+static inline lua_Integer
+luaL_maplen(struct lua_State *L, int idx)
+{
+	lua_Integer size = 0;
+	lua_pushnil(L);
+	while (lua_next(L, idx)) {
+		lua_pop(L, 1); /* pop the value */
+		size++;
+	}
+	return size;
+}
+
 /**
  * Common configuration options for Lua serializers (MsgPack, YAML, JSON)
  */
@@ -177,8 +206,7 @@ extern int luaL_array_metatable_ref;
 #define LUAL_SERIALIZE "__serialize"
 
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const luaL_Reg *reg,
-		   struct luaL_serializer *parent);
+luaL_newserializer(struct lua_State *L, const luaL_Reg *reg);
 
 static inline struct luaL_serializer *
 luaL_checkserializer(struct lua_State *L) {
@@ -289,19 +317,31 @@ luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 
 enum { FPCONV_G_FMT_BUFSIZE = 32 };
 
+extern const char *precision_fmts[];
+
 /**
  * @brief Locale-independent printf("%.(precision)lg")
  * @sa snprintf()
  */
-int
-fpconv_g_fmt(char *str, double num, int precision);
+static inline int
+fpconv_g_fmt(char *str, double num, int precision)
+{
+	if (precision <= 0 || precision > 14)
+		precision = 14;
+
+	const char *fmt = precision_fmts[precision];
+	return snprintf(str, FPCONV_G_FMT_BUFSIZE, fmt, num);
+}
 
 /**
  * @brief Locale-independent strtod.
  * @sa strtod()
  */
-double
-fpconv_strtod(const char *nptr, char **endptr);
+static inline double
+fpconv_strtod(const char *nptr, char **endptr)
+{
+	return strtod(nptr, endptr);
+}
 
 void
 luaL_register_type(struct lua_State *L, const char *type_name,

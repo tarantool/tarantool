@@ -162,7 +162,9 @@ lbox_tonumber64(struct lua_State *L)
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "tonumber64: wrong number of arguments");
 	uint64_t result = tarantool_lua_tointeger64(L, 1);
-	return luaL_pushnumber64(L, result);
+	*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
+				     sizeof(uint64_t)) = result;
+	return 1;
 }
 
 static int

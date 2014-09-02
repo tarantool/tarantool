@@ -224,13 +224,8 @@ lua_push_mysql_result(struct lua_State *L, MYSQL *mysql,
 
 				case MYSQL_TYPE_LONGLONG:
 				case MYSQL_TYPE_TIMESTAMP: {
-					/* hack: lua num64 doesn't work propery
-						with cjson */
 					long long v = atoll(row[i]);
-					if (v < (1LL << 31))
-						lua_pushnumber(L, v);
-					else
-						luaL_pushnumber64(L, v);
+					luaL_pushnumber64(L, v);
 					break;
 				}
 

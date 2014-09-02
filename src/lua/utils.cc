@@ -129,9 +129,13 @@ luaL_setcdatagc(struct lua_State *L, int idx)
 
 #define OPTION(type, name, defvalue) { #name, \
 	offsetof(struct luaL_serializer, name), type, defvalue}
+/**
+ * Configuration options for serializers
+ * @sa struct luaL_serializer
+ */
 static struct {
 	const char *name;
-	size_t offset;
+	size_t offset; /* offset in structure */
 	int type;
 	int defvalue;
 } OPTIONS[] = {
@@ -150,19 +154,35 @@ static struct {
 	{ NULL, 0, 0, 0},
 };
 
+/**
+ * @brief serializer.cfg{} Lua binding for serializers.
+ * serializer.cfg is a table that contains current configuration values from
+ * luaL_serializer structure. serializer.cfg has overriden __call() method
+ * to change configuration keys in internal userdata (like box.cfg{}).
+ * Please note that direct change in serializer.cfg.key will not affect
+ * internal state of userdata.
+ * @param L lua stack
+ * @return 0
+ */
 static int
 luaL_serializer_cfg(lua_State *L)
 {
-	luaL_checktype(L, 1, LUA_TTABLE);
-	luaL_checktype(L, 2, LUA_TTABLE);
+	luaL_checktype(L, 1, LUA_TTABLE); /* serializer */
+	luaL_checktype(L, 2, LUA_TTABLE); /* serializer.cfg */
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
+	/* Iterate over all available options and checks keys in passed table */
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		lua_getfield(L, 2, OPTIONS[i].name);
 		if (lua_isnil(L, -1)) {
-			lua_pop(L, 1);
+			lua_pop(L, 1); /* key hasn't changed */
 			continue;
 		}
+		/*
+		 * Update struct luaL_serializer using pointer to a
+		 * configuration value (all values must be `int` for that).
+		 */
 		int *pval = (int *) ((char *) cfg + OPTIONS[i].offset);
+		/* Update struct luaL_serializer structure */
 		switch (OPTIONS[i].type) {
 		case LUA_TBOOLEAN:
 			*pval = lua_toboolean(L, -1);
@@ -175,14 +195,21 @@ luaL_serializer_cfg(lua_State *L)
 		default:
 			assert(false);
 		}
+		/* Save normalized value to serializer.cfg table */
 		lua_setfield(L, 1, OPTIONS[i].name);
 	}
 	return 0;
 }
 
+/**
+ * @brief serializer.new() Lua binding.
+ * @param L stack
+ * @param reg methods to register
+ * @param parent parent serializer to inherit configuration
+ * @return new serializer
+ */
 struct luaL_serializer *
-luaL_newserializer(struct lua_State *L, const luaL_Reg *reg,
-		   struct luaL_serializer *parent)
+luaL_newserializer(struct lua_State *L, const luaL_Reg *reg)
 {
 	luaL_checkstack(L, 1, "too many upvalues");
 
@@ -211,6 +238,7 @@ luaL_newserializer(struct lua_State *L, const luaL_Reg *reg,
 	lua_pushcclosure(L, luaL_serializer_cfg, 1);
 	lua_setfield(L, -2, "__call");
 	lua_setmetatable(L, -2);
+	/* Save configuration values to serializer.cfg */
 	for (int i = 0; OPTIONS[i].name != NULL; i++) {
 		int *pval = (int *) ((char *) serializer + OPTIONS[i].offset);
 		*pval = OPTIONS[i].defvalue;
@@ -232,11 +260,6 @@ luaL_newserializer(struct lua_State *L, const luaL_Reg *reg,
 
 	luaL_pushnull(L);
 	lua_setfield(L, -2, "NULL");
-
-	if (parent != NULL) {
-		/* inherit configuration */
-		*serializer = *parent;
-	}
 	return serializer;
 }
 
@@ -279,26 +302,7 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
 	assert(lua_type(L, idx) == LUA_TTABLE);
-
-	uint32_t size = 0;
-	uint32_t max = 0;
 	const char *type;
-	field->type = MP_ARRAY;
-
-	/* Calculate size and check that table can represent an array */
-	lua_pushnil(L);
-	while (lua_next(L, idx)) {
-		size++;
-		lua_pop(L, 1); /* pop the value */
-		lua_Number k;
-		if (lua_type(L, -1) != LUA_TNUMBER ||
-		    (k = lua_tonumber(L, -1)) < 1 || floor(k) != k) {
-			field->type = MP_MAP;
-			continue;
-		}
-		if (k > max)
-			max = k;
-	}
 
 	/* Try to get field LUAL_SERIALIZER_TYPE from metatable */
 	if (!cfg->encode_load_metatables ||
@@ -321,15 +325,16 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
 	    strcmp(type, "sequence") == 0) {
 		field->type = MP_ARRAY; /* Override type */
-		field->size = max;
+		field->size = luaL_arrlen(L, idx);
 		/* YAML: use flow mode if __serialize == 'seq' */
 		if (cfg->has_compact && type[3] == '\0')
 			field->compact = true;
 		lua_pop(L, 1); /* type */
+
 		return;
 	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
 		field->type = MP_MAP;   /* Override type */
-		field->size = size;
+		field->size = luaL_maplen(L, idx);
 		/* YAML: use flow mode if __serialize == 'map' */
 		if (cfg->has_compact && type[3] == '\0')
 			field->compact = true;
@@ -340,9 +345,30 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 	}
 
 skip:
-	if (field->type == MP_MAP) {
-		field->size = size;
-		return;
+	uint32_t size = 0;
+	uint32_t max = 0;
+	field->type = MP_ARRAY;
+
+	/* Calculate size and check that table can represent an array */
+	lua_pushnil(L);
+	while (lua_next(L, idx)) {
+		size++;
+		lua_pop(L, 1); /* pop the value */
+		lua_Number k;
+		if (lua_type(L, -1) != LUA_TNUMBER ||
+		    ((k = lua_tonumber(L, -1)) != size &&
+		     (k < 1 || floor(k) != k))) {
+			/* Finish size calculation */
+			while (lua_next(L, idx)) {
+				size++;
+				lua_pop(L, 1); /* pop the value */
+			}
+			field->type = MP_MAP;
+			field->size = size;
+			return;
+		}
+		if (k > max)
+			max = k;
 	}
 
 	/* Encode excessively sparse arrays as objects (if enabled) */
@@ -358,7 +384,6 @@ skip:
 
 	assert(field->type == MP_ARRAY);
 	field->size = max;
-	return;
 }
 
 static void
@@ -541,8 +566,7 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		   lua_typename(L, lua_type(L, idx)));
 }
 
-static char locale_decimal_point = '.';
-static const char *precision_fmts[] = {
+const char *precision_fmts[] = {
 	"%.0lg", "%.1lg", "%.2lg", "%.3lg", "%.4lg", "%.5lg", "%.6lg", "%.7lg",
 	"%.8lg", "%.9lg", "%.10lg", "%.11lg", "%.12lg", "%.13lg", "%.14lg"
 };
@@ -558,50 +582,11 @@ fpconv_init()
 	 * implementation or wide characters */
 	assert(buf[0] == '0' && buf[2] == '5' && buf[3] == 0);
 
-	locale_decimal_point = buf[1];
-}
-
-int
-fpconv_g_fmt(char *str, double num, int precision)
-{
-	if (precision <= 0 || precision > 14)
-		precision = 14;
-
-	const char *fmt = precision_fmts[precision];
-	if (locale_decimal_point == '.')
-		return snprintf(str, FPCONV_G_FMT_BUFSIZE, fmt, num);
-
-	char buf[FPCONV_G_FMT_BUFSIZE];
-	int len = snprintf(buf, FPCONV_G_FMT_BUFSIZE, fmt, num);
-
-	/* Translate locale-dependent decimal point to . */
-	char *b = buf;
-	do {
-		*str++ = (*b == locale_decimal_point ? '.' : *b);
-	} while(*b++);
-
-	return len;
-}
-
-double
-fpconv_strtod(const char *nptr, char **endptr)
-{
-	/* System strtod() is fine when decimal point is '.' */
-	if (locale_decimal_point == '.')
-		return strtod(nptr, endptr);
-
-	char buf[FPCONV_G_FMT_BUFSIZE];
-	char *endbuf;
-	snprintf(buf, FPCONV_G_FMT_BUFSIZE, "%s", nptr);
-	/* Update decimal point character if found */
-	char *dp = strchr(buf, '.');
-	if (dp)
-		*dp = locale_decimal_point;
-
-	double value = strtod(buf, &endbuf);
-	*endptr = (char *)&nptr[endbuf - buf];
-
-	return value;
+	/*
+	 * Currently Tarantool doesn't support user locales (see main()).
+	 * Just check that locale decimal point is '.'.
+	 */
+	assert(buf[1] == '.');
 }
 
 /**
@@ -653,9 +638,11 @@ luaL_register_module(struct lua_State *L, const char *modname,
 int
 luaL_pushnumber64(struct lua_State *L, uint64_t val)
 {
-	if (val <= INT32_MAX) {
+	if (val < (1ULL << 52)) {
+		/* push lua_Number (double) */
 		lua_pushinteger(L, val);
 	} else {
+		/* push uint64_t */
 		*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
 					     sizeof(uint64_t)) = val;
 	}
@@ -665,9 +652,11 @@ luaL_pushnumber64(struct lua_State *L, uint64_t val)
 int
 luaL_pushinumber64(struct lua_State *L, int64_t val)
 {
-	if (val >= INT32_MIN && val <= INT32_MAX) {
+	if (val > (-1LL << 52) && val < (1LL << 52)) {
+		/* push lua_Number (double) */
 		lua_pushinteger(L, val);
 	} else {
+		/* push int64_t */
 		*(int64_t *) luaL_pushcdata(L, CTID_INT64,
 					    sizeof(int64_t)) = val;
 	}

@@ -415,15 +415,14 @@ const luaL_reg msgpacklib[] = {
 static int
 lua_msgpack_new(lua_State *L)
 {
-	struct luaL_serializer *parent = luaL_checkserializer(L);
-	luaL_newserializer(L, msgpacklib, parent);
+	luaL_newserializer(L, msgpacklib);
 	return 1;
 }
 
 LUALIB_API int
 luaopen_msgpack(lua_State *L)
 {
-	luaL_msgpack_default = luaL_newserializer(L, msgpacklib, NULL);
+	luaL_msgpack_default = luaL_newserializer(L, msgpacklib);
 	luaL_register_module(L, "msgpack", NULL);
 	return 1;
 }

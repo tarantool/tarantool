@@ -222,7 +222,7 @@ static void load_scalar(struct lua_yaml_loader *loader) {
 
       /* plain scalar and Lua can convert it to a number?  make it so... */
       char *endptr = NULL;
-      long long ival = strtol(str, &endptr, 10);
+      long long ival = strtoll(str, &endptr, 10);
       if (endptr == str + length && ival != LLONG_MAX) {
          luaL_pushinumber64(loader->L, ival);
          return;
@@ -735,14 +735,14 @@ const luaL_reg yamllib[] = {
 static int
 l_new(lua_State *L)
 {
-   struct luaL_serializer *parent = luaL_checkserializer(L);
-   luaL_newserializer(L, yamllib, parent);
+   struct luaL_serializer *s = luaL_newserializer(L, yamllib);
+   s->has_compact = 1;
    return 1;
 }
 
 int
 luaopen_yaml(lua_State *L) {
-   struct luaL_serializer *s = luaL_newserializer(L, yamllib, NULL);
+   struct luaL_serializer *s = luaL_newserializer(L, yamllib);
    s->has_compact = 1;
    luaL_register_module(L, "yaml", NULL);
    return 1;

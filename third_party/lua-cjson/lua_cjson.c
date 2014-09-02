@@ -696,7 +696,7 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
 
 
     token->type = T_INT;
-    token->value.ival = strtol(json->ptr, &endptr, 10);
+    token->value.ival = strtoll(json->ptr, &endptr, 10);
     if (token->value.ival == LLONG_MAX) {
         token->type = T_UINT;
         token->value.ival = strtoull(json->ptr, &endptr, 10);
@@ -1027,8 +1027,7 @@ const luaL_reg jsonlib[] = {
 static int
 json_new(lua_State *L)
 {
-    struct luaL_serializer *parent = luaL_checkserializer(L);
-    luaL_newserializer(L, jsonlib, parent);
+    luaL_newserializer(L, jsonlib);
     return 1;
 }
 
@@ -1036,7 +1035,7 @@ int
 luaopen_json(lua_State *L)
 {
     json_create_tokens();
-    luaL_json_default = luaL_newserializer(L, jsonlib, NULL);
+    luaL_json_default = luaL_newserializer(L, jsonlib);
     luaL_register_module(L, "json", NULL);
     return 1;
 }
