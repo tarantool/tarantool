@@ -112,4 +112,16 @@ t = s:select({},{iterator='GT', limit =1})
 t
 s:drop()
 
+---
+--- gh-282: Sophia: truncate() does nothing
+---
+
+s = box.schema.create_space('name_of_space', {id = 33, engine='sophia'})
+i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})
+s:insert{'a', 'b', 'c'}
+box.space['name_of_space']:select{'a'}
+box.space['name_of_space']:truncate()
+box.space['name_of_space']:select{'a'}
+s:drop()
+
 os.execute("rm -rf sophia")
