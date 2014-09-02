@@ -15,7 +15,7 @@ do
 
     -- create snapshot, return true if no errors
     local function snapshot()
-        log.info("%s: making snapshot...", PREFIX)
+        log.info("making snapshot...")
         local s, e = pcall(function() box.snapshot() end)
         if s then
             return true
@@ -24,7 +24,7 @@ do
         if errno() == errno.EEXIST then
             return false
         end
-        log.error("%s: error while creating snapshot: %s", PREFIX, e)
+        log.error("error while creating snapshot: %s", e)
         return false
     end
 
@@ -52,14 +52,13 @@ do
 
         local snap_name = sprintf('%020d.snap', tonumber(lsn))
         if fio.basename(last_snap) == snap_name then
-            log.debug('%s: snapshot %s is already exists', PREFIX, last_snap)
+            log.debug('snapshot file %s already exists', last_snap)
             return false
         end
 
         local snstat = fio.stat(last_snap)
         if snstat == nil then
-            log.error("%s: Can't stat %s: %s",
-                PREFIX, snaps[#snaps], errno.strerror())
+            log.error("can't stat %s: %s", snaps[#snaps], errno.strerror())
             return false
         end
         if snstat.mtime <= fiber.time() + box.cfg.snapshot_period then
@@ -72,7 +71,8 @@ do
         local snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
 
         if snaps == nil then
-            log.error("%s: Can't read snap_dir: %s", PREFIX, errno.strerror())
+            log.error("can't read snap_dir %s: %s", box.cfg.snap_dir,
+                      errno.strerror())
             return
         end
 
@@ -94,7 +94,8 @@ do
         snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
         local xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
         if xlogs == nil then
-            log.error("%s: Can't read wal_dir: %s", PREFIX, errno.strerror())
+            log.error("can't read wal_dir %s: %s", box.cfg.wal_dir,
+                      errno.strerror())
             return
         end
 
@@ -102,10 +103,10 @@ do
             local rm = snaps[1]
             table.remove(snaps, 1)
 
-            log.info("%s: Removing old snapshot %s", PREFIX, rm)
+            log.info("removing old snapshot %s", rm)
             if not fio.unlink(rm) then
-                log.error("%s: Error while removing %s: %s",
-                    PREFIX, rm, errno.strerror())
+                log.error("error while removing %s: %s",
+                          rm, errno.strerror())
                 return
             end
         end
@@ -129,11 +130,11 @@ do
 
             local rm = xlogs[1]
             table.remove(xlogs, 1)
-            log.info("%s: Removing old xlog %s", PREFIX, rm)
+            log.info("removing old xlog %s", rm)
 
             if not fio.unlink(rm) then
-                log.error("%s: Error while removing %s: %s",
-                    PREFIX, rm, errno.strerror())
+                log.error("error while removing %s: %s",
+                          rm, errno.strerror())
                 return
             end
         end
@@ -179,7 +180,7 @@ do
 
     local function daemon_fiber(self)
         fiber.name(PREFIX)
-        log.info("%s: status: %s", PREFIX, self.status)
+        log.info("%s", self.status)
         while true do
             local interval = next_snap_interval()
             fiber.sleep(interval)
@@ -190,11 +191,11 @@ do
             local s, e = pcall(process)
 
             if not s then
-                log.error("%s: %s", PREFIX, e)
+                log.error(e)
             end
         end
-        log.info("%s: status: %s", PREFIX, self.status)
-        log.info("%s: finished daemon fiber", PREFIX)
+        log.info("%s", self.status)
+        log.info("finished daemon fiber")
     end
 
     setmetatable(daemon, {
@@ -202,8 +203,7 @@ do
             start = function()
                 local daemon = box.internal[PREFIX] or daemon
                 if daemon.status == 'started' then
-                    error(
-                        sprintf("%s: %s", PREFIX, "Daemon is already started"))
+                    error("snapshot daemon has already been started")
                 end
                 daemon.status = 'started'
                 daemon.fiber = fiber.create(daemon_fiber, daemon)
@@ -212,8 +212,7 @@ do
             stop = function()
                 local daemon = box.internal[PREFIX] or daemon
                 if daemon.status == 'stopped' then
-                    error(
-                        sprintf('%s: %s', PREFIX, "Daemon is already stopped"))
+                    error("snapshot daemon has already been stopped")
                 end
                 daemon.status = 'stopped'
                 if daemon.fiber ~= nil then
@@ -224,8 +223,8 @@ do
 
             set_snapshot_period = function(snapshot_period)
                 local daemon = box.internal[PREFIX] or daemon
-                log.info("%s: new snapshot_period: %s", PREFIX,
-                    tostring(snapshot_period))
+                log.info("new snapshot period is %s",
+                         tostring(snapshot_period))
                 if daemon.fiber ~= nil then
                     daemon.fiber:wakeup()
                 end
@@ -234,8 +233,7 @@ do
 
             set_snapshot_count = function(snapshot_count)
                 local daemon = box.internal[PREFIX] or daemon
-                log.info("%s: new snapshot_count: %s",
-                    PREFIX, tostring(snapshot_count))
+                log.info("new snapshot count is %s", tostring(snapshot_count))
 
                 if daemon.fiber ~= nil then
                     daemon.fiber:wakeup()

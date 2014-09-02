@@ -287,7 +287,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 /**
  * @brief Called when recovery/replication wants to add a new server
  * to cluster.
- * cluster_add_server() is called as a commit trigger on _cluster
+ * cluster_add_server() is called as a commit trigger on jcluster
  * space and actually adds the server to the cluster.
  * @param server_uuid
  */
