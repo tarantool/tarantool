@@ -5,6 +5,7 @@ local builtin = ffi.C
 
 local MAXNESTING = 16
 local NULL = ffi.cast('void *', 0)
+local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
 local uint64_ptr_t = ffi.typeof('uint64_t *')
