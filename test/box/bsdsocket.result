@@ -642,6 +642,14 @@ json.encode(sc:name())
 ---
 - '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
 ...
+sc:name()
+---
+- host: 0.0.0.0
+  family: AF_INET
+  type: SOCK_STREAM
+  protocol: tcp
+  port: 0
+...
 sc:nonblock(true)
 ---
 - true

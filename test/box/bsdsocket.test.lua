@@ -205,6 +205,7 @@ json.encode(socket.getaddrinfo('ya.ru', '80',
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 json.encode(sc:name())
+sc:name()
 sc:nonblock(true)
 sc:close()
 
