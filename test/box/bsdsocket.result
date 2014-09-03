@@ -1207,3 +1207,34 @@ os.remove(path)
 ---
 - true
 ...
+longstring = string.rep("abc", 65535)
+---
+...
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring + 1) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+---
+- true
+...
+os.remove(path)
+---
+- true
+...
