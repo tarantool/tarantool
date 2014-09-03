@@ -4,23 +4,25 @@
     <title>{{ title }}</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <link rel="shortcut icon" href="favicon.ico" />
-    {% if not docs %}
-    <link rel="stylesheet" type="text/css" href="global.css" />
+    {% if not documentation %}
+    <link rel="stylesheet" type="text/css" href="/theme/global.css" />
+    <link rel="stylesheet" type="text/css" href="/theme/pygmentize.css" />
     {% endif %}
-    <link rel="stylesheet" type="text/css" href="styles/default.css" />
+    <link rel="stylesheet" type="text/css" href="/theme/header.css">
     {% include "script" ignore missing %}
   </head>
-  <body id="tarantool" class ="{{ page_name }}">
+  <body id="tarantool" {% if page %} class ="{{ page.slug }}" {% endif %}>
     <div id="header">
       {% block header %}
       <div id="blurb">
         <h1><a href="/" class="index">Tarantool</a></h1>
         <h2>A NoSQL database in a Lua script</h2>
         <h3>
-          <a href="intro.html" class="intro">Overview</a> &nbsp;
-          <a href="doc/mpage/index.html" class="documentation">Documentation</a> &nbsp;
-          <a href="download.html" class="download">Download</a> &nbsp;
-          <a href="support.html" class="support">Support</a>
+          <a href="/intro.html" class="intro">Overview</a> &nbsp;
+          <a href="/documentation.html" class="documentation">Documentation</a> &nbsp;
+          <a href="/download.html" class="download">Download</a> &nbsp;
+          <a href="http://rocks.tarantool.org">Rocks</a> &nbsp;
+          <a href="/support.html" class="support">Support</a>
         </h3>
       </div>
       {% endblock header %}

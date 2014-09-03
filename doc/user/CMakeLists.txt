@@ -1,5 +1,7 @@
-set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/user_guide.html")
-set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www-data.in/doc/mpage/")
+set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www/content/docs/user_guide.html")
+set(PATH_USERGUIDE_HTML_CSS "${PROJECT_BINARY_DIR}/doc/www/output/docs/")
+set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www/content/docs/user_guide/")
+set(PATH_USERGUIDE_HTML_CHUNK_CSS "${PROJECT_BINARY_DIR}/doc/www/output/docs/user_guide/")
 set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
 
 if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")
@@ -50,7 +52,7 @@ add_custom_target(html-chunk DEPENDS ${PATH_USERGUIDE_HTML_CHUNK})
 add_custom_target(txt  DEPENDS ${PATH_USERGUIDE_TXT})
 
 add_custom_target(doc-autogen ALL
-    DEPENDS html-saxon html-saxon-chunk)
+    DEPENDS html-user-saxon html-user-saxon-chunk)
 
 install (FILES ${PATH_USERGUIDE_HTML}
                ${PATH_USERGUIDE_TXT} DESTINATION share/doc/tarantool)
@@ -74,7 +76,7 @@ add_custom_target(relink
 #
 # Java saxon-based documentation generation (misc)
 #
-add_custom_target(html-saxon
+add_custom_target(html-user-saxon
     COMMAND java -cp "/usr/share/java/saxon.jar:/usr/share/java/xml-resolver.jar:/usr/share/java/docbook-xsl-saxon.jar:/usr/share/java/xercesImpl.jar:/etc/xml/resolver:/usr/share/java/xslthl.jar:/usr/share/java/xml-commons-resolver-1.1.jar"
         -Djavax.xml.parsers.DocumentBuilderFactory=org.apache.xerces.jaxp.DocumentBuilderFactoryImpl
         -Djavax.xml.parsers.SAXParserFactory=org.apache.xerces.jaxp.SAXParserFactoryImpl
@@ -83,9 +85,11 @@ add_custom_target(html-saxon
         -x org.apache.xml.resolver.tools.ResolvingXMLReader
         -y org.apache.xml.resolver.tools.ResolvingXMLReader
         -r org.apache.xml.resolver.tools.CatalogResolver
-        -u -o ${PATH_USERGUIDE_HTML} user.xml tnt-html.xsl)
+        -u -o ${PATH_USERGUIDE_HTML} user.xml tnt-html.xsl
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PATH_USERGUIDE_HTML_CSS}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/doc/user/tnt.css ${PATH_USERGUIDE_HTML_CSS})
 
-add_custom_target(html-saxon-chunk
+add_custom_target(html-user-saxon-chunk
     COMMAND java -cp "/usr/share/java/saxon.jar:/usr/share/java/xml-resolver.jar:/usr/share/java/docbook-xsl-saxon.jar:/usr/share/java/xercesImpl.jar:/etc/xml/resolver:/usr/share/java/xslthl.jar:/usr/share/java/xml-commons-resolver-1.1.jar"
         -Djavax.xml.parsers.DocumentBuilderFactory=org.apache.xerces.jaxp.DocumentBuilderFactoryImpl
         -Djavax.xml.parsers.SAXParserFactory=org.apache.xerces.jaxp.SAXParserFactoryImpl
@@ -95,7 +99,9 @@ add_custom_target(html-saxon-chunk
         -y org.apache.xml.resolver.tools.ResolvingXMLReader
         -r org.apache.xml.resolver.tools.CatalogResolver
         -u user.xml tnt-html-chunk.xsl
-        base.dir="${PATH_USERGUIDE_HTML_CHUNK}")
+        base.dir="${PATH_USERGUIDE_HTML_CHUNK}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PATH_USERGUIDE_HTML_CHUNK_CSS}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/doc/user/tnt.css ${PATH_USERGUIDE_HTML_CHUNK_CSS})
 
 
 add_custom_target(pdf-saxon

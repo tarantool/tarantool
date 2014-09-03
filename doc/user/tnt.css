@@ -53,8 +53,16 @@ pre {
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
+div.toc dl{
+    margin-top: 0px;
+}
+
+div.itemizedlist ul li p{
+    margin: 4px;
+}
+
 div#header {
-    display: flex;
+    display: block;
 }
 
 div#content {
@@ -64,13 +72,16 @@ div#content {
 div#headwrap {
     width: 100%;
 }
+
 div.column {
     display: inline-block;
 }
+
 div#headl {
     float: left;
     width: 30%;
 }
+
 div#headr {
     float: right;
     width: 69%;
