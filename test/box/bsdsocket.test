@@ -181,6 +181,7 @@ exec admin "lua box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80', { flags =
 
 exec admin "lua sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua box.cjson.encode(sc:name())"
+exec admin "lua sc:name()"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:close()"
 

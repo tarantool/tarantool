@@ -576,6 +576,10 @@ lua box.cjson.encode(sc:name())
 ---
  - {"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}
 ...
+lua sc:name()
+---
+ - 0.0.0.0:0
+...
 lua sc:nonblock(true)
 ---
  - true
