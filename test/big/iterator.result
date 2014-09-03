@@ -891,7 +891,7 @@ space.index['primary']:pairs({}, {iterator = -666 })
 -- Test cases for #123: box.index.count does not check arguments properly
 space.index['primary']:pairs(function() end, { iterator = box.index.EQ })
 ---
-- error: 'builtin/msgpackffi.lua:258: can not encode Lua type: ''function'''
+- error: 'builtin/msgpackffi.lua:259: can not encode Lua type: ''function'''
 ...
 -- Check that iterators successfully invalidated when index deleted
 gen, param, state = space.index['i1']:pairs(nil, { iterator = box.index.GE })
@@ -941,18 +941,14 @@ gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
 print(gen(param, state))
 ---
 ...
-id = s.index.t1.id
+id = space.index.t1.id
 ---
-- error: '[string "id = s.index.t1.id "]:1: attempt to index field ''t1'' (a nil value)'
 ...
-box.schema.index.drop(s.id, id)
+box.schema.index.drop(space.id, id)
 ---
-- error: Illegal parameters, index_id should be a number
 ...
-box.schema.index.alter(s.id, s.index.t2.id, {id = id})
+box.schema.index.alter(space.id, space.index.t2.id, {id = id})
 ---
-- error: '[string "return box.schema.index.alter(s.id, s.index.t..."]:1: attempt to
-    index field ''t2'' (a nil value)'
 ...
 print(gen(param, state))
 ---

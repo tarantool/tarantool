@@ -186,9 +186,9 @@ box.space.test:insert{1}
 gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
 print(gen(param, state))
 
-id = s.index.t1.id
-box.schema.index.drop(s.id, id)
-box.schema.index.alter(s.id, s.index.t2.id, {id = id})
+id = space.index.t1.id
+box.schema.index.drop(space.id, id)
+box.schema.index.alter(space.id, space.index.t2.id, {id = id})
 
 print(gen(param, state))
 
