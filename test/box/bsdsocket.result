@@ -1234,6 +1234,20 @@ client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
 ---
 - true
 ...
+longstring = "Hello\r\n\r\nworld\n\n"
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+---
+- "Hello\r\n\r\n"
+...
+server:stop()
+---
+- true
+...
 os.remove(path)
 ---
 - true

@@ -400,7 +400,6 @@ os.remove(path)
 
 
 longstring = string.rep("abc", 65535)
-
 server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
 
 client = socket.tcp_connect('unix/', path)
@@ -413,6 +412,14 @@ client = socket.tcp_connect('unix/', path)
 client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
 
 
+longstring = "Hello\r\n\r\nworld\n\n"
+
+client = socket.tcp_connect('unix/', path)
+client:read{ line = { "\n\n", "\r\n\r\n" } }
 
 
+server:stop()
 os.remove(path)
+
+
+
