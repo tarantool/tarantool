@@ -642,6 +642,14 @@ json.encode(sc:name())
 ---
 - '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
 ...
+sc:name()
+---
+- host: 0.0.0.0
+  family: AF_INET
+  type: SOCK_STREAM
+  protocol: tcp
+  port: 0
+...
 sc:nonblock(true)
 ---
 - true
@@ -1198,6 +1206,51 @@ client ~= nil
 client:read(123)
 ---
 - Hello, world
+...
+server:stop()
+---
+- true
+...
+os.remove(path)
+---
+- true
+...
+longstring = string.rep("abc", 65535)
+---
+...
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring + 1) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+---
+- true
+...
+longstring = "Hello\r\n\r\nworld\n\n"
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+---
+- "Hello\r\n\r\n"
 ...
 server:stop()
 ---

@@ -672,5 +672,5 @@ offset
 ...
 a, offset = msgpackffi.decode_unchecked(dump, offset)
 ---
-- error: 'builtin/msgpackffi.lua:457: offset = 9 is out of bounds [1..8]'
+- error: 'builtin/msgpackffi.lua:458: offset = 9 is out of bounds [1..8]'
 ...

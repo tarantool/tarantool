@@ -556,18 +556,24 @@ local function readline_check(self, eols, limit)
     if string.len(rbuf) == 0 then
         return nil
     end
+
+    local shortest
     for i, eol in pairs(eols) do
         if string.len(rbuf) >= string.len(eol) then
             local data = string.match(rbuf, "^(.-" .. eol .. ")")
             if data ~= nil then
                 if string.len(data) > limit then
-                    return string.sub(data, 1, limit)
+                    data = string.sub(data, 1, limit)
                 end
-                return data
+                if shortest == nil then
+                    shortest = data
+                elseif #shortest > #data then
+                    shortest = data
+                end
             end
         end
     end
-    return nil
+    return shortest
 end
 
 local function readline(self, limit, eol, timeout)
@@ -846,6 +852,22 @@ local function getaddrinfo(host, port, timeout, opts)
     return internal.getaddrinfo(host, port, timeout, ga_opts)
 end
 
+local soname_mt = {
+    __tostring = function(si)
+        if si.host == nil and si.port == nil then
+            return ''
+        end
+        if si.host == nil then
+            return sprintf('%s:%s', '0', tostring(si.port))
+        end
+
+        if si.port == nil then
+            return sprintf('%s:%', tostring(si.host), 0)
+        end
+        return sprintf('%s:%s', tostring(si.host), tostring(si.port))
+    end
+}
+
 socket_methods.name = function(self)
     local aka = internal.name(self.fh)
     if aka == nil then
@@ -853,6 +875,7 @@ socket_methods.name = function(self)
         return nil
     end
     self._errno = nil
+    setmetatable(aka, soname_mt)
     return aka
 end
 
@@ -863,6 +886,7 @@ socket_methods.peer = function(self)
         return nil
     end
     self._errno = nil
+    setmetatable(peer, soname_mt)
     return peer
 end
 

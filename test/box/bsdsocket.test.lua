@@ -205,6 +205,7 @@ json.encode(socket.getaddrinfo('ya.ru', '80',
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 json.encode(sc:name())
+sc:name()
 sc:nonblock(true)
 sc:close()
 
@@ -390,17 +391,36 @@ os.remove(path)
 
 
 server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
-
 server ~= nil
-
 fiber.sleep(.5)
+client = socket.tcp_connect('unix/', path)
+client ~= nil
+client:read(123)
+server:stop()
+os.remove(path)
+
+
+longstring = string.rep("abc", 65535)
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
 
 client = socket.tcp_connect('unix/', path)
+client:read(#longstring) == longstring
 
-client ~= nil
+client = socket.tcp_connect('unix/', path)
+client:read(#longstring + 1) == longstring
 
-client:read(123)
+client = socket.tcp_connect('unix/', path)
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+
+
+longstring = "Hello\r\n\r\nworld\n\n"
+
+client = socket.tcp_connect('unix/', path)
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+
 
 server:stop()
-
 os.remove(path)
+
+
+
