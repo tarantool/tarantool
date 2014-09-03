@@ -22,7 +22,7 @@ local function rt(test, s, x)
 end
 
 local function test_unsigned(test, s)
-    test:plan(38)
+    test:plan(56)
     rt(test, s, 0)
     rt(test, s, 0LL)
     rt(test, s, 0ULL)
@@ -30,6 +30,30 @@ local function test_unsigned(test, s)
     rt(test, s, 1)
     rt(test, s, 1LL)
     rt(test, s, 1ULL)
+
+    rt(test, s, 127)
+    rt(test, s, 127LL)
+    rt(test, s, 127ULL)
+
+    rt(test, s, 128)
+    rt(test, s, 128LL)
+    rt(test, s, 128ULL)
+
+    rt(test, s, 255)
+    rt(test, s, 255LL)
+    rt(test, s, 255ULL)
+
+    rt(test, s, 256)
+    rt(test, s, 256LL)
+    rt(test, s, 256ULL)
+
+    rt(test, s, 65535)
+    rt(test, s, 65535LL)
+    rt(test, s, 65535ULL)
+
+    rt(test, s, 65536)
+    rt(test, s, 65536LL)
+    rt(test, s, 65536ULL)
 
     rt(test, s, 4294967294)
     rt(test, s, 4294967294LL)
@@ -75,13 +99,34 @@ local function test_unsigned(test, s)
 end
 
 local function test_signed(test, s)
-    test:plan(16)
+    test:plan(30)
 
     rt(test, s, -1)
     rt(test, s, -1LL)
 
+    rt(test, s, -31)
+    rt(test, s, -31LL)
+
+    rt(test, s, -32)
+    rt(test, s, -32LL)
+
+    rt(test, s, -127)
+    rt(test, s, -127LL)
+
+    rt(test, s, -128)
+    rt(test, s, -128LL)
+
+    rt(test, s, -32767)
+    rt(test, s, -32767LL)
+
+    rt(test, s, -32768)
+    rt(test, s, -32768LL)
+
     rt(test, s, -2147483647)
     rt(test, s, -2147483647LL)
+
+    rt(test, s, -2147483648)
+    rt(test, s, -2147483648LL)
 
     -- 1e53 - maximum int that can be stored to double without losing precision
 

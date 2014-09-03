@@ -5,6 +5,8 @@ local builtin = ffi.C
 
 local MAXNESTING = 16
 local NULL = ffi.cast('void *', 0)
+local int8_ptr_t = ffi.typeof('int8_t *')
+local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
 local uint64_ptr_t = ffi.typeof('uint64_t *')
@@ -292,7 +294,7 @@ on_encode(ffi.typeof('double'), encode_double)
 local decode_r
 
 local function decode_u8(data)
-    local num = ffi.cast('uint8_t *', data[0])[0]
+    local num = ffi.cast(uint8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
     return num
 end
@@ -316,7 +318,7 @@ local function decode_u64(data)
 end
 
 local function decode_i8(data)
-    local num = ffi.cast(uint8_ptr_t, data[0])[0]
+    local num = ffi.cast(int8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
     return num
 end
