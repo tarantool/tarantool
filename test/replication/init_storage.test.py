@@ -4,10 +4,11 @@ from lib.tarantool_server import TarantoolServer
 
 # master server
 master = server
+master_id = master.get_param('server')['id']
 
 master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 master.admin("space = box.schema.create_space('test', {id =  42})")
-master.admin("space:create_index('primary', { type = 'hash'})")
+master.admin("space:create_index('primary', { type = 'tree'})")
 
 master.admin('for k = 1, 9 do space:insert{k, k*k} end')
 
@@ -29,14 +30,34 @@ replica.admin('box.space.test')
 replica.stop()
 replica.cleanup(True)
 
+print '-------------------------------------------------------------'
+print 'replica JOIN'
+print '-------------------------------------------------------------'
+
 master.admin('box.snapshot()')
 master.restart()
-master.admin('for k = 10, 19 do box.space[42]:insert{k, k*k*k} end')
-master_id = master.get_param('server')['id']
-lsn = master.get_lsn(master_id)
+
+replica.deploy()
+replica.wait_lsn(master_id, master.get_lsn(master_id))
+replica.admin('box.space.test:select()')
+
+#
+# gh-484: JOIN doesn't save data to snapshot with TREE index
+#
+
+replica.restart()
+
+replica.admin('box.space.test:select()')
+replica.stop()
+replica.cleanup(True)
+
 print '-------------------------------------------------------------'
 print 'replica test 2 (must be ok)'
 print '-------------------------------------------------------------'
+
+master.restart()
+master.admin('for k = 10, 19 do box.space[42]:insert{k, k*k*k} end')
+lsn = master.get_lsn(master_id)
 
 replica = TarantoolServer(server.ini)
 replica.script = 'replication/replica.lua'
