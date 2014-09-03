@@ -552,18 +552,24 @@ local function readline_check(self, eols, limit)
     if string.len(rbuf) == 0 then
         return nil
     end
+
+    local shortest
     for i, eol in pairs(eols) do
         if string.len(rbuf) >= string.len(eol) then
             local data = string.match(rbuf, "^(.-" .. eol .. ")")
             if data ~= nil then
                 if string.len(data) > limit then
-                    return string.sub(data, 1, limit)
+                    data = string.sub(data, 1, limit)
                 end
-                return data
+                if shortest == nil then
+                    shortest = data
+                elseif #shortest > #data then
+                    shortest = data
+                end
             end
         end
     end
-    return nil
+    return shortest
 end
 
 local function readline(self, limit, eol, timeout)
