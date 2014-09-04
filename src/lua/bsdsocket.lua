@@ -4,9 +4,8 @@ local TIMEOUT_INFINITY      = 500 * 365 * 86400
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
-local internal = require('socket.internal')
+local internal = require('socket')
 local fiber = require('fiber')
-package.loaded['socket.internal'] = nil
 
 ffi.cdef[[
     struct socket {
@@ -1075,7 +1074,7 @@ socket_mt   = {
     end
 }
 
-package.loaded.socket = setmetatable({
+return setmetatable({
     getaddrinfo = getaddrinfo,
     tcp_connect = tcp_connect,
     tcp_server = tcp_server
