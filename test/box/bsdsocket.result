@@ -30,6 +30,9 @@ lua type(s:error())
 ---
  - nil
 ...
+lua for k in pairs(getmetatable(s).__index) do local r, msg = pcall(s[k]); if not msg:match('Usage:') then print(k) end end
+---
+...
 lua s:nonblock(false)
 ---
  - false
@@ -219,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:322: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:345: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -458,7 +461,7 @@ lua s:bind('unix/', '/tmp/tarantool-test-socket')
 ---
  - true
 ...
-lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil
+lua string.match(tostring(s), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil
 ---
  - true
 ...
@@ -816,11 +819,19 @@ lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() =
  - nil
  - true
 ...
-lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+lua sa = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
 ---
 ...
-lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+lua sa:close()
 ---
+ - true
+...
+lua sa.socket.fd = 512
+---
+...
+lua sa:fd()
+---
+ - 512
 ...
 lua tostring(sa)
 ---
@@ -833,6 +844,12 @@ lua sa:readable(0)
 lua sa:writable(0)
 ---
  - true
+...
+lua sa = nil
+---
+...
+lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+---
 ...
 lua ch = box.ipc.channel()
 ---
@@ -1019,6 +1036,35 @@ lua client:read(123)
  - Hello, world
 ...
 lua server:stop()
+---
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua s = nil
+---
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua client, errno = box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno()
+---
+...
+lua errno == box.errno.ECONNREFUSED
 ---
  - true
 ...

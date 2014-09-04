@@ -13,6 +13,8 @@ exec admin "lua type(s)"
 exec admin "lua string.match(tostring(s), 'fd %d+, aka 0%.0%.0%.0:0') ~= nil"
 exec admin "lua s:errno()"
 exec admin "lua type(s:error())"
+# Invalid arguments
+exec admin "lua for k in pairs(getmetatable(s).__index) do local r, msg = pcall(s[k]); if not msg:match('Usage:') then print(k) end end"
 
 exec admin "lua s:nonblock(false)"
 exec admin "lua s:sysconnect('127.0.0.1', box.cfg.primary_port)"
@@ -139,7 +141,7 @@ exec admin "lua s:nonblock()"
 if os.path.exists('/tmp/tarantool-test-socket'):
         os.unlink('/tmp/tarantool-test-socket')
 exec admin "lua s:bind('unix/', '/tmp/tarantool-test-socket')"
-exec admin "lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil"
+exec admin "lua string.match(tostring(s), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil"
 exec admin "lua s:listen(1234)"
 
 exec admin "lua sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')"
@@ -262,12 +264,16 @@ if os.path.exists(path):
         os.unlink(path)
 exec admin "lua box.socket.tcp_connect('unix/', '{}'), box.errno() == box.errno.ENOENT".format(path)
 
-exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
-exec admin "lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))"
+exec admin "lua sa = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
+exec admin "lua sa:close()"
+exec admin "lua sa.socket.fd = 512"
+exec admin "lua sa:fd()"
 exec admin "lua tostring(sa)"
 exec admin "lua sa:readable(0)"
 exec admin "lua sa:writable(0)"
+exec admin "lua sa = nil"
 
+exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
 exec admin "lua ch = box.ipc.channel()"
 exec admin "lua f = box.fiber.wrap(function() s:read(12) ch:put(true) end)"
 exec admin "lua box.fiber.sleep(.1)"
@@ -327,4 +333,15 @@ exec admin "lua client ~= nil"
 exec admin "lua client:read(123)"
 exec admin "lua server:stop()"
 
+os.unlink(path)
+
+# Test that socket is closed on GC
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s:listen()"
+exec admin "lua s = nil"
+exec admin "lua collectgarbage('collect')"
+exec admin "lua collectgarbage('collect')"
+exec admin "lua client, errno = box.socket.tcp_connect('unix/', '{}'), box.errno()".format(path)
+exec admin "lua errno == box.errno.ECONNREFUSED"
 os.unlink(path)
