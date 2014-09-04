@@ -14,6 +14,15 @@ s:wait(.01)
 type(s)
 s:errno()
 type(s:error())
+-- Invalid arguments
+--# setopt delimiter ';'
+for k in pairs(getmetatable(s).__index) do
+    local r, msg = pcall(s[k])
+    if not msg:match('Usage:') then
+        error("Arguments is not checked for "..k)
+    end
+end;
+--# setopt delimiter ''
 
 port = string.gsub(box.cfg.listen, '^.*:', '')
 
@@ -286,6 +295,16 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 
+-- invalid fd
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+s:read(9)
+s:close()
+s.socket.fd = 512
+tostring(s)
+s:readable(0)
+s:writable(0)
+s = nil
+
 -- close
 port = 65454
 serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
@@ -304,12 +323,6 @@ end, serv);
 --# setopt delimiter ''
 
 s = socket.tcp_connect('127.0.0.1', port)
-s:read(9)
-sa = setmetatable({ fh = 512 }, getmetatable(s))
-tostring(sa)
-sa:readable(0)
-sa:writable(0)
-
 ch = fiber.channel()
 f = fiber.create(function() s:read(12) ch:put(true) end)
 s:close()
@@ -423,4 +436,12 @@ server:stop()
 os.remove(path)
 
 
-
+-- Test that socket is closed on GC
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s:bind('unix/', path)
+s:listen()
+s = nil
+collectgarbage('collect')
+collectgarbage('collect')
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+os.remove(path)
