@@ -168,3 +168,10 @@ box.space._priv:select{id}
 box.schema.user.drop('user')
 box.space._priv:select{id}
 session = nil
+-- -----------------------------------------------------------
+-- Be a bit more rigorous in what is accepted in space _user
+-- -----------------------------------------------------------
+box.space._user:insert{10, 1, 'name'}
+box.space._user:insert{10, 1, 'name', 'strange-object-type'}
+box.space._user:insert{10, 1, 'name', 'user', 'password'}
+box.space._user:insert{10, 1, 'name', 'role', 'password'}

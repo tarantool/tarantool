@@ -1162,8 +1162,23 @@ user_has_data(uint32_t uid)
 void
 user_fill_auth_data(struct user *user, const char *auth_data)
 {
-	if (mp_typeof(*auth_data) != MP_MAP)
+	uint8_t type = mp_typeof(*auth_data);
+	if (type == MP_ARRAY || type == MP_NIL) {
+		/*
+		 * Nothing useful.
+		 * MP_ARRAY is a special case since Lua arrays are
+		 * indistinguishable from tables, so an empty
+		 * table may well be encoded as an msgpack array.
+		 * Treat as no data.
+		 */
 		return;
+	}
+	if (mp_typeof(*auth_data) != MP_MAP) {
+		/** Prevent users from making silly mistakes */
+		tnt_raise(ClientError, ER_CREATE_USER,
+			  user->name, "invalid password format, "
+			  "use box.schema.user.passwd() to reset password");
+	}
 	uint32_t mech_count = mp_decode_map(&auth_data);
 	for (uint32_t i = 0; i < mech_count; i++) {
 		if (mp_typeof(*auth_data) != MP_STR) {
@@ -1202,6 +1217,10 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	if (len >= sizeof(user->name)) {
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  name, "user name is too long");
+	}
+	if (user->type != SC_ROLE && user->type != SC_USER) {
+		tnt_raise(ClientError, ER_CREATE_USER,
+			  user->name, "unknown user type");
 	}
 	identifier_check(name);
 	access_check_ddl(user->owner);
