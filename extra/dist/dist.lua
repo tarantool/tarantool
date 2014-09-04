@@ -137,7 +137,7 @@ box.cfg = function(cfg)
     end
     local res = orig_cfg(cfg)
 
-    require('fiber').name(istance)
+    require('fiber').name(instance)
     log.info('Run console at %s', force_cfg_console)
     console.listen(force_cfg_console)
 
