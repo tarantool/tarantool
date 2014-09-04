@@ -48,12 +48,6 @@ ffi.cdef[[
     struct protoent *getprotobyname(const char *name);
 ]]
 
-ffi.cdef([[
-struct sockaddr {
-    char _data[256]; /* enough to fit any address */
-};
-]]);
-
 local function sprintf(fmt, ...)
     return string.format(fmt, ...)
 end
@@ -133,7 +127,9 @@ socket_methods.error = function(self)
     end
 end
 
-local addr = ffi.new('struct sockaddr')
+-- addrbuf is equivalent to struct sockaddr_storage
+local addrbuf = ffi.new('char[128]') -- enough to fit any address
+local addr = ffi.cast('struct sockaddr *', addrbuf)
 local addr_len = ffi.new('socklen_t[1]')
 socket_methods.sysconnect = function(self, host, port)
     local fd = check_socket(self)
@@ -142,7 +138,7 @@ socket_methods.sysconnect = function(self, host, port)
     host = tostring(host)
     port = tostring(port)
 
-    addr_len[0] = ffi.sizeof(addr)
+    addr_len[0] = ffi.sizeof(addrbuf)
     local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.connect(fd, addr, addr_len[0]);
@@ -274,7 +270,7 @@ socket_methods.bind = function(self, host, port)
     host = tostring(host)
     port = tostring(port)
 
-    addr_len[0] = ffi.sizeof(addr)
+    addr_len[0] = ffi.sizeof(addrbuf)
     local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.bind(fd, addr, addr_len[0]);
@@ -760,7 +756,7 @@ socket_methods.sendto = function(self, host, port, octets, flags)
     port = tostring(port)
     octets = tostring(octets)
 
-    addr_len[0] = ffi.sizeof(addr)
+    addr_len[0] = ffi.sizeof(addrbuf)
     local res = ffi.C.bsdsocket_local_resolve(host, port, addr, addr_len)
     if res == 0 then
         res = ffi.C.sendto(fd, octets, string.len(octets), iflags,
