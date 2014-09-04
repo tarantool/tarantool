@@ -22,7 +22,7 @@ box.cfg
 17	readahead:16320
 18	rows_per_wal:500000
 19	wal_dir:.
-20	snapshot_period:14400
+20	snapshot_period:0
 21	wal_dir_rescan_delay:0.1
 --
 -- Test insert from detached fiber

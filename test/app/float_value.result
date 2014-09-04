@@ -17,7 +17,7 @@ box.cfg
 16	too_long_threshold:0.01
 17	readahead:16320
 18	wal_dir:.
-19	snapshot_period:14400
+19	snapshot_period:0
 20	slab_alloc_minimal:64
 21	wal_dir_rescan_delay:0.1
 ------------------------------------------------------

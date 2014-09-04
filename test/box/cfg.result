@@ -27,7 +27,7 @@ t
   - 'pid_file: tarantool.pid'
   - 'readahead: 16320'
   - 'wal_dir: .'
-  - 'snapshot_period: 14400'
+  - 'snapshot_period: 0'
   - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
@@ -57,7 +57,7 @@ t
   - 'pid_file: tarantool.pid'
   - 'readahead: 16320'
   - 'wal_dir: .'
-  - 'snapshot_period: 14400'
+  - 'snapshot_period: 0'
   - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
