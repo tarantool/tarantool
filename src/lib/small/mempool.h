@@ -93,8 +93,10 @@ enum {
 /** mslab - a standard slab formatted to store objects of equal size. */
 struct mslab {
 	struct slab slab;
-	/** Index of the first bitmap element which has a free slot. */
-	uint32_t ffi;
+	/* Pointer to earlier freed list head */
+	void *freed_list;
+	/** Offset of an object that was never allocated in mslab */
+	uint32_t untouched_offset;
 	/** Number of available slots in the slab. */
 	uint32_t nfree;
 	/** Used if this slab is a member of free_slabs tree. */
