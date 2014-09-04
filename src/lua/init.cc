@@ -232,6 +232,8 @@ tarantool_lua_setpaths(struct lua_State *L)
 	const char *home = getenv("HOME");
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
+	lua_pushliteral(L, "./?.lua;");
+	lua_pushliteral(L, "./?/init.lua;");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
@@ -247,6 +249,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "path");
 
+	lua_pushliteral(L, "./?.so;");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?.so;");

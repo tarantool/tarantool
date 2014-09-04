@@ -193,6 +193,7 @@ t;
   - 'box.error.CREATE_USER : 43'
   - 'box.error.CREATE_SPACE : 9'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.CREATE_ROLE : 84'
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.NO_ACTIVE_TRANSACTION : 80'

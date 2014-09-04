@@ -1214,7 +1214,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	if (tuple_field_count(tuple) > AUTH_MECH_LIST) {
 		const char *auth_data = tuple_field(tuple, AUTH_MECH_LIST);
 		if (user->type == SC_ROLE && strlen(auth_data)) {
-			tnt_raise(ClientError, ER_CREATE_USER,
+			tnt_raise(ClientError, ER_CREATE_ROLE, user->name,
 				  "authentication data can not be set for "
 				  "a role");
 		}

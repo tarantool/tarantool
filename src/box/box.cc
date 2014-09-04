@@ -287,7 +287,7 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 /**
  * @brief Called when recovery/replication wants to add a new server
  * to cluster.
- * cluster_add_server() is called as a commit trigger on _cluster
+ * cluster_add_server() is called as a commit trigger on jcluster
  * space and actually adds the server to the cluster.
  * @param server_uuid
  */
@@ -405,19 +405,20 @@ box_init()
 	if (recovery_has_data(recovery)) {
 		/* Process existing snapshot */
 		recover_snap(recovery);
+		space_end_recover_snapshot();
 	} else if (recovery_has_remote(recovery)) {
 		/* Initialize a new replica */
 		replica_bootstrap(recovery);
+		space_end_recover_snapshot();
 		snapshot_save(recovery);
 	} else {
 		/* Initialize the first server of a new cluster */
 		recovery_bootstrap(recovery);
 		box_set_cluster_uuid();
 		box_set_server_uuid();
+		space_end_recover_snapshot();
 		snapshot_save(recovery);
 	}
-
-	space_end_recover_snapshot();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
