@@ -48,8 +48,8 @@ mslab_create(struct mslab *slab, struct mempool *pool)
 {
 	slab->nfree = pool->objcount;
 	slab->pool = pool;
-	slab->untouched_offset = 0;
-	slab->freed_list = 0;
+	slab->free_idx = 0;
+	slab->free_list = 0;
 	/* A bit is set if a slot is free. */
 	memset(slab->map, 0xFF, sizeof(slab->map[0]) * pool->mapsize);
 }
@@ -87,14 +87,14 @@ mslab_alloc(struct mslab *slab)
 	assert(slab->nfree);
 	void *result;
 	uint32_t idx;
-	if (slab->freed_list) {
-		/* return pointer from garbage */
-		idx = mslab_idx(slab, slab->freed_list);
-		result = slab->freed_list;
-		slab->freed_list = *(void **)slab->freed_list;
+	if (slab->free_list) {
+		/* Recycle an object from the garbage pool. */
+		idx = mslab_idx(slab, slab->free_list);
+		result = slab->free_list;
+		slab->free_list = *(void **)slab->free_list;
 	} else {
-		/* return pointer to new object */
-		idx = slab->untouched_offset++;
+		/* Use an object from the "untouched" area of the slab. */
+		idx = slab->free_idx++;
 		result = mslab_obj(slab, idx);
 	}
 
@@ -114,8 +114,8 @@ void
 mslab_free(struct mempool *pool, struct mslab *slab, void *ptr)
 {
 	/* put object to garbage list */
-	*(void **)ptr = slab->freed_list;
-	slab->freed_list = ptr;
+	*(void **)ptr = slab->free_list;
+	slab->free_list = ptr;
 
 	uint32_t idx = mslab_idx(slab, ptr);
 

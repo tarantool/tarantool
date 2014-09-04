@@ -93,10 +93,10 @@ enum {
 /** mslab - a standard slab formatted to store objects of equal size. */
 struct mslab {
 	struct slab slab;
-	/* Pointer to earlier freed list head */
-	void *freed_list;
-	/** Offset of an object that was never allocated in mslab */
-	uint32_t untouched_offset;
+	/* Head of a list of used but freed objects */
+	void *free_list;
+	/** Index of an object that has never been allocated in mslab */
+	uint32_t free_idx;
 	/** Number of available slots in the slab. */
 	uint32_t nfree;
 	/** Used if this slab is a member of free_slabs tree. */
