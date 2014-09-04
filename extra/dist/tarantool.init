@@ -17,7 +17,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin:bin
 CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
 DAEMON=/usr/bin/tarantool
-DIST_LUA=/usr/bin/tarantool_ctl
+DIST_LUA=/usr/bin/tarantoolctl
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
