@@ -52,7 +52,7 @@ local default_cfg = {
     coredump            = false,
 
     -- snap_daemon
-    snapshot_period     = 3600 * 4,
+    snapshot_period     = 0,        -- 0 = disabled
     snapshot_count      = 6,
 }
 

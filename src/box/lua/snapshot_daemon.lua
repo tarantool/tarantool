@@ -183,15 +183,22 @@ do
         log.info("%s", self.status)
         while true do
             local interval = next_snap_interval()
-            fiber.sleep(interval)
-            if self.status ~= 'started' then
-                break
-            end
 
-            local s, e = pcall(process)
+            if interval ~= nil then
+                fiber.sleep(interval)
+                if self.status ~= 'started' then
+                    break
+                end
 
-            if not s then
-                log.error(e)
+                local s, e = pcall(process)
+
+                if not s then
+                    log.error(e)
+                end
+            else
+                -- daemon is disabled
+                -- do nothing, waiting for change event wakes us up
+                fiber.sleep(3600 * 24 * 365 * 100)
             end
         end
         log.info("%s", self.status)
