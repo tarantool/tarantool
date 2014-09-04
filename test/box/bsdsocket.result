@@ -222,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:341: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:345: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---

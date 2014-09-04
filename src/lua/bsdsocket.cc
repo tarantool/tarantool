@@ -847,15 +847,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ NULL,			NULL				}
 	};
 
-	if (luaL_dostring(L, bsdsocket_lua))
-		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
-		      lua_tostring(L, -1));
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "box");
-	lua_getfield(L, -1, "socket");
-	lua_getfield(L, -1, "internal");
-
-	luaL_register(L, NULL, internal_methods);
+	luaL_register(L, "box.socket.internal", internal_methods);
 
 	/* domains table */
 	lua_pushliteral(L, "DOMAIN");
@@ -929,6 +921,10 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	lua_pushliteral(L, "SOL_SOCKET");
 	lua_pushinteger(L, SOL_SOCKET);
 	lua_rawset(L, -3);
+
+	if (luaL_dostring(L, bsdsocket_lua))
+		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
+		      lua_tostring(L, -1));
 
 	lua_settop(L, top);
 }

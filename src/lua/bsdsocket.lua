@@ -5,6 +5,9 @@ do
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 
 local ffi = require 'ffi'
+local internal = box.socket.internal
+box.socket.internal = nil
+package.loaded['box.socket.internal'] = nil
 
 ffi.cdef[[
     struct socket {
@@ -70,6 +73,7 @@ local function check_socket(self)
     return socket.fd
 end
 
+local socket_mt
 local function bless_socket(fd)
     -- Make socket to be non-blocked by default
     if ffi.C.bsdsocket_nonblock(fd, 1) < 0 then
@@ -81,7 +85,7 @@ local function bless_socket(fd)
 
     local socket = ffi.new(socket_t, fd);
     ffi.gc(socket, socket_cdata_gc)
-    return setmetatable({ socket = socket }, box.socket.internal.socket_mt)
+    return setmetatable({ socket = socket }, socket_mt)
 end
 
 local function get_ivalue(table, key)
@@ -215,7 +219,7 @@ local function wait_safely(self, what, timeout)
     end
 
     self.waiters[fid] = f
-    local wres = box.socket.internal.iowait(fd, what, timeout)
+    local wres = internal.iowait(fd, what, timeout)
     self.waiters[fid] = nil
     box.fiber.testcancel()
 
@@ -331,7 +335,7 @@ end
 socket_methods.setsockopt = function(self, level, name, value)
     local fd = check_socket(self)
 
-    local info = get_ivalue(box.socket.internal.SO_OPT, name)
+    local info = get_ivalue(internal.SO_OPT, name)
 
     if info == nil then
         error(sprintf("Unknown socket option name: %s", tostring(name)))
@@ -345,7 +349,7 @@ socket_methods.setsockopt = function(self, level, name, value)
 
     if type(level) == 'string' then
         if level == 'SOL_SOCKET' then
-            level = box.socket.internal.SOL_SOCKET
+            level = internal.SOL_SOCKET
         else
             local p = ffi.C.getprotobyname(level)
             if p == nil then
@@ -397,7 +401,7 @@ end
 socket_methods.getsockopt = function(self, level, name)
     local fd = check_socket(self)
 
-    local info = get_ivalue(box.socket.internal.SO_OPT, name)
+    local info = get_ivalue(internal.SO_OPT, name)
 
     if info == nil then
         error(sprintf("Unknown socket option name: %s", tostring(name)))
@@ -407,7 +411,7 @@ socket_methods.getsockopt = function(self, level, name)
 
     if type(level) == 'string' then
         if level == 'SOL_SOCKET' then
-            level = box.socket.internal.SOL_SOCKET
+            level = internal.SOL_SOCKET
         else
             local p = ffi.C.getprotobyname(level)
             if p == nil then
@@ -457,13 +461,13 @@ end
 socket_methods.linger = function(self, active, timeout)
     local fd = check_socket(self)
 
-    local info = box.socket.internal.SO_OPT.SO_LINGER
+    local info = internal.SO_OPT.SO_LINGER
     self._errno = nil
     if active == nil then
         local value = ffi.new("linger_t[1]")
         local len = ffi.new("size_t[1]", 2 * ffi.sizeof('int'))
         local res = ffi.C.getsockopt(fd,
-            box.socket.internal.SOL_SOCKET, info.iname, value, len)
+            internal.SOL_SOCKET, info.iname, value, len)
         if res < 0 then
             self._errno = box.errno()
             return nil
@@ -491,7 +495,7 @@ socket_methods.linger = function(self, active, timeout)
         { { active = iactive, timeout = timeout } })
     local len = 2 * ffi.sizeof('int')
     local res = ffi.C.setsockopt(fd,
-        box.socket.internal.SOL_SOCKET, info.iname, value, len)
+        internal.SOL_SOCKET, info.iname, value, len)
     if res < 0 then
         self._errno = box.errno()
         return nil
@@ -688,7 +692,7 @@ end
 
 socket_methods.send = function(self, octets, flags)
     local fd = check_socket(self)
-    local iflags = get_iflags(box.socket.internal.SEND_FLAGS, flags)
+    local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
     self._errno = nil
     local res = ffi.C.send(fd, octets, string.len(octets), iflags)
@@ -701,7 +705,7 @@ end
 
 socket_methods.recv = function(self, size, flags)
     local fd = check_socket(self)
-    local iflags = get_iflags(box.socket.internal.SEND_FLAGS, flags)
+    local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
         self._errno = box.errno.EINVAL
         return nil
@@ -724,13 +728,13 @@ end
 
 socket_methods.recvfrom = function(self, size, flags)
     local fd = check_socket(self)
-    local iflags = get_iflags(box.socket.internal.SEND_FLAGS, flags)
+    local iflags = get_iflags(internal.SEND_FLAGS, flags)
     if iflags == nil then
         self._errno = box.errno.EINVAL
         return nil
     end
     self._errno = nil
-    local res, from = box.socket.internal.recvfrom(fd, size, iflags)
+    local res, from = internal.recvfrom(fd, size, iflags)
     if res == nil then
         self._errno = box.errno()
         return nil
@@ -740,7 +744,7 @@ end
 
 socket_methods.sendto = function(self, host, port, octets, flags)
     local fd = check_socket(self)
-    local iflags = get_iflags(box.socket.internal.SEND_FLAGS, flags)
+    local iflags = get_iflags(internal.SEND_FLAGS, flags)
 
     if iflags == nil then
         self._errno = box.errno.EINVAL
@@ -770,13 +774,13 @@ socket_methods.sendto = function(self, host, port, octets, flags)
 end
 
 local function create_socket(domain, stype, proto)
-    local idomain = get_ivalue(box.socket.internal.DOMAIN, domain)
+    local idomain = get_ivalue(internal.DOMAIN, domain)
     if idomain == nil then
         box.errno(box.errno.EINVAL)
         return nil
     end
 
-    local itype = get_ivalue(box.socket.internal.SO_TYPE, stype)
+    local itype = get_ivalue(internal.SO_TYPE, stype)
     if itype == nil then
         box.errno(box.errno.EINVAL)
         return nil
@@ -818,7 +822,7 @@ local function getaddrinfo(host, port, timeout, opts)
     local ga_opts = {}
     if opts ~= nil then
         if opts.type ~= nil then
-            local itype = get_ivalue(box.socket.internal.SO_TYPE, opts.type)
+            local itype = get_ivalue(internal.SO_TYPE, opts.type)
             if itype == nil then
                 self._errno = box.errno.EINVAL
                 return nil
@@ -827,7 +831,7 @@ local function getaddrinfo(host, port, timeout, opts)
         end
 
         if opts.family ~= nil then
-            local ifamily = get_ivalue(box.socket.internal.DOMAIN, opts.family)
+            local ifamily = get_ivalue(internal.DOMAIN, opts.family)
             if ifamily == nil then
                 self._errno = box.errno.EINVAL
                 return nil
@@ -846,7 +850,7 @@ local function getaddrinfo(host, port, timeout, opts)
 
         if opts.flags ~= nil then
             ga_opts.flags =
-                get_iflags(box.socket.internal.AI_FLAGS, opts.flags)
+                get_iflags(internal.AI_FLAGS, opts.flags)
             if ga_opts.flags == nil then
                 self._errno = box.errno()
                 return nil
@@ -855,7 +859,7 @@ local function getaddrinfo(host, port, timeout, opts)
 
     end
 
-    local r = box.socket.internal.getaddrinfo(host, port, timeout, ga_opts)
+    local r = internal.getaddrinfo(host, port, timeout, ga_opts)
     if r == nil then
         self._errno = box.errno()
     else
@@ -882,7 +886,7 @@ local soname_mt = {
 
 socket_methods.name = function(self)
     local fd = check_socket(self)
-    local aka = box.socket.internal.name(fd)
+    local aka = internal.name(fd)
     if aka == nil then
         self._errno = box.errno()
         return nil
@@ -894,7 +898,7 @@ end
 
 socket_methods.peer = function(self)
     local fd = check_socket(self)
-    local peer = box.socket.internal.peer(fd)
+    local peer = internal.peer(fd)
     if peer == nil then
         self._errno = box.errno()
         return nil
@@ -1067,8 +1071,7 @@ local function tcp_server(host, port, prepare, handler, timeout)
     return tcp_server_remote(dns, prepare, handler)
 end
 
-box.socket.internal = {
-    socket_mt   = {
+socket_mt   = {
         __index     = socket_methods,
         __tostring  = function(self)
             local fd = check_socket(self)
@@ -1086,7 +1089,6 @@ box.socket.internal = {
             self._errno = save_errno
             return name
         end
-    },
 }
 
 setmetatable(box.socket, {
