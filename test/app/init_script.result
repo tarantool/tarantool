@@ -9,7 +9,7 @@ box.cfg
 4	slab_alloc_minimal:64
 5	background:false
 6	logger:tarantool.log
-7	slab_alloc_arena:1
+7	slab_alloc_arena:0.1
 8	log_level:5
 9	listen:3314
 10	logger_nonblock:true

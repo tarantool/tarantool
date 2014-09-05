@@ -6,7 +6,10 @@ print[[
 --------------------------------------------------------------------------------
 ]]
 
-box.cfg{logger="tarantool.log"}
+box.cfg{
+    logger="tarantool.log",
+    slab_alloc_arena=0.1,
+}
 function pcalltest()
     local ERRMSG = "module 'some_invalid_module' not found"
     local status, msg = pcall(require, 'some_invalid_module')
