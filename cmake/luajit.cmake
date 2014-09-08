@@ -144,7 +144,6 @@ macro(luajit_build)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
     endif()
-    set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/libobjc)
     set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS}")
     # Use external unwind on all platforms.
     set (luajit_target_cc "${luajit_target_cc} -DLUAJIT_UNWIND_EXTERNAL=1")
