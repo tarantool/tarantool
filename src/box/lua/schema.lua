@@ -1082,6 +1082,10 @@ box.schema.role.drop = function(name)
     end
     return box.schema.user.drop(name)
 end
-box.schema.role.grant = box.schema.user.grant
-box.schema.role.revoke = box.schema.user.revoke
-box.schema.role .info = box.schema.user.info
+box.schema.role.grant = function(user_name, role_name, grantor)
+    return box.schema.user.grant(user_name, 'execute', 'role', role_name, grantor)
+end
+box.schema.role.revoke = function(user_name, role_name)
+    return box.schema.user.revoke(user_name, 'execute', 'role', role_name)
+end
+box.schema.role.info = box.schema.user.info

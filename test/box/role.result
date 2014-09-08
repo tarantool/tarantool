@@ -23,15 +23,15 @@ box.session.su('iddqd')
 -- test granting privilege to a role
 box.schema.role.grant('iddqd', 'execute', 'universe')
 ---
+- error: Role 'execute' is not found
 ...
 box.schema.role.info('iddqd')
 ---
-- - - execute
-    - universe
-    - 
+- []
 ...
 box.schema.role.revoke('iddqd', 'execute', 'universe')
 ---
+- error: Role 'execute' is not found
 ...
 box.schema.role.info('iddqd')
 ---
@@ -53,4 +53,20 @@ box.schema.user.info('tester')
 - - - execute
     - role
     - iddqd
+...
+-- test granting user to a user
+box.schema.user.grant('tester', 'execute', 'role', 'tester')
+---
+- error: Role 'tester' is not found
+...
+-- test granting a non-execute grant on a role - error
+box.schema.user.grant('tester', 'write', 'role', 'iddqd')
+---
+...
+box.schema.user.grant('tester', 'read', 'role', 'iddqd')
+---
+...
+-- test granting role to a role
+box.schema.user.grant('iddqd', 'execute', 'role', 'iddqd')
+---
 ...

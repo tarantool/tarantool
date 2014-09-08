@@ -1256,7 +1256,7 @@ static struct trigger drop_user_trigger =
 	{ rlist_nil, user_cache_remove_user, NULL, NULL };
 
 static void
-user_cache_replace_user(struct trigger * /* trigger */, void *event)
+user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_stmt(txn);
@@ -1266,7 +1266,7 @@ user_cache_replace_user(struct trigger * /* trigger */, void *event)
 }
 
 static struct trigger modify_user_trigger =
-	{ rlist_nil, user_cache_replace_user, NULL, NULL };
+	{ rlist_nil, user_cache_alter_user, NULL, NULL };
 
 /**
  * A trigger invoked on replace in the user table.
