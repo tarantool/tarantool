@@ -64,6 +64,8 @@ struct iproto_port
 	uint32_t found;
 	/** A pointer in the reply buffer where the reply starts. */
 	struct obuf_svp svp;
+	/** Size of data written after reply starts */
+	uint32_t size;
 };
 
 extern struct port_vtab iproto_port_vtab;
@@ -76,6 +78,7 @@ iproto_port_init(struct iproto_port *port, struct obuf *buf,
 	port->buf = buf;
 	port->sync = sync;
 	port->found = 0;
+	port->size = 0;
 }
 
 /** Stack a reply to 'ping' packet. */
