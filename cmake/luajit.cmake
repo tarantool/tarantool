@@ -131,12 +131,18 @@ message (STATUS "Use LuaJIT library: ${LUAJIT_LIB}")
 macro(luajit_build)
     set (luajit_buildoptions BUILDMODE=static)
     set (luajit_copt "")
+    set (luajit_xcflags "")
     if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
         set (luajit_buildoptions ${luajit_buildoptions} CCDEBUG=${CC_DEBUG_OPT})
         set (luajit_copt ${luajit_copt} -O1)
-        set (luajit_buildoptions ${luajit_buildoptions} XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT')
+        set (luajit_xcflags ${luajit_xcflags}
+            -DLUA_USE_APICHECK -DLUA_USE_ASSERT)
     else ()
         set (luajit_copt ${luajit_copt} -O2)
+    endif()
+    if (ENABLE_VALGRIND)
+        set (luajit_xcflags ${luajit_xcflags}
+            -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
     endif()
     set (luajit_copt ${luajit_copt} -I${PROJECT_SOURCE_DIR}/libobjc)
     set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS}")
@@ -164,6 +170,7 @@ macro(luajit_build)
     set (luajit_buildoptions ${luajit_buildoptions}
         CFLAGS=""
         CXXFLAGS=""
+        XCFLAGS="${luajit_xcflags}"
         HOST_CC="${luajit_host_cc}"
         TARGET_CC="${luajit_target_cc}"
         CCOPT="${luajit_copt}")
