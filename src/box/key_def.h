@@ -301,6 +301,16 @@ struct func_def {
 	uint32_t fid;
 	/** Owner of the function. */
 	uint32_t uid;
+	/**
+	 * True if the function requires change of user id before
+	 * invocaction.
+	 */
+	bool setuid;
+	/**
+	 * Authentication id of the owner of the function,
+	 * used for set-user-id functions.
+	 */
+	uint8_t auth_token;
 	/** Function name. */
 	char name[BOX_NAME_MAX + 1];
 	/**

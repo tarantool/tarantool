@@ -41,6 +41,8 @@ enum {
 	PRIV_W = 2,
 	/* CALL */
 	PRIV_X = 4,
+	/** Everything. */
+	PRIV_ALL = PRIV_R + PRIV_W + PRIV_X
 };
 
 /* Privilege name for error messages */

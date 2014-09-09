@@ -911,13 +911,16 @@ local function object_name(object_type, object_id)
 end
 
 box.schema.func = {}
-box.schema.func.create = function(name)
+box.schema.func.create = function(name, opts)
     local _func = box.space[box.schema.FUNC_ID]
     local func = _func.index.name:get{name}
     if func then
             box.error(box.error.FUNCTION_EXISTS, name)
     end
-    _func:auto_increment{session.uid(), name}
+    check_param_table(opts, { setuid = 'boolean' })
+    opts = update_param_table(opts, { setuid = false })
+    opts.setuid = opts.setuid and 1 or 0
+    _func:auto_increment{session.uid(), name, opts.setuid}
 end
 
 box.schema.func.drop = function(name)
@@ -926,8 +929,8 @@ box.schema.func.drop = function(name)
     local fid = object_resolve('function', name)
     local privs = _priv:select{}
     for k, tuple in pairs(privs) do
-        if tuple[2] == 'function' and tuple[3] == function_id then
-            box.schema.user.revoke(tuple[1], tuple[4], tuple[2], tuple[3])
+        if tuple[3] == 'function' and tuple[4] == fid then
+            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
         end
     end
     _func:delete{fid}
@@ -1082,6 +1085,10 @@ box.schema.role.drop = function(name)
     end
     return box.schema.user.drop(name)
 end
-box.schema.role.grant = box.schema.user.grant
-box.schema.role.revoke = box.schema.user.revoke
-box.schema.role .info = box.schema.user.info
+box.schema.role.grant = function(user_name, role_name, grantor)
+    return box.schema.user.grant(user_name, 'execute', 'role', role_name, grantor)
+end
+box.schema.role.revoke = function(user_name, role_name)
+    return box.schema.user.revoke(user_name, 'execute', 'role', role_name)
+end
+box.schema.role.info = box.schema.user.info

@@ -62,6 +62,9 @@
 #define PRIV_OBJECT_ID   3
 #define PRIV_ACCESS      4
 
+/** _func columns */
+#define FUNC_SETUID      3
+
 /* {{{ Auxiliary functions and methods. */
 
 void
@@ -1256,7 +1259,7 @@ static struct trigger drop_user_trigger =
 	{ rlist_nil, user_cache_remove_user, NULL, NULL };
 
 static void
-user_cache_replace_user(struct trigger * /* trigger */, void *event)
+user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_stmt(txn);
@@ -1266,7 +1269,7 @@ user_cache_replace_user(struct trigger * /* trigger */, void *event)
 }
 
 static struct trigger modify_user_trigger =
-	{ rlist_nil, user_cache_replace_user, NULL, NULL };
+	{ rlist_nil, user_cache_alter_user, NULL, NULL };
 
 /**
  * A trigger invoked on replace in the user table.
@@ -1324,6 +1327,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 {
 	func->fid = tuple_field_u32(tuple, ID);
 	func->uid = tuple_field_u32(tuple, UID);
+	func->auth_token = user_cache_find(func->uid)->auth_token;
+	func->setuid = false;
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(func->name)) {
@@ -1333,6 +1338,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 	snprintf(func->name, sizeof(func->name), "%s", name);
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));
+	if (tuple_field_count(tuple) > FUNC_SETUID)
+		func->setuid = tuple_field_u32(tuple, FUNC_SETUID);
 }
 
 /** Remove a function from function cache */
