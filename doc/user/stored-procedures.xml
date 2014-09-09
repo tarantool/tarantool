@@ -2854,8 +2854,8 @@ time), process the tuple as an expired tuple.
 -- put expired tuple in archive
 local function put_tuple_to_archive(space_id, args, tuple)
     -- delete expired tuple
-    box.space[space_id]:delete{tuple[0]}
-    local email = get_field(tuple, 1)
+    box.space[space_id]:delete{tuple[1]}
+    local email = get_field(tuple, 2)
     if args.archive_space_id ~= nil and email ~= nil then
         box.space[args.archive_space_id]:replace{email, os.time()}
     end
