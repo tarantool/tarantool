@@ -30,7 +30,7 @@
  */
 #include "index.h"
 #include "trigger.h"
-#include "session.h"
+#include "fiber.h"
 
 extern double too_long_threshold;
 struct tuple;
@@ -69,12 +69,22 @@ struct txn {
 	bool autocommit;
 	/** Id of the engine involved in multi-statement transaction. */
 	uint8_t engine;
-	/** Trigger on fiber yield to abort transaction for in-memory engine */
-	struct trigger fiber_on_yield;
+	/** Triggers on fiber yield and stop to abort transaction for in-memory engine */
+	struct trigger fiber_on_yield, fiber_on_stop;
 };
 
 /* Pointer to the current transaction (if any) */
-#define in_txn() (session()->txn)
+static inline struct txn *
+fiber_get_txn(struct fiber *fiber)
+{
+	return (struct txn *) fiber_get_key(fiber, FIBER_KEY_TXN);
+}
+
+static inline void
+fiber_set_txn(struct fiber *fiber, struct txn *txn)
+{
+	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
+}
 
 /**
  * Start a new statement. If no current transaction,
@@ -105,11 +115,18 @@ struct txn *
 txn_begin(bool autocommit);
 
 /**
- * Commit a transaction.
+ * Commit a transaction. txn_finish must be called after that.
  * @pre txn == in_txn()
  */
 void
 txn_commit(struct txn *txn);
+
+/**
+ * Finish a transaction. Must be called after txn_commit.
+ * @pre txn == in_txn()
+ */
+void
+txn_finish(struct txn *txn);
 
 /** Rollback a transaction, if any. */
 void

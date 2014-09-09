@@ -103,10 +103,12 @@ iproto_port_eof(struct port *ptr)
 {
 	struct iproto_port *port = iproto_port(ptr);
 	/* found == 0 means add_tuple wasn't called at all. */
-	if (port->found == 0)
+	if (port->found == 0) {
 		port->svp = obuf_book(port->buf, SVP_SIZE);
+		port->size += SVP_SIZE;
+	}
 
-	uint32_t len = obuf_size(port->buf) - port->svp.size - 5;
+	uint32_t len = port->size - 5;
 
 	struct iproto_header_bin header = iproto_header_bin;
 	header.v_len = mp_bswap_u32(len);
@@ -127,8 +129,10 @@ iproto_port_add_tuple(struct port *ptr, struct tuple *tuple)
 	if (++port->found == 1) {
 		/* Found the first tuple, add header. */
 		port->svp = obuf_book(port->buf, SVP_SIZE);
+		port->size += SVP_SIZE;
 	}
 	tuple_to_obuf(tuple, port->buf);
+	port->size += tuple->bsize;
 }
 
 struct port_vtab iproto_port_vtab = {

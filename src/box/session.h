@@ -59,8 +59,6 @@ struct session {
 	uint8_t auth_token;
 	/** User id of the authenticated user. */
 	uint32_t uid;
-	/** Current transaction, if started. */
-	struct txn *txn;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
 };
