@@ -32,3 +32,12 @@ option(ENABLE_GPROF "Enable integration with gprof, a performance analyzing tool
 if (ENABLE_GPROF)
     add_compile_flags("C;CXX" "-pg")
 endif()
+
+option(ENABLE_VALGRIND "Enable integration with valgrind, a memory analyzing tool" OFF)
+if (ENABLE_VALGRIND)
+    check_include_file(valgrind/valgrind.h HAVE_VALGRIND_VALGRIND_H)
+    if (NOT HAVE_VALGRIND_VALGRIND_H)
+        message (FATAL_ERROR
+             "ENABLE_VALGRIND option is set but valgrind/valgrind.h is not found")
+        endif()
+endif()

@@ -79,6 +79,10 @@ main(void)
 
 	char *td = mkdtemp(strdup("/tmp/fiob.XXXXXX"));
 	isnt(td, NULL, "tempdir is created");
+	if (td == 0) {
+		diag("Can't create temporary dir: %s", strerror(errno));
+		return -1;
+	}
 
 	static char buf[4096];
 

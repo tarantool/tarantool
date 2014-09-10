@@ -10,7 +10,10 @@ local function test()
 end
 
 print(pcall(test))
-box.cfg{logger="tarantool.log"}
+box.cfg{
+    logger="tarantool.log",
+    slab_alloc_arena=0.1,
+}
 print(pcall(test))
 
 os.exit(0)

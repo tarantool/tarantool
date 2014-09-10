@@ -154,17 +154,24 @@ box.space._user.index.name:select{'user1'}
 box.schema.user.create('user')
 id = box.space._user.index.name:get{'user'}[1]
 box.schema.user.grant('user', 'read,write', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.grant('user', 'read', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.revoke('user', 'write', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.revoke('user', 'read', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.grant('user', 'write', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.grant('user', 'read', 'universe')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 box.schema.user.drop('user')
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
+-- -----------------------------------------------------------
+-- Be a bit more rigorous in what is accepted in space _user
+-- -----------------------------------------------------------
+box.space._user:insert{10, 1, 'name'}
+box.space._user:insert{10, 1, 'name', 'strange-object-type'}
+box.space._user:insert{10, 1, 'name', 'user', 'password'}
+box.space._user:insert{10, 1, 'name', 'role', 'password'}
 session = nil

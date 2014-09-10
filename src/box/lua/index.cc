@@ -43,7 +43,7 @@ static inline Index *
 check_index(uint32_t space_id, uint32_t index_id)
 {
 	struct space *space = space_cache_find(space_id);
-	space_check_access(space, PRIV_R);
+	access_check_space(space, PRIV_R);
 	return index_find(space, index_id);
 }
 
@@ -98,6 +98,7 @@ boxffi_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		it->sc_version = sc_version;
 		it->space_id = space_id;
 		it->index_id = index_id;
+		it->index = index;
 		return it;
 	} catch (Exception *) {
 		if (it)
@@ -113,6 +114,8 @@ boxffi_iterator_next(struct iterator *itr)
 	if (itr->sc_version != sc_version) {
 		try {
 			Index *index = check_index(itr->space_id, itr->index_id);
+			if (index != itr->index)
+				return NULL;
 			if (index->sc_version > itr->sc_version)
 				return NULL;
 			itr->sc_version = sc_version;

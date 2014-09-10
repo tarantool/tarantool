@@ -24,7 +24,7 @@ class TestState(object):
         self.delimiter = ''
         self.suite_ini = suite_ini
         self.environ = Namespace()
-        self.create_server = create_server 
+        self.create_server = create_server
         self.servers =      { 'default': default_server }
         self.connections =  { 'default': default_server.admin }
         # curcon is an array since we may have many connections
@@ -164,12 +164,13 @@ class TestState(object):
             self.connections.pop(sname)
             self.servers[sname].stop()
         elif ctype == 'deploy':
-            pass
+            self.servers[sname].deploy()
         elif ctype == 'cleanup':
             if sname not in self.servers:
                 raise LuaPreprocessorException('Can\'t cleanup nonexistent server '+repr(sname))
             self.servers[sname].cleanup()
-            delattr(self.environ, sname)
+            if sname != 'default':
+                delattr(self.environ, sname)
         else:
             raise LuaPreprocessorException('Unknown command for server: '+repr(ctype))
 

@@ -4,7 +4,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 space = box.schema.create_space('test', {id =  42})
 ---
 ...
-space:create_index('primary', { type = 'hash'})
+space:create_index('primary', { type = 'tree'})
 ---
 ...
 for k = 1, 9 do space:insert{k, k*k} end
@@ -17,16 +17,43 @@ box.space.test
 ---
 - null
 ...
+-------------------------------------------------------------
+replica JOIN
+-------------------------------------------------------------
 box.snapshot()
 ---
 - ok
 ...
-for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
+box.space.test:select()
 ---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
+...
+box.space.test:select()
+---
+- - [1, 1]
+  - [2, 4]
+  - [3, 9]
+  - [4, 16]
+  - [5, 25]
+  - [6, 36]
+  - [7, 49]
+  - [8, 64]
+  - [9, 81]
 ...
 -------------------------------------------------------------
 replica test 2 (must be ok)
 -------------------------------------------------------------
+for k = 10, 19 do box.space[42]:insert{k, k*k*k} end
+---
+...
 space = box.space.test
 ---
 ...

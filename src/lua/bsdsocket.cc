@@ -863,7 +863,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ NULL,			NULL				}
 	};
 
-	luaL_register_module(L, "socket.internal", internal_methods);
+	luaL_register_module(L, "socket", internal_methods);
 
 	/* domains table */
 	lua_pushliteral(L, "DOMAIN");
@@ -939,8 +939,4 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 	lua_rawset(L, -3);
 
 	lua_pop(L, 1); /* socket.internal */
-
-	if (luaL_dostring(L, bsdsocket_lua))
-		panic("Error loading Lua source (internal)/bsdsocket.lua: %s",
-			      lua_tostring(L, -1));
 }

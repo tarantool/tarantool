@@ -14,6 +14,15 @@ s:wait(.01)
 type(s)
 s:errno()
 type(s:error())
+-- Invalid arguments
+--# setopt delimiter ';'
+for k in pairs(getmetatable(s).__index) do
+    local r, msg = pcall(s[k])
+    if not msg:match('Usage:') then
+        error("Arguments is not checked for "..k)
+    end
+end;
+--# setopt delimiter ''
 
 port = string.gsub(box.cfg.listen, '^.*:', '')
 
@@ -205,6 +214,7 @@ json.encode(socket.getaddrinfo('ya.ru', '80',
 
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 json.encode(sc:name())
+sc:name()
 sc:nonblock(true)
 sc:close()
 
@@ -285,6 +295,16 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 
+-- invalid fd
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+s:read(9)
+s:close()
+s.socket.fd = 512
+tostring(s)
+s:readable(0)
+s:writable(0)
+s = nil
+
 -- close
 port = 65454
 serv = socket('AF_INET', 'SOCK_STREAM', 'tcp')
@@ -303,12 +323,6 @@ end, serv);
 --# setopt delimiter ''
 
 s = socket.tcp_connect('127.0.0.1', port)
-s:read(9)
-sa = setmetatable({ fh = 512 }, getmetatable(s))
-tostring(sa)
-sa:readable(0)
-sa:writable(0)
-
 ch = fiber.channel()
 f = fiber.create(function() s:read(12) ch:put(true) end)
 s:close()
@@ -390,17 +404,44 @@ os.remove(path)
 
 
 server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
-
 server ~= nil
-
 fiber.sleep(.5)
+client = socket.tcp_connect('unix/', path)
+client ~= nil
+client:read(123)
+server:stop()
+os.remove(path)
+
+
+longstring = string.rep("abc", 65535)
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
 
 client = socket.tcp_connect('unix/', path)
+client:read(#longstring) == longstring
 
-client ~= nil
+client = socket.tcp_connect('unix/', path)
+client:read(#longstring + 1) == longstring
 
-client:read(123)
+client = socket.tcp_connect('unix/', path)
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+
+
+longstring = "Hello\r\n\r\nworld\n\n"
+
+client = socket.tcp_connect('unix/', path)
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+
 
 server:stop()
+os.remove(path)
 
+
+-- Test that socket is closed on GC
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+s:bind('unix/', path)
+s:listen()
+s = nil
+collectgarbage('collect')
+collectgarbage('collect')
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)

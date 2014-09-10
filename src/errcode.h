@@ -131,6 +131,9 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 79 */_(ER_ACTIVE_TRANSACTION,	2, "Operation is not permitted when there is an active transaction ") \
 	/* 80 */_(ER_NO_ACTIVE_TRANSACTION,	2, "Operation is not permitted when there is no active transaction ") \
 	/* 81 */_(ER_CROSS_ENGINE_TRANSACTION,	2, "A multi-statement transaction can not use multiple storage engines") \
+	/* 82 */_(ER_NO_SUCH_ROLE,		2, "Role '%s' is not found") \
+	/* 83 */_(ER_ROLE_EXISTS,		2, "Role '%s' already exists") \
+	/* 84 */_(ER_CREATE_ROLE,		2, "Failed to create role '%s': %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

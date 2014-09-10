@@ -48,6 +48,13 @@ if (RPMBUILD)
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
         )
 
+    add_custom_target(rpm_systemd
+        DEPENDS rpm_src
+        DEPENDS ${RPM_BUILDROOT}
+        COMMAND ${RPMBUILD} --buildroot ${RPM_BUILDROOT} --with systemd --rebuild ${PROJECT_BINARY_DIR}/tarantool-${VERSION}-${RELEASE}.src.rpm
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+        )
+
     add_custom_target(rpm_scl_full_old
         DEPENDS ${RPM_BUILDROOT}
         DEPENDS ${PROJECT_BINARY_DIR}/${CPACK_SOURCE_PACKAGE_FILE_NAME}.tar.gz

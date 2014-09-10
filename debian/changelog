@@ -1,3 +1,9 @@
+tarantool (1.6.3.183.gd309992-1) UNRELEASED; urgency=medium
+
+  * Init infrastructure for tarantool 1.6.
+
+ -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 20 Aug 2014 17:19:14 +0400
+
 tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
 
   * New Debian snapshot

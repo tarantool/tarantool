@@ -13,8 +13,13 @@
 %global __debug_install_post %{nil}
 %global __debug_package %{nil}
 
+%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7) && %{undefined _with_systemd}
+%global _with_systemd 1
+%endif
+
 %bcond_without postgresql
 %bcond_without mysql
+%bcond_with    systemd
 
 BuildRequires: readline-devel
 
@@ -32,6 +37,20 @@ BuildRequires: binutils-devel
 BuildRequires: perl-podlators
 %endif
 
+Requires(pre): /usr/sbin/useradd
+Requires(pre): /usr/sbin/groupadd
+%if %{with systemd}
+Requires(post): systemd
+Requires(preun): systemd
+Requires(postun): systemd
+BuildRequires: systemd
+%else
+Requires(post): chkconfig
+Requires(post): initscripts
+Requires(preun): chkconfig
+Requires(preun): initscripts
+%endif
+
 # Strange bug.
 # Fix according to http://www.jethrocarr.com/2012/05/23/bad-packaging-habits/
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -40,7 +59,7 @@ Name: %{?scl_prefix}tarantool
 Version: @RPM_PACKAGE_VERSION@
 Release: @RPM_PACKAGE_RELEASE@
 Group: Applications/Databases
-Summary: Tarantool - an efficient in-memory data store
+Summary: Tarantool - a NoSQL database in a Lua script
 Vendor: tarantool.org
 License: BSD
 Requires: readline
@@ -137,10 +156,16 @@ tarantool-sql-module.
     end
     local function dev_with (obj, flag)
         local status = "OFF"
-        if rpm.expand("%{with "..obj.."}") then
+        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
             status = "ON"
         end
-        return " -D"..flag.."="..status
+        return cmake_key_value(flag, status)
+    end
+    local function dev_with_kv (obj, key, value)
+        if tonumber(rpm.expand("%{with "..obj.."}")) ~= 0 then
+            return cmake_key_value(key, value)
+        end
+        return ""
     end
     local cmd = 'cmake'
     if is_rhel_old() then
@@ -165,19 +190,53 @@ tarantool-sql-module.
         .. ' %{?scl:-DENABLE_RPM_SCL=ON}'
         .. dev_with('postgresql', 'WITH_POSTGRESQL')
         .. dev_with('mysql', 'WITH_MYSQL')
+        .. dev_with('systemd', 'WITH_SYSTEMD')
+        .. dev_with_kv('systemd', 'SYSTEMD_SERVICES_INSTALL_DIR', '%{_unitdir}')
 
-    print(wrap_with_toolset(cmd))
-}
+    print(wrap_with_toolset(cmd))}
+%{lua:print(wrap_with_toolset('make %{?_smp_mflags}\n'))}
 
-%{lua:
-    print(wrap_with_toolset('make %{?_smp_mflags}\n'))
-}
 %install
-make DESTDIR=%{buildroot} install
+make VERBOSE=1 DESTDIR=%{buildroot} install
+
+%pre
+/usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
+%if 0%{?rhel} < 6
+/usr/sbin/useradd -M -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
+%else
+/usr/sbin/useradd -M -N -g tarantool -r -d /var/lib/tarantool -s /sbin/nologin\
+    -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
+%endif
 
 %post
+mkdir -m 0755 -p %{_var}/run/tarantool/
+chown tarantool:tarantool %{_var}/run/tarantool/
+mkdir -m 0755 -p %{_var}/log/tarantool/
+chown tarantool:tarantool %{_var}/log/tarantool/
+mkdir -m 0755 -p %{_var}/lib/tarantool/
+chown tarantool:tarantool %{_var}/lib/tarantool/
+mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
+mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.available/
+%if %{with systemd}
+%systemd_post tarantool.service
+%else
+chkconfig --add tarantool
+/sbin/service tarantool start
+%endif
 
 %preun
+%if %{with systemd}
+%systemd_preun tarantool.service
+%else
+/sbin/service tarantool stop
+chkconfig --del tarantool
+%endif
+
+# %%postun
+# %%if %%{with systemd}
+# %%systemd_postun_with_restart tarantool.service
+# %%endif
 
 %files
 %defattr(-,root,root,-)
@@ -188,7 +247,20 @@ make DESTDIR=%{buildroot} install
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
 "%{_datadir}/doc/tarantool/box-protocol.txt"
+
 "%{_mandir}/man1/tarantool.1.gz"
+
+"%{_sysconfdir}/sysconfig/tarantool"
+
+%if %{with systemd}
+"%{_unitdir}/tarantool.service"
+"%{_libdir}/tarantool/tarantool.init"
+%else
+"%{_sysconfdir}/init.d/tarantool"
+%endif
+
+%dir "%{_libdir}/tarantool/"
+"%{_bindir}/tarantoolctl"
 
 %files sql-module
 %defattr(-,root,root,-)
@@ -200,7 +272,6 @@ make DESTDIR=%{buildroot} install
 %if %{with postgresql}
 %files pg-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool/"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/pg.so"
 %endif
@@ -208,14 +279,12 @@ make DESTDIR=%{buildroot} install
 %if %{with mysql}
 %files mysql-module
 %defattr(-,root,root,-)
-%dir "%{_libdir}/tarantool"
 %dir "%{_libdir}/tarantool/box"
 "%{_libdir}/tarantool/box/net/mysql.so"
 %endif
 
 %files dev
 %defattr(-,root,root,-)
-%dir "%{_includedir}/tarantool"
 %dir "%{_includedir}/tarantool"
 "%{_includedir}/tarantool/config.h"
 "%{_includedir}/tarantool/lauxlib.h"

@@ -55,7 +55,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 }
 
 static void
-txn_on_yield(struct trigger * /* trigger */, void * /* event */)
+txn_on_yield_or_stop(struct trigger * /* trigger */, void * /* event */)
 {
 	txn_rollback(); /* doesn't throw */
 }
@@ -94,6 +94,8 @@ txn_replace(struct txn *txn, struct space *space,
 			if (engine_no_yield(txn->engine)) {
 				trigger_add(&fiber()->on_yield,
 					    &txn->fiber_on_yield);
+				trigger_add(&fiber()->on_stop,
+					    &txn->fiber_on_stop);
 			}
 		} else if (txn->engine != engine_id(space->engine))
 			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
@@ -129,25 +131,28 @@ txn_stmt_new(struct txn *txn)
 struct txn *
 txn_begin(bool autocommit)
 {
-	assert(! in_txn());
+	assert(! fiber_get_txn(fiber()));
 	struct txn *txn = (struct txn *)
 		region_alloc0(&fiber()->gc, sizeof(*txn));
 	rlist_create(&txn->stmts);
 	rlist_create(&txn->on_commit);
 	rlist_create(&txn->on_rollback);
 	txn->fiber_on_yield = {
-		rlist_nil, txn_on_yield, NULL, NULL
+		rlist_nil, txn_on_yield_or_stop, NULL, NULL
+	};
+	txn->fiber_on_stop = {
+		rlist_nil, txn_on_yield_or_stop, NULL, NULL
 	};
 
 	txn->autocommit = autocommit;
-	in_txn() = txn;
+	fiber_set_txn(fiber(), txn);
 	return txn;
 }
 
 struct txn *
 txn_begin_stmt(struct request *request)
 {
-	struct txn *txn = in_txn();
+	struct txn *txn = fiber_get_txn(fiber());
 	if (txn == NULL)
 		txn = txn_begin(true);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
@@ -161,19 +166,26 @@ txn_commit_stmt(struct txn *txn, struct port *port)
 	struct txn_stmt *stmt;
 	struct tuple *tuple;
 	stmt = txn_stmt(txn);
+	if (txn->autocommit)
+		txn_commit(txn);
+	/* Adding result to port must be after possible WAL write.
+	 * The reason is that any yield between port_add_tuple and port_eof
+	 * calls could lead to sending not finished response to iproto socket.
+	 */
 	if ((tuple = stmt->new_tuple) || (tuple = stmt->old_tuple))
 		port_add_tuple(port, tuple);
 	if (txn->autocommit)
-		txn_commit(txn);
+		txn_finish(txn);
 }
 
 void
 txn_commit(struct txn *txn)
 {
-	assert(txn == in_txn());
+	assert(txn == fiber_get_txn(fiber()));
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);
+		trigger_clear(&txn->fiber_on_stop);
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if ((!stmt->old_tuple && !stmt->new_tuple) ||
 		    space_is_temporary(stmt->space))
@@ -197,6 +209,12 @@ txn_commit(struct txn *txn)
 			tnt_raise(LoggedError, ER_WAL_IO);
 	}
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
+}
+
+void
+txn_finish(struct txn *txn)
+{
+	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
 			tuple_ref(stmt->old_tuple, -1);
@@ -206,7 +224,7 @@ txn_commit(struct txn *txn)
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
-	in_txn() = NULL;
+	fiber_set_txn(fiber(), NULL);
 }
 
 /**
@@ -218,7 +236,7 @@ txn_commit(struct txn *txn)
 void
 txn_rollback_stmt()
 {
-	struct txn *txn = in_txn();
+	struct txn *txn = fiber_get_txn(fiber());
 	if (txn == NULL)
 		return;
 	if (txn->autocommit)
@@ -238,7 +256,7 @@ txn_rollback_stmt()
 void
 txn_rollback()
 {
-	struct txn *txn = in_txn();
+	struct txn *txn = fiber_get_txn(fiber());
 	if (txn == NULL)
 		return;
 	struct txn_stmt *stmt;
@@ -255,10 +273,11 @@ txn_rollback()
 	}
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);
+		trigger_clear(&txn->fiber_on_stop);
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
-	in_txn() = NULL;
+	fiber_set_txn(fiber(), NULL);
 }
 
 void
@@ -276,7 +295,7 @@ int
 boxffi_txn_begin()
 {
 	try {
-		if (in_txn())
+		if (fiber_get_txn(fiber()))
 			tnt_raise(ClientError, ER_ACTIVE_TRANSACTION);
 		(void) txn_begin(false);
 	} catch (Exception  *e) {
@@ -289,15 +308,17 @@ int
 boxffi_txn_commit()
 {
 	try {
-		struct txn *txn = in_txn();
+		struct txn *txn = fiber_get_txn(fiber());
 		/**
 		 * COMMIT is like BEGIN or ROLLBACK
 		 * a "transaction-initiating statement".
 		 * Do nothing if transaction is not started,
 		 * it's the same as BEGIN + COMMIT.
 		 */
-		if (txn)
+		if (txn) {
 			txn_commit(txn);
+			txn_finish(txn);
+		}
 	} catch (Exception  *e) {
 		return -1; /* pass exception through FFI */
 	}

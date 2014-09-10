@@ -546,9 +546,9 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>integer</entry>
           <entry>5</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
-          <entry>How verbose the logging is. There are 5 log
-            verbosity classes: 1 -- ERROR, 2 -- CRITICAL, 3 --
-            WARNING, 4 -- INFO, 5 -- DEBUG. By setting log_level,
+          <entry>How verbose the logging is. There are six log
+            verbosity classes: 1 -- SYSERROR, 2 -- ERROR, 3 -- CRITICAL, 4 --
+            WARNING, 5 -- INFO, 6 -- DEBUG. By setting log_level,
             one can enable logging of all classes below or equal
             to the given level. Tarantool prints its logs to the
             standard error stream by default, but this can be
@@ -593,7 +593,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry><emphasis role="strong">yes</emphasis></entry>
           <entry>If processing a request takes longer than the
           given value (in seconds), warn about it in the log.
-          Has effect only if log_level is less than or equal to 3
+          Has effect only if log_level is less than or equal to 4
           (WARNING).</entry>
         </row>
 

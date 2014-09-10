@@ -45,6 +45,7 @@ alloc_checked()
 	if (ptrs[pos]) {
 		assert(ptrs[pos][0] == pos);
 		free_checked(ptrs[pos]);
+		ptrs[pos] = 0;
 	}
 	if (! allocating)
 		return NULL;

@@ -89,7 +89,7 @@ box.schema.create_space('tweedledee', { id = 3000 })
 -- stupid space id
 box.schema.create_space('tweedledee', { id = 'tweedledee' })
 ---
-- error: 'Tuple field 0 type does not match one required by operation: expected NUM'
+- error: Illegal parameters, options parameter 'id' should be of type number
 ...
 s:drop()
 ---
@@ -392,7 +392,8 @@ s:create_index('test', { type = 'hash', parts = {}})
 -- part count must be positive
 s:create_index('test', { type = 'hash', parts = { 1 }})
 ---
-- error: 'Can''t create or modify index 1 in space 512: part count must be positive'
+- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+    pairs'
 ...
 -- unknown field type
 s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
@@ -402,7 +403,8 @@ s:create_index('test', { type = 'hash', parts = { 1, 'nosuchtype' }})
 -- bad field no
 s:create_index('test', { type = 'hash', parts = { 'qq', 'nosuchtype' }})
 ---
-- error: 'Tuple field 6 type does not match one required by operation: expected NUM'
+- error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
+    pairs'
 ...
 -- big field no
 s:create_index('test', { type = 'hash', parts = { box.schema.FIELD_MAX, 'num' }})

@@ -88,6 +88,7 @@ struct iterator {
 	int sc_version;
 	uint32_t space_id;
 	uint32_t index_id;
+	class Index *index;
 };
 
 static inline void

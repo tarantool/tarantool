@@ -41,6 +41,8 @@ enum {
 	PRIV_W = 2,
 	/* CALL */
 	PRIV_X = 4,
+	/** Everything. */
+	PRIV_ALL = PRIV_R + PRIV_W + PRIV_X
 };
 
 /* Privilege name for error messages */
@@ -66,7 +68,7 @@ struct user {
 	/** User name - for error messages and debugging */
 	char name[BOX_NAME_MAX + 1];
 	/** Global privileges this user has on the universe. */
-	uint8_t universal_access;
+	struct access universal_access;
 	/** An id in users[] array to quickly find user */
 	uint8_t auth_token;
 };

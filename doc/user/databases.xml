@@ -106,43 +106,6 @@
     </para>
 
     <para>
-      <table>
-      <title xml:id="function-types">Possible types of the values that a function in the box library can return</title>
-      <tgroup cols="4" align="left" colsep="1" rowsep="1">
-      <thead>
-      <row><entry>General type</entry>                   <entry>Specific type</entry><entry>What Lua type() would return</entry>                                         <entry>Example</entry></row>
-      </thead>
-      <tbody>
-      <row><entry xml:id="function-type-number">scalar     </entry><entry>number</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.3.html">"number"</link></entry>   <entry>12345</entry></row>
-      <row><entry xml:id="function-type-string">scalar     </entry><entry>string</entry>      <entry><link xlink:href="http://www.lua.org/pil/2.4.html">"string"</link></entry>   <entry>'A B C'</entry></row>
-      <row><entry xml:id="function-type-nil">scalar        </entry><entry>nil</entry>         <entry><link xlink:href="http://www.lua.org/pil/2.1.html">"nil"</link></entry>      <entry>nil</entry></row>
-      <row><entry xml:id="function-type-lua-table">compound</entry><entry>Lua table</entry>   <entry><link xlink:href="http://www.lua.org/pil/2.5.html">"table"</link></entry>    <entry>table: 0x410f8b10</entry></row>
-      <row><entry xml:id="function-type-tuple">compound    </entry><entry>tuple</entry>       <entry><link xlink:href="http://www.lua.org/pil/28.1.html">"Userdata"</link></entry><entry>12345: {'A B C'}</entry></row>
-      </tbody>
-      </tgroup>                                   
-      </table>
-    A "number" is ordinarily an unsigned 64-bit integer. Tarantool will store a number
-    as a float if the value contains a decimal point. Tarantool can store signed
-    numbers, but not in indexed fields.
-    </para>
-    <para>
-    A "nil" type has only one possible value, also called "nil", but often displayed
-    as "null". Nils may be compared to values of any types with == (is-equal) or ~=
-    (is-not-equal), but other operations will not work. Nils may not be used in Lua tables;
-    the workaround is to use
-    <link linkend="yaml-null"><code>yaml.NULL</code></link>
-    or <link linkend="json-null"><code>json.NULL</code></link>
-    or <link linkend="msgpack-null"><code>msgpack.NULL</code></link>.
-    </para>
-    <para>
-      A tuple is returned in YAML format like <code>- [120, 'a', 'b', 'c']</code>.
-      A  few functions may return tables with multiple tuples.
-      A scalar may be converted to a tuple with only one field.
-      A Lua table may contain all of a tuple's fields, but not nil.
-      For more tuple examples see <code xlink:href="#box.tuple">box.tuple</code>.
-    </para>
-
-    <para>
      <table>
       <title xml:id="complexity-factors">Complexity Factors that may affect data manipulation functions in the box library</title>
       <tgroup cols="2" align="left" colsep="1" rowsep="1">
@@ -254,6 +217,10 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
 ---
 ...
 </programlisting>
+            After a space is created, usually the next step is to
+            <link linkend="box.create_index">create an index</link> for it, and
+            then it is available for insert, select, and all the other
+            <link linkend="box.space">box.space</link> functions.
             </para>
             <para>
             <bridgehead renderas="sect4">The Sophia alternative storage engine</bridgehead>
@@ -264,7 +231,7 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
             appeal to users who like to see data go directly to disk, so that recovery time might be
             shorter and database size might be larger. On the other hand, with Sophia the maximum
             number of indexes is 1, and the maximum number of fields per index is 1.
-            For architectural explanations and benchmarks, see sphia.org.
+            For architectural explanations and benchmarks, see <link xlink:href="http://sphia.org">sphia.org</link>.
             </para>
         </listitem>
     </varlistentry>
@@ -369,6 +336,9 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
             <para>
               Possible errors: If a tuple with the same primary key already exists, returns ER_TUPLE_FOUND.
             </para>
+            <para>
+              Example: <code>box.space.tester:insert{5000,'tuple number five thousand'}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -380,14 +350,17 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
         </term>
         <listitem>
             <para>
-                Search for a tuple in the given space.
+                Search for a tuple or a set of tuples in the given space.
             </para>
             <para>
                  Parameters: (type = tuple, as a Lua table) <code>field-value(s)</code>&mdash;
                  = values to be matched against the index key, which may be multi-part.
             </para>
             <para>
-               Returns: (type = tuple set, as a Lua table) the selected tuple.
+               Returns: (type = tuple set, as a Lua table) the tuples whose primary-key fields
+               are equal to the passed field-values. If the number of passed field-values is
+               less than the number of fields in the primary key, then only the passed field-values are
+               compared, so <code>select{1,2}</code> will match a tuple whose primary key  is {1,2,3}.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -396,28 +369,50 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
                Possible Errors: No such space; wrong type.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>box.space.tester:insert{101, 'test#1', 'my first tuple'}</userinput>
----
-- [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.tester:select{101}</userinput>
----
-- - [101, 'test#1', 'my first tuple']
-...
-tarantool> <userinput>box.space.tester:insert{105, 'test#2', 'first_name', 'last_name'}</userinput>
----
-- [105, 'test#2', 'first_name', 'last_name']
-...
-tarantool> <userinput>table_of_tuples = box.space.tester:select{105}</userinput>
+tarantool&gt; <userinput>s = box.schema.create_space('tmp', {temporary=true})</userinput>
 ---
 ...
-tarantool> <userinput>table_of_tuples[1]</userinput>
+tarantool&gt; <userinput> s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})</userinput>
 ---
-- [105, 'test#2', 'first_name', 'last_name']
 ...
-</programlisting>
-            For examples of complex <code>select</code>s, which can return multiple tuples
-            via secondary indexes, see the later section <olink targetptr="box.index.iterator">box.space.space-name.index.index-name]:select</olink>.
+tarantool&gt; <userinput> s:insert{1,'A'}</userinput>
+---
+- [1, 'A']
+...
+tarantool&gt; <userinput> s:insert{1,'B'}</userinput>
+---
+- [1, 'B']
+...
+tarantool&gt; <userinput> s:insert{1,'C'}</userinput>
+---
+- [1, 'C']
+...
+tarantool&gt; <userinput> s:insert{2,'D'}</userinput>
+---
+- [2, 'D']
+...
+tarantool&gt; <userinput> s:select{1,'B'} -- must equal both primary-key fields</userinput>
+---
+- - [1, 'B']
+...
+
+tarantool&gt; <userinput> s:select{1}     -- must equal only one primary-key field</userinput>
+---
+- - [1, 'A']
+  - [1, 'B']
+  - [1, 'C']
+...
+tarantool&gt; <userinput> s:select{}      -- must equal 0 fields, so returns all tuples</userinput>
+---
+- - [1, 'A']
+  - [1, 'B']
+  - [1, 'C']
+  - [2, 'D']
+...</programlisting>
+            For examples of complex <code>select</code>s, where one can specify which
+            index to search and what condition to use (for example "greater than"
+            instead of "equal to") and how many tuples to return, see the later section
+            <link linkend="box.index.iterator.select">box.space.space-name[.index.index-name]:select</link>.
             </para>
         </listitem>
     </varlistentry>
@@ -453,6 +448,9 @@ tarantool> <userinput>table_of_tuples[1]</userinput>
                <code>box.space.tester:select{1}[1]</code>, and may serve as a convenient
                shorthand.
              </para>
+            <para>
+              Example: <code>box.space.tester:get{1}</code>.
+            </para>
         </listitem>
     </varlistentry>
 
@@ -630,6 +628,9 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
             </para>
             <para>
               Complexity Factors: Index size, Index type, Number of indexes accessed, WAL settings.
+            </para>
+            <para>
+              Example: <code>box.space.tester:replace{5000,'New value'}</code>.
             </para>
         </listitem>
     </varlistentry>
@@ -1442,8 +1443,8 @@ console.delimiter('')!
 
     <varlistentry>
      <term>
-             <emphasis role="lua" xml:id="box.index.iterator" xreflabel="box.index.select(type, ...)">
-            box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select({<replaceable>{fields}, {parameters}]</replaceable>)</emphasis>
+             <emphasis role="lua" xml:id="box.index.iterator.select" xreflabel="box.index.select(type, ...)">
+             box.space.<replaceable>space-name</replaceable>[.index.<replaceable>index-name</replaceable>]:select({<replaceable>[field-value [, field-value ...]]</replaceable>}, {<replaceable>[option [, option ...]]</replaceable>})</emphasis>
         </term>
         <listitem>
             <para>
@@ -1451,6 +1452,12 @@ console.delimiter('')!
              which goes via a particular index and can make use of additional parameters that
              specify the iterator type, and the limit (that is, the maximum number of tuples to
              return) and the offset (that is, which tuple to start with in the list).
+            </para>
+            <para>
+             Parameters: <code>field-value(s)</code> = values to be matched against the index key.
+             <code>option(s)</code> = any or all of <code>iterator=<replaceable>iterator-type</replaceable></code>,
+             <code>limit=<replaceable>maximum-number-of-tuples</replaceable></code>,
+             <code>offset=<replaceable>start-tuple-number</replaceable></code>.
             </para>
             <para>
               Returns: (type = tuple set, as a Lua table) the tuple or tuples that match the field values.
@@ -1469,7 +1476,7 @@ box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts
 box.space.tester:insert{1,'X','Row with field[2]=X'}
 box.space.tester:insert{2,'Y','Row with field[2]=Y'}
 box.space.tester:insert{3,'Z','Row with field[2]=Z'}
-box.space.tester.index.secondary:select({'X'}, {iterator = 'GT'})
+box.space.tester.index.secondary:select({'X'}, {iterator = 'GT', limit = 1000})
 </programlisting>
 The result will be a table of tuples and will look like this:
 <programlisting>
@@ -2687,291 +2694,6 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 </para>
 </section>
 
-<section xml:id="sp-shard">
-    <title>Package <code>shard</code></title>
-
-<para>
-With <link xlink:href="https://en.wikipedia.org/wiki/Sharding">Sharding</link>,
-the tuples of a tuple set are distributed
-to multiple nodes, with a Tarantool database server on each node. With this arrangement,
-each server is handling only a subset of the total data, so larger loads can be
-handled by simply adding more computers to a network.
-</para>
-<para>
-The Tarantool shard package has facilities
-for creating or redistributing or cleaning up shards, as well as analogues for the
-data-manipulation functions of the box library (select, insert, replace, update, delete).
-The important new concept is that there must be a function which, given a key value,
-returns a Shard Identification Number so that the data-manipulation functions will know
-which location is relevant.
-In fact there must be two such functions, one for giving Shard Identification Number
-according to the current algorithm, and one for giving Shard Identification Number
-according to a previous algorithm. The former is called [curr], the latter is called [prev].
-When the algorithm has to be changed because new nodes are added or because the load
-must be balanced differently, the [curr] function becomes the [prev] function, a
-new [curr] function is introduced, and a function named <code>shard.copy()</code> redistributes
-all the tuples -- a process called "resharding".
-</para>
-<para>
-The shard package can be installed by
-putting a directive at the start of an init.lua file:<programlisting>
-require 'shard'</programlisting>which brings in all the required functionality
-from a program file named shard.lua.
-</para>
-<para>
-For the original package description in Russian, see
-<link xlink:href="https://github.com/tarantool/shard/blob/master/README.md">
-https://github.com/tarantool/shard/blob/master/README.md</link>.
-</para>
-<variablelist>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.schema.config (<replaceable>{ key = value, ... }</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function configures or reconfigures the shard-host or proxy-host.
-        The parameters which are indicated by the "key = value" pairs are:
- <code>
-    * shard list - a list of shards and their types (see "List of shards", below)
-    * me -   each node has to know "which shard in the list is me?" so this is the node's number in the list
-             (or 0 if the shard is a proxy)
-    * mode - mode for the current shard (either 'ro' or 'rw')
-    * curr - the current function that returns, for a given space and key, the Shard Number.
-    * prev - the previous function that returns, for a given space and key, the Shard Number.
-</code>
-        The function reconfigures only those parameters that are transmitted during the call.
-        Other parameters' values remain the same.
-        </para>
-        <para>
-        The SHARD LIST is a Lua table, which is an array of arrays.
-        Each entry in the table describes one shard, with the following fields :
-<code>
-        1. Shard operation mode. Either 'ro' = read only, or 'rw' = read / write.
-        2. Shard weight (a number between 0 and 1000 )
-        3. Shard connection parameters (the host and port of the node that handles the shard)
-        ?. Implicitly, a Shard Number.
-</code>
-        </para>
-        <para>
-        Notes:
-        1. If there are multiple descriptions of the same shard, only one of them may have shard operation mode = 'rw'.
-        2. Operations which modify data must always go to hosts with shard operation mode = 'rw'.
-        Operations which do not modify data may go to either 'ro' or 'rw' shards, depending on the semantics of the call.
-        </para>
-        <para>
-        The <code>shard.schema.config()</code> function must be performed on each node,
-        before creating a sharded database, and whenever the configuration changes.
-        Care must be taken that the nodes' configurations are consistent with each other.
-        The administrator is responsible for determining the values that [curr] and [prev]
-        functions should return -- a simple example would be "if key is less than a million
-        then return Shard Identification Number = 1, else return Shard Identification Number = 2".
-        </para>
-        <para>
-         Given this configuration information, subsequent <code>shard</code> functions will all
-        know what to do. Simplifying slightly, a subroutine in the shard functions will:
-<programlisting>
-Get the space number and the primary-key value from the function's parameters.
-Pass the space number and the primary-key value to [curr] or [prev] to get a Shard Identification Number.
-If the number is equal to "me", perform the function directly because this is the responsible node.
-Otherwise, use the box.net package to pass the function to the host and port of
-the node that, according to the Shard List, is responsible for handling this tuple.
-</programlisting>
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.copy()</code></emphasis></term>
-        <listitem>
-        <para>
-        This function reads all tuples, if necessary copying them to new shards.
-        </para>
-        <para>
-        Start conditions:
-        The 'me' shard, that is, the shard which this node is responsible for, must be marked as 'rw'.
-        The 'me' shard must have both a [curr] and a [prev] function.
-        </para>
-        <para>
-        For each space, for each tuple in the space: if the [prev] function says that the
-        tuple belongs in the 'me' node, and the [curr] function says that the tuple belongs
-        in a different node, then copy it by sending an "insert" request to the different node.
-        This is actually an "insert nothrow", that is, an insert without an error message,
-        because the insert is simply not performed if the different node already has a tuple
-        with the same primary key. The copied tuple is not deleted on the 'me' node at this stage;
-        that is a separate job which will be handled by a separate function, <code>shard.cleanup()</code>.
-        </para>
-        <para>
-        The function returns a list of tuples. Each tuple contains two fields:
-        1. ID Number of the space which was worked on
-        2. Count of tuples which are copied into the space (may be 0)
-        </para>
-        <para>
-        In order to perform resharding, the administrator must:
-<code>
-* For all hosts ,determine the functions [curr] and [prev]
- * Update the Shard List with shard.config
- * Run shard.copy() on all hosts -- this will find tuples
-  on nodes according to [prev], and move them to new nodes
-  according to [curr].
-* Delete the [prev] function on all shards.
-* Run shard.cleanup() on all hosts, to remove outdated data.
-</code>
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.cleanup()</code></emphasis></term>
-        <listitem>
-        <para>
-        This function reads all tuples, if necessary deleting tuples which don't fit.
-        </para>
-        <para>
-        Start conditions :
-        current shard marked as 'rw' (read/write)
-        shard specifies only one function - [curr], not [prev] (that is, resharding mode is disabled)
-        </para>
-        <para>
-        This function goes through all the Tarantool spaces and,
-        for each tuple in a space, invokes the [curr] function.
-        If the number returned by [curr] is not equal to the actual number that the shard is in (known as [me]),
-        the tuple is deleted.
-        </para>
-        <para>
-        The function returns a list of tuples. Each tuple contains two fields :
-        1. ID Number of the space which was worked on,
-        2. Count of tuples which are deleted from the space.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.select (<replaceable>space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function performs a query using a key. A key may have multiple fields.
-        </para>
-        <para>
-        If <code>shard.select()</code> is called while a resharding is taking place,
-        and the tuple is not found on the node which the [curr] function identifies,
-        then the request is forwarded to the node which the [prev] function identifies.
-        </para>
-        <para>
-        Notes:
-        if the key is multi-field key then all fields must be present -- sampling multiple nodes with partially-specified keys is not possible.
-        </para>
-        <para>
-        The <code>shard.select()</code> function is the only function which can access hosts that are marked "read only".
-        The host selection algorithm ([curr] or [prev]) may choose among multiple possible hosts that all contain
-        copies of the specific tuple. Usually the algorithm will choose the shard whose 'weight' field in the shard
-        list has the greatest value.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.eselect (<replaceable>mode, space, key [, subkey, ...]</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function is the same as <code>shard.select()</code> but has an additional parameter, "mode",
-        to indicate which hosts it is preferable to sample.
-        </para>
-        <para>
-        The mode parameter can have one of the following values:
-        'ro' (means that it is preferable to sample the hosts marked as "read only", but if there are none, then sampling an 'rw' node is okay),
-        'rw' (means that it is necessary to sample only the hosts marked as " read-write").
-        Thus, "call <code>shard.eselect('ro', ...)</code>" is the same as "call <code>shard.select(...)</code>".
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.insert (<replaceable>space, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This functions inserts a specified tuple into a given space.
-        </para>
-        <para>
-        The essential operation is:
-<code>
-* The local node -- call it Node#1 -- uses [curr] to determine the shard to go to,
-  and sends the request to the different node, call it Node#2.
-* Node#1 returns a duplicate-key error if the tuple already exists in its space.
-* If there is a [prev] function on the different node, then the different node
-  uses [prev] to determine another node to go to, and sends the request to the
-  other node, call it Node#3.
-* If Node#3 finds the row in its space, then that is an error, which eventually
-  gets returned to Node#1 and the user sees a duplicate-key error.
- </code>
-        This mechanism is a bit complex, but all the user has to know is:
-        if there's a duplicate, even if sharding or resharding is taking place when
-        the insert request happens, no problem -- Tarantool will detect the duplicate.
-</para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code><replaceable>shard.replace (space, ...)</replaceable></code></emphasis></term>
-        <listitem>
-        <para>
-        This function inserts, or possibly replaces, a tuple.
-        </para>
-        <para>
-        The initial part of the operation is the same as for <code>shard.insert()</code>,
-        but <code>shard.replace()</code> is simpler because it does not have to search for
-        duplicates.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.delete (<replaceable>space, key [, subkey, ...])</replaceable></code></emphasis></term>
-        <listitem>
-        <para>
-        This function deletes a tuple.
-        </para>
-        <para>
-        Control is transferred to the node which is responsible according to [curr].
-        That different node will delete the tuple from its own tuple set,
-        and also -- if that different node has a [prev] function in its Shard List --
-        will pass the delete request on to whatever node the [prev] function identifies.
-        </para>
-        <para>
-        Returns: exists_from_curr or exists_from_prev.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.update (<replaceable>space, key, [subkey, ...] format, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function updates a tuple.
-        </para>
-        <para>
-        Control is transferred to the node which is responsible according to [curr].
-        If the tuple is present on that different node, the tuple is updated
-        and the new updated value is returned.
-        Otherwise, if that different node has a [prev] function in its Shard List,
-        then the request is passed on to whatever node the [prev[ function identifies,
-        and that node actually performs an insert(), then returns what looks like
-        an updated value.
-        </para>
-        <para>
-        Like <code>shard.insert()</code>, the operations for <code>shard.update()</code> look a bit
-        complex. But, again, the user only has to know that the <code>shard</code> package
-        has routines which ensure that the result is an updated tuple, even though
-        there are several remotely-possible scenarios which must be taken care of.
-        </para>
-        </listitem>
-    </varlistentry>
-    <varlistentry>
-        <term><emphasis role="lua"><code>shard.call (<replaceable>mode, procname, ...</replaceable>)</code></emphasis></term>
-        <listitem>
-        <para>
-        This function calls a remote function.
-        </para>
-        <para>
-        The host which receives <code>shard.call()</code> selects a random node from
-        the Shard List -- preferably a read-only node if the mode parameter says 'ro'.
-        The remote node will perform the function and return its result to the original
-        node, which will return it to the user.
-        </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-</section>
 
 <section xml:id="administrative-requests">
   <title>Administrative requests</title>

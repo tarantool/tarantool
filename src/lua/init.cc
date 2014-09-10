@@ -73,15 +73,16 @@ extern char uuid_lua[],
 	digest_lua[],
 	init_lua[],
 	log_lua[],
+	bsdsocket_lua[],
 	console_lua[],
 	box_net_box_lua[],
 	help_lua[],
+	help_en_US_lua[],
 	tap_lua[],
 	fio_lua[];
 
 static const char *lua_sources[] = {
 	init_lua,
-	help_lua,
 	NULL
 };
 
@@ -91,10 +92,13 @@ static const char *lua_modules[] = {
 	"digest", digest_lua,
 	"uuid", uuid_lua,
 	"log", log_lua,
+	"socket", bsdsocket_lua,
 	"net.box", box_net_box_lua,
 	"console", console_lua,
 	"tap", tap_lua,
 	"fio", fio_lua,
+	"help.en_US", help_en_US_lua,
+	"help", help_lua,
 	NULL
 };
 
@@ -233,6 +237,8 @@ tarantool_lua_setpaths(struct lua_State *L)
 	const char *home = getenv("HOME");
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
+	lua_pushliteral(L, "./?.lua;");
+	lua_pushliteral(L, "./?/init.lua;");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/share/lua/5.1/?.lua;");
@@ -248,6 +254,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_concat(L, lua_gettop(L) - top);
 	lua_setfield(L, top, "path");
 
+	lua_pushliteral(L, "./?.so;");
 	if (home != NULL) {
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?.so;");

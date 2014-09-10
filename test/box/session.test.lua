@@ -5,6 +5,7 @@ space = box.schema.create_space('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
 session.exists(session.id())
+session.peer(session.id())
 session.exists()
 session.exists(1, 2, 3)
 session.exists(1234567890)

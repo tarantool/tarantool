@@ -46,6 +46,17 @@ type(s:error())
 ---
 - nil
 ...
+-- Invalid arguments
+--# setopt delimiter ';'
+for k in pairs(getmetatable(s).__index) do
+    local r, msg = pcall(s[k])
+    if not msg:match('Usage:') then
+        error("Arguments is not checked for "..k)
+    end
+end;
+---
+...
+--# setopt delimiter ''
 port = string.gsub(box.cfg.listen, '^.*:', '')
 ---
 ...
@@ -254,8 +265,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: '[string "-- bsdsocket.lua (internal file)..."]:326: Socket option SO_ACCEPTCONN
-    is read only'
+- error: 'builtin/socket.lua:339: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -641,6 +651,14 @@ json.encode(sc:name())
 ---
 - '{"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}'
 ...
+sc:name()
+---
+- host: 0.0.0.0
+  family: AF_INET
+  type: SOCK_STREAM
+  protocol: tcp
+  port: 0
+...
 sc:nonblock(true)
 ---
 - true
@@ -905,6 +923,36 @@ socket.tcp_connect('unix/', path), errno() == errno.ENOENT
 - null
 - true
 ...
+-- invalid fd
+s = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+---
+...
+s:read(9)
+---
+- null
+...
+s:close()
+---
+- true
+...
+s.socket.fd = 512
+---
+...
+tostring(s)
+---
+- fd 512
+...
+s:readable(0)
+---
+- true
+...
+s:writable(0)
+---
+- true
+...
+s = nil
+---
+...
 -- close
 port = 65454
 ---
@@ -938,25 +986,6 @@ end, serv);
 --# setopt delimiter ''
 s = socket.tcp_connect('127.0.0.1', port)
 ---
-...
-s:read(9)
----
-- Tarantool
-...
-sa = setmetatable({ fh = 512 }, getmetatable(s))
----
-...
-tostring(sa)
----
-- fd 512
-...
-sa:readable(0)
----
-- true
-...
-sa:writable(0)
----
-- true
 ...
 ch = fiber.channel()
 ---
@@ -1200,6 +1229,83 @@ client:read(123)
 ...
 server:stop()
 ---
+- true
+...
+os.remove(path)
+---
+- true
+...
+longstring = string.rep("abc", 65535)
+---
+...
+server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring + 1) == longstring
+---
+- true
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
+---
+- true
+...
+longstring = "Hello\r\n\r\nworld\n\n"
+---
+...
+client = socket.tcp_connect('unix/', path)
+---
+...
+client:read{ line = { "\n\n", "\r\n\r\n" } }
+---
+- "Hello\r\n\r\n"
+...
+server:stop()
+---
+- true
+...
+os.remove(path)
+---
+- true
+...
+-- Test that socket is closed on GC
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:listen()
+---
+- true
+...
+s = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+collectgarbage('collect')
+---
+- 0
+...
+socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
+---
+- null
 - true
 ...
 os.remove(path)

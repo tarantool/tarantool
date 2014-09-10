@@ -62,6 +62,9 @@
 #define PRIV_OBJECT_ID   3
 #define PRIV_ACCESS      4
 
+/** _func columns */
+#define FUNC_SETUID      3
+
 /* {{{ Auxiliary functions and methods. */
 
 void
@@ -1162,8 +1165,23 @@ user_has_data(uint32_t uid)
 void
 user_fill_auth_data(struct user *user, const char *auth_data)
 {
-	if (mp_typeof(*auth_data) != MP_MAP)
+	uint8_t type = mp_typeof(*auth_data);
+	if (type == MP_ARRAY || type == MP_NIL) {
+		/*
+		 * Nothing useful.
+		 * MP_ARRAY is a special case since Lua arrays are
+		 * indistinguishable from tables, so an empty
+		 * table may well be encoded as an msgpack array.
+		 * Treat as no data.
+		 */
 		return;
+	}
+	if (mp_typeof(*auth_data) != MP_MAP) {
+		/** Prevent users from making silly mistakes */
+		tnt_raise(ClientError, ER_CREATE_USER,
+			  user->name, "invalid password format, "
+			  "use box.schema.user.passwd() to reset password");
+	}
 	uint32_t mech_count = mp_decode_map(&auth_data);
 	for (uint32_t i = 0; i < mech_count; i++) {
 		if (mp_typeof(*auth_data) != MP_STR) {
@@ -1203,6 +1221,10 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 		tnt_raise(ClientError, ER_CREATE_USER,
 			  name, "user name is too long");
 	}
+	if (user->type != SC_ROLE && user->type != SC_USER) {
+		tnt_raise(ClientError, ER_CREATE_USER,
+			  user->name, "unknown user type");
+	}
 	identifier_check(name);
 	access_check_ddl(user->owner);
 	/*
@@ -1214,7 +1236,7 @@ user_create_from_tuple(struct user *user, struct tuple *tuple)
 	if (tuple_field_count(tuple) > AUTH_MECH_LIST) {
 		const char *auth_data = tuple_field(tuple, AUTH_MECH_LIST);
 		if (user->type == SC_ROLE && strlen(auth_data)) {
-			tnt_raise(ClientError, ER_CREATE_USER,
+			tnt_raise(ClientError, ER_CREATE_ROLE, user->name,
 				  "authentication data can not be set for "
 				  "a role");
 		}
@@ -1237,7 +1259,7 @@ static struct trigger drop_user_trigger =
 	{ rlist_nil, user_cache_remove_user, NULL, NULL };
 
 static void
-user_cache_replace_user(struct trigger * /* trigger */, void *event)
+user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_stmt(txn);
@@ -1247,7 +1269,7 @@ user_cache_replace_user(struct trigger * /* trigger */, void *event)
 }
 
 static struct trigger modify_user_trigger =
-	{ rlist_nil, user_cache_replace_user, NULL, NULL };
+	{ rlist_nil, user_cache_alter_user, NULL, NULL };
 
 /**
  * A trigger invoked on replace in the user table.
@@ -1305,6 +1327,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 {
 	func->fid = tuple_field_u32(tuple, ID);
 	func->uid = tuple_field_u32(tuple, UID);
+	func->auth_token = user_cache_find(func->uid)->auth_token;
+	func->setuid = false;
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(func->name)) {
@@ -1314,6 +1338,8 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 	snprintf(func->name, sizeof(func->name), "%s", name);
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));
+	if (tuple_field_count(tuple) > FUNC_SETUID)
+		func->setuid = tuple_field_u32(tuple, FUNC_SETUID);
 }
 
 /** Remove a function from function cache */
@@ -1467,27 +1493,30 @@ grant_or_revoke(struct priv_def *priv)
 	struct user *grantee = user_cache_find(priv->grantee_id);
 	if (grantee == NULL)
 		return;
+	struct access *access = NULL;
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
-		grantee->universal_access = priv->access;
+		access = &grantee->universal_access;
 		break;
 	case SC_SPACE:
 	{
 		struct space *space = space_by_id(priv->object_id);
 		if (space)
-			space->access[grantee->auth_token] = priv->access;
+			access = &space->access[grantee->auth_token];
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func_def *func = func_by_id(priv->object_id);
 		if (func)
-			func->access[grantee->auth_token] = priv->access;
+			access = &func->access[grantee->auth_token];
 		break;
 	}
 	default:
 		break;
 	}
+	if (access)
+		access->granted = access->effective = priv->access;
 }
 
 /** A trigger called on rollback of grant, or on commit of revoke. */

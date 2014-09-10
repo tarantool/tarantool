@@ -911,3 +911,48 @@ gen(param, state)
 space:drop()
 ---
 ...
+-------------------------------------------------------------------------------
+-- Iterator: https://github.com/tarantool/tarantool/issues/464
+-- Iterator safety after changing schema
+-------------------------------------------------------------------------------
+space = box.schema.create_space('test', {temporary=true})
+---
+...
+space:create_index('primary', {type='HASH',unique=true})
+---
+...
+space:create_index('t1', {type='TREE',unique=true})
+---
+...
+space:create_index('t2', {type='TREE',unique=true})
+---
+...
+box.space.test:insert{0}
+---
+- [0]
+...
+box.space.test:insert{1}
+---
+- [1]
+...
+gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
+---
+...
+print(gen(param, state))
+---
+...
+id = space.index.t1.id
+---
+...
+box.schema.index.drop(space.id, id)
+---
+...
+box.schema.index.alter(space.id, space.index.t2.id, {id = id})
+---
+...
+print(gen(param, state))
+---
+...
+space:drop()
+---
+...

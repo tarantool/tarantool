@@ -51,8 +51,18 @@
 #include "box/schema.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
-extern char session_lua[], schema_lua[], load_cfg_lua[];
-static const char *lua_sources[] = { session_lua, schema_lua, load_cfg_lua, NULL };
+extern char session_lua[],
+	schema_lua[],
+	load_cfg_lua[],
+	snapshot_daemon_lua[];
+
+static const char *lua_sources[] = {
+	session_lua,
+	schema_lua,
+	snapshot_daemon_lua,
+	load_cfg_lua,
+	NULL
+};
 
 /*
  * Functions, exported in box_lua.h should have prefix
@@ -449,26 +459,74 @@ lbox_call_loadproc(struct lua_State *L)
 	return box_lua_find(L, name, name + name_len);
 }
 
-static inline void
-access_check_func(const char *name, uint32_t name_len,
-		  struct user *user, uint8_t access)
+/**
+ * Check access to a function and change the current
+ * user id if the function is a set-definer-user-id one.
+ * The original user is restored in the destructor.
+ */
+struct SetuidGuard
 {
-	 /*
-	  * No special check for ADMIN user is necessary
-	  * since ADMIN has universal access.
-	  */
-	if (access == 0)
-		return;
+	/** True if the function was set-user-id one. */
+	bool setuid;
+	/** Original authentication token, only set if setuid = true. */
+	uint8_t orig_auth_token;
+	/** Original user id, only set if setuid = true. */
+	uint32_t orig_uid;
 
+	inline SetuidGuard(const char *name, uint32_t name_len,
+			   struct user *user, uint8_t access);
+	inline ~SetuidGuard();
+};
+
+SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
+			 struct user *user, uint8_t access)
+	:setuid(false)
+{
+	/*
+	 * If the user has universal access, don't bother with setuid.
+	 * No special check for ADMIN user is necessary
+	 * since ADMIN has universal access.
+	 */
+	if (user->universal_access.effective & PRIV_ALL)
+		return;
+	access &= ~user->universal_access.effective;
+	/*
+	 * We need to look up the function by name even if
+	 * the user has access to it, since it could require
+	 * a set of other user id.
+	 */
 	struct func_def *func = func_by_name(name, name_len);
+	if (func == NULL && access == 0) {
+		/**
+		 * Well, the function is not explicitly defined,
+		 * so it's obviously not a setuid one. Wasted
+		 * cycles on look up while the user had universal
+		 * access :(
+		 */
+		return;
+	}
 	if (func == NULL || (func->uid != user->uid &&
-			     access & ~func->access[user->auth_token])) {
+	     access & ~func->access[user->auth_token].effective)) {
+		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
 			  priv_name(access), user->name, name_buf);
 	}
+	if (func->setuid) {
+		/** Remember and change the current user id. */
+		setuid = func->setuid;
+		orig_auth_token = user->auth_token;
+		orig_uid = user->uid;
+		session_set_user(session(), func->auth_token, func->uid);
+	}
+}
+
+SetuidGuard::~SetuidGuard()
+{
+	if (setuid)
+		session_set_user(session(), orig_auth_token, orig_uid);
 }
 
 /**
@@ -484,17 +542,16 @@ box_lua_call(struct request *request, struct port *port)
 	const char *name = request->key;
 	uint32_t name_len = mp_decode_strl(&name);
 
-	uint8_t access = PRIV_X & ~user->universal_access;
-
 	/* Try to find a function by name */
 	int oc = box_lua_find(L, name, name + name_len);
 	/**
-	 * Check access to the function. Sic: the order
+	 * Check access to the function and optionally change
+	 * execution time user id (set user id). Sic: the order
 	 * is important, as is described in
 	 * https://github.com/tarantool/tarantool/issues/300
 	 * - if a function does not exist, say it first.
 	 */
-	access_check_func(name, name_len, user, access);
+	SetuidGuard setuid(name, name_len, user, PRIV_X);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

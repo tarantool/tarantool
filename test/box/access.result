@@ -343,51 +343,72 @@ id = box.space._user.index.name:get{'user'}[1]
 box.schema.user.grant('user', 'read,write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 1]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - []
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 2]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.drop('user')
 ---
 ...
-box.space._priv.index.owner:select{id}
+box.space._priv:select{id}
 ---
 - []
+...
+-- -----------------------------------------------------------
+-- Be a bit more rigorous in what is accepted in space _user
+-- -----------------------------------------------------------
+box.space._user:insert{10, 1, 'name'}
+---
+- error: Field 3 was not found in the tuple
+...
+box.space._user:insert{10, 1, 'name', 'strange-object-type'}
+---
+- error: 'Failed to create user ''name'': unknown user type'
+...
+box.space._user:insert{10, 1, 'name', 'user', 'password'}
+---
+- error: 'Failed to create user ''name'': invalid password format, use box.schema.user.passwd()
+    to reset password'
+...
+box.space._user:insert{10, 1, 'name', 'role', 'password'}
+---
+- error: 'Failed to create role ''name'': authentication data can not be set for a
+    role'
 ...
 session = nil
 ---

@@ -80,9 +80,9 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       The
       CALL request packet contains the command code for CALL (22), the name
       of a procedure to be called, and a tuple for procedure
-      arguments. Currently, Tarantool tuples are type-agnostic,
-      thus each field of the tuple is passed into the function
-      as an argument of type <quote>string</quote>. For example:
+      arguments. Fields of the tuple are passed into the function
+      as arguments of type <quote>string</quote> or <quote>number</quote>
+      or <quote>boolean</quote>.. For example:
 <programlisting><computeroutput>kostja@atlas:~<prompt>$</prompt> <userinput>cat arg.lua</userinput>
 function f1(a)
     local s = a
@@ -110,7 +110,7 @@ tarantool> <userinput>f1(1234)</userinput>
 ...</computeroutput></programlisting>
       In the above example, the function finds out the type of the
       argument (Lua 'string' or 'number') at runtime, gets the byte codes
-      if it's a string, and returns the type plus the string or number.
+      if it's a string, and returns the type plus the value.
     </para>
     <para>
       In addition to conventional method invocation,
@@ -1885,7 +1885,7 @@ end
         <listitem>
             <para>
                 Accept a new client connection and create a new connected socket.
-                It is good practice to set the socket's blocking mode explicitly affer accepting.
+                It is good practice to set the socket's blocking mode explicitly after accepting.
             </para>
             <para>
                Returns: new socket if success, null if error.
@@ -2103,6 +2103,479 @@ end
 
 </section>
 
+<section xml:id="sp-fio">
+<title>package <code>fio -- Cooperative File I/O</code></title>
+  <para>
+    Tarantool supports file input/output with an API that is similar to POSIX syscalls.
+    All operations are performed asynchronously.
+    Multiple fibers can access the same file simultaneously.
+  </para>
+  <variablelist>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.pathjoin(<replaceable>partial-string [, partial-string ...]</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Concatenate partial strings, separated by '/', to form a path name.
+      </para>
+      <para>
+        Parameters: (type = string) one or more strings to be concatenated.
+      </para>
+      <para>
+        Returns: path name
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.pathjoin('/etc', 'default', 'myfile')</userinput>
+---
+- /etc/default/myfile
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua">fio.basename(<replaceable>path-name</replaceable>[, <replaceable>suffix</replaceable>])</emphasis></term>
+    <listitem>
+      <para>
+        Given a full path name, remove all but the final part (the file name).
+        Also remove the suffix, if it is passed.
+      </para>
+      <para>
+        Parameters: (type = string) path name, (type = string) suffix.
+      </para>
+      <para>
+        Returns: file name.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.basename('/path/to/my.lua', '.lua')</userinput>
+---
+- my
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.umask(<replaceable>mask-bits</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Set the mask bits used when creating files or directories. For a detailed description type "man 2 umask".
+      </para>
+      <para>
+        Parameters: (type = number) mask bits.
+      </para>
+      <para>
+        Returns: (type = number) previous mask bits.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.umask(tonumber('755', 8)) -- pass 755 octal</userinput>
+---
+- 493
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.lstat or fio.stat(<replaceable>path-name</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Returns information about a file object.
+        For details type "man 2 lstat" or "man 2 stat".
+      </para>
+      <para>
+        Parameters: (string) path-name of file.
+      </para>
+      <para>
+        Returns: (type = table) fields which describe the file's block size, creation time, size, and other attributes.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.lstat('/tarantool-master/src/tarantool')</userinput>
+---
+- inode: 739885
+  rdev: 0
+  size: 4516886
+  atime: 1409423158
+  mode: 33277
+  mtime: 1409419499
+  nlink: 1
+  uid: 1000
+  blksize: 4096
+  gid: 1000
+  ctime: 1409419499
+  dev: 2049
+  blocks: 8848
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.mkdir or fio.rmdir(<replaceable>path-name</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Create or delete a directory. For details type "man 2 mkdir" or "man 2 rmdir".
+      </para>
+      <para>
+        Parameters: (type = string) path of directory.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.mkdir('/etc')</userinput>
+---
+- false
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.glob(<replaceable>path-name</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Return a list of files that match an input string.
+        The list is constructed with a single flag that controls the behavior of the function: GLOB_NOESCAPE.
+        For details type "man 3 glob".
+      </para>
+      <para>
+        Parameters: (type = string) path-name, which may contain wildcard characters.
+      </para>
+      <para>
+        Returns: (type = table) list of files whose names match the input string, or nil if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.glob('/etc/x*')</userinput>
+---
+- - /etc/xdg
+  - /etc/xml
+  - /etc/xul-ext
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua">fio.link or fio.symlink or fio.readlink or fio.unlink(<replaceable>path-name</replaceable> [, <replaceable>path-name</replaceable>])</emphasis></term>
+    <listitem>
+      <para>
+        Functions to create and delete links.
+        For details type "man readlink", "man 2 link", "man 2 symlink", "man 2 unlink"..
+      </para>
+      <para>
+        Parameters: (type = string) existing file name, (type = string) linked name.
+      </para>
+      <para>
+        Returns: <code>fio.link</code> and <code>fio.symlink</code> and <code>fio.unlink</code> return true if success, false if failure. <code>fio.readlink</code> returns the link value if success, nil if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.link('/home/username/tmp.txt', '/home/username/tmp.txt2')</userinput>
+---
+- true
+...
+<prompt>tarantool&gt;</prompt> <userinput>fio.unlink('/home/pgulutzan/tmp.txt2')</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.rename(<replaceable>path-name</replaceable>, <replaceable>new-path-name</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Rename a file or directory.
+        For details type "man 2 rename".
+      </para>
+      <para>
+        Parameters: (type = string) original name, (type = string) new name.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.rename('/home/username/tmp.txt', '/home/username/tmp.txt2')</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.chown or fio.chmod(<replaceable>path-name</replaceable>,<replaceable>new rights or new owner</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Manage the rights to file objects, or ownership of file objects. For details type "man 2 chown" or "man 2 chmod".
+      </para>
+      <para>
+        Parameters: (for chown) number (uid, gid) and group group name or user name.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.chmod('/home/username/tmp.txt', tonumber('0755', 8))</userinput>
+---
+- true
+...
+ <userinput>fio.chown('/home/username/tmp.txt', 'username', 'username')</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.truncate(<replaceable>path-name</replaceable>,<replaceable>new-size</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Reduce file size to a specified value. For details type "man 2 truncate".
+      </para>
+      <para>
+        Parameters: (type = string) path-name, (type = number) new-size.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.truncate('/home/username/tmp.txt', 99999)</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.sync()</emphasis></term>
+    <listitem>
+      <para>
+        Ensure that changes are written to disk. For details type "man 2 sync".
+      </para>
+      <para>
+        Parameters: none
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.sync()</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+  <term><emphasis role="lua">fio.open(<replaceable>path-name</replaceable>, <replaceable>flags</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Open a file in preparation for reading or writing or seeking.
+      </para>
+      <para>
+        Parameters: (string) path-name, (number) flags. Flags can be passed as a number or as string constants, for example 'O_RDONLY', 'O_WRONLY', 'O_RDWR'.
+        Flags can be combined by enclosing them in braces.
+      </para>
+      <para>
+        Returns: (type = table) if success = a file handle (referred to in later examples as "fh"), if failure = nil.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh = fio.open('/home/username/tmp.txt', {'O_RDWR', 'O_APPEND'})</userinput>
+---
+...
+<prompt>tarantool&gt;</prompt> <userinput>fh -- display file handle returned by fio.open</userinput>
+---
+- fh: 11
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:close()</emphasis></term>
+    <listitem>
+      <para>
+        Close a file that was opened with fio.open. For details type "man 2 close".
+      </para>
+      <para>
+        Parameters: (type = table) file handle as returned by <code>fio.open()</code>.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:close() -- where fh = file-handle</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:pread or <replaceable>file-handle></replaceable>:pwrite(<replaceable>count or new string</replaceable>, <replaceable>offset</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Perform read/write random-access operation on a file, without affecting the current seek position of the file.
+        For details type "man 2 pread" or "man 2 pwrite".
+      </para>
+      <para>
+       Parameters: (type = table) file-handle as returned by <code>fio.open</code>,
+       (type = string) value to write or (type = number) number of bytes to read,
+       (type = number) offset within file where reading or writing begins.
+      </para>
+      <para>
+       Returns: <code>pwrite</code> returns true if success, false if failure. <code>pread</code> returns the data that was read, or nil if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:read(25, 25)</userinput>
+---
+- |-
+  elete from t8//
+  insert in
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:read or <replaceable>file-handle></replaceable>:write(<replaceable>count or new string</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Perform non-random-access read or write on a file. For details type "man 2 read" or "man 2 write".
+        Important: <code>read</code> and <code>write</code> affect the seek position within the file,
+        and this must be taken into account when working on the same file from multiple fibers.
+        It is possible to limit or prevent or prevent file access from other fibers with <code>fiber.ipc</code>.
+       </para>
+      <para>
+        Parameters: (type = table) file-handle as returned by <code>fio.open</code>, (type = string) value to write or (type = number) number of bytes to read.
+      </para>
+      <para>
+        Returns: <code>write</code> returns true if success, false if failure. <code>read</code> returns the data that was read, or nil if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:write('new data')</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua"><replaceable>file-handle</replaceable>:truncate(<replaceable>new-size</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Change the size of an open file.
+        Differs from <code>fio.truncate</code>, which changes the size of a closed file.
+      </para>
+      <para>
+       Parameters: (type = table) file-handle as returned by <code>fio.open</code>, (type = number) new file size.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <para>
+       Possible errors:
+     </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:truncate(0)</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+    <term><emphasis role="lua"><replaceable>file-handle</replaceable>:seek(<replaceable>position</replaceable> [, <replaceable>offset-from</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Shift position in the file to the specified position.
+        For details type "man 2 seek".
+      </para>
+      <para>
+       Parameters: (type = table) file handle as returned by <code>fio.open</code>,
+       (type = number) position to seek to, (type = constant string) 'SEEK_END' = end of file,
+        'SEEK_CUR' = current position, 'SEEK_SET' = start of file.
+      </para>
+      <para>
+        Returns: (type = number) the new position if success, nil if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:seek(20, 'SEEK_SET')</userinput>
+---
+- 20
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:stat()</emphasis></term>
+    <listitem>
+      <para>
+        Return statistics about an open file.
+        This differs from <code>fio.stat</code> which return statistics about a closed file.
+        For details type "man 2 stat".
+      </para>
+      <para>
+        Parameters: (type = table) file handle as returned by <code>fio.open()</code>.
+      </para>
+      <para>
+        Returns: (type = table) details about the file.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:stat()</userinput>
+---
+- inode: 729866
+  rdev: 0
+  size: 100
+  atime: 1409429855
+  mode: 33261
+  mtime: 1409430660
+  nlink: 1
+  uid: 1000
+  blksize: 4096
+  gid: 1000
+  ctime: 1409430660
+  dev: 2049
+  blocks: 8
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:fsync or <replaceable>file-handle</replaceable>:fdatasync ()</emphasis></term>
+    <listitem>
+      <para>
+        Ensure that file changes are written to disk, for an open file.
+        Compare <code>fio.sync</code>, which is for all files.
+        For details type "man 2 fsync" or "man 2 fdatasync".
+      </para>
+      <para>
+        Parameters: (type = table) file-handle, as returned by <code>fio.open()</code>.
+      </para>
+      <para>
+        Returns: (type = boolean) true if success, false if failure.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fh:fsync()</userinput>
+---
+- true
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
+
+  </variablelist>
+</section>
 
 
 <section xml:id="sp-console">

@@ -5,6 +5,9 @@ import socket
 import msgpack
 from tarantool.const import *
 from tarantool import Connection
+from tarantool.request import RequestInsert
+from tarantool.request import RequestSelect
+from tarantool.response import Response
 
 print """
 #
@@ -83,3 +86,64 @@ print "IPROTO_CALL"
 test({ IPROTO_CODE : REQUEST_TYPE_CALL }, {})
 test({ IPROTO_CODE : REQUEST_TYPE_CALL }, { IPROTO_KEY: ('procname', )})
 print "\n"
+
+# gh-434 Tarantool crashes on multiple iproto requests with WAL enabled
+admin("box.cfg.wal_mode")
+admin("space = box.schema.create_space('test', { id = 567 })")
+admin("space:create_index('primary', { type = 'hash' })")
+admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
+
+c = Connection('localhost', server.sql.port)
+c.connect()
+request1 = RequestInsert(c, 567, [1, "baobab"])
+request2 = RequestInsert(c, 567, [2, "obbaba"])
+s = c._socket
+try:
+    s.send(bytes(request1) + bytes(request2))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response1 = Response(c, c._read_response())
+response2 = Response(c, c._read_response())
+print response1.__str__()
+print response2.__str__()
+
+request1 = RequestInsert(c, 567, [3, "occama"])
+request2 = RequestSelect(c, 567, 0, [1], 0, 1, 0)
+s = c._socket
+try:
+    s.send(bytes(request1) + bytes(request2))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response1 = Response(c, c._read_response())
+response2 = Response(c, c._read_response())
+print response1.__str__()
+print response2.__str__()
+
+request1 = RequestSelect(c, 567, 0, [2], 0, 1, 0)
+request2 = RequestInsert(c, 567, [4, "ockham"])
+s = c._socket
+try:
+    s.send(bytes(request1) + bytes(request2))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response1 = Response(c, c._read_response())
+response2 = Response(c, c._read_response())
+print response1.__str__()
+print response2.__str__()
+
+request1 = RequestSelect(c, 567, 0, [1], 0, 1, 0)
+request2 = RequestSelect(c, 567, 0, [2], 0, 1, 0)
+s = c._socket
+try:
+    s.send(bytes(request1) + bytes(request2))
+except OSError as e:
+    print '   => ', 'Failed to send request'
+response1 = Response(c, c._read_response())
+response2 = Response(c, c._read_response())
+print response1.__str__()
+print response2.__str__()
+
+c.close()
+
+admin("space:drop()")
+

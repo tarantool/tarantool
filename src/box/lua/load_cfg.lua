@@ -50,6 +50,42 @@ local default_cfg = {
     background          = false,
     username            = nil ,
     coredump            = false,
+
+    -- snap_daemon
+    snapshot_period     = 0,        -- 0 = disabled
+    snapshot_count      = 6,
+}
+
+-- types of available options
+-- could be comma separated lua types or 'any' if any type is allowed
+local template_cfg = {
+    listen              = 'string, number',
+    slab_alloc_arena    = 'number',
+    slab_alloc_minimal  = 'number',
+    slab_alloc_factor   = 'number',
+    work_dir            = 'string',
+    snap_dir            = 'string',
+    wal_dir             = 'string',
+    logger              = 'string',
+    logger_nonblock     = 'boolean',
+    log_level           = 'number',
+    io_collect_interval = 'number',
+    readahead           = 'number',
+    snap_io_rate_limit  = 'number',
+    too_long_threshold  = 'number',
+    wal_mode            = 'string',
+    rows_per_wal        = 'number',
+    wal_dir_rescan_delay= 'number',
+    panic_on_snap_error = 'boolean',
+    panic_on_wal_error  = 'boolean',
+    replication_source  = 'string',
+    custom_proc_title   = 'string',
+    pid_file            = 'string',
+    background          = 'boolean',
+    username            = 'string',
+    coredump            = 'boolean',
+    snapshot_period     = 'number',
+    snapshot_count      = 'number',
 }
 
 -- dynamically settable options
@@ -60,6 +96,10 @@ local dynamic_cfg = {
     io_collect_interval     = ffi.C.box_set_io_collect_interval,
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
+
+    -- snap_daemon
+    snapshot_period         = box.internal.snap_daemon.set_snapshot_period,
+    snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
 }
 
 local function reload_cfg(oldcfg, newcfg)
@@ -98,15 +138,53 @@ setmetatable(box, {
      end
 })
 
-function box.cfg(cfg)
-    if cfg == nil then
-        cfg = {}
+local function check_param_table(table, template)
+    if table == nil then
+        return
     end
-    for k,v in pairs(default_cfg) do
-        if cfg[k] == nil then
-            cfg[k] = v
+    if type(table) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
+    -- just pass {.. dont_check = true, ..} to disable check below
+    if table.dont_check then
+        return
+    end
+    for k,v in pairs(table) do
+        if template[k] == nil then
+            error("Error: cfg parameter '" .. k .. "' is unexpected")
+        elseif template[k] == 'any' then
+            -- any type is ok
+        elseif (string.find(template[k], ',') == nil) then
+            -- one type
+            if type(v) ~= template[k] then
+                error("Error: cfg parameter '" .. k .. "' should be of type " .. template[k])
+            end
+        else
+            local good_types = string.gsub(template[k], ' ', '');
+            if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
+                good_types = string.gsub(good_types, ',', ', ');
+                error("Error: cfg parameter '" .. k .. "' should be one of types: " .. template[k])
+            end
         end
     end
+end
+
+
+local function update_param_table(table, defaults)
+    if table == nil then
+        table = {}
+    end
+    for k,v in pairs(defaults) do
+        if table[k] == nil then
+            table[k] = v
+        end
+    end
+    return table
+end
+
+function box.cfg(cfg)
+    check_param_table(cfg, template_cfg)
+    cfg = update_param_table(cfg, default_cfg)
 
     for k,v in pairs(wrapper_cfg) do
         -- options that can be number or string
@@ -120,12 +198,14 @@ function box.cfg(cfg)
     box_configured = nil
     box.cfg = setmetatable(cfg,
         {
-		    __newindex = function(table, index)
-		        error('Attempt to modify a read-only table')
-		    end,
-            __call = reload_cfg
+            __newindex = function(table, index)
+                error('Attempt to modify a read-only table')
+            end,
+            __call = reload_cfg,
         })
     ffi.C.load_cfg()
+
+    box.internal.snap_daemon.start()
 end
 jit.off(box.cfg)
 jit.off(reload_cfg)

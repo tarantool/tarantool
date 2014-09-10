@@ -35,13 +35,15 @@ from <link xlink:href=" http://luarocks.org/">LuaRocks</link> -- the "downloadab
 </para>
 
 <para>
-The included language processor is LuaJIT.
+The included language processor is <link xlink:href="http://luajit.org/">LuaJIT</link>.
 Major "built-in" components are: fibers,
-MsgPack, digest, JSON, YAML, IPC, and box.
+<link xlink:href="http://msgpack.org">MsgPack</link>,
+digest, JSON, <link xlink:href="http://en.wikipedia.org/wiki/Yaml">YAML</link>,
+<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> , and box.
 </para>
 
 <para>
-<link xlink:href="http://luajit.org/">LUAJIT</link>  = a processor for the entire Lua language. 
+LUAJIT is a processor for the entire Lua language. 
 This differs from the original Lua interpreter from
 <link xlink:href="http://www.puc-rio.br/index.html">Pontifícia Universidade Católica do Rio de Janeiro</link>
 ("RIO-PUC" <link xlink:href="http://www.lua.org/">Lua</link>) 
@@ -70,21 +72,21 @@ provided one takes advantage of it where <link xlink:href="http://wiki.luajit.or
     </para>
 
 <para>
-FIBERS = like Lua coroutines, but as <link xlink:href="http://members.chello.nl/~w.couwenberg/fibers.htm">one fiber developer</link>
+FIBERS are like Lua coroutines, but as <link xlink:href="http://members.chello.nl/~w.couwenberg/fibers.htm">one fiber developer</link>
 put it: "The main difference between a coroutine and a fiber
 is that a running fiber can be suspended anywhere in a call
 chain, regardless of its C and Lua call stack nesting levels."       
 </para>
 
 <para>
-<link xlink:href="http://msgpack.org">MSGPACK</link> = a relatively new way to serialize data.                    
+MSGPACK is a relatively new way to serialize data.                    
 The point of MsgPack is that it can
 handle Lua types and C types, with structures and nesting,
 without the overhead of an SGML-style markup language.
 </para>
 
 <para>
-DIGEST = a cryptography package for CRC32, SHA, and MDA.
+DIGEST is a cryptography package for CRC32, SHA, and MDA.
 Nothing new here -- except that Tarantool has made them into a
 package, so that one doesn't have to get each one of these
 things individually from the <link xlink:href="http://lua-users.org/wiki/CryptographyStuff">many that are available</link>.
@@ -93,7 +95,7 @@ API, the routines should run faster on LuaJIT.
 </para>
 
 <para>
-JSON = a serialization format which has
+JSON is a serialization format which has
 become popular in the web world. The package within
 Tarantool is derived from <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">CJSON</link>
 which, according to <link xlink:href="http://lua-users.org/wiki/JsonModules">a survey</link>, 
@@ -102,18 +104,18 @@ edge cases come up.
 </para>
 
 <para>
-<link xlink:href="http://en.wikipedia.org/wiki/Yaml">YAML</link> -- short for "YAML Ain't a Markup Language". YAML is a            
+YAML is short for "YAML Ain't a Markup Language". YAML is a            
 way to show data in human-readable form, without losing
 underlying information about typing, arrays, and structures.
 </para>
 
 <para>
-<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> -- Inter-Process Communication.
+IPC is Inter-Process Communication.
 this is useful for implementations of task queues and long polling.
 </para>
 
 <para>
-BOX -- the NoSQL DBMS that was developed by Tarantool
+BOX is the NoSQL DBMS that was developed by Tarantool
 and its community. Box's architecture and routines will be the
 subject of the next chapter.
 </para>

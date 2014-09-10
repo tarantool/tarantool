@@ -529,6 +529,14 @@ lbox_fiber_time64(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_fiber_wakeup(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	fiber_wakeup(f);
+	return 0;
+}
+
 static const struct luaL_reg lbox_fiber_meta [] = {
 	{"id", lbox_fiber_id},
 	{"name", lbox_fiber_name},
@@ -537,6 +545,7 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{"testcancel", lbox_fiber_testcancel},
 	{"__serialize", lbox_fiber_serialize},
 	{"__tostring", lbox_fiber_tostring},
+	{"wakeup", lbox_fiber_wakeup},
 	{"__index", lbox_fiber_index},
 	{"__gc", lbox_fiber_gc},
 	{NULL, NULL}

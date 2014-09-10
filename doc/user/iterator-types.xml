@@ -26,7 +26,7 @@
 
 <tbody>
     <row>
-        <entry>box.index.ALL</entry>
+        <entry>box.index.ALL or 'ALL'</entry>
         <entry>none</entry>
         <entry>yes</entry>
         <entry>yes</entry>
@@ -41,7 +41,7 @@
     </row>
 
     <row>
-        <entry>box.index.EQ</entry>
+        <entry>box.index.EQ or 'EQ'</entry>
         <entry>key</entry>
         <entry>yes</entry>
         <entry>yes</entry>
@@ -73,7 +73,7 @@
     </row>
 
     <row>
-        <entry>box.index.GT</entry>
+        <entry>box.index.GT or 'GT'</entry>
         <entry>key</entry>
         <entry>yes (*)</entry>
         <entry>yes </entry>
@@ -115,7 +115,7 @@
 <tbody>
 
     <row>
-        <entry>box.index.REQ</entry>
+        <entry>box.index.REQ or 'REQ'</entry>
         <entry>key or key part</entry>
         <entry>
             Reverse equality iterator. Is equivalent to
@@ -126,7 +126,7 @@
     </row>
 
     <row>
-        <entry>box.index.GE</entry>
+        <entry>box.index.GE or 'GE'</entry>
         <entry>key or key part</entry>
         <entry>
             Iterate over all tuples for which the corresponding
@@ -139,7 +139,7 @@
         </entry>
     </row>
     <row>
-        <entry>box.index.LT</entry>
+        <entry>box.index.LT or 'LT'</entry>
         <entry>key or key part</entry>
         <entry>
             Similar to <code>box.index.GT</code>,
@@ -152,7 +152,7 @@
     </row>
 
     <row>
-        <entry>box.index.LE</entry>
+        <entry>box.index.LE or 'LE'</entry>
         <entry>key or key part</entry>
         <entry>
             Similar to <code>box.index.GE</code>, but

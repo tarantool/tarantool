@@ -59,8 +59,6 @@ struct session {
 	uint8_t auth_token;
 	/** User id of the authenticated user. */
 	uint32_t uid;
-	/** Current transaction, if started. */
-	struct txn *txn;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
 };
@@ -92,21 +90,10 @@ void
 session_destroy(struct session *);
 
 /**
- * Return a file descriptor
- * associated with a session, or -1 if the
- * session doesn't exist.
+ * Find a session by id.
  */
-int
-session_fd(uint32_t sid);
-
-/**
- * Check whether a session exists or not.
- */
-static inline bool
-session_exists(uint32_t sid)
-{
-	return session_fd(sid) >= 0;
-}
+struct session *
+session_find(uint32_t sid);
 
 /** Set session auth token and user id. */
 static inline void

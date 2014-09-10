@@ -46,9 +46,10 @@ rb_gen(, mslab_tree_, mslab_tree_t, struct mslab, node, mslab_cmp)
 static inline void
 mslab_create(struct mslab *slab, struct mempool *pool)
 {
-	slab->ffi = 0;
 	slab->nfree = pool->objcount;
 	slab->pool = pool;
+	slab->free_idx = 0;
+	slab->free_list = 0;
 	/* A bit is set if a slot is free. */
 	memset(slab->map, 0xFF, sizeof(slab->map[0]) * pool->mapsize);
 }
@@ -84,43 +85,47 @@ void *
 mslab_alloc(struct mslab *slab)
 {
 	assert(slab->nfree);
-	uint32_t idx = __builtin_ffsl(slab->map[slab->ffi]);
-	while (idx == 0) {
-		if (slab->ffi == slab->pool->mapsize - 1) {
-			/*
-			 * mslab_alloc() shouldn't be called
-			 * on a full slab.
-			 */
-			assert(false);
-			return NULL;
-		}
-		slab->ffi++;
-		idx = __builtin_ffsl(slab->map[slab->ffi]);
+	void *result;
+	uint32_t idx;
+	if (slab->free_list) {
+		/* Recycle an object from the garbage pool. */
+		idx = mslab_idx(slab, slab->free_list);
+		result = slab->free_list;
+		slab->free_list = *(void **)slab->free_list;
+	} else {
+		/* Use an object from the "untouched" area of the slab. */
+		idx = slab->free_idx++;
+		result = mslab_obj(slab, idx);
 	}
-	/*
-	 * find-first-set returns bit index starting from 1,
-	 * or 0 if no bit is set. Rebase the index to offset 0.
-	 */
-	idx--;
+
 	/* Mark the position as occupied. */
-	slab->map[slab->ffi] ^= ((mbitmap_t) 1) << idx;
+	const uint32_t slot = idx / MEMPOOL_MAP_BIT;
+	const uint32_t bit_no = idx & (MEMPOOL_MAP_BIT-1);
+	slab->map[slot] ^= ((mbitmap_t) 1) << (mbitmap_t) bit_no;
+
 	/* If the slab is full, remove it from the rb tree. */
 	if (--slab->nfree == 0)
 		mslab_tree_remove(&slab->pool->free_slabs, slab);
-	/* Return the pointer at the free slot */
-	return mslab_obj(slab, idx + slab->ffi * MEMPOOL_MAP_BIT);
+
+	return result;
 }
 
 void
 mslab_free(struct mempool *pool, struct mslab *slab, void *ptr)
 {
+	/* put object to garbage list */
+	*(void **)ptr = slab->free_list;
+	slab->free_list = ptr;
+
 	uint32_t idx = mslab_idx(slab, ptr);
-	uint32_t bit_no = idx & (MEMPOOL_MAP_BIT-1);
-	idx /= MEMPOOL_MAP_BIT;
-	slab->map[idx] |= ((mbitmap_t) 1) << bit_no;
+
+	/* Mark the position as free. */
+	const uint32_t slot = idx / MEMPOOL_MAP_BIT;
+	const uint32_t bit_no = idx & (MEMPOOL_MAP_BIT-1);
+	slab->map[slot] |= ((mbitmap_t) 1) << bit_no;
+
 	slab->nfree++;
-	if (idx < slab->ffi)
-		slab->ffi = idx;
+
 	if (slab->nfree == 1) {
 		/**
 		 * Add this slab to the rbtree which contains partially

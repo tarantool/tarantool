@@ -11,8 +11,8 @@ from lib.tarantool_server import Test
 
 class AppTest(Test):
     def execute(self, server):
-        execs = [os.path.join(os.path.abspath(server.builddir), "test", self.name)]
-        proc = Popen(execs, stdout=PIPE, cwd=server.vardir)
+        execs = []
+        proc = Popen([os.path.join(os.getcwd(), self.name)], stdout=PIPE, cwd=server.vardir)
         sys.stdout.write(proc.communicate()[0])
 
 class AppServer(Server):
@@ -60,8 +60,7 @@ class AppServer(Server):
                     answer.append(test)
             return answer
 
-        test_suite.tests = [AppTest(k, test_suite.args, test_suite.ini) for
-    k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua" )))]
+        test_suite.tests = [AppTest(k, test_suite.args, test_suite.ini) for k in sorted(glob.glob(os.path.join(suite_path, "*.test.lua" )))]
         test_suite.tests = sum(map((lambda x: patterned(x, test_suite.args.tests)), test_suite.tests), [])
 
     def print_log(self, lines):

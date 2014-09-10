@@ -35,7 +35,6 @@
 #include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
-#include "box/txn.h"
 
 static struct mh_i32ptr_t *session_registry;
 
@@ -76,7 +75,6 @@ session_create(int fd, uint64_t cookie)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;
-	session->txn = NULL;
 	session->fiber_on_stop = {
 		rlist_nil, session_on_stop, NULL, NULL
 	};
@@ -121,25 +119,19 @@ session_run_on_connect_triggers(struct session *session)
 void
 session_destroy(struct session *session)
 {
-	if (session->txn) {
-		assert(session->txn == in_txn());
-		txn_rollback();
-	}
-	assert(session->txn == NULL);
 	struct mh_i32ptr_node_t node = { session->id, NULL };
 	mh_i32ptr_remove(session_registry, &node, NULL);
 	mempool_free(&session_pool, session);
 }
 
-int
-session_fd(uint32_t sid)
+struct session *
+session_find(uint32_t sid)
 {
 	mh_int_t k = mh_i32ptr_find(session_registry, sid, NULL);
 	if (k == mh_end(session_registry))
-		return -1;
-	struct session *session = (struct session *)
+		return NULL;
+	return (struct session *)
 		mh_i32ptr_node(session_registry, k)->val;
-	return session->fd;
 }
 
 void

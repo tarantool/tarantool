@@ -117,7 +117,7 @@ lbox_session_exists(struct lua_State *L)
 		luaL_error(L, "session.exists(sid): bad arguments");
 
 	uint32_t sid = luaL_checkint(L, -1);
-	lua_pushnumber(L, session_exists(sid));
+	lua_pushboolean(L, session_find(sid) != NULL);
 	return 1;
 }
 
@@ -131,7 +131,10 @@ lbox_session_fd(struct lua_State *L)
 		luaL_error(L, "session.fd(sid): bad arguments");
 
 	uint32_t sid = luaL_checkint(L, -1);
-	lua_pushnumber(L, session_fd(sid));
+	struct session *session = session_find(sid);
+	if (session == NULL)
+		luaL_error(L, "session.fd(): session does not exit");
+	lua_pushinteger(L, session->fd);
 	return 1;
 }
 
@@ -145,10 +148,21 @@ lbox_session_peer(struct lua_State *L)
 	if (lua_gettop(L) > 1)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
-	uint32_t sid = lua_gettop(L) == 1 ?
-		luaL_checkint(L, -1) : session()->id;
+	int fd;
+	if (lua_gettop(L) == 1) {
+		struct session *session = session_find(luaL_checkint(L, 1));
+		if (session == NULL)
+			luaL_error(L, "session.peer(): session does not exit");
+		fd = session->fd;
+	} else {
+		fd = session()->fd;
+	}
 
-	int fd = session_fd(sid);
+	if (fd < 0) {
+		lua_pushnil(L); /* no associated peer */
+		return 1;
+	}
+
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
 	sio_getpeername(fd, (struct sockaddr *)&addr, &addrlen);

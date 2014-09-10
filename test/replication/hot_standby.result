@@ -190,8 +190,6 @@ _select(11, 20)
 --# stop server replica
 --# cleanup server hot_standby
 --# cleanup server replica
+--# deploy server default
 --# start server default
 --# set connection default
-box.space['tweedledum']:drop()
----
-...

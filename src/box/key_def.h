@@ -272,6 +272,26 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 }
 
 /**
+ * Encapsulates privileges of a user on an object.
+ * I.e. "space" object has an instance of this
+ * structure for each user.
+ */
+struct access {
+	/**
+	 * Granted access has been given to a user explicitly
+	 * via some form of a grant.
+	 */
+	uint8_t granted;
+	/**
+	 * Effective access is a sum of granted access and
+	 * all privileges inherited by a user on this object
+	 * via some role. Since roles may be granted to other
+	 * roles, this may include indirect grants.
+	 */
+	uint8_t effective;
+};
+
+/**
  * Definition of a function. Function body is not stored
  * or replicated (yet).
  */
@@ -281,6 +301,16 @@ struct func_def {
 	uint32_t fid;
 	/** Owner of the function. */
 	uint32_t uid;
+	/**
+	 * True if the function requires change of user id before
+	 * invocaction.
+	 */
+	bool setuid;
+	/**
+	 * Authentication id of the owner of the function,
+	 * used for set-user-id functions.
+	 */
+	uint8_t auth_token;
 	/** Function name. */
 	char name[BOX_NAME_MAX + 1];
 	/**
@@ -288,7 +318,7 @@ struct func_def {
 	 * to func def but belongs to func cache entry.
 	 * Kept here for simplicity.
 	 */
-	uint8_t access[BOX_USER_MAX];
+	struct access access[BOX_USER_MAX];
 };
 
 /**
@@ -303,7 +333,10 @@ struct priv_def {
 	uint32_t object_id;
 	/* Object type - function, space, universe */
 	enum schema_object_type object_type;
-	/** What is being or has been granted. */
+	/**
+	 * What is being granted, has been granted, or is being
+	 * revoked.
+	 */
 	uint8_t access;
 };
 

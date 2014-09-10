@@ -5,7 +5,10 @@
 -- 
 local filename = "1.log"
 local message = "Hello, World!"
-box.cfg{logger=filename}
+box.cfg{
+    logger=filename,
+    slab_alloc_arena=0.1,
+}
 local log = require('log')
 local io = require('io')
 local file = io.open(filename)
