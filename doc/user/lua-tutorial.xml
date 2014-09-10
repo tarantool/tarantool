@@ -441,7 +441,7 @@ main_function()!
 The screen now looks like this:
 
 <programlisting>
-tarantool&gt; <userinput>setopt delimiter = '!'!</userinput>
+tarantool&gt; <userinput>console = require('console'); console.delimiter('!')</userinput>
 tarantool&gt; <userinput>function string_function()</userinput>
         -&gt;   <userinput>local random_number</userinput>
         -&gt;   <userinput>local random_string</userinput>

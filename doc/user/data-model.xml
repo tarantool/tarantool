@@ -65,7 +65,7 @@ fill the same role as a
 <quote>row column</quote> or <quote>record field</quote>, except that: the
 fields of a tuple don't need to have names.
 That's why there was no need to pre-define the
-tuple set in the configuration file, and that's
+tuple set when creating the space, and that's
 why each tuple can have a different number of
 elements, and that's why we say that Tarantool has
 a <quote>dynamic</quote> data model.
