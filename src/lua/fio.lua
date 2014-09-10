@@ -204,6 +204,25 @@ fio.basename = function(path, suffix)
     return path
 end
 
+fio.dirname = function(path)
+    if path == nil then
+        return nil
+    end
+    path = tostring(path)
+
+    while true do
+        if path == "" or string.sub(path, -1) == "/" then
+            break
+        end
+        path = string.sub(path, 1, -2)
+    end
+    if path == "" then
+        path = "."
+    end
+
+    return path
+end
+
 fio.umask = function(umask)
 
     if umask == nil then
