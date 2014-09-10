@@ -252,7 +252,7 @@ sudo cpan install DR::Tarantool
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
     (local host, port 3301) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM").
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
@@ -329,7 +329,7 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
     (local host, port 3301) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM" in configuration file).
+    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM").
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
     with the tarantool server at localhost:3301, then send an INSERT request,
