@@ -10,7 +10,7 @@
 <title>Configuration reference</title>
 <blockquote><para>
   This chapter provides a reference of options which
-  can be set on the command line or in a configuration file.
+  can be set on the command line or in an initialization file.
 </para></blockquote>
 
 <para>
@@ -82,8 +82,8 @@ Target: Linux-x86_64-Debug
 
 </section>
 
-<section xml:id="configuration-file" xreflabel="configuration file">
-<title>Configuration file</title>
+<section xml:id="initialization-file" xreflabel="initialization file">
+<title>Initialization file</title>
 <para>
 If the command to start Tarantool includes <option><replaceable>lua-initialization-file</replaceable></option>,
 then Tarantool begins by invoking the Lua program in the file,
@@ -253,7 +253,7 @@ Starting  ARG
 1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running                  
 1000     22394 22364  0 09:14 pts/0    00:00:00 tarantool: spawner
 tarantool: primary pri: 3301 adm: 3313</programlisting>
-          <para>But if the configuration file contains custom_proc_title='sessions' then
+          <para>But if the configuration parameters include custom_proc_title='sessions' then
           the output looks like:</para>
 <programlisting><prompt>$</prompt> <userinput>ps -ef | grep tarantool</userinput>
 1000     22364  2778  0 09:14 pts/0    00:00:00 tarantool: running@sessions          
@@ -628,7 +628,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
             <anchor xml:id="local_hot_standby" xreflabel="local_hot_standby"/>
           In version 1.6 local hot standby is always on so this is a legacy setting.
           When local_hot_standby=true, the expectation is that there will be two
-          instances of the server using the same configuration file.
+          instances of the server using the same configuration.
           The first one to start will be the "primary" instance.
           The second one to start will be the "standby" instance.
           The standby instance will initialize and will try to connect on listen

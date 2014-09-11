@@ -16,6 +16,7 @@
 <xi:include href="server-administration.xml"/>
 <xi:include href="configuration-reference.xml"/>
 <xi:include href="connectors.xml"/>
+<xi:include href="errcode.xml"/>
 <xi:include href="proctitle.xml"/>
 <xi:include href="lua-tutorial.xml"/>
 <xi:include href="plugins.xml"/>
