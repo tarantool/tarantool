@@ -1,5 +1,0 @@
-{% extends "base" %}
-{% set title = "Tarantool: a benchmark" %}
-{% block content %}
-    {{ benchmark.main }}
-{% endblock content %}

@@ -9,55 +9,55 @@ dOn.on({
 
             switch ($(this).html()) {
                 case 'A_Read' : {
-                    $('#picture2').renderChart('ycsb/A_READ_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/A_READ_latency.json');
                     break;
                 }
                 case 'A_Update' : {
-                    $('#picture2').renderChart('ycsb/A_UPDATE_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/A_UPDATE_latency.json');
                     break;
                 }
                 case 'B_Read' : {
-                    $('#picture2').renderChart('ycsb/B_READ_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/B_READ_latency.json');
                     break;
                 }
                 case 'B_Update' : {
-                    $('#picture2').renderChart('ycsb/B_UPDATE_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/B_UPDATE_latency.json');
                     break;
                 }
                 case 'C_Read' : {
-                    $('#picture2').renderChart('ycsb/C_READ_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/C_READ_latency.json');
                     break;
                 }
                 case 'D_Insert' : {
-                    $('#picture2').renderChart('ycsb/D_INSERT_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/D_INSERT_latency.json');
                     break;
                 }
                 case 'D_Read' : {
-                    $('#picture2').renderChart('ycsb/D_READ_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/D_READ_latency.json');
                     break;
                 }
                 case 'E_Insert' : {
-                    $('#picture2').renderChart('ycsb/E_INSERT_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/E_INSERT_latency.json');
                     break;
                 }
                 case 'E_Scan' : {
-                    $('#picture2').renderChart('ycsb/E_SCAN_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/E_SCAN_latency.json');
                     break;
                 }
                 case 'F_Read' : {
-                    $('#picture2').renderChart('ycsb/F_READ_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/F_READ_latency.json');
                     break;
                 }
                 case 'F_Read-Modify-Write' : {
-                    $('#picture2').renderChart('ycsb/F_READ-MODIFY-WRITE_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/F_READ-MODIFY-WRITE_latency.json');
                     break;
                 }
                 case 'F_Update' : {
-                    $('#picture2').renderChart('ycsb/F_UPDATE_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/F_UPDATE_latency.json');
                     break;
                 }
                 case 'LOAD_Insert' : {
-                    $('#picture2').renderChart('ycsb/LOAD_INSERT_latency.json');
+                    $('#picture2').renderChart('theme/ycsb/LOAD_INSERT_latency.json');
                     break;
                 }
             }
@@ -78,8 +78,8 @@ dOn.on({
             switch ($(this).html()) {
                 case 'A' : {
                     head.html('Workload A')
-                    $('#picture1').renderChart('ycsb/A_throughput.json');
-                    $('#picture2').renderChart('ycsb/A_READ_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/A_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/A_READ_latency.json');
 
                     li = $('<li class="b-button b-button_on">A_Read</li>');
                     ul.append(li);
@@ -92,8 +92,8 @@ dOn.on({
                 }
                 case 'B' : {
                     head.html('Workload B')
-                    $('#picture1').renderChart('ycsb/B_throughput.json');
-                    $('#picture2').renderChart('ycsb/B_READ_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/B_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/B_READ_latency.json');
 
                     li = $('<li class="b-button b-button_on">B_Read</li>');
                     ul.append(li);
@@ -106,8 +106,8 @@ dOn.on({
                 }
                 case 'C' : {
                     head.html('Workload C')
-                    $('#picture1').renderChart('ycsb/C_throughput.json');
-                    $('#picture2').renderChart('ycsb/C_READ_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/C_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/C_READ_latency.json');
 
                     li = $('<li class="b-button b-button_on">C_Read</li>');
                     ul.append(li);
@@ -118,8 +118,8 @@ dOn.on({
                 }
                 case 'D' : {
                     head.html('Workload D')
-                    $('#picture1').renderChart('ycsb/D_throughput.json');
-                    $('#picture2').renderChart('ycsb/D_READ_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/D_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/D_READ_latency.json');
 
                     li = $('<li class="b-button b-button_on">D_Read</li>');
                     ul.append(li);
@@ -132,8 +132,8 @@ dOn.on({
                 }
                 case 'E' : {
                     head.html('Workload E')
-                    $('#picture1').renderChart('ycsb/E_throughput.json');
-                    $('#picture2').renderChart('ycsb/E_INSERT_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/E_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/E_INSERT_latency.json');
 
                     li = $('<li class="b-button b-button_on">E_Insert</li>');
                     ul.append(li);
@@ -146,8 +146,8 @@ dOn.on({
                 }
                 case 'F' : {
                     head.html('Workload F')
-                    $('#picture1').renderChart('ycsb/F_throughput.json');
-                    $('#picture2').renderChart('ycsb/F_READ_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/F_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/F_READ_latency.json');
 
                     li = $('<li class="b-button b-button_on">F_Read</li>');
                     ul.append(li);
@@ -162,8 +162,8 @@ dOn.on({
                 }
                 case 'LOAD' : {
                     head.html('Insert only')
-                    $('#picture1').renderChart('ycsb/LOAD_throughput.json');
-                    $('#picture2').renderChart('ycsb/LOAD_INSERT_latency.json');
+                    $('#picture1').renderChart('theme/ycsb/LOAD_throughput.json');
+                    $('#picture2').renderChart('theme/ycsb/LOAD_INSERT_latency.json');
 
                     li = $('<li class="b-button b-button_on">L_Insert</li>');
                     ul.append(li);
@@ -181,7 +181,7 @@ dOn.on({
 (function(){
 var dOn = $(document);
 dOn.ready(function() {
-    $('#picture1').renderChart('ycsb/A_throughput.json');
-    $('#picture2').renderChart('ycsb/A_READ_latency.json');
+    $('#picture1').renderChart('theme/ycsb/A_throughput.json');
+    $('#picture2').renderChart('theme/ycsb/A_READ_latency.json');
 });
 })();

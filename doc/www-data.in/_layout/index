@@ -1,5 +1,0 @@
-{% extends "base" %}
-{% set title = "Tarantool -- a NoSQL database in a Lua script" %}
-{% block content %}
-    {{ index.main }}
-{% endblock content %}
