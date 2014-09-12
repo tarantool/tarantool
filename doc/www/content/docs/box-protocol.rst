@@ -8,9 +8,6 @@
                                     Overview
 --------------------------------------------------------------------------------
 
-The latest version of this document can be found in Tarantool source tree,
-`doc/box-protocol.txt <https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt>`_
-
 IPROTO is a binary request/response protocol. The server begins the dialogue by
 sending a fixed-size (128 bytes) text greeting to the client. The first 64 bytes
 of the greeting contain server version. The second 64 bytes contain a

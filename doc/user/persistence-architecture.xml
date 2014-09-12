@@ -20,9 +20,9 @@ number of the first record in the file, plus an extension <filename>.xlog</filen
 <para>Apart from a log sequence number and the data change request
 (its format is the same as in the binary protocol and is described
 in <link
-xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>),
+xlink:href="http://tarantool.org/docs/box-protocol.html"><filename>docs/box-protocol.html</filename></link>),
 each WAL record contains a header, some metadata, and then the data formatted
- according to <link xlink:href="http://wiki.msgpack.org/display/MSGPACK/Format+specification">msgpack rules</link>.
+according to <link xlink:href="https://github.com/msgpack/msgpack/blob/master/spec.md">msgpack rules</link>.
 For example this is what the WAL file looks like after the first INSERT
 request ("s:insert({1})") for the introductory sandbox exercise
 <olink
