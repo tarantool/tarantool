@@ -67,33 +67,48 @@ end;
 - true
 ...
 --# setopt delimiter ''
-dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
+c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')
 ---
-- '[[{"bool2":0,"str":"abc","num":123,"bool1":1}],1]'
+- - bool2: 0
+    str: abc
+    num: 123
+    bool1: 1
+- 1
 ...
-dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})
+c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)
 ---
-- '[{},0]'
+- []
+- 0
 ...
-dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})
+c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')
 ---
-- '[{},0]'
+- []
+- 0
 ...
-dump({c:execute('CALL p1')})
+c:execute('CALL p1')
 ---
-- '[[{"One":1},{"Three":3,"Two":2}],2]'
+- - One: 1
+  - Three: 3
+    Two: 2
+- 2
 ...
-dump({c:execute('DROP PROCEDURE p1')})
+c:execute('DROP PROCEDURE p1')
 ---
-- '[{},0]'
+- []
+- 0
 ...
-dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})
+c:execute('SELECT 1 AS one UNION ALL SELECT 2')
 ---
-- '[[{"one":1},{"one":2}],2]'
+- - one: 1
+  - one: 2
+- 2
 ...
-dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
+c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')
 ---
-- '[[{"one":1},{"one":2},{"two":"abc"}],3]'
+- - one: 1
+  - one: 2
+  - two: abc
+- 3
 ...
 c:quote('test \"abc\" test')
 ---
