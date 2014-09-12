@@ -333,7 +333,7 @@ server on the same processor without ill effects.
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename
-  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</filename>.
+  xlink:href="http://tarantool.org/docs/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.html</filename>.
 </para>
 
 </section>

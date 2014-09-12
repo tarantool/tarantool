@@ -37,7 +37,7 @@
     A complete description of the binary protocol
     is maintained in annotated Backus-Naur
     form in the source tree: please see
-    <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt"><filename>doc/box-protocol.txt</filename></link>.
+    <link xlink:href="http://tarantool.org/docs/box-protocol.html"><filename>docs/box-protocol.html</filename></link>.
   </para>
 </section>
 
@@ -47,7 +47,7 @@
 The Tarantool API exists so that a client program can send a request packet
 to the server, and receive a response. Here is an example of a what the client
  would send for <command>box.space[513]:insert{'A', 'BB'}</command>. The BNF description of the components
-is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</link>.
+is in file <link xlink:href="http://tarantool.org/docs/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">docs/box-protocol.html</link>.
  A third-party contribution written in Lua for unpacking Tarantool messages is in file 
  <link xlink:href="https://github.com/negram/Tnt-dissector/blob/master/tarantool.dis.lua" xlink:title="tarantool.dis.lua">Tnt-dissector</link>.
 
@@ -124,7 +124,7 @@ is in file <link xlink:href="https://github.com/tarantool/tarantool/blob/master/
                 </informaltable>
 <para>
 Now, one could send that packet to the tarantool server,
-and interpret the response (box-protocol.txt has a description
+and interpret the response (docs/box-protocol.html has a description
 of the packet format for responses as well as requests).
 But it would be easier, and less error-prone, if one could
 invoke a routine that formats the packet according to typed
