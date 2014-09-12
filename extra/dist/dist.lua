@@ -88,7 +88,7 @@ function mk_default_dirs(cfg)
     end
     -- create log_dir
     log_dir = fio.dirname(cfg.logger)
-    if fio.stat(log_dir) == nil then
+    if log_dir:find('|') == nil and fio.stat(log_dir) == nil then
         mkdir(log_dir)
     end
 end
