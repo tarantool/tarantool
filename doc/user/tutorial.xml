@@ -350,16 +350,7 @@ ones unless you intend to work on the documentation.</para>
 <command>cd</command> python-daemon-1.5.5
 <command>sudo python</command> setup.py install
 </userinput>
-# python module for template engine (jinja2): For documentation:
-# (If wget fails, check the <citetitle xlink:href="https://pypi.python.org/pypi/Jinja2" xlink:title="Python Jinja2">python-jinja2</citetitle> web site
-# to see what the current version is.)
-<userinput>
-<command>cd</command> ~
-<command>wget</command> https://pypi.python.org/packages/source/J/Jinja2/Jinja2-2.7.2.tar.gz
-<command>tar</command> <option>-xzvf</option> Jinja2-2.7.2.tar.gz
-<command>cd</command> Jinja2-2.7.2
-<command>sudo python</command> setup.py install
-</userinput>
+
 # python module for text-to-html conversion (markdown): For documentation:
 # (If wget fails, check the <citetitle xlink:href="http://pypi.python.org/pypi/Markdown/" xlink:title="Python implementation of Markdown">python-markdown</citetitle> web site
 # to see what the current version is.)
@@ -370,6 +361,19 @@ ones unless you intend to work on the documentation.</para>
 <command>cd</command> Markdown-2.3.1
 <command>sudo python</command> setup.py install
 </userinput>
+# python module which includes Jinja2 template engine: For documentation:
+<userinput>
+<command>sudo pip install pelican</command>
+</userinput>
+# python module for HTML scraping: For documentation:
+<userinput>
+<command>cd</command> ~
+<command>wget</command> http://www.crummy.com/software/BeautifulSoup/bs3/download//3.x/BeautifulSoup-3.2.1.tar.gz
+<command>tar</command> -xzvf BeautifulSoup-3.2.1.tar.gz
+<command>cd</command> BeautifulSoup-3.2.1
+<command>sudo python</command> setup.py install
+</userinput>
+
 </programlisting>
 </para>
 
