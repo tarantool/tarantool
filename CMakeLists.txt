@@ -341,7 +341,7 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
-install (FILES README.md
+install (FILES README.md LICENSE
          DESTINATION share/doc/tarantool)
 
 #
