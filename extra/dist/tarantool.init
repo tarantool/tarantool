@@ -32,7 +32,7 @@ if [ -e "/etc/sysconfig/tarantool" ]; then
 elif [ -e "/etc/default/tarantool" ]; then
     sysconfig_tarantool="/etc/sysconfig/tarantool"
 fi
-CONF_DIR=`echo "dofile('/etc/sysconfig/tarantool') print(instance_dir)" | tarantool`
+CONF_DIR=`echo "dofile('$sysconfig_tarantool') print(instance_dir)" | tarantool`
 if [ "$CONF_DIR" = "nil" ]; then
     CONF_DIR="/etc/tarantool/instances.enabled"
 fi
