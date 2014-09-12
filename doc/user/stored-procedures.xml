@@ -1157,7 +1157,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:put(<replaceable>message[, timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:put(<replaceable>message[, timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message using a channel. If the channel is full,
@@ -1177,7 +1177,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:close()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:close()</emphasis></term>
         <listitem>
             <para>
                Close the channel. All waiters in the channel will be
@@ -1188,7 +1188,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:get(<replaceable>[timeout]</replaceable>)</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:get(<replaceable>[timeout]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Fetch a message from a channel. If the channel is empty,
@@ -1211,7 +1211,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:broadcast(<replaceable>message</replaceable>)</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:broadcast(<replaceable>message</replaceable>)</emphasis></term>
         <listitem>
             <para>
              If the channel is empty, <code>channel:broadcast()</code> is equivalent to
@@ -1225,7 +1225,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_empty()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:is_empty()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty (has no messages).
@@ -1236,7 +1236,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_full()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:is_full()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full.
@@ -1247,7 +1247,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_readers()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:has_readers()</emphasis></term>
         <listitem>
             <para>
                Check whether the specified channel is empty and has readers waiting
@@ -1260,7 +1260,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:has_writers()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:has_writers()</emphasis></term>
         <listitem>
             <para>
                 Check whether the specified channel is full and has writers waiting
@@ -1273,7 +1273,7 @@ the status is dead because the cancel worked.<programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
-        <term><emphasis role="lua">channel:is_closed()</emphasis></term>
+        <term><emphasis role="lua"><replaceable>channel</replaceable>:is_closed()</emphasis></term>
         <listitem>
             <simpara>
                 Returns: (type = boolean) true if the specified channel is already
@@ -1531,7 +1531,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sysconnect" xreflabel="socket-sysconnect"><emphasis role="lua">sock:sysconnect(<replaceable>host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-sysconnect" xreflabel="socket-sysconnect"><emphasis role="lua"><replaceable>sock</replaceable>:sysconnect(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
@@ -1554,7 +1554,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua">sock:tcp_connect(<replaceable>host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua"><replaceable>sock</replaceable>:tcp_connect(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
@@ -1572,7 +1572,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-send" xreflabel="socket-send"><emphasis role="lua">sock:send(<replaceable>data</replaceable>)</emphasis></term>
+        <term xml:id="socket-send" xreflabel="socket-send"><emphasis role="lua"><replaceable>sock</replaceable>:send(<replaceable>data</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Send data over a connected socket.
@@ -1590,7 +1590,7 @@ end
     </varlistentry>
     
     <varlistentry>
-        <term xml:id="socket-syswrite" xreflabel="socket-syswrite"><emphasis role="lua">sock:syswrite(<replaceable>size</replaceable>)</emphasis></term>
+        <term xml:id="socket-syswrite" xreflabel="socket-syswrite"><emphasis role="lua"><replaceable>sock</replaceable>:syswrite(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Write as much as possible data to the socket buffer if non-blocking.
@@ -1622,7 +1622,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua">sock:readline(<replaceable>[limit] [, separator list]</replaceable>)</emphasis></term>
+        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua"><replaceable>sock</replaceable>:readline(<replaceable>[limit] [, separator list]</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Read a line from a connected socket.
@@ -1669,7 +1669,7 @@ end
     </varlistentry>
 
     <varlistentry>
-     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua">sock:read(<replaceable>size</replaceable>)</emphasis></term>
+     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua"><replaceable>sock</replaceable>:read(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Read data on a socket, until <code>size</code> bytes have been read,
@@ -1680,7 +1680,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sysread" xreflabel="socket-sysread"><emphasis role="lua">sock:sysread(<replaceable>size</replaceable>)</emphasis></term>
+        <term xml:id="socket-sysread" xreflabel="socket-sysread"><emphasis role="lua"><replaceable>sock</replaceable>:sysread(<replaceable>size</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Return all available data from the socket buffer if non-blocking.
@@ -1690,7 +1690,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua">sock:bind(<replaceable>host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-bind" xreflabel="socket-bind"><emphasis role="lua"><replaceable>sock</replaceable>:bind(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Bind a socket to the given host/port.
@@ -1709,7 +1709,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-listen" xreflabel="socket-listen"><emphasis role="lua">sock:listen(backlog)</emphasis></term>
+        <term xml:id="socket-listen" xreflabel="socket-listen"><emphasis role="lua"><replaceable>sock</replaceable>:listen(backlog)</emphasis></term>
         <listitem>
             <para>
                 Start listening for incoming connections.
@@ -1726,7 +1726,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-accept" xreflabel="socket-accept"><emphasis role="lua">sock:accept()</emphasis></term>
+        <term xml:id="socket-accept" xreflabel="socket-accept"><emphasis role="lua"><replaceable>sock</replaceable>:accept()</emphasis></term>
         <listitem>
             <para>
                 Accept a new client connection and create a new connected socket.
@@ -1739,7 +1739,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua">sock:sendto(<replaceable>data, host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-sendto" xreflabel="socket-sendto"><emphasis role="lua"><replaceable>sock</replaceable>:sendto(<replaceable>data, host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Send a message on a UDP socket to a specified host.
@@ -1755,7 +1755,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-recvfrom" xreflabel="socket-recvfrom"><emphasis role="lua">sock:recvfrom(<replaceable>limit</replaceable>)</emphasis></term>
+        <term xml:id="socket-recvfrom" xreflabel="socket-recvfrom"><emphasis role="lua"><replaceable>sock</replaceable>:recvfrom(<replaceable>limit</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Receive a message on a UDP socket.
@@ -1771,7 +1771,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-shutdown" xreflabel="socket-shutdown"><emphasis role="lua">sock:shutdown(<replaceable>how</replaceable>)</emphasis></term>
+        <term xml:id="socket-shutdown" xreflabel="socket-shutdown"><emphasis role="lua"><replaceable>sock</replaceable>:shutdown(<replaceable>how</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Shutdown a reading end, a writing end, or both ends of a socket.
@@ -1787,7 +1787,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-close" xreflabel="socket-close"><emphasis role="lua">sock:close()</emphasis></term>
+        <term xml:id="socket-close" xreflabel="socket-close"><emphasis role="lua"><replaceable>sock</replaceable>:close()</emphasis></term>
         <listitem>
             <para>
                 Close (destroy) a socket.
@@ -1803,7 +1803,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-error" xreflabel="socket-error"><emphasis role="lua">sock:error() and sock:errno()</emphasis></term>
+        <term xml:id="socket-error" xreflabel="socket-error"><emphasis role="lua"><replaceable>sock</replaceable>:error() and <replaceable>sock</replaceable>:errno()</emphasis></term>
         <listitem>
             <para>
                 Retrieve information about the last error that occurred on a socket, if any.
@@ -1819,7 +1819,7 @@ end
     </varlistentry>
     
     <varlistentry>
-        <term xml:id="socket-setsockopt" xreflabel="socket-setsockopt"><emphasis role="lua">sock:setsockopt(<replaceable>level, name, value</replaceable>)</emphasis></term>
+        <term xml:id="socket-setsockopt" xreflabel="socket-setsockopt"><emphasis role="lua"><replaceable>sock</replaceable>:setsockopt(<replaceable>level, name, value</replaceable>)</emphasis></term>
         <listitem>
             <para>
              Set socket flags. The argument values are the same as in the <link xlink:href="http://man7.org/linux/man-pages/man2/setsockopt.2.html">Linux man page</link>.
@@ -1835,7 +1835,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-getsockopt" xreflabel="socket-getsockopt"><emphasis role="lua">sock:getsockopt(<replaceable>level, name</replaceable>)</emphasis></term>
+        <term xml:id="socket-getsockopt" xreflabel="socket-getsockopt"><emphasis role="lua"><replaceable>sock</replaceable>:getsockopt(<replaceable>level, name</replaceable>)</emphasis></term>
         <listitem>
             <para>
               Get socket flags. For a list of possible flags see description of the previous function,
@@ -1845,7 +1845,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-linger" xreflabel="socket-linger"><emphasis role="lua">sock:linger([<replaceable>active</replaceable>])</emphasis></term>
+        <term xml:id="socket-linger" xreflabel="socket-linger"><emphasis role="lua"><replaceable>sock</replaceable>:linger([<replaceable>active</replaceable>])</emphasis></term>
         <listitem>
             <para>
               Set or clear the SO_LINGER flag. For a description of the flag, see  <link xlink:href="http://man7.org/linux/man-pages/man1/loginctl.1.html">Linux man page</link>.
@@ -1860,7 +1860,7 @@ end
     </varlistentry>
     
     <varlistentry>
-        <term xml:id="socket-nonblock" xreflabel="socket-nonblock"><emphasis role="lua">sock:nonblock([<replaceable>flag</replaceable>])</emphasis></term>
+        <term xml:id="socket-nonblock" xreflabel="socket-nonblock"><emphasis role="lua"><replaceable>sock</replaceable>:nonblock([<replaceable>flag</replaceable>])</emphasis></term>
         <listitem>
             <para>
              <code>sock:nonblock()</code> returns the current flag value.
@@ -1872,7 +1872,7 @@ end
     </varlistentry>
     
     <varlistentry>
-     <term xml:id="socket-readable" xreflabel="socket-readable"><emphasis role="lua">sock:readable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:writable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:wait([<replaceable>timeout</replaceable>])</emphasis></term>
+     <term xml:id="socket-readable" xreflabel="socket-readable"><emphasis role="lua"><replaceable>sock</replaceable>:readable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:writable([<replaceable>timeout</replaceable>])</emphasis>, <emphasis>sock:wait([<replaceable>timeout</replaceable>])</emphasis></term>
         <listitem>
             <para>
                <code>sock:readable()</code> waits until something is readable, or until a timeout value expires.
