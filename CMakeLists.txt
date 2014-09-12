@@ -341,7 +341,7 @@ add_subdirectory(extra)
 add_subdirectory(test)
 add_subdirectory(doc)
 
-install (FILES README.md LICENSE doc/box-protocol.txt
+install (FILES README.md
          DESTINATION share/doc/tarantool)
 
 #
