@@ -14,7 +14,7 @@
     <itemizedlist>
     <listitem><para>a user guide</para></listitem>
     <listitem><para>a developer guide (you're reading it)</para></listitem>
-    <listitem><para>protocol description doc/www/content/docs/box-protocol.rst</para></listitem>
+    <listitem><para>protocol description doc/www/content/doc/box-protocol.rst</para></listitem>
     <listitem><para>coding style guides for Lua, Objective C, C, Python (for
     other connectors, we use conventions of the connector programming
     language community)</para></listitem>

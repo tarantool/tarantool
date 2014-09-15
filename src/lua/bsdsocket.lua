@@ -163,11 +163,12 @@ socket_methods.syswrite = function(self, octets)
     return tonumber(done)
 end
 
-socket_methods.sysread = function(self, len)
+socket_methods.sysread = function(self, size)
     local fd = check_socket(self)
+    size = size or 4096
     self._errno = nil
-    local buf = ffi.new('char[?]', len)
-    local res = ffi.C.read(fd, buf, len)
+    local buf = ffi.new('char[?]', size)
+    local res = ffi.C.read(fd, buf, size)
 
     if res < 0 then
         self._errno = boxerrno()
@@ -531,7 +532,7 @@ local function readchunk(self, size, timeout)
 
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread(4096)
+        local data = self:sysread()
         if data ~= nil then
             self.rbuf = self.rbuf .. data
             if string.len(self.rbuf) >= size then
@@ -605,7 +606,7 @@ local function readline(self, limit, eol, timeout)
         
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread(4096)
+        local data = self:sysread()
         if data ~= nil then
             self.rbuf = self.rbuf .. data
 
@@ -704,9 +705,7 @@ socket_methods.recv = function(self, size, flags)
         return nil
     end
 
-    if size == nil then
-        size = 512
-    end
+    size = size or 512
     self._errno = nil
     local buf = ffi.new("char[?]", size)
 
@@ -726,6 +725,8 @@ socket_methods.recvfrom = function(self, size, flags)
         self._errno = boxerrno.EINVAL
         return nil
     end
+
+    size = size or 512
     self._errno = nil
     local res, from = internal.recvfrom(fd, size, iflags)
     if res == nil then

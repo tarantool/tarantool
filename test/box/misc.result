@@ -120,7 +120,7 @@ t;
   - 'fieldno : 1'
 ...
 ----------------
--- # box.space
+-- # box.slab
 ----------------
 string.match(tostring(box.slab.info()), '^table:') ~= nil;
 ---
@@ -153,6 +153,13 @@ t;
   - arena_used
   - arena_size
   - slabs
+...
+--
+-- gh-502: box.slab.info() excessively sparse array
+--
+type(require('yaml').encode(box.slab.info()));
+---
+- string
 ...
 ----------------
 -- # box.error

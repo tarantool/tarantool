@@ -18,7 +18,7 @@
   <itemizedlist>
     <listitem><para>
       Primary port. This port is for handling requests in the
-      <link xlink:href="http://tarantool.org/docs/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>
+      <link xlink:href="http://tarantool.org/doc/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">native Tarantool protocol</link>
       (also called the "binary protocol"), and provides full data access.
       </para>
       <para>
@@ -99,7 +99,7 @@
     A complete description of the binary protocol
     is maintained in annotated Backus-Naur
     form in the source tree: please see
-    <link xlink:href="http://tarantool.org/docs/box-protocol.html"><filename>doc/box-protocol.html</filename></link>.
+    <link xlink:href="http://tarantool.org/doc/box-protocol.html"><filename>doc/box-protocol.html</filename></link>.
   </para>
 </section>
 
