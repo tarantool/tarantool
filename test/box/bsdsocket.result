@@ -149,7 +149,7 @@ s:wait(.01)
 ---
 - RW
 ...
-pong = s:sysread(4096)
+pong = s:sysread()
 ---
 ...
 string.len(pong)
@@ -223,7 +223,7 @@ sc:readable(.5)
 ---
 - true
 ...
-sc:sysread(4096)
+sc:sysread()
 ---
 - ok
 ...
@@ -265,7 +265,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:339: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:340: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -685,7 +685,7 @@ s:readable(10)
 ---
 - true
 ...
-s:recv(4096)
+s:recv()
 ---
 - Hello, world
 ...
@@ -697,7 +697,7 @@ s:readable(10)
 ---
 - true
 ...
-d, from = s:recvfrom(4096)
+d, from = s:recvfrom()
 ---
 ...
 from.port > 0
@@ -768,7 +768,7 @@ sc:readable(1)
 ---
 - true
 ...
-data_r, from_r = sc:recvfrom(4096)
+data_r, from_r = sc:recvfrom()
 ---
 ...
 data_r

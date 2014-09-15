@@ -804,7 +804,7 @@ local remote_methods = {
                 end
 
                 if self:_is_r_state() then
-                    local data = self.s:sysread(4096)
+                    local data = self.s:sysread()
 
                     if data ~= nil then
                         self.rbuf = self.rbuf .. data
