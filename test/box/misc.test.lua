@@ -50,7 +50,7 @@ end;
 t;
 
 ----------------
--- # box.space
+-- # box.slab
 ----------------
 string.match(tostring(box.slab.info()), '^table:') ~= nil;
 box.slab.info().arena_used >= 0;
@@ -61,6 +61,11 @@ for k, v in pairs(box.slab.info()) do
     table.insert(t, k)
 end;
 t;
+
+--
+-- gh-502: box.slab.info() excessively sparse array
+--
+type(require('yaml').encode(box.slab.info()));
 
 ----------------
 -- # box.error
