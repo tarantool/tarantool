@@ -25,8 +25,8 @@ TRANSLATION_FEED_ATOM = None
 
 DEFAULT_PAGINATION = False
 
-DOCS_PATH = ['docs']
-ARTICLE_EXCLUDES = ['docs']
+DOCS_PATH = ['doc']
+ARTICLE_EXCLUDES = ['doc']
 
 JINJA_FILTERS = {
         're_replace': (lambda s, i, o: re.sub(i, o, s)),

@@ -1,7 +1,7 @@
 :title: IProto protocol
 :slug: box-protocol
-:save_as: docs/box-protocol.html
-:url: docs/box-protocol.html
+:save_as: doc/box-protocol.html
+:url: doc/box-protocol.html
 :template: documentation
 
 --------------------------------------------------------------------------------

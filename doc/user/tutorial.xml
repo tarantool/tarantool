@@ -701,7 +701,7 @@ inserted and selected tuples.
     There is a new format
     (<link xlink:href="https://en.wikipedia.org/wiki/MessagePack">msgpack</link>).
     Snapshot and WAL files have
-    <link xlink:href="http://tarantool.org/docs/box-protocol.html">an implementation of the msgpack format</link>;
+    <link xlink:href="http://tarantool.org/doc/box-protocol.html">an implementation of the msgpack format</link>;
     incompatible with the old format.
     Snapshot and WAL files have the same format (snapshots are  logs of inserts).
   </para>
