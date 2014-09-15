@@ -180,7 +180,7 @@ lua sc:readable(.5)
 ---
  - true
 ...
-lua sc:sysread(4096)
+lua sc:sysread()
 ---
  - ok
 ...
@@ -222,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:345: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:346: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -621,7 +621,7 @@ lua s:readable(10)
 ---
  - true
 ...
-lua local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
+lua local d, from = s:recvfrom() print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
 ---
  - true
  - ["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]
@@ -683,7 +683,7 @@ lua sc:readable(1)
 ---
  - true
 ...
-lua data_r, from_r = sc:recvfrom(4096)
+lua data_r, from_r = sc:recvfrom()
 ---
 ...
 lua data_r
