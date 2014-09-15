@@ -154,7 +154,8 @@ The included language processor is <link xlink:href="http://luajit.org/">LuaJIT<
 Major "built-in" components are: fibers,
 <link xlink:href="http://msgpack.org">MsgPack</link>,
 digest, JSON, <link xlink:href="http://en.wikipedia.org/wiki/Yaml">YAML</link>,
-<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> , and box.
+<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link>,
+fio, and box.
 </para>
 
 <para>
@@ -226,7 +227,12 @@ underlying information about typing, arrays, and structures.
 
 <para>
 <emphasis>IPC</emphasis> is Inter-Process Communication.
-this is useful for implementations of task queues and long polling.
+This is useful for implementations of task queues and long polling.
+</para>
+
+<para>
+<emphasis>Fio</emphasis> is standard file IO,
+adapted to work with Tarantool's fibers in a cooperative environment.
 </para>
 
 <para>
@@ -453,7 +459,7 @@ Password is not valid
 
     <varlistentry>
         <term>
-            <emphasis role="lua">:isnil(<replaceable>uuid_with_type_cdata</replaceable>)</emphasis>
+            <emphasis role="lua"><replaceable>uuid_with_type_cdata</replaceable>:isnil()</emphasis>
         </term>
         <listitem>
             <para>
