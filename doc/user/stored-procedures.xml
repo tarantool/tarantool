@@ -1560,7 +1560,7 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua"><replaceable>sock</replaceable>:tcp_connect(<replaceable>host, port</replaceable>)</emphasis></term>
+        <term xml:id="socket-tcpconnect" xreflabel="socket-tcpconnect"><emphasis role="lua">socket.tcp_connect(<replaceable>host, port</replaceable>)</emphasis></term>
         <listitem>
             <para>
                 Connect a socket to a remote host.
@@ -1572,7 +1572,7 @@ end
                 Returns: (type = userdata) a connected socket, if no error.
             </para>
             <para>
-                Example: <code>sock:tcp_connect('tarantool.org', 80)</code>
+                Example: <code>socket.tcp_connect('tarantool.org', 80)</code>
             </para>
         </listitem>
     </varlistentry>
