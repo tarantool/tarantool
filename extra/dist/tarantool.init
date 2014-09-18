@@ -30,13 +30,16 @@ fi
 if [ -e "/etc/sysconfig/tarantool" ]; then
     sysconfig_tarantool="/etc/sysconfig/tarantool"
 elif [ -e "/etc/default/tarantool" ]; then
-    sysconfig_tarantool="/etc/sysconfig/tarantool"
-fi
-CONF_DIR=`echo "dofile('$sysconfig_tarantool') print(instance_dir)" | tarantool`
-if [ "$CONF_DIR" = "nil" ]; then
-    CONF_DIR="/etc/tarantool/instances.enabled"
+    sysconfig_tarantool="/etc/default/tarantool"
 fi
 
+if [ -n "$sysconfig_tarantool" ]; then
+    CONF_DIR=`echo "dofile('$sysconfig_tarantool') print(instance_dir)" | tarantool`
+fi
+
+if [ -z "$sysconfig_tarantool" -o "$CONF_DIR" = "nil" ]; then
+    CONF_DIR="/etc/tarantool/instances.enabled"
+fi
 
 INSTANCES=`find $CONF_DIR -xtype f -name '*lua'`
 

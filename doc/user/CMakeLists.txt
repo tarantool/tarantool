@@ -1,7 +1,7 @@
-set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www/content/docs/user_guide.html")
-set(PATH_USERGUIDE_HTML_CSS "${PROJECT_BINARY_DIR}/doc/www/output/docs/")
-set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www/content/docs/user_guide/")
-set(PATH_USERGUIDE_HTML_CHUNK_CSS "${PROJECT_BINARY_DIR}/doc/www/output/docs/user_guide/")
+set(PATH_USERGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www/content/doc/user_guide.html")
+set(PATH_USERGUIDE_HTML_CSS "${PROJECT_BINARY_DIR}/doc/www/output/doc/")
+set(PATH_USERGUIDE_HTML_CHUNK "${PROJECT_BINARY_DIR}/doc/www/content/doc/user_guide/")
+set(PATH_USERGUIDE_HTML_CHUNK_CSS "${PROJECT_BINARY_DIR}/doc/www/output/doc/user_guide/")
 set(PATH_USERGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/user/tarantool_user_guide.txt")
 
 if (XMLLINT STREQUAL "XMLLINT-NOTFOUND")

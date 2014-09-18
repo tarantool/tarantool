@@ -6,13 +6,13 @@
                                 User Guide:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- `Multi page HTML </docs/user_guide/>`_
-- `Single Page HTML </docs/user_guide.html>`_
+- `Multi page HTML </doc/user_guide/>`_
+- `Single Page HTML </doc/user_guide.html>`_
 - `FAQ </faq.html>`_
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                              Developer section:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- `Developer Guide </docs/dev_guide.html>`_
-- `IProto Protocol </docs/box-protocol.html>`_
+- `Developer Guide </doc/dev_guide.html>`_
+- `IProto Protocol </doc/box-protocol.html>`_

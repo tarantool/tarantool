@@ -54,7 +54,7 @@ s:syswrite(ping)
 s:readable(1)
 s:wait(.01)
 
-pong = s:sysread(4096)
+pong = s:sysread()
 string.len(pong)
 msgpack.decode(pong)
 msgpack.decode(pong, 6)
@@ -76,7 +76,7 @@ sc:nonblock(false)
 sc:sysconnect('127.0.0.1', 3457)
 sc:nonblock(true)
 sc:readable(.5)
-sc:sysread(4096)
+sc:sysread()
 string.match(tostring(sc), ', peer') ~= nil
 #sevres
 sevres[1].host
@@ -223,11 +223,11 @@ s:bind('127.0.0.1', 3548)
 sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
 sc:sendto('127.0.0.1', 3548, 'Hello, world')
 s:readable(10)
-s:recv(4096)
+s:recv()
 
 sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')
 s:readable(10)
-d, from = s:recvfrom(4096)
+d, from = s:recvfrom()
 from.port > 0
 from.port = 'Random port'
 json.encode{d, from}
@@ -247,7 +247,7 @@ data, from = s:recvfrom(10)
 data
 s:sendto(from.host, from.port, 'Hello, hello!')
 sc:readable(1)
-data_r, from_r = sc:recvfrom(4096)
+data_r, from_r = sc:recvfrom()
 data_r
 from_r.host
 from_r.port == s:name().port

@@ -2,8 +2,8 @@ if (JING STREQUAL "JING-NOTFOUND")
     message (FATAL_ERROR "jing is missing")
 endif()
 
-set(PATH_DEVGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www/content/docs/dev_guide.html")
-set(PATH_DEVGUIDE_HTML_CSS "${PROJECT_BINARY_DIR}/doc/www/content/docs/")
+set(PATH_DEVGUIDE_HTML "${PROJECT_BINARY_DIR}/doc/www/content/doc/dev_guide.html")
+set(PATH_DEVGUIDE_HTML_CSS "${PROJECT_BINARY_DIR}/doc/www/output/doc/")
 set(PATH_DEVGUIDE_TXT "${PROJECT_BINARY_DIR}/doc/developer/dev_guide.txt")
 
 add_custom_target(doc-check-dev

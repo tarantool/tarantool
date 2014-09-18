@@ -26,8 +26,8 @@ class DocumentationContainer(object):
 class DocumentationGenerator(Generator):
     def __init__(self, *args, **kwargs):
         super(DocumentationGenerator, self).__init__(*args, **kwargs)
-        self.docs_html = []
-        self.docs_rst = []
+        self.doc_html = []
+        self.doc_rst = []
 
     def _doc_read_file(self, relpath, op=False):
         abspath = os.path.join(self.path, relpath)
@@ -59,7 +59,7 @@ class DocumentationGenerator(Generator):
                 if not os.path.isfile(op_abspath):
                     continue
                 page = self._doc_read_file(op_relpath, True)
-                self.docs_html.append(DocumentationContainer(page))
+                self.doc_html.append(DocumentationContainer(page))
                 if not os.path.isdir(op_abspath[:-5]):
                     continue
                 mp_abspath = os.path.join(op_abspath[:-5], '*.html')
@@ -68,7 +68,7 @@ class DocumentationGenerator(Generator):
                     if not os.path.isfile(mp_html_abspath):
                         continue
                     page = self._doc_read_file(mp_html_relpath, False)
-                    self.docs_html[-1].add_mpage(page)
+                    self.doc_html[-1].add_mpage(page)
         for docpath in self.settings['DOCS_PATH']:
             abspath = os.path.join(self.path, docpath, '*.rst')
             for op_abspath in glob.glob(abspath):
@@ -87,10 +87,10 @@ class DocumentationGenerator(Generator):
                 if not is_valid_content(page, op_relpath):
                     continue
                 if page:
-                    self.docs_rst.append(DocumentationContainer(page))
+                    self.doc_rst.append(DocumentationContainer(page))
 
     def generate_output(self, writer):
-        for doc_cont in self.docs_html:
+        for doc_cont in self.doc_html:
             opage = doc_cont.opage
             writer.write_file(
                     opage.save_as,
@@ -105,7 +105,7 @@ class DocumentationGenerator(Generator):
                         self.context,
                         page = mpage,
                         documentation = True)
-        for doc_cont in self.docs_rst:
+        for doc_cont in self.doc_rst:
             opage = doc_cont.opage
             writer.write_file(
                     opage.save_as,
