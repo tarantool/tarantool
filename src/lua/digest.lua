@@ -25,6 +25,10 @@ ffi.cdef[[
     typedef uint32_t (*crc32_func)(uint32_t crc,
         const unsigned char *buf, unsigned int len);
     extern crc32_func crc32_calc;
+
+   /* base64 */
+   int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
+   int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len);
 ]]
 
 local ssl
@@ -67,6 +71,37 @@ local function tohex(r, size)
 end
 
 local m = {
+    base64_encode = function(bin)
+        if bin == nil then
+            bin = ''
+        else
+            -- note: need add check size of bin, bin might containe any binary data
+            if type(bin) == 'string' then
+                local blen = string.len(bin)
+                local slen = math.ceil(blen * 4 / 3) + 1
+                local so  = ffi.new('char[?]', slen)
+                local len = ffi.C.base64_encode(bin, blen, so, slen)
+                bin = ffi.string(so, len)
+            else
+                bin = ''
+            end
+        end
+        return bin
+    end,
+
+    base64_decode = function(data)
+        if type(data) ~= 'string' then
+            data = ''
+        else
+            local slen = string.len(data)
+            local blen = math.ceil((slen - 1) * 4 / 3)
+            local bo  = ffi.new('char[?]', blen)
+            local len = ffi.C.base64_decode(data, slen, bo, blen)
+            data = ffi.string(bo, len)
+        end
+        return data
+    end,
+
     crc32 = function(str)
         if str == nil then
             str = ''

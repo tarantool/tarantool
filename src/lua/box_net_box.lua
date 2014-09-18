@@ -39,12 +39,6 @@ local GREETING_SIZE     = 128
 
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
-
-ffi.cdef[[
-    int base64_decode(const char *in_base64, int in_len,
-                  char *out_bin, int out_len);
-]]
-
 local sequence_mt = { __serialize = 'sequence'}
 local mapping_mt = { __serialize = 'mapping'}
 
@@ -73,13 +67,6 @@ local function strxor(s1, s2)
         res = res .. string.char(bit.bxor(b1, b2))
     end
     return res
-end
-
-local function b64decode(str)
-    local so = ffi.new('char[?]', string.len(str) * 2);
-    local len =
-        ffi.C.base64_decode(str, string.len(str), so, string.len(str) * 2)
-    return ffi.string(so, len)
 end
 
 local function keyfy(v)
@@ -215,7 +202,7 @@ local proto = {
 
     auth = function(sync, user, password, handshake)
         local saltb64 = string.sub(handshake, 65)
-        local salt = string.sub(b64decode(saltb64), 1, 20)
+        local salt = string.sub(digest.base64_decode(saltb64), 1, 20)
 
         local hpassword = digest.sha1(password)
         local hhpassword = digest.sha1(hpassword)
@@ -228,7 +215,7 @@ local proto = {
         )
     end,
 
-    b64decode = b64decode,
+    b64decode = digest.base64_decode,
 }
 
 

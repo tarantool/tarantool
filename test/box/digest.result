@@ -149,6 +149,14 @@ digest.crc32_update(digest.crc32('abc'), 'cde')
 ---
 - 3628146660
 ...
+digest.base64_encode('12345')
+---
+- MTIzNDU=
+...
+digest.base64_decode('MTIzNDU=')
+---
+- '12345'
+...
 digest = nil
 ---
 ...
