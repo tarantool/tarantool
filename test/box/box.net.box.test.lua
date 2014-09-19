@@ -136,10 +136,20 @@ cn:call('test_foo', 'a', 'b', 'c')
 remote.self:call('test_foo', 'a', 'b', 'c')
 cn:call('test_foo', 'a', 'b', 'c')
 
+-- long replies
+function long_rep() return { 1,  string.rep('a', 5000) } end
+res = cn:call('long_rep')
+res[1][1] == 1
+res[1][2] == string.rep('a', 5000)
+
+function long_rep() return { 1,  string.rep('a', 50000) } end
+res = cn:call('long_rep')
+res[1][1] == 1
+res[1][2] == string.rep('a', 50000)
+
 -- auth
 cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
 cn.proto.b64decode('gJLoc!!!!!!!')
-
 
 cn = remote:new('127.0.0.1', port, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()
@@ -171,6 +181,8 @@ cn = remote:timeout(1):new('127.0.0.1', port, { user = 'netbox', password = '123
 remote.self:ping()
 remote.self.space.net_box_test_space:select{234}
 remote.self:timeout(123).space.net_box_test_space:select{234}
+
+
 
 -- cleanup database after tests
 space:drop()

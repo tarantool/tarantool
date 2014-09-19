@@ -382,6 +382,35 @@ cn:call('test_foo', 'a', 'b', 'c')
   - [{'b': 2}]
   - ['c']
 ...
+-- long replies
+function long_rep() return { 1,  string.rep('a', 5000) } end
+---
+...
+res = cn:call('long_rep')
+---
+...
+res[1][1] == 1
+---
+- true
+...
+res[1][2] == string.rep('a', 5000)
+---
+- true
+...
+function long_rep() return { 1,  string.rep('a', 50000) } end
+---
+...
+res = cn:call('long_rep')
+---
+...
+res[1][1] == 1
+---
+- true
+...
+res[1][2] == string.rep('a', 50000)
+---
+- true
+...
 -- auth
 cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
 ---
