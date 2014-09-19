@@ -89,7 +89,7 @@ end
 
 -- a precreated metatable for totable()
 local tuple_totable_mt = {
-    _serializer_compact = true;
+    __serialize = 'seq'; -- enables flow mode for yaml
 }
 
 local function tuple_totable(tuple)
@@ -155,7 +155,8 @@ local methods = {
     ["totable"]     = tuple_totable;
     ["bsize"]       = function(tuple)
         return tonumber(tuple._bsize)
-    end
+    end;
+    ["__serialize"] = tuple_totable; -- encode hook for msgpack/yaml/json
 }
 
 local const_struct_tuple_ref_t = ffi.typeof('const struct tuple&')

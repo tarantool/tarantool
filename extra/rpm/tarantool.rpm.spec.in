@@ -246,7 +246,6 @@ chkconfig --del tarantool
 %dir "%{_datadir}/doc/tarantool"
 "%{_datadir}/doc/tarantool/README.md"
 "%{_datadir}/doc/tarantool/LICENSE"
-"%{_datadir}/doc/tarantool/box-protocol.txt"
 
 "%{_mandir}/man1/tarantool.1.gz"
 

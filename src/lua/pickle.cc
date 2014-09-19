@@ -38,6 +38,7 @@ extern "C" {
 } /* extern "C" */
 
 #include "lua/utils.h"
+#include "lua/msgpack.h" /* luaL_msgpack_default */
 #include <tbuf.h>
 #include <fiber.h>
 #include "bit/bit.h"
@@ -62,7 +63,7 @@ lbox_pack(struct lua_State *L)
 		if (i > nargs)
 			luaL_error(L, "pickle.pack: argument count does not match "
 				   "the format");
-		luaL_tofield(L, i, &field);
+		luaL_checkfield(L, luaL_msgpack_default, i, &field);
 		switch (*format) {
 		case 'B':
 		case 'b':

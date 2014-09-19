@@ -246,7 +246,7 @@ lbox_request_create(struct request *request,
 	request->space_id = lua_tointeger(L, 1);
 	if (key > 0) {
 		struct tbuf *key_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, key_buf, key);
+		luamp_encode(L, luaL_msgpack_default, key_buf, key);
 		request->key = key_buf->data;
 		request->key_end = key_buf->data + key_buf->size;
 		if (mp_typeof(*request->key) != MP_ARRAY)
@@ -254,7 +254,7 @@ lbox_request_create(struct request *request,
 	}
 	if (tuple > 0) {
 		struct tbuf *tuple_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, tuple_buf, tuple);
+		luamp_encode(L, luaL_msgpack_default, tuple_buf, tuple);
 		request->tuple = tuple_buf->data;
 		request->tuple_end = tuple_buf->data + tuple_buf->size;
 		if (mp_typeof(*request->tuple) != MP_ARRAY)
@@ -558,7 +558,7 @@ box_lua_call(struct request *request, struct port *port)
 	luaL_checkstack(L, arg_count, "call: out of stack");
 
 	for (uint32_t i = 0; i < arg_count; i++) {
-		luamp_decode(L, &args);
+		luamp_decode(L, luaL_msgpack_default, &args);
 	}
 	lbox_call(L, arg_count + oc - 1, LUA_MULTRET);
 	/* Send results of the called procedure to the client. */

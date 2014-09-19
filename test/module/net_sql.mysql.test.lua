@@ -36,14 +36,14 @@ do
     return err == 'error: src/module/sql/sql.lua:111: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near \'SEL ECT 1\' at line 1'
 end;
 --# setopt delimiter ''
-dump({c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')})
+c:execute('SELECT ? AS bool1, ? AS bool2, ? AS nil, ? AS num, ? AS str', true, false, nil, 123, 'abc')
 
-dump({c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)})
-dump({c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')})
-dump({c:execute('CALL p1')})
-dump({c:execute('DROP PROCEDURE p1')})
-dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2')})
-dump({c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')})
+c:execute('SELECT * FROM (SELECT ?) t WHERE 1 = 0', 2)
+c:execute('CREATE PROCEDURE p1() BEGIN SELECT 1 AS One; SELECT 2 AS Two, 3 AS Three; END')
+c:execute('CALL p1')
+c:execute('DROP PROCEDURE p1')
+c:execute('SELECT 1 AS one UNION ALL SELECT 2')
+c:execute('SELECT 1 AS one UNION ALL SELECT 2; SELECT ? AS two', 'abc')
 
 c:quote('test \"abc\" test')
 

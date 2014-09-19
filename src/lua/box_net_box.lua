@@ -45,11 +45,14 @@ ffi.cdef[[
                   char *out_bin, int out_len);
 ]]
 
+local sequence_mt = { __serialize = 'sequence'}
+local mapping_mt = { __serialize = 'mapping'}
 
 local function request(header, body)
 
-    header = msgpack.encode(header)
-    body = msgpack.encode(body)
+    -- hint msgpack to always encode header and body as a map
+    header = msgpack.encode(setmetatable(header, mapping_mt))
+    body = msgpack.encode(setmetatable(body, mapping_mt))
 
     local len = msgpack.encode(string.len(header) + string.len(body))
 
@@ -78,7 +81,6 @@ local function b64decode(str)
         ffi.C.base64_decode(str, string.len(str), so, string.len(str) * 2)
     return ffi.string(so, len)
 end
-
 
 local function keyfy(v)
     if type(v) == 'table' then
@@ -524,6 +526,8 @@ local remote_methods = {
             hdr, off = msgpack.decode(self.rbuf, off)
             if off < #self.rbuf then
                 body, off = msgpack.decode(self.rbuf, off)
+                -- disable YAML flow output (useful for admin console)
+                setmetatable(body, mapping_mt)
             else
                 body = {}
             end
@@ -800,7 +804,7 @@ local remote_methods = {
                 end
 
                 if self:_is_r_state() then
-                    local data = self.s:sysread(4096)
+                    local data = self.s:sysread()
 
                     if data ~= nil then
                         self.rbuf = self.rbuf .. data
@@ -936,6 +940,8 @@ local remote_methods = {
             for i, v in pairs(response.body[DATA]) do
                 response.body[DATA][i] = box.tuple.new(response.body[DATA][i])
             end
+            -- disable YAML flow output (useful for admin console)
+            setmetatable(response.body[DATA], sequence_mt)
         end
 
         return response

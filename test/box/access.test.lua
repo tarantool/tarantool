@@ -175,3 +175,19 @@ box.space._user:insert{10, 1, 'name', 'strange-object-type'}
 box.space._user:insert{10, 1, 'name', 'user', 'password'}
 box.space._user:insert{10, 1, 'name', 'role', 'password'}
 session = nil
+-- -----------------------------------------------------------
+-- admin can't manage grants on not owned objects
+-- -----------------------------------------------------------
+box.schema.user.create('twostep')
+box.schema.user.grant('twostep', 'read,write,execute', 'universe')
+box.session.su('twostep')
+twostep = box.schema.create_space('twostep')
+twostep:create_index('primary')
+box.schema.func.create('test')
+box.session.su('admin')
+box.schema.user.revoke('twostep', 'execute,read,write', 'universe')
+box.schema.user.create('twostep_client')
+box.schema.user.grant('twostep_client', 'execute', 'function', 'test')
+box.schema.user.drop('twostep')
+box.schema.user.drop('twostep_client')
+-- the space is dropped when the user is dropped

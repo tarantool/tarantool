@@ -475,6 +475,30 @@ lbox_fiber_kill(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_fiber_serialize(struct lua_State *L)
+{
+	struct fiber *f = lbox_checkfiber(L, 1);
+	lua_createtable(L, 0, 1);
+	lua_pushinteger(L, f->fid);
+	lua_setfield(L, -2, "id");
+	lua_pushstring(L, fiber_name(f));
+	lua_setfield(L, -2, "name");
+	lbox_fiber_status(L);
+	lua_setfield(L, -2, "status");
+	return 1;
+}
+
+static int
+lbox_fiber_tostring(struct lua_State *L)
+{
+	char buf[20];
+	struct fiber *f = lbox_checkfiber(L, 1);
+	snprintf(buf, sizeof(buf), "fiber: %d", f->fid);
+	lua_pushstring(L, buf);
+	return 1;
+}
+
 /**
  * Check if this current fiber has been cancelled and
  * throw an exception if this is the case.
@@ -519,6 +543,8 @@ static const struct luaL_reg lbox_fiber_meta [] = {
 	{"cancel", lbox_fiber_cancel},
 	{"status", lbox_fiber_status},
 	{"testcancel", lbox_fiber_testcancel},
+	{"__serialize", lbox_fiber_serialize},
+	{"__tostring", lbox_fiber_tostring},
 	{"wakeup", lbox_fiber_wakeup},
 	{"__index", lbox_fiber_index},
 	{"__gc", lbox_fiber_gc},

@@ -1,6 +1,9 @@
 json = require 'json'
 ---
 ...
+yaml = require 'yaml'
+---
+...
 pickle = require 'pickle'
 ---
 ...
@@ -149,7 +152,7 @@ s:wait(.01)
 ---
 - RW
 ...
-pong = s:sysread(4096)
+pong = s:sysread()
 ---
 ...
 string.len(pong)
@@ -163,8 +166,7 @@ msgpack.decode(pong)
 ...
 msgpack.decode(pong, 6)
 ---
-- 0: 0
-  1: 0
+- {0: 0, 1: 0}
 - 23
 ...
 s:close()
@@ -224,7 +226,7 @@ sc:readable(.5)
 ---
 - true
 ...
-sc:sysread(4096)
+sc:sysread()
 ---
 - ok
 ...
@@ -266,7 +268,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:339: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:341: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -636,14 +638,14 @@ require('errno').strerror(sc:getsockopt('SOL_SOCKET', 'SO_ERROR'))
 json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 ---
-- '{}'
+- '[]'
 ...
 --# setopt delimiter ''
 json.encode(socket.getaddrinfo('ya.ru', '80',
     { flags = { 'AI_NUMERICSERV', 'AI_NUMERICHOST', } }))
 
 ---
-- '{}'
+- '[]'
 ...
 sc = socket('AF_INET', 'SOCK_STREAM', 'tcp')
 ---
@@ -686,7 +688,7 @@ s:readable(10)
 ---
 - true
 ...
-s:recv(4096)
+s:recv()
 ---
 - Hello, world
 ...
@@ -698,7 +700,7 @@ s:readable(10)
 ---
 - true
 ...
-d, from = s:recvfrom(4096)
+d, from = s:recvfrom()
 ---
 ...
 from.port > 0
@@ -769,7 +771,7 @@ sc:readable(1)
 ---
 - true
 ...
-data_r, from_r = sc:recvfrom(4096)
+data_r, from_r = sc:recvfrom()
 ---
 ...
 data_r
@@ -1312,4 +1314,28 @@ socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
 ---
 - true
+...
+-- Test serializers with sockets
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+x = s:wait()
+---
+...
+-- waiters is map
+s.waiters
+---
+- {}
+...
+-- check __serialize hook
+json.decode(json.encode(s)).fd == s:fd()
+---
+- true
+...
+yaml.decode(yaml.encode(s)).fd == s:fd()
+---
+- true
+...
+s = nil
+---
 ...

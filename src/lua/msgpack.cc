@@ -43,7 +43,9 @@ extern "C" {
 #include <fiber.h>
 #include "small/region.h"
 
-static void
+struct luaL_serializer *luaL_msgpack_default = NULL;
+
+static int
 luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *buf);
 
 static void
@@ -55,8 +57,9 @@ static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
 
 void
-luamp_encode_array(struct tbuf *buf, uint32_t size)
+luamp_encode_array(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size)
 {
+	(void) cfg;
 	assert(mp_sizeof_array(size) <= 5);
 	tbuf_ensure(buf, 5 + size);
 	char *data = mp_encode_array(buf->data + buf->size, size);
@@ -65,8 +68,9 @@ luamp_encode_array(struct tbuf *buf, uint32_t size)
 }
 
 void
-luamp_encode_map(struct tbuf *buf, uint32_t size)
+luamp_encode_map(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size)
 {
+	(void) cfg;
 	assert(mp_sizeof_map(size) <= 5);
 	tbuf_ensure(buf, 5 + size);
 
@@ -76,8 +80,9 @@ luamp_encode_map(struct tbuf *buf, uint32_t size)
 }
 
 void
-luamp_encode_uint(struct tbuf *buf, uint64_t num)
+luamp_encode_uint(struct luaL_serializer *cfg, struct tbuf *buf, uint64_t num)
 {
+	(void) cfg;
 	assert(mp_sizeof_uint(num) <= 9);
 	tbuf_ensure(buf, 9);
 
@@ -87,8 +92,9 @@ luamp_encode_uint(struct tbuf *buf, uint64_t num)
 }
 
 void
-luamp_encode_int(struct tbuf *buf, int64_t num)
+luamp_encode_int(struct luaL_serializer *cfg, struct tbuf *buf, int64_t num)
 {
+	(void) cfg;
 	assert(mp_sizeof_int(num) <= 9);
 	tbuf_ensure(buf, 9);
 
@@ -98,8 +104,9 @@ luamp_encode_int(struct tbuf *buf, int64_t num)
 }
 
 void
-luamp_encode_float(struct tbuf *buf, float num)
+luamp_encode_float(struct luaL_serializer *cfg, struct tbuf *buf, float num)
 {
+	(void) cfg;
 	assert(mp_sizeof_float(num) <= 5);
 	tbuf_ensure(buf, 5);
 
@@ -109,8 +116,9 @@ luamp_encode_float(struct tbuf *buf, float num)
 }
 
 void
-luamp_encode_double(struct tbuf *buf, double num)
+luamp_encode_double(struct luaL_serializer *cfg, struct tbuf *buf, double num)
 {
+	(void) cfg;
 	assert(mp_sizeof_double(num) <= 9);
 	tbuf_ensure(buf, 9);
 
@@ -120,8 +128,10 @@ luamp_encode_double(struct tbuf *buf, double num)
 }
 
 void
-luamp_encode_str(struct tbuf *buf, const char *str, uint32_t len)
+luamp_encode_str(struct luaL_serializer *cfg, struct tbuf *buf,
+		 const char *str, uint32_t len)
 {
+	(void) cfg;
 	assert(mp_sizeof_str(len) <= 5 + len);
 	tbuf_ensure(buf, 5 + len);
 
@@ -131,8 +141,9 @@ luamp_encode_str(struct tbuf *buf, const char *str, uint32_t len)
 }
 
 void
-luamp_encode_nil(struct tbuf *buf)
+luamp_encode_nil(struct luaL_serializer *cfg, struct tbuf *buf)
 {
+	(void) cfg;
 	assert(mp_sizeof_nil() <= 1);
 	tbuf_ensure(buf, 1);
 
@@ -142,8 +153,9 @@ luamp_encode_nil(struct tbuf *buf)
 }
 
 void
-luamp_encode_bool(struct tbuf *buf, bool val)
+luamp_encode_bool(struct luaL_serializer *cfg, struct tbuf *buf, bool val)
 {
+	(void) cfg;
 	assert(mp_sizeof_bool(val) <= 1);
 	tbuf_ensure(buf, 1);
 
@@ -152,14 +164,14 @@ luamp_encode_bool(struct tbuf *buf, bool val)
 	buf->size = data - buf->data;
 }
 
-static void
+static int
 luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *b)
 {
+	(void) L;
+	(void) idx;
 	(void) b;
-	luaL_error(L, "msgpack.encode: can not encode Lua type '%s'",
-		   lua_typename(L, lua_type(L, idx)));
+	return -1;
 }
-
 
 void
 luamp_set_encode_extension(luamp_encode_extension_f handler)
@@ -190,61 +202,72 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 }
 
 static void
-luamp_encode_r(struct lua_State *L, struct tbuf *b, int level)
+luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *b,
+	       int level)
 {
 	int index = lua_gettop(L);
 
 	struct luaL_field field;
-	luaL_tofield(L, index, &field);
+	/* Detect field type */
+	luaL_tofield(L, cfg, index, &field);
+	if (field.type == MP_EXT) {
+		/* Run trigger if type can't be encoded */
+		if (luamp_encode_extension(L, index, b) == 0)
+			return; /* Value has been packed by the trigger */
+		/* Try to convert value to serializable type */
+		luaL_convertfield(L, cfg, index, &field);
+	}
 	switch (field.type) {
 	case MP_UINT:
-		return luamp_encode_uint(b, field.ival);
+		return luamp_encode_uint(cfg, b, field.ival);
 	case MP_STR:
 	case MP_BIN:
-		return luamp_encode_str(b, field.sval.data, field.sval.len);
+		return luamp_encode_str(cfg, b, field.sval.data, field.sval.len);
 	case MP_INT:
-		return luamp_encode_int(b, field.ival);
+		return luamp_encode_int(cfg, b, field.ival);
 	case MP_FLOAT:
-		return luamp_encode_float(b, field.fval);
+		return luamp_encode_float(cfg, b, field.fval);
 	case MP_DOUBLE:
-		return luamp_encode_double(b, field.dval);
+		return luamp_encode_double(cfg, b, field.dval);
 	case MP_BOOL:
-		return luamp_encode_bool(b, field.bval);
+		return luamp_encode_bool(cfg, b, field.bval);
 	case MP_NIL:
-		return luamp_encode_nil(b);
+		return luamp_encode_nil(cfg, b);
 	case MP_MAP:
 		/* Map */
-		if (level >= LUA_MP_MAXNESTING)
-			return luamp_encode_nil(b); /* Limit nested maps */
-		luamp_encode_map(b, field.size);
+		if (level >= cfg->encode_max_depth)
+			return luamp_encode_nil(cfg, b); /* Limit nested maps */
+		luamp_encode_map(cfg, b, field.size);
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, index) != 0) {
 			lua_pushvalue(L, -2);
-			luamp_encode_r(L, b, level + 1);
+			luamp_encode_r(L, cfg, b, level + 1);
 			lua_pop(L, 1);
-			luamp_encode_r(L, b, level + 1);
+			luamp_encode_r(L, cfg, b, level + 1);
 			lua_pop(L, 1);
 		}
 		return;
 	case MP_ARRAY:
 		/* Array */
-		if (level >= LUA_MP_MAXNESTING)
-			return luamp_encode_nil(b); /* Limit nested arrays */
-		luamp_encode_array(b, field.size);
+		if (level >= cfg->encode_max_depth)
+			return luamp_encode_nil(cfg, b); /* Limit nested arrays */
+		luamp_encode_array(cfg, b, field.size);
 		for (uint32_t i = 0; i < field.size; i++) {
 			lua_rawgeti(L, index, i + 1);
-			luamp_encode_r(L, b, level + 1);
+			luamp_encode_r(L, cfg, b, level + 1);
 			lua_pop(L, 1);
 		}
 		return;
 	case MP_EXT:
-		luamp_encode_extension(L, index, b);
+		/* handled by luaL_convertfield */
+		assert(false);
 		return;
 	}
 }
 
 void
-luamp_encode(struct lua_State *L, struct tbuf *b, int index)
+luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *b,
+	     int index)
 {
 	int top = lua_gettop(L);
 	if (index < 0)
@@ -255,7 +278,7 @@ luamp_encode(struct lua_State *L, struct tbuf *b, int index)
 		lua_pushvalue(L, index); /* copy a value to the stack top */
 	}
 
-	luamp_encode_r(L, b, 0);
+	luamp_encode_r(L, cfg, b, 0);
 
 	if (!on_top) {
 		lua_remove(L, top + 1); /* remove a value copy */
@@ -263,44 +286,26 @@ luamp_encode(struct lua_State *L, struct tbuf *b, int index)
 }
 
 void
-luamp_decode(struct lua_State *L, const char **data)
+luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
+	     const char **data)
 {
+	double d;
 	switch (mp_typeof(**data)) {
 	case MP_UINT:
-	{
-		uint64_t val = mp_decode_uint(data);
-#if defined(LUAJIT)
-		if (val <= INT32_MAX) {
-			lua_pushinteger(L, val);
-		} else {
-			*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
-						     sizeof(uint64_t)) = val;
-		}
-#else /* !defined(LUAJIT) */
-		lua_pushinteger(L, val);
-#endif /* defined(LUAJIT) */
-		return;
-	}
+		luaL_pushnumber64(L, mp_decode_uint(data));
+		break;
 	case MP_INT:
-	{
-		int64_t val = mp_decode_int(data);
-#if defined(LUAJIT)
-		if (val >= INT32_MIN && val <= INT32_MAX) {
-			lua_pushinteger(L, val);
-		} else {
-			*(int64_t *) luaL_pushcdata(L, CTID_INT64,
-						     sizeof(int64_t)) = val;
-		}
-#else /* !defined(LUAJIT) */
-		lua_pushinteger(L, val);
-#endif /* defined(LUAJIT) */
-		return;
-	}
+		luaL_pushinumber64(L, mp_decode_int(data));
+		break;
 	case MP_FLOAT:
-		lua_pushnumber(L, mp_decode_float(data));
+		d = mp_decode_float(data);
+		luaL_checkfinite(L, cfg, d);
+		lua_pushnumber(L, d);
 		return;
 	case MP_DOUBLE:
-		lua_pushnumber(L, mp_decode_double(data));
+		d = mp_decode_double(data);
+		luaL_checkfinite(L, cfg, d);
+		lua_pushnumber(L, d);
 		return;
 	case MP_STR:
 	{
@@ -321,24 +326,17 @@ luamp_decode(struct lua_State *L, const char **data)
 		return;
 	case MP_NIL:
 		mp_decode_nil(data);
-		lua_pushnil(L);
+		luaL_pushnull(L);
 		return;
 	case MP_ARRAY:
 	{
 		uint32_t size = mp_decode_array(data);
 		lua_createtable(L, size, 0);
+		if (cfg->decode_save_metatables)
+			luaL_setarrayhint(L, -1);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, data);
+			luamp_decode(L, cfg, data);
 			lua_rawseti(L, -2, i + 1);
-		}
-		if (luaL_getn(L, -1) != size) {
-			/*
-			 * Lua does not support NIL as table values.
-			 * Add a NULL userdata to emulate NIL.
-			 */
-			lua_pushinteger(L, size);
-			lua_pushlightuserdata(L, NULL);
-			lua_rawset(L, -3);
 		}
 		return;
 	}
@@ -346,17 +344,11 @@ luamp_decode(struct lua_State *L, const char **data)
 	{
 		uint32_t size = mp_decode_map(data);
 		lua_createtable(L, 0, size);
+		if (cfg->decode_save_metatables)
+			luaL_setmaphint(L, -1);
 		for (uint32_t i = 0; i < size; i++) {
-			luamp_decode(L, data);
-			luamp_decode(L, data);
-			if (lua_type(L, -1) == LUA_TNIL) {
-				/*
-				 * Lua does not support NIL as table values.
-				 * Add a NULL userdata to emulate NIL.
-				 */
-				lua_pop(L, 1);
-				lua_pushlightuserdata(L, NULL);
-			}
+			luamp_decode(L, cfg, data);
+			luamp_decode(L, cfg, data);
 			lua_settable(L, -3);
 		}
 		return;
@@ -375,9 +367,11 @@ lua_msgpack_encode(lua_State *L)
 	if (index != 1)
 		luaL_error(L, "msgpack.encode: a Lua object expected");
 
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+
 	RegionGuard region_guard(&fiber()->gc);
 	struct tbuf *buf = tbuf_new(&fiber()->gc);
-	luamp_encode_r(L, buf, 0);
+	luamp_encode_r(L, cfg, buf, 0);
 	lua_pushlstring(L, buf->data, buf->size);
 	return 1;
 }
@@ -400,27 +394,35 @@ lua_msgpack_decode(lua_State *L)
 	if (mp_check(&b, end))
 		return luaL_error(L, "msgpack.decode: invalid MsgPack");
 
+	struct luaL_serializer *cfg = luaL_checkserializer(L);
+
 	b = data + offset;
-	luamp_decode(L, &b);
+	luamp_decode(L, cfg, &b);
 	lua_pushinteger(L, b - data + 1);
 	return 2;
+}
+
+static int
+lua_msgpack_new(lua_State *L);
+
+const luaL_reg msgpacklib[] = {
+	{ "encode", lua_msgpack_encode },
+	{ "decode", lua_msgpack_decode },
+	{ "new",    lua_msgpack_new },
+	{ NULL, NULL}
+};
+
+static int
+lua_msgpack_new(lua_State *L)
+{
+	luaL_newserializer(L, msgpacklib);
+	return 1;
 }
 
 LUALIB_API int
 luaopen_msgpack(lua_State *L)
 {
-	const luaL_reg msgpacklib[] = {
-		{ "encode", lua_msgpack_encode },
-		{ "dumps",  lua_msgpack_encode },
-		{ "decode", lua_msgpack_decode },
-		{ "loads",  lua_msgpack_decode },
-		{ NULL, NULL}
-	};
-
-	luaL_register_module(L, "msgpack", msgpacklib);
-	/* Add NULL constant */
-	luaL_loadstring(L, "return require('ffi').cast('void *', 0)");
-	lua_call(L, 0, 1);
-	lua_setfield(L, -2, "NULL");
+	luaL_msgpack_default = luaL_newserializer(L, msgpacklib);
+	luaL_register_module(L, "msgpack", NULL);
 	return 1;
 }

@@ -1463,7 +1463,7 @@ priv_def_check(struct priv_def *priv)
 	case SC_SPACE:
 	{
 		struct space *space = space_cache_find(priv->object_id);
-		if (space->def.uid != grantor->uid) {
+		if (space->def.uid != grantor->uid && grantor->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  priv_name(priv->access), grantor->name);
 		}
@@ -1472,7 +1472,7 @@ priv_def_check(struct priv_def *priv)
 	case SC_FUNCTION:
 	{
 		struct func_def *func = func_cache_find(priv->object_id);
-		if (func->uid != grantor->uid) {
+		if (func->uid != grantor->uid && grantor->uid != ADMIN) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  priv_name(priv->access), grantor->name);
 		}

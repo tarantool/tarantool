@@ -254,7 +254,7 @@ box.tuple.new{1, 2, 3}:totable()
 ...
 getmetatable(box.tuple.new{1, 2, 3}:totable())
 ---
-- _serializer_compact: true
+- __serialize: seq
 ...
 --  A test case for the key as an tuple
 space = box.schema.create_space('tweedledum')
@@ -742,6 +742,13 @@ t:findall(-9223372036854775807LL)
 msgpack = require('msgpack')
 ---
 ...
+encode_load_metatables = msgpack.cfg.encode_load_metatables
+---
+...
+-- disable __serialize hook to test internal on_encode hook
+msgpack.cfg{encode_load_metatables = false}
+---
+...
 msgpackffi = require('msgpackffi')
 ---
 ...
@@ -750,43 +757,27 @@ t = box.tuple.new({'a', 'b', 'c'})
 ...
 msgpack.decode(msgpackffi.encode(t))
 ---
-- - a
-  - b
-  - c
+- ['a', 'b', 'c']
 - 8
 ...
 msgpack.decode(msgpack.encode(t))
 ---
-- - a
-  - b
-  - c
+- ['a', 'b', 'c']
 - 8
 ...
 msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 ---
-- - 1
-  - - x
-    - y
-    - - a
-      - b
-      - c
-    - z
-  - 2
-  - 3
+- [1, ['x', 'y', ['a', 'b', 'c'], 'z'], 2, 3]
 - 19
 ...
 msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 ---
-- - 1
-  - - x
-    - y
-    - - a
-      - b
-      - c
-    - z
-  - 2
-  - 3
+- [1, ['x', 'y', ['a', 'b', 'c'], 'z'], 2, 3]
 - 19
+...
+-- restore configuration
+msgpack.cfg{encode_load_metatables = encode_load_metatables}
+---
 ...
 space:drop()
 ---

@@ -236,14 +236,10 @@ This is actually a <quote><productname>homebrew</productname></quote> recipe
 so it's not a true binary download, some source code is involved.
 First upgrade Clang (the C compiler) to version 3.2 or later using
 Command Line Tools for Xcode disk image version 4.6+ from
-Apple Developer web-site. Then use <command>brew</command>:
-<programlisting>
-<userinput>
-<command>brew install</command> --use-clang https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
-# or
-<command>brew install</command> https://raw.githubusercontent.com/tarantool/tarantool/master/extra/tarantool.rb
-</userinput>
-</programlisting>
+Apple Developer web-site. Then download the recipe file from
+<link xlink:href="tarantool.org/dist/tarantool.rb">tarantool.org/dist/tarantool.rb</link>.
+Make the file executable, execute it, and the script in the file should
+handle the necessary steps with cmake, make, and make install.
 </para>
 </simplesect>
 
@@ -705,7 +701,7 @@ inserted and selected tuples.
     There is a new format
     (<link xlink:href="https://en.wikipedia.org/wiki/MessagePack">msgpack</link>).
     Snapshot and WAL files have
-     <link xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt">an implementation of the msgpack format</link>;
+    <link xlink:href="http://tarantool.org/doc/box-protocol.html">an implementation of the msgpack format</link>;
     incompatible with the old format.
     Snapshot and WAL files have the same format (snapshots are  logs of inserts).
   </para>

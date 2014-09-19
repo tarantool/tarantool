@@ -5,6 +5,7 @@ local builtin = ffi.C
 
 local MAXNESTING = 16
 local NULL = ffi.cast('void *', 0)
+local int8_ptr_t = ffi.typeof('int8_t *')
 local uint8_ptr_t = ffi.typeof('uint8_t *')
 local uint16_ptr_t = ffi.typeof('uint16_t *')
 local uint32_ptr_t = ffi.typeof('uint32_t *')
@@ -233,6 +234,10 @@ local function encode_r(buf, obj, level)
             for key, val in pairs(obj) do -- goodbye, JIT
                 size = size + 1
             end
+            if size == 0 then
+                encode_array(buf, 0) -- encode empty table as an array
+                return
+            end
             encode_map(buf, size)
             for key, val in pairs(obj) do
                 encode_r(buf, key, level + 1)
@@ -289,7 +294,7 @@ on_encode(ffi.typeof('double'), encode_double)
 local decode_r
 
 local function decode_u8(data)
-    local num = ffi.cast('uint8_t *', data[0])[0]
+    local num = ffi.cast(uint8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
     return num
 end
@@ -313,7 +318,7 @@ local function decode_u64(data)
 end
 
 local function decode_i8(data)
-    local num = ffi.cast(uint8_ptr_t, data[0])[0]
+    local num = ffi.cast(int8_ptr_t, data[0])[0]
     data[0] = data[0] + 1
     return num
 end
@@ -510,5 +515,6 @@ return {
     encode = encode;
     on_encode = on_encode;
     decode_unchecked = decode_unchecked;
+    decode = decode_unchecked; -- just for tests
     encode_tuple = encode_tuple;
 }

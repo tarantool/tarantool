@@ -235,6 +235,10 @@ t:findall(-9223372036854775807LL)
 --------------------------------------------------------------------------------
 
 msgpack = require('msgpack')
+encode_load_metatables = msgpack.cfg.encode_load_metatables
+
+-- disable __serialize hook to test internal on_encode hook
+msgpack.cfg{encode_load_metatables = false}
 msgpackffi = require('msgpackffi')
 
 t = box.tuple.new({'a', 'b', 'c'})
@@ -242,5 +246,8 @@ msgpack.decode(msgpackffi.encode(t))
 msgpack.decode(msgpack.encode(t))
 msgpack.decode(msgpackffi.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
 msgpack.decode(msgpack.encode({1, {'x', 'y', t, 'z'}, 2, 3}))
+
+-- restore configuration
+msgpack.cfg{encode_load_metatables = encode_load_metatables}
 
 space:drop()

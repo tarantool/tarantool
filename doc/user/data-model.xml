@@ -65,7 +65,7 @@ fill the same role as a
 <quote>row column</quote> or <quote>record field</quote>, except that: the
 fields of a tuple don't need to have names.
 That's why there was no need to pre-define the
-tuple set in the configuration file, and that's
+tuple set when creating the space, and that's
 why each tuple can have a different number of
 elements, and that's why we say that Tarantool has
 a <quote>dynamic</quote> data model.
@@ -333,7 +333,7 @@ server on the same processor without ill effects.
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename
-  xlink:href="https://github.com/tarantool/tarantool/blob/master/doc/box-protocol.txt" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.txt</filename>.
+  xlink:href="http://tarantool.org/doc/box-protocol.html" xlink:title="A complete BNF of Tarantool client/server protocol">doc/box-protocol.html</filename>.
 </para>
 
 </section>

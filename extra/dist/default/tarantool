@@ -1,10 +1,12 @@
-# Options for Tarantool
+-- Options for Tarantool
+default_cfg = {
+    pid_file    =   "/var/run/tarantool", -- will become pid_file .. instance .. '.pid'
+    wal_dir     =   "/var/lib/tarantool", -- will become wal_dir/instance/
+    snap_dir    =   "/var/lib/tarantool", -- snap_dir/instance/
+    logger      =   "/var/log/tarantool", -- logger/instance .. '.log'
+    username    =   "tarantool",
+}
 
-SNAPS=/var/lib/tarantool
-XLOGS=/var/lib/tarantool
-LOGS=/var/log/tarantool
-PIDS=/var/run/tarantool
-USERNAME=tarantool
-INSTDIR=/etc/tarantool/instances.enabled
+instance_dir = "/etc/tarantool/instances.enabled"
 
-# vim: set ft=sh :
+-- vim: set ft=lua :

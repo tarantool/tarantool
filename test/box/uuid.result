@@ -106,7 +106,7 @@ uu.node[5]
 -- invalid values
 uuid.fromstr(nil)
 ---
-- error: 'builtin/uuid.lua:44: fromstr(str)'
+- error: 'builtin/uuid.lua:47: fromstr(str)'
 ...
 uuid.fromstr('')
 ---
@@ -243,6 +243,27 @@ uu == 12345
 uu == "blablabla"
 ---
 - false
+...
+--
+-- invalid usage
+--
+uu = uuid.new()
+---
+...
+uu.isnil()
+---
+- error: 'Usage: uuid:isnil()'
+...
+uu.bin()
+---
+- error: 'Usage: uuid:bin([byteorder])'
+...
+uu.str()
+---
+- error: 'Usage: uuid:str()'
+...
+uu = nil
+---
 ...
 uuid = nil
 ---

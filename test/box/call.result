@@ -42,8 +42,8 @@ function f1() return f1 end
 call f1()
 ---
 - error:
-    errcode: ER_PROC_RET
-    errmsg: msgpack.encode: can not encode Lua type 'function'
+    errcode: ER_PROC_LUA
+    errmsg: unsupported Lua type 'function'
 ...
 call dostring('box.error(33333, "Hey!")')
 ---

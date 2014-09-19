@@ -3,7 +3,15 @@
 --- The Test Anything Protocol vesion 13 producer
 ---
 
-local yaml = require('yaml')
+-- yaml formatter must be able to encode any Lua variable
+local yaml = require('yaml').new()
+yaml.cfg{
+    encode_invalid_numbers = true;
+    encode_load_metatables = true;
+    encode_use_tostring    = true;
+    encode_invalid_as_nil  = true;
+}
+
 local ffi = require('ffi') -- for iscdata
 
 local function traceback(level)
@@ -69,8 +77,21 @@ local function skip(test, message, extra)
 end
 
 
+local nan = 0/0
 
 local function cmpdeeply(got, expected, extra)
+    if type(expected) == "number" or type(got) == "number" then
+        extra.got = got
+        extra.expected = expected
+        if got ~= got and expected ~= expected then
+            return true -- nan
+        end
+        return got == expected
+    end
+
+    if ffi.istype('bool', got) then got = (got == 1) end
+    if ffi.istype('bool', expected) then expected = (expected == 1) end
+    if got == nil and expected == nil then return true end
 
     if type(got) ~= type(expected) then
         extra.got = type(got)
@@ -172,7 +193,7 @@ local function iscdata(test, v, ctype, message, extra)
 end
 
 local test_mt
-local function test(parent, name, fun)
+local function test(parent, name, fun, ...)
     local level = parent ~= nil and parent.level + 1 or 0
     local test = setmetatable({
         parent  = parent;
@@ -185,7 +206,7 @@ local function test(parent, name, fun)
     }, test_mt)
     if fun ~= nil then
         test:diag('%s', test.name)
-        fun(test)
+        fun(test, ...)
         test:diag('%s: end', test.name)
         return test:check()
     else

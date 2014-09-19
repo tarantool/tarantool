@@ -163,11 +163,12 @@ socket_methods.syswrite = function(self, octets)
     return tonumber(done)
 end
 
-socket_methods.sysread = function(self, len)
+socket_methods.sysread = function(self, size)
     local fd = check_socket(self)
+    size = size or 4096
     self._errno = nil
-    local buf = ffi.new('char[?]', len)
-    local res = ffi.C.read(fd, buf, len)
+    local buf = ffi.new('char[?]', size)
+    local res = ffi.C.read(fd, buf, size)
 
     if res < 0 then
         self._errno = boxerrno()
@@ -204,6 +205,7 @@ socket_methods.nonblock = function(self, nb)
     end
 end
 
+local waiters_mt = { __serialize = 'mapping' }
 local function wait_safely(self, what, timeout)
     local fd = check_socket(self)
     local f = fiber.self()
@@ -213,7 +215,7 @@ local function wait_safely(self, what, timeout)
     timeout = timeout or TIMEOUT_INFINITY
 
     if self.waiters == nil then
-        self.waiters = {}
+        self.waiters = setmetatable({}, waiters_mt)
     end
 
     self.waiters[fid] = true
@@ -531,7 +533,7 @@ local function readchunk(self, size, timeout)
 
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread(4096)
+        local data = self:sysread()
         if data ~= nil then
             self.rbuf = self.rbuf .. data
             if string.len(self.rbuf) >= size then
@@ -605,7 +607,7 @@ local function readline(self, limit, eol, timeout)
         
         timeout = timeout - ( fiber.time() - started )
 
-        local data = self:sysread(4096)
+        local data = self:sysread()
         if data ~= nil then
             self.rbuf = self.rbuf .. data
 
@@ -704,9 +706,7 @@ socket_methods.recv = function(self, size, flags)
         return nil
     end
 
-    if size == nil then
-        size = 512
-    end
+    size = size or 512
     self._errno = nil
     local buf = ffi.new("char[?]", size)
 
@@ -726,6 +726,8 @@ socket_methods.recvfrom = function(self, size, flags)
         self._errno = boxerrno.EINVAL
         return nil
     end
+
+    size = size or 512
     self._errno = nil
     local res, from = internal.recvfrom(fd, size, iflags)
     if res == nil then
@@ -1071,6 +1073,11 @@ socket_mt   = {
         end
         self._errno = save_errno
         return name
+    end,
+    __serialize = function(self)
+        -- Allow YAML, MsgPack and JSON to dump objects with sockets
+        local fd = check_socket(self)
+        return { fd = fd, peer = self:peer(), name = self:name() }
     end
 }
 

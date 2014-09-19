@@ -14,7 +14,6 @@
 # Author: Dmitry E. Oboukhov <unera@debian.org>
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:bin
-CONF_DIR=/etc/tarantool/instances.enabled
 SCRIPTNAME=/etc/init.d/tarantool
 DAEMON=/usr/bin/tarantool
 DIST_LUA=/usr/bin/tarantoolctl
@@ -29,9 +28,17 @@ elif [ -e "/etc/rc.d/init.d/functions" ]; then
 fi
 
 if [ -e "/etc/sysconfig/tarantool" ]; then
-    . /etc/sysconfig/tarantool
+    sysconfig_tarantool="/etc/sysconfig/tarantool"
 elif [ -e "/etc/default/tarantool" ]; then
-    . /etc/default/tarantool
+    sysconfig_tarantool="/etc/default/tarantool"
+fi
+
+if [ -n "$sysconfig_tarantool" ]; then
+    CONF_DIR=`echo "dofile('$sysconfig_tarantool') print(instance_dir)" | tarantool`
+fi
+
+if [ -z "$sysconfig_tarantool" -o "$CONF_DIR" = "nil" ]; then
+    CONF_DIR="/etc/tarantool/instances.enabled"
 fi
 
 INSTANCES=`find $CONF_DIR -xtype f -name '*lua'`

@@ -32,50 +32,61 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "utils.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <lua.h>
 
-enum { LUA_MP_MAXNESTING = 16 }; /* Max nesting levels. */
+/**
+ * Default instance of msgpack serializer (msgpack = require('msgpack')).
+ * This instance is used by all box's Lua/C API bindings (e.g. space:replace()).
+ * All changes made by msgpack.cfg{} function are also affect box's bindings
+ * (this is a feature).
+ */
+extern luaL_serializer *luaL_msgpack_default;
 
 struct tbuf;
 
 void
-luamp_encode_array(struct tbuf *buf, uint32_t size);
+luamp_encode_array(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size);
 
 void
-luamp_encode_map(struct tbuf *buf, uint32_t size);
+luamp_encode_map(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size);
 
 void
-luamp_encode_uint(struct tbuf *buf, uint64_t num);
+luamp_encode_uint(struct luaL_serializer *cfg, struct tbuf *buf, uint64_t num);
 
 void
-luamp_encode_int(struct tbuf *buf, int64_t num);
+luamp_encode_int(struct luaL_serializer *cfg, struct tbuf *buf, int64_t num);
 
 void
-luamp_encode_float(struct tbuf *buf, float num);
+luamp_encode_float(struct luaL_serializer *cfg, struct tbuf *buf, float num);
 
 void
-luamp_encode_double(struct tbuf *buf, double num);
+luamp_encode_double(struct luaL_serializer *cfg, struct tbuf *buf, double num);
 
 void
-luamp_encode_str(struct tbuf *buf, const char *str, uint32_t len);
+luamp_encode_str(struct luaL_serializer *cfg, struct tbuf *buf, const char *str,
+		 uint32_t len);
 
 void
-luamp_encode_nil(struct tbuf *buf);
+luamp_encode_nil(struct luaL_serializer *cfg);
 
 void
-luamp_encode_bool(struct tbuf *buf, bool val);
+luamp_encode_bool(struct luaL_serializer *cfg, struct tbuf *buf, bool val);
 
 void
-luamp_encode(struct lua_State *L, struct tbuf *buf, int index);
+luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *buf,
+	     int index);
 
 void
-luamp_decode(struct lua_State *L, const char **data);
+luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
+	     const char **data);
 
-typedef void
+typedef int
 (*luamp_encode_extension_f)(struct lua_State *, int, struct tbuf *);
 
 /**

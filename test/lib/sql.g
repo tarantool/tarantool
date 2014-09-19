@@ -7,7 +7,7 @@ object_no_re = re.compile("[a-z_]*", re.I)
 
 # The grammar below solely covers the functionality provided by
 # Tarantool binary protocol, from which follow all the
-# limitations. For reference please see doc/box-protocol.txt.
+# limitations. For reference please see http://tarantool.org/docs/box-protocol.html
 
 parser sql:
 

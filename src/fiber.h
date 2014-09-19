@@ -83,7 +83,9 @@ enum fiber_key {
 	FIBER_KEY_SESSION = 0,
 	/** Lua fiber.storage */
 	FIBER_KEY_LUA_STORAGE = 1,
-	FIBER_KEY_MAX = 2
+	/** transaction */
+	FIBER_KEY_TXN = 2,
+	FIBER_KEY_MAX = 3
 };
 
 struct fiber {

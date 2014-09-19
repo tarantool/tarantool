@@ -159,6 +159,7 @@ say_init_pipe()
 	sigprocmask(SIG_UNBLOCK, &mask, NULL);
 	close(pipefd[0]);
 	log_fd = pipefd[1];
+	say_info("started logging into a pipe, SIGHUP log rotation disabled");
 	return;
 error:
 	say_syserror("Can't start logger: %s", log_path);
@@ -187,6 +188,7 @@ say_logrotate(int /* signo */)
 		int flags = fcntl(log_fd, F_GETFL, 0);
 		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
 	}
+	say_info("log file has been reopened");
 }
 
 /**

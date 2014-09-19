@@ -87,6 +87,7 @@ lbox_slab_info(struct lua_State *L)
 	lua_newtable(L);
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
+	luaL_setmaphint(L, -1);
 	small_stats(&talloc, &totals, small_stats_lua_cb, L);
 	lua_settable(L, -3);
 

@@ -50,8 +50,9 @@ extern "C" {
 #include "lua/ipc.h"
 #include "lua/errno.h"
 #include "lua/bsdsocket.h"
-#include "lua/cjson.h"
-#include "lua/yaml.h"
+#include "lua/utils.h"
+#include "third_party/lua-cjson/lua_cjson.h"
+#include "third_party/lua-yaml/lyaml.h"
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
@@ -165,7 +166,9 @@ lbox_tonumber64(struct lua_State *L)
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "tonumber64: wrong number of arguments");
 	uint64_t result = tarantool_lua_tointeger64(L, 1);
-	return luaL_pushnumber64(L, result);
+	*(uint64_t *) luaL_pushcdata(L, CTID_UINT64,
+				     sizeof(uint64_t)) = result;
+	return 1;
 }
 
 static int
@@ -277,18 +280,25 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaL_openlibs(L);
 	tarantool_lua_setpaths(L);
 
+	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
+	luaL_loadstring(L, "return require('ffi')");
+	lua_call(L, 0, 0);
+
 	lua_register(L, "tonumber64", lbox_tonumber64);
 	lua_register(L, "coredump", lbox_coredump);
 
+	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);
-	tarantool_lua_cjson_init(L);
-	tarantool_lua_yaml_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_pickle_init(L);
 	tarantool_lua_fio_init(L);
 	luaopen_msgpack(L);
+	lua_pop(L, 1);
+	luaopen_yaml(L);
+	lua_pop(L, 1);
+	luaopen_json(L);
 	lua_pop(L, 1);
 
 	static const struct luaL_reg consolelib[] = {

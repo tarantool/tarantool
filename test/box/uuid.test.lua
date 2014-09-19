@@ -85,4 +85,14 @@ uu == nil
 uu == 12345
 uu == "blablabla"
 
+--
+-- invalid usage
+--
+
+uu = uuid.new()
+uu.isnil()
+uu.bin()
+uu.str()
+
+uu = nil
 uuid = nil

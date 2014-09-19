@@ -5,7 +5,10 @@
 extern "C" {
 #endif
 
-int yamlL_encode(lua_State *L);
+#include <lua.h>
+
+LUALIB_API int
+luaopen_yaml(lua_State *L);
 
 #ifdef __cplusplus
 }

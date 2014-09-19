@@ -42,7 +42,7 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
     </para>
     <para>
     Lua functions could also be called at the time of initialization with a script in a
-    <olink targetptr="configuration-file">configuration file</olink>.
+    <olink targetptr="configuration-file">lua-initialization file</olink>.
     An example and discussion of such a script will appear later in section
     <link linkend="sp-expirationd">expirationd</link>.
     </para>
@@ -75,42 +75,6 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       definitions, as described in the 
       <link xlink:href="http://www.lua.org/pil/6.1.html">
       <emphasis>closure</emphasis> section</link> of the Lua manual. 
-    </para>
-    <para>
-      The
-      CALL request packet contains the command code for CALL (22), the name
-      of a procedure to be called, and a tuple for procedure
-      arguments. Fields of the tuple are passed into the function
-      as arguments of type <quote>string</quote> or <quote>number</quote>
-      or <quote>boolean</quote>.. For example:
-<programlisting><computeroutput>kostja@atlas:~<prompt>$</prompt> <userinput>cat arg.lua</userinput>
-function f1(a)
-    local s = a
-    if type(a) == 'string' then
-        s = ''
-        for i = 1, #a, 1 do
-            s = s..string.format('0x%x ', string.byte(a, i))
-        end
-    end
-    return type(a), s
-end
-kostja@atlas:~<prompt>$</prompt> <userinput>tarantool</userinput>
-tarantool> <userinput>dofile('arg.lua')</userinput>
----
-...
-tarantool> <userinput>f1('1234')</userinput>
----
- - string
- - 0x31 0x32 0x33 0x34
-...
-tarantool> <userinput>f1(1234)</userinput>
----
- - number
- - 1234
-...</computeroutput></programlisting>
-      In the above example, the function finds out the type of the
-      argument (Lua 'string' or 'number') at runtime, gets the byte codes
-      if it's a string, and returns the type plus the value.
     </para>
     <para>
       In addition to conventional method invocation,
@@ -171,266 +135,136 @@ tarantool> <userinput>box.space[33]:drop()</userinput>
 ...
 </computeroutput></programlisting>
     </para>
-
-<variablelist>
-<title>Lua functions <code>tonumber64</code> and <code>dostring</code></title>
-    <varlistentry>
-        <term xml:id="tonumber64" xreflabel="tonumber64"> <emphasis role="lua">tonumber64(<replaceable>value</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Convert a string or a Lua number to a
-              64-bit integer. The result can be used in arithmetic,
-              and the arithmetic will be 64-bit integer arithmetic
-              rather than floating-point arithmetic. (Operations on
-              an unconverted Lua number use floating-point arithmetic.)
-              The tonumber64() function is added by Tarantool; the name is global.
-              <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>type(123456789012345), type(tonumber64(123456789012345))</userinput>
----
-- number
-- cdata
-...
-tarantool> <userinput>i = tonumber64('1000000000')</userinput>
----
-...
-tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinput>
----
- - cdata
- - 500000000
- - 999999998
- - 2000000000
- - 1000000002
- - 0
- - 1000000000000000000
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
     
-    <varlistentry>
-        <term>
-            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Parse and execute an arbitrary chunk of Lua code.
-              This function is mainly useful to define and run
-              Lua code without having to
-              introduce changes to the global Lua environment.
-            </para>
-            <para>
-              Parameters: <code>lua-chunk-string</code> = string containing Lua code,
-              <code>lua-chunk-string-argument(s)</code> = zero or more scalar values
-               which will be appended to, or substitute for, items in the Lua chunk.
-             </para>
-             <para>
-               Returns: whatever is returned by the Lua code chunk.
-            </para>
-            <para>
-               Possible errors: If there is a compilation error,
-               it is raised as a Lua error.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool&gt; <userinput>dostring('abc')</userinput>
----
-error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
-...
-tarantool&gt; <userinput>dostring('return 1')</userinput>
----
-- 1
-...
-tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
----
-- hello
-- world
-...
-tarantool&gt; <userinput>console = require('console'); console.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
-tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
-tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
-        -&gt; <userinput>              t = box.space.tester:select{key};</userinput>
-        -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
-        -&gt; <userinput>              end</userinput>
-        -&gt; <userinput>              return f(...)]], 1)!</userinput>
----
-- null
-...
-tarantool&gt; <userinput>console.delimiter('')!</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-    
-</variablelist>
+<para>
+<bridgehead renderas="sect4">The "Batteries Included" Lua Software Distribution</bridgehead>
+Tarantool incorporates open-source
+precompiled packages which Tarantool's developers
+have tested for compatibility -- the "built-in" packages.
+Tarantool specializes in packages which aid
+database applications or which Tarantool's own developers
+use to make database-related tools.
+At the same time.
+Tarantool makes it easy to add new Lua packages
+from <link xlink:href=" http://luarocks.org/">LuaRocks</link> -- the "downloadable" packages.
+</para>
 
-<section xml:id="sp-pickle">
-    <title>Package <code>pickle</code></title>
-<variablelist xml:id="x-pickle" xreflabel="x-pickle">
-    <varlistentry>
-        <term><emphasis role="lua">pickle.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
-        <listitem><para>
-            To use Tarantool binary protocol primitives from Lua,
-            it's necessary to convert Lua variables to binary
-            format. The pickle.pack() helper function is prototyped after Perl
-            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
-             'pack'</link>.
-            </para>
-            <para>
-               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Format specifiers</bridgehead>
-            <simplelist>
-                <member><code>b</code> or <code>B</code> &mdash; converts Lua
-                variable to a 1-byte
-                integer, and stores the integer in the resulting
-                string,
-                </member>
-                <member><code>s</code> or <code>S</code> &mdash; converts Lua
-                variable to a 2-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>i</code> or <code>I</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>l</code> or <code>L</code> &mdash; converts Lua
-                variable to an 8-byte
-                integer, and stores the integer in the resulting
-                string, low byte first,
-                </member>
-                <member><code>n</code> or <code>N</code> &mdash; converts Lua
-                variable to a 4-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>q</code> or <code>Q</code> &mdash; converts Lua
-                variable to an 8-byte
-                integer, and stores the integer in the resulting
-                string, big endian,
-                </member>
-                <member><code>f</code> &mdash; converts Lua
-                variable to a 4-byte
-                float, and stores the float in the resulting
-                string,
-                </member>
-                <member><code>d</code> &mdash; converts Lua
-                variable to a 8-byte
-                double, and stores the double in the resulting
-                string,
-                </member>
-                <member><code>d</code> &mdash; converts Lua
-                variable to a sequence of bytes,
-                and stores the sequence in the resulting
-                string,
-                </member>
-            </simplelist>
-            </para>
-            <para>
-              Returns: a binary string containing all arguments, packed
-              according to the format specifiers.
-            </para>
-            <para>
-              Possible Errors: Unknown format specifier.
-            </para>
-            <para>
-        <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-tarantool> <userinput>pickle = require('pickle')</userinput>
----
-...
-tarantool> <userinput>box.space.tester:insert{0, 'hello world'}</userinput>
----
-- [0, 'hello world']
-...
-tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 'bye world'}})</userinput>
----
-- [0, 'bye world']
-...
-tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
----
-- [0, "\0\0\0\0\x03\0\0\0hello"]
-...
-tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 4}})</userinput>
----
-- [0, 4]
-...
-tarantool> <userinput>box.space.tester:update({0}, {{'+', 2, 4}})</userinput>
----
-- [0, 8]
-...
-tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
----
-- [0, 12]
-...
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
+<para>
+The included language processor is <link xlink:href="http://luajit.org/">LuaJIT</link>.
+Major "built-in" components are: fibers,
+<link xlink:href="http://msgpack.org">MsgPack</link>,
+digest, JSON, <link xlink:href="http://en.wikipedia.org/wiki/Yaml">YAML</link>,
+<link xlink:href="http://en.wikipedia.org/wiki/Inter-process_communication">IPC</link> , and box.
+</para>
 
-    <varlistentry>
-        <term><emphasis role="lua">pickle.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-              Counterpart to <code>pickle.pack()</code>.
-            </para>
-            <para>
-              Parameters: <code>format</code>, <code>binary-string</code>.
-            </para>
-            <para>
-             Returns: (type = scalar) A list of strings or numbers.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>
-<prompt>tarantool</prompt> <userinput>pickle = require('pickle')</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>console = require('console'); console.delimiter('!') -- this means following commands must end with '!'</userinput>
-<prompt>tarantool></prompt> <userinput>tuple = box.space.tester:replace{0}!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>string.len(tuple[1])!</userinput>
----
-- 1
-...
-<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[1])!</userinput>
----
-- 48
-...
-<prompt>tarantool></prompt> <userinput>pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!</userinput>
----
-- 255
-- 65535
-- 4294967295
-...
-<prompt>tarantool></prompt> <userinput>pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
----
-- 18446744073709551615
-- 65535
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',</userinput>
-<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
----
-...
-<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
----
-- 666
-- string
-- 666666666666666
-...
-<prompt>tarantool></prompt> <userinput>console.delimiter('') -- back to normal: commands end with line feed!</userinput>
-</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
-</variablelist>
-</section>
+<para>
+<emphasis>LuaJIT</emphasis> is a processor for the entire Lua language. 
+This differs from the original Lua interpreter from
+<link xlink:href="http://www.puc-rio.br/index.html">Pontifícia Universidade Católica do Rio de Janeiro</link>
+("RIO-PUC" <link xlink:href="http://www.lua.org/">Lua</link>) 
+because the JIT stands for "Just In Time" compiling, that
+is, it can compile some Lua code into machine executable form the
+after a few executions of the code.
+The result is that some
+loops will run as quickly as an equivalent C program.
+Also some precompiled C code can be brought in using
+LuaJIT's FFI (<link xlink:href="https://en.wikipedia.org/wiki/Foreign_function_interface">Foreign Function Interface</link>).
+Examples for using FFI exist on the Internet, for example 
+<link xlink:href="https://github.com/tarantool/tarantool/blob/master/src/box/lua/tuple.lua">tuple.lua</link> on the tarantool.org site.
+</para>
+
+<para>
+LuaJIT has been compared to competitive implementations
+and found to be reliable and efficient,
+provided one takes advantage of it where <link xlink:href="http://wiki.luajit.org/Numerical-Computing-Performance-Guide">performance</link> counts. 
+</para>
+
+    <para>
+        Apart from increased performance, LuaJIT provides such
+        features as <link
+        xlink:href="http://bitop.luajit.org/">bitwise
+        operations</link> and <link xlink:href="#tonumber64">64-bit integer arithmetic.</link>
+    </para>
+
+<para>
+<emphasis>Fibers</emphasis> are like Lua coroutines, but as <link xlink:href="http://members.chello.nl/~w.couwenberg/fibers.htm">one fiber developer</link>
+put it: "The main difference between a coroutine and a fiber
+is that a running fiber can be suspended anywhere in a call
+chain, regardless of its C and Lua call stack nesting levels."       
+</para>
+
+<para>
+<emphasis>MsgPack</emphasis> is a relatively new way to serialize data.                    
+The point of MsgPack is that it can
+handle Lua types and C types, with structures and nesting,
+without the overhead of an SGML-style markup language.
+</para>
+
+<para>
+<emphasis>Digest</emphasis> is a cryptography package for CRC32, SHA, and MDA.
+Nothing new here -- except that Tarantool has made them into a
+package, so that one doesn't have to get each one of these
+things individually from the <link xlink:href="http://lua-users.org/wiki/CryptographyStuff">many that are available</link>.
+And, since Tarantool is binding with FFI rather than a traditional Lua C
+API, the routines should run faster on LuaJIT.
+</para>
+
+<para>
+<emphasis>JSON</emphasis> is a serialization format which has
+become popular in the web world. The package within
+Tarantool is derived from <link xlink:href="http://www.kyne.com.au/~mark/software/lua-cjson-manual.html">CJSON</link>
+which, according to <link xlink:href="http://lua-users.org/wiki/JsonModules">a survey</link>, 
+handles Unicode surrogate pairs and is robust when
+edge cases come up.
+</para>
+
+<para>
+<emphasis>YAML</emphasis> is short for "YAML Ain't a Markup Language". YAML is a            
+way to show data in human-readable form, without losing
+underlying information about typing, arrays, and structures.
+</para>
+
+<para>
+<emphasis>IPC</emphasis> is Inter-Process Communication.
+this is useful for implementations of task queues and long polling.
+</para>
+
+<para>
+<emphasis>Box</emphasis> is the NoSQL DBMS that was developed by Tarantool
+and its community. Box's architecture and routines will be the
+subject of the next chapter.
+</para>
+
+<para>
+<bridgehead renderas="sect4">The Downloadable Packages</bridgehead>
+A directory of Lua Addons packages can be found on the <link xlink:href="http://lua-users.org/wiki/LuaAddons">Lua-users</link> wiki. 
+For a "managed package" system equivalent to Perl's CPAN and Ruby's RubyGems and Python's
+Eggs, one gets "rocks" (modules or packages) from <emphasis>LuaRocks</emphasis>.
+Either way, the installation requirement can be as simple as saying
+require('package-name')
+and the effect is a simple Lua table containing 
+functions and members, superficially like C/Java classes.
+</para>
+
+<para>
+There are <link xlink:href="https://rocks.moonscript.org/modules">several hundred LuaRocks packages</link> that are not built-in       
+but are reasonably easy to obtain by anyone with an Internet
+connection. Just as a sampling: ...
+<link xlink:href="https://rocks.moonscript.org/modules/kikito/ansicolors">ansicolors</link> for color manipulation,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/htmlparser">htmlparser</link> for changing HTML text into a tree of elements,
+<link xlink:href="https://rocks.moonscript.org/modules/kikito/i18n">i18n</link> an internationalization library,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/lposix">lposix</link> a POSIX library,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/lua-spore">lua-Spore</link> a generic ReST client,
+<link xlink:href="https://rocks.moonscript.org/modules/luarocks/tekui">TekUI</link> a GUI toolkit.
+For example, to bring in the i18n package: install luarocks, say <code>luarocks install i18n</code>,
+start Tarantool, and say <code>require('i18n')</code>.
+</para>
+
+<para>
+The rest of this chapter is a reference that has what's needed for programming and
+administration with the built-in packages.
+</para>
+
 
 <section xml:id="sp-digest">
     <title>Package <code>digest</code></title>
@@ -449,24 +283,35 @@ tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
 
     as well as a checksum function
     (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
-    The functions in <code>digest</code> are:<programlisting><code>    digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
-    digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with crc32.
-    digest.sha(<replaceable>string</replaceable>)                    Returns 160-bit digest made with SHA-0. Not recommended.
-    digest.sha_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with sha.
-    digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
-    digest.sha1_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha1.
-    digest.sha224(<replaceable>string</replaceable>)                 Returns 224-bit digest made with SHA-2.
-    digest.sha224_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha224.
-    digest.sha256(<replaceable>string</replaceable>)                 Returns 256-bit digest made with SHA-2.
-    digest.sha256_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha256.
-    digest.sha384(<replaceable>string</replaceable>)                 Returns 384-bit digest made with SHA-2.
-    digest.sha384_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha384.
--   digest.sha512(<replaceable>string</replaceable>)                 Returns 512-bit digest made with SHA-2.
-    digest.sha512_hex(<replaceable>string</replaceable>)             Returns hexadecimal of a digest calculated with sha512.
-    digest.md4(<replaceable>string</replaceable>)                    Returns 128-bit digest made with MD4.
-    digest.md4_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md4.
-    digest.md5(<replaceable>string</replaceable>)                    Returns 256-bit digest made with MD5.
-    digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.</code></programlisting>
+    The functions in <code>digest</code> are:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry>name</entry><entry>effect</entry></row>
+     </thead>
+    <tbody>
+    <row><entry><code>digest.crc32(<replaceable>string</replaceable>)</code></entry><entry>                  Returns 32-bit checksum made with CRC32.</entry></row>
+    <row><entry><code>digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)</code></entry><entry>    Returns update of a checksum calculated with crc32.</entry></row>
+    <row><entry><code>digest.sha(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 160-bit digest made with SHA-0. Not recommended.</entry></row>
+    <row><entry><code>digest.sha_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with sha.</entry></row>
+    <row><entry><code>digest.sha1(<replaceable>string</replaceable>)</code></entry><entry>                   Returns 160-bit digest made with SHA-1.</entry></row>
+    <row><entry><code>digest.sha1_hex(<replaceable>string</replaceable>)</code></entry><entry>               Returns hexadecimal of a digest calculated with sha1.</entry></row>
+    <row><entry><code>digest.sha224(<replaceable>string</replaceable>)</code></entry><entry>                 Returns 224-bit digest made with SHA-2.</entry></row>
+    <row><entry><code>digest.sha224_hex(<replaceable>string</replaceable>)</code></entry><entry>             Returns hexadecimal of a digest calculated with sha224.</entry></row>
+    <row><entry><code>digest.sha256(<replaceable>string</replaceable>)</code></entry><entry>                 Returns 256-bit digest made with SHA-2.</entry></row>
+    <row><entry><code>digest.sha256_hex(<replaceable>string</replaceable>)</code></entry><entry>             Returns hexadecimal of a digest calculated with sha256.</entry></row>
+    <row><entry><code>digest.sha384(<replaceable>string</replaceable>)</code></entry><entry>                 Returns 384-bit digest made with SHA-2.</entry></row>
+    <row><entry><code>digest.sha384_hex(<replaceable>string</replaceable>)</code></entry><entry>             Returns hexadecimal of a digest calculated with sha384.</entry></row>
+    <row><entry><code>digest.sha512(<replaceable>string</replaceable>)</code></entry><entry>                 Returns 512-bit digest made with SHA-2.</entry></row>
+    <row><entry><code>digest.sha512_hex(<replaceable>string</replaceable>)</code></entry><entry>             Returns hexadecimal of a digest calculated with sha512.</entry></row>
+    <row><entry><code>digest.md4(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 128-bit digest made with MD4.</entry></row>
+    <row><entry><code>digest.md4_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with md4.</entry></row>
+    <row><entry><code>digest.md5(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 256-bit digest made with MD5.</entry></row>
+    <row><entry><code>digest.md5_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with md5.</entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+
    </para>
 <bridgehead renderas="sect4">Example</bridgehead>
     <para>
@@ -2686,6 +2531,273 @@ end
 
 </section>
 
+<section xml:id="sp-tonumber64">
+ <title>Lua functions <code>tonumber64</code> and <code>dostring</code></title>
+
+<variablelist>
+
+    <varlistentry>
+        <term xml:id="tonumber64" xreflabel="tonumber64"> <emphasis role="lua">tonumber64(<replaceable>value</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Convert a string or a Lua number to a
+              64-bit integer. The result can be used in arithmetic,
+              and the arithmetic will be 64-bit integer arithmetic
+              rather than floating-point arithmetic. (Operations on
+              an unconverted Lua number use floating-point arithmetic.)
+              The tonumber64() function is added by Tarantool; the name is global.
+              <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> <userinput>type(123456789012345), type(tonumber64(123456789012345))</userinput>
+---
+- number
+- cdata
+...
+tarantool> <userinput>i = tonumber64('1000000000')</userinput>
+---
+...
+tarantool> <userinput>type(i), i / 2, i - 2, i * 2, i + 2, i % 2, i ^ 2</userinput>
+---
+ - cdata
+ - 500000000
+ - 999999998
+ - 2000000000
+ - 1000000002
+ - 0
+ - 1000000000000000000
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua">dostring(<replaceable>lua-chunk-string [, lua-chunk-string-argument ...]</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Parse and execute an arbitrary chunk of Lua code.
+              This function is mainly useful to define and run
+              Lua code without having to
+              introduce changes to the global Lua environment.
+            </para>
+            <para>
+              Parameters: <code>lua-chunk-string</code> = string containing Lua code,
+              <code>lua-chunk-string-argument(s)</code> = zero or more scalar values
+               which will be appended to, or substitute for, items in the Lua chunk.
+             </para>
+             <para>
+               Returns: whatever is returned by the Lua code chunk.
+            </para>
+            <para>
+               Possible errors: If there is a compilation error,
+               it is raised as a Lua error.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool&gt; <userinput>dostring('abc')</userinput>
+---
+error: '[string "abc"]:1: ''='' expected near ''&lt;eof&gt;'''
+...
+tarantool&gt; <userinput>dostring('return 1')</userinput>
+---
+- 1
+...
+tarantool&gt; <userinput>dostring('return ...', 'hello', 'world')</userinput>
+---
+- hello
+- world
+...
+tarantool&gt; <userinput>console = require('console'); console.delimiter('!') --<link linkend="utility-tarantool-delim">this</link> means ignore line feeds until next '!'</userinput>
+tarantool&gt; <userinput>-- Use <link xlink:href="http://www.lua.org/pil/2.4.html">double square brackets</link> to enclose multi-line literal here!</userinput>
+tarantool&gt; <userinput>dostring([[local f = function(key)</userinput>
+        -&gt; <userinput>              t = box.space.tester:select{key};</userinput>
+        -&gt; <userinput>              if t ~= nil then return t[1] else return nil end</userinput>
+        -&gt; <userinput>              end</userinput>
+        -&gt; <userinput>              return f(...)]], 1)!</userinput>
+---
+- null
+...
+tarantool&gt; <userinput>console.delimiter('')!</userinput>
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+    
+</variablelist>
+
+</section>
+
+
+<section xml:id="sp-pickle">
+    <title>Package <code>pickle</code></title>
+<variablelist xml:id="x-pickle" xreflabel="x-pickle">
+    <varlistentry>
+        <term><emphasis role="lua">pickle.pack(<replaceable>format, argument [, argument ...]</replaceable>)</emphasis></term>
+        <listitem><para>
+            To use Tarantool binary protocol primitives from Lua,
+            it's necessary to convert Lua variables to binary
+            format. The pickle.pack() helper function is prototyped after Perl
+            <link xlink:href="http://perldoc.perl.org/functions/pack.html">
+             'pack'</link>.
+            </para>
+            <para>
+               Parameters: <code>format</code> = string containing format specifiers, <code>argument(s)</code> = scalar values to be formatted.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Format specifiers</bridgehead>
+            <simplelist>
+                <member><code>b</code> or <code>B</code> &mdash; converts Lua
+                variable to a 1-byte
+                integer, and stores the integer in the resulting
+                string,
+                </member>
+                <member><code>s</code> or <code>S</code> &mdash; converts Lua
+                variable to a 2-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>i</code> or <code>I</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>l</code> or <code>L</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, low byte first,
+                </member>
+                <member><code>n</code> or <code>N</code> &mdash; converts Lua
+                variable to a 4-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>q</code> or <code>Q</code> &mdash; converts Lua
+                variable to an 8-byte
+                integer, and stores the integer in the resulting
+                string, big endian,
+                </member>
+                <member><code>f</code> &mdash; converts Lua
+                variable to a 4-byte
+                float, and stores the float in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a 8-byte
+                double, and stores the double in the resulting
+                string,
+                </member>
+                <member><code>d</code> &mdash; converts Lua
+                variable to a sequence of bytes,
+                and stores the sequence in the resulting
+                string,
+                </member>
+            </simplelist>
+            </para>
+            <para>
+              Returns: a binary string containing all arguments, packed
+              according to the format specifiers.
+            </para>
+            <para>
+              Possible Errors: Unknown format specifier.
+            </para>
+            <para>
+        <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+tarantool> <userinput>pickle = require('pickle')</userinput>
+---
+...
+tarantool> <userinput>box.space.tester:insert{0, 'hello world'}</userinput>
+---
+- [0, 'hello world']
+...
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 'bye world'}})</userinput>
+---
+- [0, 'bye world']
+...
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, pickle.pack('iiA', 0, 3, 'hello')}})</userinput>
+---
+- [0, "\0\0\0\0\x03\0\0\0hello"]
+...
+tarantool> <userinput>box.space.tester:update({0}, {{'=', 2, 4}})</userinput>
+---
+- [0, 4]
+...
+tarantool> <userinput>box.space.tester:update({0}, {{'+', 2, 4}})</userinput>
+---
+- [0, 8]
+...
+tarantool> <userinput>box.space.tester:update({0}, {{'^', 2, 4}})</userinput>
+---
+- [0, 12]
+...
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+
+    <varlistentry>
+        <term><emphasis role="lua">pickle.unpack(<replaceable>format, binary-string</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+              Counterpart to <code>pickle.pack()</code>.
+            </para>
+            <para>
+              Parameters: <code>format</code>, <code>binary-string</code>.
+            </para>
+            <para>
+             Returns: (type = scalar) A list of strings or numbers.
+            </para>
+            <para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>
+<prompt>tarantool</prompt> <userinput>pickle = require('pickle')</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>console = require('console'); console.delimiter('!') -- this means following commands must end with '!'</userinput>
+<prompt>tarantool></prompt> <userinput>tuple = box.space.tester:replace{0}!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>string.len(tuple[1])!</userinput>
+---
+- 1
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('b', tuple[1])!</userinput>
+---
+- 48
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('bsi', pickle.pack('bsi', 255, 65535, 4294967295))!</userinput>
+---
+- 255
+- 65535
+- 4294967295
+...
+<prompt>tarantool></prompt> <userinput>pickle.unpack('ls', pickle.pack('ls', tonumber64('18446744073709551615'), 65535))!</userinput>
+---
+- 18446744073709551615
+- 65535
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64 = pickle.unpack('sAl', pickle.pack('sAl', 666, 'string',</userinput>
+<prompt>        -></prompt> <userinput>                  tonumber64('666666666666666')))!</userinput>
+---
+...
+<prompt>tarantool></prompt> <userinput>num, str, num64!</userinput>
+---
+- 666
+- string
+- 666666666666666
+...
+<prompt>tarantool></prompt> <userinput>console.delimiter('') -- back to normal: commands end with line feed!</userinput>
+</programlisting>
+            </para>
+        </listitem>
+    </varlistentry>
+</variablelist>
+</section>
+
+
 <section xml:id="sp-expirationd">
  <title>expirationd -- the daemon that shifts expired tuples to a long-term archive</title>
 
@@ -2723,8 +2835,8 @@ time), process the tuple as an expired tuple.
 -- put expired tuple in archive
 local function put_tuple_to_archive(space_id, args, tuple)
     -- delete expired tuple
-    box.space[space_id]:delete{tuple[0]}
-    local email = get_field(tuple, 1)
+    box.space[space_id]:delete{tuple[1]}
+    local email = get_field(tuple, 2)
     if args.archive_space_id ~= nil and email ~= nil then
         box.space[args.archive_space_id]:replace{email, os.time()}
     end
