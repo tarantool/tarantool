@@ -205,6 +205,7 @@ socket_methods.nonblock = function(self, nb)
     end
 end
 
+local waiters_mt = { __serialize = 'mapping' }
 local function wait_safely(self, what, timeout)
     local fd = check_socket(self)
     local f = fiber.self()
@@ -214,7 +215,7 @@ local function wait_safely(self, what, timeout)
     timeout = timeout or TIMEOUT_INFINITY
 
     if self.waiters == nil then
-        self.waiters = {}
+        self.waiters = setmetatable({}, waiters_mt)
     end
 
     self.waiters[fid] = true
@@ -1072,6 +1073,11 @@ socket_mt   = {
         end
         self._errno = save_errno
         return name
+    end,
+    __serialize = function(self)
+        -- Allow YAML, MsgPack and JSON to dump objects with sockets
+        local fd = check_socket(self)
+        return { fd = fd, peer = self:peer(), name = self:name() }
     end
 }
 

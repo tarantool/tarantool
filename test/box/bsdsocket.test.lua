@@ -1,4 +1,5 @@
 json = require 'json'
+yaml = require 'yaml'
 pickle = require 'pickle'
 socket = require 'socket'
 fiber = require 'fiber'
@@ -445,3 +446,13 @@ collectgarbage('collect')
 collectgarbage('collect')
 socket.tcp_connect('unix/', path), errno() == errno.ECONNREFUSED
 os.remove(path)
+
+-- Test serializers with sockets
+s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+x = s:wait()
+-- waiters is map
+s.waiters
+-- check __serialize hook
+json.decode(json.encode(s)).fd == s:fd()
+yaml.decode(yaml.encode(s)).fd == s:fd()
+s = nil
