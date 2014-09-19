@@ -1,13 +1,27 @@
-
 #define YAML_VERSION_MAJOR 0
 #define YAML_VERSION_MINOR 1
-#define YAML_VERSION_PATCH 3
-#define YAML_VERSION_STRING "0.1.3"
+#define YAML_VERSION_PATCH 6
+#define YAML_VERSION_STRING "0.1.6"
 
-#include "yaml.h"
+#if HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <yaml.h>
 
 #include <assert.h>
 #include <limits.h>
+#include <stddef.h>
+
+#ifndef _MSC_VER
+#include <stdint.h>
+#else
+#ifdef _WIN64
+#define PTRDIFF_MAX _I64_MAX
+#else
+#define PTRDIFF_MAX INT_MAX
+#endif
+#endif
 
 /*
  * Memory management.
@@ -133,9 +147,12 @@ yaml_string_join(
      (string).start = (string).pointer = (string).end = 0)
 
 #define STRING_EXTEND(context,string)                                           \
-    (((string).pointer+5 < (string).end)                                        \
+    ((((string).pointer+5 < (string).end)                                       \
         || yaml_string_extend(&(string).start,                                  \
-            &(string).pointer, &(string).end))
+            &(string).pointer, &(string).end)) ?                                \
+         1 :                                                                    \
+        ((context)->error = YAML_MEMORY_ERROR,                                  \
+         0))
 
 #define CLEAR(context,string)                                                   \
     ((string).pointer = (string).start,                                         \
@@ -229,9 +246,9 @@ yaml_string_join(
         (string).pointer[offset] <= (yaml_char_t) 'f') ?                        \
        ((string).pointer[offset] - (yaml_char_t) 'a' + 10) :                    \
        ((string).pointer[offset] - (yaml_char_t) '0'))
- 
+
 #define AS_HEX(string)  AS_HEX_AT((string),0)
- 
+
 /*
  * Check if the character is ASCII.
  */
@@ -421,6 +438,12 @@ yaml_queue_extend(void **start, void **head, void **tail, void **end);
 
 #define STACK_EMPTY(context,stack)                                              \
     ((stack).start == (stack).top)
+
+#define STACK_LIMIT(context,stack,size)                                         \
+    ((stack).top - (stack).start < (size) ?                                     \
+        1 :                                                                     \
+        ((context)->error = YAML_MEMORY_ERROR,                                  \
+         0))
 
 #define PUSH(context,stack,value)                                               \
     (((stack).top != (stack).end                                                \
