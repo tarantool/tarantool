@@ -1638,7 +1638,7 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	uint32_t id = tuple_field_u32(new_tuple, 0);
 	tt_uuid uuid = tuple_field_uuid(new_tuple, 1);
 
-	cluster_add_server(&uuid, id);
+	cluster_set_server(&uuid, id);
 }
 
 static struct trigger commit_cluster_trigger =
@@ -1682,6 +1682,14 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	if (tt_uuid_is_nil(&server_uuid))
 		tnt_raise(ClientError, ER_INVALID_UUID,
 			  tt_uuid_str(&server_uuid));
+	struct tuple *old_tuple = stmt->old_tuple;
+	if (old_tuple != NULL) {
+		/* server_id is read-only, other fields can be changed */
+		uint32_t old_server_id = tuple_field_u32(old_tuple, 0);
+		if (server_id != old_server_id)
+			tnt_raise(ClientError, ER_SERVER_ID_IS_RO,
+				  (unsigned) server_id);
+	}
 
 	trigger_add(&txn->on_commit, &commit_cluster_trigger);
 }
