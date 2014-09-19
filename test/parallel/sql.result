@@ -1,0 +1,598 @@
+box.schema.user.create('test', { password = 'test' })
+---
+...
+box.schema.user.grant('test', 'execute,read,write', 'universe')
+---
+...
+s = box.schema.create_space('tweedledum', { id = 0 })
+---
+...
+s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
+---
+...
+s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
+---
+...
+#
+# A test case for Bug#729758
+# "SELECT fails with a disjunct and small LIMIT"
+# https://bugs.launchpad.net/tarantool/+bug/729758
+#
+insert into t0 values ('Doe', 'Richard')
+---
+- ['Doe', 'Richard']
+...
+insert into t0 values ('Roe', 'Richard')
+---
+- ['Roe', 'Richard']
+...
+insert into t0 values ('Woe', 'Richard')
+---
+- ['Woe', 'Richard']
+...
+insert into t0 values ('Major', 'Tomas')
+---
+- ['Major', 'Tomas']
+...
+insert into t0 values ('Kytes', 'Tomas')
+---
+- ['Kytes', 'Tomas']
+...
+select * from t0 where k1='Richard' limit 2
+---
+- ['Doe', 'Richard']
+- ['Roe', 'Richard']
+...
+#
+# A test case for Bug#729879
+# "Zero limit is treated the same as no limit"
+# https://bugs.launchpad.net/tarantool/+bug/729879
+#
+select * from t0 where k1='Richard' limit 0
+---
+...
+s:truncate()
+---
+...
+#
+# A test case for Bug#730593
+# "Bad data if incomplete tuple"
+# https://bugs.launchpad.net/tarantool/+bug/730593
+# Verify that if there is an index on, say, field 2,
+# we can't insert tuples with cardinality 1 and
+# get away with it.
+#
+insert into t0 values ('Britney')
+---
+- error:
+    errcode: ER_INDEX_ARITY
+    errmsg: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+select * from t0 where k1='Anything'
+---
+...
+insert into t0 values ('Stephanie')
+---
+- error:
+    errcode: ER_INDEX_ARITY
+    errmsg: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+select * from t0 where k1='Anything'
+---
+...
+insert into t0 values ('Spears', 'Britney')
+---
+- ['Spears', 'Britney']
+...
+select * from t0 where k0='Spears'
+---
+- ['Spears', 'Britney']
+...
+select * from t0 where k1='Anything'
+---
+...
+select * from t0 where k1='Britney'
+---
+- ['Spears', 'Britney']
+...
+s.index[0]:select('Spears', { limit = 100, iterator = 'GE' })
+---
+- - ['Spears', 'Britney']
+...
+s.index[1]:select('Britney', { limit = 100, iterator = 'GE' })
+---
+- - ['Spears', 'Britney']
+...
+delete from t0 where k0='Spears'
+---
+- ['Spears', 'Britney']
+...
+s:truncate()
+---
+...
+#
+# Test composite keys with trees
+#
+s.index.secondary:alter{unique = true, parts = { 2, 'str', 3, 'str'}}
+---
+...
+insert into t0 values ('key1', 'part1', 'part2')
+---
+- ['key1', 'part1', 'part2']
+...
+replace into t0 values ('key1', 'part1', 'part2')
+---
+- ['key1', 'part1', 'part2']
+...
+insert into t0 values ('key2', 'part1', 'part2_a')
+---
+- ['key2', 'part1', 'part2_a']
+...
+insert into t0 values ('key3', 'part1', 'part2_b')
+---
+- ['key3', 'part1', 'part2_b']
+...
+s.index[1]:select{}
+---
+- - ['key1', 'part1', 'part2']
+  - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
+...
+select * from t0 where k0='key1'
+---
+- ['key1', 'part1', 'part2']
+...
+select * from t0 where k0='key2'
+---
+- ['key2', 'part1', 'part2_a']
+...
+select * from t0 where k0='key3'
+---
+- ['key3', 'part1', 'part2_b']
+...
+select * from t0 where k1='part1'
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
+s.index[1]:select('part1', { limit = 100, iterator = 'GE' })
+---
+- - ['key1', 'part1', 'part2']
+  - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
+...
+s.index[0]:select('key2', { limit = 100, iterator = 'GE' })
+---
+- - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
+...
+s.index[1]:select({ 'part1', 'part2_a' }, { limit = 100, iterator = 'GE' })
+---
+- - ['key2', 'part1', 'part2_a']
+  - ['key3', 'part1', 'part2_b']
+...
+select * from t0 where k0='key1'
+---
+- ['key1', 'part1', 'part2']
+...
+select * from t0 where k0='key2'
+---
+- ['key2', 'part1', 'part2_a']
+...
+select * from t0 where k0='key3'
+---
+- ['key3', 'part1', 'part2_b']
+...
+select * from t0 where k1='part1'
+---
+- ['key1', 'part1', 'part2']
+- ['key2', 'part1', 'part2_a']
+- ['key3', 'part1', 'part2_b']
+...
+delete from t0 where k0='key1'
+---
+- ['key1', 'part1', 'part2']
+...
+delete from t0 where k0='key2'
+---
+- ['key2', 'part1', 'part2_a']
+...
+delete from t0 where k0='key3'
+---
+- ['key3', 'part1', 'part2_b']
+...
+s:truncate()
+---
+...
+s.index.primary:alter{type = 'tree', parts = { 1, 'num'}}
+---
+...
+s.index.secondary:alter{unique = false}
+---
+...
+insert into t0 values (01234567, 'part1', 'part2')
+---
+- [1234567, 'part1', 'part2']
+...
+insert into t0 values (11234567, 'part1', 'part2')
+---
+- [11234567, 'part1', 'part2']
+...
+insert into t0 values (21234567, 'part1', 'part2_a')
+---
+- [21234567, 'part1', 'part2_a']
+...
+insert into t0 values (31234567, 'part1_a', 'part2')
+---
+- [31234567, 'part1_a', 'part2']
+...
+insert into t0 values (41234567, 'part1_a', 'part2_a')
+---
+- [41234567, 'part1_a', 'part2_a']
+...
+l = {}
+---
+...
+for state, v in s:pairs() do table.insert(l, v) end
+---
+...
+return l
+---
+- - [1234567, 'part1', 'part2']
+  - [11234567, 'part1', 'part2']
+  - [21234567, 'part1', 'part2_a']
+  - [31234567, 'part1_a', 'part2']
+  - [41234567, 'part1_a', 'part2_a']
+...
+select * from t0 where k0=01234567
+---
+- [1234567, 'part1', 'part2']
+...
+select * from t0 where k0=11234567
+---
+- [11234567, 'part1', 'part2']
+...
+select * from t0 where k0=21234567
+---
+- [21234567, 'part1', 'part2_a']
+...
+select * from t0 where k1='part1'
+---
+- [1234567, 'part1', 'part2']
+- [11234567, 'part1', 'part2']
+- [21234567, 'part1', 'part2_a']
+...
+select * from t0 where k1='part1_a'
+---
+- [31234567, 'part1_a', 'part2']
+- [41234567, 'part1_a', 'part2_a']
+...
+select * from t0 where k1='part_none'
+---
+...
+box.space[0].index[1]:select({'part1', 'part2'})
+---
+- - [1234567, 'part1', 'part2']
+  - [11234567, 'part1', 'part2']
+...
+select * from t0 where k1='part1'
+---
+- [1234567, 'part1', 'part2']
+- [11234567, 'part1', 'part2']
+- [21234567, 'part1', 'part2_a']
+...
+select * from t0 where k1='part2'
+---
+...
+delete from t0 where k0=01234567
+---
+- [1234567, 'part1', 'part2']
+...
+delete from t0 where k0=11234567
+---
+- [11234567, 'part1', 'part2']
+...
+delete from t0 where k0=21234567
+---
+- [21234567, 'part1', 'part2_a']
+...
+delete from t0 where k0=31234567
+---
+- [31234567, 'part1_a', 'part2']
+...
+delete from t0 where k0=41234567
+---
+- [41234567, 'part1_a', 'part2_a']
+...
+s:select{}
+---
+- []
+...
+s:truncate()
+---
+...
+s.index.primary:alter{type = 'hash'}
+---
+...
+s.index.secondary:alter{type = 'hash', unique = true, parts = { 2, 'str' }}
+---
+...
+insert into t0 values (1, 'hello')
+---
+- [1, 'hello']
+...
+insert into t0 values (2, 'brave')
+---
+- [2, 'brave']
+...
+insert into t0 values (3, 'new')
+---
+- [3, 'new']
+...
+insert into t0 values (4, 'world')
+---
+- [4, 'world']
+...
+s = box.space[0]
+---
+...
+#
+# Bug#929654 - secondary hash index is not built with build_indexes()
+#
+select * from t0 where k1='hello'
+---
+- [1, 'hello']
+...
+select * from t0 where k1='brave'
+---
+- [2, 'brave']
+...
+select * from t0 where k1='new'
+---
+- [3, 'new']
+...
+select * from t0 where k1='world'
+---
+- [4, 'world']
+...
+s:truncate()
+---
+...
+
+#
+# A test case for: http://bugs.launchpad.net/bugs/735140
+# Partial REPLACE corrupts index.
+#
+
+s.index.primary:alter{parts = {1, 'str'}}
+---
+...
+s.index.secondary:alter{type = 'tree', unique = false}
+---
+...
+insert into t0 values ('Spears', 'Britney')
+---
+- ['Spears', 'Britney']
+...
+select * from t0 where k0='Spears'
+---
+- ['Spears', 'Britney']
+...
+select * from t0 where k1='Britney'
+---
+- ['Spears', 'Britney']
+...
+replace into t0 values ('Spears')
+---
+- error:
+    errcode: ER_INDEX_ARITY
+    errmsg: Tuple field count 1 is less than required by a defined index (expected 2)
+...
+select * from t0 where k0='Spears'
+---
+- ['Spears', 'Britney']
+...
+delete from t0 where k0='Spears'
+---
+- ['Spears', 'Britney']
+...
+s.index.primary:alter{parts = { 1, 'num'}}
+---
+...
+insert into t0 values (1, 'duplicate one')
+---
+- [1, 'duplicate one']
+...
+insert into t0 values (2, 'duplicate one')
+---
+- [2, 'duplicate one']
+...
+insert into t0 values (3, 'duplicate one')
+---
+- [3, 'duplicate one']
+...
+insert into t0 values (4, 'duplicate one')
+---
+- [4, 'duplicate one']
+...
+insert into t0 values (5, 'duplicate one')
+---
+- [5, 'duplicate one']
+...
+insert into t0 values (6, 'duplicate two')
+---
+- [6, 'duplicate two']
+...
+insert into t0 values (7, 'duplicate two')
+---
+- [7, 'duplicate two']
+...
+insert into t0 values (8, 'duplicate two')
+---
+- [8, 'duplicate two']
+...
+insert into t0 values (9, 'duplicate two')
+---
+- [9, 'duplicate two']
+...
+insert into t0 values (10, 'duplicate two')
+---
+- [10, 'duplicate two']
+...
+insert into t0 values (11, 'duplicate three')
+---
+- [11, 'duplicate three']
+...
+insert into t0 values (12, 'duplicate three')
+---
+- [12, 'duplicate three']
+...
+insert into t0 values (13, 'duplicate three')
+---
+- [13, 'duplicate three']
+...
+insert into t0 values (14, 'duplicate three')
+---
+- [14, 'duplicate three']
+...
+insert into t0 values (15, 'duplicate three')
+---
+- [15, 'duplicate three']
+...
+select * from t0 where k1='duplicate one'
+---
+- [1, 'duplicate one']
+- [2, 'duplicate one']
+- [3, 'duplicate one']
+- [4, 'duplicate one']
+- [5, 'duplicate one']
+...
+select * from t0 where k1='duplicate two'
+---
+- [6, 'duplicate two']
+- [7, 'duplicate two']
+- [8, 'duplicate two']
+- [9, 'duplicate two']
+- [10, 'duplicate two']
+...
+select * from t0 where k1='duplicate three'
+---
+- [11, 'duplicate three']
+- [12, 'duplicate three']
+- [13, 'duplicate three']
+- [14, 'duplicate three']
+- [15, 'duplicate three']
+...
+delete from t0 where k0=1
+---
+- [1, 'duplicate one']
+...
+delete from t0 where k0=2
+---
+- [2, 'duplicate one']
+...
+delete from t0 where k0=3
+---
+- [3, 'duplicate one']
+...
+delete from t0 where k0=4
+---
+- [4, 'duplicate one']
+...
+delete from t0 where k0=5
+---
+- [5, 'duplicate one']
+...
+delete from t0 where k0=6
+---
+- [6, 'duplicate two']
+...
+delete from t0 where k0=7
+---
+- [7, 'duplicate two']
+...
+delete from t0 where k0=8
+---
+- [8, 'duplicate two']
+...
+delete from t0 where k0=9
+---
+- [9, 'duplicate two']
+...
+delete from t0 where k0=10
+---
+- [10, 'duplicate two']
+...
+delete from t0 where k0=11
+---
+- [11, 'duplicate three']
+...
+delete from t0 where k0=12
+---
+- [12, 'duplicate three']
+...
+delete from t0 where k0=13
+---
+- [13, 'duplicate three']
+...
+delete from t0 where k0=14
+---
+- [14, 'duplicate three']
+...
+delete from t0 where k0=15
+---
+- [15, 'duplicate three']
+...
+insert into t0 values(1, 'Aardvark ')
+---
+- [1, 'Aardvark ']
+...
+insert into t0 values(2, 'Bilimbi')
+---
+- [2, 'Bilimbi']
+...
+insert into t0 values(3, 'Creature ')
+---
+- [3, 'Creature ']
+...
+s.index[1]:select{}
+---
+- - [1, 'Aardvark ']
+  - [2, 'Bilimbi']
+  - [3, 'Creature ']
+...
+s.index[0]:min()
+---
+- error: HASH does not support min()
+...
+s.index[0]:max()
+---
+- error: HASH does not support max()
+...
+s.index[1]:min()
+---
+- [1, 'Aardvark ']
+...
+s.index[1]:max()
+---
+- [3, 'Creature ']
+...
+delete from t0 where k0=1
+---
+- [1, 'Aardvark ']
+...
+delete from t0 where k0=2
+---
+- [2, 'Bilimbi']
+...
+delete from t0 where k0=3
+---
+- [3, 'Creature ']
+...
+box.schema.user.drop('test')
+---
+...
+s:drop()
+---
+...

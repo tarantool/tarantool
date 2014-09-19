@@ -116,8 +116,7 @@ class TestSuite:
             self.server.stop(silent=False)
             self.server.cleanup()
         except (KeyboardInterrupt) as e:
-            color_stdout('\n')
-            color_stdout(shortsep, "\n", schema='separator')
+            color_stdout("\n", shortsep, "\n", schema='separator')
             self.server.stop(silent=False)
             self.server.cleanup()
             raise
