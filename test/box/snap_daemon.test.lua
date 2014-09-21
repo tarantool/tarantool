@@ -43,10 +43,22 @@ for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
 for i = 1, box.cfg.rows_per_wal + 10 do space:insert { no } no = no + 1 end
 
 -- wait for last snapshot
-fiber.sleep(2.5 * PERIOD)
 
-snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
-xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
+--# setopt delimiter ';'
+
+for i = 1, 100 do
+    fiber.sleep(PERIOD)
+    snaps = fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))
+    xlogs = fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))
+
+    if #snaps == 2 then
+        break
+    end
+end;
+
+--# setopt delimiter ''
+
+
 
 #snaps == 2 or snaps
 #xlogs > 0

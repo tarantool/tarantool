@@ -13,7 +13,7 @@ macro(libyaml_build)
 	             ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c)
 
     set_source_files_properties(${yaml_src} PROPERTIES COMPILE_FLAGS
-        "-std=c99")
+        "-std=c99 -I\"${PROJECT_SOURCE_DIR}/third_party/lua-yaml\"")
     set_source_files_properties(
         ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
         PROPERTIES COMPILE_FLAGS

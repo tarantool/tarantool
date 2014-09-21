@@ -237,10 +237,6 @@ yaml_emitter_write_tag_content(yaml_emitter_t *emitter,
         yaml_char_t *value, size_t length, int need_whitespace);
 
 static int
-yaml_emitter_write_verbatim_scalar(yaml_emitter_t *emitter,
-        yaml_char_t *value, size_t length, int allow_breaks);
-
-static int
 yaml_emitter_write_plain_scalar(yaml_emitter_t *emitter,
         yaml_char_t *value, size_t length, int allow_breaks);
 
@@ -640,8 +636,10 @@ yaml_emitter_emit_document_start(yaml_emitter_t *emitter,
                 return 0;
             if (!yaml_emitter_write_indicator(emitter, "---", 1, 0, 0))
                 return 0;
-            if (!yaml_emitter_write_indent(emitter))
-                 return 0;
+            if (emitter->canonical) {
+                if (!yaml_emitter_write_indent(emitter))
+                    return 0;
+            }
         }
 
         emitter->state = YAML_EMIT_DOCUMENT_CONTENT_STATE;
@@ -1156,7 +1154,7 @@ yaml_emitter_check_simple_key(yaml_emitter_t *emitter)
             break;
 
         case YAML_MAPPING_START_EVENT:
-            if (!yaml_emitter_check_empty_sequence(emitter))
+            if (!yaml_emitter_check_empty_mapping(emitter))
                 return 0;
             length += emitter->anchor_data.anchor_length
                 + emitter->tag_data.handle_length
@@ -1181,9 +1179,6 @@ static int
 yaml_emitter_select_scalar_style(yaml_emitter_t *emitter, yaml_event_t *event)
 {
     yaml_scalar_style_t style = event->data.scalar.style;
-    if (style == YAML_VERBATIM_SCALAR_STYLE)
-       goto done;
-
     int no_tag = (!emitter->tag_data.handle && !emitter->tag_data.suffix);
 
     if (no_tag && !event->data.scalar.plain_implicit
@@ -1233,8 +1228,8 @@ yaml_emitter_select_scalar_style(yaml_emitter_t *emitter, yaml_event_t *event)
         emitter->tag_data.handle_length = 1;
     }
 
-done:
     emitter->scalar_data.style = style;
+
     return 1;
 }
 
@@ -1300,11 +1295,6 @@ yaml_emitter_process_scalar(yaml_emitter_t *emitter)
 {
     switch (emitter->scalar_data.style)
     {
-        case YAML_VERBATIM_SCALAR_STYLE:
-            return yaml_emitter_write_verbatim_scalar(emitter,
-                    emitter->scalar_data.value, emitter->scalar_data.length,
-                    !emitter->simple_key_context);
-
         case YAML_PLAIN_SCALAR_STYLE:
             return yaml_emitter_write_plain_scalar(emitter,
                     emitter->scalar_data.value, emitter->scalar_data.length,
@@ -1481,20 +1471,6 @@ yaml_emitter_analyze_tag(yaml_emitter_t *emitter,
     return 1;
 }
 
-static int
-yaml_emitter_analyze_scalar_verbatim(yaml_emitter_t *emitter,
-        yaml_char_t *value, size_t length)
-{
-    emitter->scalar_data.value = value;
-    emitter->scalar_data.length = length;
-	emitter->scalar_data.multiline = 0;
-	emitter->scalar_data.flow_plain_allowed = 0;
-	emitter->scalar_data.block_plain_allowed = 1;
-	emitter->scalar_data.single_quoted_allowed = 1;
-	emitter->scalar_data.block_allowed = 0;
-	return 1;
-}
-
 /*
  * Check if a scalar is valid.
  */
@@ -1526,12 +1502,6 @@ yaml_emitter_analyze_scalar(yaml_emitter_t *emitter,
 
     emitter->scalar_data.value = value;
     emitter->scalar_data.length = length;
-
-	emitter->scalar_data.multiline = 0;
-	emitter->scalar_data.flow_plain_allowed = 0;
-	emitter->scalar_data.block_plain_allowed = 1;
-	emitter->scalar_data.single_quoted_allowed = 1;
-	emitter->scalar_data.block_allowed = 0;
 
     if (string.start == string.end)
     {
@@ -1738,10 +1708,6 @@ yaml_emitter_analyze_event(yaml_emitter_t *emitter,
                 if (!yaml_emitter_analyze_tag(emitter, event->data.scalar.tag))
                     return 0;
             }
-			if (event->data.scalar.style == YAML_VERBATIM_SCALAR_STYLE) {
-				yaml_emitter_analyze_scalar_verbatim(emitter,
-							event->data.scalar.value, event->data.scalar.length);
-			} else
             if (!yaml_emitter_analyze_scalar(emitter,
                         event->data.scalar.value, event->data.scalar.length))
                 return 0;
@@ -1926,19 +1892,6 @@ yaml_emitter_write_tag_content(yaml_emitter_t *emitter,
     emitter->indention = 0;
 
     return 1;
-}
-
-static int
-yaml_emitter_write_verbatim_scalar(yaml_emitter_t *emitter,
-        yaml_char_t *value, size_t length, int allow_breaks)
-{
-	(void)allow_breaks;
-    yaml_string_t string;
-    STRING_ASSIGN(string, value, length);
-    while (string.pointer != string.end) {
-        if (!WRITE(emitter, string)) return 0;
-    }
-	return 1;
 }
 
 static int

@@ -517,10 +517,11 @@ local remote_methods = {
             end
 
             local len, off = msgpack.decode(self.rbuf)
-
-            if len < #self.rbuf - off then
-                return
+            -- wait for correct package length
+            if len + off - 1 > #self.rbuf then
+                break
             end
+
 
             local hdr, body
             hdr, off = msgpack.decode(self.rbuf, off)
