@@ -104,3 +104,7 @@ a.imglink:hover {
 a:visited {
     color: #3f3f3f;
 }
+
+body {
+    margin-bottom: 100px;
+}

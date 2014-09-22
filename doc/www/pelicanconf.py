@@ -13,9 +13,6 @@ TIMEZONE = 'Europe/Moscow'
 
 DEFAULT_LANG = u'en'
 
-TAGS_SAVE_AS = ''
-TAG_SAVE_AS = ''
-
 PLUGINS = ['plugins.documentation']
 
 # Feed generation is usually not desired when developing
@@ -37,6 +34,19 @@ ARCHIVES_SAVE_AS = ''
 AUTHORS_SAVE_AS = ''
 CATEGORIES_SAVE_AS = ''
 TAGS_SAVE_AS = ''
+TAGS_SAVE_AS = ''
+TAG_SAVE_AS = ''
+
+STATIC_PATHS = [
+    'robots.txt',
+    'ycsb'
+]
+EXTRA_PATH_METADATA = {
+    'robots.txt'     : { 'path': 'robots.txt'  },
+    'ycsb'           : { 'path': 'ycsb'        },
+    'js/highlight.js': { 'path': 'highlight.js'},
+    'js/tabs.js'     : { 'path': 'tabs.js'     },
+}
 
 # Uncomment following line if you want document-relative URLs when developing
 #RELATIVE_URLS = True
