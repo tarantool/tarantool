@@ -745,6 +745,8 @@ replication_relay_loop()
 	ev_io_init(&sock_read_ev, replication_relay_recv,
 		   relay.sock, EV_READ);
 	ev_io_start(loop(), &sock_read_ev);
+	/** Turn off the non-blocking mode,if any. */
+	sio_setfl(relay.sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
 	recovery_init(cfg_snap_dir, cfg_wal_dir,
