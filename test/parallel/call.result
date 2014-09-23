@@ -1,7 +1,7 @@
-box.schema.user.create('test', { password = 'test' })
+box.schema.user.create()
 ---
 ...
-box.schema.user.grant('test', 'execute,read,write', 'universe')
+box.schema.user.grant()
 ---
 ...
 function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end
@@ -372,6 +372,6 @@ call space:delete(4)
 space:drop()
 ---
 ...
-box.schema.user.drop('test')
+box.schema.user.drop()
 ---
 ...

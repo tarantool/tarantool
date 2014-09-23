@@ -1,9 +1,16 @@
-import os
 import sys
+import uuid
+import random
 
-admin("box.schema.user.create('test', { password = 'test' })")
-admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
-sql.authenticate('test', 'test')
+login = 'u'+str(uuid.uuid4())[0:8]
+passw = 'p'+str(uuid.uuid4())[0:8]
+
+sys.stdout.push_filter('box.schema.user.create.*', 'box.schema.user.create()')
+sys.stdout.push_filter('box.schema.user.grant.*', 'box.schema.user.grant()')
+
+admin("box.schema.user.create('%s', { password = '%s' })" % (login, passw))
+admin("box.schema.user.grant('%s', 'execute,read,write', 'universe')" % (login))
+sql.authenticate(login, passw)
 admin("function f1() return 'testing', 1, false, -1, 1.123, 1e123, nil end")
 admin("f1()")
 sql("call f1()")
@@ -121,4 +128,5 @@ sql("call field_x(4, 2)")
 sql("call space:delete(4)")
 
 admin("space:drop()")
-admin("box.schema.user.drop('test')")
+sys.stdout.push_filter('box.schema.user.drop(.*)', 'box.schema.user.drop()')
+admin("box.schema.user.drop('%s')" % login)

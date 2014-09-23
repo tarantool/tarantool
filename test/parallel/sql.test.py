@@ -1,11 +1,19 @@
 sql.sort = True
-
+import sys
+import uuid
 #
 # Prepare spaces
 #
+login = 'u'+str(uuid.uuid4())[0:8]
+passw = 'p'+str(uuid.uuid4())[0:8]
 
-admin("box.schema.user.create('test', { password = 'test' })")
-admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
+sys.stdout.push_filter('box.schema.user.create.*', 'box.schema.user.create()')
+sys.stdout.push_filter('box.schema.user.grant.*', 'box.schema.user.grant()')
+
+admin("box.schema.user.create('%s', { password = '%s' })" % (login, passw))
+admin("box.schema.user.grant('%s', 'execute,read,write', 'universe')" % (login))
+sql.authenticate(login, passw)
+
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
 admin("s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })")
 admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})")
@@ -15,7 +23,6 @@ print """#
 # "SELECT fails with a disjunct and small LIMIT"
 # https://bugs.launchpad.net/tarantool/+bug/729758
 #"""
-sql.authenticate('test', 'test')
 sql("insert into t0 values ('Doe', 'Richard')")
 sql("insert into t0 values ('Roe', 'Richard')")
 sql("insert into t0 values ('Woe', 'Richard')")
@@ -202,7 +209,8 @@ admin("s.index[1]:max()")
 sql("delete from t0 where k0=1")
 sql("delete from t0 where k0=2")
 sql("delete from t0 where k0=3")
-admin("box.schema.user.drop('test')")
+sys.stdout.push_filter('box.schema.user.drop(.*)', 'box.schema.user.drop()')
+admin("box.schema.user.drop('%s')" % login)
 admin("s:drop()")
 
 sql.sort = False

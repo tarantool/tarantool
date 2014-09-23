@@ -98,6 +98,7 @@ class TestSuite:
         color_stdout(shortsep, "\n", schema='separator')
         failed_tests = []
         try:
+            self.server.cleanup()
             for test in self.tests:
                 color_stdout(test.name.ljust(48), schema='t_name')
                 # for better diagnostics in case of a long-running test
@@ -114,11 +115,9 @@ class TestSuite:
                         failed_tests.append(test.name)
             color_stdout(shortsep, "\n", schema='separator')
             self.server.stop(silent=False)
-            self.server.cleanup()
         except (KeyboardInterrupt) as e:
-            color_stdout("\n", shortsep, "\n", schema='separator')
+            color_stdout("\n%s\n" % shortsep, schema='separator')
             self.server.stop(silent=False)
-            self.server.cleanup()
             raise
 
         if failed_tests:

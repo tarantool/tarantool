@@ -112,6 +112,12 @@ class Options:
                 help = """Path to project build directory. Default: " + "../.""")
 
         parser.add_argument(
+                "--stress",
+                dest = "builddir",
+                default = None,
+                help = """Name of streess TestSuite to run""")
+
+        parser.add_argument(
                 "--vardir",
                 dest = "vardir",
                 default = "var",
@@ -164,9 +170,9 @@ def main():
 
         suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
 
+
         TarantoolServer.find_exe(options.args.builddir)
         UnittestServer.find_exe(options.args.builddir)
-
 
         for suite in suites:
             failed_tests.extend(suite.run_all())

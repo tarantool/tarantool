@@ -1,7 +1,7 @@
-box.schema.user.create('test', { password = 'test' })
+box.schema.user.create()
 ---
 ...
-box.schema.user.grant('test', 'execute,read,write', 'universe')
+box.schema.user.grant()
 ---
 ...
 s = box.schema.create_space('tweedledum', { id = 0 })
@@ -334,9 +334,6 @@ insert into t0 values (4, 'world')
 ---
 - [4, 'world']
 ...
-s = box.space[0]
----
-...
 #
 # Bug#929654 - secondary hash index is not built with build_indexes()
 #
@@ -590,7 +587,7 @@ delete from t0 where k0=3
 ---
 - [3, 'Creature ']
 ...
-box.schema.user.drop('test')
+box.schema.user.drop()
 ---
 ...
 s:drop()

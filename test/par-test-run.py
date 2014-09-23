@@ -29,10 +29,7 @@ logger.setLevel(logging.INFO)
 
 import pickle
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from StringIO import StringIO
 
 STATUS_TABLE = {
     0: "pass",
@@ -41,8 +38,7 @@ STATUS_TABLE = {
     3: "fail"
 }
 
-class Parallel_Manager(MBaseManager):
-    pass
+class Parallel_Manager(MBaseManager): pass
 Parallel_Manager.register('Queue', multiprocessing.Queue)
 
 class Parallel_Process(MProcess):
@@ -52,18 +48,19 @@ class Parallel_Process(MProcess):
         super(Parallel_Process, self).__init__(**kwargs)
 
     def run(self):
+        queuein  = self._args[0]
+        queueout = self._args[1]
         while True:
-            logger.info("Process.run > getting job")
-            obj = self._args[0].get()
-            logger.info("Process.run > ok, it's great")
+            logger.debug("||_process.run > getting job")
+            obj = queuein.get()
+            logger.debug("||_process.run > ok, it's great")
             assert obj
             assert len(obj) == 2
             assert callable(obj[0])
             assert isinstance(obj[1], (tuple, list))
             retv = obj[0](*obj[1])
-            logger.info("Process.run > job is done, let's put into outqueue")
-            self._args[1].put(retv)
-            logger.info("Process.run > another iteration")
+            logger.debug("||_process.run > job is done, let's put into outqueue")
+            queueout.put(retv)
 
 class Parallel_PoolException(Exception):
     def __init__(self, message):
@@ -88,9 +85,9 @@ class Parallel_Pool(object):
         self.jobs_out = 0
         self.jobs_end = False
         self.status   = Parallel_Pool.INITED
-        self._populate_pool()
+        self._populate()
 
-    def _populate_pool(self):
+    def _populate(self):
         assert(self.status == Parallel_Pool.INITED)
         for i in xrange(self.number):
             kwargs = {
@@ -105,12 +102,12 @@ class Parallel_Pool(object):
             ))
         self.status = Parallel_Pool.POPULATED
 
-    def _repopulate_pool(self):
+    def _repopulate(self):
         assert(self.status >= Parallel_Pool.STARTED)
-        logger.info('_repopulate_pool > Begin repopulation')
+        logger.debug('||_pool.repopulate > Begin repopulation')
         for n, proc in enumerate(self.pool):
             if not proc.is_alive() and self.status != Parallel_Pool.ENDED:
-                logger.info("Manager: Process %s is dead (code %s). Recreating",
+                logger.debug("Manager: Process %s is dead (code %s). Recreating",
                         repr(proc.name), proc.exitcode)
                 self.pool[n] = Parallel_Process(
                         group     = None,
@@ -121,31 +118,31 @@ class Parallel_Pool(object):
                         ]
                 )
                 self.jobs_out += 1
-        logger.info('_repopulate_pool > Ending repopulation')
+        logger.debug('||_pool.repopulate > Ending repopulation')
         return 0
 
-    def fill_wjobs(self, iterable=None):
-        logger.info('fill_wjobs > Entering')
+    def fill(self, iterable=None):
+        logger.debug('||_pool.fill > Entering')
         assert(self.status > Parallel_Pool.INITED and self.status < Parallel_Pool.ENDED)
         if iterable == None:
             raise Parallel_PoolException("Iterable must be defined \
-                    for 'Parallel_Pool.fill_wjobs'")
+                    for '||_pool.fill'")
         jobs = iterable
         target = 0
         while True:
-            self._repopulate_pool()
+            self._repopulate()
             try:
                 while (not self.queuein.full()   and
                        target < 10               and
                        not self.queueout.full()):
-                    logger.info("I'll put a job now")
+                    logger.debug("I'll put a job now")
                     job = iterable.next()
                     self.queuein.put(job)
                     self.jobs_in += 1
                     target += 1
-                logger.error("fill_wjobs > While stopped")
+                logger.debug("||_pool.fill > While stopped")
             except StopIteration:
-                logger.error("fill_wjobs > StopIteration")
+                logger.debug("||_pool.fill > StopIteration")
                 self.jobs_end = True
                 raise StopIteration
             yield
@@ -174,6 +171,7 @@ class Parallel_Iterator(object):
         else:
             ans = self.pool.queueout.get(block=True, timeout=timeout)
             self.pool.jobs_out += 1
+            return ans
 
 class Parallel_FilteredStream(object):
     def __init__(self):
@@ -182,10 +180,10 @@ class Parallel_FilteredStream(object):
 
     def write(self, fragment):
         skipped = False
-        for line in fragment:
+        for line in fragment.splitlines(True):
             original_len = len(line.strip())
             for pattern, replacement in self.filters:
-                line = re.sub(pattern, replacement, line)
+                line = pattern.sub(replacement, line)
                 skipped = original_len and not line.strip()
                 if skipped:
                     break
@@ -193,7 +191,7 @@ class Parallel_FilteredStream(object):
                 self.stream.write(line)
 
     def push_filter(self, pattern, replacement):
-        self.filters.append([pattern, replacement])
+        self.filters.append([re.compile(pattern), replacement])
 
     def pop_filter(self):
         self.filters.pop()
@@ -253,32 +251,35 @@ class Supervisor(object):
             admin = self.server.admin.ret_copy()
             yield [random.choice(self.tests), [sql, admin]]
 
-    def run_jobs(self, jobs):
+    def run(self, jobs):
         self.search_tests()
-        self.pool = Parallel_Pool(processes = 5)
+        self.pool = Parallel_Pool(processes = jobs)
         self.iterator = self.pool.run()
-        self.filler = self.pool.fill_wjobs(self.take_rand())
+        self.filler = self.pool.fill(self.take_rand())
         try:
+            self.server.cleanup()
+            logger.info("Tarantool.Instance > Server cleanuped")
+            logger.info("Tarantool.Instance > Server's path: %s", self.server.binary)
             self.server.deploy()
-            logger.info("TARANTOOL > Server deployed")
+            logger.info("Tarantool.Instance > Server deployed")
             try:
                 while True:
                     self.filler.next()
-                    logger.info("run_jobs: Jobs filled %d %d" %
+                    logger.debug("BigBrother.run > Jobs filled %d %d" %
                             (self.pool.queuein.qsize(), self.pool.queueout.qsize()))
                     while True:
                         try:
-                            logger.info("run_jobs > waiting for task")
+                            logger.debug("BigBrother.run > waiting for task")
                             task = self.iterator.next(1)
-                            logger.info("run_jobs > took task")
+                            logger.debug("BigBrother.run > took task")
                             if task is None:
-                                logger.info('Task return NONE')
+                                logger.info('>>>> Test return NONE')
                                 continue
                             stat = task.get_status()
                             if stat.status != 3:
-                                logger.info('Test %s finished' % repr(task.name))
+                                logger.info('>>>> Test %s finished' % repr(task.name))
                             else:
-                                logger.info('Test %s failed with %s' %
+                                logger.info('>>>> Test %s failed with %s' %
                                         (repr(task.name), stat.message))
                         except (QueueEmpty, StopIteration):
                             break
@@ -286,18 +287,16 @@ class Supervisor(object):
                 pass
         finally:
             self.server.stop()
-            logger.info("TARANTOOL > Server stopped")
-            self.server.cleanup()
-            logger.info("TARANTOOL > Server cleanuped")
+            logger.info("Tarantool.Instance > Server stopped")
 
 class Parallel_Test(object):
     def __init__(self, name):
         rg = re.compile('.test.*')
-        self.id   = uuid.uuid4().get_hex().replace('-', '')[0:6]
-        self.name = name
-        logger.info("__init__ > Entering test '%s'" % self.name)
+        self.name   = name
+        self.reject = None
+        self.id     = None
+        logger.debug("||_Test.__init__ > Entering test '%s'" % self.name)
         self.result = rg.sub('.result', name)
-        self.reject = rg.sub('.reject_%s' % self.id, name)
         self.is_executed     = False
         self.is_executed_ok  = False
         self.is_equal_result = False
@@ -310,16 +309,18 @@ class Parallel_Test(object):
         pass
 
     def run(self, sql, admin):
+        self.id     = uuid.uuid1().get_hex().replace('-', '')[0:6]
+        self.reject = re.sub('.test.*', '.reject_%s' % self.id, self.name)
         self.diagnostics = "unknown"
         save_stdout = sys.stdout
         self.test_stdout = Parallel_FilteredStream()
         try:
             sys.stdout = self.test_stdout
-            logger.info("Entering")
+            logger.debug("Entering")
             self.execute(sql, admin)
             self.is_executed_ok = True
         except Exception as e:
-            logger.error("Exception '%s' was thrown for '%s'" % (type(e), str(e)))
+            logger.error("||_Test.run > Exception '%s' was thrown for '%s'" % (type(e), str(e)))
             logger.error(traceback.format_exc())
             with open(self.reject, 'a') as reject:
                 traceback.print_exc(e, reject)
@@ -341,7 +342,7 @@ class Parallel_Test(object):
             with open(self.reject, 'a') as reject:
                 reject.write(self.test_stdout.getvalue())
 
-        return 0
+        return self
 
     def get_status(self):
         if self.is_executed_ok and self.is_equal_result:
@@ -358,19 +359,19 @@ class Parallel_Test(object):
 
     def __call__(self, sql, admin):
         try:
-            logger.info("__call__ > Entering test '%s'" % self.name)
-            self.run(sql, admin)
+            logger.debug("||_Test.__call__ > Entering test '%s'" % self.name)
+            return self.run(sql, admin)
         except Exception as e:
-            logger.error("Exception '%s' was thrown for '%s'" % (type(e), str(e)))
+            logger.error("||_Test.__call__ > Exception '%s' was thrown for '%s'" % (type(e), str(e)))
             logger.error(traceback.format_exc())
 
 class Parallel_FuncTest(Parallel_Test):
     def execute(self, sql, admin):
         execfile(self.name, dict(locals(), sql=sql, admin=admin))
 
-class Parallel_PythonTest(Parallel_FuncTest):
-    pass
+class Parallel_PythonTest(Parallel_FuncTest): pass
 
 if __name__ == '__main__':
+    TarantoolServer.find_exe('..')
     sup = Supervisor()
-    sup.run_jobs(2)
+    sup.run(1)
