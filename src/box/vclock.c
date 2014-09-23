@@ -54,10 +54,11 @@ rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 {
 	int rc = 0;
 	va_list ap;
-	va_start(ap, fmt);
 
 	while (1) {
+		va_start(ap, fmt);
 		int n = vsnprintf(*pos, *end - *pos, fmt, ap);
+		va_end(ap);
 		assert(n > -1); /* glibc >= 2.0.6, see vsnprintf(3) */
 		if (n < *end - *pos) {
 			*pos += n;
@@ -80,7 +81,7 @@ rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
 		*buf = chunk;
 	}
 
-	va_end(ap);
+
 	return rc;
 }
 
