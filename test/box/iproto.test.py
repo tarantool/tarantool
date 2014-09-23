@@ -5,9 +5,10 @@ import socket
 import msgpack
 from tarantool.const import *
 from tarantool import Connection
-from tarantool.request import RequestInsert
-from tarantool.request import RequestSelect
+from tarantool.request import Request, RequestInsert, RequestSelect
 from tarantool.response import Response
+
+admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 
 print """
 #
@@ -147,3 +148,66 @@ c.close()
 
 admin("space:drop()")
 
+#
+# gh-522: Broken compatibility with msgpack-python for strings of size 33..255
+#
+admin("space = box.schema.create_space('test')")
+admin("space:create_index('primary', { type = 'hash', parts = {1, 'str'}})")
+
+class RawInsert(Request):
+    request_type = REQUEST_TYPE_INSERT
+    def __init__(self, conn, space_no, blob):
+        super(RawInsert, self).__init__(conn)
+        request_body = "\x82" + msgpack.dumps(IPROTO_SPACE_ID) + \
+            msgpack.dumps(space_id) + msgpack.dumps(IPROTO_TUPLE) + blob
+        self._bytes = self.header(len(request_body)) + request_body
+
+class RawSelect(Request):
+    request_type = REQUEST_TYPE_SELECT
+    def __init__(self, conn, space_no, blob):
+        super(RawSelect, self).__init__(conn)
+        request_body = "\x83" + msgpack.dumps(IPROTO_SPACE_ID) + \
+            msgpack.dumps(space_id) + msgpack.dumps(IPROTO_KEY) + blob + \
+            msgpack.dumps(IPROTO_LIMIT) + msgpack.dumps(100);
+        self._bytes = self.header(len(request_body)) + request_body
+
+c = sql.py_con
+space = c.space('test')
+space_id = space.space_no
+
+TESTS = [
+    (1,     "\xa1", "\xd9\x01", "\xda\x00\x01", "\xdb\x00\x00\x00\x01"),
+    (31,    "\xbf", "\xd9\x1f", "\xda\x00\x1f", "\xdb\x00\x00\x00\x1f"),
+    (32,    "\xd9\x20", "\xda\x00\x20", "\xdb\x00\x00\x00\x20"),
+    (255,   "\xd9\xff", "\xda\x00\xff", "\xdb\x00\x00\x00\xff"),
+    (256,   "\xda\x01\x00", "\xdb\x00\x00\x01\x00"),
+    (65535, "\xda\xff\xff", "\xdb\x00\x00\xff\xff"),
+    (65536, "\xdb\x00\x01\x00\x00"),
+]
+
+for test in TESTS:
+    it = iter(test)
+    size = next(it)
+    print 'STR', size
+    print '--'
+    for fmt in it:
+        print '0x' + fmt.encode('hex'), '=>',
+        field = '*' * size
+        c._send_request(RawInsert(c, space_id, "\x91" + fmt + field))
+        tuple = space.select(field)[0]
+        print len(tuple[0])== size and 'ok' or 'fail',
+        it2 = iter(test)
+        next(it2)
+        for fmt2 in it2:
+            tuple = c._send_request(RawSelect(c, space_id,
+                "\x91" + fmt2 + field))[0]
+            print len(tuple[0]) == size and 'ok' or 'fail',
+        tuple = space.delete(field)[0]
+        print len(tuple[0]) == size and 'ok' or 'fail',
+        print
+    print
+
+admin("space:drop()")
+
+server.stop()
+server.deploy()

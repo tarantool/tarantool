@@ -1,3 +1,6 @@
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
 
 #
 # iproto packages test
@@ -103,6 +106,55 @@ box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
 ---
 - [2, 'obbaba']
 ...
+space:drop()
+---
+...
+space = box.schema.create_space('test')
+---
+...
+space:create_index('primary', { type = 'hash', parts = {1, 'str'}})
+---
+...
+STR 1
+--
+0xa1 => ok ok ok ok ok ok
+0xd901 => ok ok ok ok ok ok
+0xda0001 => ok ok ok ok ok ok
+0xdb00000001 => ok ok ok ok ok ok
+
+STR 31
+--
+0xbf => ok ok ok ok ok ok
+0xd91f => ok ok ok ok ok ok
+0xda001f => ok ok ok ok ok ok
+0xdb0000001f => ok ok ok ok ok ok
+
+STR 32
+--
+0xd920 => ok ok ok ok ok
+0xda0020 => ok ok ok ok ok
+0xdb00000020 => ok ok ok ok ok
+
+STR 255
+--
+0xd9ff => ok ok ok ok ok
+0xda00ff => ok ok ok ok ok
+0xdb000000ff => ok ok ok ok ok
+
+STR 256
+--
+0xda0100 => ok ok ok ok
+0xdb00000100 => ok ok ok ok
+
+STR 65535
+--
+0xdaffff => ok ok ok ok
+0xdb0000ffff => ok ok ok ok
+
+STR 65536
+--
+0xdb00010000 => ok ok ok
+
 space:drop()
 ---
 ...
