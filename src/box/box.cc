@@ -34,7 +34,7 @@
 #include "recovery.h"
 #include "log_io.h"
 #include <say.h>
-#include <iproto.h>
+#include "iproto.h"
 #include "replication.h"
 #include <stat.h>
 #include <tarantool.h>

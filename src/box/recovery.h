@@ -36,6 +36,7 @@
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "replica.h"
+#include "small/region.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -88,6 +89,8 @@ struct recovery_state {
 	uint32_t server_id;
 
 	bool finalize;
+	/** Throwaway memory for spot allocations. */
+	struct region pool;
 };
 
 extern struct recovery_state *recovery;

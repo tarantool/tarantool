@@ -17,6 +17,9 @@ add_custom_target(box_generate_lua_sources
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 add_library(box
+    iproto.cc
+    iproto_constants.cc
+    iproto_port.cc
     tuple.cc
     tuple_convert.cc
     tuple_update.cc
