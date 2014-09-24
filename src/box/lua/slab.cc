@@ -37,6 +37,7 @@ extern "C" {
 
 #include "box/tuple.h"
 #include "small/small.h"
+#include "memory.h"
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
 extern "C" {
@@ -120,6 +121,22 @@ lbox_slab_info(struct lua_State *L)
 }
 
 static int
+lbox_runtime_info(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_pushstring(L, "used");
+	luaL_pushnumber64(L, runtime.used);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "maxalloc");
+	luaL_pushnumber64(L, runtime.maxalloc);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
 lbox_slab_check(struct lua_State *L __attribute__((unused)))
 {
 	slab_cache_check(talloc.cache);
@@ -142,6 +159,16 @@ box_lua_slab_init(struct lua_State *L)
 	lua_pushcfunction(L, lbox_slab_check);
 	lua_settable(L, -3);
 
+	lua_settable(L, -3); /* box.slab */
+
+	lua_pushstring(L, "runtime");
+	lua_newtable(L);
+
+	lua_pushstring(L, "info");
+	lua_pushcfunction(L, lbox_runtime_info);
 	lua_settable(L, -3);
-	lua_pop(L, 1);
+
+	lua_settable(L, -3); /* box.runtime */
+
+	lua_pop(L, 1); /* box. */
 }
