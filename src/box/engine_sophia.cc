@@ -41,6 +41,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <errno.h>
 
 struct Sophia: public Engine {
@@ -92,21 +93,9 @@ SophiaFactory::init()
 	env = sp_env();
 	if (env == NULL)
 		panic("failed to create sophia environment");
-	void *conf = sp_ctl(env, "conf");
-	sp_set(conf, "env.dir", "sophia");
-	sp_set(conf, "env.create_on_write", 1);
-}
-
-void
-SophiaFactory::recover()
-{
-	say_info("start sophia recover");
-
 	int rc = sp_open(env);
 	if (rc == -1)
-		panic("sophia recovery failed");
-
-	say_info("complete");
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 }
 
 Engine*
@@ -122,7 +111,6 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 	case END_RECOVERY_SNAPSHOT:
 		recovery.replace = sophia_replace_recover;
 		break;
-
 	case END_RECOVERY:
 		recovery.state   = READY_NO_KEYS;
 		recovery.replace = sophia_replace;
@@ -142,15 +130,42 @@ SophiaFactory::createIndex(struct key_def *key_def)
 	}
 }
 
+static inline int
+drop_repository(char *path)
+{
+	DIR *dir = opendir(path);
+	if (dir == NULL)
+		return -1;
+	char file[1024];
+	struct dirent *de;
+	while ((de = readdir(dir))) {
+		if (de->d_name[0] == '.')
+			continue;
+		snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
+		int rc = unlink(file);
+		if (rc == -1) {
+			closedir(dir);
+			return -1;
+		}
+	}
+	closedir(dir);
+	return rmdir(path);
+}
+
 void
 SophiaFactory::dropIndex(Index *index)
 {
 	SophiaIndex *i = (SophiaIndex*)index;
-	int rc = sp_drop(i->db);
+	int rc = sp_destroy(i->db);
 	if (rc == -1)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(i->db));
 	i->db  = NULL;
 	i->env = NULL;
+	char path[1024];
+	snprintf(path, sizeof(path), "sophia/%" PRIu32,
+	         index->key_def->space_id);
+	/* todo: sophia_dir */
+	drop_repository(path);
 }
 
 void
