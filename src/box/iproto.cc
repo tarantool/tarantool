@@ -79,7 +79,7 @@ struct iproto_request
 	struct session *session;
 	iproto_request_f process;
 	/* Request message code and sync. */
-	struct iproto_header header;
+	struct xrow_header header;
 	/* Box request, if this is a DML */
 	struct request request;
 	size_t total_len;
@@ -487,7 +487,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 			iproto_request_new(con, iproto_process_dml);
 		IprotoRequestGuard guard(ireq);
 
-		iproto_header_decode(&ireq->header, &pos, reqend);
+		xrow_header_decode(&ireq->header, &pos, reqend);
 		ireq->total_len = pos - reqstart; /* total request length */
 
 

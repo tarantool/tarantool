@@ -81,7 +81,7 @@ enum iproto_key {
 			  bit(OFFSET) | bit(ITERATOR) | bit(KEY) | \
 			  bit(TUPLE) | bit(FUNCTION_NAME) | bit(USER_NAME))
 static inline bool
-iproto_header_has_key(const char *pos, const char *end)
+xrow_header_has_key(const char *pos, const char *end)
 {
 	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
 	return key < IPROTO_KEY_MAX && IPROTO_HEAD_BMAP & (1ULL<<key);

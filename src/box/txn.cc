@@ -48,8 +48,8 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 		return;
 
 	/* Create a redo log row for Lua requests */
-	struct iproto_header *row= (struct iproto_header *)
-		region_alloc0(&fiber()->gc, sizeof(struct iproto_header));
+	struct xrow_header *row= (struct xrow_header *)
+		region_alloc0(&fiber()->gc, sizeof(struct xrow_header));
 	row->type = request->type;
 	row->bodycnt = request_encode(request, row->body);
 	stmt->row = row;

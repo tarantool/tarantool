@@ -48,7 +48,7 @@ static const int RECONNECT_DELAY = 1.0;
 
 static void
 remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
-		struct iproto_header *row)
+		struct xrow_header *row)
 {
 	struct ibuf *in = &iobuf->in;
 
@@ -72,14 +72,14 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 
-	iproto_header_decode(row, (const char **) &in->pos, in->pos + len);
+	xrow_header_decode(row, (const char **) &in->pos, in->pos + len);
 }
 
 static void
-remote_write_row(struct ev_io *coio, const struct iproto_header *row)
+remote_write_row(struct ev_io *coio, const struct xrow_header *row)
 {
-	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(row, iov);
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(row, iov);
 	coio_writev(coio, iov, iovcnt, 0);
 }
 
@@ -102,12 +102,12 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 
 	/* Authenticate */
 	say_debug("authenticating...");
-	struct iproto_header row;
-	iproto_encode_auth(&row, greeting, uri->login, uri->password);
+	struct xrow_header row;
+	xrow_encode_auth(&row, greeting, uri->login, uri->password);
 	remote_write_row(coio, &row);
 	remote_read_row(coio, iobuf, &row);
 	if (row.type != IPROTO_OK)
-		iproto_decode_error(&row); /* auth failed */
+		xrow_decode_error(&row); /* auth failed */
 
 	/* auth successed */
 	say_info("authenticated");
@@ -152,8 +152,8 @@ replica_bootstrap(struct recovery_state *r)
 	}
 
 	/* Send JOIN request */
-	struct iproto_header row;
-	iproto_encode_join(&row, &r->server_uuid);
+	struct xrow_header row;
+	xrow_encode_join(&row, &r->server_uuid);
 	remote_write_row(&coio, &row);
 
 	/* Add a surrogate server id for snapshot rows */
@@ -170,7 +170,7 @@ replica_bootstrap(struct recovery_state *r)
 			/* Regular snapshot row  (IPROTO_INSERT) */
 			recovery_process(r, &row);
 		} else /* error or unexpected packet */ {
-			iproto_decode_error(&row);  /* rethrow error */
+			xrow_decode_error(&row);  /* rethrow error */
 		}
 	}
 
@@ -178,7 +178,7 @@ replica_bootstrap(struct recovery_state *r)
 	struct vclock vclock;
 	vclock_create(&vclock);
 	assert(row.type == IPROTO_OK);
-	iproto_decode_eos(&row, &vclock);
+	xrow_decode_vclock(&row, &vclock);
 
 	/* Replace server vclock using data from snapshot */
 	vclock_copy(&r->vclock, &vclock);
@@ -209,7 +209,7 @@ pull_from_remote(va_list ap)
 	for (;;) {
 		const char *err = NULL;
 		try {
-			struct iproto_header row;
+			struct xrow_header row;
 			fiber_setcancellable(true);
 			if (! evio_is_active(&coio)) {
 				remote_set_status(&r->remote, "connecting");
@@ -219,7 +219,7 @@ pull_from_remote(va_list ap)
 				remote_connect(r, &coio, iobuf);
 				/* Send SUBSCRIBE request */
 				err = "can't subscribe to master";
-				iproto_encode_subscribe(&row, &cluster_id,
+				xrow_encode_subscribe(&row, &cluster_id,
 					&r->server_uuid, &r->vclock);
 				remote_write_row(&coio, &row);
 				r->remote.warning_said = false;
@@ -228,7 +228,7 @@ pull_from_remote(va_list ap)
 			err = "can't read row";
 			remote_read_row(&coio, iobuf, &row);
 			if (!iproto_type_is_dml(row.type))
-				iproto_decode_error(&row);  /* error */
+				xrow_decode_error(&row);  /* error */
 			fiber_setcancellable(false);
 			err = NULL;
 

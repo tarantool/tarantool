@@ -132,10 +132,9 @@ void
 log_io_cursor_close(struct log_io_cursor *i);
 
 int
-log_io_cursor_next(struct log_io_cursor *i, struct iproto_header *packet);
+log_io_cursor_next(struct log_io_cursor *i, struct xrow_header *packet);
 int
-xlog_encode_row(const struct iproto_header *packet, struct iovec *iov);
-enum { XLOG_ROW_IOVMAX = IPROTO_PACKET_IOVMAX + 1 };
+xlog_encode_row(const struct xrow_header *packet, struct iovec *iov);
 
 typedef uint32_t log_magic_t;
 

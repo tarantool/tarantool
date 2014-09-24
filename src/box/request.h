@@ -43,7 +43,7 @@ struct request
 	 * on where this packet originated from: the write ahead
 	 * log/snapshot, client request, or a Lua request.
 	 */
-	struct iproto_header *header;
+	struct xrow_header *header;
 	/**
 	 * Request type - IPROTO type code
 	 */

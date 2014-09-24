@@ -213,11 +213,11 @@ struct replication_request {
 
 /** Replication acceptor fiber handler. */
 void
-replication_join(int fd, struct iproto_header *header)
+replication_join(int fd, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
-	iproto_decode_join(header, &server_uuid);
+	xrow_decode_join(header, &server_uuid);
 
 	/* Notify box about new cluster server */
 	recovery->join_handler(&server_uuid);
@@ -240,13 +240,13 @@ replication_join(int fd, struct iproto_header *header)
 
 /** Replication acceptor fiber handler. */
 void
-replication_subscribe(int fd, struct iproto_header *packet)
+replication_subscribe(int fd, struct xrow_header *packet)
 {
 	struct tt_uuid uu = uuid_nil, server_uuid = uuid_nil;
 
 	struct vclock vclock;
 	vclock_create(&vclock);
-	iproto_decode_subscribe(packet, &uu, &server_uuid, &vclock);
+	xrow_decode_subscribe(packet, &uu, &server_uuid, &vclock);
 
 	/**
 	 * Check that the given UUID matches the UUID of the
@@ -636,7 +636,7 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 
 /** Send a single row to the client. */
 static void
-replication_relay_send_row(void * /* param */, struct iproto_header *packet)
+replication_relay_send_row(void * /* param */, struct xrow_header *packet)
 {
 	assert(iproto_type_is_dml(packet->type));
 	struct recovery_state *r = recovery;
@@ -644,8 +644,8 @@ replication_relay_send_row(void * /* param */, struct iproto_header *packet)
 	/* Don't duplicate data */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
 		packet->sync = relay.sync;
-		struct iovec iov[IPROTO_ROW_IOVMAX];
-		int iovcnt = iproto_row_encode(packet, iov);
+		struct iovec iov[XROW_IOVMAX];
+		int iovcnt = xrow_to_iovec(packet, iov);
 		sio_writev_all(relay.sock, iov, iovcnt);
 	}
 
@@ -666,11 +666,11 @@ replication_relay_join(struct recovery_state *r)
 	recover_snap(r);
 
 	/* Send response to JOIN command = end of stream */
-	struct iproto_header row;
-	iproto_encode_eos(&row, &r->vclock);
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &r->vclock);
 	row.sync = relay.sync;
-	struct iovec iov[IPROTO_ROW_IOVMAX];
-	int iovcnt = iproto_row_encode(&row, iov);
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(&row, iov);
 	sio_writev_all(relay.sock, iov, iovcnt);
 
 	say_info("snapshot sent");
