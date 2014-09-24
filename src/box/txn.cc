@@ -36,6 +36,7 @@
 #include "request.h" /* for request_name */
 #include "session.h"
 #include "port.h"
+#include "iproto_constants.h"
 
 double too_long_threshold;
 

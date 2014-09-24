@@ -42,10 +42,12 @@
 #include "scoped_guard.h"
 #include "memory.h"
 #include "msgpuck/msgpuck.h"
-#include "box/replication.h"
-#include "box/session.h"
+#include "replication.h"
+#include "session.h"
 #include "third_party/base64.h"
 #include "coio.h"
+#include "xrow.h"
+#include "iproto_constants.h"
 
 class IprotoConnectionShutdown: public Exception
 {

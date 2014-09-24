@@ -28,13 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "box/box.h"
-#include "box/request.h"
-#include "box/port.h"
-#include "box/tuple.h"
+#include "box.h"
+#include "request.h"
+#include "port.h"
+#include "tuple.h"
 #include "iobuf.h"
 #include "msgpuck/msgpuck.h"
-#include "iproto_constants.h"
 
 /**
  * struct iproto_port users need to be careful to:

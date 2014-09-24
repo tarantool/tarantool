@@ -34,7 +34,7 @@
 #include <sys/uio.h>
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
-#include "iproto_constants.h"
+#include "xrow.h"
 #include "tt_uuid.h"
 #include "vclock.h"
 

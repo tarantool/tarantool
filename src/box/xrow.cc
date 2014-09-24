@@ -26,139 +26,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "iproto_constants.h"
+#include "xrow.h"
 #include "msgpuck/msgpuck.h"
 #include "exception.h"
 #include "fiber.h"
-#include "crc32.h"
 #include "tt_uuid.h"
-#include "box/vclock.h"
+#include "vclock.h"
 #include "scramble.h"
 #include "third_party/base64.h"
-
-const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
-{
-	/* {{{ header */
-		/* 0x00 */	MP_UINT,   /* IPROTO_REQUEST_TYPE */
-		/* 0x01 */	MP_UINT,   /* IPROTO_SYNC */
-		/* 0x02 */	MP_UINT,   /* IPROTO_SERVER_ID */
-		/* 0x03 */	MP_UINT,   /* IPROTO_LSN */
-		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
-	/* }}} */
-
-	/* {{{ unused */
-		/* 0x05 */	MP_UINT,
-		/* 0x06 */	MP_UINT,
-		/* 0x07 */	MP_UINT,
-		/* 0x08 */	MP_UINT,
-		/* 0x09 */	MP_UINT,
-		/* 0x0a */	MP_UINT,
-		/* 0x0b */	MP_UINT,
-		/* 0x0c */	MP_UINT,
-		/* 0x0d */	MP_UINT,
-		/* 0x0e */	MP_UINT,
-		/* 0x0f */	MP_UINT,
-	/* }}} */
-
-	/* {{{ body -- integer keys */
-		/* 0x10 */	MP_UINT, /* IPROTO_SPACE_ID */
-		/* 0x11 */	MP_UINT, /* IPROTO_INDEX_ID */
-		/* 0x12 */	MP_UINT, /* IPROTO_LIMIT */
-		/* 0x13 */	MP_UINT, /* IPROTO_OFFSET */
-		/* 0x14 */	MP_UINT, /* IPROTO_ITERATOR */
-	/* }}} */
-
-	/* {{{ unused */
-		/* 0x15 */	MP_UINT,
-		/* 0x16 */	MP_UINT,
-		/* 0x17 */	MP_UINT,
-		/* 0x18 */	MP_UINT,
-		/* 0x19 */	MP_UINT,
-		/* 0x1a */	MP_UINT,
-		/* 0x1b */	MP_UINT,
-		/* 0x1c */	MP_UINT,
-		/* 0x1d */	MP_UINT,
-		/* 0x1e */	MP_UINT,
-		/* 0x1f */	MP_UINT,
-	/* }}} */
-
-	/* {{{ body -- all keys */
-	/* 0x20 */	MP_ARRAY, /* IPROTO_KEY */
-	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
-	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
-	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
-	/* 0x24 */	MP_STR, /* IPROTO_SERVER_UUID */
-	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
-	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
-	/* }}} */
-};
-
-const char *iproto_type_strs[] =
-{
-	NULL,
-	"SELECT",
-	"INSERT",
-	"REPLACE",
-	"UPDATE",
-	"DELETE",
-	"CALL",
-	"AUTH"
-};
-
-#define bit(c) (1ULL<<IPROTO_##c)
-const uint64_t iproto_body_key_map[IPROTO_TYPE_DML_MAX] = {
-	0,                                                     /* unused */
-	bit(SPACE_ID) | bit(LIMIT) | bit(KEY),                 /* SELECT */
-	bit(SPACE_ID) | bit(TUPLE),                            /* INSERT */
-	bit(SPACE_ID) | bit(TUPLE),                            /* REPLACE */
-	bit(SPACE_ID) | bit(KEY) | bit(TUPLE),                 /* UPDATE */
-	bit(SPACE_ID) | bit(KEY),                              /* DELETE */
-	bit(FUNCTION_NAME) | bit(TUPLE),                       /* CALL */
-	bit(USER_NAME) | bit(TUPLE)                            /* AUTH */
-};
-#undef bit
-
-const char *iproto_key_strs[IPROTO_KEY_MAX] = {
-	"type",             /* 0x00 */
-	"sync",             /* 0x01 */
-	"server_id",          /* 0x02 */
-	"lsn",              /* 0x03 */
-	"timestamp",        /* 0x04 */
-	"",                 /* 0x05 */
-	"",                 /* 0x06 */
-	"",                 /* 0x07 */
-	"",                 /* 0x08 */
-	"",                 /* 0x09 */
-	"",                 /* 0x0a */
-	"",                 /* 0x0b */
-	"",                 /* 0x0c */
-	"",                 /* 0x0d */
-	"",                 /* 0x0e */
-	"",                 /* 0x0f */
-	"space_id",         /* 0x10 */
-	"index_id",         /* 0x11 */
-	"limit",            /* 0x12 */
-	"offset",           /* 0x13 */
-	"iterator",         /* 0x14 */
-	"",                 /* 0x15 */
-	"",                 /* 0x16 */
-	"",                 /* 0x17 */
-	"",                 /* 0x18 */
-	"",                 /* 0x19 */
-	"",                 /* 0x1a */
-	"",                 /* 0x1b */
-	"",                 /* 0x1c */
-	"",                 /* 0x1d */
-	"",                 /* 0x1e */
-	"",                 /* 0x1f */
-	"key",              /* 0x20 */
-	"tuple",            /* 0x21 */
-	"function name",    /* 0x22 */
-	"user name",        /* 0x23 */
-	"server UUID"       /* 0x24 */
-	"cluster UUID"      /* 0x25 */
-	"vector clock"      /* 0x26 */
-};
+#include "iproto_constants.h"
 
 void
 iproto_header_decode(struct iproto_header *header, const char **pos,
@@ -289,22 +165,19 @@ int
 iproto_row_encode(const struct iproto_header *row,
 		  struct iovec *out)
 {
+	static const int iov0_len = mp_sizeof_uint(UINT32_MAX);
 	int iovcnt = iproto_header_encode(row, out + 1) + 1;
-	char *fixheader = (char *)
-		region_alloc(&fiber()->gc, IPROTO_FIXHEADER_SIZE);
+	char *fixheader = (char *) region_alloc(&fiber()->gc, iov0_len);
 	uint32_t len = 0;
 	for (int i = 1; i < iovcnt; i++)
 		len += out[i].iov_len;
 
 	/* Encode length */
-	assert(IPROTO_FIXHEADER_SIZE == mp_sizeof_uint(UINT32_MAX));
 	char *data = fixheader;
 	*(data++) = 0xce; /* MP_UINT32 */
 	*(uint32_t *) data = mp_bswap_u32(len);
-	data += sizeof(uint32_t);
-	assert(data == fixheader + IPROTO_FIXHEADER_SIZE);
 	out[0].iov_base = fixheader;
-	out[0].iov_len = IPROTO_FIXHEADER_SIZE;
+	out[0].iov_len = iov0_len;
 
 	assert(iovcnt <= IPROTO_ROW_IOVMAX);
 	return iovcnt;

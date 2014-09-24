@@ -38,10 +38,11 @@
 #include "scoped_guard.h"
 #include "coio_buf.h"
 #include "recovery.h"
-#include "iproto_constants.h"
+#include "xrow.h"
 #include "msgpuck/msgpuck.h"
 #include "session.h"
 #include "box/cluster.h"
+#include "iproto_constants.h"
 
 static const int RECONNECT_DELAY = 1.0;
 
@@ -52,23 +53,22 @@ remote_read_row(struct ev_io *coio, struct iobuf *iobuf,
 	struct ibuf *in = &iobuf->in;
 
 	/* Read fixed header */
-	if (ibuf_size(in) < IPROTO_FIXHEADER_SIZE)
-		coio_breadn(coio, in, IPROTO_FIXHEADER_SIZE - ibuf_size(in));
+	if (ibuf_size(in) < 1)
+		coio_breadn(coio, in, 1);
 
 	/* Read length */
 	if (mp_typeof(*in->pos) != MP_UINT) {
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "invalid fixed header");
+			  "packet length");
 	}
+	ssize_t to_read = mp_check_uint(in->pos, in->end);
+	if (to_read > 0)
+		coio_breadn(coio, in, to_read);
 
 	uint32_t len = mp_decode_uint((const char **) &in->pos);
-	if (len > IPROTO_BODY_LEN_MAX) {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			  "received packet is too big");
-	}
 
 	/* Read header and body */
-	ssize_t to_read = len - ibuf_size(in);
+	to_read = len - ibuf_size(in);
 	if (to_read > 0)
 		coio_breadn(coio, in, to_read);
 

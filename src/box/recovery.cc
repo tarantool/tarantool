@@ -42,7 +42,7 @@
 #include "replica.h"
 #include "fiber.h"
 #include "msgpuck/msgpuck.h"
-#include "iproto_constants.h"
+#include "xrow.h"
 #include "crc32.h"
 #include "scoped_guard.h"
 #include "box/cluster.h"

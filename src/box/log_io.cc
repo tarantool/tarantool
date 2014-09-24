@@ -36,11 +36,11 @@
 #include "third_party/tarantool_eio.h"
 #include "fiob.h"
 #include "msgpuck/msgpuck.h"
-#include "iproto_constants.h"
 #include "scoped_guard.h"
 #define MH_UNDEF 1 /* conflicts with mh_nodeids_t */
 #include "recovery.h" /* for mh_cluster */
 #include "vclock.h"
+#include "iproto_constants.h"
 
 /*
  * marker is MsgPack fixext2
