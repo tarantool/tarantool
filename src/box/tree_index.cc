@@ -204,7 +204,7 @@ TreeIndex::TreeIndex(struct key_def *key_def_arg)
 	  build_array_alloc_size(0)
 {
 	if (tree_extent_pool_initialized == 0) {
-		mempool_create(&tree_extent_pool, &memtx_slab_cache,
+		mempool_create(&tree_extent_pool, &cord()->slabc,
 			       BPS_TREE_EXTENT_SIZE);
 		tree_extent_pool_initialized = 1;
 	}
