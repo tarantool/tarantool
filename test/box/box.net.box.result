@@ -141,7 +141,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:239: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:226: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---

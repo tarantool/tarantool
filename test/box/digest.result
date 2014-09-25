@@ -175,7 +175,7 @@ digest.base64_decode('MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==')
 ...
 digest.base64_decode(nil)
 ---
--
+- 
 ...
 digest.base64_encode(nil)
 ---
@@ -183,11 +183,11 @@ digest.base64_encode(nil)
 ...
 digest.base64_encode(123)
 ---
--
+- 
 ...
 digest.base64_decode(123)
 ---
--
+- 
 ...
 digest = nil
 ---
