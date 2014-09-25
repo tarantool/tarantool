@@ -374,3 +374,16 @@ box_lua_tuple_init(struct lua_State *L)
 
 	box_lua_slab_init(L);
 }
+
+struct tuple *
+boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end)
+{
+	RegionGuard region_guard(&fiber()->gc);
+	try {
+		return tuple_update(tuple_format_ber,
+				    region_alloc_cb, &fiber()->gc,
+				    tuple, expr, expr_end, 1);
+	} catch (ClientError *e) {
+		return NULL;
+	}
+}
