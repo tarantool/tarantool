@@ -362,7 +362,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>boolean</entry>
           <entry>true</entry>
           <entry>no</entry>
-          <entry>If there is an error reading the snapshot file (at
+          <entry>If there is an error while reading the snapshot file (at
             server start), abort.</entry>
         </row>
 
@@ -371,7 +371,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>boolean</entry>
           <entry>false</entry>
           <entry>no</entry>
-          <entry>If there is an error reading a write-ahead
+          <entry>If there is an error while reading a write-ahead
           log file (at server start), abort.</entry>
         </row>
 
