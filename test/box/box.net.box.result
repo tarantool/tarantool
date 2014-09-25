@@ -7,6 +7,9 @@ fiber = require 'fiber'
 log = require 'log'
 ---
 ...
+msgpack = require 'msgpack'
+---
+...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
@@ -341,6 +344,22 @@ cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 ---
 - - [234, 1, 2, 3]
   - [354, 1, 2, 4]
+...
+-- send broken packet (remote server will close socket)
+cn.s:syswrite(msgpack.encode(1) .. msgpack.encode('abc'))
+---
+- 5
+...
+fiber.sleep(.2)
+---
+...
+cn.state
+---
+- active
+...
+cn:ping()
+---
+- true
 ...
 -- -- dot-new-method
 cn1 = remote.new('127.0.0.1', port)

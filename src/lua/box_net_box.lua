@@ -484,7 +484,7 @@ local remote_methods = {
             self.s = nil
         end
 
-        log.warn(emsg)
+        log.warn("%s", tostring(emsg))
         self.error = emsg
         self.space = {}
         self:_switch_state('error')
@@ -540,7 +540,7 @@ local remote_methods = {
                 self.ch.sync[sync]:put({ hdr = hdr, body = body })
                 self.ch.sync[sync] = nil
             else
-                log.warn("Unexpected response %s", sync)
+                log.warn("Unexpected response %s", tostring(sync))
             end
         end
     end,
@@ -559,9 +559,11 @@ local remote_methods = {
         end
 
         for _, fid in pairs(list) do
-            if self.ch.fid[fid] ~= nil then
-                self.ch.fid[fid]:put(true)
-                self.ch.fid[fid] = nil
+            if fid ~= fiber.id() then
+                if self.ch.fid[fid] ~= nil then
+                    self.ch.fid[fid]:put(true)
+                    self.ch.fid[fid] = nil
+                end
             end
         end
     end,
@@ -799,7 +801,7 @@ local remote_methods = {
                 break
             end
 
-            if self.s:readable(.5) then
+            if self.s:readable() then
                 if self.state == 'closed' then
                     break
                 end
@@ -808,8 +810,12 @@ local remote_methods = {
                     local data = self.s:sysread()
 
                     if data ~= nil then
-                        self.rbuf = self.rbuf .. data
-                        self:_check_response()
+                        if data == '' then
+                            self:_fatal('Remote host closed connection')
+                        else
+                            self.rbuf = self.rbuf .. data
+                            self:_check_response()
+                        end
                     else
                         self:_fatal(errno.strerror(errno()))
                     end
