@@ -108,6 +108,16 @@ coeio_init(void)
 }
 
 /**
+ * ReInit coeio subsystem (for example after 'fork')
+ *
+ */
+void
+coeio_reinit(void)
+{
+	eio_init(coeio_want_poll_cb, NULL);
+}
+
+/**
  * A single task context.
  */
 struct coeio_task {

@@ -367,6 +367,8 @@ background()
 	if (setsid() == -1)
 		goto error;
 
+	/* reinit coeio after fork (because libeio required it) */
+	coeio_reinit();
 	/*
 	 * Prints to stdout on failure, so got to be done before
 	 * we close it.
