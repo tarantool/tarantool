@@ -149,6 +149,46 @@ digest.crc32_update(digest.crc32('abc'), 'cde')
 ---
 - 3628146660
 ...
+digest.base64_encode('12345')
+---
+- MTIzNDU=
+...
+digest.base64_decode('MTIzNDU=')
+---
+- '12345'
+...
+digest.base64_encode('asdfl asdf adfa zxc vzxcvz llll')
+---
+- YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==
+...
+digest.base64_decode('YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==')
+---
+- asdfl asdf adfa zxc vzxcvz llll
+...
+digest.base64_encode('11 00 11 00 abcdef ABCDEF 00 11 00 11')
+---
+- MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==
+...
+digest.base64_decode('MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==')
+---
+- 11 00 11 00 abcdef ABCDEF 00 11 00 11
+...
+digest.base64_decode(nil)
+---
+- 
+...
+digest.base64_encode(nil)
+---
+- error: 'builtin/digest.lua:76: Usage: base64.encode(str)'
+...
+digest.base64_encode(123)
+---
+- 
+...
+digest.base64_decode(123)
+---
+- 
+...
 digest = nil
 ---
 ...

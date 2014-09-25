@@ -20,6 +20,7 @@ lua_source(lua_sources lua/init.lua)
 lua_source(lua_sources lua/uuid.lua)
 lua_source(lua_sources lua/digest.lua)
 lua_source(lua_sources lua/msgpackffi.lua)
+lua_source(lua_sources lua/uri.lua)
 lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/bsdsocket.lua)
 lua_source(lua_sources lua/errno.lua)
@@ -39,7 +40,7 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 add_custom_target(ragel
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMAND ragel -G2 src/uri.rl -o src/uri.cc)
+    COMMAND ragel -G2 src/uri.rl -o src/uri.c)
 
 set (common_sources
      memory.cc
@@ -73,7 +74,7 @@ set (common_sources
      fiob.c
      tt_uuid.c
      ffisyms.cc
-     uri.cc
+     uri.c
      coeio_file.cc
      lua/digest.cc
      lua/init.cc

@@ -1,5 +1,75 @@
 #!/usr/bin/env tarantool
 
+--[[
+
+=head1 NAME
+
+dist.lua - an utility to control tarantool instances
+
+=head1 SYNOPSIS
+
+    vim /etc/tarantool/instances.enabled/my_instance.lua
+    dist.lua start my_instance
+    dist.lua stop  my_instance
+    dist.lua logrotate my_instance
+
+=head1 DESCRIPTION
+
+The script is read C</etc/sysconfig/tarantool> or C</etc/default/tarantool>.
+The file contains common default instances options:
+
+    $ cat /etc/default/tarantool
+
+
+    -- Options for Tarantool
+    default_cfg = {
+        -- will become pid_file .. instance .. '.pid'
+        pid_file    =   "/var/run/tarantool",
+        
+        -- will become wal_dir/instance/
+        wal_dir     =   "/var/lib/tarantool",
+        
+        -- snap_dir/instance/
+        snap_dir    =   "/var/lib/tarantool",
+        
+        -- logger/instance .. '.log'
+        logger      =   "/var/log/tarantool",
+
+        username    =   "tarantool",
+    }
+
+    instance_dir = "/etc/tarantool/instances.enabled"
+
+
+The file defines C<instance_dir> where user can place his
+applications (instances).
+
+Each instance can be controlled by C<dist.lua>:
+
+=head2 Starting instance
+
+    dist.lua start instance_name
+
+=head2 Stopping instance
+
+    dist.lua stop instance_name
+
+=head2 Logrotate instance's log
+
+    dist.lua logrotate instance_name
+
+
+=head1 COPYRIGHT
+
+Copyright (C) 2010-2013 Tarantool AUTHORS:
+please see AUTHORS file.
+
+
+
+=cut
+
+]]
+
 local fio = require 'fio'
 local log = require 'log'
 local errno = require 'errno'

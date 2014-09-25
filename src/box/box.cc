@@ -114,9 +114,11 @@ box_check_replication_source(const char *source)
 	if (source == NULL)
 		return;
 	struct uri uri;
-	if (uri_parse(&uri, source)) {
-		tnt_raise(ClientError, ER_CFG,
-			  "incorrect replication source");
+
+	/* URI format is [host:]service */
+	if (uri_parse(&uri, source) || !uri.service) {
+		tnt_raise(ClientError, ER_CFG, "replication source, "
+			  "expected host:service or /unix.socket");
 	}
 }
 
@@ -134,6 +136,7 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
@@ -359,15 +362,6 @@ engine_init()
 	SophiaFactory *sophia = new SophiaFactory();
 	sophia->init();
 	engine_register(sophia);
-
-	/* Prepare storage and recover data.
-	 *
-	 * This is first phase of recover, schema is not known yet.
-	 * Internal sophia spaces (databases) are created in
-	 * recover-delay mode and not accessible yet.
-	 * Recover completes on first engine index creation.
-	*/
-	sophia->recover();
 }
 
 void
@@ -419,6 +413,7 @@ box_init()
 		space_end_recover_snapshot();
 		snapshot_save(recovery);
 	}
+	fiber_gc();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
@@ -516,7 +511,7 @@ box_snapshot(void)
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
-	slab_arena_mprotect(&tuple_arena);
+	slab_arena_mprotect(&memtx_arena);
 
 	cord_set_name("snap");
 	title("dumper", "%" PRIu32, getppid());

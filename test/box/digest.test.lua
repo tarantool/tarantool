@@ -43,4 +43,16 @@ digest.crc32_update(4294967295, 'abc')
 
 digest.crc32('abccde')
 digest.crc32_update(digest.crc32('abc'), 'cde')
+
+digest.base64_encode('12345')
+digest.base64_decode('MTIzNDU=')
+digest.base64_encode('asdfl asdf adfa zxc vzxcvz llll')
+digest.base64_decode('YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==')
+digest.base64_encode('11 00 11 00 abcdef ABCDEF 00 11 00 11')
+digest.base64_decode('MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==')
+digest.base64_decode(nil)
+digest.base64_encode(nil)
+digest.base64_encode(123)
+digest.base64_decode(123)
+
 digest = nil

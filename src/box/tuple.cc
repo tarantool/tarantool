@@ -45,9 +45,9 @@ static uint32_t formats_size, formats_capacity;
 
 uint32_t snapshot_version;
 
-struct slab_arena tuple_arena;
-static struct slab_cache tuple_slab_cache;
-struct small_alloc talloc;
+struct slab_arena memtx_arena;
+struct slab_cache memtx_slab_cache;
+struct small_alloc memtx_alloc;
 
 /** Extract all available type info from keys. */
 void
@@ -252,7 +252,7 @@ struct tuple *
 tuple_alloc(struct tuple_format *format, size_t size)
 {
 	size_t total = sizeof(struct tuple) + size + format->field_map_size;
-	char *ptr = (char *) smalloc(&talloc, total, "tuple");
+	char *ptr = (char *) smalloc(&memtx_alloc, total, "tuple");
 	struct tuple *tuple = (struct tuple *)(ptr + format->field_map_size);
 
 	tuple->refs = 0;
@@ -277,10 +277,10 @@ tuple_delete(struct tuple *tuple)
 	struct tuple_format *format = tuple_format(tuple);
 	char *ptr = (char *) tuple - format->field_map_size;
 	tuple_format_ref(format, -1);
-	if (!talloc.is_delayed_free_mode || tuple->version == snapshot_version)
-		smfree(&talloc, ptr);
+	if (!memtx_alloc.is_delayed_free_mode || tuple->version == snapshot_version)
+		smfree(&memtx_alloc, ptr);
 	else
-		smfree_delayed(&talloc, ptr);
+		smfree_delayed(&memtx_alloc, ptr);
 }
 
 /**
@@ -545,14 +545,14 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 		flags = MAP_SHARED;
 	}
 
-	if (slab_arena_create(&tuple_arena, prealloc, prealloc,
+	if (slab_arena_create(&memtx_arena, prealloc, prealloc,
 			      slab_size, flags)) {
 		panic_syserror("failed to preallocate %zu bytes",
 			       prealloc);
 	}
-	slab_cache_create(&tuple_slab_cache, &tuple_arena,
+	slab_cache_create(&memtx_slab_cache, &memtx_arena,
 			  slab_size);
-	small_alloc_create(&talloc, &tuple_slab_cache,
+	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
 }
 
@@ -577,11 +577,11 @@ void
 tuple_begin_snapshot()
 {
 	snapshot_version++;
-	small_alloc_setopt(&talloc, SMALL_DELAYED_FREE_MODE, true);
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, true);
 }
 
 void
 tuple_end_snapshot()
 {
-	small_alloc_setopt(&talloc, SMALL_DELAYED_FREE_MODE, false);
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 }

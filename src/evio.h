@@ -63,11 +63,16 @@ struct evio_service
 {
 	/** Service name. E.g. 'primary', 'secondary', etc. */
 	char name[SERVICE_NAME_MAXLEN];
-	/** Bind IP address, useful for logging */
-	char host[SERVICE_NAME_MAXLEN];
+	/** Bind host:service, useful for logging */
+	char host[URI_MAXHOST];
+	char serv[URI_MAXSERVICE];
 
 	/** Interface/port to bind to */
-	struct uri port;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addrstorage;
+	};
+	socklen_t addr_len;
 
 	/** A callback invoked upon a successful bind, optional.
 	 * If on_bind callback throws an exception, it's
@@ -151,11 +156,5 @@ evio_setsockopt_tcp(int fd, int family);
 
 void
 evio_setsockopt_tcpserver(int fd);
-
-void
-evio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
-
-int
-evio_pton(const char *addr, const char *port, struct sockaddr_storage *sa, socklen_t *salen);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

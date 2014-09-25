@@ -83,11 +83,14 @@ xrow_decode_error(struct xrow_header *row);
  * \param[out] row
  * \param greeting - IPROTO greeting
  * \param login - user login
+ * \param login_len - length of \a login
  * \param password - user password
+ * \param password_len - length of \a password
 */
 void
 xrow_encode_auth(struct xrow_header *row, const char *greeting,
-		 const char *login, const char *password);
+		 const char *login, size_t login_len,
+		 const char *password, size_t password_len);
 
 /**
  * \brief Encode SUBSCRIBE command

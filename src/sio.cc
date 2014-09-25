@@ -470,26 +470,28 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 {
-	static __thread char name[SERVICE_NAME_MAXLEN];
+	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
 	switch(addr->sa_family) {
 		case AF_UNIX:
 			if (addrlen >= sizeof(sockaddr_un)) {
-				snprintf(name, sizeof(name), "unix://%s",
+				snprintf(name, sizeof(name), "unix/:%s",
 					((struct sockaddr_un *)addr)->sun_path);
 			} else {
 				snprintf(name, sizeof(name),
-					"unix://%s", "");
+					 "unix/:(socket)");
 			}
 			break;
-		case AF_INET: {
-			struct sockaddr_in *in = (struct sockaddr_in *)addr;
-			snprintf(name, sizeof(name), "%s:%d",
-				 inet_ntoa(in->sin_addr), ntohs(in->sin_port));
-			break;
-		}
-		case AF_INET6: {
-			*name = 0;
-			inet_ntop(AF_INET6, addr, name, sizeof(name));
+		default: {
+			char host[NI_MAXHOST], serv[NI_MAXSERV];
+			if (getnameinfo(addr, addrlen, host, sizeof(host),
+					serv, sizeof(serv),
+					NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+				snprintf(name, sizeof(name),
+					 addr->sa_family == AF_INET
+					 ? "%s:%s" : "[%s]:%s", host, serv);
+			} else {
+				snprintf(name, sizeof(name), "(host):(port)");
+			}
 			break;
 		}
 	}

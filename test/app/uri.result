@@ -1,0 +1,25 @@
+TAP version 13
+# uri
+1..1
+    # parse
+    1..17
+    ok - scheme
+    ok - login
+    ok - password
+    ok - host
+    ok - service
+    ok - path
+    ok - query
+    ok - fragment
+    ok - ipv4
+    ok - ipv4
+    ok - ipv6
+    ok - ipv6
+    ok - unix
+    ok - unix
+    ok - unix
+    ok - invalid uri
+    ok - invalid uri
+    # parse: end
+ok - parse
+# uri: end

@@ -1,0 +1,36 @@
+box.space._cluster:replace{1, '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'}
+---
+- [1, '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae']
+...
+box.info.server.uuid
+---
+- 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae
+...
+check log line for 'server uuid changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
+
+'server uuid changed to 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae' exists in server log
+
+box.info.server.uuid
+---
+- 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae
+...
+box.snapshot()
+---
+- ok
+...
+box.info.server.uuid
+---
+- 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae
+...
+box.space._cluster:delete(1)
+---
+- error: Can't reset server id
+...
+box.space._cluster:update(1, {{'=', 1, 10}})
+---
+- error: Can't reset server id
+...
+box.space._cluster:replace{1, require('uuid').NULL:str()}
+---
+- error: 'Invalid UUID: 00000000-0000-0000-0000-000000000000'
+...

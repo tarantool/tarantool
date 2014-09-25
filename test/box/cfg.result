@@ -2,7 +2,7 @@
 --# push filter 'admin: .*' to 'admin: <uri>'
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:202: Attempt to modify a read-only
+- error: '[string "-- load_cfg.lua - internal file..."]:204: Attempt to modify a read-only
     table'
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
@@ -13,7 +13,7 @@ t
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
-  - 'slab_alloc_minimal: 64'
+  - 'rows_per_wal: 50'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
@@ -21,14 +21,15 @@ t
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
+  - 'sophia_dir: ./sophia'
   - 'wal_mode: write'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'pid_file: tarantool.pid'
-  - 'readahead: 16320'
+  - 'slab_alloc_minimal: 64'
   - 'wal_dir: .'
+  - 'readahead: 16320'
   - 'snapshot_period: 0'
-  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 -- must be read-only
@@ -43,7 +44,7 @@ t
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
-  - 'slab_alloc_minimal: 64'
+  - 'rows_per_wal: 50'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
@@ -51,14 +52,15 @@ t
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
+  - 'sophia_dir: ./sophia'
   - 'wal_mode: write'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'pid_file: tarantool.pid'
-  - 'readahead: 16320'
+  - 'slab_alloc_minimal: 64'
   - 'wal_dir: .'
+  - 'readahead: 16320'
   - 'snapshot_period: 0'
-  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 --# clear filter

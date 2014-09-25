@@ -1,6 +1,7 @@
 remote = require 'net.box'
 fiber = require 'fiber'
 log = require 'log'
+msgpack = require 'msgpack'
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 port = box.cfg.listen
@@ -118,6 +119,13 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 
 cn:_fatal 'Test error'
 cn:_select(space.id, 0, {}, { iterator = 'ALL' })
+
+-- send broken packet (remote server will close socket)
+cn.s:syswrite(msgpack.encode(1) .. msgpack.encode('abc'))
+fiber.sleep(.2)
+
+cn.state
+cn:ping()
 
 -- -- dot-new-method
 

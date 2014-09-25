@@ -338,6 +338,61 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
       </tbody>
     </tgroup>
   </table>
+  
+  
+  <table frame='all' pgwide='1'>
+    <title>Snapshot daemon</title>
+    <tgroup cols='5' colsep='1' rowsep='1'>
+      <colspec colnum="1" colname="col1" colwidth="2*"/>
+      <colspec colnum="5" colname="col4" colwidth="6*"/>
+
+      <thead>
+        <row>
+          <entry>Name</entry>
+          <entry>Type</entry>
+          <entry>Default</entry>
+          <entry>Dynamic?</entry>
+          <entry>Description</entry>
+        </row>
+      </thead>
+
+      <tbody>
+
+        <row>
+          <entry>snapshot_period</entry>
+          <entry>float</entry>
+          <entry>0</entry>
+          <entry>yes</entry>
+          <entry>
+          	Period to make new database snapshot.
+          	Daemon is disabled by
+          	<code>snapshot_period=0</code> value.
+          	Use <code>snapshot_period=3600</code> to make
+          	snapshot for each hour.
+          </entry>
+        </row>
+
+        <row>
+          <entry>snapshot_count</entry>
+          <entry>float</entry>
+          <entry>6</entry>
+          <entry>yes</entry>
+          <entry>
+          	<para>
+			The daemon creates new snapshot and then it
+			removes old snapshots (and their xlogs) using the
+			option.
+          	</para>
+
+          	<para>
+			Daemon is disabled by
+			<code>snapshot_count=0</code> value.
+        	</para>
+          </entry>
+        </row>
+      </tbody>
+    </tgroup>
+  </table>
 
   <table frame='all' pgwide='1'>
     <title>Binary logging and snapshots</title>

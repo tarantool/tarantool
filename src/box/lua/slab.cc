@@ -89,7 +89,7 @@ lbox_slab_info(struct lua_State *L)
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
 	luaL_setmaphint(L, -1);
-	small_stats(&talloc, &totals, small_stats_lua_cb, L);
+	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
@@ -103,15 +103,15 @@ lbox_slab_info(struct lua_State *L)
 	char value[32];
 	double items_used_ratio = 100
 		* ((double)totals.used)
-		/ ((double)talloc.cache->arena->prealloc + 0.0001);
+		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
 	snprintf(value, sizeof(value), "%0.1lf%%", items_used_ratio);
 	lua_pushstring(L, "items_used_ratio");
 	lua_pushstring(L, value);
 	lua_settable(L, -3);
 
 	double arena_used_ratio = 100
-		* ((double)talloc.cache->arena->used)
-		/ ((double)talloc.cache->arena->prealloc + 0.0001);
+		* ((double)memtx_alloc.cache->arena->used)
+		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
 	snprintf(value, sizeof(value), "%0.1lf%%", arena_used_ratio);
 	lua_pushstring(L, "arena_used_ratio");
 	lua_pushstring(L, value);
@@ -139,7 +139,7 @@ lbox_runtime_info(struct lua_State *L)
 static int
 lbox_slab_check(struct lua_State *L __attribute__((unused)))
 {
-	slab_cache_check(talloc.cache);
+	slab_cache_check(memtx_alloc.cache);
 	return 0;
 }
 

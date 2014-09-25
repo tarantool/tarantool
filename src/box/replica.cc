@@ -89,21 +89,43 @@ remote_connect(struct recovery_state *r, struct ev_io *coio,
 {
 	char greeting[IPROTO_GREETING_SIZE];
 
-	evio_socket(coio, AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
+	struct remote *remote = &r->remote;
 	struct uri *uri = &r->remote.uri;
-
-	coio_connect(coio, &uri->addr, uri->addr_len);
+	/*
+	 * coio_connect() stores resolved address to \a &remote->addr
+	 * on success. &remote->addr_len is a value-result argument which
+	 * must be initialized to the size of associated buffer (addrstorage)
+	 * before calling coio_connect(). Since coio_connect() performs
+	 * DNS resolution under the hood it is theoretically possible that
+	 * remote->addr_len will be different even for same uri.
+	 */
+	remote->addr_len = sizeof(remote->addrstorage);
+	/* Prepare null-terminated strings for coio_connect() */
+	char host[URI_MAXHOST] = { '\0' };
+	if (uri->host) {
+		snprintf(host, sizeof(host), "%.*s", (int) uri->host_len,
+			 uri->host);
+	}
+	char service[URI_MAXSERVICE];
+	snprintf(service, sizeof(service), "%.*s", (int) uri->service_len,
+		 uri->service);
+	coio_connect(coio, host, service, &remote->addr, &remote->addr_len);
+	assert(coio->fd >= 0);
 	coio_readn(coio, greeting, sizeof(greeting));
 
-	say_crit("connected to master");
-	if (!r->remote.uri.login[0])
+	say_crit("connected to %s", sio_strfaddr(&remote->addr,
+						 remote->addr_len));
+
+	/* Perform authentication if user provided at least login */
+	if (!r->remote.uri.login)
 		return;
 
 	/* Authenticate */
 	say_debug("authenticating...");
 	struct xrow_header row;
-	xrow_encode_auth(&row, greeting, uri->login, uri->password);
+	xrow_encode_auth(&row, greeting, uri->login,
+			 uri->login_len, uri->password,
+			 uri->password_len);
 	remote_write_row(coio, &row);
 	remote_read_row(coio, iobuf, &row);
 	if (row.type != IPROTO_OK)
@@ -285,7 +307,7 @@ recovery_follow_remote(struct recovery_state *r)
 	assert(r->remote.reader == NULL);
 	assert(recovery_has_remote(r));
 
-	const char *uri = uri_to_string(&r->remote.uri);
+	const char *uri = uri_format(&r->remote.uri);
 	say_crit("starting replication from %s", uri);
 	snprintf(name, sizeof(name), "replica/%s", uri);
 
@@ -316,14 +338,12 @@ recovery_set_remote(struct recovery_state *r, const char *uri)
 		r->remote.source[0] = '\0';
 		return;
 	}
-	/*
-	 * @todo: as long as DNS is involved, this may fail even
-	 * on a valid uri. Don't panic in this case.
-	 */
-	if (uri_parse(&r->remote.uri, uri))
-		panic("Can't parse uri: %s", uri);
-	snprintf(r->remote.source,
-		 sizeof(r->remote.source), "%s", uri);
+	snprintf(r->remote.source, sizeof(r->remote.source), "%s", uri);
+	struct remote *remote = &r->remote;
+	int rc = uri_parse(&remote->uri, r->remote.source);
+	/* URI checked by box_check_replication_source() */
+	assert(rc == 0 && remote->uri.service != NULL);
+	(void) rc;
 }
 
 bool

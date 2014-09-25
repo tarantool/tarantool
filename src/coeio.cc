@@ -108,6 +108,16 @@ coeio_init(void)
 }
 
 /**
+ * ReInit coeio subsystem (for example after 'fork')
+ *
+ */
+void
+coeio_reinit(void)
+{
+	eio_init(coeio_want_poll_cb, NULL);
+}
+
+/**
  * A single task context.
  */
 struct coeio_task {
@@ -260,8 +270,9 @@ coeio_resolve(int socktype, const char *host, const char *port,
 	hints.ai_protocol = 0;
 	/* do resolving */
 	errno = 0;
-	if (coeio_custom(getaddrinfo_cb, timeout, host, port,
-			 &hints, &result))
+	/* make no difference between empty string and NULL for host */
+	if (coeio_custom(getaddrinfo_cb, timeout, (host && *host) ? host : NULL,
+			 port, &hints, &result))
 		return NULL;
 	return result;
 }
