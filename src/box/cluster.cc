@@ -43,16 +43,24 @@ cluster_clock()
 }
 
 void
-cluster_add_server(const tt_uuid *server_uuid, uint32_t server_id)
+cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 {
 	struct recovery_state *r = recovery;
 	/** Checked in the before-commit trigger */
 	assert(!tt_uuid_is_nil(server_uuid));
 	assert(!cserver_id_is_reserved(server_id));
 
+	if (r->server_id == server_id) {
+		if (tt_uuid_is_equal(&r->server_uuid, server_uuid))
+			return;
+		say_warn("server uuid changed to %s", tt_uuid_str(server_uuid));
+		assert(vclock_has(&r->vclock, server_id));
+		memcpy(&r->server_uuid, server_uuid, sizeof(*server_uuid));
+		return;
+	}
+
 	/* Add server */
 	vclock_add_server(&r->vclock, server_id);
-
 	if (tt_uuid_is_equal(&r->server_uuid, server_uuid)) {
 		/* Assign local server id */
 		assert(r->server_id == 0);
