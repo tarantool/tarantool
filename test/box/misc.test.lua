@@ -61,6 +61,8 @@ for k, v in pairs(box.slab.info()) do
     table.insert(t, k)
 end;
 t;
+box.runtime.info().used > 0;
+box.runtime.info().maxalloc > 0;
 
 --
 -- gh-502: box.slab.info() excessively sparse array

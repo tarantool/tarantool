@@ -24,6 +24,7 @@ t
   - info
   - internal
   - rollback
+  - runtime
   - schema
   - session
   - slab
@@ -153,6 +154,14 @@ t;
   - arena_used
   - arena_size
   - slabs
+...
+box.runtime.info().used > 0;
+---
+- true
+...
+box.runtime.info().maxalloc > 0;
+---
+- true
 ...
 --
 -- gh-502: box.slab.info() excessively sparse array

@@ -293,6 +293,33 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 	return n;
 }
 
+/** Blocking I/O writev */
+ssize_t
+sio_writev_all(int fd, struct iovec *iov, int iovcnt)
+{
+	ssize_t bytes_total = 0;
+	struct iovec *iovend = iov + iovcnt;
+	while(1) {
+		int cnt = iovend - iov;
+		if (cnt > IOV_MAX)
+			cnt = IOV_MAX;
+		ssize_t bytes_written = writev(fd, iov, cnt);
+		if (bytes_written < 0) {
+			if (errno == EINTR)
+				continue;
+			tnt_raise(SocketError, fd, "writev(%d)", cnt);
+		}
+		bytes_total += bytes_written;
+		while (bytes_written >= iov->iov_len)
+			bytes_written -= (iov++)->iov_len;
+		if (iov == iovend)
+			break;
+		iov->iov_base = (char *) iov->iov_base + bytes_written;
+		iov->iov_len -= bytes_written;
+	}
+	return bytes_total;
+}
+
 ssize_t
 sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size)
 {

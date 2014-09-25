@@ -50,7 +50,7 @@ struct txn_stmt {
 	struct tuple *new_tuple;
 
 	/** Redo info: the binary log row */
-	struct iproto_header *row;
+	struct xrow_header *row;
 };
 
 struct txn {

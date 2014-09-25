@@ -118,24 +118,8 @@ ssize_t
 sio_writen(int fd, const void *buf, size_t count);
 
 /* Only for blocked I/O */
-static inline ssize_t
-sio_writev_all(int fd, struct iovec *iov, int iovcnt)
-{
-	ssize_t bytes_total = 0;
-	struct iovec *iovend = iov + iovcnt;
-	while(1) {
-		ssize_t bytes_written = sio_writev(fd, iov, iovend - iov);
-		bytes_total += bytes_written;
-		while (bytes_written > 0 && bytes_written >= iov->iov_len)
-			bytes_written -= (iov++)->iov_len;
-		if (iov == iovend)
-			break;
-		iov->iov_base = (char *) iov->iov_base + bytes_written;
-		iov->iov_len -= bytes_written;
-	}
-
-	return bytes_total;
-}
+ssize_t
+sio_writev_all(int fd, struct iovec *iov, int iovcnt);
 
 /**
  * A wrapper over sendfile.

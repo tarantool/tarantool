@@ -68,7 +68,7 @@ Configuration files for the tested systems can be found
 
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <script src="http://code.highcharts.com/highcharts.js"></script>
-    <script type="text/javascript" src="theme/highcharts.js"></script>
+    <script type="text/javascript" src="highcharts.js"></script>
     <div class="b-tabs">
         <div>
             <ul class="b-tabs__list">
@@ -93,4 +93,4 @@ Configuration files for the tested systems can be found
             <p class="b-tabs__description" align="center">50/50 update/read ratio</p>
         </div>
     </div>
-    <script type="text/javascript" src="theme/tabs.js"></script>
+    <script type="text/javascript" src="tabs.js"></script>

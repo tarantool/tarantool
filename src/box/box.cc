@@ -34,7 +34,7 @@
 #include "recovery.h"
 #include "log_io.h"
 #include <say.h>
-#include <iproto.h>
+#include "iproto.h"
 #include "replication.h"
 #include <stat.h>
 #include <tarantool.h>
@@ -95,7 +95,7 @@ process_ro(struct port *port, struct request *request)
 }
 
 static void
-recover_row(void *param __attribute__((unused)), struct iproto_header *row)
+recover_row(void *param __attribute__((unused)), struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	struct request request;
@@ -454,8 +454,8 @@ snapshot_write_tuple(struct log_io *l,
 	body.v_space_id = mp_bswap_u32(n);
 	body.k_tuple = IPROTO_TUPLE;
 
-	struct iproto_header row;
-	memset(&row, 0, sizeof(struct iproto_header));
+	struct xrow_header row;
+	memset(&row, 0, sizeof(struct xrow_header));
 	row.type = IPROTO_INSERT;
 
 	row.bodycnt = 2;
