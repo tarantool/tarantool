@@ -185,32 +185,32 @@ xrow_to_iovec(const struct xrow_header *row,
 
 void
 xrow_encode_auth(struct xrow_header *packet, const char *greeting,
-		   const char *login, const char *password)
+		 const char *login, size_t login_len,
+		 const char *password, size_t password_len)
 {
+	assert(login != NULL);
 	memset(packet, 0, sizeof(*packet));
-
-	uint32_t login_len = strlen(login);
-	uint32_t password_len = strlen(password);
 
 	enum { PACKET_LEN_MAX = 128 };
 	size_t buf_size = PACKET_LEN_MAX + login_len + SCRAMBLE_SIZE;
 	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
 
-	char salt[SCRAMBLE_SIZE];
-	char scramble[SCRAMBLE_SIZE];
-	if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
-			  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
-		panic("invalid salt: %64s", greeting + 64);
-	scramble_prepare(scramble, salt, password, password_len);
-
 	char *d = buf;
-	d = mp_encode_map(d, 2);
+	d = mp_encode_map(d, password != NULL ? 2 : 1);
 	d = mp_encode_uint(d, IPROTO_USER_NAME);
 	d = mp_encode_str(d, login, login_len);
-	d = mp_encode_uint(d, IPROTO_TUPLE);
-	d = mp_encode_array(d, 2);
-	d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
-	d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
+	if (password != NULL) { /* password can be omitted */
+		char salt[SCRAMBLE_SIZE];
+		char scramble[SCRAMBLE_SIZE];
+		if (base64_decode(greeting + 64, SCRAMBLE_BASE64_SIZE, salt,
+				  SCRAMBLE_SIZE) != SCRAMBLE_SIZE)
+			panic("invalid salt: %64s", greeting + 64);
+		scramble_prepare(scramble, salt, password, password_len);
+		d = mp_encode_uint(d, IPROTO_TUPLE);
+		d = mp_encode_array(d, 2);
+		d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
+		d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
+	}
 
 	assert(d <= buf + buf_size);
 	packet->body[0].iov_base = buf;

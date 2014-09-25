@@ -114,9 +114,11 @@ box_check_replication_source(const char *source)
 	if (source == NULL)
 		return;
 	struct uri uri;
-	if (uri_parse(&uri, source)) {
-		tnt_raise(ClientError, ER_CFG,
-			  "incorrect replication source");
+
+	/* URI format is [host:]service */
+	if (uri_parse(&uri, source) || !uri.service) {
+		tnt_raise(ClientError, ER_CFG, "replication source, "
+			  "expected host:service or /unix.socket");
 	}
 }
 
@@ -134,6 +136,7 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {

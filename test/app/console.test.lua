@@ -12,7 +12,7 @@ os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
 box.cfg{
-    listen='unix://'..IPROTO_SOCKET;
+    listen=IPROTO_SOCKET;
     slab_alloc_arena=0.1,
     logger="tarantool.log",
 }

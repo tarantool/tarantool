@@ -32,15 +32,20 @@
 #include "tarantool_ev.h"
 #include <uri.h>
 
-enum { REMOTE_SOURCE_MAXLEN = 64 };
+enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
 /** Master connection */
 struct remote {
-	struct uri uri;
 	struct fiber *reader;
 	ev_tstamp recovery_lag, recovery_last_update_tstamp;
 	bool warning_said;
 	char source[REMOTE_SOURCE_MAXLEN];
+	struct uri uri;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addrstorage;
+	};
+	socklen_t addr_len;
 };
 
 /** Connect to a master and request a snapshot.
