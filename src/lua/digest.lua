@@ -73,12 +73,12 @@ end
 local m = {
     base64_encode = function(bin)
         if bin == nil then
-            bin = ''
+            error('Usage: base64.encode(str)')
         else
             -- note: need add check size of bin, bin might containe any binary data
             if type(bin) == 'string' then
                 local blen = string.len(bin)
-                local slen = math.ceil(blen * 4 / 3) + 1
+                local slen = math.ceil(blen * 4 / 3) + 2
                 local so  = ffi.new('char[?]', slen)
                 local len = ffi.C.base64_encode(bin, blen, so, slen)
                 bin = ffi.string(so, len)
@@ -94,7 +94,7 @@ local m = {
             data = ''
         else
             local slen = string.len(data)
-            local blen = math.ceil((slen - 1) * 4 / 3)
+            local blen = math.ceil(slen * 3 / 4)
             local bo  = ffi.new('char[?]', blen)
             local len = ffi.C.base64_decode(data, slen, bo, blen)
             data = ffi.string(bo, len)
