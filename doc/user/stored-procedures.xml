@@ -288,7 +288,8 @@ administration with the built-in packages.
     <link xlink:href="https://en.wikipedia.org/wiki/Sha-2">SHA-2</link>)
 
     as well as a checksum function
-    (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
+    (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>)
+    and two functions for <link xlink:href="https://en.wikipedia.org/wiki/Base64">base64</link>.
     The functions in <code>digest</code> are:
     <informaltable>
     <tgroup cols="2" align="left" colsep="1" rowsep="0">
@@ -314,6 +315,8 @@ administration with the built-in packages.
     <row><entry><code>digest.md4_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with md4.</entry></row>
     <row><entry><code>digest.md5(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 256-bit digest made with MD5.</entry></row>
     <row><entry><code>digest.md5_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with md5.</entry></row>
+    <row><entry><code>digest.base64_encode(<replaceable>string</replaceable>)</code></entry><entry>          Returns base64 encoding from a regular string.</entry></row>
+    <row><entry><code>digest.base64_decode(<replaceable>string</replaceable>)</code></entry><entry>          Returns a regular string from a base64 encoding.</entry></row>
     </tbody>
     </tgroup>                                   
     </informaltable>
