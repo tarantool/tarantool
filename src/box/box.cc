@@ -362,15 +362,6 @@ engine_init()
 	SophiaFactory *sophia = new SophiaFactory();
 	sophia->init();
 	engine_register(sophia);
-
-	/* Prepare storage and recover data.
-	 *
-	 * This is first phase of recover, schema is not known yet.
-	 * Internal sophia spaces (databases) are created in
-	 * recover-delay mode and not accessible yet.
-	 * Recover completes on first engine index creation.
-	*/
-	sophia->recover();
 }
 
 void

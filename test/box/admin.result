@@ -21,7 +21,7 @@ box.cfg
 - snapshot_count: 6
   too_long_threshold: 0.5
   slab_alloc_factor: 2
-  slab_alloc_minimal: 64
+  rows_per_wal: 50
   background: false
   slab_alloc_arena: 0.1
   log_level: 5
@@ -29,14 +29,15 @@ box.cfg
   logger_nonblock: true
   snap_dir: .
   coredump: false
+  sophia_dir: ./sophia
   wal_mode: write
   panic_on_snap_error: true
   panic_on_wal_error: false
   pid_file: tarantool.pid
-  readahead: 16320
+  slab_alloc_minimal: 64
   wal_dir: .
+  readahead: 16320
   snapshot_period: 0
-  rows_per_wal: 50
   wal_dir_rescan_delay: 0.1
 ...
 space:insert{1, 'tuple'}
