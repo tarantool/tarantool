@@ -34,6 +34,7 @@
 #include "errinj.h"
 #include "schema.h"
 #include "space.h"
+#include "cfg.h"
 #include "engine_sophia.h"
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -144,9 +145,12 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	if (db == NULL)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
 
-	char path[1024];
-	mkdir("sophia", 0755); /* todo: sophia_dir */
-	snprintf(path, sizeof(path), "sophia/%" PRIu32, space->def.id);
+	const char *sophia_dir = cfg_gets("sophia_dir");
+	mkdir(sophia_dir, 0755);
+
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "%s/%" PRIu32,
+	         sophia_dir, key_def->space_id);
 
 	void *c = sp_ctl(db, "conf");
 	sp_set(c, "storage.dir", path);

@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "cfg.h"
 #include "txn.h"
 #include "tuple.h"
 #include "engine.h"
@@ -161,10 +162,9 @@ SophiaFactory::dropIndex(Index *index)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(i->db));
 	i->db  = NULL;
 	i->env = NULL;
-	char path[1024];
-	snprintf(path, sizeof(path), "sophia/%" PRIu32,
-	         index->key_def->space_id);
-	/* todo: sophia_dir */
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), "%s/%" PRIu32,
+	         cfg_gets("sophia_dir"), index->key_def->space_id);
 	drop_repository(path);
 }
 
