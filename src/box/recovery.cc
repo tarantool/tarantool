@@ -187,7 +187,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 		panic("can't scan snapshot directory");
 	if (log_dir_scan(&r->wal_dir) != 0)
 		panic("can't scan WAL directory");
-	region_create(&r->pool, &cord()->slabc);
 }
 
 void
@@ -227,8 +226,6 @@ recovery_free()
 		 */
 		log_io_close(&r->current_wal);
 	}
-
-	region_destroy(&r->pool);
 	recovery= NULL;
 }
 
@@ -485,9 +482,7 @@ recover_current_wal:
 		result = -1;
 	}
 
-#if 0
 	region_free(&fiber()->gc);
-#endif
 	return result;
 }
 
@@ -1028,6 +1023,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 			break;
 		req = write_end;
 	}
+	fiber_gc();
 	STAILQ_SPLICE(input, write_end, wal_fifo_entry, rollback);
 	STAILQ_CONCAT(commit, input);
 }

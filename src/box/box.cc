@@ -422,6 +422,7 @@ box_init()
 		space_end_recover_snapshot();
 		snapshot_save(recovery);
 	}
+	fiber_gc();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
@@ -519,7 +520,7 @@ box_snapshot(void)
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
-	slab_arena_mprotect(&tuple_arena);
+	slab_arena_mprotect(&memtx_arena);
 
 	cord_set_name("snap");
 	title("dumper", "%" PRIu32, getppid());
