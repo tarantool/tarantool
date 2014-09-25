@@ -542,7 +542,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
       <tbody>
 
         <row>
-          <entry>log_level</entry>
+          <entry xml:id="log_level" xreflabel="log_level">log_level</entry>
           <entry>integer</entry>
           <entry>5</entry>
           <entry><emphasis role="strong">yes</emphasis></entry>
@@ -557,18 +557,16 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
         </row>
 
         <row>
-          <entry>logger</entry>
+          <entry xml:id="logger" xreflabel="logger">logger</entry>
           <entry>string</entry>
           <entry>null</entry>
           <entry>no</entry>
           <entry>By default, the log is sent to the standard
           error stream (<filename>stderr</filename>). If logger
-          is given a value, Tarantool creates a child process,
-          executes the command indicated by the value, and pipes its standard
-          output to the standard input of the created process.
-          Example setting: <command>tee -a
-          tarantool.log</command> (this will duplicate log output
-          to <filename>stdout</filename> and a log file).
+          is specified, the log is sent to the file named in the string.
+          Example setting: logger = 'tarantool.log'
+          (this will open tarantool.log for output on the
+          server's default directory).
           </entry>
         </row>
 
