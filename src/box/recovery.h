@@ -89,8 +89,6 @@ struct recovery_state {
 	uint32_t server_id;
 
 	bool finalize;
-	/** Throwaway memory for spot allocations. */
-	struct region pool;
 };
 
 extern struct recovery_state *recovery;

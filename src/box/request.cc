@@ -155,6 +155,10 @@ execute_select(struct request *request, struct port *port)
 			break;
 		port_add_tuple(port, tuple);
 	}
+	if (! in_txn()) {
+		 /* no txn is created, so simply collect garbage here */
+		fiber_gc();
+	}
 }
 
 void

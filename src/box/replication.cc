@@ -213,11 +213,11 @@ struct replication_request {
 
 /** Replication acceptor fiber handler. */
 void
-replication_join(int fd, struct xrow_header *header)
+replication_join(int fd, struct xrow_header *packet)
 {
-	assert(header->type == IPROTO_JOIN);
+	assert(packet->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
-	xrow_decode_join(header, &server_uuid);
+	xrow_decode_join(packet, &server_uuid);
 
 	/* Notify box about new cluster server */
 	recovery->join_handler(&server_uuid);
@@ -230,8 +230,8 @@ replication_join(int fd, struct xrow_header *header)
 	}
 	request->fd = fd;
 	request->io.data = request;
-	request->data.type = header->type;
-	request->data.sync = header->sync;
+	request->data.type = packet->type;
+	request->data.sync = packet->sync;
 
 	ev_io_init(&request->io, replication_send_socket,
 		   master_to_spawner_socket, EV_WRITE);

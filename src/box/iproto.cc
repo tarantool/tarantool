@@ -490,7 +490,6 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		xrow_header_decode(&ireq->header, &pos, reqend);
 		ireq->total_len = pos - reqstart; /* total request length */
 
-
 		/*
 		 * sic: in case of exception con->parse_size
 		 * as well as in->pos must not be advanced, to
