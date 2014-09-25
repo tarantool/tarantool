@@ -387,7 +387,8 @@ SophiaIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 	it->space  = space_cache_find(key_def->space_id);
 	const char *compare;
 	switch (type) {
-	case ITER_EQ: it->base.next = sophia_iterator_eq;
+	case ITER_EQ:
+		it->base.next = sophia_iterator_eq;
 		return;
 	case ITER_ALL:
 	case ITER_GE: compare = ">=";
@@ -402,6 +403,7 @@ SophiaIndex::initIterator(struct iterator *ptr, enum iterator_type type,
 		tnt_raise(ClientError, ER_UNSUPPORTED,
 		          "SophiaIndex", "requested iterator type");
 	}
+	it->base.next = sophia_iterator_next;
 	void *o = NULL;
 	if (key) {
 		o = sp_object(db);

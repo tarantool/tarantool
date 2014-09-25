@@ -1,0 +1,138 @@
+sophia_rmdir()
+---
+...
+-- space create/drop
+space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
+---
+...
+sophia_printdir()
+---
+- 
+...
+space:drop()
+---
+...
+sophia_printdir()
+---
+- 
+...
+-- index create/drop
+space = box.schema.create_space('test', { id = 101, engine = 'sophia' })
+---
+...
+primary = space:create_index('primary')
+---
+...
+sophia_printdir()
+---
+- '101
+
+'
+...
+space:drop()
+---
+...
+sophia_printdir()
+---
+- 
+...
+-- index create/drop alter
+space = box.schema.create_space('test', { id = 102, engine = 'sophia' })
+---
+...
+primary = space:create_index('primary')
+---
+...
+sophia_printdir()
+---
+- '102
+
+'
+...
+_index = box.space[box.schema.INDEX_ID]
+---
+...
+_index:delete{102, 0}
+---
+- [102, 0, 'primary', 'tree', 1, 1, 0, 'num']
+...
+sophia_printdir()
+---
+- 
+...
+space:drop()
+---
+...
+-- index create/drop tree string
+space = box.schema.create_space('test', { id = 103, engine = 'sophia' })
+---
+...
+primary = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
+---
+...
+space:insert({'test'})
+---
+- ['test']
+...
+sophia_printdir()
+---
+- '103
+
+'
+...
+space:drop()
+---
+...
+-- index create/drop tree num
+space = box.schema.create_space('test', { id = 104, engine = 'sophia' })
+---
+...
+primary = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
+---
+...
+space:insert({13})
+---
+- [13]
+...
+sophia_printdir()
+---
+- '104
+
+'
+...
+space:drop()
+---
+...
+-- index create hash 
+space = box.schema.create_space('test', { id = 105, engine = 'sophia' })
+---
+...
+primary = space:create_index('primary', {type = 'hash'})
+---
+- error: Unsupported index type supplied for index 0 in space 105
+...
+space:drop()
+---
+...
+-- secondary index create
+space = box.schema.create_space('test', { id = 106, engine = 'sophia' })
+---
+...
+space:create_index('primary')
+---
+...
+space:create_index('secondary')
+---
+- error: 'Can''t create or modify index 1 in space 106: Sophia TREE secondary indexes
+    are not supported'
+...
+space:drop()
+---
+...
+sophia_printdir()
+---
+- 
+...
+sophia_rmdir()
+---
+...
