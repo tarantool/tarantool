@@ -184,9 +184,9 @@ SophiaIndex::endBuild()
 size_t
 SophiaIndex::size() const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-	          "SophiaIndex", "size operation");
-	return 0;
+	void *profiler = sp_ctl(db, "profiler");
+	uint64_t count = *(uint64_t*)sp_get(profiler, "count", NULL);
+	return count;
 }
 
 size_t
