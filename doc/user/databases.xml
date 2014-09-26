@@ -638,7 +638,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
     <varlistentry>
         <term>
           <emphasis role="lua" xml:id="box.update">
-          box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)
+          box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, {format, field_no, value}...</replaceable>)
           </emphasis>
         </term>
         <listitem>
@@ -2096,6 +2096,46 @@ tarantool&gt; <userinput>tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end</
 tarantool> <userinput>tmp</userinput>
 ---
 - Fld#1Fld#2Fld#3Fld#4Fld#5
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:update(<replaceable>{{format, field_no, value}...}</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Update a tuple.
+            </para>
+            <para>
+              This function updates a tuple which is not in a space.
+              Compare the function
+              <code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code>,
+              which updates a tuple in a space.
+            </para>
+            <para>
+              Parameters: briefly:
+              <code>format</code> indicates the type of update operation such as '=' for 'assign new value',
+              <code>field_no</code> indicates the field number to change such as 2 for field number 2,
+              <code>value</code> indicates the string which operates on the field such as 'B' for a new assignable value = 'B'.
+              For details: see the description for <code>format</code>, <code>field_no</code>, and <code>value</code>
+              in the section <olink targetptr="box.update"><code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code></olink>.
+            </para>
+            <para>
+              Returns: (type = tuple) the new tuple.
+            </para>
+            <para>
+              In the following example, a tuple named t is created
+              and then its second field is updated to equal 'B'.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+---
+...
+tarantool&gt; <userinput>t:update({{'=',2,'B'}})</userinput>
+---
+- ['Fld#1', 'B', 'Fld#3', 'Fld#4', 'Fld#5']
 ...</programlisting>
         </listitem>
     </varlistentry>
