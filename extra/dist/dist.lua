@@ -117,7 +117,7 @@ end
 default_cfg.pid_file   = default_cfg.pid_file and default_cfg.pid_file or "/var/run/tarantool"
 default_cfg.wal_dir    = default_cfg.wal_dir and default_cfg.wal_dir or "/var/lib/tarantool"
 default_cfg.snap_dir   = default_cfg.snap_dir and default_cfg.snap_dir or "/var/lib/tarantool"
-default_cfg.sophia_dir = default_cfg.sophia_dir and default_cfg.sophia_dir or "/var/lib/tarantool/sophia"
+default_cfg.sophia_dir = default_cfg.sophia_dir and default_cfg.sophia_dir or "/var/lib/tarantool"
 default_cfg.logger     = default_cfg.logger and default_cfg.logger or "/var/log/tarantool"
 default_cfg.username   = default_cfg.username and default_cfg.username or "tarantool"
 
@@ -127,7 +127,7 @@ local console_sock = fio.pathjoin(default_cfg.pid_file, instance .. '.control')
 default_cfg.pid_file   = fio.pathjoin(default_cfg.pid_file, instance .. '.pid')
 default_cfg.wal_dir    = fio.pathjoin(default_cfg.wal_dir, instance)
 default_cfg.snap_dir   = fio.pathjoin(default_cfg.snap_dir, instance)
-default_cfg.sophia_dir = fio.pathjoin(default_cfg.sophia_dir, instance)
+default_cfg.sophia_dir = fio.pathjoin(default_cfg.sophia_dir, instance, 'sophia')
 default_cfg.logger     = fio.pathjoin(default_cfg.logger, instance .. '.log')
 
 local instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
