@@ -1,14 +1,15 @@
 from lib.box_connection import BoxConnection
+from lib.tarantool_connection import TarantoolConnection
 from tarantool import NetworkError
 from tarantool.const import IPROTO_GREETING_SIZE, IPROTO_CODE, IPROTO_ERROR, \
     REQUEST_TYPE_ERROR
 import socket
 import msgpack
 
-print """ 
+print """
  #
  # if on_connect() trigger raises an exception, the connection is dropped
- # 
+ #
  """
 
 server.admin("function f1() nosuchfunction() end")
@@ -16,8 +17,9 @@ server.admin("box.session.on_connect(f1)")
 
 unpacker = msgpack.Unpacker(use_list = False)
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('localhost', server.sql.port))
+conn = TarantoolConnection(server.sql.host, server.sql.port)
+conn.connect()
+s = conn.socket
 
 # Read greeting
 print 'greeting: ', len(s.recv(IPROTO_GREETING_SIZE)) == IPROTO_GREETING_SIZE

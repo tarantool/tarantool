@@ -62,17 +62,25 @@ for k in pairs(getmetatable(s).__index) do
 end;
 ---
 ...
---# setopt delimiter ''
-port = string.gsub(box.cfg.listen, '^.*:', '')
+s:close()
 ---
+- true
 ...
-s:nonblock(false)
+--# setopt delimiter ''
+s:close()
+
 ---
 - false
 ...
-s:sysconnect('127.0.0.1', port)
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
 ---
 - true
+...
+s = socket.tcp_connect(LISTEN.host, LISTEN.service)
+---
 ...
 s:nonblock(true)
 ---

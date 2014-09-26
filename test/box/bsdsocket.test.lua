@@ -24,12 +24,12 @@ for k in pairs(getmetatable(s).__index) do
         error("Arguments is not checked for "..k)
     end
 end;
+s:close()
 --# setopt delimiter ''
 
-port = string.gsub(box.cfg.listen, '^.*:', '')
-
-s:nonblock(false)
-s:sysconnect('127.0.0.1', port)
+LISTEN = require('uri').parse(box.cfg.listen)
+LISTEN ~= nil
+s = socket.tcp_connect(LISTEN.host, LISTEN.service)
 s:nonblock(true)
 s:nonblock()
 s:nonblock(false)

@@ -7,7 +7,6 @@ import yaml
 REPEAT = 20
 ID_BEGIN = 0
 ID_STEP = 5
-HOST = '127.0.0.1'
 LOGIN = 'test'
 PASSWORD = 'pass123456'
 
@@ -24,7 +23,7 @@ master = server
 master.admin("box.schema.user.create('%s', { password = '%s'})" % (LOGIN, PASSWORD))
 master.admin("box.schema.user.grant('%s', 'read,write,execute', 'universe')" % LOGIN)
 master.sql.py_con.authenticate(LOGIN, PASSWORD)
-master.uri = '%s:%s@%s:%s' % (LOGIN, PASSWORD, HOST, master.sql.port)
+master.uri = '%s:%s@%s' % (LOGIN, PASSWORD, master.sql.uri)
 os.putenv('MASTER', master.uri)
 
 # replica server
@@ -33,7 +32,7 @@ replica.script = "replication/replica.lua"
 replica.vardir = os.path.join(server.vardir, 'replica')
 replica.deploy()
 replica.admin("while box.info.server == nil do require('fiber').sleep(0.01) end")
-replica.uri = '%s:%s@%s:%s' % (LOGIN, PASSWORD, HOST, replica.sql.port)
+replica.uri = '%s:%s@%s' % (LOGIN, PASSWORD, replica.sql.uri)
 replica.admin("while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end")
 replica.sql.py_con.authenticate(LOGIN, PASSWORD)
 
@@ -42,7 +41,7 @@ master.admin("s:create_index('primary', {type = 'hash'})")
 
 ### gh-343: replica.cc must not add login and password to proc title
 #status = replica.get_param("status")
-#host_port = "%s:%s" % (HOST, master.sql.port)
+#host_port = "%s:%s" % master.sql.uri
 #m = re.search(r'replica/(.*)/.*', status)
 #if not m or m.group(1) != host_port:
 #    print 'invalid box.info.status', status, 'expected host:port', host_port
