@@ -3,7 +3,7 @@ default_cfg = {
     pid_file   = "/var/run/tarantool",        -- will become pid_file .. instance .. '.pid'
     wal_dir    = "/var/lib/tarantool",        -- will become wal_dir/instance/
     snap_dir   = "/var/lib/tarantool",        -- snap_dir/instance/
-    sophia_dir = "/var/lig/tarantool/sophia", -- will become sophia_dir/sophia/instance/
+    sophia_dir = "/var/lib/tarantool/sophia", -- will become sophia_dir/sophia/instance/
     logger     = "/var/log/tarantool",        -- logger/instance .. '.log'
     username   = "tarantool",
 }
