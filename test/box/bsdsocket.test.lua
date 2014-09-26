@@ -6,6 +6,7 @@ fiber = require 'fiber'
 msgpack = require 'msgpack'
 log = require 'log'
 errno = require 'errno'
+fio = require 'fio'
 type(socket)
 
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
@@ -114,7 +115,10 @@ sc:writable(10)
 sc:write('Hello, world')
 
 
-sa = s:accept()
+sa, addr = s:accept()
+addr2 = sa:name()
+addr2.host == addr.host
+addr2.family == addr.family
 sa:nonblock(1)
 sa:read(8)
 sa:read(3)
@@ -404,37 +408,59 @@ s:close()
 os.remove(path)
 
 
-server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+type(addr)
 server ~= nil
 fiber.sleep(.5)
 client = socket.tcp_connect('unix/', path)
 client ~= nil
 client:read(123)
-server:stop()
-os.remove(path)
+server:close()
+-- unix socket automatically removed
+fio.stat(path) == nil
 
+--# setopt delimiter ';'
+server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
+    s:read(2)
+    s:write('Hello, world')
+end, name = 'testserv'});
+--# setopt delimiter ''
+type(addr)
+server ~= nil
+addr2 = server:name()
+addr.host == addr2.host
+addr.family == addr2.family
+fiber.sleep(.5)
+client = socket.tcp_connect(addr2.host, addr2.port)
+client ~= nil
+-- Check that listen and client fibers have appropriate names
+cnt = 0
+--# setopt delimiter ';'
+for i=100,200 do
+    local f = fiber.find(i)
+    if f and f:name():match('^testserv/') then
+        cnt = cnt + 1
+    end
+end;
+--# setopt delimiter ''
+cnt
+client:write('hi')
+client:read(123)
+client:close()
+server:close()
 
 longstring = string.rep("abc", 65535)
 server = socket.tcp_server('unix/', path, function(s) s:write(longstring) end)
-
 client = socket.tcp_connect('unix/', path)
 client:read(#longstring) == longstring
-
 client = socket.tcp_connect('unix/', path)
 client:read(#longstring + 1) == longstring
-
 client = socket.tcp_connect('unix/', path)
 client:read(#longstring - 1) == string.sub(longstring, 1, #longstring - 1)
-
-
 longstring = "Hello\r\n\r\nworld\n\n"
-
 client = socket.tcp_connect('unix/', path)
 client:read{ line = { "\n\n", "\r\n\r\n" } }
-
-
-server:stop()
-os.remove(path)
+server:close()
 
 
 -- Test that socket is closed on GC
