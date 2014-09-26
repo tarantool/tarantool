@@ -335,8 +335,8 @@ bsdsocket_local_resolve(const char *host, const char *port,
 	}
 
 	/* IPv6 */
-	char ipv6[16];
-	if (inet_pton(AF_INET6, host, ipv6) == 1) {
+	struct in6_addr ipv6;
+	if (inet_pton(AF_INET6, host, &ipv6) == 1) {
 		struct sockaddr_in6 *inaddr6 = (struct sockaddr_in6 *) addr;
 		if (*socklen < sizeof(*inaddr6)) {
 			errno = ENOBUFS;
@@ -344,8 +344,8 @@ bsdsocket_local_resolve(const char *host, const char *port,
 		}
 		memset(inaddr6, 0, sizeof(*inaddr6));
 		inaddr6->sin6_family = AF_INET6;
-		inaddr6->sin6_port = htonl(atol(port));
-		memcpy(inaddr6->sin6_addr.s6_addr, ipv6, 16);
+		inaddr6->sin6_port = htons(atoi(port));
+		memcpy(inaddr6->sin6_addr.s6_addr, &ipv6, sizeof(ipv6));
 		*socklen = sizeof(*inaddr6);
 		return 0;
 	}
@@ -803,6 +803,24 @@ lbox_bsdsocket_peername(struct lua_State *L)
 }
 
 static int
+lbox_bsdsocket_accept(struct lua_State *L)
+{
+	int fh = lua_tointeger(L, 1);
+
+	struct sockaddr_storage fa;
+	socklen_t len = sizeof(fa);
+
+	int sc = accept(fh, (struct sockaddr*)&fa, &len);
+	if (sc < 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	lua_pushnumber(L, sc);
+	lbox_bsdsocket_push_addr(L, (struct sockaddr *)&fa, len);
+	return 2;
+}
+
+static int
 lbox_bsdsocket_recvfrom(struct lua_State *L)
 {
 	int fh = lua_tointeger(L, 1);
@@ -844,6 +862,7 @@ tarantool_lua_bsdsocket_init(struct lua_State *L)
 		{ "name",		lbox_bsdsocket_soname		},
 		{ "peer",		lbox_bsdsocket_peername		},
 		{ "recvfrom",		lbox_bsdsocket_recvfrom		},
+		{ "accept",		lbox_bsdsocket_accept		},
 		{ NULL,			NULL				}
 	};
 

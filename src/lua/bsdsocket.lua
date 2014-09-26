@@ -5,6 +5,7 @@ do
 local TIMEOUT_INFINITY      = 500 * 365 * 86400
 
 local ffi = require 'ffi'
+local os_remove = os.remove
 local internal = box.socket.internal
 box.socket.internal = nil
 package.loaded['box.socket.internal'] = nil
@@ -509,13 +510,12 @@ socket_methods.accept = function(self)
     local fd = check_socket(self)
     self._errno = nil
 
-    local cfd = ffi.C.accept(fd, nil, nil)
-
-    if cfd < 1 then
+    local cfd, from = internal.accept(fd)
+    if cfd == nil then
         self._errno = box.errno()
         return nil
     end
-    return bless_socket(cfd)
+    return bless_socket(cfd), from
 end
 
 local function readchunk(self, size, timeout)
@@ -979,97 +979,80 @@ local function tcp_connect(host, port, timeout)
     return nil
 end
 
-local function tcp_server_remote(list, prepare, handler)
-    local slist = {}
-
-    -- bind/create sockets
-    for _, addr in pairs(list) do
-        local s = create_socket(addr.family, addr.type, addr.protocol)
-
-        local ok = false
-        if s ~= nil then
-            local backlog = prepare(s)
-            if s:bind(addr.host, addr.port) then
-                if s:listen(backlog) then
-                    ok = true
-                end
-            end
-        end
-
-        -- errors
-        if not ok then
-            if s ~= nil then
-                s:close()
-            end
-            local save_errno = box.errno()
-            for _, s in pairs(slist) do
-                s:close()
-            end
-            box.errno(save_errno)
-            return nil
-        end
-
-        table.insert(slist, s)
-    end
-    
-    local server = { s = slist }
-
-    server.stop = function()
-        if #server.s == 0 then
-            return false
-        end
-        for _, s in pairs(server.s) do
-            s:close()
-        end
-        server.s = {}
-        return true
-    end
-
-    for _, s in pairs(server.s) do
-        box.fiber.wrap(function(s)
-            box.fiber.name(sprintf("listen_fd=%d", s:fd()))
-
-            while s:readable() do
-                
-                local sc = s:accept()
-
-                if sc == nil then
-                    break
-                end
-
-                box.fiber.wrap(function(sc)
-                    pcall(handler, sc)
-                    sc:close()
-                end, sc)
-            end
-        end, s)
-    end
-
-    return server
-
+local function tcp_server_handler(server, sc, from)
+    box.fiber.name(sprintf("%s/client/%s:%s", server.name, from.host, from.port))
+    server.handler(sc, from)
+    sc:close()
 end
 
-local function tcp_server(host, port, prepare, handler, timeout)
-    if handler == nil then
-        handler = prepare
-        prepare = function() end
+local function tcp_server_loop(server, s, addr)
+    box.fiber.name(sprintf("%s/listen/%s:%s", server.name, addr.host, addr.port))
+    while s:readable() do
+        local sc, from = s:accept()
+        if sc == nil then
+            break
+        end
+        box.fiber.wrap(tcp_server_handler, server, sc, from)
     end
-
-    if type(prepare) ~= 'function' or type(handler) ~= 'function' then
-        error("Usage: socket.tcp_server(host, port[, prepare], handler)")
+    if addr.family == 'AF_UNIX' and addr.port then
+        os_remove(addr.port) -- remove unix socket
     end
+end
 
+local function tcp_server_usage()
+    error('Usage: socket.tcp_server(host, port, handler | opts)')
+end
+
+local function tcp_server(host, port, opts, timeout)
+    local server = {}
+    if type(opts) == 'function' then
+        server.handler = opts
+    elseif type(opts) == 'table' then
+        if type(opts.handler) ~='function' or (opts.prepare ~= nil and
+            type(opts.prepare) ~= 'function') then
+            tcp_server_usage()
+        end
+        for k, v in pairs(opts) do
+            server[k] = v
+        end
+    else
+        tcp_server_usage()
+    end
+    server.name = server.name or 'server'
+    timeout = timeout and tonumber(timeout) or TIMEOUT_INFINITY
+    local dns
     if host == 'unix/' then
-        return tcp_server_remote({{host = host, port = port, protocol = 0,
-            family = 'PF_UNIX', type = 'SOCK_STREAM' }}, prepare, handler)
+        dns = {{host = host, port = port, family = 'AF_UNIX', protocol = 0,
+            type = 'SOCK_STREAM' }}
+    else
+        dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM' })
+        if dns == nil then
+            return nil
+        end
     end
 
-    local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
-        protocol = 'tcp' })
-    if dns == nil then
-        return nil
+    for _, addr in ipairs(dns) do
+        local s = create_socket(addr.family, addr.type, addr.protocol)
+        if s ~= nil then
+            local backlog
+            if server.prepare then
+                backlog = server.prepare(s)
+            else
+                s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
+            end
+            if not s:bind(addr.host, addr.port) or not s:listen(backlog) then
+                local save_errno = box.errno()
+                s:close()
+                box.errno(save_errno)
+                return nil
+            end
+            box.fiber.wrap(tcp_server_loop, server, s, addr)
+            return s, addr
+       end
     end
-    return tcp_server_remote(dns, prepare, handler)
+    -- DNS resolved successfully, but addresss family is not supported
+    box.errno(box.errno.EAFNOSUPPORT)
+    return nil
 end
 
 socket_mt   = {

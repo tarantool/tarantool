@@ -222,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:346: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:347: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -306,8 +306,19 @@ lua sc:write('Hello, world')
 ---
  - true
 ...
-lua sa = s:accept()
+lua sa, addr = s:accept()
 ---
+...
+lua addr2 = sa:name()
+---
+...
+lua addr2.host == addr.host
+---
+ - true
+...
+lua addr2.family == addr.family
+---
+ - true
 ...
 lua sa:nonblock(1)
 ---
@@ -1014,8 +1025,12 @@ lua s:close()
 ---
  - true
 ...
-lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+lua server, addr = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 ---
+...
+lua type(addr)
+---
+ - table
 ...
 lua server ~= nil
 ---
@@ -1035,7 +1050,73 @@ lua client:read(123)
 ---
  - Hello, world
 ...
-lua server:stop()
+lua client:close()
+---
+ - true
+...
+lua server:close()
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+unix socket was removed
+lua server, addr = box.socket.tcp_server('localhost', 0, { handler = function(s) s:read(2); s:write('Hello, world') end, name = 'testserv'})
+---
+...
+lua type(addr)
+---
+ - table
+...
+lua server ~= nil
+---
+ - true
+...
+lua addr2 = server:name()
+---
+...
+lua addr.host == addr2.host
+---
+ - true
+...
+lua addr.family == addr2.family
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua client = box.socket.tcp_connect(addr2.host, addr2.port)
+---
+...
+lua client ~= nil
+---
+ - true
+...
+lua cnt = 0
+---
+...
+lua for i=100,200 do local f = box.fiber.find(i); if f and f:name():match('^testserv/') then cnt = cnt + 1; end; end
+---
+...
+lua cnt
+---
+ - 2
+...
+lua client:write('hi')
+---
+ - true
+...
+lua client:read(123)
+---
+ - Hello, world
+...
+lua client:close()
+---
+ - true
+...
+lua server:close()
 ---
  - true
 ...
