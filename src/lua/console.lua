@@ -237,22 +237,16 @@ local function connect(...)
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
 end
 
-local function server_loop(server)
-    while server:readable() do
-        local client = server:accept()
-        if client then
-            local peer = client:peer()
-            log.info("console: client %s:%s connected", peer.host, peer.port)
-            local state = setmetatable({
-                running = true;
-                read = client_read;
-                print = client_print;
-                client = client;
-            }, repl_mt)
-            fiber.create(repl, state)
-        end
-    end
-    log.info("console: stopped")
+local function client_handler(client, peer)
+    log.info("console: client %s:%s connected", peer.host, peer.port)
+    local state = setmetatable({
+        running = true;
+        read = client_read;
+        print = client_print;
+        client = client;
+    }, repl_mt)
+    repl(state)
+    log.info("console: client %s:%s disconnected", peer.host, peer.port)
 end
 
 --
@@ -262,6 +256,7 @@ local function listen(uri)
     local host, port
     if uri == nil then
         host = 'unix/'
+        port = '/tmp/tarantool-console.sock'
     elseif type(uri) == 'number' or uri:match("^%d+$") then
         port = tonumber(uri)
     elseif uri:match("^/") then
@@ -270,38 +265,18 @@ local function listen(uri)
     else
         host, port = uri:match("^(.*):(.*)$")
         if not host then
-            port = uri
+            host = uri
+            port = 3313
         end
     end
-    local server
-    if host == 'unix/' then
-        port = port or '/tmp/tarantool-console.sock'
-        os.remove(port)
-        server = socket('AF_UNIX', 'SOCK_STREAM', 0)
-    else
-        host = host or '127.0.0.1'
-        port = port or 3313
-        server = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+    local s, addr = socket.tcp_server(host, port, { handler = client_handler,
+        name = 'console'})
+    if not s then
+        error(string.format('failed to create server %s:%s: %s',
+            host, port, errno.strerror()))
     end
-    if not server then
-	error(string.format('failed to create socket %s%s : %s',
-			    host, port, errno.strerror()))
-    end
-    server:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-
-    if not server:bind(host, port) then
-        local msg = string.format('failed to bind: %s', server:error())
-        server:close()
-        error(msg)
-    end
-    if not server:listen() then
-        local msg = string.format('failed to listen: %s', server:error())
-        server:close()
-        error(msg)
-    end
-    log.info("console: started on %s:%s", host, port)
-    fiber.create(server_loop, server)
-    return server
+    log.info("console: started on %s:%s", addr.host, addr.port)
+    return s
 end
 
 return {

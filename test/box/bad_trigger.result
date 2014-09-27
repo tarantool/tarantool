@@ -1,7 +1,7 @@
- 
+
  #
  # if on_connect() trigger raises an exception, the connection is dropped
- # 
+ #
  
 function f1() nosuchfunction() end
 ---

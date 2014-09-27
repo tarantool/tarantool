@@ -8,6 +8,7 @@ from tarantool import Connection
 from tarantool.request import RequestInsert
 from tarantool.request import RequestSelect
 from tarantool.response import Response
+from lib.tarantool_connection import TarantoolConnection
 
 print """
 #
@@ -16,8 +17,9 @@ print """
 """
 
 # opeing new connection to tarantool/box
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('localhost', server.sql.port))
+conn = TarantoolConnection(server.sql.host, server.sql.port)
+conn.connect()
+s = conn.socket
 
 print """
 # Test bug #899343 (server assertion failure on incorrect packet)

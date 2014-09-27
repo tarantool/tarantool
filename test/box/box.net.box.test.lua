@@ -4,13 +4,13 @@ log = require 'log'
 msgpack = require 'msgpack'
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-port = box.cfg.listen
+LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.create_space('net_box_test_space')
 space:create_index('primary', { type = 'tree' })
 
 -- low level connection
 log.info("create connection")
-cn = remote:new('127.0.0.1', port)
+cn = remote:new(LISTEN.host, LISTEN.service)
 cn:_wait_state({'active', 'error'}, 1)
 log.info("state is %s", cn.state)
 
@@ -106,7 +106,7 @@ cn:ping()
 cn:call('test_foo')
 
 -- -- 2 reconnect
-cn = remote:new('127.0.0.1', port, { reconnect_after = .1 })
+cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
 cn:_wait_state({'active'}, 1)
 cn.space ~= nil
 
@@ -129,7 +129,7 @@ cn:ping()
 
 -- -- dot-new-method
 
-cn1 = remote.new('127.0.0.1', port)
+cn1 = remote.new(LISTEN.host, LISTEN.service)
 cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- error while waiting for response
@@ -159,7 +159,7 @@ res[1][2] == string.rep('a', 50000)
 cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
 cn.proto.b64decode('gJLoc!!!!!!!')
 
-cn = remote:new('127.0.0.1', port, { user = 'netbox', password = '123', wait_connected = true })
+cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()
 cn.error
 cn.state
@@ -167,7 +167,7 @@ cn.state
 box.schema.user.create('netbox', { password  = 'test' })
 box.schema.user.grant('netbox', 'read, write, execute', 'universe');
 
-cn = remote:new('127.0.0.1', port, { user = 'netbox', password = 'test' })
+cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
 cn:ping()
@@ -180,8 +180,8 @@ cn:call('ret_after', .01)
 cn:timeout(1):call('ret_after', .01)
 cn:timeout(.01):call('ret_after', 1)
 
-cn = remote:timeout(0.0000000001):new('127.0.0.1', port, { user = 'netbox', password = '123' })
-cn = remote:timeout(1):new('127.0.0.1', port, { user = 'netbox', password = '123' })
+cn = remote:timeout(0.0000000001):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 
 
 
