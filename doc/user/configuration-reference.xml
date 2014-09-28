@@ -511,11 +511,17 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>If replication_source is not an empty string, the
           server is considered to be a Tarantool replica.
           The replica server will try to connect to the master
-          which replication_source specifies with format ip:port.
-          For example, if replication_source = "1.2.3.4:55555" then
-          the replica server tries to connect to 1.2.3.4 port 55555.
-          A replica server does not accept updates
-          on <olink targetptr="primary_port">listen</olink>. This parameter is
+          which replication_source specifies with a URI.
+          The string format is similar to the
+          <link
+          xlink:href="http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax">generic syntax for a URI schema</link>
+          So it may be a user name and password and ip:port address such as 'guest:password@127.0.0.1:3301',
+          or just ip:port address such as '127.0.0.1:3301',
+          or just port such as '3301'.
+          The default user name is 'guest'.
+          A replica server does not accept data-change requests
+          on the <olink targetptr="primary_port">listen</olink> port.
+          The replication_source parameter is
           dynamic, that is, to enter master mode, simply set
           replication_source to an empty string and issue
           "box.cfg{replication_source=new-value}".</entry>

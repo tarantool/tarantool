@@ -2506,9 +2506,9 @@ end
         <listitem>
             <para>
                 Listen on host:port. The primary way of listening for incoming
-                requests is via the host and port, or uri, specified in
+                requests is via the host and port, or URI, specified in
                 <code>box.cfg{listen=...}</code>. The alternative way of
-                listening is via the host and port, or uri, specified in
+                listening is via the host and port, or URI, specified in
                 <code>console.listen(...)</code>. This alternative way is
                 called "administrative" or simply "admin port".
            </para>
