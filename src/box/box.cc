@@ -125,6 +125,7 @@ box_check_replication_source(const char *source)
 static void
 box_check_wal_mode(const char *mode_name)
 {
+	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode == WAL_MODE_MAX) {
 		tnt_raise(ClientError, ER_CFG,
