@@ -63,4 +63,26 @@ t
   - 'snapshot_period: 0'
   - 'wal_dir_rescan_delay: 0.1'
 ...
+-- check that cfg with unexpected parameter fails.
+box.cfg{sherlock = 'holmes'}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:121: Error: cfg parameter
+    ''sherlock'' is unexpected'
+...
+-- check that cfg with unexpected type of parameter failes
+box.cfg{listen = {}}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:136: Error: cfg parameter
+    ''listen'' should be one of types: string, number'
+...
+box.cfg{wal_dir = 0}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:130: Error: cfg parameter
+    ''wal_dir'' should be of type string'
+...
+box.cfg{coredump = 'true'}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:130: Error: cfg parameter
+    ''coredump'' should be of type boolean'
+...
 --# clear filter
