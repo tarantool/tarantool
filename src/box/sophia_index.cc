@@ -176,6 +176,31 @@ SophiaIndex::~SophiaIndex()
 	}
 }
 
+struct tuple *
+SophiaIndex::random(uint32_t rnd) const
+{
+	void *o = sp_object(db);
+	if (o == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+	sp_set(o, "key", &rnd, sizeof(rnd));
+	void *c = sp_cursor(db, "random", o);
+	if (c == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+	auto scoped_guard =
+		make_scoped_guard([=] { sp_destroy(c); });
+	o = sp_get(c);
+	if (o == NULL)
+		return NULL;
+	struct space *space = space_cache_find(key_def->space_id);
+	int valuesize;
+	void *value = sp_get(o, "value", &valuesize);
+	struct tuple *ret =
+		tuple_new(space->format, (char*)value,
+		          (char*)value + valuesize);
+	tuple_ref(ret, 1);
+	return ret;
+}
+
 void
 SophiaIndex::endBuild()
 {
@@ -184,9 +209,9 @@ SophiaIndex::endBuild()
 size_t
 SophiaIndex::size() const
 {
-	tnt_raise(ClientError, ER_UNSUPPORTED,
-	          "SophiaIndex", "size operation");
-	return 0;
+	void *profiler = sp_ctl(db, "profiler");
+	uint64_t count = *(uint64_t*)sp_get(profiler, "count", NULL);
+	return count;
 }
 
 size_t

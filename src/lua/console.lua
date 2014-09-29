@@ -5,6 +5,7 @@ local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
+local urilib = require('uri')
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = require('yaml').new()
@@ -221,13 +222,23 @@ end
 --
 -- Connect to remove server
 --
-local function connect(...)
+local function connect(uri)
     local self = fiber.self().storage.console
     if self == nil then
         error("console.connect() need existing console")
     end
+
+    local u
+    if uri then
+        u = urilib.parse(tostring(uri))
+    end
+    if u == nil or u.service == nil then
+        error('Usage: console.connect("[login:password@][host:]port")')
+    end
+
     -- connect to remote host
-    local remote = require('net.box'):new(...)
+    local remote = require('net.box'):new(u.host, u.service,
+        { user = u.login, password = u.password })
     -- check permissions
     remote:call('dostring', 'return true')
     -- override methods
@@ -237,22 +248,16 @@ local function connect(...)
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
 end
 
-local function server_loop(server)
-    while server:readable() do
-        local client = server:accept()
-        if client then
-            local peer = client:peer()
-            log.info("console: client %s:%s connected", peer.host, peer.port)
-            local state = setmetatable({
-                running = true;
-                read = client_read;
-                print = client_print;
-                client = client;
-            }, repl_mt)
-            fiber.create(repl, state)
-        end
-    end
-    log.info("console: stopped")
+local function client_handler(client, peer)
+    log.info("console: client %s:%s connected", peer.host, peer.port)
+    local state = setmetatable({
+        running = true;
+        read = client_read;
+        print = client_print;
+        client = client;
+    }, repl_mt)
+    repl(state)
+    log.info("console: client %s:%s disconnected", peer.host, peer.port)
 end
 
 --
@@ -262,46 +267,23 @@ local function listen(uri)
     local host, port
     if uri == nil then
         host = 'unix/'
-    elseif type(uri) == 'number' or uri:match("^%d+$") then
-        port = tonumber(uri)
-    elseif uri:match("^/") then
-        host = 'unix/'
-        port = uri
+        port = '/tmp/tarantool-console.sock'
     else
-        host, port = uri:match("^(.*):(.*)$")
-        if not host then
-            port = uri
+        local u = urilib.parse(tostring(uri))
+        if u == nil or u.service == nil then
+            error('Usage: console.listen("[host:]port")')
         end
+        host = u.host
+        port = u.service or 3313
     end
-    local server
-    if host == 'unix/' then
-        port = port or '/tmp/tarantool-console.sock'
-        os.remove(port)
-        server = socket('AF_UNIX', 'SOCK_STREAM', 0)
-    else
-        host = host or '127.0.0.1'
-        port = port or 3313
-        server = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+    local s, addr = socket.tcp_server(host, port, { handler = client_handler,
+        name = 'console'})
+    if not s then
+        error(string.format('failed to create server %s:%s: %s',
+            host, port, errno.strerror()))
     end
-    if not server then
-	error(string.format('failed to create socket %s%s : %s',
-			    host, port, errno.strerror()))
-    end
-    server:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-
-    if not server:bind(host, port) then
-        local msg = string.format('failed to bind: %s', server:error())
-        server:close()
-        error(msg)
-    end
-    if not server:listen() then
-        local msg = string.format('failed to listen: %s', server:error())
-        server:close()
-        error(msg)
-    end
-    log.info("console: started on %s:%s", host, port)
-    fiber.create(server_loop, server)
-    return server
+    log.info("console: started on %s:%s", addr.host, addr.port)
+    return s
 end
 
 return {

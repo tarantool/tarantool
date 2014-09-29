@@ -30,8 +30,8 @@ class TestState(object):
         # curcon is an array since we may have many connections
         self.curcon = [self.connections['default']]
         nmsp = Namespace()
-        setattr(nmsp, 'admin', default_server.admin.port)
-        setattr(nmsp, 'listen', default_server.sql.port)
+        setattr(nmsp, 'admin', default_server.admin.uri)
+        setattr(nmsp, 'listen', default_server.sql.uri)
         setattr(self.environ, 'default', nmsp)
 
     def parse_preprocessor(self, string):

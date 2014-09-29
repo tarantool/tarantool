@@ -1,0 +1,17 @@
+# vim: set ft=python :
+import re
+import os
+import os.path
+import tempfile
+
+dir = tempfile.mkdtemp()
+file = os.path.join(dir, 'test-o-direct')
+
+try:
+    fh = os.open(file, os.O_CREAT | os.O_DIRECT | os.O_TRUNC | os.O_RDWR)
+    os.unlink(file)
+    os.rmdir(dir)
+except:
+    self.skip = 1
+
+

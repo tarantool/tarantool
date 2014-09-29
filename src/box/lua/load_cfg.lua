@@ -59,7 +59,7 @@ local default_cfg = {
 
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
-local template_cfg = {
+local template = {
     listen              = 'string, number',
     slab_alloc_arena    = 'number',
     slab_alloc_minimal  = 'number',
@@ -104,19 +104,51 @@ local dynamic_cfg = {
     snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
 }
 
-local function reload_cfg(oldcfg, newcfg)
-    if newcfg == nil then
-        newcfg = {}
+local function prepare_cfg(table)
+    if table == nil then
+        return {}
     end
+    if type(table) ~= 'table' then
+        error("Error: cfg should be a table")
+    end
+    -- just pass {.. dont_check = true, ..} to disable check below
+    if table.dont_check then
+        return
+    end
+    local newtable = {}
+    for k,v in pairs(table) do
+        if template[k] == nil then
+            error("Error: cfg parameter '" .. k .. "' is unexpected")
+        elseif v == "" or v == nil then
+            -- "" and NULL = ffi.cast('void *', 0) set option to default value
+            v = default_cfg[k]
+        elseif template[k] == 'any' then
+            -- any type is ok
+        elseif (string.find(template[k], ',') == nil) then
+            -- one type
+            if type(v) ~= template[k] then
+                error("Error: cfg parameter '" .. k .. "' should be of type " .. template[k])
+            end
+        else
+            local good_types = string.gsub(template[k], ' ', '');
+            if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
+                good_types = string.gsub(good_types, ',', ', ');
+                error("Error: cfg parameter '" .. k .. "' should be one of types: " .. template[k])
+            end
+        end
+        if wrapper_cfg[k] ~= nil then
+            v = wrapper_cfg[k](v)
+        end
+        newtable[k] = v
+    end
+    return newtable
+end
+
+local function reload_cfg(oldcfg, newcfg)
+    newcfg = prepare_cfg(newcfg)
     for key, val in pairs(newcfg) do
         if dynamic_cfg[key] == nil then
             box.error(box.error.RELOAD_CFG, key);
-        end
-        if val == "" then
-            val = nil
-        end
-        if wrapper_cfg[key] ~= nil then
-            val = wrapper_cfg[key](val)
         end
         dynamic_cfg[key](val)
         rawset(oldcfg, key, val)
@@ -140,57 +172,12 @@ setmetatable(box, {
      end
 })
 
-local function check_param_table(table, template)
-    if table == nil then
-        return
-    end
-    if type(table) ~= 'table' then
-        error("Error: cfg should be a table")
-    end
-    -- just pass {.. dont_check = true, ..} to disable check below
-    if table.dont_check then
-        return
-    end
-    for k,v in pairs(table) do
-        if template[k] == nil then
-            error("Error: cfg parameter '" .. k .. "' is unexpected")
-        elseif template[k] == 'any' then
-            -- any type is ok
-        elseif (string.find(template[k], ',') == nil) then
-            -- one type
-            if type(v) ~= template[k] then
-                error("Error: cfg parameter '" .. k .. "' should be of type " .. template[k])
-            end
-        else
-            local good_types = string.gsub(template[k], ' ', '');
-            if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
-                good_types = string.gsub(good_types, ',', ', ');
-                error("Error: cfg parameter '" .. k .. "' should be one of types: " .. template[k])
-            end
-        end
-    end
-end
-
-
-local function update_param_table(table, defaults)
-    if table == nil then
-        table = {}
-    end
-    for k,v in pairs(defaults) do
-        if table[k] == nil then
-            table[k] = v
-        end
-    end
-    return table
-end
-
 function box.cfg(cfg)
-    check_param_table(cfg, template_cfg)
-    cfg = update_param_table(cfg, default_cfg)
-
-    for k,v in pairs(wrapper_cfg) do
-        -- options that can be number or string
-        cfg[k] = wrapper_cfg[k](cfg[k])
+    cfg = prepare_cfg(cfg)
+    for k,v in pairs(default_cfg) do
+        if cfg[k] == nil then
+            cfg[k] = v
+        end
     end
     -- Restore box members from box_saved after initial configuration
     for k, v in pairs(box_configured) do

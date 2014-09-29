@@ -36,8 +36,7 @@ color_stdout = Colorer()
 def check_port(port, rais=True):
     try:
         if isinstance(port, (int, long)):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect(("localhost", port))
+            sock = socket.create_connection(("localhost", port))
         else:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(port)
@@ -464,10 +463,10 @@ class TarantoolServer(Server):
 
         check_port(self.admin.port)
 
-        os.putenv("LISTEN", str(self.sql.port))
-        os.putenv("ADMIN", str(self.admin.port))
+        os.putenv("LISTEN", self.sql.uri)
+        os.putenv("ADMIN", self.admin.uri)
         if self.rpl_master:
-            os.putenv("MASTER", "127.0.0.1:"+str(self.rpl_master.sql.port))
+            os.putenv("MASTER", self.rpl_master.sql.uri)
         args = self.prepare_args()
         self.logfile_pos = self.logfile
         self.process = subprocess.Popen(args,

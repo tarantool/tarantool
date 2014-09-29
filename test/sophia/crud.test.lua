@@ -43,6 +43,13 @@ index:select(7,  {iterator = box.index.LE})
 index:select({}, {iterator = box.index.LT})
 index:select(7,  {iterator = box.index.LT})
 
+-- random
+
+dofile('index_random_test.lua')
+index_random_test(space, 'primary')
+
 space:drop()
+
+--
 
 sophia_rmdir()

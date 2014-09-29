@@ -188,7 +188,7 @@ box.schema.space.create = function(name, options)
         engine = 'string',
         id = 'number',
         field_count = 'number',
-        user = 'user',
+        user = 'string, number',
     }
     local options_defaults = {
         engine = 'memtx',

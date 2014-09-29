@@ -11,7 +11,14 @@ session = box.session
 net = { box = require('net.box') }
 ---
 ...
-c = net.box:new(0, box.cfg.listen)
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
+---
+- true
+...
+c = net.box:new(LISTEN.host, LISTEN.service)
 ---
 ...
 c:call("dostring", "session.su('admin')")
@@ -45,7 +52,7 @@ box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ---
 ...
-c = net.box:new(0, box.cfg.listen)
+c = net.box:new(LISTEN.host, LISTEN.service)
 ---
 ...
 c:call("setuid_func")

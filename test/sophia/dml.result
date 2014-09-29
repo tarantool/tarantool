@@ -20,7 +20,7 @@ sophia_printdir()
 space = box.schema.create_space('test', { id = 101, engine = 'sophia' })
 ---
 ...
-primary = space:create_index('primary')
+space:create_index('primary')
 ---
 ...
 sophia_printdir()
@@ -40,7 +40,7 @@ sophia_printdir()
 space = box.schema.create_space('test', { id = 102, engine = 'sophia' })
 ---
 ...
-primary = space:create_index('primary')
+space:create_index('primary')
 ---
 ...
 sophia_printdir()
@@ -67,7 +67,7 @@ space:drop()
 space = box.schema.create_space('test', { id = 103, engine = 'sophia' })
 ---
 ...
-primary = space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
+space:create_index('primary', {type = 'tree', parts = {1, 'STR'}})
 ---
 ...
 space:insert({'test'})
@@ -87,7 +87,7 @@ space:drop()
 space = box.schema.create_space('test', { id = 104, engine = 'sophia' })
 ---
 ...
-primary = space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
+space:create_index('primary', {type = 'tree', parts = {1, 'num'}})
 ---
 ...
 space:insert({13})
@@ -107,7 +107,7 @@ space:drop()
 space = box.schema.create_space('test', { id = 105, engine = 'sophia' })
 ---
 ...
-primary = space:create_index('primary', {type = 'hash'})
+space:create_index('primary', {type = 'hash'})
 ---
 - error: Unsupported index type supplied for index 0 in space 105
 ...
@@ -132,6 +132,39 @@ space:drop()
 sophia_printdir()
 ---
 - 
+...
+-- index size
+space = box.schema.create_space('test', { id = 107, engine = 'sophia' })
+---
+...
+space:create_index('primary')
+---
+...
+primary = space.index[0]
+---
+...
+primary:len()
+---
+- 0
+...
+space:insert({13})
+---
+- [13]
+...
+space:insert({14})
+---
+- [14]
+...
+space:insert({15})
+---
+- [15]
+...
+primary:len()
+---
+- 3
+...
+space:drop()
+---
 ...
 sophia_rmdir()
 ---

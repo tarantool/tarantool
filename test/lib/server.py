@@ -15,8 +15,7 @@ import ConfigParser
 def check_port(port):
     """Check if the port we're connecting to is available"""
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", port))
+        sock = socket.create_connection(("localhost", port))
     except socket.error as e:
         return
     raise RuntimeError("The server is already running on port {0}".format(port))

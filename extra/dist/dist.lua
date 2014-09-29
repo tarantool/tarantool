@@ -31,6 +31,9 @@ The file contains common default instances options:
         
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
+
+        -- sophia_dir/instance/
+        sophia_dir  =   "/var/lib/tarantool/sophia",
         
         -- logger/instance .. '.log'
         logger      =   "/var/log/tarantool",
@@ -111,19 +114,21 @@ if instance_dir == nil then
     instance_dir = '/etc/tarantool/instances.enabled'
 end
 
-default_cfg.pid_file =  default_cfg.pid_file and default_cfg.pid_file or "/var/run/tarantool"
-default_cfg.wal_dir =  default_cfg.wal_dir and default_cfg.wal_dir or "/var/lib/tarantool"
-default_cfg.snap_dir =  default_cfg.snap_dir and default_cfg.snap_dir or "/var/lib/tarantool"
-default_cfg.logger =  default_cfg.logger and default_cfg.logger or "/var/log/tarantool"
-default_cfg.username =  default_cfg.username and default_cfg.username or "tarantool"
+default_cfg.pid_file   = default_cfg.pid_file and default_cfg.pid_file or "/var/run/tarantool"
+default_cfg.wal_dir    = default_cfg.wal_dir and default_cfg.wal_dir or "/var/lib/tarantool"
+default_cfg.snap_dir   = default_cfg.snap_dir and default_cfg.snap_dir or "/var/lib/tarantool"
+default_cfg.sophia_dir = default_cfg.sophia_dir and default_cfg.sophia_dir or "/var/lib/tarantool"
+default_cfg.logger     = default_cfg.logger and default_cfg.logger or "/var/log/tarantool"
+default_cfg.username   = default_cfg.username and default_cfg.username or "tarantool"
 
 -- create  a path to the control socket (admin console)
 local console_sock = fio.pathjoin(default_cfg.pid_file, instance .. '.control')
 
-default_cfg.pid_file = fio.pathjoin(default_cfg.pid_file, instance .. '.pid')
-default_cfg.wal_dir = fio.pathjoin(default_cfg.wal_dir, instance)
-default_cfg.snap_dir = fio.pathjoin(default_cfg.snap_dir, instance)
-default_cfg.logger = fio.pathjoin(default_cfg.logger, instance .. '.log')
+default_cfg.pid_file   = fio.pathjoin(default_cfg.pid_file, instance .. '.pid')
+default_cfg.wal_dir    = fio.pathjoin(default_cfg.wal_dir, instance)
+default_cfg.snap_dir   = fio.pathjoin(default_cfg.snap_dir, instance)
+default_cfg.sophia_dir = fio.pathjoin(default_cfg.sophia_dir, instance, 'sophia')
+default_cfg.logger     = fio.pathjoin(default_cfg.logger, instance .. '.log')
 
 local instance_lua = fio.pathjoin(instance_dir, instance .. '.lua')
 
@@ -146,15 +151,17 @@ function mk_default_dirs(cfg)
     if fio.stat(pid_dir) == nil then
         mkdir(pid_dir)
     end
-
     -- create wal_dir 
     if fio.stat(cfg.wal_dir) == nil then
         mkdir(cfg.wal_dir)
     end
-
     -- create snap_dir 
     if fio.stat(cfg.snap_dir) == nil then
         mkdir(cfg.snap_dir)
+    end
+    -- create sophia_dir
+    if fio.stat(cfg.sophia_dir) == nil then
+        mkdir(cfg.sophia_dir)
     end
     -- create log_dir
     log_dir = fio.dirname(cfg.logger)

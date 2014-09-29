@@ -39,14 +39,6 @@ box.rollback()
 s:select{10000}
 s:drop()
 
--- gh-456: Sophia: index size() is unsupported
-
-s = box.schema.create_space('tester',{engine='sophia'})
-s:create_index('sophia_index', {})
-s.index[0]:len() -- exception
-box.error()
-s:drop()
-
 -- gh-436: No error when creating temporary sophia space
 
 s = box.schema.create_space('tester',{engine='sophia', temporary=true})

@@ -1161,9 +1161,18 @@ index:select(7,  {iterator = box.index.LT})
   - [2]
   - [1]
 ...
+-- random
+dofile('index_random_test.lua')
+---
+...
+index_random_test(space, 'primary')
+---
+- true
+...
 space:drop()
 ---
 ...
+--
 sophia_rmdir()
 ---
 ...

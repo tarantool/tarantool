@@ -56,7 +56,9 @@ end;
 
 -- set begin lsn on master, replica and hot_standby.
 --# set variable replica_port to 'replica.listen'
-a = (require 'net.box'):new('127.0.0.1', replica_port)
+REPLICA = require('uri').parse(tostring(replica_port))
+REPLICA ~= nil
+a = (require 'net.box'):new(REPLICA.host, REPLICA.service)
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
@@ -78,7 +80,9 @@ while box.info.status ~= 'running' do fiber.sleep(0.001) end
 -- hot_standby.listen is garbage, since hot_standby.lua
 -- uses MASTER environment variable for its listen
 --# set variable hot_standby_port to 'hot_standby.master'
-a = (require 'net.box'):new('127.0.0.1', hot_standby_port)
+HOT_STANDBY = require('uri').parse(tostring(hot_standby_port))
+HOT_STANDBY ~= nil
+a = (require 'net.box'):new(HOT_STANDBY.host, HOT_STANDBY.service)
 a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
