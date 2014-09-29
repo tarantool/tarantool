@@ -1,5 +1,5 @@
 TAP version 13
-1..24
+1..25
 ok - console.listen started
 ok - connect to console
 ok - eval
@@ -10,6 +10,7 @@ ok - state.delimiter is ';'
 ok - get delimiter is ';'
 ok - clear delimiter
 ok - remote network error
+ok - remote access denied
 ok - remote access denied
 ok - remote connect
 ok - remote eval

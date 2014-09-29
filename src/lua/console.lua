@@ -222,13 +222,24 @@ end
 --
 -- Connect to remove server
 --
-local function connect(...)
+local function connect(uri)
     local self = fiber.self().storage.console
     if self == nil then
         error("console.connect() need existing console")
     end
+
+    local u
+    if uri then
+        u = urilib.parse(tostring(uri))
+    end
+    if u == nil or u.service == nil then
+        error('Usage: console.connect("[login:password@][host:]port")')
+    end
+
+    log.warn('host: %s, service: %s', u.host, u.service)
     -- connect to remote host
-    local remote = require('net.box'):new(...)
+    local remote = require('net.box'):new(u.host, u.service,
+        { user = u.login, password = u.password })
     -- check permissions
     remote:call('dostring', 'return true')
     -- override methods
@@ -260,7 +271,7 @@ local function listen(uri)
         port = '/tmp/tarantool-console.sock'
     else
         local u = urilib.parse(tostring(uri))
-        if u == nil then
+        if u == nil or u.service == nil then
             error('Usage: console.listen("[host:]port")')
         end
         host = u.host
