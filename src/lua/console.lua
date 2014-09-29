@@ -236,7 +236,6 @@ local function connect(uri)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
-    log.warn('host: %s, service: %s', u.host, u.service)
     -- connect to remote host
     local remote = require('net.box'):new(u.host, u.service,
         { user = u.login, password = u.password })
