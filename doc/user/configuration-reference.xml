@@ -364,11 +364,15 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>0</entry>
           <entry>yes</entry>
           <entry>
-          	Period to make new database snapshot.
-          	Daemon is disabled by
-          	<code>snapshot_period=0</code> value.
-          	Use <code>snapshot_period=3600</code> to make
-          	snapshot for each hour.
+          The interval between actions by the snapshot daemon, in seconds.
+          The snapshot daemon is a fiber which is constantly running.
+          If snapshot_period is set to a value greater than zero,
+          then the snapshot daemon
+          will call <olink targetptr="box.snapshot"/> every snapshot_period seconds, creating
+          a new snapshot file each time.
+          For example, <code>box.cfg{snapshot_period=3600}</code>
+          will cause the snapshot daemon to create a new database
+          snapshot once per hour.
           </entry>
         </row>
 
@@ -379,15 +383,15 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>yes</entry>
           <entry>
           	<para>
-			The daemon creates new snapshot and then it
-			removes old snapshots (and their xlogs) using the
-			option.
+          The maximum number of snapshots that the snapshot daemon maintains.
+          For example, <code>box.cfg{snapshot_period=3600, snapshot_count=10}</code>
+          will cause the snapshot daemon
+          to create a new snapshot each hour until it has created
+          ten snapshots. After that, it will remove the oldest
+          snapshot (and any associated write-ahead-log files) after creating
+          a new one. If snapshot_count equals zero, then the snapshot
+          daemon does not remove old snapshots.
           	</para>
-
-          	<para>
-			Daemon is disabled by
-			<code>snapshot_count=0</code> value.
-        	</para>
           </entry>
         </row>
       </tbody>
