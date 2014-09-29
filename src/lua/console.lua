@@ -5,6 +5,7 @@ local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
 local errno = require('errno')
+local urilib = require('uri')
 
 -- admin formatter must be able to encode any Lua variable
 local formatter = require('yaml').new()
@@ -257,17 +258,13 @@ local function listen(uri)
     if uri == nil then
         host = 'unix/'
         port = '/tmp/tarantool-console.sock'
-    elseif type(uri) == 'number' or uri:match("^%d+$") then
-        port = tonumber(uri)
-    elseif uri:match("^/") then
-        host = 'unix/'
-        port = uri
     else
-        host, port = uri:match("^(.*):(.*)$")
-        if not host then
-            host = uri
-            port = 3313
+        local u = urilib.parse(tostring(uri))
+        if u == nil then
+            error('Usage: console.listen("[host:]port")')
         end
+        host = u.host
+        port = u.service or 3313
     end
     local s, addr = socket.tcp_server(host, port, { handler = client_handler,
         name = 'console'})
