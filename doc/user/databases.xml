@@ -638,7 +638,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
     <varlistentry>
         <term>
           <emphasis role="lua" xml:id="box.update">
-          box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, {format, field_no, value}...</replaceable>)
+          box.space.<replaceable>space-name</replaceable>:update({<replaceable>key {, operator, field_no, value}...</replaceable>})
           </emphasis>
         </term>
         <listitem>
@@ -647,46 +647,37 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                </para>
   <para>
    The <code>update</code> function supports operations on fields &mdash;
-    assignment, arithmetic operations (the field must be numeric),
-    cutting and pasting fragments of a field, &mdash; as well as
-    operations on a tuple: push and pop of a field at the tail of
-    a tuple, deletion and insertion of a field.  Multiple
-    operations can be combined into a single update, and in this
-    case they are performed atomically. Each operation expects
-    field number as its first argument. When a sequence of changes
-    is present, field identifier in each operation is assumed to
-    be relative to the most recent state of the tuple, i.e. as if
+    assignment, arithmetic (if the field is unsigned numeric),
+    cutting and pasting fragments of a field,
+    deletng or inserting a field.  Multiple
+    operations can be combined in a single update request, and in this
+    case they are performed atomically and sequentially. Each operation requires
+    specification of a field number. When multiple operations
+    are present, the field number for each operation is assumed to
+    be relative to the most recent state of the tuple, that is, as if
     all previous operations in a multi-operation update have
-    already been applied. In other words, it's always safe to
+    already been applied. In other words, it is always safe to
     merge multiple <code>update</code> invocations into a single invocation, with no
     change in semantics.
   </para>
             <para>
              Parameters: <code>space-name</code>,
               <code>key</code> = primary-key field values, must be passed as a Lua table if key is multi-part,
-                <code>format</code> = a sequence of
-                pairs of characters, where the first character in each pair
-                is the operation specifier, and the second character in
-                each pair is the operation argument.
-                The <code>{field_no, value}</code> arguments are the
-                field numbers of affected fields and applicable values.
+                <code>{operator, field_no, value}</code> = a group of arguments
+                for each operation, indicating what the operation is, what field
+                the operation will apply to, and what value will be applied.
                 For some operations the field number can be -1, meaning
                 the last field in the tuple.
-                There must be a pair of {field_no, value} arguments
-                for each character pair in the format argument.
-                The format and {field_no, value} arguments are passed to
-                <code>pickle.pack()</code> and the result is sent
-                to <code>box.process()</code>.
-                Possible operation specifiers are: <quote>+</quote>
+                Possible operators are: <quote>+</quote>
                 for addition, <quote>-</quote> for subtraction,
                 <quote>&amp;</quote> for bitwise AND,
                 <quote>|</quote> for bitwise OR, <quote>^</quote>
                 for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice, <quote>!</quote> for insertion.
-                Possible operation arguments are: <quote>p</quote>.
-                Thus in the instruction <code>s:update{44,, {{'+p,1,55},{=p',3,'x'}})</code>
+                for string splice, <quote>!</quote> for insert,
+                <quote>#</quote> for delete.
+                Thus in the instruction <code>s:update{44,, {{'+,1,55},{=',3,'x'}})</code>
                 the primary-key value is 44,
-                the formats are '+p' and '=p'
+                the operators are '+' and '='
                 meaning "add a value to a field
                 and then assign a value to a field", the first affected field
                 is field 1 and the value which will be added to it is 55, the second affected field
@@ -764,11 +755,11 @@ box.space.tester:update({999}, {{'=', 2, 'XYZ'}})
 #In the following update ...
 #   The third argument is ':', that is, this is the example of splice.
 #   The fourth argument is 2 because the change will occur in field[2].
-#   The fifth argument is 1 because deletion will begin with the second byte.
+#   The fifth argument is 2 because deletion will begin with the second byte.
 #   The sixth argument is 1 because the number of bytes to delete is 1.
 #   The seventh argument is '!!' because '!!' is to be added at this position.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.
-box.space.tester:update({999}, {{':', 2, 1, 1, '!!'}})
+box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})
 
 </programlisting>
             </para>
