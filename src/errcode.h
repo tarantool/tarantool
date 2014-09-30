@@ -134,6 +134,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 82 */_(ER_NO_SUCH_ROLE,		2, "Role '%s' is not found") \
 	/* 83 */_(ER_ROLE_EXISTS,		2, "Role '%s' already exists") \
 	/* 84 */_(ER_CREATE_ROLE,		2, "Failed to create role '%s': %s") \
+	/* 85 */_(ER_INDEX_EXISTS,		2, "Index '%s' already exists") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

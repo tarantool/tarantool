@@ -419,6 +419,12 @@ r_empty.index.secondary:count(1)
 r_full.index.secondary:count(1)
 s_nil.index.secondary:count(1)
 
+-- gh-503 if_not_exits option in create index
+i1 = s_empty:create_index("test")
+i2 = s_empty:create_index("test")
+i3 = s_empty:create_index("test", { if_not_exists = true } )
+i3:select{}
+
 -- cleanup
 s_empty:drop()
 s_full:drop()
