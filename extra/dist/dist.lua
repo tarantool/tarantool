@@ -61,6 +61,9 @@ Each instance can be controlled by C<dist.lua>:
 
     dist.lua logrotate instance_name
 
+=head2 Enter instance admin console
+
+    dist.lua enter instance_name
 
 =head1 COPYRIGHT
 
@@ -252,6 +255,22 @@ elseif cmd == 'logrotate' then
 
     s:read({ '[.][.][.]' }, 2)
 
+    os.exit(0)
+
+elseif cmd == 'enter' then
+    if fio.stat(console_sock) == nil then
+        log.error("Can't connect to %s (socket not found)", console_sock)
+        os.exit(-1)
+    end
+    
+    log.info('Connecting to %s', console_sock)
+    
+    local cmd = string.format(
+        "require('console').connect('%s')", console_sock)
+
+    console.on_start( function(self) self:eval(cmd) end )
+    console.on_client_disconnect( function(self) self.running = false end )
+    console.start()
     os.exit(0)
 else
     log.error("Unknown command '%s'", cmd)

@@ -1,6 +1,7 @@
 TAP version 13
-1..25
+1..26
 ok - console.listen started
+ok - Handshake
 ok - connect to console
 ok - eval
 ok - state.socker:peer().host

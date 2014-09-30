@@ -163,11 +163,15 @@ local box = require('box')
 local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v
-    box[k] = nil
+    -- box.net.box uses box.error and box.internal
+    if k ~= 'error' and k ~= 'internal' then
+        box[k] = nil
+    end
 end
 
 setmetatable(box, {
     __index = function(table, index)
+        error(debug.traceback("Please call box.cfg{} first"))
         error("Please call box.cfg{} first")
      end
 })

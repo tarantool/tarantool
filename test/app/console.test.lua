@@ -22,12 +22,14 @@ local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(25)
+test:plan(26)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
 test:ok(server ~= nil, "console.listen started")
 local client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+local handshake = client:read{chunk = 128}
+test:ok(string.match(handshake, '^Tarantool console') ~= nil, 'Handshake')
 test:ok(client ~= nil, "connect to console")
 
 -- Execute some command

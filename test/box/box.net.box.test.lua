@@ -195,3 +195,31 @@ remote.self:timeout(123).space.net_box_test_space:select{234}
 -- cleanup database after tests
 space:drop()
 
+
+-- admin console tests
+function console_test(...) return { ... } end
+function console_test_error(...) error(string.format(...)) end
+function console_unpack_test(...) return ... end
+
+
+ADMIN = require('uri').parse(os.getenv('ADMIN'))
+
+cn = remote:new(LISTEN.host, LISTEN.service)
+cnc = remote:new(ADMIN.host, ADMIN.service)
+cnc.console
+
+cn:call('console_test', 1, 2, 3, 'string', nil)
+cnc:call('console_test', 1, 2, 3, 'string', nil)
+
+cn:call('console_test_error', 'error %d', 123)
+cnc:call('console_test_error', 'error %d', 123)
+
+
+cn:call('console_unpack_test', 1)
+cnc:call('console_unpack_test', 1)
+
+
+
+
+cn:call('123')
+cnc:call('123')

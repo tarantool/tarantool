@@ -70,6 +70,9 @@ end
 --
 local function remote_eval(self, line)
     if not line then
+        if type(self.on_client_disconnect) == 'function' then
+            self:on_client_disconnect()
+        end
         pcall(self.remote.close, self.remote)
         self.remote = nil
         self.eval = nil
@@ -179,13 +182,34 @@ local repl_mt = {
 -- REPL = read-eval-print-loop
 --
 local function repl(self)
+    
     fiber.self().storage.console = self
+    if type(self.on_start) == 'function' then
+        self:on_start()
+    end
+
     while self.running do
         local command = self:read()
         local output = self:eval(command)
         self:print(output)
     end
     fiber.self().storage.console = nil
+end
+
+local function on_start(foo)
+    if foo == nil or type(foo) == 'function' then
+        repl_mt.__index.on_start = foo 
+        return
+    end
+    error('Wrong type of on_start hook: ' .. type(foo))
+end
+
+local function on_client_disconnect(foo)
+    if foo == nil or type(foo) == 'function' then
+        repl_mt.__index.on_client_disconnect = foo 
+        return
+    end
+    error('Wrong type of on_client_disconnect hook: ' .. type(foo))
 end
 
 --
@@ -239,6 +263,14 @@ local function connect(uri)
     -- connect to remote host
     local remote = require('net.box'):new(u.host, u.service,
         { user = u.login, password = u.password })
+
+    -- run disconnect trigger
+    if remote.state == 'closed' then
+        if type(self.on_client_disconnect) == 'function' then
+            self:on_client_disconnect()
+        end
+    end
+
     -- check permissions
     remote:call('dostring', 'return true')
     -- override methods
@@ -256,6 +288,7 @@ local function client_handler(client, peer)
         print = client_print;
         client = client;
     }, repl_mt)
+    state:print(string.format("%-63s\n%-63s\n", "Tarantool console port", ""))
     repl(state)
     log.info("console: client %s:%s disconnected", peer.host, peer.port)
 end
@@ -292,4 +325,6 @@ return {
     delimiter = delimiter;
     connect = connect;
     listen = listen;
+    on_start = on_start;
+    on_client_disconnect = on_client_disconnect;
 }
