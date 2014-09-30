@@ -90,8 +90,20 @@ static void
 process_ro(struct port *port, struct request *request)
 {
 	if (!iproto_type_is_select(request->type))
-		tnt_raise(LoggedError, ER_SECONDARY);
+		tnt_raise(LoggedError, ER_READONLY);
 	return process_rw(port, request);
+}
+
+void
+box_set_ro(bool ro)
+{
+	box_process = ro ? process_ro : process_rw;
+}
+
+bool
+box_is_ro(void)
+{
+	return box_process == process_ro;
 }
 
 static void
@@ -237,7 +249,6 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
-	box_process = process_rw;
 	if (recovery_has_remote(recovery))
 		recovery_follow_remote(recovery);
 
