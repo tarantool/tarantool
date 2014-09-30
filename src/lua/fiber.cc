@@ -220,8 +220,12 @@ lbox_fiber_statof(struct fiber *f, void *cb_ctx)
 {
 	struct lua_State *L = (struct lua_State *) cb_ctx;
 
-	lua_pushstring(L, fiber_name(f));
+	lua_pushinteger(L, f->fid);
 	lua_newtable(L);
+
+	lua_pushliteral(L, "name");
+	lua_pushstring(L, fiber_name(f));
+	lua_settable(L, -3);
 
 	lua_pushstring(L, "fid");
 	lua_pushnumber(L, f->fid);
