@@ -29,7 +29,7 @@ box.info.server.ro
 ...
 box.info.server.lsn
 ---
-- null
+- -1
 ...
 space = box.schema.create_space("ro")
 ---
