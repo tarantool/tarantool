@@ -2008,6 +2008,27 @@ end
 </programlisting>
   </listitem>
   </varlistentry>
+  
+  <varlistentry>
+   <term><emphasis role="lua">fio.dirname(<replaceable>path-name</replaceable>)</emphasis></term>
+    <listitem>
+      <para>
+        Given a full path name, remove the final part (the file name).
+      </para>
+      <para>
+        Parameters: (type = string) path name.
+      </para>
+      <para>
+        Returns: directory name, that is, path name except for file name.
+      </para>
+     <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.dirname('/path/to/my.lua')</userinput>
+---
+- /path/to/
+...
+</programlisting>
+  </listitem>
+  </varlistentry>
 
   <varlistentry>
   <term><emphasis role="lua">fio.umask(<replaceable>mask-bits</replaceable>)</emphasis></term>
