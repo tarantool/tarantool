@@ -1,9 +1,12 @@
+import os
+import sys
 import re
 import yaml
+from lib.tarantool_server import TarantoolServer
 
-#
-# gh-434: Assertion if replace _cluster tuple
-#
+print '-------------------------------------------------------------'
+print 'gh-434: Assertion if replace _cluster tuple'
+print '-------------------------------------------------------------'
 
 new_uuid = '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
 
@@ -36,12 +39,70 @@ server.restart()
 
 server.admin("box.info.server.uuid")
 
-# Can't reset server id
-server.admin("box.space._cluster:delete(1)")
-server.admin("box.space._cluster:update(1, {{'=', 1, 10}})")
-
 # Invalid UUID
 server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
+
+# Cleanup
+server.stop()
+server.deploy()
+
+print '-------------------------------------------------------------'
+print 'gh-527: update vclock on delete from box.space._cluster'
+print '-------------------------------------------------------------'
+
+# master server
+master = server
+master_id = master.get_param('server')['id']
+
+master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
+
+replica = TarantoolServer(server.ini)
+replica.script = 'replication/replica.lua'
+replica.vardir = os.path.join(server.vardir, 'replica')
+replica.rpl_master = master
+replica.deploy()
+replica.wait_lsn(master_id, master.get_lsn(master_id))
+replica_id = replica.get_param('server')['id']
+replica_uuid = replica.get_param('server')['uuid']
+sys.stdout.push_filter(replica_uuid, '<replica uuid>')
+replica.admin('box.space._schema:insert{"test", 48}')
+
+replica.admin('box.info.server.id')
+replica.admin('box.info.server.ro')
+replica.admin('box.info.server.lsn') # 1
+replica.admin('box.info.vclock[%d]' % replica_id)
+
+master.admin('box.space._cluster:delete{%d}' % replica_id)
+replica.wait_lsn(master_id, master.get_lsn(master_id))
+replica.admin('box.info.server.id')
+replica.admin('box.info.server.ro')
+replica.admin('box.info.server.lsn') # -1
+replica.admin('box.info.vclock[%d]' % replica_id)
+# replica is read-only
+replica.admin('box.space._schema:replace{"test", 48}')
+
+replica_id2 = 10
+master.admin('box.space._cluster:insert{%d, "%s"}' %
+    (replica_id2, replica_uuid))
+replica.wait_lsn(master_id, master.get_lsn(master_id))
+replica.admin('box.info.server.id')
+replica.admin('box.info.server.ro')
+replica.admin('box.info.server.lsn') # 0
+replica.admin('box.info.vclock[%d]' % replica_id)
+replica.admin('box.info.vclock[%d]' % replica_id2)
+
+replica_id3 = 11
+server.admin("box.space._cluster:update(%d, {{'=', 1, %d}})" %
+    (replica_id2, replica_id3))
+replica.wait_lsn(master_id, master.get_lsn(master_id))
+replica.admin('box.info.server.id')
+replica.admin('box.info.server.ro')
+replica.admin('box.info.server.lsn') # 0
+replica.admin('box.info.vclock[%d]' % replica_id)
+replica.admin('box.info.vclock[%d]' % replica_id2)
+replica.admin('box.info.vclock[%d]' % replica_id3)
+
+sys.stdout.pop_filter()
 
 # Cleanup
 server.stop()

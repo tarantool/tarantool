@@ -115,7 +115,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 63 */_(ER_CLUSTER_ID_MISMATCH,	2, "Cluster id of the replica %s doesn't match cluster id of the master %s") \
 	/* 64 */_(ER_INVALID_UUID,		2, "Invalid UUID: %s") \
 	/* 65 */_(ER_CLUSTER_ID_IS_RO,		2, "Can't reset cluster id: it is already assigned") \
-	/* 66 */_(ER_SERVER_ID_IS_RO,		2, "Can't reset server id") \
+	/* 66 */_(ER_RESERVED66,		2, "Reserved66") \
 	/* 67 */_(ER_SERVER_ID_IS_RESERVED,	2, "Can't initialize server id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		2, "Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	2, "Missing mandatory field '%s' in request") \
