@@ -521,18 +521,17 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
 If all goes well, you will see the server displaying progress as it initializes, something like this:<programlisting><computeroutput>
 tarantool> box.cfg{listen=3301}
-2014-08-07 09:41:41.077 ... version 1.6.0-1691-g95435d4
+2014-08-07 09:41:41.077 ... version 1.6.3-439-g7e1011b
 2014-08-07 09:41:41.077 ... log level 5
 2014-08-07 09:41:41.078 ... mapping 1073741824 bytes for a shared arena...
-2014-08-07 09:41:41.079 ... start sophia recover
 2014-08-07 09:41:41.079 ... initialized
-2014-08-07 09:41:41.079 ... complete
 2014-08-07 09:41:41.081 ... initializing an empty data directory
 2014-08-07 09:41:41.095 ... creating `./00000000000000000000.snap.inprogress'
 2014-08-07 09:41:41.095 ... saving snapshot `./00000000000000000000.snap.inprogress'
 2014-08-07 09:41:41.127 ... done
-2014-08-07 09:41:41.128 ... bound to primary port 0.0.0.0:3301
-2014-08-07 09:41:41.128 ... ready to accept requests</computeroutput></programlisting>
+2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301
+2014-08-07 09:41:41.128 ... ready to accept requests
+2014-08-07 09:41:41.128 ... started</computeroutput></programlisting>
 </para>
 
 <para>

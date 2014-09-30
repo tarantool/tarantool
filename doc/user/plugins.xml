@@ -137,7 +137,8 @@ Linking CXX shared library libmysql.so
 # Start the Tarantool server. Do not use a Lua initialization file.
 
 <prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
-~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
+~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b
+type 'help' for interactive help
 <prompt>tarantool&gt; </prompt> <userinput>box.cfg{}</userinput>
 ...
 # Enter the following lines on the prompt (again, change "/home/pgulutzan"
@@ -260,7 +261,8 @@ Linking CXX shared library libpg.so
 # Start the Tarantool server. Do not use a Lua initialization file.
 
 <prompt>$ </prompt><userinput>~/tarantool/src/tarantool</userinput>
-~/tarantool/src/tarantool: version 1.6.0-1085-gf6d30a5
+~/tarantool/src/tarantool: version 1.6.3-439-g7e1011b
+type 'help' for interactive help
 <prompt>tarantool&gt; </prompt>  <userinput>box.cfg{}</userinput>
 
 # Enter the following lines on the prompt (again, change "/home/pgulutzan"

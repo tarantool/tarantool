@@ -280,7 +280,7 @@ $ <userinput>mkdir -p ~/tarantool_test_node_1</userinput>
 $ <userinput>cd ~/tarantool_test_node_1</userinput>
 ~/tarantool_test_node_1$ <userinput>rm -R ~/tarantool_test_node_1/*</userinput>
 ~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-~/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
@@ -355,7 +355,7 @@ tarantool> 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replica
 ~/tarantool_test_node_2$ <userinput>cd ~/tarantool_test_node_2</userinput>
 ~/tarantool_test_node_2$ <userinput>rm -R ~/tarantool_test_node_2/*</userinput>
 ~/tarantool_test_node_2$ <userinput>~/tarantool-master/src/tarantool</userinput>
-/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3302, replication_source=3301}</userinput>
 ... ...
@@ -407,7 +407,7 @@ tarantool&gt; <userinput>s:insert{1,'Tuple inserted on Terminal #1'}</userinput>
 ~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
 ~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
 ~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
-/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; box.cfg{listen=3302, replication_source=3301}
 ... ...
@@ -633,7 +633,7 @@ total 12
 -rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:41 sophia
 ~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-~/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
@@ -694,7 +694,7 @@ The screen now looks like this:
     <tbody>
      <row><entry><programlisting>... ...
 ~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
-~/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; box.cfg{listen=3301}
 ... ...

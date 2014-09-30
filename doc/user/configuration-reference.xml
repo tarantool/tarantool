@@ -39,7 +39,7 @@ or
       <para><option>--version</option>, <option>-V</option></para>
       <para>Print product name and version, for example:
        <programlisting><prompt>$ </prompt> <userinput>./tarantool --version</userinput>
-Tarantool 1.6.0-1084-ge067689
+Tarantool 1.6.3-439-g7e1011b
 Target: Linux-x86_64-Debug
 ...
         </programlisting>
@@ -95,7 +95,7 @@ The Lua program almost always begins by invoking <code>box.cfg()</code>,
 if the database server will be used or if ports need to be opened.
 For example, suppose <filename>script.lua</filename> contains the lines<programlisting>#!/usr/bin/env tarantool
 box.cfg{
-    listen              = os.getenv("LISTEN"),
+    listen              = os.getenv("LISTEN_URI"),
     slab_alloc_arena    = 0.1,
     pid_file            = "tarantool.pid",
     rows_per_wal        = 50
@@ -103,17 +103,19 @@ box.cfg{
 print('Starting ',arg[1])</programlisting>
 and suppose the command line is <code>~/tarantool/src/tarantool script.lua ARG</code>.
 Then the screen might look like this:<programlisting>
-<prompt>$</prompt> <userinput>export PRIMARY_PORT=3301</userinput>
+<prompt>$</prompt> <userinput>export LISTEN_URI=3301</userinput>
 <prompt>$</prompt> <userinput>~/tarantool/src/tarantool script.lua ARG</userinput>
-2014-07-02 10:19:29.078 ... version 1.6.0-1471-g663694c
-2014-07-02 10:19:29.078 ... log level 5
-2014-07-02 10:19:29.078 ... mapping 107374184 bytes for a shared arena...
-2014-07-02 10:19:29.086 ... initialized
-2014-07-02 10:19:29.101 ... recovery start
-2014-07-02 10:19:29.107 ...  bound to primary port tcp://0.0.0.0:3301
-2014-07-02 10:19:29.108 ... ready to accept requests
+... main/101/script.lua C> version 1.6.3-439-g7e1011b
+... main/101/script.lua C> log level 5
+... main/101/script.lua I> mapping 107374184 bytes for a shared arena...
+... main/101/spawner C> initialized
+... main/101/script.lua I> recovery start
+... main/101/script.lua I> recovering from `./00000000000000000000.snap'
+... main/101/script.lua I> primary: bound to 0.0.0.0:3301
+... main/102/leave_local_hot_standby I> ready to accept requests
+... main/103/snapshot_daemon I> started
 Starting  ARG
-2014-07-02 10:19:29.108 ... entering the event loop</programlisting>
+... main C> entering the event loop</programlisting>
 </para>
 </section>
 
@@ -121,7 +123,7 @@ Starting  ARG
 <title>Configuration parameters</title>
 <para>
     Configuration parameters have the form
-     <code>box.cfg{<replaceable> key = value [, key_value ...]</replaceable>}</code>.
+     <code>box.cfg{<replaceable> key = value [, key = value ...]</replaceable>}</code>.
     Since box.cfg may contain many configuration parameters
     and since some of the parameters (such as directory addresses)
     are semi-permanent, it's best to keep box.cfg in a Lua file.
