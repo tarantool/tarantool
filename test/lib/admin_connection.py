@@ -60,5 +60,5 @@ class AdminConnection(TarantoolConnection):
     def connect(self):
         super(AdminConnection, self).connect()
         handshake = self.socket.recv(128)
-        if not re.search(r'^Tarantool console', str(handshake)):
+        if not re.search(r'^Tarantool.*console.*', str(handshake)):
             raise RuntimeError('Broken tarantool console handshake')

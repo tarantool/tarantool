@@ -52,7 +52,7 @@ local default_cfg = {
     username            = nil ,
     coredump            = false,
 
-    -- snap_daemon
+    -- snapshot_daemon
     snapshot_period     = 0,        -- 0 = disabled
     snapshot_count      = 6,
 }
@@ -99,9 +99,9 @@ local dynamic_cfg = {
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
 
-    -- snap_daemon
-    snapshot_period         = box.internal.snap_daemon.set_snapshot_period,
-    snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
+    -- snapshot_daemon
+    snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
+    snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
 }
 
 local function prepare_cfg(table)
@@ -198,7 +198,7 @@ function box.cfg(cfg)
         })
     ffi.C.load_cfg()
 
-    box.internal.snap_daemon.start()
+    box.internal.snapshot_daemon.start()
 end
 jit.off(box.cfg)
 jit.off(reload_cfg)

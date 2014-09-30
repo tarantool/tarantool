@@ -154,7 +154,7 @@ local function client_print(self, output)
     elseif not output then
         -- disconnect peer
         local peer = self.client:peer()
-        log.info("console: client %s:%s disconnected", peer.host, peer.port)
+        log.info("client %s:%s disconnected", peer.host, peer.port)
         self.client:shutdown()
         self.client:close()
         self.client = nil
@@ -281,16 +281,18 @@ local function connect(uri)
 end
 
 local function client_handler(client, peer)
-    log.info("console: client %s:%s connected", peer.host, peer.port)
+    log.info("client %s:%s connected", peer.host, peer.port)
     local state = setmetatable({
         running = true;
         read = client_read;
         print = client_print;
         client = client;
     }, repl_mt)
-    state:print(string.format("%-63s\n%-63s\n", "Tarantool console port", ""))
+    state:print(string.format("%-63s\n%-63s\n",
+        "Tarantool ".. box.info.version.." (Lua console)",
+        "type 'help' for interactive help"))
     repl(state)
-    log.info("console: client %s:%s disconnected", peer.host, peer.port)
+    log.info("client %s:%s disconnected", peer.host, peer.port)
 end
 
 --
@@ -315,7 +317,7 @@ local function listen(uri)
         error(string.format('failed to create server %s:%s: %s',
             host, port, errno.strerror()))
     end
-    log.info("console: started on %s:%s", addr.host, addr.port)
+    log.info("started on %s:%s", addr.host, addr.port)
     return s
 end
 

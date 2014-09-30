@@ -23,7 +23,7 @@ end
 --# setopt delimiter ''
 
 
-space = box.schema.create_space('snap_daemon')
+space = box.schema.create_space('snapshot_daemon')
 space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
 
 

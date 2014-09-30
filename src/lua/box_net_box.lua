@@ -703,8 +703,7 @@ local remote_methods = {
                     self.wbuf = ''
                     self.rbuf = ''
 
-                    if string.match(self.handshake, '^Tarantool console') then
-                        log.info('Remote host is tarantool console')
+                    if string.match(self.handshake, '^Tarantool .*console') then
                         self.console = true
                         self:_switch_state('active')
                     else
