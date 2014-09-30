@@ -184,13 +184,40 @@ box.space.test:insert{0}
 box.space.test:insert{1}
 
 gen, param, state = space.index.t1:pairs({}, {iterator = box.index.ALL})
-print(gen(param, state))
+gen(param, state)
 
 id = space.index.t1.id
 box.schema.index.drop(space.id, id)
 box.schema.index.alter(space.id, space.index.t2.id, {id = id})
 
-print(gen(param, state))
+gen(param, state)
+
+space:drop()
+
+-------------------------------------------------------------------------------
+-- Iterator: https://github.com/tarantool/tarantool/issues/498
+-- Iterator is not checked for wrong type; accept lowercase iterator
+-------------------------------------------------------------------------------
+
+space = box.schema.create_space('test', {temporary=true})
+space:create_index('primary', {type='TREE',unique=true})
+space:insert{0}
+space:insert{1}
+
+gen, param, state = space.index.primary:pairs({}, {iterator = 'ALL'})
+gen(param, state)
+gen(param, state)
+gen(param, state)
+
+gen, param, state = space.index.primary:pairs({}, {iterator = 'all'})
+gen(param, state)
+gen(param, state)
+
+gen, param, state = space.index.primary:pairs({}, {iterator = 'mistake'})
+
+space:select({}, {iterator = box.index.ALL})
+space:select({}, {iterator = 'all'})
+space:select({}, {iterator = 'mistake'})
 
 space:drop()
 
