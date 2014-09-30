@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "box.h"
 #include "cluster.h"
 #include "recovery.h"
 #include "exception.h"
@@ -65,5 +66,6 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 		/* Assign local server id */
 		assert(r->server_id == 0);
 		r->server_id = server_id;
+		box_set_ro(false);
 	}
 }
