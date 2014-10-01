@@ -330,3 +330,25 @@ s:truncate()
 s:drop()
 ---
 ...
+-- #521: Cryptic error message in update operation
+s = box.schema.create_space('tweedledum')
+---
+...
+s:create_index('pk')
+---
+...
+s:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+s:update({1})
+---
+- error: Tuple/Key must be MsgPack array
+...
+s:update({1}, {'=', 1, 1})
+---
+- error: Invalid MsgPack - expected an update operation name (string)
+...
+s:drop()
+---
+...

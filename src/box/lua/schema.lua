@@ -443,19 +443,24 @@ end
 -- Change one-based indexing in update commands to zero-based.
 --
 local function normalize_update_ops(ops)
+    if type(ops) ~= 'table' then
+        return ops;
+    end
     for _, op in ipairs(ops) do
-        if op[1] == ':' then
-            -- fix offset for splice
-            if op[3] > 0 then
-                op[3] = op[3] - 1
-            elseif op[3] == 0 then
-                box.error(box.error.SPLICE, op[2], "offset is out of bound")
+        if type(op) == 'table' then
+            if op[1] == ':' then
+                -- fix offset for splice
+                if op[3] > 0 then
+                    op[3] = op[3] - 1
+                elseif op[3] == 0 then
+                    box.error(box.error.SPLICE, op[2], "offset is out of bound")
+                end
             end
-        end
-        if op[2] > 0 then
-           op[2] = op[2] - 1
-        elseif op[2] == 0 then
-           box.error(box.error.NO_SUCH_FIELD, op[2])
+            if op[2] > 0 then
+               op[2] = op[2] - 1
+            elseif op[2] == 0 then
+               box.error(box.error.NO_SUCH_FIELD, op[2])
+            end
         end
     end
     return ops
