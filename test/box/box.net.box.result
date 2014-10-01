@@ -573,3 +573,12 @@ cnc:call('123')
 ---
 - error: '[string "123()"]:1: unexpected symbol near ''123'''
 ...
+-- #545 user or password is not defined
+remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+---
+- error: 'net.box: password is not defined'
+...
+remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+---
+- error: 'net.box: user is not defined'
+...

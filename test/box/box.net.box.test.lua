@@ -223,3 +223,9 @@ cnc:call('console_unpack_test', 1)
 
 cn:call('123')
 cnc:call('123')
+
+
+-- #545 user or password is not defined
+remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+

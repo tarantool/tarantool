@@ -351,9 +351,20 @@ local remote_methods = {
         self.host = host
         self.port = port
         self.opts = opts
+
         if self.opts == nil then
             self.opts = {}
         end
+
+        if self.opts.user ~= nil and self.opts.password == nil then
+            box.error(box.error.PROC_LUA,
+                "net.box: password is not defined")
+        end
+        if self.opts.user == nil and self.opts.password ~= nil then
+            box.error(box.error.PROC_LUA,
+                "net.box: user is not defined")
+        end
+            
 
         if self.host == nil then
             self.host = 'localhost'
