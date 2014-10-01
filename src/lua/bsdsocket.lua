@@ -77,9 +77,9 @@ local socket_mt
 local function bless_socket(fd)
     -- Make socket to be non-blocked by default
     if ffi.C.bsdsocket_nonblock(fd, 1) < 0 then
-        local errno = box.errno()
+        local errno = boxerrno()
         ffi.C.close(fd)
-        box.errno(errno)
+        boxerrno(errno)
         return nil
     end
 
@@ -508,7 +508,7 @@ socket_methods.accept = function(self)
 
     local cfd, from = internal.accept(fd)
     if cfd == nil then
-        self._errno = box.errno()
+        self._errno = boxerrno()
         return nil
     end
     return bless_socket(cfd), from
@@ -950,6 +950,11 @@ local function tcp_connect(host, port, timeout)
     local dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
         protocol = 'tcp' })
     if dns == nil then
+        return nil
+    end
+
+    if #dns == 0 then
+        boxerrno(boxerrno.EINVAL)
         return nil
     end
     for i, remote in pairs(dns) do

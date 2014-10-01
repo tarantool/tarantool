@@ -497,3 +497,5 @@ s = socket.tcp_server('unix/', path, function() end)
 s ~= nil
 s:close()
 fio.stat(path) == nil
+
+{ socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }

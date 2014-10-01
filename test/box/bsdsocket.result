@@ -1475,3 +1475,8 @@ fio.stat(path) == nil
 ---
 - true
 ...
+{ socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
+---
+- - true
+  - Invalid argument
+...
