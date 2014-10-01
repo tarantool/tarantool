@@ -582,3 +582,24 @@ remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
 ---
 - error: 'net.box: user is not defined'
 ...
+-- #544 usage for remote[point]method
+cn:call('console_test')
+---
+- - []
+...
+cn.call('console_test')
+---
+- error: 'usage: remote:call(proc_name, ...)'
+...
+cn.ping()
+---
+- error: 'usage: remote:call(proc_name, ...)'
+...
+remote.self:call('console_test')
+---
+- []
+...
+remote.self.call('console_test')
+---
+- error: 'usage: remote:call(proc_name, ...)'
+...

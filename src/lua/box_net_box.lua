@@ -391,6 +391,9 @@ local remote_methods = {
 
 
     ping    = function(self)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+        end
         if not self:is_connected() then
             return false
         end
@@ -411,6 +414,10 @@ local remote_methods = {
     end,
 
     call    = function(self, proc_name, ...)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+        end
+
         proc_name = tostring(proc_name)
 
         if not self.console then
@@ -1077,6 +1084,9 @@ remote.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     call = function(_box, proc_name, ...)
+        if type(_box) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+        end
         proc_name = tostring(proc_name)
         local proc = { package.loaded['box.internal']
             .call_loadproc(proc_name) }

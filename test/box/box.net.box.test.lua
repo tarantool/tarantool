@@ -229,3 +229,12 @@ cnc:call('123')
 remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
 remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
 
+-- #544 usage for remote[point]method
+cn:call('console_test')
+cn.call('console_test')
+
+cn.ping()
+
+remote.self:call('console_test')
+remote.self.call('console_test')
+
