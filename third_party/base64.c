@@ -35,6 +35,9 @@
 
 /* {{{ encode */
 
+extern inline int
+base64_bufsize(int binsize);
+
 enum base64_encodestep { step_A, step_B, step_C };
 
 struct base64_encodestate {
