@@ -370,3 +370,18 @@ exec admin "lua collectgarbage('collect')"
 exec admin "lua client, errno = box.socket.tcp_connect('unix/', '{}'), box.errno()".format(path)
 exec admin "lua errno == box.errno.ECONNREFUSED"
 os.unlink(path)
+
+print 'test bind unix socket if old socket is exists'
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s:listen()"
+exec admin "lua s:close()"
+if not os.path.exists(path):
+    print 'unix socket was removed: test failed'
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s = box.socket.tcp_server('unix/', '{}', function() end)".format(path)
+exec admin "lua s ~= nil"
+exec admin "lua s:close()"
+if os.path.exists(path):
+    print 'unix socket was not removed: test failed'

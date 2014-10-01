@@ -6,6 +6,7 @@ local TIMEOUT_INFINITY      = 500 * 365 * 86400
 
 local ffi = require 'ffi'
 local os_remove = os.remove
+local boxerrno  = box.errno
 local internal = box.socket.internal
 box.socket.internal = nil
 package.loaded['box.socket.internal'] = nil
@@ -1003,6 +1004,38 @@ local function tcp_server_usage()
     error('Usage: socket.tcp_server(host, port, handler | opts)')
 end
 
+local function tcp_server_bind(s, addr)
+    if s:bind(addr.host, addr.port) then
+        return true
+    end
+
+    if addr.family ~= 'AF_UNIX' then
+        return false
+    end
+
+    if boxerrno() ~= boxerrno.EADDRINUSE then
+        return false
+    end
+
+    local save_errno = boxerrno()
+
+    local sc = tcp_connect(addr.host, addr.port)
+    if sc ~= nil then
+        sc:close()
+        boxerrno(save_errno)
+        return false
+    end
+
+    if boxerrno() ~= boxerrno.ECONNREFUSED then
+        boxerrno(save_errno)
+        return false
+    end
+
+    os_remove(addr.port)
+    return s:bind(addr.host, addr.port)
+end
+
+
 local function tcp_server(host, port, opts, timeout)
     local server = {}
     if type(opts) == 'function' then
@@ -1040,7 +1073,7 @@ local function tcp_server(host, port, opts, timeout)
             else
                 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
             end
-            if not s:bind(addr.host, addr.port) or not s:listen(backlog) then
+            if not tcp_server_bind(s, addr) or not s:listen(backlog) then
                 local save_errno = box.errno()
                 s:close()
                 box.errno(save_errno)

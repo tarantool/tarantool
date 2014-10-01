@@ -222,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:347: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:348: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -1146,6 +1146,40 @@ lua client, errno = box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'
 ---
 ...
 lua errno == box.errno.ECONNREFUSED
+---
+ - true
+...
+test bind unix socket if old socket is exists
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - false
+...
+lua s = box.socket.tcp_server('unix/', '/tmp/tarantool-test-socket', function() end)
+---
+...
+lua s ~= nil
+---
+ - true
+...
+lua s:close()
 ---
  - true
 ...
