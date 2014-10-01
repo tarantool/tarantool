@@ -238,3 +238,17 @@ cn.ping()
 remote.self:call('console_test')
 remote.self.call('console_test')
 
+
+-- uri as the first argument
+uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
+
+cn = remote.new(uri)
+cn:ping()
+cn:close()
+
+uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
+remote.new(uri)
+cn = remote.new(uri, { password = 'test' })
+cn:ping()
+cn:close()
+

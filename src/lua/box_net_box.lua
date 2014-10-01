@@ -8,6 +8,7 @@ local errno = require 'errno'
 local ffi = require 'ffi'
 local digest = require 'digest'
 local yaml = require 'yaml'
+local urilib = require 'uri'
 
 -- packet codes
 local OK                = 0
@@ -346,6 +347,32 @@ local remote_methods = {
             host, port, opts = cls, host, port
             setmetatable(self, getmetatable(remote))
         end
+
+
+        -- uri as the first argument
+        if opts == nil then
+            opts = {}
+            if type(port) == 'table' then
+                opts = port
+                port = nil
+            end
+
+            if port == nil then
+                
+                local address = urilib.parse(tostring(host))
+                if address == nil or address.service == nil then
+                    box.error(box.error.PROC_LUA,
+                        "usage: remote:new(uri[, opts] | host, port[, opts])")
+                end
+
+                host = address.host
+                port = address.service
+
+                opts.user = address.login or opts.user
+                opts.password = address.password or opts.password
+            end
+        end
+
 
         self.is_instance = true
         self.host = host

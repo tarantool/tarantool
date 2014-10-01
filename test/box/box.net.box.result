@@ -141,7 +141,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:228: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:229: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -602,4 +602,35 @@ remote.self:call('console_test')
 remote.self.call('console_test')
 ---
 - error: 'usage: remote:call(proc_name, ...)'
+...
+-- uri as the first argument
+uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
+---
+...
+cn = remote.new(uri)
+---
+...
+cn:ping()
+---
+- true
+...
+cn:close()
+---
+...
+uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
+---
+...
+remote.new(uri)
+---
+- error: 'net.box: password is not defined'
+...
+cn = remote.new(uri, { password = 'test' })
+---
+...
+cn:ping()
+---
+- true
+...
+cn:close()
+---
 ...
