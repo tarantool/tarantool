@@ -65,6 +65,18 @@ Each instance can be controlled by C<dist.lua>:
 
     dist.lua enter instance_name
 
+=head2 status
+
+    dist.lua status instance_name
+
+Check if instance is up.
+
+If pid file exists and control socket exists and control socket is alive
+returns code C<0>.
+
+Return code != 0 in other cases. Can complain in log (stderr) if pid file
+exists and socket doesn't, etc.
+
 =head1 COPYRIGHT
 
 Copyright (C) 2010-2013 Tarantool AUTHORS:
@@ -271,6 +283,36 @@ elseif cmd == 'enter' then
     console.on_start( function(self) self:eval(cmd) end )
     console.on_client_disconnect( function(self) self.running = false end )
     console.start()
+    os.exit(0)
+elseif cmd == 'status' then
+    if fio.stat(force_cfg.pid_file) == nil then
+        if errno() == errno.ENOENT then
+            os.exit(1)
+        end
+        log.error("Cant access pidfile %s: %s",
+            force_cfg.pid_file, errno.strerror())
+    end
+
+    if fio.stat(console_sock) == nil then
+        if errno() == errno.ENOENT then
+            log.warn("pidfile is exists, but control socket (%s) isn't",
+                console_sock)
+            os.exit(2)
+        end
+    end
+
+    local s = socket.tcp_connect('unix/', console_sock)
+    if s == nil then
+        if errno() ~= errno.EACCES then
+            log.warn("Can't access control socket %s: %s", console_sock,
+                errno.strerror())
+            os.exit(3)
+        else
+            os.exit(0)
+        end
+    end
+
+    s:close()
     os.exit(0)
 else
     log.error("Unknown command '%s'", cmd)
