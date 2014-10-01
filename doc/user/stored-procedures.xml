@@ -978,9 +978,12 @@ procedures.
             <para>
               Cancel a <code>fiber</code>.
               Running and suspended fibers can be canceled.
+              After a fiber has been canceled, attempts to operate on it will cause errors,
+              for example <code>fiber.id(<replaceable>fiber</replaceable>)</code> will cause
+              "error: the fiber is dead".
             </para>
             <para>
-              Parameters: <code>fiber</code> = the fiber to be canceled.
+              Parameters: fiber object, for example the fiber returned by <code>fiber.create</code>.
             </para>
             <para>
               Possible errors: the specified fiber does not permit cancel.
