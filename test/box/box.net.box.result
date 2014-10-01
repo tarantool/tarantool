@@ -593,7 +593,7 @@ cn.call('console_test')
 ...
 cn.ping()
 ---
-- error: 'usage: remote:call(proc_name, ...)'
+- error: 'usage: remote:ping()'
 ...
 remote.self:call('console_test')
 ---

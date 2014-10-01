@@ -419,7 +419,7 @@ local remote_methods = {
 
     ping    = function(self)
         if type(self) ~= 'table' then
-            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+            box.error(box.error.PROC_LUA, "usage: remote:ping()")
         end
         if not self:is_connected() then
             return false
