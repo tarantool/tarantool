@@ -70,3 +70,5 @@ box.cfg{snapshot_period = 3600 * 4, snapshot_count = 4 }
 space:drop()
 
 PERIOD
+
+box.cfg{ snapshot_count = .2 }

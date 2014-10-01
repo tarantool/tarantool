@@ -239,6 +239,10 @@ do
             end,
 
             set_snapshot_count = function(snapshot_count)
+                if math.floor(snapshot_count) ~= snapshot_count then
+                    box.error(box.error.PROC_LUA,
+                        "snapshot_count must be integer")
+                end
                 local daemon = box.internal[PREFIX] or daemon
                 log.info("new snapshot count is %s", tostring(snapshot_count))
 

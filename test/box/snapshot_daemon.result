@@ -112,3 +112,7 @@ PERIOD
 ---
 - 0.03
 ...
+box.cfg{ snapshot_count = .2 }
+---
+- error: snapshot_count must be integer
+...
