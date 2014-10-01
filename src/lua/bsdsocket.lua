@@ -6,6 +6,8 @@ local ffi = require('ffi')
 local boxerrno = require('errno')
 local internal = require('socket')
 local fiber = require('fiber')
+local fio = require('fio')
+local log = require('log')
 
 ffi.cdef[[
     struct socket {
@@ -980,13 +982,50 @@ local function tcp_server_loop(server, s, addr)
         fiber.create(tcp_server_handler, server, sc, from)
     end
     if addr.family == 'AF_UNIX' and addr.port then
-        os.remove(addr.port) -- remove unix socket
+        fio.unlink(addr.port) -- remove unix socket
     end
 end
 
 local function tcp_server_usage()
     error('Usage: socket.tcp_server(host, port, handler | opts)')
 end
+
+local function tcp_server_bind(s, addr)
+    if s:bind(addr.host, addr.port) then
+        return true
+    end
+
+    if addr.family ~= 'AF_UNIX' then
+        return false
+    end
+
+    if boxerrno() ~= boxerrno.EADDRINUSE then
+        return false
+    end
+
+    local save_errno = boxerrno()
+
+    local sc = tcp_connect(addr.host, addr.port)
+    if sc ~= nil then
+        sc:close()
+        boxerrno(save_errno)
+        return false
+    end
+
+    if boxerrno() ~= boxerrno.ECONNREFUSED then
+        boxerrno(save_errno)
+        return false
+    end
+
+    log.info("tcp_server: remove dead UNIX socket: %s", addr.port)
+    if not fio.unlink(addr.port) then
+        log.warn("tcp_server: %s", boxerrno.strerror())
+        boxerrno(save_errno)
+        return false
+    end
+    return s:bind(addr.host, addr.port)
+end
+
 
 local function tcp_server(host, port, opts, timeout)
     local server = {}
@@ -1025,7 +1064,7 @@ local function tcp_server(host, port, opts, timeout)
             else
                 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', 1) -- ignore error
             end
-            if not s:bind(addr.host, addr.port) or not s:listen(backlog) then
+            if not tcp_server_bind(s, addr) or not s:listen(backlog) then
                 local save_errno = boxerrno()
                 s:close()
                 boxerrno(save_errno)

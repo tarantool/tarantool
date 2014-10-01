@@ -482,3 +482,18 @@ s.waiters
 json.decode(json.encode(s)).fd == s:fd()
 yaml.decode(yaml.encode(s)).fd == s:fd()
 s = nil
+
+-- start AF_UNIX server with dead socket exists
+path = '/tmp/tarantool-test-socket'
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+s:bind('unix/', path)
+s:close()
+
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+{ s:bind('unix/', path), errno.strerror() }
+s:close()
+
+s = socket.tcp_server('unix/', path, function() end)
+s ~= nil
+s:close()
+fio.stat(path) == nil

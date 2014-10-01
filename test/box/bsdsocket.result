@@ -279,7 +279,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:341: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:343: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -1432,4 +1432,46 @@ yaml.decode(yaml.encode(s)).fd == s:fd()
 ...
 s = nil
 ---
+...
+-- start AF_UNIX server with dead socket exists
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:close()
+---
+- true
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+{ s:bind('unix/', path), errno.strerror() }
+---
+- - false
+  - Address already in use
+...
+s:close()
+---
+- true
+...
+s = socket.tcp_server('unix/', path, function() end)
+---
+...
+s ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+fio.stat(path) == nil
+---
+- true
 ...
