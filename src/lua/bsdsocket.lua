@@ -966,6 +966,11 @@ local function tcp_connect(host, port, timeout)
     if dns == nil then
         return nil
     end
+
+    if #dns == 0 then
+        box.errno(box.errno.EINVAL)
+        return nil
+    end
     for i, remote in pairs(dns) do
         timeout = stop - box.time()
         if timeout <= 0 then

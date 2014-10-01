@@ -1183,3 +1183,7 @@ lua s:close()
 ---
  - true
 ...
+lua box.cjson.encode{ box.socket.tcp_connect('test:test@localhost:3303') == nil, box.errno.strerror() }
+---
+ - [true,"Invalid argument"]
+...

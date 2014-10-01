@@ -385,3 +385,6 @@ exec admin "lua s ~= nil"
 exec admin "lua s:close()"
 if os.path.exists(path):
     print 'unix socket was not removed: test failed'
+
+
+exec admin "lua box.cjson.encode{ box.socket.tcp_connect('test:test@localhost:3303') == nil, box.errno.strerror() }"
