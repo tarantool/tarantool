@@ -97,3 +97,11 @@ fio.rmdir(tmpdir)
 
 fio.unlink()
 fio.unlink(nil)
+
+-- dirname
+
+fio.dirname('abc')
+fio.dirname('/abc')
+fio.dirname('/abc/cde')
+fio.dirname('/abc/cde/')
+fio.dirname('/')

@@ -286,3 +286,24 @@ fio.unlink(nil)
 ---
 - false
 ...
+-- dirname
+fio.dirname('abc')
+---
+- .
+...
+fio.dirname('/abc')
+---
+- /
+...
+fio.dirname('/abc/cde')
+---
+- /abc
+...
+fio.dirname('/abc/cde/')
+---
+- /abc
+...
+fio.dirname('/')
+---
+- /
+...
