@@ -47,5 +47,7 @@ void *ffi_symbols[] = {
 	(void *) bsdsocket_local_resolve,
 	(void *) bsdsocket_nonblock,
 	(void *) base64_decode,
+	(void *) base64_encode,
+	(void *) base64_bufsize,
 	(void *) SHA1internal
 };
