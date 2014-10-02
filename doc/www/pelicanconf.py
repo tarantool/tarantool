@@ -39,13 +39,15 @@ TAG_SAVE_AS = ''
 
 STATIC_PATHS = [
     'robots.txt',
-    'ycsb'
+    'ycsb',
+    'js/highcharts.js',
+    'js/tabs.js'
 ]
 EXTRA_PATH_METADATA = {
-    'robots.txt'     : { 'path': 'robots.txt'  },
-    'ycsb'           : { 'path': 'ycsb'        },
-    'js/highlight.js': { 'path': 'highlight.js'},
-    'js/tabs.js'     : { 'path': 'tabs.js'     },
+    'robots.txt'      : { 'path': 'robots.txt'   },
+    'ycsb'            : { 'path': 'ycsb'         },
+    'js/highcharts.js': { 'path': 'highcharts.js'},
+    'js/tabs.js'      : { 'path': 'tabs.js'      },
 }
 
 # Uncomment following line if you want document-relative URLs when developing
