@@ -27,7 +27,8 @@ void *ffi_symbols[] = {
 	(void *) tuple_rewind,
 	(void *) tuple_seek,
 	(void *) tuple_next,
-	(void *) tuple_ref,
+	(void *) tuple_ref_nothrow,
+	(void *) tuple_unref,
 	(void *) boxffi_index_len,
 	(void *) boxffi_index_random,
 	(void *) boxffi_index_iterator,
@@ -47,5 +48,7 @@ void *ffi_symbols[] = {
 	(void *) bsdsocket_local_resolve,
 	(void *) bsdsocket_nonblock,
 	(void *) base64_decode,
+	(void *) base64_encode,
+	(void *) base64_bufsize,
 	(void *) SHA1internal
 };

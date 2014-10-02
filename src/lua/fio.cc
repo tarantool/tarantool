@@ -292,6 +292,32 @@ lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 	lua_settable(L, -3);			\
 }
 
+#define DEF_STAT_METHOD(method_name, macro_name)		\
+	static int						\
+	lbox_fio_stat_##method_name(struct lua_State *L)		\
+	{							\
+		if (lua_gettop(L) < 1 || !lua_istable(L, 1))	\
+			luaL_error(L, "usage: stat:" #method_name "()"); \
+		lua_pushliteral(L, "mode");			\
+		lua_gettable(L, 1);				\
+		int mode = lua_tointeger(L, -1);		\
+		lua_pop(L, 1);					\
+		lua_pushboolean(L, macro_name(mode) ? 1 : 0);	\
+		return 1;					\
+	}
+
+DEF_STAT_METHOD(is_reg, S_ISREG);
+DEF_STAT_METHOD(is_dir, S_ISDIR);
+DEF_STAT_METHOD(is_chr, S_ISCHR);
+DEF_STAT_METHOD(is_blk, S_ISBLK);
+DEF_STAT_METHOD(is_fifo, S_ISFIFO);
+#ifdef S_ISLNK
+DEF_STAT_METHOD(is_link, S_ISLNK);
+#endif
+#ifdef S_ISSOCK
+DEF_STAT_METHOD(is_sock, S_ISSOCK);
+#endif
+
 static int
 lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
 {
@@ -316,6 +342,34 @@ lbox_fio_pushstat(struct lua_State *L, const struct stat *stat)
 		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
 		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atim);
 	#endif
+
+
+	int top = lua_gettop(L);
+	/* metatable for tables *stat */
+	lua_newtable(L);
+
+	lua_pushliteral(L, "__index");
+	lua_newtable(L);
+	static const struct luaL_Reg stat_methods[] = {
+		{ "is_reg", lbox_fio_stat_is_reg },
+		{ "is_dir", lbox_fio_stat_is_dir },
+		{ "is_chr", lbox_fio_stat_is_chr },
+		{ "is_blk", lbox_fio_stat_is_blk },
+		{ "is_fifo", lbox_fio_stat_is_fifo },
+#ifdef S_ISLNK
+		{ "is_link", lbox_fio_stat_is_link },
+#endif
+#ifdef S_ISSOCK
+		{ "is_sock", lbox_fio_stat_is_sock },
+#endif
+		{ NULL,			NULL				}
+	};
+	luaL_register(L, NULL, stat_methods);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, top);
+	lua_settop(L, top);
+
 	return 1;
 }
 
@@ -525,6 +579,9 @@ lbox_fio_close(struct lua_State *L)
 	return 1;
 }
 
+
+
+
 void
 tarantool_lua_fio_init(struct lua_State *L)
 {
@@ -647,6 +704,7 @@ tarantool_lua_fio_init(struct lua_State *L)
 	PUSHTABLE("S_IWOTH", lua_pushinteger, S_IWOTH);
 	PUSHTABLE("S_IXOTH", lua_pushinteger, S_IXOTH);
 	lua_settable(L, -3);
+
 
 
 	lua_pushliteral(L, "seek");

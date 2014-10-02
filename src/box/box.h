@@ -62,7 +62,12 @@ void box_free(void);
 typedef void (*box_process_func)(struct port *port, struct request *request);
 /** For read-write operations. */
 extern box_process_func box_process;
-/** For read-only port. */
+
+void
+box_set_ro(bool ro);
+
+bool
+box_is_ro(void);
 
 /** Non zero if snapshot is in progress. */
 extern int snapshot_pid;

@@ -68,8 +68,8 @@ identifier which is unique within the cluster, known as the
     To prepare the master for connections from the replica, it's only
     necessary to include "listen" in the initial <code>box.cfg</code>
     request, for example <code>box.cfg{listen=3301}</code>.
-    A master with enabled "listen" uri can accept connections
-    from as many replicas as necessary on that uri. Each replica
+    A master with enabled "listen" URI can accept connections
+    from as many replicas as necessary on that URI. Each replica
     has its own replication state.
   </para>
 </section>
@@ -120,7 +120,7 @@ identifier which is unique within the cluster, known as the
   <para>
     However, once a master failure is detected, the recovery
     is simple: declare that the replica is now the new master,
-    by saying <code>box.cfg{... listen=uri}</code>.
+    by saying <code>box.cfg{... listen=URI}</code>.
     Then, if there are updates on the old master that were not
     propagated before the old master went down, they would have
     to be re-applied manually.

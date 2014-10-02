@@ -195,3 +195,60 @@ remote.self:timeout(123).space.net_box_test_space:select{234}
 -- cleanup database after tests
 space:drop()
 
+
+-- admin console tests
+function console_test(...) return { ... } end
+function console_test_error(...) error(string.format(...)) end
+function console_unpack_test(...) return ... end
+
+
+ADMIN = require('uri').parse(os.getenv('ADMIN'))
+
+cn = remote:new(LISTEN.host, LISTEN.service)
+cnc = remote:new(ADMIN.host, ADMIN.service)
+cnc.console
+
+cn:call('console_test', 1, 2, 3, 'string', nil)
+cnc:call('console_test', 1, 2, 3, 'string', nil)
+
+cn:call('console_test_error', 'error %d', 123)
+cnc:call('console_test_error', 'error %d', 123)
+
+
+cn:call('console_unpack_test', 1)
+cnc:call('console_unpack_test', 1)
+
+
+
+
+cn:call('123')
+cnc:call('123')
+
+
+-- #545 user or password is not defined
+remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+
+-- #544 usage for remote[point]method
+cn:call('console_test')
+cn.call('console_test')
+
+cn.ping()
+
+remote.self:call('console_test')
+remote.self.call('console_test')
+
+
+-- uri as the first argument
+uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
+
+cn = remote.new(uri)
+cn:ping()
+cn:close()
+
+uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
+remote.new(uri)
+cn = remote.new(uri, { password = 'test' })
+cn:ping()
+cn:close()
+

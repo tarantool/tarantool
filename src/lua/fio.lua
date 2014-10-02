@@ -5,6 +5,7 @@ local ffi = require('ffi')
 
 ffi.cdef[[
     int umask(int mask);
+    char *dirname(char *path);
 ]]
 
 local internal = fio.internal
@@ -209,18 +210,8 @@ fio.dirname = function(path)
         return nil
     end
     path = tostring(path)
-
-    while true do
-        if path == "" or string.sub(path, -1) == "/" then
-            break
-        end
-        path = string.sub(path, 1, -2)
-    end
-    if path == "" then
-        path = "."
-    end
-
-    return path
+    path = ffi.new('char[?]', #path, path)
+    return ffi.string(ffi.C.dirname(path))
 end
 
 fio.umask = function(umask)

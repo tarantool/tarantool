@@ -56,3 +56,9 @@ class AdminConnection(TarantoolConnection):
             if not silent:
                 sys.stdout.write(res.replace("\r\n", "\n"))
         return res
+
+    def connect(self):
+        super(AdminConnection, self).connect()
+        handshake = self.socket.recv(128)
+        if not re.search(r'^Tarantool.*console.*', str(handshake)):
+            raise RuntimeError('Broken tarantool console handshake')

@@ -8,6 +8,7 @@ local errno = require 'errno'
 local ffi = require 'ffi'
 local digest = require 'digest'
 local yaml = require 'yaml'
+local urilib = require 'uri'
 
 -- packet codes
 local OK                = 0
@@ -41,6 +42,8 @@ local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
 local sequence_mt = { __serialize = 'sequence'}
 local mapping_mt = { __serialize = 'mapping'}
+
+local CONSOLE_FAKESYNC  = 15121974
 
 local function request(header, body)
 
@@ -345,13 +348,50 @@ local remote_methods = {
             setmetatable(self, getmetatable(remote))
         end
 
+
+        -- uri as the first argument
+        if opts == nil then
+            opts = {}
+            if type(port) == 'table' then
+                opts = port
+                port = nil
+            end
+
+            if port == nil then
+                
+                local address = urilib.parse(tostring(host))
+                if address == nil or address.service == nil then
+                    box.error(box.error.PROC_LUA,
+                        "usage: remote:new(uri[, opts] | host, port[, opts])")
+                end
+
+                host = address.host
+                port = address.service
+
+                opts.user = address.login or opts.user
+                opts.password = address.password or opts.password
+            end
+        end
+
+
         self.is_instance = true
         self.host = host
         self.port = port
         self.opts = opts
+
         if self.opts == nil then
             self.opts = {}
         end
+
+        if self.opts.user ~= nil and self.opts.password == nil then
+            box.error(box.error.PROC_LUA,
+                "net.box: password is not defined")
+        end
+        if self.opts.user == nil and self.opts.password ~= nil then
+            box.error(box.error.PROC_LUA,
+                "net.box: user is not defined")
+        end
+            
 
         if self.host == nil then
             self.host = 'localhost'
@@ -378,6 +418,9 @@ local remote_methods = {
 
 
     ping    = function(self)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:ping()")
+        end
         if not self:is_connected() then
             return false
         end
@@ -398,8 +441,37 @@ local remote_methods = {
     end,
 
     call    = function(self, proc_name, ...)
+        if type(self) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+        end
+
         proc_name = tostring(proc_name)
-        local res = self:_request('call', true, proc_name, {...})
+
+        if not self.console then
+            local res = self:_request('call', true, proc_name, {...})
+            return res.body[DATA]
+        end
+        
+        local eval_str = proc_name .. '('
+        for i = 1, select('#', ...) do
+            if i > 1 then
+                eval_str = eval_str .. ', '
+            end
+            local arg = select(i, ...)
+
+            if arg == nil then
+                eval_str = eval_str .. 'nil'
+            elseif type(arg) == 'number' then
+                eval_str = eval_str .. tostring(arg)
+            else
+                arg = tostring(arg)
+                arg = string.gsub(arg, '"', '\\"')
+                eval_str = eval_str .. '"' .. arg .. '"'
+            end
+        end
+        eval_str = eval_str .. ")\n"
+
+        local res = self:_console_request(eval_str, true)
         return res.body[DATA]
     end,
 
@@ -497,7 +569,49 @@ local remote_methods = {
         end
     end,
 
+
+    _check_console_response = function(self)
+        while true do
+            local resp = string.match(self.rbuf, '.-\n[.][.][.]\r?\n')
+            if resp == nil then
+                break
+            end
+            self.rbuf = string.sub(self.rbuf, #resp + 1)
+
+            local result = yaml.decode(resp)
+            if result ~= nil then
+                result = result[1]
+            end
+            
+            local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
+            local body = {}
+
+            if type(result) ~= 'table' then
+                result = { result }
+            end
+
+
+            if result.error ~= nil then
+                hdr[TYPE] = bit.bor(ERROR_TYPE, box.error.PROC_LUA)
+                body[ERROR] = result.error
+            else
+                body[DATA] = { result }
+            end
+
+            if self.ch.sync[CONSOLE_FAKESYNC] ~= nil then
+                self.ch.sync[CONSOLE_FAKESYNC]:put({hdr = hdr, body = body })
+                self.ch.sync[CONSOLE_FAKESYNC] = nil
+            else
+                log.warn("Unexpected console response: %s", resp)
+            end
+        end
+    end,
+
     _check_response = function(self)
+        if self.console then
+            return self:_check_console_response(self)
+        end
+    
         while true do
             if #self.rbuf < 5 then
                 break
@@ -599,6 +713,7 @@ local remote_methods = {
         end
     end,
 
+
     _connect_worker = function(self)
         fiber.name('net.box.connector')
         while true do
@@ -630,24 +745,29 @@ local remote_methods = {
                 elseif string.len(self.handshake) ~= 128 then
                     self:_fatal("Can't read handshake")
                 else
-
                     self.wbuf = ''
                     self.rbuf = ''
 
-                    local s, e = pcall(function()
-                        self:_auth()
-                    end)
-                    if not s then
-                        self:_fatal(e)
-                    end
-                        
-                    xpcall(function() self:_load_schema() end,
-                        function(e)
-                            log.info("Can't load schema: %s", tostring(e))
-                        end)
-                   
-                    if self.state ~= 'error' and self.state ~= 'closed' then
+                    if string.match(self.handshake, '^Tarantool .*console') then
+                        self.console = true
                         self:_switch_state('active')
+                    else
+                        self.console = false
+                        local s, e = pcall(function()
+                            self:_auth()
+                        end)
+                        if not s then
+                            self:_fatal(e)
+                        end
+                            
+                        xpcall(function() self:_load_schema() end,
+                            function(e)
+                                log.info("Can't load schema: %s", tostring(e))
+                            end)
+                       
+                        if self.state ~= 'error' and self.state ~= 'closed' then
+                            self:_switch_state('active')
+                        end
                     end
                 end
             end
@@ -886,15 +1006,19 @@ local remote_methods = {
         return self:_request_internal(name, raise, ...)
     end,
 
-    _request_internal = function(self, name, raise, ...)
+    _console_request = function(self, request_body, raise)
+        if raise == nil then
+            raise = true
+        end
+        return self:_request_raw(CONSOLE_FAKESYNC, request_body, raise)
+    end,
+
+    _request_raw = function(self, sync, request, raise)
         
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
             self.timeouts[fid] = TIMEOUT_INFINITY
         end
-
-        local sync = self.proto:sync()
-        local request = self.proto[name](sync, ...)
 
         self.wbuf = self.wbuf .. request
 
@@ -931,14 +1055,25 @@ local remote_methods = {
         end
 
         if response.body[DATA] ~= nil then
-            for i, v in pairs(response.body[DATA]) do
-                response.body[DATA][i] = box.tuple.new(response.body[DATA][i])
+            if rawget(box, 'tuple') ~= nil then
+                for i, v in pairs(response.body[DATA]) do
+                    response.body[DATA][i] =
+                        box.tuple.new(response.body[DATA][i])
+                end
             end
             -- disable YAML flow output (useful for admin console)
             setmetatable(response.body[DATA], sequence_mt)
         end
 
         return response
+    end,
+
+    _request_internal = function(self, name, raise, ...)
+
+        local sync = self.proto:sync()
+        local request = self.proto[name](sync, ...)
+        return self:_request_raw(sync, request, raise)
+        
     end,
 
     -- private (low level) methods
@@ -976,6 +1111,9 @@ remote.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     call = function(_box, proc_name, ...)
+        if type(_box) ~= 'table' then
+            box.error(box.error.PROC_LUA, "usage: remote:call(proc_name, ...)")
+        end
         proc_name = tostring(proc_name)
         local proc = { package.loaded['box.internal']
             .call_loadproc(proc_name) }
@@ -994,7 +1132,8 @@ remote.self = {
             result[i] = box.tuple.new(v)
         end
         return result
-    end
+    end,
+    console = false
 }
 
 

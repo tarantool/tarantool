@@ -122,3 +122,6 @@ sql("call space:delete(4)")
 
 admin("space:drop()")
 admin("box.schema.user.drop('test')")
+
+# Re-connect after removing user
+sql.py_con.close()

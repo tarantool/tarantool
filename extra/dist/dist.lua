@@ -61,13 +61,34 @@ Each instance can be controlled by C<dist.lua>:
 
     dist.lua logrotate instance_name
 
+=head2 Enter instance admin console
+
+    dist.lua enter instance_name
+
+=head2 status
+
+    dist.lua status instance_name
+
+Check if instance is up.
+
+If pid file exists and control socket exists and control socket is alive
+returns code C<0>.
+
+Return code != 0 in other cases. Can complain in log (stderr) if pid file
+exists and socket doesn't, etc.
+
+
+=head2 separate instances control
+
+If You use SysV init, You can use symlink from
+C<dist.lua> to C</etc/init.d/instance_name[.lua]>.
+C<dist.lua> detects if it is started by symlink and uses
+instance_name as C<`basename $0 .lua`>.
 
 =head1 COPYRIGHT
 
 Copyright (C) 2010-2013 Tarantool AUTHORS:
 please see AUTHORS file.
-
-
 
 =cut
 
@@ -81,16 +102,56 @@ local console = require 'console'
 local socket = require 'socket'
 local ffi = require 'ffi'
 local os = require 'os'
+local fiber = require 'fiber'
 
 ffi.cdef[[ int kill(int pid, int sig); ]]
 
-if arg[1] == nil or arg[2] == nil then
-    log.error("Usage: dist.lua {start|stop|logrotate} instance")
-    os.exit(-1)
+
+local available_commands = {
+    'start',
+    'stop',
+    'logrotate',
+    'status',
+    'enter',
+    'restart'
+}
+
+local function usage()
+    log.error("Usage: %s {%s} instance_name",
+        arg[0], table.concat(available_commands, '|'))
+    os.exit(1)
 end
 
+
 local cmd = arg[1]
-local instance = fio.basename(arg[2], '.lua')
+
+local valid_cmd = false
+for _, vcmd in pairs(available_commands) do
+    if cmd == vcmd then
+        valid_cmd = true
+        break
+    end
+end
+
+if not valid_cmd then
+    usage()
+end
+
+local instance
+if arg[2] == nil then
+    local istat = fio.lstat(arg[0])
+    if istat == nil then
+        log.error("Can't stat %s: %s", arg[0], errno.strerror())
+        os.exit(1)
+    end
+    if not istat:is_link() then
+        usage()
+    end
+    instance = fio.basename(arg[0], '.lua')
+    arg[2] = instance
+else
+    instance = fio.basename(arg[2], '.lua')
+end
 
 -- shift argv to remove 'tarantoolctl' from arg[0]
 for i = 0, 128 do
@@ -200,20 +261,18 @@ wrapper_cfg = function(cfg)
     return res
 end
 
-if cmd == 'start' then
-    box.cfg = wrapper_cfg
-    dofile(instance_lua)
-
-elseif cmd == 'stop' then
+function stop()
+    log.info("Stopping instance...")
     if fio.stat(force_cfg.pid_file) == nil then
         log.error("Process is not running (pid: %s)", force_cfg.pid_file)
-        os.exit(-1)
+        return 0
     end
 
     local f = fio.open(force_cfg.pid_file, 'O_RDONLY')
     if f == nil then
         log.error("Can't read pid file %s: %s",
             force_cfg.pid_file, errno.strerror())
+        return -1
     end
 
     local str = f:read(64)
@@ -224,14 +283,34 @@ elseif cmd == 'stop' then
     if pid == nil or pid <= 0 then
         log.error("Broken pid file %s", force_cfg.pid_file)
         fio.unlink(force_cfg.pid_file)
-        os.exit(-1)
+        return -1
     end
 
     if ffi.C.kill(pid, 15) < 0 then
         log.error("Can't kill process %d: %s", pid, errno.strerror())
         fio.unlink(force_cfg.pid_file)
+        return -1
     end
-    os.exit(-1)
+    return 0
+end
+
+function start()
+    log.info("Starting instance...")
+    box.cfg = wrapper_cfg
+    dofile(instance_lua)
+end
+
+
+if cmd == 'start' then
+    os.exit(start())
+
+elseif cmd == 'stop' then
+    os.exit(stop())
+
+elseif cmd == 'restart' then
+    stop()
+    fiber.sleep(1)
+    start()
 
 elseif cmd == 'logrotate' then
     if fio.stat(console_sock) == nil then
@@ -252,6 +331,52 @@ elseif cmd == 'logrotate' then
 
     s:read({ '[.][.][.]' }, 2)
 
+    os.exit(0)
+
+elseif cmd == 'enter' then
+    if fio.stat(console_sock) == nil then
+        log.error("Can't connect to %s (socket not found)", console_sock)
+        os.exit(-1)
+    end
+    
+    log.info('Connecting to %s', console_sock)
+    
+    local cmd = string.format(
+        "require('console').connect('%s')", console_sock)
+
+    console.on_start( function(self) self:eval(cmd) end )
+    console.on_client_disconnect( function(self) self.running = false end )
+    console.start()
+    os.exit(0)
+elseif cmd == 'status' then
+    if fio.stat(force_cfg.pid_file) == nil then
+        if errno() == errno.ENOENT then
+            os.exit(1)
+        end
+        log.error("Cant access pidfile %s: %s",
+            force_cfg.pid_file, errno.strerror())
+    end
+
+    if fio.stat(console_sock) == nil then
+        if errno() == errno.ENOENT then
+            log.warn("pidfile is exists, but control socket (%s) isn't",
+                console_sock)
+            os.exit(2)
+        end
+    end
+
+    local s = socket.tcp_connect('unix/', console_sock)
+    if s == nil then
+        if errno() ~= errno.EACCES then
+            log.warn("Can't access control socket %s: %s", console_sock,
+                errno.strerror())
+            os.exit(3)
+        else
+            os.exit(0)
+        end
+    end
+
+    s:close()
     os.exit(0)
 else
     log.error("Unknown command '%s'", cmd)

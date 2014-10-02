@@ -364,11 +364,15 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>0</entry>
           <entry>yes</entry>
           <entry>
-          	Period to make new database snapshot.
-          	Daemon is disabled by
-          	<code>snapshot_period=0</code> value.
-          	Use <code>snapshot_period=3600</code> to make
-          	snapshot for each hour.
+          The interval between actions by the snapshot daemon, in seconds.
+          The snapshot daemon is a fiber which is constantly running.
+          If snapshot_period is set to a value greater than zero,
+          then the snapshot daemon
+          will call <olink targetptr="box.snapshot"/> every snapshot_period seconds, creating
+          a new snapshot file each time.
+          For example, <code>box.cfg{snapshot_period=3600}</code>
+          will cause the snapshot daemon to create a new database
+          snapshot once per hour.
           </entry>
         </row>
 
@@ -379,15 +383,15 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>yes</entry>
           <entry>
           	<para>
-			The daemon creates new snapshot and then it
-			removes old snapshots (and their xlogs) using the
-			option.
+          The maximum number of snapshots that the snapshot daemon maintains.
+          For example, <code>box.cfg{snapshot_period=3600, snapshot_count=10}</code>
+          will cause the snapshot daemon
+          to create a new snapshot each hour until it has created
+          ten snapshots. After that, it will remove the oldest
+          snapshot (and any associated write-ahead-log files) after creating
+          a new one. If snapshot_count equals zero, then the snapshot
+          daemon does not remove old snapshots.
           	</para>
-
-          	<para>
-			Daemon is disabled by
-			<code>snapshot_count=0</code> value.
-        	</para>
           </entry>
         </row>
       </tbody>
@@ -417,7 +421,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>boolean</entry>
           <entry>true</entry>
           <entry>no</entry>
-          <entry>If there is an error reading the snapshot file (at
+          <entry>If there is an error while reading the snapshot file (at
             server start), abort.</entry>
         </row>
 
@@ -426,7 +430,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>boolean</entry>
           <entry>false</entry>
           <entry>no</entry>
-          <entry>If there is an error reading a write-ahead
+          <entry>If there is an error while reading a write-ahead
           log file (at server start), abort.</entry>
         </row>
 
@@ -511,11 +515,17 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>If replication_source is not an empty string, the
           server is considered to be a Tarantool replica.
           The replica server will try to connect to the master
-          which replication_source specifies with format ip:port.
-          For example, if replication_source = "1.2.3.4:55555" then
-          the replica server tries to connect to 1.2.3.4 port 55555.
-          A replica server does not accept updates
-          on <olink targetptr="primary_port">listen</olink>. This parameter is
+          which replication_source specifies with a URI.
+          The string format is similar to the
+          <link
+          xlink:href="http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax">generic syntax for a URI schema</link>
+          So it may be a user name and password and ip:port address such as 'guest:password@127.0.0.1:3301',
+          or just ip:port address such as '127.0.0.1:3301',
+          or just port such as '3301'.
+          The default user name is 'guest'.
+          A replica server does not accept data-change requests
+          on the <olink targetptr="primary_port">listen</olink> port.
+          The replication_source parameter is
           dynamic, that is, to enter master mode, simply set
           replication_source to an empty string and issue
           "box.cfg{replication_source=new-value}".</entry>

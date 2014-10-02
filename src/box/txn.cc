@@ -84,7 +84,7 @@ txn_replace(struct txn *txn, struct space *space,
 	stmt->old_tuple = space_replace(space, old_tuple, new_tuple, mode);
 	if (new_tuple) {
 		stmt->new_tuple = new_tuple;
-		tuple_ref(stmt->new_tuple, 1);
+		tuple_ref(stmt->new_tuple);
 	}
 	stmt->space = space;
 	/**
@@ -225,7 +225,7 @@ txn_finish(struct txn *txn)
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
-			tuple_ref(stmt->old_tuple, -1);
+			tuple_unref(stmt->old_tuple);
 		if (stmt->space)
 			stmt->space->engine->factory->txnFinish(txn);
 	}
@@ -254,7 +254,7 @@ txn_rollback_stmt()
 		space_replace(stmt->space, stmt->new_tuple,
 			      stmt->old_tuple, DUP_INSERT);
 		if (stmt->new_tuple)
-			tuple_ref(stmt->new_tuple, -1);
+			tuple_unref(stmt->new_tuple);
 	}
 	stmt->old_tuple = stmt->new_tuple = NULL;
 	stmt->space = NULL;
@@ -277,7 +277,7 @@ txn_rollback()
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->new_tuple)
-			tuple_ref(stmt->new_tuple, -1);
+			tuple_unref(stmt->new_tuple);
 	}
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);

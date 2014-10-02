@@ -25,7 +25,7 @@ ER = {
      4: "ER_TUPLE_NOT_FOUND"    ,
      5: "ER_UNSUPPORTED"        ,
      6: "ER_NONMASTER"          ,
-     7: "ER_SECONDARY"          ,
+     7: "ER_READONLY"           ,
      8: "ER_INJECTION"          ,
      9: "ER_CREATE_SPACE"       ,
     10: "ER_SPACE_EXISTS"       ,

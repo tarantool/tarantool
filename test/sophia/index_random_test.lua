@@ -17,14 +17,11 @@ function index_random_test(space, index_no)
 			error('too many iterations')
 			return nil
 		end
-
 		local tuple = space.index[index_no]:random(rnd)
 		if tuple == nil then
 			error('nil returned')
 			return nil
 		end
-		print(tuple)
-
 		local k = tuple[1]
 		if tuples[k] == nil then
 			found = found + 1

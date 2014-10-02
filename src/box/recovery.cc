@@ -1154,7 +1154,7 @@ snapshot_write_row(struct log_io *l, struct xrow_header *row)
 	if (l->rows % 100000 == 0)
 		say_crit("%.1fM rows written", l->rows / 1000000.);
 
-	region_free_after(&fiber()->gc, 128 * 1024);
+	fiber_gc();
 
 	if (r->snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {

@@ -239,11 +239,9 @@ box.schema.space.drop = function(space_id)
         local v = keys[i]
         _index:delete{v[1], v[2]}
     end
-    local privs = _priv:select{}
+    local privs = _priv.index.object:select{'space', space_id}
     for k, tuple in pairs(privs) do
-        if tuple[3] == 'space' and tuple[4] == space_id then
-            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-        end
+        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
     if _space:delete{space_id} == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
@@ -303,6 +301,7 @@ box.schema.index.create = function(space_id, name, options)
         parts = 'table',
         unique = 'boolean',
         id = 'number',
+        if_not_exists = 'boolean',
     }
     local options_defaults = {
         type = 'tree',
@@ -315,6 +314,13 @@ box.schema.index.create = function(space_id, name, options)
     options.parts = update_index_parts(options.parts)
 
     local _index = box.space[box.schema.INDEX_ID]
+    if _index.index.name:get{space_id, name} then
+        if options.if_not_exists then
+            return box.space[space_id].index[name], "not created"
+        else
+            box.error(box.error.INDEX_EXISTS, name)
+        end
+    end
 
     local unique = options.unique and 1 or 0
     local part_count = bit.rshift(#options.parts, 1)
@@ -435,19 +441,24 @@ end
 -- Change one-based indexing in update commands to zero-based.
 --
 local function normalize_update_ops(ops)
+    if type(ops) ~= 'table' then
+        return ops;
+    end
     for _, op in ipairs(ops) do
-        if op[1] == ':' then
-            -- fix offset for splice
-            if op[3] > 0 then
-                op[3] = op[3] - 1
-            elseif op[3] == 0 then
-                box.error(box.error.SPLICE, op[2], "offset is out of bound")
+        if type(op) == 'table' then
+            if op[1] == ':' then
+                -- fix offset for splice
+                if op[3] > 0 then
+                    op[3] = op[3] - 1
+                elseif op[3] == 0 then
+                    box.error(box.error.SPLICE, op[2], "offset is out of bound")
+                end
             end
-        end
-        if op[2] > 0 then
-           op[2] = op[2] - 1
-        elseif op[2] == 0 then
-           box.error(box.error.NO_SUCH_FIELD, op[2])
+            if op[2] > 0 then
+               op[2] = op[2] - 1
+            elseif op[2] == 0 then
+               box.error(box.error.NO_SUCH_FIELD, op[2])
+            end
         end
     end
     return ops
@@ -933,11 +944,9 @@ box.schema.func.drop = function(name)
     local _func = box.space[box.schema.FUNC_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local fid = object_resolve('function', name)
-    local privs = _priv:select{}
+    local privs = _priv.index.object:select{'function', fid}
     for k, tuple in pairs(privs) do
-        if tuple[3] == 'function' and tuple[4] == fid then
-            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-        end
+        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
     _func:delete{fid}
 end

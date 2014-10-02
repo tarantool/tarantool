@@ -296,4 +296,20 @@ end;
 f = fiber.create(test)
 done
 
+-- # gh-536: fiber.info() doesn't list fibers with default names
+--
+function loop() while true do fiber.sleep(10) end end
+f1 = fiber.create(loop)
+f2 = fiber.create(loop)
+f3 = fiber.create(loop)
+
+info = fiber.info()
+info[f1:id()] ~= nil
+info[f2:id()] ~= nil
+info[f3:id()] ~= nil
+
+f1:cancel()
+f2:cancel()
+f3:cancel()
+
 fiber = nil

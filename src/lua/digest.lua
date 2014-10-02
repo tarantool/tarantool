@@ -27,6 +27,7 @@ ffi.cdef[[
     extern crc32_func crc32_calc;
 
    /* base64 */
+   int base64_bufsize(int binsize);
    int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
    int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len);
 ]]
@@ -72,34 +73,25 @@ end
 
 local m = {
     base64_encode = function(bin)
-        if bin == nil then
-            error('Usage: base64.encode(str)')
-        else
-            -- note: need add check size of bin, bin might containe any binary data
-            if type(bin) == 'string' then
-                local blen = string.len(bin)
-                local slen = math.ceil(blen * 4 / 3) + 2
-                local so  = ffi.new('char[?]', slen)
-                local len = ffi.C.base64_encode(bin, blen, so, slen)
-                bin = ffi.string(so, len)
-            else
-                bin = ''
-            end
+        if type(bin) ~= 'string' then
+            error('Usage: digest.base64_encode(string)')
         end
-        return bin
+        local blen = #bin
+        local slen = ffi.C.base64_bufsize(blen)
+        local str  = ffi.new('char[?]', slen)
+        local len = ffi.C.base64_encode(bin, blen, str, slen)
+        return ffi.string(str, len)
     end,
 
-    base64_decode = function(data)
-        if type(data) ~= 'string' then
-            data = ''
-        else
-            local slen = string.len(data)
-            local blen = math.ceil(slen * 3 / 4)
-            local bo  = ffi.new('char[?]', blen)
-            local len = ffi.C.base64_decode(data, slen, bo, blen)
-            data = ffi.string(bo, len)
+    base64_decode = function(str)
+        if type(str) ~= 'string' then
+            error('Usage: digest.base64_decode(string)')
         end
-        return data
+        local slen = #str
+        local blen = math.ceil(slen * 3 / 4)
+        local bin  = ffi.new('char[?]', blen)
+        local len = ffi.C.base64_decode(str, slen, bin, blen)
+        return ffi.string(bin, len)
     end,
 
     crc32 = function(str)
