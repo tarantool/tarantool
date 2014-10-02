@@ -142,9 +142,12 @@ user_by_name(const char *name, uint32_t len);
 #define user()							\
 ({								\
 	struct session *s = session();				\
-	uint8_t auth_token = s ? s->auth_token : (int) ADMIN;	\
-	struct user *u = &users[auth_token];			\
-	assert(u->auth_token == auth_token);			\
+	struct user *u = &users[s->auth_token];			\
+	if (u->auth_token != s->auth_token ||			\
+	    u->uid != s->uid) {					\
+		tnt_raise(ClientError, ER_NO_SUCH_USER,		\
+			  int2str(s->uid));			\
+	}							\
 	u;							\
 })
 

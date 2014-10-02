@@ -1,15 +1,16 @@
 remote = require 'net.box'
 fiber = require 'fiber'
 log = require 'log'
+msgpack = require 'msgpack'
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-port = box.cfg.listen
+LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.create_space('net_box_test_space')
 space:create_index('primary', { type = 'tree' })
 
 -- low level connection
 log.info("create connection")
-cn = remote:new('127.0.0.1', port)
+cn = remote:new(LISTEN.host, LISTEN.service)
 cn:_wait_state({'active', 'error'}, 1)
 log.info("state is %s", cn.state)
 
@@ -105,7 +106,7 @@ cn:ping()
 cn:call('test_foo')
 
 -- -- 2 reconnect
-cn = remote:new('127.0.0.1', port, { reconnect_after = .1 })
+cn = remote:new(LISTEN.host, LISTEN.service, { reconnect_after = .1 })
 cn:_wait_state({'active'}, 1)
 cn.space ~= nil
 
@@ -119,9 +120,16 @@ cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 cn:_fatal 'Test error'
 cn:_select(space.id, 0, {}, { iterator = 'ALL' })
 
+-- send broken packet (remote server will close socket)
+cn.s:syswrite(msgpack.encode(1) .. msgpack.encode('abc'))
+fiber.sleep(.2)
+
+cn.state
+cn:ping()
+
 -- -- dot-new-method
 
-cn1 = remote.new('127.0.0.1', port)
+cn1 = remote.new(LISTEN.host, LISTEN.service)
 cn1:_select(space.id, 0, {}, { iterator = 'ALL' })
 
 -- -- error while waiting for response
@@ -151,7 +159,7 @@ res[1][2] == string.rep('a', 50000)
 cn.proto.b64decode('gJLocxbO32VmfO8x04xRVxKfgwzmNVM2t6a1ME8XsD0=')
 cn.proto.b64decode('gJLoc!!!!!!!')
 
-cn = remote:new('127.0.0.1', port, { user = 'netbox', password = '123', wait_connected = true })
+cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123', wait_connected = true })
 cn:is_connected()
 cn.error
 cn.state
@@ -159,7 +167,7 @@ cn.state
 box.schema.user.create('netbox', { password  = 'test' })
 box.schema.user.grant('netbox', 'read, write, execute', 'universe');
 
-cn = remote:new('127.0.0.1', port, { user = 'netbox', password = 'test' })
+cn = remote:new(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
 cn:ping()
@@ -172,8 +180,8 @@ cn:call('ret_after', .01)
 cn:timeout(1):call('ret_after', .01)
 cn:timeout(.01):call('ret_after', 1)
 
-cn = remote:timeout(0.0000000001):new('127.0.0.1', port, { user = 'netbox', password = '123' })
-cn = remote:timeout(1):new('127.0.0.1', port, { user = 'netbox', password = '123' })
+cn = remote:timeout(0.0000000001):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
+cn = remote:timeout(1):new(LISTEN.host, LISTEN.service, { user = 'netbox', password = '123' })
 
 
 
@@ -186,4 +194,61 @@ remote.self:timeout(123).space.net_box_test_space:select{234}
 
 -- cleanup database after tests
 space:drop()
+
+
+-- admin console tests
+function console_test(...) return { ... } end
+function console_test_error(...) error(string.format(...)) end
+function console_unpack_test(...) return ... end
+
+
+ADMIN = require('uri').parse(os.getenv('ADMIN'))
+
+cn = remote:new(LISTEN.host, LISTEN.service)
+cnc = remote:new(ADMIN.host, ADMIN.service)
+cnc.console
+
+cn:call('console_test', 1, 2, 3, 'string', nil)
+cnc:call('console_test', 1, 2, 3, 'string', nil)
+
+cn:call('console_test_error', 'error %d', 123)
+cnc:call('console_test_error', 'error %d', 123)
+
+
+cn:call('console_unpack_test', 1)
+cnc:call('console_unpack_test', 1)
+
+
+
+
+cn:call('123')
+cnc:call('123')
+
+
+-- #545 user or password is not defined
+remote:new(LISTEN.host, LISTEN.service, { user = 'test' })
+remote:new(LISTEN.host, LISTEN.service, { password = 'test' })
+
+-- #544 usage for remote[point]method
+cn:call('console_test')
+cn.call('console_test')
+
+cn.ping()
+
+remote.self:call('console_test')
+remote.self.call('console_test')
+
+
+-- uri as the first argument
+uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
+
+cn = remote.new(uri)
+cn:ping()
+cn:close()
+
+uri = string.format('%s@%s:%s', 'netbox', LISTEN.host, LISTEN.service)
+remote.new(uri)
+cn = remote.new(uri, { password = 'test' })
+cn:ping()
+cn:close()
 

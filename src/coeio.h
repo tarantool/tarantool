@@ -57,6 +57,7 @@ extern "C" {
  */
 
 void coeio_init(void);
+void coeio_reinit(void);
 ssize_t coeio_custom(ssize_t (*f)(va_list ap), ev_tstamp timeout, ...);
 
 struct addrinfo *

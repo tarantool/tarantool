@@ -4,6 +4,7 @@
 #include <box/box.h>
 #include <box/tuple.h>
 #include <box/lua/index.h>
+#include <box/lua/tuple.h>
 #include <box/lua/call.h>
 #include <lua/init.h>
 #include <tarantool.h>
@@ -30,6 +31,7 @@ void *ffi_symbols[] = {
 	(void *) boxffi_index_len,
 	(void *) boxffi_index_random,
 	(void *) boxffi_index_iterator,
+	(void *) boxffi_tuple_update,
 	(void *) port_ffi_create,
 	(void *) port_ffi_destroy,
 	(void *) boxffi_select,
@@ -45,5 +47,7 @@ void *ffi_symbols[] = {
 	(void *) bsdsocket_local_resolve,
 	(void *) bsdsocket_nonblock,
 	(void *) base64_decode,
+	(void *) base64_encode,
+	(void *) base64_bufsize,
 	(void *) SHA1internal
 };

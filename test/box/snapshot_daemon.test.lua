@@ -23,7 +23,7 @@ end
 --# setopt delimiter ''
 
 
-space = box.schema.create_space('snap_daemon')
+space = box.schema.create_space('snapshot_daemon')
 space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
 
 
@@ -70,3 +70,5 @@ box.cfg{snapshot_period = 3600 * 4, snapshot_count = 4 }
 space:drop()
 
 PERIOD
+
+box.cfg{ snapshot_count = .2 }

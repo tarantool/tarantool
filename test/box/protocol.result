@@ -13,10 +13,14 @@ space:create_index('primary', { type = 'tree'})
 for i=1,5 do space:insert{i} end
 ---
 ...
-port = string.gsub(box.cfg.listen, '^.*:', '')
+LISTEN = require('uri').parse(box.cfg.listen)
 ---
 ...
-conn = (require 'net.box'):new('127.0.0.1', tonumber(port))
+LISTEN ~= nil
+---
+- true
+...
+conn = (require 'net.box'):new(LISTEN.host, LISTEN.service)
 ---
 ...
 conn.space[space.id]:select(3, { iterator = 'GE' })

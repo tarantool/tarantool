@@ -2,7 +2,7 @@
 --# push filter 'admin: .*' to 'admin: <uri>'
 box.cfg.nosuchoption = 1
 ---
-- error: '[string "-- load_cfg.lua - internal file..."]:202: Attempt to modify a read-only
+- error: '[string "-- load_cfg.lua - internal file..."]:195: Attempt to modify a read-only
     table'
 ...
 t = {} for k,v in pairs(box.cfg) do if type(v) ~= 'table' and type(v) ~= 'function' then table.insert(t, k..': '..tostring(v)) end end
@@ -13,7 +13,7 @@ t
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
-  - 'slab_alloc_minimal: 64'
+  - 'rows_per_wal: 50'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
@@ -21,14 +21,15 @@ t
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
+  - 'sophia_dir: ./sophia'
   - 'wal_mode: write'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'pid_file: tarantool.pid'
-  - 'readahead: 16320'
+  - 'slab_alloc_minimal: 64'
   - 'wal_dir: .'
+  - 'readahead: 16320'
   - 'snapshot_period: 0'
-  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
 ...
 -- must be read-only
@@ -43,7 +44,7 @@ t
 - - 'snapshot_count: 6'
   - 'too_long_threshold: 0.5'
   - 'slab_alloc_factor: 2'
-  - 'slab_alloc_minimal: 64'
+  - 'rows_per_wal: 50'
   - 'background: false'
   - 'slab_alloc_arena: 0.1'
   - 'log_level: 5'
@@ -51,14 +52,37 @@ t
   - 'logger_nonblock: true'
   - 'snap_dir: .'
   - 'coredump: false'
+  - 'sophia_dir: ./sophia'
   - 'wal_mode: write'
   - 'panic_on_snap_error: true'
   - 'panic_on_wal_error: false'
   - 'pid_file: tarantool.pid'
-  - 'readahead: 16320'
+  - 'slab_alloc_minimal: 64'
   - 'wal_dir: .'
+  - 'readahead: 16320'
   - 'snapshot_period: 0'
-  - 'rows_per_wal: 50'
   - 'wal_dir_rescan_delay: 0.1'
+...
+-- check that cfg with unexpected parameter fails.
+box.cfg{sherlock = 'holmes'}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:121: Error: cfg parameter
+    ''sherlock'' is unexpected'
+...
+-- check that cfg with unexpected type of parameter failes
+box.cfg{listen = {}}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:136: Error: cfg parameter
+    ''listen'' should be one of types: string, number'
+...
+box.cfg{wal_dir = 0}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:130: Error: cfg parameter
+    ''wal_dir'' should be of type string'
+...
+box.cfg{coredump = 'true'}
+---
+- error: '[string "-- load_cfg.lua - internal file..."]:130: Error: cfg parameter
+    ''coredump'' should be of type boolean'
 ...
 --# clear filter

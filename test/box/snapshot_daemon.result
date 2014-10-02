@@ -43,7 +43,7 @@ end
 
 ---
 ...
-space = box.schema.create_space('snap_daemon')
+space = box.schema.create_space('snapshot_daemon')
 ---
 ...
 space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
@@ -111,4 +111,8 @@ space:drop()
 PERIOD
 ---
 - 0.03
+...
+box.cfg{ snapshot_count = .2 }
+---
+- error: snapshot_count must be integer
 ...

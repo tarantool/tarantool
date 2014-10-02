@@ -52,4 +52,15 @@ luamp_encodestack(struct lua_State *L, struct tbuf *b,
 void
 box_lua_tuple_init(struct lua_State *L);
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+struct tuple *
+boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif
+
 #endif /* INCLUDES_TARANTOOL_MOD_BOX_LUA_TUPLE_H */

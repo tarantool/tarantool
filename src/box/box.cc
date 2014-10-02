@@ -34,7 +34,7 @@
 #include "recovery.h"
 #include "log_io.h"
 #include <say.h>
-#include <iproto.h>
+#include "iproto.h"
 #include "replication.h"
 #include <stat.h>
 #include <tarantool.h>
@@ -90,12 +90,24 @@ static void
 process_ro(struct port *port, struct request *request)
 {
 	if (!iproto_type_is_select(request->type))
-		tnt_raise(LoggedError, ER_SECONDARY);
+		tnt_raise(LoggedError, ER_READONLY);
 	return process_rw(port, request);
 }
 
+void
+box_set_ro(bool ro)
+{
+	box_process = ro ? process_ro : process_rw;
+}
+
+bool
+box_is_ro(void)
+{
+	return box_process == process_ro;
+}
+
 static void
-recover_row(void *param __attribute__((unused)), struct iproto_header *row)
+recover_row(void *param __attribute__((unused)), struct xrow_header *row)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	struct request request;
@@ -114,15 +126,18 @@ box_check_replication_source(const char *source)
 	if (source == NULL)
 		return;
 	struct uri uri;
-	if (uri_parse(&uri, source)) {
-		tnt_raise(ClientError, ER_CFG,
-			  "incorrect replication source");
+
+	/* URI format is [host:]service */
+	if (uri_parse(&uri, source) || !uri.service) {
+		tnt_raise(ClientError, ER_CFG, "replication source, "
+			  "expected host:service or /unix.socket");
 	}
 }
 
 static void
 box_check_wal_mode(const char *mode_name)
 {
+	assert(mode_name != NULL); /* checked in Lua */
 	int mode = strindex(wal_mode_STRS, mode_name, WAL_MODE_MAX);
 	if (mode == WAL_MODE_MAX) {
 		tnt_raise(ClientError, ER_CFG,
@@ -134,6 +149,7 @@ static void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_replication_source(cfg_gets("replication_source"));
 
 	/* check rows_per_wal configuration */
 	if (cfg_geti("rows_per_wal") <= 1) {
@@ -233,7 +249,6 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 	stat_cleanup(stat_base, IPROTO_TYPE_DML_MAX);
 	box_set_wal_mode(cfg_gets("wal_mode"));
 
-	box_process = process_rw;
 	if (recovery_has_remote(recovery))
 		recovery_follow_remote(recovery);
 
@@ -359,15 +374,6 @@ engine_init()
 	SophiaFactory *sophia = new SophiaFactory();
 	sophia->init();
 	engine_register(sophia);
-
-	/* Prepare storage and recover data.
-	 *
-	 * This is first phase of recover, schema is not known yet.
-	 * Internal sophia spaces (databases) are created in
-	 * recover-delay mode and not accessible yet.
-	 * Recover completes on first engine index creation.
-	*/
-	sophia->recover();
 }
 
 void
@@ -419,6 +425,7 @@ box_init()
 		space_end_recover_snapshot();
 		snapshot_save(recovery);
 	}
+	fiber_gc();
 
 	title("orphan", NULL);
 	recovery_follow_local(recovery,
@@ -454,8 +461,8 @@ snapshot_write_tuple(struct log_io *l,
 	body.v_space_id = mp_bswap_u32(n);
 	body.k_tuple = IPROTO_TUPLE;
 
-	struct iproto_header row;
-	memset(&row, 0, sizeof(struct iproto_header));
+	struct xrow_header row;
+	memset(&row, 0, sizeof(struct xrow_header));
 	row.type = IPROTO_INSERT;
 
 	row.bodycnt = 2;
@@ -516,7 +523,7 @@ box_snapshot(void)
 		return (WIFSIGNALED(status) ? EINTR : WEXITSTATUS(status));
 	}
 
-	slab_arena_mprotect(&tuple_arena);
+	slab_arena_mprotect(&memtx_arena);
 
 	cord_set_name("snap");
 	title("dumper", "%" PRIu32, getppid());

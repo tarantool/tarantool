@@ -1,2 +1,10 @@
-false	[string "-- load_cfg.lua - internal file..."]:137: Please call box.cfg{} first
-true	table
+TAP version 13
+1..8
+ok - exception on unconfigured box
+ok - configured box
+ok - cfg.wal_mode default value
+ok - cfg.wal_mode default value
+ok - cfg.wal_mode change
+ok - cfg.wal_mode default value
+ok - cfg.wal_mode change
+ok - cfg.wal_mode default value

@@ -1,6 +1,7 @@
 TAP version 13
-1..18
+1..26
 ok - console.listen started
+ok - Handshake
 ok - connect to console
 ok - eval
 ok - state.socker:peer().host
@@ -11,6 +12,7 @@ ok - get delimiter is ';'
 ok - clear delimiter
 ok - remote network error
 ok - remote access denied
+ok - remote access denied
 ok - remote connect
 ok - remote eval
 ok - remote state.remote.host
@@ -18,3 +20,9 @@ ok - remote state.remote.port
 ok - remote state.prompt
 ok - remote disconnect
 ok - console.listen stopped
+ok - console.listen uri support
+ok - console.listen uri support
+ok - console.listen uri support
+ok - console.listen uri support
+ok - console.listen uri support
+ok - console.listen uri support

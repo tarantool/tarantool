@@ -103,7 +103,7 @@ cserver_id_is_reserved(uint32_t id)
  * The server is added to the cluster lsn table with LSN 0.
  */
 void
-cluster_add_server(const tt_uuid *server_uuid, uint32_t id);
+cluster_set_server(const tt_uuid *server_uuid, uint32_t id);
 
 /** }}} **/
 

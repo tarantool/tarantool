@@ -37,6 +37,7 @@ extern "C" {
 
 #include "box/tuple.h"
 #include "small/small.h"
+#include "memory.h"
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
 extern "C" {
@@ -88,7 +89,7 @@ lbox_slab_info(struct lua_State *L)
 	lua_pushstring(L, "slabs");
 	lua_newtable(L);
 	luaL_setmaphint(L, -1);
-	small_stats(&talloc, &totals, small_stats_lua_cb, L);
+	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "arena_used");
@@ -102,15 +103,15 @@ lbox_slab_info(struct lua_State *L)
 	char value[32];
 	double items_used_ratio = 100
 		* ((double)totals.used)
-		/ ((double)talloc.cache->arena->prealloc + 0.0001);
+		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
 	snprintf(value, sizeof(value), "%0.1lf%%", items_used_ratio);
 	lua_pushstring(L, "items_used_ratio");
 	lua_pushstring(L, value);
 	lua_settable(L, -3);
 
 	double arena_used_ratio = 100
-		* ((double)talloc.cache->arena->used)
-		/ ((double)talloc.cache->arena->prealloc + 0.0001);
+		* ((double)memtx_alloc.cache->arena->used)
+		/ ((double)memtx_alloc.cache->arena->prealloc + 0.0001);
 	snprintf(value, sizeof(value), "%0.1lf%%", arena_used_ratio);
 	lua_pushstring(L, "arena_used_ratio");
 	lua_pushstring(L, value);
@@ -120,9 +121,25 @@ lbox_slab_info(struct lua_State *L)
 }
 
 static int
+lbox_runtime_info(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_pushstring(L, "used");
+	luaL_pushnumber64(L, runtime.used);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "maxalloc");
+	luaL_pushnumber64(L, runtime.maxalloc);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
 lbox_slab_check(struct lua_State *L __attribute__((unused)))
 {
-	slab_cache_check(talloc.cache);
+	slab_cache_check(memtx_alloc.cache);
 	return 0;
 }
 
@@ -142,6 +159,16 @@ box_lua_slab_init(struct lua_State *L)
 	lua_pushcfunction(L, lbox_slab_check);
 	lua_settable(L, -3);
 
+	lua_settable(L, -3); /* box.slab */
+
+	lua_pushstring(L, "runtime");
+	lua_newtable(L);
+
+	lua_pushstring(L, "info");
+	lua_pushcfunction(L, lbox_runtime_info);
 	lua_settable(L, -3);
-	lua_pop(L, 1);
+
+	lua_settable(L, -3); /* box.runtime */
+
+	lua_pop(L, 1); /* box. */
 }

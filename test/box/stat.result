@@ -50,7 +50,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 2
+- 3
 ...
 --# stop server default
 --# start server default

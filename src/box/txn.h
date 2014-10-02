@@ -50,7 +50,7 @@ struct txn_stmt {
 	struct tuple *new_tuple;
 
 	/** Redo info: the binary log row */
-	struct iproto_header *row;
+	struct xrow_header *row;
 };
 
 struct txn {
@@ -75,15 +75,9 @@ struct txn {
 
 /* Pointer to the current transaction (if any) */
 static inline struct txn *
-fiber_get_txn(struct fiber *fiber)
+in_txn()
 {
-	return (struct txn *) fiber_get_key(fiber, FIBER_KEY_TXN);
-}
-
-static inline void
-fiber_set_txn(struct fiber *fiber, struct txn *txn)
-{
-	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
+	return (struct txn *) fiber_get_key(fiber(), FIBER_KEY_TXN);
 }
 
 /**

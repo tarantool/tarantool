@@ -32,6 +32,7 @@ local default_cfg = {
     work_dir            = nil,
     snap_dir            = ".",
     wal_dir             = ".",
+    sophia_dir          = './sophia',
     logger              = nil,
     logger_nonblock     = true,
     log_level           = 5,
@@ -51,14 +52,14 @@ local default_cfg = {
     username            = nil ,
     coredump            = false,
 
-    -- snap_daemon
+    -- snapshot_daemon
     snapshot_period     = 0,        -- 0 = disabled
     snapshot_count      = 6,
 }
 
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
-local template_cfg = {
+local template = {
     listen              = 'string, number',
     slab_alloc_arena    = 'number',
     slab_alloc_minimal  = 'number',
@@ -66,6 +67,7 @@ local template_cfg = {
     work_dir            = 'string',
     snap_dir            = 'string',
     wal_dir             = 'string',
+    sophia_dir          = 'string',
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',
@@ -97,50 +99,14 @@ local dynamic_cfg = {
     too_long_threshold      = ffi.C.box_set_too_long_threshold,
     snap_io_rate_limit      = ffi.C.box_set_snap_io_rate_limit,
 
-    -- snap_daemon
-    snapshot_period         = box.internal.snap_daemon.set_snapshot_period,
-    snapshot_count          = box.internal.snap_daemon.set_snapshot_count,
+    -- snapshot_daemon
+    snapshot_period         = box.internal.snapshot_daemon.set_snapshot_period,
+    snapshot_count          = box.internal.snapshot_daemon.set_snapshot_count,
 }
 
-local function reload_cfg(oldcfg, newcfg)
-    if newcfg == nil then
-        newcfg = {}
-    end
-    for key, val in pairs(newcfg) do
-        if dynamic_cfg[key] == nil then
-            box.error(box.error.RELOAD_CFG, key);
-        end
-        if val == "" then
-            val = nil
-        end
-        if wrapper_cfg[key] ~= nil then
-            val = wrapper_cfg[key](val)
-        end
-        dynamic_cfg[key](val)
-        rawset(oldcfg, key, val)
-    end
-    if type(box.on_reload_configuration) == 'function' then
-        box.on_reload_configuration()
-    end
-end
-
-local box = require('box')
--- Move all box members to box_saved
-local box_configured = {}
-for k, v in pairs(box) do
-    box_configured[k] = v
-    box[k] = nil
-end
-
-setmetatable(box, {
-    __index = function(table, index)
-        error("Please call box.cfg{} first")
-     end
-})
-
-local function check_param_table(table, template)
+local function prepare_cfg(table)
     if table == nil then
-        return
+        return {}
     end
     if type(table) ~= 'table' then
         error("Error: cfg should be a table")
@@ -149,9 +115,13 @@ local function check_param_table(table, template)
     if table.dont_check then
         return
     end
+    local newtable = {}
     for k,v in pairs(table) do
         if template[k] == nil then
             error("Error: cfg parameter '" .. k .. "' is unexpected")
+        elseif v == "" or v == nil then
+            -- "" and NULL = ffi.cast('void *', 0) set option to default value
+            v = default_cfg[k]
         elseif template[k] == 'any' then
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
@@ -166,29 +136,52 @@ local function check_param_table(table, template)
                 error("Error: cfg parameter '" .. k .. "' should be one of types: " .. template[k])
             end
         end
-    end
-end
-
-
-local function update_param_table(table, defaults)
-    if table == nil then
-        table = {}
-    end
-    for k,v in pairs(defaults) do
-        if table[k] == nil then
-            table[k] = v
+        if wrapper_cfg[k] ~= nil then
+            v = wrapper_cfg[k](v)
         end
+        newtable[k] = v
     end
-    return table
+    return newtable
 end
+
+local function reload_cfg(oldcfg, newcfg)
+    newcfg = prepare_cfg(newcfg)
+    for key, val in pairs(newcfg) do
+        if dynamic_cfg[key] == nil then
+            box.error(box.error.RELOAD_CFG, key);
+        end
+        dynamic_cfg[key](val)
+        rawset(oldcfg, key, val)
+    end
+    if type(box.on_reload_configuration) == 'function' then
+        box.on_reload_configuration()
+    end
+end
+
+local box = require('box')
+-- Move all box members to box_saved
+local box_configured = {}
+for k, v in pairs(box) do
+    box_configured[k] = v
+    -- box.net.box uses box.error and box.internal
+    if k ~= 'error' and k ~= 'internal' then
+        box[k] = nil
+    end
+end
+
+setmetatable(box, {
+    __index = function(table, index)
+        error(debug.traceback("Please call box.cfg{} first"))
+        error("Please call box.cfg{} first")
+     end
+})
 
 function box.cfg(cfg)
-    check_param_table(cfg, template_cfg)
-    cfg = update_param_table(cfg, default_cfg)
-
-    for k,v in pairs(wrapper_cfg) do
-        -- options that can be number or string
-        cfg[k] = wrapper_cfg[k](cfg[k])
+    cfg = prepare_cfg(cfg)
+    for k,v in pairs(default_cfg) do
+        if cfg[k] == nil then
+            cfg[k] = v
+        end
     end
     -- Restore box members from box_saved after initial configuration
     for k, v in pairs(box_configured) do
@@ -205,7 +198,7 @@ function box.cfg(cfg)
         })
     ffi.C.load_cfg()
 
-    box.internal.snap_daemon.start()
+    box.internal.snapshot_daemon.start()
 end
 jit.off(box.cfg)
 jit.off(reload_cfg)

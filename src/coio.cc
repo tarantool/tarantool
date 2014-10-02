@@ -28,12 +28,15 @@
  */
 #include "coio.h"
 
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/tcp.h>
 #include <stdio.h>
 
 #include "iobuf.h"
 #include "sio.h"
 #include "scoped_guard.h"
+#include "coeio.h" /* coeio_resolve() */
 
 struct CoioGuard {
 	struct ev_io *ev_io;
@@ -79,27 +82,22 @@ coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
 }
 
 /**
- * Connect to a host.
- */
-void
-coio_connect(struct ev_io *coio, struct sockaddr *addr, socklen_t addr_len)
-{
-	coio_connect_timeout(coio, addr, addr_len, TIMEOUT_INFINITY);
-}
-
-/**
  * Connect to a host with a specified timeout.
- * @retval true timeout
- * @retval false connected
+ * @retval -1 timeout
+ * @retval 0 connected
  */
-bool
-coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
-		     socklen_t len, ev_tstamp timeout)
+static int
+coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
+		  socklen_t len, ev_tstamp timeout)
 {
-	if (sio_connect(coio->fd, addr, len) == 0)
-		return false;
-	assert(errno == EINPROGRESS);
 	ev_loop *loop = loop();
+	evio_socket(coio, addr->sa_family, SOCK_STREAM, 0);
+	auto coio_guard = make_scoped_guard([=]{ evio_close(loop, coio); });
+	if (sio_connect(coio->fd, addr, len) == 0) {
+		coio_guard.is_active = false;
+		return 0;
+	}
+	assert(errno == EINPROGRESS);
 	/*
 	 * Wait until socket is ready for writing or
 	 * timed out.
@@ -111,7 +109,7 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
 	fiber_testcancel();
 	if (is_timedout) {
 		errno = ETIMEDOUT;
-		return true;
+		return -1;
 	}
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
@@ -121,50 +119,87 @@ coio_connect_timeout(struct ev_io *coio, struct sockaddr *addr,
 		errno = error;
 		tnt_raise(SocketError, coio->fd, "connect");
 	}
-	return false;
+	coio_guard.is_active = false;
+	return 0;
 }
 
 /**
- * Connect to a first address in addrinfo list and initialize coio
- * with connected socket.
+ * Resolve hostname:service from \a uri and connect to the first available
+ * address with a specified timeout.
  *
- * If coio is already initialized, socket family,
- * type and protocol must match the remote address.
+ * If \a addr is not NULL the function provides resolved address on success.
+ * In this case, \a addr_len is a value-result argument. It should be
+ * initialized to the size of the buffer associated with \a addr. Upon return,
+ * \a addr_len is updated to contain the actual size of the source address.
+ * The returned address is truncated if the buffer provided is too small;
+ * in this case, addrlen will return a value greater than was supplied to the
+ * call.
  *
- * @retval true  timeout
- * @retval false sucess
+ * This function also supports UNIX domain sockets if uri->path is not NULL and
+ * uri->service is NULL.
+ *
+ * @retval -1 timeout
+ * @retval 0 connected
  */
-bool
-coio_connect_addrinfo(struct ev_io *coio, struct addrinfo *ai,
-		      ev_tstamp timeout)
+int
+coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
+		     struct sockaddr *addr, socklen_t *addr_len,
+		     ev_tstamp timeout)
 {
+	/* try to resolve a hostname */
+	struct ev_loop *loop = loop();
 	ev_tstamp start, delay;
-	ev_loop *loop = loop();
+	evio_timeout_init(loop, &start, &delay, timeout);
+
+	assert(service != NULL);
+	if (strcmp(host, URI_HOST_UNIX) == 0) {
+		/* UNIX socket */
+		struct sockaddr_un un;
+		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
+		un.sun_family = AF_UNIX;
+		if (coio_connect_addr(coio, (struct sockaddr *) &un, sizeof(un),
+				      delay) != 0)
+			return -1;
+		if (addr != NULL) {
+			assert(addr_len != NULL);
+			*addr_len = MIN(sizeof(un), *addr_len);
+			memcpy(addr, &un, *addr_len);
+		}
+		return 0;
+	}
+
+	struct addrinfo *ai = coeio_resolve(SOCK_STREAM, host, service, delay);
+	if (ai == NULL)
+		return -1; /* timeout */
+
+	auto addrinfo_guard = make_scoped_guard([=]{ freeaddrinfo(ai); });
+	evio_timeout_update(loop(), start, &delay);
+
 	coio_timeout_init(&start, &delay, timeout);
 	assert(! evio_is_active(coio));
-	bool res = true;
 	while (ai) {
 		try {
-			evio_socket(coio, ai->ai_family,
-				    ai->ai_socktype,
-				    ai->ai_protocol);
-			res = coio_connect_timeout(coio, ai->ai_addr,
-					ai->ai_addrlen, delay);
-			if (res)
-				evio_close(loop, coio);
-			return res;
+			if (coio_connect_addr(coio, ai->ai_addr,
+					      ai->ai_addrlen, delay))
+				return -1;
+			if (addr != NULL) {
+				assert(addr_len != NULL);
+				*addr_len = MIN(ai->ai_addrlen, *addr_len);
+				memcpy(addr, ai->ai_addr, *addr_len);
+			}
+			return 0; /* connected */
 		} catch (SocketError *e) {
-			if (res)
-				evio_close(loop, coio);
-			if (ai->ai_next == NULL)
-				throw;
-			ev_now_update(loop);
-			coio_timeout_update(start, &delay);
+			/* ignore */
+			say_error("failed to connect to %s: %s",
+				  sio_strfaddr(ai->ai_addr, ai->ai_addrlen),
+				  e->errmsg());
 		}
 		ai = ai->ai_next;
+		ev_now_update(loop);
+		coio_timeout_update(start, &delay);
 	}
-	/* unreachable. */
-	tnt_raise(SocketError, coio->fd, "connect_addrinfo()");
+
+	tnt_raise(SocketError, coio->fd, "connection failed");
 }
 
 /**

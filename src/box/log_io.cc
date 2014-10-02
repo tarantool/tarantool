@@ -36,11 +36,11 @@
 #include "third_party/tarantool_eio.h"
 #include "fiob.h"
 #include "msgpuck/msgpuck.h"
-#include "iproto_constants.h"
 #include "scoped_guard.h"
 #define MH_UNDEF 1 /* conflicts with mh_nodeids_t */
 #include "recovery.h" /* for mh_cluster */
 #include "vclock.h"
+#include "iproto_constants.h"
 
 /*
  * marker is MsgPack fixext2
@@ -273,7 +273,7 @@ format_filename(struct log_dir *dir, int64_t signt, enum log_suffix suffix)
 /* {{{ struct log_io_cursor */
 
 static int
-row_reader(FILE *f, struct iproto_header *row)
+row_reader(FILE *f, struct xrow_header *row)
 {
 	const char *data;
 
@@ -326,15 +326,15 @@ error:
 		tnt_raise(ClientError, ER_INVALID_MSGPACK, "invalid crc32");
 
 	data = bodybuf;
-	iproto_header_decode(row, &data, bodybuf + len);
+	xrow_header_decode(row, &data, bodybuf + len);
 
 	return 0;
 }
 
 int
-xlog_encode_row(const struct iproto_header *row, struct iovec *iov)
+xlog_encode_row(const struct xrow_header *row, struct iovec *iov)
 {
-	int iovcnt = iproto_header_encode(row, iov + 1) + 1;
+	int iovcnt = xrow_header_encode(row, iov + 1) + 1;
 	char *fixheader = (char *) region_alloc(&fiber()->gc,
 						XLOG_FIXHEADER_SIZE);
 	uint32_t len = 0;
@@ -362,7 +362,7 @@ xlog_encode_row(const struct iproto_header *row, struct iovec *iov)
 	iov[0].iov_base = fixheader;
 	iov[0].iov_len = XLOG_FIXHEADER_SIZE;
 
-	assert(iovcnt <= XLOG_ROW_IOVMAX);
+	assert(iovcnt <= XROW_IOVMAX);
 	return iovcnt;
 }
 
@@ -400,7 +400,7 @@ log_io_cursor_close(struct log_io_cursor *i)
  *
  */
 int
-log_io_cursor_next(struct log_io_cursor *i, struct iproto_header *row)
+log_io_cursor_next(struct log_io_cursor *i, struct xrow_header *row)
 {
 	struct log_io *l = i->log;
 	log_magic_t magic;
@@ -711,7 +711,8 @@ log_io_verify_meta(struct log_io *l, const tt_uuid *server_uuid)
 	if (server_uuid != NULL && !tt_uuid_is_nil(server_uuid) &&
 	    !tt_uuid_is_equal(server_uuid, &l->server_uuid)) {
 		say_error("%s: invalid server uuid", l->filename);
-		return -1;
+		if (l->dir->panic_if_error)
+			return -1;
 	}
 	return 0;
 }

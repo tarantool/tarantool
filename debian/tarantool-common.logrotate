@@ -7,7 +7,7 @@
     delaycompress
     create 0640 tarantool adm
     postrotate
-        /usr/bin/tarantool /usr/lib/tarantool/dist.lua logrotate `basename $1 .log`
+        /usr/bin/tarantool /usr/bin/tarantoolctl logrotate `basename $1 .log`
     endscript
 }
 

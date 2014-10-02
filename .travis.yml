@@ -29,7 +29,6 @@ install:
 script:
   - mkdir ./build && cd ./build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
   - make -j8
-  - make test-force
 
 notifications:
   irc:

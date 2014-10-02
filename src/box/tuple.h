@@ -35,8 +35,9 @@ enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 
 struct tbuf;
 
-extern struct small_alloc talloc;
-extern struct slab_arena tuple_arena;
+extern struct small_alloc memtx_alloc;
+extern struct slab_cache memtx_slab_cache;
+extern struct slab_arena memtx_arena;
 
 /**
  * @brief In-memory tuple format

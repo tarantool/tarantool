@@ -24,6 +24,7 @@ t
   - info
   - internal
   - rollback
+  - runtime
   - schema
   - session
   - slab
@@ -154,6 +155,14 @@ t;
   - arena_size
   - slabs
 ...
+box.runtime.info().used > 0;
+---
+- true
+...
+box.runtime.info().maxalloc > 0;
+---
+- true
+...
 --
 -- gh-502: box.slab.info() excessively sparse array
 --
@@ -173,11 +182,11 @@ end;
 t;
 ---
 - - 'box.error.EXACT_MATCH : 19'
-  - 'box.error.SECONDARY : 7'
+  - 'box.error.NO_SUCH_TRIGGER : 34'
   - 'box.error.CLUSTER_ID_IS_RO : 65'
   - 'box.error.INDEX_TYPE : 13'
   - 'box.error.CLUSTER_ID_MISMATCH : 63'
-  - 'box.error.FIELD_TYPE : 23'
+  - 'box.error.MEMORY_ISSUE : 2'
   - 'box.error.KEY_PART_TYPE : 18'
   - 'box.error.CREATE_FUNCTION : 50'
   - 'box.error.SOPHIA : 60'
@@ -200,11 +209,12 @@ t;
   - 'box.error.CREATE_USER : 43'
   - 'box.error.CREATE_SPACE : 9'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
+  - 'box.error.PROC_LUA : 32'
   - 'box.error.CREATE_ROLE : 84'
   - 'box.error.ROLE_EXISTS : 83'
   - 'box.error.NO_SUCH_ROLE : 82'
   - 'box.error.NO_ACTIVE_TRANSACTION : 80'
-  - 'box.error.SPLICE : 25'
+  - 'box.error.TUPLE_FOUND : 3'
   - 'box.error.FIELD_TYPE_MISMATCH : 24'
   - 'box.error.UNSUPPORTED : 5'
   - 'box.error.INVALID_MSGPACK : 20'
@@ -212,7 +222,7 @@ t;
   - 'box.error.ALTER_SPACE : 12'
   - 'box.error.ACTIVE_TRANSACTION : 79'
   - 'box.error.NO_CONNECTION : 77'
-  - 'box.error.DROP_SPACE : 11'
+  - 'box.error.FIELD_TYPE : 23'
   - 'box.error.INVALID_XLOG_NAME : 75'
   - 'box.error.INVALID_XLOG : 74'
   - 'box.error.REPLICA_MAX : 73'
@@ -226,34 +236,34 @@ t;
   - 'box.error.INVALID_ORDER : 68'
   - 'box.error.CFG : 59'
   - 'box.error.SPACE_FIELD_COUNT : 38'
-  - 'box.error.SPACE_ACCESS_DENIED : 55'
+  - 'box.error.UNKNOWN : 0'
   - 'box.error.NO_SUCH_FIELD : 37'
   - 'box.error.LOCAL_SERVER_IS_NOT_ACTIVE : 61'
   - 'box.error.RELOAD_CFG : 58'
   - 'box.error.PROC_RET : 21'
   - 'box.error.INJECTION : 8'
-  - 'box.error.PROC_LUA : 32'
+  - 'box.error.FUNCTION_MAX : 54'
   - 'box.error.ILLEGAL_PARAMS : 1'
-  - 'box.error.TUPLE_NOT_ARRAY : 22'
   - 'box.error.TUPLE_FORMAT_LIMIT : 16'
+  - 'box.error.USER_MAX : 56'
   - 'box.error.INVALID_UUID : 64'
-  - 'box.error.UNKNOWN : 0'
+  - 'box.error.SPLICE : 25'
   - 'box.error.TIMEOUT : 78'
-  - 'box.error.TUPLE_FOUND : 3'
-  - 'box.error.MEMORY_ISSUE : 2'
-  - 'box.error.NO_SUCH_TRIGGER : 34'
+  - 'box.error.MORE_THAN_ONE_TUPLE : 41'
+  - 'box.error.NO_SUCH_SPACE : 36'
+  - 'box.error.INDEX_EXISTS : 85'
   - 'box.error.UPDATE_FIELD : 29'
   - 'box.error.ARG_TYPE : 26'
-  - 'box.error.NO_SUCH_SPACE : 36'
   - 'box.error.INDEX_FIELD_COUNT : 39'
-  - 'box.error.MORE_THAN_ONE_TUPLE : 41'
+  - 'box.error.READONLY : 7'
   - 'box.error.DROP_PRIMARY_KEY : 17'
+  - 'box.error.DROP_SPACE : 11'
   - 'box.error.UNKNOWN_REQUEST_TYPE : 48'
   - 'box.error.INVALID_XLOG_ORDER : 76'
-  - 'box.error.FUNCTION_MAX : 54'
+  - 'box.error.SPACE_ACCESS_DENIED : 55'
   - 'box.error.NO_SUCH_USER : 45'
-  - 'box.error.USER_MAX : 56'
   - 'box.error.UNKNOWN_UPDATE_OP : 28'
+  - 'box.error.TUPLE_NOT_ARRAY : 22'
   - 'box.error.NO_SUCH_PROC : 33'
   - 'box.error.FUNCTION_ACCESS_DENIED : 53'
 ...

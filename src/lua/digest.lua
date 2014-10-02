@@ -25,6 +25,11 @@ ffi.cdef[[
     typedef uint32_t (*crc32_func)(uint32_t crc,
         const unsigned char *buf, unsigned int len);
     extern crc32_func crc32_calc;
+
+   /* base64 */
+   int base64_bufsize(int binsize);
+   int base64_decode(const char *in_base64, int in_len, char *out_bin, int out_len);
+   int base64_encode(const char *in_bin, int in_len, char *out_base64, int out_len);
 ]]
 
 local ssl
@@ -67,6 +72,28 @@ local function tohex(r, size)
 end
 
 local m = {
+    base64_encode = function(bin)
+        if type(bin) ~= 'string' then
+            error('Usage: digest.base64_encode(string)')
+        end
+        local blen = #bin
+        local slen = ffi.C.base64_bufsize(blen)
+        local str  = ffi.new('char[?]', slen)
+        local len = ffi.C.base64_encode(bin, blen, str, slen)
+        return ffi.string(str, len)
+    end,
+
+    base64_decode = function(str)
+        if type(str) ~= 'string' then
+            error('Usage: digest.base64_decode(string)')
+        end
+        local slen = #str
+        local blen = math.ceil(slen * 3 / 4)
+        local bin  = ffi.new('char[?]', blen)
+        local len = ffi.C.base64_decode(str, slen, bin, blen)
+        return ffi.string(bin, len)
+    end,
+
     crc32 = function(str)
         if str == nil then
             str = ''

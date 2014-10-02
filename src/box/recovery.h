@@ -36,6 +36,7 @@
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "replica.h"
+#include "small/region.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -44,7 +45,7 @@ extern "C" {
 struct fiber;
 struct tbuf;
 
-typedef void (row_handler)(void *, struct iproto_header *packet);
+typedef void (row_handler)(void *, struct xrow_header *packet);
 typedef void (snapshot_handler)(struct log_io *);
 typedef void (join_handler)(const struct tt_uuid *node_uuid);
 
@@ -113,15 +114,15 @@ void recovery_follow_local(struct recovery_state *r, ev_tstamp wal_dir_rescan_de
 void recovery_finalize(struct recovery_state *r);
 
 int recover_wal(struct recovery_state *r, struct log_io *l);
-int wal_write(struct recovery_state *r, struct iproto_header *packet);
+int wal_write(struct recovery_state *r, struct xrow_header *packet);
 
 void recovery_setup_panic(struct recovery_state *r, bool on_snap_error, bool on_wal_error);
-void recovery_process(struct recovery_state *r, struct iproto_header *packet);
+void recovery_process(struct recovery_state *r, struct xrow_header *packet);
 
 struct fio_batch;
 
 void
-snapshot_write_row(struct log_io *l, struct iproto_header *packet);
+snapshot_write_row(struct log_io *l, struct xrow_header *packet);
 void snapshot_save(struct recovery_state *r);
 
 #if defined(__cplusplus)

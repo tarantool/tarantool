@@ -28,43 +28,47 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <sys/types.h>		/* for netinet/ip.h on BSD */
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netdb.h>
-#include <sys/un.h>
 
-enum { URI_STR_LEN = 32 };
+#include <stddef.h>
+#include <netdb.h> /* NI_MAXHOST, NI_MAXSERV */
+#include <limits.h> /* _POSIX_PATH_MAX */
 
-/** A parsed representation of an URI */
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 struct uri {
-
-	union {
-		struct sockaddr addr;
-		struct sockaddr_in in;
-		struct sockaddr_un un;
-		struct sockaddr_in6 in6;
-		struct sockaddr_storage addr_storage;
-	};
-	socklen_t addr_len;
-
-	char schema[URI_STR_LEN];
-	char login[URI_STR_LEN];
-	char password[URI_STR_LEN];
+	const char *scheme;
+	size_t scheme_len;
+	const char *login;
+	size_t login_len;
+	const char *password;
+	size_t password_len;
+	const char *host;
+	size_t host_len;
+	const char *service;
+	size_t service_len;
+	const char *path;
+	size_t path_len;
+	const char *query;
+	size_t query_len;
+	const char *fragment;
+	size_t fragment_len;
+	int host_hint;
 };
 
-/**
- * Parse a string and fill uri struct.
- * @retval 0 success
- * @retval -1 error
- */
+#define URI_HOST_UNIX "unix/"
+#define URI_MAXHOST NI_MAXHOST
+#define URI_MAXSERVICE _POSIX_PATH_MAX /* _POSIX_PATH_MAX always > NI_MAXSERV */
+
 int
 uri_parse(struct uri *uri, const char *str);
 
-/** Convert an uri to string */
-const char *
-uri_to_string(const struct uri * uri);
+char *
+uri_format(const struct uri *uri);
 
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_URI_H_INCLUDED */

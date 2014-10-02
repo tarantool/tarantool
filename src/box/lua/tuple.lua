@@ -4,6 +4,7 @@ local ffi = require('ffi')
 local yaml = require('yaml')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
+local internal = require('box.internal')
 
 ffi.cdef([[
 struct tuple
@@ -39,9 +40,25 @@ tuple_next(struct tuple_iterator *it);
 
 void
 tuple_to_buf(struct tuple *tuple, char *buf);
+
+struct tuple *
+boxffi_tuple_update(struct tuple *tuple, const char *expr, const char *expr_end);
 ]])
 
 local builtin = ffi.C
+
+local const_struct_tuple_ref_t = ffi.typeof('const struct tuple&')
+
+local tuple_gc = function(tuple)
+    builtin.tuple_ref(tuple, -1)
+end
+
+local tuple_bless = function(tuple)
+    -- update in-place, do not spent time calling tuple_ref
+    local tuple2 = ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
+    tuple._refs = tuple._refs + 1
+    return tuple2
+end
 
 local tuple_iterator_t = ffi.typeof('struct tuple_iterator')
 
@@ -130,13 +147,25 @@ local function tuple_findall(tuple, offset, val)
         :totable()
 end
 
+local function tuple_update(tuple, expr)
+    if type(expr) ~= 'table' then
+        error("Usage: tuple:update({ { op, field, arg}+ })")
+    end
+    expr = internal.normalize_update_ops(expr)
+    local pexpr, pexpr_end = msgpackffi.encode_tuple(expr)
+    local tuple = builtin.boxffi_tuple_update(tuple, pexpr, pexpr_end)
+    if tuple == NULL then
+        return box.error()
+    end
+    return tuple_bless(tuple)
+end
+
 -- Set encode hooks for msgpackffi
 local function tuple_to_msgpack(buf, tuple)
     buf:reserve(tuple._bsize)
     builtin.tuple_to_buf(tuple, buf.p)
     buf.p = buf.p + tuple._bsize
 end
-
 
 msgpackffi.on_encode(ffi.typeof('const struct tuple &'), tuple_to_msgpack)
 
@@ -153,24 +182,12 @@ local methods = {
     ["findall"]     = tuple_findall;
     ["unpack"]      = tuple_unpack;
     ["totable"]     = tuple_totable;
+    ["update"]      = tuple_update;
     ["bsize"]       = function(tuple)
         return tonumber(tuple._bsize)
     end;
     ["__serialize"] = tuple_totable; -- encode hook for msgpack/yaml/json
 }
-
-local const_struct_tuple_ref_t = ffi.typeof('const struct tuple&')
-
-local tuple_gc = function(tuple)
-    builtin.tuple_ref(tuple, -1)
-end
-
-local tuple_bless = function(tuple)
-    -- update in-place, do not spent time calling tuple_ref
-    local tuple2 = ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
-    tuple._refs = tuple._refs + 1
-    return tuple2
-end
 
 local tuple_field = function(tuple, field_n)
     local field = builtin.tuple_field(tuple, field_n - 1)

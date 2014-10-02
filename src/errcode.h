@@ -56,7 +56,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/*  4 */_(ER_TUPLE_NOT_FOUND,		2, "Tuple doesn't exist in index %u") \
 	/*  5 */_(ER_UNSUPPORTED,		2, "%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			2, "Can't modify data on a replication slave. My master is: %s") \
-	/*  7 */_(ER_SECONDARY,			2, "Can't modify data upon a request on the secondary port.") \
+	/*  7 */_(ER_READONLY,			2, "Can't modify data because this server in read-only mode.") \
 	/*  8 */_(ER_INJECTION,			2, "Error injection '%s'") \
 	/*  9 */_(ER_CREATE_SPACE,		2, "Failed to create space %u: %s") \
 	/* 10 */_(ER_SPACE_EXISTS,		2, "Space '%s' already exists") \
@@ -134,6 +134,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 82 */_(ER_NO_SUCH_ROLE,		2, "Role '%s' is not found") \
 	/* 83 */_(ER_ROLE_EXISTS,		2, "Role '%s' already exists") \
 	/* 84 */_(ER_CREATE_ROLE,		2, "Failed to create role '%s': %s") \
+	/* 85 */_(ER_INDEX_EXISTS,		2, "Index '%s' already exists") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

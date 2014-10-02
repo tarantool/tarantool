@@ -42,7 +42,7 @@
 #include "replica.h"
 #include "fiber.h"
 #include "msgpuck/msgpuck.h"
-#include "iproto_constants.h"
+#include "xrow.h"
 #include "crc32.h"
 #include "scoped_guard.h"
 #include "box/cluster.h"
@@ -118,7 +118,7 @@ const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 /* {{{ LSN API */
 
 static void
-fill_lsn(struct recovery_state *r, struct iproto_header *row)
+fill_lsn(struct recovery_state *r, struct xrow_header *row)
 {
 	if (row == NULL || row->server_id == 0) {
 		/* Local request */
@@ -226,7 +226,6 @@ recovery_free()
 		 */
 		log_io_close(&r->current_wal);
 	}
-
 	recovery= NULL;
 }
 
@@ -239,7 +238,7 @@ recovery_setup_panic(struct recovery_state *r, bool on_snap_error,
 }
 
 void
-recovery_process(struct recovery_state *r, struct iproto_header *row)
+recovery_process(struct recovery_state *r, struct xrow_header *row)
 {
 	/* Check lsn */
 	int64_t current_signt = vclock_get(&r->vclock, row->server_id);
@@ -326,7 +325,7 @@ recover_wal(struct recovery_state *r, struct log_io *l)
 
 	log_io_cursor_open(&i, l);
 
-	struct iproto_header row;
+	struct xrow_header row;
 	while (log_io_cursor_next(&i, &row) == 0) {
 		try {
 			recovery_process(r, &row);
@@ -483,9 +482,7 @@ recover_current_wal:
 		result = -1;
 	}
 
-#if 0
 	region_free(&fiber()->gc);
-#endif
 	return result;
 }
 
@@ -665,7 +662,7 @@ struct wal_write_request {
 	/* Auxiliary. */
 	int64_t res;
 	struct fiber *fiber;
-	struct iproto_header *row;
+	struct xrow_header *row;
 };
 
 /* Context of the WAL writer thread. */
@@ -979,7 +976,7 @@ wal_fill_batch(struct log_io *wal, struct fio_batch *batch, int rows_per_wal,
 	assert(max_rows > 0);
 	fio_batch_start(batch, max_rows);
 
-	struct iovec iov[XLOG_ROW_IOVMAX];
+	struct iovec iov[XROW_IOVMAX];
 	while (req != NULL && !fio_batch_has_space(batch, nelem(iov))) {
 		int iovcnt = xlog_encode_row(req->row, iov);
 		fio_batch_add(batch, iov, iovcnt);
@@ -1026,6 +1023,7 @@ wal_write_to_disk(struct recovery_state *r, struct wal_writer *writer,
 			break;
 		req = write_end;
 	}
+	fiber_gc();
 	STAILQ_SPLICE(input, write_end, wal_fifo_entry, rollback);
 	STAILQ_CONCAT(commit, input);
 }
@@ -1073,7 +1071,7 @@ wal_writer_thread(void *worker_args)
  * to be written to disk and wait until this task is completed.
  */
 int
-wal_write(struct recovery_state *r, struct iproto_header *row)
+wal_write(struct recovery_state *r, struct xrow_header *row)
 {
 	/*
 	 * Bump current LSN even if wal_mode = NONE, so that
@@ -1120,7 +1118,7 @@ wal_write(struct recovery_state *r, struct iproto_header *row)
 /* {{{ box.snapshot() */
 
 void
-snapshot_write_row(struct log_io *l, struct iproto_header *row)
+snapshot_write_row(struct log_io *l, struct xrow_header *row)
 {
 	static uint64_t bytes;
 	ev_tstamp elapsed;
@@ -1140,7 +1138,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	row->lsn = ++l->rows;
 	row->sync = 0; /* don't write sync to wal */
 
-	struct iovec iov[XLOG_ROW_IOVMAX];
+	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xlog_encode_row(row, iov);
 
 	/* TODO: use writev here */
@@ -1156,7 +1154,7 @@ snapshot_write_row(struct log_io *l, struct iproto_header *row)
 	if (l->rows % 100000 == 0)
 		say_crit("%.1fM rows written", l->rows / 1000000.);
 
-	region_free_after(&fiber()->gc, 128 * 1024);
+	fiber_gc();
 
 	if (r->snap_io_rate_limit != UINT64_MAX) {
 		if (last == 0) {

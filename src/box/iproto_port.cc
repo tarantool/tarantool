@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "iproto_port.h"
-
+#include "iproto_constants.h"
 
 /* m_ - msgpack meta, k_ - key, v_ - value */
 struct iproto_header_bin {
@@ -60,6 +60,13 @@ static const struct iproto_body_bin iproto_body_bin = {
 static const struct iproto_body_bin iproto_error_bin = {
 	0x81, IPROTO_ERROR, 0xdb, 0
 };
+
+/** Return a 4-byte numeric error code, with status flags. */
+static inline uint32_t
+iproto_encode_error(uint32_t error)
+{
+	return error | IPROTO_TYPE_ERROR;
+}
 
 void
 iproto_reply_ping(struct obuf *out, uint64_t sync)

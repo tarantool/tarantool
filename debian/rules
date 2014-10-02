@@ -58,23 +58,11 @@ clean::
 	rm -f doc/tnt.ent
 	rm -f www-data.in/download
 
-# install/tarantool-dbg::
-#         rm -fr debian/tarantool-dbg/usr/share/doc/tarantool-dbg
-
 install/tarantool::
-# 	pod2man -c 'tarantar' \
-# 		debian/tarantar.pod > build-area/tarantar.1
-#         make -C build-area test-force || /bin/true
 
 
-# install/tarantool-common::
-# 	pod2man -c 'tarantool instances control' \
-# 	    debian/tarantool_instance.pod > build-area/tarantool_instance.1
-# 	pod2man -c 'tarantool log rotation' \
-# 	    debian/scripts/tarantool_logrotate \
-# 	    	 > build-area/tarantool_logrotate.1
-# 	pod2man -c 'snapshot rotate' \
-# 	    debian/scripts/tarantool_snapshot_rotate \
-# 	    	> build-area/tarantool_snapshot_rotate.1
-# 	install -m0755 extra/logger.pl \
-# 	    debian/tarantool-common/usr/lib/tarantool/logger
+install/tarantool-common::
+	sed 's/dist.lua/tarantoolctl/g' extra/dist/dist.lua \
+	    > ${DEB_BUILDDIR}/tarantoolctl
+	pod2man -c 'tarantoolctl instances control' \
+	    ${DEB_BUILDDIR}/tarantoolctl > ${DEB_BUILDDIR}/tarantoolctl.1

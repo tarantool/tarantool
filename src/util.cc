@@ -314,7 +314,7 @@ backtrace_foreach(backtrace_cb cb, void *frame_, void *stack, size_t stack_size,
 	}
 }
 
-void
+extern "C" void
 print_backtrace()
 {
 	void *frame = __builtin_frame_address(0);

@@ -638,7 +638,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
     <varlistentry>
         <term>
           <emphasis role="lua" xml:id="box.update">
-          box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)
+          box.space.<replaceable>space-name</replaceable>:update({<replaceable>key {, operator, field_no, value}...</replaceable>})
           </emphasis>
         </term>
         <listitem>
@@ -647,46 +647,37 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                </para>
   <para>
    The <code>update</code> function supports operations on fields &mdash;
-    assignment, arithmetic operations (the field must be numeric),
-    cutting and pasting fragments of a field, &mdash; as well as
-    operations on a tuple: push and pop of a field at the tail of
-    a tuple, deletion and insertion of a field.  Multiple
-    operations can be combined into a single update, and in this
-    case they are performed atomically. Each operation expects
-    field number as its first argument. When a sequence of changes
-    is present, field identifier in each operation is assumed to
-    be relative to the most recent state of the tuple, i.e. as if
+    assignment, arithmetic (if the field is unsigned numeric),
+    cutting and pasting fragments of a field,
+    deletng or inserting a field.  Multiple
+    operations can be combined in a single update request, and in this
+    case they are performed atomically and sequentially. Each operation requires
+    specification of a field number. When multiple operations
+    are present, the field number for each operation is assumed to
+    be relative to the most recent state of the tuple, that is, as if
     all previous operations in a multi-operation update have
-    already been applied. In other words, it's always safe to
+    already been applied. In other words, it is always safe to
     merge multiple <code>update</code> invocations into a single invocation, with no
     change in semantics.
   </para>
             <para>
              Parameters: <code>space-name</code>,
               <code>key</code> = primary-key field values, must be passed as a Lua table if key is multi-part,
-                <code>format</code> = a sequence of
-                pairs of characters, where the first character in each pair
-                is the operation specifier, and the second character in
-                each pair is the operation argument.
-                The <code>{field_no, value}</code> arguments are the
-                field numbers of affected fields and applicable values.
+                <code>{operator, field_no, value}</code> = a group of arguments
+                for each operation, indicating what the operation is, what field
+                the operation will apply to, and what value will be applied.
                 For some operations the field number can be -1, meaning
                 the last field in the tuple.
-                There must be a pair of {field_no, value} arguments
-                for each character pair in the format argument.
-                The format and {field_no, value} arguments are passed to
-                <code>pickle.pack()</code> and the result is sent
-                to <code>box.process()</code>.
-                Possible operation specifiers are: <quote>+</quote>
+                Possible operators are: <quote>+</quote>
                 for addition, <quote>-</quote> for subtraction,
                 <quote>&amp;</quote> for bitwise AND,
                 <quote>|</quote> for bitwise OR, <quote>^</quote>
                 for bitwise exclusive OR (XOR), <quote>:</quote>
-                for string splice, <quote>!</quote> for insertion.
-                Possible operation arguments are: <quote>p</quote>.
-                Thus in the instruction <code>s:update{44,, {{'+p,1,55},{=p',3,'x'}})</code>
+                for string splice, <quote>!</quote> for insert,
+                <quote>#</quote> for delete.
+                Thus in the instruction <code>s:update{44,, {{'+,1,55},{=',3,'x'}})</code>
                 the primary-key value is 44,
-                the formats are '+p' and '=p'
+                the operators are '+' and '='
                 meaning "add a value to a field
                 and then assign a value to a field", the first affected field
                 is field 1 and the value which will be added to it is 55, the second affected field
@@ -764,11 +755,11 @@ box.space.tester:update({999}, {{'=', 2, 'XYZ'}})
 #In the following update ...
 #   The third argument is ':', that is, this is the example of splice.
 #   The fourth argument is 2 because the change will occur in field[2].
-#   The fifth argument is 1 because deletion will begin with the second byte.
+#   The fifth argument is 2 because deletion will begin with the second byte.
 #   The sixth argument is 1 because the number of bytes to delete is 1.
 #   The seventh argument is '!!' because '!!' is to be added at this position.
 #   Therefore, after the following update, field[1] = 999, field[2] = 'X!!Z'.
-box.space.tester:update({999}, {{':', 2, 1, 1, '!!'}})
+box.space.tester:update({999}, {{':', 2, 2, 1, '!!'}})
 
 </programlisting>
             </para>
@@ -1871,7 +1862,7 @@ tarantool&gt; <userinput>#t</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua"> <replaceable>tuple-value</replaceable> : bsize()</emphasis>
+            <emphasis role="lua"> <replaceable>tuple-value</replaceable>:bsize()</emphasis>
         </term>
         <listitem>
             <para>
@@ -1904,7 +1895,7 @@ tarantool&gt; <userinput>t:bsize()</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">[ <replaceable>field-number</replaceable> ]</emphasis>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable> [ <replaceable>field-number</replaceable> ]</emphasis>
         </term>
         <listitem>
             <para>
@@ -1932,7 +1923,7 @@ tarantool&gt; <userinput>t[2]</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">find(<replaceable>[field-number,] field-value) or findall([field-number,] field-value</replaceable>)</emphasis>
+         <emphasis role="lua"><replaceable>tuple-value</replaceable>:find(<replaceable>[field-number,] field-value</replaceable>) or <replaceable>tuple-value</replaceable>:findall(<replaceable>[field-number,] field-value</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -1974,7 +1965,7 @@ tarantool&gt; <userinput>t:findall(2, 'a')</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">transform(<replaceable>start-field-number, fields-to-remove [, field-value ...]</replaceable>)</emphasis>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:transform(<replaceable>start-field-number, fields-to-remove [, field-value ...]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2007,7 +1998,7 @@ tarantool&gt; <userinput>t:transform(2,2,'x')</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">slice(<replaceable>start-field-number [, end-field-number]</replaceable>)</emphasis>
+         <emphasis role="lua"><replaceable>tuple-value</replaceable>:slice(<replaceable>start-field-number [, end-field-number]</replaceable>)</emphasis>
         </term>
         <listitem>
             <para>
@@ -2039,7 +2030,7 @@ tarantool&gt; <userinput>t:slice(2, 4)</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">unpack()</emphasis>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:unpack()</emphasis>
         </term>
         <listitem>
             <para>
@@ -2070,7 +2061,7 @@ tarantool&gt; <userinput>t:unpack()</userinput>
     </varlistentry>
     <varlistentry>
         <term>
-            <emphasis role="lua">pairs()</emphasis>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:pairs()</emphasis>
         </term>
         <listitem>
             <para>
@@ -2096,6 +2087,46 @@ tarantool&gt; <userinput>tmp = ''; for k, v in t:pairs() do tmp = tmp .. v end</
 tarantool> <userinput>tmp</userinput>
 ---
 - Fld#1Fld#2Fld#3Fld#4Fld#5
+...</programlisting>
+        </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+        <term>
+            <emphasis role="lua"><replaceable>tuple-value</replaceable>:update(<replaceable>{{format, field_no, value}...}</replaceable>)</emphasis>
+        </term>
+        <listitem>
+            <para>
+              Update a tuple.
+            </para>
+            <para>
+              This function updates a tuple which is not in a space.
+              Compare the function
+              <code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code>,
+              which updates a tuple in a space.
+            </para>
+            <para>
+              Parameters: briefly:
+              <code>format</code> indicates the type of update operation such as '=' for 'assign new value',
+              <code>field_no</code> indicates the field number to change such as 2 for field number 2,
+              <code>value</code> indicates the string which operates on the field such as 'B' for a new assignable value = 'B'.
+              For details: see the description for <code>format</code>, <code>field_no</code>, and <code>value</code>
+              in the section <olink targetptr="box.update"><code>box.space.<replaceable>space-name</replaceable>:update{<replaceable>key, format, {field_no, value}...</replaceable>)</code></olink>.
+            </para>
+            <para>
+              Returns: (type = tuple) the new tuple.
+            </para>
+            <para>
+              In the following example, a tuple named t is created
+              and then its second field is updated to equal 'B'.
+            </para>
+            <bridgehead renderas="sect4">Example</bridgehead>
+<programlisting>tarantool&gt; <userinput>t = box.tuple.new({'Fld#1','Fld#2','Fld#3','Fld#4','Fld#5'})</userinput>
+---
+...
+tarantool&gt; <userinput>t:update({{'=',2,'B'}})</userinput>
+---
+- ['Fld#1', 'B', 'Fld#3', 'Fld#4', 'Fld#5']
 ...</programlisting>
         </listitem>
     </varlistentry>
@@ -2487,7 +2518,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.ping">
-        conn:ping()</emphasis></term>
+        <replaceable>conn</replaceable>:ping()</emphasis></term>
         <listitem>
             <para>
                 Execute a PING command.
@@ -2501,7 +2532,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.close">
-        conn:close()</emphasis></term>
+        <replaceable>conn</replaceable>:close()</emphasis></term>
         <listitem>
             <para>
             Close a connection.
@@ -2522,7 +2553,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.select">
-         conn.space.<replaceable>space-name</replaceable>:select{<replaceable>field-value</replaceable>, ...}</emphasis></term>
+         <replaceable>conn</replaceable>.space.<replaceable>space-name</replaceable>:select{<replaceable>field-value</replaceable>, ...}</emphasis></term>
         <listitem>
             <para>
               <code>conn.space.<replaceable>space-name</replaceable>:select{...}</code> is the remote-call equivalent of the local call
@@ -2536,7 +2567,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.insert">
-         conn.space.<replaceable>space-name</replaceable>:insert{field-value, ...}</emphasis></term>
+         <replaceable>conn</replaceable>.space.<replaceable>space-name</replaceable>:insert{field-value, ...}</emphasis></term>
         <listitem>
             <para>
              <code>conn.space.<replaceable>space-name</replaceable>:insert(...)</code> is the remote-call equivalent of the local call
@@ -2547,7 +2578,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.replace">
-         conn.space.<replaceable>space-name</replaceable>:replace{field-value, ...}</emphasis></term>
+         <replaceable>conn</replaceable>.space.<replaceable>space-name</replaceable>:replace{field-value, ...}</emphasis></term>
         <listitem>
             <para>
               <code>conn.space.<replaceable>space-name</replaceable>:replace(...)</code> is the remote-call equivalent of the local call
@@ -2558,7 +2589,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.update">
-         conn.space.<replaceable>space-name</replaceable>:update(<replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
+         <replaceable>conn</replaceable>.space.<replaceable>space-name</replaceable>:update(<replaceable>key</replaceable>, <replaceable>format</replaceable>, ...)</emphasis></term>
         <listitem>
             <para>
              <code>conn.space.<replaceable>space-name</replaceable>:update(...)</code> is the remote-call equivalent of the local call
@@ -2569,7 +2600,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.delete">
-         conn.space.<replaceable>space-name</replaceable>:delete{key}</emphasis></term>
+         <replaceable>conn</replaceable>.space.<replaceable>space-name</replaceable>:delete{key}</emphasis></term>
         <listitem>
             <para>
               <code>conn.space.<replaceable>space-name</replaceable>:delete{...}</code> is the remote-call equivalent of the local call
@@ -2580,7 +2611,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.call">
-         conn:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
+         <replaceable>conn</replaceable>:call(<replaceable>function-name</replaceable> [, <replaceable>arguments</replaceable>])</emphasis></term>
         <listitem>
             <para>
               <code>conn:call('func', '1', '2', '3')</code> is the remote-call equivalent of <code>func('1', '2', '3')</code>.
@@ -2594,7 +2625,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.timeout">
-         conn:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
+         <replaceable>conn</replaceable>:timeout(<replaceable>timeout</replaceable>)</emphasis></term>
         <listitem>
             <para>
               <code>timeout(...)</code> is a wrapper which sets a timeout for the request that follows it.

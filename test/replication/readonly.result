@@ -1,0 +1,41 @@
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.info.server.id
+---
+- 2
+...
+box.info.server.ro
+---
+- false
+...
+box.info.server.lsn
+---
+- 0
+...
+-------------------------------------------------------------
+replica is read-only until receive self server_id in _cluster
+-------------------------------------------------------------
+box.cfg{replication_source = ""}
+---
+...
+box.info.server.id
+---
+- 0
+...
+box.info.server.ro
+---
+- true
+...
+box.info.server.lsn
+---
+- -1
+...
+space = box.schema.create_space("ro")
+---
+- error: Can't modify data because this server in read-only mode.
+...
+box.info.vclock[2]
+---
+- null
+...

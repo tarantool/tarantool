@@ -139,7 +139,7 @@ static struct {
 	int type;
 	int defvalue;
 } OPTIONS[] = {
-	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 0),
+	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 1),
 	OPTION(LUA_TNUMBER,  encode_sparse_ratio, 2),
 	OPTION(LUA_TNUMBER,  encode_sparse_safe, 10),
 	OPTION(LUA_TNUMBER,  encode_max_depth, 32),

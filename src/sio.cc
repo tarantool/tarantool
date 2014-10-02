@@ -293,6 +293,33 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 	return n;
 }
 
+/** Blocking I/O writev */
+ssize_t
+sio_writev_all(int fd, struct iovec *iov, int iovcnt)
+{
+	ssize_t bytes_total = 0;
+	struct iovec *iovend = iov + iovcnt;
+	while(1) {
+		int cnt = iovend - iov;
+		if (cnt > IOV_MAX)
+			cnt = IOV_MAX;
+		ssize_t bytes_written = writev(fd, iov, cnt);
+		if (bytes_written < 0) {
+			if (errno == EINTR)
+				continue;
+			tnt_raise(SocketError, fd, "writev(%d)", cnt);
+		}
+		bytes_total += bytes_written;
+		while (bytes_written >= iov->iov_len)
+			bytes_written -= (iov++)->iov_len;
+		if (iov == iovend)
+			break;
+		iov->iov_base = (char *) iov->iov_base + bytes_written;
+		iov->iov_len -= bytes_written;
+	}
+	return bytes_total;
+}
+
 ssize_t
 sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size)
 {
@@ -443,26 +470,28 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 {
-	static __thread char name[SERVICE_NAME_MAXLEN];
+	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
 	switch(addr->sa_family) {
 		case AF_UNIX:
 			if (addrlen >= sizeof(sockaddr_un)) {
-				snprintf(name, sizeof(name), "unix://%s",
+				snprintf(name, sizeof(name), "unix/:%s",
 					((struct sockaddr_un *)addr)->sun_path);
 			} else {
 				snprintf(name, sizeof(name),
-					"unix://%s", "");
+					 "unix/:(socket)");
 			}
 			break;
-		case AF_INET: {
-			struct sockaddr_in *in = (struct sockaddr_in *)addr;
-			snprintf(name, sizeof(name), "%s:%d",
-				 inet_ntoa(in->sin_addr), ntohs(in->sin_port));
-			break;
-		}
-		case AF_INET6: {
-			*name = 0;
-			inet_ntop(AF_INET6, addr, name, sizeof(name));
+		default: {
+			char host[NI_MAXHOST], serv[NI_MAXSERV];
+			if (getnameinfo(addr, addrlen, host, sizeof(host),
+					serv, sizeof(serv),
+					NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+				snprintf(name, sizeof(name),
+					 addr->sa_family == AF_INET
+					 ? "%s:%s" : "[%s]:%s", host, serv);
+			} else {
+				snprintf(name, sizeof(name), "(host):(port)");
+			}
 			break;
 		}
 	}

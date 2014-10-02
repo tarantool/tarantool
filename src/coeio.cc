@@ -42,7 +42,7 @@
  * manner, when libeio is ready to process some requests it
  * calls coeio_poller callback.
  *
- * Due to libeio design, want_pall callback is called while
+ * Due to libeio design, want_poll callback is called while
  * locks are being held, so it's not possible to call any libeio
  * function inside this callback. Thus coeio_want_poll raises an
  * async event which will be dealt with normally as part of the
@@ -105,6 +105,15 @@ coeio_init(void)
 	ev_async_init(&coeio_manager.coeio_async, coeio_async_cb);
 
 	ev_async_start(loop(), &coeio_manager.coeio_async);
+}
+
+/**
+ * ReInit coeio subsystem (for example after 'fork')
+ */
+void
+coeio_reinit(void)
+{
+	eio_init(coeio_want_poll_cb, NULL);
 }
 
 /**
@@ -260,8 +269,9 @@ coeio_resolve(int socktype, const char *host, const char *port,
 	hints.ai_protocol = 0;
 	/* do resolving */
 	errno = 0;
-	if (coeio_custom(getaddrinfo_cb, timeout, host, port,
-			 &hints, &result))
+	/* make no difference between empty string and NULL for host */
+	if (coeio_custom(getaddrinfo_cb, timeout, (host && *host) ? host : NULL,
+			 port, &hints, &result))
 		return NULL;
 	return result;
 }

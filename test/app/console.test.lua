@@ -12,7 +12,7 @@ os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
 box.cfg{
-    listen='unix://'..IPROTO_SOCKET;
+    listen=IPROTO_SOCKET;
     slab_alloc_arena=0.1,
     logger="tarantool.log",
 }
@@ -22,12 +22,14 @@ local EOL = "\n%.%.%.\n"
 
 test = tap.test("console")
 
-test:plan(18)
+test:plan(26)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
 test:ok(server ~= nil, "console.listen started")
 local client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+local handshake = client:read{chunk = 128}
+test:ok(string.match(handshake, '^Tarantool .*console') ~= nil, 'Handshake')
 test:ok(client ~= nil, "connect to console")
 
 -- Execute some command
@@ -55,22 +57,30 @@ client:write("require('console').delimiter('');\n")
 test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
 
 -- Connect to iproto console (CALL)
-client:write(string.format("require('console').connect('unix/', '/')\n"))
+client:write(string.format("require('console').connect('/')\n"))
 -- error: Connection is not established
 test:ok(yaml.decode(client:read(EOL))[1].error:find('not established'),
     'remote network error')
 
-client:write(string.format("require('console').connect('unix/', '%s')\n",
+client:write(string.format("require('console').connect('%s')\n",
     IPROTO_SOCKET))
 -- error: Execute access denied for user 'guest' to function 'dostring
 test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
     'remote access denied')
 
+-- create user
+box.schema.user.create('test', { password = 'pass' })
+client:write(string.format("require('console').connect('test:pass@%s')\n",
+    IPROTO_SOCKET))
+-- error: Execute access denied for user 'tester' to function 'dostring
+test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
+    'remote access denied')
+
 -- Add permissions to execute `dostring` for `guest`
 box.schema.func.create('dostring')
-box.schema.user.grant('guest', 'execute', 'function', 'dostring')
+box.schema.user.grant('test', 'execute', 'function', 'dostring')
 
-client:write(string.format("require('console').connect('unix/', '%s')\n",
+client:write(string.format("require('console').connect('test:pass@%s')\n",
     IPROTO_SOCKET))
 test:is(yaml.decode(client:read(EOL)), '', "remote connect")
 
@@ -102,11 +112,24 @@ server:close()
 -- Check that admon console has been stopped
 test:isnil(socket.tcp_connect("unix/", CONSOLE_SOCKET), "console.listen stopped")
 
-test:check()
-
 -- Stop iproto (not implemented yet)
 -- box.cfg{listen = nil}
-
-os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
+
+local s = console.listen('127.0.0.1:0')
+addr = s:name()
+test:is(addr.family, 'AF_INET', 'console.listen uri support')
+test:is(addr.host, '127.0.0.1', 'console.listen uri support')
+test:isnt(addr.port, 0, 'console.listen uri support')
+s:close()
+
+local s = console.listen('console://unix/:'..CONSOLE_SOCKET)
+addr = s:name()
+test:is(addr.family, 'AF_UNIX', 'console.listen uri support')
+test:is(addr.host, 'unix/', 'console.listen uri support')
+test:is(addr.port, CONSOLE_SOCKET, 'console.listen uri support')
+s:close()
+
+test:check()
+
 os.exit(0)

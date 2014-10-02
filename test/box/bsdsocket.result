@@ -22,6 +22,9 @@ log = require 'log'
 errno = require 'errno'
 ---
 ...
+fio = require 'fio'
+---
+...
 type(socket)
 ---
 - table
@@ -59,17 +62,25 @@ for k in pairs(getmetatable(s).__index) do
 end;
 ---
 ...
---# setopt delimiter ''
-port = string.gsub(box.cfg.listen, '^.*:', '')
+s:close()
 ---
+- true
 ...
-s:nonblock(false)
+--# setopt delimiter ''
+s:close()
+
 ---
 - false
 ...
-s:sysconnect('127.0.0.1', port)
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+LISTEN ~= nil
 ---
 - true
+...
+s = socket.tcp_connect(LISTEN.host, LISTEN.service)
+---
 ...
 s:nonblock(true)
 ---
@@ -268,7 +279,7 @@ s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-- error: 'builtin/socket.lua:341: Socket option SO_ACCEPTCONN is read only'
+- error: 'builtin/socket.lua:343: Socket option SO_ACCEPTCONN is read only'
 ...
 s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -349,8 +360,19 @@ sc:write('Hello, world')
 ---
 - true
 ...
-sa = s:accept()
+sa, addr = s:accept()
 ---
+...
+addr2 = sa:name()
+---
+...
+addr2.host == addr.host
+---
+- true
+...
+addr2.family == addr.family
+---
+- true
 ...
 sa:nonblock(1)
 ---
@@ -1209,8 +1231,12 @@ os.remove(path)
 ---
 - true
 ...
-server = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+server, addr = socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 ---
+...
+type(addr)
+---
+- table
 ...
 server ~= nil
 ---
@@ -1230,11 +1256,83 @@ client:read(123)
 ---
 - Hello, world
 ...
-server:stop()
+server:close()
 ---
 - true
 ...
-os.remove(path)
+-- unix socket automatically removed
+fio.stat(path) == nil
+---
+- true
+...
+--# setopt delimiter ';'
+server, addr = socket.tcp_server('localhost', 0, { handler = function(s)
+    s:read(2)
+    s:write('Hello, world')
+end, name = 'testserv'});
+---
+...
+--# setopt delimiter ''
+type(addr)
+---
+- table
+...
+server ~= nil
+---
+- true
+...
+addr2 = server:name()
+---
+...
+addr.host == addr2.host
+---
+- true
+...
+addr.family == addr2.family
+---
+- true
+...
+fiber.sleep(.5)
+---
+...
+client = socket.tcp_connect(addr2.host, addr2.port)
+---
+...
+client ~= nil
+---
+- true
+...
+-- Check that listen and client fibers have appropriate names
+cnt = 0
+---
+...
+--# setopt delimiter ';'
+for i=100,200 do
+    local f = fiber.find(i)
+    if f and f:name():match('^testserv/') then
+        cnt = cnt + 1
+    end
+end;
+---
+...
+--# setopt delimiter ''
+cnt
+---
+- 2
+...
+client:write('hi')
+---
+- true
+...
+client:read(123)
+---
+- Hello, world
+...
+client:close()
+---
+- true
+...
+server:close()
 ---
 - true
 ...
@@ -1275,11 +1373,7 @@ client:read{ line = { "\n\n", "\r\n\r\n" } }
 ---
 - "Hello\r\n\r\n"
 ...
-server:stop()
----
-- true
-...
-os.remove(path)
+server:close()
 ---
 - true
 ...
@@ -1338,4 +1432,51 @@ yaml.decode(yaml.encode(s)).fd == s:fd()
 ...
 s = nil
 ---
+...
+-- start AF_UNIX server with dead socket exists
+path = '/tmp/tarantool-test-socket'
+---
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+s:bind('unix/', path)
+---
+- true
+...
+s:close()
+---
+- true
+...
+s = socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+{ s:bind('unix/', path), errno.strerror() }
+---
+- - false
+  - Address already in use
+...
+s:close()
+---
+- true
+...
+s = socket.tcp_server('unix/', path, function() end)
+---
+...
+s ~= nil
+---
+- true
+...
+s:close()
+---
+- true
+...
+fio.stat(path) == nil
+---
+- true
+...
+{ socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
+---
+- - true
+  - Invalid argument
 ...

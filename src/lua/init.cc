@@ -73,6 +73,7 @@ extern char uuid_lua[],
 	digest_lua[],
 	init_lua[],
 	log_lua[],
+	uri_lua[],
 	bsdsocket_lua[],
 	console_lua[],
 	box_net_box_lua[],
@@ -92,11 +93,12 @@ static const char *lua_modules[] = {
 	"digest", digest_lua,
 	"uuid", uuid_lua,
 	"log", log_lua,
+	"uri", uri_lua,
+	"fio", fio_lua,
 	"socket", bsdsocket_lua,
 	"net.box", box_net_box_lua,
 	"console", console_lua,
 	"tap", tap_lua,
-	"fio", fio_lua,
 	"help.en_US", help_en_US_lua,
 	"help", help_lua,
 	NULL
@@ -291,9 +293,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_ipc_init(L);
 	tarantool_lua_errno_init(L);
+	tarantool_lua_fio_init(L);
 	tarantool_lua_bsdsocket_init(L);
 	tarantool_lua_pickle_init(L);
-	tarantool_lua_fio_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
 	luaopen_yaml(L);

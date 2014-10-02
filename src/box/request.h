@@ -29,13 +29,12 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "iproto_constants.h"
+#include "xrow.h"
 
 struct txn;
 struct port;
 
 typedef void (*request_execute_f)(struct request *, struct port *);
-enum { REQUEST_IOVMAX = IPROTO_PACKET_BODY_IOVMAX };
 
 struct request
 {
@@ -44,7 +43,7 @@ struct request
 	 * on where this packet originated from: the write ahead
 	 * log/snapshot, client request, or a Lua request.
 	 */
-	struct iproto_header *header;
+	struct xrow_header *header;
 	/**
 	 * Request type - IPROTO type code
 	 */

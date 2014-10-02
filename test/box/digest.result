@@ -149,6 +149,64 @@ digest.crc32_update(digest.crc32('abc'), 'cde')
 ---
 - 3628146660
 ...
+digest.base64_encode('12345')
+---
+- MTIzNDU=
+...
+digest.base64_decode('MTIzNDU=')
+---
+- '12345'
+...
+digest.base64_encode('asdfl asdf adfa zxc vzxcvz llll')
+---
+- YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==
+...
+digest.base64_decode('YXNkZmwgYXNkZiBhZGZhIHp4YyB2enhjdnogbGxsbA==')
+---
+- asdfl asdf adfa zxc vzxcvz llll
+...
+digest.base64_encode('11 00 11 00 abcdef ABCDEF 00 11 00 11')
+---
+- MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==
+...
+digest.base64_decode('MTEgMDAgMTEgMDAgYWJjZGVmIEFCQ0RFRiAwMCAxMSAwMCAxMQ==')
+---
+- 11 00 11 00 abcdef ABCDEF 00 11 00 11
+...
+s = string.rep('a', 54 * 2) -- two lines in base64
+---
+...
+b = digest.base64_encode(s)
+---
+...
+b
+---
+- 'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+
+  YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh
+
+'
+...
+digest.base64_decode(b) == s
+---
+- true
+...
+digest.base64_decode(nil)
+---
+- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
+...
+digest.base64_encode(nil)
+---
+- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
+...
+digest.base64_encode(123)
+---
+- error: 'builtin/digest.lua:77: Usage: digest.base64_encode(string)'
+...
+digest.base64_decode(123)
+---
+- error: 'builtin/digest.lua:88: Usage: digest.base64_decode(string)'
+...
 digest = nil
 ---
 ...

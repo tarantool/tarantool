@@ -27,6 +27,14 @@ import errno
 import re
 
 class TarantoolConnection(object):
+
+    @property
+    def uri(self):
+        if self.host == 'unix/' or re.search(r'^/', str(self.port)):
+            return self.port
+        else:
+            return self.host+':'+str(self.port)
+
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -37,9 +45,8 @@ class TarantoolConnection(object):
             self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.socket.connect(self.port)
         else:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket = socket.create_connection((self.host, self.port))
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
-            self.socket.connect((self.host, self.port))
         self.is_connected = True
 
     def disconnect(self):

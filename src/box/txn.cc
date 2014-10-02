@@ -36,8 +36,16 @@
 #include "request.h" /* for request_name */
 #include "session.h"
 #include "port.h"
+#include "iproto_constants.h"
 
 double too_long_threshold;
+
+static inline void
+fiber_set_txn(struct fiber *fiber, struct txn *txn)
+{
+	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
+}
+
 
 static void
 txn_add_redo(struct txn_stmt *stmt, struct request *request)
@@ -47,8 +55,8 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 		return;
 
 	/* Create a redo log row for Lua requests */
-	struct iproto_header *row= (struct iproto_header *)
-		region_alloc0(&fiber()->gc, sizeof(struct iproto_header));
+	struct xrow_header *row= (struct xrow_header *)
+		region_alloc0(&fiber()->gc, sizeof(struct xrow_header));
 	row->type = request->type;
 	row->bodycnt = request_encode(request, row->body);
 	stmt->row = row;
@@ -131,7 +139,7 @@ txn_stmt_new(struct txn *txn)
 struct txn *
 txn_begin(bool autocommit)
 {
-	assert(! fiber_get_txn(fiber()));
+	assert(! in_txn());
 	struct txn *txn = (struct txn *)
 		region_alloc0(&fiber()->gc, sizeof(*txn));
 	rlist_create(&txn->stmts);
@@ -152,7 +160,7 @@ txn_begin(bool autocommit)
 struct txn *
 txn_begin_stmt(struct request *request)
 {
-	struct txn *txn = fiber_get_txn(fiber());
+	struct txn *txn = in_txn();
 	if (txn == NULL)
 		txn = txn_begin(true);
 	struct txn_stmt *stmt = txn_stmt_new(txn);
@@ -181,7 +189,7 @@ txn_commit_stmt(struct txn *txn, struct port *port)
 void
 txn_commit(struct txn *txn)
 {
-	assert(txn == fiber_get_txn(fiber()));
+	assert(txn == in_txn());
 	struct txn_stmt *stmt;
 	/* if (!txn->autocommit && txn->n_stmts && engine_no_yield(txn->engine)) */
 		trigger_clear(&txn->fiber_on_yield);
@@ -236,7 +244,7 @@ txn_finish(struct txn *txn)
 void
 txn_rollback_stmt()
 {
-	struct txn *txn = fiber_get_txn(fiber());
+	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
 	if (txn->autocommit)
@@ -256,7 +264,7 @@ txn_rollback_stmt()
 void
 txn_rollback()
 {
-	struct txn *txn = fiber_get_txn(fiber());
+	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
 	struct txn_stmt *stmt;
@@ -295,7 +303,7 @@ int
 boxffi_txn_begin()
 {
 	try {
-		if (fiber_get_txn(fiber()))
+		if (in_txn())
 			tnt_raise(ClientError, ER_ACTIVE_TRANSACTION);
 		(void) txn_begin(false);
 	} catch (Exception  *e) {
@@ -308,7 +316,7 @@ int
 boxffi_txn_commit()
 {
 	try {
-		struct txn *txn = fiber_get_txn(fiber());
+		struct txn *txn = in_txn();
 		/**
 		 * COMMIT is like BEGIN or ROLLBACK
 		 * a "transaction-initiating statement".

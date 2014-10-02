@@ -28,305 +28,193 @@
  */
 #include "uri.h"
 #include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include <sys/socket.h>
-#include <netinet/ip.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/un.h>
-#include <netdb.h>
-
-const char *
-uri_to_string(const struct uri * uri)
-{
-	static __thread char
-		str[NI_MAXSERV + NI_MAXHOST + sizeof(uri->schema)];
-
-	if (!uri || !uri->addr_len) {
-		snprintf(str, sizeof(str), "unknown address");
-		return str;
-	}
-
-	switch (uri->addr.sa_family) {
-	case AF_INET6:
-	case AF_INET:
-	{
-		char shost[NI_MAXHOST];
-		char sservice[NI_MAXSERV];
-		getnameinfo(
-			    (struct sockaddr *)&uri->addr,
-			    uri->addr_len,
-			    shost, sizeof(shost),
-			    sservice, sizeof(sservice),
-			    NI_NUMERICHOST|NI_NUMERICSERV);
-		if (uri->addr.sa_family == AF_INET) {
-			if (strncmp(uri->schema, "tcp", 3) == 0) {
-				snprintf(str, sizeof(str), "%s:%s",
-					 shost, sservice);
-			} else {
-				snprintf(str, sizeof(str), "%s://%s:%s",
-					 uri->schema, shost, sservice);
-			}
-		} else {
-			if (strncmp(uri->schema, "tcp", 3) == 0) {
-				snprintf(str, sizeof(str), "%s:%s",
-					 shost, sservice);
-			} else {
-				snprintf(str, sizeof(str), "%s://[%s]:%s",
-					 uri->schema, shost, sservice);
-			}
-		}
-                break;
-	}
-	case AF_UNIX:
-	{
-		struct sockaddr_un *un =
-			(struct sockaddr_un *)&uri->addr;
-		snprintf(str, sizeof(str), "unix://%.*s",
-			 (int) sizeof(un->sun_path), un->sun_path);
-	        break;
-	}
-	default:
-		snprintf(str, sizeof(str), "unknown address");
-	        break;
-	}
-	return str;
-}
-
+#include <stdio.h> /* snprintf */
 int
 uri_parse(struct uri *uri, const char *p)
 {
-	(void) uri;
 	const char *pe = p + strlen(p);
 	const char *eof = pe;
 	int cs;
 	memset(uri, 0, sizeof(*uri));
 
-	struct {
-		const char *start;
-		const char *end;
-	}	schema		= { 0, 0 },
-		host		= { 0, 0 },
-		service		= { 0, 0 },
-		sport		= { 0, 0 },
-		login		= { 0, 0 },
-		password	= { 0, 0 },
-		ip4		= { 0, 0 },
-		ip6		= { 0, 0 },
-		path		= { 0, 0 },
-		dport		= { 0, 0 }
-	;
+	if (p == pe)
+		return -1;
 
-	unsigned port = 0;
+	const char *s = NULL, *login = NULL, *scheme = NULL;
+	size_t login_len = 0, scheme_len = 0;
 
 	%%{
 		machine uri;
 		write data;
 
-		hex1_4 = ([0-9a-fA-F]{1,4});
+		#
+		# Line by line translation of RFC3986
+		# http://tools.ietf.org/html/rfc3986#appendix-A
+		#
 
+		gen_delims = (":" | "/" | "?" | "#" | "[" | "]" | "@");
+		sub_delims = ("!" | "$" | "&" | "'" | "(" | ")"
+				 | "*" | "+" | "," | ";" | "=");
 
-		schema		= ((alpha+) "://")
-			>{ schema.start = p; }
-		    %{ schema.end   = p - 3; };
+		reserved = (gen_delims | sub_delims);
+		unreserved = alpha | digit | "-" | "_" | "~" | ".";
+		pct_encoded = ("%%" | ("%" xdigit xdigit?)
+				   | ("%u" xdigit xdigit xdigit xdigit));
 
-		login		= (alnum+)
-			>{ login.start  = p; }
-		    %{ login.end    = p; };
+		pchar_nc = unreserved | pct_encoded | sub_delims | "@";
+		pchar = pchar_nc | ":";
 
-		password	= (alnum+)
-			>{ password.start = p; }
-		    %{ password.end   = p; };
+		query = (pchar | "/" | "?")*
+			>{ s = p; }
+			%{ uri->query = s; uri->query_len = p - s; };
 
-		ip4	= ((digit{1,3}) (("." digit{1,3}){3}))
-			>{ ip4.start = p; }
-		    %{ ip4.end   = p; };
+		fragment = (pchar | "/" | "?")*
+			>{ s = p; }
+			%{ uri->fragment = s; uri->fragment_len = p - s; };
 
-		ip4_6	= ("[::" [fF][fF][fF][fF] ":" ip4 "]");
+		segment = pchar*;
+		segment_nz = pchar+;
+		segment_nz_nc = pchar_nc+;
 
-		ip6	= ("["
-			   (hex1_4?)
-			   ((":" (hex1_4?)){1,8})
-			   "]")
-			>{ ip6.start = p + 1; }
-		    %{ ip6.end   = p - 1; };
+		path_abempty  = ( "/" segment )*;
+		path_absolute = ("/" ( segment_nz ( "/" segment )* )?);
+		path_noscheme = (segment_nz_nc ( "/" segment )*);
+		path_rootless = (pchar_nc ( "/" segment )*);
+		path_empty    = "";
 
-		host		= (ip4_6 | ip4 | ip6 | ([^:?]+))
-			>{ host.start   = p; }
-		    %{ host.end     = p; };
+		path = path_abempty    # begins with "/" or is empty
+		     | path_absolute   # begins with "/" but not "//"
+		     | path_noscheme   # begins with a non-colon segment
+		     | path_rootless   # begins with a segment
+		     | path_empty;     # zero characters
 
-		dport		= ([1-9] (digit*))
-			>{ dport.start   = p; port = 0; }
-		    ${ port = port * 10 + (int)(*p - '0'); }
-		    %{ dport.end	 = p; };
+		reg_name = (unreserved | pct_encoded | sub_delims)+
+			>{ s = p; }
+			%{ uri->host = s; uri->host_len = p - s;};
 
-		service		= (dport | (alpha{1,16}))
-			>{ service.start = p; }
-		    %{ service.end   = p; };
+		hex1_4 = ([0-9a-fa-f]{1,4});
 
+		ip4addr = ((digit{1,3}) (("." digit{1,3}){3}));
+		ip4 = ip4addr
+			>{ s = p; }
+			%{ uri->host = s; uri->host_len = p - s;
+			   uri->host_hint = 1; };
 
-		port		= ([1-9] digit*)
-			>{ sport.start   = p; port = 0; }
-		    ${ port = port * 10 + (int)(*p - '0'); }
-		    %{ sport.end     = p; };
+		ip6	= ("[" (
+				((hex1_4?) ((":" (hex1_4?)){1,8})) |
+				("::" [ff][ff][ff][ff] ":" ip4addr))
+			>{ s = p; }
+			%{ uri->host = s; uri->host_len = p - s;
+				   uri->host_hint = 2; }
+			   "]");
 
-		abspath		= ("/" any+)
-			>{ path.start = p; }
-		    %{ path.end   = p; };
+		action unix{
+			/*
+			 * This action is also called for path_* terms.
+			 * I absolutely have no idea why.
+			 */
+			if (uri->host_hint != 3) {
+				uri->host_hint = 3;
+				uri->host = URI_HOST_UNIX;
+				uri->host_len = strlen(URI_HOST_UNIX);
+				uri->service = s; uri->service_len = p - s;
+				/* a workaround for grammar limitations */
+				uri->path = NULL;
+				uri->path_len = 0;
+			};
+		}
+		# Non-standard: "unix/" support
+		unix = ("unix/:" %{ s = p;} path) %unix;
 
-		file		= (any+)
-			>{ path.start = p; }
-		    %{ path.end   = p; };
+		service = (digit+ | alpha*)
+			>{ s = p; }
+			%{ uri->service = s; uri->service_len = p - s; };
 
+		host =  (ip4 | ip6 | reg_name);
 
-		main := (
-		    ("unix://"
-		      ((login ":" password "@") ?) file) |
+		login = (unreserved | pct_encoded | sub_delims )+
+			>{ s = p; }
+			%{ login = s; login_len = p - s; };
 
-		     ((schema)?
-			((login ":" password "@")?)
-			host
-			((":" service)?))		    |
+		password = (unreserved | pct_encoded | sub_delims )+
+			>{ s = p; }
+			%{ uri->password = s; uri->password_len = p - s; };
 
-		     port				    |
-		     abspath
-		);
+		# Non-standard: split userinfo to login and password
+		userinfo = login (":" password)?
+			%{ uri->login = login; uri->login_len = login_len; };
+
+		# Non-standard: use service instead of port here + support unix
+		authority = (userinfo "@")? ((host (":" service)?) | (unix  ":"));
+
+		scheme = alpha > { s = p; }
+			 (alpha | digit | "+" | "-" | ".")*
+			%{scheme = s; scheme_len = p - s; };
+
+		# relative_part = "//" authority > { s  =  p } path_abempty |
+		#	 path_absolute |
+		#	 path_noscheme |
+		#	 path_empty;
+
+		# Non-standard: allow URI without scheme
+		hier_part_noscheme = (((authority %{ s = p; } path_abempty?
+					  | path_absolute?
+					  | path_rootless?
+					  | path_empty?
+				) %{ uri->path = s; uri->path_len = p - s; }) |
+				unix);
+
+		hier_part = "//"
+			>{ uri->scheme = scheme; uri->scheme_len = scheme_len;}
+			hier_part_noscheme;
+
+		# relative_ref = relative_part ("?" >{ s = p; } query)?
+		#	("#" >{ s = p; } fragment)?;
+
+		# absolute_URI = scheme ":" hier_part ("?" >{ s = p; } query);
+
+		PORT = digit+
+			>{ uri->service = p; }
+			%{ uri->service_len = p - uri->service;
+			   uri->host = NULL; uri->host_len = 0; };
+
+		PATH = ((userinfo "@")? %{ s = p; } path_absolute %unix);
+
+		URI = ((scheme ":" hier_part) | hier_part_noscheme)
+			("?" >{ s = p; } query)? ("#" >{ s = p; } fragment)?;
+
+		# Non-RFC: support port and absolute path
+		main := URI | PORT | PATH;
+
 		write init;
 		write exec;
 	}%%
 
+	if (uri->path_len == 0)
+		uri->path = NULL;
+	if (uri->service_len == 0)
+		uri->service = NULL;
+	if (uri->service_len >= URI_MAXSERVICE)
+		return -1;
+	if (uri->host_len >= URI_MAXHOST)
+		return -1;
+
 	(void)uri_first_final;
 	(void)uri_error;
 	(void)uri_en_main;
+	(void)eof;
 
-	if (login.start && login.end && password.start && password.end) {
-		snprintf(uri->login, sizeof(uri->login),
-			 "%.*s", (int) (login.end - login.start), login.start);
-		snprintf(uri->password, sizeof(uri->password),
-			 "%.*s", (int) (password.end - password.start),
-			 password.start);
-	}
-
-	if (path.start && path.end) {
-		struct sockaddr_un *un = (struct sockaddr_un *)&uri->addr;
-		uri->addr_len = sizeof(*un);
-		un->sun_family = AF_UNIX;
-		if (path.end - path.start >= sizeof(un->sun_path))
-			return -1;
-
-		snprintf(un->sun_path, sizeof(un->sun_path),
-			 "%.*s", (int) (path.end - path.start), path.start);
-		snprintf(uri->schema, sizeof(uri->schema), "unix");
-		return 0;
-	}
-
-	if (schema.start && schema.end) {
-		snprintf(uri->schema, sizeof(uri->schema),
-			 "%.*s", (int) (schema.end - schema.start), schema.start);
-	} else {
-		snprintf(uri->schema, sizeof(uri->schema), "tcp");
-	}
-
-
-	/* only port was defined */
-	if (sport.start && sport.end) {
-		struct sockaddr_in *in = (struct sockaddr_in *)&uri->addr;
-		uri->addr_len = sizeof(*in);
-
-		in->sin_family = AF_INET;
-		in->sin_port = htons(port);
-		in->sin_addr.s_addr = INADDR_ANY;
-		return 0;
-	}
-
-
-	if (!(dport.start && dport.end)) {
-		port = 0;
-		if (service.start && service.end) {
-			if (service.end - service.start >= NI_MAXSERV)
-				return -1;
-			char sname[NI_MAXSERV];
-			snprintf(sname, sizeof(sname), "%.*s",
-				 (int) (service.end - service.start),
-                 service.start);
-			struct servent *s = getservbyname(sname, NULL);
-			if (!s)
-				return -1;
-			port = ntohs(s->s_port);
-		}
-	}
-
-
-	/* IPv4 uri */
-	if (ip4.start && ip4.end) {
-		struct sockaddr_in *in =
-			(struct sockaddr_in *)&uri->addr;
-		uri->addr_len = sizeof(*in);
-
-		in->sin_family = AF_INET;
-		in->sin_port = htons(port);
-
-		char sip4[3 * 4 + 3 + 1];
-		memset(sip4, 0, sizeof(sip4));
-		snprintf(sip4, sizeof(sip4), "%.*s", (int) (ip4.end - ip4.start),
-			 ip4.start);
-		if (inet_aton(sip4, &in->sin_addr))
-			return 0;
-		return -1;
-	}
-
-	/* IPv6 uri */
-	if (ip6.start && ip6.end) {
-		struct sockaddr_in6 *in6 =
-			(struct sockaddr_in6 *)&uri->addr;
-		uri->addr_len = sizeof(*in6);
-
-
-		char sip6[8 * 4 + 7 + 1];
-		memset(sip6, 0, sizeof(sip6));
-		snprintf(sip6, sizeof(sip6), "%.*s", (int) (ip6.end - ip6.start),
-			 ip6.start);
-
-		in6->sin6_family = AF_INET6;
-		in6->sin6_port = htonl(port);
-
-		if (inet_pton(AF_INET6, sip6, (void *)&in6->sin6_addr))
-			return 0;
-
-		return -1;
-	}
-
-
-	if (!host.start || !host.end)
-		return -1;
-
-	if (host.end - host.start >= NI_MAXHOST)
-		return -1;
-
-	char shost[NI_MAXHOST];
-	char sservice[NI_MAXSERV];
-	snprintf(shost, sizeof(shost), "%.*s", (int) (host.end - host.start),
-		 host.start);
-	if (service.end) {
-		snprintf(sservice, sizeof(sservice), "%.*s",
-			 (int) (service.end - service.start), service.start);
-	} else {
-		sservice[0] = '\0';
-	}
-
-	struct addrinfo hints, *res;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_protocol = getprotobyname("tcp")->p_proto;
-
-	if (getaddrinfo(shost, sservice, &hints, &res) != 0)
-		return -1;
-
-	uri->addr_len = res->ai_addrlen;
-	memcpy((void *)&uri->addr, (void *)res->ai_addr, res->ai_addrlen);
-	freeaddrinfo(res);
-	return 0;
+	return cs >= uri_first_final ? 0 : -1;
 }
 
+char *
+uri_format(const struct uri *uri)
+{
+	static char buf[1024];
+	/* very primitive implementation suitable for our needs */
+	snprintf(buf, sizeof(buf), "%.*s:%.*s",
+		 (int) uri->host_len, uri->host != NULL ? uri->host : "*",
+		 (int) uri->service_len, uri->service);
+	return buf;
+}
 /* vim: set ft=ragel: */

@@ -188,7 +188,7 @@ box.schema.space.create = function(name, options)
         engine = 'string',
         id = 'number',
         field_count = 'number',
-        user = 'user',
+        user = 'string, number',
     }
     local options_defaults = {
         engine = 'memtx',
@@ -303,6 +303,7 @@ box.schema.index.create = function(space_id, name, options)
         parts = 'table',
         unique = 'boolean',
         id = 'number',
+        if_not_exists = 'boolean',
     }
     local options_defaults = {
         type = 'tree',
@@ -315,6 +316,13 @@ box.schema.index.create = function(space_id, name, options)
     options.parts = update_index_parts(options.parts)
 
     local _index = box.space[box.schema.INDEX_ID]
+    if _index.index.name:get{space_id, name} then
+        if options.if_not_exists then
+            return box.space[space_id].index[name], "not created"
+        else
+            box.error(box.error.INDEX_EXISTS, name)
+        end
+    end
 
     local unique = options.unique and 1 or 0
     local part_count = bit.rshift(#options.parts, 1)
