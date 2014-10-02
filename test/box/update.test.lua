@@ -110,3 +110,11 @@ s = box.space.tweedledum
 s:select{}
 s:truncate()
 s:drop()
+
+-- #521: Cryptic error message in update operation
+s = box.schema.create_space('tweedledum')
+s:create_index('pk')
+s:insert{1, 2, 3}
+s:update({1})
+s:update({1}, {'=', 1, 1})
+s:drop()
