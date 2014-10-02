@@ -32,6 +32,7 @@
 #include "key_def.h" /* for enum field_type */
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
+enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
 
 struct tbuf;
 
@@ -123,6 +124,8 @@ static inline void
 tuple_format_ref(struct tuple_format *format, int count)
 {
 	assert(format->refs + count >= 0);
+	assert((uint64_t)format->refs + count <= FORMAT_REF_MAX);
+
 	format->refs += count;
 	if (format->refs == 0)
 		tuple_format_delete(format);
@@ -171,21 +174,73 @@ struct tuple *
 tuple_new(struct tuple_format *format, const char *data, const char *end);
 
 /**
- * Change tuple reference counter. If it has reached zero, free the tuple.
+ * Free the tuple.
+ * @pre tuple->refs  == 0
+ */
+void
+tuple_delete(struct tuple *tuple);
+
+/**
+ * Throw and exception about tuple reference counter overflow.
+ */
+void
+tuple_ref_exception();
+
+/**
+ * Increment tuple reference counter.
+ * Throws if overflow detected.
  *
  * @pre tuple->refs + count >= 0
  */
-extern "C" void
-tuple_ref(struct tuple *tuple, int count);
+extern "C" inline void
+tuple_ref(struct tuple *tuple)
+{
+	if (tuple->refs + 1 > TUPLE_REF_MAX)
+		tuple_ref_exception();
 
-void
-tuple_delete(struct tuple *tuple);
+	tuple->refs++;
+}
+
+/**
+ * Increment tuple reference counter.
+ * Returns -1 if overflow detected, 0 otherwise
+ *
+ * @pre tuple->refs + count >= 0
+ */
+extern "C" inline int
+tuple_ref_nothrow(struct tuple *tuple)
+{
+	try {
+		tuple_ref(tuple);
+	} catch (Exception *e) {
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Decrement tuple reference counter. If it has reached zero, free the tuple.
+ *
+ * @pre tuple->refs + count >= 0
+ */
+extern "C" inline void
+tuple_unref(struct tuple *tuple)
+{
+	assert(tuple->refs - 1 >= 0);
+
+	tuple->refs--;
+
+	if (tuple->refs == 0)
+		tuple_delete(tuple);
+}
 
 /** Make tuple references exception-friendly in absence of @finally. */
 struct TupleGuard {
 	struct tuple *tuple;
-	TupleGuard(struct tuple *arg) :tuple(arg) {}
-	~TupleGuard() { if (tuple->refs == 0) tuple_delete(tuple); }
+	TupleGuard(struct tuple *arg) :tuple(arg) { tuple_ref(tuple); }
+	~TupleGuard() { tuple_unref(tuple); }
+	TupleGuard(const TupleGuard&) = delete;
+	void operator=(const TupleGuard&) = delete;
 };
 
 /**

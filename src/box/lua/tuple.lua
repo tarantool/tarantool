@@ -16,8 +16,10 @@ struct tuple
     char data[0];
 } __attribute__((packed));
 
+int
+tuple_ref_nothrow(struct tuple *tuple);
 void
-tuple_ref(struct tuple *tuple, int count);
+tuple_unref(struct tuple *tuple);
 uint32_t
 tuple_field_count(const struct tuple *tuple);
 const char *
@@ -50,13 +52,16 @@ local builtin = ffi.C
 local const_struct_tuple_ref_t = ffi.typeof('const struct tuple&')
 
 local tuple_gc = function(tuple)
-    builtin.tuple_ref(tuple, -1)
+    builtin.tuple_unref(tuple)
 end
 
 local tuple_bless = function(tuple)
-    -- update in-place, do not spent time calling tuple_ref
+    -- tuple_ref(..) may throw to prevent reference counter to overflow,
+    -- which is not allowed in ffi call, so we'll use nothrow version
+    if (builtin.tuple_ref_nothrow(tuple) ~= 0) then
+        box.error();
+    end
     local tuple2 = ffi.gc(ffi.cast(const_struct_tuple_ref_t, tuple), tuple_gc)
-    tuple._refs = tuple._refs + 1
     return tuple2
 end
 

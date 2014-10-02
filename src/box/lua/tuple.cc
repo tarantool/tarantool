@@ -106,7 +106,7 @@ static int
 lbox_tuple_gc(struct lua_State *L)
 {
 	struct tuple *tuple = lua_checktuple(L, 1);
-	tuple_ref(tuple, -1);
+	tuple_unref(tuple);
 	return 0;
 }
 
@@ -305,7 +305,7 @@ lbox_pushtuple(struct lua_State *L, struct tuple *tuple)
 		*ptr = tuple;
 		lua_pushcfunction(L, lbox_tuple_gc);
 		luaL_setcdatagc(L, -2);
-		tuple_ref(tuple, 1);
+		tuple_ref(tuple);
 	} else {
 		return lua_pushnil(L);
 	}

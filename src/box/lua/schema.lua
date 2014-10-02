@@ -239,11 +239,9 @@ box.schema.space.drop = function(space_id)
         local v = keys[i]
         _index:delete{v[1], v[2]}
     end
-    local privs = _priv:select{}
+    local privs = _priv.index.object:select{'space', space_id}
     for k, tuple in pairs(privs) do
-        if tuple[3] == 'space' and tuple[4] == space_id then
-            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-        end
+        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
     if _space:delete{space_id} == nil then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
@@ -935,11 +933,9 @@ box.schema.func.drop = function(name)
     local _func = box.space[box.schema.FUNC_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local fid = object_resolve('function', name)
-    local privs = _priv:select{}
+    local privs = _priv.index.object:select{'function', fid}
     for k, tuple in pairs(privs) do
-        if tuple[3] == 'function' and tuple[4] == fid then
-            box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
-        end
+        box.schema.user.revoke(tuple[2], tuple[5], tuple[3], tuple[4])
     end
     _func:delete{fid}
 end

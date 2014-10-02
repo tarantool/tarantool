@@ -208,6 +208,7 @@ t;
   - 'box.error.WAL_IO : 40'
   - 'box.error.CREATE_USER : 43'
   - 'box.error.CREATE_SPACE : 9'
+  - 'box.error.TUPLE_REF_OVERFLOW : 86'
   - 'box.error.UNKNOWN_SCHEMA_OBJECT : 49'
   - 'box.error.PROC_LUA : 32'
   - 'box.error.CREATE_ROLE : 84'
