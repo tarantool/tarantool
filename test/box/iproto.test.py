@@ -210,6 +210,3 @@ for test in TESTS:
     print
 
 admin("space:drop()")
-
-server.stop()
-server.deploy()
