@@ -75,6 +75,7 @@ int main_argc;
 /** Signals handled after start as part of the event loop. */
 static ev_signal ev_sigs[4];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
+static bool start_loop = true;
 
 extern const void *opt_def;
 
@@ -153,6 +154,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	(void) w;
 	(void) revents;
 
+	start_loop = false;
 	/* Terminate the main event loop */
 	ev_break(loop, EVBREAK_ALL);
 }
@@ -234,13 +236,6 @@ signal_free(void)
 		ev_signal_stop(loop(), &ev_sigs[i]);
 }
 
-static void
-signal_start(void)
-{
-	for (int i = 0; i < ev_sig_count; i++)
-		ev_signal_start(loop(), &ev_sigs[i]);
-}
-
 /** Make sure the child has a default signal disposition. */
 static void
 signal_reset()
@@ -259,6 +254,9 @@ signal_reset()
 	    sigaction(SIGSEGV, &sa, NULL) == -1 ||
 	    sigaction(SIGFPE, &sa, NULL) == -1)
 		say_syserror("sigaction");
+
+	for (int i = 0; i < ev_sig_count; i++)
+		ev_signal_stop(loop(), &ev_sigs[i]);
 
 	/* Unblock any signals blocked by libev. */
 	sigset_t sigset;
@@ -302,6 +300,8 @@ signal_init(void)
 	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_cb, SIGHUP);
+	for (int i = 0; i < ev_sig_count; i++)
+		ev_signal_start(loop(), &ev_sigs[i]);
 
 	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
 }
@@ -366,6 +366,12 @@ background()
 
 	if (setsid() == -1)
 		goto error;
+
+	/*
+	 * reinit signals after fork, because fork() implicitly calls
+	 * signal_reset() via pthread_atfork() hook installed by signal_init().
+	 */
+	signal_init();
 
 	/* reinit coeio after fork (because libeio required it) */
 	coeio_reinit();
@@ -610,9 +616,6 @@ main(int argc, char **argv)
 	main_argc = argc;
 	main_argv = argv;
 
-	/* main core cleanup routine */
-	atexit(tarantool_free);
-
 	fiber_init();
 	/* Init iobuf library with default readahead */
 	iobuf_init();
@@ -620,7 +623,9 @@ main(int argc, char **argv)
 	signal_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
-	bool start_loop = false;
+	/* main core cleanup routine */
+	atexit(tarantool_free);
+
 	try {
 		int events = ev_activecnt(loop());
 		/*
@@ -630,12 +635,16 @@ main(int argc, char **argv)
 		 * initialized.
 		 */
 		tarantool_lua_run_script(script);
-		start_loop = ev_activecnt(loop()) > events;
+		/*
+		 * Start event loop after executing Lua script if signal_cb()
+		 * wasn't triggered and there is some new events. Initial value
+		 * of start_loop can be set to false by signal_cb().
+		 */
+		start_loop = start_loop && ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_crit("entering the event loop");
 			ev_now_update(loop());
-			signal_start();
 			ev_run(loop(), 0);
 		}
 	} catch (Exception *e) {
