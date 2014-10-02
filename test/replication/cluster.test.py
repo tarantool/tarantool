@@ -102,8 +102,6 @@ replica.admin('box.info.vclock[%d]' % replica_id)
 replica.admin('box.info.vclock[%d]' % replica_id2)
 replica.admin('box.info.vclock[%d]' % replica_id3)
 
+# Cleanup
 sys.stdout.pop_filter()
 
-# Cleanup
-server.stop()
-server.deploy()
