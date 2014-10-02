@@ -32,17 +32,17 @@ identifier which is unique within the cluster, known as the
     A replica gets all updates from the master by continuously
     fetching and applying its write-ahead log (WAL).
     Each record in the WAL represents a single Tarantool
-    command such as INSERT or UPDATE or DELETE, and is assigned
+    data-change request such as INSERT or UPDATE or DELETE, and is assigned
     a monotonically growing log sequence number (LSN).
     In essence, Tarantool replication is row-based:
-    all data change commands are fully deterministic and operate
-    on a single record.
+    each data change command is fully deterministic and operate
+    on a single tuple.
   </para>
   <para>
     A stored program invocation
     <!-- , unless requested explicitly, -->
     is not written to the write-ahead log. Instead, log events
-    for actual UPDATEs and DELETEs, performed by the Lua code,
+    for actual data-change requests, performed by the Lua code,
     are written to the log. This ensures that possible
     non-determinism of Lua does not cause replication
     to go out of sync.
@@ -85,7 +85,7 @@ identifier which is unique within the cluster, known as the
     If this first <code>box.cfg</code> request occurs with
     a "replication_source" clause, then the server is a replica
     and its snapshot file, along with the cluster information,
-    is copied from the master. Therefore,
+    is constructed from the write-ahead logs of the master. Therefore,
     to start replication, specify <olink
     targetptr="replication_source"/> in a <code>box.cfg</code> request.
     When a replica contacts a master for the first time, it becomes part of a cluster.
@@ -99,6 +99,7 @@ identifier which is unique within the cluster, known as the
     A replica can be "re-seeded" by deleting all its files (the snapshot .snap file
     and the WAL .xlog files), then starting replication again -- the replica will
     then catch up with the master by retrieving all the master's tuples.
+    Again, this procedure works only if the master's WAL files are present.
   </para>
   <note><simpara>
     Replication parameters are "dynamic", which allows the
@@ -280,7 +281,7 @@ $ <userinput>mkdir -p ~/tarantool_test_node_1</userinput>
 $ <userinput>cd ~/tarantool_test_node_1</userinput>
 ~/tarantool_test_node_1$ <userinput>rm -R ~/tarantool_test_node_1/*</userinput>
 ~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-~/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
@@ -355,7 +356,7 @@ tarantool> 2014-08-14 13:41:31.097 [24958] main/101/spawner I> created a replica
 ~/tarantool_test_node_2$ <userinput>cd ~/tarantool_test_node_2</userinput>
 ~/tarantool_test_node_2$ <userinput>rm -R ~/tarantool_test_node_2/*</userinput>
 ~/tarantool_test_node_2$ <userinput>~/tarantool-master/src/tarantool</userinput>
-/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3302, replication_source=3301}</userinput>
 ... ...
@@ -407,7 +408,7 @@ tarantool&gt; <userinput>s:insert{1,'Tuple inserted on Terminal #1'}</userinput>
 ~/tarantool_test_node_2$ cd ~/tarantool_test_node_2
 ~/tarantool_test_node_2$ rm -R ~/tarantool_test_node_2/*
 ~/tarantool_test_node_2$ ~/tarantool-master/src/tarantool
-/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.0-1724-g033ed69
+/home/pgulutzan/tarantool-master/src/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; box.cfg{listen=3302, replication_source=3301}
 ... ...
@@ -633,7 +634,7 @@ total 12
 -rw-rw-r-- 1   486 Aug 14 14:52 00000000000000000000.xlog
 drwxr-x--- 2  4096 Aug 14 13:41 sophia
 ~/tarantool_test_node_1$ <userinput>~/tarantool-master/src/tarantool</userinput>
-~/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; <userinput>box.cfg{listen=3301}</userinput>
 ... ...
@@ -694,7 +695,7 @@ The screen now looks like this:
     <tbody>
      <row><entry><programlisting>... ...
 ~/tarantool_test_node_1$ ~/tarantool-master/src/tarantool
-~/tarantool: version 1.6.0-1724-g033ed69
+~/tarantool: version 1.6.3-1724-g033ed69
 type 'help' for interactive help
 tarantool&gt; box.cfg{listen=3301}
 ... ...

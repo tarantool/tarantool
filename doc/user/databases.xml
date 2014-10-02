@@ -2258,24 +2258,24 @@ tarantool> <userinput>box.cfg</userinput>
             <bridgehead renderas="sect4">Example</bridgehead><programlisting>
 tarantool> <userinput>box.info()</userinput>
 ---
-- version: 1.6.0-1663-g7bbb330
+- server:
+    lsn: 0
+    ro: false
+    uuid: 137128fb-addd-41ee-9f9a-7d6deaef61e7
+    id: 1
+  version: 1.6.3-439-g7e1011b
   status: running
   vclock:
   - 0
-  pid: 10316
-  logger_pid: 0
+  pid: 21740
   recovery_last_update: 0
   recovery_lag: 0
-  build:
-    [ build flags and options are omitted from this example ]
+  logger_pid: 0
   uptime: 2880
   snapshot_pid: 0
-  node:
-    lsn: 0
-    uuid: e8530a1a-d450-4598-bcc9-6efc842dfe20
-    id: 1
-...
-</programlisting>
+  build:
+    [ build flags and options are omitted from this example ]
+...</programlisting>
         </listitem>
     </varlistentry>
     <varlistentry>
@@ -2294,7 +2294,7 @@ tarantool> <userinput>box.info.logger_pid</userinput>
 ...
 tarantool> <userinput>box.info.version</userinput>
 ---
-- 1.6.0-819-geefb2d0
+- 1.6.3-439-g7e1011b
 ...
 tarantool> <userinput>box.info.uptime</userinput>
 ---
@@ -2765,7 +2765,7 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
         example:
 <programlisting>tarantool> <userinput>box.info.version</userinput>
 ---
-- 1.6.0-805-g4a7e71d
+- 1.6.3-439-g7e1011b
 ...
 tarantool> <userinput>box.snapshot()</userinput>
 ---
