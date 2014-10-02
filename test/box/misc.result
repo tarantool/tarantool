@@ -197,7 +197,6 @@ t;
   - 'box.error.NO_SUCH_FUNCTION : 51'
   - 'box.error.TUPLE_NOT_FOUND : 4'
   - 'box.error.DROP_USER : 44'
-  - 'box.error.SERVER_ID_IS_RO : 66'
   - 'box.error.CROSS_ENGINE_TRANSACTION : 81'
   - 'box.error.MODIFY_INDEX : 14'
   - 'box.error.PASSWORD_MISMATCH : 47'

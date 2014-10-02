@@ -105,6 +105,9 @@ cserver_id_is_reserved(uint32_t id)
 void
 cluster_set_server(const tt_uuid *server_uuid, uint32_t id);
 
+void
+cluster_del_server(uint32_t server_id);
+
 /** }}} **/
 
 #endif

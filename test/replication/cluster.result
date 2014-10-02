@@ -1,3 +1,6 @@
+-------------------------------------------------------------
+gh-434: Assertion if replace _cluster tuple
+-------------------------------------------------------------
 box.space._cluster:replace{1, '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'}
 ---
 - [1, '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae']
@@ -22,15 +25,109 @@ box.info.server.uuid
 ---
 - 8c7ff474-65f9-4abe-81a4-a3e1019bb1ae
 ...
-box.space._cluster:delete(1)
----
-- error: Can't reset server id
-...
-box.space._cluster:update(1, {{'=', 1, 10}})
----
-- error: Can't reset server id
-...
 box.space._cluster:replace{1, require('uuid').NULL:str()}
 ---
 - error: 'Invalid UUID: 00000000-0000-0000-0000-000000000000'
+...
+-------------------------------------------------------------
+gh-527: update vclock on delete from box.space._cluster
+-------------------------------------------------------------
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+---
+...
+box.space._schema:insert{"test", 48}
+---
+- ['test', 48]
+...
+box.info.server.id
+---
+- 2
+...
+box.info.server.ro
+---
+- false
+...
+box.info.server.lsn
+---
+- 1
+...
+box.info.vclock[2]
+---
+- 1
+...
+box.space._cluster:delete{2}
+---
+- [2, '<replica uuid>']
+...
+box.info.server.id
+---
+- 0
+...
+box.info.server.ro
+---
+- true
+...
+box.info.server.lsn
+---
+- -1
+...
+box.info.vclock[2]
+---
+- null
+...
+box.space._schema:replace{"test", 48}
+---
+- error: Can't modify data because this server in read-only mode.
+...
+box.space._cluster:insert{10, "<replica uuid>"}
+---
+- [10, '<replica uuid>']
+...
+box.info.server.id
+---
+- 10
+...
+box.info.server.ro
+---
+- false
+...
+box.info.server.lsn
+---
+- 0
+...
+box.info.vclock[2]
+---
+- null
+...
+box.info.vclock[10]
+---
+- 0
+...
+box.space._cluster:update(10, {{'=', 1, 11}})
+---
+- [11, '<replica uuid>']
+...
+box.info.server.id
+---
+- 11
+...
+box.info.server.ro
+---
+- false
+...
+box.info.server.lsn
+---
+- 0
+...
+box.info.vclock[2]
+---
+- null
+...
+box.info.vclock[10]
+---
+- null
+...
+box.info.vclock[11]
+---
+- 0
 ...

@@ -69,3 +69,14 @@ cluster_set_server(const tt_uuid *server_uuid, uint32_t server_id)
 		box_set_ro(false);
 	}
 }
+
+void
+cluster_del_server(uint32_t server_id)
+{
+	struct recovery_state *r = recovery;
+	vclock_del_server(&r->vclock, server_id);
+	if (r->server_id == server_id) {
+		r->server_id = 0;
+		box_set_ro(true);
+	}
+}
