@@ -32,7 +32,18 @@ file4 = fio.pathjoin(tmpdir, 'file.4')
 
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 fh1 ~= nil
-fh1:stat().size
+f1s = fh1:stat()
+f1s.size
+
+f1s.is_reg()
+f1s:is_reg()
+f1s:is_dir()
+f1s:is_link()
+f1s:is_sock()
+f1s:is_fifo()
+f1s:is_chr()
+f1s:is_blk()
+
 fh1:seek(121)
 fh1:stat().size
 fh1:write("Hello, world")

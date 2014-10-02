@@ -74,9 +74,44 @@ fh1 ~= nil
 ---
 - true
 ...
-fh1:stat().size
+f1s = fh1:stat()
+---
+...
+f1s.size
 ---
 - 0
+...
+f1s.is_reg()
+---
+- error: 'usage: stat:is_reg()'
+...
+f1s:is_reg()
+---
+- true
+...
+f1s:is_dir()
+---
+- false
+...
+f1s:is_link()
+---
+- false
+...
+f1s:is_sock()
+---
+- false
+...
+f1s:is_fifo()
+---
+- false
+...
+f1s:is_chr()
+---
+- false
+...
+f1s:is_blk()
+---
+- false
 ...
 fh1:seek(121)
 ---
