@@ -76,3 +76,13 @@ s.index[0]:select(1, { iterator = 'GE', offset = 10, limit = 2 })
 s:select(2)
 
 s:drop()
+
+s = box.schema.create_space('select', { temporary = true })
+s:create_index('primary', { type = 'tree' })
+local a s:insert{0}
+lots_of_links = {}
+ref_count = 0
+while (true) do table.insert(lots_of_links, s:get{0}) ref_count = ref_count + 1 end
+ref_count
+lots_of_links = {}
+s:drop()

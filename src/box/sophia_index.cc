@@ -128,7 +128,7 @@ sophia_gettuple(void *db, const char *key, size_t keysize,
 	void *value = sp_get(result, "value", &valuesize);
 	struct tuple *ret =
 		tuple_new(format, (char*)value, (char*)value + valuesize);
-	tuple_ref(ret, 1);
+	tuple_ref(ret);
 	return ret;
 }
 
@@ -197,7 +197,7 @@ SophiaIndex::random(uint32_t rnd) const
 	struct tuple *ret =
 		tuple_new(space->format, (char*)value,
 		          (char*)value + valuesize);
-	tuple_ref(ret, 1);
+	tuple_ref(ret);
 	return ret;
 }
 
@@ -282,14 +282,14 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 			sophia_check_dup(key_def, old_tuple, dup_tuple, mode);
 		if (errcode) {
 			if (dup_tuple)
-				tuple_ref(dup_tuple, -1);
+				tuple_unref(dup_tuple);
 			tnt_raise(ClientError, errcode, index_id(this));
 		}
 
 		void *o = sp_object(db);
 		if (o == NULL) {
 			if (dup_tuple)
-				tuple_ref(dup_tuple, -1);
+				tuple_unref(dup_tuple);
 			tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
 		}
 		sp_set(o, "key", key, keysize);
@@ -297,7 +297,7 @@ SophiaIndex::replace(struct tuple *old_tuple, struct tuple *new_tuple,
 		int rc = sp_set(db, o);
 		if (rc == -1) {
 			if (dup_tuple)
-				tuple_ref(dup_tuple, -1);
+				tuple_unref(dup_tuple);
 			tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
 		}
 		if (dup_tuple)
@@ -352,7 +352,7 @@ sophia_iterator_next(struct iterator *ptr)
 	const char *value = (const char*)sp_get(o, "value", &valuesize);
 	struct tuple *ret =
 		tuple_new(it->space->format, value, value + valuesize);
-	tuple_ref(ret, 1);
+	tuple_ref(ret);
 	return ret;
 }
 

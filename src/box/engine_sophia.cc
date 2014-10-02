@@ -217,6 +217,6 @@ SophiaFactory::txnFinish(struct txn *txn)
 #if 0
 	struct txn_stmt *stmt = txn_stmt(txn);
 	if (stmt->new_tuple)
-		tuple_ref(stmt->new_tuple, -1);
+		tuple_unref(stmt->new_tuple);
 #endif
 }

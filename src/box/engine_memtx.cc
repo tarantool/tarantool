@@ -120,7 +120,7 @@ MemtxFactory::dropIndex(Index *index)
 	index->initIterator(it, ITER_ALL, NULL, 0);
 	struct tuple *tuple;
 	while ((tuple = it->next(it)))
-		tuple_ref(tuple, -1);
+		tuple_unref(tuple);
 }
 
 void

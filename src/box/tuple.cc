@@ -284,19 +284,12 @@ tuple_delete(struct tuple *tuple)
 }
 
 /**
- * Add count to tuple's reference counter.
- * When the counter goes down to 0, the tuple is destroyed.
- *
- * @pre tuple->refs + count >= 0
+ * Throw and exception about tuple reference counter overflow.
  */
 void
-tuple_ref(struct tuple *tuple, int count)
+tuple_ref_exception()
 {
-	assert(tuple->refs + count >= 0);
-	tuple->refs += count;
-
-	if (tuple->refs == 0)
-		tuple_delete(tuple);
+	tnt_raise(ClientError, ER_TUPLE_REF_OVERFLOW);
 }
 
 const char *
