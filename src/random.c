@@ -54,7 +54,8 @@ random_init(void)
 	if (flags != -1)
 		fcntl(rfd, F_SETFD, flags | FD_CLOEXEC);
 
-	read(rfd, &seed, sizeof(seed));
+	ssize_t res = read(rfd, &seed, sizeof(seed));
+	(void) res;
 srand:
 	srandom(seed);
 	srand(seed);

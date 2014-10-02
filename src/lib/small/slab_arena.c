@@ -44,7 +44,7 @@ munmap_checked(void *addr, size_t size)
 {
 	if (munmap(addr, size)) {
 		char buf[64];
-		strerror_r(errno, buf, sizeof(buf));
+		(void) strerror_r(errno, buf, sizeof(buf));
 		fprintf(stderr, "Error in munmap(%p, %zu): %s\n",
 			addr, size, buf);
 		assert(false);

@@ -165,7 +165,8 @@ main(void)
 		done = 0;
 		for (i = 0; i < 1000000 + 1; i++) {
 			buf[0] = 0;
-			fgets(buf, 4096, f);
+			char *res = fgets(buf, 4096, f);
+			(void) res;
 			if (strcmp(buf, "Hello, world\n") == 0)
 				done++;
 		}
@@ -195,12 +196,16 @@ main(void)
 		done = 0;
 		for (i = 0; i < 1000000 + 1; i++) {
 			memset(buf, 0, 4096);
-			fgets(buf, 4096, f);
+			char *res = fgets(buf, 4096, f);
+			(void) res;
 			if (strcmp(buf, "Hello, world\n") == 0)
 				done++;
-/*                         else */
-/*                                 fprintf(stderr, "#   wrong line %zu: %s", */
-/*                                         i, buf); */
+#if 0
+			else {
+				fprintf(stderr, "#   wrong line %zu: %s",
+					i, buf);
+			}
+#endif
 		}
 		is(done, 1000000 + 1, "all records were written properly");
 

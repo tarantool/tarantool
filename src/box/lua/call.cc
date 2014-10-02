@@ -481,7 +481,10 @@ struct SetuidGuard
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 			 struct user *user, uint8_t access)
 	:setuid(false)
+	,orig_auth_token(GUEST) /* silence gnu warning */
+	,orig_uid(GUEST)
 {
+
 	/*
 	 * If the user has universal access, don't bother with setuid.
 	 * No special check for ADMIN user is necessary
@@ -516,7 +519,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	}
 	if (func->setuid) {
 		/** Remember and change the current user id. */
-		setuid = func->setuid;
+		setuid = true;
 		orig_auth_token = user->auth_token;
 		orig_uid = user->uid;
 		session_set_user(session(), func->auth_token, func->uid);

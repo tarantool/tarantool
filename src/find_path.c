@@ -41,7 +41,8 @@ find_path(const char *argv0)
 		if (rc == -1)
 			snprintf(buf, sizeof(buf) - 1, "%s", getenv("_"));
 	}
-	realpath(buf, path);
+	if (realpath(buf, path) == NULL)
+		snprintf(path, sizeof(path), "%s", buf);
 	found = true;
 	return path;
 }

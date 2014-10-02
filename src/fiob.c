@@ -274,8 +274,8 @@ fiob_open(const char *path, const char *mode)
 		flags |= O_DIRECT;
 #endif
 		bsize = O_DIRECT_BSIZE;
-		posix_memalign(&buf, 4096, bsize);
-		if (!buf) {
+		int res = posix_memalign(&buf, 4096, bsize);
+		if (res || !buf) {
 			errno = ENOMEM;
 			return NULL;
 		}

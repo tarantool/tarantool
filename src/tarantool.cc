@@ -506,7 +506,8 @@ tarantool_free(void)
 	if (time(NULL) == 0) {
 		/* never executed */
 		extern void *ffi_symbols[];
-		write(0, ffi_symbols, 0);
+		ssize_t res = write(0, ffi_symbols, 0);
+		(void) res;
 	}
 }
 
