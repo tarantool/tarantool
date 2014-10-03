@@ -260,7 +260,7 @@ getmetatable(box.tuple.new{1, 2, 3}:totable())
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary')
+index = space:create_index('primary')
 ---
 ...
 space:truncate()

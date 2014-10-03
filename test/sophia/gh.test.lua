@@ -31,7 +31,7 @@ s:drop()
 -- gh-431: Sophia: assertion if box.begin
 
 s = box.schema.create_space('tester',{engine='sophia'})
-s:create_index('sophia_index', {})
+i = s:create_index('sophia_index', {})
 s:insert{10000, 'Hilton'}
 box.begin()
 s:delete{10000} -- exception
@@ -46,7 +46,7 @@ s = box.schema.create_space('tester',{engine='sophia', temporary=true})
 -- gh-432: Sophia: ignored limit
 
 s = box.schema.create_space('tester',{id = 89, engine='sophia'})
-s:create_index('sophia_index', {})
+i = s:create_index('sophia_index', {})
 for v=1, 100 do s:insert({v}) end
 t = s:select({''},{iterator='GT', limit =1})
 t
@@ -55,7 +55,7 @@ t
 s:drop()
 
 s = box.schema.create_space('tester', {id = 90, engine='sophia'})
-s:create_index('sophia_index', {type = 'tree', parts = {1, 'STR'}})
+i = s:create_index('sophia_index', {type = 'tree', parts = {1, 'STR'}})
 for v=1, 100 do s:insert({tostring(v)}) end
 t = s:select({''},{iterator='GT', limit =1})
 t

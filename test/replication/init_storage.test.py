@@ -8,7 +8,7 @@ master_id = master.get_param('server')['id']
 
 master.admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 master.admin("space = box.schema.create_space('test', {id =  42})")
-master.admin("space:create_index('primary', { type = 'tree'})")
+master.admin("index = space:create_index('primary', { type = 'tree'})")
 
 master.admin('for k = 1, 9 do space:insert{k, k*k} end')
 

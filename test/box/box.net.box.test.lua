@@ -6,7 +6,7 @@ msgpack = require 'msgpack'
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 LISTEN = require('uri').parse(box.cfg.listen)
 space = box.schema.create_space('net_box_test_space')
-space:create_index('primary', { type = 'tree' })
+index = space:create_index('primary', { type = 'tree' })
 
 -- low level connection
 log.info("create connection")

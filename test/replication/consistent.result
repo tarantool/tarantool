@@ -60,7 +60,7 @@ a:close()
 s = box.schema.create_space('tweedledum', {id = 0});
 ---
 ...
-s:create_index('primary', {type = 'hash'})
+index = s:create_index('primary', {type = 'hash'})
 ---
 ...
 _insert(1, 10, 'master')

@@ -8,7 +8,7 @@ box.stat.REPLACE.total
 box.stat.SELECT.total
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 
 -- check stat_cleanup
 -- add several tuples

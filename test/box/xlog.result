@@ -5,7 +5,7 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
 .xlog.inprogress exists
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 ---
 ...
 .xlog.inprogress has been successfully renamed
@@ -34,7 +34,7 @@ box.space[0]:insert{5, 'Unfinished record'}
 space = box.schema.create_space('test')
 ---
 ...
-box.space['test']:create_index('primary')
+index = box.space['test']:create_index('primary')
 ---
 ...
 box.space['test']:insert{1, 'first tuple'}
@@ -49,7 +49,7 @@ box.space['test']:insert{2, 'second tuple'}
 space = box.schema.create_space('test')
 ---
 ...
-box.space['test']:create_index('primary')
+index = box.space['test']:create_index('primary')
 ---
 ...
 box.space['test']:insert{1, 'first tuple'}
@@ -88,7 +88,7 @@ box.space['test']:len()
 space = box.schema.create_space('test')
 ---
 ...
-box.space.test:create_index('primary')
+index = box.space.test:create_index('primary')
 ---
 ...
 box.space.test:insert{1, 'first tuple'}

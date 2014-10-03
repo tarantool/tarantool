@@ -24,7 +24,7 @@ server.admin("space = box.schema.create_space('tweedledum', { id = 0 })")
 if os.access(wal_inprogress, os.F_OK):
   print ".xlog.inprogress exists"
 
-server.admin("space:create_index('primary', { type = 'hash' })")
+server.admin("index = space:create_index('primary', { type = 'hash' })")
 
 if os.access(wal, os.F_OK) and not os.access(wal_inprogress, os.F_OK):
   print ".xlog.inprogress has been successfully renamed"
@@ -145,7 +145,7 @@ wal = os.path.join(server.vardir, filename)
 
 # Create wal#1
 server.admin("space = box.schema.create_space('test')")
-server.admin("box.space['test']:create_index('primary')")
+server.admin("index = box.space['test']:create_index('primary')")
 server.admin("box.space['test']:insert{1, 'first tuple'}")
 server.admin("box.space['test']:insert{2, 'second tuple'}")
 server.stop()
@@ -160,7 +160,7 @@ lsn += 4
 # Create another wal#1
 server.start()
 server.admin("space = box.schema.create_space('test')")
-server.admin("box.space['test']:create_index('primary')")
+server.admin("index = box.space['test']:create_index('primary')")
 server.admin("box.space['test']:insert{1, 'first tuple'}")
 server.admin("box.space['test']:delete{1}")
 server.stop()
@@ -207,7 +207,7 @@ server.deploy()
 
 # Create wal#1
 server.admin("space = box.schema.create_space('test')")
-server.admin("box.space.test:create_index('primary')")
+server.admin("index = box.space.test:create_index('primary')")
 server.admin("box.space.test:insert{1, 'first tuple'}")
 server.admin("box.space.test:insert{2, 'second tuple'}")
 lsn = int(yaml.load(server.admin("box.info.server.lsn", silent=True))[0])

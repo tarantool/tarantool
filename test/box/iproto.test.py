@@ -93,7 +93,7 @@ print "\n"
 # gh-434 Tarantool crashes on multiple iproto requests with WAL enabled
 admin("box.cfg.wal_mode")
 admin("space = box.schema.create_space('test', { id = 567 })")
-admin("space:create_index('primary', { type = 'hash' })")
+admin("index = space:create_index('primary', { type = 'hash' })")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
 
 c = Connection('localhost', server.sql.port)
@@ -154,7 +154,7 @@ admin("space:drop()")
 # gh-522: Broken compatibility with msgpack-python for strings of size 33..255
 #
 admin("space = box.schema.create_space('test')")
-admin("space:create_index('primary', { type = 'hash', parts = {1, 'str'}})")
+admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'str'}})")
 
 class RawInsert(Request):
     request_type = REQUEST_TYPE_INSERT

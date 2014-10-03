@@ -1,5 +1,5 @@
 s = box.schema.create_space('tweedledum')
-s:create_index('pk')
+index = s:create_index('pk')
 
 -- test delete field
 s:insert{1000001, 1000002, 1000003, 1000004, 1000005}
@@ -113,7 +113,7 @@ s:drop()
 
 -- #521: Cryptic error message in update operation
 s = box.schema.create_space('tweedledum')
-s:create_index('pk')
+index = s:create_index('pk')
 s:insert{1, 2, 3}
 s:update({1})
 s:update({1}, {'=', 1, 1})

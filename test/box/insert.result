@@ -3,7 +3,7 @@
 s = box.schema.create_space('s')
 ---
 ...
-s:create_index('pk')
+index = s:create_index('pk')
 ---
 ...
 s:insert(1)

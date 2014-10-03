@@ -13,7 +13,7 @@ while box.space['_priv']:len() < 1 do require('fiber').sleep(0.01) end
 s = box.schema.create_space('tweedledum', {id = 0})
 ---
 ...
-s:create_index('primary', {type = 'hash'})
+index = s:create_index('primary', {type = 'hash'})
 ---
 ...
 test 0 iteration

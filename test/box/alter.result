@@ -346,7 +346,7 @@ auto:drop()
 s = box.schema.create_space('space')
 ---
 ...
-s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 ---
 ...
 s:insert{1, 'a'}
@@ -389,16 +389,16 @@ s = box.schema.create_space("test", {unknown = 'param'})
 s = box.schema.create_space("test")
 ---
 ...
-s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
 ---
 - error: 'Illegal parameters, invalid index parts: field_no must be one-based'
 ...
-s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
 ---
 - error: 'Illegal parameters, options.parts: expected filed_no (number), type (string)
     pairs'
 ...
-s:create_index('primary', {unique = true, parts = 'bug'})
+index = s:create_index('primary', {unique = true, parts = 'bug'})
 ---
 - error: Illegal parameters, options parameter 'parts' should be of type table
 ...

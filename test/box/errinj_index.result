@@ -5,7 +5,7 @@ errinj = require('box.error.injection')
 s = box.schema.create_space('tweedledum')
 ---
 ...
-s:create_index('primary', {type = 'tree'} )
+index = s:create_index('primary', {type = 'tree'} )
 ---
 ...
 for i = 1,10 do s:insert{i, i, 'test' .. i} end
@@ -264,7 +264,7 @@ s:drop()
 s = box.schema.create_space('tweedledum')
 ---
 ...
-s:create_index('primary', {type = 'hash'} )
+index = s:create_index('primary', {type = 'hash'} )
 ---
 ...
 for i = 1,10 do s:insert{i, i, 'test' .. i} end

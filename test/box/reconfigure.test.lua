@@ -14,7 +14,7 @@ box.cfg.io_collect_interval
 -- configuration'
 --
 space = box.schema.create_space('tweedledum', { id = 0 })
-space:create_index('primary', { type = 'hash'})
+index = space:create_index('primary', { type = 'hash'})
 space:insert{1, 'tuple'}
 box.snapshot()
 box.cfg{}

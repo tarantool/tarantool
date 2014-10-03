@@ -8,7 +8,7 @@
 -- large tables
 -- -------------------------------------------------------
 tester = box.schema.create_space('tester')
-tester:create_index('primary',{})
+index = tester:create_index('primary',{})
 --# setopt delimiter ';'
 function tuple_max()
     local n = 'a'

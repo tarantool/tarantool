@@ -1,6 +1,6 @@
 fiber = require('fiber')
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 -- A test case for a race condition between ev_schedule
 -- and wal_schedule fiber schedulers.
 -- The same fiber should not be scheduled by ev_schedule (e.g.

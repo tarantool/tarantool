@@ -42,9 +42,9 @@ box.rollback();
 box.begin() box.space._cluster:insert{123456789, 'abc'};
 box.rollback();
 s = box.schema.space.create('test');
-box.begin() s:create_index('primary');
+box.begin() index = s:create_index('primary');
 box.rollback();
-s:create_index('primary');
+index = s:create_index('primary');
 function multi()
     box.begin()
     s:auto_increment{'first row'}
@@ -122,7 +122,7 @@ s:select{};
 s:drop();
 --# setopt delimiter ''
 tester = box.schema.create_space('tester')
-tester:create_index('primary')
+tindex = tester:create_index('primary')
 box.begin() tester:insert{1} box.rollback()
 tester:select{1}
 box.begin() tester:insert{1} box.commit()

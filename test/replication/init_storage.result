@@ -4,7 +4,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 space = box.schema.create_space('test', {id =  42})
 ---
 ...
-space:create_index('primary', { type = 'tree'})
+index = space:create_index('primary', { type = 'tree'})
 ---
 ...
 for k = 1, 9 do space:insert{k, k*k} end
