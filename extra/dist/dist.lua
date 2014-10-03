@@ -302,7 +302,7 @@ end
 
 
 if cmd == 'start' then
-    os.exit(start())
+    start()
 
 elseif cmd == 'stop' then
     os.exit(stop())
