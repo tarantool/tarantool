@@ -192,6 +192,15 @@ readline_cb(va_list ap)
 {
 	const char **line = va_arg(ap, const char **);
 	const char *prompt = va_arg(ap, const char *);
+	/*
+	 * libeio threads blocks all signals by default. Therefore, nobody
+	 * can interrupt read(2) syscall inside readline() to correctly
+	 * cleanup resources and restore terminal state. In case of signal
+	 * a signal_cb(), a ev watcher in tarantool.cc will stop event
+	 * loop and and stop entire process by exiting the main thread.
+	 * rl_cleanup_after_signal() is called from tarantool_lua_free()
+	 * in order to restore terminal state.
+	 */
 	*line = readline(prompt);
 	return 0;
 }
@@ -303,6 +312,12 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	luaopen_json(L);
 	lua_pop(L, 1);
 
+	/*
+	 * Disable libreadline signals handlers. All signals are handled in
+	 * main thread by libev watchers.
+	 */
+	rl_catch_signals = 0;
+	rl_catch_sigwinch = 0;
 	static const struct luaL_reg consolelib[] = {
 		{"readline", tarantool_console_readline},
 		{"add_history", tarantool_console_add_history},
@@ -443,5 +458,10 @@ tarantool_lua_free()
 		lua_close(tarantool_L);
 	}
 	tarantool_L = NULL;
+
+	if (isatty(STDIN_FILENO)) {
+		/* See comments in readline_cb() */
+		rl_cleanup_after_signal();
+	}
 }
 
