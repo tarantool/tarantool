@@ -43,9 +43,10 @@
 
 char log_path[PATH_MAX + 1];
 int log_fd = STDERR_FILENO;
-int logger_nonblock;
+static int logger_nonblock;
 pid_t logger_pid;
 static bool booting = true;
+static bool logger_background = true;
 static const char *binary_filename;
 static int log_level_default = S_INFO;
 static int *log_level = &log_level_default;
@@ -180,10 +181,11 @@ say_logrotate(int /* signo */)
 		      S_IRUSR | S_IWUSR | S_IRGRP);
 	if (log_fd < 0)
 		return;
-#if 0
-	dup2(log_fd, STDOUT_FILENO);
-#endif
-	dup2(log_fd, STDERR_FILENO);
+
+	if (logger_background) {
+		dup2(log_fd, STDOUT_FILENO);
+		dup2(log_fd, STDERR_FILENO);
+	}
 	if (logger_nonblock) {
 		int flags = fcntl(log_fd, F_GETFL, 0);
 		fcntl(log_fd, F_SETFL, flags | O_NONBLOCK);
@@ -216,6 +218,7 @@ say_logger_init(const char *path, int level, int nonblock, int background)
 {
 	*log_level = level;
 	logger_nonblock = nonblock;
+	logger_background = background;
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (path != NULL) {
