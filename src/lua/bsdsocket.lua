@@ -1054,7 +1054,8 @@ local function tcp_server(host, port, opts, timeout)
         dns = {{host = host, port = port, family = 'AF_UNIX', protocol = 0,
             type = 'SOCK_STREAM' }}
     else
-        dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM' })
+        dns = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
+            flags = 'AI_PASSIVE'})
         if dns == nil then
             return nil
         end

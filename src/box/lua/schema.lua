@@ -154,7 +154,7 @@ end
 --]]
 local function update_param_table(table, defaults)
     if table == nil then
-        table = {}
+        return defaults
     end
     if (defaults == nil) then
         return table
@@ -566,7 +566,6 @@ function box.schema.space.bless(space)
     end
     -- iteration
     index_mt.pairs = function(index, key, opts)
-        check_param_table(opts, {iterator = 'number,string'});
         local pkey, pkey_end = msgpackffi.encode_tuple(key)
         -- Use ALL for {} and nil keys and EQ for other keys
         local itype = pkey + 1 < pkey_end and box.index.EQ or box.index.ALL
@@ -579,6 +578,8 @@ function box.schema.space.bless(space)
                 if itype == nil then
                     box.error(box.error.ITERATOR_TYPE, opts.iterator)
                 end
+            else
+                box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
             end
         end
 
@@ -638,36 +639,37 @@ function box.schema.space.bless(space)
     end
 
     index_mt.select = function(index, key, opts)
-        local options_template = {
-            offset = 'number',
-            limit = 'number',
-            iterator = 'number,string',
-        }
-        check_param_table(opts, options_template);
+        local offset = 0
+        local limit = 4294967295
+        local iterator = box.index.EQ
 
-        local options_defaults = {
-            offset = 0,
-            limit = 4294967295,
-            iterator = box.index.EQ,
-        }
         local key, key_end = msgpackffi.encode_tuple(key)
         if key_end == key + 1 then -- empty array
-            options_defaults.iterator = box.index.ALL
+            iterator = box.index.ALL
         end
-        opts = update_param_table(opts, options_defaults)
 
-        if type(opts.iterator) == "string" then
-            local resolved_iter = box.index[string.upper(opts.iterator)]
-            if resolved_iter == nil then
-                box.error(box.error.ITERATOR_TYPE, opts.iterator);
+        if opts ~= nil then
+            if opts.offset ~= nil then
+                offset = opts.offset
             end
-            opts.iterator = resolved_iter
+            if type(opts.iterator) == "string" then
+                local resolved_iter = box.index[string.upper(opts.iterator)]
+                if resolved_iter == nil then
+                    box.error(box.error.ITERATOR_TYPE, opts.iterator);
+                end
+                opts.iterator = resolved_iter
+            end
+            if opts.iterator ~= nil then
+                iterator = opts.iterator
+            end
+            if opts.limit ~= nil then
+                limit = opts.limit
+            end
         end
 
         port.size = 0;
-        local space_id = index.space.id
-        if builtin.boxffi_select(ffi.cast(port_t, port), space_id, index.id,
-            opts.iterator, opts.offset, opts.limit, key, key_end) ~= 0 then
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.space.id,
+            index.id, iterator, offset, limit, key, key_end) ~=0 then
             return box.error()
         end
 

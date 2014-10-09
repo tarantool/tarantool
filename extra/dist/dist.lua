@@ -117,13 +117,32 @@ local available_commands = {
 }
 
 local function usage()
-    log.error("Usage: %s {%s} instance_name",
+    log.error("Usage: %s [-w] {%s} instance_name",
         arg[0], table.concat(available_commands, '|'))
     os.exit(1)
 end
 
+-- shift argv to remove 'tarantoolctl' from arg[0]
+local function shift_argv(arg, argno, argcount)
+    for i = argno, 128 do
+        arg[i] = arg[i + argcount]
+        if arg[i] == nil then
+            break
+        end
+    end
+end
 
 local cmd = arg[1]
+
+-- whether or not this is run from a wrapper which takes
+-- will daemonize for us
+local wrapper = false
+
+if cmd == '-w' or cmd == '--wrapper' then
+    wrapper = true
+    shift_argv(arg, 1, 1)
+    cmd = arg[1]
+end
 
 local valid_cmd = false
 for _, vcmd in pairs(available_commands) do
@@ -153,13 +172,7 @@ else
     instance = fio.basename(arg[2], '.lua')
 end
 
--- shift argv to remove 'tarantoolctl' from arg[0]
-for i = 0, 128 do
-    arg[i] = arg[i + 2]
-    if arg[i] == nil then
-        break
-    end
-end
+shift_argv(arg, 0, 2)
 
 if fio.stat('/etc/sysconfig/tarantool') then
     dofile('/etc/sysconfig/tarantool')
@@ -234,7 +247,7 @@ end
 local force_cfg = {
     pid_file    = default_cfg.pid_file,
     username    = default_cfg.username,
-    background  = true,
+    background  = wrapper ~= true,
     custom_proc_title = instance
 }
 
