@@ -42,6 +42,8 @@
 #include <stdio.h>
 #include <inttypes.h>
 
+extern "C" void *sp_error(void *o, ...);
+
 static inline void
 sophia_delete(void *db, struct key_def *key_def, struct tuple *tuple)
 {
