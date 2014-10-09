@@ -6,8 +6,8 @@ sql.sort = True
 admin("box.schema.user.create('test', { password = 'test' })")
 admin("box.schema.user.grant('test', 'execute,read,write', 'universe')")
 admin("s = box.schema.create_space('tweedledum', { id = 0 })")
-admin("s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })")
-admin("s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})")
+admin("index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })")
+admin("index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})")
 
 print """#
 # A test case for Bug#729758

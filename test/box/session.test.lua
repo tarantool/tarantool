@@ -2,7 +2,7 @@ session = box.session
 fiber = require('fiber')
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 
 session.exists(session.id())
 session.peer(session.id())

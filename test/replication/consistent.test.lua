@@ -44,7 +44,7 @@ a:call('_set_pri_lsn', box.info.lsn)
 a:close()
 
 s = box.schema.create_space('tweedledum', {id = 0});
-s:create_index('primary', {type = 'hash'})
+index = s:create_index('primary', {type = 'hash'})
 _insert(1, 10, 'master')
 _select(1, 10)
 --# set connection replica

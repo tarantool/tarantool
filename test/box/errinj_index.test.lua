@@ -3,7 +3,7 @@ errinj = require('box.error.injection')
 -- Check a failed realloc in tree index.
 
 s = box.schema.create_space('tweedledum')
-s:create_index('primary', {type = 'tree'} )
+index = s:create_index('primary', {type = 'tree'} )
 
 for i = 1,10 do s:insert{i, i, 'test' .. i} end
 res = {}
@@ -70,7 +70,7 @@ s:drop()
 -- Check a failed realloc in hash index.
 
 s = box.schema.create_space('tweedledum')
-s:create_index('primary', {type = 'hash'} )
+index = s:create_index('primary', {type = 'hash'} )
 
 for i = 1,10 do s:insert{i, i, 'test' .. i} end
 res = {}

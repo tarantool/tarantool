@@ -1,5 +1,5 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'tree' })
+index = space:create_index('primary', { type = 'tree' })
 --# setopt delimiter ';'
 function crossjoin(space0, space1, limit)
   local result = {}

@@ -340,6 +340,7 @@ box.schema.index.create = function(space_id, name, options)
     end
     _index:insert{space_id, iid, name, options.type,
                   unique, part_count, unpack(options.parts)}
+    return box.space[space_id].index[name]
 end
 
 box.schema.index.drop = function(space_id, index_id)

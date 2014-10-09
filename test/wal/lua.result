@@ -1,10 +1,10 @@
 space = box.schema.create_space('tweedledum')
 ---
 ...
-space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
+index1 = space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
 ---
 ...
-space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
 ---
 ...
 -- A test case for Bug#1042738
@@ -50,7 +50,7 @@ space:drop()
 space = box.schema.create_space('tweedledum', {id=0})
 ---
 ...
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 ---
 ...
 --# setopt delimiter ';'

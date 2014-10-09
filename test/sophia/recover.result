@@ -5,7 +5,7 @@ sophia_rmdir()
 space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
 ---
 ...
-space:create_index('primary')
+index = space:create_index('primary')
 ---
 ...
 sophia_printdir()

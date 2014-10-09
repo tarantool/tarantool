@@ -16,7 +16,7 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 -- gh-488 suid functions
 --
 setuid_space = box.schema.space.create('setuid_space')
-setuid_space:create_index('primary')
+index = setuid_space:create_index('primary')
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
 box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
@@ -41,7 +41,7 @@ setuid_space:drop()
 -- any more
 --
 test = box.schema.space.create('test')
-test:create_index('primary')
+index = test:create_index('primary')
 box.schema.user.create('test', {password='test'})
 box.schema.user.grant('test', 'read,write', 'space','test')
 box.schema.user.grant('test', 'read', 'space', '_space')
