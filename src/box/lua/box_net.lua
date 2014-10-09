@@ -302,16 +302,11 @@ box.net.box.new = function(host, port, reconnect_timeout)
                 return true
             end
 
-            local sc = box.socket.tcp()
-            if sc == nil then
-                self:fatal("Can't create socket")
-                return false
-            end
 
-            local s = { sc:connect( self.host, self.port ) }
-            if s[1] == nil then
-                self:fatal("Can't connect to %s:%s: %s",
-                    self.host, self.port, s[4])
+            local sc = box.socket.tcp_connect(self.host, self.port)
+            if sc == nil then
+                self:fatal("Can't connect to %s:%s: %s", self.host, self.port,
+                    box.errno.strerror())
                 return false
             end
 
@@ -324,12 +319,14 @@ box.net.box.new = function(host, port, reconnect_timeout)
             if self.s == nil then
                 return
             end
-            local res = { self.s:recv(12) }
-            if res[4] ~= nil then
-                self:fatal("Can't read socket: %s", res[3])
+
+            local header = self.s:read{chunk = 12}
+
+            if header == nil then
+                self:fatal("Can't read socket: %s", box.errno.strerror())
                 return
             end
-            local header = res[1]
+
             if string.len(header) ~= 12 then
                 self:fatal("Unexpected eof while reading header from %s",
                     self:title())
@@ -340,12 +337,12 @@ box.net.box.new = function(host, port, reconnect_timeout)
 
             local body = ''
             if blen > 0 then
-                res = { self.s:recv(blen) }
-                if res[4] ~= nil then
-                    self:fatal("Error while reading socket: %s", res[4])
-                    return
+                body = self.s:read{chunk = blen}
+                if body == nil then
+                    self:fatal("Error while reading socket: %s",
+                        box.errno.strerror())
+                        return
                 end
-                body = res[1]
                 if string.len(body) ~= blen then
                     self:fatal("Unexpected eof while reading body from %s",
                         self:title())
@@ -402,9 +399,9 @@ box.net.box.new = function(host, port, reconnect_timeout)
                     request = self.processing.wch:get(1)
                 end
                 if self.s ~= nil and request ~= nil then
-                    local res = { self.s:send(request) }
-                    if res[1] ~= string.len(request) then
-                        self:fatal("Error while write socket: %s", res[4])
+                    if not self.s:write(request) then
+                        self:fatal("Error while write socket: %s",
+                            box.errno.strerror())
                     end
                     request = nil
                 end
@@ -423,13 +420,16 @@ box.net.box.new = function(host, port, reconnect_timeout)
             self.timeouted = {}
         end,
 
+
         close = function(self)
             if self.closed then
                 errorf("box.net.box: already closed (%s)", self:title())
             end
             self.closed = true
+            
             local message = sprintf('box.net.box: connection was closed (%s)',
                 self:title())
+
             self.process = function()
                 error(message)
             end
@@ -438,6 +438,11 @@ box.net.box.new = function(host, port, reconnect_timeout)
             -- wake up write fiber
             self.processing.rch:put(true, 0)
             self.processing.wch:put(true, 0)
+
+            if self.s ~= nil then
+                self.s:close()
+                self.s = nil
+            end
             return true
         end
     }

@@ -30,6 +30,9 @@ lua type(s:error())
 ---
  - nil
 ...
+lua for k in pairs(getmetatable(s).__index) do local r, msg = pcall(s[k]); if not msg:match('Usage:') then print(k) end end
+---
+...
 lua s:nonblock(false)
 ---
  - false
@@ -177,7 +180,7 @@ lua sc:readable(.5)
 ---
  - true
 ...
-lua sc:sysread(4096)
+lua sc:sysread()
 ---
  - ok
 ...
@@ -219,7 +222,7 @@ lua s:getsockopt('SOL_SOCKET', 'SO_DEBUG')
 ...
 lua s:setsockopt('SOL_SOCKET', 'SO_ACCEPTCONN', 1)
 ---
-error: '[string "-- bsdsocket.lua (internal file)..."]:322: Socket option SO_ACCEPTCONN is read only'
+error: '[string "-- bsdsocket.lua (internal file)..."]:348: Socket option SO_ACCEPTCONN is read only'
 ...
 lua s:getsockopt('SOL_SOCKET', 'SO_RCVBUF') > 32
 ---
@@ -303,8 +306,19 @@ lua sc:write('Hello, world')
 ---
  - true
 ...
-lua sa = s:accept()
+lua sa, addr = s:accept()
 ---
+...
+lua addr2 = sa:name()
+---
+...
+lua addr2.host == addr.host
+---
+ - true
+...
+lua addr2.family == addr.family
+---
+ - true
 ...
 lua sa:nonblock(1)
 ---
@@ -458,7 +472,7 @@ lua s:bind('unix/', '/tmp/tarantool-test-socket')
 ---
  - true
 ...
-lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil
+lua string.match(tostring(s), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil
 ---
  - true
 ...
@@ -576,6 +590,10 @@ lua box.cjson.encode(sc:name())
 ---
  - {"host":"0.0.0.0","family":"AF_INET","type":"SOCK_STREAM","protocol":"tcp","port":0}
 ...
+lua sc:name()
+---
+ - 0.0.0.0:0
+...
 lua sc:nonblock(true)
 ---
  - true
@@ -614,7 +632,7 @@ lua s:readable(10)
 ---
  - true
 ...
-lua local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
+lua local d, from = s:recvfrom() print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}
 ---
  - true
  - ["Hello, world, 2",{"host":"127.0.0.1","family":"AF_INET","port":"Random port"}]
@@ -676,7 +694,7 @@ lua sc:readable(1)
 ---
  - true
 ...
-lua data_r, from_r = sc:recvfrom(4096)
+lua data_r, from_r = sc:recvfrom()
 ---
 ...
 lua data_r
@@ -812,11 +830,19 @@ lua box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno() =
  - nil
  - true
 ...
-lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+lua sa = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
 ---
 ...
-lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))
+lua sa:close()
 ---
+ - true
+...
+lua sa.socket.fd = 512
+---
+...
+lua sa:fd()
+---
+ - 512
 ...
 lua tostring(sa)
 ---
@@ -829,6 +855,12 @@ lua sa:readable(0)
 lua sa:writable(0)
 ---
  - true
+...
+lua sa = nil
+---
+...
+lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)
+---
 ...
 lua ch = box.ipc.channel()
 ---
@@ -993,8 +1025,12 @@ lua s:close()
 ---
  - true
 ...
-lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
+lua server, addr = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)
 ---
+...
+lua type(addr)
+---
+ - table
 ...
 lua server ~= nil
 ---
@@ -1014,7 +1050,140 @@ lua client:read(123)
 ---
  - Hello, world
 ...
-lua server:stop()
+lua client:close()
 ---
  - true
+...
+lua server:close()
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+unix socket was removed
+lua server, addr = box.socket.tcp_server('localhost', 0, { handler = function(s) s:read(2); s:write('Hello, world') end, name = 'testserv'})
+---
+...
+lua type(addr)
+---
+ - table
+...
+lua server ~= nil
+---
+ - true
+...
+lua addr2 = server:name()
+---
+...
+lua addr.host == addr2.host
+---
+ - true
+...
+lua addr.family == addr2.family
+---
+ - true
+...
+lua box.fiber.sleep(.5)
+---
+...
+lua client = box.socket.tcp_connect(addr2.host, addr2.port)
+---
+...
+lua client ~= nil
+---
+ - true
+...
+lua cnt = 0
+---
+...
+lua for i=100,200 do local f = box.fiber.find(i); if f and f:name():match('^testserv/') then cnt = cnt + 1; end; end
+---
+...
+lua cnt
+---
+ - 2
+...
+lua client:write('hi')
+---
+ - true
+...
+lua client:read(123)
+---
+ - Hello, world
+...
+lua client:close()
+---
+ - true
+...
+lua server:close()
+---
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua s = nil
+---
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua collectgarbage('collect')
+---
+ - 0
+...
+lua client, errno = box.socket.tcp_connect('unix/', '/tmp/tarantool-test-socket'), box.errno()
+---
+...
+lua errno == box.errno.ECONNREFUSED
+---
+ - true
+...
+test bind unix socket if old socket is exists
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - true
+...
+lua s:listen()
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)
+---
+...
+lua s:bind('unix/', '/tmp/tarantool-test-socket')
+---
+ - false
+...
+lua s = box.socket.tcp_server('unix/', '/tmp/tarantool-test-socket', function() end)
+---
+...
+lua s ~= nil
+---
+ - true
+...
+lua s:close()
+---
+ - true
+...
+lua box.cjson.encode{ box.socket.tcp_connect('test:test@localhost:3303') == nil, box.errno.strerror() }
+---
+ - [true,"Invalid argument"]
 ...

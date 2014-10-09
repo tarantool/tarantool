@@ -13,6 +13,8 @@ exec admin "lua type(s)"
 exec admin "lua string.match(tostring(s), 'fd %d+, aka 0%.0%.0%.0:0') ~= nil"
 exec admin "lua s:errno()"
 exec admin "lua type(s:error())"
+# Invalid arguments
+exec admin "lua for k in pairs(getmetatable(s).__index) do local r, msg = pcall(s[k]); if not msg:match('Usage:') then print(k) end end"
 
 exec admin "lua s:nonblock(false)"
 exec admin "lua s:sysconnect('127.0.0.1', box.cfg.primary_port)"
@@ -56,7 +58,7 @@ exec admin "lua sc:nonblock(false)"
 exec admin "lua sc:sysconnect('127.0.0.1', 3457)"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:readable(.5)"
-exec admin "lua sc:sysread(4096)"
+exec admin "lua sc:sysread()"
 exec admin "lua string.match(tostring(sc), ', peer') ~= nil"
 exec admin "lua #sevres"
 exec admin "lua sevres[1].host"
@@ -93,7 +95,10 @@ exec admin "lua r or errno == box.errno.EINPROGRESS"
 exec admin "lua sc:writable(10)"
 exec admin "lua sc:write('Hello, world')"
 
-exec admin "lua sa = s:accept()"
+exec admin "lua sa, addr = s:accept()"
+exec admin "lua addr2 = sa:name()"
+exec admin "lua addr2.host == addr.host"
+exec admin "lua addr2.family == addr.family"
 exec admin "lua sa:nonblock(1)"
 exec admin "lua sa:read(8)"
 exec admin "lua sa:read(3)"
@@ -139,7 +144,7 @@ exec admin "lua s:nonblock()"
 if os.path.exists('/tmp/tarantool-test-socket'):
         os.unlink('/tmp/tarantool-test-socket')
 exec admin "lua s:bind('unix/', '/tmp/tarantool-test-socket')"
-exec admin "lua string.match(tostring(sc), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil"
+exec admin "lua string.match(tostring(s), 'fd %d+, aka unix/:/tmp/tarantool%-test%-socket') ~= nil"
 exec admin "lua s:listen(1234)"
 
 exec admin "lua sc = box.socket('PF_UNIX', 'SOCK_STREAM', 'ip')"
@@ -181,6 +186,7 @@ exec admin "lua box.cjson.encode(box.socket.getaddrinfo('ya.ru', '80', { flags =
 
 exec admin "lua sc = box.socket('AF_INET', 'SOCK_STREAM', 'tcp')"
 exec admin "lua box.cjson.encode(sc:name())"
+exec admin "lua sc:name()"
 exec admin "lua sc:nonblock(true)"
 exec admin "lua sc:close()"
 
@@ -193,7 +199,7 @@ exec admin "lua s:recv(4096)"
 
 exec admin "lua sc:sendto('127.0.0.1', 3548, 'Hello, world, 2')"
 exec admin "lua s:readable(10)"
-exec admin "lua local d, from = s:recvfrom(4096) print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}"
+exec admin "lua local d, from = s:recvfrom() print(' - ', from.port > 0) from.port = 'Random port' return box.cjson.encode{d, from}"
 exec admin "lua s:close()"
 exec admin "lua sc:close()"
 
@@ -210,7 +216,7 @@ exec admin "lua data, from = s:recvfrom(10)"
 exec admin "lua data"
 exec admin "lua s:sendto(from.host, from.port, 'Hello, hello!')"
 exec admin "lua sc:readable(1)"
-exec admin "lua data_r, from_r = sc:recvfrom(4096)"
+exec admin "lua data_r, from_r = sc:recvfrom()"
 exec admin "lua data_r"
 exec admin "lua from_r.host"
 exec admin "lua from_r.port == s:name().port"
@@ -261,12 +267,16 @@ if os.path.exists(path):
         os.unlink(path)
 exec admin "lua box.socket.tcp_connect('unix/', '{}'), box.errno() == box.errno.ENOENT".format(path)
 
-exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
-exec admin "lua sa = { fh = 512 } setmetatable(sa, getmetatable(s))"
+exec admin "lua sa = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
+exec admin "lua sa:close()"
+exec admin "lua sa.socket.fd = 512"
+exec admin "lua sa:fd()"
 exec admin "lua tostring(sa)"
 exec admin "lua sa:readable(0)"
 exec admin "lua sa:writable(0)"
+exec admin "lua sa = nil"
 
+exec admin "lua s = box.socket.tcp_connect('127.0.0.1', box.cfg.primary_port)"
 exec admin "lua ch = box.ipc.channel()"
 exec admin "lua f = box.fiber.wrap(function() s:read(12) ch:put(true) end)"
 exec admin "lua box.fiber.sleep(.1)"
@@ -318,12 +328,63 @@ exec admin "lua s:close()"
 
 os.unlink(path)
 
-exec admin "lua server = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)"
+exec admin "lua server, addr = box.socket.tcp_server('unix/', path, function(s) s:write('Hello, world') end)"
+exec admin "lua type(addr)"
 exec admin "lua server ~= nil"
 exec admin "lua box.fiber.sleep(.5)"
 exec admin "lua client = box.socket.tcp_connect('unix/', path)"
 exec admin "lua client ~= nil"
 exec admin "lua client:read(123)"
-exec admin "lua server:stop()"
+exec admin "lua client:close()"
+exec admin "lua server:close()"
+exec admin "lua box.fiber.sleep(.5)"
 
+if not os.path.exists(path):
+    print 'unix socket was removed'
+
+exec admin "lua server, addr = box.socket.tcp_server('localhost', 0, { handler = function(s) s:read(2); s:write('Hello, world') end, name = 'testserv'})"
+exec admin "lua type(addr)"
+exec admin "lua server ~= nil"
+exec admin "lua addr2 = server:name()"
+exec admin "lua addr.host == addr2.host"
+exec admin "lua addr.family == addr2.family"
+exec admin "lua box.fiber.sleep(.5)"
+exec admin "lua client = box.socket.tcp_connect(addr2.host, addr2.port)"
+exec admin "lua client ~= nil"
+# Check that listen and client fibers have appropriate names
+exec admin "lua cnt = 0"
+exec admin "lua for i=100,200 do local f = box.fiber.find(i); if f and f:name():match('^testserv/') then cnt = cnt + 1; end; end"
+exec admin "lua cnt"
+exec admin "lua client:write('hi')"
+exec admin "lua client:read(123)"
+exec admin "lua client:close()"
+exec admin "lua server:close()"
+
+# Test that socket is closed on GC
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s:listen()"
+exec admin "lua s = nil"
+exec admin "lua collectgarbage('collect')"
+exec admin "lua collectgarbage('collect')"
+exec admin "lua client, errno = box.socket.tcp_connect('unix/', '{}'), box.errno()".format(path)
+exec admin "lua errno == box.errno.ECONNREFUSED"
 os.unlink(path)
+
+print 'test bind unix socket if old socket is exists'
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s:listen()"
+exec admin "lua s:close()"
+if not os.path.exists(path):
+    print 'unix socket was removed: test failed'
+exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 0)"
+exec admin "lua s:bind('unix/', '{}')".format(path)
+exec admin "lua s = box.socket.tcp_server('unix/', '{}', function() end)".format(path)
+exec admin "lua s ~= nil"
+exec admin "lua s:close()"
+if os.path.exists(path):
+    print 'unix socket was not removed: test failed'
+
+
+exec admin "lua box.cjson.encode{ box.socket.tcp_connect('test:test@localhost:3303') == nil, box.errno.strerror() }"
