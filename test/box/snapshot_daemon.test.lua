@@ -24,7 +24,7 @@ end
 
 
 space = box.schema.create_space('snapshot_daemon')
-space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
+index = space:create_index('pk', { type = 'tree', parts = { 1, 'num' }})
 
 
 box.cfg{snapshot_period = PERIOD, snapshot_count = 2 }

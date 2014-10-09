@@ -70,43 +70,29 @@ is in file <link xlink:href="http://tarantool.org/doc/box-protocol.html" xlink:t
                 </thead>
                       <tbody>
                         <row>
-                          <entry>type</entry>
-                          <entry>13</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                        </row>
-                        <row>
-                          <entry>body_length</entry>
-                          <entry>17</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                        </row>
-                        <row>
-                          <entry>request_id</entry>
-                          <entry>1</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                        </row>
-                        <row>
-                          <entry>flags</entry>
+                          <entry>code for insert</entry>
                           <entry>2</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
-                          <entry>0</entry>
                         </row>
                         <row>
-                          <entry>map-element count</entry>
-                          <entry>82</entry>
-                          <entry>10</entry>
+                          <entry>rest of header</entry>
+                          <entry>...</entry>
+                          <entry>...</entry>
+                          <entry>...</entry>
+                          <entry>...</entry>
                         </row>
                         <row>
                           <entry>2-digit number: space id</entry>
                           <entry>cd</entry>
                           <entry>02</entry>
-                          <entry>03</entry>
+                          <entry>01</entry>
+                        </row>
+                        <row>
+                          <entry>code for tuple</entry>
+                          <entry>21</entry>
+                        </row>
+                        <row>
+                          <entry>1-digit number: field count = 2</entry>
+                          <entry>92</entry>
                         </row>
                         <row>
                           <entry>1-character string: field[1]</entry>
@@ -129,103 +115,14 @@ of the packet format for responses as well as requests).
 But it would be easier, and less error-prone, if one could
 invoke a routine that formats the packet according to typed
 parameters. Something like <code>response=tarantool_routine("insert",0,"A","B");</code>.
-And that is why APIs exist for drivers for C, Perl, Python, PHP, Ruby, and so on.
+And that is why APIs exist for drivers for Perl, Python, PHP, and so on.
 </para>
-  </section>
-
-  <section xml:id="connector-c">
-    <title>C</title>
-    <para>
-    Here is a complete C program that inserts [99999,'BB'] into space[513] via the C API for the
-    binary protocol. To compile, paste the code into a file named example.c and say <code>
-    gcc -o example example.c -I/<replaceable>tarantool-directory</replaceable>/connector/c/include</code>
-    where tarantool-directory = the directory that contains
-    the necessary file <filename>tp.h</filename>, and the default library path contains
-    the directory where Tarantool library files were placed at installation time.
-    Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
-    (local host, port 3301) and
-    space[513]'s primary key type is numeric (space[513].index[0].key_field[1].type = "NUM").
-    To run, say <code>./example</code>.
-    The program will open a socket connection with the tarantool server at localhost:3301,
-    then format a buffer for sending an INSERT request, then send the request, then check if the
-    server returned an error, then &mdash; if all is well &mdash; print "Insert succeeded". If the
-    row already exists, the program will print <quote>Duplicate key exists in unique index 0</quote>.
-    </para>
-<programlisting language="cpp">
-#include &lt;arpa/inet.h&gt;
-#include &lt;stdio.h&gt;
-#define MP_SOURCE 1   
-#include &lt;tp.h&gt;                                                /* the usual Tarantool include */
-
-int main()
-{
-  struct tp request;                                           /* area for sending to server */
-  struct tpgreeting greet;                                     /* area for the server's greeting */
-  struct tpresponse response;                                  /* area for translation of reply */
-  int fd;                                                      /* file descriptor for socket */
-  struct sockaddr_in sock;                                     /* the usual socket address info */
-  if ((fd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) &lt;= 0)   /* open the socket. abort if failure */
-    exit(1);
-  memset(&amp;sock, 0, sizeof(sock));                              /* connect to localhost:3301 */
-  sock.sin_family = AF_INET;
-  sock.sin_addr.s_addr = inet_addr("127.0.0.1");
-  sock.sin_port = htons(3301);
-  if (connect(fd, (struct sockaddr *)&amp;sock, sizeof(sock)) &lt; 0) /* connect, abort if failure */
-    exit(1);
-  const int greeting_buffer_size = 128;                        /* handle the server's greeting */
-  char greeting_buffer[greeting_buffer_size];
-  if (read(fd, greeting_buffer, greeting_buffer_size) != 128)  /* greeting must be 128 bytes long */
-    exit(1);
-  tp_greeting(&amp;greet, greeting_buffer, 128);                   /* 
-  char request_buffer[1024];                                   /* initialize request buffer */
-  tp_init(&amp;request, request_buffer, 1024, 0, 0);
-  tp_insert(&amp;request, 513);                                    /* append INSERT header. space_no=513 */
-  tp_tuple(&amp;request, 2);                                       /* begin appending body, field count = 2 */
-  tp_encode_uint(&amp;request, 99999);                             /* append field[1] */
-  tp_sz(&amp;request, "BB");                                       /* append field[2] */
-  int rc = write(fd, tp_buf(&amp;request), tp_used(&amp;request));     /* send the INSERT request */
-  if (rc != tp_used(&amp;request))                                 /* abort if send failed */
-    exit(1);
-  char reply_buffer[1024];
-  int rres = read(fd, reply_buffer, 1024);                     /* get reply */
-  if (rres &lt;= 0) exit(1);
-  if (tp_reply(&amp;response, reply_buffer, rres) &lt; 0) exit(1);
-  if (response.error != 0) {                                   /* display+abort if error e.g. duplicate key */
-    printf("Error: %*s\n",
-    (int) (response.error_end-response.error),response.error);
-    exit(1);
-  }
-  close(fd);                                                   /* clean up */
-  printf("Insert succeeded\n");                                /* congratulate self */
-  exit(0);
-}
-</programlisting>
-    <para>
-       The example program only shows one command and does not show all that's necessary for
-       good practice. For that, please see the <link
-       xlink:href="https://github.com/tarantool/tarantool-c"><filename>connector/c</filename></link> source tree.
-    </para>
-  </section>
-
-  <section xml:id="connector-erlang">
-    <title>Erlang</title>
-    <para>
-       Please see <link xlink:href="https://github.com/tarantool/tarantool-erlang"><filename>https://github.com/tarantool/tarantool-erlang</filename></link>.
-    </para>
   </section>
 
   <section xml:id="connector-java">
     <title>Java</title>
     <para>
        Please see <link xlink:href="http://dgreenru.github.io/tarantool-java/"><filename>http://dgreenru.github.io/tarantool-java/</filename></link>.
-    </para>
-  </section>
-
-  <section xml:id="connector-node.js">
-    <title>node.js</title>
-    <para>
-       Please see <link xlink:href="https://github.com/devgru/node-tarantool"><filename>http://github.com/devgru/node-tarantool</filename></link>.
     </para>
   </section>
 
@@ -252,7 +149,7 @@ sudo cpan install DR::Tarantool
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
     (local host, port 3301) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM").
+    space[0]'s primary key type is numeric (box.space[0].index[0].parts[1].type = "NUM").
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
@@ -309,7 +206,7 @@ cd tarantool-php
 phpize
 ./configure
 make
-make install
+#make install is optional
     </programlisting>
     </para>    
     <para>
@@ -321,15 +218,15 @@ make install
     <programlisting>
 cd ~
 cp ./tarantool-php/modules/tarantool.so .
-export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
+export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared
    </programlisting>
     </para>
     <para>
-    Here is a complete PHP program that inserts [99999,'BB'] into space[0] via the PHP API.
+    Here is a complete PHP program that inserts [99999,'BB'] into a space named 'tester' via the PHP API.
     Before trying to run, check that the server
     (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
     (local host, port 3301) and
-    space[0]'s primary key type is numeric (space[0].index[0].key_field[1].type = "NUM").
+    tester's primary key type is numeric (box.space.tester.index[0].parts[1].type = "NUM").
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
     with the tarantool server at localhost:3301, then send an INSERT request,
@@ -339,9 +236,9 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/test/share
     <para>
     <programlisting>
 &lt;?php
-$tarantool = new Tarantool("localhost", 3301, 3313);
+$tarantool = new Tarantool("localhost", 3301);
 try {
-  $tarantool-&gt;insert(0, array(99999, "BB"), TARANTOOL_FLAGS_ADD);
+  $tarantool-&gt;insert("tester", array(99999, "BB"));
   print "Insert succeeded\n";
   }
 catch (Exception $e) {
@@ -362,12 +259,22 @@ catch (Exception $e) {
     <title>Python</title>
     <para>
     Here is a complete Python program that inserts ['First Tuple','Value','Value'] into space99 via the high-level Python API.
+    </para>
+<programlisting language="python">
+#!/usr/bin/python
+from tarantool import Connection
+
+c = Connection("127.0.0.1", 3301)
+result = c.insert("space99",('First Tuple','Value', 'Value'))
+print result
+</programlisting>
+    <para>
     To prepare, paste the code into a file named example.py and install tarantool-python with either
-    <userinput><code>pip install tarantool</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
+    <userinput><code>pip install tarantool\>0.4</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
-    <userinput><code>pip install tarantool --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
+    <userinput><code>pip install tarantool\>0.4 --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
     The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its listen address is
-    the default (local host, port 3301) and space99's primary key type is string (box.space.space99.index['primary'].key_field[1].type = "STR")
+    the default (local host, port 3301) and space99's primary key type is string (box.space.space99.index[0].parts[1].type = "STR")
     and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
     starting the tarantool server and executing these requests:<programlisting>
 box.cfg{listen = 3301}
@@ -379,32 +286,16 @@ box.schema.user.grant('guest', 'read,write', 'space', 'space99')</programlisting
     The program will connect to the server, will send the request, and will not throw an exception if all went well.
     If the tuple already exists, the program will throw DatabaseException(“Duplicate key exists in unique index”).
     </para>
-<programlisting language="python">
-#!/usr/bin/python
-from tarantool import Connection
 
-c = Connection("127.0.0.1", 3301)
-result = c.insert("space99",('First Tuple','Value', 'Value'))
-print result
-</programlisting>
     <para>
        The example program only shows one request and does not show all that's necessary for
-       good practice. For that, please see
-       <link xlink:href="http://tarantool-python.readthedocs.org/en/latest/"><filename>http://tarantool-python.readthedocs.org/en/latest/</filename></link>.
+       good practice. For that, see
+       <link xlink:href="http://github.com/tarantool/tarantool-python"><filename>http://github.com/tarantool/tarantool-python</filename></link>.
        For an example of a Python API for <link xlink:href="https://github.com/tarantool/queue">Queue managers on Tarantool</link>, see 
        <link xlink:href="https://github.com/tarantool/tarantool-queue-python"><filename>https://github.com/tarantool/tarantool-queue-python</filename></link>.
     </para>
   </section>
-
-  <section xml:id="connector-ruby">
-    <title>Ruby</title>
-    <para>
-       You need <emphasis role="strong">Ruby 1.9</emphasis> or later
-       to use this connector. Connector sources are located in <link
-       xlink:href="https://github.com/mailru/tarantool-ruby"><filename>http://github.com/mailru/tarantool-ruby</filename></link>.
-    </para>
-  </section>
-
+  
 </chapter>
 
 <!--

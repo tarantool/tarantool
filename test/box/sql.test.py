@@ -8,7 +8,7 @@ admin("box.schema.user.grant('test', 'Execute', 'function', 'f')")
 sql.authenticate('test', 'test')
 # call from sql to have the right owner
 sql("call f()")
-admin("box.space.test:create_index('primary', { type = 'hash' })")
+admin("index = box.space.test:create_index('primary', { type = 'hash' })")
 sql("ping")
 # xxx: bug -- currently selects no rows
 sql("select * from t0")

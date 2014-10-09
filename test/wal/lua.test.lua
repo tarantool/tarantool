@@ -1,6 +1,6 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
-space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
+index1 = space:create_index('primary', { type ='hash', parts = {1, 'str'}, unique = true })
+index2 = space:create_index('secondary', { type = 'tree', parts = {2, 'num'}, unique = false })
 -- A test case for Bug#1042738
 -- https://bugs.launchpad.net/tarantool/+bug/1042738
 -- Iteration over a non-unique TREE index
@@ -35,7 +35,7 @@ space:drop()
 -- Space does not exist error on repetitive access to space 0 in Lua
 --
 space = box.schema.create_space('tweedledum', {id=0})
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 
 --# setopt delimiter ';'
 function mktuple(n)

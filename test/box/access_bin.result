@@ -40,7 +40,7 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 setuid_space = box.schema.space.create('setuid_space')
 ---
 ...
-setuid_space:create_index('primary')
+index = setuid_space:create_index('primary')
 ---
 ...
 setuid_func = function() return box.space.setuid_space:auto_increment{} end
@@ -109,7 +109,7 @@ setuid_space:drop()
 test = box.schema.space.create('test')
 ---
 ...
-test:create_index('primary')
+index = test:create_index('primary')
 ---
 ...
 box.schema.user.create('test', {password='test'})

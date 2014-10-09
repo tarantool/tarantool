@@ -195,7 +195,7 @@ box.schema.user.create('testus')
 s = box.schema.create_space('admin_space')
 ---
 ...
-s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+index = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 ---
 ...
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
@@ -435,7 +435,7 @@ box.session.su('twostep')
 twostep = box.schema.create_space('twostep')
 ---
 ...
-twostep:create_index('primary')
+index2 = twostep:create_index('primary')
 ---
 ...
 box.schema.func.create('test')

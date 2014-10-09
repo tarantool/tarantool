@@ -1,6 +1,6 @@
 box.cfg.wal_mode
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 space:insert{1}
 space:insert{2}
 space:insert{3}

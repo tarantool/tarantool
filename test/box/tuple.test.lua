@@ -81,7 +81,7 @@ getmetatable(box.tuple.new{1, 2, 3}:totable())
 
 --  A test case for the key as an tuple
 space = box.schema.create_space('tweedledum')
-space:create_index('primary')
+index = space:create_index('primary')
 space:truncate()
 t=space:insert{0, 777, '0', '1', '2', '3'}
 t

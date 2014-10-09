@@ -16,7 +16,7 @@ box.schema.user.grant('test', 'Execute', 'function', 'f')
 call f()
 ---
 ...
-box.space.test:create_index('primary', { type = 'hash' })
+index = box.space.test:create_index('primary', { type = 'hash' })
 ---
 ...
 ping

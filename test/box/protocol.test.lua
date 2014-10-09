@@ -5,7 +5,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 --------------------------------------------------------------------------------
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'tree'})
+index = space:create_index('primary', { type = 'tree'})
 for i=1,5 do space:insert{i} end
 
 LISTEN = require('uri').parse(box.cfg.listen)

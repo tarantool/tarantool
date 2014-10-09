@@ -7,10 +7,10 @@ box.schema.user.grant('test', 'execute,read,write', 'universe')
 s = box.schema.create_space('tweedledum', { id = 0 })
 ---
 ...
-s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
+index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
 ---
 ...
-s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
+index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
 ---
 ...
 #

@@ -132,7 +132,7 @@ auto:drop()
 -- gh-281 Crash after rename + replace + delete with multi-part index
 -- ------------------------------------------------------------------
 s = box.schema.create_space('space')
-s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})
 s:insert{1, 'a'}
 box.space.space.index.primary:rename('secondary')
 box.space.space:replace{1,'The rain in Spain'}
@@ -147,7 +147,7 @@ s = box.schema.create_space(42)
 s = box.schema.create_space("test", "bug")
 s = box.schema.create_space("test", {unknown = 'param'})
 s = box.schema.create_space("test")
-s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
-s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
-s:create_index('primary', {unique = true, parts = 'bug'})
+index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
+index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
+index = s:create_index('primary', {unique = true, parts = 'bug'})
 s:drop()

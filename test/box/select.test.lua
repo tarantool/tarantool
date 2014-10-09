@@ -1,6 +1,6 @@
 s = box.schema.create_space('select', { temporary = true })
-index = s:create_index('primary', { type = 'tree' })
-s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
+index1 = s:create_index('primary', { type = 'tree' })
+index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'num', 1, 'num'}})
 for i = 1, 20 do s:insert({ i, 1, 2, 3 }) end
 
 --------------------------------------------------------------------------------
@@ -78,7 +78,7 @@ s:select(2)
 s:drop()
 
 s = box.schema.create_space('select', { temporary = true })
-s:create_index('primary', { type = 'tree' })
+index = s:create_index('primary', { type = 'tree' })
 local a s:insert{0}
 lots_of_links = {}
 ref_count = 0

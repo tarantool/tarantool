@@ -63,7 +63,7 @@ a:call('_set_pri_lsn', box.info.server.id, box.info.server.lsn)
 a:close()
 
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 
 _insert(1, 10)
 _select(1, 10)

@@ -69,7 +69,7 @@ sql("call f1('jason')")
 sql("call f1('jason', 1, 'test', 2, 'stewart')")
 
 admin("space = box.schema.create_space('tweedledum', { id = 0 })")
-admin("space:create_index('primary', { type = 'hash' })")
+admin("index = space:create_index('primary', { type = 'hash' })")
 
 admin("function myreplace(...) return space:replace{...} end")
 admin("function myinsert(...) return space:insert{...} end")

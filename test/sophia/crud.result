@@ -5,7 +5,7 @@ sophia_rmdir()
 space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
 ---
 ...
-space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 ---
 ...
 for key = 1, 132 do space:insert({key}) end

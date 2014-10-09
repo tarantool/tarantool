@@ -1,5 +1,5 @@
 space = box.schema.create_space('tweedledum')
-space:create_index('primary', { type = 'hash' })
+index = space:create_index('primary', { type = 'hash' })
 
 -- Test Lua from admin console. Whenever producing output,
 -- make sure it's a valid YAML.

@@ -168,8 +168,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_pushnumber(L, key_def->iid);
 		lua_setfield(L, -2, "id");
 
-		lua_pushvalue(L, i);
-		lua_setfield(L, -2, "space");
+		lua_pushnumber(L, space->def.id);
+		lua_setfield(L, -2, "space_id");
 
 		lua_pushstring(L, key_def->name);
 		lua_setfield(L, -2, "name");
