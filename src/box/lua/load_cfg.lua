@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 ffi.cdef([[
+void check_cfg();
 void load_cfg();
 void box_set_wal_mode(const char *mode);
 void box_set_replication_source(const char *source);
@@ -159,7 +160,7 @@ local function reload_cfg(oldcfg, newcfg)
 end
 
 local box = require('box')
--- Move all box members to box_saved
+-- Move all box members except 'error' to box_configured
 local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v
@@ -176,14 +177,20 @@ setmetatable(box, {
      end
 })
 
-function box.cfg(cfg)
+local function load_cfg(cfg)
     cfg = prepare_cfg(cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
         end
     end
-    -- Restore box members from box_saved after initial configuration
+    -- Save new box.cfg
+    box.cfg = cfg
+    if not pcall(ffi.C.check_cfg) then
+        box.cfg = load_cfg -- restore original box.cfg
+        return box.error() -- re-throw exception from check_cfg(0
+    end
+    -- Restore box members after initial configuration
     for k, v in pairs(box_configured) do
         box[k] = v
     end
@@ -200,5 +207,7 @@ function box.cfg(cfg)
 
     box.internal.snapshot_daemon.start()
 end
-jit.off(box.cfg)
+box.cfg = load_cfg
+jit.off(load_cfg)
 jit.off(reload_cfg)
+jit.off(box.cfg)

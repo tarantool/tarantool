@@ -145,7 +145,7 @@ box_check_wal_mode(const char *mode_name)
 	}
 }
 
-static void
+void
 box_check_config()
 {
 	box_check_wal_mode(cfg_gets("wal_mode"));

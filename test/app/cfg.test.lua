@@ -2,7 +2,24 @@
 
 local tap = require('tap')
 local test = tap.test('cfg')
-test:plan(8)
+test:plan(13)
+
+--------------------------------------------------------------------------------
+-- Invalid values
+--------------------------------------------------------------------------------
+
+test:is(type(box.cfg), 'function', 'box is not started')
+
+local function invalid(name, val)
+    local status, result = pcall(box.cfg, {[name]=val})
+    test:ok(not status and result:match('Incorrect option'), 'invalid '..name)
+end
+
+invalid('replication_source', '//guest@localhost:3301')
+invalid('wal_mode', 'invalid')
+invalid('rows_per_wal', -1)
+
+test:is(type(box.cfg), 'function', 'box is not started')
 
 --------------------------------------------------------------------------------
 -- All box members must raise an exception on access if box.cfg{} wasn't called

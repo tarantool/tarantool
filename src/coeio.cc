@@ -201,6 +201,13 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 	task.func = func;
 	task.result = -1;
 	task.complete = 0;
+	/*
+	 * Cancelling a fiber which is suspended
+	 * on coeio_custom task would destroy
+	 * its stack and crash the server when
+	 * this stack is accessed in the worker thread.
+	 */
+	bool cancellable = fiber_setcancellable(false);
 	va_start(task.ap, timeout);
 	struct eio_req *req = eio_custom(coeio_custom_cb, 0,
 					 coeio_on_complete, &task);
@@ -216,6 +223,7 @@ coeio_custom(ssize_t (*func)(va_list ap), ev_tstamp timeout, ...)
 		errno = task.errorno;
 	}
 	va_end(task.ap);
+	fiber_setcancellable(cancellable);
 	return task.result;
 }
 

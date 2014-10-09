@@ -1,5 +1,10 @@
 TAP version 13
-1..8
+1..13
+ok - box is not started
+ok - invalid replication_source
+ok - invalid wal_mode
+ok - invalid rows_per_wal
+ok - box is not started
 ok - exception on unconfigured box
 ok - configured box
 ok - cfg.wal_mode default value
