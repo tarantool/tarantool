@@ -521,7 +521,7 @@ function box.schema.space.bless(space)
     local index_mt = {}
     -- __len and __index
     index_mt.len = function(index)
-        local ret = builtin.boxffi_index_len(index.space.id, index.id)
+        local ret = builtin.boxffi_index_len(index.space_id, index.id)
         if ret == -1 then
             box.error()
         end
@@ -556,7 +556,7 @@ function box.schema.space.bless(space)
     end
     index_mt.random = function(index, rnd)
         rnd = rnd or math.random()
-        local tuple = builtin.boxffi_index_random(index.space.id, index.id, rnd)
+        local tuple = builtin.boxffi_index_random(index.space_id, index.id, rnd)
         if tuple == ffi.cast('void *', -1) then
             box.error() -- error
         elseif tuple ~= nil then
@@ -585,7 +585,7 @@ function box.schema.space.bless(space)
         end
 
         local keybuf = ffi.string(pkey, pkey_end - pkey)
-        local cdata = builtin.boxffi_index_iterator(index.space.id, index.id,
+        local cdata = builtin.boxffi_index_iterator(index.space_id, index.id,
             itype, keybuf);
         if cdata == nil then
             box.error()
@@ -626,7 +626,7 @@ function box.schema.space.bless(space)
     index_mt.get = function(index, key)
         local key, key_end = msgpackffi.encode_tuple(key)
         port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.space.id,
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.space_id,
            index.id, box.index.EQ, 0, 2, key, key_end) ~=0 then
             return box.error()
         end
@@ -669,7 +669,7 @@ function box.schema.space.bless(space)
         end
 
         port.size = 0;
-        if builtin.boxffi_select(ffi.cast(port_t, port), index.space.id,
+        if builtin.boxffi_select(ffi.cast(port_t, port), index.space_id,
             index.id, iterator, offset, limit, key, key_end) ~=0 then
             return box.error()
         end
@@ -682,22 +682,22 @@ function box.schema.space.bless(space)
     end
     index_mt.update = function(index, key, ops)
         ops = normalize_update_ops(ops)
-        return internal.update(index.space.id, index.id, keify(key), ops);
+        return internal.update(index.space_id, index.id, keify(key), ops);
     end
     index_mt.delete = function(index, key)
-        return internal.delete(index.space.id, index.id, keify(key));
+        return internal.delete(index.space_id, index.id, keify(key));
     end
     index_mt.drop = function(index)
-        return box.schema.index.drop(index.space.id, index.id)
+        return box.schema.index.drop(index.space_id, index.id)
     end
     index_mt.rename = function(index, name)
-        return box.schema.index.rename(index.space.id, index.id, name)
+        return box.schema.index.rename(index.space_id, index.id, name)
     end
     index_mt.alter= function(index, options)
-        if index.id == nil or index.space == nil then
+        if index.id == nil or index.space_id == nil then
             box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
         end
-        return box.schema.index.alter(index.space.id, index.id, options)
+        return box.schema.index.alter(index.space_id, index.id, options)
     end
     --
     local space_mt = {}
