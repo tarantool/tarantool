@@ -539,12 +539,6 @@ box_snapshot(void)
 	return 0;
 }
 
-void
-box_info(struct tbuf *out)
-{
-	tbuf_printf(out, "  status: %s" CRLF, status);
-}
-
 const char *
 box_status(void)
 {
