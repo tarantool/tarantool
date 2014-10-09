@@ -329,7 +329,7 @@ server on the same processor without ill effects.
   Since not all Tarantool operations can be expressed with the
   data-manipulation functions, or with Lua, to gain
   complete access to data manipulation functionality one must use
-  a <olink targetptr="connectors">Perl, Python, Ruby or other
+  a <olink targetptr="connectors">Perl, PHP, Python or other
   programming language connector</olink>.  The client/server
   protocol is open and documented: an annotated BNF can be found
   in the source tree, file <filename

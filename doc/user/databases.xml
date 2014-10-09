@@ -1296,7 +1296,7 @@ console.delimiter('')!
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.key_field</emphasis>
+            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>.parts</emphasis>
         </term>
         <listitem>
             <para>
