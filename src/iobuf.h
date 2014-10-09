@@ -153,6 +153,41 @@ struct obuf_svp
 	size_t size;
 };
 
+void
+obuf_ensure_resize(struct obuf *buf, size_t size);
+
+/**
+ * \brief Ensure \a buf to have at least \a size bytes of contiguous memory
+ * for write and return a point to this chunk.
+ * After write please call obuf_advance(wsize) where wsize <= size to advance
+ * a write position.
+ * \param buf
+ * \param size
+ * \return a pointer to contiguous chunk of memory
+ */
+static inline char *
+obuf_ensure(struct obuf *buf, size_t size)
+{
+	if (buf->iov[buf->pos].iov_len + size > buf->capacity[buf->pos])
+		obuf_ensure_resize(buf, size);
+	struct iovec *iov = &buf->iov[buf->pos];
+	return (char *) iov->iov_base + iov->iov_len;
+}
+
+/**
+ * \brief Advance write position after using obuf_ensure()
+ * \param buf
+ * \param size
+ * \sa obuf_ensure
+ */
+static inline void
+obuf_advance(struct obuf *buf, size_t size)
+{
+	buf->iov[buf->pos].iov_len += size;
+	buf->size += size;
+	assert(buf->iov[buf->pos].iov_len <= buf->capacity[buf->pos]);
+}
+
 /**
  * Reserve size bytes in the output buffer
  * and return a pointer to the reserved

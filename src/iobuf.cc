@@ -207,36 +207,39 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 	assert(iov->iov_len <= buf->capacity[buf->pos]);
 }
 
+void
+obuf_ensure_resize(struct obuf *buf, size_t size)
+{
+	struct iovec *iov = &buf->iov[buf->pos];
+	size_t capacity = buf->capacity[buf->pos];
+	if (iov->iov_len > 0) {
+		/* Move to the next buffer. */
+		buf->pos++;
+		iov = &buf->iov[buf->pos];
+		capacity = buf->capacity[buf->pos];
+	}
+	/* Make sure the next buffer can store size.  */
+	if (capacity == 0) {
+		obuf_init_pos(buf, buf->pos + 1);
+		obuf_alloc_pos(buf, buf->pos, size);
+	} else if (size > capacity) {
+		/* Simply realloc. */
+		obuf_alloc_pos(buf, buf->pos, size);
+	}
+}
+
 /** Book a few bytes in the output buffer. */
 struct obuf_svp
 obuf_book(struct obuf *buf, size_t size)
 {
-	struct iovec *iov = &buf->iov[buf->pos];
-	size_t capacity = buf->capacity[buf->pos];
-	if (iov->iov_len + size > capacity) {
-		if (iov->iov_len > 0) {
-			/* Move to the next buffer. */
-			buf->pos++;
-			iov = &buf->iov[buf->pos];
-			capacity = buf->capacity[buf->pos];
-		}
-		/* Make sure the next buffer can store size.  */
-		if (capacity == 0) {
-			obuf_init_pos(buf, buf->pos + 1);
-			obuf_alloc_pos(buf, buf->pos, size);
-		} else if (size > capacity) {
-			/* Simply realloc. */
-			obuf_alloc_pos(buf, buf->pos, size);
-		}
-	}
+	obuf_ensure(buf, size);
+
 	struct obuf_svp svp;
 	svp.pos = buf->pos;
-	svp.iov_len = iov->iov_len;
+	svp.iov_len = buf->iov[buf->pos].iov_len;
 	svp.size = buf->size;
 
-	iov->iov_len += size;
-	buf->size += size;
-	assert(iov->iov_len <= buf->capacity[buf->pos]);
+	obuf_advance(buf, size);
 	return svp;
 }
 
