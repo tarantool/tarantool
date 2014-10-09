@@ -112,7 +112,7 @@ obuf_init_pos(struct obuf *buf, size_t pos)
 static inline void
 obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
 {
-	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 : iobuf_readahead;
+	size_t capacity = pos > 0 ?  buf->capacity[pos-1] * 2 : buf->alloc_factor;
 	while (capacity < size) {
 		capacity *=2;
 	}
@@ -126,11 +126,12 @@ obuf_alloc_pos(struct obuf *buf, size_t pos, size_t size)
  * yet -- it may never be needed.
  */
 void
-obuf_create(struct obuf *buf, struct region *pool)
+obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor)
 {
 	buf->pool = pool;
 	buf->pos = 0;
 	buf->size = 0;
+	buf->alloc_factor = alloc_factor;
 	obuf_init_pos(buf, buf->pos);
 }
 
@@ -155,7 +156,7 @@ obuf_dup(struct obuf *buf, const void *data, size_t size)
 	/**
 	 * @pre buf->pos points at an array of allocated buffers.
 	 * The array ends with a zero-initialized buffer.
-         */
+	 */
 	while (iov->iov_len + size > capacity) {
 		/*
 		 * The data doesn't fit into this buffer.
@@ -285,7 +286,7 @@ iobuf_new(const char *name)
 		region_create(&iobuf->pool, &cord()->slabc);
 		/* Note: do not allocate memory upfront. */
 		ibuf_create(&iobuf->in, &iobuf->pool);
-		obuf_create(&iobuf->out, &iobuf->pool);
+		obuf_create(&iobuf->out, &iobuf->pool, iobuf_readahead);
 	} else {
 		iobuf = SLIST_FIRST(&iobuf_cache);
 		SLIST_REMOVE_HEAD(&iobuf_cache, next);
@@ -307,7 +308,7 @@ iobuf_delete(struct iobuf *iobuf)
 	} else {
 		region_free(pool);
 		ibuf_create(&iobuf->in, pool);
-		obuf_create(&iobuf->out, pool);
+		obuf_create(&iobuf->out, pool, iobuf_readahead);
 	}
 	region_set_name(pool, "iobuf_cache");
 	SLIST_INSERT_HEAD(&iobuf_cache, iobuf, next);

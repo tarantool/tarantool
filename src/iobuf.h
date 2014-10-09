@@ -113,6 +113,8 @@ struct obuf
 	size_t size;
 	/** Position of the "current" iovec. */
 	size_t pos;
+	/** Allocation factor (allocations are a multiple of this number) */
+	size_t alloc_factor;
 	/** How many bytes are actually allocated for each iovec. */
 	size_t capacity[IOBUF_IOV_MAX];
 	/**
