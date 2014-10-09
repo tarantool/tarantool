@@ -30,6 +30,7 @@
  */
 #include "trivia/util.h"
 #include "key_def.h" /* for enum field_type */
+#include "iovec.h"
 
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
@@ -166,12 +167,17 @@ tuple_alloc(struct tuple_format *format, size_t size);
  * Create a new tuple from a sequence of BER-len encoded fields.
  * tuple->refs is 0.
  *
- * @post *data is advanced to the length of tuple data
- *
  * Throws an exception if tuple format is incorrect.
  */
 struct tuple *
-tuple_new(struct tuple_format *format, const char *data, const char *end);
+tuple_newv(struct tuple_format *format, struct iovec *tbody, size_t tbody_cnt);
+
+static inline struct tuple *
+tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	struct iovec tuple = { (void *) data, (size_t) (end - data) };
+	return tuple_newv(format, &tuple, 1);
+}
 
 /**
  * Free the tuple.

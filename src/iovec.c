@@ -1,5 +1,4 @@
-#ifndef TARANTOOL_BOX_REQUEST_H_INCLUDED
-#define TARANTOOL_BOX_REQUEST_H_INCLUDED
+
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,52 +27,5 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdbool.h>
+
 #include "iovec.h"
-#include "xrow.h"
-#include "small/region.h"
-
-struct txn;
-struct port;
-
-typedef void (*request_execute_f)(struct request *, struct port *);
-
-struct request
-{
-	/*
-	 * Either log row, or network header, or NULL, depending
-	 * on where this packet originated from: the write ahead
-	 * log/snapshot, client request, or a Lua request.
-	 */
-	struct xrow_header *header;
-	/**
-	 * Request type - IPROTO type code
-	 */
-	uint32_t type;
-	uint32_t space_id;
-	uint32_t index_id;
-	uint32_t offset;
-	uint32_t limit;
-	uint32_t iterator;
-	/** Search key or proc name. */
-	const char *key;
-	const char *key_end;
-	/** Insert/replace tuple or proc argument or update operations. */
-	struct iovec tuple[TUPLE_IOVMAX];
-	int tuple_cnt;
-	/** Base field offset for error messages, e.g. 0 for C and 1 for Lua. */
-	int field_base;
-
-	request_execute_f execute;
-};
-
-void
-request_create(struct request *request, uint32_t code);
-
-void
-request_decode(struct request *request, const char *data, uint32_t len);
-
-int
-request_encode(struct request *request, struct iovec *iov);
-
-#endif /* TARANTOOL_BOX_REQUEST_H_INCLUDED */

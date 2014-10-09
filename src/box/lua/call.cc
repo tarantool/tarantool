@@ -255,10 +255,12 @@ lbox_request_create(struct request *request,
 	if (tuple > 0) {
 		struct tbuf *tuple_buf = tbuf_new(&fiber()->gc);
 		luamp_encode(L, luaL_msgpack_default, tuple_buf, tuple);
-		request->tuple = tuple_buf->data;
-		request->tuple_end = tuple_buf->data + tuple_buf->size;
-		if (mp_typeof(*request->tuple) != MP_ARRAY)
+		assert(tuple_buf->size > 0);
+		if (mp_typeof(*tuple_buf->data) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
+		request->tuple_cnt = 1;
+		request->tuple[0].iov_base = tuple_buf->data;
+		request->tuple[0].iov_len = tuple_buf->size;
 	}
 }
 
@@ -563,7 +565,9 @@ box_lua_call(struct request *request, struct port *port)
 	 */
 	SetuidGuard setuid(name, name_len, user, PRIV_X);
 	/* Push the rest of args (a tuple). */
-	const char *args = request->tuple;
+	size_t args_len;
+	const char *args = (char *) iovec_join(&fiber()->gc, request->tuple,
+					       request->tuple_cnt, &args_len);
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "call: out of stack");
 

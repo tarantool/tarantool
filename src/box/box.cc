@@ -299,8 +299,9 @@ boxk(enum iproto_type type, uint32_t space_id, const char *format, ...)
 	}
 	va_end(ap);
 	assert(data <= buf + sizeof(buf));
-	req.tuple = buf;
-	req.tuple_end = data;
+	req.tuple_cnt = 1;
+	req.tuple[0].iov_base = (void *) buf;
+	req.tuple[0].iov_len = data - buf;
 	process_rw(&null_port, &req);
 }
 
