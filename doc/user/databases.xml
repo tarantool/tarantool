@@ -2987,7 +2987,7 @@ When a client connects to a Tarantool server, the server sends a random
 which the client must mix with the hashed-password before sending
 to the server.
 Thus the original value 'x' is never stored anywhere except in the
-user's head, and the hashed value is never passed passed down a
+user's head, and the hashed value is never passed down a
 network wire except when mixed with a random salt.
 This system prevents malicious onlookers from finding passwords
 by snooping in the log files or snooping on the wire.
