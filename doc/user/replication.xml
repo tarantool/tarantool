@@ -68,7 +68,7 @@ identifier which is unique within the cluster, known as the
     To prepare the master for connections from the replica, it's only
     necessary to include "listen" in the initial <code>box.cfg</code>
     request, for example <code>box.cfg{listen=3301}</code>.
-    A master with enabled "listen" URI can accept connections
+    A master with enabled "listen" <link linkend="URI">URI</link> can accept connections
     from as many replicas as necessary on that URI. Each replica
     has its own replication state.
   </para>

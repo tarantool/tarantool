@@ -237,7 +237,7 @@ so it's not a true binary download, some source code is involved.
 First upgrade Clang (the C compiler) to version 3.2 or later using
 Command Line Tools for Xcode disk image version 4.6+ from
 Apple Developer web-site. Then download the recipe file from
-<link xlink:href="tarantool.org/dist/tarantool.rb">tarantool.org/dist/tarantool.rb</link>.
+<link xlink:href="tarantool.org/dist/master/tarantool.rb">tarantool.org/dist/master/tarantool.rb</link>.
 Make the file executable, execute it, and the script in the file should
 handle the necessary steps with cmake, make, and make install.
 </para>
@@ -625,7 +625,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
 3. Try these requests:<programlisting><userinput>box.cfg{}
 console = require('console')
-console.connect('localhost', 3301)
+console.connect('localhost:3301')
 box.space.tester:select{2}</userinput></programlisting>
 </para>
 <para>
@@ -640,7 +640,7 @@ tarantool&gt; console = require('console')
 ---
 ...
 
-tarantool&gt; console.connect('localhost', 3301)
+tarantool&gt; console.connect('localhost:3301')
 2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
 ---
 ...

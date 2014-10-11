@@ -45,7 +45,7 @@
       <emphasis role="strong">spawner</emphasis> -- controls other processes,
     </para></listitem>
     <listitem><para>
-      <emphasis role="strong">replica + uri/status</emphasis> -- replication node accepting connections on <olink targetptr="replication_port"/>,
+      <emphasis role="strong">replica + URI/status</emphasis> -- replication node accepting connections on <olink targetptr="replication_port"/>,
     </para></listitem>
     <listitem><para>
       <emphasis role="strong">relay + sockaddr</emphasis> -- serves a single replication connection,

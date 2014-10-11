@@ -82,6 +82,46 @@ Target: Linux-x86_64-Debug
 
 </section>
 
+
+<section xml:id="URI" xreflabel="URI">
+ <title>URI</title>
+ <para>
+Some configuration parameters and some functions
+depend on a URI, or "Universal Resource Identifier".
+The URI string format is similar to the
+<link
+xlink:href="http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax">generic syntax for a URI schema</link>.
+So it may contain (in order) a user name for login, a password,
+a host name or host IP address, and a port number.
+Only the port number is always mandatory. The password
+is mandatory if the user name is specified,
+unless the user name is 'guest'.
+So, formally, the URI syntax is
+<code>[host:]port</code>
+or <code>[username:password@]host:port</code>
+or if username='guest' it may be
+<code>[username@]host:port</code>.
+If host is omitted, then 'localhost' is assumed.
+If username:password is omitted, then 'guest' is assumed.
+Some examples:
+    <informaltable>
+    <tgroup cols="2" align="left" colsep="1" rowsep="0">
+     <thead>
+      <row><entry>URI fragment</entry><entry>Example</entry></row>
+     </thead>
+    <tbody>
+    <row><entry>port</entry><entry>                  3301</entry></row>
+    <row><entry>host:port</entry><entry>             127.0.0.1:3301</entry></row>
+    <row><entry>guest@host:port</entry><entry>       guest@mail.ru:3301</entry></row>
+    <row><entry>username:password@host:port</entry><entry>                  guest:sesame@mail.ru:3301</entry></row>
+    </tbody>
+    </tgroup>                                   
+    </informaltable>
+In certain circumstances a Unix socket may be used where a URI is required.
+</para>
+</section>
+
+
 <section xml:id="initialization-file" xreflabel="initialization file">
 <title>Initialization file</title>
 <para>
@@ -113,7 +153,6 @@ Then the screen might look like this:<programlisting>
 ... main/101/script.lua I> recovering from `./00000000000000000000.snap'
 ... main/101/script.lua I> primary: bound to 0.0.0.0:3301
 ... main/102/leave_local_hot_standby I> ready to accept requests
-... main/103/snapshot_daemon I> started
 Starting  ARG
 ... main C> entering the event loop</programlisting>
 </para>
@@ -217,7 +256,7 @@ Starting  ARG
           <entry>integer or string</entry>
           <entry>null</entry>
           <entry>no</entry>
-          <entry>The read/write data port number or URI (Universal Resource Identifier) string.
+          <entry>The read/write data port number or <link linkend="URI">URI</link> (Universal Resource Identifier) string.
           Has no default value, so <emphasis
           role="strong">must be specified</emphasis>
           if connections will occur from remote clients
@@ -517,13 +556,8 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           <entry>If replication_source is not an empty string, the
           server is considered to be a Tarantool replica.
           The replica server will try to connect to the master
-          which replication_source specifies with a URI.
-          The string format is similar to the
-          <link
-          xlink:href="http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax">generic syntax for a URI schema</link>
-          So it may be a user name and password and ip:port address such as 'guest:password@127.0.0.1:3301',
-          or just ip:port address such as '127.0.0.1:3301',
-          or just port such as '3301'.
+           which replication_source specifies with a <link linkend="URI">URI</link> (Universal Resource Identifier),
+          for example 'konstantin@secret_password@tarantool.org:3301'.
           The default user name is 'guest'.
           A replica server does not accept data-change requests
           on the <olink targetptr="primary_port">listen</olink> port.
