@@ -40,6 +40,9 @@
 #include <sys/types.h>
 #include <sophia.h>
 #include <stdio.h>
+#include <inttypes.h>
+
+extern "C" void *sp_error(void *o, ...);
 
 static inline void
 sophia_delete(void *db, struct key_def *key_def, struct tuple *tuple)
@@ -141,21 +144,28 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	SophiaFactory *factory =
 		(SophiaFactory*)space->engine->factory;
 	env = factory->env;
-	db = sp_storage(env);
-	if (db == NULL)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
-
 	const char *sophia_dir = cfg_gets("sophia_dir");
 	mkdir(sophia_dir, 0755);
-
 	char path[PATH_MAX];
+	char name[128];
 	snprintf(path, sizeof(path), "%s/%" PRIu32,
 	         sophia_dir, key_def->space_id);
-
-	void *c = sp_ctl(db, "conf");
-	sp_set(c, "storage.dir", path);
-	sp_set(c, "storage.cmp", sophia_index_compare, key_def);
-	sp_set(c, "storage.cmp_arg", key_def);
+	void *c = sp_ctl(env);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".dir",
+	         key_def->space_id);
+	sp_set(c, name, path);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".cmp",
+	         key_def->space_id);
+	sp_set(c, name, sophia_index_compare);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".cmp_arg",
+	         key_def->space_id);
+	sp_set(c, name, key_def);
+	snprintf(name, sizeof(name), "db.%" PRIu32,
+	         key_def->space_id);
+	db = sp_get(c, name);
+	if (db == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
+	sp_destroy(c);
 	int rc = sp_open(db);
 	if (rc == -1)
 		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
@@ -209,15 +219,33 @@ SophiaIndex::endBuild()
 size_t
 SophiaIndex::size() const
 {
-	void *profiler = sp_ctl(db, "profiler");
-	uint64_t count = *(uint64_t*)sp_get(profiler, "count", NULL);
+	void *c = sp_ctl(env);
+	char name[128];
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".profiler.count",
+	         key_def->space_id);
+	void *o = sp_get(c, name);
+	if (o == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+	uint64_t count = atoi((const char *)sp_get(o, "value", NULL));
+	sp_destroy(o);
+	sp_destroy(c);
 	return count;
 }
 
 size_t
 SophiaIndex::memsize() const
 {
-	return 0;
+	void *c = sp_ctl(env);
+	char name[128];
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".profiler.memory_used",
+	         key_def->space_id);
+	void *o = sp_get(c, name);
+	if (o == NULL)
+		tnt_raise(ClientError, ER_SOPHIA, sp_error(db));
+	uint64_t used = atoi((const char *)sp_get(o, "value", NULL));
+	sp_destroy(o);
+	sp_destroy(c);
+	return used;
 }
 
 struct tuple *

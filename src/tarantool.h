@@ -56,7 +56,7 @@ void
 load_cfg();
 
 void
-reload_cfg();
+check_cfg();
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -96,6 +96,13 @@ const char *box_status(void);
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
 
+/**
+ * Check Lua configuration before initialization or
+ * in case of a configuration change.
+ */
+void
+box_check_config();
+
 void
 box_set_replication_source(const char *source);
 

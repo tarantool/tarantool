@@ -213,7 +213,9 @@ do
                     error("snapshot daemon has already been started")
                 end
                 daemon.status = 'started'
-                daemon.fiber = fiber.create(daemon_fiber, daemon)
+                if box.cfg.snapshot_period > 0 then
+                    daemon.fiber = fiber.create(daemon_fiber, daemon)
+                end
             end,
 
             stop = function()
@@ -230,11 +232,17 @@ do
 
             set_snapshot_period = function(snapshot_period)
                 local daemon = box.internal[PREFIX] or daemon
-                log.info("new snapshot period is %s",
+                log.info("%s: new snapshot period is %s", PREFIX,
                          tostring(snapshot_period))
-                if daemon.fiber ~= nil then
-                    daemon.fiber:wakeup()
+
+                if daemon.status ~= 'started' then
+                    return
                 end
+
+                if daemon.fiber == nil then
+                    daemon.fiber = fiber.create(daemon_fiber, daemon)
+                end
+                daemon.fiber:wakeup()
                 return snapshot_period
             end,
 
@@ -244,7 +252,11 @@ do
                         "snapshot_count must be integer")
                 end
                 local daemon = box.internal[PREFIX] or daemon
-                log.info("new snapshot count is %s", tostring(snapshot_count))
+                log.info("%s: new snapshot count is %s", PREFIX,
+                    tostring(snapshot_count))
+                if daemon.status ~= 'started' then
+                    return
+                end
 
                 if daemon.fiber ~= nil then
                     daemon.fiber:wakeup()

@@ -45,6 +45,8 @@
 #include <dirent.h>
 #include <errno.h>
 
+extern "C" void *sp_error(void *o, ...);
+
 struct Sophia: public Engine {
 	Sophia(EngineFactory*);
 };
