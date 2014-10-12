@@ -549,7 +549,7 @@ Tarantool is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first <link linkend="an-index">index</link>, try this:<programlisting>
-<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('tester')</userinput>
+<prompt>tarantool&gt; </prompt><userinput>s = box.schema.space.create('tester')</userinput>
 <prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -564,7 +564,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select{3}</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting><computeroutput>
-tarantool&gt; s = box.schema.create_space('tester')
+tarantool&gt; s = box.schema.space.create('tester')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
@@ -726,7 +726,7 @@ inserted and selected tuples.
   </para>
   <para>DATA DEFINITION WITH RUNTIME REQUESTS RATHER THAN A CONFIGURATION FILE.
     <computeroutput>box.schema</computeroutput> is a new package for space configuration.
-    Spaces are added/dropped with box.schema.create_space / box.space.<replaceable>space_name</replaceable>.drop.
+    Spaces are added/dropped with box.schema.space.create / box.space.<replaceable>space_name</replaceable>.drop.
     Indexes are added/dropped with box.space.<replaceable>space-name</replaceable>.create_index /
     box.space.<replaceable>.space-name</replaceable>.index.<replaceable>index_name</replaceable>.drop.
     "space.estimated_rows" no longer exists.

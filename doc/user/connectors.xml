@@ -136,7 +136,7 @@ And that is why APIs exist for drivers for Perl, Python, PHP, and so on.
    It is easy to meet all the conditions by starting the
    server and executing this script:<programlisting>
 box.cfg{listen=3301}
-box.schema.create_space('examples',{id=999})
+box.schema.space.create('examples',{id=999})
 box.space.examples:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
 box.schema.user.grant('guest','read,write','space','examples')
 box.schema.user.grant('guest','read','space','_space')

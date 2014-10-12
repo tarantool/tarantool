@@ -381,7 +381,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
   </table>
   
   
-  <table frame='all' pgwide='1'>
+  <table xml:id="snapshot-daemon" frame='all' pgwide='1'>
     <title>Snapshot daemon</title>
     <tgroup cols='5' colsep='1' rowsep='1'>
       <colspec colnum="1" colname="col1" colwidth="2*"/>

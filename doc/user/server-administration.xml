@@ -163,7 +163,7 @@ Here is an example of an interactive-mode tarantool client session:
                 [ tarantool will display an introductory message including version number here ]
 tarantool> <userinput>box.cfg{listen=3301}</userinput>
                 [ tarantool will display configuration information here ]
-tarantool> <userinput>s = box.schema.create_space('tester')</userinput>
+tarantool> <userinput>s = box.schema.space.create('tester')</userinput>
                 [ tarantool may display an in-progress message here ]
 ---
 ...
@@ -370,7 +370,7 @@ box.cfg{listen = 3301}
 box.schema.user.passwd('Gx5!')
 box.schema.user.grant('guest','read,write,execute','universe')
 fiber = require('fiber')
-box.schema.create_space('tester')
+box.schema.space.create('tester')
 box.space.tester:create_index('primary',{})
 i = 0
 while 0 == 0 do
