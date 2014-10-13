@@ -1187,3 +1187,19 @@ lua box.cjson.encode{ box.socket.tcp_connect('test:test@localhost:3303') == nil,
 ---
  - [true,"Invalid argument"]
 ...
+lua box.socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and box.errno() == box.errno.EINVAL
+---
+ - true
+...
+lua box.socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and box.errno() == box.errno.EINVAL
+---
+ - true
+...
+lua box.socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and box.errno() == box.errno.EINVAL
+---
+ - true
+...
+lua box.socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and box.errno() == box.errno.EINVAL
+---
+ - true
+...
