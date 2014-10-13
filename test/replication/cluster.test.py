@@ -11,7 +11,7 @@ print '-------------------------------------------------------------'
 new_uuid = '8c7ff474-65f9-4abe-81a4-a3e1019bb1ae'
 
 # Requires panic_on_wal_error = false
-server.admin("box.space._cluster:replace{{1, '{}'}}".format(new_uuid))
+server.admin("box.space._cluster:replace{{1, '{0}'}}".format(new_uuid))
 server.admin("box.info.server.uuid")
 
 # Check log message

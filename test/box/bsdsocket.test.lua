@@ -499,3 +499,10 @@ s:close()
 fio.stat(path) == nil
 
 { socket.tcp_connect('abrakadabra#123') == nil, errno.strerror() }
+
+
+-- wrong options for getaddrinfo
+socket.getaddrinfo('host', 'port', { type = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { family = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { protocol = 'WRONG' }) == nil and errno() == errno.EINVAL
+socket.getaddrinfo('host', 'port', { flags = 'WRONG' }) == nil and errno() == errno.EINVAL

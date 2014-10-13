@@ -1327,7 +1327,7 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 {
 	func->fid = tuple_field_u32(tuple, ID);
 	func->uid = tuple_field_u32(tuple, UID);
-	func->auth_token = user_cache_find(func->uid)->auth_token;
+	func->auth_token = BOX_USER_MAX; /* invalid value */
 	func->setuid = false;
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);

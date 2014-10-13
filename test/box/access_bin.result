@@ -8,17 +8,10 @@ box.schema.user.grant('guest','read,write,execute','universe')
 session = box.session
 ---
 ...
-net = { box = require('net.box') }
+remote = require('net.box')
 ---
 ...
-LISTEN = require('uri').parse(box.cfg.listen)
----
-...
-LISTEN ~= nil
----
-- true
-...
-c = net.box:new(LISTEN.host, LISTEN.service)
+c = remote:new(box.cfg.listen)
 ---
 ...
 c:call("dostring", "session.su('admin')")
@@ -52,7 +45,7 @@ box.schema.func.create('setuid_func')
 box.schema.user.grant('guest', 'execute', 'function', 'setuid_func')
 ---
 ...
-c = net.box:new(LISTEN.host, LISTEN.service)
+c = remote:new(box.cfg.listen)
 ---
 ...
 c:call("setuid_func")
@@ -95,10 +88,48 @@ session.su('admin')
 c:close()
 ---
 ...
+-- OPENTAR-84: crash in on_replace_dd_func during recovery
+-- _func space recovered after _user space, so setuid option can be
+-- handled incorrectly
+box.snapshot()
+---
+- ok
+...
+--# stop server default
+--# start server default
+remote = require('net.box')
+---
+...
+session = box.session
+---
+...
+setuid_func = function() return box.space.setuid_space:auto_increment{} end
+---
+...
+c = remote:new(box.cfg.listen)
+---
+...
+c:call("setuid_func")
+---
+- - [2]
+...
+session.su('guest')
+---
+...
+setuid_func()
+---
+- error: Read access denied for user 'guest' to space 'setuid_space'
+...
+session.su('admin')
+---
+...
+c:close()
+---
+...
 box.schema.func.drop('setuid_func')
 ---
 ...
-setuid_space:drop()
+box.space.setuid_space:drop()
 ---
 ...
 --
@@ -127,7 +158,7 @@ box.schema.user.grant('test', 'read', 'space', '_index')
 net = require('net.box')
 ---
 ...
-c = net.new(LISTEN.host, LISTEN.service, {user = 'test', password='test'})
+c = net.new('test:test@'..box.cfg.listen)
 ---
 ...
 c.space.test:insert{1}

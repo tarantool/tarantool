@@ -1,0 +1,22 @@
+
+# vim: set ft=python :
+import re
+import os.path
+import socket
+import os
+
+test_path = '/tmp/tarantool-test-socket'
+
+if os.path.exists(test_path):
+    os.remove(test_path)
+
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+try:
+    s.bind(test_path)
+except:
+    self.skip = 1
+
+s.close()
+
+if os.path.exists(test_path):
+    os.remove(test_path)
