@@ -153,7 +153,7 @@ def main():
     failed_tests = []
 
     try:
-        color_stdout("Started {}\n".format(" ".join(sys.argv)), schema='tr_text')
+        color_stdout("Started {0}\n".format(" ".join(sys.argv)), schema='tr_text')
         suite_names = []
         if options.args.suites != []:
             suite_names = options.args.suites
@@ -166,7 +166,7 @@ def main():
 
         TarantoolServer.find_exe(options.args.builddir)
         UnittestServer.find_exe(options.args.builddir)
-        
+
 
         for suite in suites:
             failed_tests.extend(suite.run_all())
