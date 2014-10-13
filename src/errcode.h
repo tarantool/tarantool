@@ -99,7 +99,7 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 47 */_(ER_PASSWORD_MISMATCH,		2, "Incorrect password supplied for user '%s'") \
 	/* 48 */_(ER_UNKNOWN_REQUEST_TYPE,	2, "Unknown request type %u") \
 	/* 49 */_(ER_UNKNOWN_SCHEMA_OBJECT,	2, "Unknown object type '%s'") \
-	/* 50 */_(ER_CREATE_FUNCTION,		2, "Failed to create function: %s") \
+	/* 50 */_(ER_CREATE_FUNCTION,		2, "Failed to create function '%s': %s") \
 	/* 51 */_(ER_NO_SUCH_FUNCTION,		2, "Function '%s' does not exist") \
 	/* 52 */_(ER_FUNCTION_EXISTS,		2, "Function '%s' already exists") \
 	/* 53 */_(ER_FUNCTION_ACCESS_DENIED,	2, "%s access denied for user '%s' to function '%s'") \
