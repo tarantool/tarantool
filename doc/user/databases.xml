@@ -3010,14 +3010,14 @@ To see more about the details of the algorithm for the purpose of writing a new 
 <para>
 <bridgehead renderas="sect4">Users and the _user space</bridgehead>
 The fields in the _user space are:
-a numeric id, a number, the user name, the type, and the optional password.
+the numeric id of the tuple, the numeric id of the tuple's creator, the user name, the type, and the optional password.
 </para>
 
 <para>
 There are three special users: 'guest', 'admin', and 'public'.
 </para>
 
-            <para>
+            
                 <table>
                     <title>The system users</title>
                     <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -3029,7 +3029,7 @@ There are three special users: 'guest', 'admin', and 'public'.
                          <entry>guest</entry><entry>0</entry><entry>user</entry><entry>Default when connecting remotely. Usually an untrusted user with few privileges.</entry>
                         </row>
                         <row>
-                         <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using sys/tarantool as a console. Usually an administrative user with all privileges.</entry>
+                         <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using <code>tarantool</code> as a console. Usually an administrative user with all privileges.</entry>
                         </row>
                         <row>
                          <entry>public</entry><entry>2</entry><entry>role</entry><entry>Not a user in the usual sense. A role is a container for privileges which can be granted to regular users. </entry>
@@ -3037,15 +3037,15 @@ There are three special users: 'guest', 'admin', and 'public'.
                         </tbody>
                     </tgroup>
                 </table>
-            </para>
+            
 
 <para>
 To select a row from the _user space, use <code>box.select</code>.
 For example, here is what happens with a select for user id = 0,
-which is the 'guest' user, without a password:
+which is the 'guest' user, which by default has no password:
 <programlisting><prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{0}</userinput>
 ---
-- - [0, 1, 'guest']
+- - [0, 1, 'guest', 'user']
 ...</programlisting></para>
 
 <para>
@@ -3059,6 +3059,9 @@ To create a new user, say
 <code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
 or
 <code>box.schema.user.create(<replaceable>user-name</replaceable>, {password=<replaceable>password</replaceable>})</code>.
+The form
+<code>box.schema.user.create(<replaceable>user-name</replaceable>, {password=<replaceable>password</replaceable>})</code>
+is better because in a <link linkend="URI">URI</link> (Uniform Resource Identifier) it is usually illegal to include a user-name without a password.
 </para>
 
 <para>
@@ -3075,14 +3078,16 @@ To drop a user, say
 For example, here is a session which creates a new user with
 a strong password, selects a tuple in
 the _user space, and then drops the user.
-<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.create('JeanMartin', {password = 'Iwtso_6_os$$'})</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{4}</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>box.space._user.index.name:select{'JeanMartin'}</userinput>
 ---
-- - [4, 1, 'ElizabethBrowning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+- - [17, 1, 'JeanMartin', 'user', {'chap-sha1': 't3xjUpQdrt857O+YRvGbMY5py8Q='}]
 ...
-<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.drop('ElizabethBrowning')</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.drop('JeanMartin')</userinput>
 ---
 ...</programlisting></para>
 

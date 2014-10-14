@@ -557,7 +557,7 @@ tarantool: primary pri: 3301 adm: 3313</programlisting>
           server is considered to be a Tarantool replica.
           The replica server will try to connect to the master
            which replication_source specifies with a <link linkend="URI">URI</link> (Universal Resource Identifier),
-          for example 'konstantin@secret_password@tarantool.org:3301'.
+          for example 'konstantin:secret_password@tarantool.org:3301'.
           The default user name is 'guest'.
           A replica server does not accept data-change requests
           on the <olink targetptr="primary_port">listen</olink> port.

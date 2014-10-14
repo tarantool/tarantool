@@ -107,8 +107,11 @@ identifier which is unique within the cluster, known as the
     <olink targetptr="box.cfg">box.cfg</olink> statement.
   </simpara></note>
   <note><simpara>
-    If the <link linkend="snapshot-daemon">snaapshot daemon</link>
-    is running on the master, it should also be running on the replica.
+    The replica does not inherit the master's configuration parameters,
+    such as the ones that cause the <link linkend="snapshot-daemon">snapshot daemon</link>
+    to run on the master. To get the same behavior,
+    one would have to set the relevant parameters explicitly
+    so that they are the same on both master and replica.
   </simpara></note>
 
 </section>
