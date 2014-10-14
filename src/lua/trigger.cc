@@ -32,7 +32,9 @@
 void
 lbox_trigger_destroy(struct trigger *trigger)
 {
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, (intptr_t) trigger->data);
+	if (tarantool_L)
+		luaL_unref(tarantool_L,
+			LUA_REGISTRYINDEX, (intptr_t) trigger->data);
 	free(trigger);
 }
 
