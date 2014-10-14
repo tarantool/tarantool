@@ -29,6 +29,7 @@
 #include "tuple.h"
 
 #include "small/small.h"
+#include "small/quota.h"
 #include "tbuf.h"
 
 #include "key_def.h"
@@ -48,6 +49,8 @@ uint32_t snapshot_version;
 struct slab_arena memtx_arena;
 struct slab_cache memtx_slab_cache;
 struct small_alloc memtx_alloc;
+
+extern struct quota memory_quota;
 
 /** Extract all available type info from keys. */
 void
@@ -517,15 +520,18 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_init(float arena_prealloc, uint32_t objsize_min,
+tuple_init(float alloc_arena_max_size, uint32_t objsize_min,
 	   float alloc_factor)
 {
 	tuple_format_ber = tuple_format_new(&rlist_nil);
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_ber, 1);
 
-	uint32_t slab_size = 4*1024*1024;
-	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
+	uint32_t slab_size = 4 * 1024 * 1024;
+	size_t max_size = alloc_arena_max_size * 1024 * 1024 * 1024;
+	if (quota_set(&memory_quota, max_size)) {
+		panic_syserror("Memory quota set failed!");
+	}
 
 	int flags;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
@@ -534,14 +540,14 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 		flags = MAP_PRIVATE;
         } else {
 		say_info("mapping %zu bytes for a shared arena...",
-			 prealloc);
+			max_size);
 		flags = MAP_SHARED;
 	}
 
-	if (slab_arena_create(&memtx_arena, prealloc, prealloc,
-			      slab_size, flags)) {
+	if (slab_arena_create(&memtx_arena, &memory_quota,
+			      max_size, slab_size, flags)) {
 		panic_syserror("failed to preallocate %zu bytes",
-			       prealloc);
+			       max_size);
 	}
 	slab_cache_create(&memtx_slab_cache, &memtx_arena,
 			  slab_size);

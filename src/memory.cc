@@ -29,15 +29,20 @@
 #include "memory.h"
 
 struct slab_arena runtime;
+struct quota memory_quota;
 
-static const size_t SLAB_SIZE = 4194304;
+static const size_t RUNTIME_SLAB_SIZE = 4 * 1024 * 1024;
+static const size_t DEFAULT_MEM_QUOTA_SIZE = QUOTA_MAX_ALLOC;
 
 void
 memory_init()
 {
+	/* default quota initialization */
+	quota_init(&memory_quota, DEFAULT_MEM_QUOTA_SIZE);
+
 	/* No limit on the runtime memory. */
-	slab_arena_create(&runtime, 0, SMALL_UNLIMITED,
-			  SLAB_SIZE, MAP_PRIVATE);
+	slab_arena_create(&runtime, &memory_quota, 0,
+		RUNTIME_SLAB_SIZE, MAP_PRIVATE);
 }
 
 void

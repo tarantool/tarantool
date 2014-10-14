@@ -1,4 +1,5 @@
 #include "small/mempool.h"
+#include "small/quota.h"
 #include "unit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@ enum {
 
 struct slab_arena arena;
 struct slab_cache cache;
+struct quota quota;
 struct mempool pool;
 int objsize;
 size_t used;
@@ -101,7 +103,9 @@ int main()
 	if (objsize < OBJSIZE_MIN)
 		objsize = OBJSIZE_MIN;
 
-	slab_arena_create(&arena, 0, UINT_MAX,
+	quota_init(&quota, UINT_MAX);
+
+	slab_arena_create(&arena, &quota, UINT_MAX,
 			  4000000, MAP_PRIVATE);
 	slab_cache_create(&cache, &arena, 0);
 

@@ -30,6 +30,7 @@
  */
 #include "small/region.h"
 #include "small/small.h"
+#include "small/quota.h"
 /**
  * Define the global components of Tarantool memory subsystem:
  * slab caches, allocators, arenas.

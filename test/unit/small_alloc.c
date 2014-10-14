@@ -1,4 +1,5 @@
 #include "small/small.h"
+#include "small/quota.h"
 #include "unit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,7 @@ enum {
 struct slab_arena arena;
 struct slab_cache cache;
 struct small_alloc alloc;
+struct quota quota;
 /* Streak type - allocating or freeing */
 bool allocating = true;
 /** Keep global to easily inspect the core. */
@@ -92,7 +94,9 @@ int main()
 
 	srand(seed);
 
-	slab_arena_create(&arena, 0, UINT_MAX, 4000000,
+	quota_init(&quota, UINT_MAX);
+
+	slab_arena_create(&arena, &quota, UINT_MAX, 4000000,
 			  MAP_PRIVATE);
 	slab_cache_create(&cache, &arena, 0);
 

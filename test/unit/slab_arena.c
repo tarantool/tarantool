@@ -1,4 +1,5 @@
 #include "small/slab_arena.h"
+#include "small/quota.h"
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -10,17 +11,22 @@ slab_arena_print(struct slab_arena *arena)
 {
 	printf("arena->prealloc = %zu\narena->maxalloc = %zu\n"
 	       "arena->used = %zu\narena->slab_size = %u\n",
-	       arena->prealloc, arena->maxalloc,
+	       arena->prealloc, quota_get_total(arena->quota),
 	       arena->used, arena->slab_size);
 }
 
 int main()
 {
+	struct quota quota;
 	struct slab_arena arena;
-	slab_arena_create(&arena, 0, 0, 0, MAP_PRIVATE);
+
+	quota_init(&quota, 0);
+	slab_arena_create(&arena, &quota, 0, 0, MAP_PRIVATE);
 	slab_arena_print(&arena);
 	slab_arena_destroy(&arena);
-	slab_arena_create(&arena, 1, 1, 1, MAP_PRIVATE);
+
+	quota_init(&quota, SLAB_MIN_SIZE);
+	slab_arena_create(&arena, &quota, 1, 1, MAP_PRIVATE);
 	slab_arena_print(&arena);
 	void *ptr = slab_map(&arena);
 	slab_arena_print(&arena);
@@ -30,9 +36,10 @@ int main()
 	slab_unmap(&arena, ptr);
 	slab_unmap(&arena, ptr1);
 	slab_arena_print(&arena);
-
 	slab_arena_destroy(&arena);
-	slab_arena_create(&arena, 2000000, 3000000, 1, MAP_PRIVATE);
+
+	quota_init(&quota, 3000 * QUOTA_GRANULARITY);
+	slab_arena_create(&arena, &quota, 2000 * QUOTA_GRANULARITY, 1, MAP_PRIVATE);
 	slab_arena_print(&arena);
 	slab_arena_destroy(&arena);
 }

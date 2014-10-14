@@ -1,9 +1,11 @@
 #include "small/region.h"
+#include "small/quota.h"
 #include "unit.h"
 #include <stdio.h>
 
 struct slab_cache cache;
 struct slab_arena arena;
+struct quota quota;
 
 void
 region_basic()
@@ -75,7 +77,8 @@ region_test_truncate()
 
 int main()
 {
-	slab_arena_create(&arena, 0, UINT_MAX,
+	quota_init(&quota, UINT_MAX);
+	slab_arena_create(&arena, &quota, UINT_MAX,
 			  4000000, MAP_PRIVATE);
 	slab_cache_create(&cache, &arena, 0);
 
