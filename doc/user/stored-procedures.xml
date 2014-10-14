@@ -1472,7 +1472,7 @@ end
     <para>
      The functions for setting up and connecting are <code>socket</code>, <code>sysconnect</code>, <code>tcp_connect</code>.
      The functions for sending data are <code>send</code>, <code>sendto</code>, <code>write</code>, <code>syswrite</code>.
-     The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>, <code>readline</code>.
+     The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>.
       The functions for waiting before sending/receiving data are <code>wait</code>, <code>readable</code>, <code>writable</code>.
      The functions for setting flags are <code>nonblock</code>, <code>setsockopt</code>.
      The functions for stopping and disconnecting are <code>shutdown</code>, <code>close</code>.
