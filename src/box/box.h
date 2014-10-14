@@ -52,6 +52,10 @@ void box_init();
 /** To be called at program end. */
 void box_free(void);
 
+/** A pthread_atfork() callback for box */
+void
+box_atfork();
+
 /**
  * The main entry point to the
  * Box: callbacks into the request processor.
@@ -96,6 +100,12 @@ const char *box_status(void);
 void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
 
+void
+box_process_join(struct xrow_header *header);
+
+void
+box_process_subscribe(struct xrow_header *header);
+
 /**
  * Check Lua configuration before initialization or
  * in case of a configuration change.
@@ -111,6 +121,8 @@ void box_set_log_level(int level);
 void box_set_io_collect_interval(double interval);
 void box_set_snap_io_rate_limit(double limit);
 void box_set_too_long_threshold(double threshold);
+
+extern struct recovery_state *recovery;
 
 #if defined(__cplusplus)
 }

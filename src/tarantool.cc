@@ -265,6 +265,12 @@ signal_reset()
 		say_syserror("sigprocmask");
 }
 
+static void
+tarantool_atfork()
+{
+	signal_reset();
+	box_atfork();
+}
 
 /**
  * Adjust the process signal mask and add handlers for signals.
@@ -303,7 +309,7 @@ signal_init(void)
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_start(loop(), &ev_sigs[i]);
 
-	(void) tt_pthread_atfork(NULL, NULL, signal_reset);
+	(void) tt_pthread_atfork(NULL, NULL, tarantool_atfork);
 }
 
 static void

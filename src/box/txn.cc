@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "txn.h"
+#include "box.h"
 #include "tuple.h"
 #include "space.h"
 #include <tarantool.h>
