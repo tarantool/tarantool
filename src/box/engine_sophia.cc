@@ -205,20 +205,16 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 void
 SophiaFactory::txnFinish(struct txn *txn)
 {
-	/**
-	 * @todo: support multi-statement transactions
-	 * here when sophia supports them.
-	 */
+	/* @todo: multi-statement transactions */
 
-	/* single-stmt case:
-	 *
-	 * no need to unref tuple here, since it will be done by
-	 * TupleGuard in execute_replace().
-	*/
-	(void)txn;
-#if 0
-	struct txn_stmt *stmt = txn_stmt(txn);
-	if (stmt->new_tuple)
-		tuple_unref(stmt->new_tuple);
-#endif
+	/* single-stmt case */
+	if (txn->n_stmts == 1) {
+		struct txn_stmt *stmt = txn_stmt(txn);
+		if (stmt->new_tuple) {
+			/* 2 refs: iproto case */
+			/* 3 refs: lua case */
+			assert(stmt->new_tuple->refs >= 2);
+			tuple_unref(stmt->new_tuple);
+		}
+	}
 }
