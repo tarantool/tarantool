@@ -266,11 +266,41 @@ For example, to bring in the i18n package: install luarocks, say <code>luarocks 
 start Tarantool, and say <code>require('i18n')</code>.
 </para>
 
+<section xml:id="rocks"><title>Installing rocks from tarantool.org</title>
+<para>
+The Lua rocks that Tarantool supplies are available
+on <link xlink:href="http://rocks.tarantool.org">rocks.tarantool.org</link> and can be installed using
+the luarocks utilities. Here is an example.
+</para>
+<para>
+Look at rocks.tarantool.org. Notice that one of the
+available rocks is expirationd -- Expiration daemon for Tarantool.
+</para>
+<para>
+Create a file named ~/.luarocks/config.lua containing these three lines:<programlisting>
+rocks_servers = {
+        [[http://rocks.tarantool.org/]]
+}</programlisting>
+Install the expirationd rock with either <programlisting>luarocks --local install expirationd</programlisting>
+or, as root user, <programlisting>luarocks install expirationd</programlisting>
+Start the tarantool server and make the request:<programlisting>expirationd=require('expirationd')</programlisting>
+If there is an error, display the Lua variable
+<code>package_path</code> to make sure it is searching along
+a path that includes the new expirationd.lua file.
+</para>
+<para>
+If the result is success, which it will be if
+nothing unusual has been done when installing
+Tarantool or Luarocks, then the new rock is
+available henceforward for use in the Tarantool
+application server.
+</para>
+
 <para>
 The rest of this chapter is a reference that has what's needed for programming and
 administration with the built-in packages.
 </para>
-
+</section>
 
 <section xml:id="sp-digest">
     <title>Package <code>digest</code></title>
@@ -2923,7 +2953,7 @@ get expirationd through the test.
 </para>
 <para>
 1. Get expirationd.lua.
-   There are standard ways -- it is after all part of a standard rock --
+   There are standard ways -- it is after all part of <link linkend="rocks">a standard rock</link> --
    but for this purpose just copy the contents of
    <link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">https://github.com/tarantool/expirationd/blob/master/expirationd.lua</link>
    to a default directory.
