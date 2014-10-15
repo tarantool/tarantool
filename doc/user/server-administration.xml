@@ -216,7 +216,7 @@ program, allocating disk resources specifically for
 that program, via a standardized deployment method."
 If Tarantool was downloaded from source, then the script
 is in ~/extra/dist/dist.lua. If Tarantool was installed
-with debian or Red Hat installation packages, the script
+with Debian or Red Hat installation packages, the script
 is renamed <code>tarantoolctl</code> and is in
 /usr/bin/tarantoolctl. The script handles such things as:
 starting, stopping, rotating logs, logging in to the

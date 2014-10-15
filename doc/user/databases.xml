@@ -652,7 +652,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
    The <code>update</code> function supports operations on fields &mdash;
     assignment, arithmetic (if the field is unsigned numeric),
     cutting and pasting fragments of a field,
-    deletng or inserting a field.  Multiple
+    deleting or inserting a field.  Multiple
     operations can be combined in a single update request, and in this
     case they are performed atomically and sequentially. Each operation requires
     specification of a field number. When multiple operations
@@ -1319,8 +1319,9 @@ console.delimiter('')!
       type: NUM
       fieldno: 1
   id: 0
+  space_id: 513
+  name: primary
   type: TREE
-  idx: ' index 0'
   etc.
 ...</programlisting></listitem>
     </varlistentry>
@@ -2422,6 +2423,9 @@ tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
   INSERT:
     total: 48207694
     rps: 139
+  AUTH:
+    total: 0
+    rps: 0
   CALL:
     total: 8
     rps: 0

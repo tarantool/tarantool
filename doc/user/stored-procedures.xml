@@ -2296,7 +2296,7 @@ end
   </varlistentry>
 
   <varlistentry>
-   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:pread or <replaceable>file-handle></replaceable>:pwrite(<replaceable>count or new string</replaceable>, <replaceable>offset</replaceable>)</emphasis></term>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:pread or <replaceable>file-handle</replaceable>:pwrite(<replaceable>count or new string</replaceable>, <replaceable>offset</replaceable>)</emphasis></term>
     <listitem>
       <para>
         Perform read/write random-access operation on a file, without affecting the current seek position of the file.
@@ -2322,7 +2322,7 @@ end
   </varlistentry>
 
   <varlistentry>
-   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:read or <replaceable>file-handle></replaceable>:write(<replaceable>count or new string</replaceable>)</emphasis></term>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:read or <replaceable>file-handle</replaceable>:write(<replaceable>count or new string</replaceable>)</emphasis></term>
     <listitem>
       <para>
         Perform non-random-access read or write on a file. For details type "man 2 read" or "man 2 write".
