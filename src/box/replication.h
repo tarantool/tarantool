@@ -30,6 +30,19 @@
  */
 #include <tarantool.h>
 #include "trivia/util.h"
+#include "vclock.h"
+
+struct relay {
+	/** Replica connection */
+	int sock;
+	/* Request type - SUBSCRIBE or JOIN */
+	uint32_t type;
+	/* Request sync */
+	uint64_t sync;
+	/* Only used in SUBSCRIBE request */
+	uint32_t server_id;
+	struct vclock vclock;
+};
 
 /**
  * Pre-fork replication spawner process.

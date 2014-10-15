@@ -36,6 +36,7 @@
 #include "vclock.h"
 #include "tt_uuid.h"
 #include "replica.h"
+#include "replication.h"
 #include "small/region.h"
 
 #if defined(__cplusplus)
@@ -71,7 +72,10 @@ struct recovery_state {
 	int64_t signature; /* used to find missing xlog files */
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
-	struct remote remote;
+	union {
+		struct remote remote; /* slave->master state  */
+		struct relay relay;   /* master->slave state */
+	};
 	/**
 	 * row_handler is a module callback invoked during initial
 	 * recovery and when reading rows from the master.  It is
