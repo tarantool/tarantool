@@ -111,8 +111,6 @@
  * R -> S           # snapshot()
  */
 
-struct recovery_state *recovery;
-
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
 /* {{{ LSN API */
@@ -152,15 +150,14 @@ wal_writer_stop(struct recovery_state *r);
 static void
 recovery_stop_local(struct recovery_state *r);
 
-void
-recovery_init(const char *snap_dirname, const char *wal_dirname,
-	      row_handler row_handler, void *row_handler_param,
-	      snapshot_handler snapshot_handler, join_handler join_handler,
-	      int rows_per_wal)
+struct recovery_state *
+recovery_new(const char *snap_dirname, const char *wal_dirname,
+	     row_handler row_handler, void *row_handler_param,
+	     snapshot_handler snapshot_handler,
+	     int rows_per_wal)
 {
-	assert(recovery == NULL);
-	recovery = (struct recovery_state *) calloc(1, sizeof(struct recovery_state));
-	struct recovery_state *r = recovery;
+	struct recovery_state *r = (struct recovery_state *)
+			calloc(1, sizeof(*r));
 	recovery_update_mode(r, WAL_NONE);
 
 	assert(rows_per_wal > 1);
@@ -170,7 +167,6 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 	r->signature = -1;
 
 	r->snapshot_handler = snapshot_handler;
-	r->join_handler = join_handler;
 
 	log_dir_create(&r->snap_dir, snap_dirname, SNAP);
 
@@ -187,6 +183,8 @@ recovery_init(const char *snap_dirname, const char *wal_dirname,
 		panic("can't scan snapshot directory");
 	if (log_dir_scan(&r->wal_dir) != 0)
 		panic("can't scan WAL directory");
+
+	return r;
 }
 
 void
@@ -205,12 +203,8 @@ recovery_update_io_rate_limit(struct recovery_state *r, double new_limit)
 }
 
 void
-recovery_free()
+recovery_delete(struct recovery_state *r)
 {
-	struct recovery_state *r = recovery;
-	if (r == NULL)
-		return;
-
 	if (r->watcher)
 		recovery_stop_local(r);
 
@@ -226,7 +220,6 @@ recovery_free()
 		 */
 		log_io_close(&r->current_wal);
 	}
-	recovery= NULL;
 }
 
 void
@@ -247,7 +240,7 @@ recovery_process(struct recovery_state *r, struct xrow_header *row)
 		return;
 	}
 
-	return r->row_handler(r->row_handler_param, row);
+	return r->row_handler(r, r->row_handler_param, row);
 }
 
 void
@@ -683,8 +676,6 @@ struct wal_writer
 	struct vclock vclock;
 };
 
-static pthread_once_t wal_writer_once = PTHREAD_ONCE_INIT;
-
 static struct wal_writer wal_writer;
 
 /**
@@ -692,31 +683,22 @@ static struct wal_writer wal_writer;
  * fork the master process to save a snapshot, and in the child
  * the WAL writer thread is not necessary and not present.
  */
-static void
-wal_writer_child()
+void
+recovery_atfork(struct recovery_state *r)
 {
-	log_io_atfork(&recovery->current_wal);
-	if (wal_writer.batch) {
-		free(wal_writer.batch);
-		wal_writer.batch = NULL;
+	log_io_atfork(&r->current_wal);
+	if (r->writer == NULL)
+		return;
+	if (r->writer->batch) {
+		free(r->writer->batch);
+		r->writer->batch = NULL;
 	}
 	/*
 	 * Make sure that atexit() handlers in the child do
 	 * not try to stop the non-existent thread.
 	 * The writer is not used in the child.
 	 */
-	recovery->writer = NULL;
-}
-
-/**
- * Today a WAL writer is started once at start of the
- * server.  Nevertheless, use pthread_once() to make
- * sure we can start/stop the writer many times.
- */
-static void
-wal_writer_init_once()
-{
-        (void) tt_pthread_atfork(NULL, NULL, wal_writer_child);
+	r->writer = NULL;
 }
 
 /**
@@ -801,8 +783,6 @@ wal_writer_init(struct wal_writer *writer, struct vclock *vclock)
 	ev_async_init(&writer->write_event, wal_schedule);
 	writer->write_event.data = writer;
 	writer->txn_loop = loop();
-
-	(void) tt_pthread_once(&wal_writer_once, wal_writer_init_once);
 
 	writer->batch = fio_batch_alloc(sysconf(_SC_IOV_MAX));
 
@@ -1118,13 +1098,13 @@ wal_write(struct recovery_state *r, struct xrow_header *row)
 /* {{{ box.snapshot() */
 
 void
-snapshot_write_row(struct log_io *l, struct xrow_header *row)
+snapshot_write_row(struct recovery_state *r, struct log_io *l,
+		   struct xrow_header *row)
 {
 	static uint64_t bytes;
 	ev_tstamp elapsed;
 	static ev_tstamp last = 0;
 	ev_loop *loop = loop();
-	struct recovery_state *r = recovery;
 
 	row->tm = last;
 	row->server_id = 0;
