@@ -522,6 +522,7 @@ cord_set_exception(struct cord *cord, Exception *e)
 	cord->exception->~Exception();
 	free(cord->exception);
 	cord->exception = e;
+	cord->exception_size = 0; /* force realloc() on next throw */
 }
 
 void
@@ -600,6 +601,7 @@ void *cord_thread_func(void *p)
 int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 {
+	memset(cord, 0, sizeof(*cord));
 	int res = -1;
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
