@@ -29,6 +29,7 @@
 #include "cfg.h"
 #include "txn.h"
 #include "tuple.h"
+#include "scoped_guard.h"
 #include "engine.h"
 #include "engine_sophia.h"
 #include "index.h"
@@ -45,7 +46,15 @@
 #include <dirent.h>
 #include <errno.h>
 
-extern "C" void *sp_error(void *o, ...);
+void sophia_raise(void *env)
+{
+	void *c = sp_ctl(env);
+	void *o = sp_get(c, "sophia.error");
+	char *error = (char *)sp_get(o, "value", NULL);
+	auto scoped_guard =
+		make_scoped_guard([=] { sp_destroy(o); });
+	tnt_raise(ClientError, ER_SOPHIA, error);
+}
 
 struct Sophia: public Engine {
 	Sophia(EngineFactory*);
@@ -98,7 +107,7 @@ SophiaFactory::init()
 		panic("failed to create sophia environment");
 	int rc = sp_open(env);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(env));
+		sophia_raise(env);
 }
 
 Engine*
@@ -161,7 +170,7 @@ SophiaFactory::dropIndex(Index *index)
 	SophiaIndex *i = (SophiaIndex*)index;
 	int rc = sp_destroy(i->db);
 	if (rc == -1)
-		tnt_raise(ClientError, ER_SOPHIA, sp_error(i->db));
+		sophia_raise(env);
 	i->db  = NULL;
 	i->env = NULL;
 	char path[PATH_MAX];
