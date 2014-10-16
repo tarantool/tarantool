@@ -48,6 +48,8 @@
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
+#include "scoped_guard.h"
+#include "cfg.h"
 
 /** Replication topology
  * ----------------------
@@ -84,6 +86,9 @@ static char cfg_snap_dir[PATH_MAX];
  */
 static void
 replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */);
+static void
+replication_relay_send_row(struct recovery_state *r, void * /* param */,
+			   struct xrow_header *packet);
 
 /** Replication spawner process */
 static struct spawner {
@@ -194,23 +199,57 @@ struct replication_request {
 };
 
 /** Replication acceptor fiber handler. */
+static void *
+replication_join_thread(void *arg)
+{
+	struct recovery_state *r = (struct recovery_state *) arg;
+
+	/* Turn off the non-blocking mode, if any. */
+	int nonblock = sio_getfl(r->relay.sock) & O_NONBLOCK;
+	auto socket_guard = make_scoped_guard([=]{
+		/* Restore non-blocking mode */
+		sio_setfl(r->relay.sock, O_NONBLOCK, nonblock);
+	});
+
+	/* Send snapshot */
+	recover_snap(r);
+
+	/* Send response to JOIN command = end of stream */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &r->vclock);
+	row.sync = r->relay.sync;
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(&row, iov);
+	sio_writev_all(r->relay.sock, iov, iovcnt);
+
+	say_info("snapshot sent");
+	return NULL;
+}
+
 void
 replication_join(int fd, struct xrow_header *packet)
 {
-	struct replication_request *request = (struct replication_request *)
-			malloc(sizeof(*request));
-	if (request == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*request),
-			  "iproto", "JOIN");
-	}
-	request->fd = fd;
-	request->io.data = request;
-	request->data.type = packet->type;
-	request->data.sync = packet->sync;
+	struct recovery_state *r = recovery_new(cfg_gets("snap_dir"),
+			cfg_gets("wal_dir"), replication_relay_send_row, NULL,
+			NULL, INT32_MAX);
+	auto recovery_guard = make_scoped_guard([&]{
+		recovery_delete(r);
+	});
+	r->relay.sock = fd;
+	r->relay.sync = packet->sync;
+	r->relay.server_id = packet->server_id;
+	r->relay.type = IPROTO_JOIN;
 
-	ev_io_init(&request->io, replication_send_socket,
-		   master_to_spawner_socket, EV_WRITE);
-	ev_io_start(loop(), &request->io);
+	char name[FIBER_NAME_MAX];
+	struct sockaddr_storage peer;
+	socklen_t addrlen = sizeof(peer);
+	getpeername(r->relay.sock, ((struct sockaddr*)&peer), &addrlen);
+	snprintf(name, sizeof(name), "relay/%s",
+		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+
+	struct cord cord;
+	cord_start(&cord, name, replication_join_thread, r);
+	cord_join(&cord, NULL);
 }
 
 /** Replication acceptor fiber handler. */
@@ -635,26 +674,6 @@ replication_relay_send_row(struct recovery_state *r, void * /* param */,
 }
 
 static void
-replication_relay_join(struct recovery_state *r)
-{
-	FDGuard guard_replica(r->relay.sock);
-
-	/* Send snapshot */
-	recover_snap(r);
-
-	/* Send response to JOIN command = end of stream */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, &r->vclock);
-	row.sync = r->relay.sync;
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(&row, iov);
-	sio_writev_all(r->relay.sock, iov, iovcnt);
-
-	say_info("snapshot sent");
-	/* relay.sock closed by guard */
-}
-
-static void
 replication_relay_subscribe(struct recovery_state *r)
 {
 	/* Set LSNs */
@@ -733,16 +752,8 @@ replication_relay_loop(struct relay *relay)
 
 	int rc = EXIT_SUCCESS;
 	try {
-		switch (r->relay.type) {
-		case IPROTO_JOIN:
-			replication_relay_join(r);
-			break;
-		case IPROTO_SUBSCRIBE:
-			replication_relay_subscribe(r);
-			break;
-		default:
-			assert(false);
-		}
+		assert(r->relay.type == IPROTO_SUBSCRIBE);
+		replication_relay_subscribe(r);
 	} catch (Exception *e) {
 		say_error("relay error: %s", e->errmsg());
 		rc = EXIT_FAILURE;
