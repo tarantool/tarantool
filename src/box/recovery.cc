@@ -856,7 +856,7 @@ wal_writer_stop(struct recovery_state *r)
 	writer->is_shutdown= true;
 	(void) tt_pthread_cond_signal(&writer->cond);
 	(void) tt_pthread_mutex_unlock(&writer->mutex);
-	if (cord_join(&writer->cord)) {
+	if (cord_rawjoin(&writer->cord, NULL, NULL)) {
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}

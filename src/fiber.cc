@@ -37,6 +37,7 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
+#include "coeio.h"
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -512,6 +513,17 @@ fiber_destroy_all(struct cord *cord)
 		fiber_destroy(f);
 }
 
+static void
+cord_set_exception(struct cord *cord, Exception *e)
+{
+	/* Cleanup memory allocated for exceptions */
+	if (cord->exception == NULL || cord->exception == &out_of_memory)
+		return;
+	cord->exception->~Exception();
+	free(cord->exception);
+	cord->exception = e;
+}
+
 void
 cord_create(struct cord *cord, const char *name)
 {
@@ -550,11 +562,7 @@ cord_destroy(struct cord *cord)
 	}
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
-	/* Cleanup memory allocated for exceptions */
-	if (cord->exception && cord->exception != &out_of_memory) {
-		cord->exception->~Exception();
-		free(cord->exception);
-	}
+	cord_set_exception(cord, NULL);
 }
 
 struct cord_thread_arg
@@ -579,7 +587,14 @@ void *cord_thread_func(void *p)
 	ct_arg->is_started = true;
 	tt_pthread_cond_signal(&ct_arg->start_cond);
 	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
-	return f(arg);
+
+	try {
+		return f(arg);
+	} catch (Exception *) {
+		if (cord->id == main_thread_id)
+			throw;
+		return CORD_EXCEPTION;
+	}
 }
 
 int
@@ -602,16 +617,48 @@ end:
 }
 
 int
-cord_join(struct cord *cord)
+cord_rawjoin(struct cord *cord, void **retval, struct Exception **exception)
 {
-	int res = 0;
-	if (tt_pthread_join(cord->id, NULL)) {
+	void *ret = NULL;
+	int res = tt_pthread_join(cord->id, retval);
+	if (res != 0) {
 		/* We can't recover from this in any reasonable way. */
-		say_syserror("%s: thread join failed", cord->name);
-		res = -1;
+		cord_destroy(cord);
+		return res;
 	}
+	if (ret == CORD_EXCEPTION && exception != NULL) {
+		assert(cord->exception != NULL);
+		*exception = cord->exception; /* will be destroyed by caller */
+		cord->exception = NULL;
+	}
+	if (retval)
+		*retval = ret;
 	cord_destroy(cord);
 	return res;
+}
+
+ssize_t
+cord_join_cb(va_list ap)
+{
+	struct cord *cord = va_arg(ap, struct cord *);
+	void **retval = va_arg(ap, void **);
+	Exception **exception = va_arg(ap, Exception **);
+	return cord_rawjoin(cord, retval, exception);
+}
+
+int
+cord_join(struct cord *cord, void **retval)
+{
+	Exception *exception = NULL;
+	int rc = coeio_custom(cord_join_cb, TIMEOUT_INFINITY, cord, retval,
+			      &exception);
+	if (rc != 0)
+		return rc;
+	if (exception) {
+		cord_set_exception(cord, exception);
+		cord()->exception->raise(); /* re-throw exception from cord */
+	}
+	return 0;
 }
 
 void

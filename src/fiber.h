@@ -175,8 +175,38 @@ int
 cord_start(struct cord *cord, const char *name,
 	   void *(*f)(void *), void *arg);
 
+#define CORD_EXCEPTION ((void *) -2)
+#define CORD_CANCELLED PTHREAD_CANCELED
+
+/**
+ * \brief Synchronously wait for \a cord to terminate. If \a cord has already
+ * terminated, then returns immediately.Safe to use from raw pthreads.
+ * Doesn't throw exceptions.
+ * \param cord cord
+ * \param[out] retval exit status of the target cord, CORD_EXCEPTION if \a cord
+ * was terminated due to an exception or CORD_CANCELLED if \a cord was
+ * cancelled by pthread_cancel().
+ * \param[out] exception if not NULL then a double pointer to original
+ * exception caused \a cord to stop. It is your responsibility to free
+ * allocated memory for this exception using free(3).
+ * \sa pthread_join()
+ * \return 0 on sucess
+ */
 int
-cord_join(struct cord *cord);
+cord_rawjoin(struct cord *cord, void **retval, struct Exception **exception);
+
+/**
+ * \brief Yield until \a cord terminated. If \a cord has already terminated,
+ * then returns immediately. If \a cord was terminated due to an exception
+ * when **re-throws** this exception in the calling cord/fiber.
+ * \param cord cord
+ * \param retval[out] exit status of the target cord or CORD_CANCELLED if
+ * \a cord was cancelled.
+ * \sa pthread_join()
+ * \return 0 on sucess
+ */
+int
+cord_join(struct cord *cord, void **retval);
 
 static inline void
 cord_set_name(const char *name)
