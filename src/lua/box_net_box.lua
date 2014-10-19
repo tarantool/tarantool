@@ -619,21 +619,24 @@ local remote_methods = {
 
             local len, off = msgpack.decode(self.rbuf)
             -- wait for correct package length
-            if len + off - 1 > #self.rbuf then
+            local roff = off + len - 1
+            if roff > #self.rbuf then
                 break
             end
 
 
             local hdr, body
             hdr, off = msgpack.decode(self.rbuf, off)
-            if off < #self.rbuf then
+            -- assert(off <= roff + 1)
+            if off < roff then
                 body, off = msgpack.decode(self.rbuf, off)
+                -- assert(off == roff + 1)
                 -- disable YAML flow output (useful for admin console)
                 setmetatable(body, mapping_mt)
             else
                 body = {}
             end
-            self.rbuf = string.sub(self.rbuf, off + 1)
+            self.rbuf = string.sub(self.rbuf, off)
 
             local sync = hdr[SYNC]
 

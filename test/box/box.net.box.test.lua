@@ -252,3 +252,13 @@ cn = remote.new(uri, { password = 'test' })
 cn:ping()
 cn:close()
 
+-- #594: bad argument #1 to 'setmetatable' (table expected, got number)
+--# setopt delimiter ';'
+function gh594()
+    local cn = remote:new(box.cfg.listen)
+    local ping = fiber.create(function() cn:ping() end)
+    cn:call('dostring', 'return 2 + 2')
+    cn:close()
+end;
+--# setopt delimiter ''
+gh594()
