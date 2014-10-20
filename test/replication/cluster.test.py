@@ -16,21 +16,14 @@ server.admin("box.info.server.uuid")
 
 # Check log message
 server.stop()
-f = open(server.logfile, "r")
-f.seek(0, 2)
 server.start()
 
-check="server uuid changed to " + new_uuid
-print "check log line for '%s'" % check
+line = "server uuid changed to " + new_uuid
+print "check log line for '%s'" % line
 print
-line = f.readline()
-while line:
-    if re.search(r'(%s)' % check, line):
-        print "'%s' exists in server log" % check
-        break
-    line = f.readline()
+if server.logfile_pos.seek_once(line) >= 0:
+    print "'%s' exists in server log" % line
 print
-f.close()
 server.admin("box.info.server.uuid")
 
 # Check that new UUID has been saved in snapshot
