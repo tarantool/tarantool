@@ -25,7 +25,6 @@ find_program(LYNX lynx)
 find_program(CAT cat)
 find_program(GIT git)
 find_program(LD ld)
-find_program(POD2MAN pod2man)
 
 # Define PACKAGE macro in tarantool/config.h
 set (PACKAGE "Tarantool")
@@ -44,6 +43,8 @@ endif()
 include(GNUInstallDirs)
 
 include(cmake/utils.cmake)
+include(cmake/pod2man.cmake)
+ADD_MANPAGE_TARGET()
 
 # the order is significant: we need to know os and compiler to configure libs
 include(cmake/arch.cmake)

@@ -1,4 +1,4 @@
-# Scripts for a dist.lua packaging
+# Scripts for a tarantoolctl packaging
 set(SYSV_INITD_PATH ${CMAKE_INSTALL_LIBDIR}/tarantool/tarantool.init)
 configure_file("tarantool.service.in" "tarantool.service")
 
@@ -40,10 +40,16 @@ else (ENABLE_RPM)
     WORLD_READ)
 endif(ENABLE_RPM)
 
-install (FILES dist.lua DESTINATION ${CMAKE_INSTALL_BINDIR}
-RENAME tarantoolctl
-PERMISSIONS
-OWNER_READ OWNER_WRITE
-GROUP_READ GROUP_EXECUTE
-WORLD_READ WORLD_EXECUTE)
+install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PERMISSIONS
+    OWNER_READ OWNER_WRITE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE
+)
+
+POD2MAN (
+    ${CMAKE_SOURCE_DIR}/extra/dist/tarantoolctl
+    "tarantoolctl" 1 extra/dist
+    "tarantoolctl instances control"
+)
 
