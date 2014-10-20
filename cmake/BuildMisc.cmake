@@ -7,6 +7,7 @@ macro(libmisc_build)
         ${PROJECT_SOURCE_DIR}/third_party/proctitle.c
         ${PROJECT_SOURCE_DIR}/third_party/PMurHash.c
         ${PROJECT_SOURCE_DIR}/third_party/base64.c
+        ${PROJECT_SOURCE_DIR}/third_party/rtree.cc
     )
 
     if (NOT HAVE_MEMMEM)

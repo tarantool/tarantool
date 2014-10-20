@@ -36,6 +36,15 @@
 #include <exception.h>
 #include <stdio.h>
 
+#ifndef DBL_MIN
+#define DBL_MIN		4.94065645841246544e-324
+#define FLT_MIN		((float)1.40129846432481707e-45)
+#endif
+#ifndef DBL_MAX
+#define DBL_MAX		1.79769313486231470e+308
+#define FLT_MAX		((float)3.40282346638528860e+38)
+#endif
+
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
 struct tuple_format *tuple_format_ber;
@@ -578,3 +587,26 @@ tuple_end_snapshot()
 {
 	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 }
+
+double mp_decode_num(const char **data, uint32_t i)
+{
+	double val;
+	switch (mp_typeof(**data)) {
+	case MP_UINT:
+		val = mp_decode_uint(data);
+		break;
+	case MP_INT:
+		val = mp_decode_int(data);
+		break;
+	case MP_FLOAT:
+		val = mp_decode_float(data);
+		break;
+	case MP_DOUBLE:
+		val = mp_decode_double(data);
+		break;
+	default:
+		tnt_raise(ClientError, ER_FIELD_TYPE, i, field_type_strs[NUM]);
+	}
+	return val;
+}
+

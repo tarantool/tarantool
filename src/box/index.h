@@ -70,6 +70,8 @@ struct tuple;
 	_(ITER_BITS_ALL_SET,     7) /* all bits from x are set in key      */ \
 	_(ITER_BITS_ANY_SET,     8) /* at least one x's bit is set         */ \
 	_(ITER_BITS_ALL_NOT_SET, 9) /* all bits are not set                */ \
+	_(ITER_OVERLAPS, 10) /* key overlaps x */ \
+	_(ITER_NEIGHBOR, 11) /* typles in distance ascending order from specified point */ \
 
 ENUM(iterator_type, ITERATOR_TYPE);
 extern const char *iterator_type_strs[];

@@ -1,0 +1,104 @@
+s = box.schema.create_space('spatial')
+---
+...
+s:create_index('primary')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 512
+  name: primary
+  type: TREE
+...
+s:create_index('spatial', { type = 'rtree', parts = {2, 'num', 3, 'num', 4, 'num', 5, 'num'}})
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 2
+  - type: NUM
+    fieldno: 3
+  - type: NUM
+    fieldno: 4
+  - type: NUM
+    fieldno: 5
+  id: 1
+  space_id: 512
+  name: spatial
+  type: RTREE
+...
+s:insert{1,0,0,10,10}
+---
+- [1, 0, 0, 10, 10]
+...
+s:insert{2,5,5,10,10}
+---
+- [2, 5, 5, 10, 10]
+...
+s:insert{3,0,0,5,5}
+---
+- [3, 0, 0, 5, 5]
+...
+-- select all records
+s.index.spatial:select({}, {iterator = 'ALL'})
+---
+- - [1, 0, 0, 10, 10]
+  - [2, 5, 5, 10, 10]
+  - [3, 0, 0, 5, 5]
+...
+-- select records belonging to rectangle (0,0,5,5)
+s.index.spatial:select({0,0,5,5}, {iterator = 'LE'})
+---
+- - [3, 0, 0, 5, 5]
+...
+-- select records strict belonging to rectangle (0,0,5,5)
+s.index.spatial:select({0,0,5,5}, {iterator = 'LT'})
+---
+- []
+...
+-- select records strict belonging to rectangle (4,4,10,10)
+s.index.spatial:select({4,4,10,10}, {iterator = 'LT'})
+---
+- - [2, 5, 5, 10, 10]
+...
+-- select records containing point (5,5)
+s.index.spatial:select({5,5}, {iterator = 'GE'})
+---
+- - [1, 0, 0, 10, 10]
+  - [2, 5, 5, 10, 10]
+  - [3, 0, 0, 5, 5]
+...
+-- select records containing rectangle (1,1,2,2)
+s.index.spatial:select({1,1,2,2}, {iterator = 'GE'})
+---
+- - [1, 0, 0, 10, 10]
+  - [3, 0, 0, 5, 5]
+...
+-- select records strict containing rectangle (0,0,5,5)
+s.index.spatial:select({0,0,5,5}, {iterator = 'GT'})
+---
+- - [1, 0, 0, 10, 10]
+...
+-- select records overlapping rectangle (9,4,11,6)
+s.index.spatial:select({9,4,11,6}, {iterator = 'OVERLAPS'})
+---
+- - [1, 0, 0, 10, 10]
+  - [2, 5, 5, 10, 10]
+...
+-- select records with coordinates (0,0,5,5)
+s.index.spatial:select({0,0,5,5}, {iterator = 'EQ'})
+---
+- - [3, 0, 0, 5, 5]
+...
+-- select neigbors of point (1,1)
+s.index.spatial:select({1,1}, {iterator = 'NEIGHBOR'})
+---
+- - [3, 0, 0, 5, 5]
+  - [1, 0, 0, 10, 10]
+  - [2, 5, 5, 10, 10]
+...
+s:drop()
+---
+...
