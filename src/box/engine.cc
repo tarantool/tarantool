@@ -51,7 +51,19 @@ void EngineFactory::recover()
 void EngineFactory::shutdown()
 {}
 
-void EngineFactory::txnFinish(struct txn*)
+void EngineFactory::begin(struct txn*, struct space*)
+{}
+
+void EngineFactory::begin_stmt(struct txn*, struct space*)
+{}
+
+void EngineFactory::commit(struct txn*)
+{}
+
+void EngineFactory::rollback(struct txn*)
+{}
+
+void EngineFactory::finish_stmt(struct txn_stmt*)
 {}
 
 void EngineFactory::recoveryEvent(enum engine_recovery_event)
@@ -82,6 +94,18 @@ engine_find(const char *name)
 			return e;
 	}
 	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
+}
+
+EngineFactory *
+engine_find_id(uint32_t id)
+{
+	EngineFactory *e;
+	rlist_foreach_entry(e, &engines, link) {
+		if (e->id == id)
+			return e;
+	}
+	assert(0);
+	return NULL;
 }
 
 /** Call a visitor function on every registered engine. */

@@ -95,8 +95,11 @@ sophia_recovery_prepare(struct engine_recovery *r)
 SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
 {
+	flags = ENGINE_TRANSACTIONAL;
+	env = NULL;
+	tx = NULL;
+	tx_db = NULL;
 	sophia_recovery_prepare(&recovery);
-	flags = 0;
 }
 
 void
@@ -212,18 +215,69 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-SophiaFactory::txnFinish(struct txn *txn)
+SophiaFactory::begin(struct txn*, struct space *space)
 {
-	/* @todo: multi-statement transactions */
+	assert(space->engine->factory == this);
+	assert(tx == NULL);
+	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+	assert(index->db != NULL);
+	tx = sp_begin(index->db);
+	if (tx == NULL)
+		sophia_raise(env);
+	tx_db = index->db;
+}
 
-	/* single-stmt case */
-	if (txn->n_stmts == 1) {
-		struct txn_stmt *stmt = txn_stmt(txn);
-		if (stmt->new_tuple) {
-			/* 2 refs: iproto case */
-			/* 3 refs: lua case */
-			assert(stmt->new_tuple->refs >= 2);
-			tuple_unref(stmt->new_tuple);
-		}
+void
+SophiaFactory::begin_stmt(struct txn*, struct space *space)
+{
+	assert(space->engine->factory == this);
+	assert(tx != NULL);
+	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+	if (index->db != tx_db) {
+		tnt_raise(ClientError, ER_SOPHIA,
+		           "only one sophia space can be used in "
+		           "a multi-statement transaction");
+	}
+}
+
+void
+SophiaFactory::commit(struct txn *)
+{
+	if (tx == NULL)
+		return;
+	/* xxx: recover support */
+	auto scoped_guard = make_scoped_guard([=] {
+		tx = NULL;
+		tx_db = NULL;
+	});
+	int rc = sp_commit(tx);
+	if (rc == -1)
+		sophia_raise(env);
+	assert(rc == 0);
+}
+
+void
+SophiaFactory::rollback(struct txn *)
+{
+	if (tx == NULL)
+		return;
+	auto scoped_guard = make_scoped_guard([=] {
+		tx = NULL;
+		tx_db = NULL;
+	});
+	int rc = sp_rollback(tx);
+	if (rc == -1)
+		sophia_raise(env);
+	assert(rc == 0);
+}
+
+void
+SophiaFactory::finish_stmt(struct txn_stmt *stmt)
+{
+	if (stmt->new_tuple) {
+		/* 2 refs: iproto case */
+		/* 3 refs: lua case */
+		assert(stmt->new_tuple->refs >= 2);
+		tuple_unref(stmt->new_tuple);
 	}
 }

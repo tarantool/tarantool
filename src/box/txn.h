@@ -87,6 +87,9 @@ in_txn()
 struct txn *
 txn_begin_stmt(struct request *request);
 
+void
+txn_engine_begin_stmt(struct txn *txn, struct space *space);
+
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.

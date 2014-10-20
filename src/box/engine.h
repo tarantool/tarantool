@@ -100,30 +100,36 @@ public:
 	virtual ~EngineFactory() {}
 	/** Called once at startup. */
 	virtual void init();
-	/** Recover engine, called once at startup. */
-	virtual void recover();
-	/** Called at server shutdown. */
-	virtual void shutdown();
 	/** Create a new engine instance for a space. */
 	virtual Engine *open() = 0;
+	/** Called at server shutdown. */
+	virtual void shutdown();
+	/** Recover engine, called once at startup. */
+	virtual void recover();
+	/* Inform engine about a recovery stage change. */
+	virtual void recoveryEvent(enum engine_recovery_event);
+	/**
+	 * Check a key definition for violation of
+	 * various limits.
+	 */
+	virtual void keydefCheck(struct key_def*) = 0;
 	/**
 	 * Create an instance of space index. Used in alter
 	 * space.
 	 */
 	virtual Index *createIndex(struct key_def*) = 0;
-	/*
+	/**
 	 * Delete all tuples in the index on drop.
 	 */
 	virtual void dropIndex(Index*) = 0;
 	/**
-	 * Check a key definition for violation of
-	 * various limits.
+	 * Engine specific transaction life-cycle routines.
 	 */
-	virtual void keydefCheck(struct key_def *key_def) = 0;
-	/* Clean transaction engine resources.  */
-	virtual void txnFinish(struct txn *txn);
-	/* Inform engine about a recovery stage change. */
-	virtual void recoveryEvent(enum engine_recovery_event);
+	virtual void begin(struct txn*, struct space*);
+	virtual void begin_stmt(struct txn*, struct space*);
+	virtual void commit(struct txn*);
+	virtual void rollback(struct txn*);
+	virtual void finish_stmt(struct txn_stmt*);
 public:
 	/** Name of the engine. */
 	const char *name;
@@ -172,6 +178,9 @@ void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
 
 /** Find engine factory by name. */
 EngineFactory *engine_find(const char *name);
+
+/** Find engine factory by id. */
+EngineFactory *engine_find_id(uint32_t);
 
 /** Shutdown all engine factories. */
 void engine_shutdown();

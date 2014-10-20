@@ -52,6 +52,7 @@ execute_replace(struct request *request, struct port *port)
 {
 	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
+	txn_engine_begin_stmt(txn, space);
 
 	access_check_space(space, PRIV_W);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
@@ -68,11 +69,9 @@ static void
 execute_update(struct request *request, struct port *port)
 {
 	struct txn *txn = txn_begin_stmt(request);
-
-	/* Parse UPDATE request. */
-	/** Search key  and key part count. */
-
 	struct space *space = space_cache_find(request->space_id);
+	txn_engine_begin_stmt(txn, space);
+
 	access_check_space(space, PRIV_W);
 	Index *pk = index_find(space, 0);
 	/* Try to find the tuple by primary key. */
@@ -103,8 +102,9 @@ static void
 execute_delete(struct request *request, struct port *port)
 {
 	struct txn *txn = txn_begin_stmt(request);
-	(void) port;
 	struct space *space = space_cache_find(request->space_id);
+	txn_engine_begin_stmt(txn, space);
+
 	access_check_space(space, PRIV_W);
 
 	/* Try to find tuple by primary key */

@@ -28,17 +28,6 @@ s = box.schema.create_space('test', {engine='sophia'})
 s:insert{'a'}
 s:drop()
 
--- gh-431: Sophia: assertion if box.begin
-
-s = box.schema.create_space('tester',{engine='sophia'})
-i = s:create_index('sophia_index', {})
-s:insert{10000, 'Hilton'}
-box.begin()
-s:delete{10000} -- exception
-box.rollback()
-s:select{10000}
-s:drop()
-
 -- gh-436: No error when creating temporary sophia space
 
 s = box.schema.create_space('tester',{engine='sophia', temporary=true})

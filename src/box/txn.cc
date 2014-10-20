@@ -88,31 +88,22 @@ txn_replace(struct txn *txn, struct space *space,
 		tuple_ref(stmt->new_tuple);
 	}
 	stmt->space = space;
-	/**
-	 * Various checks of the used storage engine:
-	 * - check if it supports transactions
-	 * - only one engine can be used in a multi-statement
-	 *   transaction
-	 * - memtx doesn't allow yields between statements of
-	 *   a transaction. For this engine, set a trigger which
-	 *   would roll back the transaction if there is a yield.
+
+	/* Memtx doesn't allow yields between statements of
+	 * a transaction. Set a trigger which would roll
+	 * back the transaction if there is a yield.
 	 */
 	if (txn->autocommit == false) {
 		if (txn->n_stmts == 1) {
-			txn->engine = engine_id(space->engine);
 			if (engine_no_yield(txn->engine)) {
 				trigger_add(&fiber()->on_yield,
 					    &txn->fiber_on_yield);
 				trigger_add(&fiber()->on_stop,
 					    &txn->fiber_on_stop);
 			}
-		} else if (txn->engine != engine_id(space->engine))
-			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-		if (! engine_transactional(txn->engine)) {
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  space->def.engine_name, "transactions");
 		}
 	}
+
 	/*
 	 * Run on_replace triggers. For now, disallow mutation
 	 * of tuples in the trigger.
@@ -152,8 +143,8 @@ txn_begin(bool autocommit)
 	txn->fiber_on_stop = {
 		rlist_nil, txn_on_yield_or_stop, NULL, NULL
 	};
-
 	txn->autocommit = autocommit;
+	txn->engine = 0;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
@@ -167,6 +158,60 @@ txn_begin_stmt(struct request *request)
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	txn_add_redo(stmt, request);
 	return txn;
+}
+
+void
+txn_engine_begin_stmt(struct txn *txn, struct space *space)
+{
+	assert(txn->n_stmts >= 1);
+	/**
+	 * Notify storage engine about the transaction.
+	 * Ensure various storage engine constraints:
+	 * a. check if it supports multi-statement transactions
+	 * b. only one engine can be used in a multi-statement
+	 *    transaction
+	 */
+	EngineFactory *factory = space->engine->factory;
+	if (txn->n_stmts == 1) {
+		txn->engine = factory->id;
+		if (txn->autocommit == false) {
+			if (! engine_transactional(txn->engine))
+				tnt_raise(ClientError, ER_UNSUPPORTED,
+				          space->def.engine_name, "transactions");
+		}
+		factory->begin(txn, space);
+		return;
+	}
+	if (txn->engine != engine_id(space->engine))
+		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
+	factory->begin_stmt(txn, space);
+}
+
+static inline void
+txn_engine_commit(struct txn *txn)
+{
+	if (txn->engine == 0)
+		return;
+	EngineFactory *factory = engine_find_id(txn->engine);
+	factory->commit(txn);
+}
+
+static inline void
+txn_engine_rollback(struct txn *txn)
+{
+	if (txn->engine == 0)
+		return;
+	EngineFactory *factory = engine_find_id(txn->engine);
+	factory->rollback(txn);
+}
+
+static inline void
+txn_engine_finish_stmt(struct txn *txn, struct txn_stmt *stmt)
+{
+	if (txn->engine == 0)
+		return;
+	EngineFactory *factory = engine_find_id(txn->engine);
+	factory->finish_stmt(stmt);
 }
 
 void
@@ -217,6 +262,7 @@ txn_commit(struct txn *txn)
 		if (res)
 			tnt_raise(LoggedError, ER_WAL_IO);
 	}
+	txn_engine_commit(txn);
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
 
@@ -227,8 +273,7 @@ txn_finish(struct txn *txn)
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
 			tuple_unref(stmt->old_tuple);
-		if (stmt->space)
-			stmt->space->engine->factory->txnFinish(txn);
+		txn_engine_finish_stmt(txn, stmt);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
@@ -268,6 +313,7 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
+	/* xxx: meaningless for sophia engine */
 	struct txn_stmt *stmt;
 	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple || stmt->new_tuple) {
@@ -275,6 +321,7 @@ txn_rollback()
 				      stmt->old_tuple, DUP_INSERT);
 		}
 	}
+	txn_engine_rollback(txn);
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->new_tuple)

@@ -1,0 +1,148 @@
+sophia_rmdir()
+---
+...
+space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
+---
+...
+index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+-- begin/rollback
+box.begin()
+---
+...
+for key = 1, 10 do space:insert({key}) end
+---
+...
+t = {}
+---
+...
+for key = 1, 10 do table.insert(t, space:get({key})) end
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+box.rollback()
+---
+...
+t = {}
+---
+...
+for key = 1, 10 do assert(space:get({key}) == nil) end
+---
+...
+t
+---
+- []
+...
+-- begin/commit delete
+box.begin()
+---
+...
+for key = 1, 10 do space:delete({key}) end
+---
+...
+box.commit()
+---
+...
+-- begin/commit insert
+box.begin()
+---
+...
+t = {}
+---
+...
+for key = 1, 10 do space:insert({key}) end
+---
+...
+t = {}
+---
+...
+box.commit()
+---
+...
+t = {}
+---
+...
+for key = 1, 10 do table.insert(t, space:get({key})) end
+---
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+  - [6]
+  - [7]
+  - [8]
+  - [9]
+  - [10]
+...
+-- cross-engine constraint
+space_tmp = box.schema.create_space('test_tmp')
+---
+...
+index = space_tmp:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+box.begin()
+---
+...
+space:insert({123})
+---
+- [123]
+...
+space_tmp:insert({123}) -- exception
+---
+- error: A multi-statement transaction can not use multiple storage engines
+...
+box.rollback()
+---
+...
+space_tmp:drop()
+---
+...
+-- cross-space constraint
+space_tmp = box.schema.create_space('test_tmp', { engine = 'sophia', id = 101 })
+---
+...
+index = space_tmp:create_index('primary', { type = 'tree', parts = {1, 'num'} })
+---
+...
+box.begin()
+---
+...
+space:insert({123})
+---
+- [123]
+...
+space_tmp:insert({123}) -- exception
+---
+- error: only one sophia space can be used in a multi-statement transaction
+...
+box.rollback()
+---
+...
+space_tmp:drop()
+---
+...
+space:drop()
+---
+...
+--
+sophia_rmdir()
+---
+...

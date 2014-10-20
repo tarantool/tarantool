@@ -33,12 +33,18 @@ struct SophiaFactory: public EngineFactory {
 	SophiaFactory();
 	virtual void init();
 	virtual Engine *open();
-	virtual Index *createIndex(struct key_def *key_def);
-	virtual void dropIndex(Index *index);
-	virtual void keydefCheck(struct key_def *key_def);
-	virtual void txnFinish(struct txn *txn);
-	virtual void recoveryEvent(enum engine_recovery_event event);
+	virtual Index *createIndex(struct key_def*);
+	virtual void dropIndex(Index*);
+	virtual void keydefCheck(struct key_def*f);
+	virtual void begin(struct txn*, struct space*);
+	virtual void begin_stmt(struct txn*, struct space*);
+	virtual void commit(struct txn*);
+	virtual void rollback(struct txn*);
+	virtual void finish_stmt(struct txn_stmt*);
+	virtual void recoveryEvent(enum engine_recovery_event);
 	void *env;
+	void *tx;
+	void *tx_db;
 };
 
 void sophia_raise(void*);
