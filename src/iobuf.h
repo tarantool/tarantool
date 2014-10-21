@@ -33,6 +33,7 @@
 #include "trivia/util.h"
 #include "third_party/queue.h"
 #include "small/region.h"
+#include "iovec.h"
 
 struct ev_io;
 
@@ -125,6 +126,9 @@ struct obuf
 	 */
 	struct iovec iov[IOBUF_IOV_MAX];
 };
+
+void
+obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor);
 
 /** How many bytes are in the output buffer. */
 static inline size_t

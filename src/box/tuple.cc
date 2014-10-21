@@ -29,7 +29,6 @@
 #include "tuple.h"
 
 #include "small/small.h"
-#include "tbuf.h"
 
 #include "key_def.h"
 #include "tuple_update.h"

@@ -40,7 +40,7 @@
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
-#include "tbuf.h"
+#include "iobuf.h"
 #include "fiber.h"
 #include "scoped_guard.h"
 #include "box/box.h"
@@ -245,22 +245,24 @@ lbox_request_create(struct request *request,
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
 	if (key > 0) {
-		struct tbuf *key_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, luaL_msgpack_default, key_buf, key);
-		request->key = key_buf->data;
-		request->key_end = key_buf->data + key_buf->size;
+		struct obuf key_buf;
+		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+		luamp_encode(L, luaL_msgpack_default, &key_buf, key);
+		size_t key_len;
+		request->key = (char *) iovec_join(&fiber()->gc, key_buf.iov,
+			obuf_iovcnt(&key_buf), &key_len);
+		request->key_end = request->key + key_len;
 		if (mp_typeof(*request->key) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
 	if (tuple > 0) {
-		struct tbuf *tuple_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, luaL_msgpack_default, tuple_buf, tuple);
-		assert(tuple_buf->size > 0);
-		if (mp_typeof(*tuple_buf->data) != MP_ARRAY)
+		struct obuf tuple_buf;
+		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+		luamp_encode(L, luaL_msgpack_default, &tuple_buf, tuple);
+		iovec_copy(request->tuple, tuple_buf.iov, obuf_iovcnt(&tuple_buf));
+		request->tuple_cnt = tuple_buf.pos + 1;
+		if (mp_typeof(*(char *)request->tuple[0].iov_base) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-		request->tuple_cnt = 1;
-		request->tuple[0].iov_base = tuple_buf->data;
-		request->tuple[0].iov_len = tuple_buf->size;
 	}
 }
 

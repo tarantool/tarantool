@@ -48,38 +48,40 @@ extern "C" {
  */
 extern luaL_serializer *luaL_msgpack_default;
 
-struct tbuf;
+struct obuf;
+
+enum { LUAMP_ALLOC_FACTOR = 128 };
 
 void
-luamp_encode_array(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size);
+luamp_encode_array(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size);
 
 void
-luamp_encode_map(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size);
+luamp_encode_map(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size);
 
 void
-luamp_encode_uint(struct luaL_serializer *cfg, struct tbuf *buf, uint64_t num);
+luamp_encode_uint(struct luaL_serializer *cfg, struct obuf *buf, uint64_t num);
 
 void
-luamp_encode_int(struct luaL_serializer *cfg, struct tbuf *buf, int64_t num);
+luamp_encode_int(struct luaL_serializer *cfg, struct obuf *buf, int64_t num);
 
 void
-luamp_encode_float(struct luaL_serializer *cfg, struct tbuf *buf, float num);
+luamp_encode_float(struct luaL_serializer *cfg, struct obuf *buf, float num);
 
 void
-luamp_encode_double(struct luaL_serializer *cfg, struct tbuf *buf, double num);
+luamp_encode_double(struct luaL_serializer *cfg, struct obuf *buf, double num);
 
 void
-luamp_encode_str(struct luaL_serializer *cfg, struct tbuf *buf, const char *str,
+luamp_encode_str(struct luaL_serializer *cfg, struct obuf *buf, const char *str,
 		 uint32_t len);
 
 void
 luamp_encode_nil(struct luaL_serializer *cfg);
 
 void
-luamp_encode_bool(struct luaL_serializer *cfg, struct tbuf *buf, bool val);
+luamp_encode_bool(struct luaL_serializer *cfg, struct obuf *buf, bool val);
 
 void
-luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *buf,
+luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *buf,
 	     int index);
 
 void
@@ -87,7 +89,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	     const char **data);
 
 typedef int
-(*luamp_encode_extension_f)(struct lua_State *, int, struct tbuf *);
+(*luamp_encode_extension_f)(struct lua_State *, int, struct obuf *);
 
 /**
  * @brief Set a callback that executed by encoder on unsupported Lua type

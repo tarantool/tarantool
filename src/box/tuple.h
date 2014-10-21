@@ -35,8 +35,6 @@
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
 
-struct tbuf;
-
 extern struct small_alloc memtx_alloc;
 extern struct slab_cache memtx_slab_cache;
 extern struct slab_arena memtx_arena;
@@ -511,10 +509,6 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 /* Store tuple in the output buffer in iproto format. */
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
-
-/* Store tuple fields in the tbuf, BER-length-encoded. */
-void
-tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf);
 
 /**
  * Store tuple fields in the memory buffer. Buffer must have at least

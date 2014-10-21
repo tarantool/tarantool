@@ -89,10 +89,11 @@ iovec_copy(struct iovec *dst, struct iovec *src, int iovcnt)
 static inline void *
 iovec_join(struct region *region, struct iovec *iov, int iovcnt, size_t *plen)
 {
-	assert(iovcnt > 0 && plen != NULL);
+	assert(iovcnt > 0);
 	if (likely(iovcnt == 1)) {
 		/* Fast path for single iovec or zero size */
-		*plen = iov->iov_len;
+		if (plen)
+			*plen = iov->iov_len;
 		return iov->iov_base;
 	}
 
@@ -102,7 +103,8 @@ iovec_join(struct region *region, struct iovec *iov, int iovcnt, size_t *plen)
 	for (int i = 0; i < iovcnt; i++)
 		memcpy(pos, iov[i].iov_base, iov[i].iov_len);
 
-	*plen = len;
+	if (plen)
+		*plen = len;
 	return data;
 }
 
