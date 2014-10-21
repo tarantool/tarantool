@@ -313,16 +313,9 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	/* xxx: meaningless for sophia engine */
-	struct txn_stmt *stmt;
-	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
-		if (stmt->old_tuple || stmt->new_tuple) {
-			space_replace(stmt->space, stmt->new_tuple,
-				      stmt->old_tuple, DUP_INSERT);
-		}
-	}
 	txn_engine_rollback(txn);
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
+	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->new_tuple)
 			tuple_unref(stmt->new_tuple);

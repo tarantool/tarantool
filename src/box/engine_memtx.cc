@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "txn.h"
 #include "tuple.h"
 #include "engine.h"
 #include "engine_memtx.h"
@@ -157,5 +158,16 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 			  (unsigned) key_def->iid,
 			  (unsigned) key_def->space_id);
 		break;
+	}
+}
+
+void MemtxFactory::rollback(struct txn *txn)
+{
+	struct txn_stmt *stmt;
+	rlist_foreach_entry_reverse(stmt, &txn->stmts, next) {
+		if (stmt->old_tuple || stmt->new_tuple) {
+			space_replace(stmt->space, stmt->new_tuple,
+				      stmt->old_tuple, DUP_INSERT);
+		}
 	}
 }
