@@ -44,7 +44,6 @@ include(GNUInstallDirs)
 
 include(cmake/utils.cmake)
 include(cmake/pod2man.cmake)
-ADD_MANPAGE_TARGET()
 
 # the order is significant: we need to know os and compiler to configure libs
 include(cmake/arch.cmake)

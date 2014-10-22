@@ -65,6 +65,7 @@ License: BSD
 Requires: readline
 Provides: %{?scl_prefix}tarantool-debuginfo
 Provides: %{?scl_prefix}tarantool-debug
+Requires: %{?scl_prefix}tarantool-common
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -86,11 +87,25 @@ It supports replication, online backup, stored procedures in Lua.
 
 This package provides Tarantool client libraries.
 
+%package common
+Summary: Tarantool common files
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: %{?scl_prefix}tarantool-common
+BuildArch: noarch
+Requires: %{?scl_prefix}tarantool
+%description common
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides common files
+
 # Tarantool sql module
 %package sql-module
 Summary: Tarantool common sql interface
 Vendor: tarantool.org
 Group: Applications/Databases
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description sql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -106,6 +121,7 @@ Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-pg-module
 BuildRequires: postgresql-devel >= 9.0
 Requires: postgresql-libs >= 9.0
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description pg-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -113,18 +129,6 @@ It supports replication, online backup, stored procedures in Lua.
 This package provides a PostgreSQL interface to use with
 tarantool-sql-module.
 %endif
-
-%package common
-Summary: Tarantool common files
-Vendor: tarantool.org
-Group: Applications/Databases
-Provides: %{?scl_prefix}tarantool-common
-BuildArch: noarch
-%description common
-Tarantool is a high performance in-memory NoSQL database.
-It supports replication, online backup, stored procedures in Lua.
-
-This package provides common files
 
 %if %{with mysql}
 %package mysql-module
@@ -134,6 +138,7 @@ Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-mysql-module
 BuildRequires: mysql-devel >= 5.0
 Requires: mysql-libs >= 5.0
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description mysql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -221,7 +226,7 @@ make VERBOSE=1 DESTDIR=%{buildroot} install
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
 %endif
 
-%post
+%post common
 mkdir -m 0755 -p %{_var}/run/tarantool/
 chown tarantool:tarantool %{_var}/run/tarantool/
 mkdir -m 0755 -p %{_var}/log/tarantool/
@@ -231,7 +236,6 @@ chown tarantool:tarantool %{_var}/lib/tarantool/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.available/
 
-%post common
 %if %{with systemd}
 %systemd_post tarantool.service
 %else
@@ -245,6 +249,11 @@ chkconfig --add tarantool
 %else
 /sbin/service tarantool stop
 chkconfig --del tarantool
+%endif
+
+%postun common
+%if %{with systemd}
+%systemd_postun_with_restart tarantool.service
 %endif
 
 %files

@@ -47,7 +47,7 @@ install (FILES tarantoolctl DESTINATION ${CMAKE_INSTALL_BINDIR}
     WORLD_READ WORLD_EXECUTE
 )
 
-POD2MAN (
+pod2man (
     ${CMAKE_SOURCE_DIR}/extra/dist/tarantoolctl
     "tarantoolctl" 1 extra/dist
     "tarantoolctl instances control"
