@@ -17,6 +17,8 @@ VCS-Git: git://github.com/tarantool/tarantool.git
 Package: tarantool-common
 Architecture: all
 Priority: optional
+Conflicts: tarantool-common (<< 1.5.3)
+Replaces: tarantool-common (<< 1.5.3)
 Depends: ${misc:Depends}, adduser
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
