@@ -19,7 +19,7 @@ macro(pod2man PODFILE MANFILE SECTION OUTPATH CENTER)
         add_custom_command(
             OUTPUT ${OUTPATH_NEW}/${MANFILE}.${SECTION}
             COMMAND ${POD2MAN} --section ${SECTION} --center ${CENTER}
-                --release --stderr --name ${MANFILE} ${PODFILE}
+                --release --name ${MANFILE} ${PODFILE}
                 ${OUTPATH_NEW}/${MANFILE}.${SECTION}
         )
         set(MANPAGE_TARGET "man-${MANFILE}")
