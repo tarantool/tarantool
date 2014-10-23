@@ -46,7 +46,7 @@ tarball: clean
 		--exclude=rfc4627.txt				\
 		--exclude=doc/www-data/ycsb			\
 		--transform='s,^$(DIRNAME),tarantool_$(UVERSION),' \
-		-czf tarantool_$(UVERSION).orig.tar.gz $(DIRNAME)
+		-czf tarantool-lts_$(UVERSION).orig.tar.gz $(DIRNAME)
 
 clean::
 	find -type f -name \*.pyc -delete
