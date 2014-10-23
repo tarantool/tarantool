@@ -9,7 +9,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
@@ -33,7 +33,7 @@ Conflicts: tarantool-common (<< 1.5.3),
  tarantool-postgresql-plugin (<< 1.6~),
  libtarantool-dev (<< 1.6~)
 Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
-Depends: ${misc:Depends}, adduser
+Depends: ${misc:Depends}, adduser, lsb-base
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
  This package provides scripts to work with tarantool configuration
