@@ -133,6 +133,7 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	env = factory->env;
 	const char *sophia_dir = cfg_gets("sophia_dir");
 	mkdir(sophia_dir, 0755);
+	const char *on = "1";
 	char path[PATH_MAX];
 	char name[128];
 	snprintf(path, sizeof(path), "%s/%" PRIu32,
@@ -147,12 +148,14 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".cmp_arg",
 	         key_def->space_id);
 	sp_set(c, name, key_def);
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".commit_lsn",
+	         key_def->space_id);
+	sp_set(c, name, on);
 	snprintf(name, sizeof(name), "db.%" PRIu32,
 	         key_def->space_id);
 	db = sp_get(c, name);
 	if (db == NULL)
 		sophia_raise(env);
-	sp_destroy(c);
 	int rc = sp_open(db);
 	if (rc == -1)
 		sophia_raise(env);

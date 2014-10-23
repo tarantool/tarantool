@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "cfg.h"
+#include "xrow.h"
 #include "txn.h"
 #include "tuple.h"
 #include "scoped_guard.h"
@@ -241,16 +242,41 @@ SophiaFactory::begin_stmt(struct txn*, struct space *space)
 }
 
 void
-SophiaFactory::commit(struct txn *)
+SophiaFactory::commit(struct txn *txn)
 {
 	if (tx == NULL)
 		return;
-	/* xxx: recover support */
 	auto scoped_guard = make_scoped_guard([=] {
 		tx = NULL;
 		tx_db = NULL;
 	});
-	int rc = sp_commit(tx);
+
+	/* a. preparare transaction for commit */
+	int rc = sp_prepare(tx);
+	if (rc == -1)
+		sophia_raise(env);
+	assert(rc == 0);
+
+	/* b. create transaction log cursor and
+	 *    forge each transaction statement LSN number */
+	void *lc = sp_ctl(tx, "log_cursor");
+	if (lc == NULL) {
+		sp_rollback(tx);
+		sophia_raise(env);
+	}
+	struct txn_stmt *stmt;
+	rlist_foreach_entry(stmt, &txn->stmts, next) {
+		if (stmt->new_tuple == NULL && stmt->old_tuple == NULL)
+			continue;
+		void *v = sp_get(lc);
+		assert(v != NULL);
+		sp_set(v, "lsn", stmt->row->lsn);
+	}
+	assert(sp_get(lc) == NULL);
+	sp_destroy(lc);
+
+	/* c. commit transaction */
+	rc = sp_commit(tx);
 	if (rc == -1)
 		sophia_raise(env);
 	assert(rc == 0);
