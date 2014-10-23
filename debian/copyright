@@ -6,7 +6,7 @@ Source: https://github.com/tarantool/tarantool
 
 Files: third_party/libev/* third_party/coro/* third_party/libeio/*
 Copyright: 2007-2012 Marc Alexander Lehmann.
-License: BSD or GPL
+License: BSD-2-Clause or GPL
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
  met:
@@ -48,7 +48,7 @@ License: BSD or GPL
 Files: third_party/libev/event_compat.h
 Copyright: 2000-2004 Niels Provos <provos@citi.umich.edu>,
 	2008 Marc Alexander Lehmann <libev@schmorp.de>
-License: BSD
+License: BSD-3-Clause
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -76,7 +76,7 @@ License: BSD
 Files: third_party/libev/ev.c
 Copyright: 2007-2012 Marc Alexander Lehmann <libeio@schmorp.de>,
 	2011 Emanuele Giaquinta
-License: BSD
+License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or without modifica-
  tion, are permitted provided that the following conditions are met:
  .
@@ -125,7 +125,7 @@ License: LGPL-2.1
 Files: third_party/crc32.c
 Copyright: 1986 Gary S. Brown.
 	2004-2006 Intel Corporation - All Rights Reserved
-License: BSD
+License: BSD-3-Clause
  You may use this program, or code or tables extracted from it,
  as desired without restriction.
  .
@@ -156,7 +156,7 @@ License: BSD
 
 Files: third_party/memrchr.c third_party/memmem.c
 Copyright: 2008 The NetBSD Foundation, Inc.
-License: BSD
+License: BSD-2-Clause
  All rights reserved.
  .
  This code is derived from software contributed to The NetBSD Foundation
@@ -185,7 +185,7 @@ License: BSD
 
 Files: third_party/memcached/*
 Copyright: 2003, Danga Interactive, Inc.
-License: BSD
+License: BSD-3-Clause
  Copyright (c) 2003, Danga Interactive, Inc.
  All rights reserved.
  .
@@ -303,7 +303,7 @@ Files: third_party/qsort_arg.c
     third_party/queue.h
     connector/c/tntsql/include/tnt_queue.h
 Copyright: 1992, 1993 The Regents of the University of California.
-License: BSD
+License: BSD-3-Clause
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -377,7 +377,7 @@ License: TFL
 
 Files: third_party/valgrind/*
 Copyright: 2000-2010 Julian Seward.
-License: BSD
+License: BSD-4-Clause
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -414,7 +414,7 @@ License: BSD
 Files: third_party/sptree.h
 Copyright: 2010 Mail.RU
     2010 Teodor Sigaev
-License: BSD
+License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
@@ -439,7 +439,7 @@ License: BSD
 
 Files: third_party/proctitle.c
 Copyright: 2000-2010 PostgreSQL Global Development Group
-License: BSD
+License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
@@ -502,7 +502,7 @@ License: Expat
 
 Files: src/rope.c
 Copyright: 1993-1994 by Xerox Corporation.
-License: BSD
+License: BSD-2-Clause
  Author: Hans-J. Boehm <boehm@parc.xerox.com>
  .
  Redistribution and use in source and binary forms, with or
@@ -543,7 +543,7 @@ License: BSD
 
 Files: third_party/base64.[ch]
 Copyright: Chris Venter <chris.venter@gmail.com>
-License: BSD
+License: BSD-2-Clause
  Redistribution and use in source and binary forms, with or
  without modification, are permitted provided that the following
  conditions are met:
@@ -572,34 +572,36 @@ License: BSD
  SUCH DAMAGE.
 
 Files: *
-Copyright: 2010-2014, Aleksey Demakov, Aleksey Mashanov,
+Copyright: 2010-2014 by Aleksey Demakov, Aleksey Mashanov,
     Alexandre Kalendarev, Damien Lefortier, Dmitry E. Oboukhov,
     Dmitry Simonenko, Konstantin Osipov, Konstantin Shulgin,
     Mons Anderson, Pavel Cherenkov, Roman Antipin, Roman Tokarev,
     Roman Tsisyk, Teodor Sigaev, Timofey Khryukin, Yuriy Nevinitsin,
     Yuriy Vostrikov, Veniamin Gvozdikov
-License: BSD
- All rights reserved.
+License: BSD-2-Clause
+ Redistribution and use in source and binary forms, with or
+ without modification, are permitted provided that the following
+ conditions are met:
  .
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
- 3. The name of the author may not be used to endorse or promote products
-    derived from this software without specific prior written permission.
+ 1. Redistributions of source code must retain the above
+    copyright notice, this list of conditions and the
+    following disclaimer.
  .
- THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+ 2. Redistributions in binary form must reproduce the above
+    copyright notice, this list of conditions and the following
+    disclaimer in the documentation and/or other materials
+    provided with the distribution.
+ .
+ THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.

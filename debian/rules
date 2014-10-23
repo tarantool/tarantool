@@ -40,6 +40,7 @@ DEB_BUILDDIR := build-area
 
 DIRNAME=$(shell basename $(CURDIR))
 
+
 tarball: clean
 	git describe > VERSION
 	cd .. && tar --exclude=.git --exclude=debian 		\

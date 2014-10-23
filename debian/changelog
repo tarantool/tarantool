@@ -1,4 +1,4 @@
-tarantool-lts (1.5.4.26.g72b0ab6-1) unstable; urgency=medium
+tarantool-lts (1.5.4.28.gfcf2fef-1) unstable; urgency=medium
 
   * Tarantool 1.6 and tarantool 1.5 aren't compatible, so
     rename package tarantool to tarantool-lts (Long Time Support).
@@ -7,8 +7,11 @@ tarantool-lts (1.5.4.26.g72b0ab6-1) unstable; urgency=medium
     + third_party/qsort_arg_mt.c
     + third_party/compat/sys/bsd_time.h
     + third_party/gopt/gopt.*
+  * Fix copyright lintian issues (invalid-short-name-in-dep5-copyright).
+  * Don't strip tarantool_box: it uses debug symbols runtime.
+  * Bump Standard-Version.
 
- -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 23 Oct 2014 14:18:34 +0400
+ -- Dmitry E. Oboukhov <unera@debian.org>  Thu, 23 Oct 2014 18:18:34 +0400
 
 tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
 
