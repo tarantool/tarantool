@@ -4,7 +4,7 @@
 
 # Recommended way:
 # 1) Use "/etc/sysconfig/tarantool" or "/etc/default/tarantool" -
-# They're supported by our start-stop utility - dist.lua
+# They're supported by our start-stop utility - tarantoolctl
 
 # Usual way for RPM-based distros
 # 2) Create a file "/etc/systemd/system/tarantool.service",

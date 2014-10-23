@@ -61,9 +61,3 @@ clean::
 
 install/tarantool::
 
-
-install/tarantool-common::
-	sed 's/dist.lua/tarantoolctl/g' extra/dist/dist.lua \
-	    > ${DEB_BUILDDIR}/tarantoolctl
-	pod2man -c 'tarantoolctl instances control' \
-	    ${DEB_BUILDDIR}/tarantoolctl > ${DEB_BUILDDIR}/tarantoolctl.1
