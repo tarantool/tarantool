@@ -122,8 +122,6 @@ sophia_index_compare(char *a, size_t asz __attribute__((unused)),
 	       ((rc > 0) ? 1 : -1);
 }
 
-/* {{{ SophiaIndex */
-
 SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	: Index(key_def_arg)
 {
@@ -151,6 +149,16 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".commit_lsn",
 	         key_def->space_id);
 	sp_set(c, name, on);
+	engine_recovery *r = &space->engine->recovery;
+	if (r->recover != space_noop) {
+		/* start two-phase recovery for a space:
+		 * a. created after snapshot recovery
+		 * b. created during log recovery
+		*/
+		snprintf(name, sizeof(name), "db.%" PRIu32 ".two_phase_recover",
+				 key_def->space_id);
+		sp_set(c, name, on);
+	}
 	snprintf(name, sizeof(name), "db.%" PRIu32,
 	         key_def->space_id);
 	db = sp_get(c, name);
@@ -160,6 +168,16 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	if (rc == -1)
 		sophia_raise(env);
 	tuple_format_ref(space->format, 1);
+}
+
+void
+sophia_complete_recovery(struct space *space)
+{
+	SophiaIndex *index = (SophiaIndex*)index_find(space, 0);
+	assert(space->engine->recovery.recover == space_noop);
+	int rc = sp_open(index->db);
+	if (rc == -1)
+		sophia_raise(index->env);
 }
 
 SophiaIndex::~SophiaIndex()
@@ -204,11 +222,6 @@ SophiaIndex::random(uint32_t rnd) const
 		          (char*)value + valuesize);
 	tuple_ref(ret);
 	return ret;
-}
-
-void
-SophiaIndex::endBuild()
-{
 }
 
 size_t
@@ -468,5 +481,3 @@ SophiaIndex::initIterator(struct iterator *ptr,
 	if (it->cursor == NULL)
 		sophia_raise(env);
 }
-
-/* }}} */

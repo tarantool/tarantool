@@ -66,41 +66,40 @@ Sophia::Sophia(EngineFactory *e)
 { }
 
 static void
-sophia_end_build_primary_key(struct space *space)
+sophia_recovery_end(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
-	/* enable replace */
 	r->state   = READY_ALL_KEYS;
 	r->replace = sophia_replace;
 	r->recover = space_noop;
+	sophia_complete_recovery(space);
 }
 
 static void
-sophia_begin_build_primary_key(struct space *space)
+sophia_recovery_end_snapshot(struct space *space)
 {
 	engine_recovery *r = &space->engine->recovery;
-	r->recover = sophia_end_build_primary_key;
-	r->replace = sophia_replace_recover;
+	r->state   = READY_PRIMARY_KEY;
+	r->recover = sophia_recovery_end;
 }
 
-static inline void
-sophia_recovery_prepare(struct engine_recovery *r)
+static void
+sophia_recovery_begin_snapshot(struct space *space)
 {
-	r->state   = READY_NO_KEYS;
-	r->recover = sophia_begin_build_primary_key;
-	/* no sophia data during snapshot recover is
-	 * expected */
-	r->replace = sophia_replace_recover;
+	engine_recovery *r = &space->engine->recovery;
+	r->recover = sophia_recovery_end_snapshot;
 }
 
 SophiaFactory::SophiaFactory()
 	:EngineFactory("sophia")
 {
 	flags = ENGINE_TRANSACTIONAL;
-	env = NULL;
-	tx = NULL;
+	env   = NULL;
+	tx    = NULL;
 	tx_db = NULL;
-	sophia_recovery_prepare(&recovery);
+	recovery.state   = READY_NO_KEYS;
+	recovery.recover = sophia_recovery_begin_snapshot;
+	recovery.replace = sophia_replace_recover;
 }
 
 void
@@ -126,6 +125,7 @@ SophiaFactory::recoveryEvent(enum engine_recovery_event event)
 	switch (event) {
 	case END_RECOVERY_SNAPSHOT:
 		recovery.replace = sophia_replace_recover;
+		recovery.recover = sophia_recovery_end_snapshot;
 		break;
 	case END_RECOVERY:
 		recovery.state   = READY_NO_KEYS;
