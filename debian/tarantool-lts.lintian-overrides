@@ -1,1 +1,1 @@
-tarantool: unstripped-binary-or-object usr/bin/tarantool_box
+tarantool-lts: unstripped-binary-or-object usr/bin/tarantool_box

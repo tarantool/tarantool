@@ -1,4 +1,4 @@
-Format: http://dep.debian.net/deps/dep5/
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Debianized-By: Dmitry E. Oboukhov <unera@debian.org>
 Upstream-Name: tarantool, tarantool-box
 Upstream-Contact: tarantool-developers@lists.launchpad.net
@@ -6,7 +6,7 @@ Source: https://github.com/tarantool/tarantool
 
 Files: third_party/libev/* third_party/coro/* third_party/libeio/*
 Copyright: 2007-2012 Marc Alexander Lehmann.
-License:
+License: BSD or GPL
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
  met:
@@ -48,7 +48,7 @@ License:
 Files: third_party/libev/event_compat.h
 Copyright: 2000-2004 Niels Provos <provos@citi.umich.edu>,
 	2008 Marc Alexander Lehmann <libev@schmorp.de>
-License:
+License: BSD
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -76,7 +76,7 @@ License:
 Files: third_party/libev/ev.c
 Copyright: 2007-2012 Marc Alexander Lehmann <libeio@schmorp.de>,
 	2011 Emanuele Giaquinta
-License:
+License: BSD
  Redistribution and use in source and binary forms, with or without modifica-
  tion, are permitted provided that the following conditions are met:
  .
@@ -97,10 +97,10 @@ License:
  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTH-
  ERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  OF THE POSSIBILITY OF SUCH DAMAGE.
- 
+
 Files: third_party/coro/conftest.c
 Copyright: 1999-2001 Ralf S. Engelschall <rse@engelschall.com>
-License:
+License: LGPL-2.1
  This file is part of GNU Pth, a non-preemptive thread scheduling
  library which can be found at http://www.gnu.org/software/pth/.
  .
@@ -125,7 +125,7 @@ License:
 Files: third_party/crc32.c
 Copyright: 1986 Gary S. Brown.
 	2004-2006 Intel Corporation - All Rights Reserved
-License:
+License: BSD
  You may use this program, or code or tables extracted from it,
  as desired without restriction.
  .
@@ -156,7 +156,7 @@ License:
 
 Files: third_party/memrchr.c third_party/memmem.c
 Copyright: 2008 The NetBSD Foundation, Inc.
-License:
+License: BSD
  All rights reserved.
  .
  This code is derived from software contributed to The NetBSD Foundation
@@ -185,7 +185,7 @@ License:
 
 Files: third_party/memcached/*
 Copyright: 2003, Danga Interactive, Inc.
-License:
+License: BSD
  Copyright (c) 2003, Danga Interactive, Inc.
  All rights reserved.
  .
@@ -220,7 +220,7 @@ License:
 Files: third_party/luajit/*
 Copyright: 2005-2011 Mike Pall. All rights reserved.
     1994-2011 Lua.org, PUC-Rio.
-License:
+License: MIT
  LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
  .
  Copyright (C) 2005-2011 Mike Pall. All rights reserved.
@@ -276,7 +276,7 @@ License:
 Files: test/lib/yapps/*
 Copyright: 1999-2003 Amit J. Patel <amitp@cs.stanford.edu>
     2003-2004 by Matthias Urlichs <smurf@debian.org>
-License:
+License: MIT
  The MIT License (MIT)
  .
  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -303,7 +303,7 @@ Files: third_party/qsort_arg.c
     third_party/queue.h
     connector/c/tntsql/include/tnt_queue.h
 Copyright: 1992, 1993 The Regents of the University of California.
-License:
+License: BSD
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -333,7 +333,7 @@ License:
 
 Files: third_party/compat/unwind.h
 Copyright: 2001, 2003, 2004, 2006 Free Software Foundation, Inc.
-License:
+License: GPL
  This file is part of GCC.
  .
  GCC is free software; you can redistribute it and/or modify it
@@ -360,7 +360,7 @@ License:
 
 Files: third_party/gopt/gopt.*
 Copyright: 2003-2008, Tom Vajzovic <tom.viza@gmail.com>
-License:
+License: TFL
  I, Tom Vajzovic, am the author of this software and its documentation
  and permanently abandon all copyright and other intellectual property
  rights in them, including the right to be identified as the author.
@@ -377,7 +377,7 @@ License:
 
 Files: third_party/valgrind/*
 Copyright: 2000-2010 Julian Seward.
-License:
+License: BSD
  All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without
@@ -414,7 +414,7 @@ License:
 Files: third_party/sptree.h
 Copyright: 2010 Mail.RU
     2010 Teodor Sigaev
-License:
+License: BSD
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
@@ -439,7 +439,7 @@ License:
 
 Files: third_party/proctitle.c
 Copyright: 2000-2010 PostgreSQL Global Development Group
-License:
+License: BSD
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
@@ -464,7 +464,7 @@ License:
 
 Files: third_party/lua-cjson/*
 Copyright: 2010-2012 Mark Pulford <mark@kyne.com.au>
-License:
+License: Expat
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the
  "Software"), to deal in the Software without restriction, including
@@ -486,7 +486,7 @@ License:
 
 Files: third_party/lua-cjson/g_fmt.c
 Copyright: 1991, 1996 by Lucent Technologies.
-License:
+License: Expat
  The author of this software is David M. Gay.
  .
  Permission to use, copy, modify, and distribute this software for any
@@ -502,7 +502,7 @@ License:
 
 Files: src/rope.c
 Copyright: 1993-1994 by Xerox Corporation.
-License:
+License: BSD
  Author: Hans-J. Boehm <boehm@parc.xerox.com>
  .
  Redistribution and use in source and binary forms, with or
@@ -543,7 +543,7 @@ License:
 
 Files: third_party/base64.[ch]
 Copyright: Chris Venter <chris.venter@gmail.com>
-License:
+License: BSD
  Redistribution and use in source and binary forms, with or
  without modification, are permitted provided that the following
  conditions are met:
@@ -571,43 +571,35 @@ License:
  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  SUCH DAMAGE.
 
-Files: debian/* *
-Copyright: Aleksey Demakov,
- Aleksey Mashanov,
- Alexandre Kalendarev,
- Damien Lefortier,
- Dmitry E. Oboukhov,
- Dmitry Simonenko,
- Fedor Sigaev,
- Konstantin Osipov,
- Konstantin Shulgin,
- Yuri Nevinitsin,
- Pavel Cherenkov,
- Roman Antipin,
- Roman Tokarev,
- Teodor Sigaev,
- Timofey Khryukin,
- Yuriy Nevinitsin,
- Yuriy Vostrikov
-License:
+Files: *
+Copyright: 2010-2014, Aleksey Demakov, Aleksey Mashanov,
+    Alexandre Kalendarev, Damien Lefortier, Dmitry E. Oboukhov,
+    Dmitry Simonenko, Konstantin Osipov, Konstantin Shulgin,
+    Mons Anderson, Pavel Cherenkov, Roman Antipin, Roman Tokarev,
+    Roman Tsisyk, Teodor Sigaev, Timofey Khryukin, Yuriy Nevinitsin,
+    Yuriy Vostrikov, Veniamin Gvozdikov
+License: BSD
+ All rights reserved.
+ .
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
- .
  1. Redistributions of source code must retain the above copyright
     notice, this list of conditions and the following disclaimer.
  2. Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in the
     documentation and/or other materials provided with the distribution.
+ 3. The name of the author may not be used to endorse or promote products
+    derived from this software without specific prior written permission.
  .
- THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- SUCH DAMAGE.
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
