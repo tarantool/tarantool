@@ -24,6 +24,15 @@ local wrapper_cfg = {
     listen             = normalize_uri,
 }
 
+local default_sophia_cfg = {
+	memory_limit   = 0,
+	threads        = 5,
+	node_size      = 134217728,
+	node_page_size = 131072,
+	node_branch_wm = 10485760,
+	node_merge_wm  = 1
+}
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -34,6 +43,7 @@ local default_cfg = {
     snap_dir            = ".",
     wal_dir             = ".",
     sophia_dir          = './sophia',
+    sophia_options      = default_sophia_cfg,
     logger              = nil,
     logger_nonblock     = true,
     log_level           = 5,
@@ -69,6 +79,7 @@ local template = {
     snap_dir            = 'string',
     wal_dir             = 'string',
     sophia_dir          = 'string',
+    sophia_options      = 'table',
     logger              = 'string',
     logger_nonblock     = 'boolean',
     log_level           = 'number',

@@ -122,33 +122,61 @@ sophia_index_compare(char *a, size_t asz __attribute__((unused)),
 	       ((rc > 0) ? 1 : -1);
 }
 
-SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
-	: Index(key_def_arg)
+static inline void*
+sophia_configure(struct space *space, struct key_def *key_def)
 {
-	struct space *space = space_cache_find(key_def->space_id);
 	SophiaFactory *factory =
 		(SophiaFactory*)space->engine->factory;
-	env = factory->env;
+	void *env = factory->env;
+	void *c = sp_ctl(env);
+
 	const char *sophia_dir = cfg_gets("sophia_dir");
 	mkdir(sophia_dir, 0755);
+
 	const char *on = "1";
 	char path[PATH_MAX];
 	char name[128];
 	snprintf(path, sizeof(path), "%s/%" PRIu32,
 	         sophia_dir, key_def->space_id);
-	void *c = sp_ctl(env);
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".dir",
 	         key_def->space_id);
 	sp_set(c, name, path);
+
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".cmp",
 	         key_def->space_id);
 	sp_set(c, name, sophia_index_compare);
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".cmp_arg",
 	         key_def->space_id);
 	sp_set(c, name, key_def);
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".threads",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.threads"));
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".memory_limit",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.memory_limit"));
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_size",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.node_size"));
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_page_size",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.node_page_size"));
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_branch_wm",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.node_branch_wm"));
+
+	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_merge_wm",
+	         key_def->space_id);
+	sp_set(c, name, cfg_gets("sophia_options.node_merge_wm"));
+
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".commit_lsn",
 	         key_def->space_id);
 	sp_set(c, name, on);
+
 	engine_recovery *r = &space->engine->recovery;
 	if (r->recover != space_noop) {
 		/* start two-phase recovery for a space:
@@ -161,7 +189,20 @@ SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
 	}
 	snprintf(name, sizeof(name), "db.%" PRIu32,
 	         key_def->space_id);
-	db = sp_get(c, name);
+	void *db = sp_get(c, name);
+	if (db == NULL)
+		sophia_raise(env);
+	return db;
+}
+
+SophiaIndex::SophiaIndex(struct key_def *key_def_arg __attribute__((unused)))
+	: Index(key_def_arg)
+{
+	struct space *space = space_cache_find(key_def->space_id);
+	SophiaFactory *factory =
+		(SophiaFactory*)space->engine->factory;
+	env = factory->env;
+	db = sophia_configure(space, key_def);
 	if (db == NULL)
 		sophia_raise(env);
 	int rc = sp_open(db);
