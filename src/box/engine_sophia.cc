@@ -57,6 +57,22 @@ void sophia_raise(void *env)
 	tnt_raise(ClientError, ER_SOPHIA, error);
 }
 
+void sophia_info(void (*callback)(const char*, const char*, void*), void *arg)
+{
+	SophiaFactory *factory = (SophiaFactory*)engine_find("sophia");
+	void *env = factory->env;
+	void *c = sp_ctl(env);
+	void *o, *cur = sp_cursor(c, ">=", NULL);
+	if (cur == NULL)
+		sophia_raise(env);
+	while ((o = sp_get(cur))) {
+		const char *k = (const char *)sp_get(o, "key", NULL);
+		const char *v = (const char *)sp_get(o, "value", NULL);
+		callback(k, v, arg);
+	}
+	sp_destroy(cur);
+}
+
 struct Sophia: public Engine {
 	Sophia(EngineFactory*);
 };

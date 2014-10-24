@@ -118,6 +118,27 @@ lbox_info_logger_pid(struct lua_State *L)
 	return 1;
 }
 
+void sophia_info(void (*)(const char*, const char*, void*), void*);
+
+static void
+lbox_info_sophia_cb(const char *key, const char *value, void *arg)
+{
+	struct lua_State *L;
+	L = (struct lua_State*)arg;
+	if (value == NULL)
+		return;
+	lua_pushstring(L, key);
+	lua_pushstring(L, value);
+	lua_settable(L, -3);
+}
+
+static int
+lbox_info_sophia(struct lua_State *L)
+{
+	lua_newtable(L);
+	sophia_info(lbox_info_sophia_cb, (void*)L);
+	return 1;
+}
 
 static const struct luaL_reg
 lbox_info_dynamic_meta [] =
@@ -130,6 +151,7 @@ lbox_info_dynamic_meta [] =
 	{"uptime", lbox_info_uptime},
 	{"snapshot_pid", lbox_info_snapshot_pid},
 	{"logger_pid", lbox_info_logger_pid},
+	{"sophia", lbox_info_sophia},
 	{NULL, NULL}
 };
 
