@@ -540,8 +540,14 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 
 	if (slab_arena_create(&memtx_arena, prealloc, prealloc,
 			      slab_size, flags)) {
-		panic_syserror("failed to preallocate %zu bytes",
-			       prealloc);
+		if (ENOMEM == errno)
+			panic("failed to preallocate %zu bytes: "
+			      "Cannot allocate memory, "
+			      "check option 'slab_alloc_arena' in box.cfg(..)",
+			      prealloc);
+		else
+			panic_syserror("failed to preallocate %zu bytes",
+				       prealloc);
 	}
 	slab_cache_create(&memtx_slab_cache, &memtx_arena,
 			  slab_size);

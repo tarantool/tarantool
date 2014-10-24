@@ -29,9 +29,9 @@ DEB_CMAKE_NORMAL_ARGS := -DCMAKE_INSTALL_PREFIX="$(DEB_CMAKE_INSTALL_PREFIX)" \
 #    -DCMAKE_C_COMPILER:FILEPATH="$(CC)" \
 #    -DCMAKE_CXX_COMPILER:FILEPATH="$(CXX)" \
 
-DEB_SHLIBDEPS_INCLUDE          := /usr/lib/tarantool
+DEB_SHLIBDEPS_INCLUDE           := /usr/lib/tarantool
 DEB_INSTALL_DOCS_ALL 		:= -XTODO -XAUTHORS
-DEB_DH_STRIP_ARGS_tarantool	:= -X/usr/bin/tarantool
+DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
@@ -39,6 +39,7 @@ include /usr/share/cdbs/1/class/cmake.mk
 DEB_BUILDDIR := build-area
 
 DIRNAME=$(shell basename $(CURDIR))
+
 
 tarball: clean
 	git describe > VERSION
@@ -60,9 +61,3 @@ clean::
 
 install/tarantool::
 
-
-install/tarantool-common::
-	sed 's/dist.lua/tarantoolctl/g' extra/dist/dist.lua \
-	    > ${DEB_BUILDDIR}/tarantoolctl
-	pod2man -c 'tarantoolctl instances control' \
-	    ${DEB_BUILDDIR}/tarantoolctl > ${DEB_BUILDDIR}/tarantoolctl.1

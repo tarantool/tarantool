@@ -89,7 +89,7 @@ lsn += 1
 #
 # wal_inprogress = os.path.join(server.vardir, "00000000000000000006.xlog.inprogress")
 # wal = os.path.join(server.vardir, "00000000000000000006.xlog")
-# 
+#
 # os.symlink(abspath("box/empty.xlog"), wal_inprogress)
 # server.start()
 #
@@ -101,16 +101,16 @@ lsn += 1
 # # Empty (header only, no records) inprogress xlog must be deleted
 # # during recovery.
 # """
-# 
+#
 # # If the previous test has failed, there is a dangling link
 # # and symlink fails.
 # try:
 #   os.symlink(abspath("box/just_header.xlog"), wal_inprogress)
 # except OSError as e:
 #   print e
-# 
+#
 # server.start()
-# 
+#
 # if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
 #    print "00000000000000000006.xlog.inprogress has been successfully deleted"
 # server.stop()
@@ -118,16 +118,16 @@ lsn += 1
 # print """
 # # Inprogress xlog with bad record must be deleted during recovery.
 # """
-# 
+#
 # # If the previous test has failed, there is a dangling link
 # # and symlink fails.
 # try:
 #   os.symlink(abspath("box/bad_record.xlog"), wal_inprogress)
 # except OSError as e:
 #   print e
-# 
+#
 # server.start()
-# 
+#
 # if not os.access(wal_inprogress, os.F_OK) and not os.access(wal, os.F_OK):
 #    print "00000000000000000006.xlog.inprogress has been successfully deleted"
 
@@ -177,20 +177,13 @@ if os.access(wal, os.F_OK):
     os.unlink(wal)
     os.rename(wal_old, wal)
 
-f = open(server.logfile, "r")
-f.seek(0, 2)
 
 server.start()
-
-check="Duplicate key"
-print "check log line for '%s'" % check
+line = 'Duplicate key'
+print "check log line for '%s'" % line
 print
-line = f.readline()
-while line:
-    if re.search(r'(%s)' % check, line):
-        print "'%s' exists in server log" % check
-        break
-    line = f.readline()
+if server.logfile_pos.seek_once(line) >= 0:
+    print "'%s' exists in server log" % line
 print
 
 server.admin("box.space['test']:get{1}")
@@ -222,16 +215,13 @@ server.stop()
 
 # Remove xlog with {3, 'third tuple'}
 os.unlink(wal)
+
 server.start()
-check="ignoring missing WAL"
-print "check log line for '%s'" % check
+line="ignoring missing WAL"
+print "check log line for '%s'" % line
 print
-line = f.readline()
-while line:
-    if re.search(r'(%s)' % check, line):
-        print "'%s' exists in server log" % check
-        break
-    line = f.readline()
+if server.logfile_pos.seek_once(line) >= 0:
+    print "'%s' exists in server log" % line
 print
 
 # missing tuple from removed xlog

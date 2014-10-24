@@ -23,6 +23,7 @@ RPM
 tags
 extra/txt2c
 extra/bin2c
+extra/dist/tarantoolctl.1
 cmake_install.cmake
 config.mk
 doc/www/content/docs/dev_guide.html
