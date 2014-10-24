@@ -92,7 +92,9 @@ Summary: Tarantool common files
 Vendor: tarantool.org
 Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-common
+%if 0%{?rhel} > 5
 BuildArch: noarch
+%endif
 Requires: %{?scl_prefix}tarantool
 %description common
 Tarantool is a high performance in-memory NoSQL database.
