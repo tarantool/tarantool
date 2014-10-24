@@ -434,7 +434,7 @@ struct bps_block;
 	(tree)->debug_##type##_branches_mask |= (branch_bit)
 #else
 #define BPS_TREE_BRANCH_TRACE(tree, type, branch_bit) \
-	do {} while(0)
+	((void)0)
 #endif
 
 /**
