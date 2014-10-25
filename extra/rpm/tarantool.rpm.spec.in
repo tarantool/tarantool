@@ -92,7 +92,7 @@ Summary: Tarantool common files
 Vendor: tarantool.org
 Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-common
-%if 0%{?rhel} > 5
+%if 0%{?rhel} < 6 and 0%{?rhel} > 0
 BuildArch: noarch
 %endif
 Requires: %{?scl_prefix}tarantool
