@@ -1,16 +1,16 @@
 s = box.schema.create_space('spatial')
 s:create_index('primary')
-s:create_index('spatial', { type = 'rtree', parts = {2, 'num', 3, 'num'}})
+s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
 
-s:insert{1,0.0,0.0}
-s:insert{2,0.0,10.0}
-s:insert{3,0.0,50.0}
-s:insert{4,10.0,0.0}
-s:insert{5,50.0,0.0}
-s:insert{6,10.0,10.0}
-s:insert{7,10.0,50.0}
-s:insert{8,50.0,10.0}
-s:insert{9,50.0,50.0}
+s:insert{1,{0.0,0.0}}
+s:insert{2,{0.0,10.0}}
+s:insert{3,{0.0,50.0}}
+s:insert{4,{10.0,0.0}}
+s:insert{5,{50.0,0.0}}
+s:insert{6,{10.0,10.0}}
+s:insert{7,{10.0,50.0}}
+s:insert{8,{50.0,10.0}}
+s:insert{9,{50.0,50.0}}
 
 -- select all records
 s.index.spatial:select({iterator = 'ALL'})

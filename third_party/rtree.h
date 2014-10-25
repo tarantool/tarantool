@@ -21,7 +21,11 @@ typedef void*   record_t;
 #define AREA_MAX DBL_MAX
 #define AREA_MIN DBL_MIN
 
-#define RTREE_PAGE_SIZE 1024 /* R-Tree use linear search within element on the page, so larger page cause worse performance */
+enum {
+	RTREE_DIMENSION = 2,
+	RTREE_PAGE_SIZE = 1024 /* R-Tree use linear search within element on the page,
+				  so larger page cause worse performance */
+};
 
 class R_tree;
 class R_page;
@@ -30,18 +34,18 @@ class R_tree_iterator;
 class rectangle_t
 {
 public:
-	enum { dim = 2 };
-	coord_t boundary[dim*2];
+	coord_t boundary[RTREE_DIMENSION*2];
 
 	// Squarer of distance
 	area_t distance2(coord_t const* point) const
 	{
 		area_t d = 0;
-		for (int i = 0; i < dim; i++) {
+		for (int i = 0; i < RTREE_DIMENSION; i++) {
 			if (point[i] < boundary[i]) {
 				d += (boundary[i] - point[i]) * (boundary[i] - point[i]);
-			} else if (point[i] > boundary[dim + i]) {
-				d += (boundary[dim + i] - point[i]) * (boundary[dim + i] - point[i]);
+			} else if (point[i] > boundary[RTREE_DIMENSION + i]) {
+				d += (boundary[RTREE_DIMENSION + i] - point[i])
+				   * (boundary[RTREE_DIMENSION + i] - point[i]);
 			}
 		}
 		return d;
@@ -50,35 +54,39 @@ public:
 
 	friend area_t area(rectangle_t const& r) {
 		area_t area = 1;
-		for (int i = dim; --i >= 0; area *= r.boundary[i+dim] - r.boundary[i]);
+		for (int i = RTREE_DIMENSION;
+		     --i >= 0;
+		     area *= r.boundary[i+RTREE_DIMENSION] - r.boundary[i]);
 		return area;
 	}
 
 	void operator +=(rectangle_t const& r) {
-		int i = dim;
+		int i = RTREE_DIMENSION;
 		while (--i >= 0) {
 			boundary[i] = (boundary[i] <= r.boundary[i])
 				? boundary[i] : r.boundary[i];
-			boundary[i+dim] = (boundary[i+dim] >= r.boundary[i+dim])
-				? boundary[i+dim] : r.boundary[i+dim];
+			boundary[i+RTREE_DIMENSION] =
+				(boundary[i+RTREE_DIMENSION] >= r.boundary[i+RTREE_DIMENSION])
+				? boundary[i+RTREE_DIMENSION] : r.boundary[i+RTREE_DIMENSION];
 		}
 	}
 	rectangle_t operator + (rectangle_t const& r) const {
 		rectangle_t res;
-		int i = dim;
+		int i = RTREE_DIMENSION;
 		while (--i >= 0) {
 			res.boundary[i] = (boundary[i] <= r.boundary[i])
 				? boundary[i] : r.boundary[i];
-			res.boundary[i+dim] = (boundary[i+dim] >= r.boundary[i+dim])
-				? boundary[i+dim] : r.boundary[i+dim];
+			res.boundary[i+RTREE_DIMENSION] =
+				(boundary[i+RTREE_DIMENSION] >= r.boundary[i+RTREE_DIMENSION])
+				? boundary[i+RTREE_DIMENSION] : r.boundary[i+RTREE_DIMENSION];
 		}
 		return res;
 	}
 	bool operator& (rectangle_t const& r) const {
-		int i = dim;
+		int i = RTREE_DIMENSION;
 		while (--i >= 0) {
-			if (boundary[i] > r.boundary[i+dim] ||
-			    r.boundary[i] > boundary[i+dim])
+			if (boundary[i] > r.boundary[i+RTREE_DIMENSION] ||
+			    r.boundary[i] > boundary[i+RTREE_DIMENSION])
 			{
 				return false;
 			}
@@ -86,10 +94,10 @@ public:
 		return true;
 	}
 	bool operator <= (rectangle_t const& r) const {
-		int i = dim;
+		int i = RTREE_DIMENSION;
 		while (--i >= 0) {
 			if (boundary[i] < r.boundary[i] ||
-			    boundary[i+dim] > r.boundary[i+dim])
+			    boundary[i+RTREE_DIMENSION] > r.boundary[i+RTREE_DIMENSION])
 			{
 				return false;
 			}
@@ -108,7 +116,7 @@ public:
 	}
 
 	bool operator == (rectangle_t const& r) const {
-		int i = dim*2;
+		int i = RTREE_DIMENSION*2;
 		while (--i >= 0) {
 			if (boundary[i] != r.boundary[i]) {
 				return false;
@@ -179,28 +187,16 @@ public:
 	~R_tree_iterator();
 };
 
-class FixedSizeAllocator {
-public:
-	class Factory {
-	public:
-		virtual FixedSizeAllocator* create(size_t obj_size) = 0;
-		virtual void destroy(FixedSizeAllocator* allocator) = 0;
-		virtual ~Factory() {}
-	};
-
-	virtual void*  alloc() = 0;
-	virtual void   free(void* ptr) = 0;
-	virtual size_t used_size() = 0;
-	virtual ~FixedSizeAllocator() {}
-};
-
 class R_tree
 {
 	friend class R_tree_iterator;
 	friend class R_page;
+
+	typedef void* (*page_alloc_t)();
+	typedef void (*page_free_t)(void*);
 public:
 	size_t used_size() const {
-		return page_allocator->used_size();
+		return n_pages * RTREE_PAGE_SIZE;
 	}
 
 	unsigned number_of_records() const {
@@ -210,7 +206,7 @@ public:
 	void insert(rectangle_t const& r, record_t obj);
 	bool remove(rectangle_t const& r, record_t obj);
 	void purge();
-	R_tree(FixedSizeAllocator::Factory* allocator_factory);
+	R_tree(page_alloc_t page_alloc, page_free_t page_free);
 	~R_tree();
 
 protected:
@@ -218,9 +214,9 @@ protected:
 	unsigned height;
 	R_page*  root;
 	int update_count;
-	FixedSizeAllocator* page_allocator;
-	FixedSizeAllocator* neighbor_allocator;
-	FixedSizeAllocator::Factory* allocator_factory;
+	int n_pages;
+	page_alloc_t page_alloc;
+	page_free_t page_free;
 };
 
 #endif

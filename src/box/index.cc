@@ -75,19 +75,12 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 
         if (key_def->type == RTREE) {
                 if (part_count != 1 && part_count != 2 && part_count != 4) {
-                        tnt_raise(ClientError, ER_KEY_PART_COUNT,
-                                  "R-Tree key should be point (two integer coordinates) or rectangles (four integer coordinates)");
+                        tnt_raise(ClientError, ER_KEY_PART_COUNT, 4, part_count);
                 }
-		if (part_count == 1) {
+		for (uint32_t part = 0; part < part_count; part++) {
 			enum mp_type mp_type = mp_typeof(*key);
 			mp_next(&key);
-			key_mp_type_validate(ARR, mp_type, ER_KEY_PART_TYPE, 0);
-		} else {
-			for (uint32_t part = 0; part < part_count; part++) {
-				enum mp_type mp_type = mp_typeof(*key);
-				mp_next(&key);
-				key_mp_type_validate(NUM, mp_type, ER_KEY_PART_TYPE, part);
-			}
+			key_mp_type_validate(BOX, mp_type, ER_KEY_PART_TYPE, part);
 		}
         } else {
                 if (part_count > key_def->part_count)

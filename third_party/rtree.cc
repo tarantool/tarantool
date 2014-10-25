@@ -1,11 +1,8 @@
+#include <new>
 #include <string.h>
 #include <assert.h>
 #include "rtree.h"
 
-inline void* operator new(size_t, void* at)
-{
-	return at;
-}
 
 class R_page {
 public:
@@ -15,8 +12,10 @@ public:
 	};
 
 	enum {
-		card = (RTREE_PAGE_SIZE-4)/sizeof(branch), // maximal number of branches at page
-		min_fill = card/2        // minimal number of branches at non-root page
+		/* maximal number of branches at page */
+		CARD = (RTREE_PAGE_SIZE-4)/sizeof(branch),
+		/* minimal number of branches at non-root page */
+		MIN_FILL = CARD/2
 	};
 
 	struct reinsert_list {
@@ -34,7 +33,7 @@ public:
 	R_page* split_page(R_tree* tree, branch const& br);
 
 	R_page* add_branch(R_tree* tree, branch const& br) {
-		if (n < card) {
+		if (n < CARD) {
 			b[n++] = br;
 			return NULL;
 		} else {
@@ -45,44 +44,44 @@ public:
 
 	void purge(R_tree* tree, int level);
 
-	R_page* next_reinsert_page() const { return (R_page*)b[card-1].p; }
+	R_page* next_reinsert_page() const { return (R_page*)b[CARD-1].p; }
 
 	R_page(rectangle_t const& rect, record_t obj);
 	R_page(R_page* old_root, R_page* new_page);
 
-	int    n; // number of branches at page
-	branch b[card];
+	int    n; /* number of branches at page */
+	branch b[CARD];
 };
 
-R_tree::R_tree(FixedSizeAllocator::Factory* factory)
+R_tree::R_tree(page_alloc_t pg_alloc, page_free_t pg_free)
 {
 	n_records = 0;
 	height = 0;
 	root = NULL;
 	update_count = 0;
-	page_allocator = factory->create(sizeof(R_page));
-	neighbor_allocator = factory->create(sizeof(R_tree_iterator::Neighbor));
-	allocator_factory = factory;
+	n_pages = 0;
+	page_alloc = pg_alloc;
+	page_free = pg_free;
 }
 
 R_tree::~R_tree()
 {
 	purge();
-	allocator_factory->destroy(page_allocator);
-	allocator_factory->destroy(neighbor_allocator);
 }
 
 void R_tree::insert(rectangle_t const& r, record_t obj)
 {
 	if (root == NULL) {
-		root = new (page_allocator->alloc()) R_page(r, obj);
+		root = new (page_alloc()) R_page(r, obj);
 		height = 1;
+		n_pages += 1;
 	} else {
 		R_page* p = root->insert(this, r, obj, height);
 		if (p != NULL) {
-			// root splitted
-			root = new (page_allocator->alloc()) R_page(root, p);
+			/* root splitted */
+			root = new (page_alloc()) R_page(root, p);
 			height += 1;
+			n_pages += 1;
 		}
 	}
 	update_count += 1;
@@ -102,21 +101,24 @@ bool R_tree::remove(rectangle_t const& r, record_t obj)
 					R_page* p = root->insert(this, pg->b[i].r,
 								 pg->b[i].p, height-level);
 					if (p != NULL) {
-						// root splitted
-						root = new (page_allocator->alloc()) R_page(root, p);
+						/* root splitted */
+						root = new (page_alloc()) R_page(root, p);
 						height += 1;
+						n_pages += 1;
 					}
 				}
 				level -= 1;
 				R_page* next = pg->next_reinsert_page();
-				page_allocator->free(pg);
+				page_free(pg);
+				n_pages -= 1;
 				pg = next;
 			}
 			if (root->n == 1 && height > 1) {
 				R_page* new_root = root->b[0].p;
-				page_allocator->free(root);
+				page_free(root);
 				root = new_root;
 				height -= 1;
+				n_pages -= 1;
 			}
 			n_records -= 1;
 			update_count += 1;
@@ -184,7 +186,7 @@ R_tree_iterator::~R_tree_iterator()
 	reset();
 	for (curr = free; curr != NULL; curr = next) {
 		next = curr->next;
-		tree->neighbor_allocator->free(curr);
+		delete curr;
 	}
 }
 
@@ -236,7 +238,9 @@ bool R_tree_iterator::init(R_tree const* tree, rectangle_t const& r, Spatial_sea
 		break;
 	case SOP_NEIGHBOR:
 		if (tree->root) {
-			list = new_neighbor(tree->root, tree->root->cover().distance2(r.boundary), tree->height);
+			list = new_neighbor(tree->root,
+					    tree->root->cover().distance2(r.boundary),
+					    tree->height);
 			return true;
 		} else {
 			list = NULL;
@@ -244,7 +248,7 @@ bool R_tree_iterator::init(R_tree const* tree, rectangle_t const& r, Spatial_sea
 		}
 	}
 	if (tree->root && goto_first(0, tree->root)) {
-		stack[tree->height-1].pos -= 1; // will be incremented by goto_next
+		stack[tree->height-1].pos -= 1; /* will be incremented by goto_next */
 		eof = false;
 		return true;
 	} else {
@@ -273,7 +277,7 @@ R_tree_iterator::Neighbor* R_tree_iterator::new_neighbor(void* child, area_t dis
 {
 	Neighbor* n = free;
 	if (n == NULL) {
-		n = new (tree->neighbor_allocator->alloc()) Neighbor();
+		n = new Neighbor();
 	} else {
 		free = n->next;
 	}
@@ -293,20 +297,22 @@ void R_tree_iterator::free_neighbor(Neighbor* n)
 record_t R_tree_iterator::next()
 {
 	if (update_count != tree->update_count) {
-		// Index was updated since cursor initialziation
+		/* Index was updated since cursor initialziation */
 		return NULL;
 	}
 	if (op == SOP_NEIGHBOR) {
-		// To return element in order of increasing distance from specified point,
-		// we build sorted list of R-Tree items
-		// (ordered by distance from specified point) starting from root page.
-		// Algorithm is the following:
-		//
-		// insert root R-Tree page in the sorted list
-		// while sorted list is not empty:
-		//      get top element from the sorted list
-		//      if it is tree leaf (record) then return it as current element
-		//      otherwise (R-Tree page) get siblings of this R-Tree page and insert them in sorted list
+		/* To return element in order of increasing distance from specified point,
+		 * we build sorted list of R-Tree items
+		 * (ordered by distance from specified point) starting from root page.
+		 * Algorithm is the following:
+		 *
+		 * insert root R-Tree page in the sorted list
+		 * while sorted list is not empty:
+		 *      get top element from the sorted list
+		 *      if it is tree leaf (record) then return it as current element
+		 *      otherwise (R-Tree page) get siblings of this R-Tree page and
+		 *      insert them in sorted list
+		 */
 		while (true) {
 			Neighbor* neighbor = list;
 			if (neighbor == NULL) {
@@ -320,7 +326,9 @@ record_t R_tree_iterator::next()
 				return (record_t*)pg;
 			}
 			for (int i = 0, n = pg->n; i < n; i++) {
-				insert(new_neighbor(pg->b[i].p, pg->b[i].r.distance2(r.boundary), level-1));
+				insert(new_neighbor(pg->b[i].p,
+						    pg->b[i].r.distance2(r.boundary),
+						    level-1));
 			}
 		}
 	}
@@ -343,17 +351,17 @@ void R_tree::purge()
 		root->purge(this, height);
 		root = NULL;
 		n_records = 0;
+		n_pages = 0;
 		height = 0;
 	}
 }
 
-//-------------------------------------------------------------------------
-// R-tree page methods
-//-------------------------------------------------------------------------
+/*------------------------------------------------------------------------- */
+/* R-tree page methods */
+/*------------------------------------------------------------------------- */
 
-//
-// Create root page
-//
+
+/* Create root page */
 R_page::R_page(rectangle_t const& r, record_t obj)
 {
 	n = 1;
@@ -361,9 +369,7 @@ R_page::R_page(rectangle_t const& r, record_t obj)
 	b[0].p = (R_page*)obj;
 }
 
-//
-// Create new root page (root splitting)
-//
+/* Create new root page (root splitting) */
 R_page::R_page(R_page* old_root, R_page* new_page)
 {
 	n = 2;
@@ -373,9 +379,7 @@ R_page::R_page(R_page* old_root, R_page* new_page)
 	b[1].p = new_page;
 }
 
-//
-// Calculate cover of all rectangles at page
-//
+/* Calculate cover of all rectangles at page */
 rectangle_t R_page::cover() const
 {
 	rectangle_t r = b[0].r;
@@ -388,18 +392,18 @@ rectangle_t R_page::cover() const
 R_page* R_page::split_page(R_tree* tree, branch const& br)
 {
 	int i, j, seed[2] = {0,0};
-	area_t rect_area[card+1], waste, worst_waste = AREA_MIN;
-	//
-	// As the seeds for the two groups, find two rectangles which waste
-	// the most area if covered by a single rectangle.
-	//
+	area_t rect_area[CARD+1], waste, worst_waste = AREA_MIN;
+	/*
+	 * As the seeds for the two groups, find two rectangles which waste
+	 * the most area if covered by a single rectangle.
+	 */
 	rect_area[0] = area(br.r);
-	for (i = 0; i < card; i++) {
+	for (i = 0; i < CARD; i++) {
 		rect_area[i+1] = area(b[i].r);
 	}
 	branch const* bp = &br;
-	for (i = 0; i < card; i++) {
-		for (j = i+1; j <= card; j++) {
+	for (i = 0; i < CARD; i++) {
+		for (j = i+1; j <= CARD; j++) {
 			waste = area(bp->r + b[j-1].r) - rect_area[i] - rect_area[j];
 			if (waste > worst_waste) {
 				worst_waste = waste;
@@ -409,10 +413,10 @@ R_page* R_page::split_page(R_tree* tree, branch const& br)
 		}
 		bp = &b[i];
 	}
-	char taken[card];
+	char taken[CARD];
 	rectangle_t group[2];
 	area_t group_area[2];
-	int group_card[2];
+	int group_CARD[2];
 	R_page* p;
 
 	memset(taken, 0, sizeof taken);
@@ -421,28 +425,29 @@ R_page* R_page::split_page(R_tree* tree, branch const& br)
 
 	if (seed[0] == 0) {
 		group[0] = br.r;
-		p = new (tree->page_allocator->alloc()) R_page(br.r, br.p);
+		p = new (tree->page_alloc()) R_page(br.r, br.p);
 	} else {
 		group[0] = b[seed[0]-1].r;
-		p = new (tree->page_allocator->alloc()) R_page(group[0], b[seed[0]-1].p);
+		p = new (tree->page_alloc()) R_page(group[0], b[seed[0]-1].p);
 		b[seed[0]-1] = br;
 	}
-	group_card[0] = group_card[1] = 1;
+	tree->n_pages += 1;
+	group_CARD[0] = group_CARD[1] = 1;
 	group_area[0] = rect_area[seed[0]];
 	group_area[1] = rect_area[seed[1]];
-	//
-	// Split remaining rectangles between two groups.
-	// The one chosen is the one with the greatest difference in area
-	// expansion depending on which group - the rect most strongly
-	// attracted to one group and repelled from the other.
-	//
-	while (group_card[0] + group_card[1] < card + 1
-	       && group_card[0] < card + 1 - min_fill
-	       && group_card[1] < card + 1 - min_fill)
+	/*
+	 * Split remaining rectangles between two groups.
+	 * The one chosen is the one with the greatest difference in area
+	 * expansion depending on which group - the rect most strongly
+	 * attracted to one group and repelled from the other.
+	 */
+	while (group_CARD[0] + group_CARD[1] < CARD + 1
+	       && group_CARD[0] < CARD + 1 - MIN_FILL
+	       && group_CARD[1] < CARD + 1 - MIN_FILL)
 	{
 		int better_group = -1, chosen = -1;
 		area_t biggest_diff = -1;
-		for (i = 0; i < card; i++) {
+		for (i = 0; i < CARD; i++) {
 			if (!taken[i]) {
 				area_t diff = (area(group[0] + b[i].r) - group_area[0])
 					- (area(group[1] + b[i].r) - group_area[1]);
@@ -459,33 +464,33 @@ R_page* R_page::split_page(R_tree* tree, branch const& br)
 			}
 		}
 		assert(chosen >= 0);
-		group_card[better_group] += 1;
+		group_CARD[better_group] += 1;
 		group[better_group] += b[chosen].r;
 		group_area[better_group] = area(group[better_group]);
 		taken[chosen] = better_group+1;
 		if (better_group == 0) {
-			p->b[group_card[0]-1] = b[chosen];
+			p->b[group_CARD[0]-1] = b[chosen];
 		}
 	}
-	//
-	// If one group gets too full, then remaining rectangle are
-	// split between two groups in such way to balance cards of two groups.
-	//
-	if (group_card[0] + group_card[1] < card + 1) {
-		for (i = 0; i < card; i++) {
+	/*
+	 * If one group gets too full, then remaining rectangle are
+	 * split between two groups in such way to balance CARDs of two groups.
+	 */
+	if (group_CARD[0] + group_CARD[1] < CARD + 1) {
+		for (i = 0; i < CARD; i++) {
 			if (!taken[i]) {
-				if (group_card[0] >= group_card[1]) {
+				if (group_CARD[0] >= group_CARD[1]) {
 					taken[i] = 2;
-					group_card[1] += 1;
+					group_CARD[1] += 1;
 				} else {
 					taken[i] = 1;
-					p->b[group_card[0]++] = b[i];
+					p->b[group_CARD[0]++] = b[i];
 				}
 			}
 		}
 	}
-	p->n = group_card[0];
-	n = group_card[1];
+	p->n = group_CARD[0];
+	n = group_CARD[1];
 	for (i = 0, j = 0; i < n; j++) {
 		if (taken[j] == 2) {
 			b[i++] = b[j];
@@ -504,7 +509,7 @@ R_page* R_page::insert(R_tree* tree, rectangle_t const& r, record_t obj, int lev
 {
 	branch br;
 	if (--level != 0) {
-		// not leaf page
+		/* not leaf page */
 		int i, mini = 0;
 		area_t min_incr = AREA_MAX;
 		area_t best_area = AREA_MAX;
@@ -523,11 +528,11 @@ R_page* R_page::insert(R_tree* tree, rectangle_t const& r, record_t obj, int lev
 		R_page* p = b[mini].p;
 		R_page* q = p->insert(tree, r, obj, level);
 		if (q == NULL) {
-			// child was not split
+			/* child was not split */
 			b[mini].r += r;
 			return NULL;
 		} else {
-			// child was split
+			/* child was split */
 			b[mini].r = p->cover();
 			br.p = q;
 			br.r = q->cover();
@@ -548,11 +553,11 @@ bool R_page::remove(R_tree* tree, rectangle_t const& r, record_t rec,
 			if (b[i].r & r) {
 				R_page* p = b[i].p;
 				if (p->remove(tree, r, rec, level, rlist)) {
-					if (p->n >= min_fill) {
+					if (p->n >= MIN_FILL) {
 						b[i].r = p->cover();
 					} else {
-						// not enough entries in child
-						p->b[card-1].p = rlist.chain;
+						/* not enough entries in child */
+						p->b[CARD-1].p = rlist.chain;
 						rlist.chain = p;
 						rlist.level = level - 1;
 						remove_branch(i);
@@ -579,7 +584,7 @@ void R_page::purge(R_tree* tree, int level)
 			b[i].p->purge(tree, level);
 		}
 	}
-	tree->page_allocator->free(this);
+	tree->page_free(this);
 }
 
 

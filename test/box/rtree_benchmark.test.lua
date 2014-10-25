@@ -1,9 +1,9 @@
 s = box.schema.create_space('rtreebench')
 s:create_index('primary')
-s:create_index('spatial', { type = 'rtree', parts = {2, 'num', 3, 'num'}})
+s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
 
-n_records = 1000000
-n_iterations = 100000
+n_records = 100000
+n_iterations = 10000
 n_neighbors = 10
 
 file = io.open("rtree_benchmark.res", "w")
@@ -11,7 +11,7 @@ start = os.clock()
 
 --# setopt delimiter ';'
 for i = 1, n_records do
-   s:insert{i,180*math.random(),180*math.random()}
+   s:insert{i,{180*math.random(),180*math.random()}}
 end;
 
 file:write(string.format("Elapsed time for inserting %d records: %d\n", n_records, os.clock() - start));

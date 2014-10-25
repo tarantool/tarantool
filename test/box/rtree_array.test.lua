@@ -1,6 +1,6 @@
 s = box.schema.create_space('spatial')
 s:create_index('primary')
-s:create_index('spatial', { type = 'rtree', parts = {2, 'arr'}})
+s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
 
 s:insert{1,{0.0,0.0}}
 s:insert{2,{0.0,10.0}}

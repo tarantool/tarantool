@@ -12,93 +12,91 @@ s:create_index('primary')
   name: primary
   type: TREE
 ...
-s:create_index('spatial', { type = 'rtree', parts = {2, 'num', 3, 'num'}})
+s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
 ---
 - unique: true
   parts:
-  - type: NUM
+  - type: BOX
     fieldno: 2
-  - type: NUM
-    fieldno: 3
   id: 1
   space_id: 512
   name: spatial
   type: RTREE
 ...
-s:insert{1,0,0}
+s:insert{1,{0,0}}
 ---
-- [1, 0, 0]
+- [1, [0, 0]]
 ...
-s:insert{2,0,10}
+s:insert{2,{0,10}}
 ---
-- [2, 0, 10]
+- [2, [0, 10]]
 ...
-s:insert{3,0,50}
+s:insert{3,{0,50}}
 ---
-- [3, 0, 50]
+- [3, [0, 50]]
 ...
-s:insert{4,10,0}
+s:insert{4,{10,0}}
 ---
-- [4, 10, 0]
+- [4, [10, 0]]
 ...
-s:insert{5,50,0}
+s:insert{5,{50,0}}
 ---
-- [5, 50, 0]
+- [5, [50, 0]]
 ...
-s:insert{6,10,10}
+s:insert{6,{10,10}}
 ---
-- [6, 10, 10]
+- [6, [10, 10]]
 ...
-s:insert{7,10,50}
+s:insert{7,{10,50}}
 ---
-- [7, 10, 50]
+- [7, [10, 50]]
 ...
-s:insert{8,50,10}
+s:insert{8,{50,10}}
 ---
-- [8, 50, 10]
+- [8, [50, 10]]
 ...
-s:insert{9,50,50}
+s:insert{9,{50,50}}
 ---
-- [9, 50, 50]
+- [9, [50, 50]]
 ...
 -- select all records
 s.index.spatial:select({iterator = 'ALL'})
 ---
-- - [1, 0, 0]
-  - [2, 0, 10]
-  - [3, 0, 50]
-  - [4, 10, 0]
-  - [5, 50, 0]
-  - [6, 10, 10]
-  - [7, 10, 50]
-  - [8, 50, 10]
-  - [9, 50, 50]
+- - [1, [0, 0]]
+  - [2, [0, 10]]
+  - [3, [0, 50]]
+  - [4, [10, 0]]
+  - [5, [50, 0]]
+  - [6, [10, 10]]
+  - [7, [10, 50]]
+  - [8, [50, 10]]
+  - [9, [50, 50]]
 ...
 -- select records belonging to rectangle (0,0,10,10)
 s.index.spatial:select({0,0,10,10}, {iterator = 'LE'})
 ---
-- - [1, 0, 0]
-  - [2, 0, 10]
-  - [4, 10, 0]
-  - [6, 10, 10]
+- - [1, [0, 0]]
+  - [2, [0, 10]]
+  - [4, [10, 0]]
+  - [6, [10, 10]]
 ...
 -- select records with coodinates (10,10)
 s.index.spatial:select({10,10}, {iterator = 'EQ'})
 ---
-- - [6, 10, 10]
+- - [6, [10, 10]]
 ...
 -- select neigbors of point (5,5)
 s.index.spatial:select({5,5}, {iterator = 'NEIGHBOR'})
 ---
-- - [6, 10, 10]
-  - [4, 10, 0]
-  - [2, 0, 10]
-  - [1, 0, 0]
-  - [8, 50, 10]
-  - [7, 10, 50]
-  - [5, 50, 0]
-  - [3, 0, 50]
-  - [9, 50, 50]
+- - [6, [10, 10]]
+  - [4, [10, 0]]
+  - [2, [0, 10]]
+  - [1, [0, 0]]
+  - [8, [50, 10]]
+  - [7, [10, 50]]
+  - [5, [50, 0]]
+  - [3, [0, 50]]
+  - [9, [50, 50]]
 ...
 s:drop()
 ---

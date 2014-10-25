@@ -34,12 +34,20 @@
 #include "fiber.h"
 #include "small/small.h"
 
+/** For all memory used by all rtree indexes. */
+static struct mempool rtree_page_pool;
+/** Number of allocated pages. */
+static int rtree_page_pool_initialized = 0;
+
 /* {{{ Utilities. *************************************************/
 
 inline void extract_rectangle(rectangle_t& r, struct tuple const* tuple, struct key_def* kd)
 {
-        switch (kd->part_count) {
-	case 1: // vector
+	const char* elems = tuple_field(tuple, kd->parts[0].fieldno);
+	uint32_t size = mp_decode_array(&elems);
+        assert (kd->part_count == 1);
+	switch (size) {
+	case 1: // array
 	{
 		const char* elems = tuple_field(tuple, kd->parts[0].fieldno);
 		uint32_t size = mp_decode_array(&elems);
@@ -55,23 +63,26 @@ inline void extract_rectangle(rectangle_t& r, struct tuple const* tuple, struct 
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree field should be array with size 2 point) or 4 (rectangle)");
+				  "R-Tree index", "Field should be array with "
+				  "size 2 (point) or 4 (rectangle)");
 
 		}
 		break;
 	}
-        case 2: // point
-                r.boundary[0] = r.boundary[2] = tuple_field_num(tuple, kd->parts[0].fieldno);
-                r.boundary[1] = r.boundary[3] = tuple_field_num(tuple, kd->parts[1].fieldno);
-                break;
-        case 4: // rectangle
-                for (int i = 0; i < 4; i++) {
-                        r.boundary[i] = tuple_field_num(tuple, kd->parts[i].fieldno);
-                }
-                break;
-        default:
-                assert(false);
-        }
+	case 2: // point
+		r.boundary[0] = r.boundary[2] = mp_decode_num(&elems, 0);
+		r.boundary[1] = r.boundary[3] = mp_decode_num(&elems, 1);
+		break;
+	case 4:
+		for (int i = 0; i < 4; i++) {
+			r.boundary[i] = mp_decode_num(&elems, i);
+		}
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "R-Tree index", "Key should contain 2 (point) or 4 (rectangle) coordinates");
+
+	}
 }
 /* {{{ TreeIndex Iterators ****************************************/
 
@@ -96,54 +107,18 @@ rtree_iterator_next(struct iterator *i)
 
 /* {{{ TreeIndex  **********************************************************/
 
-class MemPoolAllocatorFactory : public FixedSizeAllocator::Factory
+static void *
+rtree_page_alloc()
 {
-	class Allocator : public FixedSizeAllocator
-	{
-	private:
-		struct mempool pool;
-		size_t size;
-	public:
-		Allocator(size_t obj_size)
-		{
-			size = obj_size;
-			mempool_create(&pool, &cord()->slabc, obj_size);
-		}
+	ERROR_INJECT(ERRINJ_INDEX_ALLOC, return 0);
+	return mempool_alloc(&rtree_page_pool);
+}
 
-		virtual void* alloc()
-		{
-			return mempool_alloc(&pool);
-		}
-
-		virtual void free(void* ptr)
-		{
-			mempool_free(&pool, ptr);
-		}
-
-		virtual size_t used_size()
-		{
-			return mempool_used(&pool);
-		}
-
-		virtual ~Allocator()
-		{
-			mempool_destroy(&pool);
-		}
-	};
-public:
-	virtual FixedSizeAllocator* create(size_t obj_size)
-	{
-		return new Allocator(obj_size);
-	}
-
-	virtual void destroy(FixedSizeAllocator* allocator)
-	{
-		delete allocator;
-	}
-};
-
-static MemPoolAllocatorFactory rtree_allocator_factory;
-
+static void
+rtree_page_free(void *page)
+{
+	return mempool_free(&rtree_page_pool, page);
+}
 RTreeIndex::~RTreeIndex()
 {
 	// Iterator has to be destroye prior to tree
@@ -154,24 +129,16 @@ RTreeIndex::~RTreeIndex()
 }
 
 RTreeIndex::RTreeIndex(struct key_def *key_def)
-: Index(key_def), tree(&rtree_allocator_factory)
+  : Index(key_def), tree(rtree_page_alloc, rtree_page_free)
 {
-        if (key_def->part_count != 1 && key_def->part_count != 2 && key_def->part_count != 4) {
+	if (rtree_page_pool_initialized == 0) {
+		mempool_create(&rtree_page_pool, &cord()->slabc,
+			       RTREE_PAGE_SIZE);
+		rtree_page_pool_initialized = 1;
+	}
+        if (key_def->part_count != 1 || key_def->parts[0].type != BOX) {
                 tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "R-Tree index can be defied only for points (two parts) or rectangles (four parts)");
-        }
-	if (key_def->part_count == 1) {
-		if (key_def->parts[0].type != ARR) {
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree index can be defied only for arrays, points and rectangles");
-		}
-	} else {
-		for (int i = 0; i < key_def->part_count; i++) {
-			if (key_def->parts[i].type != NUM) {
-				tnt_raise(ClientError, ER_UNSUPPORTED,
-					  "R-Tree index can be defied only for numeric fields");
-			}
-		}
+                          "R-Tree index", "Key should have BOX type");
         }
 }
 
@@ -208,23 +175,25 @@ RTreeIndex::findByKey(const char *key, uint32_t part_count) const
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree key should be array of 2 (point ) or 4 (rectangle) numeric coordinates");
+				  "R-Tree key", "Key should be array of 2 (point) "
+				  "or 4 (rectangle) numeric coordinates");
 		}
 		break;
 	}
-        case 2:
-                r.boundary[0] = r.boundary[2] = mp_decode_num(&key, 0);
-                r.boundary[1] = r.boundary[3] = mp_decode_num(&key, 1);
-                break;
-        case 4:
-                for (int i = 0; i < 4; i++) {
-                        r.boundary[i] = mp_decode_num(&key, i);
-                }
-                break;
-        default:
-                tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "R-Tree key should be point (two numeric coordinates) or rectangle (four numeric coordinates)");
-        }
+	case 2:
+		r.boundary[0] = r.boundary[2] = mp_decode_num(&key, 0);
+		r.boundary[1] = r.boundary[3] = mp_decode_num(&key, 1);
+		break;
+	case 4:
+		for (int i = 0; i < 4; i++) {
+			r.boundary[i] = mp_decode_num(&key, i);
+		}
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "R-Tree key", "Key should contain 2 (point) "
+			  "or 4 (rectangle) numeric coordinates");
+	}
         if (tree.search(r, SOP_OVERLAPS, iterator)) {
                 return (struct tuple*)iterator.next();
         }
@@ -273,7 +242,7 @@ RTreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
         case 0:
                 if (type != ITER_ALL) {
                         tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "It is possible to omit key only for ITER_ALL");
+				  "R-Tree index", "It is possible to omit key only for ITER_ALL");
                 }
                 break;
 	case 1:
@@ -291,23 +260,25 @@ RTreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
 			break;
 		default:
 			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree key should be array of 2 (point ) or 4 (rectangle) numeric coordinates");
+				  "R-Tree index", "Key should be array of 2 (point) "
+				  "or 4 (rectangle) numeric coordinates");
 		}
 		break;
 	}
-        case 2:
-                r.boundary[0] = r.boundary[2] = mp_decode_num(&key, 0);
-                r.boundary[1] = r.boundary[3] = mp_decode_num(&key, 1);
-                break;
-        case 4:
-                for (int i = 0; i < 4; i++) {
-                        r.boundary[i] = mp_decode_num(&key, i);
-                }
-                break;
-        default:
-                tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "R-Tree key should be point (two numeric coordinates) or rectangle (four numeric coordinates)");
-        }
+	case 2:
+		r.boundary[0] = r.boundary[2] = mp_decode_num(&key, 0);
+		r.boundary[1] = r.boundary[3] = mp_decode_num(&key, 1);
+		break;
+	case 4:
+		for (int i = 0; i < 4; i++) {
+			r.boundary[i] = mp_decode_num(&key, i);
+		}
+		break;
+	default:
+		tnt_raise(ClientError, ER_UNSUPPORTED,
+			  "R-Tree index", "Key contain 2 (point) "
+			  "or 4 (rectangle) numeric coordinates");
+	}
         Spatial_search_op op;
         switch (type) {
         case ITER_ALL:
@@ -336,7 +307,7 @@ RTreeIndex::initIterator(struct iterator *iterator, enum iterator_type type,
                 break;
         default:
                 tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "Unsupported search operation %d for R-Tree", type);
+                          "R-Tree index", "Unsupported search operation for R-Tree");
         }
         tree.search(r, op, it->impl);
 }

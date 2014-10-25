@@ -142,22 +142,9 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 		/* TREE index has no limitations. */
 		break;
 	case RTREE:
-		if (key_def->part_count != 1 && key_def->part_count != 2 && key_def->part_count != 4) {
+		if (key_def->part_count != 1 || key_def->parts[0].type != BOX) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
-				  "R-Tree index can be defied only for points (two parts) or rectangles (four parts)");
-		}
-		if (key_def->part_count == 1) {
-			if (key_def->parts[0].type != ARR) {
-				tnt_raise(ClientError, ER_MODIFY_INDEX,
-					  "R-Tree index can be defied only for points, rectangles and arrays");
-			}
-		} else {
-			for (int i = 0; i < key_def->part_count; i++) {
-				if (key_def->parts[i].type != NUM) {
-					tnt_raise(ClientError, ER_MODIFY_INDEX,
-						  "R-Tree index can be defied only for numeric fields");
-				}
-			}
+				  "R-Tree index can be defied only for BOX type");
 		}
 		break;
 	case BITSET:
