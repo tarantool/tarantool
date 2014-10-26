@@ -24,9 +24,11 @@ public:
 		reinsert_list() { chain = NULL; }
 	};
 
-	R_page* insert(R_tree* tree, rectangle_t const& r, record_t obj, int level);
+	R_page* insert(R_tree* tree, rectangle_t const& r,
+		       record_t obj, int level);
 
-	bool remove(R_tree* tree, rectangle_t const& r, record_t obj, int level, reinsert_list& rlist);
+	bool remove(R_tree* tree, rectangle_t const& r, record_t obj,
+		    int level, reinsert_list& rlist);
 
 	rectangle_t cover() const;
 
@@ -91,39 +93,39 @@ void R_tree::insert(rectangle_t const& r, record_t obj)
 
 bool R_tree::remove(rectangle_t const& r, record_t obj)
 {
-	if (height != 0) {
-		R_page::reinsert_list rlist;
-		if (root->remove(this, r, obj, height, rlist)) {
-			R_page* pg = rlist.chain;
-			int level = rlist.level;
-			while (pg != NULL) {
-				for (int i = 0, n = pg->n; i < n; i++) {
-					R_page* p = root->insert(this, pg->b[i].r,
-								 pg->b[i].p, height-level);
-					if (p != NULL) {
-						/* root splitted */
-						root = new (page_alloc()) R_page(root, p);
-						height += 1;
-						n_pages += 1;
-					}
+	R_page::reinsert_list rlist;
+	if (height != 0 && root->remove(this, r, obj, height, rlist)) {
+		R_page* pg = rlist.chain;
+		int level = rlist.level;
+		while (pg != NULL) {
+			for (int i = 0, n = pg->n; i < n; i++) {
+				R_page* p = root->insert(this,
+							 pg->b[i].r,
+							 pg->b[i].p,
+							 height-level);
+				if (p != NULL) {
+					/* root splitted */
+					root = new (page_alloc()) R_page(root, p);
+					height += 1;
+					n_pages += 1;
 				}
-				level -= 1;
-				R_page* next = pg->next_reinsert_page();
-				page_free(pg);
-				n_pages -= 1;
-				pg = next;
 			}
-			if (root->n == 1 && height > 1) {
-				R_page* new_root = root->b[0].p;
-				page_free(root);
-				root = new_root;
-				height -= 1;
-				n_pages -= 1;
-			}
-			n_records -= 1;
-			update_count += 1;
-			return true;
+			level -= 1;
+			R_page* next = pg->next_reinsert_page();
+			page_free(pg);
+			n_pages -= 1;
+			pg = next;
 		}
+		if (root->n == 1 && height > 1) {
+			R_page* new_root = root->b[0].p;
+			page_free(root);
+			root = new_root;
+			height -= 1;
+			n_pages -= 1;
+		}
+		n_records -= 1;
+		update_count += 1;
+		return true;
 	}
 	return false;
 }
@@ -140,7 +142,9 @@ bool R_tree_iterator::goto_first(int sp, R_page* pg)
 		}
 	} else {
 		for (int i = 0, n = pg->n; i < n; i++) {
-			if ((r.*intr_cmp)(pg->b[i].r) && goto_first(sp+1, pg->b[i].p)) {
+			if ((r.*intr_cmp)(pg->b[i].r)
+			    && goto_first(sp+1, pg->b[i].p))
+			{
 				stack[sp].page = pg;
 				stack[sp].pos = i;
 				return true;
@@ -163,7 +167,9 @@ bool R_tree_iterator::goto_next(int sp)
 		}
 	} else {
 		for (int i = stack[sp].pos, n = pg->n; ++i < n;) {
-			if ((r.*intr_cmp)(pg->b[i].r) && goto_first(sp+1, pg->b[i].p)) {
+			if ((r.*intr_cmp)(pg->b[i].r)
+			    && goto_first(sp+1, pg->b[i].p))
+			{
 				stack[sp].page = pg;
 				stack[sp].pos = i;
 				return true;
@@ -178,16 +184,19 @@ R_tree_iterator::R_tree_iterator()
 	list = NULL;
 	free = NULL;
 	tree = NULL;
+	page_list = NULL;
+	page_pos = N_ELEMS;
 }
 
 R_tree_iterator::~R_tree_iterator()
 {
-	Neighbor *curr, *next;
-	reset();
-	for (curr = free; curr != NULL; curr = next) {
+	Neighbor_page *curr, *next;
+	for (curr = page_list; curr != NULL; curr = next) {
 		next = curr->next;
-		delete curr;
+		tree->page_free(curr);
 	}
+	page_list = NULL;
+	page_pos = N_ELEMS;
 }
 
 void R_tree_iterator::reset()
@@ -203,10 +212,22 @@ void R_tree_iterator::reset()
 }
 
 
-bool R_tree_iterator::init(R_tree const* tree, rectangle_t const& r, Spatial_search_op op)
+R_tree_iterator::Neighbor* R_tree_iterator::allocate_neighbour()
+{
+	if (page_pos >= N_ELEMS) {
+		Neighbor_page* new_page = (Neighbor_page*)tree->page_alloc();
+		new_page->next = page_list;
+		page_list = new_page;
+		page_pos = 0;
+	}
+	return &page_list->buf[page_pos++];
+}
+
+bool R_tree_iterator::init(R_tree const* tree, rectangle_t const& r,
+			   Spatial_search_op op)
 {
 	reset();
-	this->tree = tree;
+	this->tree = (R_tree*)tree;
 	this->update_count = tree->update_count;
 	this->r = r;
 	this->op = op;
@@ -248,7 +269,8 @@ bool R_tree_iterator::init(R_tree const* tree, rectangle_t const& r, Spatial_sea
 		}
 	}
 	if (tree->root && goto_first(0, tree->root)) {
-		stack[tree->height-1].pos -= 1; /* will be incremented by goto_next */
+		stack[tree->height-1].pos -= 1;
+		/* will be incremented by goto_next */
 		eof = false;
 		return true;
 	} else {
@@ -273,11 +295,13 @@ void R_tree_iterator::insert(Neighbor* node)
 	}
 }
 
-R_tree_iterator::Neighbor* R_tree_iterator::new_neighbor(void* child, area_t distance, int level)
+R_tree_iterator::Neighbor* R_tree_iterator::new_neighbor(void* child,
+							 area_t distance,
+							 int level)
 {
 	Neighbor* n = free;
 	if (n == NULL) {
-		n = new Neighbor();
+		n = allocate_neighbour();
 	} else {
 		free = n->next;
 	}
@@ -301,17 +325,19 @@ record_t R_tree_iterator::next()
 		return NULL;
 	}
 	if (op == SOP_NEIGHBOR) {
-		/* To return element in order of increasing distance from specified point,
-		 * we build sorted list of R-Tree items
-		 * (ordered by distance from specified point) starting from root page.
+		/* To return element in order of increasing distance from
+		 * specified point, we build sorted list of R-Tree items
+		 * (ordered by distance from specified point) starting from
+		 * root page.
 		 * Algorithm is the following:
 		 *
 		 * insert root R-Tree page in the sorted list
 		 * while sorted list is not empty:
 		 *      get top element from the sorted list
-		 *      if it is tree leaf (record) then return it as current element
-		 *      otherwise (R-Tree page) get siblings of this R-Tree page and
-		 *      insert them in sorted list
+		 *      if it is tree leaf (record) then return it as
+		 *      current element
+		 *      otherwise (R-Tree page)  get siblings of this R-Tree
+		 *      page and insert them in sorted list
 		 */
 		while (true) {
 			Neighbor* neighbor = list;

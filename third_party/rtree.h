@@ -159,15 +159,29 @@ class R_tree_iterator
 		area_t    distance;
 	};
 
+	enum {
+		N_ELEMS = (RTREE_PAGE_SIZE-sizeof(Neighbor*))/ sizeof(Neighbor)
+	};
+
+	struct Neighbor_page {
+		Neighbor_page* next;
+		Neighbor buf[N_ELEMS];
+	};
+
+	Neighbor* allocate_neighbour();
+
+
 	typedef bool (rectangle_t::*comparator_t)(rectangle_t const& r) const;
 
 	rectangle_t r;
 	Spatial_search_op op;
-	R_tree const* tree;
+	R_tree* tree;
 	Neighbor* list;
 	Neighbor* free;
 	bool eof;
 	int update_count;
+	Neighbor_page* page_list;
+	int page_pos;
 
 	comparator_t intr_cmp;
 	comparator_t leaf_cmp;
@@ -194,6 +208,7 @@ class R_tree
 
 	typedef void* (*page_alloc_t)();
 	typedef void (*page_free_t)(void*);
+
 public:
 	size_t used_size() const {
 		return n_pages * RTREE_PAGE_SIZE;
