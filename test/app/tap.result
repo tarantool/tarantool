@@ -1,5 +1,5 @@
 TAP version 13
-1..31
+1..32
 ok - true
 ok - extra information is not printed on success
 not ok - extra printed using yaml only on failure
@@ -118,7 +118,7 @@ not ok - failed subtests
   planned: 1
   failed: 1
   ...
-    # isdeeply
+    # is_deeply
     1..6
     ok - 1 and 1
     ok - abc and abc
@@ -136,10 +136,16 @@ not ok - failed subtests
       expected: 5
       got: 4
       ...
-    # isdeeply: end
+    # is_deeply: end
 not ok - failed subtests
   ---
   planned: 6
   failed: 2
   ...
+    # like
+    1..2
+    ok - like(abcde, cd)
+    ok - unlike(abcde, acd)
+    # like: end
+ok - like
 # failed subtest: 15
