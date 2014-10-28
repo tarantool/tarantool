@@ -214,13 +214,13 @@ AlterSpaceOp::destroy(AlterSpaceOp *op)
  * A trigger installed on transaction commit/rollback events of
  * the transaction which initiated the alter.
  */
-struct trigger *
-txn_alter_trigger_new(trigger_f run, struct alter_space *alter)
+static struct trigger *
+txn_alter_trigger_new(trigger_f run, void *data)
 {
 	struct trigger *trigger = (struct trigger *)
 		region_alloc0(&fiber()->gc, sizeof(*trigger));
 	trigger->run = run;
-	trigger->data = alter;
+	trigger->data = data;
 	trigger->destroy = NULL;
 	return trigger;
 }
@@ -438,7 +438,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter,
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the space engine is not the same yet, the
 	 * triggers are not set.
-         */
+	 */
 	alter->new_space = space_new(&alter->space_def, &alter->key_list);
 	/*
 	 * Copy the engine, the new space is at the same recovery
@@ -659,15 +659,6 @@ ModifyIndex::~ModifyIndex()
  *
  * The trigger is removed when alter operation commits/rolls back.
  */
-struct trigger *
-add2index_trigger_new(trigger_f run, Index *new_index)
-{
-	struct trigger *trigger = (struct trigger *)
-		region_alloc0(&fiber()->gc, sizeof(*trigger));
-	trigger->run = run;
-	trigger->data = new_index;
-	return trigger;
-}
 
 /** AddIndex - add a new index to the space. */
 class AddIndex: public AlterSpaceOp {
@@ -761,7 +752,7 @@ on_replace_in_old_space(struct trigger *trigger, void *event)
 	 * creating the trigger may fail.
 	 */
 	struct trigger *on_rollback =
-		add2index_trigger_new(on_rollback_in_old_space, new_index);
+		txn_alter_trigger_new(on_rollback_in_old_space, new_index);
 	/*
 	 * In a multi-statement transaction the same space
 	 * may be modified many times, but we need only one
@@ -877,7 +868,7 @@ AddIndex::alter(struct alter_space *alter)
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
 		(void) old_tuple;
 	}
-	on_replace = add2index_trigger_new(on_replace_in_old_space,
+	on_replace = txn_alter_trigger_new(on_replace_in_old_space,
 					   new_index);
 	trigger_add(&alter->old_space->on_replace, on_replace);
 }
@@ -911,9 +902,6 @@ on_drop_space(struct trigger * /* trigger */, void *event)
 	struct space *space = space_cache_delete(id);
 	space_delete(space);
 }
-
-static struct trigger drop_space_trigger =
-	{ rlist_nil, on_drop_space, NULL, NULL };
 
 /**
  * A trigger which is invoked on replace in a data dictionary
@@ -1007,7 +995,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * so it's safe to simply drop the space on
 		 * rollback.
 		 */
-		trigger_add(&txn->on_rollback, &drop_space_trigger);
+		struct trigger *on_rollback =
+				txn_alter_trigger_new(on_drop_space, NULL);
+		trigger_add(&txn->on_rollback, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_space->def.uid);
 		/* Verify that the space is empty (has no indexes) */
@@ -1026,7 +1016,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * dd_space_delete() can't fail, any such
 		 * failure would have to abort the server.
 		 */
-		trigger_add(&txn->on_commit, &drop_space_trigger);
+		struct trigger *on_commit =
+				txn_alter_trigger_new(on_drop_space, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
 		/*
@@ -1255,9 +1247,6 @@ user_cache_remove_user(struct trigger * /* trigger */, void *event)
 	user_cache_delete(uid);
 }
 
-static struct trigger drop_user_trigger =
-	{ rlist_nil, user_cache_remove_user, NULL, NULL };
-
 static void
 user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
@@ -1267,9 +1256,6 @@ user_cache_alter_user(struct trigger * /* trigger */, void *event)
 	user_create_from_tuple(&user, stmt->new_tuple);
 	user_cache_replace(&user);
 }
-
-static struct trigger modify_user_trigger =
-	{ rlist_nil, user_cache_alter_user, NULL, NULL };
 
 /**
  * A trigger invoked on replace in the user table.
@@ -1290,7 +1276,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		struct user user;
 		user_create_from_tuple(&user, new_tuple);
 		(void) user_cache_replace(&user);
-		trigger_add(&txn->on_rollback, &drop_user_trigger);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(user_cache_remove_user, NULL);
+		trigger_add(&txn->on_rollback, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_user->owner);
 		/* Can't drop guest or super user */
@@ -1307,7 +1295,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->name, "the user has objects");
 		}
-		trigger_add(&txn->on_commit, &drop_user_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(user_cache_remove_user, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	} else { /* UPDATE, REPLACE */
 		assert(old_user != NULL && new_tuple != NULL);
 		/*
@@ -1317,7 +1307,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 */
 		struct user user;
 		user_create_from_tuple(&user, new_tuple);
-		trigger_add(&txn->on_commit, &modify_user_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(user_cache_alter_user, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	}
 }
 
@@ -1353,9 +1345,6 @@ func_cache_remove_func(struct trigger * /* trigger */, void *event)
 	func_cache_delete(fid);
 }
 
-static struct trigger drop_func_trigger =
-	{ rlist_nil, func_cache_remove_func, NULL, NULL };
-
 /** Replace a function in the function cache */
 static void
 func_cache_replace_func(struct trigger * /* trigger */, void *event)
@@ -1365,9 +1354,6 @@ func_cache_replace_func(struct trigger * /* trigger */, void *event)
 	func_def_create_from_tuple(&func, stmt->new_tuple);
 	func_cache_replace(&func);
 }
-
-static struct trigger modify_func_trigger =
-	{ rlist_nil, func_cache_replace_func, NULL, NULL };
 
 /**
  * A trigger invoked on replace in a space containing
@@ -1389,7 +1375,9 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 	if (new_tuple != NULL && old_func == NULL) { /* INSERT */
 		func_def_create_from_tuple(&func, new_tuple);
 		func_cache_replace(&func);
-		trigger_add(&txn->on_rollback, &drop_func_trigger);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(func_cache_remove_func, NULL);
+		trigger_add(&txn->on_rollback, on_rollback);
 	} else if (new_tuple == NULL) {         /* DELETE */
 		func_def_create_from_tuple(&func, old_tuple);
 		/*
@@ -1403,11 +1391,15 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  (unsigned) func.uid,
 				  "function has grants");
 		}
-		trigger_add(&txn->on_commit, &drop_func_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(func_cache_remove_func, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	} else {                                /* UPDATE, REPLACE */
 		func_def_create_from_tuple(&func, new_tuple);
 		access_check_ddl(func.uid);
-		trigger_add(&txn->on_commit, &modify_func_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(func_cache_replace_func, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	}
 }
 
@@ -1533,9 +1525,6 @@ revoke_priv(struct trigger * /* trigger */, void *event)
 	grant_or_revoke(&priv);
 }
 
-static struct trigger revoke_priv_trigger =
-	{ rlist_nil, revoke_priv, NULL, NULL };
-
 /** A trigger called on rollback of grant, or on commit of revoke. */
 static void
 modify_priv(struct trigger * /* trigger */, void *event)
@@ -1545,9 +1534,6 @@ modify_priv(struct trigger * /* trigger */, void *event)
 	priv_def_create_from_tuple(&priv, stmt->new_tuple);
 	grant_or_revoke(&priv);
 }
-
-static struct trigger modify_priv_trigger =
-	{ rlist_nil, modify_priv, NULL, NULL };
 
 /**
  * A trigger invoked on replace in the space containing
@@ -1566,16 +1552,22 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 		priv_def_create_from_tuple(&priv, new_tuple);
 		priv_def_check(&priv);
 		grant_or_revoke(&priv);
-		trigger_add(&txn->on_rollback, &revoke_priv_trigger);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(revoke_priv, NULL);
+		trigger_add(&txn->on_rollback, on_rollback);
 	} else if (new_tuple == NULL) {                /* revoke */
 		assert(old_tuple);
 		priv_def_create_from_tuple(&priv, old_tuple);
 		access_check_ddl(priv.grantor_id);
-		trigger_add(&txn->on_commit, &revoke_priv_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(revoke_priv, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	} else {                                       /* modify */
 		priv_def_create_from_tuple(&priv, new_tuple);
 		priv_def_check(&priv);
-		trigger_add(&txn->on_commit, &modify_priv_trigger);
+		struct trigger *on_commit =
+			txn_alter_trigger_new(modify_priv, NULL);
+		trigger_add(&txn->on_commit, on_commit);
 	}
 }
 
@@ -1655,9 +1647,6 @@ on_commit_dd_cluster(struct trigger *trigger, void *event)
 	cluster_set_server(&uuid, id);
 }
 
-static struct trigger commit_cluster_trigger =
-	{ rlist_nil, on_commit_dd_cluster, NULL, NULL };
-
 /**
  * A trigger invoked on replace in the space _cluster,
  * which contains cluster configuration.
@@ -1684,22 +1673,21 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 	txn_check_autocommit(txn, "Space _cluster");
 	struct txn_stmt *stmt = txn_stmt(txn);
 	struct tuple *new_tuple = stmt->new_tuple;
-	if (new_tuple == NULL) {
-		trigger_add(&txn->on_commit, &commit_cluster_trigger);
-		return;
+	if (new_tuple != NULL) {
+		/* Check fields */
+		uint32_t server_id = tuple_field_u32(new_tuple, 0);
+		if (cserver_id_is_reserved(server_id))
+			tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
+				  (unsigned) server_id);
+		tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
+		if (tt_uuid_is_nil(&server_uuid))
+			tnt_raise(ClientError, ER_INVALID_UUID,
+				  tt_uuid_str(&server_uuid));
 	}
 
-	/* Check fields */
-	uint32_t server_id = tuple_field_u32(new_tuple, 0);
-	if (cserver_id_is_reserved(server_id))
-		tnt_raise(ClientError, ER_SERVER_ID_IS_RESERVED,
-			  (unsigned) server_id);
-	tt_uuid server_uuid = tuple_field_uuid(new_tuple, 1);
-	if (tt_uuid_is_nil(&server_uuid))
-		tnt_raise(ClientError, ER_INVALID_UUID,
-			  tt_uuid_str(&server_uuid));
-
-	trigger_add(&txn->on_commit, &commit_cluster_trigger);
+	struct trigger *on_commit =
+			txn_alter_trigger_new(on_commit_dd_cluster, NULL);
+	trigger_add(&txn->on_commit, on_commit);
 }
 
 /* }}} cluster configuration */
