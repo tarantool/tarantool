@@ -28,7 +28,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -38,28 +37,30 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-enum {
-	QUOTA_MAX_ALLOC = 0xFFFFFFFFull * 1024u,
-	QUOTA_GRANULARITY = 1024
-};
+#define QUOTA_UNIT_SIZE 1024ULL
+
+static const uint64_t QUOTA_MAX = QUOTA_UNIT_SIZE * UINT32_MAX;
 
 /** A basic limit on memory usage */
 struct quota {
-	/* high order dword is total available memory and low order dword
-	 * - currently used memory both in QUOTA_GRANULARITY units
+	/**
+	 * High order dword is the total available memory
+	 * and the low order dword is the  currently used amount.
+	 * Both values are represented in units of size
+	 * QUOTA_UNIT_SIZE.
 	 */
 	uint64_t value;
 };
 
 /**
- * Initialize quota with gived memory limit
+ * Initialize quota with a given memory limit
  */
 static inline void
 quota_init(struct quota *quota, size_t total)
 {
-	uint64_t new_total_in_granul = (total + (QUOTA_GRANULARITY - 1))
-				        / QUOTA_GRANULARITY;
-	quota->value = new_total_in_granul << 32;
+	uint64_t new_total = (total + (QUOTA_UNIT_SIZE - 1)) /
+				QUOTA_UNIT_SIZE;
+	quota->value = new_total << 32;
 }
 
 /**
@@ -74,108 +75,112 @@ quota_init(struct quota *quota, size_t total)
  * Get current quota limit
  */
 static inline size_t
-quota_get_total(const struct quota *quota)
+quota_get(const struct quota *quota)
 {
-	return (quota->value >> 32) * QUOTA_GRANULARITY;
+	return (quota->value >> 32) * QUOTA_UNIT_SIZE;
 }
 
 /**
  * Get current quota usage
  */
 static inline size_t
-quota_get_used(const struct quota *quota)
+quota_used(const struct quota *quota)
 {
-	return (quota->value & 0xFFFFFFFFu) * QUOTA_GRANULARITY;
+	return (quota->value & UINT32_MAX) * QUOTA_UNIT_SIZE;
 }
 
 static inline void
 quota_get_total_and_used(struct quota *quota, size_t *total, size_t *used)
 {
 	uint64_t value = quota->value;
-	*total = (value >> 32) * QUOTA_GRANULARITY;
-	*used = (value & 0xFFFFFFFFu) * QUOTA_GRANULARITY;
+	*total = (value >> 32) * QUOTA_UNIT_SIZE;
+	*used = (value & UINT32_MAX) * QUOTA_UNIT_SIZE;
 }
 
 /**
  * Set quota memory limit.
- * returns 0 on success
- * returns -1 on error - if it's not possible to decrease limit
- * due to greater current usage
+ * @retval > 0   aligned size set on success
+ * @retval -1    error, i.e. when  it is not possible to decrease
+ *               limit due to greater current usage
  */
-static inline int
+static inline ssize_t
 quota_set(struct quota *quota, size_t new_total)
 {
-	uint32_t new_total_in_granul = (new_total + (QUOTA_GRANULARITY - 1))
-				   / QUOTA_GRANULARITY;
+	assert(new_total <= QUOTA_MAX);
+	/* Align the new total */
+	uint32_t new_total_in_units = (new_total + (QUOTA_UNIT_SIZE - 1)) /
+					QUOTA_UNIT_SIZE;
 	while (1) {
-		uint64_t old_value = quota->value;
-		/* uint32_t cur_total = old_value >> 32; */
-		uint32_t cur_used = old_value & 0xFFFFFFFFu;
-		if (new_total_in_granul < cur_used)
+		uint64_t value = quota->value;
+		uint32_t used_in_units = value & UINT32_MAX;
+		if (new_total_in_units < used_in_units)
 			return  -1;
-		uint64_t new_value = (((uint64_t)new_total_in_granul) << 32)
-				     | cur_used;
-		if (atomic_cas(&quota->value, old_value, new_value) == old_value)
+		uint64_t new_value =
+			((uint64_t) new_total_in_units << 32) | used_in_units;
+		if (atomic_cas(&quota->value, value, new_value) == value)
 			break;
 	}
-	return 0;
+	return new_total_in_units * QUOTA_UNIT_SIZE;
 }
 
 /**
  * Use up a quota
- * returns 0 on success
- * returns -1 on error - if quota limit reached
+ * @retval > 0 aligned value on success
+ * @retval -1  on error - if quota limit reached
  */
-static inline int
+static inline ssize_t
 quota_use(struct quota *quota, size_t size)
 {
-	uint32_t size_in_granul = (size + (QUOTA_GRANULARITY - 1))
-				  / QUOTA_GRANULARITY;
-	assert(size_in_granul);
+	assert(size < QUOTA_MAX);
+	uint32_t size_in_units = (size + (QUOTA_UNIT_SIZE - 1))
+				  / QUOTA_UNIT_SIZE;
+	assert(size_in_units);
 	while (1) {
-		uint64_t old_value = quota->value;
-		uint32_t cur_total = old_value >> 32;
-		uint32_t old_used = old_value & 0xFFFFFFFFu;
+		uint64_t value = quota->value;
+		uint32_t total_in_units = value >> 32;
+		uint32_t used_in_units = value & UINT32_MAX;
 
-		uint32_t new_used = old_used + size_in_granul;
-		assert(new_used > old_used);
+		uint32_t new_used_in_units = used_in_units + size_in_units;
+		assert(new_used_in_units > used_in_units);
 
-		if (new_used > cur_total)
+		if (new_used_in_units > total_in_units)
 			return -1;
 
-		uint64_t new_value = (((uint64_t)cur_total) << 32)
-				     | new_used;
+		uint64_t new_value =
+			((uint64_t) total_in_units << 32) | new_used_in_units;
 
-		if (atomic_cas(&quota->value, old_value, new_value) == old_value)
+		if (atomic_cas(&quota->value, value, new_value) == value)
 			break;
 	}
-	return 0;
+	return size_in_units * QUOTA_UNIT_SIZE;
 }
 
 /** Release used memory */
 static inline void
 quota_release(struct quota *quota, size_t size)
 {
-	uint32_t size_in_granul = (size + (QUOTA_GRANULARITY - 1))
-				  / QUOTA_GRANULARITY;
-	assert(size_in_granul);
+	assert(size < QUOTA_MAX);
+	uint32_t size_in_units = (size + (QUOTA_UNIT_SIZE - 1))
+				  / QUOTA_UNIT_SIZE;
+	assert(size_in_units);
 	while (1) {
-		uint64_t old_value = quota->value;
-		uint32_t cur_total = old_value >> 32;
-		uint32_t old_used = old_value & 0xFFFFFFFFu;
+		uint64_t value = quota->value;
+		uint32_t total_in_units = value >> 32;
+		uint32_t used_in_units = value & UINT32_MAX;
 
-		assert(size_in_granul <= old_used);
-		uint32_t new_used = old_used - size_in_granul;
+		assert(size_in_units <= used_in_units);
+		uint32_t new_used_in_units = used_in_units - size_in_units;
 
-		uint64_t new_value = (((uint64_t)cur_total) << 32)
-				     | new_used;
+		uint64_t new_value =
+			((uint64_t) total_in_units << 32) | new_used_in_units;
 
-		if (atomic_cas(&quota->value, old_value, new_value) == old_value)
+		if (atomic_cas(&quota->value, value, new_value) == value)
 			break;
 	}
 }
 
 #undef atomic_cas
+#undef QUOTA_UNIT_SIZE
 
 #if defined(__cplusplus)
 } /* extern "C" { */

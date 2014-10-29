@@ -11,7 +11,7 @@ slab_arena_print(struct slab_arena *arena)
 {
 	printf("arena->prealloc = %zu\narena->maxalloc = %zu\n"
 	       "arena->used = %zu\narena->slab_size = %u\n",
-	       arena->prealloc, quota_get_total(arena->quota),
+	       arena->prealloc, quota_get(arena->quota),
 	       arena->used, arena->slab_size);
 }
 
@@ -38,8 +38,8 @@ int main()
 	slab_arena_print(&arena);
 	slab_arena_destroy(&arena);
 
-	quota_init(&quota, 3000 * QUOTA_GRANULARITY);
-	slab_arena_create(&arena, &quota, 2000 * QUOTA_GRANULARITY, 1, MAP_PRIVATE);
+	quota_init(&quota, 2000000);
+	slab_arena_create(&arena, &quota, 3000000, 1, MAP_PRIVATE);
 	slab_arena_print(&arena);
 	slab_arena_destroy(&arena);
 }

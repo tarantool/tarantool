@@ -36,8 +36,11 @@ enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
 
 struct tbuf;
 
+/** Common quota for tuples and indexes */
+extern struct quota memtx_quota;
+/** Tuple allocator */
 extern struct small_alloc memtx_alloc;
-extern struct slab_cache memtx_slab_cache;
+/** Tuple slab arena */
 extern struct slab_arena memtx_arena;
 
 /**

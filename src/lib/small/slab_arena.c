@@ -120,7 +120,7 @@ slab_arena_create(struct slab_arena *arena, struct quota *quota,
 
 	arena->quota = quota;
 	/** Prealloc can not be greater than the quota */
-	prealloc = MIN(prealloc, quota_get_total(quota));
+	prealloc = MIN(prealloc, quota_get(quota));
 	/** Extremely large sizes can not be aligned properly */
 	prealloc = MIN(prealloc, SIZE_MAX - arena->slab_size);
 	/* Align prealloc around a fixed number of slabs. */
@@ -165,7 +165,7 @@ slab_map(struct slab_arena *arena)
 	if ((ptr = lf_lifo_pop(&arena->cache)))
 		return ptr;
 
-	if (quota_use(arena->quota, arena->slab_size))
+	if (quota_use(arena->quota, arena->slab_size) < 0)
 		return NULL;
 
 	/** Need to allocate a new slab. */

@@ -9,8 +9,8 @@ const size_t THREAD_CNT = 10;
 const size_t RUN_CNT = 128 * 1024;
 
 struct thread_data {
-	long use_change;
-	long last_lim_set;
+	size_t use_change;
+	size_t last_lim_set;
 	long use_change_success;
 	long lim_change_success;
 };
@@ -22,8 +22,7 @@ void *thread_routine(void *vparam)
 {
 	struct thread_data *data = (struct thread_data *)vparam;
 	size_t check_fail_count = 0;
-	bool allocated = false;
-	size_t allocated_size = 0;
+	ssize_t allocated_size = 0;
 	for (size_t i = 0; i < RUN_CNT; i++) {
 		{
 			size_t total, used;
@@ -31,24 +30,27 @@ void *thread_routine(void *vparam)
 			if (used > total)
 				check_fail_count++;
 		}
-		long rnd = ((rand() & 0xFFFFFFF) +  1) * QUOTA_GRANULARITY;
-		int succ = quota_set(&quota, (size_t)rnd);
-		if (succ == 0) {
-			data->last_lim_set = rnd;
+		ssize_t max = rand() % QUOTA_MAX;
+		max = quota_set(&quota, max);
+		pthread_yield();
+		if (max > 0) {
+			data->last_lim_set = max;
 			data->lim_change_success++;
 		}
-		if (allocated) {
+		if (allocated_size > 0) {
 			quota_release(&quota, allocated_size);
-			allocated = false;
+			allocated_size = -1;
 			data->use_change = 0;
 			data->use_change_success++;
+			pthread_yield();
 		} else {
-			allocated_size = (((long)rand()) & 0xFFFFFFl) + 1;
-			if (quota_use(&quota, allocated_size) == 0) {
-				allocated = true;
+			allocated_size = rand() % max + 1;
+			allocated_size = quota_use(&quota, allocated_size);
+			if (allocated_size > 0) {
 				data->use_change = allocated_size;
 				data->use_change_success++;
 			}
+			pthread_yield();
 		}
 	}
 	return (void *)check_fail_count;
@@ -60,6 +62,7 @@ main(int n, char **a)
 	(void)n;
 	(void)a;
 	quota_init(&quota, 0);
+	srand(time(0));
 
 	plan(5);
 
@@ -78,18 +81,18 @@ main(int n, char **a)
 	long set_success_count = 0;
 	long use_success_count = 0;
 	for (size_t i = 0; i < THREAD_CNT; i++) {
-		if (datum[i].last_lim_set == quota_get_total(&quota))
+		if (datum[i].last_lim_set == quota_get(&quota))
 			one_set_successed = true;
-		total_alloc += ((datum[i].use_change + QUOTA_GRANULARITY - 1) / QUOTA_GRANULARITY) * QUOTA_GRANULARITY;
+		total_alloc += datum[i].use_change;
 		use_success_count += datum[i].use_change_success;
 		set_success_count += datum[i].lim_change_success;
 	}
 
 	ok(check_fail_count == 0, "no fails detected");
 	ok(one_set_successed, "one of thread limit set is final");
-	ok(total_alloc == quota_get_used(&quota), "total alloc match");
-	ok(use_success_count > THREAD_CNT * RUN_CNT * .9, "uses are mosly successful");
-	ok(set_success_count > THREAD_CNT * RUN_CNT * .9, "sets are mosly successful");
+	ok(total_alloc == quota_used(&quota), "total alloc match");
+	ok(use_success_count > THREAD_CNT * RUN_CNT * .1, "uses are mosly successful");
+	ok(set_success_count > THREAD_CNT * RUN_CNT * .1, "sets are mosly successful");
 
 	return check_plan();
 }

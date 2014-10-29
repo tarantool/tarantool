@@ -96,7 +96,7 @@ int main()
 
 	quota_init(&quota, UINT_MAX);
 
-	slab_arena_create(&arena, &quota, UINT_MAX, 4000000,
+	slab_arena_create(&arena, &quota, 0, 4000000,
 			  MAP_PRIVATE);
 	slab_cache_create(&cache, &arena, 0);
 
