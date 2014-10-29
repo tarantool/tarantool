@@ -30,7 +30,6 @@
 #include <say.h>
 #include <fiber.h>
 #include <stddef.h>
-
 #include <stddef.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -215,13 +214,6 @@ struct replication_request {
 void
 replication_join(int fd, struct xrow_header *packet)
 {
-	assert(packet->type == IPROTO_JOIN);
-	struct tt_uuid server_uuid = uuid_nil;
-	xrow_decode_join(packet, &server_uuid);
-
-	/* Notify box about new cluster server */
-	recovery->join_handler(&server_uuid);
-
 	struct replication_request *request = (struct replication_request *)
 			malloc(sizeof(*request));
 	if (request == NULL) {
@@ -636,10 +628,10 @@ replication_relay_recv(ev_loop * /* loop */, struct ev_io *w, int __attribute__(
 
 /** Send a single row to the client. */
 static void
-replication_relay_send_row(void * /* param */, struct xrow_header *packet)
+replication_relay_send_row(struct recovery_state *r, void * /* param */,
+			   struct xrow_header *packet)
 {
 	assert(iproto_type_is_dml(packet->type));
-	struct recovery_state *r = recovery;
 
 	/* Don't duplicate data */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
@@ -749,24 +741,25 @@ replication_relay_loop()
 	sio_setfl(relay.sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
-	recovery_init(cfg_snap_dir, cfg_wal_dir,
+	struct recovery_state *r = recovery_new(cfg_snap_dir, cfg_wal_dir,
 		      replication_relay_send_row,
-		      NULL, NULL, NULL, INT32_MAX);
-
+		      NULL, NULL, INT32_MAX);
+	int rc = EXIT_SUCCESS;
 	try {
 		switch (relay.type) {
 		case IPROTO_JOIN:
-			replication_relay_join(recovery);
+			replication_relay_join(r);
 			break;
 		case IPROTO_SUBSCRIBE:
-			replication_relay_subscribe(recovery);
+			replication_relay_subscribe(r);
 			break;
 		default:
 			assert(false);
 		}
 	} catch (Exception *e) {
 		say_error("relay error: %s", e->errmsg());
-		exit(EXIT_FAILURE);
+		rc = EXIT_FAILURE;
 	}
-	exit(EXIT_SUCCESS);
+	recovery_delete(r);
+	exit(rc);
 }

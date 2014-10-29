@@ -44,10 +44,11 @@ extern "C" {
 
 struct fiber;
 struct tbuf;
+struct recovery_state;
 
-typedef void (row_handler)(void *, struct xrow_header *packet);
+typedef void (row_handler)(struct recovery_state *, void *,
+			   struct xrow_header *packet);
 typedef void (snapshot_handler)(struct log_io *);
-typedef void (join_handler)(const struct tt_uuid *node_uuid);
 
 /** A "condition variable" that allows fibers to wait when a given
  * LSN makes it to disk.
@@ -81,7 +82,6 @@ struct recovery_state {
 	row_handler *row_handler;
 	void *row_handler_param;
 	snapshot_handler *snapshot_handler;
-	join_handler *join_handler;
 	uint64_t snap_io_rate_limit;
 	int rows_per_wal;
 	enum wal_mode wal_mode;
@@ -91,16 +91,21 @@ struct recovery_state {
 	bool finalize;
 };
 
-extern struct recovery_state *recovery;
+struct recovery_state *
+recovery_new(const char *snap_dirname, const char *wal_dirname,
+	     row_handler row_handler, void *row_handler_param,
+	     snapshot_handler snapshot_handler,
+	     int rows_per_wal);
 
-void recovery_init(const char *snap_dirname, const char *xlog_dirname,
-		   row_handler row_handler, void *row_handler_param,
-		   snapshot_handler snapshot_handler, join_handler join_handler,
-		   int rows_per_wal);
+void
+recovery_delete(struct recovery_state *r);
+
+void
+recovery_atfork(struct recovery_state *r);
+
 void recovery_update_mode(struct recovery_state *r, enum wal_mode mode);
 void recovery_update_io_rate_limit(struct recovery_state *r,
 				   double new_limit);
-void recovery_free();
 
 static inline bool
 recovery_has_data(struct recovery_state *r)
@@ -122,7 +127,8 @@ void recovery_process(struct recovery_state *r, struct xrow_header *packet);
 struct fio_batch;
 
 void
-snapshot_write_row(struct log_io *l, struct xrow_header *packet);
+snapshot_write_row(struct recovery_state *r, struct log_io *l,
+		   struct xrow_header *packet);
 void snapshot_save(struct recovery_state *r);
 
 #if defined(__cplusplus)

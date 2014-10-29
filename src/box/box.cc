@@ -58,6 +58,8 @@ static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);
 box_process_func box_process = process_ro;
 
+struct recovery_state *recovery;
+
 static int stat_base;
 int snapshot_pid = 0; /* snapshot processes pid */
 
@@ -107,8 +109,11 @@ box_is_ro(void)
 }
 
 static void
-recover_row(void *param __attribute__((unused)), struct xrow_header *row)
+recover_row(struct recovery_state *r, void *param, struct xrow_header *row)
 {
+	(void) param;
+	(void) r;
+	assert(r == recovery);
 	assert(row->bodycnt == 1); /* always 1 for read */
 	struct request request;
 	request_create(&request, row->type);
@@ -324,6 +329,26 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 	     (unsigned) server_id, tt_uuid_str(server_uuid));
 }
 
+void
+box_process_join(struct xrow_header *header)
+{
+	assert(header->type == IPROTO_JOIN);
+	struct tt_uuid server_uuid = uuid_nil;
+	xrow_decode_join(header, &server_uuid);
+
+	box_on_cluster_join(&server_uuid);
+
+	/* process JOIN request via replication relay */
+	replication_join(session()->fd, header);
+}
+
+void
+box_process_subscribe(struct xrow_header *header)
+{
+	/* process SUBSCRIBE request via replication relay */
+	replication_subscribe(session()->fd, header);
+}
+
 /** Replace the current server id in _cluster */
 static void
 box_set_server_uuid()
@@ -356,10 +381,13 @@ box_set_cluster_uuid()
 void
 box_free(void)
 {
+	if (recovery == NULL)
+		return;
 	user_cache_free();
 	schema_free();
 	tuple_free();
-	recovery_free();
+	recovery_delete(recovery);
+	recovery = NULL;
 	engine_shutdown();
 	stat_free();
 	session_free();
@@ -396,9 +424,8 @@ box_init()
 	user_cache_init();
 
 	/* recovery initialization */
-	recovery_init(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
-		      recover_row, NULL, box_snapshot_cb, box_on_cluster_join,
-		      cfg_geti("rows_per_wal"));
+	recovery = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),
+		      recover_row, NULL, box_snapshot_cb, cfg_geti("rows_per_wal"));
 	recovery_set_remote(recovery, cfg_gets("replication_source"));
 	recovery_update_io_rate_limit(recovery,
 				      cfg_getd("snap_io_rate_limit"));
@@ -450,6 +477,15 @@ box_init()
 	iobuf_set_readahead(cfg_geti("readahead"));
 }
 
+
+void
+box_atfork()
+{
+	if (recovery == NULL)
+		return;
+	recovery_atfork(recovery);
+}
+
 static void
 snapshot_write_tuple(struct log_io *l,
 		     uint32_t n, struct tuple *tuple)
@@ -470,7 +506,7 @@ snapshot_write_tuple(struct log_io *l,
 	row.body[0].iov_len = sizeof(body);
 	row.body[1].iov_base = tuple->data;
 	row.body[1].iov_len = tuple->bsize;
-	snapshot_write_row(l, &row);
+	snapshot_write_row(recovery, l, &row);
 }
 
 static void

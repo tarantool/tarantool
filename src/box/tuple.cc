@@ -544,8 +544,15 @@ tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 
 	if (slab_arena_create(&memtx_arena, &memtx_quota,
 			      max_size, SLAB_SIZE, flags)) {
-		panic_syserror("failed to preallocate %zu bytes",
-			       max_size);
+		if (ENOMEM == errno) {
+			panic("failed to preallocate %zu bytes: "
+			      "Cannot allocate memory, check option "
+			      "'slab_alloc_arena' in box.cfg(..)",
+			      max_size);
+		} else {
+			panic_syserror("failed to preallocate %zu bytes",
+				       max_size);
+		}
 	}
 	slab_cache_create(&memtx_slab_cache, &memtx_arena,
 			  SLAB_SIZE);

@@ -4,32 +4,31 @@ import sys
 import os
 import re
 
+log = server.get_log()
 
 admin('print("Hello, world")')
 admin("io = require('io')")
 
-log = server.logfile
-f = open(log, "r")
-f.seek(0, 2)
-
-admin("local f = require('fiber').create(function() print('Ehllo, world') io.flush() end)")
+admin("""local f = require('fiber').create(
+    function()
+        print('Ehllo, world')
+        io.flush()
+    end
+)""")
 admin("require('fiber').sleep(0.1)")
-line = f.readline()
-print("Check log line")
-print("---")
-found = re.search(r'(Hello)', line)
-if found and re.search(r'(Hello)', line).start(1) >= 0:
-    print("""- "line contains 'Hello'" """)
-    print("...")
-else:
-    print('String "%s" does not contain "Hello"' % line)
 
-line = f.readline()
-print("Check log line")
-print("---")
-if re.search('(Ehllo)', line):
-    print("""- "line contains 'Ehllo'" """)
+print("Check log line (Hello):")
+print('---')
+if log.seek_once('Hello') >= 0:
+    print('- "logfile contains "Hello""')
 else:
-    print("""- "line doesn't contain 'Ehllo'" """)
-print("...")
+    print('- "logfile does not contain "Hello""')
+print('...')
 
+print("Check log line (Ehllo):")
+print('---')
+if log.seek_once('Ehllo') >= 0:
+    print('- "logfile contains "Ehllo""')
+else:
+    print('- "logfile does not contain "Ehllo""')
+print('...')

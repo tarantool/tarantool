@@ -6,21 +6,31 @@ _func = box.space[box.schema.FUNC_ID]
 _priv = box.space[box.schema.PRIV_ID]
 _cluster = box.space[box.schema.CLUSTER_ID]
 -- destroy everything - save snapshot produces an empty snapshot now
-_schema:run_triggers(false)
-_schema:truncate()
+
+-- space:truncate() doesn't work with disabled triggers on __index
+local function truncate(space)
+    local pk = space.index[0]
+    while pk:len() > 0 do
+        local state, t
+        for state, t in pk:pairs() do
+            local key = {}
+            for _k2, parts in ipairs(pk.parts) do
+                table.insert(key, t[parts.fieldno])
+            end
+            space:delete(key)
+        end
+    end
+end
+
 _space:run_triggers(false)
-_space:truncate()
 _index:run_triggers(false)
-_index:truncate()
 _user:run_triggers(false)
-_user:truncate()
 _func:run_triggers(false)
-_func:truncate()
 _priv:run_triggers(false)
-_priv:truncate()
-_cluster:run_triggers(false)
--- select server id 1 - self
-t = _cluster:get{1}
-_cluster:truncate()
--- preserve self-identification
-_cluster:insert(t)
+
+truncate(_space)
+truncate(_index)
+truncate(_user)
+truncate(_func)
+truncate(_priv)
+_schema:delete('version')

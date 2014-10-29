@@ -207,15 +207,15 @@ Explanatory notes about what tarantool displayed in the above example:
 
 </section>
 
-<section xml:id="dist.lua">
-<title>Utility <code>dist.lua</code></title>
+<section xml:id="tarantoolctl">
+<title>Utility <code>tarantoolctl</code></title>
 <para>
-With dist.lua one can say: "start an instance of the
+With tarantoolctl one can say: "start an instance of the
 Tarantool server which runs a single user-written Lua
 program, allocating disk resources specifically for
 that program, via a standardized deployment method."
 If Tarantool was downloaded from source, then the script
-is in ~/extra/dist/dist.lua. If Tarantool was installed
+is in ~/extra/dist/tarantoolctl. If Tarantool was installed
 with debian or Red Hat installation packages, the script
 is renamed <code>tarantoolctl</code> and is in
 /usr/bin/tarantoolctl. The script handles such things as:
@@ -223,12 +223,12 @@ starting, stopping, rotating logs, logging in to the
 application's console, and checking status.
 </para>
 
-<bridgehead renderas="sect4">configuring for dist.lua</bridgehead>
+<bridgehead renderas="sect4">configuring for tarantoolctl</bridgehead>
 <para>
-The dist.lua script will read a configuration file
+The tarantoolctl script will read a configuration file
 named /etc/sysconfig/tarantool, or /etc/default/tarantool.
 Most of the settings are similar to the settings
-used by <code>box.cfg{...}</code>; however, dist.lua
+used by <code>box.cfg{...}</code>; however, tarantoolctl
 adjusts some of them by adding an application name.
 A copy of /etc/sysconfig/tarantool, with defaults for
 all settings, would look like this:<programlisting>
@@ -270,33 +270,33 @@ username = the user that runs the tarantool server.
 </para>
 <para>
 instance_dir = the directory where all applications for this host are stored.
-The user who writes an application for dist.lua must put the application's
+The user who writes an application for tarantoolctl must put the application's
 source code in this directory, or a symbolic link. For examples in this section the application
 name <code>my_app</code> will be used, and its source will have to be in
 <code><replaceable>instance_dir</replaceable>/my_app.lua</code>.
 </para>
 
-<bridgehead renderas="sect4">commands for dist.lua</bridgehead>
+<bridgehead renderas="sect4">commands for tarantoolctl</bridgehead>
 <para>
-The command format is <code>dist.lua <replaceable>operation</replaceable> application-name</code>,
+The command format is <code>tarantoolctl <replaceable>operation</replaceable> application-name</code>,
 where <replaceable>operation</replaceable> is one of: <code>start</code>, <code>stop</code>,
 <code>status</code>, <code>logrotate</code>, <code>enter</code>. Thus ...<programlisting>
-dist.lua start my_app          -- starts application my_app
-dist.lua stop my_app           -- stops my_app
-dist.lua enter my_app          -- show my_app's admin console, if it has one
-dist.lua logrotate my_app      -- rotate my_app's log files (make new, remove old)
-dist.lua status my_app         -- check my_app's status</programlisting>
+tarantoolctl start my_app          -- starts application my_app
+tarantoolctl stop my_app           -- stops my_app
+tarantoolctl enter my_app          -- show my_app's admin console, if it has one
+tarantoolctl logrotate my_app      -- rotate my_app's log files (make new, remove old)
+tarantoolctl status my_app         -- check my_app's status</programlisting>
 </para>
 
-<bridgehead renderas="sect4">typical code snippets for dist.lua</bridgehead>
+<bridgehead renderas="sect4">typical code snippets for tarantoolctl</bridgehead>
 <para>
 A user can check whether my_app is running with these lines:<programlisting>
-  if dist.lua status my_app; then
+  if tarantoolctl status my_app; then
         ...
   fi</programlisting>
 A user can initiate, for boot time, an init.d set of instructions:<programlisting>
   for (each file mentioned in the instance_dir directory):
-   dist.lua start `basename $ file .lua`</programlisting>
+   tarantoolctl start `basename $ file .lua`</programlisting>
 A user can set up a further configuration file for log rotation, like this:<programlisting>
 /path/to/tarantool/*.log {
      daily
@@ -307,15 +307,15 @@ A user can set up a further configuration file for log rotation, like this:<prog
      delaycompress
      create 0640 tarantool adm
      postrotate
-         /path/to/dist.lua logrotate `basename $ 1 .log`
+         /path/to/tarantoolctl logrotate `basename $ 1 .log`
      endscript
 }</programlisting>
 </para>
 
-<bridgehead renderas="sect4">A detailed example for dist.lua</bridgehead>
+<bridgehead renderas="sect4">A detailed example for tarantoolctl</bridgehead>
 <para>
 The example's objective is: make a temporary directory
-where dist.lua can start a long-running application
+where tarantoolctl can start a long-running application
 and monitor it.
 </para>
 <para>
@@ -330,17 +330,17 @@ Create a directory named /tarantool_test:<programlisting>
 sudo mkdir /tarantool_test</programlisting>
 </para>
 <para>
-Copy dist.lua to /tarantool_test.
+Copy tarantoolctl to /tarantool_test.
 If you made a source download to ~/tarantool-master, then<programlisting>
-sudo cp ~/tarantool-master/extra/dist/dist.lua /tarantool_test/dist.lua</programlisting>
+sudo cp ~/tarantool-master/extra/dist/tarantoolctl /tarantool_test/tarantoolctl</programlisting>
 If the file was named tarantoolctl and placed on /usr/bin/tarantoolctl, then<programlisting>
-sudo cp /usr/bin/tarantoolctl /tarantool_test/dist.lua</programlisting>
+sudo cp /usr/bin/tarantoolctl /tarantool_test/tarantoolctl</programlisting>
 </para>
 <para>
-Check and possibly change the first line of /tarantool_test/dist.lua.
+Check and possibly change the first line of /tarantool_test/tarantoolctl.
 Initially it says<programlisting>
 #!/usr/bin/env tarantool</programlisting>
-If that is not correct, edit dist.lua and change the line.
+If that is not correct, edit tarantoolctl and change the line.
 For example, if the Tarantool server is actually on
 /home/user/tarantool-master/src/tarantool, change the line to<programlisting>
 #!/usr/bin/env /home/user/tarantool-master/src/tarantool</programlisting>
@@ -380,9 +380,9 @@ while 0 == 0 do
 end</programlisting>
 </para>
 <para>
-Tell dist.lua to start the application ...<programlisting>
+Tell tarantoolctl to start the application ...<programlisting>
 cd /tarantool_test
-sudo ./dist.lua start my_app</programlisting>
+sudo ./tarantoolctl start my_app</programlisting>
 ... expect to see messages indicating that the instance has started. Then ...<programlisting>
 ls -l /tarantool_test/my_app</programlisting>
 ... expect to see the .snap file, .xlog file, and sophia directory. Then ...<programlisting>
@@ -398,8 +398,8 @@ box.space.tester:select({0},{iterator='GE'})</programlisting>
 ... expect to see several tuples that my_app has created.
 </para>
 <para>
-Stop. The only clean way to stop my_app is with dist_lua, thus:<programlisting>
-sudo ./dist.lua stop my_app</programlisting>
+Stop. The only clean way to stop my_app is with tarantoolctl, thus:<programlisting>
+sudo ./tarantoolctl stop my_app</programlisting>
 </para>
 <para>
 Clean up. Restore the original contents of /etc/sysconfig/tarantool, and ...<programlisting>

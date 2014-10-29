@@ -151,3 +151,29 @@ index = s:create_index('primary', {unique = true, parts = {0, 'NUM', 1, 'STR'}})
 index = s:create_index('primary', {unique = true, parts = {'NUM', 1, 'STR', 2}})
 index = s:create_index('primary', {unique = true, parts = 'bug'})
 s:drop()
+
+
+-- ------------------------------------------------------------------
+-- gh-155 Tarantool failure on simultaneous space:drop()
+-- ------------------------------------------------------------------
+
+--# setopt delimiter ';'
+local fiber = require('fiber')
+local W = 4
+local N = 50
+local ch = fiber.channel(W)
+for i=1,W do
+    fiber.create(function()
+        for k=1,N do
+            local space_id = math.random(2147483647)
+            local space = box.schema.create_space(string.format('space_%d', space_id))
+            space:create_index('pk', { type = 'tree' })
+            space:drop()
+        end
+        ch:put(true)
+    end)
+end
+for i=1,W do
+    ch:get()
+end
+--# setopt delimiter ''

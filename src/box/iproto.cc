@@ -42,7 +42,6 @@
 #include "scoped_guard.h"
 #include "memory.h"
 #include "msgpuck/msgpuck.h"
-#include "replication.h"
 #include "session.h"
 #include "third_party/base64.h"
 #include "coio.h"
@@ -710,12 +709,12 @@ iproto_process_admin(struct iproto_request *ireq)
 					  ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
-			replication_join(con->input.fd, &ireq->header);
+			box_process_join(&ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
 		case IPROTO_SUBSCRIBE:
-			replication_subscribe(con->input.fd, &ireq->header);
+			box_process_subscribe(&ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
