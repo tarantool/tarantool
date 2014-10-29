@@ -1,8 +1,19 @@
-tarantool (1.6.3.183.gd309992-1) UNRELEASED; urgency=medium
+tarantool (1.6.3.539.g211672f-1) unstable; urgency=medium
 
   * Init infrastructure for tarantool 1.6.
+  * Update debian/copyright:
+     + cmake/luatest.cpp
+     + third_party/PMurHash.*
+     + third_party/lua-yaml/*
+     + third_party/sha1.*
+     + third_party/open_memstream.*
+  * Add lintian-oferrides: libyaml:
+    tarantool has patched version of the library.
+  * Rename -plugin* package to -module*
+  * Conflicts: tarantool 1.5 (it was renamed to tarantool-lts).
+  * NOSTRIP /usr/bin/tarantool binary: it uses symbols runtime.
 
- -- Dmitry E. Oboukhov <unera@debian.org>  Wed, 20 Aug 2014 17:19:14 +0400
+ -- Dmitry E. Oboukhov <unera@debian.org>  Mon, 27 Oct 2014 14:33:07 +0300
 
 tarantool (1.5.3.53.ge2308d8-1) unstable; urgency=medium
 

@@ -20,7 +20,7 @@ test.trace = false
 -- ok, fail and skip predicates
 --
 
-test:plan(31) -- plan to run 3 test
+test:plan(32) -- plan to run 3 test
 test:ok(true, 'true') -- basic function
 local extra = { state = 'some userful information to debug on failure',
         details = 'a table argument formatted using yaml.encode()' }
@@ -117,16 +117,23 @@ end)
 
 
 
-test:test('isdeeply', function(t)
+test:test('is_deeply', function(t)
     t:plan(6)
 
-    t:isdeeply(1, 1, '1 and 1')
-    t:isdeeply('abc', 'abc', 'abc and abc')
-    t:isdeeply({}, {}, 'empty tables')
-    t:isdeeply({1}, {1}, '{1} and {1}')
-    t:isdeeply({1}, {2}, '{1} and {2}')
-    t:isdeeply({1, 2, { 3, 4 }}, {1, 2, { 3, 5 }}, '{1,2,{3,4}} and {1,2,{3,5}}')
+    t:is_deeply(1, 1, '1 and 1')
+    t:is_deeply('abc', 'abc', 'abc and abc')
+    t:is_deeply({}, {}, 'empty tables')
+    t:is_deeply({1}, {1}, '{1} and {1}')
+    t:is_deeply({1}, {2}, '{1} and {2}')
+    t:is_deeply({1, 2, { 3, 4 }}, {1, 2, { 3, 5 }}, '{1,2,{3,4}} and {1,2,{3,5}}')
 
+end)
+
+
+test:test('like', function(t)
+    t:plan(2)
+    t:like('abcde', 'cd', 'like(abcde, cd)')
+    t:unlike('abcde', 'acd', 'unlike(abcde, acd)')
 end)
 
 --

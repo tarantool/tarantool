@@ -98,6 +98,7 @@ user_cache_replace(struct user *user)
 		old->auth_token = auth_token;
 	}
 	user->auth_token = old->auth_token;
+	user->universal_access = old->universal_access;
 	*old = *user;
 	struct mh_i32ptr_node_t node = { old->uid, old };
 	mh_i32ptr_put(user_registry, &node, NULL, NULL);
