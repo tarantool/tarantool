@@ -237,7 +237,7 @@ so it's not a true binary download, some source code is involved.
 First upgrade Clang (the C compiler) to version 3.2 or later using
 Command Line Tools for Xcode disk image version 4.6+ from
 Apple Developer web-site. Then download the recipe file from
-<link xlink:href="tarantool.org/dist/tarantool.rb">tarantool.org/dist/tarantool.rb</link>.
+<link xlink:href="tarantool.org/dist/master/tarantool.rb">tarantool.org/dist/master/tarantool.rb</link>.
 Make the file executable, execute it, and the script in the file should
 handle the necessary steps with cmake, make, and make install.
 </para>
@@ -549,7 +549,7 @@ Tarantool is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first <link linkend="an-index">index</link>, try this:<programlisting>
-<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('tester')</userinput>
+<prompt>tarantool&gt; </prompt><userinput>s = box.schema.space.create('tester')</userinput>
 <prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -564,7 +564,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select{3}</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting><computeroutput>
-tarantool&gt; s = box.schema.create_space('tester')
+tarantool&gt; s = box.schema.space.create('tester')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
@@ -625,7 +625,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
 <para>
 3. Try these requests:<programlisting><userinput>box.cfg{}
 console = require('console')
-console.connect('localhost', 3301)
+console.connect('localhost:3301')
 box.space.tester:select{2}</userinput></programlisting>
 </para>
 <para>
@@ -640,7 +640,7 @@ tarantool&gt; console = require('console')
 ---
 ...
 
-tarantool&gt; console.connect('localhost', 3301)
+tarantool&gt; console.connect('localhost:3301')
 2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
 ---
 ...
@@ -726,7 +726,7 @@ inserted and selected tuples.
   </para>
   <para>DATA DEFINITION WITH RUNTIME REQUESTS RATHER THAN A CONFIGURATION FILE.
     <computeroutput>box.schema</computeroutput> is a new package for space configuration.
-    Spaces are added/dropped with box.schema.create_space / box.space.<replaceable>space_name</replaceable>.drop.
+    Spaces are added/dropped with box.schema.space.create / box.space.<replaceable>space_name</replaceable>.drop.
     Indexes are added/dropped with box.space.<replaceable>space-name</replaceable>.create_index /
     box.space.<replaceable>.space-name</replaceable>.index.<replaceable>index_name</replaceable>.drop.
     "space.estimated_rows" no longer exists.

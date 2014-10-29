@@ -119,7 +119,8 @@ Linking CXX shared library libmysql.so
 
 # The MySQL module should now be in ./src/module/mysql/mysql.so.
 # If a "make install" had been done, then mysql.so would be in a
-# different place, for example /usr/local/lib/tarantool/1.5/box/net/mysql.so.
+# different place, for example
+# /usr/local/lib/x86_64-linux-gnu/tarantool/box/net/mysql.so.
 # In that case there should be additional cmake options such as
 # -DCMAKE_INSTALL_LIBDIR and -DCMAKE_INSTALL_PREFIX.
 # For this example we assume that "make install" is not done.

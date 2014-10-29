@@ -118,6 +118,31 @@ parameters. Something like <code>response=tarantool_routine("insert",0,"A","B");
 And that is why APIs exist for drivers for Perl, Python, PHP, and so on.
 </para>
   </section>
+  
+  <section xml:id="connector-server">
+   <title>Setting up the server for connector examples</title>
+   <para>
+   This chapter has examples that show how to connect to the Tarantool
+   server via the Perl, PHP, and Python connectors.
+   The examples contain hard code that will work if and only if
+   the server (tarantool) is running on localhost (127.0.0.1) and is listening on port 3301
+   (<code>box.cfg.listen='3301'</code>) and space 'examples' has id = 999
+   (<code>box.space.tester.id = 999</code>), and
+   space 'examples' has a primary-key index for a numeric field
+   (<code>box.space[999].index[0].parts[1].type = "NUM"</code>)
+   and user 'guest' has privileges for reading and writing.
+   </para>
+   <para>
+   It is easy to meet all the conditions by starting the
+   server and executing this script:<programlisting>
+box.cfg{listen=3301}
+box.schema.space.create('examples',{id=999})
+box.space.examples:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})
+box.schema.user.grant('guest','read,write','space','examples')
+box.schema.user.grant('guest','read','space','_space')
+</programlisting>
+   </para>
+  </section>
 
   <section xml:id="connector-java">
     <title>Java</title>
@@ -133,29 +158,26 @@ And that is why APIs exist for drivers for Perl, Python, PHP, and so on.
      It is not supplied as part of the Tarantool repository; it must be installed separately.
      The most common way to install it is with <link xlink:href='https://en.wikipedia.org/wiki/Cpan'>CPAN, the Comprehensive Perl Archive Network</link>.
      DR::Tarantool requires other modules which should be installed first.
-     For example, on Ubuntu, the installation could look like this:
-      <programlisting>
+     For example, on Ubuntu, the installation could look like this:<programlisting>
 sudo cpan install AnyEvent
 sudo cpan install Devel::GlobalDestruction
 sudo cpan install Coro
 sudo cpan install Test::Pod
 sudo cpan install Test::Spelling
 sudo cpan install PAR::Dist
-sudo cpan install DR::Tarantool
-      </programlisting>
-     </para>
+sudo cpan install List::MoreUtils
+sudo cpan install DR::Tarantool</programlisting>
+    </para>
     <para>
-    Here is a complete Perl program that inserts [99999,'BB'] into space[0] via the Perl API.
-    Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
-    (local host, port 3301) and
-    space[0]'s primary key type is numeric (box.space[0].index[0].parts[1].type = "NUM").
+    Here is a complete Perl program that inserts [99999,'BB'] into space[999] via the Perl API.
+    Before trying to run, check that the server is listening and that <code>examples</code> exists,
+    as described <link linkend="connector-server">earlier</link>.
     To run, paste the code into a file named example.pl and say <code>perl example.pl</code>.
     The program will connect using an application-specific definition of the space.
     The program will open a socket connection
     with the tarantool server at localhost:3301, then send an INSERT request,
     then &mdash; if all is well &mdash; end without displaying any messages.
-    If tarantool is not running on localhost with listen address = port 3301, the program will print
+    If tarantool is not running on localhost with listen address = 3301, the program will print
     <quote>Connection refused</quote>.
     </para>
     <para>
@@ -163,22 +185,24 @@ sudo cpan install DR::Tarantool
 #!/usr/bin/perl
 use DR::Tarantool ':constant', 'tarantool';
 use DR::Tarantool ':all';
+use DR::Tarantool::MsgPack::SyncClient;
 
-my $tnt = tarantool
-  host    =&gt; '127.0.0.1',                      # look for tarantool on localhost
-  port    =&gt; 3301,                             # assume tarantool listen address = default
-  spaces  =&gt; {
-    0 =&gt; {                                     # definition of space[0] ...
-      name =&gt; 't0',                            #   space[0] name = 't0'
-      default_type =&gt; 'STR',                   #   space[0] field type is 'STR' if undefined
-      fields =&gt; [ {                            #   definition of space[0].fields ...
-          name =&gt; 'k0', type =&gt; 'NUM' } ],     #     space[0].field[1] name='k0',type='NUM'
-      indexes =&gt; {                             #   definition of space[0] indexes ...
-        0 =&gt; {
-          name =&gt; 'k0', fields =&gt; 'k0' } } } };
+my $tnt = DR::Tarantool::MsgPack::SyncClient->connect(
+  host    => '127.0.0.1',                      # look for tarantool on localhost
+  port    => 3301,                             # assume tarantool listen address = default
+  user    => 'guest',                          # username. one could also say 'password=>...'
 
-$tnt-&gt;insert('t0' => [ 99999, 'BB' ]);         # INSERT INTO t0 VALUES (99999,'BB')
-     </programlisting>
+  spaces  => {
+    999 => {                                   # definition of space[999] ...
+      name => 'examples',                      #   space[999] name = 'examples'
+      default_type => 'STR',                   #   space[999] field type is 'STR' if undefined
+      fields => [ {                            #   definition of space[512].fields ...
+          name => 'field1', type => 'NUM' } ], #     space[999].field[1] name='field1',type='NUM'
+      indexes => {                             #   definition of space[999] indexes ...
+        0 => {
+          name => 'primary', fields => [ 'field1' ] } } } } );
+
+$tnt->insert('tester' => [ 99999, 'BB' ]);</programlisting>
     </para>
     <para>
        The example program only shows one command and does not show all that's necessary for
@@ -206,9 +230,8 @@ cd tarantool-php
 phpize
 ./configure
 make
-#make install is optional
-    </programlisting>
-    </para>    
+#make install is optional</programlisting>
+    </para>
     <para>
     At this point there is a file named <filename>~/tarantool-php/modules/tarantool.so</filename>.
     PHP will only find it if the PHP initialization file <filename>php.ini</filename> contains a line like
@@ -218,15 +241,12 @@ make
     <programlisting>
 cd ~
 cp ./tarantool-php/modules/tarantool.so .
-export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared
-   </programlisting>
+export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared</programlisting>
     </para>
     <para>
-    Here is a complete PHP program that inserts [99999,'BB'] into a space named 'tester' via the PHP API.
-    Before trying to run, check that the server
-    (tarantool) is running on localhost (127.0.0.1) and its listen address is the default
-    (local host, port 3301) and
-    tester's primary key type is numeric (box.space.tester.index[0].parts[1].type = "NUM").
+    Here is a complete PHP program that inserts [99999,'BB'] into a space named 'examples' via the PHP API.
+    Before trying to run, check that the server is listening and that <code>examples</code> exists,
+    as described <link linkend="connector-server">earlier</link>.
     To run, paste the code into a file named example.php and say <code>php example.php</code>.
     The program will open a socket connection
     with the tarantool server at localhost:3301, then send an INSERT request,
@@ -238,14 +258,17 @@ export PHP_INI_SCAN_DIR=~/tarantool-php/tests/shared
 &lt;?php
 $tarantool = new Tarantool("localhost", 3301);
 try {
-  $tarantool-&gt;insert("tester", array(99999, "BB"));
+  $tarantool-&gt;insert("examples", array(99999, "BB"));
   print "Insert succeeded\n";
   }
 catch (Exception $e) {
   echo "Exception: ", $e-&gt;getMessage(), "\n";
   }
-?&gt;
-    </programlisting>
+?&gt;</programlisting>
+    </para>
+    <para>
+    After running the example, it is good practice to delete the file ./tarantool.so,
+    since it is only compatible with PHP and its existence could confuse non-PHP applications.
     </para>
     <para>
     The example program only shows one command and does not show all that's necessary for
@@ -258,14 +281,14 @@ catch (Exception $e) {
   <section xml:id="connector-python">
     <title>Python</title>
     <para>
-    Here is a complete Python program that inserts ['First Tuple','Value','Value'] into space99 via the high-level Python API.
+     Here is a complete Python program that inserts [99999,'Value','Value'] into space <code>examples</code> via the high-level Python API.
     </para>
 <programlisting language="python">
 #!/usr/bin/python
 from tarantool import Connection
 
 c = Connection("127.0.0.1", 3301)
-result = c.insert("space99",('First Tuple','Value', 'Value'))
+result = c.insert("examples",(99999,'Value', 'Value'))
 print result
 </programlisting>
     <para>
@@ -273,20 +296,12 @@ print result
     <userinput><code>pip install tarantool\>0.4</code></userinput> to install in <filename>/usr</filename> (requires root privilege)
     or
     <userinput><code>pip install tarantool\>0.4 --user</code></userinput> to install in <filename>~</filename> i.e. user's default directory.
-    The program is assuming that the server (tarantool) is running on localhost (127.0.0.1) and its listen address is
-    the default (local host, port 3301) and space99's primary key type is string (box.space.space99.index[0].parts[1].type = "STR")
-    and user 'guest' has permission to read and write on space99. An administrator could fulfill all those conditions by
-    starting the tarantool server and executing these requests:<programlisting>
-box.cfg{listen = 3301}
-box.schema.create_space('space99') 
-box.space.space99:create_index('primary',{parts = {1,'STR'}})
-box.schema.user.grant('guest', 'read', 'space', '_space')
-box.schema.user.grant('guest', 'read,write', 'space', 'space99')</programlisting>
+    Before trying to run, check that the server is listening and that <code>examples</code> exists,
+    as described <link linkend="connector-server">earlier</link>.
     To run the program, say <code>python example.py</code>.
     The program will connect to the server, will send the request, and will not throw an exception if all went well.
     If the tuple already exists, the program will throw DatabaseException(“Duplicate key exists in unique index”).
     </para>
-
     <para>
        The example program only shows one request and does not show all that's necessary for
        good practice. For that, see

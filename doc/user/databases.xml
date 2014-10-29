@@ -149,13 +149,13 @@
 <variablelist xml:id="box.schema" xreflabel="box.schema">
     <para>
       The <code>box.schema</code> package has one data-definition
-      function: create_space().
+      function: space.create().
     </para>
 
     <varlistentry>
         <term>
-            <emphasis role="lua" xml:id="box.create_space">
-             box.schema.create_space(<replaceable>space-name</replaceable> [, {<replaceable>options</replaceable>} ])
+            <emphasis role="lua" xml:id="box.space.create">
+             box.schema.space.create(<replaceable>space-name</replaceable> [, {<replaceable>options</replaceable>} ])
             </emphasis>
         </term>
         <listitem>
@@ -168,7 +168,7 @@
             </para>
             <para>
                 <table>
-                    <title>Options for box.schema.create_space</title>
+                    <title>Options for box.schema.space.create</title>
                     <tgroup cols="4" align="left" colsep="1" rowsep="1">
                       <tbody>
                         <row>
@@ -206,14 +206,14 @@
               Possible errors: If a space with the same name already exists.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool> <userinput>s = box.schema.create_space('space55')</userinput>
+tarantool> <userinput>s = box.schema.space.create('space55')</userinput>
 ---
 ...
-tarantool> <userinput>s = box.schema.create_space('space55', {id = 555, temporary = false})</userinput>
+tarantool> <userinput>s = box.schema.space.create('space55', {id = 555, temporary = false})</userinput>
 ---
 - error: Space 'space55' already exists
 ...
-tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = true})</userinput>
+tarantool> <userinput>s = box.schema.space.create('space55', {if_not_exists = true})</userinput>
 ---
 ...
 </programlisting>
@@ -294,6 +294,9 @@ tarantool> <userinput>s = box.schema.create_space('space55', {if_not_exists = tr
                         <row>
                          <entry>parts</entry><entry>field-numbers + types</entry><entry>{field_no, 'NUM'|STR'}</entry><entry>{1, 'NUM'}</entry>
                         </row>
+                        <row>
+                         <entry>if_not_exists</entry><entry>no error if duplicate name</entry><entry>true|false</entry><entry>false</entry>
+                        </row>
                       </tbody>
                     </tgroup>
                 </table>
@@ -369,7 +372,7 @@ tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM
                Possible Errors: No such space; wrong type.
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-tarantool&gt; <userinput>s = box.schema.create_space('tmp', {temporary=true})</userinput>
+tarantool&gt; <userinput>s = box.schema.space.create('tmp', {temporary=true})</userinput>
 ---
 ...
 tarantool&gt; <userinput> s:create_index('primary',{parts = {1,'NUM', 2, 'STR'}})</userinput>
@@ -649,7 +652,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
    The <code>update</code> function supports operations on fields &mdash;
     assignment, arithmetic (if the field is unsigned numeric),
     cutting and pasting fragments of a field,
-    deletng or inserting a field.  Multiple
+    deleting or inserting a field.  Multiple
     operations can be combined in a single update request, and in this
     case they are performed atomically and sequentially. Each operation requires
     specification of a field number. When multiple operations
@@ -828,7 +831,7 @@ tarantool> <userinput>box.space.tester:delete('a')</userinput>
         <listitem>
             <para>
              (type = number) The required field count for all tuples in this space.
-             The field_count can be set initially with <code>box.schema.create_space<replaceable>... field_count = new-field-count-value ...</replaceable></code>.
+             The field_count can be set initially with <code>box.schema.space.create<replaceable>... field_count = new-field-count-value ...</replaceable></code>.
              The default value is 0, which means there is no required field count.
             </para>
         </listitem>
@@ -920,7 +923,7 @@ tarantool&gt; <userinput>box.space.tester:len()</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('forty_second_space')</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.space.create('forty_second_space')</userinput>
 ---
 ...
 tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
@@ -958,7 +961,7 @@ tarantool> <userinput>box.space.forty_second_space:inc{1,'a'}</userinput>
               Complexity Factors: Index size, Index type, WAL settings.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting>tarantool> <userinput>s = box.schema.create_space('space19')</userinput>
+<programlisting>tarantool> <userinput>s = box.schema.space.create('space19')</userinput>
 ---
 ...
 tarantool> <userinput>s:create_index('primary', {unique = true, parts = {1, 'NUM', 2, 'STR'}})</userinput>
@@ -992,7 +995,7 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
               Within the loop, a value (type = tuple) is returned for each iteration.
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
-<programlisting><prompt>tarantool&gt;</prompt> <userinput>s = box.schema.create_space('space33')</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>s = box.schema.space.create('space33')</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput>s:create_index('X', {}) -- index 'X' has default parts {1,'NUM'}</userinput>
@@ -1028,7 +1031,7 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
               create a function which increments a counter, create a trigger,
               do two inserts, drop the space, and display the counter value -- which is 2,
               because the function is executed once after each insert.
-<programlisting>s = box.schema.create_space('space53')
+<programlisting>s = box.schema.space.create('space53')
 s:create_index('primary', {parts = {1, 'NUM'}})
 function replace_trigger() replace_counter = replace_counter + 1 end
 s:on_replace(replace_trigger)
@@ -1316,8 +1319,9 @@ console.delimiter('')!
       type: NUM
       fieldno: 1
   id: 0
+  space_id: 513
+  name: primary
   type: TREE
-  idx: ' index 0'
   etc.
 ...</programlisting></listitem>
     </varlistentry>
@@ -1381,7 +1385,7 @@ console.delimiter('')!
             <para>
                 <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput> s = box.schema.create_space('space17')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput> s = box.schema.space.create('space17')</userinput>
 ---
 ...
 <prompt>tarantool&gt;</prompt> <userinput> s:create_index('primary', {parts = {1, 'STR', 2, 'STR'}})</userinput>
@@ -1461,7 +1465,7 @@ console.delimiter('')!
 # Create a non-unique index 'secondary' with an index on the second field.
 # Insert three tuples, values in field[2] equal to 'X', 'Y', and 'Z'.
 # Select all tuples where the secondary index keys are greater than 'X'.
-box.schema.create_space('tester')
+box.schema.space.create('tester')
 box.space.tester:create_index('primary', {parts = {1, 'NUM' }})
 box.space.tester:create_index('secondary', {type = 'tree', unique = false, parts = {2, 'STR'}})
 box.space.tester:insert{1,'X','Row with field[2]=X'}
@@ -2419,6 +2423,9 @@ tarantool> <userinput>box.stat() -- the full contents of the table</userinput>
   INSERT:
     total: 48207694
     rps: 139
+  AUTH:
+    total: 0
+    rps: 0
   CALL:
     total: 8
     rps: 0
@@ -2987,7 +2994,7 @@ When a client connects to a Tarantool server, the server sends a random
 which the client must mix with the hashed-password before sending
 to the server.
 Thus the original value 'x' is never stored anywhere except in the
-user's head, and the hashed value is never passed passed down a
+user's head, and the hashed value is never passed down a
 network wire except when mixed with a random salt.
 This system prevents malicious onlookers from finding passwords
 by snooping in the log files or snooping on the wire.
@@ -3007,14 +3014,14 @@ To see more about the details of the algorithm for the purpose of writing a new 
 <para>
 <bridgehead renderas="sect4">Users and the _user space</bridgehead>
 The fields in the _user space are:
-a numeric id, a number, the user name, the type, and the optional password.
+the numeric id of the tuple, the numeric id of the tuple's creator, the user name, the type, and the optional password.
 </para>
 
 <para>
 There are three special users: 'guest', 'admin', and 'public'.
 </para>
 
-            <para>
+            
                 <table>
                     <title>The system users</title>
                     <tgroup cols="4" align="left" colsep="1" rowsep="1">
@@ -3026,7 +3033,7 @@ There are three special users: 'guest', 'admin', and 'public'.
                          <entry>guest</entry><entry>0</entry><entry>user</entry><entry>Default when connecting remotely. Usually an untrusted user with few privileges.</entry>
                         </row>
                         <row>
-                         <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using sys/tarantool as a console. Usually an administrative user with all privileges.</entry>
+                         <entry>admin</entry><entry>1</entry><entry>user</entry><entry>Default when using <code>tarantool</code> as a console. Usually an administrative user with all privileges.</entry>
                         </row>
                         <row>
                          <entry>public</entry><entry>2</entry><entry>role</entry><entry>Not a user in the usual sense. A role is a container for privileges which can be granted to regular users. </entry>
@@ -3034,15 +3041,15 @@ There are three special users: 'guest', 'admin', and 'public'.
                         </tbody>
                     </tgroup>
                 </table>
-            </para>
+            
 
 <para>
 To select a row from the _user space, use <code>box.select</code>.
 For example, here is what happens with a select for user id = 0,
-which is the 'guest' user, without a password:
+which is the 'guest' user, which by default has no password:
 <programlisting><prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{0}</userinput>
 ---
-- - [0, 1, 'guest']
+- - [0, 1, 'guest', 'user']
 ...</programlisting></para>
 
 <para>
@@ -3056,6 +3063,9 @@ To create a new user, say
 <code>box.schema.user.create(<replaceable>user-name</replaceable>)</code>
 or
 <code>box.schema.user.create(<replaceable>user-name</replaceable>, {password=<replaceable>password</replaceable>})</code>.
+The form
+<code>box.schema.user.create(<replaceable>user-name</replaceable>, {password=<replaceable>password</replaceable>})</code>
+is better because in a <link linkend="URI">URI</link> (Uniform Resource Identifier) it is usually illegal to include a user-name without a password.
 </para>
 
 <para>
@@ -3072,14 +3082,16 @@ To drop a user, say
 For example, here is a session which creates a new user with
 a strong password, selects a tuple in
 the _user space, and then drops the user.
-<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.create('ElizabethBrowning', {password = 'Iwtso65$SDS?'})</userinput>
+<programlisting><prompt>tarantool&gt;</prompt> <userinput>box.schema.user.create('JeanMartin', {password = 'Iwtso_6_os$$'})</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>box.space._user:select{4}</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>box.space._user.index.name:select{'JeanMartin'}</userinput>
 ---
-- - [4, 1, 'ElizabethBrowning', {'chap-sha1': 'zyy3yArGOQ4T40PnsL6yPGlgYrU='}]
+- - [17, 1, 'JeanMartin', 'user', {'chap-sha1': 't3xjUpQdrt857O+YRvGbMY5py8Q='}]
 ...
-<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.drop('ElizabethBrowning')</userinput>
+
+<prompt>tarantool&gt;</prompt> <userinput>box.schema.user.drop('JeanMartin')</userinput>
 ---
 ...</programlisting></para>
 
@@ -3260,6 +3272,12 @@ box.space.payroll:select{'Jones'}</programlisting>
   
   <varlistentry>
     <term xml:id="limitations-user-count" xreflabel="limitations-user-count">Number of users</term>
+    <listitem><para>32.
+    </para></listitem>
+  </varlistentry>
+  
+  <varlistentry>
+    <term xml:id="limitations-name-length" xreflabel="limitations-name-length">Length of an index name or space name or user name</term>
     <listitem><para>32.
     </para></listitem>
   </varlistentry>
