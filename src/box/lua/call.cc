@@ -46,6 +46,7 @@
 #include "box/box.h"
 #include "box/port.h"
 #include "box/request.h"
+#include "box/engine.h"
 #include "box/txn.h"
 #include "box/access.h"
 #include "box/schema.h"

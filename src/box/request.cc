@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "request.h"
+#include "engine.h"
 #include "txn.h"
 #include "tuple.h"
 #include "index.h"

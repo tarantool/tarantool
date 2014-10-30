@@ -512,7 +512,7 @@ ModifySpace::prepare(struct alter_space *alter)
 	}
 
 	EngineFactory *factory = alter->old_space->engine->factory;
-	if (def.temporary && !engine_can_be_temporary(factory->id)) {
+	if (def.temporary && !engine_can_be_temporary(factory->flags)) {
 		tnt_raise(ClientError, ER_ALTER_SPACE,
 			  (unsigned) def.id,
 			  "space does not support temporary flag");

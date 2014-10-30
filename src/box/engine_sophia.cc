@@ -28,11 +28,11 @@
  */
 #include "cfg.h"
 #include "xrow.h"
-#include "txn.h"
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "engine.h"
 #include "engine_sophia.h"
+#include "txn.h"
 #include "index.h"
 #include "sophia_index.h"
 #include "space.h"

@@ -26,10 +26,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "txn.h"
 #include "tuple.h"
 #include "engine.h"
 #include "engine_memtx.h"
+#include "txn.h"
 #include "index.h"
 #include "hash_index.h"
 #include "tree_index.h"

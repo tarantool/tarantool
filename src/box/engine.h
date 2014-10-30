@@ -186,24 +186,21 @@ EngineFactory *engine_find_id(uint32_t);
 void engine_shutdown();
 
 static inline bool
-engine_transactional(uint32_t id)
+engine_transactional(uint32_t flags)
 {
-	assert(id);
-	return engine_flags[id] & ENGINE_TRANSACTIONAL;
+	return flags & ENGINE_TRANSACTIONAL;
 }
 
 static inline bool
-engine_no_yield(uint32_t id)
+engine_no_yield(uint32_t flags)
 {
-	assert(id);
-	return engine_flags[id] & ENGINE_NO_YIELD;
+	return flags & ENGINE_NO_YIELD;
 }
 
 static inline bool
-engine_can_be_temporary(uint32_t id)
+engine_can_be_temporary(uint32_t flags)
 {
-	assert(id);
-	return engine_flags[id] & ENGINE_CAN_BE_TEMPORARY;
+	return flags & ENGINE_CAN_BE_TEMPORARY;
 }
 
 static inline uint32_t

@@ -26,6 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "engine.h"
 #include "txn.h"
 #include "box.h"
 #include "tuple.h"
@@ -95,7 +96,7 @@ txn_replace(struct txn *txn, struct space *space,
 	 */
 	if (txn->autocommit == false) {
 		if (txn->n_stmts == 1) {
-			if (engine_no_yield(txn->engine)) {
+			if (engine_no_yield(txn->engine->flags)) {
 				trigger_add(&fiber()->on_yield,
 					    &txn->fiber_on_yield);
 				trigger_add(&fiber()->on_stop,
@@ -173,45 +174,18 @@ txn_engine_begin_stmt(struct txn *txn, struct space *space)
 	 */
 	EngineFactory *factory = space->engine->factory;
 	if (txn->n_stmts == 1) {
-		txn->engine = factory->id;
+		txn->engine = factory;
 		if (txn->autocommit == false) {
-			if (! engine_transactional(txn->engine))
+			if (! engine_transactional(txn->engine->flags))
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 				          space->def.engine_name, "transactions");
 		}
 		factory->begin(txn, space);
 		return;
 	}
-	if (txn->engine != engine_id(space->engine))
+	if (txn->engine->id != engine_id(space->engine))
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	factory->begin_stmt(txn, space);
-}
-
-static inline void
-txn_engine_commit(struct txn *txn)
-{
-	if (txn->engine == 0)
-		return;
-	EngineFactory *factory = engine_find_id(txn->engine);
-	factory->commit(txn);
-}
-
-static inline void
-txn_engine_rollback(struct txn *txn)
-{
-	if (txn->engine == 0)
-		return;
-	EngineFactory *factory = engine_find_id(txn->engine);
-	factory->rollback(txn);
-}
-
-static inline void
-txn_engine_finish_stmt(struct txn *txn, struct txn_stmt *stmt)
-{
-	if (txn->engine == 0)
-		return;
-	EngineFactory *factory = engine_find_id(txn->engine);
-	factory->finish_stmt(stmt);
 }
 
 void
@@ -262,7 +236,8 @@ txn_commit(struct txn *txn)
 		if (res)
 			tnt_raise(LoggedError, ER_WAL_IO);
 	}
-	txn_engine_commit(txn);
+	if (txn->engine)
+		txn->engine->commit(txn);
 	trigger_run(&txn->on_commit, txn); /* must not throw. */
 }
 
@@ -273,7 +248,7 @@ txn_finish(struct txn *txn)
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
 			tuple_unref(stmt->old_tuple);
-		txn_engine_finish_stmt(txn, stmt);
+		txn->engine->finish_stmt(stmt);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */
@@ -313,7 +288,8 @@ txn_rollback()
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return;
-	txn_engine_rollback(txn);
+	if (txn->engine)
+		txn->engine->rollback(txn);
 	trigger_run(&txn->on_rollback, txn); /* must not throw. */
 	struct txn_stmt *stmt;
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
