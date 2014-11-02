@@ -376,6 +376,11 @@ print result
        For an example of a Python API for <link xlink:href="https://github.com/tarantool/queue">Queue managers on Tarantool</link>, see 
        <link xlink:href="https://github.com/tarantool/tarantool-queue-python"><filename>https://github.com/tarantool/tarantool-queue-python</filename></link>.
     </para>
+    <para>
+     There is a non-blocking Tarantool client for Python <link xlink:href="https://twistedmatrix.com/trac/">twisted</link>.
+     Its name is txtarantool.
+     Its description can be found on <link xlink:href="https://github.com/zlobspb/txtarantool/blob/master/README.md">https://github.com/zlobspb/txtarantool/blob/master/README.md</link>.
+    </para>
   </section>
 
   <section xml:id="connector-ruby">
