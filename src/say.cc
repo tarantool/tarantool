@@ -210,7 +210,7 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	int r = write(sayfd, buf, p + 1);
 	(void)r;
 
-	if (S_FATAL && sayfd != STDERR_FILENO) {
+	if (level == S_FATAL && sayfd != STDERR_FILENO) {
 		r = write(STDERR_FILENO, buf, p + 1);
 		(void)r;
 	}

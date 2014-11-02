@@ -9,7 +9,7 @@ Build-Depends: cdbs, debhelper (>= 8),
  libmysqlclient-dev,
  libpq-dev
 Section: database
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Homepage: http://tarantool.org/
 VCS-Browser: https://github.com/tarantool/tarantool
 VCS-Git: git://github.com/tarantool/tarantool.git
@@ -17,9 +17,9 @@ VCS-Git: git://github.com/tarantool/tarantool.git
 Package: tarantool-lts-common
 Architecture: all
 Priority: optional
-Conflicts: tarantool-common (<< 1.6)
-Replaces: tarantool-common (<< 1.6)
-Depends: ${misc:Depends}, adduser
+Conflicts: tarantool-common (<< 1.5.3)
+Replaces: tarantool-common (<< 1.5.3)
+Depends: ${misc:Depends}, adduser, lsb-base
 Description: Tarantool in-memory database - common files
  Tarantool is an in-memory database and Lua application server.
  This package provides scripts to work with tarantool configuration
@@ -104,7 +104,7 @@ Architecture: i386 amd64 kfreebsd-i386 kfreebsd-amd64 hurd-i386
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends},
  tarantool-lts (= ${binary:Version}),
- tarantool-modules (= ${binary:Version})
+ tarantool-lts-modules (= ${binary:Version})
 Description: Tarantool in-memory database - sophia bindings
  Tarantool is an in-memory database and Lua application server.
  This package contains a bindings to the Sophia database for

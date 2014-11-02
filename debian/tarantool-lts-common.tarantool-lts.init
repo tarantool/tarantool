@@ -20,6 +20,8 @@ DAEMON=/usr/bin/tarantool_box
 INSTANCES=`find $CONF_DIR -xtype f -name '*.cfg'`
 INSTSCRIPT=/usr/sbin/tarantool_instance
 
+. /lib/lsb/init-functions
+
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
 

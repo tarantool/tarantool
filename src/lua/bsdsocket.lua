@@ -826,7 +826,7 @@ local function getaddrinfo(host, port, timeout, opts)
         if opts.type ~= nil then
             local itype = get_ivalue(internal.SO_TYPE, opts.type)
             if itype == nil then
-                self._errno = box.errno.EINVAL
+                box.errno(box.errno.EINVAL)
                 return nil
             end
             ga_opts.type = itype
@@ -835,7 +835,7 @@ local function getaddrinfo(host, port, timeout, opts)
         if opts.family ~= nil then
             local ifamily = get_ivalue(internal.DOMAIN, opts.family)
             if ifamily == nil then
-                self._errno = box.errno.EINVAL
+                box.errno(box.errno.EINVAL)
                 return nil
             end
             ga_opts.family = ifamily
@@ -844,7 +844,7 @@ local function getaddrinfo(host, port, timeout, opts)
         if opts.protocol ~= nil then
             local p = ffi.C.getprotobyname(opts.protocol)
             if p == nil then
-                self._errno = box.errno(box.errno.EINVAL)
+                box.errno(box.errno.EINVAL)
                 return nil
             end
             ga_opts.protocol = p.p_proto
@@ -854,20 +854,14 @@ local function getaddrinfo(host, port, timeout, opts)
             ga_opts.flags =
                 get_iflags(internal.AI_FLAGS, opts.flags)
             if ga_opts.flags == nil then
-                self._errno = box.errno()
+                box.errno(box.errno.EINVAL)
                 return nil
             end
         end
 
     end
 
-    local r = internal.getaddrinfo(host, port, timeout, ga_opts)
-    if r == nil then
-        self._errno = box.errno()
-    else
-        self._errno = nil
-    end
-    return r
+    return internal.getaddrinfo(host, port, timeout, ga_opts)
 end
 
 local soname_mt = {
