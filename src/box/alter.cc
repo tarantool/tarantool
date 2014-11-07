@@ -1273,7 +1273,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 
 	uint32_t uid = tuple_field_u32(old_tuple ?
 				       old_tuple : new_tuple, ID);
-	struct user_def *old_user = user_cache_find(uid);
+	struct user_def *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def user;
 		user_create_from_tuple(&user, new_tuple);
@@ -1436,8 +1436,8 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user_def *grantor = user_cache_find(priv->grantor_id);
-	struct user_def *grantee = user_cache_find(priv->grantee_id);
+	struct user_def *grantor = user_by_id(priv->grantor_id);
+	struct user_def *grantee = user_by_id(priv->grantee_id);
 	if (grantor == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantor_id));
@@ -1484,7 +1484,7 @@ priv_def_check(struct priv_def *priv)
 static void
 grant_or_revoke(struct priv_def *priv)
 {
-	struct user_def *grantee = user_cache_find(priv->grantee_id);
+	struct user_def *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
 		return;
 	struct access *access = NULL;

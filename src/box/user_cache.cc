@@ -81,7 +81,7 @@ user_map_put_slot(uint8_t auth_token)
 void
 user_cache_replace(struct user_def *user)
 {
-	struct user_def *old = user_cache_find(user->uid);
+	struct user_def *old = user_by_id(user->uid);
 	if (old == NULL) {
 		uint8_t auth_token = user_map_get_slot();
 		old = users + auth_token;
@@ -98,7 +98,7 @@ user_cache_replace(struct user_def *user)
 void
 user_cache_delete(uint32_t uid)
 {
-	struct user_def *old = user_cache_find(uid);
+	struct user_def *old = user_by_id(uid);
 	if (old) {
 		assert(old->auth_token > ADMIN);
 		user_map_put_slot(old->auth_token);
@@ -110,7 +110,7 @@ user_cache_delete(uint32_t uid)
 
 /** Find user by id. */
 struct user_def *
-user_cache_find(uint32_t uid)
+user_by_id(uint32_t uid)
 {
 	mh_int_t k = mh_i32ptr_find(user_registry, uid, NULL);
 	if (k == mh_end(user_registry))
@@ -123,7 +123,7 @@ struct user_def *
 user_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(SC_USER_ID, 2, name, len);
-	struct user_def *user = user_cache_find(uid);
+	struct user_def *user = user_by_id(uid);
 	return user && user->type == SC_USER ? user : NULL;
 }
 

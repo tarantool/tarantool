@@ -68,7 +68,7 @@ user_cache_delete(uint32_t uid);
 
 /** Find user by id. */
 struct user_def *
-user_cache_find(uint32_t uid);
+user_by_id(uint32_t uid);
 
 /* Find a user by name. Used by authentication. */
 struct user_def *

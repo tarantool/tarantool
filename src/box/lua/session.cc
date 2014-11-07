@@ -72,7 +72,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user_def *user = user_cache_find(session()->uid);
+	struct user_def *user = user_by_id(session()->uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -98,7 +98,7 @@ lbox_session_su(struct lua_State *L)
 			tnt_raise(ClientError, ER_NO_SUCH_USER, name);
 	} else {
 		uint32_t uid = lua_tointeger(L, 1);;
-		user = user_cache_find(uid);
+		user = user_by_id(uid);
 		if (user == NULL) {
 			tnt_raise(ClientError, ER_NO_SUCH_USER,
 				  int2str(uid));

@@ -524,7 +524,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		/** Remember and change the current user id. */
 		if (unlikely(func->auth_token >= BOX_USER_MAX)) {
 			/* Optimization: cache auth_token on first access */
-			struct user_def *owner = user_cache_find(func->uid);
+			struct user_def *owner = user_by_id(func->uid);
 			assert(owner != NULL); /* checked by user_has_data() */
 			func->auth_token = owner->auth_token;
 			assert(owner->auth_token < BOX_USER_MAX);
