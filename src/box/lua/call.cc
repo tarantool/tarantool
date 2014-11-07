@@ -537,14 +537,14 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		setuid = true;
 		orig_auth_token = user->auth_token;
 		orig_uid = user->uid;
-		session_set_user(session(), func->auth_token, func->uid);
+		session_set_user(session(), user_by_token(func->auth_token));
 	}
 }
 
 SetuidGuard::~SetuidGuard()
 {
 	if (setuid)
-		session_set_user(session(), orig_auth_token, orig_uid);
+		session_set_user(session(), user_by_token(orig_auth_token));
 }
 
 /**

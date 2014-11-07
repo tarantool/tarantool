@@ -35,7 +35,7 @@
 #include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
-#include "user_def.h"
+#include "user_cache.h"
 
 static struct mh_i32ptr_t *session_registry;
 
@@ -79,7 +79,8 @@ session_create(int fd, uint64_t cookie)
 	session->fiber_on_stop = {
 		rlist_nil, session_on_stop, NULL, NULL
 	};
-	session_set_user(session, ADMIN, ADMIN);
+	/* For on_connect triggers. */
+	session_set_user(session, user_by_token(ADMIN));
 	random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
 	node.key = session->id;
@@ -99,7 +100,7 @@ void
 session_run_on_disconnect_triggers(struct session *session)
 {
 	/* For triggers. */
-	session_set_user(session, ADMIN, ADMIN);
+	session_set_user(session, user_by_token(ADMIN));
 	try {
 		trigger_run(&session_on_disconnect, NULL);
 	} catch (Exception *e) {
@@ -113,8 +114,9 @@ session_run_on_disconnect_triggers(struct session *session)
 void
 session_run_on_connect_triggers(struct session *session)
 {
-	(void) session;
 	trigger_run(&session_on_connect, NULL);
+	/* Set session user to guest, until it is authenticated. */
+	session_set_user(session, user_by_token(GUEST));
 }
 
 void

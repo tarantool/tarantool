@@ -772,8 +772,6 @@ iproto_process_connect(struct iproto_request *request)
 			   IPROTO_GREETING_SIZE);
 		fiber_set_session(fiber(), con->session);
 		session_run_on_connect_triggers(con->session);
-		/* Set session user to guest, until it is authenticated. */
-		session_set_user(con->session, GUEST, GUEST);
 	} catch (ClientError *e) {
 		iproto_reply_error(&iobuf->out, e, request->header.type);
 		try {

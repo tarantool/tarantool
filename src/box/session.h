@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include "trigger.h"
 #include "fiber.h"
+#include "user_def.h"
 
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 
@@ -95,10 +96,10 @@ session_find(uint32_t sid);
 
 /** Set session auth token and user id. */
 static inline void
-session_set_user(struct session *session, uint8_t auth_token, uint32_t uid)
+session_set_user(struct session *session, struct user_def *user)
 {
-	session->auth_token = auth_token;
-	session->uid = uid;
+	session->auth_token = user->auth_token;
+	session->uid = user->uid;
 }
 
 /** Global on-connect triggers. */

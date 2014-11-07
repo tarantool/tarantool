@@ -97,7 +97,7 @@ lbox_session_su(struct lua_State *L)
 	} else {
 		user = user_cache_find(lua_tointeger(L, 1));
 	}
-	session_set_user(session, user->auth_token, user->uid);
+	session_set_user(session, user);
 	return 0;
 }
 

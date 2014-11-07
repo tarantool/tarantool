@@ -54,6 +54,6 @@ authenticate(const char *user_name, uint32_t len,
 	if (scramble_check(scramble, session->salt, user->hash2))
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
 
-	session_set_user(session, user->auth_token, user->uid);
+	session_set_user(session, user);
 }
 
