@@ -118,13 +118,28 @@ user_by_id(uint32_t uid)
 	return (struct user_def *) mh_i32ptr_node(user_registry, k)->val;
 }
 
+struct user_def *
+user_cache_find(uint32_t uid)
+{
+	struct user_def *user = user_by_id(uid);
+	if (user)
+		return user;
+	tnt_raise(ClientError, ER_NO_SUCH_USER, int2str(uid));
+}
+
 /** Find user by name. */
 struct user_def *
-user_by_name(const char *name, uint32_t len)
+user_cache_find_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(SC_USER_ID, 2, name, len);
 	struct user_def *user = user_by_id(uid);
-	return user && user->type == SC_USER ? user : NULL;
+	if (user == NULL || user->type != SC_USER) {
+		char name_buf[BOX_NAME_MAX + 1];
+		/* \0 - to correctly print user name the error message. */
+		snprintf(name_buf, sizeof(name_buf), "%.*s", len, name);
+		tnt_raise(ClientError, ER_NO_SUCH_USER, name_buf);
+	}
+	return user;
 }
 
 void

@@ -1436,12 +1436,9 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user_def *grantor = user_by_id(priv->grantor_id);
+	struct user_def *grantor = user_cache_find(priv->grantor_id);
+	/* May be a role */
 	struct user_def *grantee = user_by_id(priv->grantee_id);
-	if (grantor == NULL) {
-		tnt_raise(ClientError, ER_NO_SUCH_USER,
-			  int2str(priv->grantor_id));
-	}
 	if (grantee == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));

@@ -134,7 +134,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space '#321' does not exist
+- error: Space '321' does not exist
 ...
 _index:insert{_space.id, 0, 'primary', 'tree', 1, 1, 0, 'num'}
 ---

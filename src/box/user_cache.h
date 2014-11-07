@@ -72,7 +72,10 @@ user_by_id(uint32_t uid);
 
 /* Find a user by name. Used by authentication. */
 struct user_def *
-user_by_name(const char *name, uint32_t len);
+user_cache_find(uint32_t uid);
+
+struct user_def *
+user_cache_find_by_name(const char *name, uint32_t len);
 
 /**
  * Return the current user.
@@ -80,7 +83,7 @@ user_by_name(const char *name, uint32_t len);
 #define user()							\
 ({								\
 	struct session *s = session();				\
-	struct user_def *u = &users[s->auth_token];			\
+	struct user_def *u = &users[s->auth_token];		\
 	if (u->auth_token != s->auth_token ||			\
 	    u->uid != s->uid) {					\
 		tnt_raise(ClientError, ER_NO_SUCH_USER,		\

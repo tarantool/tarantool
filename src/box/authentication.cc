@@ -34,13 +34,7 @@ void
 authenticate(const char *user_name, uint32_t len,
 	     const char *tuple, const char * /* tuple_end */)
 {
-	struct user_def *user = user_by_name(user_name, len);
-	if (user == NULL) {
-		char name[BOX_NAME_MAX + 1];
-		/* \0 - to correctly print user name the error message. */
-		snprintf(name, sizeof(name), "%.*s", len, user_name);
-		tnt_raise(ClientError, ER_NO_SUCH_USER, name);
-	}
+	struct user_def *user = user_cache_find_by_name(user_name, len);
 	struct session *session = session();
 	uint32_t part_count = mp_decode_array(&tuple);
 	if (part_count < 2) {

@@ -93,16 +93,9 @@ lbox_session_su(struct lua_State *L)
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
 		const char *name = lua_tolstring(L, 1, &len);
-		user = user_by_name(name, len);
-		if (user == NULL)
-			tnt_raise(ClientError, ER_NO_SUCH_USER, name);
+		user = user_cache_find_by_name(name, len);
 	} else {
-		uint32_t uid = lua_tointeger(L, 1);;
-		user = user_by_id(uid);
-		if (user == NULL) {
-			tnt_raise(ClientError, ER_NO_SUCH_USER,
-				  int2str(uid));
-		}
+		user = user_cache_find(lua_tointeger(L, 1));
 	}
 	session_set_user(session, user->auth_token, user->uid);
 	return 0;
