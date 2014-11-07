@@ -47,6 +47,7 @@
 #include "coio.h"
 #include "xrow.h"
 #include "iproto_constants.h"
+#include "user_def.h"
 
 class IprotoConnectionShutdown: public Exception
 {

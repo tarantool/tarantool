@@ -28,7 +28,8 @@
  */
 #include "alter.h"
 #include "schema.h"
-#include "access.h"
+#include "user_def.h"
+#include "user_cache.h"
 #include "space.h"
 #include "txn.h"
 #include "tuple.h"
@@ -39,6 +40,7 @@
 #include <stdio.h> /* snprintf() */
 #include <ctype.h>
 #include "cluster.h" /* for cluster_set_uuid() */
+#include "session.h" /* to fetch the current user. */
 
 /** _space columns */
 #define ID               0
@@ -70,7 +72,7 @@
 void
 access_check_ddl(uint32_t owner_uid)
 {
-	struct user *user = user();
+	struct user_def *user = user();
 	/*
 	 * Only the creator of the space or superuser can modify
 	 * the space, since we don't have ALTER privilege.
@@ -1155,7 +1157,7 @@ user_has_data(uint32_t uid)
  */
 
 void
-user_fill_auth_data(struct user *user, const char *auth_data)
+user_fill_auth_data(struct user_def *user, const char *auth_data)
 {
 	uint8_t type = mp_typeof(*auth_data);
 	if (type == MP_ARRAY || type == MP_NIL) {
@@ -1199,7 +1201,7 @@ user_fill_auth_data(struct user *user, const char *auth_data)
 }
 
 void
-user_create_from_tuple(struct user *user, struct tuple *tuple)
+user_create_from_tuple(struct user_def *user, struct tuple *tuple)
 {
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
@@ -1252,7 +1254,7 @@ user_cache_alter_user(struct trigger * /* trigger */, void *event)
 {
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_stmt(txn);
-	struct user user;
+	struct user_def user;
 	user_create_from_tuple(&user, stmt->new_tuple);
 	user_cache_replace(&user);
 }
@@ -1271,9 +1273,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 
 	uint32_t uid = tuple_field_u32(old_tuple ?
 				       old_tuple : new_tuple, ID);
-	struct user *old_user = user_cache_find(uid);
+	struct user_def *old_user = user_cache_find(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
-		struct user user;
+		struct user_def user;
 		user_create_from_tuple(&user, new_tuple);
 		(void) user_cache_replace(&user);
 		struct trigger *on_rollback =
@@ -1305,7 +1307,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * password) but first check that the change is
 		 * correct.
 		 */
-		struct user user;
+		struct user_def user;
 		user_create_from_tuple(&user, new_tuple);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_alter_user, NULL);
@@ -1434,8 +1436,8 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user *grantor = user_cache_find(priv->grantor_id);
-	struct user *grantee = user_cache_find(priv->grantee_id);
+	struct user_def *grantor = user_cache_find(priv->grantor_id);
+	struct user_def *grantee = user_cache_find(priv->grantee_id);
 	if (grantor == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantor_id));
@@ -1482,7 +1484,7 @@ priv_def_check(struct priv_def *priv)
 static void
 grant_or_revoke(struct priv_def *priv)
 {
-	struct user *grantee = user_cache_find(priv->grantee_id);
+	struct user_def *grantee = user_cache_find(priv->grantee_id);
 	if (grantee == NULL)
 		return;
 	struct access *access = NULL;

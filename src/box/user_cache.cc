@@ -26,11 +26,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "access.h"
+#include "user_cache.h"
+#include "user_def.h"
 #include "assoc.h"
 #include "schema.h"
 
-struct user users[BOX_USER_MAX];
+struct user_def users[BOX_USER_MAX];
 /** Bitmap type for used/unused authentication token map. */
 typedef unsigned long user_map_t;
 
@@ -69,7 +70,7 @@ user_map_get_slot()
 void
 user_map_put_slot(uint8_t auth_token)
 {
-	memset(users + auth_token, 0, sizeof(struct user));
+	memset(users + auth_token, 0, sizeof(struct user_def));
 	uint32_t bit_no = auth_token & (sizeof(user_map_t) * CHAR_BIT - 1);
 	auth_token /= sizeof(user_map_t) * CHAR_BIT;
 	user_map[auth_token] |= ((user_map_t) 1) << bit_no;
@@ -77,20 +78,10 @@ user_map_put_slot(uint8_t auth_token)
 		user_map_idx = auth_token;
 }
 
-const char *
-priv_name(uint8_t access)
-{
-	if (access & PRIV_R)
-		return "Read";
-	if (access & PRIV_W)
-		return "Write";
-	return "Execute";
-}
-
 void
-user_cache_replace(struct user *user)
+user_cache_replace(struct user_def *user)
 {
-	struct user *old = user_cache_find(user->uid);
+	struct user_def *old = user_cache_find(user->uid);
 	if (old == NULL) {
 		uint8_t auth_token = user_map_get_slot();
 		old = users + auth_token;
@@ -107,7 +98,7 @@ user_cache_replace(struct user *user)
 void
 user_cache_delete(uint32_t uid)
 {
-	struct user *old = user_cache_find(uid);
+	struct user_def *old = user_cache_find(uid);
 	if (old) {
 		assert(old->auth_token > ADMIN);
 		user_map_put_slot(old->auth_token);
@@ -118,21 +109,21 @@ user_cache_delete(uint32_t uid)
 }
 
 /** Find user by id. */
-struct user *
+struct user_def *
 user_cache_find(uint32_t uid)
 {
 	mh_int_t k = mh_i32ptr_find(user_registry, uid, NULL);
 	if (k == mh_end(user_registry))
 		return NULL;
-	return (struct user *) mh_i32ptr_node(user_registry, k)->val;
+	return (struct user_def *) mh_i32ptr_node(user_registry, k)->val;
 }
 
 /** Find user by name. */
-struct user *
+struct user_def *
 user_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(SC_USER_ID, 2, name, len);
-	struct user *user = user_cache_find(uid);
+	struct user_def *user = user_cache_find(uid);
 	return user && user->type == SC_USER ? user : NULL;
 }
 
@@ -149,7 +140,7 @@ user_cache_init()
 	 * for 'guest' and 'admin' users here, they will be
 	 * updated with snapshot contents during recovery.
 	 */
-	struct user guest;
+	struct user_def guest;
 	memset(&guest, 0, sizeof(guest));
 	snprintf(guest.name, sizeof(guest.name), "guest");
 	guest.owner = ADMIN;
@@ -160,7 +151,7 @@ user_cache_init()
 	       guest.uid == GUEST &&
 	       users[guest.auth_token].uid == guest.uid);
 
-	struct user admin;
+	struct user_def admin;
 	memset(&admin, 0, sizeof(admin));
 	snprintf(admin.name, sizeof(admin.name), "admin");
 	admin.uid = admin.owner = ADMIN;

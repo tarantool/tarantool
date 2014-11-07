@@ -47,8 +47,11 @@
 #include "box/port.h"
 #include "box/request.h"
 #include "box/txn.h"
-#include "box/access.h"
+#include "box/user_def.h"
+#include "box/user_cache.h"
 #include "box/schema.h"
+#include "box/session.h"
+#include "box/iproto_constants.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char session_lua[],
@@ -474,12 +477,12 @@ struct SetuidGuard
 	uint32_t orig_uid;
 
 	inline SetuidGuard(const char *name, uint32_t name_len,
-			   struct user *user, uint8_t access);
+			   struct user_def *user, uint8_t access);
 	inline ~SetuidGuard();
 };
 
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
-			 struct user *user, uint8_t access)
+			 struct user_def *user, uint8_t access)
 	:setuid(false)
 	,orig_auth_token(GUEST) /* silence gnu warning */
 	,orig_uid(GUEST)
@@ -521,7 +524,7 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		/** Remember and change the current user id. */
 		if (unlikely(func->auth_token >= BOX_USER_MAX)) {
 			/* Optimization: cache auth_token on first access */
-			struct user *owner = user_cache_find(func->uid);
+			struct user_def *owner = user_cache_find(func->uid);
 			assert(owner != NULL); /* checked by user_has_data() */
 			func->auth_token = owner->auth_token;
 			assert(owner->auth_token < BOX_USER_MAX);
@@ -546,7 +549,7 @@ SetuidGuard::~SetuidGuard()
 void
 box_lua_call(struct request *request, struct port *port)
 {
-	struct user *user = user();
+	struct user_def *user = user();
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;

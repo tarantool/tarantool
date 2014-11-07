@@ -35,6 +35,7 @@
 #include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
+#include "user_def.h"
 
 static struct mh_i32ptr_t *session_registry;
 

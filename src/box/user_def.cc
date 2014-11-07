@@ -26,40 +26,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "user_cache.h"
 #include "user_def.h"
-#include "session.h"
-
-void
-authenticate(const char *user_name, uint32_t len,
-	     const char *tuple, const char * /* tuple_end */)
+const char *
+priv_name(uint8_t access)
 {
-	struct user_def *user = user_by_name(user_name, len);
-	if (user == NULL) {
-		char name[BOX_NAME_MAX + 1];
-		/* \0 - to correctly print user name the error message. */
-		snprintf(name, sizeof(name), "%.*s", len, user_name);
-		tnt_raise(ClientError, ER_NO_SUCH_USER, name);
-	}
-	struct session *session = session();
-	uint32_t part_count = mp_decode_array(&tuple);
-	if (part_count < 2) {
-		/* Expected at least: authentication mechanism and data. */
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "authentication request body");
-	}
-	mp_next(&tuple); /* Skip authentication mechanism. */
-	uint32_t scramble_len;
-	const char *scramble = mp_decode_str(&tuple, &scramble_len);
-	if (scramble_len != SCRAMBLE_SIZE) {
-		/* Authentication mechanism, data. */
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "invalid scramble size");
-	}
-
-	if (scramble_check(scramble, session->salt, user->hash2))
-		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
-
-	session_set_user(session, user->auth_token, user->uid);
+	if (access & PRIV_R)
+		return "Read";
+	if (access & PRIV_W)
+		return "Write";
+	return "Execute";
 }
 

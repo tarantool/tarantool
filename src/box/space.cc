@@ -33,12 +33,14 @@
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "trigger.h"
-#include "access.h"
+#include "user_def.h"
+#include "user_cache.h"
+#include "session.h"
 
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct user *user = user();
+	struct user_def *user = user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required

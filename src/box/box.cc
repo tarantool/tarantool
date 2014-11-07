@@ -50,9 +50,10 @@
 #include "request.h"
 #include "txn.h"
 #include "fiber.h"
-#include "access.h"
+#include "user_cache.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "iproto_constants.h"
 
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);

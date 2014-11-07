@@ -29,7 +29,8 @@
 #include "session.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
-#include "box/access.h"
+#include "box/user_cache.h"
+#include "box/user_def.h"
 
 extern "C" {
 #include <lua.h>
@@ -71,7 +72,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_cache_find(session()->uid);
+	struct user_def *user = user_cache_find(session()->uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -88,7 +89,7 @@ lbox_session_su(struct lua_State *L)
 	struct session *session = session();
 	if (session == NULL)
 		luaL_error(L, "session.su(): session does not exit");
-	struct user *user;
+	struct user_def *user;
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
 		const char *name = lua_tolstring(L, 1, &len);
