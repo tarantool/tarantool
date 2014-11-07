@@ -1321,6 +1321,17 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 {
 	func->fid = tuple_field_u32(tuple, ID);
 	func->uid = tuple_field_u32(tuple, UID);
+	/*
+	 * Do not initialize the privilege cache right away since
+	 * when loading up a function definition during recovery,
+	 * user cache may not be filled up yet (space _user is
+	 * recovered after space _func), so no user cache entry
+	 * may exist yet for such user.  The cache will be filled
+	 * up on demand upon first access.
+	 *
+	 * Later on consistency of the cache is ensured by DDL
+	 * checks (see user_has_data()).
+	 */
 	func->auth_token = BOX_USER_MAX; /* invalid value */
 	func->setuid = false;
 	const char *name = tuple_field_cstr(tuple, NAME);

@@ -523,7 +523,12 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	if (func->setuid) {
 		/** Remember and change the current user id. */
 		if (unlikely(func->auth_token >= BOX_USER_MAX)) {
-			/* Optimization: cache auth_token on first access */
+			/*
+			 * Fill the cache upon first access, since
+			 * when func_def is created, no user may
+			 * be around to fill it (recovery of
+			 * system spaces from a snapshot).
+			 */
 			struct user_def *owner = user_by_id(func->uid);
 			assert(owner != NULL); /* checked by user_has_data() */
 			func->auth_token = owner->auth_token;
