@@ -44,14 +44,15 @@ class TestSuite:
         self.ini["core"] = "tarantool"
 
         if os.access(suite_path, os.F_OK) == False:
-            raise RuntimeError("Suite \"" + suite_path + \
-                               "\" doesn't exist")
+            raise RuntimeError("Suite %s doesn't exist" % repr(suite_path))
 
         # read the suite config
         config = ConfigParser.ConfigParser()
         config.read(os.path.join(suite_path, "suite.ini"))
         self.ini.update(dict(config.items("default")))
         self.ini.update(self.args.__dict__)
+        if self.args.stress is None and self.ini['core'] == 'stress':
+            return
 
         for i in ["script"]:
             self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
@@ -59,10 +60,9 @@ class TestSuite:
             self.ini[i] = dict.fromkeys(self.ini[i].split()) if i in self.ini else dict()
         for i in ["lua_libs"]:
             self.ini[i] = map(lambda x: os.path.join(suite_path, x),
-                    dict.fromkeys(self.ini[i].split()) if i in self.ini else
-                    dict())
+                    dict.fromkeys(self.ini[i].split()) if i in self.ini else dict())
         try:
-            if self.ini['core'] == 'tarantool':
+            if self.ini['core'] in ['tarantool', 'stress']:
                 self.server = TarantoolServer(self.ini)
             else:
                 self.server = Server(self.ini)
@@ -98,7 +98,6 @@ class TestSuite:
         color_stdout(shortsep, "\n", schema='separator')
         failed_tests = []
         try:
-            self.server.cleanup()
             for test in self.tests:
                 color_stdout(test.name.ljust(48), schema='t_name')
                 # for better diagnostics in case of a long-running test
@@ -119,6 +118,8 @@ class TestSuite:
             color_stdout("\n%s\n" % shortsep, schema='separator')
             self.server.stop(silent=False)
             raise
+        finally:
+            self.server.cleanup()
 
         if failed_tests:
             color_stdout("Failed {0} tests: {1}.\n".format(len(failed_tests),

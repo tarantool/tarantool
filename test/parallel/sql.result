@@ -9,9 +9,25 @@ s = box.schema.create_space('tweedledum', { id = 0 })
 ...
 s:create_index('primary', { type = 'tree', parts = { 1, 'str'} })
 ---
+- unique: true
+  parts:
+  - type: STR
+    fieldno: 1
+  id: 0
+  space_id: 0
+  name: primary
+  type: TREE
 ...
 s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'str'}})
 ---
+- unique: false
+  parts:
+  - type: STR
+    fieldno: 2
+  id: 1
+  space_id: 0
+  name: secondary
+  type: TREE
 ...
 #
 # A test case for Bug#729758

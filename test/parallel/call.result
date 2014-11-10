@@ -188,6 +188,14 @@ space = box.schema.create_space('tweedledum', { id = 0 })
 ...
 space:create_index('primary', { type = 'hash' })
 ---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 0
+  name: primary
+  type: HASH
 ...
 function myreplace(...) return space:replace{...} end
 ---

@@ -228,32 +228,51 @@ class TestStatus(object):
         pass
 
 class Supervisor(object):
-    def __init__(self):
-        self.name      = 'parallel'
-        self.server    = TarantoolServer({
-            'core'  : 'tarantool',
-            'script': 'parallel/box.lua',
-            'vardir': 'var_parallel'
-        })
+    def __init__(self, suite_path, args):
+        self.args = args
+        self.tests = []
+        self.suite_path = suite_path
+        self.ini = {
+                'core': 'tarantool',
+                'script': os.path.join(suite_path, 'parallel.lua'),
+        }
+
+        # read suite config
+        config = ConfigParser.ConfigParser()
+        config.read(os.path.join(suite_path, "suite.ini"))
+        self.ini.update(dict(config.items("default")))
+        self.ini.update(self.args.__dict__)
+        self.jobs = int(self.ini.get('jobs', 1))
+        self.count = int(self.ini.get('count', 0))
+
+        for i in ["script"]:
+            self.ini[i] = os.path.join(suite_path, self.ini[i]) if i in self.ini else None
+        self.server = TarantoolServer(self.ini)
         self.pool = None
         self.iterator = None
 
     def search_tests(self):
-        self.tests  = []
         self.tests += [Parallel_PythonTest(k) \
-                for k in sorted(glob.glob(os.path.join(self.name, "*.test.py" )))]
-#        self.tests += [Parallel_LuaTest(k)    \
-#                for k in sorted(glob.glob(os.path.join(self.name, "*.test.lua")))]
+                for k in sorted(glob.glob(os.path.join(self.suite_path, "*.test.py" )))]
 
     def take_rand(self):
-        while True:
-            sql = self.server.sql.ret_copy()
-            admin = self.server.admin.ret_copy()
-            yield [random.choice(self.tests), [sql, admin]]
+        if self.count != 0:
+            for test in self.tests:
+                sql = self.server.sql.ret_copy()
+                admin = self.server.admin.ret_copy()
+                yield [test, [sql, admin]]
+        else:
+            while True:
+                sql = self.server.sql.ret_copy()
+                admin = self.server.admin.ret_copy()
+                yield [random.choice(self.tests), [sql, admin]]
 
-    def run(self, jobs):
+    def run(self):
         self.search_tests()
-        self.pool = Parallel_Pool(processes = jobs)
+        if self.count != 0:
+            self.tests *= self.count
+            random.shuffle(self.tests)
+        self.pool = Parallel_Pool(processes = self.jobs)
         self.iterator = self.pool.run()
         self.filler = self.pool.fill(self.take_rand())
         try:
@@ -279,7 +298,7 @@ class Supervisor(object):
                             if stat.status != 3:
                                 logger.info('>>>> Test %s finished' % repr(task.name))
                             else:
-                                logger.info('>>>> Test %s failed with %s' %
+                                logger.error('>>>> Test %s failed with %s' %
                                         (repr(task.name), stat.message))
                         except (QueueEmpty, StopIteration):
                             break
@@ -373,5 +392,4 @@ class Parallel_PythonTest(Parallel_FuncTest): pass
 
 if __name__ == '__main__':
     TarantoolServer.find_exe('..')
-    sup = Supervisor()
-    sup.run(1)
+    Supervisor().run()
