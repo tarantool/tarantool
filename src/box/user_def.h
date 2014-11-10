@@ -73,4 +73,12 @@ struct user_def {
 /** Predefined user ids. */
 enum { GUEST = 0, ADMIN =  1, PUBLIC = 2 /* role */ };
 
+static inline void
+current_user_init(struct current_user *user, struct user_def *def)
+{
+	user->auth_token = def->auth_token;
+	user->universal_access = def->universal_access.effective;
+	user->uid = def->uid;
+}
+
 #endif /* TARANTOOL_BOX_USER_DEF_H_INCLUDED */

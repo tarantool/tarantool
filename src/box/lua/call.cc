@@ -471,21 +471,17 @@ struct SetuidGuard
 {
 	/** True if the function was set-user-id one. */
 	bool setuid;
-	/** Original authentication token, only set if setuid = true. */
-	uint8_t orig_auth_token;
-	/** Original user id, only set if setuid = true. */
-	uint32_t orig_uid;
+	struct current_user *orig_user;
 
 	inline SetuidGuard(const char *name, uint32_t name_len,
-			   struct user_def *user, uint8_t access);
+			   uint8_t access);
 	inline ~SetuidGuard();
 };
 
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
-			 struct user_def *user, uint8_t access)
+			 uint8_t access)
 	:setuid(false)
-	,orig_auth_token(GUEST) /* silence gnu warning */
-	,orig_uid(GUEST)
+	,orig_user(current_user())
 {
 
 	/*
@@ -493,9 +489,9 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if (user->universal_access.effective & PRIV_ALL)
+	if (orig_user->universal_access & PRIV_ALL)
 		return;
-	access &= ~user->universal_access.effective;
+	access &= ~orig_user->universal_access;
 	/*
 	 * We need to look up the function by name even if
 	 * the user has access to it, since it could require
@@ -511,40 +507,37 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		 */
 		return;
 	}
-	if (func == NULL || (func->uid != user->uid &&
-	     access & ~func->access[user->auth_token].effective)) {
+	if (func == NULL || (func->uid != orig_user->uid &&
+	     access & ~func->access[orig_user->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
+		struct user_def *def = user_cache_find(orig_user->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->name, name_buf);
+			  priv_name(access), def->name, name_buf);
 	}
 	if (func->setuid) {
 		/** Remember and change the current user id. */
-		if (unlikely(func->auth_token >= BOX_USER_MAX)) {
+		if (unlikely(func->setuid_user.auth_token >= BOX_USER_MAX)) {
 			/*
 			 * Fill the cache upon first access, since
 			 * when func_def is created, no user may
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user_def *owner = user_by_id(func->uid);
-			assert(owner != NULL); /* checked by user_has_data() */
-			func->auth_token = owner->auth_token;
-			assert(owner->auth_token < BOX_USER_MAX);
+			struct user_def *owner = user_cache_find(func->uid);
+			current_user_init(&func->setuid_user, owner);
 		}
 		setuid = true;
-		orig_auth_token = user->auth_token;
-		orig_uid = user->uid;
-		session_set_user(session(), user_by_token(func->auth_token));
+		fiber_set_user(fiber(), &func->setuid_user);
 	}
 }
 
 SetuidGuard::~SetuidGuard()
 {
 	if (setuid)
-		session_set_user(session(), user_by_token(orig_auth_token));
+		fiber_set_user(fiber(), orig_user);
 }
 
 /**
@@ -554,7 +547,6 @@ SetuidGuard::~SetuidGuard()
 void
 box_lua_call(struct request *request, struct port *port)
 {
-	struct user_def *user = user();
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;
@@ -569,7 +561,7 @@ box_lua_call(struct request *request, struct port *port)
 	 * https://github.com/tarantool/tarantool/issues/300
 	 * - if a function does not exist, say it first.
 	 */
-	SetuidGuard setuid(name, name_len, user, PRIV_X);
+	SetuidGuard setuid(name, name_len, PRIV_X);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

@@ -56,23 +56,31 @@ static const char *sessionlib_name = "box.session";
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, session()->id);
+	lua_pushnumber(L, current_session()->id);
 	return 1;
 }
 
-/** Session user id. */
+/**
+ * Session user id.
+ * Note: effective user id (current_user()->uid)
+ * may be different in a setuid function.
+ */
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, session()->uid);
+	lua_pushnumber(L, current_session()->user.uid);
 	return 1;
 }
 
-/** Session user id. */
+/**
+ * Session user name.
+ * Note: effective user name may be different in
+ * a setuid function.
+ */
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user_def *user = user_by_id(session()->uid);
+	struct user_def *user = user_by_id(current_session()->user.uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -86,7 +94,7 @@ lbox_session_su(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "session.su(): bad arguments");
-	struct session *session = session();
+	struct session *session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.su(): session does not exit");
 	struct user_def *user;
@@ -97,7 +105,7 @@ lbox_session_su(struct lua_State *L)
 	} else {
 		user = user_cache_find(lua_tointeger(L, 1));
 	}
-	session_set_user(session, user);
+	current_user_init(&session->user, user);
 	return 0;
 }
 
@@ -143,15 +151,14 @@ lbox_session_peer(struct lua_State *L)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
 	int fd;
-	if (lua_gettop(L) == 1) {
-		struct session *session = session_find(luaL_checkint(L, 1));
-		if (session == NULL)
-			luaL_error(L, "session.peer(): session does not exit");
-		fd = session->fd;
-	} else {
-		fd = session()->fd;
-	}
-
+	struct session *session;
+	if (lua_gettop(L) == 1)
+		session = session_find(luaL_checkint(L, 1));
+	else
+		session = current_session();
+	if (session == NULL)
+		luaL_error(L, "session.peer(): session does not exit");
+	fd = session->fd;
 	if (fd < 0) {
 		lua_pushnil(L); /* no associated peer */
 		return 1;

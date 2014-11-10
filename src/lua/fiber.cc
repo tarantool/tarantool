@@ -260,7 +260,7 @@ lbox_fiber_info(struct lua_State *L)
 }
 
 static void
-box_lua_fiber_run_detached(va_list ap)
+box_lua_fiber_run(va_list ap)
 {
 	LuarefGuard coro_guard(va_arg(ap, int));
 	struct lua_State *L = va_arg(ap, struct lua_State *);
@@ -270,7 +270,6 @@ box_lua_fiber_run_detached(va_list ap)
 			fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
 		if (storage_ref > 0)
 			lua_unref(L, storage_ref);
-		fiber_set_key(fiber(), FIBER_KEY_LUA_STORAGE, NULL);
 	});
 
 	try {
@@ -293,7 +292,7 @@ lbox_fiber_create(struct lua_State *L)
 		luaL_error(L, "fiber.create(function, ...): bad arguments");
 	fiber_checkstack();
 
-	struct fiber *f = fiber_new("lua", box_lua_fiber_run_detached);
+	struct fiber *f = fiber_new("lua", box_lua_fiber_run);
 	/* Not a system fiber. */
 	f->flags |= FIBER_USER_MODE;
 	struct lua_State *child_L = lua_newthread(L);

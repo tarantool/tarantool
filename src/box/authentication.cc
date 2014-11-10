@@ -35,7 +35,7 @@ authenticate(const char *user_name, uint32_t len,
 	     const char *tuple, const char * /* tuple_end */)
 {
 	struct user_def *user = user_cache_find_by_name(user_name, len);
-	struct session *session = session();
+	struct session *session = current_session();
 	uint32_t part_count = mp_decode_array(&tuple);
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
@@ -54,6 +54,6 @@ authenticate(const char *user_name, uint32_t len,
 	if (scramble_check(scramble, session->salt, user->hash2))
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
 
-	session_set_user(session, user);
+	current_user_init(&session->user, user);
 }
 

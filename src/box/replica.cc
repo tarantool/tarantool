@@ -40,9 +40,9 @@
 #include "recovery.h"
 #include "xrow.h"
 #include "msgpuck/msgpuck.h"
-#include "session.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
+#include "box/session.h"
 
 static const int RECONNECT_DELAY = 1.0;
 
@@ -223,8 +223,6 @@ pull_from_remote(va_list ap)
 	struct ev_io coio;
 	struct iobuf *iobuf = NULL;
 	ev_loop *loop = loop();
-	/** This fiber executes transactions. */
-	SessionGuard session_guard(-1, 0);
 
 	coio_init(&coio);
 

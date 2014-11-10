@@ -40,11 +40,11 @@ enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
  * Abstraction of a single user session:
  * for now, only provides accounting of established
  * sessions and on-connect/on-disconnect event
- * handling, in future: user credentials, protocol, etc.
+ * handling, user credentials. In future: the
+ * client/server protocol, etc.
  * Session identifiers grow monotonically.
  * 0 sid is reserved to mean 'no session'.
  */
-
 struct session {
 	/** Session id. */
 	uint32_t id;
@@ -54,10 +54,8 @@ struct session {
 	uint64_t cookie;
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
-	/** A look up key to quickly find session user. */
-	uint8_t auth_token;
-	/** User id of the authenticated user. */
-	uint32_t uid;
+	/** Cached user id and global grants */
+	struct current_user user;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
 };
@@ -94,14 +92,6 @@ session_destroy(struct session *);
 struct session *
 session_find(uint32_t sid);
 
-/** Set session auth token and user id. */
-static inline void
-session_set_user(struct session *session, struct user_def *user)
-{
-	session->auth_token = user->auth_token;
-	session->uid = user->uid;
-}
-
 /** Global on-connect triggers. */
 extern struct rlist session_on_connect;
 
@@ -125,10 +115,10 @@ session_free();
 void
 session_storage_cleanup(int sid);
 
-static inline struct session *
-fiber_get_session(struct fiber *fiber)
+static inline void
+fiber_set_user(struct fiber *fiber, struct current_user *user)
 {
-	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
+	fiber_set_key(fiber, FIBER_KEY_USER, user);
 }
 
 static inline void
@@ -137,29 +127,56 @@ fiber_set_session(struct fiber *fiber, struct session *session)
 	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
 }
 
-#define session() ({\
-	struct session *s = fiber_get_session(fiber());				\
-	/* Create session on demand */						\
-	if (s == NULL) {							\
-		s = session_create(-1, 0);					\
-		fiber_set_session(fiber(), s);					\
-		/* Add a trigger to destroy session on fiber stop */		\
-		trigger_add(&fiber()->on_stop, &s->fiber_on_stop);		\
-	}									\
-	s; })
+/**
+ * Create a new session on demand, and set fiber on_stop
+ * trigger to destroy it when this fiber ends.
+ */
+struct session *
+session_create_on_demand();
 
-/** A helper class to create and set session in single-session fibers. */
-struct SessionGuard
-{
-	struct session *session;
-	SessionGuard(int fd, uint64_t cookie);
-	~SessionGuard();
-};
+/*
+ * For use in local hot standby, which runs directly
+ * from ev watchers (without current fiber), but needs
+ * to execute transactions.
+ */
+extern struct current_user admin_user;
 
-struct SessionGuardWithTriggers: public SessionGuard
+/*
+ * When creating a new fiber, the database (box)
+ * may not be initialized yet. When later on
+ * this fiber attempts to access the database,
+ * we have no other choice but initialize fiber-specific
+ * database state (something like a database connection)
+ * on demand. This is why this function needs to
+ * check whether or not the current session exists
+ * and create it otherwise.
+ */
+static inline struct session *
+current_session()
 {
-	SessionGuardWithTriggers(int fd, uint64_t cookie);
-	~SessionGuardWithTriggers();
-};
+	struct session *s = (struct session *)
+		fiber_get_key(fiber(), FIBER_KEY_SESSION);
+	return s ? s : session_create_on_demand();
+}
+
+/*
+ * Return the current user. Create it if it doesn't
+ * exist yet.
+ * The same rationale for initializing the current
+ * user on demand as in current_session() applies.
+ */
+static inline struct current_user *
+current_user()
+{
+	struct current_user *u =
+		(struct current_user *) fiber_get_key(fiber(),
+						      FIBER_KEY_USER);
+	if (u == NULL) {
+		session_create_on_demand();
+		u = (struct current_user *) fiber_get_key(fiber(),
+							  FIBER_KEY_USER);
+	}
+	return u;
+}
 
 #endif /* INCLUDES_TARANTOOL_SESSION_H */

@@ -57,10 +57,6 @@ extern "C" {
 #include "lua/pickle.h"
 #include "lua/fio.h"
 
-#include <ctype.h>
-#include "small/region.h"
-#include <stdio.h>
-#include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 

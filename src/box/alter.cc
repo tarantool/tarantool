@@ -72,14 +72,15 @@
 void
 access_check_ddl(uint32_t owner_uid)
 {
-	struct user_def *user = user();
+	struct current_user *user = current_user();
 	/*
 	 * Only the creator of the space or superuser can modify
 	 * the space, since we don't have ALTER privilege.
 	 */
 	if (owner_uid != user->uid && user->uid != ADMIN) {
+		struct user_def *def = user_cache_find(user->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", user->name);
+			  "Create or drop", def->name);
 	}
 }
 
@@ -1321,6 +1322,7 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 {
 	func->fid = tuple_field_u32(tuple, ID);
 	func->uid = tuple_field_u32(tuple, UID);
+	func->setuid = false;
 	/*
 	 * Do not initialize the privilege cache right away since
 	 * when loading up a function definition during recovery,
@@ -1332,8 +1334,7 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 	 * Later on consistency of the cache is ensured by DDL
 	 * checks (see user_has_data()).
 	 */
-	func->auth_token = BOX_USER_MAX; /* invalid value */
-	func->setuid = false;
+	func->setuid_user.auth_token = BOX_USER_MAX; /* invalid value */
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(func->name)) {
@@ -1498,8 +1499,14 @@ grant_or_revoke(struct priv_def *priv)
 	struct access *access = NULL;
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
+	{
 		access = &grantee->universal_access;
+		/** Update cache at least in the current session. */
+		struct current_user *user = current_user();
+		if (grantee->uid == user->uid)
+			user->universal_access = priv->access;
 		break;
+	}
 	case SC_SPACE:
 	{
 		struct space *space = space_by_id(priv->object_id);
