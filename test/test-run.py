@@ -177,7 +177,7 @@ def main():
             suite_names = [suite_name for suite_name in suite_names if suite_name.find(options.args.stress) != -1]
             suites = [Supervisor(suite_name, options.args) for suite_name in sorted(suite_names)]
             for suite in suites:
-                failed_tests.extend(suite.run())
+                suite.run_all()
     except RuntimeError as e:
         color_stdout("\nFatal error: %s. Execution aborted.\n" % e, schema='error')
         if options.args.gdb:

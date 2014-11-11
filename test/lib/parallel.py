@@ -48,19 +48,22 @@ class Parallel_Process(MProcess):
         super(Parallel_Process, self).__init__(**kwargs)
 
     def run(self):
-        queuein  = self._args[0]
-        queueout = self._args[1]
-        while True:
-            logger.debug("||_process.run > getting job")
-            obj = queuein.get()
-            logger.debug("||_process.run > ok, it's great")
-            assert obj
-            assert len(obj) == 2
-            assert callable(obj[0])
-            assert isinstance(obj[1], (tuple, list))
-            retv = obj[0](*obj[1])
-            logger.debug("||_process.run > job is done, let's put into outqueue")
-            queueout.put(retv)
+        try:
+            queuein  = self._args[0]
+            queueout = self._args[1]
+            while True:
+                logger.debug("||_process.run > getting job")
+                obj = queuein.get()
+                logger.debug("||_process.run > ok, it's great")
+                assert obj
+                assert len(obj) == 2
+                assert callable(obj[0])
+                assert isinstance(obj[1], (tuple, list))
+                retv = obj[0](*obj[1])
+                logger.debug("||_process.run > job is done, let's put into outqueue")
+                queueout.put(retv)
+        except EOFError:
+            pass
 
 class Parallel_PoolException(Exception):
     def __init__(self, message):
@@ -206,7 +209,7 @@ class Parallel_FilteredStream(object):
         return self.stream.getvalue()
 
 class TestStatus(object):
-    def __init__(self, status):
+    def __init__(self, status, reject = ''):
         if isinstance(status, basestring):
             status = status.lower()
             if (status == "pass"):
@@ -217,6 +220,7 @@ class TestStatus(object):
                 status = 2
             else:
                 status = 3
+        self.reject = reject
         self.status = status
         self.message = ''
 
@@ -267,7 +271,7 @@ class Supervisor(object):
                 admin = self.server.admin.ret_copy()
                 yield [random.choice(self.tests), [sql, admin]]
 
-    def run(self):
+    def run_all(self):
         self.search_tests()
         if self.count != 0:
             self.tests *= self.count
@@ -298,8 +302,8 @@ class Supervisor(object):
                             if stat.status != 3:
                                 logger.info('>>>> Test %s finished' % repr(task.name))
                             else:
-                                logger.error('>>>> Test %s failed with %s' %
-                                        (repr(task.name), stat.message))
+                                logger.error('>>>> Test %s failed with %s (%s)' %
+                                        (repr(task.name), stat.message, stat.reject))
                         except (QueueEmpty, StopIteration):
                             break
             except StopIteration:
@@ -340,7 +344,7 @@ class Parallel_Test(object):
             self.is_executed_ok = True
         except Exception as e:
             logger.error("||_Test.run > Exception '%s' was thrown for '%s'" % (type(e), str(e)))
-            logger.error(traceback.format_exc())
+            #logger.error(traceback.format_exc())
             with open(self.reject, 'a') as reject:
                 traceback.print_exc(e, reject)
             self.diagnostics = str(e)
@@ -374,7 +378,7 @@ class Parallel_Test(object):
                 where = "test execution aborted, reason '{0}'".format(self.diagnostics)
             elif not self.is_equal_result:
                 where = "wrong test output"
-            return TestStatus("fail").set_message(where)
+            return TestStatus("fail", self.reject).set_message(where)
 
     def __call__(self, sql, admin):
         try:
@@ -389,7 +393,3 @@ class Parallel_FuncTest(Parallel_Test):
         execfile(self.name, dict(locals(), sql=sql, admin=admin))
 
 class Parallel_PythonTest(Parallel_FuncTest): pass
-
-if __name__ == '__main__':
-    TarantoolServer.find_exe('..')
-    Supervisor().run()
