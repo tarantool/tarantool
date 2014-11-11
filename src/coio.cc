@@ -32,6 +32,7 @@
 #include <sys/un.h>
 #include <netinet/tcp.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 #include "iobuf.h"
 #include "sio.h"
@@ -146,7 +147,7 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 int
 coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
 		     struct sockaddr *addr, socklen_t *addr_len,
-		     ev_tstamp timeout)
+		     ev_tstamp timeout, int host_hint)
 {
 	/* try to resolve a hostname */
 	struct ev_loop *loop = loop();
@@ -170,11 +171,33 @@ coio_connect_timeout(struct ev_io *coio, const char *host, const char *service,
 		return 0;
 	}
 
-	struct addrinfo *ai = coeio_resolve(SOCK_STREAM, host, service, delay);
+	struct addrinfo *ai = NULL;
+	struct addrinfo ai_local;
+	if (host_hint) {
+		ai_local.ai_next = NULL;
+		if (host_hint == 1) { // IPv4
+			ai_local.ai_addrlen = sizeof(sockaddr_in);
+			ai_local.ai_addr = (sockaddr*)malloc(ai_local.ai_addrlen);
+			memset(ai_local.ai_addr, 0, ai_local.ai_addrlen);
+			((sockaddr_in*)ai_local.ai_addr)->sin_family = AF_INET;
+			((sockaddr_in*)ai_local.ai_addr)->sin_port = htons((uint16_t)atoi(service));
+			inet_pton(AF_INET, host, &((sockaddr_in*)ai_local.ai_addr)->sin_addr);
+		} else { // IPv6
+			ai_local.ai_addrlen = sizeof(sockaddr_in6);
+			ai_local.ai_addr = (sockaddr*)malloc(ai_local.ai_addrlen);
+			memset(ai_local.ai_addr, 0, ai_local.ai_addrlen);
+			((sockaddr_in6*)ai_local.ai_addr)->sin6_family = AF_INET6;
+			((sockaddr_in6*)ai_local.ai_addr)->sin6_port = htons((uint16_t)atoi(service));
+			inet_pton(AF_INET6, host, &((sockaddr_in6*)ai_local.ai_addr)->sin6_addr);
+		}
+		ai = &ai_local;
+	} else {
+		ai = coeio_resolve(SOCK_STREAM, host, service, delay);
+	}
 	if (ai == NULL)
 		return -1; /* timeout */
 
-	auto addrinfo_guard = make_scoped_guard([=]{ freeaddrinfo(ai); });
+	auto addrinfo_guard = make_scoped_guard([=]{ if (!host_hint) freeaddrinfo(ai); else free(ai_local.ai_addr); });
 	evio_timeout_update(loop(), start, &delay);
 
 	coio_timeout_init(&start, &delay, timeout);
@@ -595,7 +618,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * Start the created fiber. It becomes the coio object owner
 	 * and will have to close it and free before termination.
 	 */
-	fiber_call(f, coio, addr, iobuf, service->handler_param);
+	fiber_call(f, coio, addr, addrlen, iobuf, service->handler_param);
 }
 
 void
