@@ -60,7 +60,14 @@ extern "C" {
 #include <readline/readline.h>
 #include <readline/history.h>
 
+/**
+ * The single Lua state of the transaction processor (tx) thread.
+ */
 struct lua_State *tarantool_L;
+/**
+ * The fiber running the startup Lua script
+ */
+struct fiber *script_fiber;
 
 /* contents of src/lua/ files */
 extern char uuid_lua[],
@@ -432,19 +439,30 @@ tarantool_lua_run_script(char *path)
 	 * To work this problem around we must run init script in
 	 * a separate fiber.
 	 */
-	struct fiber *loader = fiber_new(title, run_script);
-	fiber_call(loader, tarantool_L, path);
+	script_fiber = fiber_new(title, run_script);
+	fiber_call(script_fiber, tarantool_L, path);
 
 	/*
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
 	 * When this fiber finishes, it will call ev_break to stop the loop.
 	 */
 	ev_run(loop(), 0);
+	/* The fiber running the startup script has ended. */
+	script_fiber = NULL;
 }
 
 void
 tarantool_lua_free()
 {
+	/*
+	 * Some part of the start script panicked, and called
+	 * exit().  The call stack in this case leads us back to
+	 * luaL_call() in run_script(). Trying to free a Lua state
+	 * from within luaL_call() is not the smartest idea (@sa
+	 * gh-612).
+	 */
+	if (script_fiber)
+		return;
 	/*
 	 * Got to be done prior to anything else, since GC
 	 * handlers can refer to other subsystems (e.g. fibers).
