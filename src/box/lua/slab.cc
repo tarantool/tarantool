@@ -37,6 +37,7 @@ extern "C" {
 
 #include "box/tuple.h"
 #include "small/small.h"
+#include "small/quota.h"
 #include "memory.h"
 
 /** A callback passed into salloc_stat() and invoked for every slab class. */
@@ -130,7 +131,7 @@ lbox_runtime_info(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "maxalloc");
-	luaL_pushnumber64(L, runtime.maxalloc);
+	luaL_pushnumber64(L, quota_get(runtime.quota));
 	lua_settable(L, -3);
 
 	return 1;

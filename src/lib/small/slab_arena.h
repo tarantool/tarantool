@@ -38,15 +38,16 @@ extern "C" {
 
 enum {
 	/* Smallest possible slab size. */
-	SLAB_MIN_SIZE = USHRT_MAX,
+	SLAB_MIN_SIZE = ((size_t)USHRT_MAX) + 1,
 	/** The largest allowed amount of memory of a single arena. */
-       SMALL_UNLIMITED = SIZE_MAX/2 + 1
+	SMALL_UNLIMITED = SIZE_MAX/2 + 1
 };
 
 /**
  * slab_arena -- a source of large aligned blocks of memory.
  * MT-safe.
  * Uses a lock-free LIFO to maintain a cache of used slabs.
+ * Uses a lock-free quota to limit allocating memory.
  * Never returns memory to the operating system.
  */
 struct slab_arena {
@@ -59,6 +60,22 @@ struct slab_arena {
 	struct lf_lifo cache;
 	/** A preallocated arena of size = prealloc. */
 	void *arena;
+	/**
+	 * How much memory is preallocated during initialization
+	 * of slab_arena.
+	 */
+	size_t prealloc;
+	/**
+	 * How much memory in the preallocated arena has
+	 * already been initialized for slabs.
+	 * @invariant used <= prealloc.
+	 */
+	size_t used;
+	/**
+	 * An external quota to which we must adhere.
+	 * A quota exists to set a common limit on two arenas.
+	 */
+	struct quota *quota;
 	/*
 	 * Each object returned by arena_map() has this size.
 	 * The size is provided at arena initialization.
@@ -76,25 +93,6 @@ struct slab_arena {
 	 */
 	uint32_t slab_size;
 	/**
-	 * How much memory is preallocated during initialization
-	 * of slab_arena.
-	 */
-	size_t prealloc;
-	/**
-	 * How much above 'prealloc' size we can go after
-	 * the arena is exhausted (arena_used == prealloc).
-	 * Each new slab is allocated by a dedicated mmap()
-	 * call. When returned, slabs allocated this way
-	 * are munmap()-ed right away.
-	 */
-	size_t maxalloc;
-	/**
-	 * How much memory in the preallocated arena has
-	 * already been initialized for slabs.
-	 * @invariant arena_used <= prealloc.
-	 */
-	size_t used;
-	/**
 	 * mmap() flags: MAP_SHARED or MAP_PRIVATE
 	 */
 	int flags;
@@ -102,8 +100,8 @@ struct slab_arena {
 
 /** Initialize an arena.  */
 int
-slab_arena_create(struct slab_arena *arena, size_t prealloc,
-		  size_t maxalloc, uint32_t slab_size, int flags);
+slab_arena_create(struct slab_arena *arena, struct quota *quota,
+		  size_t prealloc, uint32_t slab_size, int flags);
 
 /** Destroy an arena. */
 void
@@ -121,7 +119,10 @@ slab_unmap(struct slab_arena *arena, void *ptr);
 void
 slab_arena_mprotect(struct slab_arena *arena);
 
-/** Align a size. Alignment must be a power of 2 */
+/**
+ * Align a size - round up to nearest divisible by the given alignment.
+ * Alignment must be a power of 2
+ */
 static inline size_t
 small_align(size_t size, size_t alignment)
 {
@@ -132,13 +133,14 @@ small_align(size_t size, size_t alignment)
 	return (size - 1 + alignment) & ~(alignment - 1);
 }
 
-/** Round a number to the nearest power of two. */
+/** Round up a number to the nearest power of two. */
 static inline size_t
 small_round(size_t size)
 {
 	if (size < 2)
 		return size;
-	assert(size <= SMALL_UNLIMITED);
+	assert(size <= SIZE_MAX / 2 + 1);
+	assert(size - 1 <= ULONG_MAX);
 	size_t r = 1;
 	return r << (sizeof(unsigned long) * CHAR_BIT -
 		     __builtin_clzl((unsigned long) (size - 1)));
@@ -148,7 +150,7 @@ small_round(size_t size)
 static inline size_t
 small_lb(size_t size)
 {
-	assert(size <= SMALL_UNLIMITED);
+	assert(size <= ULONG_MAX);
 	return sizeof(unsigned long) * CHAR_BIT -
 		__builtin_clzl((unsigned long) size) - 1;
 }

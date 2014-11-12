@@ -50,9 +50,10 @@
 #include "request.h"
 #include "txn.h"
 #include "fiber.h"
-#include "access.h"
+#include "user_cache.h"
 #include "cfg.h"
 #include "iobuf.h"
+#include "iproto_constants.h"
 
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);
@@ -330,7 +331,7 @@ box_on_cluster_join(const tt_uuid *server_uuid)
 }
 
 void
-box_process_join(struct xrow_header *header)
+box_process_join(int fd, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_JOIN);
 	struct tt_uuid server_uuid = uuid_nil;
@@ -338,15 +339,15 @@ box_process_join(struct xrow_header *header)
 
 	box_on_cluster_join(&server_uuid);
 
-	/* process JOIN request via replication relay */
-	replication_join(session()->fd, header);
+	/* Process JOIN request via replication relay */
+	replication_join(fd, header);
 }
 
 void
-box_process_subscribe(struct xrow_header *header)
+box_process_subscribe(int fd, struct xrow_header *header)
 {
 	/* process SUBSCRIBE request via replication relay */
-	replication_subscribe(session()->fd, header);
+	replication_subscribe(fd, header);
 }
 
 /** Replace the current server id in _cluster */
@@ -383,6 +384,7 @@ box_free(void)
 {
 	if (recovery == NULL)
 		return;
+	session_free();
 	user_cache_free();
 	schema_free();
 	tuple_free();
@@ -390,7 +392,6 @@ box_free(void)
 	recovery = NULL;
 	engine_shutdown();
 	stat_free();
-	session_free();
 }
 
 static void
@@ -410,7 +411,6 @@ box_init()
 	box_check_config();
 	title("loading", NULL);
 
-	session_init();
 	replication_prefork(cfg_gets("snap_dir"), cfg_gets("wal_dir"));
 	stat_init();
 
@@ -422,6 +422,12 @@ box_init()
 
 	schema_init();
 	user_cache_init();
+	/*
+	 * The order is important: to initialize sessions,
+	 * we need to access the admin user, which is used
+	 * as a default session user when running triggers.
+	 */
+	session_init();
 
 	/* recovery initialization */
 	recovery = recovery_new(cfg_gets("snap_dir"), cfg_gets("wal_dir"),

@@ -26,33 +26,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "memory.h"
-#include "small/quota.h"
-
-struct slab_arena runtime;
-
-void
-memory_init()
+#include "user_def.h"
+const char *
+priv_name(uint8_t access)
 {
-	static struct quota runtime_quota;
-	static const size_t SLAB_SIZE = 4 * 1024 * 1024;
-	/* default quota initialization */
-	quota_init(&runtime_quota, QUOTA_MAX);
-
-	/* No limit on the runtime memory. */
-	slab_arena_create(&runtime, &runtime_quota, 0,
-			  SLAB_SIZE, MAP_PRIVATE);
+	if (access & PRIV_R)
+		return "Read";
+	if (access & PRIV_W)
+		return "Write";
+	return "Execute";
 }
 
-void
-memory_free()
-{
-	/*
-	 * If this is called from a fiber != sched, then
-	 * %rsp is pointing at the memory that we
-	 * would be trying to unmap. Don't.
-	 */
-#if 0
-	slab_arena_destroy(&runtime);
-#endif
-}

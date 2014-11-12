@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "schema.h"
-#include "access.h"
+#include "user_def.h"
 #include "engine.h"
 #include "space.h"
 #include "tuple.h"
@@ -326,12 +326,6 @@ space_end_recover_snapshot()
 	space_foreach(do_one_recover_step, NULL);
 }
 
-static void
-fix_lua(struct space *space, void * /* param */)
-{
-	box_lua_space_new(tarantool_L, space);
-}
-
 static inline void
 space_end_recover_cb(EngineFactory *f, void *udate)
 {
@@ -349,9 +343,6 @@ space_end_recover()
 	engine_foreach(space_end_recover_cb, NULL);
 
 	space_foreach(do_one_recover_step, NULL);
-
-	/* TODO: temporary solution for Bug#1229709 */
-	space_foreach(fix_lua, NULL);
 }
 
 void

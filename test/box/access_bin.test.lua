@@ -67,3 +67,15 @@ c.space.test:insert{1}
 c:close()
 test:drop()
 
+--
+-- gh-575: User loses 'universe' grants after alter
+--
+
+box.space._priv:get{1}
+u = box.space._user:get{1}
+box.session.su('admin')
+box.schema.user.passwd('Gx5!')
+c = require('net.box').new('admin:Gx5!@'..box.cfg.listen)
+c:call('dostring', 'return 2 + 2')
+c:close()
+box.space._user:replace(u)

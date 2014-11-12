@@ -41,4 +41,6 @@ struct SophiaFactory: public EngineFactory {
 	void *env;
 };
 
+void sophia_raise(void*);
+
 #endif /* TARANTOOL_BOX_ENGINE_SOPHIA_H_INCLUDED */

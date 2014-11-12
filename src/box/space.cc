@@ -33,12 +33,14 @@
 #include "tuple.h"
 #include "scoped_guard.h"
 #include "trigger.h"
-#include "access.h"
+#include "user_def.h"
+#include "user_cache.h"
+#include "session.h"
 
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct user *user = user();
+	struct current_user *user = current_user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
@@ -46,11 +48,12 @@ access_check_space(struct space *space, uint8_t access)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	access &= ~user->universal_access.effective;
+	access &= ~user->universal_access;
 	if (access && space->def.uid != user->uid &&
 	    access & ~space->access[user->auth_token].effective) {
+		struct user_def *def = user_cache_find(user->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), user->name, space->def.name);
+			  priv_name(access), def->name, space->def.name);
 	}
 }
 

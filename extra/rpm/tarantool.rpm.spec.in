@@ -65,6 +65,7 @@ License: BSD
 Requires: readline
 Provides: %{?scl_prefix}tarantool-debuginfo
 Provides: %{?scl_prefix}tarantool-debug
+Requires: %{?scl_prefix}tarantool-common
 URL: http://tarantool.org
 Source0: @RPM_PACKAGE_SOURCE_FILE_NAME@
 %description
@@ -86,11 +87,27 @@ It supports replication, online backup, stored procedures in Lua.
 
 This package provides Tarantool client libraries.
 
+%package common
+Summary: Tarantool common files
+Vendor: tarantool.org
+Group: Applications/Databases
+Provides: %{?scl_prefix}tarantool-common
+%if 0%{?rhel} != 5
+BuildArch: noarch
+%endif
+Requires: %{?scl_prefix}tarantool
+%description common
+Tarantool is a high performance in-memory NoSQL database.
+It supports replication, online backup, stored procedures in Lua.
+
+This package provides common files
+
 # Tarantool sql module
 %package sql-module
 Summary: Tarantool common sql interface
 Vendor: tarantool.org
 Group: Applications/Databases
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description sql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -100,12 +117,13 @@ tarantool-pg-module or by tarantool-mysql-module.
 
 %if %{with postgresql}
 %package pg-module
-Summary: Tarantool common sql interface
+Summary: Tarantool PostgreSQL interface
 Vendor: tarantool.org
 Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-pg-module
 BuildRequires: postgresql-devel >= 9.0
 Requires: postgresql-libs >= 9.0
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description pg-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -116,12 +134,13 @@ tarantool-sql-module.
 
 %if %{with mysql}
 %package mysql-module
-Summary: Tarantool common sql interface
+Summary: Tarantool MySQL interface
 Vendor: tarantool.org
 Group: Applications/Databases
 Provides: %{?scl_prefix}tarantool-mysql-module
 BuildRequires: mysql-devel >= 5.0
 Requires: mysql-libs >= 5.0
+Requires: %{?scl_prefix}tarantool = @RPM_PACKAGE_VERSION@-@RPM_PACKAGE_RELEASE@
 %description mysql-module
 Tarantool is a high performance in-memory NoSQL database.
 It supports replication, online backup, stored procedures in Lua.
@@ -209,7 +228,7 @@ make VERBOSE=1 DESTDIR=%{buildroot} install
     -c "Tarantool Server" tarantool > /dev/null 2>&1 || :
 %endif
 
-%post
+%post common
 mkdir -m 0755 -p %{_var}/run/tarantool/
 chown tarantool:tarantool %{_var}/run/tarantool/
 mkdir -m 0755 -p %{_var}/log/tarantool/
@@ -218,6 +237,7 @@ mkdir -m 0755 -p %{_var}/lib/tarantool/
 chown tarantool:tarantool %{_var}/lib/tarantool/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.enabled/
 mkdir -m 0755 -p %{_sysconfdir}/tarantool/instances.available/
+
 %if %{with systemd}
 %systemd_post tarantool.service
 %else
@@ -225,7 +245,7 @@ chkconfig --add tarantool
 /sbin/service tarantool start
 %endif
 
-%preun
+%preun common
 %if %{with systemd}
 %systemd_preun tarantool.service
 %else
@@ -233,10 +253,10 @@ chkconfig --add tarantool
 chkconfig --del tarantool
 %endif
 
-# %%postun
-# %%if %%{with systemd}
-# %%systemd_postun_with_restart tarantool.service
-# %%endif
+%postun common
+%if %{with systemd}
+%systemd_postun_with_restart tarantool.service
+%endif
 
 %files
 %defattr(-,root,root,-)
@@ -248,18 +268,6 @@ chkconfig --del tarantool
 "%{_datadir}/doc/tarantool/LICENSE"
 
 "%{_mandir}/man1/tarantool.1.gz"
-
-"%{_sysconfdir}/sysconfig/tarantool"
-
-%if %{with systemd}
-"%{_unitdir}/tarantool.service"
-"%{_libdir}/tarantool/tarantool.init"
-%else
-"%{_sysconfdir}/init.d/tarantool"
-%endif
-
-%dir "%{_libdir}/tarantool/"
-"%{_bindir}/tarantoolctl"
 
 %files sql-module
 %defattr(-,root,root,-)
@@ -292,6 +300,19 @@ chkconfig --del tarantool
 "%{_includedir}/tarantool/lua.hpp"
 "%{_includedir}/tarantool/luajit.h"
 "%{_includedir}/tarantool/lualib.h"
+
+%files common
+%defattr(-,root,root,-)
+%dir "%{_libdir}/tarantool/"
+"%{_bindir}/tarantoolctl"
+"%{_mandir}/man1/tarantoolctl.1.gz"
+"%{_sysconfdir}/sysconfig/tarantool"
+%if %{with systemd}
+"%{_unitdir}/tarantool.service"
+"%{_libdir}/tarantool/tarantool.init"
+%else
+"%{_sysconfdir}/init.d/tarantool"
+%endif
 
 %changelog
 * Fri Jun 06 2014 Eugine Blikh <bigbes@tarantool.org> 1.0-2

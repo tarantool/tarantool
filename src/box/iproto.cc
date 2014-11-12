@@ -47,6 +47,7 @@
 #include "coio.h"
 #include "xrow.h"
 #include "iproto_constants.h"
+#include "user_def.h"
 
 class IprotoConnectionShutdown: public Exception
 {
@@ -210,6 +211,7 @@ restart:
 	while ((request = iproto_queue_pop(i_queue))) {
 		IprotoRequestGuard guard(request);
 		fiber_set_session(fiber(), request->session);
+		fiber_set_user(fiber(), &request->session->user);
 		request->process(request);
 	}
 	/** Put the current fiber into a queue fiber cache. */
@@ -346,8 +348,8 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(iproto_connection_is_idle(con));
 	assert(!evio_is_active(&con->output));
 	if (con->session) {
-		fiber_set_session(fiber(), con->session);
-		session_run_on_disconnect_triggers(con->session);
+		if (! rlist_empty(&session_on_disconnect))
+			session_run_on_disconnect_triggers(con->session);
 		session_destroy(con->session);
 	}
 	iobuf_delete(con->iobuf[0]);
@@ -709,12 +711,12 @@ iproto_process_admin(struct iproto_request *ireq)
 					  ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
-			box_process_join(&ireq->header);
+			box_process_join(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
 		case IPROTO_SUBSCRIBE:
-			box_process_subscribe(&ireq->header);
+			box_process_subscribe(con->input.fd, &ireq->header);
 			/* TODO: check requests in `con; queue */
 			iproto_connection_shutdown(con);
 			return;
@@ -769,10 +771,8 @@ iproto_process_connect(struct iproto_request *request)
 		con->session = session_create(fd, con->cookie);
 		coio_write(&con->input, iproto_greeting(con->session->salt),
 			   IPROTO_GREETING_SIZE);
-		fiber_set_session(fiber(), con->session);
-		session_run_on_connect_triggers(con->session);
-		/* Set session user to guest, until it is authenticated. */
-		session_set_user(con->session, GUEST, GUEST);
+		if (! rlist_empty(&session_on_connect))
+			session_run_on_connect_triggers(con->session);
 	} catch (ClientError *e) {
 		iproto_reply_error(&iobuf->out, e, request->header.type);
 		try {

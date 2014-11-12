@@ -18,7 +18,6 @@ import subprocess
 import collections
 import os.path
 
-
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -122,6 +121,21 @@ class TarantoolLog(object):
             with open(self.path, 'r') as f:
                 f.seek(0, os.SEEK_END)
                 self.log_begin = f.tell()
+        return self
+
+    def seek_once(self, msg):
+        if not os.path.exists(self.path):
+            return -1
+        with open(self.path, 'r') as f:
+            f.seek(self.log_begin, os.SEEK_SET)
+            while True:
+                log_str = f.readline()
+
+                if not log_str:
+                    return -1
+                pos = log_str.find(msg)
+                if pos != -1:
+                    return pos
 
     def seek_from(self, msg, proc=None):
         while True:
@@ -275,8 +289,7 @@ class TarantoolServer(Server):
         return self._logfile_pos
     @logfile_pos.setter
     def logfile_pos(self, val):
-        self._logfile_pos = TarantoolLog(val)
-        self._logfile_pos.positioning()
+        self._logfile_pos = TarantoolLog(val).positioning()
 
     @property
     def script(self):
@@ -613,3 +626,6 @@ class TarantoolServer(Server):
         version = p.stdout.read().rstrip()
         p.wait()
         return version
+
+    def get_log(self):
+        return TarantoolLog(self.logfile).positioning()

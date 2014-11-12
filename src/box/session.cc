@@ -35,6 +35,7 @@
 #include "exception.h"
 #include "random.h"
 #include <sys/socket.h>
+#include "user_cache.h"
 
 static struct mh_i32ptr_t *session_registry;
 
@@ -54,17 +55,18 @@ sid_max()
 }
 
 static void
-session_on_stop(struct trigger * trigger, void *event)
+session_on_stop(struct trigger *trigger, void * /* event */)
 {
-	(void) event;
-	/* Remove on_stop trigger from fiber */
+	/*
+	 * Remove on_stop trigger from the fiber, otherwise the
+	 * fiber will attempt to destroy the trigger eventually,
+	 * after the trigger and its memory is long gone.
+	 */
 	trigger_clear(trigger);
-	struct session *session = fiber_get_session(fiber());
-	if (session == NULL)
-		return;
-	/* Destroy session */
+	struct session *session = (struct session *)
+		fiber_get_key(fiber(), FIBER_KEY_SESSION);
+	/* Destroy the session */
 	session_destroy(session);
-	fiber_set_session(fiber(), NULL);
 }
 
 struct session *
@@ -75,11 +77,10 @@ session_create(int fd, uint64_t cookie)
 	session->id = sid_max();
 	session->fd =  fd;
 	session->cookie = cookie;
-	session->fiber_on_stop = {
-		rlist_nil, session_on_stop, NULL, NULL
-	};
-	session_set_user(session, ADMIN, ADMIN);
-	random_bytes(session->salt, SESSION_SEED_SIZE);
+	/* For on_connect triggers. */
+	current_user_init(&session->user, user_by_token(GUEST));
+	if (fd >= 0)
+		random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
@@ -94,11 +95,35 @@ session_create(int fd, uint64_t cookie)
 	return session;
 }
 
+struct session *
+session_create_on_demand()
+{
+	/* Create session on demand */
+	struct session *s = session_create(-1, 0);
+	s->fiber_on_stop = {
+		rlist_nil, session_on_stop, NULL, NULL
+	};
+	/* Add a trigger to destroy session on fiber stop */
+	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
+	current_user_init(&s->user, user_by_token(ADMIN));
+	fiber_set_session(fiber(), s);
+	fiber_set_user(fiber(), &s->user);
+	return s;
+}
+
+/**
+ * To quickly switch to admin user when executing
+ * on_connect/on_disconnect triggers in iproto.
+ */
+struct current_user admin_user;
+
 void
 session_run_on_disconnect_triggers(struct session *session)
 {
+	struct fiber *fiber = fiber();
 	/* For triggers. */
-	session_set_user(session, ADMIN, ADMIN);
+	fiber_set_session(fiber, session);
+	fiber_set_user(fiber, &admin_user);
 	try {
 		trigger_run(&session_on_disconnect, NULL);
 	} catch (Exception *e) {
@@ -112,8 +137,11 @@ session_run_on_disconnect_triggers(struct session *session)
 void
 session_run_on_connect_triggers(struct session *session)
 {
-	(void) session;
+	struct fiber *fiber = fiber();
+	fiber_set_session(fiber, session);
+	fiber_set_user(fiber, &admin_user);
 	trigger_run(&session_on_connect, NULL);
+	/* Set session user to guest, until it is authenticated. */
 }
 
 void
@@ -141,6 +169,7 @@ session_init()
 	if (session_registry == NULL)
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
+	current_user_init(&admin_user, user_by_token(ADMIN));
 }
 
 void
@@ -148,28 +177,4 @@ session_free()
 {
 	if (session_registry)
 		mh_i32ptr_delete(session_registry);
-}
-
-SessionGuard::SessionGuard(int fd, uint64_t cookie)
-{
-	session = session_create(fd, cookie);
-	fiber_set_session(fiber(), session);
-}
-
-SessionGuard::~SessionGuard()
-{
-	assert(session == fiber_get_session(fiber()));
-	session_destroy(session);
-	fiber_set_session(fiber(), NULL);
-}
-
-SessionGuardWithTriggers::SessionGuardWithTriggers(int fd, uint64_t cookie)
-	:SessionGuard(fd, cookie)
-{
-	session_run_on_connect_triggers(session);
-}
-
-SessionGuardWithTriggers::~SessionGuardWithTriggers()
-{
-	session_run_on_disconnect_triggers(session);
 }
