@@ -826,7 +826,7 @@ tarantool> <userinput>box.space.tester:delete('a')</userinput>
 
     <varlistentry>
         <term>
-            <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.field_count</emphasis>
+            <emphasis role="lua" xml:id="box.space.field_count">box.space.<replaceable>space-name</replaceable>.field_count</emphasis>
         </term>
         <listitem>
             <para>
@@ -1179,7 +1179,7 @@ console.delimiter('')!</programlisting>
         </term>
         <listitem>
             <para>
-             _user is a new system tuple set for support of the authorization feature.
+             _user is a new system tuple set for support of the <link linkend="authentication">authorization feature</link>.
             </para>
         </listitem>
     </varlistentry>
@@ -1201,7 +1201,7 @@ console.delimiter('')!</programlisting>
         </term>
         <listitem>
             <para>
-             _cluster is a new system tuple set for support of the replication feature.
+             _cluster is a new system tuple set for support of the <olink targetptr="replication">replication feature</olink>.
             </para>
         </listitem>
     </varlistentry>
@@ -1499,7 +1499,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([<replaceable>key</replaceable>])</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:min([<replaceable>key-value</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -1507,6 +1507,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
               Returns: (type = tuple) the tuple for the first key in the index.
+              If optional <code>key-value</code> is supplied, returns the first key which is greater than or equal to key-value.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -1527,7 +1528,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([<replaceable>key</replaceable>])</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:max([<replaceable>key-value</replaceable>])</emphasis>
         </term>
         <listitem>
             <para>
@@ -1535,6 +1536,7 @@ The result will be a table of tuples and will look like this:
             </para>
             <para>
               Returns: (type = tuple) the tuple for the last key in the index.
+              If optional <code>key-value</code> is supplied, returns the last key which is less than or equal to key-value.
             </para>
             <para>
               Complexity Factors: Index size, Index type.
@@ -2016,7 +2018,8 @@ tarantool&gt; <userinput>t:transform(2,2,'x')</userinput>
               then the result is returned.
             </para>
             <para>
-              Parameters: <code>start-field-number</code> = base 1, may be negative, <code>end-field-number</code> = optional, base 1, negative treated as positive.
+              Parameters: <code>start-field-number</code> = base 1, may be negative, <code>end-field-number</code> = optional, base 1, may be negative.
+              Negative values are counted from the end, for example -2 means the second-last field.
             </para>
             <para>
               Returns: (type = scalar) one or more field values.
@@ -3221,32 +3224,31 @@ box.space.payroll:select{'Jones'}</programlisting>
 <title>Limitations</title>
 
 <variablelist>
-
+ 
   <varlistentry>
     <term xml:id="limitations-index-field-count" xreflabel="limitations-index-field-count">Number of fields in an index</term>
     <listitem><para>For BITSET indexes, the maximum is 1.
-    For TREE indexes, the theoretical maximum is about 4 billion (BOX_FIELD_MAX)
-    but the practical maximum is the number of fields in a tuple.
+    For TREE or HASH indexes, the maximum is 255 (box.schema.INDEX_PART_MAX).
     </para></listitem>
   </varlistentry>
-  
+
   <varlistentry>
     <term xml:id="limitations-index-count" xreflabel="limitations-index-count">Number of indexes in a space</term>
-    <listitem><para>10 (BOX_INDEX_MAX).
+    <listitem><para>10 (box.schema.INDEX_MAX).
     </para></listitem>
   </varlistentry>
 
   <varlistentry>
     <term xml:id="limitations-tuple-field-count" xreflabel="limitations-tuple-field-count">Number of fields in a tuple</term>
-    <listitem><para>There is no theoretical maximum.
-    The practical maximum is whatever is specified by the space's <code>field_count</code> member,
+    <listitem><para>The theoretical maximum is 2147483647 (box.schema.FIELD_MAX).
+    The practical maximum is whatever is specified by the space's <link linkend="box.space.field_count">field_count</link> member,
     or the maximum tuple length.
     </para></listitem>
   </varlistentry>
-  
+
   <varlistentry>
     <term xml:id="limitations-space-count" xreflabel="limitations-space-count">Number of spaces</term>
-    <listitem><para>65535.
+    <listitem><para>The theoretical maximum is 2147483647 (box.schema.SPACE_MAX).
     </para></listitem>
   </varlistentry>
 
@@ -3278,7 +3280,7 @@ box.space.payroll:select{'Jones'}</programlisting>
   
   <varlistentry>
     <term xml:id="limitations-name-length" xreflabel="limitations-name-length">Length of an index name or space name or user name</term>
-    <listitem><para>32.
+    <listitem><para>32 (box.schema.NAME_MAX).
     </para></listitem>
   </varlistentry>
 

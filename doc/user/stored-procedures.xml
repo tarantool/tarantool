@@ -629,11 +629,11 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>-- When nil is assigned to a Lua-table field, the field disappears</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>-- When nil is assigned to a Lua-table field, the field is null</userinput>
 <prompt>tarantool&gt;</prompt> <userinput>{nil, 'a', 'b'}</userinput>
----
-- 2: a
-  3: b
+- - null
+  - a
+  - b
 ...
 <prompt>tarantool&gt;</prompt> <userinput> -- When json.NULL is assigned to a Lua-table field, the field is json.NULL</userinput>
 <prompt>tarantool&gt;</prompt> <userinput>{json.NULL, 'a', 'b'}</userinput>
