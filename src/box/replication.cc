@@ -40,6 +40,7 @@
 #include <limits.h>
 #include <fcntl.h>
 
+#include "tarantool.h"
 #include "fiber.h"
 #include "recovery.h"
 #include "log_io.h"
@@ -49,7 +50,6 @@
 #include "box/schema.h"
 #include "box/vclock.h"
 #include "scoped_guard.h"
-#include "cfg.h"
 
 /** Replication topology
  * ----------------------
@@ -206,6 +206,7 @@ replication_join_thread(void *arg)
 
 	/* Turn off the non-blocking mode, if any. */
 	int nonblock = sio_getfl(r->relay.sock) & O_NONBLOCK;
+	sio_setfl(r->relay.sock, O_NONBLOCK, 0);
 	auto socket_guard = make_scoped_guard([=]{
 		/* Restore non-blocking mode */
 		sio_setfl(r->relay.sock, O_NONBLOCK, nonblock);
@@ -229,9 +230,10 @@ replication_join_thread(void *arg)
 void
 replication_join(int fd, struct xrow_header *packet)
 {
-	struct recovery_state *r = recovery_new(cfg_gets("snap_dir"),
-			cfg_gets("wal_dir"), replication_relay_send_row, NULL,
-			NULL, INT32_MAX);
+	struct recovery_state *r;
+	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
+			 replication_relay_send_row,
+			 NULL, NULL, INT32_MAX);
 	auto recovery_guard = make_scoped_guard([&]{
 		recovery_delete(r);
 	});
@@ -249,7 +251,7 @@ replication_join(int fd, struct xrow_header *packet)
 
 	struct cord cord;
 	cord_start(&cord, name, replication_join_thread, r);
-	cord_join(&cord, NULL);
+	cord_cojoin(&cord);
 }
 
 /** Replication acceptor fiber handler. */
@@ -745,9 +747,10 @@ replication_relay_loop(struct relay *relay)
 	sio_setfl(relay->sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
-	struct recovery_state *r = recovery_new(cfg_snap_dir, cfg_wal_dir,
-		      replication_relay_send_row,
-		      NULL, NULL, INT32_MAX);
+	struct recovery_state *r;
+	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
+			 replication_relay_send_row,
+			 NULL, NULL, INT32_MAX);
 	r->relay = *relay; /* copy relay state to recovery */
 
 	int rc = EXIT_SUCCESS;

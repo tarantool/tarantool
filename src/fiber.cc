@@ -513,18 +513,6 @@ fiber_destroy_all(struct cord *cord)
 		fiber_destroy(f);
 }
 
-static void
-cord_set_exception(struct cord *cord, Exception *e)
-{
-	/* Cleanup memory allocated for exceptions */
-	if (cord->exception == NULL || cord->exception == &out_of_memory)
-		return;
-	cord->exception->~Exception();
-	free(cord->exception);
-	cord->exception = e;
-	cord->exception_size = 0; /* force realloc() on next throw */
-}
-
 void
 cord_create(struct cord *cord, const char *name)
 {
@@ -546,6 +534,7 @@ cord_create(struct cord *cord, const char *name)
 
 	cord->sp = cord->stack;
 	cord->max_fid = 100;
+	Exception::init(cord);
 
 	ev_async_init(&cord->ready_async, fiber_ready_async);
 	ev_async_start(cord->loop, &cord->ready_async);
@@ -563,7 +552,7 @@ cord_destroy(struct cord *cord)
 	}
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
-	cord_set_exception(cord, NULL);
+	Exception::cleanup(cord);
 }
 
 struct cord_thread_arg
@@ -580,28 +569,38 @@ struct cord_thread_arg
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
-	struct cord *cord = cord() = ct_arg->cord;
+	cord() = ct_arg->cord;
+	struct cord *cord = cord();
 	cord_create(cord, ct_arg->name);
+	/** Can't possibly be the main thread */
+	assert(cord->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
 	void *(*f)(void *) = ct_arg->f;
 	void *arg = ct_arg->arg;
 	ct_arg->is_started = true;
 	tt_pthread_cond_signal(&ct_arg->start_cond);
 	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
-
+	void *res;
 	try {
-		return f(arg);
+		res = f(arg);
+		/*
+		 * Clear a possible leftover exception object
+		 * to not confuse the invoker of the thread.
+		 */
+		Exception::cleanup(cord);
 	} catch (Exception *) {
-		if (cord->id == main_thread_id)
-			throw;
-		return CORD_EXCEPTION;
+		/*
+		 * The exception is now available to the caller
+		 * via cord->exception.
+		 */
+		res = NULL;
 	}
+	return res;
 }
 
 int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 {
-	memset(cord, 0, sizeof(*cord));
 	int res = -1;
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
@@ -619,48 +618,47 @@ end:
 }
 
 int
-cord_rawjoin(struct cord *cord, void **retval, struct Exception **exception)
+cord_join(struct cord *cord)
 {
-	void *ret = NULL;
-	int res = tt_pthread_join(cord->id, retval);
-	if (res != 0) {
-		/* We can't recover from this in any reasonable way. */
+	assert(cord() != cord); /* Can't join self. */
+	void *retval = NULL;
+	int res = tt_pthread_join(cord->id, &retval);
+	if (res == 0 && cord->exception) {
+		/*
+		 * cord_thread_func guarantees that
+		 * cord->exception is only set if the subject cord
+		 * has terminated with an uncaught exception,
+		 * transfer it to the caller.
+		 */
+		Exception::move(cord, cord());
 		cord_destroy(cord);
-		return res;
+		cord()->exception->raise();
 	}
-	if (ret == CORD_EXCEPTION && exception != NULL) {
-		assert(cord->exception != NULL);
-		*exception = cord->exception; /* will be destroyed by caller */
-		cord->exception = NULL;
-	}
-	if (retval)
-		*retval = ret;
 	cord_destroy(cord);
 	return res;
 }
 
 ssize_t
-cord_join_cb(va_list ap)
+cord_cojoin_cb(va_list ap)
 {
 	struct cord *cord = va_arg(ap, struct cord *);
-	void **retval = va_arg(ap, void **);
-	Exception **exception = va_arg(ap, Exception **);
-	return cord_rawjoin(cord, retval, exception);
+	void *retval = NULL;
+	int res = tt_pthread_join(cord->id, &retval);
+	return res;
 }
 
 int
-cord_join(struct cord *cord, void **retval)
+cord_cojoin(struct cord *cord)
 {
-	Exception *exception = NULL;
-	int rc = coeio_custom(cord_join_cb, TIMEOUT_INFINITY, cord, retval,
-			      &exception);
-	if (rc != 0)
-		return rc;
-	if (exception) {
-		cord_set_exception(cord, exception);
+	assert(cord() != cord); /* Can't join self. */
+	int rc = coeio_custom(cord_cojoin_cb, TIMEOUT_INFINITY, cord);
+	if (rc == 0 && cord->exception) {
+		Exception::move(cord, cord());
+		cord_destroy(cord);
 		cord()->exception->raise(); /* re-throw exception from cord */
 	}
-	return 0;
+	cord_destroy(cord);
+	return rc;
 }
 
 void

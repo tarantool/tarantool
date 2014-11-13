@@ -49,18 +49,6 @@
 #include "iproto_constants.h"
 #include "user_def.h"
 
-class IprotoConnectionShutdown: public Exception
-{
-public:
-	IprotoConnectionShutdown(const char *file, int line)
-		:Exception(file, line) {}
-	virtual void log() const;
-};
-
-void
-IprotoConnectionShutdown::log() const
-{}
-
 /* {{{ iproto_request - declaration */
 
 struct iproto_connection;
@@ -558,8 +546,6 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		 */
 		if (!ev_is_active(&con->input))
 			ev_feed_event(loop, &con->input, EV_READ);
-	} catch (IprotoConnectionShutdown *e) {
-		iproto_connection_shutdown(con);
 	} catch (Exception *e) {
 		e->log();
 		iproto_connection_close(con);
@@ -711,13 +697,17 @@ iproto_process_admin(struct iproto_request *ireq)
 					  ireq->header.sync);
 			break;
 		case IPROTO_JOIN:
+			ev_io_stop(con->loop, &con->input);
+			ev_io_stop(con->loop, &con->output);
 			box_process_join(con->input.fd, &ireq->header);
-			/* TODO: check requests in `con; queue */
+			/* TODO: check requests in `con' queue */
 			iproto_connection_shutdown(con);
 			return;
 		case IPROTO_SUBSCRIBE:
+			ev_io_stop(con->loop, &con->input);
+			ev_io_stop(con->loop, &con->output);
 			box_process_subscribe(con->input.fd, &ireq->header);
-			/* TODO: check requests in `con; queue */
+			/* TODO: check requests in `con' queue */
 			iproto_connection_shutdown(con);
 			return;
 		default:

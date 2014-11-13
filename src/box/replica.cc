@@ -42,7 +42,6 @@
 #include "msgpuck/msgpuck.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
-#include "box/session.h"
 
 static const int RECONNECT_DELAY = 1.0;
 

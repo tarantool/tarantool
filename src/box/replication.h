@@ -28,21 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tarantool.h>
-#include "trivia/util.h"
-#include "vclock.h"
-
-struct relay {
-	/** Replica connection */
-	int sock;
-	/* Request type - SUBSCRIBE or JOIN */
-	uint32_t type;
-	/* Request sync */
-	uint64_t sync;
-	/* Only used in SUBSCRIBE request */
-	uint32_t server_id;
-	struct vclock vclock;
-};
+struct xrow_header;
 
 /**
  * Pre-fork replication spawner process.

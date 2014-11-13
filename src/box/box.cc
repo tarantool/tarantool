@@ -27,15 +27,13 @@
  * SUCH DAMAGE.
  */
 #include "box/box.h"
-#include <arpa/inet.h>
-#include <sys/wait.h>
 
-#include <errcode.h>
-#include "recovery.h"
-#include "log_io.h"
 #include <say.h>
 #include "iproto.h"
+#include "iproto_constants.h"
+#include "recovery.h"
 #include "replication.h"
+#include "replica.h"
 #include <stat.h>
 #include <tarantool.h>
 #include "tuple.h"
@@ -53,7 +51,6 @@
 #include "user_cache.h"
 #include "cfg.h"
 #include "iobuf.h"
-#include "iproto_constants.h"
 
 static void process_ro(struct port *port, struct request *request);
 static void process_rw(struct port *port, struct request *request);

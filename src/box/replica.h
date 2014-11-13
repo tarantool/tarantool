@@ -28,26 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <netinet/in.h>
-#include "tarantool_ev.h"
-#include <uri.h>
 
-enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
-
-/** Master connection */
-struct remote {
-	struct fiber *reader;
-	ev_tstamp recovery_lag, recovery_last_update_tstamp;
-	bool warning_said;
-	char source[REMOTE_SOURCE_MAXLEN];
-	struct uri uri;
-	union {
-		struct sockaddr addr;
-		struct sockaddr_storage addrstorage;
-	};
-	socklen_t addr_len;
-};
-
+struct recovery_state;
 /** Connect to a master and request a snapshot.
  * Raises an exception on error.
  *
