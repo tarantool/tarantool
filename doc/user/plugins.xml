@@ -63,7 +63,8 @@ on the local host 127.0.0.1.
 </para>
 
 <programlisting>
-# Check that the include subdirectory exists by looking for ~/include/mysql.h.
+# Check that the include subdirectory exists by looking for .../include/mysql.h.
+# (If this fails, there's a chance that it's in .../include/mysql/mysql.h instead.)
 <prompt>$ </prompt><userinput>[ -f ~/mysql-5.5/include/mysql.h ] &amp;&amp; echo "OK" || echo "Error"</userinput>
 OK
 
