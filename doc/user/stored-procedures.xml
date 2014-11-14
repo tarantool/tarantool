@@ -2619,6 +2619,248 @@ less tarantool.txt
    </variablelist>
 </section>
 
+<section xml:id="sp-tap">
+ <title>package <code>tap</code></title>
+     <para>
+       The tap package streamlines the testing of other packages.
+       It allows writing of tests in the <link xlink:href="https://en.wikipedia.org/wiki/Test_Anything_Protocol">TAP protocol</link>.
+       The results from the tests can be parsed by standard TAP-analyzers
+       so they can be passed to utilities such as <link xlink:href="https://metacpan.org/pod/distribution/Test-Harness/bin/prove">prove</link>.                                        
+       Thus one can run tests and then use the results for statistics, decision-making, and so on.          
+     </para>
+<variablelist>
+
+    <varlistentry>
+     <term><emphasis role="lua">tap.test(<replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          Initialize -- the result of <code>tap.test</code> is an object,
+          which will be called <code>taptest</code> in the rest of this discussion,
+          which is necessary for <code>taptest:plan()</code> and all the other methods.
+         </para>
+         <para>
+           Returns: (table) taptest.
+         </para>
+         <para>
+           Parameters: (type = string) test-name = an arbitrary name to give for the test outputs.
+         </para>
+         <para>
+          Example: <code>tap = require('tap') taptest = tap.test('test-name')</code>.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:plan(<replaceable>count</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+           Indicate how many tests will be performed.
+         </para>
+         <para>
+           Returns: nothing.
+         </para>
+         <para>
+           Parameters: (type = number) count.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:check()</emphasis></term>
+       <listitem>
+         <para>
+           Checks the number of tests performed.
+           This check should only be done after all planned tests are complete,
+            so ordinarily <code>taptest:check()</code> will only appear at the end of a script.
+         </para>
+         <para>
+           Returns: nothing. Will display '# bad plan: ...' if the number of completed
+           tests is not equal to the number of tests specified by <code>taptest:plan(...)</code>.
+         </para>
+         <para>
+           Parameters: none.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:diag(<replaceable>message</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+           Display a diagnostic message.
+         </para>
+         <para>
+           Returns: nothing. The message will be displayed.
+         </para>
+         <para>
+           Parameters: the message to be displayed.
+         </para>
+       </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:ok(<replaceable>condition</replaceable>, <replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+           This is a basic function which is used by other functions.
+           Depending on the value of <code>condition</code>, print 'ok' or 'not ok' along with debugging information.
+         </para>
+         <para>
+           Returns: true or false. Also displays 'true' or 'false'.
+         </para>
+         <para>
+           Parameters: (boolean expression) <code>condition</code> == an expression which is true or false, (string) test-name.
+         </para>
+         <para>
+           Example:<programlisting>tarantool&gt; <userinput>taptest:ok(true,'x')</userinput>
+ok - x
+---
+- true
+...
+tarantool&gt; <userinput>tap = require('tap')</userinput>
+---
+...
+tarantool&gt; <userinput>taptest = tap.test('test-name')</userinput>
+TAP version 13
+---
+...
+tarantool&gt; <userinput>taptest:ok(1 + 1 == 2, 'X')</userinput>
+ok - X
+---
+- true
+ ...</programlisting></para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:fail(<replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          <code>taptest:fail('x')</code> is equivalent to <code>taptest:ok(false, 'x')</code>.
+         </para>
+         <para>
+           Returns: true or false.
+         </para>
+         <para>
+           Parameters: (string) test-name.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:skip(<replaceable>message</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          <code>taptest:skip('x')</code> is equivalent to <code>taptest:ok(true, 'x' .. '# skip')</code>.
+         </para>
+         <para>
+           Returns: nothing. Displays the message
+         </para>
+         <para>
+           Parameters: (string) message.
+         </para>
+         <para>
+           Example: <code>taptest:skip('message')</code> will return <code>ok - message # skip</code>.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:is(<replaceable>got</replaceable>, <replaceable>expected</replaceable>, <replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          Check whether the first argument equals the second argument.
+         </para>
+         <para>
+           Returns: true or false. Displays extensive message if the result is false.
+         </para>
+         <para>
+           Parameters: (number) <code>got</code> = actual result, (number) <code>expected</code> = expected result, (string) test-name.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:isnt(<replaceable>got</replaceable>, <replaceable>expected</replaceable>, <replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          This is the negation of <code>taptest:is(...)</code>.
+         </para>
+         <para>
+           Returns: true or false.
+         </para>
+         <para>
+          Parameters: (number) <code>got</code> = actual result, (number) <code>expected</code> = expected result, (string) test-name.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:is<replaceable>type-name</replaceable>(<replaceable>value</replaceable>, <replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          Test whether a value has a particular type. The possible functions in this group are:
+          <code>isnil</code>, <code>isstring</code>, <code>isnumber</code>, <code>istable</code>, <code>isboolean</code>, <code>isudata</code>, <code>iscdata</code>.
+         </para>
+         <para>
+           Returns: true or false. Displays a long message if the value is not of the specified type.
+         </para>
+         <para>
+           Parameters: (nil or string or number or table or boolean or udata or cdata) value, (string) test-name.
+         </para>
+       </listitem>
+    </varlistentry>
+
+    <varlistentry>
+     <term><emphasis role="lua"><replaceable>taptest</replaceable>:is_deeply(<replaceable>got</replaceable>,<replaceable>expected</replaceable>, <replaceable>test-name</replaceable>)</emphasis></term>
+       <listitem>
+         <para>
+          Recursive version of <code>taptestis(...)</code>, which can be
+          be used to compare tables as well as scalar values.
+         </para>
+         <para>
+           Returns: true or false.
+         </para>
+         <para>
+           Parameters: (number or table) <code>got</code> = actual result, (number or table) <code>expected</code> = expected result, (string) test-name.
+         </para>
+
+         <para>
+         <bridgehead renderas="sect4">Example Lua script showing use of tap</bridgehead>
+         To run this example: put the script in a file named ./tap.lua, then make tap.lua
+         executable by saying <code>chmod a+x ./tap.lua</code>, then execute using Tarantool
+         as a script processor by saying <code>./tap.lua</code>.
+         <programlisting>
+#!/usr/bin/tarantool
+local tap = require('tap')
+test = tap.test("my test name")
+test:plan(2)
+test:ok(2 * 2 == 4, "2 * 2 is 4")
+test:test("some subtests for test2", function(test)
+    test:plan(2)
+    test:is(2 + 2, 4, "2 + 2 is 4")
+    test:isnt(2 + 3, 4, "2 + 3 is not 4")
+end)
+test:check()
+</programlisting>
+         The output from the above script will look approximately like this:
+<programlisting>
+TAP version 13
+1..2
+ok - 2 * 2 is 4
+     # Some subtests for test2
+     1..2
+     ok - 2 + 2 is 4,
+     ok - 2 + 3 is not 4
+     # Some subtests for test2: end
+ok - some subtests for test2
+</programlisting>
+         </para>
+        </listitem>
+    </varlistentry>
+   </variablelist>
+</section>
+
 <section xml:id="sp-tonumber64">
  <title>Lua functions <code>tonumber64</code> and <code>dostring</code></title>
 
