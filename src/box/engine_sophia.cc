@@ -232,7 +232,7 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-SophiaFactory::begin(struct txn*, struct space *space)
+SophiaFactory::begin(struct txn * /* txn */, struct space *space)
 {
 	assert(space->engine->factory == this);
 	assert(tx == NULL);
@@ -245,7 +245,7 @@ SophiaFactory::begin(struct txn*, struct space *space)
 }
 
 void
-SophiaFactory::begin_stmt(struct txn*, struct space *space)
+SophiaFactory::begin_stmt(struct txn * /* txn */, struct space *space)
 {
 	assert(space->engine->factory == this);
 	assert(tx != NULL);
@@ -267,14 +267,14 @@ SophiaFactory::commit(struct txn *txn)
 		tx_db = NULL;
 	});
 
-	/* a. preparare transaction for commit */
+	/* a. prepare transaction for commit */
 	int rc = sp_prepare(tx);
 	if (rc == -1)
 		sophia_raise(env);
 	assert(rc == 0);
 
 	/* b. create transaction log cursor and
-	 *    forge each transaction statement LSN number */
+	 *    forge each statement's LSN number */
 	void *lc = sp_ctl(tx, "log_cursor");
 	if (lc == NULL) {
 		sp_rollback(tx);
