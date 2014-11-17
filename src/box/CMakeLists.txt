@@ -41,7 +41,8 @@ add_library(box
     request.cc
     txn.cc
     box.cc
-    access.cc
+    user_def.cc
+    user_cache.cc
     authentication.cc
     vclock.c
     cluster.cc

@@ -29,6 +29,7 @@
 #include "tuple.h"
 
 #include "small/small.h"
+#include "small/quota.h"
 #include "tbuf.h"
 
 #include "key_def.h"
@@ -45,8 +46,10 @@ static uint32_t formats_size, formats_capacity;
 
 uint32_t snapshot_version;
 
+struct quota memtx_quota;
+
 struct slab_arena memtx_arena;
-struct slab_cache memtx_slab_cache;
+static struct slab_cache memtx_slab_cache;
 struct small_alloc memtx_alloc;
 
 /** Extract all available type info from keys. */
@@ -517,15 +520,16 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 }
 
 void
-tuple_init(float arena_prealloc, uint32_t objsize_min,
+tuple_init(float tuple_arena_max_size, uint32_t objsize_min,
 	   float alloc_factor)
 {
 	tuple_format_ber = tuple_format_new(&rlist_nil);
 	/* Make sure this one stays around. */
 	tuple_format_ref(tuple_format_ber, 1);
 
-	uint32_t slab_size = 4*1024*1024;
-	size_t prealloc = arena_prealloc * 1024 * 1024 * 1024;
+	const uint32_t SLAB_SIZE = 4 * 1024 * 1024;
+	size_t max_size = tuple_arena_max_size * 1024 * 1024 * 1024;
+	quota_init(&memtx_quota, max_size);
 
 	int flags;
 	if (access("/proc/user_beancounters", F_OK) == 0) {
@@ -534,23 +538,24 @@ tuple_init(float arena_prealloc, uint32_t objsize_min,
 		flags = MAP_PRIVATE;
         } else {
 		say_info("mapping %zu bytes for a shared arena...",
-			 prealloc);
+			max_size);
 		flags = MAP_SHARED;
 	}
 
-	if (slab_arena_create(&memtx_arena, prealloc, prealloc,
-			      slab_size, flags)) {
-		if (ENOMEM == errno)
+	if (slab_arena_create(&memtx_arena, &memtx_quota,
+			      max_size, SLAB_SIZE, flags)) {
+		if (ENOMEM == errno) {
 			panic("failed to preallocate %zu bytes: "
-			      "Cannot allocate memory, "
-			      "check option 'slab_alloc_arena' in box.cfg(..)",
-			      prealloc);
-		else
+			      "Cannot allocate memory, check option "
+			      "'slab_alloc_arena' in box.cfg(..)",
+			      max_size);
+		} else {
 			panic_syserror("failed to preallocate %zu bytes",
-				       prealloc);
+				       max_size);
+		}
 	}
 	slab_cache_create(&memtx_slab_cache, &memtx_arena,
-			  slab_size);
+			  SLAB_SIZE);
 	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
 			   objsize_min, alloc_factor);
 }

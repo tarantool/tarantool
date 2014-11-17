@@ -27,16 +27,20 @@
  * SUCH DAMAGE.
  */
 #include "memory.h"
+#include "small/quota.h"
 
 struct slab_arena runtime;
-
-static const size_t SLAB_SIZE = 4194304;
 
 void
 memory_init()
 {
+	static struct quota runtime_quota;
+	static const size_t SLAB_SIZE = 4 * 1024 * 1024;
+	/* default quota initialization */
+	quota_init(&runtime_quota, QUOTA_MAX);
+
 	/* No limit on the runtime memory. */
-	slab_arena_create(&runtime, 0, SMALL_UNLIMITED,
+	slab_arena_create(&runtime, &runtime_quota, 0,
 			  SLAB_SIZE, MAP_PRIVATE);
 }
 

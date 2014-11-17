@@ -163,7 +163,7 @@ Here is an example of an interactive-mode tarantool client session:
                 [ tarantool will display an introductory message including version number here ]
 tarantool> <userinput>box.cfg{listen=3301}</userinput>
                 [ tarantool will display configuration information here ]
-tarantool> <userinput>s = box.schema.create_space('tester')</userinput>
+tarantool> <userinput>s = box.schema.space.create('tester')</userinput>
                 [ tarantool may display an in-progress message here ]
 ---
 ...
@@ -216,7 +216,7 @@ program, allocating disk resources specifically for
 that program, via a standardized deployment method."
 If Tarantool was downloaded from source, then the script
 is in ~/extra/dist/tarantoolctl. If Tarantool was installed
-with debian or Red Hat installation packages, the script
+with Debian or Red Hat installation packages, the script
 is renamed <code>tarantoolctl</code> and is in
 /usr/bin/tarantoolctl. The script handles such things as:
 starting, stopping, rotating logs, logging in to the
@@ -267,6 +267,7 @@ The script will add /<replaceable>instance-name</replaceable>.log" to the name.
 </para>
 <para>
 username = the user that runs the tarantool server.
+This is the operating-system user name rather than the Tarantool-client user name.
 </para>
 <para>
 instance_dir = the directory where all applications for this host are stored.
@@ -369,7 +370,7 @@ box.cfg{listen = 3301}
 box.schema.user.passwd('Gx5!')
 box.schema.user.grant('guest','read,write,execute','universe')
 fiber = require('fiber')
-box.schema.create_space('tester')
+box.schema.space.create('tester')
 box.space.tester:create_index('primary',{})
 i = 0
 while 0 == 0 do

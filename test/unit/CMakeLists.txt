@@ -47,6 +47,8 @@ add_executable(vclock.test vclock.cc test.c
     ${CMAKE_SOURCE_DIR}/src/box/vclock.c)
 target_link_libraries(vclock.test core small
     ${LIBEV_LIBRARIES} ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES})
+add_executable(quota.test quota.cc test.c)
+target_link_libraries(quota.test pthread)
 
 set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
 add_executable(msgpack.test

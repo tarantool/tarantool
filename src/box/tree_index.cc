@@ -36,9 +36,12 @@
 #include <third_party/qsort_arg.h>
 
 /** For all memory used by all tree indexes. */
+extern struct quota memtx_quota;
+static struct slab_arena index_arena;
+static struct slab_cache index_arena_slab_cache;
 static struct mempool tree_extent_pool;
 /** Number of allocated extents. */
-static int tree_extent_pool_initialized = 0;
+static bool index_arena_initialized = false;
 
 /* {{{ Utilities. *************************************************/
 
@@ -203,10 +206,17 @@ TreeIndex::TreeIndex(struct key_def *key_def_arg)
 	: Index(key_def_arg), build_array(0), build_array_size(0),
 	  build_array_alloc_size(0)
 {
-	if (tree_extent_pool_initialized == 0) {
-		mempool_create(&tree_extent_pool, &cord()->slabc,
+	if (index_arena_initialized == false) {
+		const uint32_t SLAB_SIZE = 4 * 1024 * 1024;
+		if (slab_arena_create(&index_arena, &memtx_quota,
+				      0, SLAB_SIZE, MAP_PRIVATE)) {
+			panic_syserror("failed to initialize index arena");
+		}
+		slab_cache_create(&index_arena_slab_cache, &index_arena,
+				  SLAB_SIZE);
+		mempool_create(&tree_extent_pool, &index_arena_slab_cache,
 			       BPS_TREE_EXTENT_SIZE);
-		tree_extent_pool_initialized = 1;
+		index_arena_initialized = true;
 	}
 	bps_tree_index_create(&tree, key_def, extent_alloc, extent_free);
 }

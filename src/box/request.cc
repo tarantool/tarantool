@@ -40,7 +40,8 @@
 #include <scoped_guard.h>
 #include <third_party/base64.h>
 #include "authentication.h"
-#include "access.h"
+#include "user_def.h"
+#include "iproto_constants.h"
 
 enum dup_replace_mode
 dup_replace_mode(uint32_t op)

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "schema.h"
-#include "access.h"
+#include "user_def.h"
 #include "engine.h"
 #include "space.h"
 #include "tuple.h"
