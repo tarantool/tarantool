@@ -51,9 +51,8 @@ dup_replace_mode(uint32_t op)
 static void
 execute_replace(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
-	txn_engine_begin_stmt(txn, space);
+	struct txn *txn = txn_begin_stmt(request, space);
 
 	access_check_space(space, PRIV_W);
 	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
@@ -69,9 +68,8 @@ execute_replace(struct request *request, struct port *port)
 static void
 execute_update(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
-	txn_engine_begin_stmt(txn, space);
+	struct txn *txn = txn_begin_stmt(request, space);
 
 	access_check_space(space, PRIV_W);
 	Index *pk = index_find(space, 0);
@@ -102,9 +100,8 @@ execute_update(struct request *request, struct port *port)
 static void
 execute_delete(struct request *request, struct port *port)
 {
-	struct txn *txn = txn_begin_stmt(request);
 	struct space *space = space_cache_find(request->space_id);
-	txn_engine_begin_stmt(txn, space);
+	struct txn *txn = txn_begin_stmt(request, space);
 
 	access_check_space(space, PRIV_W);
 

@@ -96,18 +96,6 @@ engine_find(const char *name)
 	tnt_raise(LoggedError, ER_NO_SUCH_ENGINE, name);
 }
 
-EngineFactory *
-engine_find_id(uint32_t id)
-{
-	EngineFactory *e;
-	rlist_foreach_entry(e, &engines, link) {
-		if (e->id == id)
-			return e;
-	}
-	assert(0);
-	return NULL;
-}
-
 /** Call a visitor function on every registered engine. */
 void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
                     void *udata)

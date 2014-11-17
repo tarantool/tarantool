@@ -82,6 +82,7 @@ t
   - recovery_last_update
   - server
   - snapshot_pid
+  - sophia
   - status
   - uptime
   - vclock

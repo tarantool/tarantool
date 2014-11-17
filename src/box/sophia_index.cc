@@ -151,27 +151,27 @@ sophia_configure(struct space *space, struct key_def *key_def)
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".threads",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.threads"));
+	sp_set(c, name, cfg_gets("sophia.threads"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".memory_limit",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.memory_limit"));
+	sp_set(c, name, cfg_gets("sophia.memory_limit"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_size",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.node_size"));
+	sp_set(c, name, cfg_gets("sophia.node_size"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_page_size",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.node_page_size"));
+	sp_set(c, name, cfg_gets("sophia.node_page_size"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_branch_wm",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.node_branch_wm"));
+	sp_set(c, name, cfg_gets("sophia.node_branch_wm"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".node_merge_wm",
 	         key_def->space_id);
-	sp_set(c, name, cfg_gets("sophia_options.node_merge_wm"));
+	sp_set(c, name, cfg_gets("sophia.node_merge_wm"));
 
 	snprintf(name, sizeof(name), "db.%" PRIu32 ".commit_lsn",
 	         key_def->space_id);

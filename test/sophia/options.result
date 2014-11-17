@@ -1,7 +1,7 @@
 sophia_rmdir()
 ---
 ...
-box.cfg.sophia_options
+box.cfg.sophia
 ---
 - node_page_size: 131072
   memory_limit: 0
@@ -10,7 +10,7 @@ box.cfg.sophia_options
   node_size: 134217728
   node_branch_wm: 10485760
 ...
-box.cfg.sophia_options.threads = 3
+box.cfg.sophia.threads = 3
 ---
 ...
 sophia_rmdir()

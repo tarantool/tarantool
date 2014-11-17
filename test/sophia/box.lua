@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 os = require('os')
 
-local sophia_options = {
+local sophia = {
 	memory_limit   = 0,
 	threads        = 3, -- test case
 	node_size      = 134217728,
@@ -16,7 +16,7 @@ box.cfg{
     pid_file         = "tarantool.pid",
     rows_per_wal     = 50,
     sophia_dir       = "sophia_test",
-    sophia_options   = sophia_options
+    sophia   = sophia
 }
 
 require('console').listen(os.getenv('ADMIN'))

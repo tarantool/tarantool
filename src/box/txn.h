@@ -85,10 +85,7 @@ in_txn()
  * start a new transaction with autocommit = true.
  */
 struct txn *
-txn_begin_stmt(struct request *request);
-
-void
-txn_engine_begin_stmt(struct txn *txn, struct space *space);
+txn_begin_stmt(struct request *request, struct space *space);
 
 /**
  * End a statement. In autocommit mode, end

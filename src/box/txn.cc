@@ -145,23 +145,11 @@ txn_begin(bool autocommit)
 		rlist_nil, txn_on_yield_or_stop, NULL, NULL
 	};
 	txn->autocommit = autocommit;
-	txn->engine = 0;
 	fiber_set_txn(fiber(), txn);
 	return txn;
 }
 
-struct txn *
-txn_begin_stmt(struct request *request)
-{
-	struct txn *txn = in_txn();
-	if (txn == NULL)
-		txn = txn_begin(true);
-	struct txn_stmt *stmt = txn_stmt_new(txn);
-	txn_add_redo(stmt, request);
-	return txn;
-}
-
-void
+static void
 txn_engine_begin_stmt(struct txn *txn, struct space *space)
 {
 	assert(txn->n_stmts >= 1);
@@ -174,9 +162,10 @@ txn_engine_begin_stmt(struct txn *txn, struct space *space)
 	 */
 	EngineFactory *factory = space->engine->factory;
 	if (txn->n_stmts == 1) {
+		/* First statement. */
 		txn->engine = factory;
 		if (txn->autocommit == false) {
-			if (! engine_transactional(txn->engine->flags))
+			if (! engine_transactional(factory->flags))
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 				          space->def.engine_name, "transactions");
 		}
@@ -186,6 +175,18 @@ txn_engine_begin_stmt(struct txn *txn, struct space *space)
 	if (txn->engine->id != engine_id(space->engine))
 		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	factory->begin_stmt(txn, space);
+}
+
+struct txn *
+txn_begin_stmt(struct request *request, struct space *space)
+{
+	struct txn *txn = in_txn();
+	if (txn == NULL)
+		txn = txn_begin(true);
+	struct txn_stmt *stmt = txn_stmt_new(txn);
+	txn_add_redo(stmt, request);
+	txn_engine_begin_stmt(txn, space);
+	return txn;
 }
 
 void
@@ -260,7 +261,7 @@ txn_finish(struct txn *txn)
  * Void all effects of the statement, but
  * keep it in the list - to maintain
  * limit on the number of statements in a
- * trasnaction.
+ * transaction.
  */
 void
 txn_rollback_stmt()

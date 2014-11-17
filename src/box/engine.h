@@ -179,9 +179,6 @@ void engine_foreach(void (*func)(EngineFactory *engine, void *udata),
 /** Find engine factory by name. */
 EngineFactory *engine_find(const char *name);
 
-/** Find engine factory by id. */
-EngineFactory *engine_find_id(uint32_t);
-
 /** Shutdown all engine factories. */
 void engine_shutdown();
 
