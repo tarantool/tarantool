@@ -72,7 +72,7 @@ test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
 box.schema.user.create('test', { password = 'pass' })
 client:write(string.format("require('console').connect('test:pass@%s')\n",
     IPROTO_SOCKET))
--- error: Execute access denied for user 'tester' to function 'dostring
+-- error: Execute access denied for user 'test' to function 'dostring
 test:ok(yaml.decode(client:read(EOL))[1].error:find('access denied'),
     'remote access denied')
 

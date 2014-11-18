@@ -18,7 +18,7 @@ local function rt(test, s, x)
     else
         xstr = tostring(x)
     end
-    test:isdeeply(x, x1, "encode/decode for "..xstr)
+    test:is_deeply(x, x1, "encode/decode for "..xstr)
 end
 
 local function test_unsigned(test, s)

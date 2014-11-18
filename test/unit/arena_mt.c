@@ -1,4 +1,5 @@
 #include "small/slab_arena.h"
+#include "small/quota.h"
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <pthread.h>
 
 struct slab_arena arena;
+struct quota quota;
 
 int THREADS = 8;
 int ITERATIONS = 1009 /* 100003 */;
@@ -63,7 +65,8 @@ int
 main()
 {
 	size_t maxalloc = THREADS * (OSCILLATION + 1) * SLAB_MIN_SIZE;
-	slab_arena_create(&arena, maxalloc/8, maxalloc*2,
+	quota_init(&quota, maxalloc);
+	slab_arena_create(&arena, &quota, maxalloc/8,
 			  SLAB_MIN_SIZE, MAP_PRIVATE);
 	bench(THREADS);
 	slab_arena_destroy(&arena);

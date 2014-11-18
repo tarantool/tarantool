@@ -40,7 +40,6 @@
 #include "recovery.h"
 #include "xrow.h"
 #include "msgpuck/msgpuck.h"
-#include "session.h"
 #include "box/cluster.h"
 #include "iproto_constants.h"
 
@@ -223,8 +222,6 @@ pull_from_remote(va_list ap)
 	struct ev_io coio;
 	struct iobuf *iobuf = NULL;
 	ev_loop *loop = loop();
-	/** This fiber executes transactions. */
-	SessionGuard session_guard(-1, 0);
 
 	coio_init(&coio);
 

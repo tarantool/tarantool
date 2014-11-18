@@ -67,6 +67,33 @@ Exception::operator new(size_t size)
 }
 
 void
+Exception::init(struct cord *cord)
+{
+	cord->exception = NULL;
+	cord->exception_size = 0;
+}
+
+void
+Exception::cleanup(struct cord *cord)
+{
+	if (cord->exception != NULL && cord->exception != &out_of_memory) {
+		cord->exception->~Exception();
+		free(cord->exception);
+	}
+	Exception::init(cord);
+}
+
+void
+Exception::move(struct cord *from, struct cord *to)
+{
+	Exception::cleanup(to);
+	to->exception = from->exception;
+	to->exception_size = from->exception_size;
+	Exception::init(from);
+}
+
+
+void
 Exception::operator delete(void * /* ptr */)
 {
 	/* Unsupported */

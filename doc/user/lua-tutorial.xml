@@ -599,7 +599,7 @@ targetptr="getting-started-start-stop"><quote>Starting Tarantool and making your
 
 <programlisting>
 box.space.tester:drop()           -- if tester is left over from some previous test, destroy it
-box.schema.create_space('tester')
+box.schema.space.create('tester')
 box.space.tester:create_index('primary', {parts = {1, 'NUM'}})
 </programlisting>
 then add some tuples where the first field is a number and the second field is a string.

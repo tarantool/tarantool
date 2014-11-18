@@ -1,0 +1,6 @@
+1..5
+ok 1 - no fails detected
+ok 2 - one of thread limit set is final
+ok 3 - total alloc match
+ok 4 - uses are mosly successful
+ok 5 - sets are mosly successful

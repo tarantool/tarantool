@@ -126,6 +126,20 @@ local function cmpdeeply(got, expected, extra)
     return true
 end
 
+local function like(test, got, pattern, message, extra)
+    extra = extra or {}
+    extra.got = got
+    extra.expected = pattern
+    return ok(test, string.match(tostring(got), pattern) ~= nil, message, extra)
+end
+
+local function unlike(test, got, pattern, message, extra)
+    extra = extra or {}
+    extra.got = got
+    extra.expected = pattern
+    return ok(test, string.match(tostring(got), pattern) == nil, message, extra)
+end
+
 local function is(test, got, expected, message, extra)
     extra = extra or {}
     extra.got = got
@@ -141,7 +155,7 @@ local function isnt(test, got, unexpected, message, extra)
 end
 
 
-local function isdeeply(test, got, expected, message, extra)
+local function is_deeply(test, got, expected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = expected
@@ -268,7 +282,9 @@ test_mt = {
         isboolean = isboolean;
         isudata   = isudata;
         iscdata   = iscdata;
-        isdeeply  = isdeeply;
+        is_deeply = is_deeply;
+        like      = like;
+        unlike    = unlike;
     }
 }
 

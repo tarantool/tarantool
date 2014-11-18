@@ -33,6 +33,7 @@
 #include "errcode.h"
 #include "say.h"
 
+struct cord;
 
 class Exception: public Object {
 public:
@@ -53,6 +54,11 @@ public:
 	virtual void log() const = 0;
 	virtual ~Exception() {}
 
+	static void init(struct cord *cord);
+	/** Clear the last error saved in the current thread's TLS */
+	static void cleanup(struct cord *cord);
+	/** Move an exception from one thread to another. */
+	static void move(struct cord *from, struct cord *to);
 protected:
 	Exception(const char *file, unsigned line);
 	/* The copy constructor is needed for C++ throw */

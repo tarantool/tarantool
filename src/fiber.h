@@ -85,7 +85,9 @@ enum fiber_key {
 	FIBER_KEY_LUA_STORAGE = 1,
 	/** transaction */
 	FIBER_KEY_TXN = 2,
-	FIBER_KEY_MAX = 3
+	/** User global privilege and authentication token */
+	FIBER_KEY_USER = 3,
+	FIBER_KEY_MAX = 4
 };
 
 struct fiber {
@@ -171,12 +173,45 @@ extern __thread struct cord *cord_ptr;
 #define fiber() cord()->fiber
 #define loop() (cord()->loop)
 
+/**
+ * Start a cord with the given thread function.
+ * The return value of the function can be collected
+ * with cord_join(). If the function terminates with
+ * an exception, the return value is NULL, and cord_join()
+ * moves the exception from the terminated cord to
+ * the caller of cord_join().
+ */
 int
 cord_start(struct cord *cord, const char *name,
 	   void *(*f)(void *), void *arg);
 
+/**
+ * Wait for \a cord to terminate. If \a cord has already
+ * terminated, then returns immediately.
+ *
+ * @post If the subject cord terminated with an exception,
+ * preserves the exception in the caller's cord.
+ *
+ * @param cord cord
+ * @retval  0  pthread_join succeeded.
+ *             If the thread function terminated with an
+ *             exception, the exception is raised in the
+ *             caller cord.
+ * @retval -1   pthread_join failed.
+ */
 int
 cord_join(struct cord *cord);
+
+/**
+ * \brief Yield until \a cord has terminated.
+ * If \a cord has terminated with an uncaught exception
+ * **re-throws** this exception in the calling cord/fiber.
+ * \param cord cord
+ * \sa pthread_join()
+ * \return 0 on success
+ */
+int
+cord_cojoin(struct cord *cord);
 
 static inline void
 cord_set_name(const char *name)

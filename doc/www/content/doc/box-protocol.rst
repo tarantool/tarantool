@@ -5,46 +5,92 @@
 :template: documentation
 
 --------------------------------------------------------------------------------
+                              Notion in diagrams
+--------------------------------------------------------------------------------
+
+.. code-block:: bash
+
+    0    X
+    +----+
+    |    | - X bytes
+    +----+
+     TYPE - type of MsgPack value (if it is MsgPack object)
+
+    +====+
+    |    | - Variable size MsgPack object
+    +====+
+     TYPE - type of MsgPack value
+
+    +~~~~+
+    |    | - Variable size MsgPack Array/Map
+    +~~~~+
+     TYPE - type of MsgPack value
+
+
+MsgPack data types:
+
+* **MP_INT** - Unsigned Integer
+* **MP_MAP** - Map
+* **MP_ARR** - Array
+* **MP_STRING** - String
+* **MP_FIXSTR** - Fixed size string
+* **MP_OBJECT** - Any MsgPack object
+
+
+--------------------------------------------------------------------------------
                                     Overview
 --------------------------------------------------------------------------------
 
-IPROTO is a binary request/response protocol. The server begins the dialogue by
-sending a fixed-size (128 bytes) text greeting to the client. The first 64 bytes
-of the greeting contain server version. The second 64 bytes contain a
-base64-encoded random string, to use in authentification packet.
+IPROTO is a binary request/response protocol.
+
+--------------------------------------------------------------------------------
+                         Greeting Package
+--------------------------------------------------------------------------------
+
+.. code-block:: bash
+
+    TARANTOOL'S GRETTING:
+
+    0                                     63
+    +--------------------------------------+
+    |                                      |
+    | Tarantool Greeting (server version)  |
+    |               64 bytes               |
+    +---------------------+----------------+
+    |                     |                |
+    | BASE64 encoded SALT |      NULL      |
+    |      44 bytes       |                |
+    +---------------------+----------------+
+    64                  107              127
+
+The server begins the dialogue by sending a fixed-size (128 bytes) text greeting
+to the client. The first 64 bytes of the greeting contain server version. The
+second 44 bytes contain a base64-encoded random string, to use in authentification
+packet. And it ends with 20 bytes of spaces.
+
+--------------------------------------------------------------------------------
+                         Unified package structure
+--------------------------------------------------------------------------------
 
 Once a greeting is read, the protocol becomes pure request/response and features
 a complete access to Tarantool functionality, including:
 
-- request multiplexing, e.g. ability to asynchronously issue multiple requests\
+- request multiplexing, e.g. ability to asynchronously issue multiple requests
   via the same connection
 - response format that supports zero-copy writes
 
 For data structuring and encoding, the protocol uses msgpack data format, see
 http://msgpack.org
 
-Since msgpack uses a variable representation for compound data structures, such
-as arrays and maps, the exact byte sequence mandated by msgpack format is omitted
-in this spec. This spec therefore only defines the expected **schema** of msgpack
-streams.
-
-To specify that a msgpack map is expected in the stream, the contents of the map is
-put into "{}" (curly braces).
-
-To specify that a msgpack array is expected in the stream, the contents of the array
-is put into "[]" (square brackets).
-
-A single key-value pair in a map is separated by a ":" (semicolon), values of a map
-or array are separated by "," (comma).
-
-Tarantool protocol mandates use of a few integer constants serving as keys in maps
-used in the protocol. These constants are defined in
-https://github.com/tarantool/tarantool/blob/master/src/iproto_constants.h
+Tarantool protocol mandates use of a few integer constants serving as keys in
+maps used in the protocol. These constants are defined in `src/box/iproto_constants.h
+<https://github.com/tarantool/tarantool/blob/master/src/iproto_constants.h>`_
 
 Let's list them here too:
 
-.. code-block:: lua
+.. code-block:: bash
 
+    -- user keys
     <code>          ::= 0x00
     <sync>          ::= 0x01
     <space_id>      ::= 0x10
@@ -55,255 +101,403 @@ Let's list them here too:
     <key>           ::= 0x20
     <tuple>         ::= 0x21
     <function_name> ::= 0x22
+    <username>      ::= 0x23
     <data>          ::= 0x30
     <error>         ::= 0x31
 
+.. code-block:: bash
 
-The value of the constant defines the type of value of the map. For example,
-for :code:`<error> key (0x31)`, the expected value is a msgpack string with
-error message. All requests and responses utilize the same basic structure
+    -- -- Value for <code> key in request can be:
+    -- User command codes
+    <select>  ::= 0x01
+    <insert>  ::= 0x02
+    <replace> ::= 0x03
+    <update>  ::= 0x04
+    <delete>  ::= 0x05
+    <call>    ::= 0x06
+    <auth>    ::= 0x07
+    -- Admin command codes
+    <ping>    ::= 0x40
 
-.. code-block:: lua
-    
-    <packet> ::= <request> | <response>
-    <request> ::= <len><header><body>
-    <response> ::= <len><header><body>
-    <len> is the length of the packet, in msgpack format.
+    -- -- Value for <code> key in response can be:
+    <OK>      ::= 0x00
+    <ERROR>   ::= 0x8XXX
 
-Implementor note: for simplicity of the implementation, the server never
-"compresses" the packet length, i.e. it is always passed as msgpack 32-bit
-unsigned int, :code:`0xce b4 b3 b2 b1 (5 bytes)`
-
-.. code-block:: lua
-
-    <len> ::= msgpack Int (unsigned)
 
 Both :code:`<header>` and :code:`<body>` are msgpack maps:
 
-.. code-block:: lua
+.. code-block:: bash
 
-    <header> ::= { (<key> : <value>)+ }
-    <body> ::= { (<key> : <value>)+ }
+    Request/Response:
+
+    0      5
+    +------+ +============+ +===================================+
+    |BODY +| |            | |                                   |
+    |HEADER| |   HEADER   | |               BODY                |
+    | SIZE | |            | |                                   |
+    +------+ +============+ +===================================+
+     MP_INT      MP_MAP                     MP_MAP
+
+.. code-block:: bash
+
+    UNIFIED HEADER:
+
+    +================+================+
+    |                |                |
+    |   0x00: CODE   |   0x01: SYNC   |
+    | MP_INT: MP_INT | MP_INT: MP_INT |
+    |                |                |
+    +================+================+
+                   MP_MAP
 
 They only differ in the allowed set of keys and values, the key defines the
-type of value that follows. If a key is missing, and expects an integer value,
-the missing value is always assumed to be 0. If the missing key assumes a string
-value, the string is assumed to be empty. If a body has no keys, entire msgpack
-map for the body may be missing. Such is the case, for example, in <ping> request.
-
-.. code-block:: lua
-
-    <key> ::= <header_key> | <body_key>
-    <header_key> ::= <code> | <sync>
-
-:code:`<code>` is request code or response code
+type of value that follows. If a body has no keys, entire msgpack map for
+the body may be missing. Such is the case, for example, in <ping> request.
 
 --------------------------------------------------------------------------------
-                           Request packet structure
+                            Authorization
 --------------------------------------------------------------------------------
 
-.. code-block:: lua
+.. code-block:: bash
 
-    Value for <code> key in request can be:
-    1  -- <select>
-    2  -- <insert>
-    3  -- <replace>
-    4  -- <update>
-    5  -- <delete>
-    6  -- <call>
-    7  -- <auth>
-    64  -- <ping>
-    66 -- <subscribe>
+    PREPARE SCRAMBLE:
 
-:code:`<sync>` is a unique request identifier, preserved in the response, The
-identifier is necessary to allow request multiplexing -- i.e. sending multiple
-requests through the same connection before fetching a response to any of them.
-The value of the identifier currently bears no meaning to the server. Consequently,
-<sync> can be 0 or two requests can have an identical id.
+        LEN(ENCODED_SALT) = 44;
+        LEN(SCRAMBLE)     = 20;
 
-.. code-block:: lua
-    
-    <body_key> ::= <request_key> | <response_key>
+    prepare 'chap-sha1' scramble:
 
-Different request types allow different keys in the body:
+        salt = base64_decode(encoded_salt);
+        step_1 = sha1(password);
+        step_2 = sha1(step_1);
+        step_3 = sha1(salt, step_2);
+        scramble = xor(step_1, step_4);
+        return scramble;
 
-.. code-block:: lua
-    
-    <request_key> ::= <select> | <replace> | <delete> | <update> | <call>
+    AUTHORIZATION BODY: CODE = 0x07
 
-Find tuples matching the search pattern
+    +==================+====================================+
+    |                  |        +-------------+-----------+ |
+    |  (KEY)           | (TUPLE)|  len == 9   | len == 20 | |
+    |   0x23:USERNAME  |   0x21:| "chap-sha1" |  SCRAMBLE | |
+    | MP_INT:MP_STRING | MP_INT:|  MP_STRING  | MP_STRING | |
+    |                  |        +-------------+-----------+ |
+    |                  |                   MP_ARRAY         |
+    +==================+====================================+
+                            MP_MAP
 
-.. code-block:: lua
-    
-    <select> ::= <space_id> | <index_id> | <iterator> | <offset> | <limit> | <key>
-
-Insert a tuple into the space or replace an existing one.
-
-.. code-block:: lua
-    
-    <replace> ::= <space_id> | <tuple>
-
-Insert is similar to replace, but will return a duplicate key error if such tuple
-already exists.
-
-.. code-block:: lua
-    
-    <insert> ::= <space_id> | <tuple>
-
-Delete a tuple
-
-.. code-block:: lua
-    
-    <delete> ::= <space_id> | <index_id> | <key>
-
-Update a tuple
-
-.. code-block:: lua
-    
-    <udpate> ::= <space_id> | <index_id> | <key> | <tuple>
-
-Call a stored function
-
-.. code-block:: lua
-    
-    <call> ::= <function_name> | <tuple>
-
-Authenticate a session
 :code:`<key>` holds the user name. :code:`<tuple>` must be an array of 2 fields:
 authentication mechanism ("chap-sha1" is the only supported mechanism right now)
-and password, encrypted according to the specified mechanism
-https://github.com/tarantool/tarantool/blob/master/src/scramble.h
-for instructions how to prepare a hashed password for "chap-sha1" authentication
-mechanism. Authentication in Tarantool is optional, if no authentication is
-performed, session user is 'guest'. The server responds to authentication packet
-with a standard response with 0 tuples.
+and password, encrypted according to the specified mechanism. Authentication in
+Tarantool is optional, if no authentication is performed, session user is 'guest'.
+The server responds to authentication packet with a standard response with 0 tuples.
 
-.. code-block:: lua
-    
-    <auth> ::= <key> | <tuple>
+--------------------------------------------------------------------------------
+                                  Requests
+--------------------------------------------------------------------------------
 
-As can be seen from the grammar some requests have common keys, whereas other
-keys can be present only in a body of a single request type.
+* SELECT: CODE - 0x01
+  Find tuples matching the search pattern
 
-:code:`<space_id>` space to use in the request To find the numeric space id by
-space name, one must first query :code:`_space` system space. Id of :code:`_space`
-system space is defined in :code:`box.schema.SPACE_ID` (global Lua variable set
-in package :code:`box`)
+.. code-block:: bash
 
-:code:`<index_id>` index id of the index to use in the request Similarly to
-space, to find the numeric index id by index name, one must query the
-:code:`_index` system space. Id of :code:`_index` system space is defined in
-:code:`box.schema.INDEX_ID` (global Lua variable set in  package :code:`box`).
-:code:`<tuple>` defines the actual argument of the operation in :code:`<replace>`
-it defines the tuple which will be inserted into the database. In :code:`<call>`
-it defines call arguments. When request body allows :code:`<tuple>` as a key,
-it must always be present, since otherwise the request is meaningless.
+    SELECT BODY:
 
-:code:`<offset>` specifies offset in the result set, expects :code:`<uint32>`
-value :code:`<limit>` specifies limit in the result set, expects a :code:`<uint32>`
-value :code:`<iterator>` specifies the iterator type to use in search, an integer
-constant from the range defined in
-https://github.com/tarantool/tarantool/blob/master/src/box/index.h#L61
-:code:`<function_name>` is used to give call path for a Lua function :code:`<tuple>`
-in :code:`<update>` must carry a list of update operations:
+    +==================+==================+==================+
+    |                  |                  |                  |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x12: LIMIT    |
+    | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_INT   |
+    |                  |                  |                  |
+    +==================+==================+==================+
+    |                  |                  |                  |
+    |   0x13: OFFSET   |   0x14: ITERATOR |   0x14: KEY      |
+    | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
+    |                  |                  |                  |
+    +==================+==================+==================+
+                              MP_MAP
 
-.. code-block:: lua
-    
-    <op_list> ::= [ (<operation>)+ ]
-    <operation> ::= [ <op>, <field_no>, (<argument>)+ ]
-    <field_no> ::= <int32>
+* INSERT:  CODE - 0x02
+  Inserts tuple into the space, if no tuple with same unique keys exists. Otherwise throw *duplicate key* error.
+* REPLACE: CODE - 0x03
+  Insert a tuple into the space or replace an existing one.
+
+.. code-block:: bash
 
 
-:code:`<op>` is a 1-byte ASCII string carrying operation code:
+    INSERT/REPLACE BODY:
 
-- "=" - assign operation argument to field <field_no> .\
-  will extend the tuple if <field_no> == <max_field_no> + 1
-- "#" - delete <argument> fields starting from <field_no>
-- "!" - insert <argument> before <field_no>
+    +==================+==================+
+    |                  |                  |
+    |   0x10: SPACE_ID |   0x21: TUPLE    |
+    | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
+    |                  |                  |
+    +==================+==================+
+                     MP_MAP
 
-The following operation(s) are only defined for integer types (32 and 64 bit):
+* UPDATE: CODE - 0x04
+  Update a tuple
 
-- "+" - add argument to field <field_no>, both arguments \
-  are treated as signed 32 or 64 -bit ints
-- "-" - subtract argument from the field <field_no>
-- "&" - bitwise AND of argument and field <field_no>
-- "^" - bitwise XOR of argument and field <field_no>
-- "|" - bitwise OR of argument and field <field_no>
+.. code-block:: bash
 
-Finally there is an operation that expects offset, cut length and string paste
-arguments
+    UPDATE BODY:
 
-- ":" - implementation of Perl 'splice' command
+    +==================+==================+==================+=======================+
+    |                  |                  |                  |          +~~~~~~~~~~+ |
+    |                  |                  |                  |          |          | |
+    |                  |                  |                  | (TUPLE)  |    OP    | |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |    0x21: |          | |
+    | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |  MP_INT: +~~~~~~~~~~+ |
+    |                  |                  |                  |            MP_ARRAY   |
+    +==================+==================+==================+=======================+
+                                       MP_MAP
+
+.. code-block:: bash
+
+    OP:
+        Works only for integer fields:
+        * Addition    OP = '+' . space[key][field_no] += argument
+        * Subtraction OP = '-' . space[key][field_no] -= argument
+        * Bitwise AND OP = '&' . space[key][field_no] &= argument
+        * Bitwise XOR OP = '^' . space[key][field_no] ^= argument
+        * Bitwise OR  OP = '|' . space[key][field_no] |= argument
+        Works on any fields:
+        * Delete      OP = '#'
+          delete <argument> fields starting from <field_no> in the space[<key>]
+
+    0           2
+    +-----------+==========+==========+
+    |           |          |          |
+    |    OP     | FIELD_NO | ARGUMENT |
+    | MP_FIXSTR |  MP_INT  |  MP_INT  |
+    |           |          |          |
+    +-----------+==========+==========+
+                  MP_ARRAY
+
+.. code-block:: bash
+
+        * Insert      OP = '!'
+          insert <argument> before <field_no>
+        * Assign      OP = '='
+          assign <argument> to field <field_no>.
+          will extend the tuple if <field_no> == <max_field_no> + 1
+
+    0           2
+    +-----------+==========+===========+
+    |           |          |           |
+    |    OP     | FIELD_NO | ARGUMENT  |
+    | MP_FIXSTR |  MP_INT  | MP_OBJECT |
+    |           |          |           |
+    +-----------+==========+===========+
+                  MP_ARRAY
+
+        Works on string fields:
+        * Splice      OP = ':'
+          take the string from space[key][field_no] and
+          substitute <offset> bytes from <position> with <argument>
+
+.. code-block:: bash
+
+    0           2
+    +-----------+==========+==========+========+==========+
+    |           |          |          |        |          |
+    |    ':'    | FIELD_NO | POSITION | OFFSET | ARGUMENT |
+    | MP_FIXSTR |  MP_INT  |  MP_INT  | MP_INT |  MP_STR  |
+    |           |          |          |        |          |
+    +-----------+==========+==========+========+==========+
+                             MP_ARRAY
 
 
-It's an error to specify an argument of a type that
-differs from expected type.
+It's an error to specify an argument of a type that differs from expected type.
+
+* DELETE: CODE - 0x05
+  Delete a tuple
+
+.. code-block:: bash
+
+    DELETE BODY:
+
+    +==================+==================+==================+
+    |                  |                  |                  |
+    |   0x10: SPACE_ID |   0x11: INDEX_ID |   0x14: KEY      |
+    | MP_INT: MP_INT   | MP_INT: MP_INT   | MP_INT: MP_ARRAY |
+    |                  |                  |                  |
+    +==================+==================+==================+
+                              MP_MAP
+
+
+* CALL: CODE - 0x06
+  Call a stored function
+
+.. code-block:: bash
+
+    CALL BODY:
+
+    +=======================+==================+
+    |                       |                  |
+    |   0x22: FUNCTION_NAME |   0x21: TUPLE    |
+    | MP_INT: MP_STRING     | MP_INT: MP_ARRAY |
+    |                       |                  |
+    +=======================+==================+
+                        MP_MAP
 
 --------------------------------------------------------------------------------
                          Response packet structure
 --------------------------------------------------------------------------------
 
-Value of :code:`<code>` key in response is:
+We'll show whole packets here:
 
-.. code-block:: lua
-    
-    0  -- SUCCESS
-    !0 -- Tarantool error code
+.. code-block:: bash
 
-If response :code:`<code>` is 0 (success), response body contains zero or more
-tuples, otherwise it carries an error message that corresponds to the return code.
 
-On success, the server always returns a tuple or tuples, when found. I.e. on success,
-response :code:`<body>` contains :code:`<set>` key. For select/update/delete, it's
-the tuple that matched the search criterion. For :code:`<replace>`, it's the inserted
-tuple. For :code:`<call>`, it's whatever the called function returns.
+    OK:    LEN + HEADER + BODY
 
-.. code-block:: lua
-    
-    <response_key> = <data> | <error>
+    0      5                                          OPTIONAL
+    +------++================+================++===================+
+    |      ||                |                ||                   |
+    | BODY ||   0x00: 0x00   |   0x01: SYNC   ||   0x30: DATA      |
+    |HEADER|| MP_INT: MP_INT | MP_INT: MP_INT || MP_INT: MP_OBJECT |
+    | SIZE ||                |                ||                   |
+    +------++================+================++===================+
+     MP_INT                MP_MAP                      MP_MAP
 
-Set of tuples in the response :code:`<data>` expects  a msgpack array of tuples as value
+Set of tuples in the response :code:`<data>` expects a msgpack array of tuples as value
+
+.. code-block:: bash
+
+    ERROR: LEN + HEADER + BODY
+
+    0      5
+    +------++================+================++===================+
+    |      ||                |                ||                   |
+    | BODY ||   0x00: 0x8XXX |   0x01: SYNC   ||   0x31: ERROR     |
+    |HEADER|| MP_INT: MP_INT | MP_INT: MP_INT || MP_INT: MP_STRING |
+    | SIZE ||                |                ||                   |
+    +------++================+================++===================+
+     MP_INT                MP_MAP                      MP_MAP
+
+    Where 0xXXX is ERRCODE.
 
 Error message is present in the response only if there is an error :code:`<error>`
 expects as value a msgpack string
 
-The error :code:`<code>` consists of the actual error code and request completion status
-(completion status is complementary since it can be deduced from the error code)
-There are only 3 completion status codes in use:
-
-.. code-block:: lua
-    
-    0  - success; The only possible error code with this status is
-        0, ER_OK
-    1  - try again; An indicator of an intermittent error.
-        Usually is returned when two clients attempt to change
-        the same tuple simultaneously.
-        (<update> is not always done atomically)
-    2  - error
-
-The error code holds the actual error. Existing error codes include:
-
-.. code-block:: lua
-    
-    Completion status 0 (success)
-    -------------------------------------------
-    0x00000000 -- ER_OK
-
-    Completion status 1 (try again)
-    -------------------------------------------
-    0x00000201 -- ER_MEMORY_ISSUE - An error occurred when allocating memory
-
-    Completion status 2 (error)
-    -------------------------------------------
-    0x00000102 -- ER_ILLEGAL_PARAMS - Malformed query
-    0x00000302 -- ER_TUPLE_FOUND - Duplicate key exists in a unique index
-
-Convenience macros which define hexadecimal constants for :code:`<int32>` return
-codes (completion status + code) can be found here:
-https://github.com/tarantool/tarantool/blob/master/src/errcode.h
+Convenience macros which define hexadecimal constants for return codes
+can be found in `src/errcode.h
+<https://github.com/tarantool/tarantool/blob/master/src/errcode.h>`_
 
 --------------------------------------------------------------------------------
-                              Additional packets
+                         Replication packet structure
 --------------------------------------------------------------------------------
 
-TODO
+.. code-block:: bash
+
+    -- replication keys
+    <server_id>     ::= 0x02
+    <lsn>           ::= 0x03
+    <timestamp>     ::= 0x04
+    <server_uuid>   ::= 0x24
+    <cluster_uuid>  ::= 0x25
+    <vclock>        ::= 0x26
+
+.. code-block:: bash
+
+    -- replication codes
+    <join>      ::= 0x41
+    <subscribe> ::= 0x42
+
+
+.. code-block:: bash
+
+    JOIN:
+
+    In the beginning you must send JOIN
+                             HEADER                          BODY
+    +================+================+===================++-------+
+    |                |                |    SERVER_UUID    ||       |
+    |   0x00: 0x41   |   0x01: SYNC   |   0x24: UUID      || EMPTY |
+    | MP_INT: MP_INT | MP_INT: MP_INT | MP_INT: MP_STRING ||       |
+    |                |                |                   ||       |
+    +================+================+===================++-------+
+                   MP_MAP                                   MP_MAP
+
+    Then server, which we connect to, will send last SNAP file by, simply,
+    creating a number of INSERT's (with additional LSN and ServerID) (don't reply)
+    Then it'll send a vclock's MP_MAP and close a socket.
+
+    +================+================++============================+
+    |                |                ||        +~~~~~~~~~~~~~~~~~+ |
+    |                |                ||        |                 | |
+    |   0x00: 0x00   |   0x01: SYNC   ||   0x26:| SRV_ID: SRV_LSN | |
+    | MP_INT: MP_INT | MP_INT: MP_INT || MP_INT:| MP_INT: MP_INT  | |
+    |                |                ||        +~~~~~~~~~~~~~~~~~+ |
+    |                |                ||               MP_MAP       |
+    +================+================++============================+
+                   MP_MAP                      MP_MAP
+
+    SUBSCRIBE:
+
+    Then you must send SUBSCRIBE:
+
+                                  HEADER
+    +================+================+===================+===================+
+    |                |                |    SERVER_UUID    |    CLUSTER_UUID   |
+    |   0x00: 0x41   |   0x01: SYNC   |   0x24: UUID      |   0x25: UUID      |
+    | MP_INT: MP_INT | MP_INT: MP_INT | MP_INT: MP_STRING | MP_INT: MP_STRING |
+    |                |                |                   |                   |
+    +================+================+===================+===================+
+                                    MP_MAP
+          BODY
+    +================+
+    |                |
+    |   0x26: VCLOCK |
+    | MP_INT: MP_INT |
+    |                |
+    +================+
+          MP_MAP
+
+    Then you must process every query that'll came through other masters.
+    Every request between masters will have Additional LSN and SERVER_ID.
+
+--------------------------------------------------------------------------------
+                                XLOG / SNAP
+--------------------------------------------------------------------------------
+
+XLOG and SNAP have one format now. For example, they starts with:
+
+.. code-block:: bash
+
+    SNAP\n
+    0.12\n
+    Server: e6eda543-eda7-4a82-8bf4-7ddd442a9275\n
+    VClock: {1: 0}\n
+    \n
+    ...
+
+So, **Header** of SNAP/XLOG consists from:
+
+.. code-block:: bash
+
+    <format>\n
+    <format_version>\n
+    Server: <server_uuid>
+    VClock: <vclock_map>\n
+    \n
+
+
+There're two markers: tuple beggining - **0xd5ba0bab** and EOF marker - **0xd510aded**. So, next, between **Header** and EOF marker there's data with such schema:
+
+.. code-block:: bash
+
+    0            3 4                                         17
+    +-------------+========+============+===========+=========+
+    |             |        |            |           |         |
+    | 0xd5ba0bab  | LENGTH | CRC32 PREV | CRC32 CUR | PADDING |
+    |             |        |            |           |         |
+    +-------------+========+============+===========+=========+
+      MP_FIXEXT2    MP_INT     MP_INT       MP_INT      ---
+
+    +============+ +===================================+
+    |            | |                                   |
+    |   HEADER   | |                BODY               |
+    |            | |                                   |
+    +============+ +===================================+
+        MP_MAP                     MP_MAP

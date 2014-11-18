@@ -29,7 +29,8 @@
 #include "session.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
-#include "box/access.h"
+#include "box/user_cache.h"
+#include "box/user_def.h"
 
 extern "C" {
 #include <lua.h>
@@ -55,23 +56,31 @@ static const char *sessionlib_name = "box.session";
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, session()->id);
+	lua_pushnumber(L, current_session()->id);
 	return 1;
 }
 
-/** Session user id. */
+/**
+ * Session user id.
+ * Note: effective user id (current_user()->uid)
+ * may be different in a setuid function.
+ */
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, session()->uid);
+	lua_pushnumber(L, current_session()->user.uid);
 	return 1;
 }
 
-/** Session user id. */
+/**
+ * Session user name.
+ * Note: effective user name may be different in
+ * a setuid function.
+ */
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user *user = user_cache_find(session()->uid);
+	struct user_def *user = user_by_id(current_session()->user.uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -85,25 +94,18 @@ lbox_session_su(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1)
 		luaL_error(L, "session.su(): bad arguments");
-	struct session *session = session();
+	struct session *session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.su(): session does not exit");
-	struct user *user;
+	struct user_def *user;
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
 		const char *name = lua_tolstring(L, 1, &len);
-		user = user_by_name(name, len);
-		if (user == NULL)
-			tnt_raise(ClientError, ER_NO_SUCH_USER, name);
+		user = user_cache_find_by_name(name, len);
 	} else {
-		uint32_t uid = lua_tointeger(L, 1);;
-		user = user_cache_find(uid);
-		if (user == NULL) {
-			tnt_raise(ClientError, ER_NO_SUCH_USER,
-				  int2str(uid));
-		}
+		user = user_cache_find(lua_tointeger(L, 1));
 	}
-	session_set_user(session, user->auth_token, user->uid);
+	current_user_init(&session->user, user);
 	return 0;
 }
 
@@ -149,15 +151,14 @@ lbox_session_peer(struct lua_State *L)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
 	int fd;
-	if (lua_gettop(L) == 1) {
-		struct session *session = session_find(luaL_checkint(L, 1));
-		if (session == NULL)
-			luaL_error(L, "session.peer(): session does not exit");
-		fd = session->fd;
-	} else {
-		fd = session()->fd;
-	}
-
+	struct session *session;
+	if (lua_gettop(L) == 1)
+		session = session_find(luaL_checkint(L, 1));
+	else
+		session = current_session();
+	if (session == NULL)
+		luaL_error(L, "session.peer(): session does not exit");
+	fd = session->fd;
 	if (fd < 0) {
 		lua_pushnil(L); /* no associated peer */
 		return 1;

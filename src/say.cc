@@ -297,7 +297,7 @@ vsay(int level, const char *filename, int line, const char *error, const char *f
 	int r = write(log_fd, buf, p + 1);
 	(void)r;
 
-	if (S_FATAL && log_fd != STDERR_FILENO) {
+	if (level == S_FATAL && log_fd != STDERR_FILENO) {
 		r = write(STDERR_FILENO, buf, p + 1);
 		(void)r;
 	}

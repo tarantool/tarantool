@@ -13,7 +13,8 @@ box.cfg {
     wal_dir = tempdir,
     snap_dir = tempdir,
     sophia_dir = tempdir,
-    logger      = fio.pathjoin(tempdir, 'tarantool.log')
+    logger      = fio.pathjoin(tempdir, 'tarantool.log'),
+    slab_alloc_arena=0.1 -- for small systems
 }
 
 local function test_replace(old_tuple, new_tuple)

@@ -37,6 +37,7 @@
 #include "assoc.h"
 #include "memory.h"
 #include "trigger.h"
+#include "coeio.h"
 
 static struct cord main_cord;
 __thread struct cord *cord_ptr = NULL;
@@ -533,6 +534,7 @@ cord_create(struct cord *cord, const char *name)
 
 	cord->sp = cord->stack;
 	cord->max_fid = 100;
+	Exception::init(cord);
 
 	ev_async_init(&cord->ready_async, fiber_ready_async);
 	ev_async_start(cord->loop, &cord->ready_async);
@@ -550,11 +552,7 @@ cord_destroy(struct cord *cord)
 	}
 	slab_cache_destroy(&cord->slabc);
 	ev_loop_destroy(cord->loop);
-	/* Cleanup memory allocated for exceptions */
-	if (cord->exception && cord->exception != &out_of_memory) {
-		cord->exception->~Exception();
-		free(cord->exception);
-	}
+	Exception::cleanup(cord);
 }
 
 struct cord_thread_arg
@@ -571,15 +569,33 @@ struct cord_thread_arg
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
-	struct cord *cord = cord() = ct_arg->cord;
+	cord() = ct_arg->cord;
+	struct cord *cord = cord();
 	cord_create(cord, ct_arg->name);
+	/** Can't possibly be the main thread */
+	assert(cord->id != main_thread_id);
 	tt_pthread_mutex_lock(&ct_arg->start_mutex);
 	void *(*f)(void *) = ct_arg->f;
 	void *arg = ct_arg->arg;
 	ct_arg->is_started = true;
 	tt_pthread_cond_signal(&ct_arg->start_cond);
 	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
-	return f(arg);
+	void *res;
+	try {
+		res = f(arg);
+		/*
+		 * Clear a possible leftover exception object
+		 * to not confuse the invoker of the thread.
+		 */
+		Exception::cleanup(cord);
+	} catch (Exception *) {
+		/*
+		 * The exception is now available to the caller
+		 * via cord->exception.
+		 */
+		res = NULL;
+	}
+	return res;
 }
 
 int
@@ -604,14 +620,45 @@ end:
 int
 cord_join(struct cord *cord)
 {
-	int res = 0;
-	if (tt_pthread_join(cord->id, NULL)) {
-		/* We can't recover from this in any reasonable way. */
-		say_syserror("%s: thread join failed", cord->name);
-		res = -1;
+	assert(cord() != cord); /* Can't join self. */
+	void *retval = NULL;
+	int res = tt_pthread_join(cord->id, &retval);
+	if (res == 0 && cord->exception) {
+		/*
+		 * cord_thread_func guarantees that
+		 * cord->exception is only set if the subject cord
+		 * has terminated with an uncaught exception,
+		 * transfer it to the caller.
+		 */
+		Exception::move(cord, cord());
+		cord_destroy(cord);
+		cord()->exception->raise();
 	}
 	cord_destroy(cord);
 	return res;
+}
+
+ssize_t
+cord_cojoin_cb(va_list ap)
+{
+	struct cord *cord = va_arg(ap, struct cord *);
+	void *retval = NULL;
+	int res = tt_pthread_join(cord->id, &retval);
+	return res;
+}
+
+int
+cord_cojoin(struct cord *cord)
+{
+	assert(cord() != cord); /* Can't join self. */
+	int rc = coeio_custom(cord_cojoin_cb, TIMEOUT_INFINITY, cord);
+	if (rc == 0 && cord->exception) {
+		Exception::move(cord, cord());
+		cord_destroy(cord);
+		cord()->exception->raise(); /* re-throw exception from cord */
+	}
+	cord_destroy(cord);
+	return rc;
 }
 
 void

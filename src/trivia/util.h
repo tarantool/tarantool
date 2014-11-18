@@ -172,7 +172,7 @@ char *find_path(const char *argv0);
 char *abspath(const char *filename);
 
 char *
-int2str(int val);
+int2str(long int val);
 
 #ifndef HAVE_MEMMEM
 /* Declare memmem(). */

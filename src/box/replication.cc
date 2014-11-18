@@ -40,6 +40,7 @@
 #include <limits.h>
 #include <fcntl.h>
 
+#include "tarantool.h"
 #include "fiber.h"
 #include "recovery.h"
 #include "log_io.h"
@@ -48,6 +49,7 @@
 #include "box/cluster.h"
 #include "box/schema.h"
 #include "box/vclock.h"
+#include "scoped_guard.h"
 
 /** Replication topology
  * ----------------------
@@ -78,29 +80,15 @@ static int master_to_spawner_socket;
 static char cfg_wal_dir[PATH_MAX];
 static char cfg_snap_dir[PATH_MAX];
 
-
-/**
- * State of a replica. We only need one global instance
- * since we fork() for every replica.
- */
-struct relay_data {
-	/** Replica connection */
-	int sock;
-	/* Request type - SUBSCRIBE or JOIN */
-	uint32_t type;
-	/* Request sync */
-	uint64_t sync;
-	/* Only used in SUBSCRIBE request */
-	uint32_t server_id;
-	struct vclock vclock;
-} relay;
-
 /** Send a file descriptor to replication relay spawner.
  *
  * Invoked when spawner's end of the socketpair becomes ready.
  */
 static void
 replication_send_socket(ev_loop *loop, ev_io *watcher, int /* events */);
+static void
+replication_relay_send_row(struct recovery_state *r, void * /* param */,
+			   struct xrow_header *packet);
 
 /** Replication spawner process */
 static struct spawner {
@@ -140,7 +128,7 @@ spawner_sigchld_handler(int signal __attribute__((unused)));
  * @return 0 on success, -1 on error
  */
 static int
-spawner_create_replication_relay();
+spawner_create_replication_relay(struct relay *relay);
 
 /** Shut down all relays when shutting down the spawner. */
 static void
@@ -148,7 +136,7 @@ spawner_shutdown_children();
 
 /** Initialize replication relay process. */
 static void
-replication_relay_loop();
+replication_relay_loop(struct relay *relay);
 
 /*
  * ------------------------------------------------------------------------
@@ -207,27 +195,63 @@ replication_prefork(const char *snap_dir, const char *wal_dir)
 struct replication_request {
 	struct ev_io io;
 	int fd;
-	struct relay_data data;
+	struct relay data;
 };
 
 /** Replication acceptor fiber handler. */
+static void *
+replication_join_thread(void *arg)
+{
+	struct recovery_state *r = (struct recovery_state *) arg;
+
+	/* Turn off the non-blocking mode, if any. */
+	int nonblock = sio_getfl(r->relay.sock) & O_NONBLOCK;
+	sio_setfl(r->relay.sock, O_NONBLOCK, 0);
+	auto socket_guard = make_scoped_guard([=]{
+		/* Restore non-blocking mode */
+		sio_setfl(r->relay.sock, O_NONBLOCK, nonblock);
+	});
+
+	/* Send snapshot */
+	recover_snap(r);
+
+	/* Send response to JOIN command = end of stream */
+	struct xrow_header row;
+	xrow_encode_vclock(&row, &r->vclock);
+	row.sync = r->relay.sync;
+	struct iovec iov[XROW_IOVMAX];
+	int iovcnt = xrow_to_iovec(&row, iov);
+	sio_writev_all(r->relay.sock, iov, iovcnt);
+
+	say_info("snapshot sent");
+	return NULL;
+}
+
 void
 replication_join(int fd, struct xrow_header *packet)
 {
-	struct replication_request *request = (struct replication_request *)
-			malloc(sizeof(*request));
-	if (request == NULL) {
-		tnt_raise(ClientError, ER_MEMORY_ISSUE, sizeof(*request),
-			  "iproto", "JOIN");
-	}
-	request->fd = fd;
-	request->io.data = request;
-	request->data.type = packet->type;
-	request->data.sync = packet->sync;
+	struct recovery_state *r;
+	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
+			 replication_relay_send_row,
+			 NULL, NULL, INT32_MAX);
+	auto recovery_guard = make_scoped_guard([&]{
+		recovery_delete(r);
+	});
+	r->relay.sock = fd;
+	r->relay.sync = packet->sync;
+	r->relay.server_id = packet->server_id;
+	r->relay.type = IPROTO_JOIN;
 
-	ev_io_init(&request->io, replication_send_socket,
-		   master_to_spawner_socket, EV_WRITE);
-	ev_io_start(loop(), &request->io);
+	char name[FIBER_NAME_MAX];
+	struct sockaddr_storage peer;
+	socklen_t addrlen = sizeof(peer);
+	getpeername(r->relay.sock, ((struct sockaddr*)&peer), &addrlen);
+	snprintf(name, sizeof(name), "relay/%s",
+		 sio_strfaddr((struct sockaddr *)&peer, addrlen));
+
+	struct cord cord;
+	cord_start(&cord, name, replication_join_thread, r);
+	cord_cojoin(&cord);
 }
 
 /** Replication acceptor fiber handler. */
@@ -435,6 +459,7 @@ spawner_main_loop()
 			break;
 		}
 
+		struct relay relay;
 		int sock = spawner_unpack_cmsg(&msg);
 		msglen = read(spawner.sock, &relay, len);
 		relay.sock = sock;
@@ -448,7 +473,8 @@ spawner_main_loop()
 			/* continue, the error may be temporary */
 			break;
 		}
-		spawner_create_replication_relay();
+		assert(msglen == sizeof(relay));
+		spawner_create_replication_relay(&relay);
 	}
 	spawner_shutdown();
 }
@@ -507,7 +533,7 @@ spawner_sigchld_handler(int signo __attribute__((unused)))
 
 /** Create replication client handler process. */
 static int
-spawner_create_replication_relay()
+spawner_create_replication_relay(struct relay *relay)
 {
 	/* flush buffers to avoid multiple output */
 	/* https://github.com/tarantool/tarantool/issues/366 */
@@ -524,10 +550,10 @@ spawner_create_replication_relay()
 		ev_loop_fork(loop());
 		ev_run(loop(), EVRUN_NOWAIT);
 		close(spawner.sock);
-		replication_relay_loop();
+		replication_relay_loop(relay);
 	} else {
 		spawner.child_count++;
-		close(relay.sock);
+		close(relay->sock);
 		say_info("created a replication relay: pid = %d", (int) pid);
 	}
 
@@ -635,10 +661,10 @@ replication_relay_send_row(struct recovery_state *r, void * /* param */,
 
 	/* Don't duplicate data */
 	if (packet->server_id == 0 || packet->server_id != r->server_id)  {
-		packet->sync = relay.sync;
+		packet->sync = r->relay.sync;
 		struct iovec iov[XROW_IOVMAX];
 		int iovcnt = xrow_to_iovec(packet, iov);
-		sio_writev_all(relay.sock, iov, iovcnt);
+		sio_writev_all(r->relay.sock, iov, iovcnt);
 	}
 
 	/*
@@ -650,32 +676,12 @@ replication_relay_send_row(struct recovery_state *r, void * /* param */,
 }
 
 static void
-replication_relay_join(struct recovery_state *r)
-{
-	FDGuard guard_replica(relay.sock);
-
-	/* Send snapshot */
-	recover_snap(r);
-
-	/* Send response to JOIN command = end of stream */
-	struct xrow_header row;
-	xrow_encode_vclock(&row, &r->vclock);
-	row.sync = relay.sync;
-	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec(&row, iov);
-	sio_writev_all(relay.sock, iov, iovcnt);
-
-	say_info("snapshot sent");
-	/* relay.sock closed by guard */
-}
-
-static void
 replication_relay_subscribe(struct recovery_state *r)
 {
 	/* Set LSNs */
-	vclock_copy(&r->vclock, &relay.vclock);
+	vclock_copy(&r->vclock, &r->relay.vclock);
 	/* Set server_id */
-	r->server_id = relay.server_id;
+	r->server_id = r->relay.server_id;
 
 	recovery_follow_local(r, 0.1);
 	ev_run(loop(), 0);
@@ -685,7 +691,7 @@ replication_relay_subscribe(struct recovery_state *r)
 
 /** The main loop of replication client service process. */
 static void
-replication_relay_loop()
+replication_relay_loop(struct relay *relay)
 {
 	struct sigaction sa;
 
@@ -695,7 +701,7 @@ replication_relay_loop()
 	 */
 	struct sockaddr_storage peer;
 	socklen_t addrlen = sizeof(peer);
-	getpeername(relay.sock, ((struct sockaddr*)&peer), &addrlen);
+	getpeername(relay->sock, ((struct sockaddr*)&peer), &addrlen);
 	title("relay", "%s", sio_strfaddr((struct sockaddr *)&peer, addrlen));
 	fiber_set_name(fiber(), status);
 
@@ -733,29 +739,24 @@ replication_relay_loop()
 	 * relay.
 	 */
 	struct ev_io sock_read_ev;
-	sock_read_ev.data = (void *)(intptr_t) relay.sock;
+	sock_read_ev.data = (void *)(intptr_t) relay->sock;
 	ev_io_init(&sock_read_ev, replication_relay_recv,
-		   relay.sock, EV_READ);
+		   relay->sock, EV_READ);
 	ev_io_start(loop(), &sock_read_ev);
 	/** Turn off the non-blocking mode,if any. */
-	sio_setfl(relay.sock, O_NONBLOCK, 0);
+	sio_setfl(relay->sock, O_NONBLOCK, 0);
 
 	/* Initialize the recovery process */
-	struct recovery_state *r = recovery_new(cfg_snap_dir, cfg_wal_dir,
-		      replication_relay_send_row,
-		      NULL, NULL, INT32_MAX);
+	struct recovery_state *r;
+	r = recovery_new(cfg_snap_dir, cfg_wal_dir,
+			 replication_relay_send_row,
+			 NULL, NULL, INT32_MAX);
+	r->relay = *relay; /* copy relay state to recovery */
+
 	int rc = EXIT_SUCCESS;
 	try {
-		switch (relay.type) {
-		case IPROTO_JOIN:
-			replication_relay_join(r);
-			break;
-		case IPROTO_SUBSCRIBE:
-			replication_relay_subscribe(r);
-			break;
-		default:
-			assert(false);
-		}
+		assert(r->relay.type == IPROTO_SUBSCRIBE);
+		replication_relay_subscribe(r);
 	} catch (Exception *e) {
 		say_error("relay error: %s", e->errmsg());
 		rc = EXIT_FAILURE;
