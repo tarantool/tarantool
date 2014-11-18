@@ -35,7 +35,7 @@ identifier which is unique within the cluster, known as the
     data-change request such as INSERT or UPDATE or DELETE, and is assigned
     a monotonically growing log sequence number (LSN).
     In essence, Tarantool replication is row-based:
-    each data change command is fully deterministic and operate
+    each data change command is fully deterministic and operates
     on a single tuple.
   </para>
   <para>

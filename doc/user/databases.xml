@@ -98,7 +98,7 @@
   
     The contents of the <code>box</code> library can be inspected at runtime with
     <code>box</code>, with no arguments.
-    The packages inside the box library are: schema, box.tuple, box.space, box.index, 
+    The packages inside the box library are: box.schema, box.tuple, box.space, box.index, 
     net.box, box.cfg, box.info, box.slab, box.stat.
     Every package contains one or more Lua functions. A few packages contain members as well as functions.
     The functions allow data definition (create alter drop), data manipulation (insert delete update select replace),
@@ -1621,7 +1621,7 @@ The result will be a table of tuples and will look like this:
 
     <varlistentry>
         <term>
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>.auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
+         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:auto_increment{<replaceable>field-value [, field-value ...]</replaceable>}</emphasis>
         </term>
         <listitem>
             <para>

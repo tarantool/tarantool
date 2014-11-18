@@ -164,7 +164,7 @@ This differs from the original Lua interpreter from
 <link xlink:href="http://www.puc-rio.br/index.html">Pontifícia Universidade Católica do Rio de Janeiro</link>
 ("RIO-PUC" <link xlink:href="http://www.lua.org/">Lua</link>) 
 because the JIT stands for "Just In Time" compiling, that
-is, it can compile some Lua code into machine executable form the
+is, it can compile some Lua code into machine executable form
 after a few executions of the code.
 The result is that some
 loops will run as quickly as an equivalent C program.

@@ -621,7 +621,7 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
   <command>~/tarantool/src/tarantool</command> </userinput></programlisting>
 </para>
 <para>
-3. Try these requests:<programlisting><userinput>sconsole = require('console')
+3. Try these requests:<programlisting><userinput>console = require('console')
 console.connect('localhost:3301')
 box.space.tester:select{2}</userinput></programlisting>
 </para>
