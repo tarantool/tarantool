@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_RTREE_H_INCLUDED
-#define TARANTOOL_RTREE_H_INCLUDED
+#ifndef INCLUDES_TARANTOOL_SALAD_RTREE_H
+#define INCLUDES_TARANTOOL_SALAD_RTREE_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,9 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stddef.h>
 #include <stdbool.h>
+
+/**
+ * In-memory Guttman's R-tree
+ */
 
 /* Type of payload data */
 typedef void *record_t;
@@ -46,12 +49,14 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 enum {
-	/* Number of dimensions of R-tree geometry */
+	/** Number of dimensions of R-tree geometry */
 	RTREE_DIMENSION = 2,
-	/* Maximal possible R-tree height */
+	/** Maximal possible R-tree height */
 	RTREE_MAX_HEIGHT = 16,
-	/* R-Tree use linear search within element on the page,
-	   so larger page cause worse performance */
+	/**
+	 * R-Tree uses linear search for elements on a page,
+	 * so a larger page size can hurt performance.
+	 */
 	RTREE_PAGE_SIZE = 1024
 };
 
@@ -68,8 +73,8 @@ enum spatial_search_op
 };
 
 /* pointers to page allocation and deallocations functions */
-typedef void* (*rtree_page_alloc_t)();
-typedef void (*rtree_page_free_t)(void*);
+typedef void *(*rtree_page_alloc_t)();
+typedef void (*rtree_page_free_t)(void *);
 
 /* A point in RTREE_DIMENSION space */
 struct rtree_point
@@ -197,4 +202,4 @@ rtree_iterator_next(struct rtree_iterator *itr);
 }
 #endif /* defined(__cplusplus) */
 
-#endif /* #ifndef TARANTOOL_RTREE_H_INCLUDED */
+#endif /* #ifndef INCLUDES_TARANTOOL_SALAD_RTREE_H */

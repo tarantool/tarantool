@@ -26,7 +26,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include "rtree.h"
 #include <string.h>
 #include <assert.h>
@@ -131,8 +130,10 @@ static area_t
 rtree_rect_area(const struct rtree_rect *rect)
 {
 	area_t area = 1;
-	for (int i = RTREE_DIMENSION; --i >= 0; )
-	     area *= rect->upper_point.coords[i] - rect->lower_point.coords[i];
+	for (int i = RTREE_DIMENSION; --i >= 0; ) {
+		area *= rect->upper_point.coords[i] -
+			rect->lower_point.coords[i];
+	}
 	return area;
 }
 
@@ -160,7 +161,8 @@ rtree_max(coord_t a, coord_t b)
 }
 
 static struct rtree_rect
-rtree_rect_cover(const struct rtree_rect *item1, const struct rtree_rect *item2)
+rtree_rect_cover(const struct rtree_rect *item1,
+		 const struct rtree_rect *item2)
 {
 	struct rtree_rect res;
 	for (int i = RTREE_DIMENSION; --i >= 0; ) {
@@ -293,7 +295,7 @@ rtree_page_init_record(struct rtree_page *page,
 /* Create root page by branch */
 static void
 rtree_page_init_branch(struct rtree_page *page,
-		      const struct rtree_page_branch *br)
+		       const struct rtree_page_branch *br)
 {
 	page->n = 1;
 	page->b[0] = *br;
@@ -322,8 +324,9 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 		rect_area[i + 1] = rtree_rect_area(&page->b[i].rect);
 
 	/*
-	 * As the seeds for the two groups, find two rectangles which waste
-	 * the most area if covered by a single rectangle.
+	 * As the seeds for the two groups, find two rectangles
+	 * which waste the most area if covered by a single
+	 * rectangle.
 	 */
 	int seed[2] = {-1, -1};
 	coord_t worst_waste = 0;
@@ -417,8 +420,9 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 			p->b[group_card[0] - 1] = page->b[chosen];
 	}
 	/*
-	 * If one group gets too full, then remaining rectangle are
-	 * split between two groups in such way to balance CARDs of two groups.
+	 * If one group gets too full, then remaining rectangle
+	 * are split between two groups in such way to balance
+	 * CARDs of two groups.
 	 */
 	if (group_card[0] + group_card[1] < RTREE_MAX_FILL + 1) {
 		for (int i = 0; i < RTREE_MAX_FILL; i++) {
@@ -459,7 +463,7 @@ rtree_page_remove_branch(struct rtree_page *page, int i)
 {
 	page->n -= 1;
 	memmove(page->b + i, page->b + i + 1,
-	       (page->n - i) * sizeof(struct rtree_page_branch));
+		(page->n - i) * sizeof(struct rtree_page_branch));
 }
 
 static struct rtree_page *
@@ -577,7 +581,7 @@ rtree_iterator_goto_first(struct rtree_iterator *itr, int sp, struct rtree_page*
 		for (int i = 0, n = pg->n; i < n; i++) {
 			if (itr->intr_cmp(&itr->rect, &pg->b[i].rect)
 			    && rtree_iterator_goto_first(itr, sp + 1,
-				    	    	         pg->b[i].data.page))
+							 pg->b[i].data.page))
 			{
 				itr->stack[sp].page = pg;
 				itr->stack[sp].pos = i;
@@ -640,7 +644,7 @@ rtree_iterator_reset(struct rtree_iterator *itr)
 	}
 }
 
-static struct rtree_neighbor*
+static struct rtree_neighbor *
 rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 {
 	if (itr->page_pos >= RTREE_NEIGHBORS_IN_PAGE) {
@@ -655,7 +659,7 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 
 static struct rtree_neighbor *
 rtree_iterator_new_neighbor(struct rtree_iterator *itr,
-			    void* child, sq_coord_t distance, int level)
+			    void *child, sq_coord_t distance, int level)
 {
 	struct rtree_neighbor *n = itr->neigh_free_list;
 	if (n == NULL)
@@ -724,7 +728,7 @@ rtree_iterator_next(struct rtree_iterator *itr)
 		 *      current element
 		 *      otherwise (R-Tree page)  get siblings of this R-Tree
 		 *      page and insert them in sorted list
-		 */
+		*/
 		while (true) {
 			struct rtree_neighbor *neighbor = itr->neigh_list;
 			if (neighbor == NULL)
