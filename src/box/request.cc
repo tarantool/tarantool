@@ -55,8 +55,8 @@ execute_replace(struct request *request, struct port *port)
 	struct space *space = space_cache_find(request->space_id);
 
 	access_check_space(space, PRIV_W);
-	struct tuple *new_tuple = tuple_newv(space->format, request->tuple,
-					     request->tuple_cnt);
+	struct tuple *new_tuple = tuple_new(space->format, request->tuple,
+					    request->tuple_end);
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
@@ -87,23 +87,13 @@ execute_update(struct request *request, struct port *port)
 		return;
 	}
 
-	/*
-	 * tuple_update() currently doesn't support scattered tuples.
-	 * Update expression usually fits to first iovec and it's not
-	 * a problem. For huge expressions prepare contiguous chunk of memory
-	 * from vector.
-	 */
-	size_t expr_len;
-	const char *expr = (const char *) iovec_join(&fiber()->gc,
-		request->tuple, request->tuple_cnt, &expr_len);
-
 	/* Update the tuple. */
 	struct tuple *new_tuple = tuple_update(space->format,
 					       region_alloc_cb,
 					       &fiber()->gc,
-					       old_tuple, expr, expr + expr_len,
+					       old_tuple, request->tuple,
+					       request->tuple_end,
 					       request->field_base);
-
 	TupleGuard guard(new_tuple);
 	space_validate_tuple(space, new_tuple);
 	txn_replace(txn, space, old_tuple, new_tuple, DUP_INSERT);
@@ -177,17 +167,7 @@ execute_auth(struct request *request, struct port * /* port */)
 {
 	const char *user = request->key;
 	uint32_t len = mp_decode_strl(&user);
-
-	/*
-	 * authenticate() doesn't support scattered tuple and requires
-	 * contiguous chunk of memory. Since size of first iovec is usually
-	 * enough to fit credentials, a slow path of iovec_join() is not a
-	 * problem.
-	 */
-	size_t credentials_len;
-	const char *credentials = (const char *) iovec_join(&fiber()->gc,
-		request->tuple, request->tuple_cnt, &credentials_len);
-	authenticate(user, len, credentials, credentials + credentials_len);
+	authenticate(user, len, request->tuple, request->tuple_end);
 }
 
 /** }}} */
@@ -249,9 +229,8 @@ error:
 			request->iterator = mp_decode_uint(&value);
 			break;
 		case IPROTO_TUPLE:
-			request->tuple_cnt = 1;
-			request->tuple[0].iov_base = (void *) value;
-			request->tuple[0].iov_len = data - value;
+			request->tuple = value;
+			request->tuple_end = data;
 			break;
 		case IPROTO_KEY:
 		case IPROTO_FUNCTION_NAME:
@@ -298,10 +277,11 @@ request_encode(struct request *request, struct iovec *iov)
 		pos += key_len;
 		map_size++;
 	}
-	if (request->tuple_cnt > 0) {
+	if (request->tuple) {
 		pos = mp_encode_uint(pos, IPROTO_TUPLE);
-		iovec_copy(iov + iovcnt, request->tuple, request->tuple_cnt);
-		iovcnt += request->tuple_cnt;
+		iov[1].iov_base = (void *) request->tuple;
+		iov[1].iov_len = (request->tuple_end - request->tuple);
+		iovcnt++;
 		map_size++;
 	}
 
@@ -310,6 +290,5 @@ request_encode(struct request *request, struct iovec *iov)
 	iov[0].iov_base = begin;
 	iov[0].iov_len = pos - begin;
 
-	assert(iovcnt <= REQUEST_IOVMAX);
 	return iovcnt;
 }

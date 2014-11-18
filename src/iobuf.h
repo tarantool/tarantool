@@ -33,7 +33,6 @@
 #include "trivia/util.h"
 #include "third_party/queue.h"
 #include "small/region.h"
-#include "iovec.h"
 
 struct ev_io;
 
@@ -232,6 +231,28 @@ obuf_svp_to_ptr(struct obuf *buf, struct obuf_svp *svp)
 /** Forget anything added to output buffer after the savepoint. */
 void
 obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp);
+
+/**
+ * \brief Conventional function to join iovec into a solid memory chunk.
+ * For iovec of size 1 returns iov->iov_base without allocation extra memory.
+ * \param[out] size calculated length of \a iov
+ * \return solid memory chunk
+ */
+static inline char *
+obuf_join(struct obuf *obuf)
+{
+	size_t iovcnt = obuf_iovcnt(obuf);
+	if (iovcnt == 1)
+		return (char *) obuf->iov[0].iov_base;
+
+	char *data = (char *) region_alloc(obuf->pool, obuf_size(obuf));
+	char *pos = data;
+	for (int i = 0; i < iovcnt; i++) {
+		memcpy(pos, obuf->iov[i].iov_base, obuf->iov[i].iov_len);
+		pos += obuf->iov[i].iov_len;
+	}
+	return data;
+}
 
 /* }}} */
 

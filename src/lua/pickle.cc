@@ -145,10 +145,8 @@ lbox_pack(struct lua_State *L)
 		format++;
 	}
 
-	size_t len;
-	const char *res = (char *) iovec_join(&fiber()->gc, buf.iov,
-					      obuf_iovcnt(&buf), &len);
-	lua_pushlstring(L, res, len);
+	const char *res = obuf_join(&buf);
+	lua_pushlstring(L, res, obuf_size(&buf));
 	return 1;
 }
 

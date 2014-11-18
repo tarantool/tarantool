@@ -358,10 +358,8 @@ lua_msgpack_encode(lua_State *L)
 	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
 	luamp_encode_r(L, cfg, &buf, 0);
 
-	size_t len;
-	const char *res = (char *) iovec_join(&fiber()->gc, buf.iov,
-					      obuf_iovcnt(&buf), &len);
-	lua_pushlstring(L, res, len);
+	const char *res = obuf_join(&buf);
+	lua_pushlstring(L, res, obuf_size(&buf));
 	return 1;
 }
 

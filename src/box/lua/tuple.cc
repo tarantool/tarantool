@@ -193,7 +193,7 @@ luamp_encodestack(struct lua_State *L, struct obuf *b, int first, int last)
 		return 1;
 	} else {
 		/* Backward-compatible format */
-		/* sic: if arg_count is 0, first > last */
+		/* sic: first > last */
 		luamp_encode_array(luaL_msgpack_default, b, last + 1 - first);
 		for (int k = first; k <= last; ++k) {
 			luamp_encode(L, luaL_msgpack_default, b, k);
@@ -287,14 +287,11 @@ lbox_tuple_transform(struct lua_State *L)
 	}
 
 	/* Execute tuple_update */
-	size_t expr_len;
-	const char *expr = (const char *) iovec_join(&fiber()->gc, buf.iov,
-		obuf_iovcnt(&buf), &expr_len);
+	const char *expr = obuf_join(&buf);
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       tuple_update_region_alloc,
 					       &fiber()->gc,
-					       tuple,
-					       expr, expr + expr_len,
+					       tuple, expr, expr + obuf_size(&buf),
 					       0);
 	lbox_pushtuple(L, new_tuple);
 	return 1;
@@ -333,7 +330,7 @@ static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 };
 
 
-struct tuple*
+struct tuple *
 lua_totuple(struct lua_State *L, int first, int last)
 {
 	RegionGuard region_guard(&fiber()->gc);
@@ -347,9 +344,12 @@ lua_totuple(struct lua_State *L, int first, int last)
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
-	if (unlikely(mp_typeof(*(char *) buf.iov[0].iov_base) != MP_ARRAY))
+	const char *data = obuf_join(&buf);
+	if (unlikely(mp_typeof(*data) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	return tuple_newv(tuple_format_ber, buf.iov, buf.pos + 1);
+	struct tuple *tuple = tuple_new(tuple_format_ber, data,
+					data + obuf_size(&buf));
+	return tuple;
 }
 
 /* }}} */

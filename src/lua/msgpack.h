@@ -50,7 +50,7 @@ extern luaL_serializer *luaL_msgpack_default;
 
 struct obuf;
 
-enum { LUAMP_ALLOC_FACTOR = 128 };
+enum { LUAMP_ALLOC_FACTOR = 256 };
 
 void
 luamp_encode_array(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size);

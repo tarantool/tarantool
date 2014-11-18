@@ -59,7 +59,6 @@ set (common_sources
      object.cc
      exception.cc
      ipc.cc
-     iovec.c
      errinj.cc
      errcode.c
      assoc.c

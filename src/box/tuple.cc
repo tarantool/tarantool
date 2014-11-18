@@ -398,17 +398,12 @@ tuple_update(struct tuple_format *format,
 }
 
 struct tuple *
-tuple_newv(struct tuple_format *format, struct iovec *tbody, size_t tbody_cnt)
+tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	size_t len = iovec_len(tbody, tbody_cnt);
-	struct tuple *new_tuple = tuple_alloc(format, len);
-	char *data = new_tuple->data;
-	for (int i = 0; i < tbody_cnt; i++) {
-		memcpy(data, tbody->iov_base, tbody->iov_len);
-		data += tbody->iov_len;
-		tbody++;
-	}
-
+	size_t tuple_len = end - data;
+	assert(mp_typeof(*data) == MP_ARRAY);
+	struct tuple *new_tuple = tuple_alloc(format, tuple_len);
+	memcpy(new_tuple->data, data, tuple_len);
 	try {
 		tuple_init_field_map(format, new_tuple, (uint32_t *)new_tuple);
 	} catch (...) {

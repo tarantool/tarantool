@@ -251,10 +251,8 @@ lbox_request_create(struct request *request,
 		struct obuf key_buf;
 		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
 		luamp_encode(L, luaL_msgpack_default, &key_buf, key);
-		size_t key_len;
-		request->key = (char *) iovec_join(&fiber()->gc, key_buf.iov,
-			obuf_iovcnt(&key_buf), &key_len);
-		request->key_end = request->key + key_len;
+		request->key = obuf_join(&key_buf);
+		request->key_end = request->key + obuf_size(&key_buf);
 		if (mp_typeof(*request->key) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
@@ -262,9 +260,9 @@ lbox_request_create(struct request *request,
 		struct obuf tuple_buf;
 		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
 		luamp_encode(L, luaL_msgpack_default, &tuple_buf, tuple);
-		iovec_copy(request->tuple, tuple_buf.iov, obuf_iovcnt(&tuple_buf));
-		request->tuple_cnt = tuple_buf.pos + 1;
-		if (mp_typeof(*(char *)request->tuple[0].iov_base) != MP_ARRAY)
+		request->tuple = obuf_join(&tuple_buf);
+		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
+		if (mp_typeof(*request->tuple) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
 }
@@ -567,9 +565,7 @@ box_lua_call(struct request *request, struct port *port)
 	 */
 	SetuidGuard setuid(name, name_len, PRIV_X);
 	/* Push the rest of args (a tuple). */
-	size_t args_len;
-	const char *args = (char *) iovec_join(&fiber()->gc, request->tuple,
-					       request->tuple_cnt, &args_len);
+	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "call: out of stack");
 

@@ -29,9 +29,7 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "iovec.h"
 #include "xrow.h"
-#include "small/region.h"
 
 struct txn;
 struct port;
@@ -59,8 +57,8 @@ struct request
 	const char *key;
 	const char *key_end;
 	/** Insert/replace tuple or proc argument or update operations. */
-	struct iovec tuple[TUPLE_IOVMAX];
-	int tuple_cnt;
+	const char *tuple;
+	const char *tuple_end;
 	/** Base field offset for error messages, e.g. 0 for C and 1 for Lua. */
 	int field_base;
 
