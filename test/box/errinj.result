@@ -271,7 +271,7 @@ box.space['withdata']
 ...
 index7 = s_withdata:create_index('another', { type = 'tree', parts = { 5, 'num' }, unique = false})
 ---
-- error: Space '#514' does not exist
+- error: Space '514' does not exist
 ...
 s_withdata.index.another
 ---

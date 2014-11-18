@@ -97,8 +97,8 @@ release=`lsb_release -c -s`
 <para>
 There is always an up-to-date Ubuntu repository at
 <link xlink:href="http://tarantool.org/dist/master/ubuntu">http://tarantool.org/dist/master/ubuntu</link>
-The repository contains builds for Ubuntu 12.04 "precise", 12.10 "quantal",
-13.04 "raring", 13.10 "saucy", 14.04 "Trusty".
+The repository contains builds for Ubuntu 12.04 "precise",
+13.10 "saucy", and 14.04 "trusty".
 Add the tarantool.org repository to your apt sources list
 $release is an environment variable which will contain the Ubuntu version
 code e.g. "precise". If you want the version that comes with
@@ -174,12 +174,12 @@ add the new section thus:
 <simplesect>
 <title>Fedora</title>
 <para>
-These instructions are applicable for Fedora 20.
+These instructions are applicable for Fedora 19 or Fedora 20.
 Pick the Fedora repository, for example <link xlink:href="http://tarantool.org/dist/master/fedora/20/x86_64">http://tarantool.org/dist/master/fedora/20/x86_64</link> for version 20, x86-64.
 Add the following section to your yum repository list
 (<filename>/etc/yum.repos.d/tarantool.repo</filename>)
 (in the following instructions, $releasever i.e. Fedora release
-version must be 2 and $basearch i.e. base architecture must be x86_64):
+version must be 19 or 20 and $basearch i.e. base architecture must be x86_64):
 <programlisting>
 <userinput>
 [tarantool]
@@ -194,13 +194,12 @@ For example, if you have Fedora version 20, you can add the new section thus:
 <userinput>
 <command>echo</command> "[tarantool]" | \
 <command>sudo tee</command> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "name=Fedora - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "baseurl="http://tarantool.org/dist/master/fedora/20/x86_64/" | \
+<command>echo</command> "name=Fedora-20 - Tarantool"| <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
+<command>echo</command> "baseurl=http://tarantool.org/dist/master/fedora/20/x86_64/" | \
 <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
 <command>echo</command> "enabled=1" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-<command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename>
-</userinput>
-</programlisting>
+<command>echo</command> "gpgcheck=0" | <command>sudo tee</command> <option>-a</option> <filename>/etc/yum.repos.d/tarantool.repo</filename></userinput></programlisting>
+Then install with <code>sudo yum install tarantool</code>.
 </para>
 </simplesect>
 
@@ -237,7 +236,7 @@ so it's not a true binary download, some source code is involved.
 First upgrade Clang (the C compiler) to version 3.2 or later using
 Command Line Tools for Xcode disk image version 4.6+ from
 Apple Developer web-site. Then download the recipe file from
-<link xlink:href="tarantool.org/dist/tarantool.rb">tarantool.org/dist/tarantool.rb</link>.
+<link xlink:href="http://tarantool.org/dist/master/tarantool.rb">tarantool.org/dist/master/tarantool.rb</link>.
 Make the file executable, execute it, and the script in the file should
 handle the necessary steps with cmake, make, and make install.
 </para>
@@ -530,8 +529,7 @@ tarantool> box.cfg{listen=3301}
 2014-08-07 09:41:41.095 ... saving snapshot `./00000000000000000000.snap.inprogress'
 2014-08-07 09:41:41.127 ... done
 2014-08-07 09:41:41.128 ... primary: bound to 0.0.0.0:3301
-2014-08-07 09:41:41.128 ... ready to accept requests
-2014-08-07 09:41:41.128 ... started</computeroutput></programlisting>
+2014-08-07 09:41:41.128 ... ready to accept requests</computeroutput></programlisting>
 </para>
 
 <para>
@@ -549,7 +547,7 @@ Tarantool is waiting for the user to type instructions.
 
 <para>
 To create the first space and the first <link linkend="an-index">index</link>, try this:<programlisting>
-<prompt>tarantool&gt; </prompt><userinput>s = box.schema.create_space('tester')</userinput>
+<prompt>tarantool&gt; </prompt><userinput>s = box.schema.space.create('tester')</userinput>
 <prompt>tarantool&gt; </prompt><userinput>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</userinput></programlisting>
 </para>
 
@@ -564,7 +562,7 @@ To select a tuple from the first space of the database,
 using the first defined key, try this:<programlisting><prompt>tarantool&gt; </prompt><userinput>s:select{3}</userinput></programlisting>
 
 Your terminal screen should now look like this:<programlisting><computeroutput>
-tarantool&gt; s = box.schema.create_space('tester')
+tarantool&gt; s = box.schema.space.create('tester')
 2014-06-10 12:04:18.158 ... creating `./00000000000000000002.xlog.inprogress'
 ---
 ...
@@ -623,9 +621,8 @@ The server name is <computeroutput><filename>tarantool</filename></computeroutpu
   <command>~/tarantool/src/tarantool</command> </userinput></programlisting>
 </para>
 <para>
-3. Try these requests:<programlisting><userinput>box.cfg{}
-console = require('console')
-console.connect('localhost', 3301)
+3. Try these requests:<programlisting><userinput>sconsole = require('console')
+console.connect('localhost:3301')
 box.space.tester:select{2}</userinput></programlisting>
 </para>
 <para>
@@ -640,7 +637,7 @@ tarantool&gt; console = require('console')
 ---
 ...
 
-tarantool&gt; console.connect('localhost', 3301)
+tarantool&gt; console.connect('localhost:3301')
 2014-08-31 12:46:54.650 [32628] main/101/interactive I> connected to localhost:3301
 ---
 ...
@@ -726,7 +723,7 @@ inserted and selected tuples.
   </para>
   <para>DATA DEFINITION WITH RUNTIME REQUESTS RATHER THAN A CONFIGURATION FILE.
     <computeroutput>box.schema</computeroutput> is a new package for space configuration.
-    Spaces are added/dropped with box.schema.create_space / box.space.<replaceable>space_name</replaceable>.drop.
+    Spaces are added/dropped with box.schema.space.create / box.space.<replaceable>space_name</replaceable>.drop.
     Indexes are added/dropped with box.space.<replaceable>space-name</replaceable>.create_index /
     box.space.<replaceable>.space-name</replaceable>.index.<replaceable>index_name</replaceable>.drop.
     "space.estimated_rows" no longer exists.

@@ -29,14 +29,14 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <netinet/in.h>
 
 #include "trivia/util.h"
 #include "third_party/tarantool_ev.h"
 #include "log_io.h"
 #include "vclock.h"
 #include "tt_uuid.h"
-#include "replica.h"
-#include "small/region.h"
+#include "uri.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -62,16 +62,51 @@ enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 /** String constants for the supported modes. */
 extern const char *wal_mode_STRS[];
 
+/** State of a replication relay. */
+struct relay {
+	/** Replica connection */
+	int sock;
+	/* Request type - SUBSCRIBE or JOIN */
+	uint32_t type;
+	/* Request sync */
+	uint64_t sync;
+	/* Only used in SUBSCRIBE request */
+	uint32_t server_id;
+	struct vclock vclock;
+};
+
+enum { REMOTE_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
+
+/** State of a replication connection to the master */
+struct remote {
+	struct fiber *reader;
+	ev_tstamp recovery_lag, recovery_last_update_tstamp;
+	bool warning_said;
+	char source[REMOTE_SOURCE_MAXLEN];
+	struct uri uri;
+	union {
+		struct sockaddr addr;
+		struct sockaddr_storage addrstorage;
+	};
+	socklen_t addr_len;
+};
+
 struct recovery_state {
 	struct vclock vclock;
-	/* The WAL we're currently reading/writing from/to. */
+	/** The WAL we're currently reading/writing from/to. */
 	struct log_io *current_wal;
 	struct log_dir snap_dir;
 	struct log_dir wal_dir;
-	int64_t signature; /* used to find missing xlog files */
+	/** Used to find missing xlog files */
+	int64_t signature;
 	struct wal_writer *writer;
 	struct wal_watcher *watcher;
-	struct remote remote;
+	union {
+		/** slave->master state */
+		struct remote remote;
+		/** master->slave state */
+		struct relay relay;
+	};
 	/**
 	 * row_handler is a module callback invoked during initial
 	 * recovery and when reading rows from the master.  It is

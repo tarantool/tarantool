@@ -40,15 +40,18 @@
 
 #include "lua/utils.h"
 #include "lua/msgpack.h"
-#include "tbuf.h"
+#include "iobuf.h"
 #include "fiber.h"
 #include "scoped_guard.h"
 #include "box/box.h"
 #include "box/port.h"
 #include "box/request.h"
 #include "box/txn.h"
-#include "box/access.h"
+#include "box/user_def.h"
+#include "box/user_cache.h"
 #include "box/schema.h"
+#include "box/session.h"
+#include "box/iproto_constants.h"
 
 /* contents of box.lua, misc.lua, box.net.lua respectively */
 extern char session_lua[],
@@ -245,18 +248,20 @@ lbox_request_create(struct request *request,
 	request_create(request, type);
 	request->space_id = lua_tointeger(L, 1);
 	if (key > 0) {
-		struct tbuf *key_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, luaL_msgpack_default, key_buf, key);
-		request->key = key_buf->data;
-		request->key_end = key_buf->data + key_buf->size;
+		struct obuf key_buf;
+		obuf_create(&key_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+		luamp_encode(L, luaL_msgpack_default, &key_buf, key);
+		request->key = obuf_join(&key_buf);
+		request->key_end = request->key + obuf_size(&key_buf);
 		if (mp_typeof(*request->key) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
 	if (tuple > 0) {
-		struct tbuf *tuple_buf = tbuf_new(&fiber()->gc);
-		luamp_encode(L, luaL_msgpack_default, tuple_buf, tuple);
-		request->tuple = tuple_buf->data;
-		request->tuple_end = tuple_buf->data + tuple_buf->size;
+		struct obuf tuple_buf;
+		obuf_create(&tuple_buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+		luamp_encode(L, luaL_msgpack_default, &tuple_buf, tuple);
+		request->tuple = obuf_join(&tuple_buf);
+		request->tuple_end = request->tuple + obuf_size(&tuple_buf);
 		if (mp_typeof(*request->tuple) != MP_ARRAY)
 			tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
 	}
@@ -468,21 +473,17 @@ struct SetuidGuard
 {
 	/** True if the function was set-user-id one. */
 	bool setuid;
-	/** Original authentication token, only set if setuid = true. */
-	uint8_t orig_auth_token;
-	/** Original user id, only set if setuid = true. */
-	uint32_t orig_uid;
+	struct current_user *orig_user;
 
 	inline SetuidGuard(const char *name, uint32_t name_len,
-			   struct user *user, uint8_t access);
+			   uint8_t access);
 	inline ~SetuidGuard();
 };
 
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
-			 struct user *user, uint8_t access)
+			 uint8_t access)
 	:setuid(false)
-	,orig_auth_token(GUEST) /* silence gnu warning */
-	,orig_uid(GUEST)
+	,orig_user(current_user())
 {
 
 	/*
@@ -490,9 +491,9 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if (user->universal_access.effective & PRIV_ALL)
+	if (orig_user->universal_access & PRIV_ALL)
 		return;
-	access &= ~user->universal_access.effective;
+	access &= ~orig_user->universal_access;
 	/*
 	 * We need to look up the function by name even if
 	 * the user has access to it, since it could require
@@ -508,35 +509,37 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		 */
 		return;
 	}
-	if (func == NULL || (func->uid != user->uid &&
-	     access & ~func->access[user->auth_token].effective)) {
+	if (func == NULL || (func->uid != orig_user->uid &&
+	     access & ~func->access[orig_user->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
+		struct user_def *def = user_cache_find(orig_user->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), user->name, name_buf);
+			  priv_name(access), def->name, name_buf);
 	}
 	if (func->setuid) {
 		/** Remember and change the current user id. */
-		if (unlikely(func->auth_token >= BOX_USER_MAX)) {
-			/* Optimization: cache auth_token on first access */
-			struct user *owner = user_cache_find(func->uid);
-			assert(owner != NULL); /* checked by user_has_data() */
-			func->auth_token = owner->auth_token;
-			assert(owner->auth_token < BOX_USER_MAX);
+		if (unlikely(func->setuid_user.auth_token >= BOX_USER_MAX)) {
+			/*
+			 * Fill the cache upon first access, since
+			 * when func_def is created, no user may
+			 * be around to fill it (recovery of
+			 * system spaces from a snapshot).
+			 */
+			struct user_def *owner = user_cache_find(func->uid);
+			current_user_init(&func->setuid_user, owner);
 		}
 		setuid = true;
-		orig_auth_token = user->auth_token;
-		orig_uid = user->uid;
-		session_set_user(session(), func->auth_token, func->uid);
+		fiber_set_user(fiber(), &func->setuid_user);
 	}
 }
 
 SetuidGuard::~SetuidGuard()
 {
 	if (setuid)
-		session_set_user(session(), orig_auth_token, orig_uid);
+		fiber_set_user(fiber(), orig_user);
 }
 
 /**
@@ -546,7 +549,6 @@ SetuidGuard::~SetuidGuard()
 void
 box_lua_call(struct request *request, struct port *port)
 {
-	struct user *user = user();
 	lua_State *L = lua_newthread(tarantool_L);
 	LuarefGuard coro_ref(tarantool_L);
 	const char *name = request->key;
@@ -561,7 +563,7 @@ box_lua_call(struct request *request, struct port *port)
 	 * https://github.com/tarantool/tarantool/issues/300
 	 * - if a function does not exist, say it first.
 	 */
-	SetuidGuard setuid(name, name_len, user, PRIV_X);
+	SetuidGuard setuid(name, name_len, PRIV_X);
 	/* Push the rest of args (a tuple). */
 	const char *args = request->tuple;
 	uint32_t arg_count = mp_decode_array(&args);

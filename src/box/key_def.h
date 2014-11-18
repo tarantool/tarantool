@@ -292,10 +292,27 @@ struct access {
 };
 
 /**
+ * Effective session user. A cache of user data
+ * and access stored in session and fiber local storage.
+ * Differs from the authenticated user when executing
+ * setuid functions.
+ */
+struct current_user {
+	/** A look up key to quickly find session user. */
+	uint8_t auth_token;
+	/**
+	 * Cached global grants, to avoid an extra look up
+	 * when checking global grants.
+	 */
+	uint8_t universal_access;
+	/** User id of the authenticated user. */
+	uint32_t uid;
+};
+
+/**
  * Definition of a function. Function body is not stored
  * or replicated (yet).
  */
-
 struct func_def {
 	/** Function id. */
 	uint32_t fid;
@@ -303,14 +320,14 @@ struct func_def {
 	uint32_t uid;
 	/**
 	 * True if the function requires change of user id before
-	 * invocaction.
+	 * invocation.
 	 */
 	bool setuid;
 	/**
 	 * Authentication id of the owner of the function,
 	 * used for set-user-id functions.
 	 */
-	uint8_t auth_token;
+	struct current_user setuid_user;
 	/** Function name. */
 	char name[BOX_NAME_MAX + 1];
 	/**

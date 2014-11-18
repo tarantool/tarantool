@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "small/slab_arena.h"
+#include "small/quota.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -105,9 +106,8 @@ pow2round(size_t size)
 #define MIN(a, b) (a) < (b) ? (a) : (b)
 
 int
-slab_arena_create(struct slab_arena *arena,
-		  size_t prealloc, size_t maxalloc,
-		  uint32_t slab_size, int flags)
+slab_arena_create(struct slab_arena *arena, struct quota *quota,
+		  size_t prealloc, uint32_t slab_size, int flags)
 {
 	assert(flags & (MAP_PRIVATE | MAP_SHARED));
 	lf_lifo_init(&arena->cache);
@@ -118,9 +118,9 @@ slab_arena_create(struct slab_arena *arena,
 	 */
 	arena->slab_size = small_round(MAX(slab_size, SLAB_MIN_SIZE));
 
-	arena->maxalloc = maxalloc;
-	/** Prealloc can not be greater than maxalloc */
-	prealloc = MIN(prealloc, maxalloc);
+	arena->quota = quota;
+	/** Prealloc can not be greater than the quota */
+	prealloc = MIN(prealloc, quota_get(quota));
 	/** Extremely large sizes can not be aligned properly */
 	prealloc = MIN(prealloc, SIZE_MAX - arena->slab_size);
 	/* Align prealloc around a fixed number of slabs. */
@@ -165,15 +165,14 @@ slab_map(struct slab_arena *arena)
 	if ((ptr = lf_lifo_pop(&arena->cache)))
 		return ptr;
 
+	if (quota_use(arena->quota, arena->slab_size) < 0)
+		return NULL;
+
 	/** Need to allocate a new slab. */
 	size_t used = __sync_add_and_fetch(&arena->used, arena->slab_size);
 	if (used <= arena->prealloc)
 		return arena->arena + used - arena->slab_size;
 
-	if (used > arena->maxalloc) {
-		__sync_sub_and_fetch(&arena->used, arena->slab_size);
-		return NULL;
-	}
 	return mmap_checked(arena->slab_size, arena->slab_size,
 			    arena->flags);
 }

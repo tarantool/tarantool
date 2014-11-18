@@ -214,9 +214,9 @@
   <para>
     Please report bugs in Tarantool at <link
     xlink:href="http://github.com/tarantool/tarantool/issues"/>. You can
-    contact developers directly on
+    contact developers directly on the
     <link xlink:href="irc://irc.freenode.net#tarantool">#tarantool</link>
-    IRC channel or via a mailing list,
+    IRC channel on freenode, or via a mailing list,
     <link xlink:href="https://googlegroups.com/group/tarantool">Tarantool Google group</link>.
   </para>
 </section>

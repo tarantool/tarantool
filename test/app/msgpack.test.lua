@@ -25,11 +25,11 @@ local function test_offsets(test, s)
     local a
     local offset = 1
     a, offset = s.decode(dump, offset)
-    test:isdeeply(a, arr1, "decoded part1")
+    test:is_deeply(a, arr1, "decoded part1")
     test:is(offset, 5, "offset of part2")
 
     a, offset = s.decode(dump, offset)
-    test:isdeeply(a, arr2, "decoded part2")
+    test:is_deeply(a, arr2, "decoded part2")
     test:is(offset, 9, "offset of end")
 
     test:ok(not pcall(s.decode, dump, offset), "invalid offset")

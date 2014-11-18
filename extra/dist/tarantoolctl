@@ -4,14 +4,14 @@
 
 =head1 NAME
 
-dist.lua - an utility to control tarantool instances
+tarantoolctl - an utility to control tarantool instances
 
 =head1 SYNOPSIS
 
     vim /etc/tarantool/instances.enabled/my_instance.lua
-    dist.lua start my_instance
-    dist.lua stop  my_instance
-    dist.lua logrotate my_instance
+    tarantoolctl start my_instance
+    tarantoolctl stop  my_instance
+    tarantoolctl logrotate my_instance
 
 =head1 DESCRIPTION
 
@@ -25,16 +25,16 @@ The file contains common default instances options:
     default_cfg = {
         -- will become pid_file .. instance .. '.pid'
         pid_file    =   "/var/run/tarantool",
-        
+
         -- will become wal_dir/instance/
         wal_dir     =   "/var/lib/tarantool",
-        
+
         -- snap_dir/instance/
         snap_dir    =   "/var/lib/tarantool",
 
         -- sophia_dir/instance/
         sophia_dir  =   "/var/lib/tarantool/sophia",
-        
+
         -- logger/instance .. '.log'
         logger      =   "/var/log/tarantool",
 
@@ -47,27 +47,27 @@ The file contains common default instances options:
 The file defines C<instance_dir> where user can place his
 applications (instances).
 
-Each instance can be controlled by C<dist.lua>:
+Each instance can be controlled by C<tarantoolctl>:
 
 =head2 Starting instance
 
-    dist.lua start instance_name
+    tarantoolctl start instance_name
 
 =head2 Stopping instance
 
-    dist.lua stop instance_name
+    tarantoolctl stop instance_name
 
 =head2 Logrotate instance's log
 
-    dist.lua logrotate instance_name
+    tarantoolctl logrotate instance_name
 
 =head2 Enter instance admin console
 
-    dist.lua enter instance_name
+    tarantoolctl enter instance_name
 
 =head2 status
 
-    dist.lua status instance_name
+    tarantoolctl status instance_name
 
 Check if instance is up.
 
@@ -81,8 +81,8 @@ exists and socket doesn't, etc.
 =head2 separate instances control
 
 If You use SysV init, You can use symlink from
-C<dist.lua> to C</etc/init.d/instance_name[.lua]>.
-C<dist.lua> detects if it is started by symlink and uses
+C<tarantoolctl> to C</etc/init.d/instance_name[.lua]>.
+C<tarantoolctl> detects if it is started by symlink and uses
 instance_name as C<`basename $0 .lua`>.
 
 =head1 COPYRIGHT
@@ -117,7 +117,7 @@ local available_commands = {
 }
 
 local function usage()
-    log.error("Usage: %s [-w] {%s} instance_name",
+    log.error("Usage: %s {%s} instance_name",
         arg[0], table.concat(available_commands, '|'))
     os.exit(1)
 end
@@ -133,16 +133,6 @@ local function shift_argv(arg, argno, argcount)
 end
 
 local cmd = arg[1]
-
--- whether or not this is run from a wrapper which takes
--- will daemonize for us
-local wrapper = false
-
-if cmd == '-w' or cmd == '--wrapper' then
-    wrapper = true
-    shift_argv(arg, 1, 1)
-    cmd = arg[1]
-end
 
 local valid_cmd = false
 for _, vcmd in pairs(available_commands) do
@@ -225,11 +215,11 @@ function mk_default_dirs(cfg)
     if fio.stat(pid_dir) == nil then
         mkdir(pid_dir)
     end
-    -- create wal_dir 
+    -- create wal_dir
     if fio.stat(cfg.wal_dir) == nil then
         mkdir(cfg.wal_dir)
     end
-    -- create snap_dir 
+    -- create snap_dir
     if fio.stat(cfg.snap_dir) == nil then
         mkdir(cfg.snap_dir)
     end
@@ -247,7 +237,7 @@ end
 local force_cfg = {
     pid_file    = default_cfg.pid_file,
     username    = default_cfg.username,
-    background  = wrapper ~= true,
+    background  = true,
     custom_proc_title = instance
 }
 
@@ -258,7 +248,7 @@ wrapper_cfg = function(cfg)
         cfg[i] = v
     end
 
-    for i, v in pairs(default_cfg) do 
+    for i, v in pairs(default_cfg) do
         if cfg[i] == nil then
             cfg[i] = v
         end
@@ -351,9 +341,9 @@ elseif cmd == 'enter' then
         log.error("Can't connect to %s (socket not found)", console_sock)
         os.exit(-1)
     end
-    
+
     log.info('Connecting to %s', console_sock)
-    
+
     local cmd = string.format(
         "require('console').connect('%s')", console_sock)
 
@@ -395,3 +385,5 @@ else
     log.error("Unknown command '%s'", cmd)
     os.exit(-1)
 end
+
+-- vim: syntax=lua

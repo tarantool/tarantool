@@ -4,17 +4,22 @@ print("Hello, world")
 io = require('io')
 ---
 ...
-local f = require('fiber').create(function() print('Ehllo, world') io.flush() end)
+local f = require('fiber').create(
+    function()
+        print('Ehllo, world')
+        io.flush()
+    end
+)
 ---
 ...
 require('fiber').sleep(0.1)
 ---
 ...
-Check log line
+Check log line (Hello):
 ---
-- "line contains 'Hello'" 
+- "logfile contains "Hello""
 ...
-Check log line
+Check log line (Ehllo):
 ---
-- "line contains 'Ehllo'" 
+- "logfile contains "Ehllo""
 ...

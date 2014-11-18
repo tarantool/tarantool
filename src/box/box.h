@@ -101,10 +101,10 @@ void
 box_leave_local_standby_mode(void *data __attribute__((unused)));
 
 void
-box_process_join(struct xrow_header *header);
+box_process_join(int fd, struct xrow_header *header);
 
 void
-box_process_subscribe(struct xrow_header *header);
+box_process_subscribe(int fd, struct xrow_header *header);
 
 /**
  * Check Lua configuration before initialization or

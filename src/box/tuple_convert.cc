@@ -28,18 +28,11 @@
  */
 #include "tuple.h"
 #include "iobuf.h"
-#include "tbuf.h"
 
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
 	obuf_dup(buf, tuple->data, tuple->bsize);
-}
-
-void
-tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf)
-{
-	tbuf_append(buf, tuple->data, tuple->bsize);
 }
 
 void

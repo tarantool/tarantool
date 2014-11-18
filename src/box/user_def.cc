@@ -1,5 +1,3 @@
-#ifndef TARANTOOL_REPLICA_H_INCLUDED
-#define TARANTOOL_REPLICA_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,27 +26,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "user_def.h"
+const char *
+priv_name(uint8_t access)
+{
+	if (access & PRIV_R)
+		return "Read";
+	if (access & PRIV_W)
+		return "Write";
+	return "Execute";
+}
 
-struct recovery_state;
-/** Connect to a master and request a snapshot.
- * Raises an exception on error.
- *
- * @return A connected socket, ready too receive
- * data.
- */
-void
-replica_bootstrap(struct recovery_state *r);
-
-void
-recovery_follow_remote(struct recovery_state *r);
-
-void
-recovery_stop_remote(struct recovery_state *r);
-
-void
-recovery_set_remote(struct recovery_state *r, const char *source);
-
-bool
-recovery_has_remote(struct recovery_state *r);
-
-#endif /* TARANTOOL_REPLICA_H_INCLUDED */

@@ -47,6 +47,7 @@ struct rlist {
 	struct rlist *next;
 };
 
+/* Used for static initialization of an empty list. */
 extern struct rlist rlist_nil;
 
 /**

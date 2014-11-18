@@ -28,7 +28,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <tbuf.h>
+
+#include <stddef.h>
+#include <stdint.h>
 
 void stat_init(void);
 void stat_free(void);

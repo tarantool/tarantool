@@ -39,8 +39,8 @@ extern "C" {
 
 #include "lua/utils.h"
 #include "lua/msgpack.h" /* luaL_msgpack_default */
-#include <tbuf.h>
 #include <fiber.h>
+#include "iobuf.h"
 #include "bit/bit.h"
 
 static int
@@ -54,7 +54,8 @@ lbox_pack(struct lua_State *L)
 	const char *str;
 
 	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *b = tbuf_new(&fiber()->gc);
+	struct obuf buf;
+	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
 
 	struct luaL_field field;
 	double dbl;
@@ -71,7 +72,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 8-bit int");
 
-			tbuf_append(b, (char *) &field.ival, sizeof(uint8_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint8_t));
 			break;
 		case 'S':
 		case 's':
@@ -79,7 +80,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
-			tbuf_append(b, (char *) &field.ival, sizeof(uint16_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'n':
 			/* signed and unsigned 16-bit big endian integers */
@@ -87,7 +88,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 16-bit int");
 
 			field.ival = (uint16_t) htons((uint16_t) field.ival);
-			tbuf_append(b, (char *) &field.ival, sizeof(uint16_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint16_t));
 			break;
 		case 'I':
 		case 'i':
@@ -95,7 +96,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.ival != MP_INT)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
-			tbuf_append(b, (char *) &field.ival, sizeof(uint32_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'N':
 			/* signed and unsigned 32-bit big endian integers */
@@ -103,7 +104,7 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 32-bit int");
 
 			field.ival = htonl(field.ival);
-			tbuf_append(b, (char *) &field.ival, sizeof(uint32_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint32_t));
 			break;
 		case 'L':
 		case 'l':
@@ -111,7 +112,7 @@ lbox_pack(struct lua_State *L)
 			if (field.type != MP_UINT && field.type != MP_INT)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
-			tbuf_append(b, (char *) &field.ival, sizeof(uint64_t));
+			obuf_dup(&buf, &field.ival, sizeof(uint64_t));
 			break;
 		case 'Q':
 		case 'q':
@@ -120,21 +121,21 @@ lbox_pack(struct lua_State *L)
 				luaL_error(L, "pickle.pack: expected 64-bit int");
 
 			field.ival = bswap_u64(field.ival);
-			tbuf_append(b, (char *) &field.ival, sizeof(uint64_t));
+			obuf_dup(&buf,  &field.ival, sizeof(uint64_t));
 			break;
 		case 'd':
 			dbl = (double) lua_tonumber(L, i);
-			tbuf_append(b, (char *) &dbl, sizeof(double));
+			obuf_dup(&buf, &dbl, sizeof(double));
 			break;
 		case 'f':
 			flt = (float) lua_tonumber(L, i);
-			tbuf_append(b, (char *) &flt, sizeof(float));
+			obuf_dup(&buf, &flt, sizeof(float));
 			break;
 		case 'A':
 		case 'a':
 			/* A sequence of bytes */
 			str = luaL_checklstring(L, i, &size);
-			tbuf_append(b, str, size);
+			obuf_dup(&buf, str, size);
 			break;
 		default:
 			luaL_error(L, "pickle.pack: unsupported pack "
@@ -144,8 +145,8 @@ lbox_pack(struct lua_State *L)
 		format++;
 	}
 
-	lua_pushlstring(L, tbuf_str(b), b->size);
-
+	const char *res = obuf_join(&buf);
+	lua_pushlstring(L, res, obuf_size(&buf));
 	return 1;
 }
 

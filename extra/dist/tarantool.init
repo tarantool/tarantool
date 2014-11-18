@@ -18,6 +18,8 @@ SCRIPTNAME=/etc/init.d/tarantool
 DAEMON=/usr/bin/tarantool
 DIST_LUA=/usr/bin/tarantoolctl
 
+. /lib/lsb/init-functions
+
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
 

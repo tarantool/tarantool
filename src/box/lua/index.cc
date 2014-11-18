@@ -31,10 +31,9 @@
 #include "box/index.h"
 #include "box/space.h"
 #include "box/schema.h"
-#include "box/access.h"
+#include "box/user_def.h"
 #include "box/lua/tuple.h"
 #include "fiber.h"
-#include "tbuf.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */

@@ -34,7 +34,6 @@
 #include "trivia/config.h"
 #include "trivia/util.h"
 #include "say.h"
-#include "tbuf.h"
 #include "errinj.h"
 
 #define ERRINJ_MEMBER(n, s) { /* .name = */ #n, /* .state = */ s },

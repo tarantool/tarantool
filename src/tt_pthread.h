@@ -46,7 +46,7 @@
 
 #define tt_pthread_error(e)			\
 	if (e != 0)				\
-		say_error("%s error %d", __func__, e);\
+		say_syserror("%s error %d", __func__, e);\
 	assert(e == 0);				\
 	e
 

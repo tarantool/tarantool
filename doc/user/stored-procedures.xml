@@ -86,7 +86,7 @@ tarantool> <userinput>'hello' .. ' world' -- '..' means 'concatenate'</userinput
       or is the full <replaceable>library-name.package-name[object-numeric-id]</replaceable>.
       The following example shows all four forms of object-specifier:
 <programlisting>
-tarantool> <userinput>s = box.schema.create_space('name_of_space', {id = 33})</userinput>
+tarantool> <userinput>s = box.schema.space.create('name_of_space', {id = 33})</userinput>
 ---
 ...
 tarantool> <userinput>i = s:create_index('name_of_index', {type = 'tree', parts = {1, 'STR'}})</userinput>
@@ -266,11 +266,41 @@ For example, to bring in the i18n package: install luarocks, say <code>luarocks 
 start Tarantool, and say <code>require('i18n')</code>.
 </para>
 
+<section xml:id="rocks"><title>Installing rocks from tarantool.org</title>
+<para>
+The Lua rocks that Tarantool supplies are available
+on <link xlink:href="http://rocks.tarantool.org">rocks.tarantool.org</link> and can be installed using
+the luarocks utilities. Here is an example.
+</para>
+<para>
+Look at rocks.tarantool.org. Notice that one of the
+available rocks is expirationd -- Expiration daemon for Tarantool.
+</para>
+<para>
+Create a file named ~/.luarocks/config.lua containing these three lines:<programlisting>
+rocks_servers = {
+        [[http://rocks.tarantool.org/]]
+}</programlisting>
+Install the expirationd rock with either <programlisting>luarocks --local install expirationd</programlisting>
+or, as root user, <programlisting>luarocks install expirationd</programlisting>
+Start the tarantool server and make the request:<programlisting>expirationd=require('expirationd')</programlisting>
+If there is an error, display the Lua variable
+<code>package_path</code> to make sure it is searching along
+a path that includes the new expirationd.lua file.
+</para>
+<para>
+If the result is success, which it will be if
+nothing unusual has been done when installing
+Tarantool or Luarocks, then the new rock is
+available henceforward for use in the Tarantool
+application server.
+</para>
+
 <para>
 The rest of this chapter is a reference that has what's needed for programming and
 administration with the built-in packages.
 </para>
-
+</section>
 
 <section xml:id="sp-digest">
     <title>Package <code>digest</code></title>
@@ -599,11 +629,11 @@ tarantool&gt; <userinput>json.decode('{"hello": "world"}').hello</userinput>
             </para>
             <bridgehead renderas="sect4">Example</bridgehead>
 <programlisting>
-<prompt>tarantool&gt;</prompt> <userinput>-- When nil is assigned to a Lua-table field, the field disappears</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>-- When nil is assigned to a Lua-table field, the field is null</userinput>
 <prompt>tarantool&gt;</prompt> <userinput>{nil, 'a', 'b'}</userinput>
----
-- 2: a
-  3: b
+- - null
+  - a
+  - b
 ...
 <prompt>tarantool&gt;</prompt> <userinput> -- When json.NULL is assigned to a Lua-table field, the field is json.NULL</userinput>
 <prompt>tarantool&gt;</prompt> <userinput>{json.NULL, 'a', 'b'}</userinput>
@@ -1472,7 +1502,7 @@ end
     <para>
      The functions for setting up and connecting are <code>socket</code>, <code>sysconnect</code>, <code>tcp_connect</code>.
      The functions for sending data are <code>send</code>, <code>sendto</code>, <code>write</code>, <code>syswrite</code>.
-     The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>, <code>readline</code>.
+     The functions for receiving data are <code>recv</code>, <code>recvfrom</code>, <code>read</code>.
       The functions for waiting before sending/receiving data are <code>wait</code>, <code>readable</code>, <code>writable</code>.
      The functions for setting flags are <code>nonblock</code>, <code>setsockopt</code>.
      The functions for stopping and disconnecting are <code>shutdown</code>, <code>close</code>.
@@ -1496,7 +1526,6 @@ end
        <row><entry><link linkend="socket-recv">recv</link></entry><entry>receiving</entry></row>
        <row><entry><link linkend="socket-recvfrom">recvfrom</link></entry><entry>receiving</entry></row>
        <row><entry><link linkend="socket-read">read</link></entry><entry>receiving</entry></row>
-       <row><entry><link linkend="socket-readline">readline</link></entry><entry>receiving</entry></row>
        <row><entry><link linkend="socket-nonblock">nonblock</link></entry><entry>flag setting  </entry></row>
        <row><entry><link linkend="socket-setsockopt">setsockopt</link></entry><entry>flag setting  </entry></row>
        <row><entry><link linkend="socket-linger">linger</link></entry><entry>flag setting</entry></row>
@@ -1634,59 +1663,30 @@ end
     </varlistentry>
 
     <varlistentry>
-        <term xml:id="socket-readline" xreflabel="socket-readline"><emphasis role="lua"><replaceable>sock</replaceable>:readline(<replaceable>[limit] [, separator list]</replaceable>)</emphasis></term>
+        <term xml:id="socket-read" xreflabel="socket-read">
+        <emphasis role="lua"><replaceable>sock</replaceable>:read(<replaceable>limit</replaceable> [, <replaceable>timeout</replaceable>])</emphasis>
+        or <emphasis role="lua"><replaceable>sock</replaceable>:read(<replaceable>delimiter</replaceable> [, <replaceable>timeout</replaceable>])</emphasis>
+        or <emphasis role="lua"><replaceable>sock</replaceable>:read({limit=<replaceable>limit</replaceable>} [, <replaceable>timeout</replaceable>])</emphasis>
+        or <emphasis role="lua"><replaceable>sock</replaceable>:read({delimiter=<replaceable>delimiter</replaceable>} [, <replaceable>timeout</replaceable>])</emphasis>
+        or <emphasis role="lua"><replaceable>sock</replaceable>:read({limit=<replaceable>limit</replaceable>, delimiter=<replaceable>delimiter</replaceable>} [, <replaceable>timeout</replaceable>])</emphasis>
+        </term>
         <listitem>
             <para>
-                Read a line from a connected socket.
+                Read from a connected socket until some condition is true, and return the bytes that were read.
             </para>
             <para>
-                <code>sock:readline()</code> with no arguments reads data from a socket
-                until '\n' (line feed) or eof (end of transmission).
-            </para>
-            <para>
-              Parameters: <code>limit</code> &mdash; maximum number of bytes to read. The function reads
-              until a separator is seen, or until (limit) bytes have been read. The default is "no limit".
-              <code>separator list</code> &mdash; a Lua table containing one or more separators.
-              The function reads until one of the separators is seen. The default is a Lua table containing '\n'.
+              Parameters: <code>limit</code> (type = integer) &mdash; maximum number of bytes to read for example 50 means "stop after 50 bytes",
+                          <code>delimiter</code> (type = string) &mdash; separator or <link xlink:href="http://www.lua.org/pil/20.2.html">Lua pattern</link> for example '[0-9]' means "stop after a digit",
+                          <code>timeout</code> (type = number) &mdash; maximum number of seconds to wait for example 50 means "stop after 50 seconds".
+              Reading goes on until <code>limit</code> bytes have been read,
+              or a delimiter has been read, or a timeout has expired.
             </para>
             <para>
                 Returns:
-                (type = string) A Lua string with data if success,
-                an empty string if error. If multiple separators were passed in <code>separator list</code>,
-                the separator which matched is also shown, as the third part of the return.
-                <table>
-                    <title><code>readline()</code> returns</title>
-                    <tgroup cols="2" align="left" colsep="1" rowsep="1">
-                      <tbody>
-                        <row>
-                          <entry><code>data, nil, separator</code></entry><entry>success</entry>
-                        </row>
-                        <row>
-                          <entry><code>"", "timeout", ETIMEDOUT, errstr</code></entry><entry>timeout</entry>
-                        </row>
-                        <row>
-                          <entry><code>"", "error", errno, errstr</code></entry><entry>error</entry>
-                        </row>
-                        <row>
-                          <entry><code>data, "limit"</code></entry><entry>limit</entry>
-                        </row>
-                        <row>
-                          <entry><code>data, "eof"</code></entry><entry>eof</entry>
-                        </row>
-                      </tbody>
-                    </tgroup>
-                </table>
-            </para>
-        </listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term xml:id="socket-read" xreflabel="socket-read"><emphasis role="lua"><replaceable>sock</replaceable>:read(<replaceable>size</replaceable>)</emphasis></term>
-        <listitem>
-            <para>
-             Read data on a socket, until <code>size</code> bytes have been read,
-             or until there is nothing more to read, or until an error occurs.
-             Similar to sock:readline(), except for the fact that there is no list of separators.
+                (type = string) an empty string if there is nothing more to read,
+                or a nil value if error,
+                or a string up to <code>limit</code> bytes long,
+                which may include the bytes that matched the <code>delimiter</code> expression.
             </para>
         </listitem>
     </varlistentry>
@@ -1923,7 +1923,7 @@ end
  This is not a useful way to communicate with this particular site,
  but shows that the system works.
 <programlisting>
- <prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>socket = require('socket')</userinput>
 ---
 ...
 
@@ -2250,7 +2250,7 @@ end
   </varlistentry>
 
   <varlistentry>
-  <term><emphasis role="lua">fio.open(<replaceable>path-name</replaceable>, <replaceable>flags</replaceable>)</emphasis></term>
+  <term><emphasis role="lua">fio.open(<replaceable>path-name</replaceable>[, <replaceable>flags</replaceable>])</emphasis></term>
     <listitem>
       <para>
         Open a file in preparation for reading or writing or seeking.
@@ -2296,7 +2296,7 @@ end
   </varlistentry>
 
   <varlistentry>
-   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:pread or <replaceable>file-handle></replaceable>:pwrite(<replaceable>count or new string</replaceable>, <replaceable>offset</replaceable>)</emphasis></term>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:pread or <replaceable>file-handle</replaceable>:pwrite(<replaceable>count or new string</replaceable>, <replaceable>offset</replaceable>)</emphasis></term>
     <listitem>
       <para>
         Perform read/write random-access operation on a file, without affecting the current seek position of the file.
@@ -2322,7 +2322,7 @@ end
   </varlistentry>
 
   <varlistentry>
-   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:read or <replaceable>file-handle></replaceable>:write(<replaceable>count or new string</replaceable>)</emphasis></term>
+   <term><emphasis role="lua"><replaceable>file-handle</replaceable>:read or <replaceable>file-handle</replaceable>:write(<replaceable>count or new string</replaceable>)</emphasis></term>
     <listitem>
       <para>
         Perform non-random-access read or write on a file. For details type "man 2 read" or "man 2 write".
@@ -2470,10 +2470,10 @@ end
 <variablelist>
  
     <varlistentry>
-     <term><emphasis role="lua">console.connect(<replaceable>host</replaceable>,<replaceable>port</replaceable>[, <replaceable>options</replaceable>])</emphasis></term>
+     <term><emphasis role="lua">console.connect(<replaceable>URI</replaceable>[, <replaceable>options</replaceable>])</emphasis></term>
         <listitem>
             <para>
-                Connect to the server at host:port, change the prompt from
+             Connect to the server at <link linkend="URI">URI</link>, change the prompt from
                 'tarantool' to 'host:port', and act henceforth as a client
                 until the user ends the session or types control-D.
             </para>
@@ -2500,10 +2500,10 @@ end
     <code>box.schema.user.grant('guest','execute','universe')</code>.
     </para>
             <para>
-             Parameters: <code>host</code>, <code>port</code>, <code>options</code>.
+             Parameters: <code>URI</code>, <code>options</code>.
              The options may be necessary if the Tarantool server at host:port requires
              authentication. In such a case the connection might look something like:
-             <code>console.connect('127.0.0.1', port, { user = 'netbox', password = '123' })</code>.
+             <code>console.connect('netbox:123@127.0.0.1'})</code>.
             </para>
             <para>
              Returns: nothing.
@@ -2517,7 +2517,7 @@ end
 <prompt>tarantool&gt;</prompt> <userinput>console = require('console')</userinput>
 ---
 ...
-<prompt>tarantool&gt;</prompt> <userinput>console.connect('198.18.44.44', 3301)</userinput>
+<prompt>tarantool&gt;</prompt> <userinput>console.connect('198.18.44.44:3301')</userinput>
 ---
 ...
 <prompt>198.18.44.44:3301&gt;</prompt> <userinput>-- prompt is telling us that server is remote</userinput></programlisting>
@@ -2530,7 +2530,7 @@ end
         <listitem>
             <para>
                 Listen on host:port. The primary way of listening for incoming
-                requests is via the host and port, or URI, specified in
+                requests is via the host and port, or <link linkend="URI">URI</link>, specified in
                 <code>box.cfg{listen=...}</code>. The alternative way of
                 listening is via the host and port, or URI, specified in
                 <code>console.listen(...)</code>. This alternative way is
@@ -2542,8 +2542,8 @@ end
                 specified as host = 'unix/', port = 'path/to/something.sock'.
            </para>
            <para xml:id="admin_port" xreflabel="admin_port">
-           The "admin" address is the port or URI to listen on for administrative
-           connections. It has no default value, so it must be specified
+          The "admin" address is the port or <link linkend="URI">URI</link> to listen on for administrative
+          connections. It has no default value, so it must be specified
           if connections will occur via telnet. It is not used unless
           assigned a value. The parameters may be expressed with URI = Universal
           Resource Identifier format, for example "unix://unix_domain_socket",
@@ -2953,7 +2953,7 @@ get expirationd through the test.
 </para>
 <para>
 1. Get expirationd.lua.
-   There are standard ways -- it is after all part of a standard rock --
+   There are standard ways -- it is after all part of <link linkend="rocks">a standard rock</link> --
    but for this purpose just copy the contents of
    <link xlink:href="https://github.com/tarantool/expirationd/blob/master/expirationd.lua">https://github.com/tarantool/expirationd/blob/master/expirationd.lua</link>
    to a default directory.
@@ -2965,16 +2965,16 @@ get expirationd through the test.
 3. Execute these requests:
 <programlisting><userinput>
      box.cfg{}
-     a = box.schema.create_space('origin')
+     a = box.schema.space.create('origin')
      a:create_index('first', {type = 'tree', parts = {1, 'NUM'}})
-     b = box.schema.create_space('archive')
+     b = box.schema.space.create('archive')
      b:create_index('first', {type = 'tree', parts = {1, 'STR'}})
      expd = require('expirationd')
      expd._debug = true
      expd.do_test('origin', 'archive')
      os.exit()
 </userinput></programlisting>
-The database-specific requests (cfg, create_space, create_index)
+The database-specific requests (cfg, space.create, create_index)
 should already be familiar. The key for getting the rock rolling is
 <code>expd = require('expirationd')</code>.
 The "require" function is what reads in the program; it will appear
