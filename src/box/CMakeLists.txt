@@ -28,6 +28,7 @@ add_library(box
     index.cc
     hash_index.cc
     tree_index.cc
+    rtree_index.cc
     bitset_index.cc
     engine.cc
     engine_memtx.cc

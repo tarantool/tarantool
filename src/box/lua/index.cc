@@ -34,7 +34,6 @@
 #include "box/user_def.h"
 #include "box/lua/tuple.h"
 #include "fiber.h"
-#include "tbuf.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */

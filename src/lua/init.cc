@@ -30,7 +30,6 @@
 #include "lua/utils.h"
 #include "tarantool.h"
 #include "box/box.h"
-#include "tbuf.h"
 #if defined(__FreeBSD__) || defined(__APPLE__)
 #include "libgen.h"
 #endif

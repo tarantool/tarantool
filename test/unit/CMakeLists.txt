@@ -41,6 +41,10 @@ add_executable(bps_tree.test bps_tree.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_a
 target_link_libraries(bps_tree.test small)
 add_executable(bps_tree_itr.test bps_tree_itr.cc ${CMAKE_SOURCE_DIR}/third_party/qsort_arg.c)
 target_link_libraries(bps_tree_itr.test small)
+add_executable(rtree.test rtree.cc ${CMAKE_SOURCE_DIR}/src/lib/salad/rtree.c)
+target_link_libraries(rtree.test)
+add_executable(rtree_itr.test rtree_itr.cc ${CMAKE_SOURCE_DIR}/src/lib/salad/rtree.c)
+target_link_libraries(rtree_itr.test)
 add_executable(matras.test matras.cc)
 target_link_libraries(matras.test small)
 add_executable(vclock.test vclock.cc test.c

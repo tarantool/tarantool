@@ -774,7 +774,6 @@ iproto_process_connect(struct iproto_request *request)
 		return;
 	} catch (Exception *e) {
 		e->log();
-		assert(con->session == NULL);
 		iproto_connection_close(con);
 		return;
 	}

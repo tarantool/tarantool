@@ -113,6 +113,8 @@ struct obuf
 	size_t size;
 	/** Position of the "current" iovec. */
 	size_t pos;
+	/** Allocation factor (allocations are a multiple of this number) */
+	size_t alloc_factor;
 	/** How many bytes are actually allocated for each iovec. */
 	size_t capacity[IOBUF_IOV_MAX];
 	/**
@@ -123,6 +125,9 @@ struct obuf
 	 */
 	struct iovec iov[IOBUF_IOV_MAX];
 };
+
+void
+obuf_create(struct obuf *buf, struct region *pool, size_t alloc_factor);
 
 /** How many bytes are in the output buffer. */
 static inline size_t
@@ -150,6 +155,41 @@ struct obuf_svp
 	size_t iov_len;
 	size_t size;
 };
+
+void
+obuf_ensure_resize(struct obuf *buf, size_t size);
+
+/**
+ * \brief Ensure \a buf to have at least \a size bytes of contiguous memory
+ * for write and return a point to this chunk.
+ * After write please call obuf_advance(wsize) where wsize <= size to advance
+ * a write position.
+ * \param buf
+ * \param size
+ * \return a pointer to contiguous chunk of memory
+ */
+static inline char *
+obuf_ensure(struct obuf *buf, size_t size)
+{
+	if (buf->iov[buf->pos].iov_len + size > buf->capacity[buf->pos])
+		obuf_ensure_resize(buf, size);
+	struct iovec *iov = &buf->iov[buf->pos];
+	return (char *) iov->iov_base + iov->iov_len;
+}
+
+/**
+ * \brief Advance write position after using obuf_ensure()
+ * \param buf
+ * \param size
+ * \sa obuf_ensure
+ */
+static inline void
+obuf_advance(struct obuf *buf, size_t size)
+{
+	buf->iov[buf->pos].iov_len += size;
+	buf->size += size;
+	assert(buf->iov[buf->pos].iov_len <= buf->capacity[buf->pos]);
+}
 
 /**
  * Reserve size bytes in the output buffer
@@ -191,6 +231,28 @@ obuf_svp_to_ptr(struct obuf *buf, struct obuf_svp *svp)
 /** Forget anything added to output buffer after the savepoint. */
 void
 obuf_rollback_to_svp(struct obuf *buf, struct obuf_svp *svp);
+
+/**
+ * \brief Conventional function to join iovec into a solid memory chunk.
+ * For iovec of size 1 returns iov->iov_base without allocation extra memory.
+ * \param[out] size calculated length of \a iov
+ * \return solid memory chunk
+ */
+static inline char *
+obuf_join(struct obuf *obuf)
+{
+	size_t iovcnt = obuf_iovcnt(obuf);
+	if (iovcnt == 1)
+		return (char *) obuf->iov[0].iov_base;
+
+	char *data = (char *) region_alloc(obuf->pool, obuf_size(obuf));
+	char *pos = data;
+	for (int i = 0; i < iovcnt; i++) {
+		memcpy(pos, obuf->iov[i].iov_base, obuf->iov[i].iov_len);
+		pos += obuf->iov[i].iov_len;
+	}
+	return data;
+}
 
 /* }}} */
 

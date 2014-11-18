@@ -31,7 +31,7 @@
 #include "box/tuple.h"
 #include "box/tuple_update.h"
 #include "fiber.h"
-#include "tbuf.h"
+#include "iobuf.h"
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 #include "third_party/lua-yaml/lyaml.h"
@@ -169,11 +169,11 @@ lbox_tuple_slice(struct lua_State *L)
 
 /* A MsgPack extensions handler that supports tuples */
 static int
-luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
+luamp_encode_extension_box(struct lua_State *L, int idx, struct obuf *b)
 {
 	struct tuple *tuple = lua_istuple(L, idx);
 	if (tuple != NULL) {
-		tuple_to_tbuf(tuple, b);
+		tuple_to_obuf(tuple, b);
 		return 0;
 	}
 
@@ -185,7 +185,7 @@ luamp_encode_extension_box(struct lua_State *L, int idx, struct tbuf *b)
  * Will be removed after API change.
  */
 int
-luamp_encodestack(struct lua_State *L, struct tbuf *b, int first, int last)
+luamp_encodestack(struct lua_State *L, struct obuf *b, int first, int last)
 {
 	if (first == last && (lua_istable(L, first) || lua_istuple(L, first))) {
 		/* New format */
@@ -193,7 +193,7 @@ luamp_encodestack(struct lua_State *L, struct tbuf *b, int first, int last)
 		return 1;
 	} else {
 		/* Backward-compatible format */
-		/* sic: if arg_count is 0, first > last */
+		/* sic: first > last */
 		luamp_encode_array(luaL_msgpack_default, b, last + 1 - first);
 		for (int k = first; k <= last; ++k) {
 			luamp_encode(L, luaL_msgpack_default, b, k);
@@ -269,27 +269,29 @@ lbox_tuple_transform(struct lua_State *L)
 	/*
 	 * Prepare UPDATE expression
 	 */
-	struct tbuf *b = tbuf_new(&fiber()->gc);
-	luamp_encode_array(luaL_msgpack_default,b, op_cnt);
+	struct obuf buf;
+	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+	luamp_encode_array(luaL_msgpack_default, &buf, op_cnt);
 	if (len > 0) {
-		luamp_encode_array(luaL_msgpack_default, b, 3);
-		luamp_encode_str(luaL_msgpack_default, b, "#", 1);
-		luamp_encode_uint(luaL_msgpack_default, b, offset);
-		luamp_encode_uint(luaL_msgpack_default, b, len);
+		luamp_encode_array(luaL_msgpack_default, &buf, 3);
+		luamp_encode_str(luaL_msgpack_default, &buf, "#", 1);
+		luamp_encode_uint(luaL_msgpack_default, &buf, offset);
+		luamp_encode_uint(luaL_msgpack_default, &buf, len);
 	}
 
 	for (int i = argc ; i > 3; i--) {
-		luamp_encode_array(luaL_msgpack_default, b, 3);
-		luamp_encode_str(luaL_msgpack_default, b, "!", 1);
-		luamp_encode_uint(luaL_msgpack_default, b, offset);
-		luamp_encode(L, luaL_msgpack_default, b, i);
+		luamp_encode_array(luaL_msgpack_default, &buf, 3);
+		luamp_encode_str(luaL_msgpack_default, &buf, "!", 1);
+		luamp_encode_uint(luaL_msgpack_default, &buf, offset);
+		luamp_encode(L, luaL_msgpack_default, &buf, i);
 	}
 
 	/* Execute tuple_update */
+	const char *expr = obuf_join(&buf);
 	struct tuple *new_tuple = tuple_update(tuple_format_ber,
 					       tuple_update_region_alloc,
 					       &fiber()->gc,
-					       tuple, tbuf_str(b), tbuf_end(b),
+					       tuple, expr, expr + obuf_size(&buf),
 					       0);
 	lbox_pushtuple(L, new_tuple);
 	return 1;
@@ -328,22 +330,25 @@ static const struct luaL_reg lbox_tuple_iterator_meta[] = {
 };
 
 
-struct tuple*
+struct tuple *
 lua_totuple(struct lua_State *L, int first, int last)
 {
 	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *b = tbuf_new(&fiber()->gc);
+	struct obuf buf;
+	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+
 	try {
-		luamp_encodestack(L, b, first, last);
+		luamp_encodestack(L, &buf, first, last);
 	} catch (Exception *e) {
 		throw;
 	} catch (...) {
 		tnt_raise(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
 	}
-	const char *data = b->data;
+	const char *data = obuf_join(&buf);
 	if (unlikely(mp_typeof(*data) != MP_ARRAY))
 		tnt_raise(ClientError, ER_TUPLE_NOT_ARRAY);
-	struct tuple *tuple = tuple_new(tuple_format_ber, data, tbuf_end(b));
+	struct tuple *tuple = tuple_new(tuple_format_ber, data,
+					data + obuf_size(&buf));
 	return tuple;
 }
 

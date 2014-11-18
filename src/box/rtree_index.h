@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED
+#define TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -26,17 +28,32 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tuple.h"
-#include "iobuf.h"
 
-void
-tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
-{
-	obuf_dup(buf, tuple->data, tuple->bsize);
-}
+#include "index.h"
 
-void
-tuple_to_buf(struct tuple *tuple, char *buf)
+#include <salad/rtree.h>
+
+class RTreeIndex: public Index
 {
-	memcpy(buf, tuple->data, tuple->bsize);
-}
+public:
+	RTreeIndex(struct key_def *key_def);
+	~RTreeIndex();
+
+	virtual void beginBuild();
+	virtual size_t size() const;
+	virtual struct tuple *findByKey(const char *key, uint32_t part_count) const;
+	virtual struct tuple *replace(struct tuple *old_tuple,
+                                      struct tuple *new_tuple,
+                                      enum dup_replace_mode mode);
+
+	virtual size_t memsize() const;
+	virtual struct iterator *allocIterator() const;
+	virtual void initIterator(struct iterator *iterator,
+                                  enum iterator_type type,
+                                  const char *key, uint32_t part_count) const;
+
+protected:
+	struct rtree tree;
+};
+
+#endif /* TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED */

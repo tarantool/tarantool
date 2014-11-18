@@ -39,14 +39,14 @@ extern "C" {
 } /* extern "C" */
 
 #include <msgpuck/msgpuck.h>
-#include <tbuf.h>
+#include <iobuf.h>
 #include <fiber.h>
 #include "small/region.h"
 
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
 static int
-luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *buf);
+luamp_encode_extension_default(struct lua_State *L, int idx, struct obuf *buf);
 
 static void
 luamp_decode_extension_default(struct lua_State *L, const char **data);
@@ -57,115 +57,98 @@ static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
 
 void
-luamp_encode_array(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size)
+luamp_encode_array(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size)
 {
 	(void) cfg;
 	assert(mp_sizeof_array(size) <= 5);
-	tbuf_ensure(buf, 5 + size);
-	char *data = mp_encode_array(buf->data + buf->size, size);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 5);
+	char *pos = mp_encode_array(data, size);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_map(struct luaL_serializer *cfg, struct tbuf *buf, uint32_t size)
+luamp_encode_map(struct luaL_serializer *cfg, struct obuf *buf, uint32_t size)
 {
 	(void) cfg;
 	assert(mp_sizeof_map(size) <= 5);
-	tbuf_ensure(buf, 5 + size);
-
-	char *data = mp_encode_map(buf->data + buf->size, size);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 5);
+	char *pos = mp_encode_map(data, size);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_uint(struct luaL_serializer *cfg, struct tbuf *buf, uint64_t num)
+luamp_encode_uint(struct luaL_serializer *cfg, struct obuf *buf, uint64_t num)
 {
 	(void) cfg;
 	assert(mp_sizeof_uint(num) <= 9);
-	tbuf_ensure(buf, 9);
-
-	char *data = mp_encode_uint(buf->data + buf->size, num);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 9);
+	char *pos = mp_encode_uint(data, num);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_int(struct luaL_serializer *cfg, struct tbuf *buf, int64_t num)
+luamp_encode_int(struct luaL_serializer *cfg, struct obuf *buf, int64_t num)
 {
 	(void) cfg;
 	assert(mp_sizeof_int(num) <= 9);
-	tbuf_ensure(buf, 9);
-
-	char *data = mp_encode_int(buf->data + buf->size, num);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 9);
+	char *pos = mp_encode_int(data, num);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_float(struct luaL_serializer *cfg, struct tbuf *buf, float num)
+luamp_encode_float(struct luaL_serializer *cfg, struct obuf *buf, float num)
 {
 	(void) cfg;
 	assert(mp_sizeof_float(num) <= 5);
-	tbuf_ensure(buf, 5);
-
-	char *data = mp_encode_float(buf->data + buf->size, num);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 5);
+	char *pos = mp_encode_float(data, num);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_double(struct luaL_serializer *cfg, struct tbuf *buf, double num)
+luamp_encode_double(struct luaL_serializer *cfg, struct obuf *buf, double num)
 {
 	(void) cfg;
 	assert(mp_sizeof_double(num) <= 9);
-	tbuf_ensure(buf, 9);
-
-	char *data = mp_encode_double(buf->data + buf->size, num);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 9);
+	char *pos = mp_encode_double(data, num);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_str(struct luaL_serializer *cfg, struct tbuf *buf,
+luamp_encode_str(struct luaL_serializer *cfg, struct obuf *buf,
 		 const char *str, uint32_t len)
 {
 	(void) cfg;
 	assert(mp_sizeof_str(len) <= 5 + len);
-	tbuf_ensure(buf, 5 + len);
-
-	char *data = mp_encode_str(buf->data + buf->size, str, len);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 5 + len);
+	char *pos = mp_encode_str(data, str, len);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_nil(struct luaL_serializer *cfg, struct tbuf *buf)
+luamp_encode_nil(struct luaL_serializer *cfg, struct obuf *buf)
 {
 	(void) cfg;
 	assert(mp_sizeof_nil() <= 1);
-	tbuf_ensure(buf, 1);
-
-	char *data = mp_encode_nil(buf->data + buf->size);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 1);
+	char *pos = mp_encode_nil(data);
+	obuf_advance(buf, pos - data);
 }
 
 void
-luamp_encode_bool(struct luaL_serializer *cfg, struct tbuf *buf, bool val)
+luamp_encode_bool(struct luaL_serializer *cfg, struct obuf *buf, bool val)
 {
 	(void) cfg;
 	assert(mp_sizeof_bool(val) <= 1);
-	tbuf_ensure(buf, 1);
-
-	char *data = mp_encode_bool(buf->data + buf->size, val);
-	assert(data <= buf->data + buf->capacity);
-	buf->size = data - buf->data;
+	char *data = obuf_ensure(buf, 1);
+	char *pos = mp_encode_bool(data, val);
+	obuf_advance(buf, pos - data);
 }
 
 static int
-luamp_encode_extension_default(struct lua_State *L, int idx, struct tbuf *b)
+luamp_encode_extension_default(struct lua_State *L, int idx, struct obuf *b)
 {
 	(void) L;
 	(void) idx;
@@ -202,7 +185,7 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 }
 
 static void
-luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *b,
+luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 	       int level)
 {
 	int index = lua_gettop(L);
@@ -266,7 +249,7 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *b,
 }
 
 void
-luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct tbuf *b,
+luamp_encode(struct lua_State *L, struct luaL_serializer *cfg, struct obuf *b,
 	     int index)
 {
 	int top = lua_gettop(L);
@@ -370,9 +353,13 @@ lua_msgpack_encode(lua_State *L)
 	struct luaL_serializer *cfg = luaL_checkserializer(L);
 
 	RegionGuard region_guard(&fiber()->gc);
-	struct tbuf *buf = tbuf_new(&fiber()->gc);
-	luamp_encode_r(L, cfg, buf, 0);
-	lua_pushlstring(L, buf->data, buf->size);
+
+	struct obuf buf;
+	obuf_create(&buf, &fiber()->gc, LUAMP_ALLOC_FACTOR);
+	luamp_encode_r(L, cfg, &buf, 0);
+
+	const char *res = obuf_join(&buf);
+	lua_pushlstring(L, res, obuf_size(&buf));
 	return 1;
 }
 

@@ -34,8 +34,6 @@
 enum { FORMAT_ID_MAX = UINT16_MAX - 1, FORMAT_ID_NIL = UINT16_MAX };
 enum { FORMAT_REF_MAX = INT32_MAX, TUPLE_REF_MAX = UINT16_MAX };
 
-struct tbuf;
-
 /** Common quota for tuples and indexes */
 extern struct quota memtx_quota;
 /** Tuple allocator */
@@ -345,6 +343,25 @@ tuple_field_u32(struct tuple *tuple, uint32_t i)
 }
 
 /**
+ * Decode numeric field and return its value as double
+ */
+double
+mp_decode_num(const char **data, uint32_t i);
+
+/**
+ * A convenience shortcut for data dictionary - get a numeric tuple field as double
+ */
+inline double
+tuple_field_num(const struct tuple* tuple, uint32_t field_no)
+{
+	const char* field = tuple_field(tuple, field_no);
+	if (field == NULL) {
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD, field_no);
+	}
+	return mp_decode_num(&field, field_no);
+}
+
+/**
  * A convenience shortcut for data dictionary - get a tuple field
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
@@ -508,10 +525,6 @@ tuple_compare_with_key(const struct tuple *tuple_a, const char *key,
 /* Store tuple in the output buffer in iproto format. */
 void
 tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
-
-/* Store tuple fields in the tbuf, BER-length-encoded. */
-void
-tuple_to_tbuf(struct tuple *tuple, struct tbuf *buf);
 
 /**
  * Store tuple fields in the memory buffer. Buffer must have at least
