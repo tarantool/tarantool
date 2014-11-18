@@ -147,16 +147,16 @@ RTreeIndex::~RTreeIndex()
 RTreeIndex::RTreeIndex(struct key_def *key_def)
   : Index(key_def)
 {
+	assert(key_def->part_count == 1);
+	assert(key_def->parts[0].type = ARRAY);
+	assert(key_def->is_unique == false);
+
 	if (rtree_page_pool_initialized == 0) {
 		mempool_create(&rtree_page_pool, &cord()->slabc,
 			       RTREE_PAGE_SIZE);
 		rtree_page_pool_initialized = 1;
 	}
 	rtree_init(&tree, rtree_page_alloc, rtree_page_free);
-        if (key_def->part_count != 1 || key_def->parts[0].type != BOX) {
-                tnt_raise(ClientError, ER_UNSUPPORTED,
-                          "R-Tree index", "Key should have BOX type");
-        }
 }
 
 size_t

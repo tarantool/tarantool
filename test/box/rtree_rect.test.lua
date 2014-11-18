@@ -1,6 +1,6 @@
 s = box.schema.create_space('spatial')
 s:create_index('primary')
-s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
+s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
 
 s:insert{1,{0,0,10,10}{
 s:insert{2,{5,5,10,10}}
@@ -24,7 +24,7 @@ s.index.spatial:select({0,0,5,5}, {iterator = 'GT'})
 s.index.spatial:select({9,4,11,6}, {iterator = 'OVERLAPS'})
 -- select records with coordinates (0,0,5,5)
 s.index.spatial:select({0,0,5,5}, {iterator = 'EQ'})
--- select neigbors of point (1,1)
+-- select neighbors of point (1,1)
 s.index.spatial:select({1,1}, {iterator = 'NEIGHBOR'})
 
 s:drop()

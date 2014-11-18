@@ -75,7 +75,7 @@ schema_object_type(const char *name);
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_type { UNKNOWN = 0, NUM, STRING, ARR, BOX, field_type_MAX };
+enum field_type { UNKNOWN = 0, NUM, STRING, ARRAY, field_type_MAX };
 extern const char *field_type_strs[];
 
 static inline uint32_t

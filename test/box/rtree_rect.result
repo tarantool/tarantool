@@ -12,11 +12,11 @@ s:create_index('primary')
   name: primary
   type: TREE
 ...
-s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
+s:create_index('spatial', { type = 'rtree', unique = false, parts = {2, 'array'}})
 ---
-- unique: true
+- unique: false
   parts:
-  - type: BOX
+  - type: ARRAY
     fieldno: 2
   id: 1
   space_id: 512
@@ -82,7 +82,7 @@ s.index.spatial:select({0,0,5,5}, {iterator = 'EQ'})
 ---
 - - [3, [0, 0, 5, 5]]
 ...
--- select neigbors of point (1,1)
+-- select neighbors of point (1,1)
 s.index.spatial:select({1,1}, {iterator = 'NEIGHBOR'})
 ---
 - - [3, [0, 0, 5, 5]]
