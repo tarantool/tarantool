@@ -110,17 +110,32 @@ struct rtree
 	rtree_page_free_t page_free;
 };
 
+/* Struct for iteration and retrieving rtree values */
 struct rtree_iterator
 {
+	/* Pointer to rtree */
 	const struct rtree *tree;
+	/* Rectangle of current iteration operation */
 	struct rtree_rect rect;
+	/* Type of current iteration operation */
 	enum spatial_search_op op;
+	/* Flag that means that no more values left */
 	bool eof;
+	/* A verion of a tree when the iterator was created */
 	int version;
 
+	/* Special single-linked list of closest neqighbors
+	 * Used only for iteration with op = SOP_NEIGHBOR
+	 * For allocating list entries, page allocator of tree is used.
+	 * Allocated page is much bigger than list entry and thus
+	 * provides several list entries.
+	 */
 	struct rtree_neighbor *neigh_list;
+	/* List of unused (deleted) list entries */
 	struct rtree_neighbor *neigh_free_list;
+	/* List of tree pages, allocated for list entries */
 	struct rtree_neighbor_page *page_list;
+	/* Position of ready-to-use list entry in allocated page */
 	int page_pos;
 
 	rtree_comparator_t intr_cmp;
