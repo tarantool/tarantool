@@ -1,3 +1,32 @@
+/*
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above
+ *    copyright notice, this list of conditions and the
+ *    following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+ * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include "rtree.h"
 #include <string.h>
 #include <assert.h>
@@ -33,7 +62,7 @@ struct rtree_neighbor {
 	void *child;
 	struct rtree_neighbor *next;
 	int level;
-	coord_t distance;
+	sq_coord_t distance;
 };
 
 enum {
@@ -79,29 +108,29 @@ rtree_set2d(struct rtree_rect *rect,
 	rect->upper_point.coords[1] = top;
 }
 
-static coord_t
+static sq_coord_t
 rtree_rect_point_distance2(const struct rtree_rect *rect,
 			   const struct rtree_point *point)
 {
-	coord_t result = 0;
+	sq_coord_t result = 0;
 	for (int i = RTREE_DIMENSION; --i >= 0; ) {
 		if (point->coords[i] < rect->lower_point.coords[i]) {
-			coord_t diff = point->coords[i] -
-				rect->lower_point.coords[i];
+			sq_coord_t diff = (sq_coord_t)(point->coords[i] -
+				rect->lower_point.coords[i]);
 			result += diff * diff;
 		} else if (point->coords[i] > rect->upper_point.coords[i]) {
-			coord_t diff = point->coords[i] -
-				rect->upper_point.coords[i];
+			sq_coord_t diff = (sq_coord_t)(point->coords[i] -
+				rect->upper_point.coords[i]);
 			result += diff * diff;
 		}
 	}
 	return result;
 }
 
-static coord_t
+static area_t
 rtree_rect_area(const struct rtree_rect *rect)
 {
-	coord_t area = 1;
+	area_t area = 1;
 	for (int i = RTREE_DIMENSION; --i >= 0; )
 	     area *= rect->upper_point.coords[i] - rect->lower_point.coords[i];
 	return area;
@@ -287,7 +316,7 @@ static struct rtree_page *
 rtree_split_page(struct rtree *tree, struct rtree_page *page,
 		 const struct rtree_page_branch *br)
 {
-	coord_t rect_area[RTREE_MAX_FILL + 1];
+	area_t rect_area[RTREE_MAX_FILL + 1];
 	rect_area[0] = rtree_rect_area(&br->rect);
 	for (int i = 0; i < RTREE_MAX_FILL; i++)
 		rect_area[i + 1] = rtree_rect_area(&page->b[i].rect);
@@ -297,7 +326,8 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	 * the most area if covered by a single rectangle.
 	 */
 	int seed[2] = {-1, -1};
-	coord_t worst_waste = -RTREE_COORD_MAX;
+	coord_t worst_waste = 0;
+	bool worst_waste_set = false;
 
 	const struct rtree_page_branch *bp = br;
 	for (int i = 0; i < RTREE_MAX_FILL; i++) {
@@ -307,7 +337,12 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 						 &page->b[j - 1].rect);
 			coord_t waste = rtree_rect_area(&cover) -
 				rect_area[i] - rect_area[j];
-			if (waste > worst_waste) {
+			if (!worst_waste_set) {
+				worst_waste_set = true;
+				worst_waste = waste;
+				seed[0] = i;
+				seed[1] = j;
+			}else if (waste > worst_waste) {
 				worst_waste = waste;
 				seed[0] = i;
 				seed[1] = j;
@@ -320,8 +355,6 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	char taken[RTREE_MAX_FILL];
 	memset(taken, 0, sizeof(taken));
 	struct rtree_rect group_rect[2];
-	coord_t group_area[2];
-	int group_card[2];
 	struct rtree_page *p = rtree_alloc_page(tree);
 	tree->n_pages++;
 
@@ -336,9 +369,8 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 		rtree_page_init_branch(p, &page->b[seed[0] - 1]);
 		page->b[seed[0] - 1] = *br;
 	}
-	group_card[0] = group_card[1] = 1;
-	group_area[0] = rect_area[seed[0]];
-	group_area[1] = rect_area[seed[1]];
+	area_t group_area[2] = {rect_area[seed[0]], rect_area[seed[1]]};
+	int group_card[2] = {1, 1};
 
 	/*
 	 * Split remaining rectangles between two groups.
@@ -351,7 +383,7 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 	       && group_card[1] < RTREE_MAX_FILL + 1 - RTREE_MIN_FILL)
 	{
 		int better_group = -1, chosen = -1;
-		coord_t biggest_diff = -1;
+		area_t biggest_diff = -1;
 		for (int i = 0; i < RTREE_MAX_FILL; i++) {
 			if (taken[i])
 				continue;
@@ -361,7 +393,7 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 			struct rtree_rect cover1 =
 				rtree_rect_cover(&group_rect[1],
 						 &page->b[i].rect);
-			coord_t diff = rtree_rect_area(&cover0) - group_area[0]
+			area_t diff = rtree_rect_area(&cover0) - group_area[0]
 				- (rtree_rect_area(&cover1) - group_area[1]);
 			if (diff > biggest_diff || -diff > biggest_diff) {
 				chosen = i;
@@ -437,16 +469,19 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 	struct rtree_page_branch br;
 	if (--level != 0) {
 		/* not a leaf page */
-		int i, mini = 0;
-		coord_t min_incr = RTREE_COORD_MAX;
-		coord_t best_area = RTREE_COORD_MAX;
-		for (i = 0; i < page->n; i++) {
-			coord_t r_area = rtree_rect_area(&page->b[i].rect);
+		int mini = -1;
+		area_t min_incr, best_area;
+		for (int i = 0; i < page->n; i++) {
+			area_t r_area = rtree_rect_area(&page->b[i].rect);
 			struct rtree_rect cover =
 				rtree_rect_cover(&page->b[i].rect, rect);
-			coord_t incr = rtree_rect_area(&cover) - r_area;
+			area_t incr = rtree_rect_area(&cover) - r_area;
 			assert(incr >= 0);
-			if (incr < min_incr) {
+			if (i == 0) {
+				best_area = r_area;
+				min_incr = incr;
+				mini = i;
+			} else if (incr < min_incr) {
 				best_area = r_area;
 				min_incr = incr;
 				mini = i;
@@ -455,6 +490,7 @@ rtree_page_insert(struct rtree *tree, struct rtree_page *page,
 				mini = i;
 			}
 		}
+		assert(mini >= 0);
 		struct rtree_page *p = page->b[mini].data.page;
 		struct rtree_page *q = rtree_page_insert(tree, p,
 							 rect, obj, level);
@@ -619,7 +655,7 @@ rtree_iterator_allocate_neighbour(struct rtree_iterator *itr)
 
 static struct rtree_neighbor *
 rtree_iterator_new_neighbor(struct rtree_iterator *itr,
-			    void* child, coord_t distance, int level)
+			    void* child, sq_coord_t distance, int level)
 {
 	struct rtree_neighbor *n = itr->neigh_free_list;
 	if (n == NULL)
@@ -655,7 +691,7 @@ rtree_iterator_insert_neighbor(struct rtree_iterator *itr,
 			       struct rtree_neighbor *node)
 {
 	struct rtree_neighbor *prev = NULL, *next = itr->neigh_list;
-	coord_t distance = node->distance;
+	sq_coord_t distance = node->distance;
 	while (next != NULL && next->distance < distance) {
 		prev = next;
 		next = prev->next;
@@ -852,7 +888,7 @@ rtree_search(const struct rtree *tree, const struct rtree_rect *rect,
 	case SOP_NEIGHBOR:
 		if (tree->root) {
 			struct rtree_rect cover = rtree_page_cover(tree->root);
-			coord_t distance =
+			sq_coord_t distance =
 				rtree_rect_point_distance2(&cover,
 							   &rect->lower_point);
 			itr->neigh_list =
