@@ -31,7 +31,7 @@
 
 #include "index.h"
 
-#include <third_party/rtree.h>
+#include <salad/rtree.h>
 
 class RTreeIndex: public Index
 {
@@ -53,7 +53,7 @@ public:
                                   const char *key, uint32_t part_count) const;
 
 protected:
-	R_tree tree;
+	struct rtree tree;
 };
 
 #endif /* TARANTOOL_BOX_RTREE_INDEX_H_INCLUDED */

@@ -426,8 +426,7 @@ typedef uint32_t bps_tree_block_id_t;
 
 /**
  * struct bps_block forward declaration (Used in struct bps_tree)
- */
-struct bps_block;
+ */struct bps_block;
 
 #ifdef BPS_TREE_DEBUG_BRANCH_VISIT
 #define BPS_TREE_BRANCH_TRACE(tree, type, branch_bit) \

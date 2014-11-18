@@ -23,7 +23,7 @@ s:create_index('spatial', { type = 'rtree', parts = {2, 'box'}})
   name: spatial
   type: RTREE
 ...
-n_records = 100000
+n_records = 20000
 ---
 ...
 n_iterations = 10000
