@@ -2539,6 +2539,20 @@ tarantool> <userinput>box.stat().DELETE -- a selected item of the table</userinp
             </para>
         </listitem>
     </varlistentry>
+    
+    <varlistentry>
+        <term><emphasis role="lua" xml:id="net.box.wait_connected">
+        <replaceable>conn</replaceable>:wait_connected([<replaceable>timeout</replaceable>])</emphasis></term>
+        <listitem>
+            <para>
+                Wait for connection to be active or closed.
+            </para>
+            <para>
+               Returns: (type = boolean) <code>true</code> when connected,
+               <code>false</code> on failure. Example: <code>net_box.self:wait_connected()</code>.
+            </para>
+        </listitem>
+    </varlistentry>
 
     <varlistentry>
         <term><emphasis role="lua" xml:id="net.box.close">
@@ -3215,7 +3229,6 @@ and later a guest user, who wishes to see the payroll, might say:<programlisting
 box.session.su('manager')
 box.space.payroll:select{'Jones'}</programlisting>
 </para>
-
 
 </section>
 
