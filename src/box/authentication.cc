@@ -46,12 +46,13 @@ authenticate(const char *user_name, uint32_t len,
 	 * checking a password. This is useful for connection
 	 * pooling.
 	 */
-	if (user->uid == GUEST && memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE)) {
+	part_count = mp_decode_array(&tuple);
+	if (part_count == 0 && user->uid == GUEST &&
+	    memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE)) {
 		/* No password is set for GUEST, OK. */
 		goto ok;
 	}
 
-	part_count = mp_decode_array(&tuple);
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
