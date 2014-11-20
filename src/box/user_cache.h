@@ -37,7 +37,7 @@ struct user_def;
  * in session->auth_token. This way it's easy to quickly find
  * the current user of the session.
  * An auth token, instead of a direct pointer, is stored in the
- * session because it make dropping of a signed in user safe.
+ * session because it makes dropping of a signed in user safe.
  * The same auth token (index in an array)
  * is also used to find out user privileges when accessing stored
  * objects, such as spaces and functions.

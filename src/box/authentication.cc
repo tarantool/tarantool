@@ -30,21 +30,35 @@
 #include "user_def.h"
 #include "session.h"
 
+static char zero_hash[SCRAMBLE_SIZE];
+
 void
 authenticate(const char *user_name, uint32_t len,
 	     const char *tuple, const char * /* tuple_end */)
 {
 	struct user_def *user = user_cache_find_by_name(user_name, len);
 	struct session *session = current_session();
-	uint32_t part_count = mp_decode_array(&tuple);
+	uint32_t part_count;
+	uint32_t scramble_len;
+	const char *scramble;
+	/*
+	 * Allow authenticating back to GUEST user without
+	 * checking a password. This is useful for connection
+	 * pooling.
+	 */
+	if (user->uid == GUEST && memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE)) {
+		/* No password is set for GUEST, OK. */
+		goto ok;
+	}
+
+	part_count = mp_decode_array(&tuple);
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			   "authentication request body");
 	}
 	mp_next(&tuple); /* Skip authentication mechanism. */
-	uint32_t scramble_len;
-	const char *scramble = mp_decode_str(&tuple, &scramble_len);
+	scramble = mp_decode_str(&tuple, &scramble_len);
 	if (scramble_len != SCRAMBLE_SIZE) {
 		/* Authentication mechanism, data. */
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
@@ -54,6 +68,7 @@ authenticate(const char *user_name, uint32_t len,
 	if (scramble_check(scramble, session->salt, user->hash2))
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
 
+ok:
 	current_user_init(&session->user, user);
 }
 
