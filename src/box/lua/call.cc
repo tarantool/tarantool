@@ -48,7 +48,7 @@
 #include "box/request.h"
 #include "box/txn.h"
 #include "box/user_def.h"
-#include "box/user_cache.h"
+#include "box/user.h"
 #include "box/schema.h"
 #include "box/session.h"
 #include "box/iproto_constants.h"

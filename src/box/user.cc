@@ -26,7 +26,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "user_cache.h"
+#include "user.h"
 #include "user_def.h"
 #include "assoc.h"
 #include "schema.h"

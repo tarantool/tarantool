@@ -43,7 +43,7 @@ add_library(box
     txn.cc
     box.cc
     user_def.cc
-    user_cache.cc
+    user.cc
     authentication.cc
     vclock.c
     cluster.cc

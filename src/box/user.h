@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_USER_CACHE_H
-#define INCLUDES_TARANTOOL_BOX_USER_CACHE_H
+#ifndef INCLUDES_TARANTOOL_BOX_USER_H
+#define INCLUDES_TARANTOOL_BOX_USER_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,6 +31,7 @@
 #include <stdint.h>
 
 struct user_def;
+
 /**
  * For best performance, all users are maintained in this array.
  * Position in the array is store in user->auth_token and also
@@ -87,4 +88,4 @@ user_cache_init();
 void
 user_cache_free();
 
-#endif /* INCLUDES_TARANTOOL_BOX_USER_CACHE_H */
+#endif /* INCLUDES_TARANTOOL_BOX_USER_H */
