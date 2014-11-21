@@ -83,7 +83,6 @@ struct rtree_reinsert_list {
 /* R-tree rectangle methods */
 /*------------------------------------------------------------------------- */
 
-
 void
 rtree_rect_normalize(struct rtree_rect *rect)
 {
@@ -284,8 +283,8 @@ rtree_page_cover(const struct rtree_page *page)
 
 /* Create root page by first inserting record */
 static void
-rtree_page_init_record(struct rtree_page *page,
-		       struct rtree_rect *rect, record_t obj)
+rtree_page_init_with_record(struct rtree_page *page,
+			    struct rtree_rect *rect, record_t obj)
 {
 	page->n = 1;
 	page->b[0].rect = *rect;
@@ -294,8 +293,8 @@ rtree_page_init_record(struct rtree_page *page,
 
 /* Create root page by branch */
 static void
-rtree_page_init_branch(struct rtree_page *page,
-		       const struct rtree_page_branch *br)
+rtree_page_init_with_branch(struct rtree_page *page,
+			    const struct rtree_page_branch *br)
 {
 	page->n = 1;
 	page->b[0] = *br;
@@ -303,9 +302,9 @@ rtree_page_init_branch(struct rtree_page *page,
 
 /* Create new root page (root splitting) */
 static void
-rtree_page_init_page(struct rtree_page *page,
-		     struct rtree_page *page1,
-		     struct rtree_page *page2)
+rtree_page_init_with_pages(struct rtree_page *page,
+			   struct rtree_page *page1,
+			   struct rtree_page *page2)
 {
 	page->n = 2;
 	page->b[0].rect = rtree_page_cover(page1);
@@ -366,10 +365,10 @@ rtree_split_page(struct rtree *tree, struct rtree_page *page,
 
 	if (seed[0] == 0) {
 		group_rect[0] = br->rect;
-		rtree_page_init_branch(p, br);
+		rtree_page_init_with_branch(p, br);
 	} else {
 		group_rect[0] = page->b[seed[0] - 1].rect;
-		rtree_page_init_branch(p, &page->b[seed[0] - 1]);
+		rtree_page_init_with_branch(p, &page->b[seed[0] - 1]);
 		page->b[seed[0] - 1] = *br;
 	}
 	area_t group_area[2] = {rect_area[seed[0]], rect_area[seed[1]]};
@@ -788,7 +787,7 @@ rtree_insert(struct rtree *tree, struct rtree_rect *rect, record_t obj)
 {
 	if (tree->root == NULL) {
 		tree->root = rtree_alloc_page(tree);
-		rtree_page_init_record(tree->root, rect, obj);
+		rtree_page_init_with_record(tree->root, rect, obj);
 		tree->height = 1;
 		tree->n_pages++;
 	} else {
@@ -797,7 +796,7 @@ rtree_insert(struct rtree *tree, struct rtree_rect *rect, record_t obj)
 		if (p != NULL) {
 			/* root splitted */
 			struct rtree_page *new_root = rtree_alloc_page(tree);
-			rtree_page_init_page(new_root, tree->root, p);
+			rtree_page_init_with_pages(new_root, tree->root, p);
 			tree->root = new_root;
 			tree->height++;
 			tree->n_pages++;
@@ -830,7 +829,8 @@ rtree_remove(struct rtree *tree, const struct rtree_rect *rect, record_t obj)
 				/* root splitted */
 				struct rtree_page *new_root
 					= rtree_alloc_page(tree);
-				rtree_page_init_page(new_root, tree->root, p);
+				rtree_page_init_with_pages(new_root,
+							   tree->root, p);
 				tree->root = new_root;
 				tree->height++;
 				tree->n_pages++;

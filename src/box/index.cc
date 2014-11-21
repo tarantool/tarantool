@@ -74,16 +74,28 @@ key_validate(struct key_def *key_def, enum iterator_type type, const char *key,
 	}
 
         if (key_def->type == RTREE) {
-                if (part_count != 1 && part_count != 2 && part_count != 4) {
+                if (part_count != 1 && part_count != 2 && part_count != 4)
                         tnt_raise(ClientError, ER_KEY_PART_COUNT, 4, part_count);
-                }
-#if 0
-		for (uint32_t part = 0; part < part_count; part++) {
+                if (part_count == 1) {
 			enum mp_type mp_type = mp_typeof(*key);
-			mp_next(&key);
-			key_mp_type_validate(NUM, mp_type, ER_KEY_PART_TYPE, part);
-		}
-#endif
+			key_mp_type_validate(ARRAY, mp_type, ER_KEY_PART_TYPE, 0);
+			uint32_t arr_size = mp_decode_array(&key);
+			if (arr_size != 2 && arr_size != 4)
+				tnt_raise(ClientError, ER_UNSUPPORTED,
+					  "R-Tree key", "Key should contain 2 (point) "
+					  "or 4 (rectangle) numeric coordinates");
+			for (uint32_t part = 0; part < arr_size; part++) {
+				enum mp_type mp_type = mp_typeof(*key);
+				mp_next(&key);
+				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, 0);
+			}
+                } else {
+			for (uint32_t part = 0; part < part_count; part++) {
+				enum mp_type mp_type = mp_typeof(*key);
+				mp_next(&key);
+				key_mp_type_validate(NUMBER, mp_type, ER_KEY_PART_TYPE, part);
+			}
+                }
         } else {
                 if (part_count > key_def->part_count)
                         tnt_raise(ClientError, ER_KEY_PART_COUNT,
