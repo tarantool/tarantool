@@ -312,8 +312,5 @@ SophiaFactory::rollback(struct txn *)
 		tx = NULL;
 		tx_db = NULL;
 	});
-	int rc = sp_rollback(tx);
-	if (rc == -1)
-		sophia_raise(env);
-	assert(rc == 0);
+	sp_rollback(tx);
 }
