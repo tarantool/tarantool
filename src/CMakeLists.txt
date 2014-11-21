@@ -67,7 +67,6 @@ set (common_sources
      crc32.c
      random.c
      scramble.c
-     tbuf.c
      opts.c
      cfg.cc
      cpu_feature.c

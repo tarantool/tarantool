@@ -30,7 +30,6 @@
 
 #include "trivia/util.h"
 #include "fiber.h"
-#include <tbuf.h>
 #include <say.h>
 
 #include <assoc.h>

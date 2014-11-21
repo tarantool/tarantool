@@ -29,7 +29,7 @@
 #include "alter.h"
 #include "schema.h"
 #include "user_def.h"
-#include "user_cache.h"
+#include "user.h"
 #include "space.h"
 #include "txn.h"
 #include "tuple.h"
@@ -1152,13 +1152,13 @@ user_has_data(uint32_t uid)
 	return false;
 }
 
-/** Supposedly a user may have many authentication mechanisms
+/**
+ * Supposedly a user may have many authentication mechanisms
  * defined, but for now we only support chap-sha1. Get
  * password of chap-sha1 from the _user space.
  */
-
 void
-user_fill_auth_data(struct user_def *user, const char *auth_data)
+user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 {
 	uint8_t type = mp_typeof(*auth_data);
 	if (type == MP_ARRAY || type == MP_NIL) {
@@ -1202,7 +1202,7 @@ user_fill_auth_data(struct user_def *user, const char *auth_data)
 }
 
 void
-user_create_from_tuple(struct user_def *user, struct tuple *tuple)
+user_def_create_from_tuple(struct user_def *user, struct tuple *tuple)
 {
 	/* In case user password is empty, fill it with \0 */
 	memset(user, 0, sizeof(*user));
@@ -1235,7 +1235,7 @@ user_create_from_tuple(struct user_def *user, struct tuple *tuple)
 				  "authentication data can not be set for "
 				  "a role");
 		}
-		user_fill_auth_data(user, auth_data);
+		user_def_fill_auth_data(user, auth_data);
 	}
 }
 
@@ -1256,7 +1256,7 @@ user_cache_alter_user(struct trigger * /* trigger */, void *event)
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_stmt(txn);
 	struct user_def user;
-	user_create_from_tuple(&user, stmt->new_tuple);
+	user_def_create_from_tuple(&user, stmt->new_tuple);
 	user_cache_replace(&user);
 }
 
@@ -1277,7 +1277,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 	struct user_def *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def user;
-		user_create_from_tuple(&user, new_tuple);
+		user_def_create_from_tuple(&user, new_tuple);
 		(void) user_cache_replace(&user);
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(user_cache_remove_user, NULL);
@@ -1309,7 +1309,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * correct.
 		 */
 		struct user_def user;
-		user_create_from_tuple(&user, new_tuple);
+		user_def_create_from_tuple(&user, new_tuple);
 		struct trigger *on_commit =
 			txn_alter_trigger_new(user_cache_alter_user, NULL);
 		trigger_add(&txn->on_commit, on_commit);

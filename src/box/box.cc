@@ -48,7 +48,7 @@
 #include "request.h"
 #include "txn.h"
 #include "fiber.h"
-#include "user_cache.h"
+#include "user.h"
 #include "cfg.h"
 #include "iobuf.h"
 

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_QBUF_H_INCLUDED
-#define TARANTOOL_QBUF_H_INCLUDED
+#ifndef TARANTOOL_FIFO_H_INCLUDED
+#define TARANTOOL_FIFO_H_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -28,12 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stdlib.h>
 
-#define QBUF_WATERMARK (512 * sizeof(void*))
+#define FIFO_WATERMARK (512 * sizeof(void*))
 
-struct qbuf {
+/** A simple FIFO made using a ring buffer */
+
+struct fifo {
 	char *buf;
 	size_t bottom; /* advanced by batch free */
 	size_t top;
@@ -41,7 +42,8 @@ struct qbuf {
 };
 
 static inline int
-qbuf_init(struct qbuf *q, size_t size) {
+fifo_create(struct fifo *q, size_t size)
+{
 	q->size = size;
 	q->bottom = 0;
 	q->top = 0;
@@ -50,7 +52,8 @@ qbuf_init(struct qbuf *q, size_t size) {
 }
 
 static inline void
-qbuf_free(struct qbuf *q) {
+fifo_destroy(struct fifo *q)
+{
 	if (q->buf) {
 		free(q->buf);
 		q->buf = NULL;
@@ -58,7 +61,8 @@ qbuf_free(struct qbuf *q) {
 }
 
 static inline int
-qbuf_n(struct qbuf *q) {
+fifo_size(struct fifo *q)
+{
 	return (q->top - q->bottom) / sizeof(void*);
 }
 
@@ -67,12 +71,12 @@ qbuf_n(struct qbuf *q) {
 #endif
 
 static inline int
-qbuf_push(struct qbuf *q, void *ptr)
+fifo_push(struct fifo *q, void *ptr)
 {
 	/* reduce memory allocation and memmove
 	 * effect by reusing free pointers buffer space only after the
 	 * watermark frees reached. */
-	if (unlikely(q->bottom >= QBUF_WATERMARK)) {
+	if (unlikely(q->bottom >= FIFO_WATERMARK)) {
 		memmove(q->buf, q->buf + q->bottom, q->bottom);
 		q->top -= q->bottom;
 		q->bottom = 0;
@@ -90,8 +94,8 @@ qbuf_push(struct qbuf *q, void *ptr)
 	return 0;
 }
 
-static inline void*
-qbuf_pop(struct qbuf *q) {
+static inline void *
+fifo_pop(struct fifo *q) {
 	if (unlikely(q->bottom == q->top))
 		return NULL;
 	void *ret = *(void**)(q->buf + q->bottom);
@@ -99,4 +103,6 @@ qbuf_pop(struct qbuf *q) {
 	return ret;
 }
 
-#endif
+#undef FIFO_WATERMARK
+
+#endif /* TARANTOOL_FIFO_H_INCLUDED */

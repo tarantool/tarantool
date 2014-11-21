@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_USER_CACHE_H
-#define INCLUDES_TARANTOOL_BOX_USER_CACHE_H
+#ifndef INCLUDES_TARANTOOL_BOX_USER_H
+#define INCLUDES_TARANTOOL_BOX_USER_H
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,13 +31,14 @@
 #include <stdint.h>
 
 struct user_def;
+
 /**
  * For best performance, all users are maintained in this array.
  * Position in the array is store in user->auth_token and also
  * in session->auth_token. This way it's easy to quickly find
  * the current user of the session.
  * An auth token, instead of a direct pointer, is stored in the
- * session because it make dropping of a signed in user safe.
+ * session because it makes dropping of a signed in user safe.
  * The same auth token (index in an array)
  * is also used to find out user privileges when accessing stored
  * objects, such as spaces and functions.
@@ -87,4 +88,4 @@ user_cache_init();
 void
 user_cache_free();
 
-#endif /* INCLUDES_TARANTOOL_BOX_USER_CACHE_H */
+#endif /* INCLUDES_TARANTOOL_BOX_USER_H */

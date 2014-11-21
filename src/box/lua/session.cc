@@ -29,7 +29,7 @@
 #include "session.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
-#include "box/user_cache.h"
+#include "box/user.h"
 #include "box/user_def.h"
 
 extern "C" {

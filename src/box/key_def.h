@@ -75,21 +75,22 @@ schema_object_type(const char *name);
  * since there is a mismatch between enum name (STRING) and type
  * name literal ("STR"). STR is already used as Objective C type.
  */
-enum field_type { UNKNOWN = 0, NUM, STRING, field_type_MAX };
+enum field_type { UNKNOWN = 0, NUM, STRING, ARRAY, field_type_MAX };
 extern const char *field_type_strs[];
 
 static inline uint32_t
 field_type_maxlen(enum field_type type)
 {
 	static const uint32_t maxlen[] =
-		{ UINT32_MAX, 4, 8, UINT32_MAX, UINT32_MAX };
+		{ UINT32_MAX, 8, UINT32_MAX, UINT32_MAX, UINT32_MAX };
 	return maxlen[type];
 }
 
 #define ENUM_INDEX_TYPE(_) \
 	_(HASH,    0) /* HASH Index */   \
 	_(TREE,    1) /* TREE Index */   \
-	_(BITSET,  2) /* BITSET Index */
+	_(BITSET,  2) /* BITSET Index */ \
+	_(RTREE,   3) /* R-Tree Index */ \
 
 ENUM(index_type, ENUM_INDEX_TYPE);
 extern const char *index_type_strs[];
@@ -265,7 +266,6 @@ key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
 {
 	assert(key_type < field_type_MAX);
 	assert((int) mp_type < (int) CHAR_BIT * sizeof(*key_mp_type));
-
 	if (unlikely((key_mp_type[key_type] & (1U << mp_type)) == 0))
 		tnt_raise(ClientError, err, field_no,
 			  field_type_strs[key_type]);

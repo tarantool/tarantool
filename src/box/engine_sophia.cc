@@ -222,6 +222,13 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 				  (unsigned) key_def->space_id,
 				  "Sophia TREE index key can not be multipart");
 		}
+		if (key_def->parts[0].type != NUM &&
+		    key_def->parts[0].type != STRING) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "Sophia TREE index field type must be STR or NUM");
+		}
 		break;
 	default:
 		tnt_raise(ClientError, ER_INDEX_TYPE,

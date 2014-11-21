@@ -33,6 +33,7 @@
 #include "index.h"
 #include "hash_index.h"
 #include "tree_index.h"
+#include "rtree_index.h"
 #include "bitset_index.h"
 #include "space.h"
 #include "exception.h"
@@ -106,6 +107,8 @@ MemtxFactory::createIndex(struct key_def *key_def)
 		return new HashIndex(key_def);
 	case TREE:
 		return new TreeIndex(key_def);
+	case RTREE:
+		return new RTreeIndex(key_def);
 	case BITSET:
 		return new BitsetIndex(key_def);
 	default:
@@ -139,6 +142,20 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 	case TREE:
 		/* TREE index has no limitations. */
 		break;
+	case RTREE:
+		if (key_def->part_count != 1) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "RTREE index key can not be multipart");
+		}
+		if (key_def->is_unique) {
+			tnt_raise(ClientError, ER_MODIFY_INDEX,
+				  (unsigned) key_def->iid,
+				  (unsigned) key_def->space_id,
+				  "RTREE index can not be unique");
+		}
+		break;
 	case BITSET:
 		if (key_def->part_count != 1) {
 			tnt_raise(ClientError, ER_MODIFY_INDEX,
@@ -158,6 +175,30 @@ MemtxFactory::keydefCheck(struct key_def *key_def)
 			  (unsigned) key_def->iid,
 			  (unsigned) key_def->space_id);
 		break;
+	}
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		switch (key_def->parts[i].type) {
+		case NUM:
+		case STRING:
+			if (key_def->type == RTREE) {
+				tnt_raise(ClientError, ER_MODIFY_INDEX,
+					  (unsigned) key_def->iid,
+					  (unsigned) key_def->space_id,
+					  "RTREE index field type must be ARRAY");
+			}
+			break;
+		case ARRAY:
+			if (key_def->type != RTREE) {
+				tnt_raise(ClientError, ER_MODIFY_INDEX,
+					  (unsigned) key_def->iid,
+					  (unsigned) key_def->space_id,
+					  "ARRAY field type is not supported");
+			}
+			break;
+		default:
+			assert(false);
+			break;
+		}
 	}
 }
 

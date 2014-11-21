@@ -28,6 +28,7 @@ add_library(box
     index.cc
     hash_index.cc
     tree_index.cc
+    rtree_index.cc
     bitset_index.cc
     engine.cc
     engine_memtx.cc
@@ -42,7 +43,7 @@ add_library(box
     txn.cc
     box.cc
     user_def.cc
-    user_cache.cc
+    user.cc
     authentication.cc
     vclock.c
     cluster.cc

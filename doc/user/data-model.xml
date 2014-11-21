@@ -161,7 +161,7 @@ The syntax details for defining spaces and indexes are in section
     Storage is variable-length, so the smallest number requires only one byte but the largest number requires nine bytes.
     </para>
     <para>
-    A "string" a variable-length sequence of bytes, usually represented with alphanumeric
+    A "string" is a variable-length sequence of bytes, usually represented with alphanumeric
     characters inside single quotes.
     </para>
     <para>
