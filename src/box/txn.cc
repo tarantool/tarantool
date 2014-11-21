@@ -169,12 +169,11 @@ txn_engine_begin_stmt(struct txn *txn, struct space *space)
 				tnt_raise(ClientError, ER_UNSUPPORTED,
 				          space->def.engine_name, "transactions");
 		}
-		factory->begin(txn, space);
-		return;
+	} else {
+		if (txn->engine->id != engine_id(space->engine))
+			tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 	}
-	if (txn->engine->id != engine_id(space->engine))
-		tnt_raise(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-	factory->begin_stmt(txn, space);
+	factory->begin(txn, space);
 }
 
 struct txn *
@@ -249,7 +248,6 @@ txn_finish(struct txn *txn)
 	rlist_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->old_tuple)
 			tuple_unref(stmt->old_tuple);
-		txn->engine->finish_stmt(stmt);
 	}
 	TRASH(txn);
 	/** Free volatile txn memory. */

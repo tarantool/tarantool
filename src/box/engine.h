@@ -126,10 +126,8 @@ public:
 	 * Engine specific transaction life-cycle routines.
 	 */
 	virtual void begin(struct txn*, struct space*);
-	virtual void begin_stmt(struct txn*, struct space*);
 	virtual void commit(struct txn*);
 	virtual void rollback(struct txn*);
-	virtual void finish_stmt(struct txn_stmt*);
 public:
 	/** Name of the engine. */
 	const char *name;

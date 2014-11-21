@@ -232,22 +232,19 @@ SophiaFactory::keydefCheck(struct key_def *key_def)
 }
 
 void
-SophiaFactory::begin(struct txn * /* txn */, struct space *space)
+SophiaFactory::begin(struct txn * txn, struct space *space)
 {
 	assert(space->engine->factory == this);
-	assert(tx == NULL);
-	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
-	assert(index->db != NULL);
-	tx = sp_begin(index->db);
-	if (tx == NULL)
-		sophia_raise(env);
-	tx_db = index->db;
-}
-
-void
-SophiaFactory::begin_stmt(struct txn * /* txn */, struct space *space)
-{
-	assert(space->engine->factory == this);
+	if (txn->n_stmts == 1) {
+		assert(tx == NULL);
+		SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
+		assert(index->db != NULL);
+		tx = sp_begin(index->db);
+		if (tx == NULL)
+			sophia_raise(env);
+		tx_db = index->db;
+		return;
+	}
 	assert(tx != NULL);
 	SophiaIndex *index = (SophiaIndex *)index_find(space, 0);
 	if (index->db != tx_db) {
@@ -274,7 +271,8 @@ SophiaFactory::commit(struct txn *txn)
 	assert(rc == 0);
 
 	/* b. create transaction log cursor and
-	 *    forge each statement's LSN number */
+	 *    forge each statement's LSN number.
+	*/
 	void *lc = sp_ctl(tx, "log_cursor");
 	if (lc == NULL) {
 		sp_rollback(tx);
@@ -287,6 +285,13 @@ SophiaFactory::commit(struct txn *txn)
 		void *v = sp_get(lc);
 		assert(v != NULL);
 		sp_set(v, "lsn", stmt->row->lsn);
+		/* remove tuple reference */
+		if (stmt->new_tuple) {
+			/* 2 refs: iproto case */
+			/* 3 refs: lua case */
+			assert(stmt->new_tuple->refs >= 2);
+			tuple_unref(stmt->new_tuple);
+		}
 	}
 	assert(sp_get(lc) == NULL);
 	sp_destroy(lc);
@@ -311,15 +316,4 @@ SophiaFactory::rollback(struct txn *)
 	if (rc == -1)
 		sophia_raise(env);
 	assert(rc == 0);
-}
-
-void
-SophiaFactory::finish_stmt(struct txn_stmt *stmt)
-{
-	if (stmt->new_tuple) {
-		/* 2 refs: iproto case */
-		/* 3 refs: lua case */
-		assert(stmt->new_tuple->refs >= 2);
-		tuple_unref(stmt->new_tuple);
-	}
 }

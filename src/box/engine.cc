@@ -54,16 +54,10 @@ void EngineFactory::shutdown()
 void EngineFactory::begin(struct txn*, struct space*)
 {}
 
-void EngineFactory::begin_stmt(struct txn*, struct space*)
-{}
-
 void EngineFactory::commit(struct txn*)
 {}
 
 void EngineFactory::rollback(struct txn*)
-{}
-
-void EngineFactory::finish_stmt(struct txn_stmt*)
 {}
 
 void EngineFactory::recoveryEvent(enum engine_recovery_event)
