@@ -144,12 +144,12 @@ macro(luajit_build)
         set (luajit_xcflags ${luajit_xcflags}
             -DLUAJIT_USE_VALGRIND -DLUAJIT_USE_SYSMALLOC)
     endif()
-    set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS}")
+    set (luajit_target_cc "${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1} ${CMAKE_C_FLAGS}")
     # Use external unwind on all platforms.
     set (luajit_target_cc "${luajit_target_cc} -DLUAJIT_UNWIND_EXTERNAL=1")
     if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
         # Regular mode - use CMake compiler for building host utils.
-        set (luajit_host_cc ${CMAKE_C_COMPILER})
+        set (luajit_host_cc ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ARG1} ${CMAKE_C_FLAGS})
     else()
         # Crosscompile mode - use a host CC compiler for building host utils.
         # Since CMake does not support cross compilation properly
