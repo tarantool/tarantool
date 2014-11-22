@@ -544,8 +544,8 @@ main(int argc, char **argv)
 #endif
 	start_time = ev_time();
 	/* set locale to make iswXXXX function work */
-	if (setlocale(LC_CTYPE, "en_US.UTF-8") == NULL)
-		fprintf(stderr, "Failed to set locale to en_US.UTF-8\n");
+	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
+		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
 
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		if (argc == 2 && argv[1][0] != '-') {
