@@ -5,8 +5,12 @@
 :template: old_documentation
 
 --------------------------------------------------------------------------------
-                              Notion in diagrams
+                                IProto Protocol
 --------------------------------------------------------------------------------
+
+================================================================================
+                              Notion in diagrams
+================================================================================
 
 .. code-block:: bash
 
@@ -37,15 +41,15 @@ MsgPack data types:
 * **MP_OBJECT** - Any MsgPack object
 
 
---------------------------------------------------------------------------------
+================================================================================
                                     Overview
---------------------------------------------------------------------------------
+================================================================================
 
 IPROTO is a binary request/response protocol.
 
---------------------------------------------------------------------------------
+================================================================================
                          Greeting Package
---------------------------------------------------------------------------------
+================================================================================
 
 .. code-block:: bash
 
@@ -68,9 +72,9 @@ to the client. The first 64 bytes of the greeting contain server version. The
 second 44 bytes contain a base64-encoded random string, to use in authentification
 packet. And it ends with 20 bytes of spaces.
 
---------------------------------------------------------------------------------
+================================================================================
                          Unified package structure
---------------------------------------------------------------------------------
+================================================================================
 
 Once a greeting is read, the protocol becomes pure request/response and features
 a complete access to Tarantool functionality, including:
@@ -201,9 +205,9 @@ and password, encrypted according to the specified mechanism. Authentication in
 Tarantool is optional, if no authentication is performed, session user is 'guest'.
 The server responds to authentication packet with a standard response with 0 tuples.
 
---------------------------------------------------------------------------------
+================================================================================
                                   Requests
---------------------------------------------------------------------------------
+================================================================================
 
 * SELECT: CODE - 0x01
   Find tuples matching the search pattern
@@ -366,9 +370,9 @@ It's an error to specify an argument of a type that differs from expected type.
                         MP_MAP
 
 
---------------------------------------------------------------------------------
+================================================================================
                          Response packet structure
---------------------------------------------------------------------------------
+================================================================================
 
 We'll show whole packets here:
 
@@ -411,9 +415,9 @@ Convenience macros which define hexadecimal constants for return codes
 can be found in `src/errcode.h
 <https://github.com/tarantool/tarantool/blob/master/src/errcode.h>`_
 
---------------------------------------------------------------------------------
+================================================================================
                          Replication packet structure
---------------------------------------------------------------------------------
+================================================================================
 
 .. code-block:: bash
 
@@ -484,9 +488,9 @@ can be found in `src/errcode.h
     Then you must process every query that'll came through other masters.
     Every request between masters will have Additional LSN and SERVER_ID.
 
---------------------------------------------------------------------------------
+================================================================================
                                 XLOG / SNAP
---------------------------------------------------------------------------------
+================================================================================
 
 XLOG and SNAP have the same format. They start with:
 
