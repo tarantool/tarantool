@@ -29,8 +29,19 @@
  * SUCH DAMAGE.
  */
 #include <stdint.h>
+#include "user_def.h"
 
-struct user_def;
+struct user: public user_def
+{
+	/** Global privileges this user has on the universe. */
+	struct access universal_access;
+	/**
+	 * An id in privileges array to quickly find a
+	 * respective privilege.
+	 */
+	uint8_t auth_token;
+};
+
 
 /**
  * For best performance, all users are maintained in this array.
@@ -43,7 +54,7 @@ struct user_def;
  * is also used to find out user privileges when accessing stored
  * objects, such as spaces and functions.
  */
-extern struct user_def users[];
+extern struct user *guest_user, *admin_user;
 
 /*
  * Insert or update user object (a cache entry
@@ -57,7 +68,7 @@ extern struct user_def users[];
  * user in it. Update user->auth_token
  * with an index in the users[] array.
  */
-void
+struct user *
 user_cache_replace(struct user_def *user);
 
 /**
@@ -68,16 +79,14 @@ void
 user_cache_delete(uint32_t uid);
 
 /** Find user by id. */
-struct user_def *
+struct user *
 user_by_id(uint32_t uid);
 
-#define user_by_token(token) (users + token)
-
 /* Find a user by name. Used by authentication. */
-struct user_def *
+struct user *
 user_cache_find(uint32_t uid);
 
-struct user_def *
+struct user *
 user_cache_find_by_name(const char *name, uint32_t len);
 
 /** Initialize the user cache and access control subsystem. */

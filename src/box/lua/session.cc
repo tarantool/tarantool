@@ -30,7 +30,6 @@
 #include "lua/utils.h"
 #include "lua/trigger.h"
 #include "box/user.h"
-#include "box/user_def.h"
 
 extern "C" {
 #include <lua.h>
@@ -68,7 +67,11 @@ lbox_session_id(struct lua_State *L)
 static int
 lbox_session_uid(struct lua_State *L)
 {
-	lua_pushnumber(L, current_session()->user.uid);
+	/*
+	 * Sic: push session user, not the current user,
+	 * which may differ inside a setuid function.
+	 */
+	lua_pushnumber(L, current_session()->credentials.uid);
 	return 1;
 }
 
@@ -80,7 +83,7 @@ lbox_session_uid(struct lua_State *L)
 static int
 lbox_session_user(struct lua_State *L)
 {
-	struct user_def *user = user_by_id(current_session()->user.uid);
+	struct user *user = user_by_id(current_session()->credentials.uid);
 	if (user)
 		lua_pushstring(L, user->name);
 	else
@@ -97,7 +100,7 @@ lbox_session_su(struct lua_State *L)
 	struct session *session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.su(): session does not exit");
-	struct user_def *user;
+	struct user *user;
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t len;
 		const char *name = lua_tolstring(L, 1, &len);
@@ -105,7 +108,7 @@ lbox_session_su(struct lua_State *L)
 	} else {
 		user = user_cache_find(lua_tointeger(L, 1));
 	}
-	current_user_init(&session->user, user);
+	credentials_init(&session->credentials, user);
 	return 0;
 }
 

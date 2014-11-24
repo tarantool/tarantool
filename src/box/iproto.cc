@@ -199,7 +199,7 @@ restart:
 	while ((request = iproto_queue_pop(i_queue))) {
 		IprotoRequestGuard guard(request);
 		fiber_set_session(fiber(), request->session);
-		fiber_set_user(fiber(), &request->session->user);
+		fiber_set_user(fiber(), &request->session->credentials);
 		request->process(request);
 	}
 	/** Put the current fiber into a queue fiber cache. */

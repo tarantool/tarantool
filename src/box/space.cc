@@ -40,7 +40,7 @@
 void
 access_check_space(struct space *space, uint8_t access)
 {
-	struct current_user *user = current_user();
+	struct credentials *cr = current_user();
 	/*
 	 * If a user has a global permission, clear the respective
 	 * privilege from the list of privileges required
@@ -48,12 +48,12 @@ access_check_space(struct space *space, uint8_t access)
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	access &= ~user->universal_access;
-	if (access && space->def.uid != user->uid &&
-	    access & ~space->access[user->auth_token].effective) {
-		struct user_def *def = user_cache_find(user->uid);
+	access &= ~cr->universal_access;
+	if (access && space->def.uid != cr->uid &&
+	    access & ~space->access[cr->auth_token].effective) {
+		struct user *user = user_cache_find(cr->uid);
 		tnt_raise(ClientError, ER_SPACE_ACCESS_DENIED,
-			  priv_name(access), def->name, space->def.name);
+			  priv_name(access), user->name, space->def.name);
 	}
 }
 

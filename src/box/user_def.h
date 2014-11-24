@@ -64,21 +64,9 @@ struct user_def {
 	char hash2[SCRAMBLE_SIZE];
 	/** User name - for error messages and debugging */
 	char name[BOX_NAME_MAX + 1];
-	/** Global privileges this user has on the universe. */
-	struct access universal_access;
-	/** An id in users[] array to quickly find user */
-	uint8_t auth_token;
 };
 
 /** Predefined user ids. */
 enum { GUEST = 0, ADMIN =  1, PUBLIC = 2 /* role */ };
-
-static inline void
-current_user_init(struct current_user *user, struct user_def *def)
-{
-	user->auth_token = def->auth_token;
-	user->universal_access = def->universal_access.effective;
-	user->uid = def->uid;
-}
 
 #endif /* TARANTOOL_BOX_USER_DEF_H_INCLUDED */

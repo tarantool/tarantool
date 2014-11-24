@@ -579,7 +579,7 @@ recovery_rescan_dir(ev_loop * loop, ev_timer *w, int /* revents */)
 	 * but to run queries we need at least a current
 	 * user.
 	 */
-	fiber_set_user(fiber(), &admin_user);
+	fiber_set_user(fiber(), &admin_credentials);
 	int result = recover_remaining_wals(r);
 	fiber_set_user(fiber(), NULL);
 	if (result < 0)
@@ -597,7 +597,7 @@ recovery_rescan_file(ev_loop * loop, ev_stat *w, int /* revents */)
 {
 	struct recovery_state *r = (struct recovery_state *) w->data;
 	struct wal_watcher *watcher = r->watcher;
-	fiber_set_user(fiber(), &admin_user);
+	fiber_set_user(fiber(), &admin_credentials);
 	int result = recover_wal(r, r->current_wal);
 	fiber_set_user(fiber(), NULL);
 	if (result < 0)

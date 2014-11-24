@@ -474,7 +474,7 @@ struct SetuidGuard
 {
 	/** True if the function was set-user-id one. */
 	bool setuid;
-	struct current_user *orig_user;
+	struct credentials *orig_credentials;
 
 	inline SetuidGuard(const char *name, uint32_t name_len,
 			   uint8_t access);
@@ -484,7 +484,7 @@ struct SetuidGuard
 SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 			 uint8_t access)
 	:setuid(false)
-	,orig_user(current_user())
+	,orig_credentials(current_user())
 {
 
 	/*
@@ -492,9 +492,9 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 	 * No special check for ADMIN user is necessary
 	 * since ADMIN has universal access.
 	 */
-	if (orig_user->universal_access & PRIV_ALL)
+	if (orig_credentials->universal_access & PRIV_ALL)
 		return;
-	access &= ~orig_user->universal_access;
+	access &= ~orig_credentials->universal_access;
 	/*
 	 * We need to look up the function by name even if
 	 * the user has access to it, since it could require
@@ -510,37 +510,37 @@ SetuidGuard::SetuidGuard(const char *name, uint32_t name_len,
 		 */
 		return;
 	}
-	if (func == NULL || (func->uid != orig_user->uid &&
-	     access & ~func->access[orig_user->auth_token].effective)) {
+	if (func == NULL || (func->uid != orig_credentials->uid &&
+	     access & ~func->access[orig_credentials->auth_token].effective)) {
 		/* Access violation, report error. */
 		char name_buf[BOX_NAME_MAX + 1];
 		snprintf(name_buf, sizeof(name_buf), "%.*s", name_len, name);
-		struct user_def *def = user_cache_find(orig_user->uid);
+		struct user *user = user_cache_find(orig_credentials->uid);
 
 		tnt_raise(ClientError, ER_FUNCTION_ACCESS_DENIED,
-			  priv_name(access), def->name, name_buf);
+			  priv_name(access), user->name, name_buf);
 	}
 	if (func->setuid) {
 		/** Remember and change the current user id. */
-		if (unlikely(func->setuid_user.auth_token >= BOX_USER_MAX)) {
+		if (func->owner_credentials.auth_token >= BOX_USER_MAX) {
 			/*
 			 * Fill the cache upon first access, since
 			 * when func_def is created, no user may
 			 * be around to fill it (recovery of
 			 * system spaces from a snapshot).
 			 */
-			struct user_def *owner = user_cache_find(func->uid);
-			current_user_init(&func->setuid_user, owner);
+			struct user *owner = user_cache_find(func->uid);
+			credentials_init(&func->owner_credentials, owner);
 		}
 		setuid = true;
-		fiber_set_user(fiber(), &func->setuid_user);
+		fiber_set_user(fiber(), &func->owner_credentials);
 	}
 }
 
 SetuidGuard::~SetuidGuard()
 {
 	if (setuid)
-		fiber_set_user(fiber(), orig_user);
+		fiber_set_user(fiber(), orig_credentials);
 }
 
 /**

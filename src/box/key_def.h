@@ -297,7 +297,7 @@ struct access {
  * Differs from the authenticated user when executing
  * setuid functions.
  */
-struct current_user {
+struct credentials {
 	/** A look up key to quickly find session user. */
 	uint8_t auth_token;
 	/**
@@ -327,7 +327,7 @@ struct func_def {
 	 * Authentication id of the owner of the function,
 	 * used for set-user-id functions.
 	 */
-	struct current_user setuid_user;
+	struct credentials owner_credentials;
 	/** Function name. */
 	char name[BOX_NAME_MAX + 1];
 	/**

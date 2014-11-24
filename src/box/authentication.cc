@@ -36,7 +36,7 @@ void
 authenticate(const char *user_name, uint32_t len,
 	     const char *tuple, const char * /* tuple_end */)
 {
-	struct user_def *user = user_cache_find_by_name(user_name, len);
+	struct user *user = user_cache_find_by_name(user_name, len);
 	struct session *session = current_session();
 	uint32_t part_count;
 	uint32_t scramble_len;
@@ -70,6 +70,6 @@ authenticate(const char *user_name, uint32_t len,
 		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->name);
 
 ok:
-	current_user_init(&session->user, user);
+	credentials_init(&session->credentials, user);
 }
 

@@ -72,15 +72,15 @@
 void
 access_check_ddl(uint32_t owner_uid)
 {
-	struct current_user *user = current_user();
+	struct credentials *cr = current_user();
 	/*
 	 * Only the creator of the space or superuser can modify
 	 * the space, since we don't have ALTER privilege.
 	 */
-	if (owner_uid != user->uid && user->uid != ADMIN) {
-		struct user_def *def = user_cache_find(user->uid);
+	if (owner_uid != cr->uid && cr->uid != ADMIN) {
+		struct user *user = user_cache_find(cr->uid);
 		tnt_raise(ClientError, ER_ACCESS_DENIED,
-			  "Create or drop", def->name);
+			  "Create or drop", user->name);
 	}
 }
 
@@ -1334,7 +1334,7 @@ func_def_create_from_tuple(struct func_def *func, struct tuple *tuple)
 	 * Later on consistency of the cache is ensured by DDL
 	 * checks (see user_has_data()).
 	 */
-	func->setuid_user.auth_token = BOX_USER_MAX; /* invalid value */
+	func->owner_credentials.auth_token = BOX_USER_MAX; /* invalid value */
 	const char *name = tuple_field_cstr(tuple, NAME);
 	uint32_t len = strlen(name);
 	if (len >= sizeof(func->name)) {
@@ -1493,7 +1493,7 @@ priv_def_check(struct priv_def *priv)
 static void
 grant_or_revoke(struct priv_def *priv)
 {
-	struct user_def *grantee = user_by_id(priv->grantee_id);
+	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
 		return;
 	struct access *access = NULL;
@@ -1502,9 +1502,9 @@ grant_or_revoke(struct priv_def *priv)
 	{
 		access = &grantee->universal_access;
 		/** Update cache at least in the current session. */
-		struct current_user *user = current_user();
-		if (grantee->uid == user->uid)
-			user->universal_access = priv->access;
+		struct credentials *cr = current_user();
+		if (grantee->uid == cr->uid)
+			cr->universal_access = priv->access;
 		break;
 	}
 	case SC_SPACE:

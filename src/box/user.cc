@@ -31,7 +31,10 @@
 #include "assoc.h"
 #include "schema.h"
 
-struct user_def users[BOX_USER_MAX];
+static struct user users[BOX_USER_MAX];
+struct user *guest_user = users;
+struct user *admin_user = users + 1;
+
 /** Bitmap type for used/unused authentication token map. */
 typedef unsigned long user_map_t;
 
@@ -78,61 +81,59 @@ user_map_put_slot(uint8_t auth_token)
 		user_map_idx = auth_token;
 }
 
-void
-user_cache_replace(struct user_def *user)
+struct user *
+user_cache_replace(struct user_def *def)
 {
-	struct user_def *old = user_by_id(user->uid);
-	if (old == NULL) {
+	struct user *user = user_by_id(def->uid);
+	if (user == NULL) {
 		uint8_t auth_token = user_map_get_slot();
-		old = users + auth_token;
-		assert(old->auth_token == 0);
-		old->auth_token = auth_token;
+		user = users + auth_token;
+		assert(user->auth_token == 0);
+		user->auth_token = auth_token;
+		struct mh_i32ptr_node_t node = { def->uid, user };
+		mh_i32ptr_put(user_registry, &node, NULL, NULL);
 	}
-	user->auth_token = old->auth_token;
-	user->universal_access = old->universal_access;
-	*old = *user;
-	struct mh_i32ptr_node_t node = { old->uid, old };
-	mh_i32ptr_put(user_registry, &node, NULL, NULL);
+	*(struct user_def *) user = *def;
+	return user;
 }
 
 void
 user_cache_delete(uint32_t uid)
 {
-	struct user_def *old = user_by_id(uid);
+	struct user *old = user_by_id(uid);
 	if (old) {
 		assert(old->auth_token > ADMIN);
 		user_map_put_slot(old->auth_token);
-		old->auth_token = 0;
-		old->uid = 0;
+		memset(old, 0, sizeof(*old));
 		mh_i32ptr_del(user_registry, uid, NULL);
 	}
 }
 
 /** Find user by id. */
-struct user_def *
+struct user *
 user_by_id(uint32_t uid)
 {
 	mh_int_t k = mh_i32ptr_find(user_registry, uid, NULL);
 	if (k == mh_end(user_registry))
 		return NULL;
-	return (struct user_def *) mh_i32ptr_node(user_registry, k)->val;
+	return (struct user *) mh_i32ptr_node(user_registry, k)->val;
 }
 
-struct user_def *
+struct user *
 user_cache_find(uint32_t uid)
 {
-	struct user_def *user = user_by_id(uid);
+	struct user *user = user_by_id(uid);
 	if (user)
 		return user;
 	tnt_raise(ClientError, ER_NO_SUCH_USER, int2str(uid));
 }
 
 /** Find user by name. */
-struct user_def *
+struct user *
 user_cache_find_by_name(const char *name, uint32_t len)
 {
 	uint32_t uid = schema_find_id(SC_USER_ID, 2, name, len);
-	struct user_def *user = user_by_id(uid);
+	struct user *user = user_by_id(uid);
 	if (user == NULL || user->type != SC_USER) {
 		char name_buf[BOX_NAME_MAX + 1];
 		/* \0 - to correctly print user name the error message. */
@@ -155,26 +156,22 @@ user_cache_init()
 	 * for 'guest' and 'admin' users here, they will be
 	 * updated with snapshot contents during recovery.
 	 */
-	struct user_def guest;
-	memset(&guest, 0, sizeof(guest));
-	snprintf(guest.name, sizeof(guest.name), "guest");
-	guest.owner = ADMIN;
-	guest.type = SC_USER;
-	user_cache_replace(&guest);
+	struct user_def def;
+	memset(&def, 0, sizeof(def));
+	snprintf(def.name, sizeof(def.name), "guest");
+	def.owner = ADMIN;
+	def.type = SC_USER;
+	struct user *user = user_cache_replace(&def);
 	/* 0 is the auth token and user id by default. */
-	assert(guest.auth_token == GUEST &&
-	       guest.uid == GUEST &&
-	       users[guest.auth_token].uid == guest.uid);
+	assert(user->uid == GUEST && user->auth_token == GUEST);
 
-	struct user_def admin;
-	memset(&admin, 0, sizeof(admin));
-	snprintf(admin.name, sizeof(admin.name), "admin");
-	admin.uid = admin.owner = ADMIN;
-	admin.type = SC_USER;
-	user_cache_replace(&admin);
+	memset(&def, 0, sizeof(def));
+	snprintf(def.name, sizeof(def.name), "admin");
+	def.uid = def.owner = ADMIN;
+	def.type = SC_USER;
+	user = user_cache_replace(&def);
 	/* ADMIN is both the auth token and user id for 'admin' user. */
-	assert(admin.auth_token == ADMIN &&
-	       users[admin.auth_token].uid == ADMIN);
+	assert(user->uid == ADMIN && user->auth_token == ADMIN);
 }
 
 void

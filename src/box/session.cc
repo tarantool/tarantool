@@ -78,7 +78,7 @@ session_create(int fd, uint64_t cookie)
 	session->fd =  fd;
 	session->cookie = cookie;
 	/* For on_connect triggers. */
-	current_user_init(&session->user, user_by_token(GUEST));
+	credentials_init(&session->credentials, guest_user);
 	if (fd >= 0)
 		random_bytes(session->salt, SESSION_SEED_SIZE);
 	struct mh_i32ptr_node_t node;
@@ -105,9 +105,9 @@ session_create_on_demand()
 	};
 	/* Add a trigger to destroy session on fiber stop */
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
-	current_user_init(&s->user, user_by_token(ADMIN));
+	credentials_init(&s->credentials, admin_user);
 	fiber_set_session(fiber(), s);
-	fiber_set_user(fiber(), &s->user);
+	fiber_set_user(fiber(), &s->credentials);
 	return s;
 }
 
@@ -115,7 +115,7 @@ session_create_on_demand()
  * To quickly switch to admin user when executing
  * on_connect/on_disconnect triggers in iproto.
  */
-struct current_user admin_user;
+struct credentials admin_credentials;
 
 void
 session_run_on_disconnect_triggers(struct session *session)
@@ -123,7 +123,7 @@ session_run_on_disconnect_triggers(struct session *session)
 	struct fiber *fiber = fiber();
 	/* For triggers. */
 	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &admin_user);
+	fiber_set_user(fiber, &admin_credentials);
 	try {
 		trigger_run(&session_on_disconnect, NULL);
 	} catch (Exception *e) {
@@ -139,7 +139,7 @@ session_run_on_connect_triggers(struct session *session)
 {
 	struct fiber *fiber = fiber();
 	fiber_set_session(fiber, session);
-	fiber_set_user(fiber, &admin_user);
+	fiber_set_user(fiber, &admin_credentials);
 	trigger_run(&session_on_connect, NULL);
 	/* Set session user to guest, until it is authenticated. */
 }
@@ -169,7 +169,7 @@ session_init()
 	if (session_registry == NULL)
 		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
-	current_user_init(&admin_user, user_by_token(ADMIN));
+	credentials_init(&admin_credentials, admin_user);
 }
 
 void

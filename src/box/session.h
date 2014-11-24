@@ -32,7 +32,7 @@
 #include <stdbool.h>
 #include "trigger.h"
 #include "fiber.h"
-#include "user_def.h"
+#include "user.h"
 
 enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 
@@ -55,7 +55,7 @@ struct session {
 	/** Authentication salt. */
 	char salt[SESSION_SEED_SIZE];
 	/** Cached user id and global grants */
-	struct current_user user;
+	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
 };
@@ -116,9 +116,9 @@ void
 session_storage_cleanup(int sid);
 
 static inline void
-fiber_set_user(struct fiber *fiber, struct current_user *user)
+fiber_set_user(struct fiber *fiber, struct credentials *cr)
 {
-	fiber_set_key(fiber, FIBER_KEY_USER, user);
+	fiber_set_key(fiber, FIBER_KEY_USER, cr);
 }
 
 static inline void
@@ -139,7 +139,7 @@ session_create_on_demand();
  * from ev watchers (without current fiber), but needs
  * to execute transactions.
  */
-extern struct current_user admin_user;
+extern struct credentials admin_credentials;
 
 /*
  * When creating a new fiber, the database (box)
@@ -165,18 +165,26 @@ current_session()
  * The same rationale for initializing the current
  * user on demand as in current_session() applies.
  */
-static inline struct current_user *
+static inline struct credentials *
 current_user()
 {
-	struct current_user *u =
-		(struct current_user *) fiber_get_key(fiber(),
+	struct credentials *u =
+		(struct credentials *) fiber_get_key(fiber(),
 						      FIBER_KEY_USER);
 	if (u == NULL) {
 		session_create_on_demand();
-		u = (struct current_user *) fiber_get_key(fiber(),
+		u = (struct credentials *) fiber_get_key(fiber(),
 							  FIBER_KEY_USER);
 	}
 	return u;
+}
+
+static inline void
+credentials_init(struct credentials *cr, struct user *user)
+{
+	cr->auth_token = user->auth_token;
+	cr->universal_access = user->universal_access.effective;
+	cr->uid = user->uid;
 }
 
 #endif /* INCLUDES_TARANTOOL_SESSION_H */
