@@ -48,7 +48,7 @@ authenticate(const char *user_name, uint32_t len,
 	 */
 	part_count = mp_decode_array(&tuple);
 	if (part_count == 0 && user->uid == GUEST &&
-	    memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE)) {
+	    memcmp(user->hash2, zero_hash, SCRAMBLE_SIZE) == 0) {
 		/* No password is set for GUEST, OK. */
 		goto ok;
 	}
