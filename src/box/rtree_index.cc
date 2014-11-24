@@ -44,9 +44,9 @@ static int rtree_page_pool_initialized = 0;
 inline void extract_rectangle(struct rtree_rect *rect,
 			      const struct tuple *tuple, struct key_def *kd)
 {
+        assert(kd->part_count == 1);
 	const char *elems = tuple_field(tuple, kd->parts[0].fieldno);
 	uint32_t size = mp_decode_array(&elems);
-        assert (kd->part_count == 1);
 	switch (size) {
 	case 1: // array
 	{
@@ -197,9 +197,7 @@ RTreeIndex::findByKey(const char *key, uint32_t part_count) const
 			rect.upper_point.coords[1] = mp_decode_num(&key, 3);
 			break;
 		default:
-			tnt_raise(ClientError, ER_UNSUPPORTED,
-				  "R-Tree key", "Key should be array of 2 (point) "
-				  "or 4 (rectangle) numeric coordinates");
+			assert(false);
 		}
 		break;
 	}
@@ -218,9 +216,7 @@ RTreeIndex::findByKey(const char *key, uint32_t part_count) const
 		rect.upper_point.coords[1] = mp_decode_num(&key, 3);
 		break;
 	default:
-		tnt_raise(ClientError, ER_UNSUPPORTED,
-			  "R-Tree key", "Key should contain 2 (point) "
-			  "or 4 (rectangle) numeric coordinates");
+		assert(false);
 	}
         struct tuple *result = NULL;
         if (rtree_search(&tree, &rect, SOP_OVERLAPS, &iterator))

@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include "exception.h"
 
-const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "\0"};
+const char *field_type_strs[] = {"UNKNOWN", "NUM", "STR", "ARRAY", "NUMBER", ""};
 STRS(index_type, ENUM_INDEX_TYPE);
 
 const uint32_t key_mp_type[] = {
@@ -41,6 +41,7 @@ const uint32_t key_mp_type[] = {
 	/* [NUM]     = */  1U << MP_UINT,
 	/* [STR]     =  */  1U << MP_STR,
 	/* [ARRAY]   =  */  1U << MP_ARRAY,
+	/* [NUMBER]  =  */  (1U << MP_UINT) | (1U << MP_INT) | (1U << MP_FLOAT) | (1U << MP_DOUBLE),
 };
 
 enum schema_object_type

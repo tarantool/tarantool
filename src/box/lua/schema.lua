@@ -533,8 +533,8 @@ function box.schema.space.bless(space)
     index_mt.__index = index_mt
     -- min and max
     index_mt.min = function(index, key)
-        if index.type == 'HASH' then
-            box.error(box.error.UNSUPPORTED, 'HASH', 'min()')
+        if index.type ~= 'TREE' then
+            box.error(box.error.UNSUPPORTED, index.type, 'min()')
         end
         local lst = index:select(key, { iterator = 'GE', limit = 1 })[1]
         if lst ~= nil then
@@ -544,8 +544,8 @@ function box.schema.space.bless(space)
         end
     end
     index_mt.max = function(index, key)
-        if index.type == 'HASH' then
-            box.error(box.error.UNSUPPORTED, 'HASH', 'max()')
+        if index.type ~= 'TREE' then
+            box.error(box.error.UNSUPPORTED, index.type, 'max()')
         end
         local lst = index:select(key, { iterator = 'LE', limit = 1 })[1]
         if lst ~= nil then

@@ -105,7 +105,7 @@ iterator_close(struct iterator *it) {
  *
  * @param key_def key definition
  * @param type iterator type (see enum iterator_type)
- * @param key BER-encoded key
+ * @param key msgpack-encoded key
  * @param part_count number of parts in \a key
  */
 void
