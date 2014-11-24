@@ -1912,6 +1912,20 @@ end
         </listitem>
     </varlistentry>
 
+    <varlistentry>
+     <term xml:id="socket-tcp_server" xreflabel="socket-tcp_server"><emphasis role="lua">socket.tcp_server(<replaceable>host</replaceable>, <replaceable>port</replaceable>, <replaceable>handler-function</replaceable>)</emphasis></term>
+        <listitem>
+            <para>
+             The <code>socket.tcp_server()</code> function makes Tarantool act as a server
+             that can accept connections.
+             Usually the same objective is accomplished with <code>box.cfg{listen=...)</code>.
+            </para>
+            <para>
+             Example: <code>socket.tcp_server('localhost', 3302, function () end)</code>.
+            </para>
+        </listitem>
+    </varlistentry>
+
 </variablelist>
 
 
@@ -2131,6 +2145,20 @@ end
   - /etc/xul-ext
 ...
 </programlisting>
+  </listitem>
+  </varlistentry>
+  
+  <varlistentry>
+   <term><emphasis role="lua">fio.tempdir()</emphasis></term>
+   <listitem>
+    <para>
+     Return the name of a directory that can be used to store temporary files.
+    </para>
+    <bridgehead renderas="sect4">Example</bridgehead><programlisting>
+<prompt>tarantool&gt;</prompt> <userinput>fio.tempdir()</userinput>
+---
+- /tmp/lG31e7
+ ...</programlisting>
   </listitem>
   </varlistentry>
 
