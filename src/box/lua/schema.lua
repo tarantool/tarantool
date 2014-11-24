@@ -989,6 +989,14 @@ box.schema.user.create = function(name, opts)
     _user:auto_increment{session.uid(), name, 'user', auth_mech_list}
 end
 
+box.schema.user.exists = function(name)
+    if user_resolve(name) then
+        return true
+    else
+        return false
+    end
+end
+
 box.schema.user.drop = function(name)
     local uid = user_resolve(name)
     if uid == nil then

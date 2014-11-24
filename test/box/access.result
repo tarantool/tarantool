@@ -460,3 +460,33 @@ box.schema.user.drop('twostep_client')
 ---
 ...
 -- the space is dropped when the user is dropped
+-- 
+-- box.schema.user.exists()
+box.schema.user.exists('guest')
+---
+- true
+...
+box.schema.user.exists(0)
+---
+- true
+...
+box.schema.user.exists(1)
+---
+- true
+...
+box.schema.user.exists(100500)
+---
+- false
+...
+box.schema.user.exists('admin')
+---
+- true
+...
+box.schema.user.exists('nosuchuser')
+---
+- false
+...
+box.schema.user.exists{}
+---
+- error: 'Supplied key type of part 0 does not match index part type: expected NUM'
+...

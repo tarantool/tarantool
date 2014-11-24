@@ -193,3 +193,12 @@ box.schema.user.grant('twostep_client', 'execute', 'function', 'test')
 box.schema.user.drop('twostep')
 box.schema.user.drop('twostep_client')
 -- the space is dropped when the user is dropped
+-- 
+-- box.schema.user.exists()
+box.schema.user.exists('guest')
+box.schema.user.exists(0)
+box.schema.user.exists(1)
+box.schema.user.exists(100500)
+box.schema.user.exists('admin')
+box.schema.user.exists('nosuchuser')
+box.schema.user.exists{}
