@@ -31,21 +31,14 @@ import pickle
 
 from StringIO import StringIO
 
-STATUS_TABLE = {
-    0: "pass",
-    1: "skip",
-    2: "NEW",
-    3: "fail"
-}
+class ParallelManager(MBaseManager): pass
+ParallelManager.register('Queue', multiprocessing.Queue)
 
-class Parallel_Manager(MBaseManager): pass
-Parallel_Manager.register('Queue', multiprocessing.Queue)
-
-class Parallel_Process(MProcess):
+class Gopher(MProcess):
     def __init__(self, **kwargs):
         if kwargs and 'target' in kwargs:
             del kwargs['target']
-        super(Parallel_Process, self).__init__(**kwargs)
+        super(Gopher, self).__init__(**kwargs)
 
     def run(self):
         try:
@@ -65,11 +58,11 @@ class Parallel_Process(MProcess):
         except EOFError:
             pass
 
-class Parallel_PoolException(Exception):
+class GopherPoolException(Exception):
     def __init__(self, message):
         self.message = message
 
-class Parallel_Pool(object):
+class GopherPool(object):
     DEFAULT = -1
     INITED = 0
     POPULATED = 1
@@ -77,25 +70,25 @@ class Parallel_Pool(object):
     ENDED = 3
 
     def __init__(self, **kwargs):
-        self.status   = Parallel_Pool.DEFAULT
+        self.status   = GopherPool.DEFAULT
         self.pool     = []
         self.number   = kwargs.get('processes', 1)
-        self.manager  = Parallel_Manager()
+        self.manager  = ParallelManager()
         self.manager.start()
         self.queuein  = self.manager.Queue()
         self.queueout = self.manager.Queue()
         self.jobs_in  = 0
         self.jobs_out = 0
         self.jobs_end = False
-        self.status   = Parallel_Pool.INITED
+        self.status   = GopherPool.INITED
         self._populate()
 
     def _populate(self):
-        assert(self.status == Parallel_Pool.INITED)
+        assert(self.status == GopherPool.INITED)
         for i in xrange(self.number):
             kwargs = {
             }
-            self.pool.append(Parallel_Process(
+            self.pool.append(Gopher(
                 group    = None,
                 name     = 'Worker-%d' % i,
                 args     = [
@@ -103,16 +96,16 @@ class Parallel_Pool(object):
                     self.queueout
                 ]
             ))
-        self.status = Parallel_Pool.POPULATED
+        self.status = GopherPool.POPULATED
 
     def _repopulate(self):
-        assert(self.status >= Parallel_Pool.STARTED)
+        assert(self.status >= GopherPool.STARTED)
         logger.debug('||_pool.repopulate > Begin repopulation')
         for n, proc in enumerate(self.pool):
-            if not proc.is_alive() and self.status != Parallel_Pool.ENDED:
+            if not proc.is_alive() and self.status != GopherPool.ENDED:
                 logger.debug("Manager: Process %s is dead (code %s). Recreating",
                         repr(proc.name), proc.exitcode)
-                self.pool[n] = Parallel_Process(
+                self.pool[n] = Gopher(
                         group     = None,
                         name      = proc.name,
                         args      = [
@@ -126,9 +119,9 @@ class Parallel_Pool(object):
 
     def fill(self, iterable=None):
         logger.debug('||_pool.fill > Entering')
-        assert(self.status > Parallel_Pool.INITED and self.status < Parallel_Pool.ENDED)
+        assert(self.status > GopherPool.INITED and self.status < GopherPool.ENDED)
         if iterable == None:
-            raise Parallel_PoolException("Iterable must be defined \
+            raise GopherPoolException("Iterable must be defined \
                     for '||_pool.fill'")
         jobs = iterable
         target = 0
@@ -154,7 +147,7 @@ class Parallel_Pool(object):
     def run(self):
         for proc in self.pool:
             proc.start()
-        self.status = Parallel_Pool.STARTED
+        self.status = GopherPool.STARTED
         return Parallel_Iterator(self)
 
 class Parallel_Iterator(object):
@@ -255,33 +248,33 @@ class Supervisor(object):
         self.pool = None
         self.iterator = None
 
-    def search_tests(self):
+    def find_tests(self):
         self.tests += [Parallel_PythonTest(k) \
                 for k in sorted(glob.glob(os.path.join(self.suite_path, "*.test.py" )))]
 
     def take_rand(self):
         if self.count != 0:
             for test in self.tests:
-                sql = self.server.sql.ret_copy()
-                admin = self.server.admin.ret_copy()
+                sql = self.server.sql.clone()
+                admin = self.server.admin.clone()
                 yield [test, [sql, admin]]
         else:
             while True:
-                sql = self.server.sql.ret_copy()
-                admin = self.server.admin.ret_copy()
+                sql = self.server.sql.clone()
+                admin = self.server.admin.clone()
                 yield [random.choice(self.tests), [sql, admin]]
 
     def run_all(self):
-        self.search_tests()
+        self.find_tests()
         if self.count != 0:
             self.tests *= self.count
             random.shuffle(self.tests)
-        self.pool = Parallel_Pool(processes = self.jobs)
+        self.pool = GopherPool(processes = self.jobs)
         self.iterator = self.pool.run()
         self.filler = self.pool.fill(self.take_rand())
         try:
             self.server.cleanup()
-            logger.info("Tarantool.Instance > Server cleanuped")
+            logger.info("Tarantool.Instance > Server cleaned up")
             logger.info("Tarantool.Instance > Server's path: %s", self.server.binary)
             self.server.deploy()
             logger.info("Tarantool.Instance > Server deployed")

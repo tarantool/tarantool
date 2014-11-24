@@ -73,7 +73,7 @@ class TarantoolConnection(object):
             else:
                 self.reconnect()
 
-    def ret_copy(self):
+    def clone(self):
         return type(self)(self.host, self.port)
 
     def execute(self, command, silent=True):

@@ -7,7 +7,6 @@ _CPack_Packages
 *.gcda
 *.o
 *.reject
-*.reject_*
 *.so
 *~
 .gitignore
