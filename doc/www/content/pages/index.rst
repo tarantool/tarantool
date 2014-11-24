@@ -33,8 +33,8 @@ and is a `Tarantool Lua script <http://github.com/tarantool/try>`_.
                                     News
 -------------------------------------------------------------------------------
 
+- *2014-11-24* Tarantool 1.6.4 is released
 - *2014-08-01* Tarantool 1.5.4 is released
-- *2014-07-20* Tarantool 1.6.3 is released
 
 -------------------------------------------------------------------------------
                                    Example
