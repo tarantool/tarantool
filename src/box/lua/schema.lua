@@ -1021,6 +1021,15 @@ end
 
 box.schema.user.grant = function(user_name, privilege, object_type,
                                  object_name, grantor)
+    -- From user point of view, role is the same thing
+    -- as a privilege. Allow syntax grant(user, role).
+    if object_name == nil and object_type == nil then
+        -- sic: avoid recursion, to not bother with roles
+        -- named 'execute'
+        object_type = 'role'
+        object_name = privilege
+        privilege = 'execute'
+    end
     local uid = user_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, user_name)
@@ -1050,6 +1059,13 @@ box.schema.user.grant = function(user_name, privilege, object_type,
 end
 
 box.schema.user.revoke = function(user_name, privilege, object_type, object_name)
+    -- From user point of view, role is the same thing
+    -- as a privilege. Allow syntax revoke(user, role).
+    if object_name == nil and object_type == nil then
+        object_type = 'role'
+        object_name = privilege
+        privilege = 'execute'
+    end
     local uid = user_resolve(user_name)
     if uid == nil then
         box.error(box.error.NO_SUCH_USER, name)

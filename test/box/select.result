@@ -555,7 +555,7 @@ ref_count = 0
 ...
 while (true) do table.insert(lots_of_links, s:get{0}) ref_count = ref_count + 1 end
 ---
-- error: Tuple reference counter is overflowed
+- error: Tuple reference counter overflow
 ...
 ref_count
 ---

@@ -135,7 +135,8 @@ enum { TNT_ERRMSG_MAX = 512 };
 	/* 83 */_(ER_ROLE_EXISTS,		2, "Role '%s' already exists") \
 	/* 84 */_(ER_CREATE_ROLE,		2, "Failed to create role '%s': %s") \
 	/* 85 */_(ER_INDEX_EXISTS,		2, "Index '%s' already exists") \
-	/* 86 */_(ER_TUPLE_REF_OVERFLOW,	1, "Tuple reference counter is overflowed") \
+	/* 86 */_(ER_TUPLE_REF_OVERFLOW,	1, "Tuple reference counter overflow") \
+	/* 87 */_(ER_ROLE_LOOP,			2, "Granting role '%s' to role '%s' would create a loop") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

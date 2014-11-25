@@ -30,63 +30,161 @@
 #include "user_def.h"
 #include "assoc.h"
 #include "schema.h"
+#include "bit/bit.h"
 
+struct universe universe;
 static struct user users[BOX_USER_MAX];
 struct user *guest_user = users;
 struct user *admin_user = users + 1;
 
-/** Bitmap type for used/unused authentication token map. */
-typedef unsigned long user_map_t;
-
-/** A map to quickly look up free slots in users[] array. */
-user_map_t user_map[BOX_USER_MAX/(CHAR_BIT*sizeof(user_map_t)) + 1];
-
-int user_map_idx = 0;
 struct mh_i32ptr_t *user_registry;
 
-uint8_t
-user_map_get_slot()
-{
-        uint32_t idx = __builtin_ffsl(user_map[user_map_idx]);
-        while (idx == 0) {
-		if (user_map_idx == sizeof(user_map)/sizeof(*user_map))
-			panic("Out of slots for new users");
+/* {{{ user_map */
 
-		user_map_idx++;
-                idx = __builtin_ffsl(user_map[user_map_idx]);
+/* Initialize an empty user map. */
+void
+user_map_init(struct user_map *map)
+{
+	memset(map, 0, sizeof(*map));
+}
+
+static inline int
+user_map_calc_idx(uint8_t auth_token, uint8_t *bit_no)
+{
+	*bit_no = auth_token & (UMAP_INT_BITS - 1);
+	return auth_token / UMAP_INT_BITS;
+}
+
+
+/** Set a bit in the user map - add a user. */
+static inline void
+user_map_set(struct user_map *map, uint8_t auth_token)
+{
+	uint8_t bit_no;
+	int idx = user_map_calc_idx(auth_token, &bit_no);
+	map->m[idx] |= ((umap_int_t) 1) << bit_no;
+}
+
+/** Clear a bit in the user map - remove a user. */
+static inline void
+user_map_clear(struct user_map *map, uint8_t auth_token)
+{
+	uint8_t bit_no;
+	int idx = user_map_calc_idx(auth_token, &bit_no);
+	map->m[idx] &= ~(((umap_int_t) 1) << bit_no);
+}
+
+/* Check if a bit is set in the user map. */
+static inline bool
+user_map_is_set(struct user_map *map, uint8_t auth_token)
+{
+	uint8_t bit_no;
+	int idx = user_map_calc_idx(auth_token, &bit_no);
+	return map->m[idx] & (((umap_int_t) 1) << bit_no);
+}
+
+/**
+ * Merge two sets of users: add all users from right argument
+ * to the left one.
+ */
+void
+user_map_union(struct user_map *lhs, struct user_map *rhs)
+{
+	for (int i = 0; i < USER_MAP_SIZE; i++)
+		lhs->m[i] |= rhs->m[i];
+}
+
+/** Iterate over users in the set of users. */
+struct user_map_iterator
+{
+	struct bit_iterator it;
+};
+
+void
+user_map_iterator_init(struct user_map_iterator *it, struct user_map *map)
+{
+	bit_iterator_init(&it->it, map->m,
+			  USER_MAP_SIZE * sizeof(umap_int_t), true);
+}
+
+struct user *
+user_map_iterator_next(struct user_map_iterator *it)
+{
+	size_t auth_token = bit_iterator_next(&it->it);
+	if (auth_token != SIZE_MAX)
+		return users + auth_token;
+	return NULL;
+}
+
+/* }}} */
+
+/* {{{ authentication tokens */
+
+/** A map to quickly look up free slots in users[] array. */
+static umap_int_t tokens[USER_MAP_SIZE];
+/**
+ * Index of the minimal element of the tokens array which
+ * has an unused token.
+ */
+static int min_token_idx = 0;
+
+/**
+ * Find and return a spare authentication token.
+ * Raise an exception when the maximal number of users
+ * is reached (and we're out of tokens).
+ */
+uint8_t
+auth_token_get()
+{
+	uint8_t bit_no = 0;
+	while (min_token_idx < USER_MAP_SIZE) {
+                bit_no = __builtin_ffs(tokens[min_token_idx]);
+		if (bit_no)
+			break;
+		min_token_idx++;
         }
+	if (bit_no == 0 || bit_no > BOX_USER_MAX) {
+		/* A cap on the number of users was reached.
+		 * Check for BOX_USER_MAX to cover case when
+		 * USER_MAP_BITS > BOX_USER_MAX.
+		 */
+		tnt_raise(LoggedError, ER_USER_MAX, BOX_USER_MAX);
+	}
         /*
          * find-first-set returns bit index starting from 1,
          * or 0 if no bit is set. Rebase the index to offset 0.
          */
-        idx--;
-	if (idx == BOX_USER_MAX) {
-		/* A cap on the number of users was reached. */
-		tnt_raise(LoggedError, ER_USER_MAX, BOX_USER_MAX);
-	}
-	user_map[user_map_idx] ^= ((user_map_t) 1) << idx;
-	idx += user_map_idx * sizeof(*user_map) * CHAR_BIT;
-	assert(idx < UINT8_MAX);
-	return idx;
+	bit_no--;
+	tokens[min_token_idx] ^= ((umap_int_t) 1) << bit_no;
+	int auth_token = min_token_idx * UMAP_INT_BITS + bit_no;
+	assert(auth_token < UINT8_MAX);
+	return auth_token;
 }
 
+/**
+ * Return an authentication token to the set of unused
+ * tokens.
+ */
 void
-user_map_put_slot(uint8_t auth_token)
+auth_token_put(uint8_t auth_token)
 {
-	memset(users + auth_token, 0, sizeof(struct user_def));
-	uint32_t bit_no = auth_token & (sizeof(user_map_t) * CHAR_BIT - 1);
-	auth_token /= sizeof(user_map_t) * CHAR_BIT;
-	user_map[auth_token] |= ((user_map_t) 1) << bit_no;
-	if (auth_token > user_map_idx)
-		user_map_idx = auth_token;
+	uint8_t bit_no;
+	int idx = user_map_calc_idx(auth_token, &bit_no);
+	tokens[idx] |= ((umap_int_t) 1) << bit_no;
+	if (idx < min_token_idx)
+		min_token_idx = idx;
 }
+
+/* }}} */
+
+/* {{{ user cache */
 
 struct user *
 user_cache_replace(struct user_def *def)
 {
 	struct user *user = user_by_id(def->uid);
 	if (user == NULL) {
-		uint8_t auth_token = user_map_get_slot();
+		uint8_t auth_token = auth_token_get();
 		user = users + auth_token;
 		assert(user->auth_token == 0);
 		user->auth_token = auth_token;
@@ -100,11 +198,17 @@ user_cache_replace(struct user_def *def)
 void
 user_cache_delete(uint32_t uid)
 {
-	struct user *old = user_by_id(uid);
-	if (old) {
-		assert(old->auth_token > ADMIN);
-		user_map_put_slot(old->auth_token);
-		memset(old, 0, sizeof(*old));
+	struct user *user = user_by_id(uid);
+	if (user) {
+		assert(user->auth_token > ADMIN);
+		auth_token_put(user->auth_token);
+		/*
+		 * Sic: we don't have to remove a deleted
+		 * user from users hash of roles, since
+		 * to drop a user, one has to revoke
+		 * all privileges from them first.
+		 */
+		memset(user, 0, sizeof(*user));
 		mh_i32ptr_del(user_registry, uid, NULL);
 	}
 }
@@ -146,7 +250,8 @@ user_cache_find_by_name(const char *name, uint32_t len)
 void
 user_cache_init()
 {
-	memset(user_map, 0xFF, sizeof(user_map));
+	/** Mark all tokens as unused. */
+	memset(tokens, 0xFF, sizeof(tokens));
 	user_registry = mh_i32ptr_new();
 	/*
 	 * Solve a chicken-egg problem:
@@ -180,3 +285,69 @@ user_cache_free()
 	if (user_registry)
 		mh_i32ptr_delete(user_registry);
 }
+
+/* }}} user cache */
+
+/** {{{ roles */
+
+void
+role_check(struct user *role, struct user *grantee)
+{
+	/*
+	 * Check that there is no loop from grantee to role:
+	 * if grantee is a role, build up a closure of all
+	 * immediate and indirect users of grantee, and ensure
+	 * the granted role is not in this set.
+	 */
+	struct user_map transitive_closure;
+	user_map_init(&transitive_closure);
+	user_map_set(&transitive_closure, grantee->auth_token);
+	struct user_map current_layer = transitive_closure;
+	while (true) {
+		/*
+		 * As long as we're traversing a directed
+		 * acyclic graph, we're bound to end at some
+		 * point in a layer with no incoming edges.
+		 */
+		struct user_map next_layer;
+		user_map_init(&next_layer);
+		bool found = false;
+		struct user_map_iterator it;
+		user_map_iterator_init(&it, &current_layer);
+		struct user *user;
+		while ((user = user_map_iterator_next(&it))) {
+			user_map_union(&next_layer, &user->users);
+			found = true;
+		}
+		user_map_union(&transitive_closure, &next_layer);
+		if (! found)
+			break;
+		current_layer = next_layer;
+	}
+
+	if (user_map_is_set(&transitive_closure,
+			    role->auth_token)) {
+		tnt_raise(ClientError, ER_ROLE_LOOP,
+			  role->name, grantee->name);
+	}
+}
+
+void
+role_grant(struct user *grantee, struct user *role)
+{
+	user_map_set(&role->users, grantee->auth_token);
+}
+
+void
+role_revoke(struct user *grantee, struct user *role)
+{
+	user_map_clear(&role->users, grantee->auth_token);
+}
+
+void
+user_set_effective_access(struct user * /* grantee */,
+			  struct user * /* role */)
+{
+}
+
+/** }}} */

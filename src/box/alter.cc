@@ -74,8 +74,13 @@ access_check_ddl(uint32_t owner_uid)
 {
 	struct credentials *cr = current_user();
 	/*
-	 * Only the creator of the space or superuser can modify
-	 * the space, since we don't have ALTER privilege.
+	 * For privileges, only the current user can claim he's
+	 * the grantor/owner of the privilege that is being
+	 * granted.
+	 * For spaces/funcs/other objects, only the creator
+	 * of the object or admin can modify the space, since
+	 * there is no such thing in Tarantool as GRANT OPTION or
+	 * ALTER privilege.
 	 */
 	if (owner_uid != cr->uid && cr->uid != ADMIN) {
 		struct user *user = user_cache_find(cr->uid);
@@ -1448,9 +1453,9 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 static void
 priv_def_check(struct priv_def *priv)
 {
-	struct user_def *grantor = user_cache_find(priv->grantor_id);
+	struct user *grantor = user_cache_find(priv->grantor_id);
 	/* May be a role */
-	struct user_def *grantee = user_by_id(priv->grantee_id);
+	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL) {
 		tnt_raise(ClientError, ER_NO_SUCH_USER,
 			  int2str(priv->grantee_id));
@@ -1481,6 +1486,21 @@ priv_def_check(struct priv_def *priv)
 		}
 		break;
 	}
+	case SC_ROLE:
+	{
+		struct user *role = user_by_id(priv->object_id);
+		if (role == NULL || role->type != SC_ROLE) {
+			tnt_raise(ClientError, ER_NO_SUCH_ROLE,
+				  role ? role->name :
+				  int2str(priv->object_id));
+		}
+		/* Only the creator of the role can grant it. */
+		if (role->owner != grantor->uid && grantor->uid != ADMIN) {
+			tnt_raise(ClientError, ER_ACCESS_DENIED,
+				  role->name, grantor->name);
+		}
+		role_check(role, grantee);
+	}
 	default:
 		break;
 	}
@@ -1500,7 +1520,7 @@ grant_or_revoke(struct priv_def *priv)
 	switch (priv->object_type) {
 	case SC_UNIVERSE:
 	{
-		access = &grantee->universal_access;
+		access = universe.access;
 		/** Update cache at least in the current session. */
 		struct credentials *cr = current_user();
 		if (grantee->uid == cr->uid)
@@ -1511,21 +1531,34 @@ grant_or_revoke(struct priv_def *priv)
 	{
 		struct space *space = space_by_id(priv->object_id);
 		if (space)
-			access = &space->access[grantee->auth_token];
+			access = space->access;
 		break;
 	}
 	case SC_FUNCTION:
 	{
 		struct func_def *func = func_by_id(priv->object_id);
 		if (func)
-			access = &func->access[grantee->auth_token];
+			access = func->access;
+		break;
+	}
+	case SC_ROLE:
+	{
+		struct user *role = user_by_id(priv->object_id);
+		if (role == NULL || role->type != SC_ROLE)
+			break;
+		if (priv->access)
+			role_grant(grantee, role);
+		else
+			role_revoke(grantee, role);
 		break;
 	}
 	default:
 		break;
 	}
-	if (access)
-		access->granted = access->effective = priv->access;
+	if (access) {
+		access[grantee->auth_token].granted = priv->access;
+		access[grantee->auth_token].effective = priv->access;
+	}
 }
 
 /** A trigger called on rollback of grant, or on commit of revoke. */
@@ -1538,6 +1571,12 @@ revoke_priv(struct trigger * /* trigger */, void *event)
 			       stmt->new_tuple : stmt->old_tuple);
 	struct priv_def priv;
 	priv_def_create_from_tuple(&priv, tuple);
+	/*
+	 * Access to the object has been removed altogether so
+	 * there should be no grants at all. If only some grants
+	 * were removed, modify_priv trigger would have been
+	 * invoked.
+	 */
 	priv.access = 0;
 	grant_or_revoke(&priv);
 }

@@ -183,7 +183,7 @@ static inline void
 credentials_init(struct credentials *cr, struct user *user)
 {
 	cr->auth_token = user->auth_token;
-	cr->universal_access = user->universal_access.effective;
+	cr->universal_access = universe.access[cr->auth_token].effective;
 	cr->uid = user->uid;
 }
 
