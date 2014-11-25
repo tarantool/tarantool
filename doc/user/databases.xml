@@ -1026,6 +1026,10 @@ tarantool> <userinput>box.space.space19:dec{1,'a'}</userinput>
               Returns: nil.
             </para>
             <para>
+             Notes: A replace trigger can be temporarily disabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(false)</code>
+             and re-enabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(true)</code>.
+            </para>
+            <para>
             <bridgehead renderas="sect4">Example</bridgehead>
               The following series of requests will create a space, create an index,
               create a function which increments a counter, create a trigger,
@@ -3093,6 +3097,12 @@ To change the current user's password, say
 <para>
 To drop a user, say
 <code>box.schema.user.drop(<replaceable>user-name</replaceable>)</code>.
+</para>
+
+<para>
+To check whether a user exists, say
+<code>box.schema.user.exists(<replaceable>user-name</replaceable>)</code>,
+which returns <code>true</code> or <code>false</code>.
 </para>
 
 <para>

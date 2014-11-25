@@ -12,7 +12,7 @@
     Triggers are Lua scripts which are executed by the server
     when certain events happen. Currently the two types of
     triggers are <link linkend="on_replace">on_replace</link> triggers
-    which for database events, and connection triggers,
+    which are for database events, and connection triggers,
     which are executed when a new connection
     is created or dropped.
     Triggers must be set up when the server starts.
