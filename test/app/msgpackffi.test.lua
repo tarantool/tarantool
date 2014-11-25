@@ -35,9 +35,18 @@ local function test_offsets(test, s)
     test:ok(not pcall(s.decode, dump, offset), "invalid offset")
 end
 
+local function test_other(test, s)
+    test:plan(1)
+    local buf = string.char(0x93, 0x6e, 0xcb, 0x42, 0x2b, 0xed, 0x30, 0x47,
+        0x6f, 0xff, 0xff, 0xac, 0x77, 0x6b, 0x61, 0x71, 0x66, 0x7a, 0x73,
+        0x7a, 0x75, 0x71, 0x71, 0x78)
+	local num = s.decode(buf)[2]
+    test:ok(num < 59971740600 and num > 59971740599, "gh-633 double decode")
+end
+
 tap.test("msgpackffi", function(test)
     local serializer = require('msgpackffi')
-    test:plan(8)
+    test:plan(9)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -48,4 +57,5 @@ tap.test("msgpackffi", function(test)
     -- udata/cdata hooks are not implemented
     --test:test("ucdata", common.test_ucdata, serializer)
     test:test("offsets", test_offsets, serializer)
+    test:test("other", test_other, serializer)
 end)

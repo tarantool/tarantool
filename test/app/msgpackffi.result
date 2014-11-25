@@ -1,6 +1,6 @@
 TAP version 13
 # msgpackffi
-1..8
+1..9
     # unsigned
     1..56
     ok - encode/decode for 0
@@ -156,4 +156,9 @@ ok - table
     ok - invalid offset
     # offsets: end
 ok - offsets
+    # other
+    1..1
+    ok - gh-633 double decode
+    # other: end
+ok - other
 # msgpackffi: end
