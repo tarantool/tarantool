@@ -127,6 +127,8 @@
 #cmakedefine ENABLE_BUNDLED_LIBEIO 1
 #cmakedefine ENABLE_BUNDLED_LIBCORO 1
 
+#cmakedefine HAVE_PTHREAD_YIELD 1
+#cmakedefine HAVE_SCHED_YIELD 1
 
 #cmakedefine HAVE_PRCTL_H 1
 

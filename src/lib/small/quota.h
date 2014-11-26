@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <unistd.h>
 
 #if defined(__cplusplus)
 extern "C" {
