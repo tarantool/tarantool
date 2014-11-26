@@ -1,6 +1,3 @@
-sophia_rmdir()
----
-...
 -- insert
 space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
 ---
@@ -1170,9 +1167,5 @@ index_random_test(space, 'primary')
 - true
 ...
 space:drop()
----
-...
---
-sophia_rmdir()
 ---
 ...

@@ -1,6 +1,4 @@
 
-sophia_rmdir()
-
 space = box.schema.create_space('test', { engine = 'sophia', id = 100 })
 index = space:create_index('primary', { type = 'tree', parts = {1, 'num'} })
 
@@ -56,5 +54,3 @@ space_tmp:drop()
 space:drop()
 
 --
-
-sophia_rmdir()
