@@ -17,10 +17,6 @@ local const_char_ptr_t = ffi.typeof('const char *')
 ffi.cdef([[
 uint32_t bswap_u32(uint32_t x);
 uint64_t bswap_u64(uint64_t x);
-double
-mp_bswap_double(double d);
-float
-mp_bswap_float(float f);
 ]])
 local function bswap_u16(num)
     return bit.rshift(bit.bswap(tonumber(num)), 16)
@@ -118,14 +114,16 @@ end
 local function encode_float(buf, num)
     buf:reserve(5)
     buf.p[0] = 0xca;
-    ffi.cast(float_ptr_t, buf.p + 1)[0] = builtin.mp_bswap_float(num)
+    ffi.cast(float_ptr_t, buf.p + 1)[0] = num
+    ffi.cast(uint32_ptr_t, buf.p + 1)[0] = bswap_u32(ffi.cast(uint32_ptr_t, buf.p + 1)[0])
     buf.p = buf.p + 5
 end
 
 local function encode_double(buf, num)
     buf:reserve(9)
     buf.p[0] = 0xcb;
-    ffi.cast(double_ptr_t, buf.p + 1)[0] = builtin.mp_bswap_double(num)
+    ffi.cast(double_ptr_t, buf.p + 1)[0] = num
+    ffi.cast(uint64_ptr_t, buf.p + 1)[0] = bswap_u64(ffi.cast(uint64_ptr_t, buf.p + 1)[0])
     buf.p = buf.p + 9
 end
 
@@ -341,14 +339,17 @@ local function decode_i64(data)
     return ffi.cast('int64_t', ffi.cast('uint64_t', num))
 end
 
+local bswap_buf = ffi.new('char[8]')
 local function decode_float(data)
-    local num = builtin.mp_bswap_float(ffi.cast(float_ptr_t,data[0])[0])
+    ffi.cast(uint32_ptr_t, bswap_buf)[0] = bswap_u32(ffi.cast(uint32_ptr_t, data[0])[0])
+    local num = ffi.cast(float_ptr_t, bswap_buf)[0]
     data[0] = data[0] + 4
     return tonumber(num)
 end
 
 local function decode_double(data)
-    local num = builtin.mp_bswap_double(ffi.cast(double_ptr_t, data[0])[0])
+    ffi.cast(uint64_ptr_t, bswap_buf)[0] = bswap_u64(ffi.cast(uint64_ptr_t, data[0])[0])
+    local num = ffi.cast(double_ptr_t, bswap_buf)[0]
     data[0] = data[0] + 8
     return tonumber(num)
 end

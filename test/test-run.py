@@ -32,11 +32,11 @@ import shutil
 import os.path
 import argparse
 
-from lib.colorer import Colorer
-from lib.test_suite import TestSuite
+from lib.colorer          import Colorer
+from lib.parallel         import Supervisor
+from lib.test_suite       import TestSuite
 from lib.tarantool_server import TarantoolServer
-from lib.unittest_server import UnittestServer
-
+from lib.unittest_server  import UnittestServer
 color_stdout = Colorer()
 #
 # Run a collection of tests.
@@ -112,6 +112,12 @@ class Options:
                 help = """Path to project build directory. Default: " + "../.""")
 
         parser.add_argument(
+                "--stress",
+                dest = "stress",
+                default = None,
+                help = """Name of streess TestSuite to run""")
+
+        parser.add_argument(
                 "--vardir",
                 dest = "vardir",
                 default = "var",
@@ -153,25 +159,27 @@ def main():
     failed_tests = []
 
     try:
+        TarantoolServer.find_exe(options.args.builddir)
+        UnittestServer.find_exe(options.args.builddir)
+
         color_stdout("Started {0}\n".format(" ".join(sys.argv)), schema='tr_text')
-        suite_names = []
-        if options.args.suites != []:
-            suite_names = options.args.suites
-        else:
+        suite_names = options.args.suites
+        if suite_names == []:
             for root, dirs, names in os.walk(os.getcwd()):
                 if "suite.ini" in names:
                     suite_names.append(os.path.basename(root))
 
-        suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
-
-        TarantoolServer.find_exe(options.args.builddir)
-        UnittestServer.find_exe(options.args.builddir)
-
-
-        for suite in suites:
-            failed_tests.extend(suite.run_all())
+        if options.args.stress is None:
+            suites = [TestSuite(suite_name, options.args) for suite_name in sorted(suite_names)]
+            for suite in suites:
+                failed_tests.extend(suite.run_all())
+        else:
+            suite_names = [suite_name for suite_name in suite_names if suite_name.find(options.args.stress) != -1]
+            suites = [Supervisor(suite_name, options.args) for suite_name in sorted(suite_names)]
+            for suite in suites:
+                suite.run_all()
     except RuntimeError as e:
-        color_stdout("\nFatal error: {0}. Execution aborted.\n".format(e), schema='error')
+        color_stdout("\nFatal error: %s. Execution aborted.\n" % e, schema='error')
         if options.args.gdb:
             time.sleep(100)
         return (-1)
@@ -179,9 +187,9 @@ def main():
         os.chdir(oldcwd)
 
     if failed_tests and options.args.is_force:
-        color_stdout("\n===== {0} tests failed:".format(len(failed_tests))+"\n", schema='error')
+        color_stdout("\n===== %d tests failed:\n" % len(failed_tests), schema='error')
         for test in failed_tests:
-             color_stdout("----- "+test+"\n", schema='info')
+             color_stdout("----- %s\n" % test, schema='info')
 
     return (-1 if failed_tests else 0)
 

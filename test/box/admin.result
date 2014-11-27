@@ -27,7 +27,7 @@ box.cfg
   sophia:
     node_page_size: 131072
     memory_limit: 0
-    node_merge_wm: 1
+    node_compact_wm: 1
     threads: 5
     node_size: 134217728
     node_branch_wm: 10485760

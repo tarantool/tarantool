@@ -42,7 +42,8 @@ fiob_readf(struct fiob *f, char *buf, size_t count)
 {
 	ssize_t to_read = (ssize_t) count;
 	while (to_read > 0) {
-		ssize_t nrd = read(f->fd, buf, to_read);
+		int unaligned = f->buf != NULL && (intptr_t) buf % 4096;
+		ssize_t nrd = read(f->fd, unaligned ? f->buf : buf, to_read);
 		if (nrd < 0) {
 			if (errno == EINTR) {
 				errno = 0;
@@ -56,8 +57,15 @@ fiob_readf(struct fiob *f, char *buf, size_t count)
 		if (nrd == 0)
 			break;
 
+		if (unaligned) {
+			memcpy(buf, f->buf, nrd);
+		}
 		buf += nrd;
 		to_read -= nrd;
+		if (f->buf && to_read > 0 && nrd % 4096 != 0) {
+			/* A workaround to detect EOF with O_DIRECT */
+			break;
+		}
 	}
 	return count - to_read;
 }

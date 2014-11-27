@@ -1,6 +1,3 @@
-sophia_rmdir()
----
-...
 -- snapshot
 space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
 ---
@@ -24,7 +21,4 @@ space:drop()
 box.snapshot()
 ---
 - ok
-...
-sophia_rmdir()
----
 ...

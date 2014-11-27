@@ -73,6 +73,9 @@ class TarantoolConnection(object):
             else:
                 self.reconnect()
 
+    def clone(self):
+        return type(self)(self.host, self.port)
+
     def execute(self, command, silent=True):
         self.opt_reconnect()
         return self.execute_no_reconnect(command, silent)

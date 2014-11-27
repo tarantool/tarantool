@@ -124,6 +124,16 @@ SophiaFactory::init()
 	env = sp_env();
 	if (env == NULL)
 		panic("failed to create sophia environment");
+	void *c = sp_ctl(env);
+	sp_set(c, "sophia.path", cfg_gets("sophia_dir"));
+	sp_set(c, "scheduler.threads", cfg_gets("sophia.threads"));
+	sp_set(c, "memory.limit", cfg_gets("sophia.memory_limit"));
+	sp_set(c, "compaction.node_size", cfg_gets("sophia.node_size"));
+	sp_set(c, "compaction.node_branch_wm", cfg_gets("sophia.node_branch_wm"));
+	sp_set(c, "compaction.node_compact_wm", cfg_gets("sophia.node_compact_wm"));
+	sp_set(c, "log.enable", "0");
+	sp_set(c, "log.two_phase_recover", "1");
+	sp_set(c, "log.commit_lsn", "1");
 	int rc = sp_open(env);
 	if (rc == -1)
 		sophia_raise(env);
