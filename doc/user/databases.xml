@@ -283,7 +283,7 @@ tarantool> <userinput>s = box.schema.space.create('space55', {if_not_exists = tr
                          <entry>NAME</entry><entry>EFFECT</entry><entry>TYPE</entry><entry>DEFAULT</entry>
                         </row>
                         <row>
-                         <entry>type</entry><entry>type of index</entry><entry>'HASH'|'TREE'|'BITSET'</entry><entry>'TREE'</entry>
+                         <entry>type</entry><entry>type of index</entry><entry>'HASH'|'TREE'|'BITSET'|'RTREE'</entry><entry>'TREE'</entry>
                         </row>
                         <row>
                          <entry>id</entry><entry>unique identifier</entry><entry>number</entry><entry>last index's id, +1</entry>
@@ -1296,7 +1296,7 @@ console.delimiter('')!
         </term>
         <listitem>
             <para>
-              (type = string) index type,  'TREE' or 'HASH' or 'BITSET'.
+              (type = string) index type,  'TREE' or 'HASH' or 'BITSET' or 'RTREE'.
             </para>
         </listitem>
     </varlistentry>
@@ -1490,6 +1490,17 @@ The result will be a table of tuples and will look like this:
             omitted, then the assumed index is the first (primary-key) index. Therefore, for
             the example above, <code>box.space.tester:select({1}, {iterator = 'GT'})</code>
             would have returned the same two rows, via the 'primary' index.
+            </para>
+            <para>
+             Note: <code>iterator = <replaceable>iterator type</replaceable></code> is optional.
+             If it is omitted, then <code>iterator = 'EQ'</code> is assumed.
+            </para>
+            <para>
+             Note: <code><replaceable>field-value [, field-value ...]</replaceable></code> is optional.
+             If it is omitted, then every key in the index is considered to be a match,
+             regardless of iterator type.
+             Therefore, for the example above, <code>box.space.tester:select{}</code>
+             will select every tuple in the tester space via the first (primary-key) index.
             </para>
             <para>
              Note: <code>box.space.<replaceable>space-name</replaceable>.index.<replaceable>index-name</replaceable>:select(...)[1]</code>.
@@ -1719,6 +1730,90 @@ console.delimiter('')!
 </programlisting>
 </para>
 
+</section>
+
+<section xml:id="RTREE">
+    <title>RTREE</title>
+    <para>
+        The <code>box.index</code> package may be used for spatial searches
+        if the index type is RTREE. There are operations for searching
+        <emphasis>rectangles</emphasis>. Rectangles are described according
+        to their X-axis (horizontal axis) and Y-axis (vertical axis)
+        coordinates in a grid of arbitrary size. Here is a picture of four
+        rectangles on a grid with 11 horizontal points and 11 vertical points:
+<programlisting>
+               X AXIS
+           1   2   3   4   5   6   7   8   9   10  11
+        1                     
+        2  *-------+                                           &lt;-Rectangle#1
+Y AXIS  3  |       |     
+        4  +-------* 
+        5          *-----------------------+                   &lt;-Rectangle#2
+        6          |                       |
+        7          |   *---+               |                   &lt;-Rectangle#3
+        8          |   |   |               |
+        9          |   +---*               |
+        10         +-----------------------*
+        11                                     *               &lt;-Rectangle#4
+</programlisting>
+        The rectangles are defined according to this scheme:
+        {X-axis coordinate of top left,
+          Y-axis coordinate of top left,
+          X-axis coordinate of bottom right,
+          Y-axis coordinate of bottom right} -- or more succinctly:
+        {x1,y1,x2,y2}. So in the picture ...
+        Rectangle#1 starts at position 1 on the X axis and position
+        2 on the Y axis, and ends at position 3 on the X axis and
+        position 4 on the Y axis, so its coordinates are
+        {1,2,3,4}. Rectangle#2's coordinates are {3,5,9,10}.
+        Rectangle#3's coordinates are {4,7,5,9}. And finally
+        Rectangle#4's coordinates are {10,11,10,11}.
+        Rectangle#4 is actually a "point" since it has zero
+        width and zero height, so it could have been described
+        with only two digits: {10,11}.
+        </para>
+        <para>
+        Some relationships between the rectangles are:
+        "Rectangle#1's nearest neighbor is Rectangle#2", and
+        "Rectangle#3 is entirely inside Rectangle#2".
+        </para>
+        <para>
+        Now let us create a space and add an RTREE index.
+<programlisting>
+<userinput>s = box.schema.create_space('rectangles')</userinput>
+<userinput>i = s:create_index('primary',{type='HASH',parts={1,'NUM'}})</userinput>
+<userinput>r = s:create_index('spatial',{type='RTREE',unique=false,parts={2,'ARRAY'}})</userinput>
+</programlisting>
+        Field#1 doesn't matter, we just make it because we need a primary-key index.
+        (RTREE indexes cannot be unique and therefore cannot be primary-key indexes.)
+        The second field must be an "array", which means its values must represent
+        {x,y} points or {x1,y1,x2,y2} rectangles.
+        Now let us populate the table by inserting two tuples,
+        containing the coordinates of Rectangle#2 and Rectangle#4.
+<programlisting>
+<userinput>s:insert{1, {3,5,9,10}}</userinput>
+<userinput>s:insert{2, {10,11}}</userinput>
+</programlisting>
+         and now, following the description of <link linkend="rtree-iterator">RTREE iterator types</link>,
+         we can search the rectangles with these requests:
+<programlisting>
+<userinput>r:select({10,11,10,11},{iterator='EQ'})       -- Request#1 (returns 1 tuple)</userinput>
+<userinput>r:select({4,7,5,9},{iterator='GT'})           -- Request#2 (returns 1 tuple)</userinput>
+<userinput>r:select({1,2,3,4},{iterator='NEIGHBOR'})     -- Request#3 (returns 2 tuples)</userinput>
+</programlisting>
+         Request#1 returns 1 tuple because the point {10,11} is the same as the
+         rectangle {10,11,10,11} ("Rectangle#4" in the picture).
+         Request#2 returns 1 tuple because the rectangle {4,7,5,9}, which was
+         "Rectangle#3" in the picture, is entirely within{3,5,9,10} which was Rectangle#2.
+         Request#3 returns 2 tuples, because the NEIGHBOR iterator always returns all
+         tuples, and the first returned tuple will be {3,5,9,10} ("Rectangle#2" in
+         the picture) because it is the closest neighbor of {1,2,3,4} ("Rectangle#1"
+         in the picture).
+    </para>
+    <para>
+         More examples of spatial searching are online in the file
+         <link xlink:href="https://github.com/tarantool/tarantool/wiki/R-tree-index-quick-start-and-usage">"R tree index quick start and usage"</link>.
+    </para>
 </section>
 
 <section xml:id="sp-error">
@@ -3252,6 +3347,7 @@ box.space.payroll:select{'Jones'}</programlisting>
     <term xml:id="limitations-index-field-count" xreflabel="limitations-index-field-count">Number of fields in an index</term>
     <listitem><para>For BITSET indexes, the maximum is 1.
     For TREE or HASH indexes, the maximum is 255 (box.schema.INDEX_PART_MAX).
+    For RTREE indexes, the number of fields must be either 2 or 4.
     </para></listitem>
   </varlistentry>
 

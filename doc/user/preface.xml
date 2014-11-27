@@ -115,7 +115,7 @@
     Unlike most NoSQL DBMSs, Tarantool supports <emphasis role="strong">
     secondary index keys and multi-part index keys</emphasis>
     as well as primary keys. The possible index types are
-    HASH, TREE, and BITSET.
+    HASH, TREE, BITSET, and RTREE.
   </para>
 
   <para>
