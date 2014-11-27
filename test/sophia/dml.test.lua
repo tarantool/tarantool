@@ -1,6 +1,4 @@
 
-sophia_rmdir()
-
 -- space create/drop
 
 space = box.schema.create_space('test', { id = 100, engine = 'sophia' })
@@ -67,5 +65,3 @@ space:insert({14})
 space:insert({15})
 primary:len()
 space:drop()
-
-sophia_rmdir()

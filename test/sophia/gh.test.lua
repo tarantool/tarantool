@@ -1,6 +1,4 @@
 
-sophia_rmdir()
-
 -- gh-283: Sophia: hang after three creates and drops
 
 s = box.schema.create_space('space0', {id = 33, engine='sophia'})
@@ -61,5 +59,3 @@ box.space['name_of_space']:select{'a'}
 box.space['name_of_space']:truncate()
 box.space['name_of_space']:select{'a'}
 s:drop()
-
-sophia_rmdir()
