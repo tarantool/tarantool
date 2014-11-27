@@ -103,11 +103,11 @@ An index may be <emphasis>multi-part</emphasis>, that is, the user can declare
 that an index key value is taken from two or more fields
 in the tuple, in any order. An index may be <emphasis>unique</emphasis>, that is, the user can declare
 that it would be illegal to have the same key value twice.
-An index may have <emphasis>one of three types</emphasis>:
+An index may have <emphasis>one of four types</emphasis>:
 HASH which is fastest and uses the least memory but must be unique,
 TREE which allows partial-key searching and ordered results,
-and BITSET which can be good for searches that contain '=' and 
-multiple  ANDed conditions.
+BITSET which can be good for searches that contain '=' and 
+multiple ANDed conditions, and RTREE for spatial coordinates.
 The first index is called the <emphasis><quote>primary key</quote> index</emphasis>
 and it must be unique; all other indexes are called
 <quote>secondary</quote> indexes.
@@ -115,7 +115,8 @@ and it must be unique; all other indexes are called
 
 <para>
 An index definition may include identifiers of tuple fields and their expected types.
-The allowed types are NUM (64-bit unsigned integer between 0 and 18,446,744,073,709,551,615), or STR (string, any sequence of octets)
+The allowed types are NUM (64-bit unsigned integer between 0 and 18,446,744,073,709,551,615), or STR (string, any sequence of octets),
+or ARRAY (a series of numbers for use with <link linkend="RTREE">RTREE indexes</link>).
 Take our example, which has the request:
 <programlisting>i = s:create_index('primary', {type = 'hash', parts = {1, 'NUM'}})</programlisting>
 The effect is that, for all tuples in tester, field number 1
