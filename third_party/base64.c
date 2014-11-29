@@ -190,10 +190,10 @@ struct base64_decodestate
 	char result;
 };
 
-static char
-base64_decode_value(char value)
+static int
+base64_decode_value(int value)
 {
-	static const char decoding[] = {
+	static const int decoding[] = {
 		62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58,
 		59, 60, 61, -1, -1, -1, -2, -1, -1, -1,  0,  1,
 		2,   3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13,
@@ -202,8 +202,8 @@ base64_decode_value(char value)
 		32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
 		44, 45, 46, 47, 48, 49, 50, 51
 	};
-	static const char decoding_size = sizeof(decoding);
-	int codepos = (signed char) value;
+	static const int decoding_size = sizeof(decoding);
+	int codepos = value;
 	codepos -= 43;
 	if (codepos < 0 || codepos > decoding_size)
 		return -1;
@@ -226,7 +226,7 @@ base64_decode_block(const char *in_base64, int in_len,
 	const char *in_end = in_base64 + in_len;
 	char *out_pos = out_bin;
 	char *out_end = out_bin + out_len;
-	char fragment;
+	int fragment;
 
 	*out_pos = state->result;
 
