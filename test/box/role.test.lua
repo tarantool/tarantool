@@ -42,3 +42,11 @@ box.schema.role.drop('d')
 box.schema.role.drop('b')
 box.schema.role.drop('c')
 box.schema.role.drop('a')
+-- check that when dropping a role, it's first revoked
+-- from whoever it is granted
+box.schema.role.create('a')
+box.schema.role.create('b')
+box.schema.user.grant('b', 'a')
+box.schema.role.drop('a')
+box.schema.user.info('b')
+box.schema.role.drop('b')

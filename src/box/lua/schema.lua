@@ -1016,6 +1016,11 @@ box.schema.user.drop = function(name)
     for k, tuple in pairs(funcs) do
         box.schema.func.drop(tuple[1])
     end
+    -- if this is a role, revoke grants of this role
+    grants = _priv.index.object:select{'role', uid}
+    for k, tuple in pairs(grants) do
+        box.schema.user.revoke(tuple[2], uid)
+    end
     box.space[box.schema.USER_ID]:delete{uid}
 end
 
