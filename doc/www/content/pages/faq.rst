@@ -25,9 +25,9 @@
 **What's the key advantage of Tarantool?**
 ::
 
-    Tarantool provides a rich database feature set (HASH, TREE BITSET indexes,
-    secondary indexes, composite indexes, asynchronous replication, hot standby,
-    data durability) in a flexible environment of a Lua interpreter.
+    Tarantool provides a rich database feature set (HASH, TREE, RTREE, BITSET indexes,
+    secondary indexes, composite indexes, transactions, triggres, asynchronous replication) 
+    in a flexible environment of a Lua interpreter.
     
     These two properties make it possible to code fast, atomic and reliable in-memory
     data servers which handle non-trivial application-specific logic. The win over
@@ -40,7 +40,7 @@
 ::
 
     We continuously improve server performance. On the feature front, automatic
-    sharding and online upgrade are the two major goals of 2014.
+    sharding and online upgrade are the two major goals of 2015.
 
 **Who is developing Tarantool?**
 ::
