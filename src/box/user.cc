@@ -83,6 +83,15 @@ user_map_is_set(struct user_map *map, uint8_t auth_token)
 	return map->m[idx] & (((umap_int_t) 1) << bit_no);
 }
 
+static inline bool
+user_map_is_empty(struct user_map *map)
+{
+	for (int i = 0; i < USER_MAP_SIZE; i++)
+		if (map->m[i])
+			return false;
+	return true;
+}
+
 /**
  * Merge two sets of users: add all users from right argument
  * to the left one.
@@ -291,7 +300,7 @@ user_cache_free()
 /** {{{ roles */
 
 void
-role_check(struct user *role, struct user *grantee)
+role_check(struct user *grantee, struct user *role)
 {
 	/*
 	 * Check that there is no loop from grantee to role:
@@ -303,7 +312,7 @@ role_check(struct user *role, struct user *grantee)
 	user_map_init(&transitive_closure);
 	user_map_set(&transitive_closure, grantee->auth_token);
 	struct user_map current_layer = transitive_closure;
-	while (true) {
+	while (! user_map_is_empty(&current_layer)) {
 		/*
 		 * As long as we're traversing a directed
 		 * acyclic graph, we're bound to end at some
@@ -311,17 +320,12 @@ role_check(struct user *role, struct user *grantee)
 		 */
 		struct user_map next_layer;
 		user_map_init(&next_layer);
-		bool found = false;
 		struct user_map_iterator it;
 		user_map_iterator_init(&it, &current_layer);
 		struct user *user;
-		while ((user = user_map_iterator_next(&it))) {
+		while ((user = user_map_iterator_next(&it)))
 			user_map_union(&next_layer, &user->users);
-			found = true;
-		}
 		user_map_union(&transitive_closure, &next_layer);
-		if (! found)
-			break;
 		current_layer = next_layer;
 	}
 
@@ -336,18 +340,59 @@ void
 role_grant(struct user *grantee, struct user *role)
 {
 	user_map_set(&role->users, grantee->auth_token);
+	/**
+	 * Todo: grant all effective privileges of
+	 * the role to whoever this role was granted
+	 * to.
+	 */
 }
 
 void
 role_revoke(struct user *grantee, struct user *role)
 {
 	user_map_clear(&role->users, grantee->auth_token);
+	/**
+	 * Todo: rebuild effective privileges of grantee,
+	 * for all effective privileges which he/she
+	 * might have inherited through the revoked role.
+	 */
 }
 
 void
-user_set_effective_access(struct user * /* grantee */,
-			  struct user * /* role */)
+privilege_grant(struct user *user,
+		struct access *object, uint8_t access)
 {
+	bool grant = access > object[user->auth_token].granted;
+	object[user->auth_token].granted = access;
+	if (grant) {
+		/*
+		 * Grant the privilege to this user or
+		 * role and all users to which this
+		 * role has been granted, if this is
+		 * a role.
+		 */
+		struct user_map current_layer;
+		user_map_init(&current_layer);
+		user_map_set(&current_layer, user->auth_token);
+		while (!user_map_is_empty(&current_layer)) {
+			struct user_map next_layer;
+			user_map_init(&next_layer);
+			struct user_map_iterator it;
+			user_map_iterator_init(&it, &current_layer);
+			while ((user = user_map_iterator_next(&it))) {
+				object[user->auth_token].effective |= access;
+				user_map_union(&next_layer, &user->users);
+			}
+			current_layer = next_layer;
+		}
+	} else {
+		/**
+		 * @fixme: this only works for users and
+		 * non-recursive roles
+		 */
+		object[user->auth_token].effective =
+			object[user->auth_token].granted;
+	}
 }
 
 /** }}} */

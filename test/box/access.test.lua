@@ -56,6 +56,7 @@ box.space['_user']:delete{uid}
 box.schema.func.drop('dummy')
 box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
+box.schema.user.revoke('rich', 'public')
 box.space['_user']:delete{uid}
 box.schema.user.drop('test')
 

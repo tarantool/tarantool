@@ -50,3 +50,26 @@ box.schema.user.grant('b', 'a')
 box.schema.role.drop('a')
 box.schema.user.info('b')
 box.schema.role.drop('b')
+-- check a grant received via a role
+box.schema.user.create('test')
+box.schema.user.create('grantee')
+box.schema.role.create('liaison')
+box.schema.user.grant('grantee', 'liaison')
+box.schema.user.grant('test', 'read,write', 'universe')
+box.session.su('test')
+s = box.schema.space.create('test')
+s:create_index('i1')
+box.schema.role.grant('liaison', 'read,write', 'space', 'test')
+box.session.su('grantee')
+box.space.test:insert{1}
+box.space.test:select{1}
+box.session.su('test')
+box.schema.user.revoke('liaison', 'read,write', 'space', 'test')
+box.session.su('grantee')
+box.space.test:insert{1}
+box.space.test:select{1}
+box.session.su('admin')
+box.schema.user.drop('test')
+box.schema.user.drop('grantee')
+box.schema.user.drop('liaison')
+
