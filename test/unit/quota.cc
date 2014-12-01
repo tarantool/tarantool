@@ -1,6 +1,7 @@
 #include "small/quota.h"
 
 #include <pthread.h>
+#include <sched.h>
 
 #include "test.h"
 
@@ -19,15 +20,6 @@ struct thread_data {
 pthread_t threads[THREAD_CNT];
 thread_data datum[THREAD_CNT];
 
-static inline void do_yield()
-{
-#ifdef HAVE_PTHREAD_YIELD
-  pthread_yield();
-#elif HAVE_SCHED_YIELD
-  sched_yield()
-#endif
-}
-
 void *thread_routine(void *vparam)
 {
 	struct thread_data *data = (struct thread_data *)vparam;
@@ -42,7 +34,7 @@ void *thread_routine(void *vparam)
 		}
 		ssize_t max = rand() % QUOTA_MAX;
 		max = quota_set(&quota, max);
-    do_yield();
+		sched_yield();
 		if (max > 0) {
 			data->last_lim_set = max;
 			data->lim_change_success++;
@@ -52,7 +44,7 @@ void *thread_routine(void *vparam)
 			allocated_size = -1;
 			data->use_change = 0;
 			data->use_change_success++;
-      do_yield();
+			sched_yield();
 		} else {
 			allocated_size = rand() % max + 1;
 			allocated_size = quota_use(&quota, allocated_size);
@@ -60,7 +52,7 @@ void *thread_routine(void *vparam)
 				data->use_change = allocated_size;
 				data->use_change_success++;
 			}
-      do_yield();
+			sched_yield();
 		}
 	}
 	return (void *)check_fail_count;
