@@ -69,6 +69,9 @@ check_include_file(sys/prctl.h HAVE_PRCTL_H)
 
 check_symbol_exists(O_DSYNC fcntl.h HAVE_O_DSYNC)
 check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
+check_symbol_exists(pthread_yield pthread.h HAVE_PTHREAD_YIELD)
+check_symbol_exists(sched_yield sched.h HAVE_SCHED_YIELD)
+
 check_function_exists(memmem HAVE_MEMMEM)
 check_function_exists(memrchr HAVE_MEMRCHR)
 check_function_exists(sendfile HAVE_SENDFILE)

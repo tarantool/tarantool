@@ -543,10 +543,11 @@ main(int argc, char **argv)
 	__libc_stack_end = (void*) &argv;
 #endif
 	start_time = ev_time();
+#ifndef __APPLE__
 	/* set locale to make iswXXXX function work */
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		fprintf(stderr, "Failed to set locale to C.UTF-8\n");
-
+#endif
 	if (argc > 1 && access(argv[1], R_OK) != 0) {
 		if (argc == 2 && argv[1][0] != '-') {
 			/*
