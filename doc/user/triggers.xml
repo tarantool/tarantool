@@ -58,7 +58,7 @@
         the trigger raises an error, the error is logged but otherwise
         is ignored. The trigger is invoked while the session associated
         with the client still exists and can access session properties,
-        such as id.
+        such as id. Typically the argument to <code>box.session.on_disconnect</code> is a function name.
         </simpara></listitem>
     </varlistentry>
 </variablelist>

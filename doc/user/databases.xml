@@ -678,7 +678,7 @@ tarantool> <userinput>box.space.space55.index.primary:rename('secondary')</useri
                 for bitwise exclusive OR (XOR), <quote>:</quote>
                 for string splice, <quote>!</quote> for insert,
                 <quote>#</quote> for delete.
-                Thus in the instruction <code>s:update{44,, {{'+,1,55},{=',3,'x'}})</code>
+                Thus in the instruction <code>s:update(44, {{'+',1,55},{'=',3,'x'}})</code>
                 the primary-key value is 44,
                 the operators are '+' and '='
                 meaning "add a value to a field
@@ -1734,7 +1734,7 @@ console.delimiter('')!
 </section>
 
 <section xml:id="RTREE">
-    <title>RTREE</title>
+    <title>Package <code >box.index</code> with index type = RTREE for spatial searches</title>
     <para>
         The <code>box.index</code> package may be used for spatial searches
         if the index type is RTREE. There are operations for searching
@@ -3241,8 +3241,9 @@ or
 
 <para>
 The function for revoking a privilege is:
-<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>.
-</para>
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, <replaceable>object-type</replaceable>, <replaceable>object-name</replaceable>)</code>
+or
+<code>box.schema.user.revoke(<replaceable>user-name-of-grantee</replaceable>, <replaceable>operation-type</replaceable>, 'universe')</code>.</para>
 
 <para>
 For example, here is a session where the admin user gave
