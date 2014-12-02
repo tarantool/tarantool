@@ -33,7 +33,7 @@ func_limit();
 ...
 drop_limit_func();
 ---
-- error: Function 'func32001' does not exist
+- error: Function 'func32000' does not exist
 ...
 box.schema.user.create('testuser');
 ---
@@ -50,7 +50,7 @@ func_limit();
 ...
 drop_limit_func();
 ---
-- error: Function 'func32001' does not exist
+- error: Function 'func32000' does not exist
 ...
 session.su('admin')
 box.schema.user.drop('testuser');

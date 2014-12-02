@@ -124,7 +124,7 @@ user_cache_free();
  * a given role.
  */
 void
-role_check(struct user *role, struct user *grantee);
+role_check(struct user *grantee, struct user *role);
 
 /**
  * Grant a role to a user or another role.
@@ -139,12 +139,13 @@ void
 role_revoke(struct user *grantee, struct user *role);
 
 /**
- * Re-evaluate effective access of a user based on this role
- * that is granted to him/her.
- * The role has its effective access already re-evaluated.
+ * Grant or revoke a single privilege to a user or role
+ * and re-evaluate effective access of all users of this
+ * role if this role.
  */
 void
-user_set_effective_access(struct user *grantee, struct user *role);
+privilege_grant(struct user *grantee, struct access *object,
+		uint8_t access);
 
 /* }}} */
 

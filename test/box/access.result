@@ -117,6 +117,9 @@ box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 ---
 ...
+box.schema.user.revoke('rich', 'public')
+---
+...
 box.space['_user']:delete{uid}
 ---
 - [4, 1, 'rich', 'user', []]
@@ -352,42 +355,47 @@ box.schema.user.grant('user', 'read,write', 'universe')
 ...
 box.space._priv:select{id}
 ---
-- - [1, 3, 'universe', 0, 3]
+- - [1, 3, 'role', 2, 4]
+  - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 3, 'universe', 0, 3]
+- - [1, 3, 'role', 2, 4]
+  - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 3, 'universe', 0, 1]
+- - [1, 3, 'role', 2, 4]
+  - [1, 3, 'universe', 0, 1]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- []
+- - [1, 3, 'role', 2, 4]
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 3, 'universe', 0, 2]
+- - [1, 3, 'role', 2, 4]
+  - [1, 3, 'universe', 0, 2]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
 ...
 box.space._priv:select{id}
 ---
-- - [1, 3, 'universe', 0, 3]
+- - [1, 3, 'role', 2, 4]
+  - [1, 3, 'universe', 0, 3]
 ...
 box.schema.user.drop('user')
 ---

@@ -41,6 +41,16 @@ of "Command Line Tools for Xcode". This package contains /usr/bin/clang and
 
 3. Install necessary python modules: pyYAML, python-daemon
 -------------
+If you use latest Mac OS X version it is recommended using easy_install or pip.
+For instance to install these packages via easy_install just type following commands
+into terminal:
+
+sudo easy_install pyyaml
+sudo easy_install pydaemon
+sudo easy_install daemon
+
+Otherwise see following instruction
+
 NB: it is recommended to install python modules through setup.py,
 using the default python (which should be >= 2.6.x and < 3.x);
 
@@ -60,7 +70,7 @@ NOTE: If you want to get DMG package go to section 6.
 
     cd tarantool
     mkdir build && cd build
-    CC=clang CXX=clang++ cmake .. \
+    cmake .. \
         -DCMAKE_BUILD_TYPE=RelWithDebugInfo \
         -DENABLE_CLIENT=true \
         -DDARWIN_BUILD_TYPE=Ports

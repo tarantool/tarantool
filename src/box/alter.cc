@@ -1494,12 +1494,16 @@ priv_def_check(struct priv_def *priv)
 				  role ? role->name :
 				  int2str(priv->object_id));
 		}
-		/* Only the creator of the role can grant it. */
-		if (role->owner != grantor->uid && grantor->uid != ADMIN) {
+		/* Only the creator of the role can grant or revoke it.
+		 * Everyone can grant 'PUBLIC' role.
+		 */
+		if (role->owner != grantor->uid && grantor->uid != ADMIN &&
+		    (role->uid != PUBLIC || priv->access < PRIV_X)) {
 			tnt_raise(ClientError, ER_ACCESS_DENIED,
 				  role->name, grantor->name);
 		}
-		role_check(role, grantee);
+		/* Not necessary to do during revoke, but who cares. */
+		role_check(grantee, role);
 	}
 	default:
 		break;
@@ -1555,10 +1559,8 @@ grant_or_revoke(struct priv_def *priv)
 	default:
 		break;
 	}
-	if (access) {
-		access[grantee->auth_token].granted = priv->access;
-		access[grantee->auth_token].effective = priv->access;
-	}
+	if (access)
+		privilege_grant(grantee, access, priv->access);
 }
 
 /** A trigger called on rollback of grant, or on commit of revoke. */

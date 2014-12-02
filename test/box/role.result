@@ -23,15 +23,15 @@ box.session.su('iddqd')
 -- test granting privilege to a role
 box.schema.role.grant('iddqd', 'execute', 'universe')
 ---
-- error: Role 'execute' is not found
 ...
 box.schema.role.info('iddqd')
 ---
-- []
+- - - execute
+    - universe
+    - 
 ...
 box.schema.role.revoke('iddqd', 'execute', 'universe')
 ---
-- error: Role 'execute' is not found
 ...
 box.schema.role.info('iddqd')
 ---
@@ -43,7 +43,9 @@ box.schema.user.create('tester')
 ...
 box.schema.user.info('tester')
 ---
-- []
+- - - execute
+    - role
+    - public
 ...
 box.schema.user.grant('tester', 'execute', 'role', 'iddqd')
 ---
@@ -51,6 +53,9 @@ box.schema.user.grant('tester', 'execute', 'role', 'iddqd')
 box.schema.user.info('tester')
 ---
 - - - execute
+    - role
+    - public
+  - - execute
     - role
     - iddqd
 ...
@@ -131,5 +136,102 @@ box.schema.role.drop('c')
 ---
 ...
 box.schema.role.drop('a')
+---
+...
+-- check that when dropping a role, it's first revoked
+-- from whoever it is granted
+box.schema.role.create('a')
+---
+...
+box.schema.role.create('b')
+---
+...
+box.schema.user.grant('b', 'a')
+---
+...
+box.schema.role.drop('a')
+---
+...
+box.schema.user.info('b')
+---
+- []
+...
+box.schema.role.drop('b')
+---
+...
+-- check a grant received via a role
+box.schema.user.create('test')
+---
+...
+box.schema.user.create('grantee')
+---
+...
+box.schema.role.create('liaison')
+---
+...
+box.schema.user.grant('grantee', 'liaison')
+---
+...
+box.schema.user.grant('test', 'read,write', 'universe')
+---
+...
+box.session.su('test')
+---
+...
+s = box.schema.space.create('test')
+---
+...
+s:create_index('i1')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 512
+  name: i1
+  type: TREE
+...
+box.schema.role.grant('liaison', 'read,write', 'space', 'test')
+---
+...
+box.session.su('grantee')
+---
+...
+box.space.test:insert{1}
+---
+- [1]
+...
+box.space.test:select{1}
+---
+- - [1]
+...
+box.session.su('test')
+---
+...
+box.schema.user.revoke('liaison', 'read,write', 'space', 'test')
+---
+...
+box.session.su('grantee')
+---
+...
+box.space.test:insert{1}
+---
+- error: Duplicate key exists in unique index 0
+...
+box.space.test:select{1}
+---
+- - [1]
+...
+box.session.su('admin')
+---
+...
+box.schema.user.drop('test')
+---
+...
+box.schema.user.drop('grantee')
+---
+...
+box.schema.user.drop('liaison')
 ---
 ...

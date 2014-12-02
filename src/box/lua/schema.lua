@@ -986,7 +986,9 @@ box.schema.user.create = function(name, opts)
         auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.uid(), name, 'user', auth_mech_list}
+    uid = _user:auto_increment{session.uid(), name, 'user', auth_mech_list}[1]
+    -- grant role 'public' to the user
+    box.schema.user.grant(uid, 'public')
 end
 
 box.schema.user.exists = function(name)
@@ -1015,6 +1017,11 @@ box.schema.user.drop = function(name)
     local funcs = box.space[box.schema.FUNC_ID].index.owner:select{uid}
     for k, tuple in pairs(funcs) do
         box.schema.func.drop(tuple[1])
+    end
+    -- if this is a role, revoke grants of this role
+    grants = _priv.index.object:select{'role', uid}
+    for k, tuple in pairs(grants) do
+        box.schema.user.revoke(tuple[2], uid)
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
@@ -1127,10 +1134,22 @@ box.schema.role.drop = function(name)
     end
     return box.schema.user.drop(name)
 end
-box.schema.role.grant = function(user_name, role_name, grantor)
-    return box.schema.user.grant(user_name, 'execute', 'role', role_name, grantor)
+box.schema.role.grant = function(user_name, privilege, object_type,
+                                 object_name, grantor)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.error(box.error.NO_SUCH_ROLE, user_name)
+    end
+    return box.schema.user.grant(user_name, privilege, object_type,
+                                 object_name, grantor)
 end
-box.schema.role.revoke = function(user_name, role_name)
-    return box.schema.user.revoke(user_name, 'execute', 'role', role_name)
+box.schema.role.revoke = function(user_name, privilege, object_type,
+                                  object_name)
+    local uid = user_resolve(user_name)
+    if uid == nil then
+        box.error(box.error.NO_SUCH_ROLE, user_name)
+    end
+    return box.schema.user.revoke(user_name, privilege, object_type,
+                                  object_name)
 end
 box.schema.role.info = box.schema.user.info
