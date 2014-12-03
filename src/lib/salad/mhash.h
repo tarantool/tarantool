@@ -368,7 +368,7 @@ _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 		mh_arg_t arg)
 {
 	struct _mh(t) *s = h->shadow;
-	uint32_t y = _mh(get)(s, (const mh_node_t *) &(h->p[x]),
+	mh_int_t y = _mh(get)(s, (const mh_node_t *) &(h->p[x]),
 			      arg);
 	_mh(del)(s, y, arg);
 	_mh(resize)(h, arg);
@@ -390,10 +390,19 @@ _mh(new)()
 void
 _mh(clear)(struct _mh(t) *h)
 {
+	if (h->shadow->p) {
+		free(h->shadow->p);
+		free(h->shadow->b);
+		memset(h->shadow, 0, sizeof(*h->shadow));
+	}
 	free(h->p);
+	free(h->b);
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+	h->upper_bound = h->n_buckets * MH_DENSITY;
+	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 }
 
@@ -449,6 +458,7 @@ _mh(resize)(struct _mh(t) *h,
 	s->size = h->size;
 	memcpy(h, s, sizeof(*h));
 	h->resize_cnt++;
+	memset(s, 0, sizeof(*s));
 }
 
 int
