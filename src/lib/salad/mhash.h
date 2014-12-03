@@ -92,9 +92,17 @@ static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
 #ifndef MH_HEADER
 #define MH_HEADER
 
+#ifndef mh_bytemap
+#define mh_bytemap 0
+#endif
+
 struct _mh(t) {
 	mh_node_t *p;
-	mh_int_t *b;
+#if !mh_bytemap
+	uint32_t *b;
+#else
+	uint8_t *b;
+#endif
 	mh_int_t n_buckets;
 	mh_int_t n_dirty;
 	mh_int_t size;
@@ -107,12 +115,25 @@ struct _mh(t) {
 	struct _mh(t) *shadow;
 };
 
+#if !mh_bytemap
 #define mh_exist(h, i)		({ h->b[i >> 4] & (1 << (i % 16)); })
 #define mh_dirty(h, i)		({ h->b[i >> 4] & (1 << (i % 16 + 16)); })
+#define mh_gethk(hash)		(1)
+#define mh_mayeq(h, i, hk)	mh_exist(h, i)
 
 #define mh_setfree(h, i)	({ h->b[i >> 4] &= ~(1 << (i % 16)); })
-#define mh_setexist(h, i)	({ h->b[i >> 4] |= (1 << (i % 16)); })
+#define mh_setexist(h, i, hk)	({ h->b[i >> 4] |= (1 << (i % 16)); })
 #define mh_setdirty(h, i)	({ h->b[i >> 4] |= (1 << (i % 16 + 16)); })
+#else
+#define mh_exist(h, i)		({ h->b[i] & 0x7f; })
+#define mh_dirty(h, i)		({ h->b[i] & 0x80; })
+#define mh_gethk(hash)		({ (hash) % 127 + 1; })
+#define mh_mayeq(h, i, hk)	({ mh_exist(h, i) == hk; })
+
+#define mh_setfree(h, i)	({ h->b[i] &= 0x80; })
+#define mh_setexist(h, i, hk)	({ h->b[i] |= hk; })
+#define mh_setdirty(h, i)	({ h->b[i] |= 0x80; })
+#endif
 
 #define mh_node(h, i)		((const mh_node_t *) &((h)->p[(i)]))
 #define mh_size(h)		({ (h)->size;		})
@@ -158,8 +179,8 @@ void __attribute__((noinline)) _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 size_t _mh(memsize)(struct _mh(t) *h);
 void _mh(dump)(struct _mh(t) *h);
 
-#define put_slot(h, node, arg) \
-	_mh(put_slot)(h, node, arg)
+#define put_slot(h, node, exist, arg) \
+	_mh(put_slot)(h, node, exist, arg)
 
 static inline mh_node_t *
 _mh(node)(struct _mh(t) *h, mh_int_t x)
@@ -187,10 +208,11 @@ _mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
 	(void) arg;
 
 	mh_int_t k = mh_hash_key(key, arg);
+	uint8_t hk = mh_gethk(k); (void)hk;
 	mh_int_t i = k % h->n_buckets;
 	mh_int_t inc = 1 + k % (h->n_buckets - 1);
 	for (;;) {
-		if ((mh_exist(h, i) && mh_eq_key(key, mh_node(h, i), arg)))
+		if ((mh_mayeq(h, i, hk) && mh_eq_key(key, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
@@ -208,10 +230,11 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 	(void) arg;
 
 	mh_int_t k = mh_hash(node, arg);
+	uint8_t hk = mh_gethk(k); (void)hk;
 	mh_int_t i = k % h->n_buckets;
 	mh_int_t inc = 1 + k % (h->n_buckets - 1);
 	for (;;) {
-		if ((mh_exist(h, i) && mh_eq(node, mh_node(h, i), arg)))
+		if ((mh_mayeq(h, i, hk) && mh_eq(node, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
@@ -234,18 +257,20 @@ _mh(random)(struct _mh(t) *h, mh_int_t rnd)
 }
 
 static inline mh_int_t
-_mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
+_mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 	      mh_arg_t arg)
 {
 	(void) arg;
 
 	mh_int_t k = mh_hash(node, arg); /* hash key */
+	uint8_t hk = mh_gethk(k); (void)hk;
 	mh_int_t i = k % h->n_buckets; /* offset in the hash table. */
 	mh_int_t inc = 1 + k % (h->n_buckets - 1); /* overflow chain increment. */
 
+	*exist = 1;
 	/* Skip through all collisions. */
 	while (mh_exist(h, i)) {
-		if (mh_eq(node, mh_node(h, i), arg))
+		if (mh_mayeq(h, i, hk) && mh_eq(node, mh_node(h, i), arg))
 			return i;               /* Found a duplicate. */
 		/*
 		 * Mark this link as part of a collision chain. The
@@ -268,10 +293,15 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node,
 	while (mh_dirty(h, i)) {
 		i = _mh(next_slot)(i, inc, h->n_buckets);
 
-		if (mh_exist(h, i) && mh_eq(mh_node(h, i), node, arg))
+		if (mh_mayeq(h, i, hk) && mh_eq(mh_node(h, i), node, arg))
 			return i;               /* Found a duplicate. */
 	}
 	/* Reached the end of the collision chain: no duplicates. */
+	*exist = 0;
+	h->size++;
+	if (!mh_dirty(h, save_i))
+		h->n_dirty++;
+	mh_setexist(h, save_i, hk);
 	return save_i;
 }
 
@@ -311,25 +341,15 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 	}
 #endif
 
-	x = put_slot(h, node, arg);
-	exist = mh_exist(h, x);
+	x = put_slot(h, node, &exist, arg);
 
-	if (!exist) {
-		/* add new */
-		mh_setexist(h, x);
-		h->size++;
-		if (!mh_dirty(h, x))
-			h->n_dirty++;
-
-		memcpy(&(h->p[x]), node, sizeof(mh_node_t));
-		if (ret)
-			*ret = NULL;
-	} else {
-		if (ret)
+	if (ret) {
+		if (exist)
 			memcpy(*ret, &(h->p[x]), sizeof(mh_node_t));
-		/* replace old */
-		memcpy(&(h->p[x]), node, sizeof(mh_node_t));
+		else
+			*ret = NULL;
 	}
+	memcpy(&(h->p[x]), node, sizeof(mh_node_t));
 
 put_done:
 	return x;
@@ -382,7 +402,11 @@ _mh(new)()
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
-	h->b = (mh_int_t *) calloc(h->n_buckets / 16 + 1, sizeof(mh_int_t));
+#if !mh_bytemap
+	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+#else
+	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
+#endif
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
 }
@@ -400,7 +424,11 @@ _mh(clear)(struct _mh(t) *h)
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
 	h->p = (mh_node_t *) calloc(h->n_buckets, sizeof(mh_node_t));
+#if !mh_bytemap
 	h->b = (uint32_t *) calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+#else
+	h->b = (uint8_t *) calloc(h->n_buckets, sizeof(uint8_t));
+#endif
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
@@ -422,11 +450,19 @@ _mh(memsize)(struct _mh(t) *h)
     size_t sz = 2 * sizeof(struct _mh(t));
 
     sz += h->n_buckets * sizeof(mh_node_t);
-    sz += (h->n_buckets / 16 + 1) * sizeof(mh_int_t);
+#if !mh_bytemap
+    sz += (h->n_buckets / 16 + 1) * sizeof(uint32_t);
+#else
+    sz += h->n_buckets;
+#endif
     if (h->resize_position) {
 	    h = h->shadow;
 	    sz += h->n_buckets * sizeof(mh_node_t);
-	    sz += (h->n_buckets / 16 + 1) * sizeof(mh_int_t);
+#if !mh_bytemap
+	    sz += (h->n_buckets / 16 + 1) * sizeof(uint32_t);
+#else
+	    sz += h->n_buckets;
+#endif
     }
     return sz;
 }
@@ -436,6 +472,7 @@ _mh(resize)(struct _mh(t) *h,
 	    mh_arg_t arg)
 {
 	struct _mh(t) *s = h->shadow;
+	int exist;
 #if MH_INCREMENTAL_RESIZE
 	mh_int_t  batch = h->batch;
 #endif
@@ -448,14 +485,13 @@ _mh(resize)(struct _mh(t) *h,
 #endif
 		if (!mh_exist(h, i))
 			continue;
-		mh_int_t n = put_slot(s, mh_node(h, i), arg);
+		mh_int_t n = put_slot(s, mh_node(h, i), &exist, arg);
 		s->p[n] = h->p[i];
-		mh_setexist(s, n);
-		s->n_dirty++;
 	}
 	free(h->p);
 	free(h->b);
-	s->size = h->size;
+	if (s->size != h->size)
+		abort();
 	memcpy(h, s, sizeof(*h));
 	h->resize_cnt++;
 	memset(s, 0, sizeof(*s));
@@ -495,10 +531,15 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	s->n_buckets = __ac_prime_list[h->prime];
 	s->upper_bound = s->n_buckets * MH_DENSITY;
 	s->n_dirty = 0;
+	s->size = 0;
 	s->p = (mh_node_t *) malloc(s->n_buckets * sizeof(mh_node_t));
 	if (s->p == NULL)
 		return -1;
-	s->b = (mh_int_t *) calloc(s->n_buckets / 16 + 1, sizeof(mh_int_t));
+#if !mh_bytemap
+	s->b = (uint32_t *) calloc(s->n_buckets / 16 + 1, sizeof(uint32_t));
+#else
+	s->b = (uint8_t *) calloc(s->n_buckets, sizeof(uint8_t));
+#endif
 	if (s->b == NULL) {
 		free(s->p);
 		s->p = NULL;
@@ -577,6 +618,7 @@ _mh(dump)(struct _mh(t) *h)
 #undef slot
 #undef slot_and_dirty
 #undef MH_DENSITY
+#undef mh_bytemap
 #endif
 
 #undef mh_cat
