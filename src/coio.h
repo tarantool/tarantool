@@ -132,7 +132,14 @@ coio_write(struct ev_io *coio, const void *buf, size_t sz)
 }
 
 ssize_t
-coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size);
+coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
+		    size_t size, ev_tstamp timeout);
+
+static inline ssize_t
+coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size)
+{
+	return coio_writev_timeout(coio, iov, iovcnt, size, TIMEOUT_INFINITY);
+}
 
 ssize_t
 coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,

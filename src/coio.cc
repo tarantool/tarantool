@@ -442,13 +442,14 @@ coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
 }
 
 ssize_t
-coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
-	    size_t size_hint)
+coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
+		    size_t size_hint, ev_tstamp timeout)
 {
 	ssize_t total = 0;
 	size_t iov_len = 0;
 	struct iovec *end = iov + iovcnt;
-
+	ev_tstamp start, delay;
+	coio_timeout_init(&start, &delay, timeout);
 	CoioGuard coio_guard(coio);
 
 	/* Avoid a syscall in case of 0 iovcnt. */
@@ -476,8 +477,20 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt,
 			ev_io_start(loop(), coio);
 		}
 		/* Yield control to other fibers. */
-		coio_fiber_yield(coio);
 		fiber_testcancel();
+		/*
+		 * Yield control to other fibers until the
+		 * timeout is reached or the socket is
+		 * ready.
+		 */
+		bool is_timedout = coio_fiber_yield_timeout(coio, delay);
+		fiber_testcancel();
+
+		if (is_timedout) {
+			errno = ETIMEDOUT;
+			return total;
+		}
+		coio_timeout_update(start, &delay);
 	}
 	return total;
 }
