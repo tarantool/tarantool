@@ -358,7 +358,7 @@ local remote_methods = {
             end
 
             if port == nil then
-                
+
                 local address = urilib.parse(tostring(host))
                 if address == nil or address.service == nil then
                     box.error(box.error.PROC_LUA,
@@ -391,7 +391,7 @@ local remote_methods = {
             box.error(box.error.PROC_LUA,
                 "net.box: user is not defined")
         end
-            
+
 
         if self.host == nil then
             self.host = 'localhost'
@@ -451,7 +451,7 @@ local remote_methods = {
             local res = self:_request('call', true, proc_name, {...})
             return res.body[DATA]
         end
-        
+
         local eval_str = proc_name .. '('
         for i = 1, select('#', ...) do
             if i > 1 then
@@ -582,7 +582,7 @@ local remote_methods = {
             if result ~= nil then
                 result = result[1]
             end
-            
+
             local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
             local body = {}
 
@@ -611,7 +611,7 @@ local remote_methods = {
         if self.console then
             return self:_check_console_response(self)
         end
-    
+
         while true do
             if #self.rbuf < 5 then
                 break
@@ -762,12 +762,12 @@ local remote_methods = {
                         if not s then
                             self:_fatal(e)
                         end
-                            
+
                         xpcall(function() self:_load_schema() end,
                             function(e)
                                 log.info("Can't load schema: %s", tostring(e))
                             end)
-                       
+
                         if self.state ~= 'error' and self.state ~= 'closed' then
                             self:_switch_state('active')
                         end
@@ -827,7 +827,7 @@ local remote_methods = {
             self:_fatal 'Can not load schema from the state'
             return
         end
-        
+
         self:_switch_state('schema')
 
         local spaces = self:_request_internal('select',
@@ -941,7 +941,7 @@ local remote_methods = {
         fiber.name('net.box.write')
         while self.state ~= 'closed' do
             self:_wait_state(self._rw_states)
-            
+
             if self.state == 'closed' then
                 break
             end
@@ -1017,7 +1017,7 @@ local remote_methods = {
     end,
 
     _request_raw = function(self, sync, request, raise)
-        
+
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
             self.timeouts[fid] = TIMEOUT_INFINITY
@@ -1052,7 +1052,7 @@ local remote_methods = {
 
         if raise and response.hdr[TYPE] ~= OK then
             box.error({
-                code = response.hdr[TYPE],
+                code = bit.band(response.hdr[TYPE], bit.lshift(1, 15) - 1),
                 reason = response.body[ERROR]
             })
         end
@@ -1151,5 +1151,3 @@ setmetatable(remote.self, {
 })
 
 return remote
-
-
