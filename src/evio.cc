@@ -38,6 +38,9 @@
 
 #define BIND_RETRY_DELAY 0.1
 
+static void
+evio_setsockopt_server(int fd, int family, int type);
+
 /** Note: this function does not throw. */
 void
 evio_close(ev_loop *loop, struct ev_io *evio)
@@ -60,46 +63,72 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol)
 	assert(coio->fd == -1);
 	/* Don't leak fd if setsockopt fails. */
 	coio->fd = sio_socket(domain, type, protocol);
-	if (type == SOCK_STREAM) {
-		evio_setsockopt_tcp(coio->fd, domain);
-	} else {
-		sio_setfl(coio->fd, O_NONBLOCK, 1);
-	}
+	evio_setsockopt_client(coio->fd, domain, type);
 }
 
-
-/** Set common tcp socket client options. */
-void
-evio_setsockopt_tcp(int fd, int family)
+static void
+evio_setsockopt_keepalive(int fd)
 {
 	int on = 1;
-	/* In case this throws, the socket is not leaked. */
-	sio_setfl(fd, O_NONBLOCK, on);
-	/* SO_KEEPALIVE to ensure connections don't hang
+	/*
+	 * SO_KEEPALIVE to ensure connections don't hang
 	 * around for too long when a link goes away.
 	 */
 	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 		       &on, sizeof(on));
+#ifdef __linux__
 	/*
-	 * Lower latency is more important than higher
-	 * bandwidth, and we usually write entire
-	 * request/response in a single syscall.
+	 * On Linux, we are able to fine-tune keepalive
+	 * intervals. Set smaller defaults, since the system-wide
+	 * defaults are in days.
 	 */
-	if (family != AF_UNIX)
-		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+	int keepcnt = 5;
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt,
+		       sizeof(int));
+	int keepidle = 30;
+
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle,
+		       sizeof(int));
+
+	int keepintvl = 60;
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl,
+		       sizeof(int));
+#endif
 }
 
-/** Set tcp options for server sockets. */
+/** Set common client socket options. */
 void
-evio_setsockopt_tcpserver(int fd)
+evio_setsockopt_client(int fd, int family, int type)
+{
+	int on = 1;
+	/* In case this throws, the socket is not leaked. */
+	sio_setfl(fd, O_NONBLOCK, on);
+	if (type == SOCK_STREAM && family != AF_UNIX) {
+		if (family != AF_UNIX) {
+			/*
+			 * SO_KEEPALIVE to ensure connections don't hang
+			 * around for too long when a link goes away.
+			 */
+			evio_setsockopt_keepalive(fd);
+			/*
+			 * Lower latency is more important than higher
+			 * bandwidth, and we usually write entire
+			 * request/response in a single syscall.
+			 */
+			sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+		}
+	}
+}
+
+/** Set options for server sockets. */
+static void
+evio_setsockopt_server(int fd, int family, int type)
 {
 	int on = 1;
 	/* In case this throws, the socket is not leaked. */
 	sio_setfl(fd, O_NONBLOCK, on);
 	/* Allow reuse local adresses. */
 	sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-		       &on, sizeof(on));
-	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 		       &on, sizeof(on));
 
 	/* Send all buffered messages on socket before take
@@ -108,6 +137,8 @@ evio_setsockopt_tcpserver(int fd)
 
 	sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
 		       &linger, sizeof(linger));
+	if (type == SOCK_STREAM && family != AF_UNIX)
+		evio_setsockopt_keepalive(fd);
 }
 
 static inline const char *
@@ -136,8 +167,8 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 
 		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
 			return;
-		/* set common tcp options */
-		evio_setsockopt_tcp(fd, service->addr.sa_family);
+		/* set common client socket options */
+		evio_setsockopt_client(fd, service->addr.sa_family, SOCK_STREAM);
 		/*
 		 * Invoke the callback and pass it the accepted
 		 * socket.
@@ -167,7 +198,7 @@ evio_service_bind_addr(struct evio_service *service)
 		SOCK_STREAM, IPPROTO_TCP);
 
 	try {
-		evio_setsockopt_tcpserver(fd);
+		evio_setsockopt_server(fd, service->addr.sa_family, SOCK_STREAM);
 
 		if (sio_bind(fd, &service->addr, service->addr_len) ||
 		    sio_listen(fd)) {

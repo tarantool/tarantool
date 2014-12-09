@@ -152,9 +152,6 @@ evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 }
 
 void
-evio_setsockopt_tcp(int fd, int family);
-
-void
-evio_setsockopt_tcpserver(int fd);
+evio_setsockopt_client(int fd, int family, int type);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */
