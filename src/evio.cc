@@ -38,6 +38,9 @@
 
 #define BIND_RETRY_DELAY 0.1
 
+static void
+evio_setsockopt_server(int fd, int type);
+
 /**
  * Try to convert IPv4 or IPv6 addresses from text to binary form.
  * sa buf must be sizeo of sizeof(sockaddr_in6).
@@ -85,46 +88,67 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol)
 	assert(coio->fd == -1);
 	/* Don't leak fd if setsockopt fails. */
 	coio->fd = sio_socket(domain, type, protocol);
-	if (type == SOCK_STREAM) {
-		evio_setsockopt_tcp(coio->fd);
-	} else {
-		sio_setfl(coio->fd, O_NONBLOCK, 1);
-	}
+	evio_setsockopt_client(coio->fd, type);
 }
 
-
-/** Set common tcp socket client options. */
-void
-evio_setsockopt_tcp(int fd)
+static void
+evio_setsockopt_keepalive(int fd)
 {
 	int on = 1;
-	/* In case this throws, the socket is not leaked. */
-	sio_setfl(fd, O_NONBLOCK, on);
-	/* SO_KEEPALIVE to ensure connections don't hang
+	/*
+	 * SO_KEEPALIVE to ensure connections don't hang
 	 * around for too long when a link goes away.
 	 */
 	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 		       &on, sizeof(on));
+#ifdef __linux__
 	/*
-	 * Lower latency is more important than higher
-	 * bandwidth, and we usually write entire
-	 * request/response in a single syscall.
+	 * On Linux, we are able to fine-tune keepalive
+	 * intervals. Set smaller defaults, since the system-wide
+	 * defaults are in days.
 	 */
-	sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
-		       &on, sizeof(on));
+	int keepcnt = 5;
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt,
+		       sizeof(int));
+	int keepidle = 30;
+
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle,
+		       sizeof(int));
+
+	int keepintvl = 60;
+	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl,
+		       sizeof(int));
+#endif
+}
+
+/** Set common tcp socket client options. */
+void
+evio_setsockopt_client(int fd, int type)
+{
+	int on = 1;
+	/* In case this throws, the socket is not leaked. */
+	sio_setfl(fd, O_NONBLOCK, on);
+	if (type == SOCK_STREAM) {
+		/*
+		 * Lower latency is more important than higher
+		 * bandwidth, and we usually write entire
+		 * request/response in a single syscall.
+		 */
+		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+			       &on, sizeof(on));
+		evio_setsockopt_keepalive(fd);
+	}
 }
 
 /** Set tcp options for server sockets. */
-void
-evio_setsockopt_tcpserver(int fd)
+static void
+evio_setsockopt_server(int fd, int type)
 {
 	int on = 1;
 	/* In case this throws, the socket is not leaked. */
 	sio_setfl(fd, O_NONBLOCK, on);
 	/* Allow reuse local adresses. */
 	sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-		       &on, sizeof(on));
-	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
 		       &on, sizeof(on));
 
 	/* Send all buffered messages on socket before take
@@ -133,6 +157,8 @@ evio_setsockopt_tcpserver(int fd)
 
 	sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
 		       &linger, sizeof(linger));
+	if (type == SOCK_STREAM)
+		evio_setsockopt_keepalive(fd);
 }
 
 /**
@@ -149,7 +175,7 @@ evio_bind_addrinfo(struct ev_io *evio, struct addrinfo *ai)
 		try {
 			fd = sio_socket(ai->ai_family, ai->ai_socktype,
 					ai->ai_protocol);
-			evio_setsockopt_tcpserver(fd);
+			evio_setsockopt_server(fd, ai->ai_socktype);
 			if (sio_bind(fd, addr, ai->ai_addrlen) == 0) {
 				evio->fd = fd;
 				return; /* success. */
@@ -193,7 +219,7 @@ evio_service_accept_cb(ev_io *watcher,
 		if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
 			return;
 		/* set common tcp options */
-		evio_setsockopt_tcp(fd);
+		evio_setsockopt_client(fd, SOCK_STREAM);
 		/*
 		 * Invoke the callback and pass it the accepted
 		 * socket.
@@ -220,7 +246,7 @@ evio_service_bind_and_listen(struct evio_service *service)
 	int fd = sio_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	try {
-		evio_setsockopt_tcpserver(fd);
+		evio_setsockopt_server(fd, SOCK_STREAM);
 
 		if (sio_bind(fd, &service->addr, sizeof(service->addr)) ||
 		    sio_listen(fd)) {
