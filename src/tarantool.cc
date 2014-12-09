@@ -115,7 +115,7 @@ title(const char *role, const char *fmt, ...)
 	(void) role;
 
 	va_list ap;
-	char buf[128], *bufptr = buf, *bufend = buf + sizeof(buf);
+	char buf[256], *bufptr = buf, *bufend = buf + sizeof(buf);
 	char *statusptr = status, *statusend = status + sizeof(status);
 	statusptr += snprintf(statusptr, statusend - statusptr, "%s", role);
 	bufptr += snprintf(bufptr, bufend - bufptr, "%s%s", role,
