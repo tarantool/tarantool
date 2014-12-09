@@ -26,8 +26,10 @@ box.schema.user.grant('iddqd', 'iddqd')
 box.schema.user.revoke('iddqd', 'iddqd')
 box.schema.user.grant('tester', 'iddqd')
 box.schema.user.revoke('tester', 'iddqd')
+box.schema.role.drop('iddqd')
 box.schema.user.revoke('tester', 'no-such-role')
 box.schema.user.grant('tester', 'no-such-role')
+box.schema.user.drop('tester')
 -- check for loops in role grants
 box.schema.role.create('a')
 box.schema.role.create('b')
@@ -73,3 +75,5 @@ box.schema.user.drop('test')
 box.schema.user.drop('grantee')
 box.schema.user.drop('liaison')
 
+
+-- cleanup

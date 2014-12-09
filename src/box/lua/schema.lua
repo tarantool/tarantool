@@ -1018,7 +1018,7 @@ box.schema.user.drop = function(name)
     for k, tuple in pairs(funcs) do
         box.schema.func.drop(tuple[1])
     end
-    -- if this is a role, revoke grants of this role
+    -- if this is a role, revoke this role from whoever it was granted to
     grants = _priv.index.object:select{'role', uid}
     for k, tuple in pairs(grants) do
         box.schema.user.revoke(tuple[2], uid)
@@ -1035,6 +1035,9 @@ box.schema.user.grant = function(user_name, privilege, object_type,
         -- named 'execute'
         object_type = 'role'
         object_name = privilege
+    end
+    -- sanitize privilege type for role object type
+    if object_type == 'role' then
         privilege = 'execute'
     end
     local uid = user_resolve(user_name)
@@ -1071,7 +1074,9 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     if object_name == nil and object_type == nil then
         object_type = 'role'
         object_name = privilege
-        privilege = 'execute'
+        -- revoke everything possible from role,
+        -- to prevent stupid mistakes with privilege name
+        privilege = 'read,write,execute'
     end
     local uid = user_resolve(user_name)
     if uid == nil then
@@ -1086,10 +1091,12 @@ box.schema.user.revoke = function(user_name, privilege, object_type, object_name
     end
     local old_privilege = tuple[5]
     local grantor = tuple[1]
-    -- XXX gh-449: the privilege may be removed by someone who did
-    -- not grant it
-    if privilege ~= old_privilege then
-        privilege = bit.band(old_privilege, bit.bnot(privilege))
+    -- sic:
+    -- a user may revoke more than he/she granted
+    -- (erroneous user input)
+    --
+    privilege = bit.band(old_privilege, bit.bnot(privilege))
+    if privilege ~= 0 then
         _priv:replace{grantor, uid, object_type, oid, privilege}
     else
         _priv:delete{uid, object_type, oid}
