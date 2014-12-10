@@ -515,14 +515,7 @@ local remote_methods = {
     end,
 
     reload_schema = function(self)
-         xpcall(function() self:_load_schema() end,
-               function(e)
-                  log.info("Can't load schema: %s", tostring(e))
-               end)
-
-         if self.state ~= 'error' and self.state ~= 'closed' then
-               self:_switch_state('active')
-         end
+         self:_load_schema()
     end,
 
     close = function(self)
@@ -1112,6 +1105,7 @@ setmetatable(remote, { __index = remote_methods })
 
 remote.self = {
     ping = function() return true end,
+    reload_schema = function() end,
     close = function() end,
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,

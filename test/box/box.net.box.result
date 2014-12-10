@@ -141,7 +141,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:226: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:229: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -667,13 +667,7 @@ sp:insert{1, 2, 3}
 ---
 - [1, 2, 3]
 ...
-LISTEN = require('uri').parse(box.cfg.listen)
----
-...
-uri = string.format('%s:%s', LISTEN.host, LISTEN.service)
----
-...
-con = remote.new(uri)
+con = remote.new(box.cfg.listen)
 ---
 ...
 con:ping()
@@ -684,10 +678,9 @@ con.space.test_old:select{}
 ---
 - - [1, 2, 3]
 ...
-con.space.test:select{}
+con.space.test == nil
 ---
-- error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
-    (a nil value)'
+- true
 ...
 sp = box.schema.create_space('test')
 ---
@@ -707,17 +700,19 @@ sp:insert{2, 3, 4}
 ---
 - [2, 3, 4]
 ...
+con.space.test == nil
+---
+- true
+...
+con:reload_schema()
+---
+- error: '[string "return con:reload_schema() "]:1: attempt to call method ''reload_schema''
+    (a nil value)'
+...
 con.space.test:select{}
 ---
 - error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
     (a nil value)'
-...
-con:reload_schema()
----
-...
-con.space.test:select{}
----
-- - [2, 3, 4]
 ...
 box.space.test:drop()
 ---
@@ -727,4 +722,42 @@ box.space.test_old:drop()
 ...
 con:close()
 ---
+...
+file_log = require('fio').open('tarantool.log', {'O_RDONLY', 'O_NONBLOCK'})
+---
+...
+file_log:seek(0, 'SEEK_END') ~= 0
+---
+- true
+...
+--# setopt delimiter ';'
+require('fiber').create(
+   function()
+         conn = require('net.box').new(box.cfg.listen)
+         conn.call('no_such_function', {})
+   end
+);
+---
+- status: suspended
+  name: lua
+  id: 151
+...
+while true do
+   local line = file_log:read(2048)
+   if line ~= nil then
+      if string.match(line, "ER_UNKNOWN") == nil then
+         return "Success"
+      else
+         return "Failure"
+      end
+   end
+   require('fiber').sleep(0.1)
+end;
+---
+- Success
+...
+--# setopt delimiter ''
+file_log:close()
+---
+- true
 ...
