@@ -141,7 +141,7 @@ cn.space.net_box_test_space:insert{234, 1,2,3}
 ...
 cn.space.net_box_test_space.insert{234, 1,2,3}
 ---
-- error: 'builtin/net.box.lua:229: Use space:method(...) instead space.method(...)'
+- error: 'builtin/net.box.lua:226: Use space:method(...) instead space.method(...)'
 ...
 cn.space.net_box_test_space:replace{354, 1,2,3}
 ---
@@ -646,5 +646,85 @@ end;
 ...
 --# setopt delimiter ''
 gh594()
+---
+...
+-- #636: Reload schema on demand
+sp = box.schema.create_space('test_old')
+---
+...
+sp:create_index('primary')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 512
+  name: primary
+  type: TREE
+...
+sp:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+LISTEN = require('uri').parse(box.cfg.listen)
+---
+...
+uri = string.format('%s:%s', LISTEN.host, LISTEN.service)
+---
+...
+con = remote.new(uri)
+---
+...
+con:ping()
+---
+- true
+...
+con.space.test_old:select{}
+---
+- - [1, 2, 3]
+...
+con.space.test:select{}
+---
+- error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
+    (a nil value)'
+...
+sp = box.schema.create_space('test')
+---
+...
+sp:create_index('primary')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 513
+  name: primary
+  type: TREE
+...
+sp:insert{2, 3, 4}
+---
+- [2, 3, 4]
+...
+con.space.test:select{}
+---
+- error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
+    (a nil value)'
+...
+con:reload_schema()
+---
+...
+con.space.test:select{}
+---
+- - [2, 3, 4]
+...
+box.space.test:drop()
+---
+...
+box.space.test_old:drop()
+---
+...
+con:close()
 ---
 ...

@@ -262,3 +262,28 @@ function gh594()
 end;
 --# setopt delimiter ''
 gh594()
+
+-- #636: Reload schema on demand
+sp = box.schema.create_space('test_old')
+sp:create_index('primary')
+sp:insert{1, 2, 3}
+
+LISTEN = require('uri').parse(box.cfg.listen)
+uri = string.format('%s:%s', LISTEN.host, LISTEN.service)
+
+con = remote.new(uri)
+con:ping()
+con.space.test_old:select{}
+con.space.test:select{}
+
+sp = box.schema.create_space('test')
+sp:create_index('primary')
+sp:insert{2, 3, 4}
+
+con.space.test:select{}
+con:reload_schema()
+con.space.test:select{}
+
+box.space.test:drop()
+box.space.test_old:drop()
+con:close()

@@ -40,19 +40,17 @@ local GREETING_SIZE     = 128
 
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
-local sequence_mt = { __serialize = 'sequence'}
-local mapping_mt = { __serialize = 'mapping'}
+local sequence_mt = { __serialize = 'sequence' }
+local mapping_mt = { __serialize = 'mapping' }
 
 local CONSOLE_FAKESYNC  = 15121974
 
 local function request(header, body)
-
     -- hint msgpack to always encode header and body as a map
     header = msgpack.encode(setmetatable(header, mapping_mt))
     body = msgpack.encode(setmetatable(body, mapping_mt))
 
     local len = msgpack.encode(string.len(header) + string.len(body))
-
 
     return len .. header .. body
 end
@@ -158,8 +156,7 @@ local proto = {
     end,
 
     -- select
-    select  = function(sync, spaceno, indexno, key, opts)
-
+    select = function(sync, spaceno, indexno, key, opts)
         if opts == nil then
             opts = {}
         end
@@ -517,6 +514,17 @@ local remote_methods = {
         }
     end,
 
+    reload_schema = function(self)
+         xpcall(function() self:_load_schema() end,
+               function(e)
+                  log.info("Can't load schema: %s", tostring(e))
+               end)
+
+         if self.state ~= 'error' and self.state ~= 'closed' then
+               self:_switch_state('active')
+         end
+    end,
+
     close = function(self)
         if self.state ~= 'closed' then
             self:_switch_state('closed')
@@ -779,11 +787,11 @@ local remote_methods = {
 
     _auth = function(self)
         if self.opts.user == nil or self.opts.password == nil then
-            self:_switch_state 'authen'
+            self:_switch_state('authen')
             return
         end
 
-        self:_switch_state 'auth'
+        self:_switch_state('auth')
 
         local auth_res = self:_request_internal('auth',
             false, self.opts.user, self.opts.password, self.handshake)
@@ -793,7 +801,7 @@ local remote_methods = {
             return
         end
 
-        self:_switch_state 'authen'
+        self:_switch_state('authen')
     end,
 
     -- states wakeup _read_worker
@@ -821,10 +829,9 @@ local remote_methods = {
         return false
     end,
 
-
     _load_schema = function(self)
-        if self.state ~= 'authen' then
-            self:_fatal 'Can not load schema from the state'
+        if self.state == 'closed' or self.state == 'error' then
+            self:_fatal('Can not load schema from the state')
             return
         end
 
@@ -836,7 +843,6 @@ local remote_methods = {
             true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
-
 
         for _, space in pairs(spaces) do
             local name = space[3]
@@ -851,7 +857,6 @@ local remote_methods = {
                 field_count     = field_count,
                 enabled         = true,
                 index           = {}
-
             }
             if #space > 5 and string.match(space[6], 'temporary') then
                 s.temporary = true
@@ -863,7 +868,6 @@ local remote_methods = {
 
             sl[id] = s
             sl[name] = s
-
         end
 
         for _, index in pairs(indexes) do
@@ -1072,11 +1076,9 @@ local remote_methods = {
     end,
 
     _request_internal = function(self, name, raise, ...)
-
         local sync = self.proto:sync()
         local request = self.proto[name](sync, ...)
         return self:_request_raw(sync, request, raise)
-        
     end,
 
     -- private (low level) methods
