@@ -72,11 +72,11 @@ class Tarantool < Formula
     else
       doc.install "test/box/box.lua"
       inreplace doc/"box.lua" do |s|
-          s.gsub!(/^os = require.*\n/     , '')
-          s.gsub!(/(primary_port\s*=).*/, '\1 3301,')
-          s.gsub!(/(admin_port\s*=).*/  , '\1 3313,')
-          s.gsub!(/(rows_per_wal.*)/    , '\1,')
-          s.gsub!(/^}.*/                , "\twork_dir\t\t\t= \"#{prefix}/var/lib/tarantool\",\n}")
+          s.gsub!(/^os = require.*\n/    , '')
+          s.gsub!(/os.getenv\("LISTEN"\)/, '3301')
+          s.gsub!(/os.getenv\('ADMIN'\)/ , '3313')
+          s.gsub!(/(rows_per_wal\s*=).*/ , '\1 500,')
+          s.gsub!(/^}.*/                 , "\twork_dir\t\t\t= \"#{prefix}/var/lib/tarantool\",\n}")
       end
     end
 
