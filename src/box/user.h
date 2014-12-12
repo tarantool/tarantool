@@ -30,6 +30,7 @@
  */
 #include <stdint.h>
 #include "user_def.h"
+#include "small/region.h"
 
 /** Global grants. */
 struct universe {
@@ -51,6 +52,18 @@ struct user_map {
 	umap_int_t m[USER_MAP_SIZE];
 };
 
+static inline bool
+user_map_is_empty(struct user_map *map)
+{
+	for (int i = 0; i < USER_MAP_SIZE; i++)
+		if (map->m[i])
+			return false;
+	return true;
+}
+
+typedef rb_tree(struct priv_def) privset_t;
+rb_proto(, privset_, privset_t, struct priv_def);
+
 struct user: public user_def
 {
 	/**
@@ -60,6 +73,14 @@ struct user: public user_def
 	uint8_t auth_token;
 	/** List of users or roles this role has been granted to */
 	struct user_map users;
+	/** List of roles granted to this role or user. */
+	struct user_map roles;
+	/** A cache of effective privileges of this user. */
+	privset_t privs;
+	/** True if this user privileges need to be reloaded. */
+	bool is_dirty;
+	/** Memory pool for privs */
+	struct region pool;
 };
 
 /**
@@ -144,8 +165,10 @@ role_revoke(struct user *grantee, struct user *role);
  * role if this role.
  */
 void
-privilege_grant(struct user *grantee, struct access *object,
-		uint8_t access);
+priv_grant(struct user *grantee, struct priv_def *priv);
+
+void
+priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple);
 
 /* }}} */
 

@@ -30,23 +30,23 @@
 #include "user_def.h"
 #include "assoc.h"
 #include "schema.h"
+#include "space.h"
+#include "index.h"
 #include "bit/bit.h"
+#include "fiber.h"
+#include "scoped_guard.h"
+#include "session.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
 struct user *guest_user = users;
 struct user *admin_user = users + 1;
 
+static struct user_map user_map_nil;
+
 struct mh_i32ptr_t *user_registry;
 
 /* {{{ user_map */
-
-/* Initialize an empty user map. */
-void
-user_map_init(struct user_map *map)
-{
-	memset(map, 0, sizeof(*map));
-}
 
 static inline int
 user_map_calc_idx(uint8_t auth_token, uint8_t *bit_no)
@@ -83,24 +83,25 @@ user_map_is_set(struct user_map *map, uint8_t auth_token)
 	return map->m[idx] & (((umap_int_t) 1) << bit_no);
 }
 
-static inline bool
-user_map_is_empty(struct user_map *map)
-{
-	for (int i = 0; i < USER_MAP_SIZE; i++)
-		if (map->m[i])
-			return false;
-	return true;
-}
-
 /**
  * Merge two sets of users: add all users from right argument
  * to the left one.
  */
-void
+static void
 user_map_union(struct user_map *lhs, struct user_map *rhs)
 {
 	for (int i = 0; i < USER_MAP_SIZE; i++)
 		lhs->m[i] |= rhs->m[i];
+}
+
+/**
+ * Remove all users present in rhs from lhs
+ */
+static void
+user_map_minus(struct user_map *lhs, struct user_map *rhs)
+{
+	for (int i = 0; i < USER_MAP_SIZE; i++)
+		lhs->m[i] &= ~rhs->m[i];
 }
 
 /** Iterate over users in the set of users. */
@@ -109,14 +110,14 @@ struct user_map_iterator
 	struct bit_iterator it;
 };
 
-void
+static void
 user_map_iterator_init(struct user_map_iterator *it, struct user_map *map)
 {
 	bit_iterator_init(&it->it, map->m,
 			  USER_MAP_SIZE * sizeof(umap_int_t), true);
 }
 
-struct user *
+static struct user *
 user_map_iterator_next(struct user_map_iterator *it)
 {
 	size_t auth_token = bit_iterator_next(&it->it);
@@ -126,6 +127,193 @@ user_map_iterator_next(struct user_map_iterator *it)
 }
 
 /* }}} */
+
+/* {{{ privset_t - set of effective privileges of a user */
+
+extern "C" {
+
+static int
+priv_def_compare(const struct priv_def *lhs, const struct priv_def *rhs)
+{
+	if (lhs->object_type != rhs->object_type)
+		return lhs->object_type > rhs->object_type ? 1 : -1;
+	if (lhs->object_id != rhs->object_id)
+		return lhs->object_id > rhs->object_id ? 1 : -1;
+	return 0;
+}
+
+} /* extern "C" */
+
+rb_gen(, privset_, privset_t, struct priv_def, link, priv_def_compare);
+
+/* }}}  */
+
+/** {{{ user */
+
+static void
+user_create(struct user *user, uint8_t auth_token)
+{
+	assert(user->auth_token == 0);
+	user->auth_token = auth_token;
+	privset_new(&user->privs);
+	region_create(&user->pool, &cord()->slabc);
+}
+
+static void
+user_destroy(struct user *user)
+{
+	/*
+	 * Sic: we don't have to remove a deleted
+	 * user from users set of roles, since
+	 * to drop a user, one has to revoke
+	 * all privileges from them first.
+	 */
+	region_destroy(&user->pool);
+	memset(user, 0, sizeof(*user));
+}
+
+/**
+ * Add a privilege definition to the list
+ * of effective privileges of a user.
+ */
+void
+user_grant_priv(struct user *user, struct priv_def *def)
+{
+	struct priv_def *old = privset_search(&user->privs, def);
+	if (old == NULL) {
+		old = (struct priv_def *)
+			region_alloc(&user->pool, sizeof(struct priv_def));
+		*old = *def;
+		privset_insert(&user->privs, old);
+	} else {
+		old->access |= def->access;
+	}
+}
+
+/**
+ * Find the corresponding access structure
+ * given object type and object id.
+ */
+struct access *
+access_find(struct priv_def *priv)
+{
+	struct access *access = NULL;
+	switch (priv->object_type) {
+	case SC_UNIVERSE:
+	{
+		access = universe.access;
+		break;
+	}
+	case SC_SPACE:
+	{
+		struct space *space = space_by_id(priv->object_id);
+		if (space)
+			access = space->access;
+		break;
+	}
+	case SC_FUNCTION:
+	{
+		struct func_def *func = func_by_id(priv->object_id);
+		if (func)
+			access = func->access;
+		break;
+	}
+	default:
+		break;
+	}
+	return access;
+}
+
+
+/**
+ * Reset effective access of the user in the
+ * corresponding objects.
+ */
+static void
+user_set_effective_access(struct user *user)
+{
+	struct credentials *cr = current_user();
+	struct priv_def *priv;
+	for (priv = privset_first(&user->privs);
+	     priv;
+	     priv = privset_next(&user->privs, priv)) {
+		struct access *object = access_find(priv);
+		 /* Protect against a concurrent drop. */
+		if (object == NULL)
+			continue;
+		struct access *access = &object[user->auth_token];
+		access->effective = access->granted | priv->access;
+		/** Update global access in the current session. */
+		if (priv->object_type == SC_UNIVERSE && user->uid == cr->uid)
+			cr->universal_access = access->effective;
+	}
+}
+
+/**
+ * Reload user privileges and re-grant them.
+ */
+static void
+user_reload_privs(struct user *user)
+{
+	if (user->is_dirty == false)
+		return;
+	struct priv_def *priv;
+	/**
+	 * Reset effective access of the user in the
+	 * corresponding objects to have
+	 * only the stuff that it's granted directly.
+	 */
+	for (priv = privset_first(&user->privs);
+	     priv;
+	     priv = privset_next(&user->privs, priv)) {
+		priv->access = 0;
+	}
+	user_set_effective_access(user);
+	region_free(&user->pool);
+	privset_new(&user->privs);
+	/* Load granted privs from _priv space. */
+	{
+		struct space *space = space_cache_find(SC_PRIV_ID);
+		char key[6];
+		/** Primary key - by user id */
+		Index *index = index_find(space, 0);
+		mp_encode_uint(key, user->uid);
+
+		struct iterator *it = index->position();
+		index->initIterator(it, ITER_EQ, key, 1);
+		auto iterator_guard =
+			make_scoped_guard([=] { iterator_close(it); });
+
+		struct tuple *tuple;
+		while ((tuple = it->next(it))) {
+			struct priv_def priv;
+			priv_def_create_from_tuple(&priv, tuple);
+			/**
+			 * Skip role grants, we're only
+			 * interested in real objects.
+			 */
+			if (priv.object_type != SC_ROLE)
+				user_grant_priv(user, &priv);
+		}
+	}
+	{
+		/* Take into account privs granted through roles. */
+		struct user_map_iterator it;
+		user_map_iterator_init(&it, &user->roles);
+		struct user *role;
+		while ((role = user_map_iterator_next(&it))) {
+			struct priv_def *def = privset_first(&role->privs);
+			while (def) {
+				user_grant_priv(user, def);
+				def = privset_next(&role->privs, def);
+			}
+		}
+	}
+	user_set_effective_access(user);
+	user->is_dirty = false;
+}
+
+/** }}} */
 
 /* {{{ authentication tokens */
 
@@ -195,8 +383,7 @@ user_cache_replace(struct user_def *def)
 	if (user == NULL) {
 		uint8_t auth_token = auth_token_get();
 		user = users + auth_token;
-		assert(user->auth_token == 0);
-		user->auth_token = auth_token;
+		user_create(user, auth_token);
 		struct mh_i32ptr_node_t node = { def->uid, user };
 		mh_i32ptr_put(user_registry, &node, NULL, NULL);
 	}
@@ -211,13 +398,15 @@ user_cache_delete(uint32_t uid)
 	if (user) {
 		assert(user->auth_token > ADMIN);
 		auth_token_put(user->auth_token);
+		assert(user_map_is_empty(&user->roles));
+		assert(user_map_is_empty(&user->users));
 		/*
 		 * Sic: we don't have to remove a deleted
 		 * user from users hash of roles, since
 		 * to drop a user, one has to revoke
 		 * all privileges from them first.
 		 */
-		memset(user, 0, sizeof(*user));
+		user_destroy(user);
 		mh_i32ptr_del(user_registry, uid, NULL);
 	}
 }
@@ -308,8 +497,7 @@ role_check(struct user *grantee, struct user *role)
 	 * immediate and indirect users of grantee, and ensure
 	 * the granted role is not in this set.
 	 */
-	struct user_map transitive_closure;
-	user_map_init(&transitive_closure);
+	struct user_map transitive_closure = user_map_nil;
 	user_map_set(&transitive_closure, grantee->auth_token);
 	struct user_map current_layer = transitive_closure;
 	while (! user_map_is_empty(&current_layer)) {
@@ -318,8 +506,7 @@ role_check(struct user *grantee, struct user *role)
 		 * acyclic graph, we're bound to end at some
 		 * point in a layer with no incoming edges.
 		 */
-		struct user_map next_layer;
-		user_map_init(&next_layer);
+		struct user_map next_layer = user_map_nil;
 		struct user_map_iterator it;
 		user_map_iterator_init(&it, &current_layer);
 		struct user *user;
@@ -328,7 +515,10 @@ role_check(struct user *grantee, struct user *role)
 		user_map_union(&transitive_closure, &next_layer);
 		current_layer = next_layer;
 	}
-
+	/*
+	 * Check if the role is in the list of roles to which the
+	 * grantee is granted.
+	 */
 	if (user_map_is_set(&transitive_closure,
 			    role->auth_token)) {
 		tnt_raise(ClientError, ER_ROLE_LOOP,
@@ -336,63 +526,121 @@ role_check(struct user *grantee, struct user *role)
 	}
 }
 
+/**
+ * Re-calculate effective grants of the linked subgraph
+ * this user/role is a part of.
+ */
+void
+rebuild_effective_grants(struct user *grantee)
+{
+	/*
+	 * Recurse over all roles to which grantee is granted
+	 * and mark them as dirty - in need for rebuild.
+	 */
+	struct user_map_iterator it;
+	struct user *user;
+	struct user_map current_layer = user_map_nil;
+	user_map_set(&current_layer, grantee->auth_token);
+	while (!user_map_is_empty(&current_layer)) {
+		struct user_map next_layer = user_map_nil;
+		user_map_iterator_init(&it, &current_layer);
+		while ((user = user_map_iterator_next(&it))) {
+			user->is_dirty = true;
+			user_map_union(&next_layer, &user->users);
+		}
+		/*
+		 * Switch to the nodes which are not in the set
+		 * yet.
+		 */
+		current_layer = next_layer;
+	}
+	/*
+	 * First, construct a subset of the transitive
+	 * closure consisting from the nodes with no
+	 * incoming edges (roles which have no granted
+	 * roles). Build their list of effective grants
+	 * from their actual grants.
+	 *
+	 * Propagate the effective grants through the
+	 * outgoing edges of the nodes, avoiding the nodes
+	 * with incoming edges from not-yet-evaluated nodes.
+	 * Eventually this process will end with a set of
+	 * nodes with no outgoing edges.
+	 */
+	struct user_map transitive_closure = user_map_nil;
+	current_layer = user_map_nil;
+	user_map_set(&current_layer, grantee->auth_token);
+	/*
+	 * Propagate effective privileges from the nodes
+	 * with no incoming edges to the remaining nodes.
+	 */
+	while (! user_map_is_empty(&current_layer)) {
+		struct user_map postponed = user_map_nil;
+		struct user_map next_layer = user_map_nil;
+		user_map_iterator_init(&it, &current_layer);
+		while ((user = user_map_iterator_next(&it))) {
+			struct user_map indirect_edges = user->roles;
+			user_map_minus(&indirect_edges, &transitive_closure);
+			if (user_map_is_empty(&indirect_edges)) {
+				user_reload_privs(user);
+				user_map_union(&next_layer, &user->users);
+			} else {
+				/*
+				 * The user has roles whose
+				 * effective grants have not been
+				 * calculated yet. Postpone
+				 * evaluation of effective grants
+				 * of this user till these roles'
+				 * effective grants have been
+				 * built.
+				 */
+				user_map_union(&next_layer, &indirect_edges);
+				user_map_set(&postponed, user->auth_token);
+				user_map_set(&next_layer, user->auth_token);
+			}
+		}
+		user_map_minus(&current_layer, &postponed);
+		user_map_union(&transitive_closure, &current_layer);
+		current_layer = next_layer;
+	}
+}
+
+
+/**
+ * Update verges in the graph of dependencies.
+ * Grant all effective privileges of the role to whoever
+ * this role was granted to.
+ */
 void
 role_grant(struct user *grantee, struct user *role)
 {
 	user_map_set(&role->users, grantee->auth_token);
-	/**
-	 * Todo: grant all effective privileges of
-	 * the role to whoever this role was granted
-	 * to.
-	 */
+	user_map_set(&grantee->roles, role->auth_token);
+	rebuild_effective_grants(grantee);
 }
 
+/**
+ * Update the role dependencies graph.
+ * Rebuild effective privileges of the grantee.
+ */
 void
 role_revoke(struct user *grantee, struct user *role)
 {
 	user_map_clear(&role->users, grantee->auth_token);
-	/**
-	 * Todo: rebuild effective privileges of grantee,
-	 * for all effective privileges which he/she
-	 * might have inherited through the revoked role.
-	 */
+	user_map_clear(&grantee->roles, role->auth_token);
+	rebuild_effective_grants(grantee);
 }
 
 void
-privilege_grant(struct user *user,
-		struct access *object, uint8_t access)
+priv_grant(struct user *grantee, struct priv_def *priv)
 {
-	bool grant = access > object[user->auth_token].granted;
-	object[user->auth_token].granted = access;
-	if (grant) {
-		/*
-		 * Grant the privilege to this user or
-		 * role and all users to which this
-		 * role has been granted, if this is
-		 * a role.
-		 */
-		struct user_map current_layer;
-		user_map_init(&current_layer);
-		user_map_set(&current_layer, user->auth_token);
-		while (!user_map_is_empty(&current_layer)) {
-			struct user_map next_layer;
-			user_map_init(&next_layer);
-			struct user_map_iterator it;
-			user_map_iterator_init(&it, &current_layer);
-			while ((user = user_map_iterator_next(&it))) {
-				object[user->auth_token].effective |= access;
-				user_map_union(&next_layer, &user->users);
-			}
-			current_layer = next_layer;
-		}
-	} else {
-		/**
-		 * @fixme: this only works for users and
-		 * non-recursive roles
-		 */
-		object[user->auth_token].effective =
-			object[user->auth_token].granted;
-	}
+	struct access *object = access_find(priv);
+	if (object == NULL)
+		return;
+	struct access *access = &object[grantee->auth_token];
+	assert(privset_search(&grantee->privs, priv) || access->granted == 0);
+	access->granted = priv->access;
+	rebuild_effective_grants(grantee);
 }
 
 /** }}} */

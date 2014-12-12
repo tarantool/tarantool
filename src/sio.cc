@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <limits.h>
+#include <netinet/in.h> /* TCP_NODELAY */
 #include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h> /* inet_ntoa */
 #include <poll.h>
@@ -102,6 +103,10 @@ sio_option_name(int option)
 	CASE_OPTION(SO_ERROR);
 	CASE_OPTION(SO_REUSEADDR);
 	CASE_OPTION(TCP_NODELAY);
+#ifdef __linux__
+	CASE_OPTION(TCP_KEEPCNT);
+	CASE_OPTION(TCP_KEEPINTVL);
+#endif
 	default:
 		return "undefined";
 	}

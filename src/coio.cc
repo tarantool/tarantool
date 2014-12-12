@@ -220,7 +220,8 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
 		 * available */
 		int fd = sio_accept(coio->fd, addr, &addrlen);
 		if (fd >= 0) {
-			evio_setsockopt_tcp(fd, addr->sa_family);
+			evio_setsockopt_client(fd, addr->sa_family,
+					       SOCK_STREAM);
 			return fd;
 		}
 		/* The socket is not ready, yield */

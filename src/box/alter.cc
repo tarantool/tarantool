@@ -1146,14 +1146,22 @@ space_has_data(uint32_t id, uint32_t iid, uint32_t uid)
 }
 
 bool
-user_has_data(uint32_t uid)
+user_has_data(struct user *user)
 {
+	uint32_t uid = user->uid;
 	uint32_t spaces[] = { SC_SPACE_ID, SC_FUNC_ID, SC_PRIV_ID };
 	uint32_t *end = spaces + sizeof(spaces)/sizeof(*spaces);
 	for (uint32_t *i = spaces; i < end; i++) {
 		if (space_has_data(*i, 1, uid))
 			return true;
 	}
+	if (! user_map_is_empty(&user->users))
+		return true;
+	/*
+	 * If there was a role, the previous check would have
+	 * returned true.
+	 */
+	assert(user_map_is_empty(&user->roles));
 	return false;
 }
 
@@ -1279,7 +1287,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 
 	uint32_t uid = tuple_field_u32(old_tuple ?
 				       old_tuple : new_tuple, ID);
-	struct user_def *old_user = user_by_id(uid);
+	struct user *old_user = user_by_id(uid);
 	if (new_tuple != NULL && old_user == NULL) { /* INSERT */
 		struct user_def user;
 		user_def_create_from_tuple(&user, new_tuple);
@@ -1299,7 +1307,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		 * Can only delete user if it has no spaces,
 		 * no functions and no grants.
 		 */
-		if (user_has_data(uid)) {
+		if (user_has_data(old_user)) {
 			tnt_raise(ClientError, ER_DROP_USER,
 				  old_user->name, "the user has objects");
 		}
@@ -1425,7 +1433,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 /**
  * Create a privilege definition from tuple.
  */
-static void
+void
 priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 {
 	priv->grantor_id = tuple_field_u32(tuple, ID);
@@ -1508,6 +1516,10 @@ priv_def_check(struct priv_def *priv)
 	default:
 		break;
 	}
+	if (priv->access == 0) {
+		tnt_raise(ClientError, ER_GRANT,
+			  "the grant tuple has no privileges");
+	}
 }
 
 /**
@@ -1520,47 +1532,17 @@ grant_or_revoke(struct priv_def *priv)
 	struct user *grantee = user_by_id(priv->grantee_id);
 	if (grantee == NULL)
 		return;
-	struct access *access = NULL;
-	switch (priv->object_type) {
-	case SC_UNIVERSE:
-	{
-		access = universe.access;
-		/** Update cache at least in the current session. */
-		struct credentials *cr = current_user();
-		if (grantee->uid == cr->uid)
-			cr->universal_access = priv->access;
-		break;
-	}
-	case SC_SPACE:
-	{
-		struct space *space = space_by_id(priv->object_id);
-		if (space)
-			access = space->access;
-		break;
-	}
-	case SC_FUNCTION:
-	{
-		struct func_def *func = func_by_id(priv->object_id);
-		if (func)
-			access = func->access;
-		break;
-	}
-	case SC_ROLE:
-	{
+	if (priv->object_type == SC_ROLE) {
 		struct user *role = user_by_id(priv->object_id);
 		if (role == NULL || role->type != SC_ROLE)
-			break;
+			return;
 		if (priv->access)
 			role_grant(grantee, role);
 		else
 			role_revoke(grantee, role);
-		break;
+	} else {
+		priv_grant(grantee, priv);
 	}
-	default:
-		break;
-	}
-	if (access)
-		privilege_grant(grantee, access, priv->access);
 }
 
 /** A trigger called on rollback of grant, or on commit of revoke. */
