@@ -3702,7 +3702,7 @@ Select OK, 1 rows affected
     as well as a checksum function
     (<link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check">CRC32</link>).
     The functions in <code>box.digest</code> are:<programlisting><code>    box.digest.crc32(<replaceable>string</replaceable>)                  Returns 32-bit checksum made with CRC32.
-    box.digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with crc32.
+    box.digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)    Returns update of a checksum calculated with CRC32.
     box.digest.sha0(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-0. Not recommended.
     box.digest.sha0_hex(<replaceable>string</replaceable>)               Returns hexadecimal of a digest calculated with sha0.
     box.digest.sha1(<replaceable>string</replaceable>)                   Returns 160-bit digest made with SHA-1.
@@ -3720,6 +3720,16 @@ Select OK, 1 rows affected
     box.digest.md5(<replaceable>string</replaceable>)                    Returns 256-bit digest made with MD5.
     box.digest.md5_hex(<replaceable>string</replaceable>)                Returns hexadecimal of a digest calculated with md5.</code></programlisting>
    </para>
+   <note><simpara>
+   <code>box.digest.crc32(<replaceable>string</replaceable>)</code> uses the
+   <link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use">
+   CRC-32C (Castagnoli)</link> polynomial value: hexadecimal 11EDC6F41 / decimal 4812730177.
+   If it is necessary to be compatible with other checksum functions in other programming languages,
+   ensure that the other functions use the same polynomial value.
+   For example, in Python, install the crcmod package and say:
+   <code>import crcmod ... fun = crcmod.mkCrcFun('4812730177') ... fun('string')</code>.
+   </simpara></note>
+
 <bridgehead renderas="sect4">Example</bridgehead>
     <para>
     In the following example, the user creates two functions, password_insert() 
