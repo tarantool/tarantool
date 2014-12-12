@@ -339,7 +339,7 @@ administration with the built-in packages.
      </thead>
     <tbody>
     <row><entry><code>digest.crc32(<replaceable>string</replaceable>)</code></entry><entry>                  Returns 32-bit checksum made with CRC32.</entry></row>
-    <row><entry><code>digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)</code></entry><entry>    Returns update of a checksum calculated with crc32.</entry></row>
+    <row><entry><code>digest.crc32_update(<replaceable>number</replaceable>,<replaceable>string</replaceable>)</code></entry><entry>    Returns update of a checksum calculated with CRC32.</entry></row>
     <row><entry><code>digest.sha(<replaceable>string</replaceable>)</code></entry><entry>                    Returns 160-bit digest made with SHA-0. Not recommended.</entry></row>
     <row><entry><code>digest.sha_hex(<replaceable>string</replaceable>)</code></entry><entry>                Returns hexadecimal of a digest calculated with sha.</entry></row>
     <row><entry><code>digest.sha1(<replaceable>string</replaceable>)</code></entry><entry>                   Returns 160-bit digest made with SHA-1.</entry></row>
@@ -361,6 +361,15 @@ administration with the built-in packages.
     </tbody>
     </tgroup>                                   
     </informaltable>
+   <note><simpara>
+   <code>box.digest.crc32(<replaceable>string</replaceable>)</code> uses the
+   <link xlink:href="https://en.wikipedia.org/wiki/Cyclic_redundancy_check#Standards_and_common_use">
+   CRC-32C (Castagnoli)</link> polynomial value: hexadecimal 11EDC6F41 / decimal 4812730177.
+   If it is necessary to be compatible with other checksum functions in other programming languages,
+   ensure that the other functions use the same polynomial value.
+   For example, in Python, install the crcmod package and say:
+   <code>import crcmod ... fun = crcmod.mkCrcFun('4812730177') ... fun('string')</code>.
+   </simpara></note>
 
    </para>
 <bridgehead renderas="sect4">Example</bridgehead>
