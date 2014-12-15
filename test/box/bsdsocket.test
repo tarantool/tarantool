@@ -360,6 +360,28 @@ exec admin "lua client:read(123)"
 exec admin "lua client:close()"
 exec admin "lua server:close()"
 
+## gh-658: socket:read() incorrectly handles size and delimiter together
+exec admin 'lua body = "a 10\\nb 15\\nx"'
+exec admin 'lua remaining = #body'
+exec admin 'lua server = box.socket.tcp_server("unix/", "%s", function(s) s:write(body) s:read() end)'.format(path)
+exec admin 'lua client = box.socket.tcp_connect("unix/", "%s")'.format(path)
+exec admin 'lua buf = client:read({ size = remaining, delimiter = "[\\r\\n]+"})'
+exec admin 'lua buf == "a 10\\n"'
+exec admin 'lua remaining = remaining - #buf'
+exec admin 'lua buf = client:read({ size = remaining, delimiter = "[\\r\\n]+"})'
+exec admin 'lua buf == "b 15\\n"'
+exec admin 'lua remaining = remaining - #buf'
+exec admin 'lua buf = client:read({ size = remaining, delimiter = "[\\r\\n]+"})'
+exec admin 'lua buf == "x"'
+exec admin 'lua remaining = remaining - #buf'
+exec admin 'lua remaining == 0'
+exec admin 'lua buf = client:read({ size = remaining, delimiter = "[\\r\\n]+"})'
+exec admin 'lua buf == ""'
+exec admin 'lua buf = client:read({ size = remaining, delimiter = "[\\r\\n]+"})'
+exec admin 'lua buf == ""'
+exec admin 'lua client:close()'
+exec admin 'lua server:close()'
+
 # Test that socket is closed on GC
 exec admin "lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')"
 exec admin "lua s:bind('unix/', '{}')".format(path)

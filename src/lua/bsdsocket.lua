@@ -565,28 +565,26 @@ end
 
 local function readline_check(self, eols, limit)
     local rbuf = self.rbuf
-    if rbuf == nil then
-        return nil
-    end
     if string.len(rbuf) == 0 then
         return nil
     end
 
     local shortest
-    for i, eol in pairs(eols) do
-        if string.len(rbuf) >= string.len(eol) then
-            local data = string.match(rbuf, "^(.-" .. eol .. ")")
-            if data ~= nil then
-                if string.len(data) > limit then
-                    data = string.sub(data, 1, limit)
-                end
-                if shortest == nil then
-                    shortest = data
-                elseif #shortest > #data then
-                    shortest = data
-                end
+    for i, eol in ipairs(eols) do
+        local data = string.match(rbuf, "^(.-" .. eol .. ")")
+        if data ~= nil then
+            if string.len(data) > limit then
+                data = string.sub(data, 1, limit)
+            end
+            if shortest == nil then
+                shortest = data
+            elseif #shortest > #data then
+                shortest = data
             end
         end
+    end
+    if shortest == nil and #rbuf >= limit then
+        return string.sub(rbuf, limit)
     end
     return shortest
 end
@@ -597,6 +595,9 @@ local function readline(self, limit, eol, timeout)
     end
 
     self._errno = nil
+    if limit == 0 then
+        return ''
+    end
     local data = readline_check(self, eol, limit)
     if data ~= nil then
         self.rbuf = string.sub(self.rbuf, string.len(data) + 1)
