@@ -462,6 +462,32 @@ client = socket.tcp_connect('unix/', path)
 client:read{ line = { "\n\n", "\r\n\r\n" } }
 server:close()
 
+-- gh-658: socket:read() incorrectly handles size and delimiter together
+body = "a 10\nb 15\nx"
+remaining = #body
+--# setopt delimiter ';'
+server = socket.tcp_server('unix/', path, function(s)
+    s:write(body)
+    s:read()
+end);
+--# setopt delimiter ''
+client = socket.tcp_connect('unix/', path)
+buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf == "a 10\n"
+remaining = remaining - #buf
+buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf == "b 15\n"
+remaining = remaining - #buf
+buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf == "x"
+remaining = remaining - #buf
+remaining == 0
+buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf == ""
+buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+buf == ""
+client:close()
+server:close()
 
 -- Test that socket is closed on GC
 s = socket('AF_UNIX', 'SOCK_STREAM', 'ip')
