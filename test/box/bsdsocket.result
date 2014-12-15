@@ -1120,13 +1120,13 @@ lua server:close()
 ---
  - true
 ...
-lua body = "a 10\nb 15\nx"
+lua body = "a 10\nb 15\nabc"
 ---
 ...
 lua remaining = #body
 ---
 ...
-lua server = box.socket.tcp_server("unix/", "%s", function(s) s:write(body) s:read() end)
+lua server = box.socket.tcp_server("unix/", "%s", function(s) s:write(body) s:read(100500) end)
 ---
 ...
 lua client = box.socket.tcp_connect("unix/", "%s")
@@ -1155,7 +1155,7 @@ lua remaining = remaining - #buf
 lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
 ---
 ...
-lua buf == "x"
+lua buf == "abc"
 ---
  - true
 ...
