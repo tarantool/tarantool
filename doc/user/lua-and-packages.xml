@@ -23,7 +23,7 @@
 
 
 <xi:include href="stored-procedures.xml" />
-<xi:include href="triggers.xml" />
+
 
 </chapter>
 

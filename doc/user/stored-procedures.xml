@@ -2514,11 +2514,11 @@ end
     administrative host/port.
     </para> 
 
- 
+
 <variablelist>
  
     <varlistentry>
-     <term><emphasis role="lua">console.connect(<replaceable>URI</replaceable>[, <replaceable>options</replaceable>])</emphasis></term>
+     <term xml:id="console-connect" xreflabel="console-connect"><emphasis role="lua">console.connect(<replaceable>URI</replaceable>[, <replaceable>options</replaceable>])</emphasis></term>
         <listitem>
             <para>
              Connect to the server at <link linkend="URI">URI</link>, change the prompt from

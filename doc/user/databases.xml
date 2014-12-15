@@ -1051,39 +1051,6 @@ tarantool> <userinput>box.space.tester:auto_increment{'Fld#3'}</userinput>
         </listitem>
     </varlistentry>
 
-    <varlistentry>
-        <term xml:id="on_replace">
-         <emphasis role="lua">box.space.<replaceable>space-name</replaceable>:on_replace(<replaceable>function-name</replaceable>)</emphasis>
-        </term>
-        <listitem>
-            <para>
-              Create a "replace trigger". The <code>function-name</code> will be executed whenever a replace() or insert() happens to <code>space-name</code>.
-            </para>
-            <para>
-              Returns: nil.
-            </para>
-            <para>
-             Notes: A replace trigger can be temporarily disabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(false)</code>
-             and re-enabled with <code>box.space.<replaceable>space-name</replaceable>:run_triggers(true)</code>.
-            </para>
-            <para>
-            <bridgehead renderas="sect4">Example</bridgehead>
-              The following series of requests will create a space, create an index,
-              create a function which increments a counter, create a trigger,
-              do two inserts, drop the space, and display the counter value -- which is 2,
-              because the function is executed once after each insert.
-<programlisting>s = box.schema.space.create('space53')
-s:create_index('primary', {parts = {1, 'NUM'}})
-function replace_trigger() replace_counter = replace_counter + 1 end
-s:on_replace(replace_trigger)
-replace_counter = 0
-t = s:insert{1, 'First replace'}
-t = s:insert{2, 'Second replace'}
-s:drop()
-replace_counter</programlisting>
-            </para>
-        </listitem>
-    </varlistentry>
     
     <varlistentry>
         <term>
