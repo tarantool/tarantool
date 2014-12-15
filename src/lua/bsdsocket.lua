@@ -579,7 +579,7 @@ local function readline_check(self, eols, limit)
         end
     end
     if shortest == nil and #rbuf >= limit then
-        return string.sub(rbuf, limit)
+        return string.sub(rbuf, 1, limit)
     end
     return shortest
 end

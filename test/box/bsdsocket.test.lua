@@ -463,12 +463,12 @@ client:read{ line = { "\n\n", "\r\n\r\n" } }
 server:close()
 
 -- gh-658: socket:read() incorrectly handles size and delimiter together
-body = "a 10\nb 15\nx"
+body = "a 10\nb 15\nabc"
 remaining = #body
 --# setopt delimiter ';'
 server = socket.tcp_server('unix/', path, function(s)
     s:write(body)
-    s:read()
+    s:read(100500)
 end);
 --# setopt delimiter ''
 client = socket.tcp_connect('unix/', path)
@@ -479,7 +479,7 @@ buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
 buf == "b 15\n"
 remaining = remaining - #buf
 buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
-buf == "x"
+buf == "abc"
 remaining = remaining - #buf
 remaining == 0
 buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
