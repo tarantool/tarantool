@@ -1120,6 +1120,74 @@ lua server:close()
 ---
  - true
 ...
+lua body = "a 10\nb 15\nabc"
+---
+...
+lua remaining = #body
+---
+...
+lua server = box.socket.tcp_server("unix/", "%s", function(s) s:write(body) s:read(100500) end)
+---
+...
+lua client = box.socket.tcp_connect("unix/", "%s")
+---
+...
+lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+---
+...
+lua buf == "a 10\n"
+---
+ - true
+...
+lua remaining = remaining - #buf
+---
+...
+lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+---
+...
+lua buf == "b 15\n"
+---
+ - true
+...
+lua remaining = remaining - #buf
+---
+...
+lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+---
+...
+lua buf == "abc"
+---
+ - true
+...
+lua remaining = remaining - #buf
+---
+...
+lua remaining == 0
+---
+ - true
+...
+lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+---
+...
+lua buf == ""
+---
+ - true
+...
+lua buf = client:read({ size = remaining, delimiter = "[\r\n]+"})
+---
+...
+lua buf == ""
+---
+ - true
+...
+lua client:close()
+---
+ - true
+...
+lua server:close()
+---
+ - true
+...
 lua s = box.socket('AF_UNIX', 'SOCK_STREAM', 'ip')
 ---
 ...

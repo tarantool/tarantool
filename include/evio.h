@@ -143,10 +143,7 @@ evio_timeout_update(ev_tstamp start, ev_tstamp *delay)
 }
 
 void
-evio_setsockopt_tcp(int fd);
-
-void
-evio_setsockopt_tcpserver(int fd);
+evio_setsockopt_client(int fd, int type);
 
 void
 evio_bind_addrinfo(struct ev_io *coio, struct addrinfo *ai);
