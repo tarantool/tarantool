@@ -76,4 +76,132 @@ box.schema.user.drop('grantee')
 box.schema.user.drop('liaison')
 
 
--- cleanup
+--
+-- Test how privileges are propagated through a complex role graph.
+-- Here's the graph:
+--
+-- role1 ->- role2 -->- role4 -->- role6 ->- user1
+--                \               /     \
+--                 \->- role5 ->-/       \->- role9 ->- role10 ->- user
+--                     /     \               /
+--           role3 ->-/       \->- role7 ->-/
+--
+-- Privilege checks verify that grants/revokes are propagated correctly
+-- from the role1 to role10.
+--
+box.schema.user.create("user")
+box.schema.role.create("role1")
+box.schema.role.create("role2")
+box.schema.role.create("role3")
+box.schema.role.create("role4")
+box.schema.role.create("role5")
+box.schema.role.create("role6")
+box.schema.role.create("role7")
+box.schema.user.create("user1")
+box.schema.role.create("role9")
+box.schema.role.create("role10")
+
+box.schema.role.grant("role2", "role1")
+box.schema.role.grant("role4", "role2")
+box.schema.role.grant("role5", "role2")
+box.schema.role.grant("role5", "role3")
+box.schema.role.grant("role6", "role4")
+box.schema.role.grant("role6", "role5")
+box.schema.role.grant("role7", "role5")
+box.schema.role.grant("user1", "role6")
+box.schema.role.grant("role9", "role6")
+box.schema.role.grant("role9", "role7")
+box.schema.role.grant("role10", "role9")
+box.schema.user.grant("user", "role10")
+
+-- try to create a cycle
+box.schema.role.grant("role2", "role10")
+
+--
+-- test grant propagation
+-- 
+box.schema.role.grant("role1", "read", "universe")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.session.su("admin")
+box.schema.role.revoke("role1", "read", "universe")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.session.su("admin")
+
+--
+-- space-level privileges
+--
+box.schema.role.grant("role1", "read", "space", "_index")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.space._index:get{288, 0}[3]
+box.session.su("admin")
+box.schema.role.revoke("role1", "read", "space", "_index")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.space._index:get{288, 0}[3]
+box.session.su("admin")
+
+--
+-- grant to a non-leaf branch
+--
+box.schema.role.grant("role5", "read", "space", "_index")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.space._index:get{288, 0}[3]
+box.session.su("admin")
+box.schema.role.revoke("role5", "read", "space", "_index")
+box.session.su("user")
+box.space._space.index.name:get{"_space"}[3]
+box.space._index:get{288, 0}[3]
+box.session.su("admin")
+
+-- grant via two branches
+--
+box.schema.role.grant("role3", "read", "space", "_index")
+box.schema.role.grant("role4", "read", "space", "_index")
+box.schema.role.grant("role9", "read", "space", "_index")
+
+box.session.su("user")
+box.space._index:get{288, 0}[3]
+box.session.su("user1")
+box.space._index:get{288, 0}[3]
+
+box.session.su("admin")
+box.schema.role.revoke("role3", "read", "space", "_index")
+
+box.session.su("user")
+box.space._index:get{288, 0}[3]
+box.session.su("user1")
+box.space._index:get{288, 0}[3]
+
+box.session.su("admin")
+box.schema.role.revoke("role4", "read", "space", "_index")
+
+box.session.su("user")
+box.space._index:get{288, 0}[3]
+box.session.su("user1")
+box.space._index:get{288, 0}[3]
+
+box.session.su("admin")
+box.schema.role.revoke("role9", "read", "space", "_index")
+
+box.session.su("user")
+box.space._index:get{288, 0}[3]
+box.session.su("user1")
+box.space._index:get{288, 0}[3]
+box.session.su("admin")
+
+box.schema.user.drop("user")
+box.schema.user.drop("user1")
+box.schema.role.drop("role1")
+box.schema.role.drop("role2")
+box.schema.role.drop("role3")
+box.schema.role.drop("role4")
+box.schema.role.drop("role5")
+box.schema.role.drop("role6")
+box.schema.role.drop("role7")
+box.schema.role.drop("role9")
+box.schema.role.drop("role10")
+
