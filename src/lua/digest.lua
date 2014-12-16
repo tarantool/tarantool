@@ -35,6 +35,7 @@ ffi.cdef[[
 local ssl
 if ssl == nil then
     local variants = {
+        'libssl.so.10',
         'libssl.so.1.0.0',
         'libssl.so.0.9.8',
         'libssl.so',
