@@ -40,19 +40,17 @@ local GREETING_SIZE     = 128
 
 local TIMEOUT_INFINITY  = 500 * 365 * 86400
 
-local sequence_mt = { __serialize = 'sequence'}
-local mapping_mt = { __serialize = 'mapping'}
+local sequence_mt = { __serialize = 'sequence' }
+local mapping_mt = { __serialize = 'mapping' }
 
 local CONSOLE_FAKESYNC  = 15121974
 
 local function request(header, body)
-
     -- hint msgpack to always encode header and body as a map
     header = msgpack.encode(setmetatable(header, mapping_mt))
     body = msgpack.encode(setmetatable(body, mapping_mt))
 
     local len = msgpack.encode(string.len(header) + string.len(body))
-
 
     return len .. header .. body
 end
@@ -158,8 +156,7 @@ local proto = {
     end,
 
     -- select
-    select  = function(sync, spaceno, indexno, key, opts)
-
+    select = function(sync, spaceno, indexno, key, opts)
         if opts == nil then
             opts = {}
         end
@@ -358,7 +355,7 @@ local remote_methods = {
             end
 
             if port == nil then
-                
+
                 local address = urilib.parse(tostring(host))
                 if address == nil or address.service == nil then
                     box.error(box.error.PROC_LUA,
@@ -391,7 +388,7 @@ local remote_methods = {
             box.error(box.error.PROC_LUA,
                 "net.box: user is not defined")
         end
-            
+
 
         if self.host == nil then
             self.host = 'localhost'
@@ -451,7 +448,7 @@ local remote_methods = {
             local res = self:_request('call', true, proc_name, {...})
             return res.body[DATA]
         end
-        
+
         local eval_str = proc_name .. '('
         for i = 1, select('#', ...) do
             if i > 1 then
@@ -515,6 +512,10 @@ local remote_methods = {
                 return cn
             end
         }
+    end,
+
+    reload_schema = function(self)
+         self:_load_schema()
     end,
 
     close = function(self)
@@ -582,7 +583,7 @@ local remote_methods = {
             if result ~= nil then
                 result = result[1]
             end
-            
+
             local hdr = { [SYNC] = CONSOLE_FAKESYNC, [TYPE] = 0 }
             local body = {}
 
@@ -611,7 +612,7 @@ local remote_methods = {
         if self.console then
             return self:_check_console_response(self)
         end
-    
+
         while true do
             if #self.rbuf < 5 then
                 break
@@ -762,12 +763,12 @@ local remote_methods = {
                         if not s then
                             self:_fatal(e)
                         end
-                            
+
                         xpcall(function() self:_load_schema() end,
                             function(e)
                                 log.info("Can't load schema: %s", tostring(e))
                             end)
-                       
+
                         if self.state ~= 'error' and self.state ~= 'closed' then
                             self:_switch_state('active')
                         end
@@ -779,11 +780,11 @@ local remote_methods = {
 
     _auth = function(self)
         if self.opts.user == nil or self.opts.password == nil then
-            self:_switch_state 'authen'
+            self:_switch_state('authen')
             return
         end
 
-        self:_switch_state 'auth'
+        self:_switch_state('auth')
 
         local auth_res = self:_request_internal('auth',
             false, self.opts.user, self.opts.password, self.handshake)
@@ -793,7 +794,7 @@ local remote_methods = {
             return
         end
 
-        self:_switch_state 'authen'
+        self:_switch_state('authen')
     end,
 
     -- states wakeup _read_worker
@@ -821,13 +822,12 @@ local remote_methods = {
         return false
     end,
 
-
     _load_schema = function(self)
-        if self.state ~= 'authen' then
-            self:_fatal 'Can not load schema from the state'
+        if self.state == 'closed' or self.state == 'error' then
+            self:_fatal('Can not load schema from the state')
             return
         end
-        
+
         self:_switch_state('schema')
 
         local spaces = self:_request_internal('select',
@@ -836,7 +836,6 @@ local remote_methods = {
             true, box.schema.INDEX_ID, 0, nil, { iterator = 'ALL' }).body[DATA]
 
         local sl = {}
-
 
         for _, space in pairs(spaces) do
             local name = space[3]
@@ -851,7 +850,6 @@ local remote_methods = {
                 field_count     = field_count,
                 enabled         = true,
                 index           = {}
-
             }
             if #space > 5 and string.match(space[6], 'temporary') then
                 s.temporary = true
@@ -863,7 +861,6 @@ local remote_methods = {
 
             sl[id] = s
             sl[name] = s
-
         end
 
         for _, index in pairs(indexes) do
@@ -941,7 +938,7 @@ local remote_methods = {
         fiber.name('net.box.write')
         while self.state ~= 'closed' do
             self:_wait_state(self._rw_states)
-            
+
             if self.state == 'closed' then
                 break
             end
@@ -1017,7 +1014,7 @@ local remote_methods = {
     end,
 
     _request_raw = function(self, sync, request, raise)
-        
+
         local fid = fiber.id()
         if self.timeouts[fid] == nil then
             self.timeouts[fid] = TIMEOUT_INFINITY
@@ -1052,7 +1049,7 @@ local remote_methods = {
 
         if raise and response.hdr[TYPE] ~= OK then
             box.error({
-                code = response.hdr[TYPE],
+                code = bit.band(response.hdr[TYPE], bit.lshift(1, 15) - 1),
                 reason = response.body[ERROR]
             })
         end
@@ -1072,11 +1069,9 @@ local remote_methods = {
     end,
 
     _request_internal = function(self, name, raise, ...)
-
         local sync = self.proto:sync()
         local request = self.proto[name](sync, ...)
         return self:_request_raw(sync, request, raise)
-        
     end,
 
     -- private (low level) methods
@@ -1110,6 +1105,7 @@ setmetatable(remote, { __index = remote_methods })
 
 remote.self = {
     ping = function() return true end,
+    reload_schema = function() end,
     close = function() end,
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
@@ -1151,5 +1147,3 @@ setmetatable(remote.self, {
 })
 
 return remote
-
-

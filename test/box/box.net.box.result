@@ -648,3 +648,116 @@ end;
 gh594()
 ---
 ...
+-- #636: Reload schema on demand
+sp = box.schema.create_space('test_old')
+---
+...
+sp:create_index('primary')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 512
+  name: primary
+  type: TREE
+...
+sp:insert{1, 2, 3}
+---
+- [1, 2, 3]
+...
+con = remote.new(box.cfg.listen)
+---
+...
+con:ping()
+---
+- true
+...
+con.space.test_old:select{}
+---
+- - [1, 2, 3]
+...
+con.space.test == nil
+---
+- true
+...
+sp = box.schema.create_space('test')
+---
+...
+sp:create_index('primary')
+---
+- unique: true
+  parts:
+  - type: NUM
+    fieldno: 1
+  id: 0
+  space_id: 513
+  name: primary
+  type: TREE
+...
+sp:insert{2, 3, 4}
+---
+- [2, 3, 4]
+...
+con.space.test == nil
+---
+- true
+...
+con:reload_schema()
+---
+- error: '[string "return con:reload_schema() "]:1: attempt to call method ''reload_schema''
+    (a nil value)'
+...
+con.space.test:select{}
+---
+- error: '[string "return con.space.test:select{} "]:1: attempt to index field ''test''
+    (a nil value)'
+...
+box.space.test:drop()
+---
+...
+box.space.test_old:drop()
+---
+...
+con:close()
+---
+...
+file_log = require('fio').open('tarantool.log', {'O_RDONLY', 'O_NONBLOCK'})
+---
+...
+file_log:seek(0, 'SEEK_END') ~= 0
+---
+- true
+...
+--# setopt delimiter ';'
+require('fiber').create(
+   function()
+         conn = require('net.box').new(box.cfg.listen)
+         conn.call('no_such_function', {})
+   end
+);
+---
+- status: suspended
+  name: lua
+  id: 151
+...
+while true do
+   local line = file_log:read(2048)
+   if line ~= nil then
+      if string.match(line, "ER_UNKNOWN") == nil then
+         return "Success"
+      else
+         return "Failure"
+      end
+   end
+   require('fiber').sleep(0.1)
+end;
+---
+- Success
+...
+--# setopt delimiter ''
+file_log:close()
+---
+- true
+...

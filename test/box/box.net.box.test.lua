@@ -262,3 +262,52 @@ function gh594()
 end;
 --# setopt delimiter ''
 gh594()
+
+-- #636: Reload schema on demand
+sp = box.schema.create_space('test_old')
+sp:create_index('primary')
+sp:insert{1, 2, 3}
+
+con = remote.new(box.cfg.listen)
+con:ping()
+con.space.test_old:select{}
+con.space.test == nil
+
+sp = box.schema.create_space('test')
+sp:create_index('primary')
+sp:insert{2, 3, 4}
+
+con.space.test == nil
+con:reload_schema()
+con.space.test:select{}
+
+box.space.test:drop()
+box.space.test_old:drop()
+con:close()
+
+file_log = require('fio').open('tarantool.log', {'O_RDONLY', 'O_NONBLOCK'})
+file_log:seek(0, 'SEEK_END') ~= 0
+
+--# setopt delimiter ';'
+
+require('fiber').create(
+   function()
+         conn = require('net.box').new(box.cfg.listen)
+         conn.call('no_such_function', {})
+   end
+);
+while true do
+   local line = file_log:read(2048)
+   if line ~= nil then
+      if string.match(line, "ER_UNKNOWN") == nil then
+         return "Success"
+      else
+         return "Failure"
+      end
+   end
+   require('fiber').sleep(0.1)
+end;
+
+--# setopt delimiter ''
+
+file_log:close()
